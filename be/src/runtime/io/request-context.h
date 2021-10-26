@@ -173,6 +173,25 @@ class RequestContext {
     bytes_read_counter_ = bytes_read_counter;
   }
 
+  void set_read_use_mem_counter(RuntimeProfile::Counter* read_use_mem_counter) {
+    read_use_mem_counter_ = read_use_mem_counter;
+  }
+
+  void set_bytes_read_use_mem_counter(
+      RuntimeProfile::Counter* bytes_read_use_mem_counter) {
+    bytes_read_use_mem_counter_ = bytes_read_use_mem_counter;
+  }
+
+  void set_read_use_local_disk_counter(
+      RuntimeProfile::Counter* read_use_local_disk_counter) {
+    read_use_local_disk_counter_ = read_use_local_disk_counter;
+  }
+
+  void set_bytes_read_use_local_disk_counter(
+      RuntimeProfile::Counter* bytes_read_use_local_disk_counter) {
+    bytes_read_use_local_disk_counter_ = bytes_read_use_local_disk_counter;
+  }
+
   void set_read_timer(RuntimeProfile::Counter* read_timer) { read_timer_ = read_timer; }
 
   void set_open_file_timer(RuntimeProfile::Counter* open_file_timer) {
@@ -337,6 +356,18 @@ class RequestContext {
 
   /// Total bytes read for this reader
   RuntimeProfile::Counter* bytes_read_counter_ = nullptr;
+
+  /// Total read from mem buffer for this reader
+  RuntimeProfile::Counter* read_use_mem_counter_ = nullptr;
+
+  /// Total bytes read from mem buffer for this reader
+  RuntimeProfile::Counter* bytes_read_use_mem_counter_ = nullptr;
+
+  /// Total read from local disk buffer for this reader
+  RuntimeProfile::Counter* read_use_local_disk_counter_ = nullptr;
+
+  /// Total bytes read from local disk buffer for this reader
+  RuntimeProfile::Counter* bytes_read_use_local_disk_counter_ = nullptr;
 
   /// Total time spent in hdfs reading
   RuntimeProfile::Counter* read_timer_ = nullptr;

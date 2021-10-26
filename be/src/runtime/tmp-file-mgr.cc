@@ -50,6 +50,7 @@
 #include "util/hdfs-util.h"
 #include "util/histogram-metric.h"
 #include "util/kudu-status-util.h"
+#include "util/mem-info.h"
 #include "util/os-util.h"
 #include "util/parse-util.h"
 #include "util/pretty-printer.h"
@@ -103,6 +104,9 @@ DEFINE_string(remote_tmp_file_size, "16M",
 DEFINE_string(remote_tmp_file_block_size, "1M",
     "Specify the size of the block for doing file uploading and fetching. The block "
     "size should be power of 2 and less than the size of remote temporary file.");
+DEFINE_string(remote_read_memory_buffer_size, "1G",
+    "Specify the maximum size of read memory buffers for the remote temporary "
+    "files. Only valid when --remote_batch_read is true.");
 DEFINE_bool(remote_tmp_files_avail_pool_lifo, false,
     "If true, lifo is the algo to evict the local buffer files during spilling "
     "to the remote. Otherwise, fifo would be used.");
@@ -110,6 +114,10 @@ DEFINE_int32(wait_for_spill_buffer_timeout_s, 60,
     "Specify the timeout duration waiting for the buffer to write (second). If a spilling"
     "opertion fails to get a buffer from the pool within the duration, the operation"
     "fails.");
+DEFINE_bool(remote_batch_read, false,
+    "Set if the system uses batch reading for the remote temporary files. Batch reading"
+    "allows reading a block asynchronously when the buffer pool is trying to pin one"
+    "page of that block.");
 
 using boost::algorithm::is_any_of;
 using boost::algorithm::join;
@@ -131,7 +139,21 @@ constexpr int64_t TmpFileMgr::HOLE_PUNCH_BLOCK_SIZE_BYTES;
 
 const string TMP_SUB_DIR_NAME = "impala-scratch";
 const uint64_t AVAILABLE_SPACE_THRESHOLD_MB = 1024;
-const uint64_t MAX_REMOTE_TMPFILE_SIZE_THRESHOLD_MB = 256;
+const uint64_t MAX_REMOTE_TMPFILE_SIZE_THRESHOLD_MB = 512;
+
+// For spilling to remote fs, the max size of a read memory block.
+const uint64_t MAX_REMOTE_READ_MEM_BLOCK_THRESHOLD_BYTES = 16 * 1024 * 1024;
+
+// The memory limits for the memory buffer to read the spilled data in the remote fs.
+// The maximum bytes of the read buffer should be limited by the
+// REMOTE_READ_BUFFER_MAX_MEM_PERCENT, which stands for the percentage of the total
+// memory and REMOTE_READ_BUFFER_MEM_HARD_LIMIT_PERCENT, which stands for the percentage
+// of the remaining memory which is not used by the process.
+// Also, if the remaining memory is less than REMOTE_READ_BUFFER_DISABLE_THRESHOLD_PERCENT
+// of the total memory, then the read buffer for remote spilled data should be disabled.
+const double REMOTE_READ_BUFFER_MAX_MEM_PERCENT = 0.1;
+const double REMOTE_READ_BUFFER_MEM_HARD_LIMIT_PERCENT = 0.5;
+const double REMOTE_READ_BUFFER_DISABLE_THRESHOLD_PERCENT = 0.05;
 
 // Metric keys
 const string TMP_FILE_MGR_ACTIVE_SCRATCH_DIRS = "tmp-file-mgr.active-scratch-dirs";
@@ -141,6 +163,10 @@ const string TMP_FILE_MGR_SCRATCH_SPACE_BYTES_USED_HIGH_WATER_MARK =
     "tmp-file-mgr.scratch-space-bytes-used-high-water-mark";
 const string TMP_FILE_MGR_SCRATCH_SPACE_BYTES_USED =
     "tmp-file-mgr.scratch-space-bytes-used";
+const string TMP_FILE_MGR_SCRATCH_READ_MEMORY_BUFFER_USED_HIGH_WATER_MARK =
+    "tmp-file-mgr.scratch-read-memory-buffer-used-high-water-mark";
+const string TMP_FILE_MGR_SCRATCH_READ_MEMORY_BUFFER_USED =
+    "tmp-file-mgr.scratch-read-memory-buffer-used";
 const string SCRATCH_DIR_BYTES_USED_FORMAT =
     "tmp-file-mgr.scratch-space-bytes-used.dir-$0";
 const string LOCAL_BUFF_BYTES_USED_FORMAT = "tmp-file-mgr.local-buff-bytes-used.dir-$0";
@@ -235,6 +261,18 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
     return Status(Substitute("Invalid value of wait_for_spill_buffer_timeout_us '$0'",
         FLAGS_wait_for_spill_buffer_timeout_s));
   }
+
+  tmp_dirs_remote_ctrl_.remote_batch_read_enabled_ = FLAGS_remote_batch_read;
+  if (tmp_dirs_remote_ctrl_.remote_batch_read_enabled_) {
+    Status setup_read_buffer_status = tmp_dirs_remote_ctrl_.SetUpReadBufferParams();
+    if (!setup_read_buffer_status.ok()) {
+      LOG(WARNING) << "Disabled the read buffer for the remote temporary files "
+                      "due to errors in read buffer parameters: "
+                   << setup_read_buffer_status.msg().msg();
+      tmp_dirs_remote_ctrl_.remote_batch_read_enabled_ = false;
+    }
+  }
+
   // Below options are using for test by setting different modes to implement the
   // spilling to the remote.
   tmp_dirs_remote_ctrl_.remote_tmp_files_avail_pool_lifo_ =
@@ -357,6 +395,10 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
       metrics->AddHWMGauge(TMP_FILE_MGR_SCRATCH_SPACE_BYTES_USED_HIGH_WATER_MARK,
           TMP_FILE_MGR_SCRATCH_SPACE_BYTES_USED, 0);
 
+  scratch_read_memory_buffer_used_metric_ =
+      metrics->AddHWMGauge(TMP_FILE_MGR_SCRATCH_READ_MEMORY_BUFFER_USED_HIGH_WATER_MARK,
+          TMP_FILE_MGR_SCRATCH_READ_MEMORY_BUFFER_USED, 0);
+
   initialized_ = true;
 
   if ((tmp_dirs_.empty() && local_buff_dir_ == nullptr) && !tmp_dirs.empty()) {
@@ -444,17 +486,28 @@ Status TmpFileMgr::DequeueTmpFilesPool(shared_ptr<TmpFile>* tmp_file, bool quick
       tmp_file, quick_return);
 }
 
+void TmpFileMgr::ReleaseTmpFileReadBuffer(
+    const unique_lock<shared_mutex>& file_lock, TmpFile* tmp_file) {
+  DCHECK(tmp_file != nullptr);
+  DCHECK(IsRemoteBatchReadingEnabled());
+  TmpFileRemote* tmp_file_remote = static_cast<TmpFileRemote*>(tmp_file);
+  for (int i = 0; i < GetNumReadBuffersPerFile(); i++) {
+    tmp_file_remote->TryDeleteReadBuffer(file_lock, i);
+  }
+}
+
 Status TmpFileMgr::TryEvictFile(TmpFile* tmp_file) {
   DCHECK(tmp_file != nullptr);
   if (tmp_file->disk_type() == io::DiskFileType::DUMMY) return Status::OK();
+
+  TmpFileRemote* tmp_file_remote = static_cast<TmpFileRemote*>(tmp_file);
+  DiskFile* buffer_file = tmp_file_remote->DiskBufferFile();
 
   // Remove the buffer of the TmpFile.
   // After deletion of the buffer, if the TmpFile doesn't exist in the remote file system
   // either, that means the TmpFile shared pointer can be removed from the TmpFileMgr,
   // because in this case, the physical file is considered no longer in the system.
-  // Fetch the unique locks of the files when doing the deletion.
-  TmpFileRemote* tmp_file_remote = static_cast<TmpFileRemote*>(tmp_file);
-  DiskFile* buffer_file = tmp_file_remote->DiskBufferFile();
+  // Hold the unique locks of the files during the deletion.
   Status status = Status::OK();
   {
     unique_lock<shared_mutex> buffer_lock(buffer_file->physical_file_lock_);
@@ -538,6 +591,58 @@ string TmpFileMgr::GetTmpDirPath(DeviceId device_id) const {
   } else {
     return tmp_dirs_remote_->path_;
   }
+}
+
+int64_t TmpFileMgr::TmpDirRemoteCtrl::CalcMaxReadBufferBytes() {
+  int64_t max_allow_bytes = 0;
+  int64_t process_bytes_limit;
+  int64_t total_avail_mem;
+  if (!ChooseProcessMemLimit(&process_bytes_limit, &total_avail_mem).ok()) {
+    // Return 0 to disable read buffer if unable to get the process and system limit.
+    return max_allow_bytes;
+  }
+  DCHECK_GE(total_avail_mem, process_bytes_limit);
+  // Only allows the read buffer if the memory not being used is larger than
+  // REMOTE_READ_BUFFER_DISABLE_THRESHOLD_PERCENT of the total memory.
+  if ((total_avail_mem - process_bytes_limit)
+      > total_avail_mem * REMOTE_READ_BUFFER_DISABLE_THRESHOLD_PERCENT) {
+    // Max allowed bytes are the minimum of REMOTE_READ_BUFFER_MAX_MEM_PERCENT of the
+    // total memory and REMOTE_READ_BUFFER_MEM_HARD_LIMIT_PERCENT of the unused memory.
+    max_allow_bytes = min((total_avail_mem - process_bytes_limit)
+            * REMOTE_READ_BUFFER_MEM_HARD_LIMIT_PERCENT,
+        total_avail_mem * REMOTE_READ_BUFFER_MAX_MEM_PERCENT);
+  }
+  return max_allow_bytes;
+}
+
+Status TmpFileMgr::TmpDirRemoteCtrl::SetUpReadBufferParams() {
+  bool is_percent;
+  // If the temporary file size is smaller than the max block size, set the block size
+  // as the file size
+  read_buffer_block_size_ =
+      remote_tmp_file_size_ < MAX_REMOTE_READ_MEM_BLOCK_THRESHOLD_BYTES ?
+      remote_tmp_file_size_ :
+      MAX_REMOTE_READ_MEM_BLOCK_THRESHOLD_BYTES;
+  num_read_buffer_blocks_per_file_ =
+      static_cast<int>(remote_tmp_file_size_ / read_buffer_block_size_);
+  max_read_buffer_size_ =
+      ParseUtil::ParseMemSpec(FLAGS_remote_read_memory_buffer_size, &is_percent, 0);
+  if (max_read_buffer_size_ <= 0) {
+    return Status(Substitute("Invalid value of remote_read_memory_buffer_size '$0'",
+        FLAGS_remote_read_memory_buffer_size));
+  }
+  // Calculate the max allowed bytes for the read buffer.
+  int64_t max_allow_bytes = CalcMaxReadBufferBytes();
+  DCHECK_GE(max_allow_bytes, 0);
+  if (max_read_buffer_size_ > max_allow_bytes) {
+    max_read_buffer_size_ = max_allow_bytes;
+    LOG(WARNING) << "The remote read memory buffer size exceeds the maximum "
+                    "allowed and is reduced to "
+                 << max_allow_bytes << " bytes.";
+  }
+  LOG(INFO) << "Using " << max_read_buffer_size_
+            << " bytes for the batch reading buffer of TmpFileMgr.";
+  return Status::OK();
 }
 
 TmpDir::TmpDir(const string& raw_path, const string& prefix, bool is_local)
@@ -872,9 +977,11 @@ TmpFileRemote::TmpFileRemote(TmpFileGroup* file_group, TmpFileMgr::DeviceId devi
   if (IsHdfsPath(hdfs_url, false)) {
     disk_type_ = io::DiskFileType::DFS;
     disk_id_ = file_group->io_mgr_->RemoteDfsDiskId();
+    disk_id_file_op_ = file_group->io_mgr_->RemoteDfsDiskFileOperId();
   } else if (IsS3APath(hdfs_url, false)) {
     disk_type_ = io::DiskFileType::S3;
     disk_id_ = file_group->io_mgr_->RemoteS3DiskId();
+    disk_id_file_op_ = file_group->io_mgr_->RemoteS3DiskFileOperId();
     options = file_group_->tmp_file_mgr_->s3a_options();
   }
   Status status = HdfsFsCache::instance()->GetConnection(
@@ -883,8 +990,23 @@ TmpFileRemote::TmpFileRemote(TmpFileGroup* file_group, TmpFileMgr::DeviceId devi
   local_buffer_path_ = local_buffer_path;
   disk_file_ = make_unique<io::DiskFile>(path_, file_group->io_mgr_,
       file_group_->tmp_file_mgr_->GetRemoteTmpFileSize(), disk_type_, &hdfs_conn_);
-  disk_buffer_file_ = make_unique<io::DiskFile>(local_buffer_path_, file_group_->io_mgr_,
-      file_group_->tmp_file_mgr_->GetRemoteTmpFileSize(), io::DiskFileType::LOCAL_BUFFER);
+  if (file_group_->tmp_file_mgr_->IsRemoteBatchReadingEnabled()) {
+    read_buffer_block_size_ = file_group_->tmp_file_mgr_->GetReadBufferBlockSize();
+    int num_of_read_buffers = file_group_->tmp_file_mgr_->GetNumReadBuffersPerFile();
+    disk_buffer_file_ = make_unique<io::DiskFile>(local_buffer_path_,
+        file_group_->io_mgr_, file_group_->tmp_file_mgr_->GetRemoteTmpFileSize(),
+        io::DiskFileType::LOCAL_BUFFER, read_buffer_block_size_, num_of_read_buffers);
+    disk_read_page_cnts_ = std::make_unique<int64_t[]>(num_of_read_buffers);
+    DCHECK(disk_read_page_cnts_.get() != nullptr);
+    memset(disk_read_page_cnts_.get(), 0, num_of_read_buffers * sizeof(int64_t));
+    for (int i = 0; i < num_of_read_buffers; i++) {
+      fetch_ranges_.emplace_back(nullptr);
+    }
+  } else {
+    disk_buffer_file_ = make_unique<io::DiskFile>(local_buffer_path_,
+        file_group_->io_mgr_, file_group_->tmp_file_mgr_->GetRemoteTmpFileSize(),
+        io::DiskFileType::LOCAL_BUFFER);
+  }
 }
 
 TmpFileRemote::~TmpFileRemote() {
@@ -910,6 +1032,133 @@ io::DiskFile* TmpFileRemote::GetWriteFile() {
   return disk_buffer_file_.get();
 }
 
+int TmpFileRemote::GetReadBufferIndex(int64_t offset) {
+  DCHECK(disk_buffer_file_ != nullptr);
+  return disk_buffer_file_->GetReadBufferIndex(offset);
+}
+
+void TmpFileRemote::AsyncFetchReadBufferBlock(io::DiskFile* read_buffer_file,
+    io::MemBlock* read_buffer_block, int read_buffer_idx, bool* fetched) {
+  DCHECK(fetched != nullptr);
+  *fetched = false;
+  {
+    shared_lock<shared_mutex> read_file_lock(*(read_buffer_file->GetFileLock()));
+    unique_lock<SpinLock> mem_bloc_lock(*(read_buffer_block->GetLock()));
+    // Check the block status.
+    // If the block is disabled, the caller won't be able to use this buffer block.
+    // If the block is written, the block is already fetched, set the fetched flag and
+    // return immediately.
+    // If the block is uninitialized, we will fetch the block immediately but without
+    // waiting for the fetch, so that it won't block the current page reading.
+    // If the block is in reserved or alloc status, means one other thread is handling
+    // the block, here we don't wait because the blocking could be expensive.
+    if (read_buffer_file->IsReadBufferBlockStatus(read_buffer_block,
+            io::MemBlockStatus::DISABLED, read_file_lock, &mem_bloc_lock)) {
+      return;
+    } else if (read_buffer_file->IsReadBufferBlockStatus(read_buffer_block,
+                   io::MemBlockStatus::WRITTEN, read_file_lock, &mem_bloc_lock)) {
+      *fetched = true;
+      return;
+    } else if (read_buffer_file->IsReadBufferBlockStatus(read_buffer_block,
+                   io::MemBlockStatus::UNINIT, read_file_lock, &mem_bloc_lock)) {
+      bool dofetch = true;
+      int64_t mem_size_limit =
+          file_group_->tmp_file_mgr()->GetRemoteMaxTotalReadBufferSize();
+      auto read_mem_counter =
+          file_group_->tmp_file_mgr()->scratch_read_memory_buffer_used_metric_;
+      if (read_mem_counter->Increment(read_buffer_file->read_buffer_block_size())
+          > mem_size_limit) {
+        read_mem_counter->Increment(-1 * read_buffer_file->read_buffer_block_size());
+        dofetch = false;
+      }
+      if (dofetch) {
+        read_buffer_file->SetReadBufferBlockStatus(read_buffer_block,
+            io::MemBlockStatus::RESERVED, read_file_lock, &mem_bloc_lock);
+        RemoteOperRange::RemoteOperDoneCallback fetch_callback =
+            [read_buffer_block, tmp_file = this](const Status& fetch_status) {
+              if (!fetch_status.ok()) {
+                // Disable the read buffer if fails to fetch.
+                tmp_file->TryDeleteReadBufferExcl(read_buffer_block->block_id());
+              }
+            };
+        fetch_ranges_[read_buffer_idx].reset(new RemoteOperRange(disk_file_.get(),
+            read_buffer_file, file_group_->tmp_file_mgr()->GetRemoteTmpBlockSize(),
+            disk_id(true), RequestType::FILE_FETCH, file_group_->io_mgr_, fetch_callback,
+            GetReadBuffStartOffset(read_buffer_idx)));
+        Status add_status = file_group_->io_ctx_->AddRemoteOperRange(
+            fetch_ranges_[read_buffer_idx].get());
+        if (!add_status.ok()) {
+          read_buffer_file->SetReadBufferBlockStatus(read_buffer_block,
+              io::MemBlockStatus::DISABLED, read_file_lock, &mem_bloc_lock);
+        }
+      } else {
+        read_buffer_file->SetReadBufferBlockStatus(read_buffer_block,
+            io::MemBlockStatus::DISABLED, read_file_lock, &mem_bloc_lock);
+      }
+    }
+  }
+  *fetched = true;
+  return;
+}
+
+io::DiskFile* TmpFileRemote::GetReadBufferFile(int64_t offset) {
+  // If the local buffer file exists, return the file directly.
+  // If it is deleted (probably due to eviction), and batch reading is enabled, would
+  // try to fetch the current block asynchronously if it is not present in the memory
+  // buffer.
+  // If the local buffer file is deleted and the read memory buffer doesn't have the
+  // block right now, then return a nullptr to indicate there is no buffer available.
+  io::DiskFile* read_buffer_file = disk_buffer_file_.get();
+  if (disk_buffer_file_->GetFileStatus() != io::DiskFileStatus::DELETED) {
+    return read_buffer_file;
+  }
+  if (!file_group_->tmp_file_mgr()->IsRemoteBatchReadingEnabled()) return nullptr;
+  int read_buffer_idx = GetReadBufferIndex(offset);
+  io::MemBlock* read_buffer_block = disk_buffer_file_->GetBufferBlock(read_buffer_idx);
+  bool fetched = false;
+  io::MemBlockStatus block_status = read_buffer_block->GetStatus();
+  if (block_status == io::MemBlockStatus::DISABLED) {
+    // do nothing
+  } else if (block_status == io::MemBlockStatus::WRITTEN) {
+    fetched = true;
+  } else {
+    AsyncFetchReadBufferBlock(
+        read_buffer_file, read_buffer_block, read_buffer_idx, &fetched);
+  }
+  return fetched ? read_buffer_file : nullptr;
+}
+
+bool TmpFileRemote::IncrementReadPageCount(int buffer_idx) {
+  int64_t read_count = 0;
+  int64_t total_num = 0;
+  DCheckReadBufferIdx(buffer_idx);
+  total_num = GetReadBuffPageCount(buffer_idx);
+  {
+    lock_guard<SpinLock> lock(lock_);
+    read_count = ++disk_read_page_cnts_[buffer_idx];
+  }
+  // Return true if all the pages have been read of the block.
+  return read_count == total_num;
+}
+
+template <typename T>
+void TmpFileRemote::TryDeleteReadBuffer(const T& lock, int buffer_idx) {
+  DCheckReadBufferIdx(buffer_idx);
+  bool reserved = false;
+  bool allocated = false;
+  DCHECK(disk_buffer_file_->IsBatchReadEnabled());
+  DCHECK(lock.mutex() == disk_buffer_file_->GetFileLock() && lock.owns_lock());
+  disk_buffer_file_->DeleteReadBuffer(
+      disk_buffer_file_->GetBufferBlock(buffer_idx), &reserved, &allocated, lock);
+  if (reserved || allocated) {
+    // Because the reservation will increase the current allocated read buffer usage
+    // ahead of the real allocation, we need to decrease it if the block is reserved
+    // or allocated.
+    file_group_->tmp_file_mgr_->scratch_read_memory_buffer_used_metric_->Increment(
+        -1 * read_buffer_block_size_);
+  }
+}
+
 TmpDir* TmpFileRemote::GetLocalBufferDir() const {
   return file_group_->tmp_file_mgr_->GetLocalBufferDir();
 }
@@ -919,33 +1168,44 @@ Status TmpFileRemote::Remove() {
   // If True, we need to enqueue the file back to the pool after deletion.
   bool to_return_the_buffer = false;
 
-  // The order of acquiring the lock must be from local to remote to avoid deadlocks.
-  unique_lock<shared_mutex> buffer_file_lock(*(disk_buffer_file_->GetFileLock()));
-  unique_lock<shared_mutex> file_lock(*(disk_file_->GetFileLock()));
+  // Set a flag to notify other threads which are holding the file lock to release,
+  // since the remove process needs a unique lock, it accelerates acquiring the mutex.
+  SetToDeleteFlag();
 
-  // Delete the local buffer file if exists.
-  if (disk_buffer_file_->GetFileStatus() != io::DiskFileStatus::DELETED) {
-    status = disk_buffer_file_->Delete(buffer_file_lock);
-    if (!status.ok()) {
-      // If the physical file is failed to delete, log a warning, and set a deleted flag
-      // anyway.
-      LOG(WARNING) << "Delete file: " << disk_buffer_file_->path() << " failed.";
-      disk_buffer_file_->SetStatus(io::DiskFileStatus::DELETED);
-    } else if (disk_file_->GetFileStatus() != io::DiskFileStatus::PERSISTED
-        && disk_buffer_file_->IsSpaceReserved()) {
-      // If the file is not uploaded and the buffer space is reserved, we need to return
-      // the buffer to the pool after deletion of the TmpFile. The buffer of a uploaded
-      // file should have been returned to the pool after upload operation completes.
-      to_return_the_buffer = true;
-    } else {
-      // Do nothing.
+  {
+    // The order of acquiring the lock must be from local to remote to avoid deadlocks.
+    unique_lock<shared_mutex> buffer_file_lock(*(disk_buffer_file_->GetFileLock()));
+    unique_lock<shared_mutex> file_lock(*(disk_file_->GetFileLock()));
+
+    // Delete the local buffer file if exists.
+    if (disk_buffer_file_->GetFileStatus() != io::DiskFileStatus::DELETED) {
+      status = disk_buffer_file_->Delete(buffer_file_lock);
+      if (!status.ok()) {
+        // If the physical file is failed to delete, log a warning, and set a deleted flag
+        // anyway.
+        LOG(WARNING) << "Delete file: " << disk_buffer_file_->path() << " failed.";
+        disk_buffer_file_->SetStatus(io::DiskFileStatus::DELETED);
+      } else if (disk_file_->GetFileStatus() != io::DiskFileStatus::PERSISTED
+          && disk_buffer_file_->IsSpaceReserved()) {
+        // If the file is not uploaded and the buffer space is reserved, we need to return
+        // the buffer to the pool after deletion of the TmpFile. The buffer of a uploaded
+        // file should have been returned to the pool after upload operation completes.
+        to_return_the_buffer = true;
+      } else {
+        // Do nothing.
+      }
+    }
+
+    // Set the remote file status to deleted. The physical remote files would be deleted
+    // during deconstruction of TmpFileGroup by deleting the entire remote
+    // directory for efficiency consideration.
+    disk_file_->SetStatus(io::DiskFileStatus::DELETED);
+
+    // Try to delete all the read buffers.
+    if (file_group_->tmp_file_mgr_->IsRemoteBatchReadingEnabled()) {
+      file_group_->tmp_file_mgr_->ReleaseTmpFileReadBuffer(buffer_file_lock, this);
     }
   }
-
-  // Set the remote file status to deleted. The physical remote files would be deleted
-  // during deconstruction of TmpFileGroup by deleting the entire remote
-  // directory for efficiency consideration.
-  disk_file_->SetStatus(io::DiskFileStatus::DELETED);
 
   // Update the metrics.
   GetDir()->bytes_used_metric()->Increment(-file_size_);
@@ -972,6 +1232,13 @@ TmpFileGroup::TmpFileGroup(TmpFileMgr* tmp_file_mgr, DiskIoMgr* io_mgr,
         ADD_COUNTER(profile, "UncompressedScratchBytesWritten", TUnit::BYTES)),
     read_counter_(ADD_COUNTER(profile, "ScratchReads", TUnit::UNIT)),
     bytes_read_counter_(ADD_COUNTER(profile, "ScratchBytesRead", TUnit::BYTES)),
+    read_use_mem_counter_(ADD_COUNTER(profile, "ScratchReadsUseMem", TUnit::UNIT)),
+    bytes_read_use_mem_counter_(
+        ADD_COUNTER(profile, "ScratchBytesReadUseMem", TUnit::BYTES)),
+    read_use_local_disk_counter_(
+        ADD_COUNTER(profile, "ScratchReadsUseLocalDisk", TUnit::UNIT)),
+    bytes_read_use_local_disk_counter_(
+        ADD_COUNTER(profile, "ScratchBytesReadUseLocalDisk", TUnit::BYTES)),
     scratch_space_bytes_used_counter_(
         ADD_COUNTER(profile, "ScratchFileUsedBytes", TUnit::BYTES)),
     disk_read_timer_(ADD_TIMER(profile, "TotalReadBlockTime")),
@@ -987,6 +1254,10 @@ TmpFileGroup::TmpFileGroup(TmpFileMgr* tmp_file_mgr, DiskIoMgr* io_mgr,
     free_ranges_(64) {
   DCHECK(tmp_file_mgr != nullptr);
   io_ctx_ = io_mgr_->RegisterContext();
+  io_ctx_->set_read_use_mem_counter(read_use_mem_counter_);
+  io_ctx_->set_bytes_read_use_mem_counter(bytes_read_use_mem_counter_);
+  io_ctx_->set_read_use_local_disk_counter(read_use_local_disk_counter_);
+  io_ctx_->set_bytes_read_use_local_disk_counter(bytes_read_use_local_disk_counter_);
   // Populate the priority based index ranges.
   const std::vector<std::unique_ptr<TmpDir>>& tmp_dirs = tmp_file_mgr_->tmp_dirs_;
   if (tmp_dirs.size() > 0) {
@@ -1352,29 +1623,29 @@ Status TmpFileGroup::ReadAsync(TmpWriteHandle* handle, MemRange buffer) {
   // Don't grab handle->write_state_lock_, it is safe to touch all of handle's state
   // since the write is not in flight.
   handle->read_range_ = scan_range_pool_.Add(new ScanRange);
-
+  int64_t offset = handle->write_range_->offset();
   if (handle->file_ != nullptr && !handle->file_->is_local()) {
     TmpFileRemote* tmp_file = static_cast<TmpFileRemote*>(handle->file_);
-    DiskFile* disk_buffer_file = tmp_file->DiskBufferFile();
-    DiskFile* disk_file = tmp_file->DiskFile();
+    DiskFile* local_read_buffer_file = tmp_file->GetReadBufferFile(offset);
+    DiskFile* remote_file = tmp_file->DiskFile();
     // Reset the read_range, use the remote filesystem's disk id.
-    handle->read_range_->Reset(tmp_file->hdfs_conn_, disk_file->path().c_str(),
-        handle->write_range_->len(), handle->write_range_->offset(), tmp_file->disk_id(),
-        false, tmp_file->mtime_,
+    handle->read_range_->Reset(tmp_file->hdfs_conn_, remote_file->path().c_str(),
+        handle->write_range_->len(), offset, tmp_file->disk_id(), false, tmp_file->mtime_,
         BufferOpts::ReadInto(
             read_buffer.data(), read_buffer.len(), BufferOpts::NO_CACHING),
-        nullptr, disk_file, disk_buffer_file);
+        nullptr, remote_file, local_read_buffer_file);
   } else {
     // Read from local.
     handle->read_range_->Reset(nullptr, handle->write_range_->file(),
-        handle->write_range_->len(), handle->write_range_->offset(),
-        handle->write_range_->disk_id(), false, ScanRange::INVALID_MTIME,
+        handle->write_range_->len(), offset, handle->write_range_->disk_id(), false,
+        ScanRange::INVALID_MTIME,
         BufferOpts::ReadInto(
             read_buffer.data(), read_buffer.len(), BufferOpts::NO_CACHING));
   }
 
   read_counter_->Add(1);
   bytes_read_counter_->Add(read_buffer.len());
+
   bool needs_buffers;
   RETURN_IF_ERROR(io_ctx_->StartScanRange(handle->read_range_, &needs_buffers));
   DCHECK(!needs_buffers) << "Already provided a buffer";
@@ -1431,6 +1702,16 @@ Status TmpFileGroup::WaitForAsyncRead(
     if (!status.ok()) goto exit;
   }
 exit:
+  if (handle->file_ != nullptr && !handle->file_->is_local()) {
+    auto tmp_file = static_cast<TmpFileRemote*>(handle->file_);
+    // If all the pages of specific read buffer have been read, try delete the read
+    // buffer.
+    if (tmp_file_mgr()->IsRemoteBatchReadingEnabled()) {
+      int buffer_idx = tmp_file->GetReadBufferIndex(handle->write_range_->offset());
+      bool all_read = tmp_file->IncrementReadPageCount(buffer_idx);
+      if (all_read) tmp_file->TryDeleteMemReadBufferShared(buffer_idx);
+    }
+  }
   // Always return the buffer before exiting to avoid leaking it.
   if (io_mgr_buffer != nullptr) handle->read_range_->ReturnBuffer(move(io_mgr_buffer));
   handle->read_range_ = nullptr;
@@ -1762,15 +2043,13 @@ void TmpWriteHandle::WriteComplete(const Status& write_status) {
       // Do file upload if the local buffer file is finished.
       if (write_range_->is_full()) {
         TmpFileRemote* tmp_file = static_cast<TmpFileRemote*>(file_);
-        int disk_id = tmp_file->DiskFile()->disk_type() == io::DiskFileType::S3 ?
-            parent_->io_mgr_->RemoteS3DiskFileOperId() :
-            parent_->io_mgr_->RemoteDfsDiskFileOperId();
         RemoteOperRange::RemoteOperDoneCallback u_callback =
             [this, tmp_file](
                 const Status& upload_status) { UploadComplete(tmp_file, upload_status); };
-        tmp_file->upload_range_.reset(new RemoteOperRange(tmp_file->DiskBufferFile(),
-            tmp_file->DiskFile(), parent_->tmp_file_mgr()->GetRemoteTmpBlockSize(),
-            disk_id, RequestType::FILE_UPLOAD, parent_->io_mgr_, u_callback));
+        tmp_file->upload_range_.reset(
+            new RemoteOperRange(tmp_file->DiskBufferFile(), tmp_file->DiskFile(),
+                parent_->tmp_file_mgr()->GetRemoteTmpBlockSize(), tmp_file->disk_id(true),
+                RequestType::FILE_UPLOAD, parent_->io_mgr_, u_callback));
         status = parent_->io_ctx_->AddRemoteOperRange(tmp_file->upload_range_.get());
       }
     }

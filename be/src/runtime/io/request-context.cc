@@ -58,8 +58,8 @@ class RequestContext::PerDiskState {
   const InternalQueue<WriteRange>* unstarted_write_ranges() const {
     return &unstarted_write_ranges_;
   }
-  const InternalQueue<RemoteOperRange>* unstarted_remote_upload_ranges() const {
-    return &unstarted_remote_upload_ranges_;
+  const InternalQueue<RemoteOperRange>* unstarted_remote_file_oper_ranges() const {
+    return &unstarted_remote_file_op_ranges_;
   }
 
   const InternalQueue<RequestRange>* in_flight_ranges() const {
@@ -70,8 +70,8 @@ class RequestContext::PerDiskState {
   InternalQueue<WriteRange>* unstarted_write_ranges() {
     return &unstarted_write_ranges_;
   }
-  InternalQueue<RemoteOperRange>* unstarted_remote_upload_ranges() {
-    return &unstarted_remote_upload_ranges_;
+  InternalQueue<RemoteOperRange>* unstarted_remote_file_oper_ranges() {
+    return &unstarted_remote_file_op_ranges_;
   }
 
   InternalQueue<RequestRange>* in_flight_ranges() { return &in_flight_ranges_; }
@@ -197,8 +197,8 @@ class RequestContext::PerDiskState {
   /// processed)
   InternalQueue<WriteRange> unstarted_write_ranges_;
 
-  /// A Queue for file operation ranges to process uploading operations to remote disks.
-  InternalQueue<RemoteOperRange> unstarted_remote_upload_ranges_;
+  /// A Queue for file operation ranges to process file uploading or fetching operations.
+  InternalQueue<RemoteOperRange> unstarted_remote_file_op_ranges_;
 };
 
 void RequestContext::ReadDone(int disk_id, ReadOutcome outcome, ScanRange* range) {
@@ -242,7 +242,8 @@ void RequestContext::OperDone(RequestRange* range, const Status& status) {
   if (range->request_type() == RequestType::WRITE) {
     (static_cast<WriteRange*>(range))->callback()(status);
   } else {
-    DCHECK(range->request_type() == RequestType::FILE_UPLOAD);
+    DCHECK(range->request_type() == RequestType::FILE_UPLOAD
+        || range->request_type() == RequestType::FILE_FETCH);
     (static_cast<RemoteOperRange*>(range))->callback()(status);
   }
   {
@@ -313,7 +314,7 @@ void RequestContext::Cancel() {
       }
 
       RemoteOperRange* oper_range;
-      while ((oper_range = disk_state.unstarted_remote_upload_ranges()->Dequeue())
+      while ((oper_range = disk_state.unstarted_remote_file_oper_ranges()->Dequeue())
           != nullptr) {
         remote_oper_callbacks.push_back(oper_range->callback());
       }
@@ -405,10 +406,11 @@ void RequestContext::AddRangeToDisk(const unique_lock<mutex>& lock,
     // ScheduleContext() has no effect if already scheduled, so this is safe to do always.
     disk_state->ScheduleContext(lock, this, range->disk_id());
   } else {
-    DCHECK(range->request_type() == RequestType::FILE_UPLOAD);
+    DCHECK(range->request_type() == RequestType::FILE_UPLOAD
+        || range->request_type() == RequestType::FILE_FETCH);
     DCHECK(schedule_mode == ScheduleMode::IMMEDIATELY) << static_cast<int>(schedule_mode);
     RemoteOperRange* oper_range = static_cast<RemoteOperRange*>(range);
-    disk_state->unstarted_remote_upload_ranges()->Enqueue(oper_range);
+    disk_state->unstarted_remote_file_oper_ranges()->Enqueue(oper_range);
     disk_state->ScheduleContext(lock, this, range->disk_id());
   }
 
@@ -648,10 +650,10 @@ RequestRange* RequestContext::GetNextRequestRange(int disk_id) {
   }
 
   // Do remote temporary files related work.
-  if (!request_disk_state->unstarted_remote_upload_ranges()->empty()) {
+  if (!request_disk_state->unstarted_remote_file_oper_ranges()->empty()) {
     RemoteOperRange* oper_range;
-    if (!request_disk_state->unstarted_remote_upload_ranges()->empty()) {
-      oper_range = request_disk_state->unstarted_remote_upload_ranges()->Dequeue();
+    if (!request_disk_state->unstarted_remote_file_oper_ranges()->empty()) {
+      oper_range = request_disk_state->unstarted_remote_file_oper_ranges()->Dequeue();
       request_disk_state->in_flight_ranges()->Enqueue(oper_range);
     }
   }

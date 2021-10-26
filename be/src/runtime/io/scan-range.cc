@@ -148,10 +148,12 @@ bool ScanRange::FileHandleCacheEnabled() {
   return false;
 }
 
-ReadOutcome ScanRange::DoReadInternal(
-    DiskQueue* queue, int disk_id, bool use_local_buff) {
+ReadOutcome ScanRange::DoReadInternal(DiskQueue* queue, int disk_id, bool use_local_buff,
+    bool use_mem_buffer, shared_lock<shared_mutex>* local_file_lock) {
   int64_t bytes_remaining = bytes_to_read_ - bytes_read_;
   DCHECK_GT(bytes_remaining, 0);
+  // Can't be set to true together.
+  DCHECK(!(use_local_buff && use_mem_buffer));
 
   unique_ptr<BufferDescriptor> buffer_desc;
   FileReader* file_reader = nullptr;
@@ -177,43 +179,75 @@ ReadOutcome ScanRange::DoReadInternal(
       buffer_manager_->add_iomgr_buffer_cumulative_bytes_used(buffer_desc->buffer_len());
     }
     read_in_flight_ = true;
-    if (use_local_buff) {
-      file_reader = local_buffer_reader_.get();
-      file_ = disk_buffer_file_->path();
-    } else {
-      file_reader = file_reader_.get();
+    // Set the correct reader to read the range if the memory buffer is not available.
+    if (!use_mem_buffer) {
+      if (use_local_buff) {
+        file_reader = local_buffer_reader_.get();
+        file_ = disk_buffer_file_->path();
+      } else {
+        file_reader = file_reader_.get();
+      }
+      use_local_buffer_ = use_local_buff;
     }
-    use_local_buffer_ = use_local_buff;
   }
-  DCHECK(file_reader != nullptr);
 
-  // No locks in this section.  Only working on local vars.  We don't want to hold a
-  // lock across the read call.
-  // To use the file handle cache:
-  // 1. It must be enabled at the daemon level.
-  // 2. It must be enabled for the particular filesystem.
-  bool use_file_handle_cache = FileHandleCacheEnabled();
-  VLOG_FILE << (use_file_handle_cache ? "Using" : "Skipping")
-            << " file handle cache for " << (expected_local_ ? "local" : "remote")
-            << " file " << file();
-  Status read_status = file_reader->Open(use_file_handle_cache);
   bool eof = false;
-  if (read_status.ok()) {
-    COUNTER_ADD_IF_NOT_NULL(reader_->active_read_thread_counter_, 1L);
-    COUNTER_BITOR_IF_NOT_NULL(reader_->disks_accessed_bitmap_, 1LL << disk_id);
+  Status read_status = Status::OK();
 
-    if (sub_ranges_.empty()) {
-      DCHECK(cache_.data == nullptr);
-      read_status =
-          file_reader->ReadFromPos(queue, offset_ + bytes_read_, buffer_desc->buffer_,
-              min(bytes_to_read() - bytes_read_, buffer_desc->buffer_len_),
-              &buffer_desc->len_, &eof);
-    } else {
-      read_status = ReadSubRanges(queue, buffer_desc.get(), &eof, file_reader);
+  if (use_mem_buffer) {
+    // The only scenario to use the memory buffer is for the temporary files, the range
+    // is supposed to be read in one round.
+    // For the efficiency consideration, don't have the lock of the memory block, the
+    // safety is implicitly guaranteed by the physical lock of the disk file, which is
+    // required while removing the disk file and the memory blocks. The other case of
+    // removing the memory block is when all of the pages have been read, and that could
+    // only happen after this read.
+    DCHECK(local_file_lock != nullptr);
+    read_status = disk_buffer_file_->ReadFromMemBuffer(
+        offset_, bytes_to_read_, buffer_desc->buffer_, *local_file_lock);
+    if (read_status.ok()) {
+      buffer_desc->len_ = bytes_to_read_;
+      eof = true;
+      COUNTER_ADD_IF_NOT_NULL(reader_->read_use_mem_counter_, 1L);
+      COUNTER_ADD_IF_NOT_NULL(reader_->bytes_read_use_mem_counter_, buffer_desc->len_);
+      COUNTER_ADD_IF_NOT_NULL(reader_->bytes_read_counter_, buffer_desc->len_);
     }
+  } else {
+    DCHECK(file_reader != nullptr);
 
-    COUNTER_ADD_IF_NOT_NULL(reader_->bytes_read_counter_, buffer_desc->len_);
-    COUNTER_ADD_IF_NOT_NULL(reader_->active_read_thread_counter_, -1L);
+    // No locks in this section.  Only working on local vars.  We don't want to hold a
+    // lock across the read call.
+    // To use the file handle cache:
+    // 1. It must be enabled at the daemon level.
+    // 2. It must be enabled for the particular filesystem.
+    bool use_file_handle_cache = FileHandleCacheEnabled();
+    VLOG_FILE << (use_file_handle_cache ? "Using" : "Skipping")
+              << " file handle cache for " << (expected_local_ ? "local" : "remote")
+              << " file " << file();
+
+    read_status = file_reader->Open(use_file_handle_cache);
+    if (read_status.ok()) {
+      COUNTER_ADD_IF_NOT_NULL(reader_->active_read_thread_counter_, 1L);
+      COUNTER_BITOR_IF_NOT_NULL(reader_->disks_accessed_bitmap_, 1LL << disk_id);
+
+      if (sub_ranges_.empty()) {
+        DCHECK(cache_.data == nullptr);
+        read_status =
+            file_reader->ReadFromPos(queue, offset_ + bytes_read_, buffer_desc->buffer_,
+                min(bytes_to_read() - bytes_read_, buffer_desc->buffer_len_),
+                &buffer_desc->len_, &eof);
+      } else {
+        read_status = ReadSubRanges(queue, buffer_desc.get(), &eof, file_reader);
+      }
+
+      COUNTER_ADD_IF_NOT_NULL(reader_->bytes_read_counter_, buffer_desc->len_);
+      COUNTER_ADD_IF_NOT_NULL(reader_->active_read_thread_counter_, -1L);
+      if (use_local_buffer_) {
+        COUNTER_ADD_IF_NOT_NULL(reader_->read_use_local_disk_counter_, 1L);
+        COUNTER_ADD_IF_NOT_NULL(
+            reader_->bytes_read_use_local_disk_counter_, buffer_desc->len_);
+      }
+    }
   }
 
   DCHECK(buffer_desc->buffer_ != nullptr);
@@ -246,7 +280,7 @@ ReadOutcome ScanRange::DoReadInternal(
   // Store the state we need before calling EnqueueReadyBuffer().
   bool eosr = buffer_desc->eosr();
   // No more reads for this scan range - we can close it.
-  if (eosr) file_reader->Close();
+  if (eosr && file_reader != nullptr) file_reader->Close();
   // Read successful - enqueue the buffer and return the appropriate outcome.
   if (!EnqueueReadyBuffer(move(buffer_desc))) return ReadOutcome::CANCELLED;
   // At this point, if eosr=true, then we cannot touch the state of this scan range
@@ -256,7 +290,9 @@ ReadOutcome ScanRange::DoReadInternal(
 
 ReadOutcome ScanRange::DoRead(DiskQueue* queue, int disk_id) {
   bool use_local_buffer = false;
-  if (disk_file_ != nullptr && disk_file_->disk_type() != DiskFileType::LOCAL) {
+  bool use_mem_buffer = false;
+  if (disk_file_ != nullptr && disk_file_->disk_type() != DiskFileType::LOCAL
+      && disk_buffer_file_ != nullptr) {
     // The sequence for acquiring the locks should always be from the local to
     // the remote to avoid deadlocks.
     shared_lock<shared_mutex> local_file_lock(*(disk_buffer_file_->GetFileLock()));
@@ -270,18 +306,25 @@ ReadOutcome ScanRange::DoRead(DiskQueue* queue, int disk_id) {
         // the only case could be the query is cancelled, so that both files are deleted.
         return ReadOutcome::CANCELLED;
       }
-      // If the local buffer exists, we can read from the local buffer, otherwise,
-      // we will read from the remote file system.
+
+      // The range can be read from local for two cases.
+      // 1. If the local buffer file is not deleted(evicted) yet.
+      // 2. A block of the file, which contains the range, has been read and stored in
+      // the memory.
+      // If we don't meet any of the cases, the range needs to be read from the remote.
       if (!disk_buffer_file_->is_deleted(buffer_file_lock)) {
         use_local_buffer = true;
+      } else if (disk_buffer_file_->CanReadFromReadBuffer(local_file_lock, offset_)) {
+        use_mem_buffer = true;
       } else {
         // Read from the remote file. The remote file must be in persisted status.
         DCHECK(disk_file_->is_persisted(file_lock));
       }
     }
-    return DoReadInternal(queue, disk_id, use_local_buffer);
+    return DoReadInternal(
+        queue, disk_id, use_local_buffer, use_mem_buffer, &local_file_lock);
   }
-  return DoReadInternal(queue, disk_id, use_local_buffer);
+  return DoReadInternal(queue, disk_id, use_local_buffer, use_mem_buffer);
 }
 
 Status ScanRange::ReadSubRanges(

@@ -25,6 +25,7 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/io/file-writer.h"
 
+#include "util/condition-variable.h"
 #include "util/spinlock.h"
 
 namespace impala {
@@ -35,6 +36,130 @@ namespace io {
 class RemoteOperRange;
 class ScanRange;
 class WriteRange;
+
+static const int64_t DISK_FILE_INVALID_FILE_OFFSET = -1;
+
+/// MemBlockStatus indicates the status of a MemBlock.
+/// Normal status change should be: UNINIT -> RESERVED -> ALLOC -> WRITTEN -> DISABLED.
+/// But all status can jump to DISABLED directly.
+/// UNINIT is the default status, indicates the block is not initialized.
+/// RESERVED indicates the memory required by the block is reserved.
+/// ALLOC indicates the memory required by the block is allocated.
+/// WRITTEN indicates the memory is allocated and content has been written to the memory.
+/// DISABLED indicates the MemBlock is disabled, doesn't allow any writes to or reads from
+/// the block. It is a final state, and no memory should be allocated or reserved.
+enum class MemBlockStatus { UNINIT, RESERVED, ALLOC, WRITTEN, DISABLED };
+
+/// Each MemBlock can contain multiple pages, and be used as the buffer to read multiple
+/// pages at a time from the DiskFile.
+/// The caller may need to maintain the status of the MemBlock and make sure the block is
+/// used under the correct status.
+class MemBlock {
+ public:
+  MemBlock(int block_id) : block_id_(block_id), status_(MemBlockStatus::UNINIT) {}
+  virtual ~MemBlock() {
+    // Must be MemBlockStatus::DISABLED before destruction.
+    DCHECK_EQ(static_cast<int>(status_), static_cast<int>(MemBlockStatus::DISABLED));
+    DCHECK(data_ == nullptr);
+  }
+
+  // Release the memory if it is allocated.
+  // The MemBlock status will be set to MemBlockStatus::DISABLED after deletion.
+  // Return to the caller whether the memory is reserved or allocated before deletion.
+  // Must be called before the MemBlock destruction.
+  void Delete(bool* reserved, bool* alloc);
+
+  // Allocate the memory for the MemBlock.
+  // Status must be MemBlockStatus::RESERVED before allocation.
+  // If successfully allocated, the status will be set to MemBlockStatus::ALLOC.
+  Status AllocLocked(const std::unique_lock<SpinLock>& lock, int64_t size) {
+    DCHECK(lock.mutex() == &mem_block_lock_ && lock.owns_lock());
+    DCHECK_EQ(static_cast<int>(status_), static_cast<int>(MemBlockStatus::RESERVED));
+    // Use malloc, could be better to alloc from a buffer pool.
+    data_ = static_cast<uint8_t*>(malloc(size));
+    if (UNLIKELY(data_ == nullptr)) {
+      return Status(strings::Substitute("Couldn't allocate memory for a memory block, "
+                                        "block size: '$0' bytes",
+          size));
+    }
+    SetStatusLocked(lock, MemBlockStatus::ALLOC);
+    return Status::OK();
+  }
+
+  uint8_t* data() { return data_; }
+
+  MemBlockStatus GetStatus() {
+    std::unique_lock<SpinLock> l(mem_block_lock_);
+    return status_;
+  }
+
+  bool IsStatus(MemBlockStatus status) {
+    std::unique_lock<SpinLock> l(mem_block_lock_);
+    return IsStatusLocked(l, status);
+  }
+
+  bool IsStatusLocked(const std::unique_lock<SpinLock>& lock, MemBlockStatus status) {
+    DCHECK(lock.mutex() == &mem_block_lock_ && lock.owns_lock());
+    return status_ == status;
+  }
+
+  void SetStatus(MemBlockStatus status) {
+    std::unique_lock<SpinLock> l(mem_block_lock_);
+    SetStatusLocked(l, status);
+  }
+
+  void SetStatusLocked(const std::unique_lock<SpinLock>& lock, MemBlockStatus status) {
+    DCHECK(lock.mutex() == &mem_block_lock_ && lock.owns_lock());
+    SetInternalStatus(status);
+  }
+
+  /// Return the lock of the memory block.
+  SpinLock* GetLock() { return &mem_block_lock_; }
+
+  /// Return the block id.
+  int block_id() { return block_id_; }
+
+ private:
+  friend class TmpFileRemote;
+  friend class RemoteOperRange;
+  friend class DiskFileTest;
+
+  /// Caller should hold the lock.
+  void SetInternalStatus(MemBlockStatus new_status) {
+    switch (new_status) {
+      case MemBlockStatus::RESERVED: {
+        DCHECK(status_ == MemBlockStatus::UNINIT);
+        break;
+      }
+      case MemBlockStatus::ALLOC: {
+        DCHECK(status_ == MemBlockStatus::RESERVED);
+        break;
+      }
+      case MemBlockStatus::WRITTEN: {
+        DCHECK(status_ == MemBlockStatus::ALLOC);
+        break;
+      }
+      case MemBlockStatus::DISABLED: {
+        break;
+      }
+      default:
+        DCHECK(false) << "Invalid memory block status: " << static_cast<int>(new_status);
+    }
+    status_ = new_status;
+  }
+
+  /// The id of the memory block.
+  const int block_id_;
+
+  /// Protect the members below.
+  SpinLock mem_block_lock_;
+
+  /// The status of the memory block.
+  MemBlockStatus status_;
+
+  /// The data of the memory block, may contain multiple pages.
+  uint8_t* data_ = nullptr;
+};
 
 /// DiskFileType indicates the type of the file handled by the DiskFile.
 /// LOCAL indicates the file is in the local filesystem.
@@ -64,7 +189,45 @@ class DiskFile {
   DiskFile(const std::string& path, DiskIoMgr* io_mgr, int64_t file_size,
       DiskFileType disk_type, const hdfsFS* hdfs_conn = nullptr);
 
+  /// Constructor for a file with read buffers.
+  DiskFile(const std::string& path, DiskIoMgr* io_mgr, int64_t file_size,
+      DiskFileType disk_type, int64_t read_buffer_size, int num_read_buffer_blocks);
+
   virtual ~DiskFile() {}
+
+  /// The ReadBuffer is designed for batch reading. Each ReadBuffer belongs to one
+  /// DiskFile, and contains multiple read buffer blocks which are divided from the
+  /// DiskFile by the block size. Each block contains multiple pages.
+  /// When reading a page from the read buffer, we firstly use the offset of the page
+  /// to calculate which block contains the page, then see whether the block is
+  /// available or not. If it is available, the caller can read the page from the block.
+  /// The block is only available after a fetch, which is triggered in TmpFileMgr.
+  /// The default size of a read buffer block is fixed and the number of the block per
+  /// disk file is the default file size divided by the default block size.
+  struct ReadBuffer {
+    ReadBuffer(int64_t read_buffer_block_size, int64_t num_read_buffer_blocks);
+
+    /// The default read buffer block size.
+    const int64_t read_buffer_block_size_;
+
+    /// The number of read buffer blocks per disk file.
+    const int64_t num_of_read_buffer_blocks_;
+
+    /// Each read buffer is a memory block, therefore, the size of read_buffer_blocks_ is
+    /// num_of_read_buffer_blocks_.
+    std::vector<std::unique_ptr<MemBlock>> read_buffer_blocks_;
+
+    /// Protect below members.
+    SpinLock read_buffer_ctrl_lock_;
+
+    /// The statistics for the page number for each read buffer block.
+    /// The size of page_cnts_per_block_ is num_of_read_buffer_blocks_.
+    std::unique_ptr<int64_t[]> page_cnts_per_block_;
+
+    /// The start offsets of each read buffer block to the whole file.
+    /// The size of read_buffer_block_offsets_ is num_of_read_buffer_blocks_.
+    std::unique_ptr<int64_t[]> read_buffer_block_offsets_;
+  };
 
   // Delete the physical file. Caller should hold the exclusive file lock.
   Status Delete(const std::unique_lock<boost::shared_mutex>& lock);
@@ -81,7 +244,7 @@ class DiskFile {
   int64_t file_size() const { return file_size_; }
 
   /// Return the actual size of the file.
-  int64_t actual_file_size() const { return actual_file_size_.Load(); }
+  int64_t actual_file_size() { return actual_file_size_.Load(); }
 
   /// If return True, the file is persisted.
   /// The caller should hold the status lock.
@@ -101,6 +264,9 @@ class DiskFile {
     return GetFileStatusLocked(l) == DiskFileStatus::DELETED;
   }
 
+  /// If True, the file is to be deleted.
+  bool is_to_delete() { return to_delete_.Load(); }
+
   /// Set the status of the DiskFile. Caller should not hold the status lock.
   void SetStatus(DiskFileStatus status) {
     std::unique_lock<SpinLock> l(status_lock_);
@@ -113,6 +279,9 @@ class DiskFile {
     DCHECK(status_lock.mutex() == &status_lock_ && status_lock.owns_lock());
     SetInternalStatus(status);
   }
+
+  /// Set the flag of to_delete.
+  void SetToDeleteFlag(bool to_delete = true) { to_delete_.Store(to_delete); }
 
   /// Returns the status of the file.
   /// The caller should not hold the status lock.
@@ -133,14 +302,181 @@ class DiskFile {
   void SetSpaceReserved() { space_reserved_.Store(true); }
   bool IsSpaceReserved() { return space_reserved_.Load(); }
 
-  /// Set actual file size. Should only be called by the TmpFileRemote::AllocateSpace()
-  /// right after the allocation is at capacity, and the function should only be called
-  /// once during the lifetime of the DiskFile.
+  /// Set actual file size.
+  /// The function should only be called once during the lifetime of the DiskFile.
   void SetActualFileSize(int64_t size) {
     DCHECK_EQ(0, actual_file_size_.Load());
     DCHECK_LE(file_size_, size);
     actual_file_size_.Store(size);
   }
+
+  // Update the metadata of read buffer if the file is batch read enabled.
+  // The metadata of read buffer is set when the file is written, because each page may
+  // have different sizes, so for each read buffer block, the number of pages and the
+  // start offset of a block could be different. By updating the metadata, these
+  // information would be recorded.
+  void UpdateReadBufferMetaDataIfNeeded(int64_t offset) {
+    if (!IsBatchReadEnabled()) return;
+    int64_t par_idx = GetReadBufferIndex(offset);
+    DCheckReadBufferIdx(par_idx);
+    std::lock_guard<SpinLock> lock(read_buffer_->read_buffer_ctrl_lock_);
+    read_buffer_->page_cnts_per_block_[par_idx]++;
+    int64_t cur_offset = read_buffer_->read_buffer_block_offsets_[par_idx];
+    if (cur_offset == DISK_FILE_INVALID_FILE_OFFSET || offset < cur_offset) {
+      read_buffer_->read_buffer_block_offsets_[par_idx] = offset;
+    }
+  }
+
+  // Return the index of the buffer block by the file offset.
+  int GetReadBufferIndex(int64_t offset) {
+    int read_buffer_idx = offset / read_buffer_block_size();
+    if (read_buffer_idx >= num_of_read_buffers()) {
+      // Because the offset could be a little over the default file size, the index
+      // could equal to the max number of read buffers, but can't be more than it.
+      DCHECK(read_buffer_idx == num_of_read_buffers());
+      read_buffer_idx = num_of_read_buffers() - 1;
+    }
+    DCheckReadBufferIdx(read_buffer_idx);
+    return read_buffer_idx;
+  }
+
+  // Return the start offset by the index of the buffer block.
+  int64_t GetReadBuffStartOffset(int buffer_idx) {
+    DCheckReadBufferIdx(buffer_idx);
+    std::lock_guard<SpinLock> lock(read_buffer_->read_buffer_ctrl_lock_);
+    int64_t offset = read_buffer_->read_buffer_block_offsets_[buffer_idx];
+    DCHECK(offset != DISK_FILE_INVALID_FILE_OFFSET);
+    return offset;
+  }
+
+  // Return the actual size of the specific read buffer block.
+  int64_t GetReadBuffActualSize(int buffer_idx) {
+    DCheckReadBufferIdx(buffer_idx);
+    std::lock_guard<SpinLock> lock(read_buffer_->read_buffer_ctrl_lock_);
+    int64_t cur_offset = read_buffer_->read_buffer_block_offsets_[buffer_idx];
+    DCHECK(cur_offset != DISK_FILE_INVALID_FILE_OFFSET);
+    while (buffer_idx != num_of_read_buffers() - 1) {
+      DCHECK_LT(buffer_idx, num_of_read_buffers() - 1);
+      int64_t nxt_offset = read_buffer_->read_buffer_block_offsets_[buffer_idx + 1];
+      if (nxt_offset != DISK_FILE_INVALID_FILE_OFFSET) return nxt_offset - cur_offset;
+      buffer_idx++;
+    }
+    int64_t actual_file_size = actual_file_size_.Load();
+    DCHECK_GT(actual_file_size, 0);
+    return actual_file_size - cur_offset;
+  }
+
+  // Return the number of the page count in the read buffer block.
+  int64_t GetReadBuffPageCount(int buffer_idx) {
+    DCheckReadBufferIdx(buffer_idx);
+    std::lock_guard<SpinLock> lock(read_buffer_->read_buffer_ctrl_lock_);
+    return read_buffer_->page_cnts_per_block_[buffer_idx];
+  }
+
+  // Return the read buffer block.
+  MemBlock* GetBufferBlock(int index) {
+    DCheckReadBufferIdx(index);
+    return read_buffer_->read_buffer_blocks_[index].get();
+  }
+
+  // Return the lock of the read buffer block.
+  SpinLock* GetBufferBlockLock(int index) {
+    DCheckReadBufferIdx(index);
+    return read_buffer_->read_buffer_blocks_[index]->GetLock();
+  }
+
+  // Check if there is an available local memory buffer for the specific offset.
+  // Caller should hold the physical lock of the disk file in case the object is
+  // destroyed. But the caller should not hold the lock of the memory block because the
+  // IsStatus() would require the lock.
+  bool CanReadFromReadBuffer(
+      const boost::shared_lock<boost::shared_mutex>& lock, int64_t offset) {
+    if (!IsBatchReadEnabled()) return false;
+    DCHECK(lock.mutex() == &physical_file_lock_ && lock.owns_lock());
+    MemBlock* read_buffer_block = GetBufferBlock(GetReadBufferIndex(offset));
+    return read_buffer_block != nullptr
+        && read_buffer_block->IsStatus(MemBlockStatus::WRITTEN);
+  }
+
+  // Return if batch reading is enabled.
+  bool IsBatchReadEnabled() { return read_buffer_ != nullptr; }
+
+  void DCheckMemBlock(const boost::shared_lock<boost::shared_mutex>& file_lock,
+      MemBlock* read_buffer_block) {
+    DCHECK(file_lock.mutex() == &physical_file_lock_ && file_lock.owns_lock());
+    DCHECK(read_buffer_block != nullptr);
+  }
+
+  // Read the spilled data from the memory buffer.
+  // Caller should hold the physical file lock of the disk file in case the object is
+  // destroyed. Also, caller should guarantee the buffer won't be released during reading,
+  // it is good for the caller to have the lock of the read buffer block.
+  Status ReadFromMemBuffer(int64_t offset_to_file, int64_t len, uint8_t* dst,
+      const boost::shared_lock<boost::shared_mutex>& file_lock) {
+    DCHECK(file_lock.mutex() == &physical_file_lock_ && file_lock.owns_lock());
+    int64_t idx = GetReadBufferIndex(offset_to_file);
+    DCheckReadBufferIdx(idx);
+    uint8_t* read_buffer_block = read_buffer_->read_buffer_blocks_[idx]->data();
+    DCHECK(read_buffer_block != nullptr);
+    int64_t offset_to_block = offset_to_file - GetReadBuffStartOffset(idx);
+    DCHECK_GE(offset_to_block, 0);
+    DCHECK_GE(GetReadBuffActualSize(idx), offset_to_block + len);
+    memcpy(dst, read_buffer_block + offset_to_block, len);
+    return Status::OK();
+  }
+
+  // Helper function to allocate the memory for a reading buffer block.
+  // Caller should hold both physical_file_lock_ and the lock of the read buffer block.
+  Status AllocReadBufferBlockLocked(MemBlock* read_buffer_block, int64_t size,
+      const boost::shared_lock<boost::shared_mutex>& file_lock,
+      const std::unique_lock<SpinLock>& block_lock) {
+    DCheckMemBlock(file_lock, read_buffer_block);
+    return read_buffer_block->AllocLocked(block_lock, size);
+  }
+
+  // Helper function to set the status of a memory block.
+  // Caller should hold the physical_file_lock_.
+  // If the caller holds the lock of the read buffer block, SetStatusLocked() will be
+  // called.
+  void SetReadBufferBlockStatus(MemBlock* read_buffer_block, MemBlockStatus status,
+      const boost::shared_lock<boost::shared_mutex>& file_lock,
+      const std::unique_lock<SpinLock>* block_lock = nullptr) {
+    DCheckMemBlock(file_lock, read_buffer_block);
+    if (block_lock == nullptr) {
+      read_buffer_block->SetStatus(status);
+    } else {
+      read_buffer_block->SetStatusLocked(*block_lock, status);
+    }
+  }
+
+  // Helper function to check the status of a read buffer block.
+  // Caller should hold the physical_file_lock_.
+  // If the caller holds the lock of the read buffer block, IsStatusLocked() will be
+  // called.
+  bool IsReadBufferBlockStatus(MemBlock* read_buffer_block, MemBlockStatus status,
+      const boost::shared_lock<boost::shared_mutex>& file_lock,
+      const std::unique_lock<SpinLock>* block_lock = nullptr) {
+    DCheckMemBlock(file_lock, read_buffer_block);
+    if (block_lock == nullptr) return read_buffer_block->IsStatus(status);
+    return read_buffer_block->IsStatusLocked(*block_lock, status);
+  }
+
+  // Helper function to delete the read buffer block.
+  // Caller should hold the physical_file_lock_, but should not hold the lock of the
+  // read buffer block, because Delete() will hold the read buffer block's lock.
+  template <typename T>
+  void DeleteReadBuffer(
+      MemBlock* read_buffer_block, bool* reserved, bool* alloc, const T& file_lock) {
+    DCHECK(file_lock.mutex() == &physical_file_lock_ && file_lock.owns_lock());
+    DCHECK(read_buffer_block != nullptr);
+    return read_buffer_block->Delete(reserved, alloc);
+  }
+
+  // Return the number of read buffer blocks of this DiskFile.
+  int64_t num_of_read_buffers() { return read_buffer_->num_of_read_buffer_blocks_; }
+
+  // Return the default size of a read buffer.
+  int64_t read_buffer_block_size() { return read_buffer_->read_buffer_block_size_; }
 
  private:
   friend class RemoteOperRange;
@@ -183,10 +519,17 @@ class DiskFile {
   /// avoid a deadlock.
   /// The lock order of file lock and status lock (above) should be file lock acquired
   /// first.
+  /// If the disk file has the memory blocks, the lock also protects them from
+  /// destruction.
   boost::shared_mutex physical_file_lock_;
 
   /// The hdfs connection used to connect to the remote scratch path.
   hdfsFS hdfs_conn_;
+
+  /// to_delete_ is set to true if the file is to be deleted.
+  /// It is a flag for the deleting thread to fetch the unique file lock and
+  /// ask the current lock holder to yield.
+  AtomicBool to_delete_{false};
 
   /// Specify if the file's space is reserved to be allowed to write to the filesystem
   /// because the filesystem may reach the size limit and needs some time before it can
@@ -229,6 +572,10 @@ class DiskFile {
   /// like S3, it is set after a successful upload.
   AtomicInt64 actual_file_size_{0};
 
+  /// The read buffer for the disk file, would be a nullptr if batch reading is not
+  /// enabled.
+  std::unique_ptr<ReadBuffer> read_buffer_;
+
   /// Internal setter to set the status.
   /// The status is from INWRITING -> PERSISTED -> DELETED, which should not be a
   /// reverse transition.
@@ -258,6 +605,14 @@ class DiskFile {
 
   /// Return the status lock of the file.
   SpinLock* GetStatusLock() { return &status_lock_; }
+
+  /// Helper function to DCHECK if the read buffer control is not NULL and if the buffer
+  /// index is valid.
+  void DCheckReadBufferIdx(int buffer_idx) {
+    DCHECK(read_buffer_ != nullptr);
+    DCHECK_LT(buffer_idx, read_buffer_->num_of_read_buffer_blocks_);
+    DCHECK_GE(buffer_idx, 0);
+  }
 };
 } // namespace io
 } // namespace impala

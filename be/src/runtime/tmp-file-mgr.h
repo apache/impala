@@ -49,6 +49,7 @@ namespace io {
   class DiskIoMgr;
   class RequestContext;
   class ScanRange;
+  class DiskFile;
   class WriteRange;
   class RemoteOperRange;
 }
@@ -136,20 +137,39 @@ class TmpFileMgr {
   /// A configuration for the control parameters of remote temporary directories.
   /// The struct is used by TmpFileMgr and has the same lifecycle as TmpFileMgr.
   struct TmpDirRemoteCtrl {
+    /// Calculate the maximum allowed read buffer bytes for the remote spilling.
+    int64_t CalcMaxReadBufferBytes();
+
+    /// A helper function to set up the paremeters of read buffers for remote files.
+    Status SetUpReadBufferParams() WARN_UNUSED_RESULT;
+
     /// The high water mark metric for local buffer directory.
     AtomicInt64 local_buff_dir_bytes_high_water_mark_{0};
 
     /// The default size of a remote temporary file.
     int64_t remote_tmp_file_size_;
 
+    /// The default size of a read buffer block for a remote temporary file.
+    int64_t read_buffer_block_size_;
+
+    /// The number of read buffer blocks for a remote file, it is from
+    /// remote_tmp_file_size_/read_buffer_block_size_.
+    int num_read_buffer_blocks_per_file_;
+
     /// The default block size of a remote temporary file. The block is used as a buffer
     /// while doing upload and fetch a remote temporary file.
     int64_t remote_tmp_block_size_;
+
+    /// The maximum total size of read buffer for remote spilling.
+    int64_t max_read_buffer_size_;
 
     /// Specify the mode to enqueue the tmp file to the pool.
     /// If true, the file would be placed in the first to be poped out from the pool.
     /// If false, the file would be placed in the last of the pool.
     bool remote_tmp_files_avail_pool_lifo_;
+
+    /// Indicates if batch reading is enabled for the remote temporary files.
+    bool remote_batch_read_enabled_;
 
     /// Temporary file buffer pool managed by TmpFileMgr, is only activated when there is
     /// a remote scratch space is registered. So, if TmpFileMgr::HasRemoteDir() is true,
@@ -197,6 +217,21 @@ class TmpFileMgr {
     return tmp_dirs_remote_ctrl_.remote_tmp_file_size_;
   }
 
+  /// Return the read buffer block size for a remote temporary file.
+  int64_t GetReadBufferBlockSize() const {
+    return tmp_dirs_remote_ctrl_.read_buffer_block_size_;
+  }
+
+  /// Return the number of read buffer blocks for a remote temporary file.
+  int GetNumReadBuffersPerFile() const {
+    return tmp_dirs_remote_ctrl_.num_read_buffer_blocks_per_file_;
+  }
+
+  /// Return the maximum total size of all the read buffer blocks for remote spilling.
+  int64_t GetRemoteMaxTotalReadBufferSize() const {
+    return tmp_dirs_remote_ctrl_.max_read_buffer_size_;
+  }
+
   /// Return the remote temporary block size.
   int64_t GetRemoteTmpBlockSize() const {
     return tmp_dirs_remote_ctrl_.remote_tmp_block_size_;
@@ -211,6 +246,11 @@ class TmpFileMgr {
   /// If false is returned, it is set by FIFO.
   bool GetRemoteTmpFileBufferPoolLifo() {
     return tmp_dirs_remote_ctrl_.remote_tmp_files_avail_pool_lifo_;
+  }
+
+  // Return if batch reading for remote temporary files is enabled.
+  bool IsRemoteBatchReadingEnabled() {
+    return tmp_dirs_remote_ctrl_.remote_batch_read_enabled_;
   }
 
   /// Return the local buffer dir for remote spilling.
@@ -256,6 +296,11 @@ class TmpFileMgr {
   /// If quick_return is true, one won't wait if no file is in the pool. Otherwise,
   /// one would wait util a file is dequeued.
   Status DequeueTmpFilesPool(std::shared_ptr<TmpFile>* tmp_file, bool quick_return);
+
+  /// The function releases all the memory of read buffer in a temporary file.
+  /// Caller needs to hold the unique lock of the buffer file.
+  void ReleaseTmpFileReadBuffer(
+      const std::unique_lock<boost::shared_mutex>& lock, TmpFile* tmp_file);
 
   /// Try to delete the buffer of a TmpFile to make some space for other buffers.
   /// May return an error status if error happens during deletion of the buffer.
@@ -350,6 +395,9 @@ class TmpFileMgr {
 
   /// Metrics to track the scratch space HWM.
   AtomicHighWaterMarkGauge* scratch_bytes_used_metric_ = nullptr;
+
+  /// Metrics to track the read memory buffer HWM.
+  AtomicHighWaterMarkGauge* scratch_read_memory_buffer_used_metric_ = nullptr;
 };
 
 /// Represents a group of temporary files - one per disk with a scratch directory. The
@@ -553,6 +601,18 @@ class TmpFileGroup {
   /// Number of bytes read from disk (includes reads started but not yet complete).
   RuntimeProfile::Counter* const bytes_read_counter_;
 
+  /// Number of read operations that use mem buffer.
+  RuntimeProfile::Counter* const read_use_mem_counter_;
+
+  /// Number of bytes read from mem buffer.
+  RuntimeProfile::Counter* const bytes_read_use_mem_counter_;
+
+  /// Number of read operations that use local disk buffer.
+  RuntimeProfile::Counter* const read_use_local_disk_counter_;
+
+  /// Number of bytes read from local disk buffer.
+  RuntimeProfile::Counter* const bytes_read_use_local_disk_counter_;
+
   /// Amount of scratch space allocated in bytes.
   RuntimeProfile::Counter* const scratch_space_bytes_used_counter_;
 
@@ -566,7 +626,7 @@ class TmpFileGroup {
   /// is not enabled.
   RuntimeProfile::Counter* compression_timer_;
 
-  /// Protects tmp_files_remote_ptrs_lock_.
+  /// Protects tmp_files_remote_ptrs_.
   SpinLock tmp_files_remote_ptrs_lock_;
 
   /// A map of raw pointer and its shared_ptr of remote TmpFiles.

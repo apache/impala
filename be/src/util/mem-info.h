@@ -126,5 +126,6 @@ class MemInfo {
 /// the memory available to the daemon process. Returns an error if the memory limit is
 /// invalid or another error is encountered that should prevent starting up the daemon.
 /// Logs the memory limit chosen and any relevant diagnostics related to that choice.
-Status ChooseProcessMemLimit(int64_t* bytes_limit);
+/// If avail_mem is not nullptr, the bytes of system available memory will be returned.
+Status ChooseProcessMemLimit(int64_t* bytes_limit, int64_t* avail_mem = nullptr);
 }

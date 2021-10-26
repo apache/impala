@@ -58,6 +58,8 @@ DECLARE_int32(stress_scratch_write_delay_ms);
 #endif
 DECLARE_string(remote_tmp_file_size);
 DECLARE_int32(wait_for_spill_buffer_timeout_s);
+DECLARE_bool(remote_batch_read);
+DECLARE_string(remote_read_memory_buffer_size);
 
 namespace impala {
 
@@ -73,6 +75,10 @@ static const string HDFS_LOCAL_URL = "hdfs://localhost:20500/tmp";
 static const string REMOTE_URL = HDFS_LOCAL_URL;
 static const string LOCAL_BUFFER_PATH = "/tmp/tmp-file-mgr-test-buffer";
 
+/// Read buffer sizes for TestBatchReadingSetMaxBytes().
+static const int64_t READ_BUFFER_SMALL_SIZE_BYTES = 1 << 20; // 1MB
+static const int64_t READ_BUFFER_EXTREMELY_BIG_SIZE_BYTES = 100ll << 30; // 100GB
+
 class TmpFileMgrTest : public ::testing::Test {
  public:
   static const int DEFAULT_PRIORITY = numeric_limits<int>::max();
@@ -85,6 +91,8 @@ class TmpFileMgrTest : public ::testing::Test {
     FLAGS_stress_scratch_write_delay_ms = 0;
 #endif
     FLAGS_remote_tmp_file_size = "8MB";
+    FLAGS_remote_read_memory_buffer_size = "1GB";
+    FLAGS_remote_batch_read = false;
 
     metrics_.reset(new MetricGroup("tmp-file-mgr-test"));
     profile_ = RuntimeProfile::Create(&obj_pool_, "tmp-file-mgr-test");
@@ -147,6 +155,14 @@ class TmpFileMgrTest : public ::testing::Test {
     ASSERT_EQ(hwm_value->GetValue(), exp_hwm_value);
   }
 
+  /// Check the current scratch space read buffer HWM higher than zero.
+  void checkHWMReadBuffMetrics() {
+    AtomicHighWaterMarkGauge* hwm_value =
+        metrics_->FindMetricForTesting<AtomicHighWaterMarkGauge>(
+            "tmp-file-mgr.scratch-read-memory-buffer-used-high-water-mark");
+    ASSERT_TRUE(hwm_value->GetValue() > 0);
+  }
+
   void RemoveAndCreateDirs(const vector<string>& dirs) {
     for (const string& dir: dirs) {
       ASSERT_OK(FileSystemUtil::RemoveAndCreateDirectory(dir));
@@ -155,6 +171,40 @@ class TmpFileMgrTest : public ::testing::Test {
 
   void RemoveDirs(const vector<string>& dirs) {
     ASSERT_OK(FileSystemUtil::RemovePaths(dirs));
+  }
+
+  int64_t GetReadBufferMaxAllowedBytes(TmpFileMgr* mgr) {
+    return mgr->tmp_dirs_remote_ctrl_.CalcMaxReadBufferBytes();
+  }
+
+  int64_t GetReadBufferCurrentMaxBytes(TmpFileMgr* mgr) {
+    return mgr->tmp_dirs_remote_ctrl_.max_read_buffer_size_;
+  }
+
+  void CreateAndGetGeneralRemoteTmpDir(vector<string>* tmp_dirs) {
+    FLAGS_remote_tmp_file_size = "1K";
+    vector<string> tmp_create_dirs{{LOCAL_BUFFER_PATH}};
+    RemoveAndCreateDirs(tmp_create_dirs);
+    tmp_dirs->push_back(Substitute(LOCAL_BUFFER_PATH + ":$0", 4096));
+    tmp_dirs->push_back(REMOTE_URL);
+  }
+
+  // Helper for TestBatchReadingSetMaxBytes() to set the read buffer size and check
+  // whether we should expect the system to use the max allowed bytes instead of the
+  // specified buffer size in the testcase.
+  void SetReadBufferSizeHelper(int64_t buffer_size, bool* expect_max_allowed_bytes) {
+    ASSERT_TRUE(expect_max_allowed_bytes != nullptr);
+    if (buffer_size == READ_BUFFER_SMALL_SIZE_BYTES) {
+      FLAGS_remote_read_memory_buffer_size = "1MB";
+      *expect_max_allowed_bytes = false;
+    } else if (buffer_size == READ_BUFFER_EXTREMELY_BIG_SIZE_BYTES) {
+      FLAGS_remote_read_memory_buffer_size = "100GB";
+      // If buffer size is too large for the system, we expect the actual capacity of
+      // the read buffer to be changed to the max allowed bytes in the testcase.
+      *expect_max_allowed_bytes = true;
+    } else {
+      ASSERT_TRUE(false) << "Unexpected buffer size " << buffer_size;
+    }
   }
 
   /// Helper to call the private CreateFiles() method and return
@@ -260,6 +310,30 @@ class TmpFileMgrTest : public ::testing::Test {
     EXPECT_TRUE(search != group->tmp_files_index_range_.end());
     EXPECT_EQ(start, search->second.start);
     EXPECT_EQ(end, search->second.end);
+  }
+
+  /// Helper to wait for the disk file changing to specific status. Will timeout after 2
+  /// seconds.
+  static void WaitForDiskFileStatus(DiskFile* file, DiskFileStatus status) {
+    int wait_times = 10;
+    while (true) {
+      if (file->GetFileStatus() == status) {
+        break;
+      }
+      // Suppose the upload should be finished in two seconds.
+      ASSERT_TRUE(wait_times-- > 0);
+      usleep(200 * 1000);
+    }
+  }
+
+  /// Helper to get the remote temporary file from the temporary file group.
+  static TmpFileRemote* GetRemoteTmpFileByFileGroup(TmpFileGroup& file_group, int idx) {
+    return static_cast<TmpFileRemote*>(file_group.tmp_files_remote_[idx].get());
+  }
+
+  /// Helper to get the number of remote temporary files from the temporary file group.
+  static int GetRemoteTmpFileNum(TmpFileGroup& file_group) {
+    return file_group.tmp_files_remote_.size();
   }
 
   /// Helpers to call WriteHandle methods.
@@ -1796,7 +1870,7 @@ TEST_F(TmpFileMgrTest, TestMixTmpFileLimits) {
   RemoveAndCreateDirs(tmp_create_dirs);
   tmp_dirs.push_back(REMOTE_URL);
   int64_t alloc_size = 1024;
-  int64_t file_size = 256 * 1024 * 1024;
+  int64_t file_size = 512 * 1024 * 1024;
   int64_t offset;
   TmpFile* alloc_file;
   FLAGS_remote_tmp_file_size = "512MB";
@@ -2059,6 +2133,105 @@ TEST_F(TmpFileMgrTest, TestRemoteUploadFailed) {
 
   file_group.Close();
   test_env_->TearDownQueries();
+}
+
+/// Test using batch reading while reading the remote spilled data.
+TEST_F(TmpFileMgrTest, TestBatchReadingFromRemote) {
+  TmpFileMgr tmp_file_mgr;
+  vector<string> tmp_dirs;
+  CreateAndGetGeneralRemoteTmpDir(&tmp_dirs);
+  FLAGS_remote_read_memory_buffer_size = "1MB";
+  FLAGS_remote_batch_read = true;
+  int64_t page_size_big = 512;
+  int64_t page_size_small = 256;
+  // There should be two files,
+  // file 1. page_big + page_big = 1024B
+  // file 2. page_big + page_small + page_big = 1280B
+  // So that we can test two cases, a file with a default size and one with a little over
+  // size.
+  int64_t file_size_1 = 2 * page_size_big;
+  int64_t file_size_2 = 2 * page_size_big + page_size_small;
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, true, "", false, metrics_.get()));
+  TUniqueId id;
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
+
+  vector<unique_ptr<MemRange>> mem_ranges;
+  vector<unique_ptr<TmpWriteHandle>> handles;
+  WriteRange::WriteDoneCallback callback =
+      bind(mem_fn(&TmpFileMgrTest::SignalCallback), this, _1);
+  const int PAGE_NUM = 5;
+  vector<vector<uint8_t>> data(PAGE_NUM);
+  for (int i = 0; i < PAGE_NUM; i++) {
+    int64_t page_size = page_size_big;
+    if (i == 3) {
+      page_size = page_size_small;
+    }
+    data[i].resize(page_size);
+    std::iota(data[i].begin(), data[i].end(), i);
+    mem_ranges.emplace_back(make_unique<MemRange>(data[i].data(), page_size));
+    unique_ptr<TmpWriteHandle> handle;
+    ASSERT_OK(file_group.Write(*(mem_ranges[i].get()), callback, &handle));
+    WaitForWrite(handle.get());
+    handles.emplace_back(move(handle));
+  }
+  WaitForCallbacks(PAGE_NUM);
+
+  // There should be two files in the TmpFileMgr.
+  ASSERT_EQ(GetRemoteTmpFileNum(file_group), 2);
+  auto file1 = GetRemoteTmpFileByFileGroup(file_group, 0);
+  auto file2 = GetRemoteTmpFileByFileGroup(file_group, 1);
+  WaitForDiskFileStatus(file1->DiskFile(), DiskFileStatus::PERSISTED);
+  WaitForDiskFileStatus(file1->DiskBufferFile(), DiskFileStatus::PERSISTED);
+  WaitForDiskFileStatus(file2->DiskFile(), DiskFileStatus::PERSISTED);
+  WaitForDiskFileStatus(file2->DiskBufferFile(), DiskFileStatus::PERSISTED);
+
+  // Check Actual Size is as expected.
+  ASSERT_EQ(file1->DiskBufferFile()->actual_file_size(), file_size_1);
+  ASSERT_EQ(file2->DiskBufferFile()->actual_file_size(), file_size_2);
+
+  // Remove the local buffers in order to read from the remote fs.
+  ASSERT_OK(tmp_file_mgr.TryEvictFile(file1));
+  ASSERT_OK(tmp_file_mgr.TryEvictFile(file2));
+
+  // Read the data.
+  for (int i = 0; i < PAGE_NUM; i++) {
+    vector<uint8_t> tmp;
+    tmp.resize(mem_ranges[i]->len());
+    ASSERT_OK(file_group.Read(handles[i].get(), MemRange(tmp.data(), tmp.size())));
+    EXPECT_EQ(0, memcmp(tmp.data(), mem_ranges[i]->data(), tmp.size()));
+    file_group.DestroyWriteHandle(move(handles[i]));
+  }
+
+  // Check the metrics that we did use the read buffer for reading.
+  checkHWMReadBuffMetrics();
+
+  file_group.Close();
+  test_env_->TearDownQueries();
+}
+
+// Test to set different capacities of the read buffer for remote spilling.
+TEST_F(TmpFileMgrTest, TestBatchReadingSetMaxBytes) {
+  vector<int64_t> buffer_sizes(
+      {READ_BUFFER_SMALL_SIZE_BYTES, READ_BUFFER_EXTREMELY_BIG_SIZE_BYTES});
+  FLAGS_remote_batch_read = true;
+  for (int64_t buffer_size : buffer_sizes) {
+    TmpFileMgr tmp_file_mgr;
+    vector<string> tmp_dirs;
+    bool expect_max_allowed_bytes = false;
+    CreateAndGetGeneralRemoteTmpDir(&tmp_dirs);
+    SetReadBufferSizeHelper(buffer_size, &expect_max_allowed_bytes);
+    ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, true, "", false, metrics_.get()));
+    int64_t max_allowed_bytes = GetReadBufferMaxAllowedBytes(&tmp_file_mgr);
+    int64_t cur_max_bytes = GetReadBufferCurrentMaxBytes(&tmp_file_mgr);
+    // If the buffer size is too large, then the current max bytes of the read buffer
+    // should be set to the system max allowed bytes instead of the buffer size.
+    if (expect_max_allowed_bytes) {
+      EXPECT_EQ(cur_max_bytes, max_allowed_bytes);
+    } else {
+      EXPECT_EQ(cur_max_bytes, buffer_size);
+    }
+    metrics_.reset(new MetricGroup("tmp-file-mgr-test"));
+  }
 }
 
 } // namespace impala

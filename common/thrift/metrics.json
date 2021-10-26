@@ -2421,6 +2421,26 @@
     "key": "tmp-file-mgr.scratch-space-bytes-used.dir-$0"
   },
   {
+    "description": "The current total read memory buffer bytes for all scratch directories.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Read memory buffer used for scratch directories",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "tmp-file-mgr.scratch-read-memory-buffer-used"
+  },
+  {
+    "description": "The high water mark for read memory buffer bytes of all scratch directories.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Read memory buffer HWM for scratch directories",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "tmp-file-mgr.scratch-read-memory-buffer-used-high-water-mark"
+  },
+  {
     "description": "The current total spilled bytes for the local buffer directory.",
     "contexts": [
       "IMPALAD"

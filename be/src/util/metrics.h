@@ -270,9 +270,11 @@ class AtomicHighWaterMarkGauge : public ScalarMetric<int64_t, TMetricKind::GAUGE
 
   /// Adds 'delta' to the current value atomically.
   /// The hwm value is also updated atomically.
-  void Increment(int64_t delta) {
+  /// The updated current value is also returned.
+  int64_t Increment(int64_t delta) {
     const int64_t new_val = current_value_->Increment(delta);
     UpdateMax(new_val);
+    return new_val;
   }
 
   IntGauge* current_value() const { return current_value_; }

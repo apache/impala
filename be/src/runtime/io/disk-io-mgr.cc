@@ -263,6 +263,7 @@ Status WriteRange::DoWrite() {
     ret_status = file_writer->Open();
     if (!ret_status.ok()) return DoWriteEnd(queue, ret_status);
     ret_status = file_writer->Write(this, &written_bytes);
+    disk_file_->UpdateReadBufferMetaDataIfNeeded(written_bytes - len_);
     int64_t actual_file_size = disk_file_->actual_file_size();
     // actual_file_size is only set once, otherwise it is 0 by default. If it is still
     // not set, it is impossible to be full.
@@ -296,28 +297,23 @@ Status WriteRange::DoWriteEnd(DiskQueue* queue, const Status& ret_status) {
 
 RemoteOperRange::RemoteOperRange(DiskFile* src_file, DiskFile* dst_file,
     int64_t block_size, int disk_id, RequestType::type type, DiskIoMgr* io_mgr,
-    RemoteOperDoneCallback callback)
-  : RequestRange(type, disk_id),
+    RemoteOperDoneCallback callback, int64_t file_offset)
+  : RequestRange(type, disk_id, file_offset),
     callback_(callback),
     io_mgr_(io_mgr),
     disk_file_src_(src_file),
     disk_file_dst_(dst_file),
     block_size_(block_size) {}
 
-Status RemoteOperRange::DoOper(uint8_t* buffer, int64_t buffer_size) {
-  DCHECK(request_type() == RequestType::FILE_UPLOAD);
-  return DoUpload(buffer, buffer_size);
-}
-
 Status RemoteOperRange::DoUpload(uint8_t* buffer, int64_t buffer_size) {
   DCHECK(disk_file_src_ != nullptr);
   DCHECK(disk_file_dst_ != nullptr);
   hdfsFS hdfs_conn = disk_file_dst_->hdfs_conn_;
-  int64_t file_size = disk_file_src_->actual_file_size_.Load();
+  int64_t file_size = disk_file_src_->actual_file_size();
   DCHECK(hdfs_conn != nullptr);
   DCHECK(file_size != 0);
-  const char* remote_file_path = disk_file_dst_->path().c_str();
-  const char* local_file_path = disk_file_src_->path().c_str();
+  const string& remote_file_path = disk_file_dst_->path();
+  const string& local_file_path = disk_file_src_->path();
   DiskQueue* queue = io_mgr_->disk_queues_[disk_id_];
   Status status = Status::OK();
   int64_t ret, offset = 0;
@@ -337,9 +333,9 @@ Status RemoteOperRange::DoUpload(uint8_t* buffer, int64_t buffer_size) {
   }
 
   RETURN_IF_ERROR(io_mgr_->local_file_system_->OpenForRead(
-      local_file_path, O_RDONLY, S_IRUSR | S_IWUSR, &local_file));
+      local_file_path.c_str(), O_RDONLY, S_IRUSR | S_IWUSR, &local_file));
   hdfsFile remote_hdfs_file =
-      hdfsOpenFile(hdfs_conn, remote_file_path, O_WRONLY, 0, 0, buffer_size);
+      hdfsOpenFile(hdfs_conn, remote_file_path.c_str(), O_WRONLY, 0, 0, buffer_size);
 
   if (remote_hdfs_file == nullptr) {
     status = Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
@@ -350,9 +346,12 @@ Status RemoteOperRange::DoUpload(uint8_t* buffer, int64_t buffer_size) {
   /// Read the blocks from the local buffer file and write the blocks
   /// to the remote file.
   while (file_size != offset) {
+    // If to_delete flag is set, we will quit the upload process, close the local file
+    // but leave the deletion work to the thread which sets the to_delete flag.
+    if (disk_file_src_->is_to_delete()) goto end;
     int bytes = min(file_size - offset, buffer_size);
-    status =
-        io_mgr_->local_file_system_->Fread(local_file, buffer, bytes, local_file_path);
+    status = io_mgr_->local_file_system_->Fread(
+        local_file, buffer, bytes, local_file_path.c_str());
     if (!status.ok()) goto end;
     {
       ScopedHistogramTimer write_timer(queue->write_latency());
@@ -377,18 +376,94 @@ end:
     ScopedHistogramTimer write_timer(queue->write_latency());
     if (hdfsCloseFile(hdfs_conn, remote_hdfs_file) != 0) {
       // Try to close the local file if error happens.
-      RETURN_IF_ERROR(io_mgr_->local_file_system_->Fclose(local_file, local_file_path));
+      RETURN_IF_ERROR(
+          io_mgr_->local_file_system_->Fclose(local_file, local_file_path.c_str()));
       return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
           Substitute(
               "Failed to close HDFS file: $0", remote_file_path, GetHdfsErrorMsg("")));
     }
   }
-  RETURN_IF_ERROR(io_mgr_->local_file_system_->Fclose(local_file, local_file_path));
+  RETURN_IF_ERROR(
+      io_mgr_->local_file_system_->Fclose(local_file, local_file_path.c_str()));
   if (status.ok()) {
     disk_file_dst_->SetStatus(io::DiskFileStatus::PERSISTED);
     disk_file_dst_->SetActualFileSize(file_size);
   } else {
     LOG(WARNING) << "File upload failed, msg:" << status.msg().msg();
+  }
+  return status;
+}
+
+Status RemoteOperRange::DoFetch() {
+  hdfsFS hdfs_conn = disk_file_src_->hdfs_conn_;
+  DCHECK(hdfs_conn != nullptr);
+  // Fetch the data from the source file (remote) to the destination file (local).
+  DCHECK(disk_file_dst_ != nullptr);
+  DCHECK(disk_file_src_ != nullptr);
+  int64_t buffer_idx = disk_file_dst_->GetReadBufferIndex(offset_);
+  int64_t local_file_size = disk_file_dst_->GetReadBuffActualSize(buffer_idx);
+  const string& remote_file_path = disk_file_src_->path();
+  DiskQueue* queue = io_mgr_->disk_queues_[disk_id_];
+  Status status = Status::OK();
+
+  // Get the shared lock to prevent the physical files from deletion during the fetching.
+  // The sequence is to get the local file lock, then remote file lock, or it might meet
+  // deadlocks.
+  shared_lock<shared_mutex> dstl(disk_file_dst_->physical_file_lock_);
+  shared_lock<shared_mutex> srcl(disk_file_src_->physical_file_lock_);
+
+  // Check if the remote file is deleted.
+  auto src_status = disk_file_src_->GetFileStatus();
+  if (src_status != io::DiskFileStatus::PERSISTED) {
+    DCHECK(src_status == io::DiskFileStatus::DELETED);
+    return Status(Substitute("File has been deleted, path: '$0'", remote_file_path));
+  }
+
+  unique_lock<SpinLock> read_buffer_lock(
+      *(disk_file_dst_->GetBufferBlockLock(buffer_idx)));
+  MemBlock* read_buffer_bloc = disk_file_dst_->GetBufferBlock(buffer_idx);
+  if (disk_file_dst_->IsReadBufferBlockStatus(
+          read_buffer_bloc, MemBlockStatus::DISABLED, dstl, &read_buffer_lock)) {
+    // If the read block is disabled, the status doesn't allow any writes to
+    // the block, probably the query ends or is cancelled.
+    return Status(Substitute(
+        "Mem block '$0' has been deleted, path: '$1'", buffer_idx, remote_file_path));
+  }
+  RETURN_IF_ERROR(disk_file_dst_->AllocReadBufferBlockLocked(
+      read_buffer_bloc, local_file_size, dstl, read_buffer_lock));
+  DCHECK(read_buffer_bloc->data() != nullptr);
+  hdfsFile remote_hdfs_file =
+      hdfsOpenFile(hdfs_conn, remote_file_path.c_str(), O_RDONLY, 0, 0, block_size_);
+  if (remote_hdfs_file == nullptr) {
+    status = Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
+        Substitute("Could not open file: $0: $1", remote_file_path, GetStrErrMsg()));
+  } else {
+    int ret = [&]() {
+      ScopedHistogramTimer read_timer(queue->read_latency());
+      return hdfsPreadFully(hdfs_conn, remote_hdfs_file, offset_,
+          read_buffer_bloc->data(), local_file_size);
+    }();
+    if (ret != -1) {
+      queue->read_size()->Update(local_file_size);
+      disk_file_dst_->SetReadBufferBlockStatus(
+          read_buffer_bloc, MemBlockStatus::WRITTEN, dstl, &read_buffer_lock);
+    } else {
+      // The caller may need to handle the error, and deal with the read buffer block.
+      status = Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
+          GetHdfsErrorMsg("Error reading from HDFS file: ", remote_file_path));
+    }
+  }
+
+  // Try to close the remote file.
+  if (remote_hdfs_file != nullptr && hdfsCloseFile(hdfs_conn, remote_hdfs_file) != 0) {
+    // If there was an error during reading, keep the old status.
+    string close_err_msg = Substitute(
+        "Failed to close HDFS file: $0", remote_file_path, GetHdfsErrorMsg(""));
+    if (status.ok()) {
+      return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(), close_err_msg);
+    } else {
+      LOG(WARNING) << close_err_msg;
+    }
   }
   return status;
 }
@@ -690,7 +765,7 @@ int64_t DiskIoMgr::ComputeIdealBufferReservation(int64_t scan_range_len) {
 // Work is available if there is a RequestContext with
 //  - A ScanRange with a buffer available, or
 //  - A WriteRange in unstarted_write_ranges_ or
-//  - A RemoteOperRange in unstarted_remote_upload_ranges_
+//  - A RemoteOperRange in unstarted_remote_file_op_ranges_.
 RequestRange* DiskQueue::GetNextRequestRange(RequestContext** request_context) {
   // This loops returns either with work to do or when the disk IoMgr shuts down.
   while (true) {
@@ -766,10 +841,16 @@ void DiskQueue::DiskThreadLoop(DiskIoMgr* io_mgr) {
                                 "block size: '$0'",
                   size)));
         } else {
-          Status oper_status = oper_range->DoOper(buffer, size);
+          Status oper_status = oper_range->DoUpload(buffer, size);
           worker_context->OperDone(oper_range, oper_status);
           free(buffer);
         }
+        break;
+      }
+      case RequestType::FILE_FETCH: {
+        RemoteOperRange* oper_range = static_cast<RemoteOperRange*>(range);
+        Status oper_status = oper_range->DoFetch();
+        worker_context->OperDone(oper_range, oper_status);
         break;
       }
       default:

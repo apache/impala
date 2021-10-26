@@ -45,6 +45,13 @@ class TestScratchDir(CustomClusterTestSuite):
       from tpch.orders
       order by o_orderdate
       """
+  # Query against a big table with order by requires spill to disk if intermediate
+  # results don't fit in memory.
+  spill_query_big_table = """
+      select l_orderkey, l_linestatus, l_shipdate, l_comment
+      from tpch.lineitem
+      order by l_orderkey
+      """
   # Query without order by can be executed without spilling to disk.
   in_mem_query = """
       select o_orderdate, o_custkey, o_comment from tpch.orders
@@ -440,3 +447,38 @@ class TestScratchDir(CustomClusterTestSuite):
     # assert that we did use the scratch space and should be integer times of the
     # remote file size.
     assert (total_size > 0 and total_size % (8 * 1024 * 1024) == 0)
+
+  @pytest.mark.execute_serially
+  @SkipIf.not_hdfs
+  def test_scratch_dirs_batch_reading(self, vector):
+    # Set the buffer directory small enough to spill to the remote one.
+    normal_dirs = self.generate_dirs(1)
+    normal_dirs[0] = '{0}:2MB:{1}'.format(normal_dirs[0], 1)
+    normal_dirs.append('hdfs://localhost:20500/tmp')
+    self._start_impala_cluster([
+      '--impalad_args=-logbuflevel=-1 -scratch_dirs={0}'.format(','.join(normal_dirs)),
+      '--impalad_args=--allow_multiple_scratch_dirs_per_device=true',
+      '--impalad_args=--buffer_pool_clean_pages_limit=1m',
+      '--impalad_args=--remote_tmp_file_size=1M',
+      '--impalad_args=--remote_tmp_file_block_size=1m',
+      '--impalad_args=--remote_read_memory_buffer_size=1GB',
+      '--impalad_args=--remote_batch_read=true'],
+      cluster_size=1,
+      expected_num_impalads=1)
+    self.assert_impalad_log_contains("INFO", "Using scratch directory ",
+                                    expected_count=len(normal_dirs) - 1)
+    vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
+    impalad = self.cluster.impalads[0]
+    client = impalad.service.create_beeswax_client()
+    handle = self.execute_query_async_using_client(client, self.spill_query, vector)
+    verifier = MetricVerifier(impalad.service)
+    verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
+    results = client.fetch(self.spill_query, handle)
+    assert results.success
+    metrics0 = self.get_metric(
+      'tmp-file-mgr.scratch-read-memory-buffer-used-high-water-mark')
+    assert (metrics0 > 0)
+    metrics1 = self.get_metric('tmp-file-mgr.scratch-space-bytes-used-high-water-mark')
+    assert (metrics1 > 0)
+    client.close_query(handle)
+    client.close()

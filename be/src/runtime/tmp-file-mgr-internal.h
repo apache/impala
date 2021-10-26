@@ -30,6 +30,9 @@
 #include "util/hdfs-util.h"
 
 namespace impala {
+namespace io {
+class DiskIoMgr;
+}
 
 /// TmpFile is a handle to a physical file in a temporary directory. File space
 /// can be allocated and files removed using AllocateSpace() and Remove(). Used
@@ -84,7 +87,11 @@ class TmpFile {
   int64_t len() const { return allocation_offset_; }
 
   /// Returns the disk id of the temporary file.
-  int disk_id() const { return disk_id_; }
+  virtual int disk_id(bool is_file_op = false) const {
+    // The disk id for file operations should only be supported in TmpFileRemote.
+    DCHECK(!is_file_op);
+    return disk_id_;
+  }
 
   /// Returns if the temporary file is in local file system.
   bool is_local() { return expected_local_; }
@@ -166,9 +173,9 @@ class TmpFileLocal : public TmpFile {
   TmpFileLocal(TmpFileGroup* file_group, TmpFileMgr::DeviceId device_id,
       const std::string& path, bool expected_local = true);
 
-  bool AllocateSpace(int64_t num_bytes, int64_t* offset);
-  io::DiskFile* GetWriteFile();
-  Status Remove();
+  bool AllocateSpace(int64_t num_bytes, int64_t* offset) override;
+  io::DiskFile* GetWriteFile() override;
+  Status Remove() override;
 };
 
 /// TmpFileRemote is a derived class of TmpFile to provide methods to handle a
@@ -179,7 +186,7 @@ class TmpFileLocal : public TmpFile {
 /// read or upload on the file.A remote temporary file can have two DiskFiles, a local
 /// buffer and a remote file.
 /// Each DiskFile owns two type of locks, a file lock and a status lock.
-/// DiskFile::lock_  -- file lock
+/// DiskFile::physical_file_lock_  -- file lock
 /// DiskFile::status_lock_ -- status lock
 /// For doing file deleting operation, a unique file lock is needed. For other types of
 /// operations on the file, like reading or writing, a shared file lock is needed to
@@ -212,10 +219,48 @@ class TmpFileRemote : public TmpFile {
       bool expected_local = false, const char* url = nullptr);
   ~TmpFileRemote();
 
-  bool AllocateSpace(int64_t num_bytes, int64_t* offset);
-  io::DiskFile* GetWriteFile();
+  bool AllocateSpace(int64_t num_bytes, int64_t* offset) override;
+  io::DiskFile* GetWriteFile() override;
   TmpDir* GetLocalBufferDir() const;
-  Status Remove();
+  Status Remove() override;
+
+  /// Returns the buffer file handle for reading.
+  /// If the local file is not evicted, return immediately.
+  /// If the local file is evicted and batch reading is enabled, may also send a request
+  /// to fetch a block from the remote asynchronously to the memory.
+  io::DiskFile* GetReadBufferFile(int64_t offset);
+
+  /// Send a request to the disk queue to fetch a block asynchronously from the remote
+  /// filesystem.
+  /// If the content is in the buffer block, "fetched" will be set to true. Otherwise,
+  /// the caller should fetch the page from the remote filesystem.
+  void AsyncFetchReadBufferBlock(io::DiskFile* read_buffer_file,
+      io::MemBlock* read_buffer_block, int buffer_idx, bool* fetched);
+
+  /// Get the read buffer block index from the offset to the file.
+  int GetReadBufferIndex(int64_t offset);
+
+  /// Increase the counter of the page that have been read off the buffer block.
+  /// Return true if all the pages have been read of the block.
+  bool IncrementReadPageCount(int buffer_idx);
+
+  /// Try to delete the buffer block and release the reservation.
+  template <typename T>
+  void TryDeleteReadBuffer(const T& lock, int buffer_idx);
+
+  /// Try to delete the buffer block and release the reservation with exclusive lock.
+  void TryDeleteReadBufferExcl(int buffer_idx) {
+    std::unique_lock<boost::shared_mutex> lock(*(disk_buffer_file_->GetFileLock()));
+    TryDeleteReadBuffer(lock, buffer_idx);
+  }
+
+  /// Try to delete the buffer block and release the reservation with shared lock.
+  /// Use the exclusive one unless sure that no one else would access the specific
+  /// read buffer block during deletion and the scenario requires high performance.
+  void TryDeleteMemReadBufferShared(int buffer_idx) {
+    boost::shared_lock<boost::shared_mutex> lock(*(disk_buffer_file_->GetFileLock()));
+    TryDeleteReadBuffer(lock, buffer_idx);
+  }
 
   /// Returns the size of the file.
   int64_t file_size() const { return file_size_; }
@@ -259,6 +304,19 @@ class TmpFileRemote : public TmpFile {
     return buffer_returned_;
   }
 
+  /// Set the flag to files to indicate the file is going to be deleted.
+  void SetToDeleteFlag(bool to_delete = true) {
+    disk_buffer_file_->SetToDeleteFlag(to_delete);
+    disk_file_->SetToDeleteFlag(to_delete);
+  }
+
+  /// Returns the disk id of the temporary file.
+  /// If is_file_op is true, return the disk id specially for file operations.
+  int disk_id(bool is_file_op = false) const override {
+    if (!is_file_op) return disk_id_;
+    return disk_id_file_op_;
+  }
+
  private:
   friend class TmpWriteHandle;
   friend class TmpFileMgr;
@@ -271,14 +329,17 @@ class TmpFileRemote : public TmpFile {
   /// remaining space.
   int64_t file_size_ = 0;
 
+  /// The default size of a read buffer block.
+  int64_t read_buffer_block_size_ = 0;
+
+  /// The id of the disk for file operations.
+  int disk_id_file_op_ = 0;
+
   /// Bogus value of mtime for HDFS files.
   const int64_t mtime_{100000};
 
-  /// The range for doing file uploading.
-  std::unique_ptr<io::RemoteOperRange> upload_range_;
-
   // The pointer of the disk buffer file, which is the local buffer
-  // of the disk file when disk file is a remote disk file.
+  // of the remote disk file. The buffer is for writing.
   std::unique_ptr<io::DiskFile> disk_buffer_file_;
 
   /// The hdfs connection used to connect to the remote scratch path.
@@ -287,6 +348,12 @@ class TmpFileRemote : public TmpFile {
   /// at_capacity_ is set to true if the file can't assign space anymore when the
   /// assigned space is equal to or just over the default file size.
   bool at_capacity_ = false;
+
+  /// The range for doing file uploading.
+  std::unique_ptr<io::RemoteOperRange> upload_range_;
+
+  /// The ranges for doing fetch operations from a remote filesystem.
+  std::vector<std::unique_ptr<io::RemoteOperRange>> fetch_ranges_;
 
   /// Protect below members.
   SpinLock lock_;
@@ -297,6 +364,27 @@ class TmpFileRemote : public TmpFile {
   /// True if the buffer of the file is returned to the pool. We assume that the buffer
   /// only returns once and only needs to be returned when the buffer space is reserved.
   bool buffer_returned_ = false;
+
+  // The number of pages have been read per read buffer.
+  std::unique_ptr<int64_t[]> disk_read_page_cnts_;
+
+  // Return the start offset of the read buffer block.
+  int64_t GetReadBuffStartOffset(int buffer_idx) {
+    DCHECK(disk_buffer_file_ != nullptr);
+    return disk_buffer_file_->GetReadBuffStartOffset(buffer_idx);
+  }
+
+  // Return the page count of the read buffer block.
+  int64_t GetReadBuffPageCount(int buffer_idx) {
+    DCHECK(disk_buffer_file_ != nullptr);
+    return disk_buffer_file_->GetReadBuffPageCount(buffer_idx);
+  }
+
+  /// Internal DCHECK for the buffer index.
+  void DCheckReadBufferIdx(int buffer_idx) {
+    DCHECK_LT(buffer_idx, file_group_->tmp_file_mgr()->GetNumReadBuffersPerFile());
+    DCHECK_GE(buffer_idx, 0);
+  }
 };
 
 /// TmpFileDummy is a derived class of TmpFile for dummy allocation, used in
@@ -304,9 +392,9 @@ class TmpFileRemote : public TmpFile {
 class TmpFileDummy : public TmpFile {
  public:
   TmpFileDummy() : TmpFile(nullptr, -1, "") { disk_type_ = io::DiskFileType::DUMMY; }
-  bool AllocateSpace(int64_t num_bytes, int64_t* offset) { return true; }
-  io::DiskFile* GetWriteFile() { return nullptr; }
-  Status Remove() { return Status::OK(); }
+  bool AllocateSpace(int64_t num_bytes, int64_t* offset) override { return true; }
+  io::DiskFile* GetWriteFile() override { return nullptr; }
+  Status Remove() override { return Status::OK(); }
 };
 
 /// A configured temporary directory that TmpFileMgr allocates files in.

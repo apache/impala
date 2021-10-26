@@ -2479,5 +2479,127 @@ TEST_F(DiskIoMgrTest, WriteToRemoteDiffPagesSuccess) {
   tmp_file_grp->Close();
   io_mgr.UnregisterContext(io_ctx.get());
 }
+
+// Delete the physical remote file after upload.
+TEST_F(DiskIoMgrTest, WriteToRemoteFileDeleted) {
+  num_oper_ = 0;
+  num_ranges_written_ = 0;
+  string remote_file_path = REMOTE_URL + "/test";
+  string local_buffer_path = LOCAL_BUFFER_PATH + "/test";
+  FLAGS_remote_tmp_file_size = "1K";
+  int64_t file_size = 1024;
+  int64_t block_size = 1024;
+
+  // Delete the hdfs file if it exists.
+  hdfsDelete(hdfsConnect("default", 0), remote_file_path.c_str(), 1);
+
+  // Delete the file in local file system if it exists.
+  vector<string> local_buffer_path_vec;
+  local_buffer_path_vec.push_back(local_buffer_path);
+  Status rm_status = FileSystemUtil::RemovePaths(local_buffer_path_vec);
+
+  TmpFileMgr tmp_file_mgr;
+  DiskIoMgr io_mgr(1, 1, 1, 1, 10);
+  ASSERT_OK(io_mgr.Init());
+  TmpFileGroup* tmp_file_grp = NewRemoteFileGroup(&tmp_file_mgr, &io_mgr);
+  ASSERT_TRUE(tmp_file_grp != nullptr);
+
+  ObjectPool tmp_pool;
+  unique_ptr<RequestContext> io_ctx = io_mgr.RegisterContext();
+
+  TmpFileRemote tmp_file(
+      tmp_file_grp, 0, remote_file_path, local_buffer_path, false, REMOTE_URL.c_str());
+  DiskFile* remote_file = tmp_file.DiskFile();
+  DiskFile* local_buffer_file = tmp_file.DiskBufferFile();
+  tmp_file.GetWriteFile()->SetActualFileSize(file_size);
+
+  // Write some data for testing.
+  size_t write_size_len = sizeof(int32_t);
+  vector<WriteRange*> ranges;
+  vector<int32_t> datas;
+  for (int i = 0; i < file_size / write_size_len; i++) {
+    int32_t* data = tmp_pool.Add(new int32_t);
+    *data = rand();
+    datas.push_back(*data);
+    WriteRange** new_range = tmp_pool.Add(new WriteRange*);
+    WriteRange::WriteDoneCallback callback = [=](const Status& status) {
+      ASSERT_EQ(0, status.code());
+      lock_guard<mutex> l(written_mutex_);
+      num_ranges_written_ = 1;
+      writes_done_.NotifyOne();
+    };
+
+    *new_range = tmp_pool.Add(new WriteRange(remote_file_path, 0, 0, callback));
+    (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));
+    (*new_range)->SetDiskFile(tmp_file.GetWriteFile());
+    ranges.push_back(*new_range);
+    EXPECT_OK(io_ctx->AddWriteRange(*new_range));
+    {
+      unique_lock<mutex> lock(written_mutex_);
+      while (num_ranges_written_ < 1) writes_done_.Wait(lock);
+    }
+    num_ranges_written_ = 0;
+    if (i == file_size / write_size_len - 1) {
+      tmp_file.SetAtCapacity();
+    }
+  }
+
+  auto disk_id = io_mgr.RemoteDfsDiskFileOperId();
+  bool upload_ok = false;
+  RemoteOperRange::RemoteOperDoneCallback callback = [&](const Status& status) {
+    upload_ok = status.ok();
+    lock_guard<mutex> l(oper_mutex_);
+    num_oper_ = 1;
+    oper_done_.NotifyOne();
+  };
+
+  // Request to upload the file to the remote.
+  auto oper_range = tmp_pool.Add(new RemoteOperRange(local_buffer_file, remote_file,
+      block_size, disk_id, RequestType::FILE_UPLOAD, &io_mgr, callback));
+  Status add_status = io_ctx->AddRemoteOperRange(oper_range);
+  ASSERT_OK(add_status);
+
+  // Wait until the file is created before calling the deletion.
+  while (!HdfsFileExist(remote_file_path)) {
+    usleep(rand() % 1000);
+  }
+  // Delete the file to create the failure.
+  hdfsDelete(hdfsConnect("default", 0), remote_file_path.c_str(), 1);
+
+  {
+    unique_lock<mutex> lock(oper_mutex_);
+    while (num_oper_ < 1) oper_done_.Wait(lock);
+  }
+
+  // If any chance the file is deleted and cause an upload failure, it won't lead to a
+  // crash. Otherwise the upload succeeds, and we should meet a failure during reading
+  // due to the deletion of the remote file.
+  EXPECT_FALSE(HdfsFileExist(remote_file_path));
+  if (upload_ok) {
+    // TryEvictFile and the local buffer file should be evicted.
+    Status try_evict_status = tmp_file_mgr.TryEvictFile(&tmp_file);
+    ASSERT_TRUE(try_evict_status.ok());
+
+    // None of the files should exist.
+    EXPECT_FALSE(FileExist(local_buffer_path));
+
+    // Should fail reading the first range.
+    ScanRange* scan_range = tmp_pool.Add(new ScanRange);
+    auto range = ranges.at(0);
+    size_t buffer_len = sizeof(int32_t);
+    vector<uint8_t> client_buffer(buffer_len);
+    scan_range->Reset(hdfsConnect("default", 0), range->file(), range->len(),
+        range->offset(), 0, false, 1000000,
+        BufferOpts::ReadInto(client_buffer.data(), buffer_len, BufferOpts::NO_CACHING),
+        nullptr, tmp_file.DiskFile(), tmp_file.DiskBufferFile());
+    bool needs_buffers;
+    ASSERT_OK(io_ctx->StartScanRange(scan_range, &needs_buffers));
+    unique_ptr<BufferDescriptor> io_buffer;
+    EXPECT_FALSE(scan_range->GetNext(&io_buffer).ok());
+  }
+  num_oper_ = 0;
+  tmp_file_grp->Close();
+  io_mgr.UnregisterContext(io_ctx.get());
+}
 }
 }
