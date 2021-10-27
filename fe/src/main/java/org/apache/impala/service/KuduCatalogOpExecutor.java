@@ -74,8 +74,9 @@ public class KuduCatalogOpExecutor {
    * Throws an exception if 'msTbl' represents an external table or if the table couldn't
    * be created in Kudu.
    */
-  static void createSynchronizedTable(org.apache.hadoop.hive.metastore.api.Table msTbl,
-      TCreateTableParams params) throws ImpalaRuntimeException {
+  public static void createSynchronizedTable(
+          org.apache.hadoop.hive.metastore.api.Table msTbl,
+          TCreateTableParams params) throws ImpalaRuntimeException {
     Preconditions.checkState(KuduTable.isSynchronizedTable(msTbl));
     Preconditions.checkState(
         msTbl.getParameters().get(KuduTable.KEY_TABLE_ID) == null);
@@ -263,7 +264,7 @@ public class KuduCatalogOpExecutor {
    * TableNotFoundException is thrown. If the table exists and could not be dropped,
    * an ImpalaRuntimeException is thrown.
    */
-  static void dropTable(org.apache.hadoop.hive.metastore.api.Table msTbl,
+  public static void dropTable(org.apache.hadoop.hive.metastore.api.Table msTbl,
       boolean ifExists) throws ImpalaRuntimeException, TableNotFoundException {
     Preconditions.checkState(KuduTable.isSynchronizedTable(msTbl));
     String tableName = msTbl.getParameters().get(KuduTable.KEY_TABLE_NAME);
