@@ -457,8 +457,31 @@ build_all_components() {
     fi
   fi
   ${MAKE_CMD} -j${IMPALA_BUILD_THREADS:-4} ${IMPALA_MAKE_FLAGS} ${MAKE_TARGETS}
+  save_coverage_data ${build_type}
 }
 
+save_coverage_data() {
+  local build_type=$1
+  local gcov_prefix=''
+  case $build_type in
+    CODE_COVERAGE_RELEASE)
+      gcov_prefix='gcov_release'
+      ;;
+    CODE_COVERAGE_DEBUG)
+      gcov_prefix='gcov_debug'
+      ;;
+    *)
+      # Other build types don't generate coverage data
+      return
+      ;;
+  esac
+  # Copy all '.gcno' files to ${gcov_prefix}
+  mkdir -p ${IMPALA_HOME}/${gcov_prefix}
+  pushd ${IMPALA_HOME}
+  find ./be -name '*.gcno' -exec \
+       cp --parents \{\} ./${gcov_prefix} \;
+  popd
+}
 
 # Called with the CMAKE_BUILD_TYPE as the first argument, e.g.
 #   generate_cmake_files DEBUG
@@ -609,9 +632,17 @@ if [[ "$BUILD_RELEASE_AND_DEBUG" -eq 1 ]]; then
   # Build the standard release and debug builds. We can't do this for arbitrary build
   # types because many build types reuse the same be/build/debug and be/build/release
   # trees.
-  build_all_components RELEASE 1
+  CMAKE_BUILD_TYPE=RELEASE
+  if [[ ${CODE_COVERAGE} -eq 1 ]]; then
+    CMAKE_BUILD_TYPE=CODE_COVERAGE_RELEASE
+  fi
+  build_all_components ${CMAKE_BUILD_TYPE} 1
   # Avoid rebuilding targets that are independent of the build type.
-  build_all_components DEBUG 0
+  CMAKE_BUILD_TYPE=DEBUG
+  if [[ ${CODE_COVERAGE} -eq 1 ]]; then
+    CMAKE_BUILD_TYPE=CODE_COVERAGE_DEBUG
+  fi
+  build_all_components ${CMAKE_BUILD_TYPE} 0
 else
   build_all_components $CMAKE_BUILD_TYPE 1
 fi
