@@ -468,6 +468,9 @@ def get_toolchain_downloads():
        "jwt-cpp", "libev", "libunwind", "lz4", "openldap", "openssl", "orc", "protobuf",
        "python", "rapidjson", "re2", "snappy", "thrift", "tpc-h", "tpc-ds", "zlib",
        "zstd"])
+  protobuf_package_clang = ToolchainPackage(
+      "protobuf", explicit_version=os.environ.get("IMPALA_PROTOBUF_CLANG_VERSION"))
+  toolchain_packages += [protobuf_package_clang]
   # Check whether this platform is supported (or whether a valid custom toolchain
   # has been provided).
   if not try_get_platform_release_label() \

@@ -390,7 +390,7 @@ class ExactlyOnceRpcTest : public RpcTestBase {
 TEST_F(ExactlyOnceRpcTest, TestExactlyOnceSemanticsAfterRpcCompleted) {
   ASSERT_OK(StartServer());
   ExactlyOnceResponsePB original_resp;
-  int mem_consumption = mem_tracker_->consumption();
+  size_t mem_consumption = mem_tracker_->consumption();
   {
     RpcController controller;
     ExactlyOnceRequestPB req;
@@ -404,9 +404,9 @@ TEST_F(ExactlyOnceRpcTest, TestExactlyOnceSemanticsAfterRpcCompleted) {
 
     // The incremental usage of a new client is the size of the response itself
     // plus some fixed overhead for the client-tracking structure.
-    int expected_incremental_usage = original_resp.SpaceUsed() + 200;
+    size_t expected_incremental_usage = original_resp.SpaceUsedLong() + 200;
 
-    int mem_consumption_after = mem_tracker_->consumption();
+    size_t mem_consumption_after = mem_tracker_->consumption();
     ASSERT_GT(mem_consumption_after - mem_consumption, expected_incremental_usage);
     mem_consumption = mem_consumption_after;
   }

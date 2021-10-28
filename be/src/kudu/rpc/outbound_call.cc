@@ -18,6 +18,8 @@
 #include "kudu/rpc/outbound_call.h"
 
 #include <cstdint>
+#include <functional>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -25,7 +27,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/function.hpp>
 #include <gflags/gflags.h>
 #include <google/protobuf/message.h>
 
@@ -147,7 +148,8 @@ void OutboundCall::SetRequestPayload(const Message& req,
 
   // Compute total size of sidecar payload so that extra space can be reserved as part of
   // the request body.
-  uint32_t message_size = req.ByteSize();
+  size_t message_size = req.ByteSizeLong();
+  CHECK_LE(message_size, std::numeric_limits<uint32_t>::max());
   sidecar_byte_size_ = 0;
   for (const unique_ptr<RpcSidecar>& car: sidecars_) {
     header_.add_sidecar_offsets(sidecar_byte_size_ + message_size);
