@@ -82,7 +82,8 @@ def get_package_info(pkg_name, pkg_version):
   # to sort them and return the first value in alphabetical order. This ensures that the
   # same result is always returned even if the ordering changed on the server.
   candidates = []
-  url = '{0}/simple/{1}/'.format(PYPI_MIRROR, pkg_name)
+  normalized_name = re.sub(r"[-_.]+", "-", pkg_name).lower()
+  url = '{0}/simple/{1}/'.format(PYPI_MIRROR, normalized_name)
   print('Getting package info from {0}'.format(url))
   # The web page should be in PEP 503 format (https://www.python.org/dev/peps/pep-0503/).
   # We parse the page with regex instead of an html parser because that requires
