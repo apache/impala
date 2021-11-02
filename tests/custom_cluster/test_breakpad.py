@@ -144,6 +144,7 @@ class TestBreakpadBase(CustomClusterTestSuite):
     self.assert_impalad_log_contains('ERROR', 'Wrote minidump to ',
         expected_count=expected_count)
 
+
 class TestBreakpadCore(TestBreakpadBase):
   """Core tests to check that the breakpad integration into the daemons works as
   expected. This includes writing minidump when the daemons call abort(). Add tests here
@@ -379,3 +380,67 @@ class TestBreakpadExhaustive(TestBreakpadBase):
     reduced_minidump_size = self.trigger_single_minidump_and_get_size()
     # Check that the minidump file size has been reduced.
     assert reduced_minidump_size < full_minidump_size
+
+
+class TestLogging(TestBreakpadBase):
+  """Exhaustive tests to check that impala log is rolled periodically, obeying
+  max_log_size and max_log_files, even in the presence of heavy stderr writing.
+  """
+  @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('These logging tests only run in exhaustive')
+    super(TestLogging, cls).setup_class()
+
+  def start_cluster_with_args(self, cluster_size, log_dir, **kwargs):
+    cluster_options = []
+    for daemon_arg in DAEMON_ARGS:
+      daemon_options = " ".join("-{0}={1}".format(k, v) for k, v in kwargs.iteritems())
+      cluster_options.append("--{0}={1}".format(daemon_arg, daemon_options))
+    self._start_impala_cluster(cluster_options, cluster_size=cluster_size,
+                               expected_num_impalads=cluster_size, impala_log_dir=log_dir)
+
+  def assert_logs(self, daemon, max_count, max_bytes, base_dir=None):
+    """Assert that there are at most 'max_count' of INFO + ERROR log files for the
+    specified daemon and the individual file size does not exceed 'max_bytes'."""
+    path = base_dir or self.tmp_dir
+    log_paths = glob.glob("%s/%s*log.ERROR.*" % (path, daemon)) \
+                + glob.glob("%s/%s*log.INFO.*" % (path, daemon))
+    assert len(log_paths) <= max_count
+    for path in log_paths:
+      try:
+        log_size = os.path.getsize(path)
+        assert log_size <= max_bytes, "{} exceed {} bytes".format(path, max_bytes)
+      except OSError:
+        # The daemon might delete the log in the middle of assertion.
+        # In that case, do nothing and move on.
+        pass
+
+  @pytest.mark.execute_serially
+  def test_excessive_cerr(self):
+    """Check that impalad log is kept being rotated when most writing activity is coming
+    from stderr stream.
+    Along with LogFaultInjectionThread in init.cc, this test will fill impalad error logs
+    with approximately 128kb error messages per second."""
+    test_cluster_size = 1
+    test_logbufsecs = 3
+    test_max_log_files = 2
+    test_max_log_size = 1  # 1 MB
+    test_error_msg = ('123456789abcde_' * 64)  # 1 KB error message
+    test_debug_actions = 'LOG_MAINTENANCE_STDERR:FAIL@1.0@' + test_error_msg
+    os.chmod(self.tmp_dir, 0744)
+
+    expected_log_max_bytes = int(1.2 * 1024**2)  # 1.2 MB
+    self.assert_logs('impalad', 0, expected_log_max_bytes)
+    self.start_cluster_with_args(test_cluster_size, self.tmp_dir,
+                                 logbufsecs=test_logbufsecs,
+                                 max_log_files=test_max_log_files,
+                                 max_log_size=test_max_log_size,
+                                 debug_actions=test_debug_actions)
+    self.wait_for_num_processes('impalad', test_cluster_size, 30)
+    expected_log_max_count = test_max_log_files * 2  # Both INFO and ERROR logs
+    # Wait for log maintenance thread to flush and rotate the logs asynchronously.
+    start = time.time()
+    while (time.time() - start < 40):
+      time.sleep(1)
+      self.assert_logs('impalad', expected_log_max_count, expected_log_max_bytes)

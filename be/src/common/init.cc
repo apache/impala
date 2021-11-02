@@ -19,7 +19,6 @@
 
 #include <csignal>
 #include <gperftools/heap-profiler.h>
-#include <gperftools/malloc_extension.h>
 #include <third_party/lss/linux_syscall_support.h>
 
 #include "common/global-flags.h"
@@ -34,7 +33,6 @@
 #include "rpc/thrift-util.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/datetime-simple-date-format-parser.h"
-#include "runtime/decimal-value.h"
 #include "runtime/exec-env.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
@@ -76,6 +74,7 @@ DECLARE_string(redaction_rules_file);
 DECLARE_bool(redirect_stdout_stderr);
 DECLARE_string(reserved_words_version);
 DECLARE_bool(symbolize_stacktrace);
+DECLARE_string(debug_actions);
 
 DEFINE_int32(memory_maintenance_sleep_time_ms, 10000, "Sleep time in milliseconds "
     "between memory maintenance iterations");
@@ -123,6 +122,10 @@ static unique_ptr<impala::Thread> pause_monitor;
 // Thread only used in backend tests to implement a test timeout.
 static unique_ptr<impala::Thread> be_timeout_thread;
 
+// Fault injection thread that is spawned if FLAGS_debug_actions has label
+// 'LOG_MAINTENANCE_STDERR'.
+static unique_ptr<impala::Thread> log_fault_inject_thread;
+
 // Timeout after 2 hours - backend tests should generally run in minutes or tens of
 // minutes at worst.
 #if defined(UNDEFINED_SANITIZER_FULL)
@@ -135,20 +138,54 @@ static const int64_t BE_TEST_TIMEOUT_S = 60L * 60L * 2L;
 extern "C" { void __gcov_flush(); }
 #endif
 
-[[noreturn]] static void LogMaintenanceThread() {
+[[noreturn]] static void LogFaultInjectionThread() {
+  const int64_t sleep_duration = 1;
   while (true) {
-    sleep(FLAGS_logbufsecs);
+    sleep(sleep_duration);
+
+    const int64_t now = MonotonicMillis();
+    Status status = DebugAction(FLAGS_debug_actions, "LOG_MAINTENANCE_STDERR");
+    if (!status.ok()) {
+      // Fault injection activated. Print the error message several times to cerr.
+      for (int i = 0; i < 128; i++) {
+        std::cerr << now << " " << i << " "
+                  << " LOG_MAINTENANCE_STDERR " << status.msg().msg() << endl;
+      }
+    }
+  }
+}
+
+[[noreturn]] static void LogMaintenanceThread() {
+  int64_t last_flush = MonotonicMillis();
+  const int64_t sleep_duration = std::min(1, FLAGS_logbufsecs);
+  while (true) {
+    sleep(sleep_duration);
+
+    const int64_t now = MonotonicMillis();
+    bool max_log_file_exceeded = RedirectStdoutStderr() && impala::CheckLogSize();
+    if ((now - last_flush) / 1000 < FLAGS_logbufsecs && !max_log_file_exceeded) {
+      continue;
+    }
 
     google::FlushLogFiles(google::GLOG_INFO);
 
+    // Check log size again and force log rotation this time if they still big after
+    // FlushLogFiles.
+    if (max_log_file_exceeded && impala::CheckLogSize()) impala::ForceRotateLog();
+
     // No need to rotate log files in tests.
     if (impala::TestInfo::is_test()) continue;
+    // Reattach stdout and stderr if necessary.
+    if (impala::RedirectStdoutStderr()) impala::AttachStdoutStderr();
     // Check for log rotation in every interval of the maintenance thread
     impala::CheckAndRotateLogFiles(FLAGS_max_log_files);
     // Check for minidump rotation in every interval of the maintenance thread. This is
     // necessary since an arbitrary number of minidumps can be written by sending SIGUSR1
     // to the process.
     impala::CheckAndRotateMinidumps(FLAGS_max_minidumps);
+
+    // update last_flush.
+    last_flush = MonotonicMillis();
   }
 }
 
@@ -326,6 +363,13 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   thread_spawn_status =
       Thread::Create("common", "pause-monitor", &PauseMonitorLoop, &pause_monitor);
   if (!thread_spawn_status.ok()) CLEAN_EXIT_WITH_ERROR(thread_spawn_status.GetDetail());
+
+  // Initialize log fault injection if such debug action exist.
+  if (strstr(FLAGS_debug_actions.c_str(), "LOG_MAINTENANCE_STDERR") != NULL) {
+    thread_spawn_status = Thread::Create("common", "log-fault-inject-thread",
+        &LogFaultInjectionThread, &log_fault_inject_thread);
+    if (!thread_spawn_status.ok()) CLEAN_EXIT_WITH_ERROR(thread_spawn_status.GetDetail());
+  }
 
   // Implement timeout for backend tests.
   if (impala::TestInfo::is_be_test()) {

@@ -108,6 +108,10 @@ class FileSystemUtil {
   /// Returns OK otherwise.
   static Status CheckHolePunch(const std::string& path);
 
+  /// Return the approximate file size of 'path' into output argument 'file_size', based
+  /// on what file system sees.
+  static Status ApproximateFileSize(const std::string& path, uintmax_t& file_size);
+
   class Directory {
    public:
     // Different types of entry in the directory

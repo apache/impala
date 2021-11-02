@@ -18,7 +18,6 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -32,7 +31,6 @@
 
 #include <boost/filesystem.hpp>
 
-#include "common/logging.h"
 #include "common/status.h"
 #include "gen-cpp/ErrorCodes_types.h"
 #include "gutil/macros.h"
@@ -429,6 +427,24 @@ Status FileSystemUtil::CheckHolePunch(const string& path) {
         offset));
   }
 
+  return Status::OK();
+}
+
+Status FileSystemUtil::ApproximateFileSize(
+    const std::string& path, uintmax_t& file_size) {
+  bool exist = false;
+  RETURN_IF_ERROR(PathExists(path, &exist));
+  if (!exist) {
+    return Status("Path does not exist!");
+  } else {
+    error_code errcode;
+    file_size = filesystem::file_size(path, errcode);
+    if (errcode != errc::success) {
+      return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR,
+          Substitute("Encountered exception while checking file size of path $0: $1",
+              path, errcode.message())));
+    }
+  }
   return Status::OK();
 }
 

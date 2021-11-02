@@ -120,6 +120,21 @@ void LogCommandLineFlags();
 /// removes the oldest ones given an upper bound of number of logfiles to keep.
 void CheckAndRotateLogFiles(int max_log_files);
 
+/// Redirect stdout to INFO log and stderr to ERROR log.
+/// Needs to be done after InitGoogleLogging, to get the INFO/ERROR file paths.
+void AttachStdoutStderr();
+
+/// Check whether INFO or ERROR log size has exceed FLAGS_max_log_size.
+/// If error encountered during individual log size check, print error message to ERROR
+/// log and return false.
+bool CheckLogSize();
+
+/// Force glog to do the log rotation.
+void ForceRotateLog();
+
+/// Return true if FLAGS_redirect_stdout_stderr is true and TestInfo::is_test() is false.
+bool RedirectStdoutStderr();
+
 #endif // IR_COMPILE
 
 /// Prints v in base 10.

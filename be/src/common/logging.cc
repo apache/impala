@@ -18,34 +18,31 @@
 #include "common/logging.h"
 
 #include <stdio.h>
-#include <cerrno>
-#include <ctime>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <map>
 #include <mutex>
-#include <sstream>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <gutil/strings/substitute.h>
 
-#include "common/logging.h"
+#include "common/thread-debug-info.h"
 #include "kudu/util/flags.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
+#include "util/filesystem-util.h"
 #include "util/logging-support.h"
 #include "util/redactor.h"
 #include "util/test-info.h"
-#include "common/thread-debug-info.h"
 
 #include "common/names.h"
 
 DECLARE_string(redaction_rules_file);
 DECLARE_string(log_filename);
 DECLARE_bool(redirect_stdout_stderr);
+DECLARE_int32(max_log_size);
 
 using boost::uuids::random_generator;
 using impala::TUniqueId;
@@ -54,6 +51,9 @@ namespace {
 bool logging_initialized = false;
 // A 0 unique id, which indicates that one has not been set.
 const TUniqueId ZERO_UNIQUE_ID;
+
+string last_info_log_path = "";
+string last_error_log_path = "";
 
 // Prepends fragment id, when available. If unavailable, looks
 // for query id. If unavailable, prepends nothing.
@@ -83,6 +83,58 @@ void MessageListener(string* s, bool* changed) {
 
 mutex logging_mutex;
 
+// Resolve 'symlink_path' into its 'canonical_path'.
+// If 'symlink_path' is not a symlink, copy it to 'canonical_path'.
+impala::Status ResolveLogSymlink(const string& symlink_path, string& canonical_path) {
+  bool is_symbolic_link;
+  string resolved_path;
+  RETURN_IF_ERROR(impala::FileSystemUtil::IsSymbolicLink(
+      symlink_path, &is_symbolic_link, &resolved_path));
+  canonical_path = is_symbolic_link ? resolved_path : symlink_path;
+  return impala::Status::OK();
+}
+
+// The main implementation of AttachStdoutStderr().
+// Caller must hold lock over logging_mutex.
+impala::Status AttachStdoutStderrLocked() {
+  // Needs to be done after InitGoogleLogging, to get the INFO/ERROR file paths.
+  // Redirect stdout to INFO log and stderr to ERROR log
+  string info_log_symlink_path, error_log_symlink_path;
+  impala::GetFullLogFilename(google::INFO, &info_log_symlink_path);
+  impala::GetFullLogFilename(google::ERROR, &error_log_symlink_path);
+
+  string info_log_path, error_log_path;
+  RETURN_IF_ERROR(ResolveLogSymlink(info_log_symlink_path, info_log_path));
+  RETURN_IF_ERROR(ResolveLogSymlink(error_log_symlink_path, error_log_path));
+
+  if (last_info_log_path != info_log_path || last_error_log_path != error_log_path) {
+    // Both INFO and ERROR log should be rotated together at the same time.
+    DCHECK_NE(last_info_log_path, info_log_path);
+    DCHECK_NE(last_error_log_path, error_log_path);
+
+    // The log files are created on first use, log something to each before redirecting.
+    LOG(INFO) << "stdout will be logged to this file.";
+    LOG(ERROR) << "stderr will be logged to this file.";
+
+    // Print to stderr/stdout before redirecting so people looking for these logs in
+    // the standard place know where to look.
+    cout << "Redirecting stdout to " << info_log_symlink_path << endl;
+    cerr << "Redirecting stderr to " << error_log_symlink_path << endl;
+
+    // TODO: how to handle these errors? Maybe abort the process?
+    if (freopen(info_log_path.c_str(), "a", stdout) == NULL) {
+      cout << "Could not redirect stdout: " << impala::GetStrErrMsg();
+    }
+    if (freopen(error_log_path.c_str(), "a", stderr) == NULL) {
+      cerr << "Could not redirect stderr: " << impala::GetStrErrMsg();
+    }
+
+    last_info_log_path = info_log_path;
+    last_error_log_path = error_log_path;
+  }
+  return impala::Status::OK();
+}
+
 void impala::InitGoogleLoggingSafe(const char* arg) {
   lock_guard<mutex> logging_lock(logging_mutex);
   if (logging_initialized) return;
@@ -103,7 +155,7 @@ void impala::InitGoogleLoggingSafe(const char* arg) {
   // Don't double log to stderr on any threshold.
   FLAGS_stderrthreshold = google::FATAL + 1;
 
-  if (FLAGS_redirect_stdout_stderr && !TestInfo::is_test()) {
+  if (RedirectStdoutStderr()) {
     // We will be redirecting stdout/stderr to INFO/LOG so override any glog settings
     // that log to stdout/stderr...
     FLAGS_logtostderr = false;
@@ -136,32 +188,55 @@ void impala::InitGoogleLoggingSafe(const char* arg) {
     FLAGS_log_filename = google::ProgramInvocationShortName();
   }
 
-  if (FLAGS_redirect_stdout_stderr && !TestInfo::is_test()) {
-    // Needs to be done after InitGoogleLogging, to get the INFO/ERROR file paths.
-    // Redirect stdout to INFO log and stderr to ERROR log
-    string info_log_path, error_log_path;
-    GetFullLogFilename(google::INFO, &info_log_path);
-    GetFullLogFilename(google::ERROR, &error_log_path);
-
-    // The log files are created on first use, log something to each before redirecting.
-    LOG(INFO) << "stdout will be logged to this file.";
-    LOG(ERROR) << "stderr will be logged to this file.";
-
-    // Print to stderr/stdout before redirecting so people looking for these logs in
-    // the standard place know where to look.
-    cout << "Redirecting stdout to " << info_log_path << endl;
-    cerr << "Redirecting stderr to " << error_log_path << endl;
-
-    // TODO: how to handle these errors? Maybe abort the process?
-    if (freopen(info_log_path.c_str(), "a", stdout) == NULL) {
-      cout << "Could not redirect stdout: " << GetStrErrMsg();
-    }
-    if (freopen(error_log_path.c_str(), "a", stderr) == NULL) {
-      cerr << "Could not redirect stderr: " << GetStrErrMsg();
+  if (RedirectStdoutStderr()) {
+    Status status = AttachStdoutStderrLocked();
+    if (!status.ok()) {
+      LOG(ERROR) << "Failed to attach STDOUT/STDERR: " << status.GetDetail();
     }
   }
 
   logging_initialized = true;
+}
+
+void impala::AttachStdoutStderr() {
+  lock_guard<mutex> logging_lock(logging_mutex);
+  Status status = AttachStdoutStderrLocked();
+  if (!status.ok()) {
+    LOG(ERROR) << "Failed to attach STDOUT/STDERR: " << status.GetDetail();
+  }
+}
+
+bool impala::CheckLogSize() {
+  lock_guard<mutex> logging_lock(logging_mutex);
+  int log_to_check[2] = {google::INFO, google::ERROR};
+  bool max_log_file_exceeded = false;
+  for (int log_level : log_to_check) {
+    uintmax_t file_size = 0;
+    string log_path;
+    GetFullLogFilename(log_level, &log_path);
+    Status status = FileSystemUtil::ApproximateFileSize(log_path, file_size);
+    if (status.ok()) {
+      // max_log_size is measured in megabytes. Thus, we SHR the file_size 20 bits to
+      // convert it from bytes to megabytes.
+      max_log_file_exceeded |= (file_size >> 20) >= FLAGS_max_log_size;
+    } else {
+      LOG(ERROR) << "Failed to check log file size: " << status.GetDetail();
+      return false;
+    }
+  }
+
+  return max_log_file_exceeded;
+}
+
+void impala::ForceRotateLog() {
+  google::SetLogFilenameExtension(".cut");
+  google::SetLogFilenameExtension("");
+  LOG(INFO) << "INFO log rotated by Impala due to max_log_size exceeded.";
+  LOG(ERROR) << "ERROR log rotated by Impala due to max_log_size exceeded.";
+}
+
+bool impala::RedirectStdoutStderr() {
+  return FLAGS_redirect_stdout_stderr && !TestInfo::is_test();
 }
 
 void impala::GetFullLogFilename(google::LogSeverity severity, string* filename) {
