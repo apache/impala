@@ -2391,7 +2391,6 @@ Status HdfsParquetScanner::FillScratchMicroBatches(
         // Skipping this row group. Free up all the resources with this row group.
         FlushRowGroupResources(row_batch);
         *num_tuples = 0;
-        DCHECK(scratch_batch_->AtEnd());
         *skip_row_group = true;
         if (num_tuples_mismatch && continue_execution) {
           Status err(Substitute("Corrupt Parquet file '$0': column '$1' "

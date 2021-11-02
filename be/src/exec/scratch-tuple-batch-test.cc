@@ -155,7 +155,7 @@ TEST_F(ScratchTupleBatchTest, TestRandomGeneratedMicroBatches) {
   // gaps to try
   vector<int> gaps = {5, 16, 29, 37, 1025};
   vector<float> selected_ratios = {0.5, 0.75, 0.1, 1.0, 0.44};
-  for (int g = 0; g < sizeof(gaps); g++) {
+  for (int g = 0; g < gaps.size(); g++) {
     int n = gaps[g];
     // Set random locations as selected.
     srand(time(NULL));
