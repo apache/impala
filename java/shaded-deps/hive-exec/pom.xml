@@ -89,6 +89,8 @@ the same dependencies
             <filter>
               <artifact>org.apache.hive:hive-exec</artifact>
               <includes>
+                <include>META-INF/services/org.apache.hadoop.fs.FileSystem</include>
+                <include>org/apache/hadoop/hive/ql/io/SingleFileSystem*</include>
                 <include>org/apache/hadoop/hive/conf/**/*</include>
                 <include>org/apache/hadoop/hive/common/type/*</include>
                 <include>org/apache/hadoop/hive/common/FileUtils*</include>

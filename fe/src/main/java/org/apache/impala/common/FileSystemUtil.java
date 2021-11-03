@@ -69,6 +69,7 @@ public class FileSystemUtil {
   public static final String SCHEME_ALLUXIO = "alluxio";
   public static final String SCHEME_GCS = "gs";
   public static final String SCHEME_COS = "cosn";
+  public static final String SCHEME_SFS = "sfs";
 
   /**
    * Set containing all FileSystem scheme that known to supports storage UUIDs in
@@ -531,7 +532,8 @@ public class FileSystemUtil {
     OZONE,
     ALLUXIO,
     GCS,
-    COS;
+    COS,
+    SFS;
 
     private static final Map<String, FsType> SCHEME_TO_FS_MAPPING =
         ImmutableMap.<String, FsType>builder()
@@ -556,6 +558,9 @@ public class FileSystemUtil {
      * hdfs, s3a, etc.)
      */
     public static FsType getFsType(String scheme) {
+      if(scheme.startsWith("sfs+")) {
+        return SFS;
+      }
       return SCHEME_TO_FS_MAPPING.get(scheme);
     }
   }

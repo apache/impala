@@ -80,6 +80,9 @@ bool IsCosPath(const char* path, bool check_default_fs = true);
 /// Returns true iff the path refers to a location on an Ozone filesystem.
 bool IsOzonePath(const char* path, bool check_default_fs = true);
 
+/// Returns true iff the path refers to a location on an SFS filesystem.
+bool IsSFSPath(const char* path, bool check_default_fs = true);
+
 /// Returns true iff 'pathA' and 'pathB' are on the same filesystem.
 bool FilesystemsMatch(const char* pathA, const char* pathB);
 

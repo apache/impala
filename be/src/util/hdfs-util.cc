@@ -38,6 +38,7 @@ const char* FILESYS_PREFIX_GCS = "gs://";
 const char* FILESYS_PREFIX_COS = "cosn://";
 const char* FILESYS_PREFIX_OZONE = "o3fs://";
 const char* FILESYS_PREFIX_OFS = "ofs://";
+const char* FILESYS_PREFIX_SFS = "sfs+";
 const char* FILESYS_PREFIX_OSS = "oss://";
 const char* FILESYS_PREFIX_JINDOFS = "jfs://";
 
@@ -131,6 +132,10 @@ bool IsCosPath(const char* path, bool check_default_fs) {
 bool IsOzonePath(const char* path, bool check_default_fs) {
   return IsSpecificPath(path, FILESYS_PREFIX_OZONE, check_default_fs)
       || IsSpecificPath(path, FILESYS_PREFIX_OFS, check_default_fs);
+}
+
+bool IsSFSPath(const char* path, bool check_default_fs) {
+  return IsSpecificPath(path, FILESYS_PREFIX_SFS, check_default_fs);
 }
 
 // Returns the length of the filesystem name in 'path' which is the length of the
