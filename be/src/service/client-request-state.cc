@@ -1060,6 +1060,9 @@ Status ClientRequestState::WaitInternal() {
   }
   if (!child_queries.empty()) query_events_->MarkEvent("Child queries finished");
 
+  bool isCTAS = catalog_op_type() == TCatalogOpType::DDL
+      && ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT;
+
   if (GetCoordinator() != NULL) {
     Status status = GetCoordinator()->Wait();
     if (UNLIKELY(!status.ok())) {
@@ -1067,6 +1070,14 @@ Status ClientRequestState::WaitInternal() {
       return status;
     }
     RETURN_IF_ERROR(UpdateCatalog());
+  } else {
+    // When the coordinator is not available for CTAS that requires a coordinator, check
+    // further if the query has been cancelled. If so, return immediately as there will
+    // be no query result available (IMPALA-11006).
+    if (isCTAS) {
+      lock_guard<mutex> l(lock_);
+      if (is_cancelled_) return Status::CANCELLED;
+    }
   }
 
   if (catalog_op_type() == TCatalogOpType::DDL &&
@@ -1078,8 +1089,7 @@ Status ClientRequestState::WaitInternal() {
     // Queries that do not return a result are finished at this point. This includes
     // DML operations.
     eos_.Store(true);
-  } else if (catalog_op_type() == TCatalogOpType::DDL &&
-      ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT) {
+  } else if (isCTAS) {
     SetCreateTableAsSelectResultSet();
   }
   // Rows are available now (for SELECT statement), so start the 'wait' timer that tracks
