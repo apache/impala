@@ -115,6 +115,12 @@ class TestWebPage(ImpalaTestSuite):
     assert page.status_code == requests.codes.ok
     page = requests.get("http://localhost:25020/memz")
     assert page.status_code == requests.codes.ok
+    page = requests.head("http://localhost:25000/memz")
+    assert page.status_code == requests.codes.ok
+    page = requests.head("http://localhost:25010/memz")
+    assert page.status_code == requests.codes.ok
+    page = requests.head("http://localhost:25020/memz")
+    assert page.status_code == requests.codes.ok
 
   def test_memz_shows_fragment_instance_id(self):
     """Tests that the memory breakdown on memz shows fragment instance IDs."""
@@ -161,6 +167,9 @@ class TestWebPage(ImpalaTestSuite):
     responses = []
     for port in ports_to_test:
       input_url = url.format(port)
+      response = requests.head(input_url, headers=headers)
+      assert response.status_code == requests.codes.ok, "URL: {0} Str:'{1}'\nResp:{2}"\
+        .format(input_url, string_to_search, response.text)
       response = requests.get(input_url, headers=headers)
       assert response.status_code == requests.codes.ok, "URL: {0} Str:'{1}'\nResp:{2}"\
         .format(input_url, string_to_search, response.text)
@@ -391,6 +400,9 @@ class TestWebPage(ImpalaTestSuite):
       ports_to_test = self.TEST_PORTS_WITH_SS
     for port in ports_to_test:
       input_url = url.format(port)
+      response = requests.head(input_url)
+      assert response.status_code == requests.codes.not_found, "URL: {0} Str:'{" \
+        "1}'\nResp:{2}".format(input_url, string_to_search, response.text)
       response = requests.get(input_url)
       assert response.status_code == requests.codes.not_found, "URL: {0} Str:'{" \
         "1}'\nResp:{2}".format(input_url, string_to_search, response.text)
@@ -779,6 +791,8 @@ class TestWebPage(ImpalaTestSuite):
     for port in self.TEST_PORTS_WITH_SS:
       page = requests.get(self.HEALTHZ_URL.format(port))
       assert page.status_code == requests.codes.ok
+      page = requests.head(self.HEALTHZ_URL.format(port))
+      assert page.status_code == requests.codes.ok
 
   def test_knox_compatibility(self):
     """Checks that the template files conform to the requirements for compatibility with
@@ -841,4 +855,6 @@ class TestWebPage(ImpalaTestSuite):
   def test_catalog_operations_endpoint(self):
     """Test to check that the /operations endpoint returns 200 OK."""
     page = requests.get("http://localhost:25020/operations")
+    assert page.status_code == requests.codes.ok
+    page = requests.head("http://localhost:25020/operations")
     assert page.status_code == requests.codes.ok

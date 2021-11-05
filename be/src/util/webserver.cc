@@ -817,7 +817,10 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
 
   // The output of this page is accumulated into this stringstream.
   stringstream output;
-  if (!url_handler->use_templates()) {
+  if (strncmp("HEAD", request_info->request_method, 4) == 0) {
+    // For a HEAD call do not generate the response body.
+    VLOG(4) << "Not generating output for HEAD call on " << request_info->uri;
+  } else if (!url_handler->use_templates()) {
     content_type = PLAIN;
     url_handler->raw_callback()(req, &output, &response);
   } else {
