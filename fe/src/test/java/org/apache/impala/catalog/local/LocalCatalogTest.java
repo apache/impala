@@ -20,6 +20,7 @@ package org.apache.impala.catalog.local;
 import static org.junit.Assert.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
@@ -36,9 +37,11 @@ import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
@@ -48,8 +51,11 @@ import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TMetadataOpcode;
+import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TPartialTableInfo;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.util.ListMap;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.PatternMatcher;
 import org.hamcrest.CoreMatchers;
@@ -247,6 +253,40 @@ public class LocalCatalogTest {
     }
     assertEquals(24, totalFds);
     assertTrue(t.getHostIndex().size() > 0);
+  }
+
+  /**
+   * This test verifies that the network adresses used by the LocalIcebergTable are
+   * the same used by CatalogD.
+   */
+  @Test
+  public void testLoadIcebergFileDescriptors() throws Exception {
+    LocalIcebergTable t = (LocalIcebergTable)catalog_.getTable(
+        "functional_parquet", "iceberg_partitioned");
+    Map<String, FileDescriptor> localTblFdMap = t.getPathHashToFileDescMap();
+    TPartialTableInfo tblInfo = provider_.loadTableInfoWithIcebergSnapshot(t.ref_);
+    ListMap<TNetworkAddress> catalogdHostIndexes = new ListMap<>();
+    catalogdHostIndexes.populate(tblInfo.getNetwork_addresses());
+    Map<String, FileDescriptor> catalogFdMap =
+        FeIcebergTable.Utils.loadFileDescMapFromThrift(
+            tblInfo.getIceberg_snapshot().getIceberg_file_desc_map(),
+            null, null);
+    for (Map.Entry<String, FileDescriptor> entry : localTblFdMap.entrySet()) {
+      String path = entry.getKey();
+      FileDescriptor localFd = entry.getValue();
+      FileDescriptor catalogFd = catalogFdMap.get(path);
+      assertEquals(localFd.getNumFileBlocks(), 1);
+      FbFileBlock localBlock = localFd.getFbFileBlock(0);
+      FbFileBlock catalogBlock = catalogFd.getFbFileBlock(0);
+      assertEquals(localBlock.replicaHostIdxsLength(), 3);
+      for (int i = 0; i < localBlock.replicaHostIdxsLength(); ++i) {
+        TNetworkAddress localAddr = t.getHostIndex().getEntry(
+            localBlock.replicaHostIdxs(i));
+        TNetworkAddress catalogAddr = catalogdHostIndexes.getEntry(
+            catalogBlock.replicaHostIdxs(i));
+        assertEquals(localAddr, catalogAddr);
+      }
+    }
   }
 
   @Test

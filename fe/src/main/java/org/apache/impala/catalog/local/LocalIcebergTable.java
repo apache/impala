@@ -43,6 +43,7 @@ import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergSnapshot;
+import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.IcebergSchemaConverter;
@@ -52,10 +53,13 @@ import org.apache.thrift.TException;
 import com.google.common.base.Preconditions;
 import com.google.errorprone.annotations.Immutable;
 
+import org.apache.log4j.Logger;
+
 /**
  * Iceberg table for LocalCatalog
  */
 public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
+  private static final Logger LOG = Logger.getLogger(LocalIcebergTable.class);
   private TableParams tableParams_;
   private TIcebergFileFormat icebergFileFormat_;
   private TCompressionCodec icebergParquetCompressionCodec_;
@@ -102,19 +106,20 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     super(db, msTable, ref, cmap);
     localFsTable_ = LocalFsTable.load(db, msTable, ref);
     tableParams_ = new TableParams(msTable);
-    TIcebergSnapshot tSnapshot;
+    FeIcebergTable.Snapshot snapshot;
     try {
-      tSnapshot = db_.getCatalog().getMetaProvider().loadIcebergSnapshot(ref);
+      snapshot = db_.getCatalog().getMetaProvider().loadIcebergSnapshot(
+          ref, getHostIndex());
+      Preconditions.checkNotNull(snapshot);
+      snapshotId_ = snapshot.snapshotId;
+      pathHashToFileDescMap_ = snapshot.pathHashToFileDescMap;
     } catch (TException e) {
       throw new TableLoadingException(String.format(
           "Failed to load table: %s.%s", msTable.getDbName(), msTable.getTableName()), e);
     }
-    snapshotId_ = tSnapshot.getSnapshot_id();
     partitionSpecs_ = Utils.loadPartitionSpecByIceberg(metadata);
     defaultPartitionSpecId_ = metadata.defaultSpecId();
     icebergSchema_ = metadata.schema();
-    pathHashToFileDescMap_ = FeIcebergTable.Utils.loadFileDescMapFromThrift(
-        tSnapshot.getIceberg_file_desc_map());
     icebergFileFormat_ = IcebergUtil.getIcebergFileFormat(msTable);
     icebergParquetCompressionCodec_ = Utils.getIcebergParquetCompressionCodec(msTable);
     icebergParquetRowGroupSize_ = Utils.getIcebergParquetRowGroupSize(msTable);

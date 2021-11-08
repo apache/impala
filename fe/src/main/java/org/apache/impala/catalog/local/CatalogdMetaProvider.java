@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.lang3.StringUtils;
@@ -52,6 +53,7 @@ import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogDeltaLog;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogObjectCache;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
@@ -83,6 +85,7 @@ import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.TIcebergSnapshot;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartialPartitionInfo;
+import org.apache.impala.thrift.TPartialTableInfo;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableInfoSelector;
 import org.apache.impala.thrift.TUniqueId;
@@ -1002,14 +1005,34 @@ public class CatalogdMetaProvider implements MetaProvider {
     return ret;
   }
 
-  @Override
-  public TIcebergSnapshot loadIcebergSnapshot(final TableMetaRef table)
+  /**
+   * Utility function for to retrieve table info with Iceberg snapshot. Exists for testing
+   * purposes, use loadIcebergSnapshot() which translates the file descriptors to the
+   * table's host index.
+   */
+  @VisibleForTesting
+  TPartialTableInfo loadTableInfoWithIcebergSnapshot(final TableMetaRef table)
       throws TException {
     Preconditions.checkArgument(table instanceof TableMetaRefImpl);
     TGetPartialCatalogObjectRequest req = newReqForTable(table);
     req.table_info_selector.want_iceberg_snapshot = true;
     TGetPartialCatalogObjectResponse resp = sendRequest(req);
-    return resp.table_info.getIceberg_snapshot();
+    return resp.table_info;
+  }
+
+  @Override
+  public FeIcebergTable.Snapshot loadIcebergSnapshot(final TableMetaRef table,
+      ListMap<TNetworkAddress> hostIndex)
+      throws TException {
+    TPartialTableInfo tableInfo = loadTableInfoWithIcebergSnapshot(table);
+    Map<String, FileDescriptor> pathToFds =
+        FeIcebergTable.Utils.loadFileDescMapFromThrift(
+            tableInfo.getIceberg_snapshot().getIceberg_file_desc_map(),
+            tableInfo.getNetwork_addresses(),
+            hostIndex);
+    return new FeIcebergTable.Snapshot(
+        tableInfo.getIceberg_snapshot().getSnapshot_id(),
+        pathToFds);
   }
 
   private ImmutableList<FileDescriptor> convertThriftFdList(List<THdfsFileDesc> thriftFds,

@@ -28,6 +28,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
@@ -127,7 +128,9 @@ public interface MetaProvider {
   /**
    * Loads Iceberg snapshot information, i.e. snapshot id and file descriptors.
    */
-  public TIcebergSnapshot loadIcebergSnapshot(final TableMetaRef table) throws TException;
+  public FeIcebergTable.Snapshot loadIcebergSnapshot(final TableMetaRef table,
+      ListMap<TNetworkAddress> hostIndex)
+      throws TException;
 
   /**
    * Reference to a table as returned by loadTable(). This reference must be passed

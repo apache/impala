@@ -418,8 +418,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
     icebergParquetDictPageSize_ = ticeberg.getParquet_dict_page_size();
     partitionSpecs_ = loadPartitionBySpecsFromThrift(ticeberg.getPartition_spec());
     defaultPartitionSpecId_ = ticeberg.getDefault_partition_spec_id();
+    // Load file descriptors for the Iceberg snapshot. We are using the same host index,
+    // so there's no need for translation.
     pathHashToFileDescMap_ = FeIcebergTable.Utils.loadFileDescMapFromThrift(
-        ticeberg.getPath_hash_to_file_descriptor());
+        ticeberg.getPath_hash_to_file_descriptor(), null, null);
     snapshotId_ = ticeberg.getSnapshot_id();
     hdfsTable_.loadFromThrift(thriftTable);
     TableMetadata metadata = IcebergUtil.getIcebergTableMetadata(this);
@@ -483,6 +485,9 @@ public class IcebergTable extends Table implements FeIcebergTable {
     if (req.table_info_selector.want_iceberg_snapshot) {
       resp.table_info.setIceberg_snapshot(
           FeIcebergTable.Utils.createTIcebergSnapshot(this));
+      if (!resp.table_info.isSetNetwork_addresses()) {
+        resp.table_info.setNetwork_addresses(getHostIndex().getList());
+      }
     }
     return resp;
   }

@@ -23,6 +23,7 @@ import java.util.List;
 
 import javax.annotation.Nullable;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
@@ -86,6 +87,7 @@ abstract class LocalTable implements FeTable {
    * about them.
    */
   @Nullable
+  @VisibleForTesting
   protected final TableMetaRef ref_;
 
   public static LocalTable load(LocalDb db, String tblName) throws TableLoadingException {

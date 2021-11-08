@@ -37,6 +37,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TableMeta;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FileMetadataLoader;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCachePool;
@@ -501,7 +502,8 @@ class DirectMetaProvider implements MetaProvider {
   }
 
   @Override
-  public TIcebergSnapshot loadIcebergSnapshot(final TableMetaRef table)
+  public FeIcebergTable.Snapshot loadIcebergSnapshot(final TableMetaRef table,
+      ListMap<TNetworkAddress> hostIndex)
       throws TException {
     throw new NotImplementedException(
         "loadIcebergSnapshot() is not implemented for DirectMetaProvider");

@@ -63,11 +63,14 @@ import org.apache.impala.util.TResultRowBuilder;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Ints;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Frontend interface for interacting with an Iceberg-backed table.
  */
 public interface FeIcebergTable extends FeFsTable {
-
+  final static Logger LOG = LoggerFactory.getLogger(FeIcebergTable.class);
   /**
    * FileDescriptor map
    */
@@ -266,6 +269,18 @@ public interface FeIcebergTable extends FeFsTable {
   long snapshotId();
 
   /**
+   * Utility class to hold information about Iceberg snapshots.
+   */
+  public static class Snapshot {
+    public Snapshot(long snapshotId, Map<String, FileDescriptor> pathHashToFileDescMap) {
+      this.snapshotId = snapshotId;
+      this.pathHashToFileDescMap = pathHashToFileDescMap;
+    }
+    public long snapshotId;
+    public Map<String, FileDescriptor> pathHashToFileDescMap;
+  }
+
+  /**
    * Utility functions
    */
   public static abstract class Utils {
@@ -423,12 +438,26 @@ public interface FeIcebergTable extends FeFsTable {
       return ret;
     }
 
+    /**
+     * Load the file descriptors from the thrift-encoded 'tFileDescMap'. Optionally
+     * translate the file descriptors with the given 'networkAddresses'/'hostIndex'.
+     */
     public static Map<String, FileDescriptor> loadFileDescMapFromThrift(
-        Map<String, THdfsFileDesc> tFileDescMap) {
+        Map<String, THdfsFileDesc> tFileDescMap,
+        List<TNetworkAddress> networkAddresses,
+        ListMap<TNetworkAddress> hostIndex) {
       Map<String, FileDescriptor> fileDescMap = new HashMap<>();
       if (tFileDescMap == null) return fileDescMap;
       for (Map.Entry<String, THdfsFileDesc> entry : tFileDescMap.entrySet()) {
-        fileDescMap.put(entry.getKey(), FileDescriptor.fromThrift(entry.getValue()));
+        FileDescriptor fd = FileDescriptor.fromThrift(entry.getValue());
+        Preconditions.checkNotNull(fd);
+        if (networkAddresses == null) {
+          fileDescMap.put(entry.getKey(), fd);
+        } else {
+          Preconditions.checkNotNull(hostIndex);
+          fileDescMap.put(entry.getKey(),
+              fd.cloneWithNewHostIndex(networkAddresses, hostIndex));
+        }
       }
       return fileDescMap;
     }
