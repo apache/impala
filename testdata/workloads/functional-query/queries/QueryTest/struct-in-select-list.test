@@ -288,6 +288,27 @@ from functional_orc_def.complextypestbl.nested_struct.c.d.ITEM as inner_arr;
 STRING,INT,STRING
 ====
 ---- QUERY
+# Similar to the above, but on a non-transactional version of the table.
+# Regression test for IMPALA-11011.
+select inner_arr.ITEM
+from functional_orc_def.complextypestbl_non_transactional.nested_struct.c.d.ITEM as inner_arr;
+---- RESULTS
+'{"e":-1,"f":"nonnullable"}'
+'{"e":10,"f":"aaa"}'
+'{"e":-10,"f":"bbb"}'
+'{"e":11,"f":"c"}'
+'{"e":null,"f":null}'
+'{"e":10,"f":"aaa"}'
+'{"e":null,"f":null}'
+'{"e":-10,"f":"bbb"}'
+'{"e":null,"f":null}'
+'{"e":11,"f":"c"}'
+'NULL'
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
 # Querying a struct that is inside a nested array. Referencing the inner array through a
 # join with the base table.
 select tbl.id, inner_arr.ITEM

@@ -600,7 +600,9 @@ class OrcStructReader : public OrcComplexColumnReader {
   int GetChildBatchOffset(int row_idx) const override { return row_idx; }
 
   int NumElements() const final {
-    if (MaterializeTuple()) return vbatch_->numElements;
+    if (MaterializeTuple()) {
+      return vbatch_ ? vbatch_->numElements : 0;
+    }
     DCHECK_EQ(children().size(), 1);
     OrcColumnReader* child = children()[0];
     return child->NumElements();
