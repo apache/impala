@@ -78,6 +78,8 @@ import org.apache.impala.common.Reference;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.hive.common.MutableValidWriteIdList;
+import org.apache.impala.hive.executor.HiveJavaFunction;
+import org.apache.impala.hive.executor.HiveJavaFunctionFactoryImpl;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.CatalogLookupStatus;
@@ -1749,9 +1751,10 @@ public class CatalogServiceCatalog extends Catalog {
     LOG.info("Loading Java functions for database: " + db.getName());
     for (org.apache.hadoop.hive.metastore.api.Function function: functions) {
       try {
-        List<Function> fns = FunctionUtils.extractFunctions(db.getName(), function,
-            localLibraryPath_);
-        for (Function fn: fns) {
+        HiveJavaFunctionFactoryImpl factory = new HiveJavaFunctionFactoryImpl();
+        HiveJavaFunction javaFunction =
+            factory.create(localLibraryPath_, function);
+        for (Function fn: javaFunction.extract()) {
           db.addFunction(fn);
           fn.setCatalogVersion(incrementAndGetCatalogVersion());
         }

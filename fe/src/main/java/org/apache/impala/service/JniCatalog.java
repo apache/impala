@@ -51,6 +51,7 @@ import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.JniUtil;
+import org.apache.impala.hive.executor.HiveJavaFunctionFactoryImpl;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDdlExecRequest;
@@ -149,7 +150,8 @@ public class JniCatalog {
         cfg.local_library_path, metaStoreClientPool);
     authzManager_ = authzFactory.newAuthorizationManager(catalog_);
     catalog_.setAuthzManager(authzManager_);
-    catalogOpExecutor_ = new CatalogOpExecutor(catalog_, authzConfig, authzManager_);
+    catalogOpExecutor_ = new CatalogOpExecutor(catalog_, authzConfig, authzManager_,
+        new HiveJavaFunctionFactoryImpl());
     MetastoreEventFactory eventFactory =
         new EventFactoryForSyncToLatestEvent(catalogOpExecutor_);
     catalog_.setEventFactoryForSyncToLatestEvent(eventFactory);

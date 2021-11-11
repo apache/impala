@@ -148,6 +148,8 @@ import org.apache.impala.common.TransactionException;
 import org.apache.impala.common.TransactionKeepalive.HeartbeatContext;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.hive.common.MutableValidWriteIdList;
+import org.apache.impala.hive.executor.HiveJavaFunction;
+import org.apache.impala.hive.executor.HiveJavaFunctionFactory;
 import org.apache.impala.thrift.JniCatalogConstants;
 import org.apache.impala.thrift.TAlterDbParams;
 import org.apache.impala.thrift.TAlterDbSetOwnerParams;
@@ -228,7 +230,6 @@ import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.AcidUtils.TblTransaction;
 import org.apache.impala.util.CompressionUtil;
 import org.apache.impala.util.DebugUtils;
-import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.KuduUtil;
@@ -348,6 +349,7 @@ public class CatalogOpExecutor {
   private final CatalogServiceCatalog catalog_;
   private final AuthorizationConfig authzConfig_;
   private final AuthorizationManager authzManager_;
+  private final HiveJavaFunctionFactory hiveJavaFuncFactory_;
 
   // A singleton monitoring class that keeps track of the catalog usage metrics.
   private final CatalogOperationMetrics catalogOpMetric_ =
@@ -358,11 +360,13 @@ public class CatalogOpExecutor {
   private final ReentrantLock metastoreDdlLock_ = new ReentrantLock();
 
   public CatalogOpExecutor(CatalogServiceCatalog catalog, AuthorizationConfig authzConfig,
-      AuthorizationManager authzManager) throws ImpalaException {
+      AuthorizationManager authzManager,
+      HiveJavaFunctionFactory hiveJavaFuncFactory) throws ImpalaException {
     Preconditions.checkNotNull(authzManager);
     catalog_ = Preconditions.checkNotNull(catalog);
     authzConfig_ = Preconditions.checkNotNull(authzConfig);
     authzManager_ = Preconditions.checkNotNull(authzManager);
+    hiveJavaFuncFactory_ = Preconditions.checkNotNull(hiveJavaFuncFactory);
   }
 
   public CatalogServiceCatalog getCatalog() { return catalog_; }
@@ -2105,6 +2109,11 @@ public class CatalogOpExecutor {
     }
     boolean isPersistentJavaFn =
         (fn.getBinaryType() == TFunctionBinaryType.JAVA) && fn.isPersistent();
+    HiveJavaFunction hiveJavaFunction = (fn.getBinaryType() == TFunctionBinaryType.JAVA)
+        ? hiveJavaFuncFactory_.create(
+            BackendConfig.INSTANCE.getBackendCfg().local_library_path,
+            (ScalarFunction) fn)
+        : null;
     Db db = catalog_.getDb(fn.dbName());
     if (db == null) {
       throw new CatalogException("Database: " + fn.dbName() + " does not exist.");
@@ -2136,16 +2145,9 @@ public class CatalogOpExecutor {
         // For persistent Java functions we extract all supported function signatures from
         // the corresponding Jar and add each signature to the catalog.
         Preconditions.checkState(fn instanceof ScalarFunction);
-        org.apache.hadoop.hive.metastore.api.Function hiveFn =
-            ((ScalarFunction) fn).toHiveFunction();
-        List<Function> funcs = FunctionUtils.extractFunctions(fn.dbName(), hiveFn,
-            BackendConfig.INSTANCE.getBackendCfg().local_library_path);
-        if (funcs.isEmpty()) {
-          throw new CatalogException(
-              "No compatible function signatures found in class: " + hiveFn
-                  .getClassName());
-        }
-        if (addJavaFunctionToHms(fn.dbName(), hiveFn, params.if_not_exists)) {
+        List<ScalarFunction> funcs = hiveJavaFunction.extract();
+        if (addJavaFunctionToHms(fn.dbName(), hiveJavaFunction.getHiveFunction(),
+            params.if_not_exists)) {
           for (Function addedFn : funcs) {
             if (LOG.isTraceEnabled()) {
               LOG.trace(String.format("Adding function: %s.%s", addedFn.dbName(),

@@ -327,6 +327,7 @@ class TestUdfExecution(TestUdfBase):
 
   def test_java_udfs(self, vector, unique_database):
     self.run_test_case('QueryTest/load-java-udfs', vector, use_db=unique_database)
+    self.run_test_case('QueryTest/load-java-udfs-fail', vector, use_db=unique_database)
     self.run_test_case('QueryTest/java-udf', vector, use_db=unique_database)
 
   def test_udf_errors(self, vector, unique_database):
@@ -424,7 +425,7 @@ class TestUdfTargeted(TestUdfBase):
 
   def test_udf_invalid_symbol(self, vector, unique_database):
     """ IMPALA-1642: Impala crashes if the symbol for a Hive UDF doesn't exist
-        Crashing is non-deterministic so we run the UDF several times."""
+        Invalid symbols are checked at UDF creation time."""
     src_udf_path = os.path.join(
         os.environ['IMPALA_HOME'], 'testdata/udfs/impala-hive-udfs.jar')
     tgt_udf_path = get_fs_path(
@@ -435,15 +436,11 @@ class TestUdfTargeted(TestUdfBase):
         "create function `{0}`.fn_invalid_symbol(STRING) returns "
         "STRING LOCATION '{1}' SYMBOL='not.a.Symbol'".format(
             unique_database, tgt_udf_path))
-    query = "select `{0}`.fn_invalid_symbol('test')".format(unique_database)
 
     self.filesystem_client.copy_from_local(src_udf_path, tgt_udf_path)
     self.client.execute(drop_fn_stmt)
-    self.client.execute(create_fn_stmt)
-    for _ in xrange(5):
-      ex = self.execute_query_expect_failure(self.client, query)
-      assert "Unable to find class" in str(ex)
-    self.client.execute(drop_fn_stmt)
+    ex = self.execute_query_expect_failure(self.client, create_fn_stmt)
+    assert "ClassNotFoundException" in str(ex)
 
   def test_hidden_symbol(self, vector, unique_database):
     """Test that symbols in the test UDFs are hidden by default and that therefore

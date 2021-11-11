@@ -239,6 +239,9 @@ public class UdfExecutorTest {
     TFunction fn = scalar_fn.toThrift();
 
     long inputNullsPtr = allocate(argTypes.size());
+    for (int i = 0; i < argTypes.size(); ++i) {
+      UnsafeUtil.UNSAFE.putByte(inputNullsPtr + i, (byte)0);
+    }
     long inputBufferPtr = allocate(inputBufferSize);
     long outputNullPtr = allocate(1);
     long outputBufferPtr = allocate(retType.getSlotSize());
@@ -249,8 +252,8 @@ public class UdfExecutorTest {
     return new UdfExecutor(serializer.serialize(params));
   }
 
-  // Runs the hive udf contained in c. Validates that c.evaluate(args) == retValue.
-  // Arguments and return value cannot be NULL.
+  // Runs the hive udf contained in c. Validates that c.evaluate(args) == expectedValue,
+  // if the "validate" argument is true. Arguments and return value cannot be NULL.
   void TestUdfImpl(String jarFile, Class<?> c, Object expectedValue,
       Type expectedType, boolean validate, Object... args)
     throws ImpalaException, MalformedURLException, TException {
@@ -264,11 +267,8 @@ public class UdfExecutorTest {
         // object here.
         if (method.getParameterTypes()[i] == Text.class) {
           inputArgs[i] = createText((String)args[i]);
-        } else if (method.getParameterTypes()[i] == BytesWritable.class) {
-          inputArgs[i] = createBytes((String)args[i]);
         } else {
-          Preconditions.checkState(method.getParameterTypes()[i] == String.class);
-          inputArgs[i] = args[i];
+          inputArgs[i] = createBytes((String)args[i]);
         }
       } else {
         inputArgs[i] = args[i];

@@ -4,25 +4,9 @@ create function hive_pi() returns double
 location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
 symbol='org.apache.hadoop.hive.ql.udf.UDFPI';
 
-create function hive_round(double) returns double
-location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
-symbol='org.apache.hadoop.hive.ql.udf.UDFRound';
-
-create function hive_floor(double) returns bigint
-location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
-symbol='org.apache.hadoop.hive.ql.udf.UDFFloor';
-
-create function hive_mod(int, int) returns int
-location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
-symbol='org.apache.hadoop.hive.ql.udf.UDFPosMod';
-
 create function hive_bin(bigint) returns string
 location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
 symbol='org.apache.hadoop.hive.ql.udf.UDFBin';
-
-create function hive_lower(string) returns string
-location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
-symbol='org.apache.hadoop.hive.ql.udf.UDFLower';
 
 # Used to test persistent java functions
 create function identity_anytype

@@ -32,6 +32,7 @@ import org.apache.impala.catalog.events.NoOpEventProcessor;
 import org.apache.impala.catalog.metastore.NoOpCatalogMetastoreServer;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.hive.executor.TestHiveJavaFunctionFactory;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TUniqueId;
@@ -81,7 +82,8 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
       cs.setCatalogMetastoreServer(NoOpCatalogMetastoreServer.INSTANCE);
       cs.setCatalogOpExecutor(new CatalogOpExecutor(cs,
           new NoopAuthorizationFactory().getAuthorizationConfig(),
-          new NoopAuthorizationFactory.NoopAuthorizationManager()));
+          new NoopAuthorizationFactory.NoopAuthorizationManager(),
+          new TestHiveJavaFunctionFactory()));
       cs.setEventFactoryForSyncToLatestEvent(new EventFactoryForSyncToLatestEvent(
           cs.getCatalogOpExecutor()));
       cs.reset();
@@ -110,7 +112,8 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
     cs.setMetastoreEventProcessor(NoOpEventProcessor.getInstance());
     cs.setCatalogOpExecutor(new CatalogOpExecutor(cs,
         new NoopAuthorizationFactory().getAuthorizationConfig(),
-        new NoopAuthorizationFactory.NoopAuthorizationManager()));
+        new NoopAuthorizationFactory.NoopAuthorizationManager(),
+        new TestHiveJavaFunctionFactory()));
     cs.setEventFactoryForSyncToLatestEvent(
         new EventFactoryForSyncToLatestEvent(cs.getCatalogOpExecutor()));
     cs.reset();

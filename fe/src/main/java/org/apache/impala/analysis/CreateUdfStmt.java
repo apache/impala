@@ -25,7 +25,7 @@ import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.hive.executor.UdfExecutor.JavaUdfDataType;
+import org.apache.impala.hive.executor.JavaUdfDataType;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TSymbolType;
 

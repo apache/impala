@@ -103,6 +103,8 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.common.TransactionException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.hive.executor.HiveJavaFunctionFactory;
+import org.apache.impala.hive.executor.TestHiveJavaFunctionFactory;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
@@ -1725,16 +1727,18 @@ public class MetastoreEventsProcessorTest {
 
     public FakeCatalogOpExecutorForTests(CatalogServiceCatalog catalog,
         AuthorizationConfig authzConfig,
-        AuthorizationManager authzManager)
+        AuthorizationManager authzManager,
+        HiveJavaFunctionFactory hiveJavaFuncFactory)
         throws ImpalaException {
-      super(catalog, authzConfig, authzManager);
+      super(catalog, authzConfig, authzManager, hiveJavaFuncFactory);
     }
 
     public static CatalogOpExecutor create() throws ImpalaException {
       return new FakeCatalogOpExecutorForTests(
           FakeCatalogServiceCatalogForFlagTests.create(),
           new NoopAuthorizationFactory().getAuthorizationConfig(),
-          new NoopAuthorizationManager());
+          new NoopAuthorizationManager(),
+          new TestHiveJavaFunctionFactory());
     }
   }
 

@@ -1,0 +1,9 @@
+====
+---- QUERY
+create function hive_round(double) returns double
+location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
+symbol='org.apache.hadoop.hive.ql.udf.UDFRound';
+---- CATCH
+org.apache.hadoop.hive.ql.udf.UDFRound not found in Jar
+====
+
