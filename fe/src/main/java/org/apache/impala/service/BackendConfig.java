@@ -103,6 +103,10 @@ public class BackendConfig {
     return !Strings.isNullOrEmpty(backendCfg_.authorized_proxy_group_config);
   }
 
+  public boolean isShellBasedGroupsMappingEnabled() {
+    return backendCfg_.enable_shell_based_groups_mapping_support;
+  }
+
   public boolean disableCatalogDataOpsDebugOnly() {
     return backendCfg_.disable_catalog_data_ops_debug_only;
   }

@@ -823,7 +823,8 @@ public class JniFrontend {
     output.append(checkLogFilePermission());
     output.append(checkFileSystem(CONF));
     output.append(checkShortCircuitRead(CONF));
-    if (BackendConfig.INSTANCE.isAuthorizedProxyGroupEnabled()) {
+    if (BackendConfig.INSTANCE.isAuthorizedProxyGroupEnabled() &&
+        !BackendConfig.INSTANCE.isShellBasedGroupsMappingEnabled()) {
       output.append(checkGroupsMappingProvider(CONF));
     }
     return output.toString();

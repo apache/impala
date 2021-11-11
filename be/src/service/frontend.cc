@@ -74,6 +74,11 @@ DEFINE_string(authorized_proxy_group_config, "",
     "all users. For example: hue=group1,group2;admin=*");
 DEFINE_string(authorized_proxy_group_config_delimiter, ",",
     "Specifies the delimiter used in authorized_proxy_group_config. ");
+DEFINE_bool(enable_shell_based_groups_mapping_support, false,
+    "Enables support for Hadoop groups mapping "
+    "org.apache.hadoop.security.ShellBasedUnixGroupsMapping. By default this support "
+    "is not enabled as it can lead to many process getting spawned to fetch groups for "
+    "user using shell command.");
 DEFINE_string(kudu_master_hosts, "", "Specifies the default Kudu master(s). The given "
     "value should be a comma separated list of hostnames or IP addresses; ports are "
     "optional.");

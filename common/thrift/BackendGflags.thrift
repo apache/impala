@@ -217,4 +217,6 @@ struct TBackendGflags {
   96: required string startup_filesystem_check_directories
 
   97: required bool hms_event_incremental_refresh_transactional_table
+
+  98: required bool enable_shell_based_groups_mapping_support
 }

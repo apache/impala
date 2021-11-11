@@ -48,6 +48,7 @@ DECLARE_string(principal);
 DECLARE_string(local_library_dir);
 DECLARE_string(server_name);
 DECLARE_string(authorized_proxy_group_config);
+DECLARE_bool(enable_shell_based_groups_mapping_support);
 DECLARE_string(catalog_topic_mode);
 DECLARE_string(kudu_master_hosts);
 DECLARE_string(reserved_words_version);
@@ -230,6 +231,8 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_max_filter_error_rate(FLAGS_max_filter_error_rate);
   cfg.__set_min_buffer_size(FLAGS_min_buffer_size);
   cfg.__set_authorized_proxy_group_config(FLAGS_authorized_proxy_group_config);
+  cfg.__set_enable_shell_based_groups_mapping_support(
+      FLAGS_enable_shell_based_groups_mapping_support);
   cfg.__set_disable_catalog_data_ops_debug_only(
       FLAGS_disable_catalog_data_ops_debug_only);
   cfg.__set_catalog_topic_mode(FLAGS_catalog_topic_mode);

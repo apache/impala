@@ -172,7 +172,8 @@ under the License.
 
       <li>
         ShellBasedUnixGroupsNetgroupMapping and ShellBasedUnixGroupsMapping Hadoop group mapping
-        providers are not supported in Impala group delegation.
+        providers are not supported in Impala group delegation by default. To enable them, flag
+        <codeph>enable_shell_based_groups_mapping</codeph> needs to be enabled.
       </li>
 
       <li>
