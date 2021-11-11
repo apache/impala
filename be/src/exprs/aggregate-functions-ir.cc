@@ -23,7 +23,7 @@
 #include <utility>
 #include <cmath>
 
-#include <boost/random/ranlux.hpp>
+#include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_int.hpp>
 
 #include "codegen/impala-ir.h"
@@ -53,7 +53,7 @@
 #include "common/names.h"
 
 using boost::uniform_int;
-using boost::ranlux64_3;
+using boost::mt19937_64;
 using std::make_pair;
 using std::map;
 using std::min_element;
@@ -1277,8 +1277,9 @@ class ReservoirSampleState {
   int64_t source_size_;
 
   // Random number generator for generating 64-bit integers
-  // TODO: Replace with mt19937_64 when upgrading boost
-  ranlux64_3 rng_;
+  // Replace ranlux64_3 with mt19937_64 for better performance. See boost benchmark at
+  // https://www.boost.org/doc/libs/1_74_0/doc/html/boost_random/performance.html
+  mt19937_64 rng_;
 
   // True if the array of samples is in the same memory allocation as this object. If
   // false, this object is responsible for freeing the memory.
