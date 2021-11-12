@@ -140,6 +140,9 @@ public class IsNullPredicate extends Predicate {
   }
 
   protected void computeSelectivity() {
+    if (hasValidSelectivityHint()) {
+      return;
+    }
     // TODO: increase this to make sure we don't end up favoring broadcast joins
     // due to underestimated cardinalities?
     Reference<SlotRef> slotRefRef = new Reference<SlotRef>();

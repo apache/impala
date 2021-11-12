@@ -1366,4 +1366,13 @@ public class PlannerTest extends PlannerTestBase {
             PlannerTestOption.VALIDATE_RESOURCES,
             PlannerTestOption.VALIDATE_CARDINALITY));
   }
+
+  /**
+   * Test SELECTIVITY hints
+   */
+  @Test
+  public void testPredicateSelectivityHints() {
+    runPlannerTestFile("predicate-selectivity-hint",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
 }

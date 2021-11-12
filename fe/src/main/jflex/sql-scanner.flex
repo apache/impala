@@ -240,6 +240,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("schema", SqlParserSymbols.KW_SCHEMA);
     keywordMap.put("schemas", SqlParserSymbols.KW_SCHEMAS);
     keywordMap.put("select", SqlParserSymbols.KW_SELECT);
+    keywordMap.put("selectivity", SqlParserSymbols.KW_SELECTIVITY);
     keywordMap.put("semi", SqlParserSymbols.KW_SEMI);
     keywordMap.put("sequencefile", SqlParserSymbols.KW_SEQUENCEFILE);
     keywordMap.put("serdeproperties", SqlParserSymbols.KW_SERDEPROPERTIES);

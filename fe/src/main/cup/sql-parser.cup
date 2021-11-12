@@ -325,7 +325,7 @@ terminal
   KW_RANGE, KW_RCFILE, KW_RECOVER, KW_REFERENCES, KW_REFRESH, KW_REGEXP, KW_RELY,
   KW_RENAME, KW_REPEATABLE, KW_REPLACE, KW_REPLICATION, KW_RESTRICT, KW_RETURNS,
   KW_REVOKE, KW_RIGHT, KW_RLIKE, KW_ROLE, KW_ROLES, KW_ROLLUP, KW_ROW, KW_ROWS, KW_RWSTORAGE, KW_SCHEMA,
-  KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES, KW_SERIALIZE_FN,
+  KW_SCHEMAS, KW_SELECT, KW_SELECTIVITY, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES, KW_SERIALIZE_FN,
   KW_SET, KW_SHOW, KW_SMALLINT, KW_SETS, KW_SORT, KW_SPEC, KW_STORAGE_HANDLER_URI, KW_STORED, KW_STRAIGHT_JOIN,
   KW_STRING, KW_STRUCT, KW_SYMBOL, KW_SYSTEM_TIME, KW_SYSTEM_VERSION,
   KW_TABLE, KW_TABLES, KW_TABLESAMPLE, KW_TBLPROPERTIES,
@@ -454,7 +454,7 @@ nonterminal TimeTravelSpec opt_asof;
 nonterminal Subquery subquery;
 nonterminal JoinOperator join_operator;
 nonterminal opt_inner, opt_outer;
-nonterminal PlanHint plan_hint;
+nonterminal PlanHint plan_hint, selectivity_hint;
 nonterminal List<PlanHint> plan_hints, opt_plan_hints, plan_hint_list;
 nonterminal TypeDef type_def;
 nonterminal Type type;
@@ -653,6 +653,9 @@ precedence left KW_INTO;
 
 precedence left KW_OVER;
 precedence left KW_HASH;
+
+// Avoid shift/reduce conflicts for supporting selectivity hint after predicates.
+precedence left COMMENTED_PLAN_HINT_START;
 
 start with stmt;
 
@@ -3400,6 +3403,19 @@ expr_list ::=
   :}
   ;
 
+// Currently, 'selectivity' hint can be set for some predicates.
+// It's used to replace the selectivity estimated by the planner.
+selectivity_hint ::=
+  COMMENTED_PLAN_HINT_START KW_SELECTIVITY LPAREN DECIMAL_LITERAL:value RPAREN
+      COMMENTED_PLAN_HINT_END
+  {:
+    RESULT = new PlanHint("selectivity",
+      new ArrayList(Arrays.asList(value.toString())));
+  :}
+  | /* empty */
+  {: RESULT = null; :}
+  ;
+
 // Currently, we allow predicate hints for the top level WHERE
 // clause. An attempt was made to set this for individual exprs
 // (as part of the 'expr' grammar) but that generated quite a
@@ -3888,8 +3904,12 @@ predicate ::=
   {: RESULT = p; :}
   | bool_test_expr:e
   {: RESULT = e; :}
-  | LPAREN predicate:p RPAREN
+  | LPAREN predicate:p RPAREN selectivity_hint:hint
   {:
+    if (p instanceof Predicate && hint != null) {
+      Predicate predicate = (Predicate) p;
+      predicate.setSelectivityHint(Double.valueOf(hint.getArgs().get(0)));
+    }
     p.setPrintSqlInParens(true);
     RESULT = p;
   :}
@@ -4456,6 +4476,8 @@ word ::=
   | KW_SCHEMAS:r
   {: RESULT = r.toString(); :}
   | KW_SELECT:r
+  {: RESULT = r.toString(); :}
+  | KW_SELECTIVITY:r
   {: RESULT = r.toString(); :}
   | KW_SEMI:r
   {: RESULT = r.toString(); :}

@@ -245,6 +245,10 @@ public class BinaryPredicate extends Predicate {
   protected void computeSelectivity() {
     // TODO: Compute selectivity for nested predicates.
     // TODO: Improve estimation using histograms.
+    if (hasValidSelectivityHint()) {
+      return;
+    }
+
     Reference<SlotRef> slotRefRef = new Reference<SlotRef>();
     if (!isSingleColumnPredicate(slotRefRef, null)) {
       return;

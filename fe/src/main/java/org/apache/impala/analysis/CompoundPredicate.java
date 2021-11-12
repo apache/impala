@@ -143,10 +143,22 @@ public class CompoundPredicate extends Predicate {
     Preconditions.checkState(fn_.getReturnType().isBoolean());
     castForFunctionCall(false, analyzer.isDecimalV2());
 
-    computeSelectivity();
+    computeSelectivity(analyzer);
   }
 
-  protected void computeSelectivity() {
+  protected void computeSelectivity(Analyzer analyzer) {
+    if (hasValidSelectivityHint()) {
+      // TODO: Support selectivity hint for 'AND' compound predicates.
+      if (this.getOp() == Operator.AND) {
+        // 'AND' compound predicates will be replaced by children in Expr#getConjuncts,
+        // so selectivity hint will be missing, we add a warning here.
+        analyzer.addWarning("Selectivity hints are ignored for 'AND' compound "
+            + "predicates, either in the SQL query or internally generated.");
+      } else {
+        return;
+      }
+    }
+
     if (!getChild(0).hasSelectivity() ||
         (children_.size() == 2 && !getChild(1).hasSelectivity())) {
       // Give up if one of our children has an unknown selectivity.

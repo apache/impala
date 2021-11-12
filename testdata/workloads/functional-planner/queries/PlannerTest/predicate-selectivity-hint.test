@@ -1,0 +1,262 @@
+# Table 'tpch.lineitem' has 6001215 rows, so the scan on it has cardinality as 6.00M.
+# If the selectivity of the predicate is 0.1, cardinality in '00:SCAN HDFS' is 6001215 * 0.1 = 600.12K
+# Simple 'BinaryPredicate' example without selectivity hint
+# Planner assigns the default selectivity (0.1) to this predicate
+select * from tpch.lineitem where l_shipdate <= '1998-09-02'
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   predicates: l_shipdate <= '1998-09-02'
+   row-size=231B cardinality=600.12K
+====
+# Simple 'BinaryPredicate' example with selectivity hint
+# Since almost 98% of the values are less than '1998-09-02', we set selectivity manually for this predicate
+select * from tpch.lineitem where (l_shipdate <= '1998-09-02')/* +SELECTIVITY(0.98) */
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   predicates: (l_shipdate <= '1998-09-02')
+   row-size=231B cardinality=5.88M
+====
+# Simple 'InPredicate' case without selectivity hint
+# This predicate selectivity is 3/distinctValue, almost 0.12%
+select * from tpch.lineitem where l_shipdate IN ('1998-09-01', '1998-09-02', '1998-09-03')
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   predicates: l_shipdate IN ('1998-09-01', '1998-09-02', '1998-09-03')
+   row-size=231B cardinality=6.85K
+====
+# Simple 'InPredicate' case with selectivity hint
+# This predicate selectivity is 3/distinctValue, almost 0.12%
+# We assume that this predicate actual selectivity is 0.5 for testing, and set hint manually
+select * from tpch.lineitem
+where (l_shipdate IN ('1998-09-01', '1998-09-02', '1998-09-03'))/* +SELECTIVITY(0.5) */
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   predicates: (l_shipdate IN ('1998-09-01', '1998-09-02', '1998-09-03'))
+   row-size=231B cardinality=3.00M
+====
+# Simple 'IsNullPredicate' case without selectivity hint
+# This predicate selectivity is: getStats().getNumNulls() / numRows
+# There are no null values in 'l_shipdate' column, so this selectivity is 0
+select * from tpch.lineitem where l_shipdate IS NULL
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   predicates: l_shipdate IS NULL
+   row-size=231B cardinality=1
+====
+# Simple 'IsNullPredicate' case with selectivity hint
+# Assuming the predicate has 0.5 as the selectivity by using the hint
+select * from tpch.lineitem where (l_shipdate IS NULL)/* +SELECTIVITY(0.5) */
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   predicates: (l_shipdate IS NULL)
+   row-size=231B cardinality=3.00M
+====
+# Simple 'LikePredicate' example without selectivity hint
+# Planner will assign the default selectivity (0.1) on this predicate
+select * from tpch.lineitem where l_shipdate LIKE '1998-%'
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   predicates: l_shipdate LIKE '1998-%'
+   row-size=231B cardinality=600.12K
+====
+# Simple 'LikePredicate' example with selectivity hint
+# The actual selectivity of this predicate is around 11.5%. Set it by the hint manually.
+select * from tpch.lineitem where (l_shipdate LIKE '1998-%')/* +SELECTIVITY(0.115) */
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   predicates: (l_shipdate LIKE '1998-%')
+   row-size=231B cardinality=690.14K
+====
+# Simple not 'LikePredicate' example without selectivity hint
+# Planner will assign the default selectivity (0.1) on this predicate
+select * from tpch.lineitem where l_shipdate NOT LIKE '1998-%'
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   predicates: NOT l_shipdate LIKE '1998-%'
+   row-size=231B cardinality=600.12K
+====
+# Simple not 'LikePredicate' example with selectivity hint
+# The actual selectivity of this LIKE predicate is around 11.5% (same as the above one).
+# So the selectivity of the corresponding NOT LIKE predicate is 88.5%
+select * from tpch.lineitem where (l_shipdate NOT LIKE '1998-%')/* +SELECTIVITY(0.885) */
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   predicates: (NOT l_shipdate LIKE '1998-%')
+   row-size=231B cardinality=5.31M
+====
+# Simple 'BetweenPredicate' example without selectivity hint
+# Planner will assign the default selectivity (0.1) on this predicate
+select * from tpch.lineitem where l_shipdate BETWEEN '1998-09-01' AND '1998-09-03'
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   predicates: l_shipdate <= '1998-09-03', l_shipdate >= '1998-09-01'
+   row-size=231B cardinality=600.12K
+====
+# Selectivity hint is invalid for BetweenPredicate currently
+select * from tpch.lineitem
+where (l_shipdate BETWEEN '1998-09-01' AND '1998-09-03')/* +SELECTIVITY(0.5)*/
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   predicates: l_shipdate <= '1998-09-03', l_shipdate >= '1998-09-01'
+   row-size=231B cardinality=600.12K
+====
+# Test for compound predicates
+# Planner will assign the default selectivity (0.1) on this predicate
+select * from tpch.lineitem where l_shipdate <= '1998-09-02' and l_shipdate >= '1997-09-02'
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   predicates: l_shipdate <= '1998-09-02', l_shipdate >= '1997-09-02'
+   row-size=231B cardinality=600.12K
+====
+# Selectivity hint for 'AND' compound predicate is invalid
+select * from tpch.lineitem
+where (l_shipdate <= '1998-09-02' and l_shipdate >= '1997-09-02')/* +SELECTIVITY(0.5) */
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   predicates: l_shipdate <= '1998-09-02', l_shipdate >= '1997-09-02'
+   row-size=231B cardinality=600.12K
+====
+# Test for compound predicate, with 'OR'
+# Planner will assign the default selectivity (0.1) on this predicate
+select * from tpch.lineitem
+where (l_shipdate <= '1998-09-02' or l_shipdate >= '1997-09-02')
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   predicates: (l_shipdate <= '1998-09-02' OR l_shipdate >= '1997-09-02')
+   row-size=231B cardinality=600.12K
+====
+# Set selectivity hint for compound predicate, with 'OR'
+select * from tpch.lineitem
+where (l_shipdate <= '1998-09-02' or l_shipdate >= '1997-09-02')/* +SELECTIVITY(0.5) */
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   predicates: (l_shipdate <= '1998-09-02' OR l_shipdate >= '1997-09-02')
+   row-size=231B cardinality=3.00M
+====
+# Set selectivity hint for each single predicate also valid for compound predicate
+select * from tpch.lineitem
+where (l_shipdate <= '1998-09-02')/* +SELECTIVITY(0.5) */ and (l_shipdate >= '1997-09-02')/* +SELECTIVITY(0.5) */
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   predicates: (l_shipdate <= '1998-09-02'), (l_shipdate >= '1997-09-02')
+   row-size=231B cardinality=2.12M
+====
+# A simple example to show that selectivity hint can help change join mode and be used as an optimization tool.
+# This query is from tpch-3.sql
+# The original join is: lineitem JOIN(PARTITIONED) orders JOIN(BROADCAST) customer
+# For predicate o_orderdate < date '1995-03-15', the planner assigns the default selectivity (0.1) to it
+# If we assume the actual selectivity is 0.01, and add selectivity
+# hint manually, the new join becomes:
+# lineitem JOIN(BROADCAST) orders JOIN(BROADCAST) customer
+select
+        l_orderkey,
+        sum(l_extendedprice * (1 - l_discount)) as revenue,
+        o_orderdate,
+        o_shippriority
+from
+        tpch.customer,
+        tpch.orders,
+        tpch.lineitem
+where
+        c_mktsegment = 'BUILDING'
+        and c_custkey = o_custkey
+        and l_orderkey = o_orderkey
+        and (o_orderdate < date '1995-03-15') /* +SELECTIVITY(0.01) */
+        and l_shipdate > date '1995-03-15'
+group by
+        l_orderkey,
+        o_orderdate,
+        o_shippriority
+order by
+        revenue desc,
+        o_orderdate;
+---- PLAN
+PLAN-ROOT SINK
+|
+06:SORT
+|  order by: sum(l_extendedprice * (1 - l_discount)) DESC, o_orderdate ASC
+|  row-size=50B cardinality=1.76K
+|
+05:AGGREGATE [FINALIZE]
+|  output: sum(l_extendedprice * (1 - l_discount))
+|  group by: l_orderkey, o_orderdate, o_shippriority
+|  row-size=50B cardinality=1.76K
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: c_custkey = o_custkey
+|  runtime filters: RF000 <- o_custkey
+|  row-size=117B cardinality=1.76K
+|
+|--03:HASH JOIN [INNER JOIN]
+|  |  hash predicates: l_orderkey = o_orderkey
+|  |  runtime filters: RF002 <- o_orderkey
+|  |  row-size=88B cardinality=5.76K
+|  |
+|  |--01:SCAN HDFS [tpch.orders]
+|  |     HDFS partitions=1/1 files=1 size=162.56MB
+|  |     predicates: (o_orderdate < DATE '1995-03-15')
+|  |     row-size=42B cardinality=15.00K
+|  |
+|  02:SCAN HDFS [tpch.lineitem]
+|     HDFS partitions=1/1 files=1 size=718.94MB
+|     predicates: l_shipdate > DATE '1995-03-15'
+|     runtime filters: RF002 -> l_orderkey
+|     row-size=46B cardinality=600.12K
+|
+00:SCAN HDFS [tpch.customer]
+   HDFS partitions=1/1 files=1 size=23.08MB
+   predicates: c_mktsegment = 'BUILDING'
+   runtime filters: RF000 -> c_custkey
+   row-size=29B cardinality=30.00K
+====

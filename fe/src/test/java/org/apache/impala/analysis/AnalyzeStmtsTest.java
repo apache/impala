@@ -5124,4 +5124,59 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "Table hint not recognized for table " +
             "functional_hbase.alltypes: TABLE_NUM_ROWS(100)");
   }
+
+  @Test
+  public void testSelectivityHintNegative() {
+    // Selectivity hint must use bracket, even for single predicate
+    AnalysisError("select * from t1 where a > 1 and b > 2 /* +SELECTIVITY(0.1) */",
+        "Syntax error in line 1");
+    AnalysisError("select * from t1 where a > 1 /* +SELECTIVITY(0.1) */",
+        "Syntax error in line 1");
+
+    // Cannot set selectivity hint exists predicate
+    AnalysisError("select * from t1 where exists (select x from t2) " +
+            "/* +SELECTIVITY(0.1) */",
+        "Syntax error in line 1");
+
+    // Selectivity hint only accept one parameter with decimal type
+    // Negative number and zero are not allowed
+    AnalysisError("select * from t1 where (a > 1) /* +SELECTIVITY('0.1') */",
+        "Syntax error in line 1");
+    AnalysisError("select * from t1 where (a > 1) /* +SELECTIVITY(0) */",
+        "Syntax error in line 1");
+    AnalysisError("select * from t1 where (a > 1) /* +SELECTIVITY(-1.0) */",
+        "Syntax error in line 1");
+    AnalysisError("select * from t1 where (a > 1) /* +SELECTIVITY(0.1, 0.2) */",
+        "Syntax error in line 1");
+    AnalysisError("select * from t1 where (a > 1) /* +SELECTIVITY(1/3) */",
+        "Syntax error in line 1");
+  }
+
+  @Test
+  public void testSelectivityHintPositive() {
+    // Selectivity hint legal value is (0,1]
+    AnalyzesOk("select * from tpch.lineitem where (l_shipdate <= '1998-09-02') " +
+            "/* +SELECTIVITY(1.1) */",
+        "Invalid selectivity hint value: 1.1, allowed value should be a double value in "
+            + "(0, 1].");
+    AnalyzesOk("select * from tpch.lineitem where (l_shipdate <= '1998-09-02') " +
+            "/* +SELECTIVITY(0.0) */",
+        "Invalid selectivity hint value: 0.0, allowed value should be a double value in "
+            + "(0, 1].");
+
+    // Also valid for a very long decimal value
+    AnalyzesOk("select * from functional.alltypes where (id > 1000)" +
+        "/* +SELECTIVITY(0.3333333333333333333333333333333333) */");
+    // Set selectivity hint for compound predicate
+    AnalyzesOk("select * from functional.alltypes where (id > 1000 and int_col = 1)" +
+        "/* +SELECTIVITY(0.1) */");
+    AnalyzesOk("select * from functional.alltypes where (id > 1000 or int_col = 1)" +
+        "/* +SELECTIVITY(0.1) */");
+
+    // Selectivity hint is invalid for 'AND' compound predicate.
+    AnalyzesOk("select * from tpch.lineitem where (l_shipdate <= '1998-09-02' and " +
+            "l_shipdate >= '1997-09-02')/* +SELECTIVITY(0.5) */",
+        "Selectivity hints are ignored for 'AND' compound predicates, either in the SQL "
+            + "query or internally generated.");
+  }
 }
