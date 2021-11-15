@@ -90,7 +90,8 @@ def load():
     # explicitly creating an external table so that files are in the external warehouse
     # directory. Use external.table.purge=true so that it is equivalent to a Hive 2
     # managed table.
-    if HIVE_MAJOR_VERSION >= 3:
+    # For Apache Hive, HIVE-20085 (Hive 4) Allow CTAS.
+    if HIVE_MAJOR_VERSION >= 3 and os.environ["USE_APACHE_HIVE"] != "true":
       external = "EXTERNAL"
       tblproperties += ",'external.table.purge'='TRUE'"
     sql_params = {

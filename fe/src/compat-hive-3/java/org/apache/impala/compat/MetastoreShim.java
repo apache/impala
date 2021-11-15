@@ -84,6 +84,7 @@ import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.CompactionInfoLoader;
 import org.apache.impala.catalog.DatabaseNotFoundException;
+import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Hive3MetastoreShimBase;
@@ -515,6 +516,12 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
    */
   public static String getManagedLocationUri(Database db) {
     return db.getManagedLocationUri();
+  }
+
+  /**
+   * Apache Hive-3 only function.
+   */
+  public static void setTableLocation(Db db, Table tbl) throws ImpalaRuntimeException {
   }
 
   /**

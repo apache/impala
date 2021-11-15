@@ -32,6 +32,8 @@ if [[ "${USE_APACHE_HIVE}" != true ]]; then
   exit 0
 fi
 
+# Rebuild tag
+HIVE_REBUILD=${HIVE_REBUILD-false}
 # Cache applied patches
 PATCHED_CACHE_FILE="$HIVE_SRC_DIR/.patched"
 if [ ! -f "$PATCHED_CACHE_FILE" ]; then touch "$PATCHED_CACHE_FILE"; fi
@@ -53,6 +55,7 @@ function apply_patch {
     echo "Apply patch: $p"
     patch -p1 < ${HIVE_PARCH_DIR}/$p
     echo $p >> $PATCHED_CACHE_FILE
+    HIVE_REBUILD=true
   fi
 }
 
@@ -70,5 +73,9 @@ do
 done
 
 # 3. Repackage the hive submodules affected by the patch
-
+if [[ "${HIVE_REBUILD}" = "true" ]]; then
+  echo "Repackage the hive-exec module"
+  ${IMPALA_HOME}/bin/mvn-quiet.sh -pl ql clean package -Dmaven.test.skip
+  cp $HIVE_SRC_DIR/ql/target/hive-exec-${APACHE_HIVE_VERSION}.jar $HIVE_HOME/lib/
+fi
 popd

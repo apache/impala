@@ -156,6 +156,14 @@ def parse_test_file(test_file_name, valid_section_names, skip_unknown_sections=T
   with open(test_file_name, 'rb') as test_file:
     file_data = test_file.read()
     if encoding: file_data = file_data.decode(encoding)
+    if os.environ["USE_APACHE_HIVE"] == "true":
+      # Remove Hive 4.0 feature for tpcds_schema_template.sql
+      if "tpcds_schema_template" in test_file_name:
+        # HIVE-20703
+        file_data = file_data.replace(
+          'set hive.optimize.sort.dynamic.partition.threshold=1;', '')
+        # HIVE-18284
+        file_data = file_data.replace('distribute by ss_sold_date_sk', '')
     return parse_test_file_text(file_data, valid_section_names,
                                 skip_unknown_sections)
 

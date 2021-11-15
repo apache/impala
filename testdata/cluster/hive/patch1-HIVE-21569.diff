@@ -1,0 +1,257 @@
+diff --git a/druid-handler/pom.xml b/druid-handler/pom.xml
+index 27f8a9bd9c..bf39f6acfc 100644
+--- a/druid-handler/pom.xml
++++ b/druid-handler/pom.xml
+@@ -30,7 +30,7 @@
+   <properties>
+     <hive.path.to.root>..</hive.path.to.root>
+     <druid.metamx.util.version>1.3.2</druid.metamx.util.version>
+-    <druid.guava.version>16.0.1</druid.guava.version>
++    <druid.guava.version>28.1-jre</druid.guava.version>
+   </properties>
+ 
+   <dependencies>
+diff --git a/druid-handler/src/java/org/apache/hadoop/hive/druid/serde/DruidScanQueryRecordReader.java b/druid-handler/src/java/org/apache/hadoop/hive/druid/serde/DruidScanQueryRecordReader.java
+index 64c640f45a..6b9f08cd8a 100644
+--- a/druid-handler/src/java/org/apache/hadoop/hive/druid/serde/DruidScanQueryRecordReader.java
++++ b/druid-handler/src/java/org/apache/hadoop/hive/druid/serde/DruidScanQueryRecordReader.java
+@@ -28,6 +28,7 @@
+ import com.google.common.collect.Iterators;
+ 
+ import java.io.IOException;
++import java.util.Collections;
+ import java.util.Iterator;
+ import java.util.List;
+ 
+@@ -43,7 +44,7 @@
+ 
+   private ScanResultValue current;
+ 
+-  private Iterator<List<Object>> compactedValues = Iterators.emptyIterator();
++  private Iterator<List<Object>> compactedValues = Collections.emptyIterator();
+ 
+   @Override
+   protected JavaType getResultTypeDef() {
+diff --git a/itests/qtest-druid/pom.xml b/itests/qtest-druid/pom.xml
+index 8b20ac342f..ecefff3e52 100644
+--- a/itests/qtest-druid/pom.xml
++++ b/itests/qtest-druid/pom.xml
+@@ -41,7 +41,7 @@
+     <druid.jersey.version>1.19.3</druid.jersey.version>
+     <druid.jetty.version>9.3.19.v20170502</druid.jetty.version>
+     <druid.derby.version>10.11.1.1</druid.derby.version>
+-    <druid.guava.version>16.0.1</druid.guava.version>
++    <druid.guava.version>28.1-jre</druid.guava.version>
+     <druid.guice.version>4.1.0</druid.guice.version>
+     <kafka.version>0.10.2.0</kafka.version>
+   </properties>
+diff --git a/llap-common/src/java/org/apache/hadoop/hive/llap/AsyncPbRpcProxy.java b/llap-common/src/java/org/apache/hadoop/hive/llap/AsyncPbRpcProxy.java
+index ad39963614..475a159e3f 100644
+--- a/llap-common/src/java/org/apache/hadoop/hive/llap/AsyncPbRpcProxy.java
++++ b/llap-common/src/java/org/apache/hadoop/hive/llap/AsyncPbRpcProxy.java
+@@ -171,7 +171,7 @@ public void shutdown() {
+           CallableRequest<T, U> request, LlapNodeId nodeId) {
+         ListenableFuture<U> future = executor.submit(request);
+         Futures.addCallback(future, new ResponseCallback<U>(
+-            request.getCallback(), nodeId, this));
++            request.getCallback(), nodeId, this), MoreExecutors.directExecutor());
+       }
+ 
+       @VisibleForTesting
+@@ -283,7 +283,7 @@ public void onFailure(Throwable t) {
+           LOG.warn("RequestManager shutdown with error", t);
+         }
+       }
+-    });
++    }, MoreExecutors.directExecutor());
+   }
+ 
+   @Override
+@@ -490,4 +490,4 @@ protected abstract ProtocolType createProtocolImpl(Configuration config, String
+   protected abstract void shutdownProtocolImpl(ProtocolType proxy);
+ 
+   protected abstract String getTokenUser(Token<TokenType> token);
+-}
+\ No newline at end of file
++}
+diff --git a/llap-server/src/java/org/apache/hadoop/hive/llap/daemon/impl/AMReporter.java b/llap-server/src/java/org/apache/hadoop/hive/llap/daemon/impl/AMReporter.java
+index 088a5f33c0..a49920eeac 100644
+--- a/llap-server/src/java/org/apache/hadoop/hive/llap/daemon/impl/AMReporter.java
++++ b/llap-server/src/java/org/apache/hadoop/hive/llap/daemon/impl/AMReporter.java
+@@ -174,7 +174,7 @@ public void onFailure(Throwable t) {
+           Thread.getDefaultUncaughtExceptionHandler().uncaughtException(Thread.currentThread(), t);
+         }
+       }
+-    });
++    }, MoreExecutors.directExecutor());
+     // TODO: why is this needed? we could just save the host and port?
+     nodeId = LlapNodeId.getInstance(localAddress.get().getHostName(), localAddress.get().getPort());
+     LOG.info("AMReporter running with DaemonId: {}, NodeId: {}", daemonId, nodeId);
+@@ -274,7 +274,7 @@ public void onFailure(Throwable t) {
+         LOG.warn("Failed to send taskKilled for {}. The attempt will likely time out.",
+             taskAttemptId);
+       }
+-    });
++    }, MoreExecutors.directExecutor());
+   }
+ 
+   public void queryComplete(QueryIdentifier queryIdentifier) {
+@@ -342,7 +342,7 @@ public void onFailure(Throwable t) {
+                     amNodeInfo.amNodeId, currentQueryIdentifier, t);
+                   queryFailedHandler.queryFailed(currentQueryIdentifier);
+                 }
+-              });
++              }, MoreExecutors.directExecutor());
+             }
+           }
+         } catch (InterruptedException e) {
+diff --git a/llap-server/src/java/org/apache/hadoop/hive/llap/daemon/impl/LlapTaskReporter.java b/llap-server/src/java/org/apache/hadoop/hive/llap/daemon/impl/LlapTaskReporter.java
+index 33ade55ee1..848c42a750 100644
+--- a/llap-server/src/java/org/apache/hadoop/hive/llap/daemon/impl/LlapTaskReporter.java
++++ b/llap-server/src/java/org/apache/hadoop/hive/llap/daemon/impl/LlapTaskReporter.java
+@@ -128,7 +128,7 @@ public synchronized void registerTask(RuntimeTask task,
+         sendCounterInterval, maxEventsToGet, requestCounter, containerIdStr, initialEvent,
+         fragmentRequestId, wmCounters);
+     ListenableFuture<Boolean> future = heartbeatExecutor.submit(currentCallable);
+-    Futures.addCallback(future, new HeartbeatCallback(errorReporter));
++    Futures.addCallback(future, new HeartbeatCallback(errorReporter), MoreExecutors.directExecutor());
+   }
+ 
+   /**
+diff --git a/llap-server/src/java/org/apache/hadoop/hive/llap/daemon/impl/TaskExecutorService.java b/llap-server/src/java/org/apache/hadoop/hive/llap/daemon/impl/TaskExecutorService.java
+index 047a55ccae..fac0f77c6a 100644
+--- a/llap-server/src/java/org/apache/hadoop/hive/llap/daemon/impl/TaskExecutorService.java
++++ b/llap-server/src/java/org/apache/hadoop/hive/llap/daemon/impl/TaskExecutorService.java
+@@ -175,7 +175,7 @@ public TaskExecutorService(int numExecutors, int waitQueueSize,
+     executionCompletionExecutorService = MoreExecutors.listeningDecorator(
+         executionCompletionExecutorServiceRaw);
+     ListenableFuture<?> future = waitQueueExecutorService.submit(new WaitQueueWorker());
+-    Futures.addCallback(future, new WaitQueueWorkerCallback());
++    Futures.addCallback(future, new WaitQueueWorkerCallback(), MoreExecutors.directExecutor());
+   }
+ 
+   private LlapQueueComparatorBase createComparator(
+diff --git a/llap-tez/src/java/org/apache/hadoop/hive/llap/tezplugins/LlapTaskSchedulerService.java b/llap-tez/src/java/org/apache/hadoop/hive/llap/tezplugins/LlapTaskSchedulerService.java
+index 82179645da..b20e8cda65 100644
+--- a/llap-tez/src/java/org/apache/hadoop/hive/llap/tezplugins/LlapTaskSchedulerService.java
++++ b/llap-tez/src/java/org/apache/hadoop/hive/llap/tezplugins/LlapTaskSchedulerService.java
+@@ -744,15 +744,17 @@ public Void call() throws Exception {
+       }, 10000L, TimeUnit.MILLISECONDS);
+ 
+       nodeEnablerFuture = nodeEnabledExecutor.submit(nodeEnablerCallable);
+-      Futures.addCallback(nodeEnablerFuture, new LoggingFutureCallback("NodeEnablerThread", LOG));
++      Futures.addCallback(nodeEnablerFuture, new LoggingFutureCallback("NodeEnablerThread", LOG),
++          MoreExecutors.directExecutor());
+ 
+       delayedTaskSchedulerFuture =
+           delayedTaskSchedulerExecutor.submit(delayedTaskSchedulerCallable);
+       Futures.addCallback(delayedTaskSchedulerFuture,
+-          new LoggingFutureCallback("DelayedTaskSchedulerThread", LOG));
++          new LoggingFutureCallback("DelayedTaskSchedulerThread", LOG), MoreExecutors.directExecutor());
+ 
+       schedulerFuture = schedulerExecutor.submit(schedulerCallable);
+-      Futures.addCallback(schedulerFuture, new LoggingFutureCallback("SchedulerThread", LOG));
++      Futures.addCallback(schedulerFuture, new LoggingFutureCallback("SchedulerThread", LOG),
++          MoreExecutors.directExecutor());
+ 
+       registry.start();
+       registry.registerStateChangeListener(new NodeStateChangeListener());
+diff --git a/pom.xml b/pom.xml
+index c06f7f81c1..17dd2cf886 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -144,7 +144,7 @@
+     <dropwizard-metrics-hadoop-metrics2-reporter.version>0.1.2</dropwizard-metrics-hadoop-metrics2-reporter.version>
+     <druid.version>0.12.0</druid.version>
+     <flatbuffers.version>1.2.0-3f79e055</flatbuffers.version>
+-    <guava.version>19.0</guava.version>
++    <guava.version>28.1-jre</guava.version>
+     <groovy.version>2.4.11</groovy.version>
+     <h2database.version>1.3.166</h2database.version>
+     <hadoop.version>3.1.0</hadoop.version>
+diff --git a/ql/src/java/org/apache/hadoop/hive/ql/exec/tez/WorkloadManager.java b/ql/src/java/org/apache/hadoop/hive/ql/exec/tez/WorkloadManager.java
+index 97ba036335..649ef99d9b 100644
+--- a/ql/src/java/org/apache/hadoop/hive/ql/exec/tez/WorkloadManager.java
++++ b/ql/src/java/org/apache/hadoop/hive/ql/exec/tez/WorkloadManager.java
+@@ -27,6 +27,7 @@
+ import com.google.common.util.concurrent.FutureCallback;
+ import com.google.common.util.concurrent.Futures;
+ import com.google.common.util.concurrent.ListenableFuture;
++import com.google.common.util.concurrent.MoreExecutors;
+ import com.google.common.util.concurrent.SettableFuture;
+ import com.google.common.util.concurrent.ThreadFactoryBuilder;
+ 
+@@ -1092,7 +1093,7 @@ private static int transferSessionsToDestroy(Collection<WmTezSession> source,
+   }
+ 
+   private void failOnFutureFailure(ListenableFuture<?> future) {
+-    Futures.addCallback(future, FATAL_ERROR_CALLBACK);
++    Futures.addCallback(future, FATAL_ERROR_CALLBACK, MoreExecutors.directExecutor());
+   }
+ 
+   private void queueGetRequestOnMasterThread(
+@@ -1925,7 +1926,7 @@ public SessionInitContext(SettableFuture<WmTezSession> future,
+ 
+     public void start() throws Exception {
+       ListenableFuture<WmTezSession> getFuture = tezAmPool.getSessionAsync();
+-      Futures.addCallback(getFuture, this);
++      Futures.addCallback(getFuture, this, MoreExecutors.directExecutor());
+     }
+ 
+     @Override
+@@ -1979,7 +1980,7 @@ public void onSuccess(WmTezSession session) {
+       case GETTING: {
+         ListenableFuture<WmTezSession> waitFuture = session.waitForAmRegistryAsync(
+             amRegistryTimeoutMs, timeoutPool);
+-        Futures.addCallback(waitFuture, this);
++        Futures.addCallback(waitFuture, this, MoreExecutors.directExecutor());
+         break;
+       }
+       case WAITING_FOR_REGISTRY: {
+diff --git a/ql/src/test/org/apache/hadoop/hive/ql/exec/tez/SampleTezSessionState.java b/ql/src/test/org/apache/hadoop/hive/ql/exec/tez/SampleTezSessionState.java
+index f5ab981f26..d4296b9b43 100644
+--- a/ql/src/test/org/apache/hadoop/hive/ql/exec/tez/SampleTezSessionState.java
++++ b/ql/src/test/org/apache/hadoop/hive/ql/exec/tez/SampleTezSessionState.java
+@@ -22,6 +22,7 @@
+ import com.google.common.util.concurrent.Futures;
+ import com.google.common.util.concurrent.FutureCallback;
+ import com.google.common.util.concurrent.ListenableFuture;
++import com.google.common.util.concurrent.MoreExecutors;
+ import com.google.common.util.concurrent.SettableFuture;
+ import java.io.IOException;
+ import java.util.concurrent.ScheduledExecutorService;
+@@ -128,7 +129,7 @@ public void onSuccess(Boolean result) {
+       public void onFailure(Throwable t) {
+         future.setException(t);
+       }
+-    });
++    }, MoreExecutors.directExecutor());
+     return future;
+   }
+ 
+diff --git a/standalone-metastore/pom.xml b/standalone-metastore/pom.xml
+index 884dbfdf31..bd2e51edeb 100644
+--- a/standalone-metastore/pom.xml
++++ b/standalone-metastore/pom.xml
+@@ -70,7 +70,7 @@
+     <derby.version>10.10.2.0</derby.version>
+     <dropwizard-metrics-hadoop-metrics2-reporter.version>0.1.2</dropwizard-metrics-hadoop-metrics2-reporter.version>
+     <dropwizard.version>3.1.0</dropwizard.version>
+-    <guava.version>19.0</guava.version>
++    <guava.version>28.1-jre</guava.version>
+     <hadoop.version>3.1.0</hadoop.version>
+     <hikaricp.version>2.6.1</hikaricp.version>
+     <jackson.version>2.9.5</jackson.version>
+diff --git a/storage-api/pom.xml b/storage-api/pom.xml
+index a40feff575..799e541332 100644
+--- a/storage-api/pom.xml
++++ b/storage-api/pom.xml
+@@ -32,7 +32,7 @@
+   <properties>
+     <commons-lang.version>2.6</commons-lang.version>
+     <commons-logging.version>1.1.3</commons-logging.version>
+-    <guava.version>19.0</guava.version>
++    <guava.version>28.1-jre</guava.version>
+     <hadoop.version>3.0.0-beta1</hadoop.version>
+     <junit.version>4.11</junit.version>
+     <slf4j.version>1.7.10</slf4j.version>

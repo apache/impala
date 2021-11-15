@@ -482,6 +482,10 @@ def build_insert_into_statement(insert, db_name, db_suffix, table_name, file_for
 
 def build_hbase_insert(db_name, db_suffix, table_name):
   hbase_insert = SET_HIVE_HBASE_BULK_LOAD + ';\n'
+  # For Apache Hive, "hive.hbase.bulk does not exist" exception will be thrown and there
+  # is only warning in cdp
+  if os.environ['USE_APACHE_HIVE'] == "true":
+    hbase_insert = ""
   hbase_insert += ("INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}"
                    " SELECT * FROM {db_name}.{table_name};\n").\
                    format(db_name=db_name, db_suffix=db_suffix,table_name=table_name)

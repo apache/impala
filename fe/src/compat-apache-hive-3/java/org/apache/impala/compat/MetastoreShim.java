@@ -65,6 +65,7 @@ import org.apache.hadoop.hive.metastore.txn.TxnUtils;
 import org.apache.hadoop.hive.metastore.utils.FileUtils;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
+import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Hive3MetastoreShimBase;
@@ -474,6 +475,24 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
       return db.getParameters().get(MANAGEDLOCATIONURI);
     }
     return null;
+  }
+
+  /**
+   * Set the default table path for a new table.
+   */
+  public static void setTableLocation(Db db, Table tbl) throws ImpalaRuntimeException {
+    Preconditions.checkNotNull(db);
+    Preconditions.checkNotNull(tbl);
+    // Set a valid location of this table using the same rules as the cdp metastore,
+    // unless the user specified a path.
+    try {
+      if (tbl.getSd().getLocation() == null || tbl.getSd().getLocation().isEmpty()) {
+        tbl.getSd().setLocation(
+            MetastoreShim.getPathForNewTable(db.getMetaStoreDb(), tbl));
+      }
+    } catch (MetaException e) {
+      throw new ImpalaRuntimeException("setTableLocation", e);
+    }
   }
 
   /**

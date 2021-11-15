@@ -112,6 +112,7 @@ if kerberize:
 # Enable Tez, ACID and proleptic Gregorian calendar DATE types for Hive 3
 if hive_major_version >= 3:
   CONFIG.update({
+   'hive.execution.engine': 'tez',
    'hive.tez.container.size': '512',
    'hive.txn.manager': 'org.apache.hadoop.hive.ql.lockmgr.DbTxnManager',
    # We run YARN with Tez on the classpath directly
