@@ -65,12 +65,20 @@ def create_table_and_copy_files(impala_client, create_stmt, unique_database, tab
   create_stmt = create_stmt.format(db=unique_database, tbl=table_name)
   impala_client.execute(create_stmt)
 
+  hdfs_dir = get_fs_path(
+      os.path.join("/test-warehouse", unique_database + ".db", table_name))
+  copy_files_to_hdfs_dir(files, hdfs_dir)
+
+  # Refresh the table metadata to see the new files
+  refresh_stmt = "refresh {0}.{1}".format(unique_database, table_name)
+  impala_client.execute(refresh_stmt)
+
+
+def copy_files_to_hdfs_dir(files, hdfs_dir):
   # Copy the files
   #  - build a list of source files
   #  - issue a single put to the hdfs_dir ( -d skips a staging copy)
   source_files = []
-  hdfs_dir = get_fs_path(
-      os.path.join("/test-warehouse", unique_database + ".db", table_name))
   for local_file in files:
     # Cut off leading '/' to make os.path.join() happy
     local_file = local_file if local_file[0] != '/' else local_file[1:]
@@ -78,10 +86,6 @@ def create_table_and_copy_files(impala_client, create_stmt, unique_database, tab
     assert os.path.isfile(local_file)
     source_files.append(local_file)
   check_call(['hdfs', 'dfs', '-put', '-f', '-d'] + source_files + [hdfs_dir])
-
-  # Refresh the table metadata to see the new files
-  refresh_stmt = "refresh {0}.{1}".format(unique_database, table_name)
-  impala_client.execute(refresh_stmt)
 
 
 def grep_dir(dir, search, filename_search=""):

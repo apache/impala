@@ -154,6 +154,8 @@ testdata/data/widerow.txt
 testdata/data/local_tbl/00000.txt
 testdata/data/hudi_parquet/*
 testdata/data/iceberg_test/*
+testdata/data/sfs_d2.txt
+testdata/data/sfs_d4.txt
 testdata/datasets/functional/functional_schema_template.sql
 testdata/impala-profiles/README
 testdata/impala-profiles/impala_profile_log_tpcds_compute_stats

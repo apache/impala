@@ -1,0 +1,286 @@
+====
+---- QUERY
+# We do not hardcode the host name to something like "localhost" since the host name may
+# be an IP address in a test environment.
+CREATE EXTERNAL TABLE test_tbl_01 (s STRING, i INT) STORED AS PARQUET
+LOCATION 'sfs+hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/$DATABASE.db/sfs_d1.parq/#SINGLEFILE#'
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+CREATE EXTERNAL TABLE test_tbl_02 (s STRING, i INT)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 'sfs+hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/$DATABASE.db/sfs_d2.txt/#SINGLEFILE#'
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+SELECT * FROM test_tbl_01;
+---- RESULTS
+'a',1
+'b',2
+'c',3
+'d',4
+'e',5
+---- TYPES
+STRING, INT
+====
+---- QUERY
+SELECT * FROM test_tbl_02;
+---- RESULTS
+'u',1
+'v',2
+'w',3
+'x',4
+'y',5
+---- TYPES
+STRING, INT
+====
+---- QUERY
+INSERT INTO TABLE test_tbl_01 VALUES ('x', 100);
+---- CATCH
+row_regex: .*Unable to INSERT into target table .+ because .+ is not a supported filesystem.*
+====
+---- QUERY
+INSERT INTO TABLE test_tbl_02 VALUES ('x', 100);
+---- CATCH
+row_regex: .*Unable to INSERT into target table .+ because .+ is not a supported filesystem.*
+====
+---- QUERY
+LOAD DATA INPATH 'hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/$DATABASE.db/sfs_d3.parq' INTO TABLE test_tbl_01
+---- CATCH
+Unsupported SFS filesystem operation!
+====
+---- QUERY
+LOAD DATA INPATH 'hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/$DATABASE.db/sfs_d4.txt' INTO TABLE test_tbl_02
+---- CATCH
+Unsupported SFS filesystem operation!
+====
+---- QUERY
+LOAD DATA INPATH 'sfs+hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/$DATABASE.db/sfs_d3.parq/#SINGLEFILE#' INTO TABLE test_tbl_01
+---- CATCH
+row_regex: .*INPATH location .+ must point to one of the supported filesystem URI scheme.*
+====
+---- QUERY
+LOAD DATA INPATH 'sfs+hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/$DATABASE.db/sfs_d4.txt/#SINGLEFILE#' INTO TABLE test_tbl_02
+---- CATCH
+row_regex: .*INPATH location .+ must point to one of the supported filesystem URI scheme.*
+====
+---- QUERY
+TRUNCATE TABLE $DATABASE.test_tbl_01
+---- CATCH
+Unsupported SFS filesystem operation!
+====
+---- QUERY
+TRUNCATE TABLE $DATABASE.test_tbl_02
+---- CATCH
+Unsupported SFS filesystem operation!
+====
+---- QUERY
+COMPUTE STATS $DATABASE.test_tbl_01
+---- RESULTS
+'Updated 1 partition(s) and 2 column(s).'
+====
+---- QUERY
+COMPUTE STATS $DATABASE.test_tbl_02
+---- RESULTS
+'Updated 1 partition(s) and 2 column(s).'
+====
+---- QUERY
+CREATE EXTERNAL TABLE test_tbl_03 (s STRING, i INT) STORED AS PARQUET
+LOCATION 'sfs+hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/managed/$DATABASE.db/sfs_d3.parq/#SINGLEFILE#'
+---- CATCH
+An external table's location should not be located within managed warehouse root directory
+====
+---- QUERY
+CREATE EXTERNAL TABLE test_tbl_04 (s STRING, i INT)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 'sfs+hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/managed/$DATABASE.db/sfs_d4.txt/#SINGLEFILE#'
+---- CATCH
+An external table's location should not be located within managed warehouse root directory
+====
+---- QUERY
+# The table can actually be created.
+CREATE TABLE test_tbl_03 (s STRING, i INT)
+STORED AS PARQUET
+LOCATION 'sfs+hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/managed/$DATABASE.db/sfs_d3.parq/#SINGLEFILE#'
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# The table can actually be created.
+CREATE TABLE test_tbl_04 (s STRING, i INT)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 'sfs+hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/managed/$DATABASE.db/sfs_d4.txt/#SINGLEFILE#'
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# test_tbl_03 is considered as an external table with the parameter
+# 'external.table.purge' set to true. But the associated single file will not be deleted
+# after the table is dropped.
+DESCRIBE FORMATTED test_tbl_03
+---- RESULTS: VERIFY_IS_SUBSET
+'Table Type:         ','EXTERNAL_TABLE      ','NULL'
+'','external.table.purge','TRUE                '
+'','EXTERNAL            ','TRUE                '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# test_tbl_04 is considered as an external table with the parameter
+# 'external.table.purge' set to true. But the associated single file will not be deleted
+# after the table is dropped.
+DESCRIBE FORMATTED test_tbl_04
+---- RESULTS: VERIFY_IS_SUBSET
+'Table Type:         ','EXTERNAL_TABLE      ','NULL'
+'','external.table.purge','TRUE                '
+'','EXTERNAL            ','TRUE                '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# The contents of the table can be correctly retrieved.
+SELECT * FROM test_tbl_03;
+---- RESULTS
+'a',1
+'b',2
+'c',3
+'d',4
+'e',5
+---- TYPES
+STRING, INT
+====
+---- QUERY
+# The contents of the table can be correctly retrieved.
+SELECT * FROM test_tbl_04;
+---- RESULTS
+'u',1
+'v',2
+'w',3
+'x',4
+'y',5
+---- TYPES
+STRING, INT
+====
+---- QUERY
+INSERT INTO TABLE test_tbl_03 VALUES ('x', 100);
+---- CATCH
+row_regex: .*Unable to INSERT into target table .+ because .+ is not a supported filesystem.*
+====
+---- QUERY
+INSERT INTO TABLE test_tbl_04 VALUES ('x', 100);
+---- CATCH
+row_regex: .*Unable to INSERT into target table .+ because .+ is not a supported filesystem.*
+====
+---- QUERY
+DROP TABLE test_tbl_03;
+DROP TABLE test_tbl_04
+====
+---- QUERY
+# test_tbl_05 can be created, which shows that sfs_d3.parq has not been deleted after
+# test_tbl_03 was dropped.
+CREATE TABLE test_tbl_05 (s STRING, i INT) STORED AS PARQUET
+LOCATION 'sfs+hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/managed/$DATABASE.db/sfs_d3.parq/#SINGLEFILE#'
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# test_tbl_06 can be created, which shows that sfs_d4.txt has not been deleted after
+# test_tbl_04 was dropped.
+CREATE TABLE test_tbl_06 (s STRING, i INT)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 'sfs+hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/managed/$DATABASE.db/sfs_d4.txt/#SINGLEFILE#'
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# The contents of the table can still be correctly retrieved.
+SELECT * FROM test_tbl_05;
+---- RESULTS
+'a',1
+'b',2
+'c',3
+'d',4
+'e',5
+---- TYPES
+STRING, INT
+====
+---- QUERY
+# The contents of the table can be still correctly retrieved.
+SELECT * FROM test_tbl_06;
+---- RESULTS
+'u',1
+'v',2
+'w',3
+'x',4
+'y',5
+---- TYPES
+STRING, INT
+====
+---- QUERY
+# We need to set the following query option to submit to HMS a request to create a
+# managed table.
+SET DEFAULT_TRANSACTIONAL_TYPE=INSERT_ONLY;
+CREATE TABLE test_tbl_03 (s STRING, i INT)
+STORED AS PARQUET
+LOCATION 'sfs+hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/managed/$DATABASE.db/sfs_d3.parq/#SINGLEFILE#'
+---- CATCH
+A managed table's location should be located within managed warehouse root directory or within its database's managedLocationUri.
+====
+---- QUERY
+# We need to set the following query option to submit to HMS a request to create a
+# managed table.
+SET DEFAULT_TRANSACTIONAL_TYPE=INSERT_ONLY;
+CREATE TABLE test_tbl_04 (s STRING, i INT)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 'sfs+hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/managed/$DATABASE.db/sfs_d4.txt/#SINGLEFILE#'
+---- CATCH
+A managed table's location should be located within managed warehouse root directory or within its database's managedLocationUri.
+====
+---- QUERY
+SET DEFAULT_TRANSACTIONAL_TYPE=INSERT_ONLY;
+CREATE TABLE test_tbl_03 (s STRING, i INT)
+STORED AS PARQUET
+LOCATION 'hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/managed/$DATABASE.db/sfs_d3.parq'
+---- CATCH
+Path is not a directory
+====
+---- QUERY
+SET DEFAULT_TRANSACTIONAL_TYPE=INSERT_ONLY;
+CREATE TABLE test_tbl_04 (s STRING, i INT)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 'hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/managed/$DATABASE.db/sfs_d4.txt'
+---- CATCH
+Path is not a directory
+====
+---- QUERY
+# The table can actually be created but the contents of the table cannot be retrieved.
+CREATE EXTERNAL TABLE test_tbl_03 (s STRING) PARTITIONED BY (i INT) STORED AS PARQUET
+LOCATION 'sfs+hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/$DATABASE.db/sfs_d3.parq/#SINGLEFILE#'
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# The table can actually be created but the contents of the table cannot be retrieved.
+CREATE EXTERNAL TABLE test_tbl_04 (s STRING) PARTITIONED BY (i INT)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 'sfs+hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/$DATABASE.db/sfs_d4.txt/#SINGLEFILE#'
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+SELECT * FROM test_tbl_03
+---- RESULTS
+====
+---- QUERY
+SELECT * FROM test_tbl_04
+---- RESULTS
+====
