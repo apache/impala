@@ -1565,3 +1565,52 @@ class TestKuduReadTokenSplit(KuduTestSuite):
     assert len(matches.groups()) == 1, plan
     self.client.clear_configuration()
     return int(matches.group(1))
+
+
+@SkipIfHive2.create_external_kudu_table
+class TestKuduInsertWithBufferedTupleDesc(KuduTestSuite):
+  """
+  This test verifies bug fixing for IMPALA-11029.
+  """
+
+  # queries to create Kudu tables.
+  _create_kudu_table_1_query = "CREATE TABLE {0} (id1 INT NOT NULL, " \
+      "agrmt INT NOT NULL, big_id BIGINT NOT NULL, outdated_flag STRING NOT NULL, " \
+      "mod_ts TIMESTAMP NOT NULL, PRIMARY KEY (id1, agrmt)) " \
+      "PARTITION BY HASH (id1) PARTITIONS 2 STORED AS KUDU"
+
+  _create_kudu_table_2_query = "CREATE TABLE {0} (cl_id INT NOT NULL, " \
+      "cl_agrmt INT NOT NULL, outdat STRING NULL, mod_dat TIMESTAMP NULL, " \
+      "PRIMARY KEY (cl_id, cl_agrmt)) " \
+      "PARTITION BY HASH (cl_id) PARTITIONS 2 STORED AS KUDU"
+
+  # query to insert rows to Kudu table.
+  _insert_query = "INSERT INTO {0} (id1, agrmt, big_id, outdated_flag, mod_ts) " \
+      "SELECT i.cl_id, cast(row_number() over(order by null) as int), i.cl_agrmt, 'Y', " \
+      "case when outdat='Y' and i.mod_dat is not null then i.mod_dat else now() end " \
+      "from {1} i left join {0} u on u.big_id=i.cl_agrmt " \
+      "left join (select id1, big_id from {0} group by id1, big_id) uu " \
+      "on uu.big_id=i.cl_agrmt " \
+      "where u.big_id is null"
+
+  @SkipIfKudu.no_hybrid_clock
+  def test_kudu_insert_with_buffered_tuple_desc(self, cursor, kudu_client,
+      unique_database):
+    # Create Kudu tables.
+    table_1_name = "%s.tab1" % unique_database
+    cursor.execute(self._create_kudu_table_1_query.format(table_1_name))
+    assert kudu_client.table_exists(
+        KuduTestSuite.to_kudu_table_name(unique_database, "tab1"))
+    table_2_name = "%s.tab2" % unique_database
+    cursor.execute(self._create_kudu_table_2_query.format(table_2_name))
+    assert kudu_client.table_exists(
+        KuduTestSuite.to_kudu_table_name(unique_database, "tab2"))
+
+    # Insert rows
+    try:
+      cursor.execute(self._insert_query.format(table_1_name, table_2_name))
+      cursor.execute("SELECT * FROM %s" % table_1_name)
+      assert len(cursor.fetchall()) == 0
+    except Exception as e:
+      # Not expect to throw exception like "IllegalStateException: null"
+      assert False, str(e)
