@@ -1,0 +1,206 @@
+# Check that for a single unnest the predicate on the unnested items is pushed to the
+# Scan node.
+select id, item from (
+    select id, unnest(arr1) from functional_parquet.complextypes_arrays) x
+where item < 5;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:SUBPLAN
+|  row-size=20B cardinality=13.51K
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=20B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=16B cardinality=1
+|  |
+|  03:UNNEST [functional_parquet.complextypes_arrays.arr1 arr1]
+|     row-size=4B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypes_arrays]
+   HDFS partitions=1/1 files=1 size=1.06KB
+   predicates: !empty(functional_parquet.complextypes_arrays.arr1)
+   predicates on arr1: UNNEST(arr1) < 5, arr1.item < 5
+   row-size=16B cardinality=1.35K
+====
+# Similar as above but using the FROM clause syntax for zipping unnest.
+select id, unnest1 from (
+    select id, arr1.item as unnest1
+    from functional_parquet.complextypes_arrays a, unnest(a.arr1)) x
+where unnest1 < 5;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:SUBPLAN
+|  row-size=20B cardinality=13.51K
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=20B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=16B cardinality=1
+|  |
+|  03:UNNEST [a.arr1]
+|     row-size=4B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypes_arrays a]
+   HDFS partitions=1/1 files=1 size=1.06KB
+   predicates: !empty(a.arr1)
+   predicates on a.arr1: arr1.item < 5
+   row-size=16B cardinality=1.35K
+====
+# Check that for a single unnest the predicate on the unnested items is pushed to the
+# Scan node. Queries a view instead of a table.
+select id, item from (
+    select id, unnest(arr1) from test_zipping_unnest_db.view_arrays) x
+where item < 5;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:SUBPLAN
+|  row-size=20B cardinality=13.51K
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=20B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=16B cardinality=1
+|  |
+|  03:UNNEST [test_zipping_unnest_db.view_arrays.arr1]
+|     row-size=4B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypes_arrays]
+   HDFS partitions=1/1 files=1 size=1.06KB
+   predicates: !empty(arr1)
+   predicates on arr1: UNNEST(arr1) < 5, arr1.item < 5
+   row-size=16B cardinality=1.35K
+====
+# Similar as above but using the FROM clause syntax for zipping unnest.
+select id, unnest1 from (
+    select id, arr1.item as unnest1
+    from test_zipping_unnest_db.view_arrays a, unnest(a.arr1)) x
+where unnest1 < 5;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:SUBPLAN
+|  row-size=20B cardinality=13.51K
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=20B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=16B cardinality=1
+|  |
+|  03:UNNEST [a.arr1]
+|     row-size=4B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypes_arrays]
+   HDFS partitions=1/1 files=1 size=1.06KB
+   predicates: !empty(arr1)
+   predicates on arr1: arr1.item < 5
+   row-size=16B cardinality=1.35K
+====
+# Check that for multiple unnests the predicate on the unnested items is pushed to the
+# Unnest node instead of the Scan node.
+select id, unnest1 from (
+    select id, unnest(arr1) unnest1, unnest(arr2) unnest2
+    from functional_parquet.complextypes_arrays) x
+where unnest1 < 5;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:SUBPLAN
+|  row-size=20B cardinality=13.51K
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=20B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=16B cardinality=1
+|  |
+|  03:UNNEST [functional_parquet.complextypes_arrays.arr1 arr1, functional_parquet.complextypes_arrays.arr2 arr2]
+|     predicates: UNNEST(arr1) < 5
+|     row-size=4B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypes_arrays]
+   HDFS partitions=1/1 files=1 size=1.06KB
+   row-size=16B cardinality=1.35K
+====
+# Similar as above but using the FROM clause syntax for zipping unnest.
+select id, unnest1 from (
+    select id, arr1.item as unnest1, arr2.item as unnest2
+    from functional_parquet.complextypes_arrays a, unnest(a.arr1, a.arr2)) x
+where unnest1 < 5;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:SUBPLAN
+|  row-size=20B cardinality=13.51K
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=20B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=16B cardinality=1
+|  |
+|  03:UNNEST [a.arr1, a.arr2]
+|     predicates: arr1.item < 5
+|     row-size=4B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypes_arrays a]
+   HDFS partitions=1/1 files=1 size=1.06KB
+   row-size=16B cardinality=1.35K
+====
+# Check that for multiple unnests the predicate on the unnested items is pushed to the
+# Unnest node instead of the Scan node. Queries a view instead of a table.
+select id, unnest1 from (
+    select id, unnest(arr1) unnest1, unnest(arr2) unnest2
+    from test_zipping_unnest_db.view_arrays) x
+where unnest1 < 5;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:SUBPLAN
+|  row-size=20B cardinality=13.51K
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=20B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=16B cardinality=1
+|  |
+|  03:UNNEST [test_zipping_unnest_db.view_arrays.arr1, test_zipping_unnest_db.view_arrays.arr2]
+|     predicates: UNNEST(arr1) < 5
+|     row-size=4B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypes_arrays]
+   HDFS partitions=1/1 files=1 size=1.06KB
+   row-size=16B cardinality=1.35K
+====
+# Similar as above but using the FROM clause syntax for zipping unnest.
+select id, unnest1 from (
+    select id, arr1.item as unnest1, arr2.item as unnest2
+    from test_zipping_unnest_db.view_arrays a, unnest(a.arr1, a.arr2)) x
+where unnest1 < 5;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:SUBPLAN
+|  row-size=20B cardinality=13.51K
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=20B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=16B cardinality=1
+|  |
+|  03:UNNEST [a.arr1, a.arr2]
+|     predicates: arr1.item < 5
+|     row-size=4B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypes_arrays]
+   HDFS partitions=1/1 files=1 size=1.06KB
+   row-size=16B cardinality=1.35K
+====

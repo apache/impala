@@ -105,6 +105,7 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
           }
           if (firstZippingUnnestRef == null) firstZippingUnnestRef = tblRef;
           analyzer.addZippingUnnestTupleId((CollectionTableRef)tblRef);
+          analyzer.increaseZippingUnnestCount();
         }
       }
     }
@@ -146,6 +147,9 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
   private void checkTopLevelComplexAcidScan(Analyzer analyzer,
       CollectionTableRef collRef) {
     if (collRef.getCollectionExpr() != null) return;
+    // Don't do any checks of the collection that came from a view as getTable() would
+    // return null in that case.
+    if (collRef.getTable() == null) return;
     if (!AcidUtils.isFullAcidTable(
         collRef.getTable().getMetaStoreTable().getParameters())) {
       return;

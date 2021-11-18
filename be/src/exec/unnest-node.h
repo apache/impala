@@ -33,7 +33,7 @@ class UnnestPlanNode : public PlanNode {
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
   /// Initializes the expressions that produce the collections to be unnested.
   /// Called by the containing subplan plan-node.
-  Status InitCollExpr(FragmentState* state);
+  Status InitCollExprs(FragmentState* state);
 
   ~UnnestPlanNode(){}
 

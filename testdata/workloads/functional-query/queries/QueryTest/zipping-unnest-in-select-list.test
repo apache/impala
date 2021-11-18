@@ -156,7 +156,7 @@ AnalysisException: Providing zipping and joining unnests together is not support
 ---- QUERY
 # Zipping and joining unnests are given together where a single table ref is in the FROM
 # clause with absolute path.
-select unnest(a) from complextypestbl.int_array_array;
+select unnest(item) from complextypestbl.int_array_array;
 ---- CATCH
 AnalysisException: Providing zipping and joining unnests together is not supported.
 ====
@@ -171,6 +171,24 @@ AnalysisException: Providing zipping unnest both in the SELECT list and in the F
 select unnest(arr1) from complextypes_arrays t, unnest(t.arr2);
 ---- CATCH
 AnalysisException: Providing zipping unnest both in the SELECT list and in the FROM clause is not supported.
+====
+---- QUERY
+# WHERE filter on an unnested array in the same SELECT statement is not allowed.
+select id, unnest(arr1), unnest(arr2) from complextypes_arrays where arr1.item = 1;
+---- CATCH
+AnalysisException: Not allowed to add a filter on an unnested array under the same select statement: arr1.item
+====
+---- QUERY
+select id, unnest(arr1), unnest(arr2) from complextypes_arrays
+where id < 3 and length(arr2.item) < 5;
+---- CATCH
+AnalysisException: Not allowed to add a filter on an unnested array under the same select statement: arr2.item
+====
+---- QUERY
+select id, unnest(arr1), unnest(arr2) from complextypes_arrays
+where 3 * arr1.item > 8;
+---- CATCH
+AnalysisException: Not allowed to add a filter on an unnested array under the same select statement: arr1.item
 ====
 ---- QUERY
 # Do an unnest on the outer layer of a nested array.
@@ -196,3 +214,19 @@ STRING
 select unnest(int_array_array.item) from complextypestbl;
 ---- CATCH
 AnalysisException: Illegal column/field reference 'int_array_array.item' with intermediate collection 'int_array_array' of type 'ARRAY<ARRAY<INT>>'
+====
+---- QUERY
+# Unnest the same array multiple times. Check that the where filter is still allowed even
+# though there are multiple unnest, but they are for the same array.
+select id, unnest(arr1), unnest(arr1) from complextypes_arrays
+where arr1.item < 3;
+---- RESULTS
+1,1,1
+1,2,2
+2,1,1
+7,1,1
+7,2,2
+10,1,1
+10,2,2
+---- TYPES
+INT,INT,INT

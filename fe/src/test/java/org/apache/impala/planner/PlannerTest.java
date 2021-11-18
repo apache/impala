@@ -352,6 +352,14 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testZippingUnnest() {
+    addTestDb("test_zipping_unnest_db", "For creating views for zipping unnest queries.");
+    addTestView("create view test_zipping_unnest_db.view_arrays as " +
+        "select id, arr1, arr2 from functional_parquet.complextypes_arrays");
+    runPlannerTestFile("zipping-unnest");
+  }
+
+  @Test
   public void testJoins() {
     TQueryOptions options = defaultQueryOptions();
     options.setDisable_hdfs_num_rows_estimate(false);

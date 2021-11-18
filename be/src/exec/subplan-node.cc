@@ -44,7 +44,7 @@ Status SubplanPlanNode::SetContainingSubplan(
   } else {
     if (node->tnode_->node_type == TPlanNodeType::UNNEST_NODE) {
       UnnestPlanNode* unnest_node = reinterpret_cast<UnnestPlanNode*>(node);
-      RETURN_IF_ERROR(unnest_node->InitCollExpr(state));
+      RETURN_IF_ERROR(unnest_node->InitCollExprs(state));
     }
     int num_children = node->children_.size();
     for (int i = 0; i < num_children; ++i) {

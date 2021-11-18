@@ -23,7 +23,6 @@ import java.util.Set;
 
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.catalog.FeFsTable;
-import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.StructField;
@@ -43,13 +42,18 @@ import com.google.common.base.Preconditions;
 
 public class SlotRef extends Expr {
   protected List<String> rawPath_;
-  private final String label_;  // printed in toSql()
+  protected final String label_;  // printed in toSql()
 
   // Results of analysis.
-  private SlotDescriptor desc_;
+  protected SlotDescriptor desc_;
 
   // The resolved path after resolving 'rawPath_'.
   protected Path resolvedPath_ = null;
+
+  // Indicates if this SlotRef is coming from zipping unnest where the unest is given in
+  // the FROM clause. Note, when the unnest in in the select list then an UnnestExpr would
+  // be used instead of a SlotRef.
+  protected boolean isZippingUnnest_ = false;
 
   public SlotRef(List<String> rawPath) {
     super();
@@ -103,6 +107,7 @@ public class SlotRef extends Expr {
     }
     label_ = other.label_;
     desc_ = other.desc_;
+    isZippingUnnest_ = other.isZippingUnnest_;
   }
 
   /**
@@ -300,6 +305,8 @@ public class SlotRef extends Expr {
     return desc_.getPath();
   }
 
+  public void setIsZippingUnnest(boolean b) { isZippingUnnest_ = b; }
+
   @Override
   public String toSqlImpl(ToSqlOptions options) {
     if (label_ != null) return label_;
@@ -366,6 +373,15 @@ public class SlotRef extends Expr {
   @Override
   public boolean isBoundByTupleIds(List<TupleId> tids) {
     Preconditions.checkState(desc_ != null);
+    // If this SlotRef is coming from zipping unnest then try to do a similar check as
+    // UnnestExpr does.
+    if (isZippingUnnest_ && desc_.getParent() != null &&
+        desc_.getParent().getRootDesc() != null) {
+      TupleId parentId = desc_.getParent().getRootDesc().getId();
+      for (TupleId tid: tids) {
+        if (tid.equals(parentId)) return true;
+      }
+    }
     for (TupleId tid: tids) {
       if (tid.equals(desc_.getParent().getId())) return true;
     }

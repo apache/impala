@@ -48,7 +48,7 @@ void UnnestPlanNode::Close() {
   PlanNode::Close();
 }
 
-Status UnnestPlanNode::InitCollExpr(FragmentState* state) {
+Status UnnestPlanNode::InitCollExprs(FragmentState* state) {
   DCHECK(containing_subplan_ != nullptr)
       << "set_containing_subplan() must have been called";
   const RowDescriptor& row_desc = *containing_subplan_->children_[0]->row_descriptor_;

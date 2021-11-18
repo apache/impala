@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -32,6 +33,7 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprId;
 import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.ToSqlOptions;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
@@ -496,6 +498,30 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   /**
+   * If there are more than one array to be zipping unnested in the 'analyzer' then
+   * removes the conjuncts related to the unnested array item from the 'conjuncts' list.
+   * This could be useful to prevent e.g. ScanNode or SingularRowSrc to pick up the
+   * conjuncts for zipping unnested arrays and let the UnnestNode to take care of them.
+   */
+  public static void removeZippingUnnestConjuncts(List<Expr> conjuncts,
+      Analyzer analyzer) {
+    Set<TupleId> zippingUnnestTupleIds = analyzer.getZippingUnnestTupleIds();
+
+    Iterator<Expr> it = conjuncts.iterator();
+    while(it.hasNext()) {
+      Expr e = it.next();
+      List<SlotRef> slotRefs = new ArrayList<>();
+      e.collect(SlotRef.class, slotRefs);
+      for (SlotRef slotRef : slotRefs) {
+        if (zippingUnnestTupleIds.contains(slotRef.getDesc().getParent().getId())) {
+          it.remove();
+          break;
+        }
+      }
+    }
+  }
+
+  /**
    * Computes the full internal state, including smap and planner-relevant statistics
    * (calls computeStats()), marks all slots referenced by this node as materialized
    * and computes the mem layout of all materialized tuples (with the assumption that
@@ -515,9 +541,14 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    */
   protected void assignConjuncts(Analyzer analyzer) {
     List<Expr> unassigned = analyzer.getUnassignedConjuncts(this);
+    if (!shouldPickUpZippingUnnestConjuncts()) {
+      removeZippingUnnestConjuncts(unassigned, analyzer);
+    }
     conjuncts_.addAll(unassigned);
     analyzer.markConjunctsAssigned(unassigned);
   }
+
+  protected boolean shouldPickUpZippingUnnestConjuncts() { return true; }
 
   /**
    * Apply the provided conjuncts to the this node, returning the new root of

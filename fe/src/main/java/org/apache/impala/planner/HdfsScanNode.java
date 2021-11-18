@@ -948,8 +948,8 @@ public class HdfsScanNode extends ScanNode {
       // FROM clause then avoid pushing down conjunct for this slot to the scanner as it
       // would result incorrect results on that slot after performing the unnest.
       // One exception is when there is only one such table reference in the FROM clause.
-      Set<TupleId> zippingUnnestTupleIds = analyzer.getZippingUnnestTupleIds();
-      if (zippingUnnestTupleIds.size() > 1 && zippingUnnestTupleIds.contains(itemTid)) {
+      if (analyzer.getNumZippingUnnests() > 1 &&
+          analyzer.getZippingUnnestTupleIds().contains(itemTid)) {
         continue;
       }
 

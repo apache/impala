@@ -22,7 +22,6 @@ import org.apache.impala.analysis.TableRef.ZippingUnnestType;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.thrift.TExprNode;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -40,6 +39,15 @@ public class UnnestExpr extends SlotRef {
 
   protected UnnestExpr(UnnestExpr other) {
     super(other);
+    // Removing "item" from the end of the path is required so that re-analyze will work
+    // as well after adding "item" to the path in the first round of analysis here in the
+    // unnest.
+    removeItemFromPath();
+    rawPathWithoutItem_ = other.rawPathWithoutItem_;
+  }
+
+  protected UnnestExpr(SlotDescriptor desc) {
+    super(desc);
   }
 
   @Override
@@ -54,11 +62,13 @@ public class UnnestExpr extends SlotRef {
     // find the corresponding CollectionTableRef during resolution.
     Path resolvedPath = resolveAndVerifyRawPath(analyzer);
     Preconditions.checkNotNull(resolvedPath);
+    if (!rawPathWithoutItem_.isEmpty()) rawPathWithoutItem_.clear();
     rawPathWithoutItem_.addAll(rawPath_);
 
     List<String> tableRefRawPath = constructRawPathForTableRef(resolvedPath);
     Preconditions.checkNotNull(tableRefRawPath);
-    createAndRegisterCollectionTableRef(tableRefRawPath, analyzer);
+    CollectionTableRef tblRef = createAndRegisterCollectionTableRef(tableRefRawPath,
+        analyzer);
 
     // 'rawPath_' points to an array and we need a SlotRef to refer to the item of the
     // array. Hence, adding "item" to the end of the path.
@@ -69,12 +79,14 @@ public class UnnestExpr extends SlotRef {
       rawPath_ = rawPath_.subList(rawPath_.size() - 2, rawPath_.size());
     }
     super.analyzeImpl(analyzer);
+    Preconditions.checkState(tblRef.desc_.getSlots().size() == 1);
+    analyzer.addZippingUnnestTupleId(desc_.getParent().getId());
   }
 
   private void verifyTableRefs(Analyzer analyzer) throws AnalysisException {
     for (TableRef ref : analyzer.getTableRefs().values()) {
       if (ref instanceof CollectionTableRef) {
-        if (!ref.isZippingUnnest()) {
+        if (!ref.isZippingUnnest() && !ref.isCollectionInSelectList()) {
           throw new AnalysisException(
               "Providing zipping and joining unnests together is not supported.");
         } else if (ref.getZippingUnnestType() ==
@@ -119,22 +131,40 @@ public class UnnestExpr extends SlotRef {
     return tableRefRawPath;
   }
 
-  private void createAndRegisterCollectionTableRef(List<String> tableRefRawPath,
-      Analyzer analyzer) throws AnalysisException {
-    TableRef tblRef = new TableRef(tableRefRawPath, null);
+  private CollectionTableRef createAndRegisterCollectionTableRef(
+      List<String> tableRefRawPath, Analyzer analyzer) throws AnalysisException {
+    String alias = "";
+    if (rawPath_ != null && rawPath_.size() > 0) {
+      alias = rawPath_.get(rawPath_.size() - 1);
+    }
+    TableRef tblRef = new TableRef(tableRefRawPath, alias);
     tblRef = analyzer.resolveTableRef(tblRef);
     Preconditions.checkState(tblRef instanceof CollectionTableRef);
     tblRef.setZippingUnnestType(ZippingUnnestType.SELECT_LIST_ZIPPING_UNNEST);
-    if (!analyzer.isRegisteredTableRef(tblRef)) {
+    TableRef existingTblRef = analyzer.getRegisteredTableRef(tblRef.getUniqueAlias());
+    if (existingTblRef == null) {
       tblRef.analyze(analyzer);
-      // This just registers the tbl ref to be added to the FROM clause because it's not
-      // available here. Note, SelectStmt will add it to the FROM clause during analysis.
+      // This just registers the table ref in the analyzer to be added to the FROM clause
+      // because the FROM clause is not available here. Note, a query rewrite will add it
+      // eventually before a re-analysis.
       analyzer.addTableRefFromUnnestExpr((CollectionTableRef)tblRef);
+      return (CollectionTableRef)tblRef;
+    } else if (existingTblRef.isCollectionInSelectList() ||
+        existingTblRef.getZippingUnnestType() == ZippingUnnestType.NONE) {
+      Preconditions.checkState(existingTblRef instanceof CollectionTableRef);
+      // This case happens when unnesting an array that comes from a view where the array
+      // is present in the select list of the view. Here the view has already registered
+      // the table ref to the analyzer.
+      existingTblRef.setZippingUnnestType(ZippingUnnestType.SELECT_LIST_ZIPPING_UNNEST);
+      analyzer.addTableRefFromUnnestExpr((CollectionTableRef)existingTblRef);
     }
+    existingTblRef.setHidden(false);
+    existingTblRef.getDesc().setHidden(false);
+    return (CollectionTableRef)existingTblRef;
   }
 
   private void removeItemFromPath() {
-    Preconditions.checkNotNull(rawPath_);
+    if (rawPath_ == null || rawPath_.isEmpty()) return;
     if (rawPath_.get(rawPath_.size() - 1).equals("item")) {
       rawPath_.remove(rawPath_.size() - 1);
     }
@@ -145,6 +175,39 @@ public class UnnestExpr extends SlotRef {
 
   @Override
   public String toSqlImpl(ToSqlOptions options) {
-    return "UNNEST(" + ToSqlUtils.getPathSql(rawPathWithoutItem_)  + ")";
+    Preconditions.checkState(isAnalyzed());
+    String label = "";
+    if (rawPathWithoutItem_ != null) label = ToSqlUtils.getPathSql(rawPathWithoutItem_);
+    if (label.equals("") && label_ != null) {
+      // If 'rawPathWithoutItem_' is null then this slot is from a view and we have to
+      // use 'label_' for displaying purposes.
+      if (label_.endsWith(".item")) label = label_.substring(0, label_.length() - 5);
+    }
+    return "UNNEST(" + label  + ")";
+  }
+
+  @Override
+  protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer) {
+    if (smap == null) return this;
+    SlotRef slotRef = new SlotRef(this.desc_);
+    Expr substExpr = smap.get(slotRef);
+    if (substExpr == null) {
+      UnnestExpr unnestExpr = new UnnestExpr(this.desc_);
+      substExpr = smap.get(unnestExpr);
+      if (substExpr == null) return this;
+      return substExpr;
+    }
+
+    return new UnnestExpr(((SlotRef)substExpr).getDesc());
+  }
+
+  @Override
+  public boolean isBoundByTupleIds(List<TupleId> tids) {
+    Preconditions.checkState(desc_ != null);
+    TupleId parentId = desc_.getParent().getRootDesc().getId();
+    for (TupleId tid: tids) {
+      if (tid.equals(parentId)) return true;
+    }
+    return super.isBoundByTupleIds(tids);
   }
 }

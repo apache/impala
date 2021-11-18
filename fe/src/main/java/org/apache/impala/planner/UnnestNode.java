@@ -17,12 +17,14 @@
 
 package org.apache.impala.planner;
 
+import java.util.Comparator;
 import java.util.List;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.CollectionTableRef;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanNode;
@@ -120,6 +122,11 @@ public class UnnestNode extends PlanNode {
   protected String getDisplayLabelDetail() {
     StringBuilder strBuilder = new StringBuilder();
     boolean first = true;
+    tblRefs_.sort( (CollectionTableRef t1, CollectionTableRef t2) -> {
+      String path1 = ToSqlUtils.getPathSql(t1.getPath());
+      String path2 = ToSqlUtils.getPathSql(t2.getPath());
+      return path1.compareTo(path2);
+    });
     for (CollectionTableRef tblRef : tblRefs_) {
       if (!first) strBuilder.append(", ");
       strBuilder.append(Joiner.on(".").join(tblRef.getPath()));

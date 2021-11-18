@@ -1,5 +1,156 @@
 ====
 ---- QUERY
+create view view_arrays as
+    select id, arr1, arr2 from functional_parquet.complextypes_arrays;
+---- RESULTS
+'View has been created.'
+====
+---- QUERY
+# Unnest arrays from a view where there are no filters.
+select id, unnest(arr1), unnest(arr2) from view_arrays;
+---- RESULTS
+1,1,'one'
+1,2,'two'
+1,3,'three'
+1,4,'four'
+1,5,'five'
+2,1,'one'
+2,NULL,'two'
+2,3,'three'
+2,4,'NULL'
+2,5,'five'
+3,10,'ten'
+3,9,'NULL'
+3,8,'NULL'
+4,10,'ten'
+4,NULL,'nine'
+4,NULL,'eight'
+5,10,'ten'
+5,NULL,'eleven'
+5,12,'twelve'
+5,NULL,'thirteen'
+6,NULL,'str1'
+6,NULL,'str2'
+7,1,'NULL'
+7,2,'NULL'
+9,NULL,'str1'
+9,NULL,'str2'
+10,1,'NULL'
+10,2,'NULL'
+10,3,'NULL'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Unnest arrays from a view where there is a filter on an outer SELECT.
+# Note, filtering by the unnested items has to happen on the array's item.
+select id, unnest1, unnest2 from (
+    select id, unnest(arr1) as unnest1, unnest(arr2) as unnest2 from view_arrays) x
+where unnest1 < 3;
+---- RESULTS
+1,1,'one'
+1,2,'two'
+2,1,'one'
+7,1,'NULL'
+7,2,'NULL'
+10,1,'NULL'
+10,2,'NULL'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Similar as above but here the unnested field to be filtered by doesn't have an alias.
+select id, unnest1, item from (
+    select id, unnest(arr1) as unnest1, unnest(arr2) from view_arrays) x
+where item is null;
+---- RESULTS
+2,4,'NULL'
+3,9,'NULL'
+3,8,'NULL'
+7,1,'NULL'
+7,2,'NULL'
+10,1,'NULL'
+10,2,'NULL'
+10,3,'NULL'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Giving a filter on an unnested array is allowed if there is only one unnest in the
+# query.
+select id, unnest(arr1) from view_arrays
+where arr1.item > 5;
+---- RESULTS
+3,10
+3,9
+3,8
+4,10
+5,10
+5,12
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Giving a filter on an unnested array is not allowed if there are multiple unnests in the
+# query.
+select id, unnest(arr1), unnest(arr2) from view_arrays
+where arr1.item > 5;
+---- CATCH
+AnalysisException: Not allowed to add a filter on an unnested array under the same select statement: arr1.item
+====
+---- QUERY
+create view view_arrays_with_filter as
+    select id, arr1, arr2 from functional_orc_def.complextypes_arrays where id < 5;
+---- RESULTS
+'View has been created.'
+====
+---- QUERY
+# Unnest arrays from a view where there is a filter within the view.
+select id, unnest(arr1), unnest(arr2) from view_arrays_with_filter;
+---- RESULTS
+1,1,'one'
+1,2,'two'
+1,3,'three'
+1,4,'four'
+1,5,'five'
+2,1,'one'
+2,NULL,'two'
+2,3,'three'
+2,4,'NULL'
+2,5,'five'
+3,10,'ten'
+3,9,'NULL'
+3,8,'NULL'
+4,10,'ten'
+4,NULL,'nine'
+4,NULL,'eight'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Unnest arrays from a view where there are filters both within the view and on the outer
+# select.
+select id, unnest1, unnest2 from (
+    select id, unnest(arr1) unnest1, unnest(arr2) unnest2 from view_arrays_with_filter) x
+where unnest2 is not null;
+---- RESULTS
+1,1,'one'
+1,2,'two'
+1,3,'three'
+1,4,'four'
+1,5,'five'
+2,1,'one'
+2,NULL,'two'
+2,3,'three'
+2,5,'five'
+3,10,'ten'
+4,10,'ten'
+4,NULL,'nine'
+4,NULL,'eight'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
 create view view_unnested_arrays as
     select id, unnest(arr1) as arr1_unnested, unnest(arr2) as arr2_unnested
     from functional_orc_def.complextypes_arrays;
@@ -45,12 +196,287 @@ INT,INT,STRING
 ---- QUERY
 # Same as above but there is a filter in the outer select.
 select id, arr1_unnested, arr2_unnested from view_unnested_arrays
-where arr1_unnested > 5;
+where arr1_unnested >= 5 and length(arr2_unnested) > 3;
+---- RESULTS
+1,5,'five'
+2,5,'five'
+5,12,'twelve'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Create a wrapper view around an existing view that in turn contains arrays.
+# Adds an additional filter on the underlying view.
+create view nested_view_arrays as
+    select id, arr1, arr2 from view_arrays
+    where id % 2 = 1;
+---- RESULTS
+'View has been created.'
+====
+---- QUERY
+# Do an unnest where the array is in a nested view.
+select id, unnest(arr1), unnest(arr2) from nested_view_arrays;
+---- RESULTS
+1,1,'one'
+1,2,'two'
+1,3,'three'
+1,4,'four'
+1,5,'five'
+3,10,'ten'
+3,9,'NULL'
+3,8,'NULL'
+5,10,'ten'
+5,NULL,'eleven'
+5,12,'twelve'
+5,NULL,'thirteen'
+7,1,'NULL'
+7,2,'NULL'
+9,NULL,'str1'
+9,NULL,'str2'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# In this query the array has different unique aliases in the different levels:
+# 'x.arr1', 'arr1'
+select id, unnest(arr1) unnest1, unnest(arr2) from (
+    select id, arr1, arr2 from nested_view_arrays where id < 5) x;
+---- RESULTS
+1,1,'one'
+1,2,'two'
+1,3,'three'
+1,4,'four'
+1,5,'five'
+3,10,'ten'
+3,9,'NULL'
+3,8,'NULL'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Similar as above but apply an additional filter on the select. The filter is on a
+# non-unnested column.
+select id, unnest(arr1), unnest(arr2) from nested_view_arrays
+where id > 4;
+---- RESULTS
+5,10,'ten'
+5,NULL,'eleven'
+5,12,'twelve'
+5,NULL,'thirteen'
+7,1,'NULL'
+7,2,'NULL'
+9,NULL,'str1'
+9,NULL,'str2'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Similar as above but here the filter is on a column that is being unnested in the same
+# select. This is not allowed.
+select id, unnest(arr1), unnest(arr2) from nested_view_arrays
+where arr1.item = 4;
+---- CATCH
+AnalysisException: Not allowed to add a filter on an unnested array under the same select statement: arr1.item
+====
+---- QUERY
+# Similar as above but here the filter is in an outer select.
+select id, unnest1, unnest2 from (
+    select id, unnest(arr1) unnest1, unnest(arr2) unnest2 from nested_view_arrays) x
+where unnest1 = 4;
+---- RESULTS
+1,4,'four'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Create a wrapper view around an existing view that in turn contains arrays.
+# This wrapper view unnests the arrays from the underlying view.
+create view nested_view_unnested_arrays as
+    select id, unnest(arr1) as arr1_unnested, unnest(arr2) as arr2_unnested
+    from view_arrays
+    where id % 2 = 1;
+---- RESULTS
+'View has been created.'
+====
+---- QUERY
+# Query the nested view where one view gives the arrays and the other unnests them.
+select id, arr1_unnested, arr2_unnested from nested_view_unnested_arrays;
+---- RESULTS
+1,1,'one'
+1,2,'two'
+1,3,'three'
+1,4,'four'
+1,5,'five'
+3,10,'ten'
+3,9,'NULL'
+3,8,'NULL'
+5,10,'ten'
+5,NULL,'eleven'
+5,12,'twelve'
+5,NULL,'thirteen'
+7,1,'NULL'
+7,2,'NULL'
+9,NULL,'str1'
+9,NULL,'str2'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Similar as above but with a where filter on the outermost select.
+select id, arr1_unnested, arr2_unnested from nested_view_unnested_arrays
+where arr1_unnested > 7;
 ---- RESULTS
 3,10,'ten'
 3,9,'NULL'
 3,8,'NULL'
+5,10,'ten'
+5,12,'twelve'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# The queries below will test the syntax where the unnest is in the from clause.
+# WHERE filter is not allowed when multiple arrays are being unnested in the same SELECT
+# statement.
+select id, arr1.item from
+    view_arrays va, unnest(va.arr1, va.arr2)
+where arr1.item < 3;
+---- CATCH
+AnalysisException: Not allowed to add a filter on an unnested array under the same select statement: arr1.item
+====
+---- QUERY
+# Similar as above but here only one array is unnested, hence the WHERE filter is allowed.
+select id, arr1.item from
+    view_arrays va, unnest(va.arr1)
+where arr1.item < 3;
+---- RESULTS
+1,1
+1,2
+2,1
+7,1
+7,2
+10,1
+10,2
+---- TYPES
+INT,INT
+====
+---- QUERY
+# An outer select has a WHERE filter while an inner select unnests multiple arrays.
+select id, unnest1, unnest2 from
+    (select id, arr1.item as unnest1, arr2.item as unnest2 from
+        functional_parquet.complextypes_arrays va,
+        unnest(va.arr1, va.arr2)) x
+where unnest1 < 3;
+---- RESULTS
+1,1,'one'
+1,2,'two'
+2,1,'one'
+7,1,'NULL'
+7,2,'NULL'
+10,1,'NULL'
+10,2,'NULL'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Unnest arrays from a view where there is a filter within the view.
+select id, arr1.item, arr2.item from view_arrays_with_filter va, unnest(va.arr1, va.arr2);
+---- RESULTS
+1,1,'one'
+1,2,'two'
+1,3,'three'
+1,4,'four'
+1,5,'five'
+2,1,'one'
+2,NULL,'two'
+2,3,'three'
+2,4,'NULL'
+2,5,'five'
+3,10,'ten'
+3,9,'NULL'
+3,8,'NULL'
 4,10,'ten'
+4,NULL,'nine'
+4,NULL,'eight'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+create view view_unnested_arrays2 as
+    select id, arr1.item as arr1_unnested, arr2.item as arr2_unnested
+    from functional_orc_def.complextypes_arrays va, unnest(va.arr1, va.arr2);
+---- RESULTS
+'View has been created.'
+====
+---- QUERY
+# Query from a view that does the unnesting itself. Apply a filter on top of the view.
+select id, arr1_unnested, arr2_unnested from view_unnested_arrays2
+where arr1_unnested >= 5 and length(arr2_unnested) > 3;
+---- RESULTS
+1,5,'five'
+2,5,'five'
+5,12,'twelve'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Unnest arrays that are coming from nested views.
+select id, arr1.item, arr2.item from nested_view_arrays va, unnest(va.arr1, va.arr2)
+where id > 4;
+---- RESULTS
+5,10,'ten'
+5,NULL,'eleven'
+5,12,'twelve'
+5,NULL,'thirteen'
+7,1,'NULL'
+7,2,'NULL'
+9,NULL,'str1'
+9,NULL,'str2'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Create a wrapper view around an existing view that in turn contains arrays.
+# This wrapper view unnests the arrays from the underlying view using the syntax where
+# the unnest is in the from clause.
+create view nested_view_unnested_arrays2 as
+    select id, arr1.item as arr1_unnested, arr2.item as arr2_unnested
+    from view_arrays va, unnest(va.arr1, va.arr2)
+    where id % 2 = 1;
+---- RESULTS
+'View has been created.'
+====
+---- QUERY
+# Query the nested view where one view gives the arrays and the other unnests them.
+select id, arr1_unnested, arr2_unnested from nested_view_unnested_arrays2;
+---- RESULTS
+1,1,'one'
+1,2,'two'
+1,3,'three'
+1,4,'four'
+1,5,'five'
+3,10,'ten'
+3,9,'NULL'
+3,8,'NULL'
+5,10,'ten'
+5,NULL,'eleven'
+5,12,'twelve'
+5,NULL,'thirteen'
+7,1,'NULL'
+7,2,'NULL'
+9,NULL,'str1'
+9,NULL,'str2'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Similar as above but with a where filter on the outermost select.
+select id, arr1_unnested, arr2_unnested from nested_view_unnested_arrays2
+where arr1_unnested > 7;
+---- RESULTS
+3,10,'ten'
+3,9,'NULL'
+3,8,'NULL'
 5,10,'ten'
 5,12,'twelve'
 ---- TYPES

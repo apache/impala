@@ -1849,6 +1849,8 @@ public class SingleNodePlanner {
 
     // Also add remaining unassigned conjuncts
     List<Expr> unassigned = analyzer.getUnassignedConjuncts(tid.asList());
+    PlanNode.removeZippingUnnestConjuncts(unassigned, analyzer);
+
     conjuncts.addAll(unassigned);
     analyzer.markConjunctsAssigned(unassigned);
     analyzer.createEquivConjuncts(tid, conjuncts);

@@ -513,14 +513,18 @@ public class Analyzer {
     public final Map<String, org.apache.kudu.client.KuduTable> kuduTables =
         new HashMap<>();
 
-    // This holds the tuple id's of the arrays that are given as a zipping unnest table
-    // ref.
-    public Set<TupleId> zippingUnnestTupleIds = new HashSet<>();
-
     // This holds the nullable side slot ids from the outer join's equi-join conjuncts
     // e.g. t1 left join t2 on t1.id = t2.id, the slot id of t2.id will be added to
     // this set.
     public Set<SlotId> ojNullableSlotsInEquiPreds = new HashSet<>();
+
+    // This holds the tuple id's of the arrays that are given as a zipping unnest table
+    // ref. If the table ref is originated from a view then also add the tuple IDs for the
+    // respective table refs from the view.
+    public Set<TupleId> zippingUnnestTupleIds = new HashSet<>();
+
+    // Shows how many zipping unnests were in the query;
+    public int numZippingUnnests = 0;
 
     public GlobalState(StmtTableCache stmtTableCache, TQueryCtx queryCtx,
         AuthorizationFactory authzFactory, AuthorizationContext authzCtx) {
@@ -725,10 +729,16 @@ public class Analyzer {
     }
   }
 
-  public boolean isRegisteredTableRef(TableRef ref) {
-    if (ref == null) return false;
-    String uniqueAlias = ref.getUniqueAlias();
-    return aliasMap_.containsKey(uniqueAlias);
+  /**
+   * Checks if a table ref has already been registered in this analyzer and returns it.
+   * Uses the unique alias from the table ref for the check. Returns null if the table
+   * ref has not been registered.
+   */
+  public TableRef getRegisteredTableRef(String uniqueAlias) {
+    if (uniqueAlias == null) return null;
+    TupleDescriptor tupleDesc = aliasMap_.get(uniqueAlias);
+    if (tupleDesc == null) return null;
+    return tableRefMap_.get(tupleDesc.getId());
   }
 
   /**
@@ -785,6 +795,10 @@ public class Analyzer {
       String alias, CollectionTableRef ref, TupleDescriptor desc) {
     aliasMap_.put(alias, desc);
     tableRefMap_.put(desc.getId(), ref);
+  }
+
+  public void addAlias(String alias, TupleDescriptor desc) {
+    aliasMap_.put(alias, desc);
   }
 
   /**
@@ -998,6 +1012,11 @@ public class Analyzer {
 
   public void addZippingUnnestTupleId(CollectionTableRef tblRef) {
     Expr collExpr = tblRef.getCollectionExpr();
+    addZippingUnnestTupleId(collExpr);
+  }
+
+  public void addZippingUnnestTupleId(Expr collExpr) {
+    if (collExpr == null) return;
     if (!(collExpr instanceof SlotRef)) return;
     SlotRef slotCollExpr = (SlotRef)collExpr;
     SlotDescriptor collSlotDesc = slotCollExpr.getDesc();
@@ -1007,8 +1026,20 @@ public class Analyzer {
     globalState_.zippingUnnestTupleIds.add(collTupleDesc.getId());
   }
 
+  public void addZippingUnnestTupleId(TupleId tid) {
+    globalState_.zippingUnnestTupleIds.add(tid);
+  }
+
   public Set<TupleId> getZippingUnnestTupleIds() {
     return globalState_.zippingUnnestTupleIds;
+  }
+
+  public void increaseZippingUnnestCount() {
+    ++globalState_.numZippingUnnests;
+  }
+
+  public int getNumZippingUnnests() {
+    return globalState_.numZippingUnnests;
   }
 
   /**

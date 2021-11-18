@@ -403,6 +403,9 @@ public class TableRef extends StmtNode {
   public boolean isAnalyzed() { return isAnalyzed_; }
   public boolean isResolved() { return !getClass().equals(TableRef.class); }
 
+  public boolean isFromClauseZippingUnnest() {
+    return zippingUnnestType_ == ZippingUnnestType.FROM_CLAUSE_ZIPPING_UNNEST;
+  }
   public boolean isZippingUnnest() {
     return zippingUnnestType_ != ZippingUnnestType.NONE;
   }

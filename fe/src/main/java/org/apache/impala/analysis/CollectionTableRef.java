@@ -100,6 +100,13 @@ public class CollectionTableRef extends TableRef {
     if (resolvedPath_.getRootDesc() != null) {
       sourceView = resolvedPath_.getRootDesc().getSourceView();
     }
+    if (sourceView != null && zippingUnnestType_ ==
+        ZippingUnnestType.FROM_CLAUSE_ZIPPING_UNNEST) {
+      String implicitAlias = rawPath_.get(rawPath_.size() - 1).toLowerCase();
+      analyzer.addZippingUnnestTupleId(analyzer.getDescriptor(implicitAlias).getId());
+      TableRef existingTableRef = analyzer.getRegisteredTableRef(getUniqueAlias());
+      existingTableRef.getDesc().setHidden(false);
+    }
     if (sourceView == null || inSelectList_) {
       desc_ = analyzer.registerTableRef(this);
       // Avoid polluting the namespace with collections that back arrays
@@ -195,6 +202,8 @@ public class CollectionTableRef extends TableRef {
 
   public Expr getCollectionExpr() { return collectionExpr_; };
 
+  @Override
+  public boolean isCollectionInSelectList() { return inSelectList_; }
   public void setInSelectList(boolean value) { inSelectList_ = value; }
 
   @Override

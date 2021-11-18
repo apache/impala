@@ -88,4 +88,7 @@ public class SingularRowSrcNode extends PlanNode {
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.SINGULAR_ROW_SRC_NODE;
   }
+
+  @Override
+  protected boolean shouldPickUpZippingUnnestConjuncts() { return false; }
 }

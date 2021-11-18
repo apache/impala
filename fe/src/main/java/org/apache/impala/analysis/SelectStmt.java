@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.impala.analysis.Path.PathType;
+import org.apache.impala.analysis.TableRef.ZippingUnnestType;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Column;
@@ -148,6 +149,8 @@ public class SelectStmt extends QueryStmt {
   public boolean hasAnalyticInfo() { return analyticInfo_ != null; }
   public boolean hasHavingClause() { return havingClause_ != null; }
   public ExprSubstitutionMap getBaseTblSmap() { return baseTblSmap_; }
+
+  public void addToFromClause(TableRef ref) { fromClause_.add(ref); }
 
   /**
    * A simple limit statement has a limit but no order-by,
@@ -286,6 +289,8 @@ public class SelectStmt extends QueryStmt {
       registerViewColumnPrivileges();
       analyzeWhereClause();
       createSortInfo(analyzer_);
+
+      setZippingUnnestSlotRefsFromViews();
 
       // Analyze aggregation-relevant components of the select block (Group By
       // clause, select list, Order By clause), substitute AVG with SUM/COUNT,
@@ -446,29 +451,77 @@ public class SelectStmt extends QueryStmt {
             "WHERE clause must not contain analytic expressions: " + e.toSql());
       }
 
-      // Don't allow a WHERE conjunct on an array item that is part of a zipping unnest.
-      // In case there is only one zipping unnested array this restriction is not needed
-      // as the UNNEST node has to handle a single array and it's safe to do the filtering
-      // in the scanner.
-      Set<TupleId> zippingUnnestTupleIds = analyzer_.getZippingUnnestTupleIds();
-      if (zippingUnnestTupleIds.size() > 1) {
-        for (Expr expr : whereClause_.getChildren()) {
-          if (expr == null || !(expr instanceof SlotRef)) continue;
-          SlotRef slotRef = (SlotRef)expr;
-          for (TupleId tid : zippingUnnestTupleIds) {
-            TupleDescriptor collTupleDesc = analyzer_.getTupleDesc(tid);
-            // If there is no slot ref for the collection tuple then there is no need to
-            // check.
-            if (collTupleDesc.getSlots().size() == 0) continue;
-            Preconditions.checkState(collTupleDesc.getSlots().size() == 1);
-            if (slotRef.getDesc().equals(collTupleDesc.getSlots().get(0))) {
-              throw new AnalysisException("Not allowed to add a filter on an unnested " +
-                  "array under the same select statement: " + expr.toSql());
+      verifyZippingUnnestSlots();
+
+      analyzer_.registerConjuncts(whereClause_, false);
+    }
+
+    /**
+     * Don't allow a WHERE conjunct on an array item that is part of a zipping unnest.
+     * In case there is only one zipping unnested array this restriction is not needed
+     * as the UNNEST node has to handle a single array and it's safe to do the filtering
+     * in the scanner.
+     */
+    private void verifyZippingUnnestSlots() throws AnalysisException {
+      if (analyzer_.getNumZippingUnnests() <= 1) return;
+      List<TupleId> zippingUnnestTupleIds = Lists.newArrayList(
+          analyzer_.getZippingUnnestTupleIds());
+
+      List<SlotRef> slotRefsInWhereClause = new ArrayList<>();
+      whereClause_.collect(SlotRef.class, slotRefsInWhereClause);
+      for (SlotRef slotRef : slotRefsInWhereClause) {
+        if (slotRef.isBoundByTupleIds(zippingUnnestTupleIds)) {
+          throw new AnalysisException("Not allowed to add a filter on an unnested " +
+              "array under the same select statement: " + slotRef.toSql());
+        }
+      }
+    }
+
+    /**
+     * When zipping unnest is performed using the SQL standard compliant syntax (where
+     * the unnest is in the FROM clause) the SlotRefs used for the zipping unnest are not
+     * UnnestExprs as with the other approach (where zipping unnest is in the select list)
+     * but regular SlotRefs. As a result they have to be marked so that later on anything
+     * specific for zipping unnest could be executed for them.
+     * This function identifies the SlotRefs that are for zipping unnesting and sets a
+     * flag for them. Note, only marks the SlotRefs that are originated form a view.
+     */
+    private void setZippingUnnestSlotRefsFromViews() {
+      for (TableRef tblRef : fromClause_.getTableRefs()) {
+        if (!tblRef.isFromClauseZippingUnnest()) continue;
+        Preconditions.checkState(tblRef instanceof CollectionTableRef);
+        ExprSubstitutionMap exprSubMap = getBaseTableSMapFromTableRef(tblRef);
+        if (exprSubMap == null) continue;
+
+        for (SelectListItem item : selectList_.getItems()) {
+          if (item.isStar()) continue;
+          Expr itemExpr = item.getExpr();
+          List<SlotRef> slotRefs = new ArrayList<>();
+          itemExpr.collect(SlotRef.class, slotRefs);
+          for (SlotRef slotRef : slotRefs) {
+            Expr subbedExpr = exprSubMap.get(slotRef);
+            if (subbedExpr == null || !(subbedExpr instanceof SlotRef)) continue;
+            SlotRef subbedSlotRef = (SlotRef)subbedExpr;
+            CollectionTableRef collTblRef = (CollectionTableRef)tblRef;
+            SlotRef collectionSlotRef = (SlotRef)collTblRef.getCollectionExpr();
+            // Check if 'slotRef' is originated from 'collectionSlotRef'.
+            if (subbedSlotRef.getDesc().getParent().getId() ==
+                collectionSlotRef.getDesc().getItemTupleDesc().getId()) {
+              slotRef.setIsZippingUnnest(true);
             }
           }
         }
       }
-      analyzer_.registerConjuncts(whereClause_, false);
+    }
+
+    /**
+     * If 'tblRef' is originated from a view then returns the baseTblSmap from the view.
+     * Returns false otherwise.
+     */
+    private ExprSubstitutionMap getBaseTableSMapFromTableRef(TableRef tblRef) {
+      if (tblRef.getResolvedPath().getRootDesc() == null) return null;
+      if (tblRef.getResolvedPath().getRootDesc().getSourceView() == null) return null;
+      return tblRef.getResolvedPath().getRootDesc().getSourceView().getBaseTblSmap();
     }
 
     /**
@@ -522,7 +575,7 @@ public class SelectStmt extends QueryStmt {
           continue;
         // Don't push down the "is not empty" predicate for zipping unnests if there are
         // multiple zipping unnests in the FROM clause.
-        if (tblRef.isZippingUnnest() && analyzer_.getZippingUnnestTupleIds().size() > 1) {
+        if (tblRef.isZippingUnnest() && analyzer_.getNumZippingUnnests() > 1) {
           continue;
         }
         IsNotEmptyPredicate isNotEmptyPred =
