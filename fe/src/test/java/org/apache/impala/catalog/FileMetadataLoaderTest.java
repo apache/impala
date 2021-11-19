@@ -152,6 +152,7 @@ public class FileMetadataLoaderTest {
     ValidWriteIdList writeIds = MetastoreShim.getValidWriteIdListFromString(
         "functional_orc_def.complextypestbl_minor_compacted:10:10::");
     Path tablePath = new Path("hdfs://localhost:20500/test-warehouse/managed/" +
+                              "functional_orc_def.db/" +
                               "complextypestbl_minor_compacted_orc_def/");
     FileMetadataLoader fml = new FileMetadataLoader(tablePath, /* recursive=*/true,
         /* oldFds = */ Collections.emptyList(), hostIndex, new ValidReadTxnList(""),

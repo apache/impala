@@ -117,7 +117,7 @@ show files in functional_orc_def.complextypestbl_minor_compacted;
 ---- LABELS
 Path,Size,Partition
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/managed/complextypestbl_minor_compacted_orc_def/delta_0000001_0000008_v\d+/bucket_00000','.+KB',''
+row_regex:'$NAMENODE/test-warehouse/managed/functional_orc_def.db/complextypestbl_minor_compacted_orc_def/delta_0000001_0000008_v\d+/bucket_00000','.+KB',''
 ---- TYPES
 STRING,STRING,STRING
 ====

@@ -308,7 +308,8 @@ class TestDdlStatements(TestDdlBase):
   @SkipIfGCS.hive
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_create_table_like_file_orc(self, vector, unique_database):
-    COMPLEXTYPETBL_PATH = 'test-warehouse/managed/complextypestbl_orc_def/'
+    COMPLEXTYPETBL_PATH = 'test-warehouse/managed/functional_orc_def.db/' \
+                          'complextypestbl_orc_def/'
     base_dir = filter(lambda s: s.startswith('base'),
       self.filesystem_client.ls(COMPLEXTYPETBL_PATH))[0]
     bucket_file = filter(lambda s: s.startswith('bucket'),

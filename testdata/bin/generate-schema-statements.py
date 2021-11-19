@@ -698,7 +698,8 @@ def generate_statements(output_name, test_vectors, sections,
         hdfs_location = hdfs_location.split('.')[-1]
       # Transactional tables need to be put under the 'managed' directory.
       if is_transactional(tblproperties):
-        hdfs_location = os.path.join('managed', hdfs_location)
+        db_location = '{0}{1}.db'.format(db_name, db_suffix)
+        hdfs_location = os.path.join('managed', db_location, hdfs_location)
       data_path = os.path.join(options.hive_warehouse_dir, hdfs_location)
 
       output = impala_create
@@ -775,7 +776,7 @@ def generate_statements(output_name, test_vectors, sections,
       if not force_reload and hdfs_location in existing_tables:
         print 'HDFS path:', data_path, 'contains data. Data loading can be skipped.'
       else:
-        print 'HDFS path:', data_path, 'does not exists or is empty. Data will be loaded.'
+        print 'HDFS path:', data_path, 'does not exist or is empty. Data will be loaded.'
         if not db_suffix:
           if load:
             hive_output.load_base.append(build_load_statement(load, db_name,
