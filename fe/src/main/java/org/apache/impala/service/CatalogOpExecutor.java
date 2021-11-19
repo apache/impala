@@ -233,7 +233,6 @@ import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.MetaStoreUtil.TableInsertEventInfo;
-import org.apache.kudu.client.Delete;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1853,15 +1852,15 @@ public class CatalogOpExecutor {
 
   /**
    * Wrapper around
-   * {@code MetastoreEventsProcessor#getNextMetastoreEvents} with the
+   * {@code MetastoreEventsProcessor#getNextMetastoreEventsInBatches} with the
    * addition that it checks if events processing is active or not. If not active,
    * returns an empty list.
    */
   private List<NotificationEvent> getNextMetastoreEventsIfEnabled(long eventId,
-      NotificationFilter eventsFilter) throws ImpalaRuntimeException {
+      NotificationFilter eventsFilter) throws MetastoreNotificationException {
     if (!catalog_.isEventProcessingActive()) return Collections.emptyList();
     return MetastoreEventsProcessor
-        .getNextMetastoreEvents(catalog_, eventId, eventsFilter);
+        .getNextMetastoreEventsInBatches(catalog_, eventId, eventsFilter);
   }
 
   /**
@@ -4434,7 +4433,7 @@ public class CatalogOpExecutor {
                     partitionToEventSubMap.get(part));
           }
         }
-      } catch (TException e) {
+      } catch (MetastoreNotificationException | TException e) {
         throw new ImpalaRuntimeException(
             String.format(HMS_RPC_ERROR_FORMAT_STR, "add_partitions"), e);
       }

@@ -17,11 +17,9 @@
 
 package org.apache.impala.catalog;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.hive.metastore.IMetaStoreClient.NotificationFilter;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
@@ -34,7 +32,6 @@ import com.google.common.base.Stopwatch;
 
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.util.ThreadNameAnnotator;
-import org.apache.thrift.TException;
 
 /**
  * Class that implements the logic for how a table's metadata should be loaded from
@@ -86,8 +83,8 @@ public class TableLoader {
         // we are only interested in fetching the events if we have a valid eventId
         // for a table. For tables where eventId is unknown are not created by
         // this catalogd and hence the self-event detection logic does not apply.
-        events = MetastoreEventsProcessor.getNextMetastoreEvents(catalog_, eventId,
-            notificationEvent -> CreateTableEvent.CREATE_TABLE_EVENT_TYPE
+        events = MetastoreEventsProcessor.getNextMetastoreEventsInBatches(catalog_,
+            eventId, notificationEvent -> CreateTableEvent.CREATE_TABLE_EVENT_TYPE
                 .equals(notificationEvent.getEventType())
                 && notificationEvent.getDbName().equalsIgnoreCase(db.getName())
                 && notificationEvent.getTableName().equalsIgnoreCase(tblName));

@@ -78,6 +78,12 @@ elif variant == 'ranger_auth':
     'hive.metastore.pre.event.listeners':
         'org.apache.hadoop.hive.ql.security.authorization.plugin.metastore.HiveMetaStoreAuthorizer',
   })
+elif variant == 'events_cleanup':
+  # HMS configs needed for regression test for IMPALA-11028
+  CONFIG.update({
+    'hive.metastore.event.db.listener.timetolive': '60s',
+    'hive.metastore.event.db.listener.clean.interval': '10s'
+  })
 
 # HBase-related configs.
 # Impala processes need to connect to zookeeper on INTERNAL_LISTEN_HOST for HBase.

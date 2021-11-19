@@ -308,16 +308,17 @@ public class MetastoreEventsProcessorTest {
     createDatabaseFromImpala(TEST_DB_NAME, null);
     createTableFromImpala(TEST_DB_NAME, "testNextMetastoreEvents1", false);
     createTable("testNextMetastoreEvents2", false);
-    List<NotificationEvent> events = MetastoreEventsProcessor.getNextMetastoreEvents(
+    List<NotificationEvent> events =
+        MetastoreEventsProcessor.getNextMetastoreEventsInBatches(
         eventsProcessor_.catalog_, currentEventId, null, 2);
     assertEquals(3, events.size());
-    events = MetastoreEventsProcessor.getNextMetastoreEvents(
+    events = MetastoreEventsProcessor.getNextMetastoreEventsInBatches(
         eventsProcessor_.catalog_, currentEventId+1, null, 10);
     assertEquals(2, events.size());
-    events = MetastoreEventsProcessor.getNextMetastoreEvents(
+    events = MetastoreEventsProcessor.getNextMetastoreEventsInBatches(
         eventsProcessor_.catalog_, currentEventId, null, 3);
     assertEquals(3, events.size());
-    events = MetastoreEventsProcessor.getNextMetastoreEvents(
+    events = MetastoreEventsProcessor.getNextMetastoreEventsInBatches(
         eventsProcessor_.catalog_, currentEventId+3, null, 3);
     assertEquals(0, events.size());
   }

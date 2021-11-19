@@ -28,7 +28,6 @@ import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.AbstractThriftHiveMetastore;
 import org.apache.hadoop.hive.metastore.DefaultPartitionExpressionProxy;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
-import org.apache.hadoop.hive.metastore.IMetaStoreClient.NotificationFilter;
 import org.apache.hadoop.hive.metastore.PartFilterExprUtil;
 import org.apache.hadoop.hive.metastore.PartitionExpressionProxy;
 import org.apache.hadoop.hive.metastore.api.AbortTxnRequest;
@@ -269,13 +268,11 @@ import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 import org.apache.impala.catalog.CatalogHmsAPIHelper;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
-import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.IncompleteTable;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.events.MetastoreEvents;
 import org.apache.impala.catalog.events.MetastoreEvents.DropTableEvent;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
-import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Reference;
 import org.apache.impala.common.Pair;
 import org.apache.impala.compat.MetastoreShim;
@@ -3024,7 +3021,7 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
     }
     try {
       List<NotificationEvent> events = MetastoreEventsProcessor
-          .getNextMetastoreEvents(catalog_, beforeDropEventId,
+          .getNextMetastoreEventsInBatches(catalog_, beforeDropEventId,
               event -> event.getEventType()
                   .equalsIgnoreCase(DropTableEvent.DROP_TABLE_EVENT_TYPE)
                   && catName.equalsIgnoreCase(event.getCatName())
@@ -3119,7 +3116,7 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
 
     try {
       List<NotificationEvent> events = MetastoreEventsProcessor
-          .getNextMetastoreEvents(catalog_, beforeDropEventId,
+          .getNextMetastoreEventsInBatches(catalog_, beforeDropEventId,
               event -> event.getEventType()
                   .equalsIgnoreCase(MetastoreEvents.DropDatabaseEvent
                       .DROP_DATABASE_EVENT_TYPE)

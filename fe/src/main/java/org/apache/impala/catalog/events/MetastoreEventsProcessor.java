@@ -35,6 +35,7 @@ import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient.NotificationFilter;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
+import org.apache.hadoop.hive.metastore.api.NotificationEventRequest;
 import org.apache.hadoop.hive.metastore.api.NotificationEventResponse;
 import org.apache.hadoop.hive.metastore.messaging.MessageDeserializer;
 import org.apache.impala.catalog.CatalogException;
@@ -43,12 +44,9 @@ import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.events.ConfigValidator.ValidationResult;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
-import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.CatalogOpExecutor;
-import org.apache.impala.thrift.TCreateTableParams;
-import org.apache.impala.thrift.TDdlExecResponse;
 import org.apache.impala.thrift.TEventProcessorMetrics;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
 import org.apache.impala.util.MetaStoreUtil;
@@ -248,13 +246,15 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   public static final String NUMBER_OF_BATCH_EVENTS = "batch-events-created";
 
   /**
-   * Wrapper around {@link MetastoreEventsProcessor#getNextMetastoreEvents} which passes
-   * the default batch size.
+   * Wrapper around {@link
+   * MetastoreEventsProcessor#getNextMetastoreEventsInBatches(CatalogServiceCatalog,
+   * long, NotificationFilter, int)} which passes the default batch size.
    */
-  public static List<NotificationEvent> getNextMetastoreEvents(
+  public static List<NotificationEvent> getNextMetastoreEventsInBatches(
       CatalogServiceCatalog catalog, long eventId, NotificationFilter filter)
-      throws ImpalaRuntimeException {
-    return getNextMetastoreEvents(catalog, eventId, filter, EVENTS_BATCH_SIZE_PER_RPC);
+      throws MetastoreNotificationFetchException {
+    return getNextMetastoreEventsInBatches(catalog, eventId, filter,
+        EVENTS_BATCH_SIZE_PER_RPC);
   }
 
   /**
@@ -269,12 +269,12 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    * @param eventsBatchSize the batch size for fetching the events from metastore.
    * @return List of {@link NotificationEvent} which are all greater than eventId and
    * satisfy the given filter.
-   * @throws ImpalaRuntimeException in case of RPC errors to metastore.
+   * @throws MetastoreNotificationFetchException in case of RPC errors to metastore.
    */
   @VisibleForTesting
-  public static List<NotificationEvent> getNextMetastoreEvents(
+  public static List<NotificationEvent> getNextMetastoreEventsInBatches(
       CatalogServiceCatalog catalog, long eventId, NotificationFilter filter,
-      int eventsBatchSize) throws ImpalaRuntimeException {
+      int eventsBatchSize) throws MetastoreNotificationFetchException {
     Preconditions.checkArgument(eventsBatchSize > 0);
     List<NotificationEvent> result = new ArrayList<>();
     try (MetaStoreClient msc = catalog.getMetaStoreClient()) {
@@ -285,8 +285,16 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       while (currentEventId < toEventId) {
         int batchSize = Math
             .min(eventsBatchSize, (int)(toEventId - currentEventId));
-        for (NotificationEvent event : msc.getHiveClient()
-            .getNextNotification(currentEventId, batchSize, null).getEvents()) {
+        // we don't call the HiveMetaStoreClient's getNextNotification()
+        // call here because it can throw a IllegalStateException if the eventId
+        // which we pass in is very old and metastore has already cleaned up
+        // the events since that eventId.
+        NotificationEventRequest eventRequest = new NotificationEventRequest();
+        eventRequest.setMaxEvents(batchSize);
+        eventRequest.setLastEvent(currentEventId);
+        NotificationEventResponse notificationEventResponse = msc.getHiveClient()
+            .getThriftClient().get_next_notification(eventRequest);
+        for (NotificationEvent event : notificationEventResponse.getEvents()) {
           // if no filter is provided we add all the events
           if (filter == null || filter.accept(event)) result.add(event);
           currentEventId = event.getEventId();
@@ -294,7 +302,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       }
       return result;
     } catch (TException e) {
-      throw new ImpalaRuntimeException(String.format(
+      throw new MetastoreNotificationFetchException(String.format(
           CatalogOpExecutor.HMS_RPC_ERROR_FORMAT_STR, "getNextNotification"), e);
     }
   }
@@ -575,7 +583,10 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    * NotificationEvents are filtered using the NotificationFilter provided if it is not
    * null.
    * @param eventId The returned events are all after this given event id.
-   * @param skipBatching If this is true all the events since eventId are returned.
+   * @param getAllEvents If this is true all the events since eventId are returned.
+   *                     Note that Hive MetaStore can limit the response to a specific
+   *                     maximum number of limit based on the value of configuration
+   *                     {@code hive.metastore.max.event.response}.
    *                     If it is false, only EVENTS_BATCH_SIZE_PER_RPC events are
    *                     returned, caller is expected to issue more calls to this method
    *                     to fetch the remaining events.
@@ -585,7 +596,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    * @throws MetastoreNotificationFetchException In case of exceptions from HMS.
    */
   public List<NotificationEvent> getNextMetastoreEvents(final long eventId,
-      final boolean skipBatching, @Nullable final NotificationFilter filter)
+      final boolean getAllEvents, @Nullable final NotificationFilter filter)
       throws MetastoreNotificationFetchException {
     final Timer.Context context = metrics_.getTimer(EVENTS_FETCH_DURATION_METRIC).time();
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
@@ -601,12 +612,23 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       if (currentEventId <= eventId) {
         return Collections.emptyList();
       }
-      int batchSize = skipBatching ? -1 : EVENTS_BATCH_SIZE_PER_RPC;
-      NotificationEventResponse response = msClient.getHiveClient()
-          .getNextNotification(eventId, batchSize, filter);
+      int batchSize = getAllEvents ? -1 : EVENTS_BATCH_SIZE_PER_RPC;
+      // we use the thrift API directly instead of
+      // HiveMetastoreClient#getNextNotification because the HMS client can throw an
+      // exception when there is a gap between the eventIds returned.
+      NotificationEventRequest eventRequest = new NotificationEventRequest();
+      eventRequest.setLastEvent(eventId);
+      eventRequest.setMaxEvents(batchSize);
+      NotificationEventResponse response = msClient.getHiveClient().getThriftClient()
+          .get_next_notification(eventRequest);
       LOG.info(String.format("Received %d events. Start event id : %d",
           response.getEvents().size(), eventId));
-      return response.getEvents();
+      if (filter == null) return response.getEvents();
+      List<NotificationEvent> filteredEvents = new ArrayList<>();
+      for (NotificationEvent event : response.getEvents()) {
+        if (filter.accept(event)) filteredEvents.add(event);
+      }
+      return filteredEvents;
     } catch (TException e) {
       throw new MetastoreNotificationFetchException(
           "Unable to fetch notifications from metastore. Last synced event id is "
