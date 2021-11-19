@@ -1314,7 +1314,7 @@ public class HdfsScanNode extends ScanNode {
             partition.getHostIndex().getEntry(replicaHostIdx);
         Preconditions.checkNotNull(networkAddress);
         // Translate from network address to the global (to this request) host index.
-        Integer globalHostIdx = analyzer.getHostIndex().getIndex(networkAddress);
+        Integer globalHostIdx = analyzer.getHostIndex().getOrAddIndex(networkAddress);
         location.setHost_idx(globalHostIdx);
         if (fsHasBlocks && !fileDesc.getIsEc() && FileBlock.getDiskId(block, j) == -1) {
           ++numScanRangesNoDiskIds_;

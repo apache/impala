@@ -246,7 +246,7 @@ public class KuduScanNode extends ScanNode {
         TNetworkAddress address =
             new TNetworkAddress(replica.getRpcHost(), replica.getRpcPort());
         // Use the network address to look up the host in the global list
-        Integer hostIndex = analyzer.getHostIndex().getIndex(address);
+        Integer hostIndex = analyzer.getHostIndex().getOrAddIndex(address);
         locations.add(new TScanRangeLocation(hostIndex));
         hostIndexSet_.add(hostIndex);
       }

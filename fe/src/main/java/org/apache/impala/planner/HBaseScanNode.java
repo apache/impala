@@ -497,7 +497,8 @@ public class HBaseScanNode extends ScanNode {
           TScanRangeLocationList scanRangeLocation = new TScanRangeLocationList();
           TNetworkAddress networkAddress = addressToTNetworkAddress(locEntry.getKey());
           scanRangeLocation.addToLocations(
-              new TScanRangeLocation(analyzer.getHostIndex().getIndex(networkAddress)));
+              new TScanRangeLocation(
+                  analyzer.getHostIndex().getOrAddIndex(networkAddress)));
 
           TScanRange scanRange = new TScanRange();
           scanRange.setHbase_key_range(keyRange);

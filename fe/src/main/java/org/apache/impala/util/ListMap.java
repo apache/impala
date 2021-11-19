@@ -53,7 +53,7 @@ public class ListMap<T> {
    * Map from T t to Integer index. If the mapping from t doesn't
    * exist, then create a new mapping from t to a unique index.
    */
-  public int getIndex(T t) {
+  public int getOrAddIndex(T t) {
     Integer index = map_.get(t);
     if (index != null) return index;
     // No match was found, add a new entry.
@@ -70,7 +70,7 @@ public class ListMap<T> {
   }
 
   /**
-   * Populate the bi-map from the given list.  Does not perform a copy
+   * Populate the bi-map from the given list. Does not perform a copy
    * of the list.
    */
   public synchronized void populate(List<T> list) {

@@ -326,7 +326,7 @@ public class DataSourceScanNode extends ScanNode {
   private void computeScanRangeLocations(Analyzer analyzer) {
     // TODO: Does the port matter?
     TNetworkAddress networkAddress = addressToTNetworkAddress("localhost:12345");
-    Integer hostIndex = analyzer.getHostIndex().getIndex(networkAddress);
+    Integer hostIndex = analyzer.getHostIndex().getOrAddIndex(networkAddress);
     scanRangeSpecs_ = new TScanRangeSpec();
     scanRangeSpecs_.addToConcrete_ranges(new TScanRangeLocationList(
         new TScanRange(), Lists.newArrayList(new TScanRangeLocation(hostIndex))));

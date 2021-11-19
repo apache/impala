@@ -141,7 +141,7 @@ public class HdfsPartition extends CatalogObjectImpl
           int origHostIdx = FileBlock.getReplicaHostIdx(it, j);
           boolean isCached = FileBlock.isReplicaCached(it, j);
           TNetworkAddress origHost = origIndex.get(origHostIdx);
-          int newHostIdx = dstIndex.getIndex(origHost);
+          int newHostIdx = dstIndex.getOrAddIndex(origHost);
           it.mutateReplicaHostIdxs(j, FileBlock.makeReplicaIdx(isCached, newHostIdx));
         }
       }
@@ -178,7 +178,7 @@ public class HdfsPartition extends CatalogObjectImpl
         if (isEc) {
           fbFileBlockOffsets[blockIdx++] = FileBlock.createFbFileBlock(fbb,
               loc.getOffset(), loc.getLength(),
-              (short) hostIndex.getIndex(REMOTE_NETWORK_ADDRESS));
+              (short) hostIndex.getOrAddIndex(REMOTE_NETWORK_ADDRESS));
         } else {
           fbFileBlockOffsets[blockIdx++] =
               FileBlock.createFbFileBlock(fbb, loc, hostIndex, numUnknownDiskIds);
@@ -399,7 +399,7 @@ public class HdfsPartition extends CatalogObjectImpl
       // map it to the corresponding hostname from getHosts().
       for (int i = 0; i < loc.getNames().length; ++i) {
         TNetworkAddress networkAddress = BlockReplica.parseLocation(loc.getNames()[i]);
-        short replicaIdx = (short) hostIndex.getIndex(networkAddress);
+        short replicaIdx = (short) hostIndex.getOrAddIndex(networkAddress);
         boolean isReplicaCached = cachedHosts.contains(loc.getHosts()[i]);
         replicaIdx = makeReplicaIdx(isReplicaCached, replicaIdx);
         fbb.addShort(replicaIdx);
