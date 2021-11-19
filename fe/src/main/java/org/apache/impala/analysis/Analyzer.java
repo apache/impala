@@ -3324,11 +3324,26 @@ public class Analyzer {
    * getWarnings() has been called, no warning may be added to the Analyzer anymore.
    */
   public void addWarning(String msg) {
-    Preconditions.checkState(!globalState_.warningsRetrieved);
+    if (checkWarningsRetrieved(msg)) return;
+
     if (msg == null) return;
     Integer count = globalState_.warnings.get(msg);
     if (count == null) count = 0;
     globalState_.warnings.put(msg, count + 1);
+  }
+
+  /**
+   * 'addWarning' method may be called after the warnings are retrieved, e.g. in
+   * analyzing some substituted/cloned predicates (IMPALA-11021). We need to make sure
+   * no new warnings are added after retrieved.
+   */
+  private boolean checkWarningsRetrieved(String msg) {
+    if (globalState_.warningsRetrieved) {
+      // Make sure that substituted/cloned predicates' warnings already exists in map.
+      Preconditions.checkState(globalState_.warnings.containsKey(msg));
+      return true;
+    }
+    return false;
   }
 
   /**

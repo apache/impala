@@ -4966,4 +4966,39 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         tblProperties,
         "Only BUCKET and TRUNCATE partition transforms accept a parameter.");
   }
+
+  @Test
+  public void testPredicateHint() {
+    // Legal hint return correct results without warning, we currently only support
+    // 'ALWAYS_TRUE' hint.
+    AnalyzesOk("select * from tpch.lineitem where /* +ALWAYS_TRUE */ " +
+            "l_shipdate <= (select '1998-09-02')");
+
+    // Illegal hint return correct results with a warning.
+    AnalyzesOk("select * from tpch.lineitem where /* +ALWAYS_TRUE_TEST */ " +
+            "l_shipdate <= (select '1998-09-02')",
+        "Predicate hint not recognized: ALWAYS_TRUE_TEST");
+    AnalyzesOk("select * from tpch.lineitem where /* +ILLEGAL_HINT_TEST */ " +
+            "l_shipdate <= (select '1998-09-02')",
+        "Predicate hint not recognized: ILLEGAL_HINT_TEST");
+
+    // Multiple hints with legal and illegal hints also output a warning.
+    AnalyzesOk("select * from tpch.lineitem where /* +ALWAYS_TRUE,ILLEGAL_HINT_TEST */ "
+            + "l_shipdate <= (select '1998-09-02')",
+        "Predicate hint not recognized: ILLEGAL_HINT_TEST");
+
+    // Multiple illegal hints will output each hint warnings.
+    AnalyzesOk("select * from tpch.lineitem where " +
+            "/* +ILLEGAL_HINT_TEST1,ILLEGAL_HINT_TEST2,ILLEGAL_HINT_TEST3 */ " +
+            "l_shipdate <= (select '1998-09-02')",
+        "Predicate hint not recognized: ILLEGAL_HINT_TEST1");
+    AnalyzesOk("select * from tpch.lineitem where " +
+            "/* +ILLEGAL_HINT_TEST1,ILLEGAL_HINT_TEST2,ILLEGAL_HINT_TEST3 */ " +
+            "l_shipdate <= (select '1998-09-02')",
+        "Predicate hint not recognized: ILLEGAL_HINT_TEST2");
+    AnalyzesOk("select * from tpch.lineitem where " +
+            "/* +ILLEGAL_HINT_TEST1,ILLEGAL_HINT_TEST2,ILLEGAL_HINT_TEST3 */ " +
+            "l_shipdate <= (select '1998-09-02')",
+        "Predicate hint not recognized: ILLEGAL_HINT_TEST3");
+  }
 }
