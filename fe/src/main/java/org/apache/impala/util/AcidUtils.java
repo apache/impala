@@ -805,8 +805,13 @@ public class AcidUtils {
       request.setPartitionnames(partNames);
     }
 
-    GetLatestCommittedCompactionInfoResponse response =
-        CompactionInfoLoader.getLatestCompactionInfo(catalog, request);
+    GetLatestCommittedCompactionInfoResponse response;
+    try (MetaStoreClientPool.MetaStoreClient client = catalog.getMetaStoreClient()) {
+      response = CompactionInfoLoader.getLatestCompactionInfo(client, request);
+    } catch (Exception e) {
+      throw new CatalogException("Error getting latest compaction info for "
+          + hdfsTable.getFullName(), e);
+    }
 
     Map<String, Long> partNameToCompactionId = new HashMap<>();
     if (hdfsTable.isPartitioned()) {

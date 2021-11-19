@@ -141,6 +141,8 @@ public interface MetaProvider {
   interface TableMetaRef {
     boolean isMarkedCached();
     List<String> getPartitionPrefixes();
+    boolean isPartitioned();
+    boolean isTransactional();
   }
 
   /**
@@ -166,6 +168,7 @@ public interface MetaProvider {
     byte[] getPartitionStats();
     boolean hasIncrementalStats();
     boolean isMarkedCached();
+    long getLastCompactionId();
   }
 
   public TValidWriteIdList getValidWriteIdList(TableMetaRef ref);

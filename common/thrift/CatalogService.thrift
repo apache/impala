@@ -414,6 +414,9 @@ struct TPartialPartitionInfo {
   // Set if 'want_partition_files' was set in TTableInfoSelector.
   9: optional list<CatalogObjects.THdfsFileDesc> delete_file_descriptors
 
+  // Set if 'want_partition_files' was set in TTableInfoSelector.
+  14: optional i64 last_compaction_id
+
   // Deflate-compressed byte[] representation of TPartitionStats for this partition.
   // Set if 'want_partition_stats' was set in TTableInfoSelector. Not set if the
   // partition does not have stats.

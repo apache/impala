@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableCollection;
@@ -65,6 +66,7 @@ import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.service.FrontendProfile;
 import org.apache.impala.service.MetadataOp;
@@ -93,6 +95,7 @@ import org.apache.impala.thrift.TUnit;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
 import org.apache.impala.thrift.TValidWriteIdList;
+import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.ListMap;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
@@ -895,6 +898,18 @@ public class CatalogdMetaProvider implements MetaProvider {
     // Load what we can from the cache.
     Map<PartitionRef, PartitionMetadata> refToMeta = loadPartitionsFromCache(refImpl,
         hostIndex, partitionRefs);
+    if (BackendConfig.INSTANCE.isAutoCheckCompaction()) {
+      // If any partitions are stale after compaction, they will be removed from refToMeta
+      List<PartitionRef> stalePartitions = directProvider_.checkLatestCompaction(
+          refImpl.dbName_, refImpl.tableName_, refImpl, refToMeta);
+      cache_.invalidateAll(stalePartitions.stream()
+          .map(PartitionRefImpl.class::cast)
+          .map(PartitionRefImpl::getId)
+          .map(PartitionCacheKey::new)
+          .collect(Collectors.toList()));
+      LOG.debug("Checked the latest compaction id for {}.{}", refImpl.dbName_,
+          refImpl.tableName_);
+    }
 
     final int numHits = refToMeta.size();
     final int numMisses = partitionRefs.size() - numHits;
@@ -941,6 +956,9 @@ public class CatalogdMetaProvider implements MetaProvider {
     req.table_info_selector.partition_ids = ids;
     req.table_info_selector.want_partition_metadata = true;
     req.table_info_selector.want_partition_files = true;
+    if (BackendConfig.INSTANCE.isAutoCheckCompaction()) {
+      req.table_info_selector.valid_write_ids = table.validWriteIds_;
+    }
     // TODO(todd): fetch incremental stats on-demand for compute-incremental-stats.
     req.table_info_selector.want_partition_stats = true;
     TGetPartialCatalogObjectResponse resp = sendRequest(req);
@@ -992,7 +1010,8 @@ public class CatalogdMetaProvider implements MetaProvider {
       PartitionMetadataImpl metaImpl = new PartitionMetadataImpl(part.getHms_parameters(),
           part.write_id, hdfsStorageDescriptor,
           fds, insertFds, deleteFds, part.getPartition_stats(),
-          part.has_incremental_stats, part.is_marked_cached, location);
+          part.has_incremental_stats, part.is_marked_cached, location,
+          part.last_compaction_id);
 
       checkResponse(partRef != null, req, "returned unexpected partition id %s", part.id);
 
@@ -1565,12 +1584,13 @@ public class CatalogdMetaProvider implements MetaProvider {
     private final byte[] partitionStats_;
     private final boolean hasIncrementalStats_;
     private final boolean isMarkedCached_;
+    private final long lastCompactionId_;
 
     public PartitionMetadataImpl(Map<String, String> hmsParameters, long writeId,
         HdfsStorageDescriptor hdfsStorageDescriptor, ImmutableList<FileDescriptor> fds,
         ImmutableList<FileDescriptor> insertFds, ImmutableList<FileDescriptor> deleteFds,
         byte[] partitionStats, boolean hasIncrementalStats, boolean isMarkedCached,
-        HdfsPartitionLocationCompressor.Location location) {
+        HdfsPartitionLocationCompressor.Location location, long lastCompactionId) {
       this.hmsParameters_ = hmsParameters;
       this.writeId_ = writeId;
       this.hdfsStorageDescriptor_ = hdfsStorageDescriptor;
@@ -1581,6 +1601,7 @@ public class CatalogdMetaProvider implements MetaProvider {
       this.partitionStats_ = partitionStats;
       this.hasIncrementalStats_ = hasIncrementalStats;
       this.isMarkedCached_ = isMarkedCached;
+      this.lastCompactionId_ = lastCompactionId;
     }
 
     /**
@@ -1598,7 +1619,7 @@ public class CatalogdMetaProvider implements MetaProvider {
           deleteFds_, origIndex, dstIndex);
       return new PartitionMetadataImpl(hmsParameters_, writeId_, hdfsStorageDescriptor_,
           fds, insertFds, deleteFds, partitionStats_, hasIncrementalStats_,
-          isMarkedCached_, location_);
+          isMarkedCached_, location_, lastCompactionId_);
     }
 
     private static ImmutableList<FileDescriptor> cloneFdsRelativeToHostIndex(
@@ -1653,6 +1674,9 @@ public class CatalogdMetaProvider implements MetaProvider {
 
     @Override
     public boolean isMarkedCached() { return isMarkedCached_; }
+
+    @Override
+    public long getLastCompactionId() { return lastCompactionId_; }
   }
 
   /**
@@ -1715,6 +1739,12 @@ public class CatalogdMetaProvider implements MetaProvider {
       return String.format("TableMetaRef %s.%s@%d", dbName_, tableName_, catalogVersion_);
     }
 
+    @Override
+    public boolean isPartitioned() {
+      return msTable_.getPartitionKeysSize() != 0;
+    }
+
+    @Override
     public boolean isMarkedCached() { return isMarkedCached_; }
 
     public HdfsPartitionLocationCompressor getPartitionLocationCompressor() {
@@ -1723,6 +1753,11 @@ public class CatalogdMetaProvider implements MetaProvider {
 
     public List<String> getPartitionPrefixes() {
       return partitionLocationCompressor_.getPrefixes();
+    }
+
+    @Override
+    public boolean isTransactional() {
+      return AcidUtils.isTransactionalTable(msTable_.getParameters());
     }
   }
 

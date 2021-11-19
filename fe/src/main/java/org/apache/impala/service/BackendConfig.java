@@ -341,4 +341,8 @@ public class BackendConfig {
   public boolean getHMSEventIncrementalRefreshTransactionalTable() {
     return backendCfg_.hms_event_incremental_refresh_transactional_table;
   }
+
+  public boolean isAutoCheckCompaction() {
+    return backendCfg_.auto_check_compaction;
+  }
 }

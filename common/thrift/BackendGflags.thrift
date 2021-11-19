@@ -219,4 +219,6 @@ struct TBackendGflags {
   97: required bool hms_event_incremental_refresh_transactional_table
 
   98: required bool enable_shell_based_groups_mapping_support
+
+  99: required bool auto_check_compaction
 }

@@ -19,16 +19,26 @@ package org.apache.impala.catalog.local;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
+import com.google.common.base.Stopwatch;
+import com.google.common.collect.Iterables;
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
+import org.apache.hadoop.hive.metastore.api.CompactionInfoStruct;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.ForeignKeysRequest;
+import org.apache.hadoop.hive.metastore.api.GetLatestCommittedCompactionInfoRequest;
+import org.apache.hadoop.hive.metastore.api.GetLatestCommittedCompactionInfoResponse;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
@@ -37,6 +47,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TableMeta;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.CompactionInfoLoader;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FileMetadataLoader;
 import org.apache.impala.catalog.Function;
@@ -48,6 +59,7 @@ import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.PrintUtils;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TBackendGflags;
@@ -55,6 +67,7 @@ import org.apache.impala.thrift.TBriefTableMeta;
 import org.apache.impala.thrift.TIcebergSnapshot;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TValidWriteIdList;
+import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.thrift.TException;
@@ -67,12 +80,15 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.errorprone.annotations.Immutable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Metadata provider which calls out directly to the source systems
  * (filesystem, HMS, etc) with no caching.
  */
 class DirectMetaProvider implements MetaProvider {
+  private final static Logger LOG = LoggerFactory.getLogger(DirectMetaProvider.class);
   private static MetaStoreClientPool msClientPool_;
 
   DirectMetaProvider() {
@@ -465,6 +481,12 @@ class DirectMetaProvider implements MetaProvider {
       throw new UnsupportedOperationException("Hdfs caching not supported with " +
           "DirectMetaProvider implementation");
     }
+
+    @Override
+    public long getLastCompactionId() {
+      throw new UnsupportedOperationException("Compaction id is not provided with " +
+          "DirectMetaProvider implementation");
+    }
   }
 
   private class TableMetaRefImpl implements TableMetaRef {
@@ -479,7 +501,8 @@ class DirectMetaProvider implements MetaProvider {
       this.msTable_ = msTable;
     }
 
-    private boolean isPartitioned() {
+    @Override
+    public boolean isPartitioned() {
       return msTable_.getPartitionKeysSize() != 0;
     }
 
@@ -493,12 +516,69 @@ class DirectMetaProvider implements MetaProvider {
     public List<String> getPartitionPrefixes() {
       return Collections.emptyList();
     }
+
+    @Override
+    public boolean isTransactional() {
+      return AcidUtils.isTransactionalTable(msTable_.getParameters());
+    }
   }
 
   @Override
   public TValidWriteIdList getValidWriteIdList(TableMetaRef ref) {
     throw new NotImplementedException(
         "getValidWriteIdList() is not implemented for DirectMetaProvider");
+  }
+
+  /**
+   * Fetches the latest compaction id from HMS and compares with partition metadata in
+   * cache. If a partition is stale due to compaction, removes it from metas.
+   */
+  public List<PartitionRef> checkLatestCompaction(String dbName, String tableName,
+      TableMetaRef table, Map<PartitionRef, PartitionMetadata> metas) throws TException {
+    Preconditions.checkNotNull(table, "TableMetaRef must be non-null");
+    Preconditions.checkNotNull(metas, "Partition map must be non-null");
+    Stopwatch sw = Stopwatch.createStarted();
+    List<PartitionRef> stalePartitions = new ArrayList<>();
+    if (!table.isTransactional() || metas.isEmpty()) return stalePartitions;
+    GetLatestCommittedCompactionInfoRequest request =
+        new GetLatestCommittedCompactionInfoRequest(dbName, tableName);
+    if (table.isPartitioned()) {
+      request.setPartitionnames(metas.keySet().stream()
+          .map(PartitionRef::getName).collect(Collectors.toList()));
+    }
+    GetLatestCommittedCompactionInfoResponse response;
+    try (MetaStoreClientPool.MetaStoreClient client = msClientPool_.getClient()) {
+      response = CompactionInfoLoader.getLatestCompactionInfo(client, request);
+    }
+    Map<String, Long> partNameToCompactionId = new HashMap<>();
+    // If the table is partitioned, we must set partition name, otherwise empty result
+    // will be returned.
+    if (table.isPartitioned()) {
+      for (CompactionInfoStruct ci : response.getCompactions()) {
+        partNameToCompactionId.put(
+            Preconditions.checkNotNull(ci.getPartitionname()), ci.getId());
+      }
+    } else {
+      CompactionInfoStruct ci = Iterables.getOnlyElement(response.getCompactions(),
+          null);
+      if (ci != null) {
+        partNameToCompactionId.put(PartitionRefImpl.UNPARTITIONED_NAME, ci.getId());
+      }
+    }
+    Iterator<Map.Entry<PartitionRef, PartitionMetadata>> iter =
+        metas.entrySet().iterator();
+    while (iter.hasNext()) {
+      Map.Entry<PartitionRef, PartitionMetadata> entry = iter.next();
+      long latestCompactionId = partNameToCompactionId.getOrDefault(
+          entry.getKey().getName(), -1L);
+      if (entry.getValue().getLastCompactionId() < latestCompactionId) {
+        stalePartitions.add(entry.getKey());
+        iter.remove();
+      }
+    }
+    LOG.debug("Checked the latest compaction id for {}.{} Time taken: {}", dbName,
+        tableName, PrintUtils.printTimeMs(sw.stop().elapsed(TimeUnit.MILLISECONDS)));
+    return stalePartitions;
   }
 
   @Override

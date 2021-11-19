@@ -36,8 +36,13 @@ import org.apache.impala.catalog.local.MetaProvider.PartitionMetadata;
 import org.apache.impala.catalog.local.MetaProvider.PartitionRef;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.common.Pair;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
+import org.apache.impala.service.Frontend;
 import org.apache.impala.service.FrontendProfile;
+import org.apache.impala.testutil.HiveJdbcClientPool;
+import org.apache.impala.testutil.HiveJdbcClientPool.HiveJdbcClient;
+import org.apache.impala.testutil.ImpalaJdbcClient;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TBriefTableMeta;
@@ -71,6 +76,12 @@ public class CatalogdMetaProviderTest {
 
   private CacheStats prevStats_;
 
+  private static HiveJdbcClientPool hiveJdbcClientPool_;
+  private static final String testDbName_ = "catalogd_meta_provider_test";
+  private static final String testTblName_ = "insert_only";
+  private static final String testPartitionedTblName_ = "insert_only_partitioned";
+  private static final String testFullAcidTblName_ = "full_acid";
+
   static {
     FeSupport.loadLibrary();
   }
@@ -84,6 +95,7 @@ public class CatalogdMetaProviderTest {
     Pair<Table, TableMetaRef> tablePair = provider_.loadTable("functional", "alltypes");
     tableRef_ = tablePair.second;
     prevStats_ = provider_.getCacheStats();
+    hiveJdbcClientPool_ = HiveJdbcClientPool.create(1);
   }
 
   private CacheStats diffStats() {
@@ -92,6 +104,50 @@ public class CatalogdMetaProviderTest {
     prevStats_ = s;
     LOG.info("Stats: {}", diff);
     return diff;
+  }
+
+  private void createTestTbls() throws Exception {
+    ImpalaJdbcClient client = ImpalaJdbcClient.createClientUsingHiveJdbcDriver();
+    client.connect();
+    try {
+      client.execStatement("drop database if exists " + testDbName_ + " cascade");
+      client.execStatement("create database " + testDbName_);
+      client.execStatement("create table " + getTestTblName() + " like "
+          + "functional.insert_only_transactional_table stored as parquet");
+      client.execStatement("create table " + getTestPartitionedTblName()
+          + " (c1 int) partitioned by (part int) stored as parquet "
+          + "tblproperties ('transactional'='true', 'transactional_properties'="
+          + "'insert_only')");
+      client.execStatement("create table " + getTestFullAcidTblName()
+          + " (c1 int) partitioned by (part int) stored as orc "
+          + "tblproperties ('transactional'='true')");
+    } finally {
+      client.close();
+    }
+  }
+
+  private void dropTestTbls() throws Exception {
+    try (HiveJdbcClient hiveClient = hiveJdbcClientPool_.getClient()) {
+      hiveClient.executeSql("drop database if exists " + testDbName_ + " cascade");
+    }
+  }
+
+  private static String getTestTblName() {
+    return testDbName_ + "." + testTblName_;
+  }
+
+  private static String getTestPartitionedTblName() {
+    return testDbName_ + "." + testPartitionedTblName_;
+  }
+
+  private static String getTestFullAcidTblName() {
+    return testDbName_ + "." + testFullAcidTblName_;
+  }
+
+  private void executeHiveSql(String query) throws Exception {
+    try (HiveJdbcClient hiveClient = hiveJdbcClientPool_.getClient()) {
+      hiveClient.executeSql(query);
+    }
   }
 
   @Test
@@ -143,6 +199,26 @@ public class CatalogdMetaProviderTest {
     return provider_.loadPartitionsByRefs(
         tableMetaRef, /* partitionColumnNames unused by this impl */null, HOST_INDEX,
         partRefs);
+  }
+
+  /**
+   * Helper method for loading partitions by dbName and tableName. Retries when there is
+   * inconsistent metadata.
+   */
+  private Map<String, PartitionMetadata> loadPartitions(String dbName, String tableName)
+      throws Exception {
+    Frontend.RetryTracker retryTracker = new Frontend.RetryTracker(
+        String.format("load partitions for table %s.%s", dbName, tableName));
+    while (true) {
+      try {
+        Pair<Table, TableMetaRef> tablePair = provider_.loadTable(dbName, tableName);
+        List<PartitionRef> allRefs = provider_.loadPartitionList(tablePair.second);
+        return loadPartitions(tablePair.second, allRefs);
+      } catch (InconsistentMetadataFetchException e) {
+        diffStats();
+        retryTracker.handleRetryOrThrow(e);
+      }
+    }
   }
 
   @Test
@@ -428,4 +504,127 @@ public class CatalogdMetaProviderTest {
     assertEquals(1, stats.missCount());
   }
 
+  @Test
+  public void testFullAcidFileMetadataAfterMajorCompaction() throws Exception {
+    boolean origFlag = BackendConfig.INSTANCE.isAutoCheckCompaction();
+    try {
+      BackendConfig.INSTANCE.getBackendCfg().setAuto_check_compaction(true);
+      createTestTbls();
+      String partition = "partition (part=1)";
+      testFileMetadataAfterCompaction(testDbName_, testFullAcidTblName_, partition,
+          true);
+    } finally {
+      BackendConfig.INSTANCE.getBackendCfg().setAuto_check_compaction(origFlag);
+      dropTestTbls();
+    }
+  }
+
+  @Test
+  public void testFullAcidFileMetadataAfterMinorCompaction() throws Exception {
+    boolean origFlag = BackendConfig.INSTANCE.isAutoCheckCompaction();
+    try {
+      BackendConfig.INSTANCE.getBackendCfg().setAuto_check_compaction(true);
+      createTestTbls();
+      String partition = "partition (part=1)";
+      testFileMetadataAfterCompaction(testDbName_, testFullAcidTblName_, partition,
+          false);
+    } finally {
+      BackendConfig.INSTANCE.getBackendCfg().setAuto_check_compaction(origFlag);
+      dropTestTbls();
+    }
+  }
+
+  @Test
+  public void testTableFileMetadataAfterMajorCompaction() throws Exception {
+    boolean origFlag = BackendConfig.INSTANCE.isAutoCheckCompaction();
+    try {
+      BackendConfig.INSTANCE.getBackendCfg().setAuto_check_compaction(true);
+      createTestTbls();
+      testFileMetadataAfterCompaction(testDbName_, testTblName_, "", true);
+    } finally {
+      BackendConfig.INSTANCE.getBackendCfg().setAuto_check_compaction(origFlag);
+      dropTestTbls();
+    }
+  }
+
+  @Test
+  public void testTableFileMetadataAfterMinorCompaction() throws Exception {
+    boolean origFlag = BackendConfig.INSTANCE.isAutoCheckCompaction();
+    try {
+      BackendConfig.INSTANCE.getBackendCfg().setAuto_check_compaction(true);
+      createTestTbls();
+      testFileMetadataAfterCompaction(testDbName_, testTblName_, "", false);
+    } finally {
+      BackendConfig.INSTANCE.getBackendCfg().setAuto_check_compaction(origFlag);
+      dropTestTbls();
+    }
+  }
+
+  @Test
+  public void testPartitionFileMetadataAfterMajorCompaction() throws Exception {
+    boolean origFlag = BackendConfig.INSTANCE.isAutoCheckCompaction();
+    try {
+      BackendConfig.INSTANCE.getBackendCfg().setAuto_check_compaction(true);
+      createTestTbls();
+      String partition = "partition (part=1)";
+      testFileMetadataAfterCompaction(testDbName_, testPartitionedTblName_, partition,
+          true);
+    } finally {
+      BackendConfig.INSTANCE.getBackendCfg().setAuto_check_compaction(origFlag);
+      dropTestTbls();
+    }
+  }
+
+  @Test
+  public void testPartitionFileMetadataAfterMinorCompaction() throws Exception {
+    boolean origFlag = BackendConfig.INSTANCE.isAutoCheckCompaction();
+    try {
+      BackendConfig.INSTANCE.getBackendCfg().setAuto_check_compaction(true);
+      createTestTbls();
+      String partition = "partition (part=1)";
+      testFileMetadataAfterCompaction(testDbName_, testPartitionedTblName_, partition,
+          false);
+    } finally {
+      BackendConfig.INSTANCE.getBackendCfg().setAuto_check_compaction(origFlag);
+      dropTestTbls();
+    }
+  }
+
+  private void testFileMetadataAfterCompaction(String dbName, String tableName,
+      String partition, boolean isMajorCompaction) throws Exception {
+    String tableOrPartition = dbName + "." + tableName + " " + partition;
+    executeHiveSql("insert into " + tableOrPartition + " values (1)");
+    executeHiveSql("insert into " + tableOrPartition + " values (2)");
+    loadPartitions(dbName, tableName);
+    // load again to make sure the partition is in cache.
+    Map<String, PartitionMetadata> partMap;
+    try (FrontendProfile.Scope scope = FrontendProfile.createNewWithScope()) {
+      partMap = loadPartitions(dbName, tableName);
+      FrontendProfile profile = FrontendProfile.getCurrent();
+      TRuntimeProfileNode prof = profile.emitAsThrift();
+      Map<String, TCounter> counters = Maps.uniqueIndex(prof.counters, TCounter::getName);
+      assertEquals(1, counters.get("CatalogFetch.Partitions.Requests").getValue());
+      assertEquals(1, counters.get("CatalogFetch.Partitions.Hits").getValue());
+      int preFileCount = partMap.values().stream()
+          .map(PartitionMetadata::getFileDescriptors).mapToInt(List::size).sum();
+      assertEquals(2, preFileCount);
+    }
+
+    String compactionType = isMajorCompaction ? "'major'" : "'minor'";
+    executeHiveSql(
+        "alter table " + tableOrPartition + " compact " + compactionType + " and wait");
+    // After Compaction, it should fetch the partition from catalogd again, and
+    // file metadata should be updated.
+    try (FrontendProfile.Scope scope = FrontendProfile.createNewWithScope()) {
+      partMap = loadPartitions(dbName, tableName);
+      FrontendProfile profile = FrontendProfile.getCurrent();
+      TRuntimeProfileNode prof = profile.emitAsThrift();
+      Map<String, TCounter> counters = Maps.uniqueIndex(prof.counters, TCounter::getName);
+      assertEquals(1, counters.get("CatalogFetch.Partitions.Requests").getValue());
+      assertEquals(1, counters.get("CatalogFetch.Partitions.Misses").getValue());
+      int afterFileCount = partMap.values().stream()
+          .map(PartitionMetadata::getFileDescriptors).mapToInt(List::size).sum();
+      assertEquals(1, afterFileCount);
+    }
+  }
 }

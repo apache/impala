@@ -344,6 +344,12 @@ DEFINE_int32(admission_heartbeat_frequency_ms, 1000,
     "admission service, if enabled. Heartbeats are used to ensure resources are properly "
     "accounted for even if rpcs to the admission service occasionally fail.");
 
+DEFINE_bool(auto_check_compaction, false,
+    "When true, compaction checking will be conducted for each query in local catalog "
+    "mode. Note that this checking introduces additional overhead because Impala makes "
+    "additional RPCs to hive metastore for each table in a query during the query "
+    "compilation.");
+
 // Flags for JWT token based authentication.
 DECLARE_bool(jwt_token_auth);
 DECLARE_bool(jwt_validate_signature);

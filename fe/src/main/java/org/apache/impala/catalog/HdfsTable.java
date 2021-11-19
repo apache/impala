@@ -2158,6 +2158,7 @@ public class HdfsTable extends Table implements FeFsTable {
         }
 
         if (req.table_info_selector.want_partition_files) {
+          partInfo.setLast_compaction_id(part.getLastCompactionId());
           try {
             if (!part.getInsertFileDescriptors().isEmpty()) {
               partInfo.file_descriptors = new ArrayList<>();

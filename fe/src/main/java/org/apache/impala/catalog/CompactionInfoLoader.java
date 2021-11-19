@@ -17,8 +17,10 @@
 
 package org.apache.impala.catalog;
 
+import com.google.common.base.Throwables;
 import org.apache.hadoop.hive.metastore.api.GetLatestCommittedCompactionInfoRequest;
 import org.apache.hadoop.hive.metastore.api.GetLatestCommittedCompactionInfoResponse;
+import org.apache.thrift.TException;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,14 +37,12 @@ public class CompactionInfoLoader {
       new ConcurrentHashMap<>();
 
   public static GetLatestCommittedCompactionInfoResponse getLatestCompactionInfo(
-      CatalogServiceCatalog catalog, GetLatestCommittedCompactionInfoRequest request)
-      throws CatalogException {
+      MetaStoreClientPool.MetaStoreClient client,
+      GetLatestCommittedCompactionInfoRequest request)
+      throws TException {
     FutureTask<GetLatestCommittedCompactionInfoResponse> reqTask =
         new FutureTask<>(() -> {
-          try (
-              MetaStoreClientPool.MetaStoreClient client = catalog.getMetaStoreClient()) {
-            return client.getHiveClient().getLatestCommittedCompactionInfo(request);
-          }
+          return client.getHiveClient().getLatestCommittedCompactionInfo(request);
         });
 
     FutureTask<GetLatestCommittedCompactionInfoResponse> existingTask =
@@ -56,8 +56,10 @@ public class CompactionInfoLoader {
     try {
       return reqTask.get();
     } catch (Exception e) {
-      throw new CatalogException("Error getting latest compaction info for "
-              + request.getDbname() + "." + request.getTablename(), e);
+      Throwables.propagateIfPossible(e.getCause(), TException.class);
+      // The HMS request should only throw TException, we won't get any other exceptions
+      // here. If for some reason we do, just rethrow as RTE.
+      throw new RuntimeException(e);
     } finally {
       requests_.remove(request, reqTask);
     }
