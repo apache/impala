@@ -142,7 +142,7 @@ void THttpServer::parseHeader(char* header) {
   } else if (THRIFT_strncasecmp(header, "Content-length", sz) == 0) {
     chunked_ = false;
     contentLength_ = atoi(value);
-  } else if (strncmp(header, "X-Forwarded-For", sz) == 0) {
+  } else if (THRIFT_strncasecmp(header, "X-Forwarded-For", sz) == 0) {
     origin_ = value;
   } else if ((has_ldap_ || has_kerberos_ || has_saml_ || has_jwt_)
       && THRIFT_strncasecmp(header, "Authorization", sz) == 0) {

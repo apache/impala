@@ -376,7 +376,7 @@ public class LdapHS2Test {
     verifyMetrics(0, 0);
     verifyTrustedDomainMetrics(3);
 
-    // Case 2: Authenticate as 'Test1Ldap' without password
+    // Case 2a: Authenticate as 'Test1Ldap' without password
     headers.put("Authorization", "Basic VGVzdDFMZGFwOg==");
     headers.put("X-Forwarded-For", "127.0.0.1");
     transport.setCustomHeaders(headers);
@@ -388,6 +388,21 @@ public class LdapHS2Test {
     verifyMetrics(0, 0);
     verifyTrustedDomainMetrics(6);
 
+    // Case 2b: Authenticate as 'Test1Ldap' without password. Tests that XFF header name
+    // is case-insensitive.
+    headers.put("Authorization", "Basic VGVzdDFMZGFwOg==");
+    headers.remove("X-Forwarded-For");
+    headers.put("x-Forwarded-for", "127.0.0.1");
+    transport.setCustomHeaders(headers);
+    openResp = client.OpenSession(openReq);
+    verifyMetrics(0, 0);
+    verifyTrustedDomainMetrics(7);
+    operationHandle = execAndFetch(client, openResp.getSessionHandle(),
+        "select logged_in_user()", "Test1Ldap");
+    verifyMetrics(0, 0);
+    verifyTrustedDomainMetrics(9);
+    headers.remove("x-Forwarded-for");
+
     // Case 3: Case 1: Authenticate as 'Test1Ldap' with the right password
     // '12345' but with a non trusted address in X-Forwarded-For header
     headers.put("Authorization", "Basic VGVzdDFMZGFwOjEyMzQ1");
@@ -395,11 +410,11 @@ public class LdapHS2Test {
     transport.setCustomHeaders(headers);
     openResp = client.OpenSession(openReq);
     verifyMetrics(1, 0);
-    verifyTrustedDomainMetrics(6);
+    verifyTrustedDomainMetrics(9);
     operationHandle = execAndFetch(client, openResp.getSessionHandle(),
         "select logged_in_user()", "Test1Ldap");
     verifyMetrics(3, 0);
-    verifyTrustedDomainMetrics(6);
+    verifyTrustedDomainMetrics(9);
 
     // Case 4: No auth header, does not work
     headers.remove("Authorization");
@@ -409,7 +424,7 @@ public class LdapHS2Test {
       openResp = client.OpenSession(openReq);
       fail("Exception exception.");
     } catch (Exception e) {
-      verifyTrustedDomainMetrics(6);
+      verifyTrustedDomainMetrics(9);
       assertEquals(e.getMessage(), "HTTP Response code: 401");
     }
 
@@ -423,7 +438,7 @@ public class LdapHS2Test {
       fail("Exception exception.");
     } catch (Exception e) {
       verifyMetrics(3, 1);
-      verifyTrustedDomainMetrics(6);
+      verifyTrustedDomainMetrics(9);
       assertEquals(e.getMessage(), "HTTP Response code: 401");
     }
 
@@ -435,7 +450,7 @@ public class LdapHS2Test {
     openResp = client.OpenSession(openReq);
     // Account for 1 successful basic auth increment.
     verifyMetrics(4, 1);
-    verifyTrustedDomainMetrics(6);
+    verifyTrustedDomainMetrics(9);
   }
 
   /**
