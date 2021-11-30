@@ -169,3 +169,71 @@ class TestWebPage(CustomClusterTestSuite):
     # Even though webserver url is not exposed, it is still accessible.
     page = requests.get('http://localhost:25000')
     assert page.status_code == requests.codes.ok
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--logtostderr=true --redirect_stdout_stderr=false",
+    statestored_args="--logtostderr=true --redirect_stdout_stderr=false",
+    catalogd_args="--logtostderr=true --redirect_stdout_stderr=false"
+  )
+  def test_webserver_hide_logs_link(self, vector):
+    """Validate that there is no /logs link when we use --logtostderr=true """
+    ports = ["25000", "25010", "25020"]
+    for port in ports:
+      # Get the webui home page as json.
+      response = requests.get("http://localhost:%s?json" % port)
+      assert response.status_code == requests.codes.ok
+      home = json.loads(response.text)
+      # Get the items in the navbar.
+      navbar = home["__common__"]['navbar']
+      found_links = [link_item['link'] for link_item in navbar]
+      # The links that we expect to see in the navbar.
+      expected_coordinator_links = [
+        "/",
+        "/admission",
+        "/backends",
+        "/catalog",
+        "/hadoop-varz",
+        "/jmx",
+        "/log_level",
+        "/memz",
+        "/metrics",
+        "/profile_docs",
+        "/queries",
+        "/rpcz",
+        "/sessions",
+        "/threadz",
+        "/varz",
+      ]
+      expected_statestore_links = [
+        "/",
+        "/log_level",
+        "/memz",
+        "/metrics",
+        "/profile_docs",
+        "/rpcz",
+        "/subscribers",
+        "/threadz",
+        "/topics",
+        "/varz",
+      ]
+      expected_catalog_links = [
+        "/",
+        "/catalog",
+        "/jmx",
+        "/log_level",
+        "/memz",
+        "/metrics",
+        "/operations",
+        "/profile_docs",
+        "/rpcz",
+        "/threadz",
+        "/varz",
+      ]
+      msg = "bad links from webui port %s" % port
+      if port == "25000":
+        assert found_links == expected_coordinator_links, msg
+      elif port == "25010":
+        assert found_links == expected_statestore_links, msg
+      elif port == "25020":
+        assert found_links == expected_catalog_links, msg

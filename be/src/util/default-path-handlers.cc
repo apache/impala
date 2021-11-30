@@ -280,7 +280,9 @@ void RootHandler(const Webserver::WebRequest& req, Document* document) {
 
 void AddDefaultUrlCallbacks(Webserver* webserver, MetricGroup* metric_group,
     MemTracker* process_mem_tracker) {
-  webserver->RegisterUrlCallback("/logs", "logs.tmpl", LogsHandler, true);
+  if (!FLAGS_logtostderr) {
+    webserver->RegisterUrlCallback("/logs", "logs.tmpl", LogsHandler, true);
+  }
   webserver->RegisterUrlCallback("/varz", "flags.tmpl", FlagsHandler, true);
   webserver->RegisterUrlCallback(
       "/profile_docs", "profile_docs.tmpl", ProfileDocsHandler, true);
