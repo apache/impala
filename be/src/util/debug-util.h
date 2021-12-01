@@ -79,7 +79,6 @@ std::string PrintThriftEnum(const TStmtType::type& value);
 std::string PrintThriftEnum(const TUnit::type& value);
 std::string PrintThriftEnum(const TParquetTimestampType::type& value);
 std::string PrintThriftEnum(const TTransactionalType::type& value);
-std::string PrintThriftEnum(const TEnabledRuntimeFilterTypes::type& value);
 std::string PrintThriftEnum(const TMinmaxFilteringLevel::type& value);
 std::string PrintThriftEnum(const TKuduReplicaSelection::type& value);
 std::string PrintThriftEnum(const TMinmaxFilterFastCodePathMode::type& value);

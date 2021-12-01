@@ -23,6 +23,7 @@
 #include "runtime/raw-value.h"
 #include "runtime/runtime-filter-bank.h"
 #include "util/bloom-filter.h"
+#include "util/in-list-filter.h"
 #include "util/condition-variable.h"
 #include "util/time.h"
 
@@ -45,8 +46,8 @@ class RuntimeFilterTest;
 class RuntimeFilter {
  public:
   RuntimeFilter(const TRuntimeFilterDesc& filter, int64_t filter_size)
-      : bloom_filter_(nullptr), min_max_filter_(nullptr), filter_desc_(filter),
-        registration_time_(MonotonicMillis()), arrival_time_(0L),
+      : bloom_filter_(nullptr), min_max_filter_(nullptr), in_list_filter_(nullptr),
+        filter_desc_(filter), registration_time_(MonotonicMillis()), arrival_time_(0L),
         filter_size_(filter_size) {
     DCHECK(filter_desc_.type == TRuntimeFilterType::MIN_MAX || filter_size_ > 0);
   }
@@ -64,6 +65,9 @@ class RuntimeFilter {
   bool is_min_max_filter() const {
     return filter_desc().type == TRuntimeFilterType::MIN_MAX;
   }
+  bool is_in_list_filter() const {
+    return filter_desc().type == TRuntimeFilterType::IN_LIST;
+  }
 
   extdatasource::TComparisonOp::type getCompareOp() const {
     return filter_desc().compareOp;
@@ -71,11 +75,13 @@ class RuntimeFilter {
 
   BloomFilter* get_bloom_filter() const { return bloom_filter_.Load(); }
   MinMaxFilter* get_min_max() const { return min_max_filter_.Load(); }
+  InListFilter* get_in_list_filter() const { return in_list_filter_.Load(); }
 
-  /// Sets the internal filter bloom_filter to 'bloom_filter' or 'min_max_filter'
+  /// Sets the internal filter to 'bloom_filter', 'min_max_filter' or 'in_list_filter'
   /// depending on the type of this RuntimeFilter. Can only legally be called
   /// once per filter. Does not acquire the memory associated with 'bloom_filter'.
-  void SetFilter(BloomFilter* bloom_filter, MinMaxFilter* min_max_filter);
+  void SetFilter(BloomFilter* bloom_filter, MinMaxFilter* min_max_filter,
+      InListFilter* in_list_filter);
 
   /// Set the internal bloom or min-max filter to the equivalent filter from 'other'.
   /// The parameters of 'other' must be compatible and the filters must have the same
@@ -144,6 +150,9 @@ class RuntimeFilter {
 
   /// May be NULL even after arrival_time_ is set if filter_desc_.min_max_filter is false.
   AtomicPtr<MinMaxFilter> min_max_filter_;
+
+  /// May be NULL even after arrival_time_ is set if filter_desc_.in_list_filter is false.
+  AtomicPtr<InListFilter> in_list_filter_;
 
   /// Reference to the filter's thrift descriptor in the thrift Plan tree.
   const TRuntimeFilterDesc& filter_desc_;

@@ -233,10 +233,6 @@ TEST(QueryOptions, SetEnumOptions) {
   TestEnumCase(options, CASE(kudu_read_mode, TKuduReadMode,
       (DEFAULT, READ_LATEST, READ_AT_SNAPSHOT)), true);
   TestEnumCase(options,
-      CASE(enabled_runtime_filter_types, TEnabledRuntimeFilterTypes,
-          (BLOOM, MIN_MAX, ALL)),
-      true);
-  TestEnumCase(options,
       CASE(kudu_replica_selection, TKuduReplicaSelection, (LEADER_ONLY, CLOSEST_REPLICA)),
       true);
 #undef CASE
@@ -556,6 +552,62 @@ TEST(QueryOptions, CompressionCodec) {
 #undef CASE
 #undef ENTRIES
 #undef ENTRY
+}
+
+void VerifyFilterTypes(const set<TRuntimeFilterType::type>& types,
+    const std::initializer_list<TRuntimeFilterType::type>& expects) {
+  EXPECT_EQ(expects.size(), types.size());
+  for (const auto t : expects) {
+    EXPECT_NE(types.end(), types.find(t));
+  }
+}
+
+// Tests for setting of ENABLED_RUNTIME_FILTER_TYPES.
+TEST(QueryOptions, EnabledRuntimeFilterTypes) {
+  const string KEY = "enabled_runtime_filter_types";
+  {
+    TQueryOptions options;
+    EXPECT_TRUE(SetQueryOption(KEY, "all", &options, nullptr).ok());
+    VerifyFilterTypes(options.enabled_runtime_filter_types,
+        {
+            TRuntimeFilterType::BLOOM,
+            TRuntimeFilterType::MIN_MAX,
+            TRuntimeFilterType::IN_LIST
+        });
+  }
+  {
+    TQueryOptions options;
+    EXPECT_TRUE(SetQueryOption(KEY, "bloom,min_max,in_list", &options, nullptr).ok());
+    VerifyFilterTypes(options.enabled_runtime_filter_types,
+        {
+            TRuntimeFilterType::BLOOM,
+            TRuntimeFilterType::MIN_MAX,
+            TRuntimeFilterType::IN_LIST
+        });
+  }
+  {
+    TQueryOptions options;
+    EXPECT_TRUE(SetQueryOption(KEY, "bloom", &options, nullptr).ok());
+    VerifyFilterTypes(options.enabled_runtime_filter_types, {TRuntimeFilterType::BLOOM});
+  }
+  {
+    TQueryOptions options;
+    EXPECT_TRUE(SetQueryOption(KEY, "bloom,min_max", &options, nullptr).ok());
+    VerifyFilterTypes(options.enabled_runtime_filter_types,
+        {
+            TRuntimeFilterType::BLOOM,
+            TRuntimeFilterType::MIN_MAX
+        });
+  }
+  {
+    TQueryOptions options;
+    EXPECT_TRUE(SetQueryOption(KEY, "in_list,bloom", &options, nullptr).ok());
+    VerifyFilterTypes(options.enabled_runtime_filter_types,
+                      {
+                          TRuntimeFilterType::BLOOM,
+                          TRuntimeFilterType::IN_LIST
+                      });
+  }
 }
 
 // Tests for setting of MAX_RESULT_SPOOLING_MEM and

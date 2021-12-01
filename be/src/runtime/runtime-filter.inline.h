@@ -29,22 +29,28 @@
 namespace impala {
 
 inline bool RuntimeFilter::AlwaysTrue() const {
-  if (is_bloom_filter()) {
-    return HasFilter() && bloom_filter_.Load() == BloomFilter::ALWAYS_TRUE_FILTER;
-  } else {
-    DCHECK(is_min_max_filter());
-    return HasFilter() && min_max_filter_.Load()->AlwaysTrue();
+  switch (filter_desc().type) {
+    case TRuntimeFilterType::BLOOM:
+      return HasFilter() && bloom_filter_.Load() == BloomFilter::ALWAYS_TRUE_FILTER;
+    case TRuntimeFilterType::MIN_MAX:
+      return HasFilter() && min_max_filter_.Load()->AlwaysTrue();
+    case TRuntimeFilterType::IN_LIST:
+      return HasFilter() && in_list_filter_.Load()->AlwaysTrue();
   }
+  return false;
 }
 
 inline bool RuntimeFilter::AlwaysFalse() const {
-  if (is_bloom_filter()) {
-    return bloom_filter_.Load() != BloomFilter::ALWAYS_TRUE_FILTER
-        && bloom_filter_.Load()->AlwaysFalse();
-  } else {
-    DCHECK(is_min_max_filter());
-    return min_max_filter_.Load() != nullptr && min_max_filter_.Load()->AlwaysFalse();
+  switch (filter_desc().type) {
+    case TRuntimeFilterType::BLOOM:
+      return bloom_filter_.Load() != BloomFilter::ALWAYS_TRUE_FILTER
+             && bloom_filter_.Load()->AlwaysFalse();
+    case TRuntimeFilterType::MIN_MAX:
+      return min_max_filter_.Load() != nullptr && min_max_filter_.Load()->AlwaysFalse();
+    case TRuntimeFilterType::IN_LIST:
+      return in_list_filter_.Load() != nullptr && in_list_filter_.Load()->AlwaysFalse();
   }
+  return false;
 }
 
 }

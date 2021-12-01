@@ -46,6 +46,7 @@ namespace impala {
 class BloomFilter;
 class MemTracker;
 class MinMaxFilter;
+class InListFilter;
 class RuntimeFilter;
 class QueryState;
 class TBloomFilter;
@@ -118,12 +119,13 @@ class RuntimeFilterBank {
   /// to check for the filter's arrival.
   RuntimeFilter* RegisterConsumer(const TRuntimeFilterDesc& filter_desc);
 
-  /// Updates a filter's 'bloom_filter' or 'min_max_filter' which has been produced by
-  /// some operator in a local fragment instance. At most one of 'bloom_filter' and
-  /// 'min_max_filter' may be non-NULL, depending on the filter's type. They may both be
-  /// NULL, representing a filter that allows all rows to pass.
-  void UpdateFilterFromLocal(
-      int32_t filter_id, BloomFilter* bloom_filter, MinMaxFilter* min_max_filter);
+  /// Updates a filter's 'bloom_filter', 'min_max_filter' or 'in_list_filter' which has
+  /// been produced by some operator in a local fragment instance. At most one of
+  /// 'bloom_filter', 'min_max_filter' and 'in_list_filter' may be non-NULL, depending on
+  /// the filter's type. They may both be NULL, representing a filter that allows all rows
+  /// to pass.
+  void UpdateFilterFromLocal(int32_t filter_id, BloomFilter* bloom_filter,
+      MinMaxFilter* min_max_filter, InListFilter* in_list_filter);
 
   /// Makes a bloom_filter (aggregated globally from all producer fragments) available for
   /// consumption by operators that wish to use it for filtering.
@@ -141,6 +143,9 @@ class RuntimeFilterBank {
 
   /// Returns a new MinMaxFilter. Handles memory the same as AllocateScratchBloomFilter().
   MinMaxFilter* AllocateScratchMinMaxFilter(int32_t filter_id, ColumnType type);
+
+  /// Returns a new InListFilter. Handles memory the same as AllocateScratchBloomFilter().
+  InListFilter* AllocateScratchInListFilter(int32_t filter_id, ColumnType type);
 
   /// Default hash seed to use when computing hashed values to insert into filters.
   static int32_t IR_ALWAYS_INLINE DefaultHashSeed() { return 1234; }
@@ -221,6 +226,10 @@ class RuntimeFilterBank {
     /// Contains references to all the min-max filters generated. Used in Close() to
     /// safely release all memory allocated for MinMaxFilters.
     vector<MinMaxFilter*> min_max_filters;
+
+    /// Contains references to all the in-list filters generated. Used in Close() to
+    /// safely release all memory allocated for InListFilters.
+    vector<InListFilter*> in_list_filters;
   } CACHELINE_ALIGNED;
 
   /// Object pool for objects that will be freed in Close(), e.g. allocated filters.
@@ -259,6 +268,9 @@ class RuntimeFilterBank {
 
   /// Total amount of memory allocated to Bloom Filters
   RuntimeProfile::Counter* const bloom_memory_allocated_;
+
+  /// Total number of items of all in-list filters.
+  RuntimeProfile::Counter* const total_in_list_filter_items_;
 
   /// Total amount of memory required by the bloom filters as calculated by the planner.
   const int64_t total_bloom_filter_mem_required_;

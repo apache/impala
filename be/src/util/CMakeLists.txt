@@ -61,6 +61,8 @@ set(UTIL_SRCS
   histogram-metric.cc
   impalad-metrics.cc
   impala-bloom-filter-buffer-allocator.cc
+  in-list-filter.cc
+  in-list-filter-ir.cc
   jni-util.cc
   json-util.cc
   jwt-util.cc

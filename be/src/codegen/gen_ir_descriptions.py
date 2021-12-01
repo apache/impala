@@ -217,6 +217,7 @@ ir_functions = [
   ["DECIMAL_MIN_MAX_FILTER_INSERT4", "_ZN6impala19DecimalMinMaxFilter7Insert4EPKv"],
   ["DECIMAL_MIN_MAX_FILTER_INSERT8", "_ZN6impala19DecimalMinMaxFilter7Insert8EPKv"],
   ["DECIMAL_MIN_MAX_FILTER_INSERT16", "_ZN6impala19DecimalMinMaxFilter8Insert16EPKv"],
+  ["IN_LIST_FILTER_INSERT", "_ZN6impala12InListFilter6InsertEPKv"],
   ["KRPC_DSS_GET_PART_EXPR_EVAL",
   "_ZN6impala20KrpcDataStreamSender25GetPartitionExprEvaluatorEi"],
   ["KRPC_DSS_HASH_AND_ADD_ROWS",

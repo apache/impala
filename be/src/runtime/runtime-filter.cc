@@ -25,17 +25,20 @@ using namespace impala;
 
 const char* RuntimeFilter::LLVM_CLASS_NAME = "class.impala::RuntimeFilter";
 
-void RuntimeFilter::SetFilter(BloomFilter* bloom_filter, MinMaxFilter* min_max_filter) {
+void RuntimeFilter::SetFilter(BloomFilter* bloom_filter, MinMaxFilter* min_max_filter,
+    InListFilter* in_list_filter) {
   {
     unique_lock<mutex> l(arrival_mutex_);
     DCHECK(!HasFilter()) << "SetFilter() should not be called multiple times.";
-    DCHECK(bloom_filter_.Load() == nullptr && min_max_filter_.Load() == nullptr);
+    DCHECK(bloom_filter_.Load() == nullptr);
+    DCHECK(min_max_filter_.Load() == nullptr);
+    DCHECK(in_list_filter_.Load() == nullptr);
     if (arrival_time_.Load() != 0) return; // The filter may already have been cancelled.
-    if (is_bloom_filter()) {
-      bloom_filter_.Store(bloom_filter);
-    } else {
-      DCHECK(is_min_max_filter());
-      min_max_filter_.Store(min_max_filter);
+    switch (filter_desc_.type) {
+      case TRuntimeFilterType::BLOOM: bloom_filter_.Store(bloom_filter); break;
+      case TRuntimeFilterType::MIN_MAX: min_max_filter_.Store(min_max_filter); break;
+      case TRuntimeFilterType::IN_LIST: in_list_filter_.Store(in_list_filter); break;
+      default: DCHECK(false);
     }
     arrival_time_.Store(MonotonicMillis());
     has_filter_.Store(true);
@@ -46,7 +49,8 @@ void RuntimeFilter::SetFilter(BloomFilter* bloom_filter, MinMaxFilter* min_max_f
 void RuntimeFilter::SetFilter(RuntimeFilter* other) {
   DCHECK_EQ(id(), other->id());
   SetFilter(is_bloom_filter() ? other->bloom_filter_.Load() : nullptr,
-      is_min_max_filter() ? other->min_max_filter_.Load() : nullptr);
+      is_min_max_filter() ? other->min_max_filter_.Load() : nullptr,
+      is_in_list_filter() ? other->in_list_filter_.Load() : nullptr);
 }
 
 void RuntimeFilter::Or(RuntimeFilter* other) {

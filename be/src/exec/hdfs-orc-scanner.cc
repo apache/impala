@@ -38,6 +38,7 @@
 
 using namespace impala;
 using namespace impala::io;
+using namespace impala::io;
 
 namespace impala {
 
@@ -311,6 +312,11 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
   metadata_range_ = stream_->scan_range();
   num_stripes_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumOrcStripes", TUnit::UNIT);
+  num_pushed_down_predicates_counter_ =
+      ADD_COUNTER(scan_node_->runtime_profile(), "NumPushedDownPredicates", TUnit::UNIT);
+  num_pushed_down_runtime_filters_counter_ =
+      ADD_COUNTER(scan_node_->runtime_profile(), "NumPushedDownRuntimeFilters",
+          TUnit::UNIT);
 
   codegend_process_scratch_batch_fn_ = scan_node_->GetCodegenFn(THdfsFileFormat::ORC);
   if (codegend_process_scratch_batch_fn_ == nullptr) {
@@ -400,7 +406,10 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
   // blob more efficiently.
   row_reader_options_.setEnableLazyDecoding(true);
 
-  RETURN_IF_ERROR(PrepareSearchArguments());
+  // Clone the statistics conjuncts.
+  RETURN_IF_ERROR(ScalarExprEvaluator::Clone(&obj_pool_, state_, expr_perm_pool_.get(),
+      context_->expr_results_pool(), scan_node_->stats_conjunct_evals(),
+      &stats_conjunct_evals_));
 
   // To create OrcColumnReaders, we need the selected orc schema. It's a subset of the
   // file schema: a tree of selected orc types and can only be got from an orc::RowReader
@@ -907,6 +916,8 @@ Status HdfsOrcScanner::NextStripe() {
       RETURN_IF_ERROR(StartColumnReading(*stripe.get()));
     }
     row_reader_options_.range(stripe->getOffset(), stripe_len);
+    // Update SearchArguments in case any new runtime filters arrive.
+    RETURN_IF_ERROR(PrepareSearchArguments());
     try {
       row_reader_ = reader_->createRowReader(row_reader_options_);
     } catch (ResourceError& e) {  // errors throw from the orc scanner
@@ -1252,6 +1263,13 @@ bool HdfsOrcScanner::PrepareInListPredicate(uint64_t orc_column_id,
         << "Non-literal constant expr cannot be used";
     in_list.emplace_back(GetSearchArgumentLiteral(eval, i, type, &predicate_type));
   }
+  return PrepareInListPredicate(orc_column_id, type, in_list, sarg);
+}
+
+bool HdfsOrcScanner::PrepareInListPredicate(uint64_t orc_column_id,
+    const ColumnType& type, const std::vector<orc::Literal>& in_list,
+    orc::SearchArgumentBuilder* sarg) {
+  orc::PredicateDataType predicate_type = GetOrcPredicateDataType(type);
   // The ORC library requires IN-list has at least 2 literals. Converting to EQUALS
   // when there is one.
   if (in_list.size() == 1) {
@@ -1277,16 +1295,23 @@ void HdfsOrcScanner::PrepareIsNullPredicate(bool is_not_null, uint64_t orc_colum
   }
 }
 
+bool HdfsOrcScanner::ShouldUpdateSearchArgument() {
+  int num_current_filters = 0;
+  for (const FilterContext* ctx : filter_ctxs_) {
+    if (IsPushableInListFilter(ctx->filter)) num_current_filters++;
+  }
+  VLOG_FILE << "num_current_filters: " << num_current_filters
+            << ", last num_usable_in_list_filters: " << num_pushable_in_list_filters_;
+  return num_current_filters > num_pushable_in_list_filters_;
+}
+
 Status HdfsOrcScanner::PrepareSearchArguments() {
   if (!state_->query_options().orc_read_statistics) return Status::OK();
+  if (!ShouldUpdateSearchArgument()) return Status::OK();
+  VLOG_FILE << "Building SearchArgument on ORC file " << filename();
 
   const TupleDescriptor* stats_tuple_desc = scan_node_->stats_tuple_desc();
   if (!stats_tuple_desc) return Status::OK();
-
-  // Clone the min/max statistics conjuncts.
-  RETURN_IF_ERROR(ScalarExprEvaluator::Clone(&obj_pool_, state_,
-      expr_perm_pool_.get(), context_->expr_results_pool(),
-      scan_node_->stats_conjunct_evals(), &stats_conjunct_evals_));
 
   std::unique_ptr<orc::SearchArgumentBuilder> sarg =
       orc::SearchArgumentFactory::newBuilder();
@@ -1294,8 +1319,9 @@ Status HdfsOrcScanner::PrepareSearchArguments() {
   const orc::Type* node = nullptr;
   bool pos_field;
   bool missing_field;
+  int num_pushed_down_predicates = 0;
 
-  DCHECK_EQ(stats_tuple_desc->slots().size(), stats_conjunct_evals_.size());
+  DCHECK_GE(stats_tuple_desc->slots().size(), stats_conjunct_evals_.size());
   for (int i = 0; i < stats_conjunct_evals_.size(); ++i) {
     SlotDescriptor* slot_desc = stats_tuple_desc->slots()[i];
     // Resolve column path to determine col idx in file schema.
@@ -1309,6 +1335,7 @@ Status HdfsOrcScanner::PrepareSearchArguments() {
       PrepareIsNullPredicate(fn_name == "is_not_null_pred", node->getColumnId(),
           slot_desc->type(), sarg.get());
       sargs_supported = true;
+      num_pushed_down_predicates++;
       continue;
     }
     ScalarExpr* const_expr = eval->root().GetChild(1);
@@ -1336,15 +1363,26 @@ Status HdfsOrcScanner::PrepareSearchArguments() {
         || node->getKind() == orc::TIMESTAMP) {
       continue;
     }
-
+    bool success;
     if (fn_name == "in_iterate" || fn_name == "in_set_lookup") {
-      sargs_supported |= PrepareInListPredicate(
+      success = PrepareInListPredicate(
           node->getColumnId(), slot_desc->type(), eval, sarg.get());
+      if (success) {
+        sargs_supported = true;
+        num_pushed_down_predicates++;
+      }
       continue;
     }
-    sargs_supported |= PrepareBinaryPredicate(fn_name, node->getColumnId(),
+    success = PrepareBinaryPredicate(fn_name, node->getColumnId(),
         slot_desc->type(), eval, sarg.get());
+    if (success) {
+      sargs_supported = true;
+      num_pushed_down_predicates++;
+    }
   }
+  VLOG_FILE << "Pushed " << num_pushed_down_predicates << " predicates down";
+  COUNTER_SET(num_pushed_down_predicates_counter_, num_pushed_down_predicates);
+  sargs_supported |= UpdateSearchArgumentWithFilters(sarg.get());
   if (sargs_supported) {
     try {
       std::unique_ptr<orc::SearchArgument> final_sarg = sarg->build();
@@ -1361,6 +1399,106 @@ Status HdfsOrcScanner::PrepareSearchArguments() {
   // Free any expr result allocations accumulated during conjunct evaluation.
   context_->expr_results_pool()->Clear();
   return Status::OK();
+}
+
+bool HdfsOrcScanner::IsPushableInListFilter(const RuntimeFilter* filter) {
+  VLOG_FILE << "Checking readiness";
+  if (!filter || !filter->is_in_list_filter() || !filter->HasFilter()) return false;
+  VLOG_FILE << "Checking partition filters";
+  // Only apply runtime filters on non-partition columns.
+  if (filter->IsBoundByPartitionColumn(GetScanNodeId())) return false;
+  VLOG_FILE << "Checking always_true of filter " << filter->id();
+  InListFilter* in_list_filter = filter->get_in_list_filter();
+  if (in_list_filter->AlwaysTrue()) return false;
+  VLOG_FILE << "Checking target expr of filter " << filter->id();
+  const TRuntimeFilterTargetDesc& target_desc = filter->filter_desc().targets[0];
+  // Filters target on an expr (e.g. 100 * col) can't be simply pushed down.
+  if (target_desc.target_expr.nodes.size() != 1) return false;
+  if (!target_desc.target_expr.nodes[0].__isset.slot_ref) return false;
+  return true;
+}
+
+bool HdfsOrcScanner::UpdateSearchArgumentWithFilters(orc::SearchArgumentBuilder* sarg) {
+  VLOG_FILE << "Updating SearchArgument with runtime filters";
+  int num_usable_filters = 0;
+  int num_pushed_down_filters = 0;
+  for (const FilterContext* ctx : filter_ctxs_) {
+    const RuntimeFilter* filter = ctx->filter;
+    if (!IsPushableInListFilter(filter)) continue;
+    num_usable_filters++;
+    VLOG_FILE << "Filter " << filter->id() << " is usable. "
+              << "Resolving filter target in ORC file " << filename();
+    InListFilter* in_list_filter = filter->get_in_list_filter();
+    const TRuntimeFilterTargetDesc& target_desc = filter->filter_desc().targets[0];
+    DCHECK_EQ(target_desc.target_expr_slotids.size(), 1);
+    TSlotId sid = target_desc.target_expr_slotids[0];
+    const SlotDescriptor* target_slot = nullptr;
+    for (const SlotDescriptor* slot : scan_node_->tuple_desc()->slots()) {
+      if (slot->id() == sid) {
+        target_slot = slot;
+        break;
+      }
+    }
+    if (target_slot == nullptr) {
+      VLOG_FILE << "Can't find slot of id=" << sid << " in "
+                << scan_node_->tuple_desc()->DebugString();
+      continue;
+    }
+    const orc::Type* node = nullptr;
+    bool pos_field;
+    bool missing_field;
+    Status s = schema_resolver_->ResolveColumn(target_slot->col_path(),
+        &node, &pos_field, &missing_field);
+    if (!s.ok()) {
+      VLOG_FILE << "Can't resolve " << target_slot->DebugString() << " in ORC file "
+                << filename();
+      continue;
+    }
+    if (pos_field || missing_field) continue;
+
+    VLOG_FILE << "Generating ORC IN-list for filter " << filter->id();
+    std::vector<orc::Literal> in_list;
+    const ColumnType& col_type = filter->type();
+    switch(col_type.type) {
+      case TYPE_TINYINT:
+      case TYPE_SMALLINT:
+      case TYPE_INT:
+      case TYPE_BIGINT: {
+        for (int64_t v : in_list_filter->values_) {
+          in_list.emplace_back(v);
+        }
+        break;
+      }
+      case TYPE_DATE: {
+        for (int64_t v : in_list_filter->values_) {
+          in_list.emplace_back(orc::PredicateDataType::DATE, v);
+        }
+        break;
+      }
+      case TYPE_STRING: {
+        for (const string& str : in_list_filter->str_values_) {
+          in_list.emplace_back(str.c_str(), str.length());
+        }
+        break;
+      }
+      default: break;
+    }
+    if (in_list_filter->ContainsNull()) {
+      // Add a null literal with type.
+      in_list.emplace_back(GetOrcPredicateDataType(col_type));
+    }
+    if (!in_list.empty()) {
+      VLOG_FILE << "Updated sarg with " << in_list.size() << " items for filter "
+                << filter->id();
+      if (PrepareInListPredicate(node->getColumnId(), col_type, in_list, sarg))
+        num_pushed_down_filters++;
+    }
+  }
+  num_pushable_in_list_filters_ = num_usable_filters;
+  COUNTER_SET(num_pushed_down_runtime_filters_counter_, num_pushed_down_filters);
+  VLOG_FILE << num_usable_filters << " usable filters. Pushed " << num_pushed_down_filters
+            << " filters down.";
+  return num_pushed_down_filters > 0;
 }
 
 Status HdfsOrcScanner::ReadFooterStream(void* buf, uint64_t length, uint64_t offset) {

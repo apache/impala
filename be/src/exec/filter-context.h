@@ -103,6 +103,9 @@ struct FilterContext {
   /// Working copy of local min-max filter
   MinMaxFilter* local_min_max_filter = nullptr;
 
+  /// Working copy of local in-list filter
+  InListFilter* local_in_list_filter = nullptr;
+
   /// Struct name in LLVM IR.
   static const char* LLVM_CLASS_NAME;
 

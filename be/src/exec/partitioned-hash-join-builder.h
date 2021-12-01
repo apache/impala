@@ -707,7 +707,7 @@ class PhjBuilder : public JoinBuilder {
   /// row-backing resources to it.
   void CloseAndDeletePartitions(RowBatch* row_batch);
 
-  /// For each filter in filters_, allocate a bloom_filter from the fragment-local
+  /// For each filter in filters_, allocate a runtime_filter from the fragment-local
   /// RuntimeFilterBank and store it in runtime_filters_ to populate during the build
   /// phase.
   void AllocateRuntimeFilters();

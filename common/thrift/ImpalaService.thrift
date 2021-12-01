@@ -719,8 +719,11 @@ enum TImpalaQueryOptions {
   // warning will be logged if the Java UDF throws an exception.
   ABORT_JAVA_UDF_ON_EXCEPTION = 140;
 
-  // Indicates whether to use ORC's search argument to push down predicates.
+  // Indicates whether to use ORC's async read.
   ORC_ASYNC_READ = 141
+
+  // Maximum number of distinct entries in a runtime in-list filter.
+  RUNTIME_IN_LIST_FILTER_ENTRY_LIMIT = 142;
 }
 
 // The summary of a DML statement.

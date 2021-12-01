@@ -319,3 +319,6 @@ table_name:alltypessmall_bool_sorted, constraint:restrict_to, table_format:orc/d
 
 table_name:complextypes_arrays_only_view, constraint:restrict_to, table_format:parquet/none/none
 table_name:complextypes_arrays_only_view, constraint:restrict_to, table_format:orc/def/block
+
+# 'alltypestiny_negative' only used in ORC tests.
+table_name:alltypestiny_negative, constraint:restrict_to, table_format:orc/def/block

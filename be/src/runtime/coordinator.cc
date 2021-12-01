@@ -58,6 +58,7 @@
 #include "util/hdfs-util.h"
 #include "util/histogram-metric.h"
 #include "util/kudu-status-util.h"
+#include "util/in-list-filter.h"
 #include "util/min-max-filter.h"
 #include "util/pretty-printer.h"
 #include "util/table-printer.h"
@@ -595,6 +596,7 @@ string Coordinator::FilterDebugString() {
   table_printer.AddColumn("Est fpp", false);
   table_printer.AddColumn("Min value", false);
   table_printer.AddColumn("Max value", false);
+  table_printer.AddColumn("In-list size", false);
   ObjectPool temp_object_pool;
   MemTracker temp_mem_tracker;
   for (auto& v: filter_routing_table_->id_to_filter) {
@@ -643,9 +645,9 @@ string Coordinator::FilterDebugString() {
       stringstream ss;
       ss << setprecision(3) << fpp;
       row.push_back(ss.str());
-      row.push_back("");
-      row.push_back("");
-    } else {
+      // The following 3 fields belong to MinMax/IN-list filters.
+      for (int i = 0; i < 3; ++i) row.push_back("");
+    } else if (state.is_min_max_filter()) {
       // Add the filter type for minmax filters.
       row.push_back(PrintThriftEnum(state.desc().type));
       row.push_back("");
@@ -680,6 +682,25 @@ string Coordinator::FilterDebugString() {
           row.push_back("PartialUpdates");
           row.push_back("PartialUpdates");
         }
+      }
+      row.push_back("");
+    } else if (state.is_in_list_filter()) {
+      row.push_back(PrintThriftEnum(state.desc().type));
+      // Skip 3 fields belong to Bloom/MinMax filters.
+      for (int i = 0; i < 3; ++i) row.push_back("");
+      const InListFilterPB& in_list_filterPB =
+          const_cast<FilterState*>(&state)->in_list_filter();
+      if (state.AlwaysTrueFilterReceived()) {
+        row.push_back("AlwaysTrue");
+      } else if (state.received_all_updates()) {
+        if (state.AlwaysFalseFlippedToFalse()
+            || InListFilter::AlwaysFalse(in_list_filterPB)) {
+          row.push_back("AlwaysFalse");
+        } else {
+          row.push_back(std::to_string(in_list_filterPB.value().size()));
+        }
+      } else {
+        row.push_back("PartialUpdates");
       }
     }
     table_printer.AddRow(row);
@@ -1492,9 +1513,11 @@ void Coordinator::UpdateFilter(const UpdateFilterParamsPB& params, RpcContext* c
           || rpc_params.bloom_filter().always_true()
           || !state->bloom_filter_directory().empty());
 
-    } else {
-      DCHECK(state->is_min_max_filter());
+    } else if (state->is_min_max_filter()) {
       MinMaxFilter::Copy(state->min_max_filter(), rpc_params.mutable_min_max_filter());
+    } else {
+      DCHECK(state->is_in_list_filter());
+      *rpc_params.mutable_in_list_filter() = state->in_list_filter();
     }
 
     // Filter is complete. We disable it so future UpdateFilter rpcs will be ignored,
@@ -1575,8 +1598,7 @@ void Coordinator::FilterState::ApplyUpdate(
             sidecar_slice.size());
       }
     }
-  } else {
-    DCHECK(is_min_max_filter());
+  } else if (is_min_max_filter()) {
     DCHECK(params.has_min_max_filter());
     ColumnType col_type = ColumnType::FromThrift(desc_.src_expr.nodes[0].type);
     VLOG(3) << "Coordinator::FilterState::ApplyUpdate() on minmax."
@@ -1598,6 +1620,15 @@ void Coordinator::FilterState::ApplyUpdate(
       MinMaxFilter::Or(params.min_max_filter(), &min_max_filter_, col_type);
     }
     VLOG(3) << " Updated accumulated filter=" << DebugString();
+  } else {
+    DCHECK(is_in_list_filter());
+    DCHECK(params.has_in_list_filter());
+    VLOG(3) << "Update IN-list filter " << params.filter_id() << ", "
+            << InListFilter::DebugString(params.in_list_filter());
+    DCHECK(!in_list_filter_.always_true());
+    DCHECK_EQ(in_list_filter_.value_size(), 0);
+    DCHECK(!in_list_filter_.contains_null());
+    in_list_filter_ = params.in_list_filter();
   }
 
   if (pending_count_ == 0 || disabled()) {
@@ -1611,7 +1642,7 @@ void Coordinator::FilterState::DisableAndRelease(
   Release(tracker);
 }
 
-void Coordinator::FilterState::Disable(const bool all_updates_received) {
+void Coordinator::FilterState::Disable(bool all_updates_received) {
   all_updates_received_ = all_updates_received;
   if (is_bloom_filter()) {
     bloom_filter_.set_always_true(true);
@@ -1619,13 +1650,18 @@ void Coordinator::FilterState::Disable(const bool all_updates_received) {
       always_false_flipped_to_false_ = true;
     }
     bloom_filter_.set_always_false(false);
-  } else {
-    DCHECK(is_min_max_filter());
+  } else if (is_min_max_filter()) {
     min_max_filter_.set_always_true(true);
     if (MinMaxFilter::AlwaysFalse(min_max_filter_)) {
       always_false_flipped_to_false_ = true;
     }
     min_max_filter_.set_always_false(false);
+  } else {
+    DCHECK(is_in_list_filter());
+    if (InListFilter::AlwaysFalse(in_list_filter_)) {
+      always_false_flipped_to_false_ = true;
+    }
+    in_list_filter_.set_always_true(true);
   }
 }
 

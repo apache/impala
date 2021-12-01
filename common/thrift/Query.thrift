@@ -446,8 +446,8 @@ struct TQueryOptions {
   103: optional bool retry_failed_queries = false;
 
   // See comment in ImpalaService.thrift
-  104: optional PlanNodes.TEnabledRuntimeFilterTypes enabled_runtime_filter_types =
-      PlanNodes.TEnabledRuntimeFilterTypes.ALL;
+  104: optional set<PlanNodes.TRuntimeFilterType> enabled_runtime_filter_types =
+      [PlanNodes.TRuntimeFilterType.BLOOM, PlanNodes.TRuntimeFilterType.MIN_MAX];
 
   // See comment in ImpalaService.thrift
   105: optional bool async_codegen = false;
@@ -574,6 +574,9 @@ struct TQueryOptions {
 
   // Indicates whether to use ORC's async read.
   142: optional bool orc_async_read = true;
+
+  // See comment in ImpalaService.thrift
+  143: optional i32 runtime_in_list_filter_entry_limit = 1024;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

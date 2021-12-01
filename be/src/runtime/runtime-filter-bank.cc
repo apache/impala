@@ -68,6 +68,8 @@ RuntimeFilterBank::RuntimeFilterBank(QueryState* query_state,
         -1, "Runtime Filter Bank", query_state->query_mem_tracker(), false))),
     bloom_memory_allocated_(
         query_state->host_profile()->AddCounter("BloomFilterBytes", TUnit::BYTES)),
+    total_in_list_filter_items_(
+        query_state->host_profile()->AddCounter("InListFilterItems", TUnit::UNIT)),
     total_bloom_filter_mem_required_(total_filter_mem_required) {}
 
 RuntimeFilterBank::~RuntimeFilterBank() {}
@@ -158,7 +160,8 @@ void RuntimeFilterBank::UpdateFilterCompleteCb(
 }
 
 void RuntimeFilterBank::UpdateFilterFromLocal(
-    int32_t filter_id, BloomFilter* bloom_filter, MinMaxFilter* min_max_filter) {
+    int32_t filter_id, BloomFilter* bloom_filter, MinMaxFilter* min_max_filter,
+    InListFilter* in_list_filter) {
   DCHECK_NE(query_state_->query_options().runtime_filter_mode, TRuntimeFilterMode::OFF)
       << "Should not be calling UpdateFilterFromLocal() if filtering is disabled";
   // This function is only called from ExecNode::Open() or more specifically
@@ -187,15 +190,17 @@ void RuntimeFilterBank::UpdateFilterFromLocal(
         return;
       }
       VLOG(3) << "Setting broadcast filter " << filter_id;
-      result_filter->SetFilter(bloom_filter, min_max_filter);
+      result_filter->SetFilter(bloom_filter, min_max_filter, in_list_filter);
       complete_filter = result_filter;
     } else {
+      DCHECK(in_list_filter == nullptr)
+          << "InListFilter should only be generated for broadcast joins";
       // Merge partitioned join filters in parallel - each thread setting the filter will
       // try to merge its filter with a previously merged filter, looping until either
       // it has produced the final filter or it runs out of other filters to merge.
       unique_ptr<RuntimeFilter> tmp_filter = make_unique<RuntimeFilter>(
           result_filter->filter_desc(), result_filter->filter_size());
-      tmp_filter->SetFilter(bloom_filter, min_max_filter);
+      tmp_filter->SetFilter(bloom_filter, min_max_filter, nullptr);
       while (produced_filter.pending_merge_filter != nullptr) {
         unique_ptr<RuntimeFilter> pending_merge =
             std::move(produced_filter.pending_merge_filter);
@@ -245,8 +250,14 @@ void RuntimeFilterBank::UpdateFilterFromLocal(
             << consumed_filter->filter_desc();
       } else {
         consumed_filter->SetFilter(complete_filter);
-        query_state_->host_profile()->AddInfoString(
-            Substitute("Filter $0 arrival", filter_id),
+        string into_key;
+        if (in_list_filter != nullptr) {
+          into_key = Substitute("Filter $0 arrival with $1 items",
+              filter_id, in_list_filter->NumItems());
+        } else {
+          into_key = Substitute("Filter $0 arrival", filter_id);
+        }
+        query_state_->host_profile()->AddInfoString(into_key,
             PrettyPrinter::Print(consumed_filter->arrival_delay_ms(), TUnit::TIME_MS));
       }
     }
@@ -266,9 +277,11 @@ void RuntimeFilterBank::UpdateFilterFromLocal(
     TRuntimeFilterType::type type = complete_filter->filter_desc().type;
     if (type == TRuntimeFilterType::BLOOM) {
       BloomFilter::ToProtobuf(bloom_filter, controller, params.mutable_bloom_filter());
-    } else {
-      DCHECK_EQ(type, TRuntimeFilterType::MIN_MAX);
+    } else if (type == TRuntimeFilterType::MIN_MAX) {
       min_max_filter->ToProtobuf(params.mutable_min_max_filter());
+    } else {
+      DCHECK_EQ(type, TRuntimeFilterType::IN_LIST);
+      InListFilter::ToProtobuf(in_list_filter, params.mutable_in_list_filter());
     }
     const TNetworkAddress& krpc_address = query_state_->query_ctx().coord_ip_address;
     const std::string& hostname = query_state_->query_ctx().coord_hostname;
@@ -315,6 +328,8 @@ void RuntimeFilterBank::PublishGlobalFilter(
   }
   BloomFilter* bloom_filter = nullptr;
   MinMaxFilter* min_max_filter = nullptr;
+  InListFilter* in_list_filter = nullptr;
+  string details;
   if (fs->consumed_filter->is_bloom_filter()) {
     DCHECK(params.has_bloom_filter());
     if (params.bloom_filter().always_true()) {
@@ -354,16 +369,25 @@ void RuntimeFilterBank::PublishGlobalFilter(
         }
       }
     }
-  } else {
-    DCHECK(fs->consumed_filter->is_min_max_filter());
+  } else if (fs->consumed_filter->is_min_max_filter()) {
     DCHECK(params.has_min_max_filter());
     min_max_filter = MinMaxFilter::Create(params.min_max_filter(),
         fs->consumed_filter->type(), &obj_pool_, filter_mem_tracker_);
     fs->min_max_filters.push_back(min_max_filter);
+  } else {
+    DCHECK(fs->consumed_filter->is_in_list_filter());
+    DCHECK(params.has_in_list_filter());
+    DCHECK(query_state_->query_options().__isset.runtime_in_list_filter_entry_limit);
+    int entry_limit = query_state_->query_options().runtime_in_list_filter_entry_limit;
+    in_list_filter = InListFilter::Create(params.in_list_filter(),
+        fs->consumed_filter->type(), entry_limit, &obj_pool_);
+    fs->in_list_filters.push_back(in_list_filter);
+    total_in_list_filter_items_->Add(params.in_list_filter().value_size());
+    details = Substitute(" with $0 items", params.in_list_filter().value_size());
   }
-  fs->consumed_filter->SetFilter(bloom_filter, min_max_filter);
+  fs->consumed_filter->SetFilter(bloom_filter, min_max_filter, in_list_filter);
   query_state_->host_profile()->AddInfoString(
-      Substitute("Filter $0 arrival", params.filter_id()),
+      Substitute("Filter $0 arrival$1", params.filter_id(), details),
       PrettyPrinter::Print(fs->consumed_filter->arrival_delay_ms(), TUnit::TIME_MS));
 }
 
@@ -405,6 +429,22 @@ MinMaxFilter* RuntimeFilterBank::AllocateScratchMinMaxFilter(
       MinMaxFilter::Create(type, &obj_pool_, filter_mem_tracker_);
   fs->min_max_filters.push_back(min_max_filter);
   return min_max_filter;
+}
+
+InListFilter* RuntimeFilterBank::AllocateScratchInListFilter(
+    int32_t filter_id, ColumnType type) {
+  auto it = filters_.find(filter_id);
+  DCHECK(it != filters_.end()) << "Filter ID " << filter_id << " not registered";
+  PerFilterState* fs = it->second.get();
+  lock_guard<SpinLock> l(fs->lock);
+  if (closed_) return nullptr;
+
+  DCHECK(query_state_->query_options().__isset.runtime_in_list_filter_entry_limit);
+  int32_t entry_limit = query_state_->query_options().runtime_in_list_filter_entry_limit;
+  InListFilter* in_list_filter =
+      InListFilter::Create(type, entry_limit, &obj_pool_);
+  fs->in_list_filters.push_back(in_list_filter);
+  return in_list_filter;
 }
 
 vector<unique_lock<SpinLock>> RuntimeFilterBank::LockAllFilters() {
@@ -449,6 +489,7 @@ void RuntimeFilterBank::Close() {
   for (auto& entry : filters_) {
     for (BloomFilter* filter : entry.second->bloom_filters) filter->Close();
     for (MinMaxFilter* filter : entry.second->min_max_filters) filter->Close();
+    for (InListFilter* filter : entry.second->in_list_filters) filter->Close();
   }
   obj_pool_.Clear();
   if (buffer_pool_client_.is_registered()) {

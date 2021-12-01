@@ -271,6 +271,21 @@ FROM {db_name}.{table_name};
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+alltypestiny_negative
+---- CREATE
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+LIKE {db_name}{db_suffix}.alltypestiny STORED AS {file_format};
+---- DEPENDENT_LOAD_HIVE
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition (year, month)
+SELECT id, bool_col,
+       -tinyint_col, -smallint_col, -int_col, -bigint_col, -float_col, -double_col,
+       date_string_col, 'x', timestamp_col, year, month
+FROM functional.alltypestiny
+WHERE int_col = 1;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 alltypesinsert
 ---- CREATE
 CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}

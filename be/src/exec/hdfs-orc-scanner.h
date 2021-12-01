@@ -298,6 +298,16 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   /// Number of stripes that need to be read.
   RuntimeProfile::Counter* num_stripes_counter_ = nullptr;
 
+  /// Number of predicates that are pushed down to the ORC reader.
+  RuntimeProfile::Counter* num_pushed_down_predicates_counter_ = nullptr;
+
+  /// Number of runtime filters that are pushed down to the ORC reader.
+  RuntimeProfile::Counter* num_pushed_down_runtime_filters_counter_ = nullptr;
+
+  /// Number of arrived runtime IN-list filters that can be pushed down.
+  /// Used in ShouldUpdateSearchArgument(). Init to -1 so the check can pass at first.
+  int num_pushable_in_list_filters_ = -1;
+
   /// Number of collection items read in current row batch. It is a scanner-local counter
   /// used to reduce the frequency of updating HdfsScanNode counter. It is updated by the
   /// callees of AssembleRows() and is merged into the HdfsScanNode counter at the end of
@@ -376,12 +386,14 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
       orc::SearchArgumentBuilder* sarg);
   bool PrepareInListPredicate(uint64_t orc_column_id, const ColumnType& type,
       ScalarExprEvaluator* eval, orc::SearchArgumentBuilder* sarg);
+  bool PrepareInListPredicate(uint64_t orc_column_id, const ColumnType& type,
+      const std::vector<orc::Literal>& in_list, orc::SearchArgumentBuilder* sarg);
   void PrepareIsNullPredicate(bool is_not_null, uint64_t orc_column_id,
       const ColumnType& type, orc::SearchArgumentBuilder* sarg);
 
-  /// Clones the stats conjucts into stats_conjunct_evals_, then builds ORC search
-  /// arguments from the conjuncts. The search arguments will exist for the lifespan of
-  /// the scanner and need not to be updated.
+  /// Builds ORC search arguments from the conjuncts and arrived runtime filters.
+  /// The search arguments will be re-built each time we start reading a new stripe,
+  /// because we may have new runtime filters arrive.
   Status PrepareSearchArguments() WARN_UNUSED_RESULT;
 
   /// Helper function for GetLiteralSearchArguments. The template parameter T is the
@@ -407,6 +419,18 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   }
 
   Status ReadFooterStream(void* buf, uint64_t length, uint64_t offset);
+
+  /// Updates the SearchArgument based on arrived runtime filters.
+  /// Returns true if any filter is applied.
+  bool UpdateSearchArgumentWithFilters(orc::SearchArgumentBuilder* sarg);
+
+  /// Decides whether we should rebuild the SearchArgument. It returns true at the first
+  /// call and whenever a new and usable IN-list filter arrives.
+  bool ShouldUpdateSearchArgument();
+
+  /// Checks whether the runtime filter is a usable IN-list filter that can be pushed
+  /// down.
+  bool IsPushableInListFilter(const RuntimeFilter* filter);
 };
 
 } // namespace impala

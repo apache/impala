@@ -155,16 +155,12 @@ Status ScanNode::Prepare(RuntimeState* state) {
     filter_ctxs_.emplace_back();
     FilterContext& filter_ctx = filter_ctxs_.back();
     filter_ctx.filter = state->filter_bank()->RegisterConsumer(filter_desc);
-    // TODO: Enable stats for min-max filters when Kudu exposes info about filters
-    // (KUDU-2162).
-    if (filter_ctx.filter->is_bloom_filter() || filter_ctx.filter->is_min_max_filter()) {
-      string filter_profile_title = Substitute("Filter $0 ($1)", filter_desc.filter_id,
-          PrettyPrinter::Print(filter_ctx.filter->filter_size(), TUnit::BYTES));
-      RuntimeProfile* profile =
-          RuntimeProfile::Create(state->obj_pool(), filter_profile_title);
-      runtime_profile_->AddChild(profile);
-      filter_ctx.stats = state->obj_pool()->Add(new FilterStats(profile));
-    }
+    string filter_profile_title = Substitute("Filter $0 ($1)", filter_desc.filter_id,
+        PrettyPrinter::Print(filter_ctx.filter->filter_size(), TUnit::BYTES));
+    RuntimeProfile* profile =
+        RuntimeProfile::Create(state->obj_pool(), filter_profile_title);
+    runtime_profile_->AddChild(profile);
+    filter_ctx.stats = state->obj_pool()->Add(new FilterStats(profile));
   }
 
   rows_read_counter_ = PROFILE_RowsRead.Instantiate(runtime_profile());

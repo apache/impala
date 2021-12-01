@@ -98,6 +98,24 @@ const string PrintQueryOptionValue(const impala::TCompressionCodec& compression_
   }
 }
 
+std::ostream& impala::operator<<(std::ostream& out,
+    const std::set<impala::TRuntimeFilterType::type>& filter_types) {
+  bool first = true;
+  for (const auto& t : filter_types) {
+    if (!first) out << ",";
+    out << t;
+    first = false;
+  }
+  return out;
+}
+
+const string PrintQueryOptionValue(
+    const set<impala::TRuntimeFilterType::type>& filter_types) {
+  stringstream val;
+  val << filter_types;
+  return val.str();
+}
+
 void impala::TQueryOptionsToMap(const TQueryOptions& query_options,
     map<string, string>* configuration) {
 #define QUERY_OPT_FN(NAME, ENUM, LEVEL)\
@@ -947,11 +965,23 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
       }
       case TImpalaQueryOptions::ENABLED_RUNTIME_FILTER_TYPES: {
-        // Parse the enabled runtime filter types and validate it.
-        TEnabledRuntimeFilterTypes::type enum_type;
-        RETURN_IF_ERROR(GetThriftEnum(value, "enabled runtime filter types",
-            _TEnabledRuntimeFilterTypes_VALUES_TO_NAMES, &enum_type));
-        query_options->__set_enabled_runtime_filter_types(enum_type);
+        set<TRuntimeFilterType::type> filter_types;
+        if (iequals(value, "all")) {
+          for (const auto& kv : _TRuntimeFilterType_VALUES_TO_NAMES) {
+            filter_types.insert(static_cast<TRuntimeFilterType::type>(kv.first));
+          }
+        } else {
+          // Parse and verify the enabled runtime filter types.
+          vector<string> str_types;
+          split(str_types, value, is_any_of(","), token_compress_on);
+          for (const auto& t : str_types) {
+            TRuntimeFilterType::type filter_type;
+            RETURN_IF_ERROR(GetThriftEnum(t, "runtime filter type",
+                _TRuntimeFilterType_VALUES_TO_NAMES, &filter_type));
+            filter_types.insert(filter_type);
+          }
+        }
+        query_options->__set_enabled_runtime_filter_types(filter_types);
         break;
       }
       case TImpalaQueryOptions::ASYNC_CODEGEN: {
@@ -1158,6 +1188,17 @@ Status impala::SetQueryOption(const string& key, const string& value,
       }
       case TImpalaQueryOptions::ORC_ASYNC_READ: {
         query_options->__set_orc_async_read(IsTrue(value));
+        break;
+      }
+      case TImpalaQueryOptions::RUNTIME_IN_LIST_FILTER_ENTRY_LIMIT: {
+        StringParser::ParseResult result;
+        const int32_t limit =
+            StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
+        if (value == nullptr || result != StringParser::PARSE_SUCCESS || limit < 0) {
+          return Status(Substitute("Invalid runtime in-list filter entry limit '$0'. "
+              "Only integer value 0 and above is allowed.", value));
+        }
+        query_options->__set_runtime_in_list_filter_entry_limit(limit);
         break;
       }
       default:

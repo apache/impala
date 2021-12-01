@@ -86,11 +86,14 @@ void FilterContext::Insert(TupleRow* row) const noexcept {
     uint32_t filter_hash = RawValue::GetHashValueFastHash32(
         val, expr_eval->root().type(), RuntimeFilterBank::DefaultHashSeed());
     local_bloom_filter->Insert(filter_hash);
-  } else {
-    DCHECK(filter->is_min_max_filter());
+  } else if (filter->is_min_max_filter()) {
     if (local_min_max_filter == nullptr || local_min_max_filter->AlwaysTrue()) return;
     void* val = expr_eval->GetValue(row);
     local_min_max_filter->Insert(val);
+  } else {
+    DCHECK(filter->is_in_list_filter());
+    if (local_in_list_filter == nullptr || local_in_list_filter->AlwaysTrue()) return;
+    local_in_list_filter->Insert(expr_eval->GetValue(row));
   }
 }
 
@@ -391,8 +394,7 @@ Status FilterContext::CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_exp
         builder.CreateStructGEP(nullptr, this_arg, 3, "local_bloom_filter_ptr");
     local_filter_arg =
         builder.CreateLoad(local_bloom_filter_ptr, "local_bloom_filter_arg");
-  } else {
-    DCHECK(filter_desc.type == TRuntimeFilterType::MIN_MAX);
+  } else if (filter_desc.type == TRuntimeFilterType::MIN_MAX) {
     // Load 'local_min_max_filter' from 'this_arg' FilterContext object.
     llvm::Value* local_min_max_filter_ptr =
         builder.CreateStructGEP(nullptr, this_arg, 4, "local_min_max_filter_ptr");
@@ -403,10 +405,17 @@ Status FilterContext::CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_exp
         local_min_max_filter_ptr, min_max_filter_type, "cast_min_max_filter_ptr");
     local_filter_arg =
         builder.CreateLoad(local_min_max_filter_ptr, "local_min_max_filter_arg");
+  } else {
+    DCHECK(filter_desc.type == TRuntimeFilterType::IN_LIST);
+    // Load 'local_in_list_filter' from 'this_arg' FilterContext object.
+    llvm::Value* local_in_list_filter_ptr =
+        builder.CreateStructGEP(nullptr, this_arg, 5, "local_in_list_filter_ptr");
+    local_filter_arg =
+        builder.CreateLoad(local_in_list_filter_ptr, "local_in_list_filter_arg");
   }
 
-  // Check if 'local_bloom_filter' or 'local_min_max_filter' are NULL (depending on
-  // filter desc) and return if so.
+  // Check if 'local_bloom_filter', 'local_min_max_filter' or 'local_in_list_filter' are
+  // NULL (depending on filter desc) and return if so.
   llvm::Value* filter_null = builder.CreateIsNull(local_filter_arg, "filter_is_null");
   llvm::BasicBlock* filter_not_null_block =
       llvm::BasicBlock::Create(context, "filters_not_null", insert_filter_fn);
@@ -515,8 +524,7 @@ Status FilterContext::CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_exp
 
     llvm::Value* insert_args[] = {local_filter_arg, hash_value};
     builder.CreateCall(insert_bloom_filter_fn, insert_args);
-  } else {
-    DCHECK(filter_desc.type == TRuntimeFilterType::MIN_MAX);
+  } else if (filter_desc.type == TRuntimeFilterType::MIN_MAX) {
     // The function for inserting into the min-max filter.
     llvm::Function* min_max_insert_fn = codegen->GetFunction(
         MinMaxFilter::GetInsertIRFunctionType(filter_expr->type()), false);
@@ -524,6 +532,15 @@ Status FilterContext::CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_exp
 
     llvm::Value* insert_filter_args[] = {local_filter_arg, val_ptr_phi};
     builder.CreateCall(min_max_insert_fn, insert_filter_args);
+  } else {
+    DCHECK(filter_desc.type == TRuntimeFilterType::IN_LIST);
+    // The function for inserting into the in-list filter.
+    llvm::Function* insert_in_list_filter_fn =
+        codegen->GetFunction(IRFunction::IN_LIST_FILTER_INSERT, false);
+    DCHECK(insert_in_list_filter_fn != nullptr);
+
+    llvm::Value* insert_filter_args[] = {local_filter_arg, val_ptr_phi};
+    builder.CreateCall(insert_in_list_filter_fn, insert_filter_args);
   }
 
   builder.CreateRetVoid();

@@ -32,7 +32,7 @@ import org.apache.impala.datagenerator.HBaseTestDataRegionAssignment;
 import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.testutil.TestUtils.IgnoreValueFilter;
-import org.apache.impala.thrift.TEnabledRuntimeFilterTypes;
+import org.apache.impala.thrift.TRuntimeFilterType;
 import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TJoinDistributionMode;
@@ -612,13 +612,16 @@ public class PlannerTest extends PlannerTestBase {
     runPlannerTestFile("disable-runtime-overlap-filter", options);
 
     options.setMinmax_filter_threshold(1.0);
-    options.setEnabled_runtime_filter_types(TEnabledRuntimeFilterTypes.BLOOM);
+    options.unsetEnabled_runtime_filter_types();
+    options.addToEnabled_runtime_filter_types(TRuntimeFilterType.BLOOM);
     runPlannerTestFile("disable-runtime-overlap-filter", options);
   }
 
   @Test
   public void testRuntimeFilterQueryOptions() {
-    runPlannerTestFile("runtime-filter-query-options");
+    runPlannerTestFile("runtime-filter-query-options",
+        ImmutableSet.of(
+            PlannerTestOption.DO_NOT_VALIDATE_ROWCOUNT_ESTIMATION_FOR_PARTITIONS));
   }
 
   @Test
@@ -661,7 +664,9 @@ public class PlannerTest extends PlannerTestBase {
   @Test
   public void testKudu() {
     TQueryOptions options = defaultQueryOptions();
-    options.setEnabled_runtime_filter_types(TEnabledRuntimeFilterTypes.ALL);
+    options.unsetEnabled_runtime_filter_types();
+    options.addToEnabled_runtime_filter_types(TRuntimeFilterType.BLOOM);
+    options.addToEnabled_runtime_filter_types(TRuntimeFilterType.MIN_MAX);
     addTestDb("kudu_planner_test", "Test DB for Kudu Planner.");
     addTestTable("CREATE EXTERNAL TABLE kudu_planner_test.no_stats STORED AS KUDU " +
         "TBLPROPERTIES ('kudu.table_name' = 'impala::functional_kudu.alltypes');");
@@ -676,7 +681,9 @@ public class PlannerTest extends PlannerTestBase {
   @Test
   public void testKuduUpdate() {
     TQueryOptions options = defaultQueryOptions();
-    options.setEnabled_runtime_filter_types(TEnabledRuntimeFilterTypes.ALL);
+    options.unsetEnabled_runtime_filter_types();
+    options.addToEnabled_runtime_filter_types(TRuntimeFilterType.BLOOM);
+    options.addToEnabled_runtime_filter_types(TRuntimeFilterType.MIN_MAX);
     runPlannerTestFile("kudu-update", options);
   }
 
@@ -706,7 +713,9 @@ public class PlannerTest extends PlannerTestBase {
   @Test
   public void testKuduTpch() {
     TQueryOptions options = defaultQueryOptions();
-    options.setEnabled_runtime_filter_types(TEnabledRuntimeFilterTypes.ALL);
+    options.unsetEnabled_runtime_filter_types();
+    options.addToEnabled_runtime_filter_types(TRuntimeFilterType.BLOOM);
+    options.addToEnabled_runtime_filter_types(TRuntimeFilterType.MIN_MAX);
     runPlannerTestFile("tpch-kudu", options,
         ImmutableSet.of(PlannerTestOption.INCLUDE_RESOURCE_HEADER,
             PlannerTestOption.VALIDATE_RESOURCES));
@@ -895,7 +904,8 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = defaultQueryOptions();
     options.setExplain_level(TExplainLevel.EXTENDED);
     options.setDisable_hdfs_num_rows_estimate(false);
-    options.setEnabled_runtime_filter_types(TEnabledRuntimeFilterTypes.MIN_MAX);
+    options.unsetEnabled_runtime_filter_types();
+    options.addToEnabled_runtime_filter_types(TRuntimeFilterType.MIN_MAX);
     runPlannerTestFile("min-max-runtime-filters-hdfs-num-rows-est-enabled", options,
         ImmutableSet.of(
             PlannerTestOption.DO_NOT_VALIDATE_ROWCOUNT_ESTIMATION_FOR_PARTITIONS));
@@ -907,7 +917,8 @@ public class PlannerTest extends PlannerTestBase {
     options.setExplain_level(TExplainLevel.EXTENDED);
     options.setDisable_hdfs_num_rows_estimate(true);
     options.setMinmax_filter_partition_columns(false);
-    options.setEnabled_runtime_filter_types(TEnabledRuntimeFilterTypes.MIN_MAX);
+    options.unsetEnabled_runtime_filter_types();
+    options.addToEnabled_runtime_filter_types(TRuntimeFilterType.MIN_MAX);
     runPlannerTestFile("min-max-runtime-filters", options);
   }
 

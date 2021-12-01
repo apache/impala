@@ -939,17 +939,21 @@ void PhjBuilder::AllocateRuntimeFilters() {
   DCHECK(join_op_ != TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN || filter_ctxs_.size() == 0)
       << "Runtime filters not supported with NULL_AWARE_LEFT_ANTI_JOIN";
   DCHECK(ht_ctx_ != nullptr);
-  for (int i = 0; i < filter_ctxs_.size(); ++i) {
-    if (filter_ctxs_[i].filter->is_bloom_filter()) {
-      filter_ctxs_[i].local_bloom_filter =
+  for (FilterContext& filter_ctx : filter_ctxs_) {
+    if (filter_ctx.filter->is_bloom_filter()) {
+      filter_ctx.local_bloom_filter =
           runtime_state_->filter_bank()->AllocateScratchBloomFilter(
-              filter_ctxs_[i].filter->id());
-    } else {
-      DCHECK(filter_ctxs_[i].filter->is_min_max_filter());
-      filter_ctxs_[i].local_min_max_filter =
+              filter_ctx.filter->id());
+    } else if (filter_ctx.filter->is_min_max_filter()) {
+      filter_ctx.local_min_max_filter =
           runtime_state_->filter_bank()->AllocateScratchMinMaxFilter(
-              filter_ctxs_[i].filter->id(), filter_ctxs_[i].expr_eval->root().type());
-      minmax_filter_ctxs_.push_back(&filter_ctxs_[i]);
+              filter_ctx.filter->id(), filter_ctx.expr_eval->root().type());
+      minmax_filter_ctxs_.push_back(&filter_ctx);
+    } else {
+      DCHECK(filter_ctx.filter->is_in_list_filter());
+      filter_ctx.local_in_list_filter =
+          runtime_state_->filter_bank()->AllocateScratchInListFilter(
+              filter_ctx.filter->id(), filter_ctx.expr_eval->root().type());
     }
   }
 

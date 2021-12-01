@@ -131,7 +131,7 @@ class NljBuilder : public JoinBuilder {
   inline RowBatchList* input_build_batches() { return &input_build_batches_; }
   inline RowBatchList* copied_build_batches() { return &copied_build_batches_; }
 
-  /// For each filter in filters_, allocate a bloom_filter from the fragment-local
+  /// For each filter in filters_, allocate a minmax_filter from the fragment-local
   /// RuntimeFilterBank and store it in runtime_filters_ to populate during the build
   /// phase.
   void AllocateRuntimeFilters();

@@ -168,12 +168,16 @@ void JoinBuilder::PublishRuntimeFilters(const std::vector<FilterContext>& filter
       if (!ctx.local_min_max_filter->AlwaysTrue()) {
         ++num_enabled_filters;
       }
+    } else if (ctx.local_in_list_filter != nullptr) {
+      if (!ctx.local_in_list_filter->AlwaysTrue()) {
+        ++num_enabled_filters;
+      }
     }
 
-    runtime_state->filter_bank()->UpdateFilterFromLocal(
-        ctx.filter->id(), bloom_filter, ctx.local_min_max_filter);
+    runtime_state->filter_bank()->UpdateFilterFromLocal(ctx.filter->id(),
+        bloom_filter, ctx.local_min_max_filter, ctx.local_in_list_filter);
 
-    if ( ctx.local_min_max_filter != nullptr ) {
+    if (ctx.local_min_max_filter != nullptr) {
       VLOG(3) << name() << " published min/max filter: "
               << " id=" << ctx.filter->id()
               << ", details=" << ctx.local_min_max_filter->DebugString();

@@ -140,6 +140,11 @@ void PrintQueryOptionValue(const impala::TCompressionCodec& compression_codec,
   }
 }
 
+void PrintQueryOptionValue(const set<impala::TRuntimeFilterType::type>& filter_types,
+    stringstream& val) {
+  val << filter_types;
+}
+
 void ChildQuery::SetQueryOptions(const TQueryOptions& parent_options,
     TExecuteStatementReq* exec_stmt_req) {
   map<string, string> conf;

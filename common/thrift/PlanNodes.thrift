@@ -129,13 +129,7 @@ struct TRuntimeFilterTargetDesc {
 enum TRuntimeFilterType {
   BLOOM = 0
   MIN_MAX = 1
-}
-
-// Enabled runtime filter types to be applied to scan nodes.
-enum TEnabledRuntimeFilterTypes {
-  BLOOM = 1
-  MIN_MAX = 2
-  ALL = 3
+  IN_LIST = 2
 }
 
 // The level of filtering of enabled min/max filters to be applied to Parquet scan nodes.

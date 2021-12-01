@@ -92,7 +92,9 @@ TEST_F(RuntimeFilterTest, Arrived) {
       new thread([&tc] { tc.runtime_filter->WaitForArrival(tc.wait_for_ms); }));
   SleepForMs(100); // give waiting thread a head start
   workers.add_thread(
-      new thread([&tc] { tc.runtime_filter->SetFilter(nullptr, tc.min_max_filter); }));
+      new thread([&tc] {
+        tc.runtime_filter->SetFilter(nullptr, tc.min_max_filter, nullptr);
+      }));
   workers.join_all();
   sw.Stop();
 

@@ -1,0 +1,173 @@
+====
+---- QUERY
+# Test IN-list filter on partition columns.
+# There are 24 partitions and 24 files in alltypes. 22 of them will be filtered out.
+# Expect 22 / 3 = 7 files be rejected per scan fragment.
+select STRAIGHT_JOIN count(*) from alltypes p join [BROADCAST] alltypestiny b
+on p.month = b.int_col and b.month = 1 and b.string_col = "1"
+---- RESULTS
+620
+---- RUNTIME_PROFILE
+row_regex: .*Filter 0 arrival with 1 items.*
+row_regex: .*Files rejected: 7 \(7\).*
+====
+---- QUERY
+# Test two hop IN-list filters on partition columns.
+# "c.month = 13" won't match any rows in alltypestiny. Expect all files be rejected.
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] alltypes b
+    join [BROADCAST] alltypestiny c
+    where c.month = 13 and b.year = c.year and a.month = b.month
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*Filter 0 arrival with 0 items.*
+row_regex: .*Filter 1 arrival with 0 items.*
+row_regex: .*Files rejected: 8 \(8\).*
+====
+---- QUERY
+# Test IN-list filter on string column.
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] alltypestiny_negative b
+    where a.string_col = b.string_col
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*Filter 0 arrival with 1 items.*
+row_regex: .*NumPushedDownRuntimeFilters: 1 \(1\).*
+row_regex: .*RowsRead: 0 \(0\).*
+====
+---- QUERY
+# Test IN-list filter on empty strings.
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] nulltable n
+    where a.string_col = n.b;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*Filter 0 arrival with 1 items.*
+row_regex: .*NumPushedDownRuntimeFilters: 1 \(1\).*
+row_regex: .*RowsRead: 0 \(0\).*
+====
+---- QUERY
+# Test IN-list filter on tinyint column.
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] alltypestiny_negative b
+    where a.tinyint_col = b.tinyint_col
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*Filter 0 arrival with 1 items.*
+row_regex: .*NumPushedDownRuntimeFilters: 1 \(1\).*
+row_regex: .*RowsRead: 0 \(0\).*
+====
+---- QUERY
+# Test IN-list filter on smallint column.
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] alltypestiny_negative b
+    where a.smallint_col = b.smallint_col
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*Filter 0 arrival with 1 items.*
+row_regex: .*NumPushedDownRuntimeFilters: 1 \(1\).*
+row_regex: .*RowsRead: 0 \(0\).*
+====
+---- QUERY
+# Test IN-list filter on int column.
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] alltypestiny_negative b
+    where a.int_col = b.int_col
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*Filter 0 arrival with 1 items.*
+row_regex: .*NumPushedDownRuntimeFilters: 1 \(1\).*
+row_regex: .*RowsRead: 0 \(0\).*
+====
+---- QUERY
+# Test IN-list filter on bigint column.
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] alltypestiny_negative b
+    where a.bigint_col = b.bigint_col
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*Filter 0 arrival with 1 items.*
+row_regex: .*NumPushedDownRuntimeFilters: 1 \(1\).*
+row_regex: .*RowsRead: 0 \(0\).*
+====
+---- QUERY
+# Test IN-list filter on bigint column.
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] alltypestiny b
+    where a.bigint_col = b.bigint_col + 100
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*Filter 0 arrival with 2 items.*
+row_regex: .*NumPushedDownRuntimeFilters: 1 \(1\).*
+row_regex: .*RowsRead: 0 \(0\).*
+====
+---- QUERY
+# Test IN-list filter on DATE partition column.
+# 2 of the 4 partitions are filtered out.
+select STRAIGHT_JOIN count(*) from date_tbl a
+    join [BROADCAST] date_tbl b
+    on a.date_part = b.date_col
+---- RESULTS
+11
+---- RUNTIME_PROFILE
+row_regex: .*Filter 0 arrival with 17 items.*
+aggregation(SUM, Files rejected): 2
+====
+---- QUERY
+# Test IN-list filter on DATE non-partition column.
+select STRAIGHT_JOIN count(*) from date_tbl a
+    join [BROADCAST] date_tbl b
+    on a.date_col = b.date_part
+---- RESULTS
+11
+---- RUNTIME_PROFILE
+row_regex: .*Filter 0 arrival with 4 items.*
+row_regex: .*NumPushedDownRuntimeFilters: 1 \(1\).*
+====
+---- QUERY
+# Test IN-list filter with NULL.
+# 'id' is a string column without NULLs. 'null_str' is a string column with all NULLs.
+# The pushed down IN-list filter should be able to filter out all rows.
+select STRAIGHT_JOIN count(*) from nullrows a
+    join [BROADCAST] nullrows b
+    where a.id <=> b.null_str;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*Filter 0 arrival with 1 items.*
+row_regex: .*NumPushedDownRuntimeFilters: 1 \(1\).*
+row_regex: .*RowsRead: 0 \(0\).*
+====
+---- QUERY
+# Test IN-list filter on complex target expr, i.e. not a simple slot ref.
+# The filter can't be pushed down to the ORC lib since the ORC lib can't evaluate the
+# expr. Expect 7300 / 3 = 2433 rows read per scan fragment on 'alltypes'.
+select STRAIGHT_JOIN count(*) from functional_orc_def.alltypes a
+  join [BROADCAST] functional_orc_def.alltypestiny b
+  on a.id + 1 = b.id
+---- RESULTS
+7
+---- RUNTIME_PROFILE
+row_regex: .*RowsRead: 2.43K \(2433\).*
+====
+---- QUERY
+# Test IN-list filter on wide string that exceeds the total string size.
+# The filter is turned off (always_true=true). Expect it arrives with 0 items.
+# Expect 7300 / 3 = 2433 rows read per scan fragment on 'alltypes'.
+set max_row_size=16m;
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] widerow b
+    on a.string_col = b.string_col
+---- RUNTIME_PROFILE
+row_regex: .*Filter 0 arrival with 0 items.*
+row_regex: .*RowsRead: 2.43K \(2433\).*
+====
+

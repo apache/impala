@@ -267,7 +267,7 @@ void OrcSchemaResolver::TranslateColPaths(const SchemaPath& col_path,
       table_col_path->push_back(num_part_cols + 1 + second_idx);
       file_col_path->push_back(second_idx);
     } else {
-      DCHECK_GE(first_idx, num_part_cols);
+      DCHECK_GE(first_idx, num_part_cols) << "col_path: " << PrintNumericPath(col_path);
       // 'col_path' refers to the ACID columns. In table schema they are nested
       // under the synthetic 'row__id' column. 'row__id' is at index 'num_part_cols'.
       table_col_path->push_back(num_part_cols);
@@ -290,7 +290,7 @@ void OrcSchemaResolver::TranslateColPaths(const SchemaPath& col_path,
       table_col_path->push_back(num_part_cols + 1 + second_idx);
       file_col_path->push_back(second_idx);
     } else {
-      DCHECK_GE(first_idx, num_part_cols);
+      DCHECK_GE(first_idx, num_part_cols) << "col_path: " << PrintNumericPath(col_path);
       // 'col_path' refers to the ACID columns. In table schema they are nested
       // under the synthetic 'row__id' column. 'row__id' is at index 'num_part_cols'.
       table_col_path->push_back(num_part_cols);

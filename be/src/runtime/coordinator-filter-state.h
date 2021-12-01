@@ -72,6 +72,7 @@ class Coordinator::FilterState {
   BloomFilterPB& bloom_filter() { return bloom_filter_; }
   std::string& bloom_filter_directory() { return bloom_filter_directory_; }
   MinMaxFilterPB& min_max_filter() { return min_max_filter_; }
+  InListFilterPB& in_list_filter() { return in_list_filter_; }
   std::vector<FilterTarget>* targets() { return &targets_; }
   const std::vector<FilterTarget>& targets() const { return targets_; }
   int64_t first_arrival_time() const { return first_arrival_time_; }
@@ -79,6 +80,7 @@ class Coordinator::FilterState {
   const TRuntimeFilterDesc& desc() const { return desc_; }
   bool is_bloom_filter() const { return desc_.type == TRuntimeFilterType::BLOOM; }
   bool is_min_max_filter() const { return desc_.type == TRuntimeFilterType::MIN_MAX; }
+  bool is_in_list_filter() const { return desc_.type == TRuntimeFilterType::IN_LIST; }
   int pending_count() const { return pending_count_; }
   void set_pending_count(int pending_count) { pending_count_ = pending_count; }
   int num_producers() const { return num_producers_; }
@@ -86,9 +88,11 @@ class Coordinator::FilterState {
   bool disabled() const {
     if (is_bloom_filter()) {
       return bloom_filter_.always_true();
-    } else {
-      DCHECK(is_min_max_filter());
+    } else if (is_min_max_filter()) {
       return min_max_filter_.always_true();
+    } else {
+      DCHECK(is_in_list_filter());
+      return in_list_filter_.always_true();
     }
   }
   bool enabled() const { return !disabled(); }
@@ -151,6 +155,7 @@ class Coordinator::FilterState {
   /// aggregated Bloom filter.
   std::string bloom_filter_directory_;
   MinMaxFilterPB min_max_filter_;
+  InListFilterPB in_list_filter_;
 
   /// Time at which first local filter arrived.
   int64_t first_arrival_time_ = 0L;

@@ -76,9 +76,7 @@ class TestRuntimeFilters(ImpalaTestSuite):
   def test_basic_filters(self, vector):
     new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
-    if 'kudu' in str(vector.get_value('table_format')):
-      self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=ALL")
-    self.run_test_case('QueryTest/runtime_filters', vector,
+    self.run_test_case('QueryTest/runtime_filters', new_vector,
         test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS' : str(WAIT_TIME_MS)})
 
   def test_wait_time(self, vector):
@@ -190,8 +188,7 @@ class TestBloomFilters(ImpalaTestSuite):
       add_exec_option_dimension(cls, "async_codegen", 1)
 
   def test_bloom_filters(self, vector):
-    if 'kudu' in str(vector.get_value('table_format')):
-      self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=BLOOM")
+    self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=BLOOM")
     self.run_test_case('QueryTest/bloom_filters', vector)
 
   def test_iceberg_dictionary_runtime_filter(self, vector, unique_database):
@@ -341,7 +338,29 @@ class TestOverlapMinMaxFilters(ImpalaTestSuite):
     self.execute_query("select * from {0}.{1} t1, {0}.{1} t2 where t1.d=t2.d and t2.i=2".
         format(unique_database, tbl_name))
 
-# Apply both Bloom filter and Minmax filters
+
+class TestInListFilters(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestInListFilters, cls).add_test_dimensions()
+    # Currently, IN-list filters are only implemented for orc.
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format in ['orc'])
+    # Enable query option ASYNC_CODEGEN for slow build
+    if build_runs_slowly:
+      add_exec_option_dimension(cls, "async_codegen", 1)
+
+  def test_in_list_filters(self, vector):
+    vector.get_value('exec_option')['enabled_runtime_filter_types'] = 'in_list'
+    vector.get_value('exec_option')['runtime_filter_wait_time_ms'] = WAIT_TIME_MS
+    self.run_test_case('QueryTest/in_list_filters', vector)
+
+
+# Apply Bloom filter, Minmax filter and IN-list filters
 class TestAllRuntimeFilters(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):

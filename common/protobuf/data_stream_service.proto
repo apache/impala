@@ -106,6 +106,12 @@ message MinMaxFilterPB {
   optional ColumnValuePB max = 4;
 }
 
+message InListFilterPB {
+  optional bool always_true = 1;
+  optional bool contains_null = 2;
+  repeated ColumnValuePB value = 3;
+}
+
 message UpdateFilterParamsPB {
   // Filter ID, unique within a query.
   optional int32 filter_id = 1;
@@ -116,6 +122,8 @@ message UpdateFilterParamsPB {
   optional BloomFilterPB bloom_filter = 3;
 
   optional MinMaxFilterPB min_max_filter = 4;
+
+  optional InListFilterPB in_list_filter = 5;
 }
 
 message UpdateFilterResultPB {
@@ -137,6 +145,9 @@ message PublishFilterParamsPB {
 
   // Actual min_max_filter payload
   optional MinMaxFilterPB min_max_filter = 4;
+
+  // Actual in_list_filter payload
+  optional InListFilterPB in_list_filter = 5;
 }
 
 message PublishFilterResultPB {

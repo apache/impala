@@ -116,7 +116,8 @@ void DataStreamService::UpdateFilter(
   DebugActionNoFail(FLAGS_debug_actions, "UPDATE_FILTER_DELAY");
   DCHECK(req->has_filter_id());
   DCHECK(req->has_query_id());
-  DCHECK(req->has_bloom_filter() || req->has_min_max_filter());
+  DCHECK(req->has_bloom_filter() || req->has_min_max_filter()
+      || req->has_in_list_filter());
   ExecEnv::GetInstance()->impala_server()->UpdateFilter(resp, *req, context);
   RespondAndReleaseRpc(Status::OK(), resp, context, mem_tracker_.get());
 }
@@ -127,7 +128,8 @@ void DataStreamService::PublishFilter(
   DebugActionNoFail(FLAGS_debug_actions, "PUBLISH_FILTER_DELAY");
   DCHECK(req->has_filter_id());
   DCHECK(req->has_dst_query_id());
-  DCHECK(req->has_bloom_filter() || req->has_min_max_filter());
+  DCHECK(req->has_bloom_filter() || req->has_min_max_filter()
+      || req->has_in_list_filter());
   QueryState::ScopedRef qs(ProtoToQueryId(req->dst_query_id()));
 
   if (qs.get() != nullptr) {

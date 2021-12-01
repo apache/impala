@@ -22,18 +22,26 @@ using namespace impala;
 
 bool IR_ALWAYS_INLINE RuntimeFilter::Eval(
     void* val, const ColumnType& col_type) const noexcept {
-  if (LIKELY((is_bloom_filter()))) {
-    if (bloom_filter_.Load() == BloomFilter::ALWAYS_TRUE_FILTER) return true;
-    uint32_t h = RawValue::GetHashValueFastHash32(
-        val, col_type, RuntimeFilterBank::DefaultHashSeed());
-    return bloom_filter_.Load()->Find(h);
-  } else {
-    DCHECK(is_min_max_filter());
-    // Min/max overlap does not deal with nulls (val==nullptr).
-    if (LIKELY(val)) {
-      MinMaxFilter* filter = get_min_max(); // get the loaded version.
+  switch (filter_desc().type) {
+    case TRuntimeFilterType::BLOOM: {
+      if (bloom_filter_.Load() == BloomFilter::ALWAYS_TRUE_FILTER) return true;
+      uint32_t h = RawValue::GetHashValueFastHash32(
+          val, col_type, RuntimeFilterBank::DefaultHashSeed());
+      return bloom_filter_.Load()->Find(h);
+    }
+    case TRuntimeFilterType::MIN_MAX: {
+      // Min/max overlap does not deal with nulls (val==nullptr).
+      if (LIKELY(val)) {
+        MinMaxFilter* filter = get_min_max(); // get the loaded version.
+        if (LIKELY(filter && !filter->AlwaysTrue())) {
+          return filter->EvalOverlap(col_type, val, val);
+        }
+      }
+    }
+    case TRuntimeFilterType::IN_LIST: {
+      InListFilter* filter = get_in_list_filter();
       if (LIKELY(filter && !filter->AlwaysTrue())) {
-        return filter->EvalOverlap(col_type, val, val);
+        return filter->Find(val, col_type);
       }
     }
   }
