@@ -53,24 +53,4 @@ public class UnionStmt extends SetOperationStmt {
   public SetOperationStmt clone() {
     return new UnionStmt(this);
   }
-
-  /**
-   * Undoes all changes made by analyze() except distinct propagation and unnesting.
-   * After analysis, operands_ contains the list of unnested operands with qualifiers
-   * adjusted to reflect distinct propagation. Every operand in that list is reset().
-   * The unionDistinctOperands_ and unionAllOperands_ are cleared because they are
-   * redundant
-   * with operands_.
-   */
-  @Override
-  public void reset() {
-    super.reset();
-    for (SetOperand op : operands_) op.reset();
-    unionDistinctOperands_.clear();
-    unionAllOperands_.clear();
-    distinctAggInfo_ = null;
-    tupleId_ = null;
-    toSqlString_ = null;
-    widestExprs_ = null;
-  }
 }
