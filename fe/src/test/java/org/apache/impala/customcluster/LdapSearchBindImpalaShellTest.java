@@ -136,4 +136,21 @@ public class LdapSearchBindImpalaShellTest extends LdapImpalaShellTest {
     command = buildCommand(query, "hs2-http", "invalid", "123", "/cliservice");
     RunShellCommand.Run(command, /* shouldSucceed */ false, "", "");
   }
+
+  /**
+   * Test group search filter validity when there is an escaped character in the user DN.
+   */
+  @Test
+  public void testEscapedCharactersInDN() throws Exception {
+    setUp("--ldap_user_search_basedn=dc=myorg,dc=com "
+        + "--ldap_group_search_basedn=ou=Groups,dc=myorg,dc=com "
+        + "--ldap_user_filter=(cn={0}) "
+        + "--ldap_group_filter=(uniqueMember={1}) ");
+    String query = "select logged_in_user()";
+
+    // Authentications should succeed with user who has escaped character in its DN
+    String[] command =
+        buildCommand(query, "hs2-http", TEST_USER_6, TEST_PASSWORD_6, "/cliservice");
+    RunShellCommand.Run(command, /* shouldSucceed */ true, TEST_USER_6, "");
+  }
 }

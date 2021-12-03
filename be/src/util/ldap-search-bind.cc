@@ -92,9 +92,10 @@ bool LdapSearchBind::LdapCheckPass(const char* user, const char* pass, unsigned 
   if (!success) return false;
   VLOG(2) << "LDAP bind successful";
 
-  // Replace the USER_NAME_PATTERN in the filter with the username
+  // Escape special characters and replace the USER_NAME_PATTERN in the filter.
   string filter = string(user_filter_);
-  replace_all(filter, USER_NAME_PATTERN, user);
+  string escaped_user = EscapeFilterProperty(user);
+  replace_all(filter, USER_NAME_PATTERN, escaped_user);
 
   // Execute the LDAP search and try to retrieve the user dn
   VLOG(1) << "Trying LDAP user search for: " << user;
@@ -137,10 +138,11 @@ bool LdapSearchBind::LdapCheckFilters(string username) {
   // USER_DN_PATTERN requires to determine the user dn and therefore an additional LDAP
   // search.
   string group_filter = group_filter_;
-  replace_all(group_filter, USER_NAME_PATTERN, username);
+  string escaped_username = EscapeFilterProperty(username);
+  replace_all(group_filter, USER_NAME_PATTERN, escaped_username);
   if (group_filter.find(USER_DN_PATTERN) != string::npos) {
     string user_filter = user_filter_;
-    replace_all(user_filter, USER_NAME_PATTERN, username);
+    replace_all(user_filter, USER_NAME_PATTERN, escaped_username);
     vector<string> user_dns =
         LdapSearchObject(ld, FLAGS_ldap_user_search_basedn.c_str(), user_filter.c_str());
     if (user_dns.size() != 1) {
@@ -151,7 +153,9 @@ bool LdapSearchBind::LdapCheckFilters(string username) {
       ldap_unbind_ext(ld, nullptr, nullptr);
       return false;
     }
-    replace_all(group_filter, USER_DN_PATTERN, user_dns[0]);
+    // Escape the characters in the the DN then replace the USER_DN_PATTERN.
+    string escaped_user_dn = EscapeFilterProperty(user_dns[0]);
+    replace_all(group_filter, USER_DN_PATTERN, escaped_user_dn);
   }
 
   // Execute LDAP search for the group
@@ -163,6 +167,35 @@ bool LdapSearchBind::LdapCheckFilters(string username) {
   VLOG(2) << "LDAP group search successful";
 
   return true;
+}
+
+string LdapSearchBind::EscapeFilterProperty(string property) {
+    string escaped;
+    escaped.reserve(property.size() * 2);
+    for (const char& propChar : property) {
+      switch (propChar) {
+        case '\x2A': // '*'
+          escaped.append("\\2A");
+          break;
+        case '\x28': // '('
+          escaped.append("\\28");
+          break;
+        case '\x29': // ')'
+          escaped.append("\\29");
+          break;
+        case '\x5C': //  '\'
+          escaped.append("\\5C");
+          break;
+        case '\x00': // 'NUL'
+          escaped.append("\\00");
+          break;
+        default:
+          escaped.push_back(propChar);
+          break;
+        }
+    }
+    escaped.shrink_to_fit();
+    return escaped;
 }
 
 } // namespace impala

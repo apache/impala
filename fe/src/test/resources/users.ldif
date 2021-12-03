@@ -69,12 +69,23 @@ sn: Ldap
 uid: ldaptest5
 userPassword: klmnop
 
+dn: cn=Ldap\, (Test6*),ou=Users2,dc=myorg,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: top
+cn: Ldap\, (Test6*)
+sn: Ldap
+uid: ldaptes6
+userPassword: qrstu
+
 dn: cn=group1,ou=Groups,dc=myorg,dc=com
 objectClass: top
 objectClass: groupOfUniqueNames
 cn: group1
 uniqueMember: cn=Test1Ldap,ou=Users,dc=myorg,dc=com
 uniqueMember: cn=Test2Ldap,ou=Users,dc=myorg,dc=com
+uniqueMember: cn=Ldap\, (Test6*),ou=Users2,dc=myorg,dc=com
 
 dn: cn=group2,ou=Groups,dc=myorg,dc=com
 objectClass: top

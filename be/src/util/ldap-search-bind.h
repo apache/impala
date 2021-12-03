@@ -57,6 +57,15 @@ class LdapSearchBind : public ImpalaLdap {
   /// which will be replace with the user dn. '{1}' requires an extra ldap search for
   /// the user dn. If empty, the group check will be skipped.
   std::string group_filter_;
+
+  /// The LDAP filter specification assigns special meaning to the following characters:
+  /// '*', '(', ')', '\', 'NUL'. These 5 characters should be escaped with the backslash
+  /// escape character, followed by the two character ASCII hexadecimal representation of
+  /// the character.
+  /// This function should only be called on internal properties, currently these are
+  /// the results of '{0}' and '{1}' resolution. Impala should be configured with properly
+  /// escaped filters apart from '{0}' and '{1}'.
+  std::string EscapeFilterProperty(string property);
 };
 
 } // namespace impala
