@@ -557,39 +557,40 @@ class TestReusePartitionMetadata(CustomClusterTestSuite):
     # Make sure the table is unloaded either in catalogd or coordinator.
     self.execute_query("invalidate metadata %s.alltypes" % unique_database)
     # First time: misses all(24) partitions.
-    self.check_missing_partitions(unique_database, 24)
+    self.check_missing_partitions(unique_database, 24, 24)
     # Second time: hits all(24) partitions.
-    self.check_missing_partitions(unique_database, 0)
+    self.check_missing_partitions(unique_database, 0, 24)
 
     # Alter comment on the table. Partition metadata should be reusable.
     self.execute_query(
         "comment on table %s.alltypes is null" % unique_database)
-    self.check_missing_partitions(unique_database, 0)
+    self.check_missing_partitions(unique_database, 0, 24)
 
     # Refresh one partition. Although table version bumps, metadata cache of other
     # partitions should be reusable.
     self.execute_query(
         "refresh %s.alltypes partition(year=2009, month=1)" % unique_database)
-    self.check_missing_partitions(unique_database, 1)
+    self.check_missing_partitions(unique_database, 1, 24)
 
     # Drop one partition. Although table version bumps, metadata cache of existing
     # partitions should be reusable.
     self.execute_query(
         "alter table %s.alltypes drop partition(year=2009, month=1)" % unique_database)
-    self.check_missing_partitions(unique_database, 0)
+    self.check_missing_partitions(unique_database, 0, 23)
 
     # Add back one partition. The partition meta is loaded in catalogd but not the
     # coordinator. So we still miss its meta. For other partitions, we can reuse them.
     self.execute_query(
         "insert into %s.alltypes partition(year=2009, month=1) "
         "select 0,true,0,0,0,0,0,0,'a','a',NULL" % unique_database)
-    self.check_missing_partitions(unique_database, 1)
+    self.check_missing_partitions(unique_database, 1, 24)
 
-  def check_missing_partitions(self, unique_database, partition_misses):
+  def check_missing_partitions(self, unique_database, partition_misses, total_partitions):
     """Helper method for checking number of missing partitions while selecting
      all partitions of the alltypes table"""
     ret = self.execute_query_expect_success(
         self.client, "explain select count(*) from %s.alltypes" % unique_database)
+    assert ("partitions=%d" % total_partitions) in ret.get_data()
     match = re.search(r"CatalogFetch.Partitions.Misses: (\d+)", ret.runtime_profile)
     assert len(match.groups()) == 1
     assert match.group(1) == str(partition_misses)

@@ -4082,7 +4082,7 @@ public class CatalogOpExecutor {
       } else {
         LOG.info(
             "EventId: {} Skipping removal of {}/{} partitions since they don't exist or"
-                + "were created later in table {}.", eventId, skippedPartitions.size(),
+                + " were created later in table {}.", eventId, skippedPartitions.size(),
             droppedPartitions.size(), table.getFullName());
       }
       List<List<TPartitionKeyValue>> allTPartKeyVals = Lists
@@ -6258,7 +6258,7 @@ public class CatalogOpExecutor {
       }
 
       loadTableMetadata(table, newCatalogVersion, true, false, partsToLoadMetadata,
-          "INSERT");
+          partitionToEventId, "INSERT");
       addTableToCatalogUpdate(table, update.header.want_minimal_response,
           response.result);
     } finally {
