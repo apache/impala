@@ -447,6 +447,13 @@ row_regex:.* RF000\[min_max\] <- max\(id\).*
 row_regex:.* RF001\[min_max\] <- min\(id\).*
 ====
 ---- QUERY
+# Regression test for IMPALA-11047: should compile successfully.
+set PARQUET_READ_STATISTICS=false;
+select straight_join count(*) from
+functional_parquet.alltypes a join [SHUFFLE] functional_parquet.alltypes b
+where a.year = b.int_col;
+====
+---- QUERY
 # Negative tests to check out the explain output involving a non-correlated one-row
 # sub-query. Expect to observe no min/max filters.
 #

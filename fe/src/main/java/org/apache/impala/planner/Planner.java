@@ -680,15 +680,17 @@ public class Planner {
    * MINMAX_FILTERING_LEVEL) if set and the threshold is 0.0.
    */
   private void checkAndOverrideMinmaxFilterThresholdAndLevel(TQueryOptions queryOptions) {
-    if (queryOptions.isMinmax_filter_sorted_columns()) {
-      if (queryOptions.getMinmax_filter_threshold() == 0.0) {
-        queryOptions.setMinmax_filter_threshold(0.5);
-        queryOptions.setMinmax_filtering_level(TMinmaxFilteringLevel.PAGE);
+    if (queryOptions.parquet_read_statistics) {
+      if (queryOptions.isMinmax_filter_sorted_columns()) {
+        if (queryOptions.getMinmax_filter_threshold() == 0.0) {
+          queryOptions.setMinmax_filter_threshold(0.5);
+          queryOptions.setMinmax_filtering_level(TMinmaxFilteringLevel.PAGE);
+        }
       }
-    }
-    if (queryOptions.isMinmax_filter_partition_columns()) {
-      if (queryOptions.getMinmax_filter_threshold() == 0.0) {
-        queryOptions.setMinmax_filter_threshold(0.5);
+      if (queryOptions.isMinmax_filter_partition_columns()) {
+        if (queryOptions.getMinmax_filter_threshold() == 0.0) {
+          queryOptions.setMinmax_filter_threshold(0.5);
+        }
       }
     }
   }

@@ -884,6 +884,13 @@ public final class RuntimeFilterGenerator {
     runtimeFilter.markFinalized();
   }
 
+  public static boolean enableOverlapFilter(TQueryOptions queryOptions) {
+    return queryOptions.parquet_read_statistics
+        && ((queryOptions.isMinmax_filter_sorted_columns()
+                || queryOptions.getMinmax_filter_threshold() > 0.0)
+            || queryOptions.isMinmax_filter_partition_columns());
+  }
+
   /**
    * Assigns runtime filters to a specific scan node 'scanNode'.
    * The assigned filters are the ones for which 'scanNode' can be used as a destination
@@ -912,16 +919,13 @@ public final class RuntimeFilterGenerator {
     Analyzer analyzer = ctx.getRootAnalyzer();
     boolean disableRowRuntimeFiltering =
         ctx.getQueryOptions().isDisable_row_runtime_filtering();
-    boolean disable_overlap_filter =
-        !ctx.getQueryOptions().isMinmax_filter_sorted_columns()
-        && !ctx.getQueryOptions().isMinmax_filter_partition_columns()
-        && ctx.getQueryOptions().getMinmax_filter_threshold() == 0.0;
+    boolean enable_overlap_filter = enableOverlapFilter(ctx.getQueryOptions());
     TRuntimeFilterMode runtimeFilterMode = ctx.getQueryOptions().getRuntime_filter_mode();
     TEnabledRuntimeFilterTypes enabledRuntimeFilterTypes =
         ctx.getQueryOptions().getEnabled_runtime_filter_types();
 
     // Init the overlap predicate for the hdfs scan node.
-    if (scanNode instanceof HdfsScanNode && !disable_overlap_filter) {
+    if (scanNode instanceof HdfsScanNode && enable_overlap_filter) {
       ((HdfsScanNode) scanNode).initOverlapPredicate(analyzer);
     }
 
@@ -949,7 +953,7 @@ public final class RuntimeFilterGenerator {
           if (!allow_min_max) {
             continue;
           }
-          if (!disable_overlap_filter) {
+          if (enable_overlap_filter) {
             // Try to compute an overlap predicate for the filter. This predicate will be
             // used to filter out partitions, or row groups, pages or rows in Parquet data
             // files.
@@ -1024,7 +1028,7 @@ public final class RuntimeFilterGenerator {
     }
 
     // finalize the overlap predicate for the hdfs scan node.
-    if (scanNode instanceof HdfsScanNode && !disable_overlap_filter) {
+    if (scanNode instanceof HdfsScanNode && enable_overlap_filter) {
       ((HdfsScanNode) scanNode).finalizeOverlapPredicate();
     }
   }
