@@ -3496,3 +3496,42 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> l_partkey
    row-size=20B cardinality=235.34K
 ====
+# IMPALA-11030: 2 Analytic functions within inline view,
+# only one of which has partitioning expr. Predicate in
+# outer query on partitioning expr
+select * from
+ (select id, string_col, row_number() over (order by id) num_rank,
+  row_number() over (partition by string_col order by id) prime_rank
+ from functional.alltypessmall) v where string_col = '0';
+---- PLAN
+PLAN-ROOT SINK
+|
+05:SELECT
+|  predicates: string_col = '0'
+|  row-size=33B cardinality=10
+|
+04:ANALYTIC
+|  functions: row_number()
+|  order by: id ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=33B cardinality=100
+|
+03:SORT
+|  order by: id ASC
+|  row-size=25B cardinality=100
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: string_col
+|  order by: id ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=25B cardinality=100
+|
+01:SORT
+|  order by: string_col ASC NULLS LAST, id ASC
+|  row-size=17B cardinality=100
+|
+00:SCAN HDFS [functional.alltypessmall]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=17B cardinality=100
+====

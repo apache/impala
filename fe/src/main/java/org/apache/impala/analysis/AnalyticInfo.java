@@ -113,7 +113,11 @@ public class AnalyticInfo extends AggregateInfoBase {
     for (Expr analyticExpr: analyticExprs_) {
       Preconditions.checkState(analyticExpr.isAnalyzed());
       List<Expr> partitionExprs = ((AnalyticExpr) analyticExpr).getPartitionExprs();
-      if (partitionExprs == null) continue;
+      if (partitionExprs == null || partitionExprs.size() == 0) {
+        // if any of the partition by list is empty, the intersection set is empty
+        result.clear();
+        break;
+      }
       if (result.isEmpty()) {
         result.addAll(partitionExprs);
       } else {

@@ -2206,3 +2206,27 @@ BIGINT,BIGINT
 7,8
 8,8
 ====
+---- QUERY
+# IMPALA-11030: 2 Analytic functions within inline view,
+# only one of which has partitioning expr. Predicate in
+# outer query on partitioning expr
+select * from
+ (select id, string_col, row_number() over (order by id) num_rank,
+  row_number() over (partition by string_col order by id) prime_rank
+ from alltypessmall) v where string_col = '0'
+---- TYPES
+INT, STRING, BIGINT, BIGINT
+---- RESULTS
+0,'0',1,1
+10,'0',11,2
+20,'0',21,3
+25,'0',26,4
+35,'0',36,5
+45,'0',46,6
+50,'0',51,7
+60,'0',61,8
+70,'0',71,9
+75,'0',76,10
+85,'0',86,11
+95,'0',96,12
+====
