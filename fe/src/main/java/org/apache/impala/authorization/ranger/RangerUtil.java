@@ -72,6 +72,18 @@ public class RangerUtil {
     return resource;
   }
 
+  public static Map<String, String> createStorageHandlerUriResource(
+      TPrivilege privilege) {
+    Map<String, String> resource = new HashMap<>();
+
+    resource.put(RangerImpalaResourceBuilder.STORAGE_TYPE,
+        getOrAll(privilege.getStorage_type()));
+    resource.put(RangerImpalaResourceBuilder.STORAGE_URL,
+        getOrAll(privilege.getStorage_url()));
+
+    return resource;
+  }
+
   private static String getOrAll(String resource) {
     return (resource == null) ? "*" : resource;
   }

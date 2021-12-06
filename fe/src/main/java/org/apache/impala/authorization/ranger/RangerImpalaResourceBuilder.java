@@ -29,6 +29,8 @@ public class RangerImpalaResourceBuilder {
   public static final String COLUMN = "column";
   public static final String UDF = "udf";
   public static final String URL = "url";
+  public static final String STORAGE_TYPE = "storage-type";
+  public static final String STORAGE_URL = "storage-url";
 
   private final RangerAccessResourceImpl rangerAccessResource =
       new RangerAccessResourceImpl();
@@ -55,6 +57,16 @@ public class RangerImpalaResourceBuilder {
 
   public RangerImpalaResourceBuilder uri(String uri) {
     rangerAccessResource.setValue(URL, Preconditions.checkNotNull(uri));
+    return this;
+  }
+
+  public RangerImpalaResourceBuilder storageType(String storageType) {
+    rangerAccessResource.setValue(STORAGE_TYPE, Preconditions.checkNotNull(storageType));
+    return this;
+  }
+
+  public RangerImpalaResourceBuilder storageUri(String storageUri) {
+    rangerAccessResource.setValue(STORAGE_URL, Preconditions.checkNotNull(storageUri));
     return this;
   }
 

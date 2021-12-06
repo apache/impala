@@ -67,6 +67,13 @@ public class PrivilegeRequestBuilder {
     return this;
   }
 
+  public PrivilegeRequestBuilder onStorageHandlerUri(String storageType,
+      String storageUri) {
+    Preconditions.checkState(authorizable_ == null);
+    authorizable_ = authzFactory_.newStorageHandlerUri(storageType, storageUri);
+    return this;
+  }
+
   /**
    * Determines whether the given FeTable corresponds to a view that was created by a
    * non-superuser in HiveMetaStore.
@@ -206,6 +213,11 @@ public class PrivilegeRequestBuilder {
    */
   public PrivilegeRequestBuilder all() {
     privilege_ = Privilege.ALL;
+    return this;
+  }
+
+  public PrivilegeRequestBuilder rwstorage() {
+    privilege_ = Privilege.RWSTORAGE;
     return this;
   }
 

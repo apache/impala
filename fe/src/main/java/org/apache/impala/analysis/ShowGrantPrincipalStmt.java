@@ -77,6 +77,12 @@ public class ShowGrantPrincipalStmt extends AuthorizationStmt {
         case URI:
           sb.append(String.format(" '%s'", privilegeSpec_.getUri()));
           break;
+        case STORAGE_TYPE:
+          sb.append(String.format(" '%s'", privilegeSpec_.getStorageType()));
+          break;
+        case STORAGEHANDLER_URI:
+          sb.append(String.format(" '%s'", privilegeSpec_.getStorageUri()));
+          break;
         default:
           throw new IllegalStateException("Unexpected privilege spec scope: " +
               privilegeSpec_.getScope());

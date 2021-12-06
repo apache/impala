@@ -102,6 +102,11 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
         resources.add(new RangerImpalaResourceBuilder()
             .database("*").function("*").build());
         resources.add(new RangerImpalaResourceBuilder().uri("*").build());
+        if (privilege == Privilege.ALL || privilege == Privilege.OWNER ||
+            privilege == Privilege.RWSTORAGE) {
+          resources.add(new RangerImpalaResourceBuilder()
+              .storageType("*").storageUri("*").build());
+        }
         break;
       case DB:
         resources.add(new RangerImpalaResourceBuilder()
@@ -151,6 +156,12 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
       case URI:
         resources.add(new RangerImpalaResourceBuilder()
             .uri(authorizable.getName())
+            .build());
+        break;
+      case STORAGEHANDLER_URI:
+        resources.add(new RangerImpalaResourceBuilder()
+            .storageType(authorizable.getStorageType())
+            .storageUri(authorizable.getStorageUri())
             .build());
         break;
       default:
@@ -594,9 +605,16 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     }
     // 'tmpAuditHandler' could be null if 'originalAuditHandler' is null or
     // authzCtx.getRetainAudits() is false.
+    // Moreover, when 'resource' is associated with a storage handler URI, we pass
+    // Privilege.RWSTORAGE to updateAuditEvents() since RWSTORAGE is the only valid
+    // access type on a storage handler URI. Otherwise, we may update
+    // 'originalAuditHandler' incorrectly since the audit log entries produced by Ranger
+    // corresponding to a command like REFRESH/INVALIDATE METADATA has a entry with
+    // access type being RWSTORAGE instead of REFRESH.
     if (originalAuditHandler != null && tmpAuditHandler != null) {
       updateAuditEvents(tmpAuditHandler, originalAuditHandler, false /*not any*/,
-          privilege);
+          resource.getKeys().contains(RangerImpalaResourceBuilder.STORAGE_TYPE) ?
+          Privilege.RWSTORAGE : privilege);
     }
     return authorized;
   }
@@ -633,13 +651,20 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
       RangerAccessResourceImpl resource, Authorizable authorizable, Privilege privilege,
       RangerBufferAuditHandler auditHandler) throws InternalException {
     String accessType;
-    if (privilege == Privilege.ANY) {
-      accessType = RangerPolicyEngine.ANY_ACCESS;
-    } else if (privilege == Privilege.INSERT) {
-      // Ranger plugin for Hive considers INSERT to be UPDATE.
-      accessType = UPDATE_ACCESS_TYPE;
+    // If 'resource' is associated with a storage handler URI, then 'accessType' can only
+    // be RWSTORAGE since RWSTORAGE is the only valid privilege that could be applied on
+    // a storage handler URI.
+    if (resource.getKeys().contains(RangerImpalaResourceBuilder.STORAGE_TYPE)) {
+      accessType = Privilege.RWSTORAGE.name().toLowerCase();
     } else {
-      accessType = privilege.name().toLowerCase();
+      if (privilege == Privilege.ANY) {
+        accessType = RangerPolicyEngine.ANY_ACCESS;
+      } else if (privilege == Privilege.INSERT) {
+        // Ranger plugin for Hive considers INSERT to be UPDATE.
+        accessType = UPDATE_ACCESS_TYPE;
+      } else {
+        accessType = privilege.name().toLowerCase();
+      }
     }
     RangerAccessRequestImpl request = new RangerAccessRequestImpl(resource,
         accessType, user.getShortName(), getUserGroups(user));

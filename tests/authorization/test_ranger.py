@@ -105,8 +105,8 @@ class TestRanger(CustomClusterTestSuite):
           result = self.execute_query("show grant {0} {1} on database {2}"
                                       .format(kw, ident, unique_database))
           TestRanger._check_privileges(result, [
-              [kw, ident, unique_database, "", "", "", "*", "select", "false"],
-              [kw, ident, unique_database, "*", "*", "", "", "select", "false"]])
+              [kw, ident, unique_database, "", "", "", "", "", "*", "select", "false"],
+              [kw, ident, unique_database, "*", "*", "", "", "", "", "select", "false"]])
           self.execute_query_expect_success(admin_client,
                                             "revoke select on database {0} from {1} "
                                             "{2}".format(unique_database, kw, ident),
@@ -152,10 +152,10 @@ class TestRanger(CustomClusterTestSuite):
       result = self.execute_query("show grant user {0} on database {1}"
                                   .format(user1, unique_database))
       TestRanger._check_privileges(result, [
-          ["USER", user1, unique_database, "", "", "", "*", "insert", "true"],
-          ["USER", user1, unique_database, "", "", "", "*", "select", "true"],
-          ["USER", user1, unique_database, "*", "*", "", "", "insert", "true"],
-          ["USER", user1, unique_database, "*", "*", "", "", "select", "true"]])
+          ["USER", user1, unique_database, "", "", "", "", "", "*", "insert", "true"],
+          ["USER", user1, unique_database, "", "", "", "", "", "*", "select", "true"],
+          ["USER", user1, unique_database, "*", "*", "", "", "", "", "insert", "true"],
+          ["USER", user1, unique_database, "*", "*", "", "", "", "", "select", "true"]])
 
       # Revoke select privilege and check grant option is still present
       self.execute_query_expect_success(admin_client,
@@ -168,8 +168,8 @@ class TestRanger(CustomClusterTestSuite):
       # current limitation of Ranger since privileges on the same resource share the same
       # delegateAdmin field in the corresponding RangerPolicyItem.
       TestRanger._check_privileges(result, [
-          ["USER", user1, unique_database, "", "", "", "*", "insert", "false"],
-          ["USER", user1, unique_database, "*", "*", "", "", "insert", "false"]])
+          ["USER", user1, unique_database, "", "", "", "", "", "*", "insert", "false"],
+          ["USER", user1, unique_database, "*", "*", "", "", "", "", "insert", "false"]])
 
       # Revoke privilege granting from user 1
       self.execute_query_expect_success(admin_client, "revoke grant option for insert "
@@ -181,8 +181,8 @@ class TestRanger(CustomClusterTestSuite):
       result = self.execute_query("show grant user {0} on database {1}"
                                   .format(user1, unique_database))
       TestRanger._check_privileges(result, [
-          ["USER", user1, unique_database, "", "", "", "*", "insert", "false"],
-          ["USER", user1, unique_database, "*", "*", "", "", "insert", "false"]])
+          ["USER", user1, unique_database, "", "", "", "", "", "*", "insert", "false"],
+          ["USER", user1, unique_database, "*", "*", "", "", "", "", "insert", "false"]])
     finally:
       admin_client.execute("revoke insert on database {0} from user {1}"
                            .format(unique_database, user1), user=ADMIN)
@@ -242,59 +242,90 @@ class TestRanger(CustomClusterTestSuite):
       result = self.client.execute("show grant user {0} on database {1}"
                                    .format(user, unique_db))
       TestRanger._check_privileges(result, [
-          ["GROUP", user, unique_db, "", "", "", "*", "select", "false"],
-          ["GROUP", user, unique_db, "*", "*", "", "", "select", "false"]])
+          ["GROUP", user, unique_db, "", "", "", "", "", "*", "select", "false"],
+          ["GROUP", user, unique_db, "*", "*", "", "", "", "", "select", "false"]])
     finally:
       admin_client.execute("revoke select on database {0} from group {1}"
                            .format(unique_db, group))
 
   def _test_show_grant_mask(self, admin_client, user):
-    privileges = ["select", "insert", "create", "alter", "drop", "refresh"]
+    privs_excl_rwstorage = ["select", "insert", "create", "alter", "drop", "refresh"]
     try:
-      for privilege in privileges:
+      for privilege in privs_excl_rwstorage:
         admin_client.execute("grant {0} on server to user {1}".format(privilege, user))
       result = self.client.execute("show grant user {0} on server".format(user))
       TestRanger._check_privileges(result, [
-          ["USER", user, "", "", "", "*", "", "alter", "false"],
-          ["USER", user, "", "", "", "*", "", "create", "false"],
-          ["USER", user, "", "", "", "*", "", "drop", "false"],
-          ["USER", user, "", "", "", "*", "", "insert", "false"],
-          ["USER", user, "", "", "", "*", "", "refresh", "false"],
-          ["USER", user, "", "", "", "*", "", "select", "false"],
-          ["USER", user, "*", "", "", "", "*", "alter", "false"],
-          ["USER", user, "*", "", "", "", "*", "create", "false"],
-          ["USER", user, "*", "", "", "", "*", "drop", "false"],
-          ["USER", user, "*", "", "", "", "*", "insert", "false"],
-          ["USER", user, "*", "", "", "", "*", "refresh", "false"],
-          ["USER", user, "*", "", "", "", "*", "select", "false"],
-          ["USER", user, "*", "*", "*", "", "", "alter", "false"],
-          ["USER", user, "*", "*", "*", "", "", "create", "false"],
-          ["USER", user, "*", "*", "*", "", "", "drop", "false"],
-          ["USER", user, "*", "*", "*", "", "", "insert", "false"],
-          ["USER", user, "*", "*", "*", "", "", "refresh", "false"],
-          ["USER", user, "*", "*", "*", "", "", "select", "false"]])
+          ["USER", user, "", "", "", "*", "", "", "", "alter", "false"],
+          ["USER", user, "", "", "", "*", "", "", "", "create", "false"],
+          ["USER", user, "", "", "", "*", "", "", "", "drop", "false"],
+          ["USER", user, "", "", "", "*", "", "", "", "insert", "false"],
+          ["USER", user, "", "", "", "*", "", "", "", "refresh", "false"],
+          ["USER", user, "", "", "", "*", "", "", "", "select", "false"],
+          ["USER", user, "*", "", "", "", "", "", "*", "alter", "false"],
+          ["USER", user, "*", "", "", "", "", "", "*", "create", "false"],
+          ["USER", user, "*", "", "", "", "", "", "*", "drop", "false"],
+          ["USER", user, "*", "", "", "", "", "", "*", "insert", "false"],
+          ["USER", user, "*", "", "", "", "", "", "*", "refresh", "false"],
+          ["USER", user, "*", "", "", "", "", "", "*", "select", "false"],
+          ["USER", user, "*", "*", "*", "", "", "", "", "alter", "false"],
+          ["USER", user, "*", "*", "*", "", "", "", "", "create", "false"],
+          ["USER", user, "*", "*", "*", "", "", "", "", "drop", "false"],
+          ["USER", user, "*", "*", "*", "", "", "", "", "insert", "false"],
+          ["USER", user, "*", "*", "*", "", "", "", "", "refresh", "false"],
+          ["USER", user, "*", "*", "*", "", "", "", "", "select", "false"]])
+
+      # GRANT RWSTORAGE ON SERVER additionally grants the RWSTORAGE privilege on all
+      # storage types and all storage URI's.
+      admin_client.execute("grant rwstorage on server to user {0}".format(user))
+      result = self.client.execute("show grant user {0} on server".format(user))
+      TestRanger._check_privileges(result, [
+        ["USER", user, "", "", "", "", "*", "*", "", "rwstorage", "false"],
+        ["USER", user, "", "", "", "*", "", "", "", "alter", "false"],
+        ["USER", user, "", "", "", "*", "", "", "", "create", "false"],
+        ["USER", user, "", "", "", "*", "", "", "", "drop", "false"],
+        ["USER", user, "", "", "", "*", "", "", "", "insert", "false"],
+        ["USER", user, "", "", "", "*", "", "", "", "refresh", "false"],
+        ["USER", user, "", "", "", "*", "", "", "", "select", "false"],
+        ["USER", user, "*", "", "", "", "", "", "*", "alter", "false"],
+        ["USER", user, "*", "", "", "", "", "", "*", "create", "false"],
+        ["USER", user, "*", "", "", "", "", "", "*", "drop", "false"],
+        ["USER", user, "*", "", "", "", "", "", "*", "insert", "false"],
+        ["USER", user, "*", "", "", "", "", "", "*", "refresh", "false"],
+        ["USER", user, "*", "", "", "", "", "", "*", "select", "false"],
+        ["USER", user, "*", "*", "*", "", "", "", "", "alter", "false"],
+        ["USER", user, "*", "*", "*", "", "", "", "", "create", "false"],
+        ["USER", user, "*", "*", "*", "", "", "", "", "drop", "false"],
+        ["USER", user, "*", "*", "*", "", "", "", "", "insert", "false"],
+        ["USER", user, "*", "*", "*", "", "", "", "", "refresh", "false"],
+        ["USER", user, "*", "*", "*", "", "", "", "", "select", "false"]])
 
       admin_client.execute("grant all on server to user {0}".format(user))
       result = self.client.execute("show grant user {0} on server".format(user))
       TestRanger._check_privileges(result, [
-          ["USER", user, "", "", "", "*", "", "all", "false"],
-          ["USER", user, "*", "", "", "", "*", "all", "false"],
-          ["USER", user, "*", "*", "*", "", "", "all", "false"]])
+          ["USER", user, "", "", "", "", "*", "*", "", "rwstorage", "false"],
+          ["USER", user, "", "", "", "*", "", "", "", "all", "false"],
+          ["USER", user, "*", "", "", "", "", "", "*", "all", "false"],
+          ["USER", user, "*", "*", "*", "", "", "", "", "all", "false"]])
     finally:
       admin_client.execute("revoke all on server from user {0}".format(user))
-      for privilege in privileges:
+      admin_client.execute("revoke rwstorage on server from user {0}".format(user))
+      for privilege in privs_excl_rwstorage:
         admin_client.execute("revoke {0} on server from user {1}".format(privilege, user))
 
   def _test_show_grant_basic(self, admin_client, kw, id, unique_database, unique_table):
     uri = WAREHOUSE_PREFIX + '/tmp'
+    database = 'functional'
+    table = 'alltypes'
+    storagehandler_uri = 'kudu://localhost/impala::tpch_kudu.nation'
     try:
       # Grant server privileges and verify
       admin_client.execute("grant all on server to {0} {1}".format(kw, id), user=ADMIN)
       result = self.client.execute("show grant {0} {1} on server".format(kw, id))
       TestRanger._check_privileges(result, [
-          [kw, id, "", "", "", "*", "", "all", "false"],
-          [kw, id, "*", "", "", "", "*", "all", "false"],
-          [kw, id, "*", "*", "*", "", "", "all", "false"]])
+          [kw, id, "", "", "", "", "*", "*", "", "rwstorage", "false"],
+          [kw, id, "", "", "", "*", "", "", "", "all", "false"],
+          [kw, id, "*", "", "", "", "", "", "*", "all", "false"],
+          [kw, id, "*", "*", "*", "", "", "", "", "all", "false"]])
 
       # Revoke server privileges and verify
       admin_client.execute("revoke all on server from {0} {1}".format(kw, id))
@@ -307,7 +338,8 @@ class TestRanger(CustomClusterTestSuite):
       result = self.client.execute("show grant {0} {1} on uri '{2}'"
                                    .format(kw, id, uri))
       TestRanger._check_privileges(result, [
-          [kw, id, "", "", "", "{0}{1}".format(NAMENODE, '/tmp'), "", "all", "false"]])
+          [kw, id, "", "", "", "{0}{1}".format(NAMENODE, '/tmp'), "", "", "", "all",
+           "false"]])
 
       # Revoke uri privileges and verify
       admin_client.execute("revoke all on uri '{0}' from {1} {2}"
@@ -316,14 +348,46 @@ class TestRanger(CustomClusterTestSuite):
                                    .format(kw, id, uri))
       TestRanger._check_privileges(result, [])
 
+      # Grant storage handler URI privilege and verify
+      admin_client.execute("grant rwstorage on storagehandler_uri '{0}' to {1} {2}"
+                          .format(storagehandler_uri, kw, id))
+      result = self.client.execute("show grant {0} {1} on storagehandler_uri '{2}'"
+                                   .format(kw, id, storagehandler_uri))
+      TestRanger._check_privileges(result, [
+          [kw, id, "", "", "", "", "kudu", "localhost/impala::tpch_kudu.nation", "",
+          "rwstorage", "false"]])
+
+      # Grant the rwstorage privilege on a database does not result in the grantee being
+      # granted the privilege on the database.
+      admin_client.execute("grant rwstorage on database {0} to {1} {2}"
+                          .format(database, kw, id))
+      result = self.client.execute("show grant {0} {1} on database {2}"
+                                  .format(kw, id, database))
+      TestRanger._check_privileges(result, [])
+
+      # Grant the rwstorage privilege on a table does not result in the grantee being
+      # granted the privilege on the table.
+      admin_client.execute("grant rwstorage on table {0}.{1} to {2} {3}"
+                          .format(database, table, kw, id))
+      result = self.client.execute("show grant {0} {1} on table {2}.{3}"
+                                  .format(kw, id, database, table))
+      TestRanger._check_privileges(result, [])
+
+      # Revoke storage handler URI privilege and verify
+      admin_client.execute("revoke rwstorage on storagehandler_uri '{0}' from {1} {2}"
+                           .format(storagehandler_uri, kw, id))
+      result = self.client.execute("show grant {0} {1} on storagehandler_uri '{2}'"
+                                   .format(kw, id, storagehandler_uri))
+      TestRanger._check_privileges(result, [])
+
       # Grant database privileges and verify
       admin_client.execute("grant select on database {0} to {1} {2}"
                            .format(unique_database, kw, id))
       result = self.client.execute("show grant {0} {1} on database {2}"
                                    .format(kw, id, unique_database))
       TestRanger._check_privileges(result, [
-          [kw, id, unique_database, "", "", "", "*", "select", "false"],
-          [kw, id, unique_database, "*", "*", "", "", "select", "false"]])
+          [kw, id, unique_database, "", "", "", "", "", "*", "select", "false"],
+          [kw, id, unique_database, "*", "*", "", "", "", "", "select", "false"]])
 
       # Revoke database privileges and verify
       admin_client.execute("revoke select on database {0} from {1} {2}"
@@ -338,7 +402,8 @@ class TestRanger(CustomClusterTestSuite):
       result = self.client.execute("show grant {0} {1} on table {2}.{3}"
                                    .format(kw, id, unique_database, unique_table))
       TestRanger._check_privileges(result, [
-          [kw, id, unique_database, unique_table, "*", "", "", "select", "false"]])
+          [kw, id, unique_database, unique_table, "*", "", "", "", "", "select",
+           "false"]])
 
       # Revoke table privileges and verify
       admin_client.execute("revoke select on table {0}.{1} from {2} {3}"
@@ -353,7 +418,8 @@ class TestRanger(CustomClusterTestSuite):
       result = self.client.execute("show grant {0} {1} on column {2}.{3}.x"
                                    .format(kw, id, unique_database, unique_table))
       TestRanger._check_privileges(result, [
-          [kw, id, unique_database, unique_table, "x", "", "", "select", "false"]])
+          [kw, id, unique_database, unique_table, "x", "", "", "", "", "select",
+           "false"]])
 
       # Revoke column privileges and verify
       admin_client.execute("revoke select(x) on table {0}.{1} from {2} {3}"
@@ -365,6 +431,8 @@ class TestRanger(CustomClusterTestSuite):
       admin_client.execute("revoke all on server from {0} {1}".format(kw, id))
       admin_client.execute("revoke all on uri '{0}' from {1} {2}"
                            .format(uri, kw, id))
+      admin_client.execute("revoke rwstorage on storagehandler_uri '{0}' from {1} {2}"
+                           .format(storagehandler_uri, kw, id))
       admin_client.execute("revoke select on database {0} from {1} {2}"
                            .format(unique_database, kw, id))
       admin_client.execute("revoke select on table {0}.{1} from {2} {3}"
@@ -381,31 +449,31 @@ class TestRanger(CustomClusterTestSuite):
       # Verify the privileges are correctly added
       result = self.client.execute("show grant {0} {1} on server".format(kw, id))
       TestRanger._check_privileges(result, [
-          [kw, id, "", "", "", "*", "", "select", "false"],
-          [kw, id, "*", "", "", "", "*", "select", "false"],
-          [kw, id, "*", "*", "*", "", "", "select", "false"]])
+          [kw, id, "", "", "", "*", "", "", "", "select", "false"],
+          [kw, id, "*", "", "", "", "", "", "*", "select", "false"],
+          [kw, id, "*", "*", "*", "", "", "", "", "select", "false"]])
 
       # Verify the highest level of resource that contains the specified resource could
       # be computed when the specified resource is a database
       result = self.client.execute("show grant {0} {1} on database {2}"
           .format(kw, id, unique_database))
       TestRanger._check_privileges(result, [
-          [kw, id, "*", "", "", "", "*", "select", "false"],
-          [kw, id, "*", "*", "*", "", "", "select", "false"]])
+          [kw, id, "*", "", "", "", "", "", "*", "select", "false"],
+          [kw, id, "*", "*", "*", "", "", "", "", "select", "false"]])
 
       # Verify the highest level of resource that contains the specified resource could
       # be computed when the specified resource is a table
       result = self.client.execute("show grant {0} {1} on table {2}.{3}"
                                    .format(kw, id, unique_database, unique_table))
       TestRanger._check_privileges(result, [
-          [kw, id, "*", "*", "*", "", "", "select", "false"]])
+          [kw, id, "*", "*", "*", "", "", "", "", "select", "false"]])
 
       # Verify the highest level of resource that contains the specified resource could
       # be computed when the specified resource is a column
       result = self.client.execute("show grant {0} {1} on column {2}.{3}.x"
                                    .format(kw, id, unique_database, unique_table))
       TestRanger._check_privileges(result, [
-          [kw, id, "*", "*", "*", "", "", "select", "false"]])
+          [kw, id, "*", "*", "*", "", "", "", "", "select", "false"]])
 
       # Grant the create privilege on database and verify
       admin_client.execute("grant create on database {0} to {1} {2}"
@@ -413,10 +481,10 @@ class TestRanger(CustomClusterTestSuite):
       result = self.client.execute("show grant {0} {1} on database {2}"
                                    .format(kw, id, unique_database))
       TestRanger._check_privileges(result, [
-          [kw, id, "*", "", "", "", "*", "select", "false"],
-          [kw, id, "*", "*", "*", "", "", "select", "false"],
-          [kw, id, unique_database, "", "", "", "*", "create", "false"],
-          [kw, id, unique_database, "*", "*", "", "", "create", "false"]
+          [kw, id, "*", "", "", "", "", "", "*", "select", "false"],
+          [kw, id, "*", "*", "*", "", "", "", "", "select", "false"],
+          [kw, id, unique_database, "", "", "", "", "", "*", "create", "false"],
+          [kw, id, unique_database, "*", "*", "", "", "", "", "create", "false"]
       ])
 
       # Grant the insert privilege on table and verify
@@ -425,9 +493,9 @@ class TestRanger(CustomClusterTestSuite):
       result = self.client.execute("show grant {0} {1} on table {2}.{3}"
                                    .format(kw, id, unique_database, unique_table))
       TestRanger._check_privileges(result, [
-          [kw, id, "*", "*", "*", "", "", "select", "false"],
-          [kw, id, unique_database, "*", "*", "", "", "create", "false"],
-          [kw, id, unique_database, unique_table, "*", "", "", "insert", "false"]
+          [kw, id, "*", "*", "*", "", "", "", "", "select", "false"],
+          [kw, id, unique_database, "*", "*", "", "", "", "", "create", "false"],
+          [kw, id, unique_database, unique_table, "*", "", "", "", "", "insert", "false"]
       ])
 
       # Grant the select privilege on column and verify
@@ -436,9 +504,9 @@ class TestRanger(CustomClusterTestSuite):
       result = self.client.execute("show grant {0} {1} on column {2}.{3}.x"
                                    .format(kw, id, unique_database, unique_table))
       TestRanger._check_privileges(result, [
-          [kw, id, unique_database, "*", "*", "", "", "create", "false"],
-          [kw, id, unique_database, unique_table, "*", "", "", "insert", "false"],
-          [kw, id, unique_database, unique_table, "x", "", "", "select", "false"]
+          [kw, id, unique_database, "*", "*", "", "", "", "", "create", "false"],
+          [kw, id, unique_database, unique_table, "*", "", "", "", "", "insert", "false"],
+          [kw, id, unique_database, unique_table, "x", "", "", "", "", "select", "false"]
       ])
 
       # The insert privilege on table masks the select privilege just added
@@ -447,9 +515,9 @@ class TestRanger(CustomClusterTestSuite):
       result = self.client.execute("show grant {0} {1} on column {2}.{3}.x"
                                    .format(kw, id, unique_database, unique_table))
       TestRanger._check_privileges(result, [
-          [kw, id, unique_database, "*", "*", "", "", "create", "false"],
-          [kw, id, unique_database, unique_table, "*", "", "", "insert", "false"],
-          [kw, id, unique_database, unique_table, "x", "", "", "select", "false"]
+          [kw, id, unique_database, "*", "*", "", "", "", "", "create", "false"],
+          [kw, id, unique_database, unique_table, "*", "", "", "", "", "insert", "false"],
+          [kw, id, unique_database, unique_table, "x", "", "", "", "", "select", "false"]
       ])
 
       # The all privilege on table masks the privileges of insert and select, but not the
@@ -459,8 +527,8 @@ class TestRanger(CustomClusterTestSuite):
       result = self.client.execute("show grant {0} {1} on column {2}.{3}.x"
                                    .format(kw, id, unique_database, unique_table))
       TestRanger._check_privileges(result, [
-          [kw, id, unique_database, unique_table, "*", "", "", "all", "false"],
-          [kw, id, unique_database, unique_table, "x", "", "", "select", "false"]
+          [kw, id, unique_database, unique_table, "*", "", "", "", "", "all", "false"],
+          [kw, id, unique_database, unique_table, "x", "", "", "", "", "select", "false"]
       ])
 
     finally:
@@ -510,8 +578,8 @@ class TestRanger(CustomClusterTestSuite):
                                    .format(user, unique_db))
 
       TestRanger._check_privileges(result, [
-          ["USER", user, unique_db, "*", "*", "", "", "create", "false"],
-          ["USER", user, unique_db, "*", "*", "", "", "select", "false"]
+          ["USER", user, unique_db, "*", "*", "", "", "", "", "create", "false"],
+          ["USER", user, unique_db, "*", "*", "", "", "", "", "select", "false"]
       ])
 
       # Revoke privileges via Ranger REST API
@@ -521,8 +589,8 @@ class TestRanger(CustomClusterTestSuite):
       result = self.client.execute("show grant user {0} on database {1}"
                                    .format(user, unique_db))
       TestRanger._check_privileges(result, [
-          ["USER", user, unique_db, "*", "*", "", "", "create", "false"],
-          ["USER", user, unique_db, "*", "*", "", "", "select", "false"]
+          ["USER", user, unique_db, "*", "*", "", "", "", "", "create", "false"],
+          ["USER", user, unique_db, "*", "*", "", "", "", "", "select", "false"]
       ])
 
       # Refresh and check updated privileges
@@ -568,7 +636,7 @@ class TestRanger(CustomClusterTestSuite):
                                    .format(user, unique_db))
 
       TestRanger._check_privileges(result, [
-          ["USER", user, unique_db, "*", "*", "", "", "select", "false"]
+          ["USER", user, unique_db, "*", "*", "", "", "", "", "select", "false"]
       ])
 
       # Assert that lock, select privilege exists in Ranger server

@@ -491,6 +491,25 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
     return privileges;
   }
 
+  protected TPrivilege[] onStorageHandlerUri(String storageType, String storageUri,
+      TPrivilegeLevel... levels) {
+    return onStorageHandlerUri(false, storageType, storageUri, levels);
+  }
+
+  protected TPrivilege[] onStorageHandlerUri(boolean grantOption, String storageType,
+      String storageUri, TPrivilegeLevel... levels) {
+    TPrivilege[] privileges = new TPrivilege[levels.length];
+    for (int i = 0; i < levels.length; i++) {
+      privileges[i] = new TPrivilege(levels[i], TPrivilegeScope.STORAGEHANDLER_URI,
+          false);
+      privileges[i].setServer_name(SERVER_NAME);
+      privileges[i].setStorage_type(storageType);
+      privileges[i].setStorage_url(storageUri);
+      privileges[i].setHas_grant_opt(grantOption);
+    }
+    return privileges;
+  }
+
   private void authzOk(String stmt, WithPrincipal withPrincipal) throws ImpalaException {
     authzOk(authzCtx_, stmt, withPrincipal, /* expectAnalysisOk */ true);
   }
@@ -631,6 +650,10 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
 
   protected static String createError(String object) {
     return "User '%s' does not have privileges to execute 'CREATE' on: " + object;
+  }
+
+  protected static String rwstorageError(String object) {
+    return "User '%s' does not have privileges to execute 'RWSTORAGE' on: " + object;
   }
 
   protected static String alterError(String object) {

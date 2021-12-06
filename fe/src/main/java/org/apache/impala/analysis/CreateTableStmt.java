@@ -56,6 +56,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
@@ -355,16 +356,33 @@ public class CreateTableStmt extends StatementBase {
    * Kudu tables.
    */
   private void analyzeKuduTableProperties(Analyzer analyzer) throws AnalysisException {
+    String kuduMasters = getKuduMasters(analyzer);
+    if (kuduMasters.isEmpty()) {
+      throw new AnalysisException(String.format(
+          "Table property '%s' is required when the impalad startup flag " +
+          "-kudu_master_hosts is not used.", KuduTable.KEY_MASTER_HOSTS));
+    }
+    putGeneratedProperty(KuduTable.KEY_MASTER_HOSTS, kuduMasters);
+
     AuthorizationConfig authzConfig = analyzer.getAuthzConfig();
     if (authzConfig.isEnabled()) {
-      // Today there is no comprehensive way of enforcing a Ranger authorization policy
-      // against tables stored in Kudu. This is why only users with ALL privileges on
-      // SERVER may create external Kudu tables or set the master addresses.
-      // See IMPALA-4000 for details.
       boolean isExternal = tableDef_.isExternal() ||
           MetaStoreUtil.findTblPropKeyCaseInsensitive(
               getTblProperties(), "EXTERNAL") != null;
-      if (getTblProperties().containsKey(KuduTable.KEY_MASTER_HOSTS) || isExternal) {
+      if (isExternal) {
+        String externalTableName = getTblProperties().get(KuduTable.KEY_TABLE_NAME);
+        AnalysisUtils.throwIfNull(externalTableName,
+            String.format("Table property %s must be specified when creating " +
+                "an external Kudu table.", KuduTable.KEY_TABLE_NAME));
+        List<String> storageUris = getUrisForAuthz(kuduMasters, externalTableName);
+        for (String storageUri : storageUris) {
+          analyzer.registerPrivReq(builder -> builder
+                  .onStorageHandlerUri("kudu", storageUri)
+                  .rwstorage().build());
+        }
+      }
+
+      if (getTblProperties().containsKey(KuduTable.KEY_MASTER_HOSTS)) {
         String authzServer = authzConfig.getServerName();
         Preconditions.checkNotNull(authzServer);
         analyzer.registerPrivReq(builder -> builder.onServer(authzServer).all().build());
@@ -380,14 +398,6 @@ public class CreateTableStmt extends StatementBase {
     putGeneratedProperty(KuduTable.KEY_STORAGE_HANDLER,
         KuduTable.KUDU_STORAGE_HANDLER);
 
-    String kuduMasters = getKuduMasters(analyzer);
-    if (kuduMasters.isEmpty()) {
-      throw new AnalysisException(String.format(
-          "Table property '%s' is required when the impalad startup flag " +
-          "-kudu_master_hosts is not used.", KuduTable.KEY_MASTER_HOSTS));
-    }
-    putGeneratedProperty(KuduTable.KEY_MASTER_HOSTS, kuduMasters);
-
     // TODO: Find out what is creating a directory in HDFS and stop doing that. Kudu
     //       tables shouldn't have HDFS dirs: IMPALA-3570
     AnalysisUtils.throwIfNotNull(getCachingOp(),
@@ -399,6 +409,15 @@ public class CreateTableStmt extends StatementBase {
     AnalysisUtils.throwIfNotNull(getTblProperties().get(KuduTable.KEY_TABLE_ID),
         String.format("Table property %s should not be specified when creating a " +
             "Kudu table.", KuduTable.KEY_TABLE_ID));
+  }
+
+  private List<String> getUrisForAuthz(String kuduMasterAddresses, String kuduTableName) {
+    List<String> masterAddresses = Lists.newArrayList(kuduMasterAddresses.split(","));
+    List<String> uris = new ArrayList<>();
+    for (String masterAddress : masterAddresses) {
+      uris.add(masterAddress + "/" + kuduTableName);
+    }
+    return uris;
   }
 
   /**

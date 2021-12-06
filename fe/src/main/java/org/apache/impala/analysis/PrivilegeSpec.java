@@ -46,6 +46,8 @@ public class PrivilegeSpec extends StmtNode {
   private final TPrivilegeLevel privilegeLevel_;
   private final TableName tableName_;
   private final HdfsUri uri_;
+  private final String storageType_;
+  private final String storageUri_;
   private final List<String> columnNames_;
 
   // Set/modified during analysis
@@ -54,7 +56,7 @@ public class PrivilegeSpec extends StmtNode {
 
   private PrivilegeSpec(TPrivilegeLevel privilegeLevel, TPrivilegeScope scope,
       String serverName, String dbName, TableName tableName, HdfsUri uri,
-      List<String> columnNames) {
+      String storageType, String storageUri, List<String> columnNames) {
     Preconditions.checkNotNull(scope);
     Preconditions.checkNotNull(privilegeLevel);
     privilegeLevel_ = privilegeLevel;
@@ -63,6 +65,8 @@ public class PrivilegeSpec extends StmtNode {
     tableName_ = tableName;
     dbName_ = (tableName_ != null ? tableName_.getDb() : dbName);
     uri_ = uri;
+    storageType_ = storageType;
+    storageUri_ = storageUri;
     columnNames_ = columnNames;
   }
 
@@ -73,21 +77,21 @@ public class PrivilegeSpec extends StmtNode {
   public static PrivilegeSpec createServerScopedPriv(TPrivilegeLevel privilegeLevel,
       String serverName) {
     return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.SERVER, serverName, null,
-        null, null, null);
+        null, null, null, null, null);
   }
 
   public static PrivilegeSpec createDbScopedPriv(TPrivilegeLevel privilegeLevel,
       String dbName) {
     Preconditions.checkNotNull(dbName);
     return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.DATABASE, null, dbName,
-        null, null, null);
+        null, null, null, null, null);
   }
 
   public static PrivilegeSpec createTableScopedPriv(TPrivilegeLevel privilegeLevel,
       TableName tableName) {
     Preconditions.checkNotNull(tableName);
-    return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.TABLE, null, null, tableName,
-        null, null);
+    return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.TABLE, null, null,
+        tableName, null, null, null, null);
   }
 
   public static PrivilegeSpec createColumnScopedPriv(TPrivilegeLevel privilegeLevel,
@@ -95,14 +99,22 @@ public class PrivilegeSpec extends StmtNode {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(columnNames);
     return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.COLUMN, null, null,
-        tableName, null, columnNames);
+        tableName, null, null, null, columnNames);
   }
 
   public static PrivilegeSpec createUriScopedPriv(TPrivilegeLevel privilegeLevel,
       HdfsUri uri) {
     Preconditions.checkNotNull(uri);
     return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.URI, null, null, null, uri,
-        null);
+        null, null, null);
+  }
+
+  public static PrivilegeSpec createStorageHandlerUriScopedPriv(
+      TPrivilegeLevel privilegeLevel, StorageHandlerUri storageHandlerUri) {
+    Preconditions.checkNotNull(storageHandlerUri);
+    return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.STORAGEHANDLER_URI, null,
+        null, null, null, storageHandlerUri.getStorageType(),
+        storageHandlerUri.getStoreUrl(), null);
   }
 
   public List<TPrivilege> toThrift() {
@@ -133,6 +145,8 @@ public class PrivilegeSpec extends StmtNode {
     if (dbName_ != null) privilege.setDb_name(dbName_);
     if (tableName_ != null) privilege.setTable_name(tableName_.getTbl());
     if (uri_ != null) privilege.setUri(uri_.toString());
+    if (storageType_ != null) privilege.setStorage_type(storageType_);
+    if (storageUri_ != null) privilege.setStorage_url(storageUri_);
     if (columnName != null) privilege.setColumn_name(columnName);
     privilege.setCreate_time_ms(-1);
     return privilege;
@@ -174,6 +188,8 @@ public class PrivilegeSpec extends StmtNode {
       sb.append(" ON TABLE " + tableName_.toString());
     } else if (scope_ == TPrivilegeScope.URI) {
       sb.append(" '" + uri_.getLocation() + "'");
+    } else if (scope_ == TPrivilegeScope.STORAGEHANDLER_URI) {
+      sb.append(" '" + storageType_ + "://" + storageUri_ + "'");
     }
     return sb.toString();
   }
@@ -213,6 +229,12 @@ public class PrivilegeSpec extends StmtNode {
               "URI scope in privilege spec.");
         }
         uri_.analyze(analyzer, Privilege.ALL, false);
+        break;
+      case STORAGEHANDLER_URI:
+        if (privilegeLevel_ != TPrivilegeLevel.RWSTORAGE) {
+          throw new AnalysisException("Only 'RWSTORAGE' privilege may be applied at " +
+              "storage handler URI scope in privilege spec.");
+        }
         break;
       case TABLE:
         analyzeTargetTable(analyzer);
@@ -297,6 +319,10 @@ public class PrivilegeSpec extends StmtNode {
   public TableName getTableName() { return tableName_; }
 
   public HdfsUri getUri() { return uri_; }
+
+  public String getStorageType() { return storageType_; }
+
+  public String getStorageUri() { return storageUri_; }
 
   public String getDbName() { return dbName_; }
 

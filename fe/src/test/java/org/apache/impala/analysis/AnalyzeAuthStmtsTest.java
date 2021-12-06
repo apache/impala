@@ -190,6 +190,10 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
             formatArgs));
         AnalysisError(String.format("%s ALL ON URI 'xxxx:////abc//123' %s %s",
             formatArgs), "No FileSystem for scheme: xxxx");
+        AnalysisError(String.format(
+            "%s ALL ON STORAGEHANDLER_URI 'kudu://localhost/tbl' %s %s", formatArgs),
+            "Only 'RWSTORAGE' privilege may be applied at storage handler URI scope " +
+                "in privilege spec.");
         AnalysisError(String.format("%s ALL ON DATABASE does_not_exist %s %s",
             formatArgs), "Error setting/showing privileges for " +
             "database 'does_not_exist'. Verify that the database exists and that you " +
@@ -215,6 +219,10 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
         AnalysisError(String.format("%s INSERT ON URI 'hdfs:////abc//123' %s %s",
             formatArgs), "Only 'ALL' privilege may be applied at URI scope in " +
             "privilege spec.");
+        AnalysisError(String.format(
+            "%s INSERT ON STORAGEHANDLER_URI 'kudu://localhost/tbl' %s %s", formatArgs),
+            "Only 'RWSTORAGE' privilege may be applied at storage handler URI scope " +
+                "in privilege spec.");
 
         // SELECT privilege
         AnalyzesOk(String.format("%s SELECT ON TABLE alltypessmall %s %s", formatArgs),
@@ -229,6 +237,10 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
         AnalysisError(String.format("%s SELECT ON URI 'hdfs:////abc//123' %s %s",
             formatArgs), "Only 'ALL' privilege may be applied at URI scope in " +
             "privilege spec.");
+        AnalysisError(String.format(
+            "%s SELECT ON STORAGEHANDLER_URI 'kudu://localhost/tbl' %s %s", formatArgs),
+            "Only 'RWSTORAGE' privilege may be applied at storage handler URI scope " +
+                "in privilege spec.");
 
         // SELECT privileges on columns
         AnalyzesOk(String.format("%s SELECT (id, int_col) ON TABLE functional.alltypes " +
@@ -276,6 +288,10 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
         AnalysisError(String.format(
             "%s REFRESH ON URI 'hdfs:////abc//123' %s %s", formatArgs),
             "Only 'ALL' privilege may be applied at URI scope in privilege spec.");
+        AnalysisError(String.format(
+            "%s REFRESH ON STORAGEHANDLER_URI 'kudu://localhost/tbl' %s %s", formatArgs),
+            "Only 'RWSTORAGE' privilege may be applied at storage handler URI scope " +
+                "in privilege spec.");
 
         // CREATE privilege
         AnalyzesOk(String.format("%s CREATE ON SERVER %s %s", formatArgs));
@@ -288,6 +304,10 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
         AnalysisError(String.format(
             "%s CREATE ON URI 'hdfs:////abc//123' %s %s", formatArgs),
             "Only 'ALL' privilege may be applied at URI scope in privilege spec.");
+        AnalysisError(String.format(
+            "%s CREATE ON STORAGEHANDLER_URI 'kudu://localhost/tbl' %s %s", formatArgs),
+            "Only 'RWSTORAGE' privilege may be applied at storage handler URI scope " +
+                "in privilege spec.");
 
         // ALTER privilege
         AnalyzesOk(String.format("%s ALTER ON SERVER %s %s", formatArgs));
@@ -298,6 +318,10 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
         AnalysisError(String.format(
             "%s ALTER ON URI 'hdfs:////abc/123' %s %s", formatArgs),
             "Only 'ALL' privilege may be applied at URI scope in privilege spec.");
+        AnalysisError(String.format(
+            "%s ALTER ON STORAGEHANDLER_URI 'kudu://localhost/tbl' %s %s", formatArgs),
+            "Only 'RWSTORAGE' privilege may be applied at storage handler URI scope " +
+                "in privilege spec.");
 
         // DROP privilege
         AnalyzesOk(String.format("%s DROP ON SERVER %s %s", formatArgs));
@@ -308,6 +332,30 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
         AnalysisError(String.format(
             "%s DROP ON URI 'hdfs:////abc/123' %s %s", formatArgs),
             "Only 'ALL' privilege may be applied at URI scope in privilege spec.");
+        AnalysisError(String.format(
+            "%s DROP ON STORAGEHANDLER_URI 'kudu://localhost/tbl' %s %s", formatArgs),
+            "Only 'RWSTORAGE' privilege may be applied at storage handler URI scope " +
+            "in privilege spec.");
+
+        // RWSTORAGE privilege
+        AnalyzesOk(String.format(
+            "%s RWSTORAGE ON STORAGEHANDLER_URI 'kudu://localhost/tbl' %s %s",
+            formatArgs));
+        AnalyzesOk(String.format(
+            "%s RWSTORAGE ON STORAGEHANDLER_URI '*://*' %s %s", formatArgs));
+        AnalyzesOk(String.format(
+            "%s RWSTORAGE ON STORAGEHANDLER_URI 'kudu://*' %s %s", formatArgs));
+        AnalyzesOk(String.format(
+            "%s RWSTORAGE ON STORAGEHANDLER_URI 'kudu://localhost/*' %s %s", formatArgs));
+        AnalysisError(String.format(
+            "%s DROP ON STORAGEHANDLER_URI 'abc://localhost/tbl' %s %s", formatArgs),
+            "The storage type \"abc\" is not supported. " +
+                "A storage handler URI should be in the form of " +
+                "<storage_type>://<hostname>[:<port>]/<path_to_resource>.");
+        AnalysisError(String.format(
+            "%s RWSTORAGE ON STORAGEHANDLER_URI 'kudu://*/*' %s %s", formatArgs),
+            "A storage handler URI should be in the form of " +
+            "<storage_type>://<hostname>[:<port>]/<path_to_resource>.");
       }
 
       AnalysisContext authDisabledCtx = createAuthDisabledAnalysisCtx();

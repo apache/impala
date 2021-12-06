@@ -78,4 +78,11 @@ public class DefaultAuthorizableFactory implements AuthorizableFactory {
     Preconditions.checkNotNull(fnName);
     return new AuthorizableFn(dbName, fnName);
   }
+
+  @Override
+  public Authorizable newStorageHandlerUri(String storageType, String storageUri) {
+    Preconditions.checkNotNull(storageType);
+    Preconditions.checkNotNull(storageUri);
+    return new AuthorizableStorageHandlerUri(storageType, storageUri);
+  }
 }

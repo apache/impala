@@ -307,9 +307,9 @@ terminal
   KW_PARTITIONS, KW_PRECEDING, KW_PREPARE_FN, KW_PRIMARY, KW_PRODUCED, KW_PURGE,
   KW_RANGE, KW_RCFILE, KW_RECOVER, KW_REFERENCES, KW_REFRESH, KW_REGEXP, KW_RELY,
   KW_RENAME, KW_REPEATABLE, KW_REPLACE, KW_REPLICATION, KW_RESTRICT, KW_RETURNS,
-  KW_REVOKE, KW_RIGHT, KW_RLIKE, KW_ROLE, KW_ROLES, KW_ROLLUP, KW_ROW, KW_ROWS, KW_SCHEMA,
+  KW_REVOKE, KW_RIGHT, KW_RLIKE, KW_ROLE, KW_ROLES, KW_ROLLUP, KW_ROW, KW_ROWS, KW_RWSTORAGE, KW_SCHEMA,
   KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES, KW_SERIALIZE_FN,
-  KW_SET, KW_SHOW, KW_SMALLINT, KW_SETS, KW_SORT, KW_SPEC, KW_STORED, KW_STRAIGHT_JOIN,
+  KW_SET, KW_SHOW, KW_SMALLINT, KW_SETS, KW_SORT, KW_SPEC, KW_STORAGE_HANDLER_URI, KW_STORED, KW_STRAIGHT_JOIN,
   KW_STRING, KW_STRUCT, KW_SYMBOL, KW_SYSTEM_TIME, KW_SYSTEM_VERSION,
   KW_TABLE, KW_TABLES, KW_TABLESAMPLE, KW_TBLPROPERTIES,
   KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TRUNCATE, KW_STATS,
@@ -1021,6 +1021,13 @@ show_grant_principal_stmt ::=
     RESULT = new ShowGrantPrincipalStmt(name, type,
         PrivilegeSpec.createUriScopedPriv(TPrivilegeLevel.ALL, new HdfsUri(uri)));
   :}
+  | KW_SHOW KW_GRANT principal_type:type ident_or_default:name KW_ON KW_STORAGE_HANDLER_URI
+  STRING_LITERAL:storage_handler_uri
+  {:
+    RESULT = new ShowGrantPrincipalStmt(name, type,
+        PrivilegeSpec.createStorageHandlerUriScopedPriv(TPrivilegeLevel.RWSTORAGE,
+        new StorageHandlerUri(storage_handler_uri)));
+  :}
   ;
 
 create_drop_role_stmt ::=
@@ -1093,6 +1100,11 @@ privilege_spec ::=
   {: RESULT = PrivilegeSpec.createColumnScopedPriv(priv, tbl_name, cols); :}
   | privilege:priv KW_ON uri_ident:uri_kw STRING_LITERAL:uri
   {: RESULT = PrivilegeSpec.createUriScopedPriv(priv, new HdfsUri(uri)); :}
+  | privilege:priv KW_ON KW_STORAGE_HANDLER_URI STRING_LITERAL:storage_handler_uri
+  {:
+    RESULT = PrivilegeSpec.createStorageHandlerUriScopedPriv(priv,
+        new StorageHandlerUri(storage_handler_uri));
+  :}
   ;
 
 privilege ::=
@@ -1110,6 +1122,8 @@ privilege ::=
   {: RESULT = TPrivilegeLevel.DROP; :}
   | KW_ALL
   {: RESULT = TPrivilegeLevel.ALL; :}
+  | KW_RWSTORAGE
+  {: RESULT = TPrivilegeLevel.RWSTORAGE; :}
   ;
 
 principal_type ::=
@@ -4371,6 +4385,8 @@ word ::=
   {: RESULT = r.toString(); :}
   | KW_ROWS:r
   {: RESULT = r.toString(); :}
+  | KW_RWSTORAGE:r
+  {: RESULT = r.toString(); :}
   | KW_SCHEMA:r
   {: RESULT = r.toString(); :}
   | KW_SCHEMAS:r
@@ -4396,6 +4412,8 @@ word ::=
   | KW_SORT:r
   {: RESULT = r.toString(); :}
   | KW_SPEC:r
+  {: RESULT = r.toString(); :}
+  | KW_STORAGE_HANDLER_URI:r
   {: RESULT = r.toString(); :}
   | KW_STORED:r
   {: RESULT = r.toString(); :}

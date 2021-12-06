@@ -72,4 +72,6 @@ public interface AuthorizableFactory {
    * function names.
    */
   Authorizable newFunction(String dbName, String fnName);
+
+  Authorizable newStorageHandlerUri(String storageType, String storageUri);
 }

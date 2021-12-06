@@ -85,13 +85,14 @@ STRING
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER on server
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','','','','*','','all',false,regex:.+
-'ROLE','grant_revoke_test_ALL_SERVER','*','','','','*','all',false,regex:.+
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','','','','','*','*','','rwstorage',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','','','','*','','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','','','','','','*','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- USER
 does_not_exist
@@ -315,33 +316,33 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_URI on uri '$NAMENODE/test-warehouse/grant_rev_test_tbl2'
 ---- RESULTS
-'ROLE','grant_revoke_test_ALL_URI','','','','$NAMENODE/test-warehouse/grant_rev_test_tbl2','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_URI','','','','$NAMENODE/test-warehouse/grant_rev_test_tbl2','','','','all',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 # We have to specify the resource for SHOW GRANT since SHOW GRANT is not supported
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_URI on uri '$NAMENODE/test-warehouse/GRANT_REV_TEST_TBL3'
 ---- RESULTS
-'ROLE','grant_revoke_test_ALL_URI','','','','$NAMENODE/test-warehouse/GRANT_REV_TEST_TBL3','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_URI','','','','$NAMENODE/test-warehouse/GRANT_REV_TEST_TBL3','','','','all',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 # We have to specify the resource for SHOW GRANT since SHOW GRANT is not supported
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_URI on uri '$NAMENODE/test-warehouse/grant_rev_test_prt'
 ---- RESULTS
-'ROLE','grant_revoke_test_ALL_URI','','','','$NAMENODE/test-warehouse/grant_rev_test_prt','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_URI','','','','$NAMENODE/test-warehouse/grant_rev_test_prt','','','','all',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 # Does not result in an AuthorizationException since '$GROUP_NAME' is still assigned the
@@ -444,12 +445,12 @@ GRANT INSERT ON TABLE grant_rev_db.test_tbl1 TO grant_revoke_test_SELECT_INSERT_
 ---- QUERY
 show grant role grant_revoke_test_SELECT_INSERT_TEST_TBL on table grant_rev_db.test_tbl1
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_SELECT_INSERT_TEST_TBL','grant_rev_db','test_tbl1','*','','','insert',false,regex:.+
-'ROLE','grant_revoke_test_SELECT_INSERT_TEST_TBL','grant_rev_db','test_tbl1','*','','','select',false,regex:.+
+'ROLE','grant_revoke_test_SELECT_INSERT_TEST_TBL','grant_rev_db','test_tbl1','*','','','','','insert',false,regex:.+
+'ROLE','grant_revoke_test_SELECT_INSERT_TEST_TBL','grant_rev_db','test_tbl1','*','','','','','select',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 insert overwrite grant_rev_db.test_tbl1 select 1
@@ -564,12 +565,12 @@ non_owner
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_NON_OWNER on database functional
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_NON_OWNER','functional','','','','*','all',true,regex:.+
-'ROLE','grant_revoke_test_NON_OWNER','functional','*','*','','','all',true,regex:.+
+'ROLE','grant_revoke_test_NON_OWNER','functional','','','','','','*','all',true,regex:.+
+'ROLE','grant_revoke_test_NON_OWNER','functional','*','*','','','','','all',true,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- USER
 non_owner
@@ -579,11 +580,11 @@ non_owner
 # Note that the column of 'grant_option' is false for this privilege.
 show grant role grant_revoke_test_NON_OWNER on table functional.alltypes
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_NON_OWNER','functional','alltypes','*','','','all',false,regex:.+
+'ROLE','grant_revoke_test_NON_OWNER','functional','alltypes','*','','','','','all',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- USER
 admin
@@ -648,12 +649,12 @@ non_owner
 # Also, privilege still exists, but grant option is set to false.
 show grant role grant_revoke_test_NON_OWNER on database functional
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_NON_OWNER','functional','','','','*','all',false,regex:.+
-'ROLE','grant_revoke_test_NON_OWNER','functional','*','*','','','all',false,regex:.+
+'ROLE','grant_revoke_test_NON_OWNER','functional','','','','','','*','all',false,regex:.+
+'ROLE','grant_revoke_test_NON_OWNER','functional','*','*','','','','','all',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- USER
 admin
@@ -699,36 +700,36 @@ GRANT SELECT (a, b, x) ON TABLE grant_rev_db.test_tbl3 TO grant_revoke_test_ALL_
 # resource will be shown as well.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.a
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
-'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','a','','','select',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','a','','','','','select',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 # We have to specify the resource for SHOW GRANT since SHOW GRANT is not supported
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.b
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
-'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','b','','','select',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','b','','','','','select',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 # We have to specify the resource for SHOW GRANT since SHOW GRANT is not supported
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.x
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
-'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','x','','','select',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','x','','','','','select',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- USER
 admin
@@ -744,36 +745,36 @@ GRANT SELECT (c, d, y) ON TABLE grant_rev_db.test_tbl3 TO grant_revoke_test_ALL_
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.c
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
-'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','c','','','select',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','c','','','','','select',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 # We have to specify the resource for SHOW GRANT since SHOW GRANT is not supported
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.d
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
-'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','d','','','select',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','d','','','','','select',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 # We have to specify the resource for SHOW GRANT since SHOW GRANT is not supported
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.y
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
-'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','y','','','select',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','y','','','','','select',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- USER
 admin
@@ -788,12 +789,12 @@ GRANT SELECT (a, a, e, x) ON TABLE grant_rev_db.test_tbl3 TO grant_revoke_test_A
 # Verify that the privilege on 'grant_rev_db.test_tbl3.e' is indeed granted.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.e
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
-'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','e','','','select',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','e','','','','','select',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- USER
 admin
@@ -809,33 +810,33 @@ REVOKE SELECT (a, b, b, y) ON TABLE grant_rev_db.test_tbl3 FROM grant_revoke_tes
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.a
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 # We have to specify the resource for SHOW GRANT since SHOW GRANT is not supported
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.b
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 # We have to specify the resource for SHOW GRANT since SHOW GRANT is not supported
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.y
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- USER
 admin
@@ -851,33 +852,33 @@ REVOKE SELECT (a, b, c, x) ON TABLE grant_rev_db.test_tbl3 FROM grant_revoke_tes
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.b
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 # We have to specify the resource for SHOW GRANT since SHOW GRANT is not supported
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.c
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 # We have to specify the resource for SHOW GRANT since SHOW GRANT is not supported
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.x
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- USER
 admin
@@ -893,22 +894,22 @@ REVOKE SELECT (a, b, c, d, e) ON TABLE grant_rev_db.test_tbl3 FROM grant_revoke_
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.d
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 # We have to specify the resource for SHOW GRANT since SHOW GRANT is not supported
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.e
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- USER
 admin
@@ -929,11 +930,11 @@ non_owner
 # 'grant_revoke_test_NON_OWNER'.
 show grant role grant_revoke_test_NON_OWNER on table grant_rev_db.test_tbl3
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_NON_OWNER','grant_rev_db','test_tbl3','*','','','select',false,regex:.+
+'ROLE','grant_revoke_test_NON_OWNER','grant_rev_db','test_tbl3','*','','','','','select',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- USER
 non_owner
@@ -975,11 +976,11 @@ non_owner
 # investigate whether this is the expected behavior after IMPALA-8587.
 show grant role grant_revoke_test_NON_OWNER on column grant_rev_db.test_tbl3.a
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_NON_OWNER','grant_rev_db','test_tbl3','a','','','select',false,regex:.+
+'ROLE','grant_revoke_test_NON_OWNER','grant_rev_db','test_tbl3','a','','','','','select',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- USER
 admin
@@ -995,36 +996,36 @@ GRANT SELECT (a, c, e) ON TABLE grant_rev_db.test_tbl3 TO grant_revoke_test_ALL_
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.a
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
-'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','a','','','select',true,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','a','','','','','select',true,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 # We have to specify the resource for SHOW GRANT since SHOW GRANT is not supported
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.c
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
-'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','c','','','select',true,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','c','','','','','select',true,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 # We have to specify the resource for SHOW GRANT since SHOW GRANT is not supported
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.e
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
-'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','e','','','select',true,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','e','','','','','select',true,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- USER
 admin
@@ -1040,24 +1041,24 @@ REVOKE GRANT OPTION FOR SELECT (a, c) ON TABLE grant_rev_db.test_tbl3 FROM grant
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.a
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
-'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','a','','','select',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','a','','','','','select',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 # We have to specify the resource for SHOW GRANT since SHOW GRANT is not supported
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER on column grant_rev_db.test_tbl3.c
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','all',false,regex:.+
-'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','c','','','select',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','*','*','*','','','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER','grant_rev_db','test_tbl3','c','','','','','select',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- USER
 admin
@@ -1128,13 +1129,14 @@ does not have privileges to execute 'CREATE' on: grant_rev_db
 # without a defined resource in Ranger.
 show grant role grant_revoke_test_ALL_SERVER1 on server
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-'ROLE','grant_revoke_test_ALL_SERVER1','','','','*','','all',false,regex:.+
-'ROLE','grant_revoke_test_ALL_SERVER1','*','','','','*','all',false,regex:.+
-'ROLE','grant_revoke_test_ALL_SERVER1','*','*','*','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER1','','','','','*','*','','rwstorage',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER1','','','','*','','','','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER1','*','','','','','','*','all',false,regex:.+
+'ROLE','grant_revoke_test_ALL_SERVER1','*','*','*','','','','','all',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- USER
 admin
@@ -1148,9 +1150,9 @@ revoke all on server server1 from grant_revoke_test_ALL_SERVER1
 show grant role grant_revoke_test_ALL_SERVER1 on server
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- USER
 admin
@@ -1194,9 +1196,9 @@ non_owner
 show grant role grant_revoke_test_COLUMN_PRIV on table grant_rev_db.test_tbl4
 ---- RESULTS
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- USER
 non_owner
@@ -1218,11 +1220,11 @@ non_owner
 ---- QUERY
 show grant role grant_revoke_test_COLUMN_PRIV on column grant_rev_db.test_tbl4.col1
 ---- RESULTS
-'ROLE','grant_revoke_test_COLUMN_PRIV','grant_rev_db','test_tbl4','col1','','','select',false,regex:.+
+'ROLE','grant_revoke_test_COLUMN_PRIV','grant_rev_db','test_tbl4','col1','','','','','select',false,regex:.+
 ---- LABELS
-principal_type, principal_name, database, table, column, uri, udf, privilege, grant_option, create_time
+principal_type, principal_name, database, table, column, uri, storage_type, storage_uri, udf, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- USER
 non_owner

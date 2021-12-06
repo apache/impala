@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.impala.authorization.AuthorizationDelta;
 import org.apache.impala.authorization.AuthorizationManager;
+import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.User;
 import org.apache.impala.authorization.ranger.RangerBufferAuditHandler.AutoFlush;
 import org.apache.impala.catalog.AuthzCacheInvalidation;
@@ -383,10 +384,11 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
           createGrantRevokeRequest(grantor, user, groups, roles, clusterName,
               p.has_grant_opt, isGrant, p.privilege_level, resource, clientIp);
 
-      // Ranger Impala service definition defines 3 resources:
+      // Ranger Impala service definition defines 4 resources:
       // [DB -> Table -> Column]
       // [DB -> Function]
       // [URI]
+      // [Storage Type -> Storage URI]
       // What it means is if we grant a particular privilege on a resource that
       // is common to other resources, we need to grant that privilege to those
       // resources.
@@ -398,11 +400,14 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
         // DB is used by column and function resources.
         requests.add(createRequest.apply(RangerUtil.createColumnResource(p)));
         requests.add(createRequest.apply(RangerUtil.createFunctionResource(p)));
+      } else if (p.getStorage_url() != null || p.getStorage_type() != null) {
+        requests.add(createRequest.apply(RangerUtil.createStorageHandlerUriResource(p)));
       } else {
-        // Server is used by column, function, and URI resources.
+        // Server is used by column, function, URI, and storage handler URI resources.
         requests.add(createRequest.apply(RangerUtil.createColumnResource(p)));
         requests.add(createRequest.apply(RangerUtil.createFunctionResource(p)));
         requests.add(createRequest.apply(RangerUtil.createUriResource(p)));
+        requests.add(createRequest.apply(RangerUtil.createStorageHandlerUriResource(p)));
       }
     }
 
@@ -431,10 +436,35 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
 
     // For revoke grant option, omit the privilege
     if (!(!isGrant && withGrantOpt)) {
-      if (level == TPrivilegeLevel.INSERT) {
-        request.getAccessTypes().add(RangerAuthorizationChecker.UPDATE_ACCESS_TYPE);
+      if (resource.containsKey(RangerImpalaResourceBuilder.STORAGE_TYPE)) {
+        // We consider TPrivilegeLevel.ALL and TPrivilegeLevel.OWNER because for a
+        // statement that grants or revokes the ALL or OWNER privileges on SERVER,
+        // 'resource' could also correspond to a storage handler URI.
+        // For such a statement, we add the RWSTORAGE privilege on the wildcard storage
+        // handler URI. On the other hand, we won't ask Ranger to add a policy associated
+        // with the RWSTORAGE privilege on the wildcard storage handler URI in a
+        // query that grants or revokes a privilege other than ALL or OWNER. For
+        // instance, we won't ask Ranger to add a policy granting the RWSTORAGE privilege
+        // on the wildcard storage handler URI for "GRANT SELECT ON SERVER TO USER
+        // non_owner".
+        // Recall that no new Ranger policy will be added if we do not add a Privilege
+        // to 'accessTypes' of 'request'.
+        if (level == TPrivilegeLevel.ALL || level == TPrivilegeLevel.OWNER ||
+            level == TPrivilegeLevel.RWSTORAGE) {
+          request.getAccessTypes().add(Privilege.RWSTORAGE.name().toLowerCase());
+        }
       } else {
-        request.getAccessTypes().add(level.name().toLowerCase());
+        if (level == TPrivilegeLevel.INSERT) {
+          request.getAccessTypes().add(RangerAuthorizationChecker.UPDATE_ACCESS_TYPE);
+        } else if (level != TPrivilegeLevel.RWSTORAGE) {
+          // When 'resource' does not correspond to a storage handler URI, we add the
+          // specified 'level' as is to 'accessTypes' of 'request' only if 'level' is not
+          // TPrivilegeLevel.RWSTORAGE since TPrivilegeLevel.RWSTORAGE is not
+          // well-defined with respect to other types of resources, e.g., table. This
+          // way we won't add a policy that grants or revokes the privilege of RWSTORAGE
+          // on a 'resource' that is incompatible.
+          request.getAccessTypes().add(level.name().toLowerCase());
+        }
       }
     }
 

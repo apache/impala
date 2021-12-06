@@ -31,7 +31,8 @@ public abstract class Authorizable {
     TABLE,
     COLUMN,
     FUNCTION,
-    URI
+    URI,
+    STORAGEHANDLER_URI
   }
 
   // Returns the name of the object.
@@ -54,6 +55,10 @@ public abstract class Authorizable {
 
   // Returns the function name if applicable, null otherwise.
   public String getFnName() { return null; }
+
+  public String getStorageType() { return null; }
+
+  public String getStorageUri() { return null; }
 
   // Returns the owner for this authorizable if applicable, null otherwise.
   // Currently, ownership is applicable only for database and table objects.

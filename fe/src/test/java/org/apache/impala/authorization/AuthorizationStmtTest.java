@@ -1025,7 +1025,11 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
   @Test
   public void testUseDb() throws ImpalaException {
     AuthzTest test = authorize("use functional");
-    for (TPrivilegeLevel privilege: TPrivilegeLevel.values()) {
+    // We exclude TPrivilegeLevel.RWSTORAGE because we do not ask Ranger service to grant
+    // the RWSTORAGE privilege on a resource if the resource is not a storage handler
+    // URI. Refer to RangerCatalogdAuthorizationManager#createGrantRevokeRequest() for
+    // further details.
+    for (TPrivilegeLevel privilege: allExcept(TPrivilegeLevel.RWSTORAGE)) {
       test.ok(onServer(privilege))
           .ok(onDatabase("functional", privilege))
           .ok(onTable("functional", "alltypes", privilege))
@@ -1213,7 +1217,11 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
     // Show tables.
     AuthzTest test = authorize("show tables in functional");
-    for (TPrivilegeLevel privilege: TPrivilegeLevel.values()) {
+    // We exclude TPrivilegeLevel.RWSTORAGE because we do not ask Ranger service to grant
+    // the RWSTORAGE privilege on a resource if the resource is not a storage handler
+    // URI. Refer to RangerCatalogdAuthorizationManager#createGrantRevokeRequest() for
+    // further details.
+    for (TPrivilegeLevel privilege: allExcept(TPrivilegeLevel.RWSTORAGE)) {
       test.ok(onServer(privilege))
           .ok(onDatabase("functional", privilege))
           .ok(onTable("functional", "alltypes", privilege));
@@ -1831,8 +1839,8 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
         .error(systemDbError(), onServer(TPrivilegeLevel.ALL))
         .error(systemDbError(), onServer(TPrivilegeLevel.OWNER));
 
-    // IMPALA-4000: Only users with ALL/OWNER privileges on SERVER may create external
-    // Kudu tables.
+    // Only users with ALL/OWNER privileges on SERVER may create external Kudu tables
+    // when 'kudu.master_addresses' is specified.
     authorize("create external table functional.kudu_tbl stored as kudu " +
         "tblproperties ('kudu.master_addresses'='127.0.0.1', 'kudu.table_name'='tbl')")
         .ok(onServer(TPrivilegeLevel.ALL))
@@ -1840,10 +1848,59 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
         .error(createError("functional"))
         .error(accessError("server1"), onServer(allExcept(TPrivilegeLevel.ALL,
             TPrivilegeLevel.OWNER)))
-        .error(accessError("server1"), onDatabase("functional", TPrivilegeLevel.ALL))
-        .error(accessError("server1"), onDatabase("functional", TPrivilegeLevel.OWNER));
+        .error(accessError("server1"), onDatabase("functional", TPrivilegeLevel.ALL),
+            onStorageHandlerUri("kudu", "127.0.0.1/tbl", TPrivilegeLevel.RWSTORAGE))
+        .error(accessError("server1"), onDatabase("functional", TPrivilegeLevel.OWNER),
+            onStorageHandlerUri("kudu", "127.0.0.1/tbl", TPrivilegeLevel.RWSTORAGE));
 
-    // IMPALA-4000: ALL/OWNER privileges on SERVER are not required to create managed
+
+    // ALL/OWNER privileges on SERVER are not required to create external Kudu tables
+    // when 'kudu.master_addresses' is not specified as long as the RWSTORAGE privilege
+    // is granted on the storage handler URI.
+    authorize("create external table functional.kudu_tbl stored as kudu " +
+        "tblproperties ('kudu.table_name'='tbl')")
+        .ok(onDatabase("functional", TPrivilegeLevel.ALL),
+            onStorageHandlerUri("kudu", "127.0.0.1/tbl", TPrivilegeLevel.RWSTORAGE))
+        .ok(onDatabase("functional", TPrivilegeLevel.OWNER),
+            onStorageHandlerUri("kudu", "127.0.0.1/tbl", TPrivilegeLevel.RWSTORAGE))
+        .ok(onDatabase("functional", TPrivilegeLevel.CREATE),
+            onStorageHandlerUri("kudu", "127.0.0.1/tbl", TPrivilegeLevel.RWSTORAGE))
+        .error(rwstorageError("kudu://127.0.0.1/tbl"),
+            onDatabase("functional", TPrivilegeLevel.ALL))
+        .error(rwstorageError("kudu://127.0.0.1/tbl"),
+            onDatabase("functional", TPrivilegeLevel.OWNER))
+        .error(rwstorageError("kudu://127.0.0.1/tbl"),
+            onDatabase("functional", TPrivilegeLevel.CREATE))
+        .error(createError("functional"), onDatabase("functional", allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.CREATE)))
+        .error(createError("functional"));
+
+    // Wildcard is supported when a storage handler URI is specified.
+    authorize("create external table functional.kudu_tbl stored as kudu " +
+        "tblproperties ('kudu.table_name'='impala::tpch_kudu.nation')")
+        .ok(onDatabase("functional", TPrivilegeLevel.CREATE),
+            onStorageHandlerUri("*", "*", TPrivilegeLevel.RWSTORAGE))
+        .ok(onDatabase("functional", TPrivilegeLevel.CREATE),
+            onStorageHandlerUri("kudu", "*", TPrivilegeLevel.RWSTORAGE))
+        .ok(onDatabase("functional", TPrivilegeLevel.CREATE),
+            onStorageHandlerUri("kudu", "127.0.0.1/impala::tpch_kudu.*",
+                TPrivilegeLevel.RWSTORAGE));
+
+    // The authorization will fail if the wildcard storage handler URI on which the
+    // privilege is granted does not cover the storage handler URI of the Kudu table used
+    // to create the external table whether or not the Kudu table exists.
+    for (String tableName : new String[]{"alltypes", "alltypestiny", "non_existing"}) {
+      authorize(String.format("create external table functional.kudu_tbl " +
+          "stored as kudu tblproperties " +
+          "('kudu.table_name'='impala::functional_kudu.%s')", tableName))
+          .error(rwstorageError(
+              String.format("kudu://127.0.0.1/impala::functional_kudu.%s", tableName)),
+              onDatabase("functional", TPrivilegeLevel.CREATE),
+              onStorageHandlerUri("kudu", "127.0.0.1/impala::tpch_kudu.*",
+                  TPrivilegeLevel.RWSTORAGE));
+    }
+
+    // ALL/OWNER privileges on SERVER are not required to create managed
     // tables.
     authorize("create table functional.kudu_tbl (i int, j int, primary key (i))" +
         " partition by hash (i) partitions 9 stored as kudu")

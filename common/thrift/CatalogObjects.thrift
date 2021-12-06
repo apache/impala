@@ -709,6 +709,8 @@ enum TPrivilegeScope {
   DATABASE = 2
   TABLE = 3
   COLUMN = 4
+  STORAGE_TYPE = 5
+  STORAGEHANDLER_URI = 6
 }
 
 // The privilege level allowed.
@@ -721,6 +723,7 @@ enum TPrivilegeLevel {
   ALTER = 5
   DROP = 6
   OWNER = 7
+  RWSTORAGE = 8
 }
 
 // Represents a privilege in an authorization policy. Privileges contain the level
@@ -771,6 +774,10 @@ struct TPrivilege {
 
   // Set if scope is COLUMN
   12: optional string column_name
+
+  13: optional string storage_type
+
+  14: optional string storage_url
 }
 
 // Thrift representation of an HdfsCachePool.

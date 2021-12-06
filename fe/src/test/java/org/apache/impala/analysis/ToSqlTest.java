@@ -1671,6 +1671,7 @@ public class ToSqlTest extends FrontendTestBase {
     List<String> principalTypes = Arrays.asList("USER", "ROLE", "GROUP");
     String testRole = System.getProperty("user.name");
     String testUri = "hdfs://localhost:20500/test-warehouse";
+    String testStorageHandlerUri = "kudu://localhost/tbl";
 
     for (String pt : principalTypes) {
       try {
@@ -1745,6 +1746,17 @@ public class ToSqlTest extends FrontendTestBase {
             pt, testRole));
         testToSql(ctx, String.format("REVOKE GRANT OPTION FOR ALL ON URI '%s' FROM %s %s",
             testUri, pt, testRole));
+
+        // Storage handler URI (Only RWSTORAGE is supported)
+        testToSql(ctx, String.format(
+            "GRANT RWSTORAGE ON STORAGEHANDLER_URI '%s' TO %s %s",
+            testStorageHandlerUri, pt, testRole));
+        testToSql(ctx, String.format("GRANT RWSTORAGE ON STORAGEHANDLER_URI '%s' " +
+            "TO %s %s WITH GRANT OPTION", testStorageHandlerUri, pt, testRole));
+        testToSql(ctx, String.format("REVOKE RWSTORAGE ON STORAGEHANDLER_URI '%s' " +
+            "FROM %s %s", testStorageHandlerUri, pt, testRole));
+        testToSql(ctx, String.format("REVOKE GRANT OPTION FOR RWSTORAGE ON " +
+            "STORAGEHANDLER_URI '%s' FROM %s %s", testStorageHandlerUri, pt, testRole));
 
         // Column (Only SELECT is supported)
         testToSql(ctx, String.format(
