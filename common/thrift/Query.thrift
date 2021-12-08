@@ -567,6 +567,10 @@ struct TQueryOptions {
   // enable runtime filtering on the row group. For example, 2 means that runtime filter
   // will be evaluated when the dictionary size is smaller or equal to 2.
   140: optional i32 parquet_dictionary_runtime_filter_entry_limit = 1024;
+
+  // Abort the Java UDF if an exception is thrown. Default is that only a
+  // warning will be logged if the Java UDF throws an exception.
+  141: optional bool abort_java_udf_on_exception = false;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

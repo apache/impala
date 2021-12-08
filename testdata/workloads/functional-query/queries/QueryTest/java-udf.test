@@ -104,6 +104,12 @@ boolean
 NULL
 ====
 ---- QUERY
+set abort_java_udf_on_exception=true;
+select throws_exception() from functional.alltypestiny;
+---- CATCH
+Test exception
+====
+---- QUERY
 select throws_exception() from functional.alltypestiny;
 ---- TYPES
 boolean

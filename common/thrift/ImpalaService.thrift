@@ -714,6 +714,10 @@ enum TImpalaQueryOptions {
   // enable runtime filtering on the row group. For example, 2 means that runtime filter
   // will be evaluated when the dictionary size is smaller or equal to 2.
   PARQUET_DICTIONARY_RUNTIME_FILTER_ENTRY_LIMIT = 139;
+
+  // Abort the Java UDF if an exception is thrown. Default is that only a
+  // warning will be logged if the Java UDF throws an exception.
+  ABORT_JAVA_UDF_ON_EXCEPTION = 140;
 }
 
 // The summary of a DML statement.

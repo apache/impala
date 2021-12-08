@@ -115,8 +115,12 @@ AnyVal* HiveUdfCall::Evaluate(ScalarExprEvaluator* eval, const TupleRow* row) co
       stringstream ss;
       ss << "Hive UDF path=" << fn_.hdfs_location << " class=" << fn_.scalar_fn.symbol
         << " failed due to: " << status.GetDetail();
-      fn_ctx->AddWarning(ss.str().c_str());
-      jni_ctx->warning_logged = true;
+      if (fn_ctx->impl()->state()->abort_java_udf_on_exception()) {
+        fn_ctx->SetError(ss.str().c_str());
+      } else {
+        fn_ctx->AddWarning(ss.str().c_str());
+        jni_ctx->warning_logged = true;
+      }
     }
     jni_ctx->output_anyval->is_null = true;
     return jni_ctx->output_anyval;

@@ -104,6 +104,9 @@ class RuntimeState {
   bool strict_mode() const { return query_options().strict_mode; }
   bool utf8_mode() const { return query_options().utf8_mode; }
   bool decimal_v2() const { return query_options().decimal_v2; }
+  bool abort_java_udf_on_exception() const {
+     return query_options().abort_java_udf_on_exception;
+  }
   const TQueryCtx& query_ctx() const;
   const TPlanFragment& fragment() const { return *fragment_; }
   const TPlanFragmentInstanceCtx& instance_ctx() const { return *instance_ctx_; }
