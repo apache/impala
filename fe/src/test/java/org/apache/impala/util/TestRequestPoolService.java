@@ -105,8 +105,8 @@ public class TestRequestPoolService {
       Files.copy(getClasspathFile(llamaConfFile), llamaConfFile_);
       llamaConfPath = llamaConfFile_.getAbsolutePath();
     }
-    poolService_ = new RequestPoolService(allocationConfFile_.getAbsolutePath(),
-        llamaConfPath);
+    poolService_ = RequestPoolService.getInstance(
+        allocationConfFile_.getAbsolutePath(), llamaConfPath, /* isTest */ true);
 
     // Lower the wait times on the AllocationFileLoaderService and RequestPoolService so
     // the test doesn't have to wait very long to test that file changes are reloaded.

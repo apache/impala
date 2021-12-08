@@ -69,9 +69,9 @@ class RequestPoolService {
 
   /// The following members are not initialized if default_pool_only_ is true.
   /// Descriptor of Java RequestPoolService class itself, used to create a new instance.
-  jclass request_pool_service_class_;
+  jclass jni_request_pool_service_class_;
   /// Instance of org.apache.impala.util.RequestPoolService
-  jobject request_pool_service_;
+  jobject jni_request_pool_service_;
   jmethodID resolve_request_pool_id_;  // RequestPoolService.resolveRequestPool()
   jmethodID get_pool_config_id_;  // RequestPoolService.getPoolConfig()
   jmethodID ctor_;

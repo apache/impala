@@ -31,6 +31,7 @@
 #include "util/collection-metrics.h"
 #include "util/mem-info.h"
 #include "util/parse-util.h"
+#include "util/test-info.h"
 #include "util/time.h"
 
 #include "common/names.h"
@@ -115,21 +116,21 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
   }
   default_pool_only_ = false;
 
-  jmethodID start_id; // RequestPoolService.start(), only called in this method.
+  jmethodID start_id; // JniRequestPoolService.start(), only called in this method.
   JniMethodDescriptor methods[] = {
-    {"<init>", "(Ljava/lang/String;Ljava/lang/String;)V", &ctor_},
-    {"start", "()V", &start_id},
-    {"resolveRequestPool", "([B)[B", &resolve_request_pool_id_},
-    {"getPoolConfig", "([B)[B", &get_pool_config_id_}};
+      {"<init>", "(Ljava/lang/String;Ljava/lang/String;Z)V", &ctor_},
+      {"start", "()V", &start_id},
+      {"resolveRequestPool", "([B)[B", &resolve_request_pool_id_},
+      {"getPoolConfig", "([B)[B", &get_pool_config_id_}};
 
   JNIEnv* jni_env = JniUtil::GetJNIEnv();
-  request_pool_service_class_ =
-    jni_env->FindClass("org/apache/impala/util/RequestPoolService");
+  jni_request_pool_service_class_ =
+      jni_env->FindClass("org/apache/impala/util/JniRequestPoolService");
   ABORT_IF_EXC(jni_env);
   uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
   for (int i = 0; i < num_methods; ++i) {
-    ABORT_IF_ERROR(JniUtil::LoadJniMethod(jni_env, request_pool_service_class_,
-        &(methods[i])));
+    ABORT_IF_ERROR(
+        JniUtil::LoadJniMethod(jni_env, jni_request_pool_service_class_, &(methods[i])));
   }
 
   jstring fair_scheduler_config_path =
@@ -139,12 +140,13 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
       jni_env->NewStringUTF(FLAGS_llama_site_path.c_str());
   ABORT_IF_EXC(jni_env);
 
-  jobject request_pool_service = jni_env->NewObject(request_pool_service_class_, ctor_,
-      fair_scheduler_config_path, llama_site_path);
+  jboolean is_be_test = TestInfo::is_be_test();
+  jobject jni_request_pool_service = jni_env->NewObject(jni_request_pool_service_class_,
+      ctor_, fair_scheduler_config_path, llama_site_path, is_be_test);
   ABORT_IF_EXC(jni_env);
-  ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, request_pool_service,
-      &request_pool_service_));
-  jni_env->CallObjectMethod(request_pool_service_, start_id);
+  ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(
+      jni_env, jni_request_pool_service, &jni_request_pool_service_));
+  jni_env->CallObjectMethod(jni_request_pool_service_, start_id);
   ABORT_IF_EXC(jni_env);
 }
 
@@ -168,8 +170,8 @@ Status RequestPoolService::ResolveRequestPool(const TQueryCtx& ctx,
   params.__set_requested_pool(requested_pool);
   TResolveRequestPoolResult result;
   int64_t start_time = MonotonicMillis();
-  Status status = JniUtil::CallJniMethod(request_pool_service_, resolve_request_pool_id_,
-      params, &result);
+  Status status = JniUtil::CallJniMethod(
+      jni_request_pool_service_, resolve_request_pool_id_, params, &result);
   resolve_pool_ms_metric_->Update(MonotonicMillis() - start_time);
 
   if (result.status.status_code != TErrorCode::OK) {
@@ -205,7 +207,7 @@ Status RequestPoolService::GetPoolConfig(const string& pool_name,
   TPoolConfigParams params;
   params.__set_pool(pool_name);
   RETURN_IF_ERROR(JniUtil::CallJniMethod(
-        request_pool_service_, get_pool_config_id_, params, pool_config));
+      jni_request_pool_service_, get_pool_config_id_, params, pool_config));
   if (FLAGS_disable_pool_max_requests) pool_config->__set_max_requests(-1);
   if (FLAGS_disable_pool_mem_limits) pool_config->__set_max_mem_resources(-1);
   return Status::OK();
