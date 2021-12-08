@@ -811,10 +811,8 @@ def generate_statements(output_name, test_vectors, sections,
         (output_name, file_format, codec, compression_type))
 
   if hbase_output:
-    hbase_output.create.append("exit")
     hbase_output.write_to_file('load-' + output_name + '-hbase-generated.create')
   if hbase_post_load:
-    hbase_post_load.load.append("exit")
     hbase_post_load.write_to_file('post-load-' + output_name + '-hbase-generated.sql')
   impala_invalidate.write_to_file("invalidate-" + output_name + "-impala-generated.sql")
 
