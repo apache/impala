@@ -57,7 +57,7 @@ add_library(SchedulingTests STATIC
 add_dependencies(SchedulingTests gen-deps)
 
 ADD_UNIFIED_BE_LSAN_TEST(admission-controller-test AdmissionControllerTest.*)
-ADD_UNIFIED_BE_LSAN_TEST(cluster-membership-mgr-test ClusterMembershipMgrTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(cluster-membership-mgr-test "ClusterMembershipMgrTest.*:ClusterMembershipMgrUnitTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(executor-group-test ExecutorGroupTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(hash-ring-test HashRingTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(scheduler-test SchedulerTest.*)

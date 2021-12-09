@@ -286,10 +286,22 @@ DEFINE_string(executor_groups, "",
     "contains at least that number of executors for the group will it be considered "
     "healthy for admission. Currently only a single group may be specified.");
 
-DEFINE_int32(num_expected_executors, 20, "The number of executors that are expected to "
+DEFINE_int32(num_expected_executors, 20,
+    "The number of executors that are expected to "
     "be available for the execution of a single query. This value is used during "
     "planning if no executors have started yet. Once a healthy executor group has "
-    "started, its size is used instead.");
+    "started, its size is used instead. NOTE: This flag is overridden by "
+    "'expected_executor_group_sets' which is a more expressive way of specifying "
+    "multiple executor group sets");
+
+DEFINE_string(expected_executor_group_sets, "",
+    "Only used by the coordinator. List of expected executor group sets, separated by "
+    "comma in the following format: <executor_group_name_prefix>:<expected_group_size> . "
+    "For eg. “prefix1:10”, this set will include executor groups named like "
+    "prefix1-group1, prefix1-group2, etc. The expected group size (number of executors "
+    "in each group) is used during planning when no healthy executor group is available. "
+    "If this flag is used then any executor groups that do not map to the specified group"
+    " sets will never be used to schedule queries.");
 
 // TODO: can we automatically choose a startup grace period based on the max admission
 // control queue timeout + some margin for error?

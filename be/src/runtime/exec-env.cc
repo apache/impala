@@ -174,11 +174,11 @@ using namespace impala;
 /// Helper method to forward cluster membership updates to the frontend.
 /// For additional details see comments for PopulateExecutorMembershipRequest()
 /// in cluster-membership-mgr.cc
-void SendClusterMembershipToFrontend(
-    ClusterMembershipMgr::SnapshotPtr& snapshot, Frontend* frontend) {
+void SendClusterMembershipToFrontend(ClusterMembershipMgr::SnapshotPtr& snapshot,
+    const vector<TExecutorGroupSet>& expected_exec_group_sets, Frontend* frontend) {
   TUpdateExecutorMembershipRequest update_req;
 
-  PopulateExecutorMembershipRequest(snapshot, update_req);
+  PopulateExecutorMembershipRequest(snapshot, expected_exec_group_sets, update_req);
 
   Status status = frontend->UpdateExecutorMembership(update_req);
   if (!status.ok()) {
@@ -435,7 +435,9 @@ Status ExecEnv::Init() {
   if (FLAGS_is_coordinator && frontend_ != nullptr) {
     cluster_membership_mgr_->RegisterUpdateCallbackFn(
         [this](ClusterMembershipMgr::SnapshotPtr snapshot) {
-          SendClusterMembershipToFrontend(snapshot, this->frontend());
+          SendClusterMembershipToFrontend(snapshot,
+              this->cluster_membership_mgr()->GetExpectedExecGroupSets(),
+              this->frontend());
         });
   }
 

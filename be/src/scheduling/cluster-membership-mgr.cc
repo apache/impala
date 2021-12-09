@@ -17,12 +17,20 @@
 
 #include "scheduling/cluster-membership-mgr.h"
 
+#include <boost/algorithm/string/join.hpp>
+#include <gutil/strings/split.h>
+#include <gutil/strings/stringpiece.h>
+
 #include "common/logging.h"
 #include "common/names.h"
-#include "gen-cpp/Frontend_types.h"
+#include "runtime/exec-env.h"
 #include "service/impala-server.h"
 #include "util/metrics.h"
+#include "util/string-parser.h"
 #include "util/test-info.h"
+
+DECLARE_int32(num_expected_executors);
+DECLARE_string(expected_executor_group_sets);
 
 namespace {
 using namespace impala;
@@ -59,6 +67,10 @@ ClusterMembershipMgr::ClusterMembershipMgr(
     current_membership_(std::make_shared<const Snapshot>()),
     statestore_subscriber_(subscriber),
     local_backend_id_(move(local_backend_id)) {
+  Status status = PopulateExpectedExecGroupSets(expected_exec_group_sets_);
+  if(!status.ok()) {
+    LOG(FATAL) << "Error populating expected executor group sets: " << status;
+  }
   DCHECK(metrics != nullptr);
   MetricGroup* metric_grp = metrics->GetOrCreateChildGroup("cluster-membership");
   total_live_executor_groups_ = metric_grp->AddCounter(LIVE_EXEC_GROUP_KEY, 0);
@@ -568,48 +580,119 @@ bool ClusterMembershipMgr::IsBackendInExecutorGroups(
   return false;
 }
 
-/// Helper method to populate a thrift request object for cluster membership
-/// using a supplied snapshot from the cluster membership manager.
-///
-/// The frontend uses cluster membership information to determine whether it expects the
-/// scheduler to assign local or remote reads. It also uses the number of executors to
-/// determine the join type (partitioned vs broadcast). For the default executor group, we
-/// assume that local reads are preferred and will include the hostnames and IP addresses
-/// in the update to the frontend. For non-default executor groups, we assume that we will
-/// read data remotely and will only send the number of executors in the largest healthy
-/// group.
+/// For the default executor group, we assume that local reads are preferred and will
+/// include the hostnames and IP addresses in the update to the frontend. For non-default
+/// executor groups, we assume that we will read data remotely and will only send the
+/// number of executors in the largest healthy group. When expected exec group sets are
+/// specified we apply the aforementioned steps for each group set.
 void PopulateExecutorMembershipRequest(ClusterMembershipMgr::SnapshotPtr& snapshot,
+    const vector<TExecutorGroupSet>& expected_exec_group_sets,
     TUpdateExecutorMembershipRequest& update_req) {
-  const ExecutorGroup* group = nullptr;
-  bool is_default_group = false;
+  vector<TExecutorGroupSet> exec_group_sets;
   auto default_it =
       snapshot->executor_groups.find(ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME);
   if (default_it != snapshot->executor_groups.end()) {
-    is_default_group = true;
-    group = &(default_it->second);
-  } else {
-    int max_num_executors = 0;
-    // Find largest healthy group.
-    for (const auto& it : snapshot->executor_groups) {
-      if (!it.second.IsHealthy()) continue;
-      int num_executors = it.second.NumExecutors();
-      if (num_executors > max_num_executors) {
-        max_num_executors = num_executors;
-        group = &(it.second);
-      }
-    }
-  }
-  if (group) {
+    exec_group_sets.emplace_back();
+    exec_group_sets.back().__set_expected_num_executors(FLAGS_num_expected_executors);
+    const ExecutorGroup* group = &(default_it->second);
     for (const auto& backend : group->GetAllExecutorDescriptors()) {
       if (backend.is_executor()) {
-        if (is_default_group) {
-          update_req.hostnames.insert(backend.address().hostname());
-          update_req.ip_addresses.insert(backend.ip_address());
-        }
-        update_req.num_executors++;
+        update_req.hostnames.insert(backend.address().hostname());
+        update_req.ip_addresses.insert(backend.ip_address());
+        exec_group_sets.back().curr_num_executors++;
       }
     }
+  } else {
+    if (expected_exec_group_sets.empty()) {
+      // Add a default exec group set if no expected group sets were specified.
+      exec_group_sets.emplace_back();
+      exec_group_sets.back().__set_expected_num_executors(FLAGS_num_expected_executors);
+    } else {
+      exec_group_sets.insert(exec_group_sets.begin(), expected_exec_group_sets.begin(),
+          expected_exec_group_sets.end());
+    }
+    int matching_exec_groups_found = 0;
+    for (auto& set : exec_group_sets) {
+      int max_num_executors = -1;
+      StringPiece prefix(set.exec_group_name_prefix);
+      DCHECK(!prefix.empty() || exec_group_sets.size() == 1)
+          << "An empty group set prefix can only exist if no executor group sets are "
+             "specified";
+      for (const auto& it : snapshot->executor_groups) {
+        StringPiece name(it.first);
+        if (!prefix.empty() && !name.starts_with(prefix)) continue;
+        matching_exec_groups_found++;
+        if (!it.second.IsHealthy()) continue;
+        int num_executors = it.second.NumExecutors();
+        if (num_executors > max_num_executors) {
+          max_num_executors = num_executors;
+          set.curr_num_executors = num_executors;
+        }
+      }
+    }
+    if (matching_exec_groups_found != snapshot->executor_groups.size()) {
+      vector<string> group_sets;
+      for (const auto& set : exec_group_sets) {
+        group_sets.push_back(set.exec_group_name_prefix);
+      }
+      vector<string> group_names;
+      for (const auto& it : snapshot->executor_groups) {
+        group_names.push_back(it.first);
+      }
+      LOG(WARNING) << "Some executor groups either do not match expected group sets or "
+                   "match to more than one set. Expected group sets: "
+                << boost::algorithm::join(group_sets, ",") << " Current executor groups: "
+                << boost::algorithm::join(group_names, ",");
+    }
   }
+  update_req.__set_exec_group_sets(exec_group_sets);
+}
+
+Status ClusterMembershipMgr::PopulateExpectedExecGroupSets(
+    std::vector<TExecutorGroupSet>& expected_exec_group_sets) {
+  expected_exec_group_sets.clear();
+  std::unordered_set<string> parsed_group_prefixes;
+  vector<StringPiece> groups;
+  groups = strings::Split(FLAGS_expected_executor_group_sets, ",", strings::SkipEmpty());
+  if (groups.empty()) return Status::OK();
+
+  // Name and expected group size are separated by ':'.
+  for (const StringPiece& group : groups) {
+    int colon_idx = group.find_first_of(':');
+    string group_prefix = group.substr(0, colon_idx).as_string();
+    if (group_prefix.empty()) {
+      return Status(Substitute(
+          "Executor group set prefix cannot be empty for input: $0", group.ToString()));
+    }
+    if (parsed_group_prefixes.find(group_prefix) != parsed_group_prefixes.end()) {
+      return Status(Substitute(
+          "Executor group set prefix specified multiple times: $0", group.ToString()));
+    }
+    if (colon_idx != StringPiece::npos) {
+      StringParser::ParseResult result;
+      int64_t expected_num_executors = StringParser::StringToInt<int64_t>(
+          group.data() + colon_idx + 1, group.length() - colon_idx - 1, &result);
+      if (result != StringParser::PARSE_SUCCESS) {
+        return Status(
+            Substitute("Failed to parse expected executor group set size for input: $0",
+                group.ToString()));
+      }
+      expected_exec_group_sets.emplace_back();
+      expected_exec_group_sets.back().__set_exec_group_name_prefix(group_prefix);
+      expected_exec_group_sets.back().__set_expected_num_executors(
+          expected_num_executors);
+      parsed_group_prefixes.insert(group_prefix);
+    } else {
+      return Status(
+          Substitute("Invalid executor group set format: $0", group.ToString()));
+    }
+  }
+  // sort by increasing order expected group size.
+  sort(expected_exec_group_sets.begin(), expected_exec_group_sets.end(),
+      [](const TExecutorGroupSet& first, const TExecutorGroupSet& second) {
+        return first.expected_num_executors < second.expected_num_executors;
+      });
+  return Status::OK();
 }
 
 } // end namespace impala

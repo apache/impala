@@ -711,18 +711,35 @@ struct TUpdateCatalogCacheResponse {
   3: required i64 new_catalog_version
 }
 
+// Types of executor groups
+struct TExecutorGroupSet {
+  // The current max number of executors among all healthy groups of this group set.
+  1: i32 curr_num_executors = 0
+
+  // The expected size of the executor groups. Can be used to plan queries when
+  // no healthy executor groups are present(curr_num_executors is 0).
+  2: i32 expected_num_executors = 0
+
+  // The name of the request pool associated with this executor group type. All
+  // executor groups that match this prefix will be included as a part of this set.
+  // Note: this will be empty when 'default' executor group is used or
+  // 'expected_executor_group_sets' startup flag is not specified.
+  3: string exec_group_name_prefix
+}
+
 // Sent from the impalad BE to FE with the latest membership snapshot of the
 // executors on the cluster resulting from the Membership heartbeat.
 struct TUpdateExecutorMembershipRequest {
   // The hostnames of the executor nodes.
+  // Note: There can be multiple executors running on the same host.
   1: required set<string> hostnames
 
   // The ip addresses of the executor nodes.
+  // Note: There can be multiple executors running on the same ip addresses.
   2: required set<string> ip_addresses
 
-  // The number of executors on a cluster, needed since there can be multiple
-  // impalads running on the same host.
-  3: i32 num_executors
+  // Info about existing executor group sets.
+  3: list<TExecutorGroupSet> exec_group_sets
 }
 
 // Contains all interesting statistics from a single 'memory pool' in the JVM.

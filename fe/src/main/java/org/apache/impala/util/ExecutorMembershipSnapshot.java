@@ -17,12 +17,16 @@
 
 package org.apache.impala.util;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TExecutorGroupSet;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
+import org.apache.kudu.shaded.com.google.common.base.Preconditions;
+
 import com.google.common.collect.Sets;
 
 /**
@@ -53,16 +57,24 @@ public class ExecutorMembershipSnapshot {
   // multiple impalads are running on a single host.
 
   // When using executor groups, this value reflects the number of executors in the
-  // largest healthy group. If all group become unhealthy, the backend will not send a
-  // membership update and this value will retain the last non-zero value. This allows the
-  // planner to work on the assumption that a healthy executor group of the same size will
+  // largest healthy group. If all groups become unhealthy, it will be set to the
+  // expected group size for that executor group set. This allows the planner to
+  // work on the assumption that a healthy executor group of the same size will
   // eventually come online to execute queries.
   private final int numExecutors_;
+
+  // Info about the expected executor group sets sorted by the expected executor
+  // group size. When not using executor groups (using 'default' excutor group) or
+  // when 'expected_executor_group_sets' startup flag is not specified, this will
+  // contain a single entry with an empty group name prefix.
+  // TODO: IMPALA-10992: use this info to plan queries for multiple executor group sets.
+  private final List<TExecutorGroupSet> exec_group_sets_;
 
   // Used only to construct the initial ExecutorMembershipSnapshot.
   private ExecutorMembershipSnapshot() {
     hostnames_ = Sets.newHashSet();
     ipAddresses_ = Sets.newHashSet();
+    exec_group_sets_ = new ArrayList<TExecutorGroupSet>();
     // We use 0 for the number of executors to indicate that no update from the
     // ClusterMembershipManager has arrived yet and we will return the value
     // '-num_expected_executors' in numExecutors().
@@ -73,13 +85,10 @@ public class ExecutorMembershipSnapshot {
   private ExecutorMembershipSnapshot(TUpdateExecutorMembershipRequest request) {
     hostnames_ = request.getHostnames();
     ipAddresses_ = request.getIp_addresses();
-    // If the updates snapshot does not contain any executors we fall back to the previous
-    // value. This can happen if no healthy executor groups are currently online.
-    if (request.getNum_executors() > 0) {
-      numExecutors_ = request.getNum_executors();
-    } else {
-      numExecutors_ = cluster_.get().numExecutors_;
-    }
+    exec_group_sets_ = request.getExec_group_sets();
+    Preconditions.checkState(!exec_group_sets_.isEmpty(), "Atleast one executor group "
+        + "set should have been specified in the membership update.");
+    numExecutors_ = exec_group_sets_.get(0).curr_num_executors;
   }
 
   // Determine whether a host, given either by IP address or hostname, is a member of
@@ -93,8 +102,8 @@ public class ExecutorMembershipSnapshot {
   // been registered so far, this method will return a configurable default to allow the
   // planner to operated based on the expected number of executors.
   public int numExecutors() {
-    if (numExecutors_ == 0) {
-      return BackendConfig.INSTANCE.getBackendCfg().num_expected_executors;
+    if (numExecutors_ == 0 && !exec_group_sets_.isEmpty()) {
+      return exec_group_sets_.get(0).expected_num_executors;
     }
     return numExecutors_;
   }

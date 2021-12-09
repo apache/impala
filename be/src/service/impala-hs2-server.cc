@@ -1248,7 +1248,8 @@ void ImpalaServer::GetExecutorMembership(
 
   // Populate an instance of TUpdateExecutorMembershipRequest
   // with the field values retrieved from membership_snapshot
-  PopulateExecutorMembershipRequest(membership_snapshot, return_val.executor_membership);
+  PopulateExecutorMembershipRequest(membership_snapshot,
+      cluster_membership_mgr->GetExpectedExecGroupSets(), return_val.executor_membership);
 
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
   VLOG_RPC << "GetExecutorMembership(): return_val=" << ThriftDebugString(return_val);

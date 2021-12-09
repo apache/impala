@@ -50,6 +50,7 @@ import org.apache.impala.thrift.ImpalaInternalServiceConstants;
 import org.apache.impala.thrift.QueryConstants;
 import org.apache.impala.thrift.TDescriptorTable;
 import org.apache.impala.thrift.TExecRequest;
+import org.apache.impala.thrift.TExecutorGroupSet;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.THBaseKeyRange;
 import org.apache.impala.thrift.THdfsFileSplit;
@@ -106,7 +107,11 @@ public class PlannerTestBase extends FrontendTestBase {
     TUpdateExecutorMembershipRequest updateReq = new TUpdateExecutorMembershipRequest();
     updateReq.setIp_addresses(Sets.newHashSet("127.0.0.1"));
     updateReq.setHostnames(Sets.newHashSet("localhost"));
-    updateReq.setNum_executors(3);
+    TExecutorGroupSet group_set = new TExecutorGroupSet();
+    group_set.curr_num_executors = 3;
+    group_set.expected_num_executors = 20; // default num_expected_executors startup flag
+    updateReq.setExec_group_sets(new ArrayList<TExecutorGroupSet>());
+    updateReq.getExec_group_sets().add(group_set);
     ExecutorMembershipSnapshot.update(updateReq);
 
     kuduClient_ = new KuduClient.KuduClientBuilder("127.0.0.1:7051").build();

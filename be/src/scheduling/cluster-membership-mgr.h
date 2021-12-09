@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "common/status.h"
+#include "gen-cpp/Frontend_types.h"
 #include "scheduling/executor-blacklist.h"
 #include "scheduling/executor-group.h"
 #include "statestore/statestore-subscriber.h"
@@ -170,6 +171,10 @@ class ClusterMembershipMgr {
   /// queries.
   const ExecutorGroup* GetEmptyExecutorGroup() { return &empty_exec_group_; }
 
+  const std::vector<TExecutorGroupSet>& GetExpectedExecGroupSets() {
+    return expected_exec_group_sets_;
+  }
+
  private:
   /// Serializes and adds the local backend descriptor to 'subscriber_topic_updates'.
   void AddLocalBackendToStatestore(const BackendDescriptorPB& local_be_desc,
@@ -210,8 +215,18 @@ class ClusterMembershipMgr {
   bool IsBackendInExecutorGroups(
       const BackendDescriptorPB& be_desc, const ExecutorGroups& executor_groups);
 
+  /// Parses the --expected_executor_group_sets startup flag and populates
+  /// 'expected_exec_group_sets' with the group name prefix and expected group size. Also
+  /// sorts it in increasing order by the expected group size.
+  static Status PopulateExpectedExecGroupSets(
+      std::vector<TExecutorGroupSet>& expected_exec_group_sets);
+
   /// An empty group used for scheduling coordinator only queries.
   const ExecutorGroup empty_exec_group_;
+
+  /// Info about expected executor group sets parsed from num_expected_executor_groups
+  /// flag in Init() and sorted by the expected group size in increasing order.
+  std::vector<TExecutorGroupSet> expected_exec_group_sets_;
 
   /// Ensures that only one thread is processing a membership update at a time, either
   /// from a statestore update or a blacklisting decision. Must be taken before any other
@@ -257,9 +272,17 @@ class ClusterMembershipMgr {
   mutable std::mutex callback_fn_lock_;
 
   friend class impala::test::SchedulerWrapper;
+  friend class ClusterMembershipMgrUnitTest_TestPopulateExpectedExecGroupSets_Test;
 };
 
+/// Helper method to populate a thrift request object 'update_req' for cluster membership
+/// using a supplied 'snapshot' from the cluster membership manager and the
+/// 'expected_exec_group_sets' sorted in increasing order by their expected group size.
+/// The frontend uses cluster membership information to determine whether it expects the
+/// scheduler to assign local or remote reads. It also uses the number of executors to
+/// determine the join type (partitioned vs broadcast).
 void PopulateExecutorMembershipRequest(ClusterMembershipMgr::SnapshotPtr& snapshot,
+    const std::vector<TExecutorGroupSet>& expected_exec_group_sets,
     TUpdateExecutorMembershipRequest& update_req);
 
 } // end namespace impala

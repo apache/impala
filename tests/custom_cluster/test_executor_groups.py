@@ -497,12 +497,12 @@ class TestExecutorGroups(CustomClusterTestSuite):
                                                    timeout=20)
     assert_broadcast_join()
 
-    # Kill a second executor. The group becomes unhealthy but we cache its last healthy
-    # size and will continue to pick a broadcast join.
+    # Kill a second executor. The group becomes unhealthy and we go back to using the
+    # expected size to plan which would result in a hash join
     self.cluster.impalads[-2].kill()
     self.coordinator.service.wait_for_metric_value("cluster-membership.backends.total", 1,
                                                    timeout=20)
-    assert_broadcast_join()
+    assert_hash_join()
 
   @pytest.mark.execute_serially
   def test_join_strategy_multiple_executors(self):

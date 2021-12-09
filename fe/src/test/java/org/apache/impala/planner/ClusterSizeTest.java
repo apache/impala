@@ -20,12 +20,16 @@ package org.apache.impala.planner;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.testutil.TestUtils;
+import org.apache.impala.thrift.TExecutorGroupSet;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
 import org.apache.impala.util.ExecutorMembershipSnapshot;
 
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+
+import java.util.ArrayList;
+
 import org.junit.Test;
 import com.google.common.collect.Sets;
 
@@ -52,13 +56,18 @@ public class ClusterSizeTest extends FrontendTestBase {
 
   /**
    * Sends an update to the ExecutorMembershipSnapshot containing the specified number of
-   * executors. The host list will only contain localhost.
+   * executors. The host list will only contain localhost. 'numExpectedExecutors' is the
+   * value that corresponds to the -num_expected_executors startup flag.
    */
-  private void setNumExecutors(int num) {
+  private void setNumExecutors(int numExecutor, int numExpectedExecutors) {
     TUpdateExecutorMembershipRequest updateReq = new TUpdateExecutorMembershipRequest();
     updateReq.setIp_addresses(Sets.newHashSet("127.0.0.1"));
     updateReq.setHostnames(Sets.newHashSet("localhost"));
-    updateReq.setNum_executors(num);
+    TExecutorGroupSet group_set = new TExecutorGroupSet();
+    group_set.curr_num_executors = numExecutor;
+    group_set.expected_num_executors = numExpectedExecutors;
+    updateReq.setExec_group_sets(new ArrayList<TExecutorGroupSet>());
+    updateReq.getExec_group_sets().add(group_set);
     ExecutorMembershipSnapshot.update(updateReq);
   }
 
@@ -71,25 +80,28 @@ public class ClusterSizeTest extends FrontendTestBase {
     final String query = "select * from alltypes a inner join alltypes b on a.id = b.id";
     final String broadcast_exchange = ":EXCHANGE [BROADCAST]";
     final String hash_exchange = ":EXCHANGE [HASH(b.id)]";
+    // default value for the -num_expected_executors startup flag.
+    final int default_num_expected_executors = 20;
 
     // By default no executors are registered and the planner falls back to the value of
     // -num_expected_executors, which is 20 by default.
+    setNumExecutors(0, default_num_expected_executors);
     assertTrue(getExplainString(query).contains(hash_exchange));
 
     // Adding a single executor will make the planner switch to a broadcast join.
-    setNumExecutors(1);
+    setNumExecutors(1, default_num_expected_executors);
     assertTrue(getExplainString(query).contains(broadcast_exchange));
 
     // Adding two or more executors will make the planner switch to a partitioned hash
     // join.
     for (int n = 2; n < 5; ++n) {
-      setNumExecutors(n);
+      setNumExecutors(n, default_num_expected_executors);
       assertTrue(getExplainString(query).contains(hash_exchange));
     }
 
     // If the backend reports a single executor, the planner should fall back to a
     // broadcast join.
-    setNumExecutors(1);
+    setNumExecutors(1, default_num_expected_executors);
     assertTrue(getExplainString(query).contains(broadcast_exchange));
   }
 }
