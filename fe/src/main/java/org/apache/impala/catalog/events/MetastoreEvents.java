@@ -59,6 +59,7 @@ import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.FileMetadataLoadOpts;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.IncompleteTable;
@@ -858,21 +859,16 @@ public class MetastoreEvents {
      * Reloads the partitions provided, only if the table is loaded and if the partitions
      * exist in catalogd.
      * @param partitions the list of Partition objects which need to be reloaded.
-     * @param loadFileMetadata
+     * @param fileMetadataLoadOpts: describes how to reload file metadata for partitions
      * @param reason The reason for reload operation which is used for logging by
      *               catalogd.
      */
-    protected void reloadPartitions(List<Partition> partitions, boolean loadFromEvent,
-        boolean loadFileMetadata, String reason) throws CatalogException {
+    protected void reloadPartitions(List<Partition> partitions,
+        FileMetadataLoadOpts fileMetadataLoadOpts, String reason)
+        throws CatalogException {
       try {
-        int numPartsRefreshed;
-        if (loadFromEvent) {
-          numPartsRefreshed = catalogOpExecutor_.reloadPartitionsFromEvent(getEventId(),
-              dbName_, tblName_, partitions, loadFileMetadata, reason);
-        } else {
-          numPartsRefreshed = catalogOpExecutor_.reloadPartitionsIfExist(getEventId(),
-              dbName_, tblName_, partitions, reason);
-        }
+        int numPartsRefreshed = catalogOpExecutor_.reloadPartitionsIfExist(getEventId(),
+            dbName_, tblName_, partitions, reason, fileMetadataLoadOpts);
         if (numPartsRefreshed > 0) {
           metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_PARTITION_REFRESHES)
               .inc(numPartsRefreshed);
@@ -885,6 +881,32 @@ public class MetastoreEvents {
             getFullyQualifiedTblName());
       }
     }
+
+    /**
+     * Reloads partitions from the event if they exist. Does not fetch those partitions
+     * from HMS. Does NOT reload file metadata
+     * @param partitions: Partitions to be reloaded
+     * @param reason: Reason for reloading. Mainly used for logging in catalogD
+     * @throws CatalogException
+     */
+    protected void reloadPartitionsFromEvent(List<Partition> partitions, String reason)
+        throws CatalogException {
+      try {
+        int numPartsRefreshed = catalogOpExecutor_.reloadPartitionsFromEvent(getEventId(),
+            dbName_, tblName_, partitions, reason);
+        if (numPartsRefreshed > 0) {
+          metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_PARTITION_REFRESHES)
+              .inc(numPartsRefreshed);
+        }
+      } catch (TableNotLoadedException e) {
+        debugLog("Ignoring the event since table {} is not loaded",
+            getFullyQualifiedTblName());
+      } catch (DatabaseNotFoundException | TableNotFoundException e) {
+        debugLog("Ignoring the event since table {} is not found",
+            getFullyQualifiedTblName());
+      }
+    }
+
 
     /**
      * To decide whether to skip processing this event, fetch table from cache
@@ -1259,7 +1281,10 @@ public class MetastoreEvents {
         // Ignore event if table or database is not in catalog. Throw exception if
         // refresh fails. If the partition does not exist in metastore the reload
         // method below removes it from the catalog
-        reloadPartitions(Arrays.asList(insertPartition_), false, true, "INSERT event");
+        // forcing file metadata reload so that new files (due to insert) are reflected
+        // HdfsPartition
+        reloadPartitions(Arrays.asList(insertPartition_),
+            FileMetadataLoadOpts.FORCE_LOAD, "INSERT event");
       } catch (CatalogException e) {
         throw new MetastoreNotificationNeedsInvalidateException(debugString("Refresh "
                 + "partition on table {} partition {} failed. Event processing cannot "
@@ -2021,8 +2046,10 @@ public class MetastoreEvents {
         List<TPartitionKeyValue> tPartSpec = getTPartitionSpecFromHmsPartition(msTbl_,
             partitionAfter_);
         try {
-          reloadPartitions(Arrays.asList(partitionAfter_), false, true,
-              "ALTER_PARTITION event");
+          // load file metadata only if storage descriptor of partitionAfter_ differs
+          // from sd of HdfsPartition
+          reloadPartitions(Arrays.asList(partitionAfter_),
+              FileMetadataLoadOpts.LOAD_IF_SD_CHANGED, "ALTER_PARTITION event");
         } catch (CatalogException e) {
           throw new MetastoreNotificationNeedsInvalidateException(debugString("Refresh "
                   + "partition on table {} partition {} failed. Event processing cannot "
@@ -2059,8 +2086,8 @@ public class MetastoreEvents {
       boolean incrementalRefresh =
           BackendConfig.INSTANCE.getHMSEventIncrementalRefreshTransactionalTable();
       if (incrementalRefresh) {
-        reloadPartitions(Collections.singletonList(partitionAfter_), true, false,
-            "ALTER_PARTITION");
+        reloadPartitionsFromEvent(Collections.singletonList(partitionAfter_),
+            "ALTER_PARTITION EVENT FOR TRANSACTIONAL TABLE");
       } else {
         reloadTableFromCatalog("ALTER_PARTITION", true);
       }
@@ -2157,7 +2184,17 @@ public class MetastoreEvents {
           partitions.add(event.getPartitionForBatching());
         }
         try {
-          reloadPartitions(partitions, false, true, getEventType().toString() + " event");
+          if (baseEvent_ instanceof InsertEvent) {
+            // for insert event, always reload file metadata so that new files
+            // are reflected in HdfsPartition
+            reloadPartitions(partitions, FileMetadataLoadOpts.FORCE_LOAD,
+                getEventType().toString() + " event");
+          } else {
+            // alter partition event. Reload file metadata of only those partitions
+            // for which sd has changed
+            reloadPartitions(partitions, FileMetadataLoadOpts.LOAD_IF_SD_CHANGED,
+                getEventType().toString() + " event");
+          }
         } catch (CatalogException e) {
           throw new MetastoreNotificationNeedsInvalidateException(String.format(
               "Refresh partitions on table %s failed when processing event ids %s-%s. "

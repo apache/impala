@@ -97,6 +97,7 @@ import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
+import org.apache.impala.catalog.FileMetadataLoadOpts;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
@@ -2714,6 +2715,12 @@ public class MetastoreEventsProcessorTest {
     }
   }
 
+  /**
+   * The test asserts that file metadata is not reloaded when processing
+   * alter partition event for a transactional table. Because for such tables,
+   * file metadata reloading is done during commit txn event processing
+   * @throws Exception
+   */
   @Test
   public void testAlterPartitionNotReloadFMD() throws Exception {
     // Turn on incremental refresh for transactional table
@@ -2771,6 +2778,146 @@ public class MetastoreEventsProcessorTest {
       // Restore original config
       BackendConfig.create(origCfg);
     }
+  }
+
+  /**
+   * For an external table, the test asserts file metadata is not reloaded during
+   * AlterPartitionEvent processing if only partition parameters are changed
+   * @throws Exception
+   */
+  @Test
+  public void testAlterPartitionNoFileMetadataReload() throws Exception {
+    createDatabase(TEST_DB_NAME, null);
+    final String testTblName = "testAlterPartitionNoFileMetadataReload";
+    createTable(testTblName, true);
+    eventsProcessor_.processEvents();
+    // simulate the table being loaded by explicitly calling load table
+    loadTable(testTblName);
+    List<List<String>> partVals = new ArrayList<>();
+
+    // create 1 partition
+    partVals.add(Arrays.asList("1"));
+    addPartitions(TEST_DB_NAME, testTblName, partVals);
+
+    eventsProcessor_.processEvents();
+    assertEquals("Unexpected number of partitions fetched for the loaded table", 1,
+        ((HdfsTable) catalog_.getTable(TEST_DB_NAME, testTblName))
+            .getPartitions()
+            .size());
+    HdfsTable tbl = (HdfsTable) catalog_.getTable(TEST_DB_NAME, testTblName);
+    // get file metadata load counter before altering the partition
+    long fileMetadataLoadBefore =
+        tbl.getMetrics().getCounter(HdfsTable.NUM_LOAD_FILEMETADATA_METRIC).getCount();
+    // issue alter partition ops
+    partVals.clear();
+    partVals.add(Arrays.asList("1"));
+    String testKey = "randomDummyKey1";
+    String testVal = "randomDummyVal1";
+    alterPartitionsParams(TEST_DB_NAME, testTblName, testKey, testVal,
+        partVals);
+    eventsProcessor_.processEvents();
+
+    tbl = (HdfsTable) catalog_.getTable(TEST_DB_NAME, testTblName);
+    long fileMetadataLoadAfter =
+        tbl.getMetrics().getCounter(HdfsTable.NUM_LOAD_FILEMETADATA_METRIC).getCount();
+    assertEquals(fileMetadataLoadAfter, fileMetadataLoadBefore);
+
+    Collection<? extends FeFsPartition> parts =
+        FeCatalogUtils.loadAllPartitions((HdfsTable)
+            catalog_.getTable(TEST_DB_NAME, testTblName));
+    FeFsPartition singlePartition =
+        Iterables.getOnlyElement(parts);
+    String val = singlePartition.getParameters().getOrDefault(testKey, null);
+    assertNotNull("Expected " + testKey + " to be present in partition parameters",
+        val);
+    assertEquals(testVal, val);
+  }
+
+  /*
+  For an external table, the test asserts that file metadata is reloaded for an alter
+   partition event if the storage descriptor of partition to be altered has changed or
+  partition does not exist in cache but is present in HMS
+   */
+  @Test
+  public void testAlterPartitionFileMetadataReload() throws Exception {
+    createDatabase(TEST_DB_NAME, null);
+    final String testTblName = "testAlterPartitionFileMetadataReload";
+    createTable(testTblName, true);
+    // sync to latest event id
+    eventsProcessor_.processEvents();
+
+    // simulate the table being loaded by explicitly calling load table
+    loadTable(testTblName);
+    List<List<String>> partVals = new ArrayList<>();
+
+    // create 1 partition
+    partVals.add(Arrays.asList("1"));
+    addPartitions(TEST_DB_NAME, testTblName, partVals);
+
+    eventsProcessor_.processEvents();
+    assertEquals("Unexpected number of partitions fetched for the loaded table", 1,
+        ((HdfsTable) catalog_.getTable(TEST_DB_NAME, testTblName))
+            .getPartitions()
+            .size());
+    // HdfsPartitionSdCompareTest already covers all the ways in which storage
+    // descriptor can differ. Here we will only alter sd location to test that
+    // file metadata is reloaded.
+    HdfsTable tbl = (HdfsTable) catalog_.getTable(TEST_DB_NAME, testTblName);
+    long fileMetadataLoadBefore =
+        tbl.getMetrics().getCounter(HdfsTable.NUM_LOAD_FILEMETADATA_METRIC).getCount();
+
+    partVals.clear();
+    partVals.add(Arrays.asList("1"));
+    String newLocation = "/path/to/new_location/";
+    alterPartitions(testTblName, partVals, newLocation);
+    eventsProcessor_.processEvents();
+    // not asserting new location check since it is already done in previous tests
+    long fileMetadataLoadAfter =
+        tbl.getMetrics().getCounter(HdfsTable.NUM_LOAD_FILEMETADATA_METRIC).getCount();
+    assertEquals(fileMetadataLoadBefore + 1, fileMetadataLoadAfter);
+    /*
+     Drop a partition only from cache not from HMS. In such case,
+     the expected behavior is that tbl.reloadPartitions() for such
+     partition should *not* skip file metadata reload even if
+     FileMetadataLoadOpts is LOAD_IF_SD_CHANGED. The following code asserts
+     this behaviour
+     */
+    String partName = FeCatalogUtils.getPartitionName(tbl, partVals.get(0));
+    List<HdfsPartition> partitionsToDrop =
+        tbl.getPartitionsForNames(Arrays.asList(partName));
+    tbl.dropPartitions(partitionsToDrop, false);
+    assertEquals(0, tbl.getPartitions().size());
+
+    fileMetadataLoadBefore =
+        tbl.getMetrics().getCounter(HdfsTable.NUM_LOAD_FILEMETADATA_METRIC).getCount();
+    Partition msPartition = null;
+    try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
+      msPartition = metaStoreClient.getHiveClient().getPartition(TEST_DB_NAME,
+          testTblName, Arrays.asList("1"));
+      Map<Partition, HdfsPartition> mp = new HashMap();
+      mp.put(msPartition, null);
+      // reload the just dropped partition again with LOAD_IF_SD_CHANGED file
+      // metadataOpts. Assert that partition is loaded back in tbl
+      if (!catalog_.tryWriteLock(tbl)) {
+        throw new CatalogException("Couldn't acquire write lock on table: " +
+            tbl.getFullName());
+      }
+      catalog_.getLock().writeLock().unlock();
+      try {
+        tbl.reloadPartitions(metaStoreClient.getHiveClient(), mp,
+            FileMetadataLoadOpts.LOAD_IF_SD_CHANGED);
+      } finally {
+        if (tbl.isWriteLockedByCurrentThread()) {
+          tbl.releaseWriteLock();
+        }
+      }
+    }
+    assertEquals(1, tbl.getPartitionsForNames(Arrays.asList(partName)).size());
+
+    fileMetadataLoadAfter =
+        tbl.getMetrics().getCounter(HdfsTable.NUM_LOAD_FILEMETADATA_METRIC).getCount();
+
+    assertEquals(fileMetadataLoadBefore+1, fileMetadataLoadAfter);
   }
 
   private abstract class AlterTableExecutor {

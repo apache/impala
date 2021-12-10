@@ -2702,10 +2702,23 @@ public class HdfsTable extends Table implements FeFsTable {
 
   /**
    * Reloads the HdfsPartitions which correspond to the given partNames. Returns the
-   * number of partitions which were reloaded.
+   * number of partitions which were reloaded. This method also reloads file metadata
+   * of all the partitions for the given partNames
    */
   public int reloadPartitionsFromNames(IMetaStoreClient client,
       List<String> partNames, String reason) throws CatalogException {
+    return reloadPartitionsFromNames(client, partNames, reason,
+        FileMetadataLoadOpts.FORCE_LOAD);
+  }
+
+  /**
+   * Reloads the HdfsPartitions which correspond to the given partNames. Returns the
+   * number of partitions which were reloaded.
+   * fileMetadataLoadOpts: decides how to reload file metadata for the partitions
+   */
+  public int reloadPartitionsFromNames(IMetaStoreClient client,
+      List<String> partNames, String reason, FileMetadataLoadOpts fileMetadataLoadOpts)
+      throws CatalogException {
     Preconditions.checkState(partNames != null && !partNames.isEmpty());
     LOG.info(String.format("Reloading partition metadata: %s %s (%s)",
         getFullName(), generateDebugStr(partNames, 3), reason));
@@ -2721,7 +2734,7 @@ public class HdfsTable extends Table implements FeFsTable {
           hmsPartToHdfsPart.put(partition, hdfsPartition);
         }
       }
-      reloadPartitions(client, hmsPartToHdfsPart, true);
+      reloadPartitions(client, hmsPartToHdfsPart, fileMetadataLoadOpts);
       return hmsPartToHdfsPart.size();
     } catch (NoSuchObjectException e) {
       // HMS throws a NoSuchObjectException if the table does not exist
@@ -2781,15 +2794,38 @@ public class HdfsTable extends Table implements FeFsTable {
    *                            reconstructed from the HMS partition key. If the
    *                            value for a given partition key is null then nothing is
    *                            removed and a new HdfsPartition is simply added.
-   * @param loadFileMetadata If true, file metadata will be reloaded.
+   * @param loadFileMetadata If true, file metadata for all hmsPartsToHdfsParts will be
+   *                        reloaded.
    */
   public void reloadPartitions(IMetaStoreClient client,
       Map<Partition, HdfsPartition> hmsPartsToHdfsParts, boolean loadFileMetadata)
       throws CatalogException {
+    if (loadFileMetadata) {
+      reloadPartitions(client, hmsPartsToHdfsParts, FileMetadataLoadOpts.FORCE_LOAD);
+    } else {
+      reloadPartitions(client, hmsPartsToHdfsParts, FileMetadataLoadOpts.NO_LOAD);
+    }
+  }
+
+  /**
+   * Reloads the metadata of partitions given by a map of HMS Partitions to existing (old)
+   * HdfsPartitions.
+   * @param hmsPartsToHdfsParts The map of HMS partition object to the old HdfsPartition.
+   *                            Every key-value in this map represents the HdfsPartition
+   *                            which needs to be removed from the table and
+   *                            reconstructed from the HMS partition key. If the
+   *                            value for a given partition key is null then nothing is
+   *                            removed and a new HdfsPartition is simply added.
+   * @param fileMetadataLoadOpts describes how to load file metadata
+   */
+  public void reloadPartitions(IMetaStoreClient client,
+      Map<Partition, HdfsPartition> hmsPartsToHdfsParts,
+      FileMetadataLoadOpts fileMetadataLoadOpts) throws CatalogException {
     Preconditions.checkState(isWriteLockedByCurrentThread(), "Write Lock should be "
         + "held before reloadPartitions");
     FsPermissionCache permissionCache = new FsPermissionCache();
     Map<HdfsPartition.Builder, HdfsPartition> partBuilderToPartitions = new HashMap<>();
+    Set<HdfsPartition.Builder> partBuildersFileMetadataRefresh = new HashSet<>();
     for (Map.Entry<Partition, HdfsPartition> entry : hmsPartsToHdfsParts.entrySet()) {
       Partition hmsPartition = entry.getKey();
       HdfsPartition oldPartition = entry.getValue();
@@ -2801,11 +2837,32 @@ public class HdfsTable extends Table implements FeFsTable {
       if (oldPartition != null) {
         partBuilder.setFileDescriptors(oldPartition);
       }
+      switch (fileMetadataLoadOpts) {
+        case FORCE_LOAD:
+          partBuildersFileMetadataRefresh.add(partBuilder);
+          break;
+        case LOAD_IF_SD_CHANGED:
+          if (oldPartition == null || !oldPartition.compareSd(hmsPartition.getSd()) ||
+              partBuilder.isMarkedCached()) {
+            partBuildersFileMetadataRefresh.add(partBuilder);
+          }
+          break;
+        case NO_LOAD:
+          // do nothing
+          break;
+        default:
+          throw new CatalogException("Invalid filemetadataOpts: " +
+              fileMetadataLoadOpts.name() + " in reloadPartitions()");
+      }
       partBuilderToPartitions.put(partBuilder, oldPartition);
     }
-    if (loadFileMetadata) {
+    if (!partBuildersFileMetadataRefresh.isEmpty()) {
+      LOG.info("for table {}, file metadataOps: {}, refreshing file metadata for {}"
+              + " out of {} partitions to reload in reloadPartitions()", getFullName(),
+          fileMetadataLoadOpts.name(), partBuildersFileMetadataRefresh.size(),
+          partBuilderToPartitions.size());
       // load file metadata in parallel
-      loadFileMetadataForPartitions(client, partBuilderToPartitions.keySet(),
+      loadFileMetadataForPartitions(client, partBuildersFileMetadataRefresh,
           /*isRefresh=*/true);
     }
     for (Map.Entry<HdfsPartition.Builder, HdfsPartition> entry :

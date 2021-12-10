@@ -29,6 +29,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -99,6 +100,7 @@ import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeCatalogUtils;
+import org.apache.impala.catalog.FileMetadataLoadOpts;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
@@ -141,7 +143,6 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.JniUtil;
-import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
 import org.apache.impala.common.TransactionException;
@@ -4240,11 +4241,13 @@ public class CatalogOpExecutor {
    * @param partsFromEvent List of {@link Partition} objects from the events to be
    *                       reloaded.
    * @param reason Reason for reloading the partitions for logging purposes.
+   * @param fileMetadataLoadOpts describes how to reload file metadata for partsFromEvent
    * @return the number of partitions which were reloaded. If the table does not exist,
    * returns 0. Some partitions could be skipped if they don't exist anymore.
    */
   public int reloadPartitionsIfExist(long eventId, String dbName, String tblName,
-      List<Partition> partsFromEvent, String reason) throws CatalogException {
+      List<Partition> partsFromEvent, String reason,
+      FileMetadataLoadOpts fileMetadataLoadOpts) throws CatalogException {
     Table table = catalog_.getTable(dbName, tblName);
     if (table == null) {
       DeleteEventLog deleteEventLog = catalog_.getMetastoreEventProcessor()
@@ -4294,7 +4297,7 @@ public class CatalogOpExecutor {
       int numOfPartsReloaded;
       try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
         numOfPartsReloaded = hdfsTable.reloadPartitionsFromNames(
-            metaStoreClient.getHiveClient(), partNames, reason);
+            metaStoreClient.getHiveClient(), partNames, reason, fileMetadataLoadOpts);
       }
       hdfsTable.setCatalogVersion(newCatalogVersion);
       return numOfPartsReloaded;
@@ -4321,6 +4324,7 @@ public class CatalogOpExecutor {
   /**
    * Reloads the given partitions if they exist and have not been removed since the event
    * was generated. We don't retrieve partitions from HMS but use partitions from event.
+   * This api does NOT reload file metadata when reloading partitions
    *
    * @param eventId EventId being processed.
    * @param dbName Database name for the partition
@@ -4328,13 +4332,11 @@ public class CatalogOpExecutor {
    * @param partsFromEvent List of {@link Partition} objects from the events to be
    *                       reloaded.
    * @param reason Reason for reloading the partitions for logging purposes.
-   * @param loadFileMetadata If true, reload file metadata. Otherwise, just reload
-   *                         partitions metadata.
    * @return the number of partitions which were reloaded. If the table does not exist,
    * returns 0. Some partitions could be skipped if they don't exist anymore.
    */
   public int reloadPartitionsFromEvent(long eventId, String dbName, String tblName,
-      List<Partition> partsFromEvent, boolean loadFileMetadata, String reason)
+      List<Partition> partsFromEvent, String reason)
       throws CatalogException {
     Table table = catalog_.getTable(dbName, tblName);
     if (table == null) {
@@ -4367,7 +4369,7 @@ public class CatalogOpExecutor {
       int numOfPartsReloaded;
       try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
         numOfPartsReloaded = hdfsTable.reloadPartitionsFromEvent(
-            metaStoreClient.getHiveClient(), partsFromEvent, loadFileMetadata, reason);
+            metaStoreClient.getHiveClient(), partsFromEvent, false, reason);
       }
       hdfsTable.setCatalogVersion(newCatalogVersion);
       return numOfPartsReloaded;
