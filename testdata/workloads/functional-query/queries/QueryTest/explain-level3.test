@@ -88,3 +88,58 @@ explain select * from functional_parquet.iceberg_partitioned;
 ---- RESULTS: VERIFY_IS_SUBSET
 '     file formats: [PARQUET]'
 ====
+---- QUERY
+# Tests 'SimplifyCastExprRule' rewrite when group by and order by clauses contain cast exprs
+# 'd_date' is STRING type, rewrite succeed
+explain
+select month(to_timestamp(cast(d_date AS string),'yyyy-MM-dd')) a
+from tpcds_parquet.date_dim
+group by month(to_timestamp(cast(d_date AS string),'yyyy-MM-dd'))
+order by month(to_timestamp(cast(d_date AS string),'yyyy-MM-dd'))
+---- RESULTS: VERIFY_IS_SUBSET
+'Analyzed query: SELECT month(to_timestamp(d_date, 'yyyy-MM-dd')) a FROM'
+'tpcds_parquet.date_dim GROUP BY month(to_timestamp(d_date, 'yyyy-MM-dd')) ORDER'
+'BY month(to_timestamp(d_date, 'yyyy-MM-dd')) ASC'
+====
+---- QUERY
+# Tests 'SimplifyCastExprRule' rewrite when group by and order by clauses contain aliases
+# 'd_date' is STRING type, rewrite succeed
+# Aliases in group by clauses will substituted by exprs
+explain
+select month(to_timestamp(cast(d_date AS string),'yyyy-MM-dd')) a
+from tpcds_parquet.date_dim
+group by a
+order by a
+---- RESULTS: VERIFY_IS_SUBSET
+'Analyzed query: SELECT month(to_timestamp(d_date, 'yyyy-MM-dd')) a FROM'
+'tpcds_parquet.date_dim GROUP BY month(to_timestamp(d_date, 'yyyy-MM-dd')) ORDER'
+'BY a ASC'
+====
+---- QUERY
+# Tests 'SimplifyCastExprRule' rewrite when group by and order by clauses contain exprs
+# 'd_date_sk' is INT type, not rewrite
+explain
+select month(to_timestamp(cast(d_date_sk AS string),'yyyy-MM-dd')) a
+from tpcds_parquet.date_dim
+group by month(to_timestamp(cast(d_date_sk AS string),'yyyy-MM-dd'))
+order by month(to_timestamp(cast(d_date_sk AS string),'yyyy-MM-dd'))
+---- RESULTS: VERIFY_IS_SUBSET
+'Analyzed query: SELECT month(to_timestamp(CAST(d_date_sk AS STRING),'
+''yyyy-MM-dd')) a FROM tpcds_parquet.date_dim GROUP BY'
+'month(to_timestamp(CAST(d_date_sk AS STRING), 'yyyy-MM-dd')) ORDER BY'
+'month(to_timestamp(CAST(d_date_sk AS STRING), 'yyyy-MM-dd')) ASC'
+====
+---- QUERY
+# Tests 'SimplifyCastExprRule' rewrite when group by and order by clauses contain aliases
+# 'd_date_sk' is INT type, not rewrite
+# Aliases in group by clauses will substituted by exprs
+explain
+select month(to_timestamp(cast(d_date_sk AS string),'yyyy-MM-dd')) a
+from tpcds_parquet.date_dim
+group by a
+order by a
+---- RESULTS: VERIFY_IS_SUBSET
+'Analyzed query: SELECT month(to_timestamp(CAST(d_date_sk AS STRING),'
+''yyyy-MM-dd')) a FROM tpcds_parquet.date_dim GROUP BY'
+'month(to_timestamp(CAST(d_date_sk AS STRING), 'yyyy-MM-dd')) ORDER BY a ASC'
+====

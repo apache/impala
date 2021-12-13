@@ -22,6 +22,7 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.CastExpr;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.NullLiteral;
+import org.apache.impala.catalog.Type;
 
 /**
  * This rewrite rule simplifies cast expr when cast target data type is the same as inner
@@ -57,6 +58,12 @@ public class SimplifyCastExprRule implements ExprRewriteRule {
     //this situation, such as cast(cast(NULL as string) as timestamp FORMAT 'YYYY-MM-DD').
     //If we replace inner 'cast(NULL as string)' as 'NULL', query will throw exception.
     if (child instanceof NullLiteral) return castExpr;
+
+    //Expr must analyzed before rewrite. Without analyze, expr type is 'INVALID'
+    if (!castExpr.isAnalyzed()) castExpr.analyzeNoThrow(analyzer);
+    if (!child.isAnalyzed()) child.analyzeNoThrow(analyzer);
+    Preconditions.checkState(castExpr.getType() != Type.INVALID &&
+        child.getType() != Type.INVALID, "'castExpr' must be analyzed before rewrite");
     return castExpr.getType().matchesType(child.getType())? child : castExpr;
   }
 }
