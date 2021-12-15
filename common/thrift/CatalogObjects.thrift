@@ -140,6 +140,7 @@ enum TIcebergPartitionTransformType {
   YEAR = 4
   BUCKET = 5
   TRUNCATE = 6
+  VOID = 7
 }
 
 struct TCompressionCodec {

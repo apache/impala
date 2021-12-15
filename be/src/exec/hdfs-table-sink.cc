@@ -500,7 +500,7 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
 string HdfsTableSink::GetPartitionName(int i) {
   if (IsIceberg()) {
     DCHECK_LT(i, partition_key_expr_evals_.size());
-    return table_desc_->IcebergPartitionNames()[i];
+    return table_desc_->IcebergNonVoidPartitionNames()[i];
   } else {
     DCHECK_LT(i, table_desc_->num_clustering_cols());
     return table_desc_->col_descs()[i].name();

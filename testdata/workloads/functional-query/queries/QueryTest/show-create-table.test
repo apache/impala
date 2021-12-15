@@ -926,3 +926,15 @@ LOCATION '$$location_uri$$'
 TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
 'engine.hive.enabled'='true', 'iceberg.catalog'='ice_hadoop_cat')
 ====
+---- CREATE_TABLE
+CREATE TABLE iceberg_void_transform (i int, j int)
+PARTITIONED BY SPEC (void(i), void(j))
+STORED AS ICEBERG
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_void_transform (i INT NULL, j INT NULL)
+PARTITIONED BY SPEC (VOID(i), VOID(j))
+STORED AS ICEBERG
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
+'engine.hive.enabled'='true', 'table_type'='ICEBERG')
+====

@@ -881,9 +881,14 @@ public class InsertStmt extends StatementBase {
       }
     }
 
-    if (isIcebergTarget()) {
-      Preconditions.checkState(
-          partitionKeyExprs_.size() == icebergPartSpec.getIcebergPartitionFieldsSize());
+    if (isIcebergTarget() && icebergPartSpec.hasPartitionFields()) {
+      int parts = 0;
+      for (IcebergPartitionField pField : icebergPartSpec.getIcebergPartitionFields()) {
+        if (pField.getTransformType() != TIcebergPartitionTransformType.VOID) {
+          ++parts;
+        }
+      }
+      Preconditions.checkState(partitionKeyExprs_.size() == parts);
     }
     else if (isKuduTable) {
       Preconditions.checkState(
@@ -964,6 +969,7 @@ public class InsertStmt extends StatementBase {
       IcebergPartitionSpec icebergPartSpec) throws AnalysisException {
     if (!icebergPartSpec.hasPartitionFields()) return;
     for (IcebergPartitionField partField : icebergPartSpec.getIcebergPartitionFields()) {
+      if (partField.getTransformType() == TIcebergPartitionTransformType.VOID) continue;
       for (int i = 0; i < selectListExprs.size(); ++i) {
         IcebergColumn targetColumn = (IcebergColumn)selectExprTargetColumns.get(i);
         if (targetColumn.getFieldId() != partField.getSourceId()) continue;

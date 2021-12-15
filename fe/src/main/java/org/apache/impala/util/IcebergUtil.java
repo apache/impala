@@ -223,6 +223,8 @@ public class IcebergUtil {
       } else if (transformType == TIcebergPartitionTransformType.TRUNCATE) {
         builder.truncate(partitionField.getField_name(),
             partitionField.getTransform().getTransform_param());
+      } else if (transformType == TIcebergPartitionTransformType.VOID) {
+        builder.alwaysNull(partitionField.getField_name());
       } else {
         throw new ImpalaRuntimeException(String.format("Skip partition: %s, %s",
             partitionField.getField_name(), transformType));
@@ -409,6 +411,7 @@ public class IcebergUtil {
       case "DAY":   case "DAYS":   return TIcebergPartitionTransformType.DAY;
       case "MONTH": case "MONTHS": return TIcebergPartitionTransformType.MONTH;
       case "YEAR":  case "YEARS":  return TIcebergPartitionTransformType.YEAR;
+      case "VOID": return TIcebergPartitionTransformType.VOID;
       default:
         throw new TableLoadingException("Unsupported iceberg partition type: " +
             transformType);
@@ -483,6 +486,14 @@ public class IcebergUtil {
           public Pair<String, Integer> hour(String sourceName, int sourceId) {
             String mappingKey = getPartitonTransformMappingKey(sourceId,
                 TIcebergPartitionTransformType.HOUR);
+            return new Pair<String, Integer>(mappingKey, null);
+          }
+
+          @Override
+          public Pair<String, Integer> alwaysNull(int fieldId, String sourceName,
+              int sourceId) {
+            String mappingKey = getPartitonTransformMappingKey(sourceId,
+                TIcebergPartitionTransformType.VOID);
             return new Pair<String, Integer>(mappingKey, null);
           }
         });
@@ -643,14 +654,20 @@ public class IcebergUtil {
 
     PartitionData data = new PartitionData(spec.getIcebergPartitionFieldsSize());
     String[] partitions = path.split("/", -1);
-    for (int i = 0; i < partitions.length; i += 1) {
+    int path_i = 0;
+    for (int i = 0; i < spec.getIcebergPartitionFieldsSize(); ++i) {
       IcebergPartitionField field = spec.getIcebergPartitionFields().get(i);
-      String[] parts = partitions[i].split("=", 2);
+      if (field.getTransformType() == TIcebergPartitionTransformType.VOID) {
+        continue;
+      }
+      String[] parts = partitions[path_i].split("=", 2);
       Preconditions.checkArgument(parts.length == 2 && parts[0] != null &&
-          field.getFieldName().equals(parts[0]), "Invalid partition: %s", partitions[i]);
+          field.getFieldName().equals(parts[0]), "Invalid partition: %s",
+          partitions[path_i]);
       TIcebergPartitionTransformType transformType = field.getTransformType();
       data.set(i, getPartitionValue(
           partitionType.fields().get(i).type(), transformType, parts[1]));
+      path_i += 1;
     }
     return data;
   }
@@ -676,6 +693,7 @@ public class IcebergUtil {
       case YEAR: return parseYearToTransformYear(stringValue);
       case MONTH: return parseMonthToTransformMonth(stringValue);
       case HOUR: return parseHourToTransformHour(stringValue);
+      case VOID: return null;
     }
     throw new ImpalaRuntimeException("Unexpected partition transform: " + transformType);
   }

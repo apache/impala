@@ -315,3 +315,107 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/d_year=2020
 ---- TYPES
 STRING, STRING, STRING
 ====
+---- QUERY
+create table ice_void (i int, s string, d date)
+partitioned by spec (void(i), truncate(1, s), year(d))
+stored as iceberg;
+insert into ice_void values (1, 'one', '2001-01-01'),
+                            (11,'other','2001-01-11'),
+                            (2, 'two', '2002-02-02'),
+                            (3, 'three', '2003-03-03');
+select * from ice_void;
+---- RESULTS
+1,'one',2001-01-01
+11,'other',2001-01-11
+2,'two',2002-02-02
+3,'three',2003-03-03
+---- TYPES
+INT, STRING, DATE
+====
+---- QUERY
+show files in ice_void;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+alter table ice_void set partition spec (i, void(s), year(d));
+insert into ice_void values (4, 'four', '2004-04-04');
+select * from ice_void;
+---- RESULTS
+1,'one',2001-01-01
+11,'other',2001-01-11
+2,'two',2002-02-02
+3,'three',2003-03-03
+4,'four',2004-04-04
+---- TYPES
+INT, STRING, DATE
+====
+---- QUERY
+show files in ice_void;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=4/d_year=2004/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+alter table ice_void set partition spec (i, void(s), void(d));
+insert into ice_void values (5, 'five', '2005-05-05'), (5, 'other five', '1995-05-05');
+select * from ice_void;
+---- RESULTS
+1,'one',2001-01-01
+11,'other',2001-01-11
+2,'two',2002-02-02
+3,'three',2003-03-03
+4,'four',2004-04-04
+5,'five',2005-05-05
+5,'other five',1995-05-05
+---- TYPES
+INT, STRING, DATE
+====
+---- QUERY
+show files in ice_void;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=4/d_year=2004/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=5/[^=/]*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+alter table ice_void set partition spec (void(i), void(s), void(d));
+insert into ice_void values (6, 'six', '2006-06-06'), (7, 'seven', '2007-07-07');
+select * from ice_void;
+---- RESULTS
+1,'one',2001-01-01
+11,'other',2001-01-11
+2,'two',2002-02-02
+3,'three',2003-03-03
+4,'four',2004-04-04
+5,'five',2005-05-05
+5,'other five',1995-05-05
+6,'six',2006-06-06
+7,'seven',2007-07-07
+---- TYPES
+INT, STRING, DATE
+====
+---- QUERY
+show files in ice_void;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=4/d_year=2004/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=5/[^=/]*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/[^=/]*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
