@@ -706,6 +706,14 @@ enum TImpalaQueryOptions {
   // Number of minimum consecutive rows when filtered out, will avoid materialization
   // of columns in parquet. Set it to -1 to turn off late materialization feature.
   PARQUET_LATE_MATERIALIZATION_THRESHOLD = 138;
+
+  // Max entries in the dictionary before skipping runtime filter evaluation for row
+  // groups. If a dictionary has many entries, then runtime filter evaluation is more
+  // likely to give false positive results, which means that the row groups won't be
+  // rejected. Set it to 0 to disable runtime filter dictionary filtering, above 0 will
+  // enable runtime filtering on the row group. For example, 2 means that runtime filter
+  // will be evaluated when the dictionary size is smaller or equal to 2.
+  PARQUET_DICTIONARY_RUNTIME_FILTER_ENTRY_LIMIT = 139;
 }
 
 // The summary of a DML statement.

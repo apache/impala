@@ -559,6 +559,14 @@ struct TQueryOptions {
   // Number of minimum consecutive rows when filtered out, will avoid materialization
   // of columns in parquet. Set it to -1 to turn off late materialization feature.
   139: optional i32 parquet_late_materialization_threshold = 20;
+
+  // Max entries in the dictionary before skipping runtime filter evaluation for row
+  // groups. If a dictionary has many entries, then runtime filter evaluation is more
+  // likely to give false positive results, which means that the row groups won't be
+  // rejected. Set it to 0 to disable runtime filter dictionary filtering, above 0 will
+  // enable runtime filtering on the row group. For example, 2 means that runtime filter
+  // will be evaluated when the dictionary size is smaller or equal to 2.
+  140: optional i32 parquet_dictionary_runtime_filter_entry_limit = 1024;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

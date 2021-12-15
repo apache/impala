@@ -1137,6 +1137,17 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_parquet_late_materialization_threshold(threshold);
         break;
       }
+      case TImpalaQueryOptions::PARQUET_DICTIONARY_RUNTIME_FILTER_ENTRY_LIMIT: {
+        StringParser::ParseResult result;
+        const int32_t limit =
+            StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
+        if (value == nullptr || result != StringParser::PARSE_SUCCESS || limit < 0) {
+          return Status(Substitute("Invalid parquet parquet dictionary runtime filter "
+              "entry limit '$0'. Only integer value 0 and above is allowed.", value));
+        }
+        query_options->__set_parquet_dictionary_runtime_filter_entry_limit(limit);
+        break;
+      }
       case TImpalaQueryOptions::ENABLE_ASYNC_LOAD_DATA_EXECUTION: {
         query_options->__set_enable_async_load_data_execution(IsTrue(value));
         break;

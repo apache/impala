@@ -1,0 +1,131 @@
+====
+---- QUERY
+CREATE TABLE parquet_dict_runtime_filter (
+  col_1 INT,
+  col_2 STRING
+)
+STORED AS PARQUET;
+====
+---- QUERY
+INSERT INTO parquet_dict_runtime_filter VALUES (1, "a");
+====
+---- QUERY
+INSERT INTO parquet_dict_runtime_filter VALUES (2, "b");
+====
+---- QUERY
+# This insert will create a new file with PLAIN encoded col_2, because NULL is not present
+# in parquet dictionary. This row group will be skipped before dictionary filtering.
+INSERT INTO parquet_dict_runtime_filter VALUES (3, NULL);
+====
+---- QUERY
+# Test that runtime filters are applied on row groups.
+#   2 row groups are filtered by the right handside scanner's dictionary filter.
+#   1 row group is filtered by the left side scanner's runtime filter.
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SELECT * FROM parquet_dict_runtime_filter a
+  JOIN parquet_dict_runtime_filter b
+  ON a.col_2 = b.col_2 AND b.col_1 = 1;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumDictFilteredRowGroups): 3
+aggregation(SUM, RowGroups total): 2
+====
+---- QUERY
+# Test multiple filters on the same slot id.
+#   2 row groups are filtered by the right most side scanner's dictionary filter.
+#   2 row groups are filtered by the middle scanner's runtime filter + dictionary filter.
+#   1 row group is filtered by the left most side scanner's runtime filter.
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SELECT * FROM parquet_dict_runtime_filter a
+  JOIN parquet_dict_runtime_filter b ON a.col_2 = b.col_2 AND b.col_1 = 1
+  JOIN parquet_dict_runtime_filter c ON a.col_2 = c.col_2 AND c.col_1 = 1;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumDictFilteredRowGroups): 5
+aggregation(SUM, RowGroups total): 5
+====
+---- QUERY
+# Multiple columns in the join predicate, runtime filter should be skipped because only
+# single slot predicates are supported.
+#   2 row groups are filtered by the right side scanner's dictionary filter.
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SELECT * FROM parquet_dict_runtime_filter a
+  JOIN parquet_dict_runtime_filter b
+  ON CONCAT(a.col_2, CAST(a.col_1 as STRING)) = b.col_2 AND b.col_1 = 1;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumDictFilteredRowGroups): 2
+aggregation(SUM, RowGroups total): 0
+====
+---- QUERY
+# An expression in the join predicate, should be evaluated normally.
+#   2 row groups are filtered by the right side scanner's dictionary filter.
+#   2 row groups are filtered by the left side scanner's runtime filter.
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SELECT * FROM parquet_dict_runtime_filter a
+  JOIN parquet_dict_runtime_filter b
+  ON CONCAT(a.col_2, "1") = b.col_2 AND b.col_1 = 1;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumDictFilteredRowGroups): 4
+aggregation(SUM, RowGroups total): 2
+====
+---- QUERY
+CREATE TABLE parquet_dict_runtime_filter_partitioned (
+  col_2 STRING
+)
+PARTITIONED BY (col_1 INT)
+STORED AS PARQUET;
+====
+---- QUERY
+# (NULL, 3) will create a new file with PLAIN encoded col_2, because NULL is not present
+# in parquet dictionary. This row group will be skipped before dictionary filtering.
+INSERT INTO parquet_dict_runtime_filter_partitioned
+  PARTITION(col_1)
+  VALUES ("a", 1), ("b", 2), (NULL, 3);
+====
+---- QUERY
+# Test that runtime filters are applied on row groups.
+#   2 partitions (row groups) are pruned, the right side scanner does not filter.
+#   1 row group is filtered by the left side scanner's runtime filter.
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SELECT * FROM parquet_dict_runtime_filter_partitioned a
+  JOIN parquet_dict_runtime_filter_partitioned b
+  ON a.col_2 = b.col_2 AND b.col_1 = 1;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumDictFilteredRowGroups): 1
+aggregation(SUM, RowGroups total): 2
+====
+---- QUERY
+# Test multiple filters on the same slot id.
+#   2 partitions (row groups) are pruned, the right side scanner does not filter.
+#   2 partitions (row groups) are pruned, the middle scanner does not filter.
+#   1 row group is filtered by the left most side scanner's runtime filter.
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SELECT * FROM parquet_dict_runtime_filter a
+  JOIN parquet_dict_runtime_filter_partitioned b ON a.col_2 = b.col_2 AND b.col_1 = 1
+  JOIN parquet_dict_runtime_filter_partitioned c ON a.col_2 = c.col_2 AND c.col_1 = 1;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumDictFilteredRowGroups): 1
+aggregation(SUM, RowGroups total): 4
+====
+---- QUERY
+# Multiple columns in the join predicate, runtime filter should be skipped because only
+# single slot predicates are supported.
+#   2 partitions (row groups) are pruned, the right side scanner does not filter.
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SELECT * FROM parquet_dict_runtime_filter_partitioned a
+  JOIN parquet_dict_runtime_filter_partitioned b
+  ON CONCAT(a.col_2, CAST(a.col_1 as STRING)) = b.col_2 AND b.col_1 = 1;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumDictFilteredRowGroups): 0
+aggregation(SUM, RowGroups total): 0
+====
+---- QUERY
+# An expression in the join predicate, should be evaluated normally.
+#   2 partitions (row groups) are pruned, the right side scanner does not filter.
+#   2 row groups are filtered by the left side scanner's runtime filter.
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SELECT * FROM parquet_dict_runtime_filter_partitioned a
+  JOIN parquet_dict_runtime_filter_partitioned b
+  ON CONCAT(a.col_2, "1") = b.col_2 AND b.col_1 = 1;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumDictFilteredRowGroups): 2
+aggregation(SUM, RowGroups total): 2
+====

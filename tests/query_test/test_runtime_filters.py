@@ -193,6 +193,23 @@ class TestBloomFilters(ImpalaTestSuite):
       self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=BLOOM")
     self.run_test_case('QueryTest/bloom_filters', vector)
 
+  def test_iceberg_dictionary_runtime_filter(self, vector, unique_database):
+    self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=BLOOM")
+    self.execute_query("SET PARQUET_READ_STATISTICS=false;")
+    self.execute_query("SET MINMAX_FILTER_THRESHOLD = 0.0;")
+    self.execute_query("SET MINMAX_FILTER_SORTED_COLUMNS=FALSE;")
+    self.execute_query("SET MINMAX_FILTER_PARTITION_COLUMNS=FALSE;")
+    self.run_test_case('QueryTest/iceberg-dictionary-runtime-filter', vector,
+      unique_database, test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
+
+  def test_parquet_dictionary_runtime_filter(self, vector, unique_database):
+    self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=BLOOM")
+    self.execute_query("SET PARQUET_READ_STATISTICS=false;")
+    self.execute_query("SET MINMAX_FILTER_THRESHOLD = 0.0;")
+    self.execute_query("SET MINMAX_FILTER_SORTED_COLUMNS=FALSE;")
+    self.execute_query("SET MINMAX_FILTER_PARTITION_COLUMNS=FALSE;")
+    self.run_test_case('QueryTest/parquet-dictionary-runtime-filter', vector,
+      unique_database, test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 
 @SkipIfLocal.multiple_impalad
 class TestMinMaxFilters(ImpalaTestSuite):
@@ -357,6 +374,7 @@ class TestRuntimeRowFilters(ImpalaTestSuite):
     # Disable generating min/max filters for sorted columns
     self.execute_query("SET MINMAX_FILTER_SORTED_COLUMNS=false")
     self.execute_query("SET MINMAX_FILTER_PARTITION_COLUMNS=false")
+    self.execute_query("SET PARQUET_DICTIONARY_RUNTIME_FILTER_ENTRY_LIMIT=0")
     self.run_test_case('QueryTest/runtime_row_filters', new_vector,
                        test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 

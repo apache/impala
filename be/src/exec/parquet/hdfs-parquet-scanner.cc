@@ -52,12 +52,12 @@
 
 #include "common/names.h"
 
-DECLARE_bool(convert_legacy_hive_parquet_utc_timestamps);
-
 using std::move;
 using std::sort;
 using namespace impala;
 using namespace impala::io;
+
+namespace impala {
 
 // Max entries in the dictionary before switching to PLAIN encoding. If a dictionary
 // has fewer entries, then the entire column is dictionary encoded. This threshold
@@ -67,8 +67,6 @@ const int LEGACY_IMPALA_MAX_DICT_ENTRIES = 40000;
 
 static const string PARQUET_MEM_LIMIT_EXCEEDED =
     "HdfsParquetScanner::$0() failed to allocate $1 bytes for $2.";
-
-namespace impala {
 
 static const string IDEAL_RESERVATION_COUNTER_NAME = "ParquetRowGroupIdealReservation";
 static const string ACTUAL_RESERVATION_COUNTER_NAME = "ParquetRowGroupActualReservation";
@@ -195,6 +193,11 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
     const FilterContext* ctx = &context->filter_ctxs()[i];
     DCHECK(ctx->filter != nullptr);
     filter_ctxs_.push_back(ctx);
+    const auto& expr = ctx->expr_eval->root();
+    vector<SlotId> slot_ids;
+    if(expr.GetSlotIds(&slot_ids) == 1) {
+      single_col_filter_ctxs_[slot_ids[0]].push_back(ctx);
+    }
   }
   filter_stats_.resize(filter_ctxs_.size());
   for (int i = 0; i < filter_stats_.size(); ++i) {
@@ -994,7 +997,6 @@ Status HdfsParquetScanner::NextRowGroup() {
       continue;
     }
     if (skip_row_group_on_dict_filters) {
-      COUNTER_ADD(num_dict_filtered_row_groups_counter_, 1);
       ReleaseSkippedRowGroupResources();
       continue;
     }
@@ -1679,7 +1681,9 @@ bool HdfsParquetScanner::IsDictFilterable(BaseScalarColumnReader* col_reader) {
   if (!slot_desc) return false;
   // Does this column reader have any dictionary filter conjuncts?
   auto dict_filter_it = dict_filter_map_.find(slot_desc->id());
-  if (dict_filter_it == dict_filter_map_.end()) return false;
+  auto runtime_filter_it = single_col_filter_ctxs_.find(slot_desc->id());
+  if (runtime_filter_it == single_col_filter_ctxs_.end()
+      && dict_filter_it == dict_filter_map_.end()) return false;
 
   // Certain datatypes (chars, timestamps) do not have the appropriate value in the
   // file format and must be converted before return. This is true for the
@@ -1719,7 +1723,8 @@ void HdfsParquetScanner::PartitionReaders(
 
 Status HdfsParquetScanner::InitDictFilterStructures() {
   bool can_eval_dict_filters =
-      state_->query_options().parquet_dictionary_filtering && !dict_filter_map_.empty();
+      state_->query_options().parquet_dictionary_filtering &&
+      (!dict_filter_map_.empty() || !single_col_filter_ctxs_.empty());
 
   // Separate column readers into scalar and collection readers.
   PartitionReaders(column_readers_, can_eval_dict_filters);
@@ -1849,9 +1854,16 @@ Status HdfsParquetScanner::EvalDictionaryFilters(const parquet::RowGroup& row_gr
     DCHECK(slot_desc != nullptr);
     const TupleDescriptor* tuple_desc = slot_desc->parent();
     auto dict_filter_it = dict_filter_map_.find(slot_desc->id());
-    DCHECK(dict_filter_it != dict_filter_map_.end());
-    const vector<ScalarExprEvaluator*>& dict_filter_conjunct_evals =
-        dict_filter_it->second;
+    const vector<ScalarExprEvaluator*>* dict_filter_conjunct_evals =
+        dict_filter_it != dict_filter_map_.end()
+        ? &(dict_filter_it->second) : nullptr;
+
+    auto runtime_filter_it = single_col_filter_ctxs_.find(slot_desc->id());
+    const vector<const FilterContext*>* runtime_filters =
+        runtime_filter_it != single_col_filter_ctxs_.end()
+        ? &runtime_filter_it->second : nullptr;
+    DCHECK(runtime_filters != nullptr || dict_filter_conjunct_evals != nullptr);
+
     Tuple* dict_filter_tuple = nullptr;
     auto dict_filter_tuple_it = tuple_map.find(tuple_desc);
     if (dict_filter_tuple_it == tuple_map.end()) {
@@ -1867,6 +1879,9 @@ Status HdfsParquetScanner::EvalDictionaryFilters(const parquet::RowGroup& row_gr
     DCHECK(dict_filter_tuple != nullptr);
     void* slot = dict_filter_tuple->GetSlot(slot_desc->tuple_offset());
     bool column_has_match = false;
+    bool should_eval_runtime_filter = dictionary->num_entries() <=
+        state_->query_options().parquet_dictionary_runtime_filter_entry_limit;
+    int runtime_filters_processed = 0;
     for (int dict_idx = 0; dict_idx < dictionary->num_entries(); ++dict_idx) {
       if (dict_idx % 1024 == 0) {
         // Don't let expr result allocations accumulate too much for large dictionaries or
@@ -1875,23 +1890,48 @@ Status HdfsParquetScanner::EvalDictionaryFilters(const parquet::RowGroup& row_gr
       }
       dictionary->GetValue(dict_idx, slot);
 
-      // We can only eliminate this row group if no value from the dictionary matches.
-      // If any dictionary value passes the conjuncts, then move on to the next column.
+      // If any dictionary value passes the conjuncts and runtime filters, then move on to
+      // the next column.
       TupleRow row;
       row.SetTuple(0, dict_filter_tuple);
-      if (ExecNode::EvalConjuncts(dict_filter_conjunct_evals.data(),
-              dict_filter_conjunct_evals.size(), &row)) {
-        column_has_match = true;
-        break;
+      if (dict_filter_conjunct_evals != nullptr
+          && !ExecNode::EvalConjuncts(dict_filter_conjunct_evals->data(),
+              dict_filter_conjunct_evals->size(), &row)) {
+        continue; // Failed the conjunct check, move on to the next entry.
+      }
+      column_has_match = true; // match caused by conjunct evaluation
+      if (runtime_filters != nullptr && should_eval_runtime_filter) {
+        for (int rf_idx = 0; rf_idx < runtime_filters->size(); rf_idx++) {
+          if (runtime_filters_processed <= rf_idx) runtime_filters_processed++;
+          if (!runtime_filters->at(rf_idx)->Eval(&row)) {
+            column_has_match = false;
+            break;
+          }
+        }
+        if (column_has_match) {
+          break; // Passed the conjunct and there were no runtime filter miss.
+        }
+      } else {
+        break; // Passed the conjunct and runtime filter does not exist.
       }
     }
     // Free all expr result allocations now that we're done with the filter.
     context_->expr_results_pool()->Clear();
 
+    // Although, the accepted and rejected runtime filter stats can not be updated
+    // meaningfully, it is possible to update the processed stat.
+    if (runtime_filters != nullptr) {
+      for (int rf_idx = 0; rf_idx < runtime_filters_processed; rf_idx++) {
+          runtime_filters->at(rf_idx)->stats->IncrCounters(
+              FilterStats::ROW_GROUPS_KEY, 1, 1, 0);
+      }
+    }
+
+    // This column contains no value that matches the conjunct or runtime filter,
+    // therefore this row group can be eliminated.
     if (!column_has_match) {
-      // The column contains no value that matches the conjunct. The row group
-      // can be eliminated.
       *row_group_eliminated = true;
+      COUNTER_ADD(num_dict_filtered_row_groups_counter_, 1);
       return Status::OK();
     }
   }

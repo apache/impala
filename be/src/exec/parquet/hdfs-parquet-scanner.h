@@ -470,6 +470,10 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// or nested within a collection.
   std::vector<BaseScalarColumnReader*> non_dict_filterable_readers_;
 
+  /// Runtime filters that depend on only a single column. These filters can be used
+  /// during dictionary filtering.
+  std::unordered_map<SlotId, std::vector<const FilterContext*>> single_col_filter_ctxs_;
+
   /// Flattened list of all scalar column readers in column_readers_.
   std::vector<BaseScalarColumnReader*> scalar_readers_;
 
@@ -537,7 +541,9 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// with the midpoint of any row-group in the file.
   RuntimeProfile::Counter* num_scanners_with_no_reads_counter_;
 
-  /// Number of row groups skipped due to dictionary filter
+  /// Number of row groups skipped due to dictionary filter. This is an aggregated counter
+  /// that includes the number of filtered row groups as a result of evaluating conjuncts
+  /// and runtime bloom filters on the dictionary entries.
   RuntimeProfile::Counter* num_dict_filtered_row_groups_counter_;
 
   /// Tracks the size of any compressed pages read. If no compressed pages are read, this
