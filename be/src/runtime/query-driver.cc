@@ -89,6 +89,8 @@ Status QueryDriver::SetExternalPlan(
   // Update local_time_zone in the external request
   exec_request_->query_exec_request.query_ctx.__set_local_time_zone(
       query_ctx.local_time_zone);
+  exec_request_->query_exec_request.query_ctx.__set_now_string(
+      query_ctx.now_string);
   return Status::OK();
 }
 
