@@ -23,6 +23,9 @@
 #include <exception>
 #include <fstream>
 #include <sstream>
+#ifdef CALLONCEHACK
+#include <calloncehack.h>
+#endif
 
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/join.hpp>
@@ -2880,6 +2883,12 @@ void ImpalaServer::ExpireQuery(ClientRequestState* crs, const Status& status) {
 Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
     int32_t hs2_http_port, int32_t external_fe_port) {
   exec_env_->SetImpalaServer(this);
+
+#ifdef CALLONCEHACK
+  // Include this calloncehack call (which is a no-op) to make sure calloncehack
+  // is required at link time when using it.
+  calloncehack::InitializeCallOnceHack();
+#endif
 
   // We must register the HTTP handlers after registering the ImpalaServer with the
   // ExecEnv. Otherwise the HTTP handlers will try to resolve the ImpalaServer through the

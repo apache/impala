@@ -119,6 +119,7 @@ set_dep_root(THRIFT)
 set_dep_root(ZLIB)
 set_dep_root(CCTZ)
 set_dep_root(CURL)
+set_dep_root(CALLONCEHACK)
 
 # The boost-cmake project hasn't been maintained for years. Let's make sure we
 # don't accidentally use it if it can be found.
@@ -351,6 +352,11 @@ find_package(KerberosPrograms REQUIRED)
 # find curl headers and libs
 find_package(Curl REQUIRED)
 IMPALA_ADD_THIRDPARTY_LIB(curl ${CURL_INCLUDE_DIR} ${CURL_STATIC_LIB} "")
+
+# find calloncehack headers and libs
+find_package(CallOnceHack REQUIRED)
+IMPALA_ADD_THIRDPARTY_LIB(calloncehack ${CALLONCEHACK_INCLUDE_DIR} ""
+  ${CALLONCEHACK_SHARED_LIB})
 
 # Tests that run any security related tests need to link this in to override the
 # krb5_realm_override() implementation in krb5.

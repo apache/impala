@@ -68,7 +68,7 @@ fi
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=62-4fde3e799d
+export IMPALA_TOOLCHAIN_BUILD_ID=70-b2f92bd26e
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p5
@@ -161,6 +161,8 @@ export IMPALA_THRIFT_VERSION=0.11.0-p4
 unset IMPALA_THRIFT_URL
 export IMPALA_ZLIB_VERSION=1.2.11
 unset IMPALA_ZLIB_URL
+export IMPALA_CALLONCEHACK_VERSION=1.0.0
+unset IMPALA_CALLONCEHACK_URL
 
 if [[ $OSTYPE == "darwin"* ]]; then
   IMPALA_CYRUS_SASL_VERSION=2.1.26
@@ -727,7 +729,7 @@ fi
 # overall build type) and does not apply when using a local Kudu build.
 export USE_KUDU_DEBUG_BUILD=${USE_KUDU_DEBUG_BUILD-false}
 
-export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"f486f0813a"}
+export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"1754f517b2"}
 export IMPALA_KUDU_HOME=${IMPALA_TOOLCHAIN_PACKAGES_HOME}/kudu-$IMPALA_KUDU_VERSION
 export IMPALA_KUDU_JAVA_HOME=\
 ${IMPALA_TOOLCHAIN_PACKAGES_HOME}/kudu-${IMPALA_KUDU_VERSION}/java

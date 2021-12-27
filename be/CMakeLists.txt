@@ -89,6 +89,7 @@ SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -Wno-zero-as-null-pointer-constant")
 SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -Wno-c++17-extensions")
 SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -Wno-inconsistent-missing-destructor-override")
 SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -Wno-return-type-c-linkage")
+SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -DCALLONCEHACK")
 # For any gcc builds:
 #   -g: Enable symbols for profiler tools
 #   -Wno-unused-local-typedefs: Do not warn for local typedefs that are unused.
@@ -552,6 +553,23 @@ set (IMPALA_DEPENDENCIES
   kudu_client
   cctz
   curl)
+
+# When building with Clang, linking fails because it is trying to
+# use a symbol in kudu_client, but that symbol is discarded. To
+# hack around this error, the calloncehack shared library defines the
+# same symbol publicly. Placing calloncehack ahead of kudu_client
+# causes the linker to use its definition rather than kudu_client's.
+# The underlying issue is some incompatibility when building with
+# Clang while having libraries built with GCC, so this only applies
+# to Clang compilation.
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+  message(STATUS "C++ compiler is Clang, enabling calloncehack")
+  # Put calloncehack at the start of the dependencies. The important thing
+  # is that it is ahead of kudu_client.
+  set(IMPALA_DEPENDENCIES calloncehack ${IMPALA_DEPENDENCIES})
+else()
+  message(STATUS "C++ compiler is not Clang, skipping calloncehack")
+endif()
 
 # Add all external dependencies. They should come after the impala libs.
 set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
