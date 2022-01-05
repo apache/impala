@@ -17,6 +17,7 @@
 
 package org.apache.impala.planner;
 
+import org.apache.impala.planner.ResourceProfile;
 import com.google.common.base.Preconditions;
 
 /**

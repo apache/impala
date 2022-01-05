@@ -197,7 +197,8 @@ def create_exec_option_dimension(cluster_sizes=ALL_CLUSTER_SIZES,
       'batch_size': batch_sizes,
       'disable_codegen': disable_codegen_options,
       'disable_codegen_rows_threshold': disable_codegen_rows_threshold_options,
-      'num_nodes': cluster_sizes}
+      'num_nodes': cluster_sizes,
+      'test_replan': [1]}
 
   if sync_ddl is not None:
     exec_option_dimensions['sync_ddl'] = sync_ddl

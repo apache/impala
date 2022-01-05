@@ -1619,7 +1619,8 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkNotNull(scanRangeSpecs_);
     ExecutorMembershipSnapshot cluster = ExecutorMembershipSnapshot.getCluster();
     final int maxInstancesPerNode = getMaxInstancesPerNode(analyzer);
-    final int maxPossibleInstances = cluster.numExecutors() * maxInstancesPerNode;
+    final int maxPossibleInstances =
+        analyzer.numExecutorsForPlanning() * maxInstancesPerNode;
     int totalNodes = 0;
     int totalInstances = 0;
     int numLocalRanges = 0;
@@ -1683,10 +1684,12 @@ public class HdfsScanNode extends ScanNode {
           // hosts that hold block replica for those ranges.
           int numLocalNodes = Math.min(numLocalRanges, localRangeCounts.size());
           // The remote ranges are round-robined across all the impalads.
-          int numRemoteNodes = Math.min(numRemoteRanges, cluster.numExecutors());
+          int numRemoteNodes =
+              Math.min(numRemoteRanges, analyzer.numExecutorsForPlanning());
           // The local and remote assignments may overlap, but we don't know by how much
           // so conservatively assume no overlap.
-          totalNodes = Math.min(numLocalNodes + numRemoteNodes, cluster.numExecutors());
+          totalNodes = Math.min(
+              numLocalNodes + numRemoteNodes, analyzer.numExecutorsForPlanning());
           totalInstances = computeNumInstances(numLocalRanges, numRemoteRanges,
               totalNodes, maxInstancesPerNode, totalLocalParallelism);
           // Exit early if we have maxed out our estimate of hosts/instances, to avoid
@@ -1703,7 +1706,8 @@ public class HdfsScanNode extends ScanNode {
           generatedScanRangeCount_ >= scanRangeSpecs_.getSplit_specsSize());
       numRemoteRanges += generatedScanRangeCount_;
       int numLocalNodes = Math.min(numLocalRanges, localRangeCounts.size());
-      totalNodes = Math.min(numLocalNodes + numRemoteRanges, cluster.numExecutors());
+      totalNodes =
+          Math.min(numLocalNodes + numRemoteRanges, analyzer.numExecutorsForPlanning());
       totalInstances = computeNumInstances(numLocalRanges, numRemoteRanges,
           totalNodes, maxInstancesPerNode, totalLocalParallelism);
     }
@@ -1717,7 +1721,7 @@ public class HdfsScanNode extends ScanNode {
           + " localRanges=" + numLocalRanges + " remoteRanges=" + numRemoteRanges
           + " localRangeCounts.size=" + localRangeCounts.size()
           + " totalLocalParallelism=" + totalLocalParallelism
-          + " executorNodes=" + cluster.numExecutors() + " "
+          + " executorNodes=" + analyzer.numExecutorsForPlanning() + " "
           + " numNodes=" + numNodes_ + " numInstances=" + numInstances_);
     }
   }

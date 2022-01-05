@@ -19,9 +19,11 @@ package org.apache.impala.planner;
 
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TExecutorGroupSet;
 import org.apache.impala.thrift.TQueryCtx;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
 import org.apache.impala.util.ExecutorMembershipSnapshot;
 
@@ -47,6 +49,10 @@ public class ClusterSizeTest extends FrontendTestBase {
       TQueryCtx queryCtx = TestUtils.createQueryContext(
           "functional", System.getProperty("user.name"));
       queryCtx.client_request.setStmt(stmt);
+      TQueryOptions queryOptions = queryCtx.client_request.getQuery_options();
+      // Disable the default treatment of a default group as a two-group testing
+      // environment.
+      queryOptions.setTest_replan(false);
       ret = frontend_.getExplainString(queryCtx);
     } catch (ImpalaException e) {
       fail(e.getMessage());

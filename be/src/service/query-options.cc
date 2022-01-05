@@ -1201,6 +1201,14 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_runtime_in_list_filter_entry_limit(limit);
         break;
       }
+      case TImpalaQueryOptions::ENABLE_REPLAN: {
+        query_options->__set_enable_replan(IsTrue(value));
+        break;
+      }
+      case TImpalaQueryOptions::TEST_REPLAN: {
+        query_options->__set_test_replan(IsTrue(value));
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

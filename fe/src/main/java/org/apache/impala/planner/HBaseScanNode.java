@@ -363,7 +363,7 @@ public class HBaseScanNode extends ScanNode {
 
     // Assume that each node/instance in the cluster gets a scan range, unless there are
     // fewer scan ranges than nodes/instances.
-    int numExecutors = ExecutorMembershipSnapshot.getCluster().numExecutors();
+    int numExecutors = analyzer.numExecutorsForPlanning();
     numNodes_ =
         Math.max(1, Math.min(scanRangeSpecs_.getConcrete_rangesSize(), numExecutors));
     int maxInstances = numNodes_ * getMaxInstancesPerNode(analyzer);

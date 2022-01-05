@@ -304,7 +304,8 @@ public class KuduScanNode extends ScanNode {
   protected void computeNumNodes(Analyzer analyzer) {
     ExecutorMembershipSnapshot cluster = ExecutorMembershipSnapshot.getCluster();
     final int maxInstancesPerNode = getMaxInstancesPerNode(analyzer);
-    final int maxPossibleInstances = cluster.numExecutors() * maxInstancesPerNode;
+    final int maxPossibleInstances =
+        analyzer.numExecutorsForPlanning() * maxInstancesPerNode;
     int totalNodes = 0;
     int totalInstances = 0;
     int numLocalRanges = 0;
@@ -347,10 +348,12 @@ public class KuduScanNode extends ScanNode {
         // hosts that hold replica for those ranges.
         int numLocalNodes = Math.min(numLocalRanges, localRangeCounts.size());
         // The remote ranges are round-robined across all the impalads.
-        int numRemoteNodes = Math.min(numRemoteRanges, cluster.numExecutors());
+        int numRemoteNodes =
+            Math.min(numRemoteRanges, analyzer.numExecutorsForPlanning());
         // The local and remote assignments may overlap, but we don't know by how much
         // so conservatively assume no overlap.
-        totalNodes = Math.min(numLocalNodes + numRemoteNodes, cluster.numExecutors());
+        totalNodes =
+            Math.min(numLocalNodes + numRemoteNodes, analyzer.numExecutorsForPlanning());
 
         int numLocalInstances = Math.min(numLocalRanges, totalLocalParallelism);
         totalInstances = Math.min(numLocalInstances + numRemoteRanges,

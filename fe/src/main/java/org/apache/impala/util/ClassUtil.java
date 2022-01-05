@@ -27,4 +27,12 @@ public class ClassUtil {
     StackTraceElement stackTrace = Thread.currentThread().getStackTrace()[2];
     return stackTrace.getClassName() + "." + stackTrace.getMethodName() + "()";
   }
+
+  public static String getStackTraceForThread() {
+    StringBuilder stringBuilder = new StringBuilder();
+    for (StackTraceElement frame: Thread.currentThread().getStackTrace()) {
+      stringBuilder.append(frame.toString() + "\n");
+    }
+    return stringBuilder.toString();
+  }
 }

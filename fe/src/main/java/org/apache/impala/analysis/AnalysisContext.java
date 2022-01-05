@@ -435,6 +435,13 @@ public class AnalysisContext {
     return result;
   }
 
+  public AnalysisResult analyzeAndAuthorize(StatementBase stmt,
+      StmtTableCache stmtTableCache, AuthorizationChecker authzChecker)
+      throws ImpalaException {
+    return analyzeAndAuthorize(
+        stmt, stmtTableCache, authzChecker, false /*disableAuthorization*/);
+  }
+
   /**
    * Analyzes and authorizes the given statement using the provided table cache and
    * authorization checker.
@@ -442,8 +449,8 @@ public class AnalysisContext {
    * reveal the existence/absence of objects the user is not authorized to see.
    */
   public AnalysisResult analyzeAndAuthorize(StatementBase stmt,
-      StmtTableCache stmtTableCache, AuthorizationChecker authzChecker)
-      throws ImpalaException {
+      StmtTableCache stmtTableCache, AuthorizationChecker authzChecker,
+      boolean disableAuthorization) throws ImpalaException {
     // TODO: Clean up the creation/setting of the analysis result.
     analysisResult_ = new AnalysisResult();
     analysisResult_.stmt_ = stmt;
@@ -469,12 +476,14 @@ public class AnalysisContext {
     // Authorize statement and record exception. Authorization relies on information
     // collected during analysis.
     AuthorizationException authException = null;
-    try {
-      authzChecker.authorize(authzCtx, analysisResult_, catalog_);
-    } catch (AuthorizationException e) {
-      authException = e;
-    } finally {
-      authzChecker.postAuthorize(authzCtx, authException == null);
+    if (!disableAuthorization) {
+      try {
+        authzChecker.authorize(authzCtx, analysisResult_, catalog_);
+      } catch (AuthorizationException e) {
+        authException = e;
+      } finally {
+        authzChecker.postAuthorize(authzCtx, authException == null);
+      }
     }
 
     // AuthorizationExceptions take precedence over AnalysisExceptions so as not

@@ -724,6 +724,12 @@ enum TImpalaQueryOptions {
 
   // Maximum number of distinct entries in a runtime in-list filter.
   RUNTIME_IN_LIST_FILTER_ENTRY_LIMIT = 142;
+
+  // If true, replanning is enabled.
+  ENABLE_REPLAN = 143;
+
+  // If true, test replan by imposing artificial two executor groups in FE.
+  TEST_REPLAN = 144;
 }
 
 // The summary of a DML statement.

@@ -95,6 +95,7 @@ import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.DisjointSet;
+import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.apache.impala.util.Graph.RandomAccessibleGraph;
 import org.apache.impala.util.Graph.SccCondensedGraph;
 import org.apache.impala.util.Graph.WritableGraph;
@@ -501,6 +502,12 @@ public class Analyzer {
     // require analysis (e.g. some literal expressions).
     private int numStmtExprs_ = 0;
 
+    // When set to a value > -1, it represents the number of executors for current
+    // iteration of compilation. Used by auto scaling to pass the info to the planner in
+    // place of ExecutorMembershipSnapshot.numExecutors(). ExecutorMembershipSnapshot is a
+    // singleton.
+    private int numExecutorsForPlanning_ = -1;
+
     // Cache of KuduTables opened for this query. (map from table name to kudu table)
     // This cache prevent multiple openTable calls for a given table in the same query.
     public final Map<String, org.apache.kudu.client.KuduTable> kuduTables =
@@ -552,6 +559,15 @@ public class Analyzer {
 
   public boolean containsSubquery() { return globalState_.containsSubquery; }
   public boolean containsSetOperation() { return globalState_.setOperationNeedsRewrite; }
+
+  public int numExecutorsForPlanning() {
+    return (globalState_.numExecutorsForPlanning_ >= 0) ?
+        globalState_.numExecutorsForPlanning_ :
+        ExecutorMembershipSnapshot.getCluster().numExecutors();
+  }
+  public void setNumExecutorsForPlanning(int x) {
+    globalState_.numExecutorsForPlanning_ = x;
+  }
 
   // An analyzer stores analysis state for a single select block. A select block can be
   // a top level select statement, or an inline view select block.

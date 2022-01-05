@@ -121,6 +121,9 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.KuduTransactionManager;
 import org.apache.impala.common.NotImplementedException;
+import org.apache.impala.common.Pair;
+import org.apache.impala.common.PrintUtils;
+import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.common.TransactionException;
 import org.apache.impala.common.TransactionKeepalive;
 import org.apache.impala.common.TransactionKeepalive.HeartbeatContext;
@@ -142,11 +145,13 @@ import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TCommentOnParams;
 import org.apache.impala.thrift.TCreateDropRoleParams;
+import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDdlExecRequest;
 import org.apache.impala.thrift.TDdlType;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TDescribeResult;
 import org.apache.impala.thrift.TExecRequest;
+import org.apache.impala.thrift.TExecutorGroupSet;
 import org.apache.impala.thrift.TExplainResult;
 import org.apache.impala.thrift.TFinalizeParams;
 import org.apache.impala.thrift.TFunctionCategory;
@@ -155,6 +160,8 @@ import org.apache.impala.thrift.TGetTableHistoryResult;
 import org.apache.impala.thrift.TGetTableHistoryResultItem;
 import org.apache.impala.thrift.TGrantRevokePrivParams;
 import org.apache.impala.thrift.TGrantRevokeRoleParams;
+import org.apache.impala.thrift.THdfsTableSink;
+import org.apache.impala.thrift.TKuduTableSink;
 import org.apache.impala.thrift.TLineageGraph;
 import org.apache.impala.thrift.TLoadDataReq;
 import org.apache.impala.thrift.TLoadDataResp;
@@ -162,6 +169,7 @@ import org.apache.impala.thrift.TCopyTestCaseReq;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TPlanExecInfo;
 import org.apache.impala.thrift.TPlanFragment;
+import org.apache.impala.thrift.TPoolConfig;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryExecRequest;
 import org.apache.impala.thrift.TQueryOptions;
@@ -173,6 +181,7 @@ import org.apache.impala.thrift.TShowFilesParams;
 import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TStmtType;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.thrift.TTableSink;
 import org.apache.impala.thrift.TTruncateParams;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
@@ -184,6 +193,7 @@ import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.PatternMatcher;
+import org.apache.impala.util.RequestPoolService;
 import org.apache.impala.util.TResultRowBuilder;
 import org.apache.impala.util.TSessionStateUtil;
 import org.apache.kudu.client.KuduClient;
@@ -201,6 +211,9 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
+
+import static org.apache.impala.common.ByteUnits.MEGABYTE;
+import static org.apache.impala.common.ByteUnits.GIGABYTE;
 
 /**
  * Frontend API for the impalad process.
@@ -224,6 +237,10 @@ public class Frontend {
   // Maximum number of threads used to check authorization for the user when executing
   // show tables/databases.
   private static final int MAX_CHECK_AUTHORIZATION_POOL_SIZE = 128;
+
+  // The default pool name to use when ExecutorMembershipSnapshot is in initial state
+  // (i.e., ExecutorMembershipSnapshot.numExecutors_ == 0).
+  private static final String DEFAULT_POOL_NAME = "default-pool";
 
   /**
    * Plan-time context that allows capturing various artifacts created
@@ -249,14 +266,109 @@ public class Frontend {
     // Thrift. For unit testing.
     protected List<PlanFragment> plan_;
 
+    // An inner class to capture the state of compilation for auto-scaling.
+    final class AutoScalingCompilationState {
+      // Flag to indicate whether to disable authorization after analyze. Used by
+      // auto-scalling to avoid redundent authorizations.
+      protected boolean disableAuthorization_ = false;
+
+      // The estimated memory per host for certain queries that do not populate
+      // TExecRequest.query_exec_request field.
+      protected long estimated_memory_per_host_ = -1;
+
+      // The initial length of content in explain buffer to help return the buffer
+      // to the initial position prior to another auto-scaling compilation.
+      protected int initialExplainBufLen_ = -1;
+
+      // The initial query options seen before any compilations, which will be copied
+      // and used by each iteration of auto-scaling compilation.
+      protected TQueryOptions initialQueryOptions_ = null;
+
+      // The allocated write Id when in an ACID transaction.
+      protected long writeId_ = -1;
+
+      // The transaction token when in a Kudu transaction.
+      protected byte[] kuduTransactionToken_ = null;
+
+      // Indicate whether runtime profile/summary can be accessed. Set at the end of
+      // 1st iteration.
+      protected boolean user_has_profile_access_ = false;
+
+      // The group set being applied in current compilation.
+      protected TExecutorGroupSet group_set_ = null;
+
+      public boolean disableAuthorization() { return disableAuthorization_; }
+
+      public long getEstimatedMemoryPerHost() { return estimated_memory_per_host_; }
+      public void setEstimatedMemoryPerHost(long x) { estimated_memory_per_host_ = x; }
+
+      // Capture the current state and initialize before iterative compilations begin.
+      public void captureState() {
+        disableAuthorization_ = false;
+        estimated_memory_per_host_ = -1;
+        initialExplainBufLen_ = PlanCtx.this.explainBuf_.length();
+        initialQueryOptions_ =
+            new TQueryOptions(getQueryContext().client_request.getQuery_options());
+        writeId_ = -1;
+        kuduTransactionToken_ = null;
+      }
+
+      // Restore to the captured state after an iterative compilation
+      public void restoreState() {
+        // Avoid authorization starting from 2nd iteration. This flag can be set to
+        // false when meta-data change is detected.
+        disableAuthorization_ = true;
+
+        // Reset estimated memory
+        estimated_memory_per_host_ = -1;
+
+        // Remove the explain string accumulated
+        explainBuf_.delete(initialExplainBufLen_, explainBuf_.length());
+
+        // Use a brand new copy of query options
+        getQueryContext().client_request.setQuery_options(
+            new TQueryOptions(initialQueryOptions_));
+
+        // Set the flag to false to avoid serializing TQueryCtx.desc_tbl_testonly (a list
+        // of Descriptors.TDescriptorTable) in next iteration of compilation.
+        // TQueryCtx.desc_tbl_testonly is set in current iteration during planner test.
+        queryCtx_.setDesc_tbl_testonlyIsSet(false);
+      }
+
+      // When exception InconsistentMetadataFetchException is received and before
+      // next compilation, disable stmt cache and re-authorize.
+      public void disableStmtCacheAndReauthorize() {
+        restoreState();
+        disableAuthorization_ = false;
+      }
+
+      long getWriteId() { return writeId_; }
+      void setWriteId(long x) { writeId_ = x; }
+
+      byte[] getKuduTransactionToken() { return kuduTransactionToken_; }
+      void setKuduTransactionToken(byte[] token) {
+        kuduTransactionToken_ = (token == null) ? null : token.clone();
+      }
+
+      boolean userHasProfileAccess() { return user_has_profile_access_; }
+      void setUserHasProfileAccess(boolean x) { user_has_profile_access_ = x; }
+
+      TExecutorGroupSet getGroupSet() { return group_set_; }
+      void setGroupSet(TExecutorGroupSet x) { group_set_ = x; }
+    }
+
+    public AutoScalingCompilationState compilationState_;
+
     public PlanCtx(TQueryCtx qCtx) {
       queryCtx_ = qCtx;
       explainBuf_ = new StringBuilder();
+      compilationState_ = new AutoScalingCompilationState();
     }
 
     public PlanCtx(TQueryCtx qCtx, StringBuilder describe) {
       queryCtx_ = qCtx;
       explainBuf_ = describe;
+      compilationState_ = new AutoScalingCompilationState();
     }
 
     /**
@@ -1597,6 +1709,10 @@ public class Frontend {
     planCtx.explainBuf_.append(planner.getExplainString(allFragments, result));
     result.setQuery_plan(planCtx.getExplainString());
 
+    // copy estimated memory per host to planCtx for auto-scaling.
+    planCtx.compilationState_.setEstimatedMemoryPerHost(
+        result.getPer_host_mem_estimate());
+
     return result;
   }
 
@@ -1630,34 +1746,238 @@ public class Frontend {
             + "%s of %s times: ",numRetries, INCONSISTENT_METADATA_NUM_RETRIES) + msg);
   }
 
+  /**
+   * Examines the input 'executorGroupSets', removes non-default and useless group sets
+   * from it and fills the max_mem_limit field. A group set is considered useless if its
+   * name is not a suffix of 'request_pool'. The max_mem_limit is set to the
+   * max_query_mem_limit from the pool service for the surviving group sets.
+   *
+   * Also imposes the artificial two-executor groups for testing when needed.
+   */
+  private List<TExecutorGroupSet> setupThresholdsForExecutorGroupSets(
+      List<TExecutorGroupSet> executorGroupSets, String request_pool,
+      boolean default_executor_group, boolean test_replan) throws ImpalaException {
+    RequestPoolService poolService = RequestPoolService.getInstance();
+
+    List<TExecutorGroupSet> result = Lists.newArrayList();
+    if (default_executor_group) {
+      TExecutorGroupSet e = executorGroupSets.get(0);
+      if (e.getCurr_num_executors() == 0) {
+        // The default group has 0 executors. Return one with the number of default
+        // executors as the number of expected executors.
+        result.add(new TExecutorGroupSet(e));
+        result.get(0).setCurr_num_executors(e.getExpected_num_executors());
+        result.get(0).setMax_mem_limit(Long.MAX_VALUE);
+      } else if (test_replan) {
+        ExecutorMembershipSnapshot cluster = ExecutorMembershipSnapshot.getCluster();
+        int num_nodes = cluster.numExecutors();
+        Preconditions.checkState(e.getCurr_num_executors() == num_nodes);
+        // Form a two-executor group testing environment so that we can exercise
+        // auto-scaling logic (see getTExecRequest()).
+        TExecutorGroupSet s = new TExecutorGroupSet(e);
+        s.setExec_group_name_prefix("small");
+        s.setMax_mem_limit(64*MEGABYTE);
+        result.add(s);
+        TExecutorGroupSet l = new TExecutorGroupSet(e);
+        String newName = "large";
+        if (e.isSetExec_group_name_prefix()) {
+          String currentName = e.getExec_group_name_prefix();
+          if (currentName.length() > 0) newName = currentName;
+        }
+        l.setExec_group_name_prefix(newName);
+        l.setMax_mem_limit(Long.MAX_VALUE);
+        result.add(l);
+      } else {
+        // Copy and augment the group with the maximally allowed max_mem_limit value.
+        result.add(new TExecutorGroupSet(e));
+        result.get(0).setMax_mem_limit(Long.MAX_VALUE);
+      }
+      return result;
+    }
+
+    // If there are no executor groups in the cluster, Create a group set with 1 executor.
+    if (executorGroupSets.size() == 0) {
+      result.add(new TExecutorGroupSet(1, 20, DEFAULT_POOL_NAME));
+      result.get(0).setMax_mem_limit(Long.MAX_VALUE);
+      return result;
+    }
+
+    // Executor groups exist in the cluster. Identify those that can be used.
+    for (TExecutorGroupSet e : executorGroupSets) {
+      // If defined, request_pool can be a suffix of the group name prefix. For example
+      //   group_set_prefix = root.queue1
+      //   request_pool = queue1
+      if (request_pool != null && !e.getExec_group_name_prefix().endsWith(request_pool)) {
+        continue;
+      }
+      TExecutorGroupSet new_entry = new TExecutorGroupSet(e);
+      if (poolService != null) {
+        // Find out the max_mem_limit from the pool service
+        TPoolConfig poolConfig =
+            poolService.getPoolConfig(e.getExec_group_name_prefix());
+        Preconditions.checkNotNull(poolConfig);
+        new_entry.setMax_mem_limit(poolConfig.getMax_query_mem_limit());
+      } else {
+        // Set to max possible thresold value when there is no pool service
+        new_entry.setMax_mem_limit(Long.MAX_VALUE);
+      }
+      result.add(new_entry);
+    }
+    if (executorGroupSets.size() > 0 && result.size() == 0 && request_pool != null) {
+      throw new AnalysisException("Request pool: " + request_pool
+          + " does not map to any known executor group set.");
+    }
+
+    // Sort 'executorGroupSets' by max_mem_limit field in ascending order. Use
+    // exec_group_name_prefix to break the tie.
+    Collections.sort(result, new Comparator<TExecutorGroupSet>() {
+      @Override
+      public int compare(TExecutorGroupSet e1, TExecutorGroupSet e2) {
+        int i = Long.compare(e1.getMax_mem_limit(), e2.getMax_mem_limit());
+        if (i == 0) {
+          i = e1.getExec_group_name_prefix().compareTo(e2.getExec_group_name_prefix());
+        }
+        return i;
+      }
+    });
+    return result;
+  }
+
+  // Only the following types of statements are considered auto scalable since each
+  // can be planned by the distributed planner utilizing the number of executors in
+  // an executor group as input.
+  private boolean canStmtBeAutoScaled(TStmtType type) {
+    return type == TStmtType.EXPLAIN || type == TStmtType.QUERY || type == TStmtType.DML;
+  }
+
   private TExecRequest getTExecRequest(PlanCtx planCtx, EventSequence timeline)
       throws ImpalaException {
     TQueryCtx queryCtx = planCtx.getQueryContext();
     LOG.info("Analyzing query: " + queryCtx.client_request.stmt + " db: "
         + queryCtx.session.database);
 
-    int attempt = 0;
-    String retryMsg = "";
-    while (true) {
-      try {
-        TExecRequest req = doCreateExecRequest(planCtx, timeline);
-        markTimelineRetries(attempt, retryMsg, timeline);
-        return req;
-      } catch (InconsistentMetadataFetchException e) {
-        if (attempt++ == INCONSISTENT_METADATA_NUM_RETRIES) {
-          markTimelineRetries(attempt, e.getMessage(), timeline);
-          throw e;
-        }
-        if (attempt > 1) {
-          // Back-off a bit on later retries.
-          Uninterruptibles.sleepUninterruptibly(200 * attempt, TimeUnit.MILLISECONDS);
-        }
-        retryMsg = e.getMessage();
-        LOG.warn("Retrying plan of query {}: {} (retry #{} of {})",
-            queryCtx.client_request.stmt, retryMsg, attempt,
-            INCONSISTENT_METADATA_NUM_RETRIES);
-      }
+    TQueryOptions queryOptions = queryCtx.client_request.getQuery_options();
+    boolean enable_replan = queryOptions.isEnable_replan();
+
+    List<TExecutorGroupSet> originalExecutorGroupSets =
+        ExecutorMembershipSnapshot.getAllExecutorGroupSets();
+
+    LOG.info("The original executor group sets from executor membership snapshot: "
+        + originalExecutorGroupSets);
+
+    boolean default_executor_group = false;
+    if (originalExecutorGroupSets.size() == 1) {
+      TExecutorGroupSet e = originalExecutorGroupSets.get(0);
+      default_executor_group = e.getExec_group_name_prefix() == null
+          || e.getExec_group_name_prefix().isEmpty();
     }
+
+    List<TExecutorGroupSet> executorGroupSetsToUse = setupThresholdsForExecutorGroupSets(
+        originalExecutorGroupSets, queryOptions.getRequest_pool(), default_executor_group,
+        enable_replan
+            && (RuntimeEnv.INSTANCE.isTestEnv() || queryOptions.isTest_replan()));
+
+    int num_executor_group_sets = executorGroupSetsToUse.size();
+    if (num_executor_group_sets == 0) {
+      throw new AnalysisException(
+          "No suitable executor group sets can be identified and used.");
+    }
+    LOG.info("A total of {} executor group sets to be considered for auto-scaling: "
+            + executorGroupSetsToUse, num_executor_group_sets);
+
+    TExecRequest req = null;
+
+    // Capture the current state.
+    planCtx.compilationState_.captureState();
+
+    TExecutorGroupSet group_set = null;
+    long per_host_mem_estimate = -1;
+    String reason = "Unknown";
+    int attempt = 0;
+    for (int i = 0; i < num_executor_group_sets; i++) {
+      group_set = executorGroupSetsToUse.get(i);
+      planCtx.compilationState_.setGroupSet(group_set);
+      LOG.info("Consider executor group set: " + group_set);
+
+      String retryMsg = "";
+      while (true) {
+        try {
+          req = doCreateExecRequest(planCtx, timeline);
+          markTimelineRetries(attempt, retryMsg, timeline);
+          break;
+        } catch (InconsistentMetadataFetchException e) {
+          if (attempt++ == INCONSISTENT_METADATA_NUM_RETRIES) {
+            markTimelineRetries(attempt, e.getMessage(), timeline);
+            throw e;
+          }
+          planCtx.compilationState_.disableStmtCacheAndReauthorize();
+          if (attempt > 1) {
+            // Back-off a bit on later retries.
+            Uninterruptibles.sleepUninterruptibly(200 * attempt, TimeUnit.MILLISECONDS);
+          }
+          retryMsg = e.getMessage();
+          LOG.warn("Retrying plan of query {}: {} (retry #{} of {})",
+              queryCtx.client_request.stmt, retryMsg, attempt,
+              INCONSISTENT_METADATA_NUM_RETRIES);
+        }
+      }
+
+      // If it is for a single node plan, enable_replan is disabled, or it is not a query
+      // that can be auto scaled, return the 1st plan generated.
+      if (queryOptions.num_nodes == 1) {
+        reason = "the number of nodes is 1";
+        break;
+      } else if (!enable_replan) {
+        reason = "query option 'enable_replan' is false";
+        break;
+      } else if (!canStmtBeAutoScaled(req.stmt_type)) {
+        reason = "query is not auto-scalable";
+        break;
+      }
+
+      // Find out the per host memory estimated from two possible sources.
+      per_host_mem_estimate = -1;
+      if (req.query_exec_request != null) {
+        // For non-explain queries
+        per_host_mem_estimate = req.query_exec_request.per_host_mem_estimate;
+      } else {
+        // For explain queries
+        per_host_mem_estimate = planCtx.compilationState_.getEstimatedMemoryPerHost();
+      }
+
+      Preconditions.checkState(per_host_mem_estimate >= 0);
+
+      if (per_host_mem_estimate <= group_set.getMax_mem_limit()) {
+        reason = "suitable group found (estimated per-host memory="
+            + PrintUtils.printBytes(per_host_mem_estimate) + ")";
+
+        // Set the group name prefix in both the returned query options and
+        // the query context for non default group setup.
+        if (!default_executor_group) {
+          String namePrefix = group_set.getExec_group_name_prefix();
+          req.query_options.setRequest_pool(namePrefix);
+          if (req.query_exec_request != null) {
+            req.query_exec_request.query_ctx.setRequest_pool(namePrefix);
+          }
+        }
+
+        break;
+      }
+
+      // Restore to the captured state.
+      planCtx.compilationState_.restoreState();
+    }
+
+    if (reason.equals("Unknown") && group_set.getMax_mem_limit() > 0) {
+      throw new AnalysisException("The query does not fit any executor group sets.");
+    }
+
+    LOG.info("Selected executor group: " + group_set + ", reason: " + reason);
+
+    // Transfer the profile access flag which is collected during 1st compilation.
+    req.setUser_has_profile_access(planCtx.compilationState_.userHasProfileAccess());
+
+    return req;
   }
 
   private TExecRequest doCreateExecRequest(PlanCtx planCtx,
@@ -1675,10 +1995,22 @@ public class Frontend {
     // Analyze and authorize stmt
     AnalysisContext analysisCtx = new AnalysisContext(queryCtx, authzFactory_, timeline);
     AnalysisResult analysisResult = analysisCtx.analyzeAndAuthorize(stmt, stmtTableCache,
-        authzChecker_.get());
-    LOG.info("Analysis and authorization finished.");
+        authzChecker_.get(), planCtx.compilationState_.disableAuthorization());
+    if (!planCtx.compilationState_.disableAuthorization()) {
+      LOG.info("Analysis and authorization finished.");
+      planCtx.compilationState_.setUserHasProfileAccess(
+          analysisResult.userHasProfileAccess());
+    } else {
+      LOG.info("Analysis finished.");
+    }
     Preconditions.checkNotNull(analysisResult.getStmt());
     TExecRequest result = createBaseExecRequest(queryCtx, analysisResult);
+
+    // Transfer the current number of executors in executor group set from planCtx to
+    // analyzer's global state. The info is needed to compute the number of nodes to be
+    // used during planner phase for scans (see HdfsScanNode.computeNumNodes()).
+    analysisResult.getAnalyzer().setNumExecutorsForPlanning(
+        planCtx.compilationState_.getGroupSet().getCurr_num_executors());
 
     try {
       TQueryOptions queryOptions = queryCtx.client_request.query_options;
@@ -1701,18 +2033,27 @@ public class Frontend {
         FeTable targetTable = insertStmt.getTargetTable();
         if (AcidUtils.isTransactionalTable(
             targetTable.getMetaStoreTable().getParameters())) {
-          long txnId = openTransaction(queryCtx);
-          timeline.markEvent("Transaction opened (" + String.valueOf(txnId) + ")");
-          Collection<FeTable> tables = stmtTableCache.tables.values();
-          String staticPartitionTarget = null;
-          if (insertStmt.isStaticPartitionTarget()) {
-            staticPartitionTarget = FeCatalogUtils.getPartitionName(
-                insertStmt.getPartitionKeyValues());
+
+          if (planCtx.compilationState_.getWriteId() == -1) {
+            // 1st time compilation. Open a transaction and save the writeId.
+            long txnId = openTransaction(queryCtx);
+            timeline.markEvent("Transaction opened (" + String.valueOf(txnId) + ")");
+            Collection<FeTable> tables = stmtTableCache.tables.values();
+            String staticPartitionTarget = null;
+            if (insertStmt.isStaticPartitionTarget()) {
+              staticPartitionTarget = FeCatalogUtils.getPartitionName(
+                  insertStmt.getPartitionKeyValues());
+            }
+            createLockForInsert(txnId, tables, targetTable, insertStmt.isOverwrite(),
+                staticPartitionTarget);
+            long writeId = allocateWriteId(queryCtx, targetTable);
+            insertStmt.setWriteId(writeId);
+
+            planCtx.compilationState_.setWriteId(writeId);
+          } else {
+            // Continue the transaction by reusing the writeId.
+            insertStmt.setWriteId(planCtx.compilationState_.getWriteId());
           }
-          createLockForInsert(txnId, tables, targetTable, insertStmt.isOverwrite(),
-              staticPartitionTarget);
-          long writeId = allocateWriteId(queryCtx, targetTable);
-          insertStmt.setWriteId(writeId);
         }
       } else if (analysisResult.isLoadDataStmt()) {
         result.stmt_type = TStmtType.LOAD;
@@ -1749,23 +2090,23 @@ public class Frontend {
         return result;
       }
 
-      // Open Kudu transaction if Kudu transaction is enabled and target table is Kudu
-      // table.
+      // Open or continue Kudu transaction if Kudu transaction is enabled and target table
+      // is Kudu table.
       if (!analysisResult.isExplainStmt() && queryOptions.isEnable_kudu_transaction()) {
         if ((analysisResult.isInsertStmt() || analysisResult.isCreateTableAsSelectStmt())
             && analysisResult.getInsertStmt().isTargetTableKuduTable()) {
-          // Open Kudu transaction for INSERT/UPSERT/CTAS statements.
-          openKuduTransaction(queryCtx, analysisResult,
+          // For INSERT/UPSERT/CTAS statements.
+          openOrContinueKuduTransaction(planCtx, queryCtx, analysisResult,
               analysisResult.getInsertStmt().getTargetTable(), timeline);
         } else if (analysisResult.isUpdateStmt()
             && analysisResult.getUpdateStmt().isTargetTableKuduTable()) {
-          // Open Kudu transaction for UPDATE statement.
-          openKuduTransaction(queryCtx, analysisResult,
+          // For UPDATE statement.
+          openOrContinueKuduTransaction(planCtx, queryCtx, analysisResult,
               analysisResult.getUpdateStmt().getTargetTable(), timeline);
         } else if (analysisResult.isDeleteStmt()
             && analysisResult.getDeleteStmt().isTargetTableKuduTable()) {
-          // Open Kudu transaction for DELETE statement.
-          openKuduTransaction(queryCtx, analysisResult,
+          // For DELETE statement.
+          openOrContinueKuduTransaction(planCtx, queryCtx, analysisResult,
               analysisResult.getDeleteStmt().getTargetTable(), timeline);
         }
       }
@@ -1819,6 +2160,7 @@ public class Frontend {
     } catch (Exception e) {
       if (queryCtx.isSetTransaction_id()) {
         try {
+          planCtx.compilationState_.setWriteId(-1);
           abortTransaction(queryCtx.getTransaction_id());
           timeline.markEvent("Transaction aborted");
         } catch (TransactionException te) {
@@ -1826,6 +2168,7 @@ public class Frontend {
         }
       } else if (queryCtx.isIs_kudu_transactional()) {
         try {
+          planCtx.compilationState_.setKuduTransactionToken(null);
           abortKuduTransaction(queryCtx.getQuery_id());
           timeline.markEvent(
               "Kudu transaction aborted: " + queryCtx.getQuery_id().toString());
@@ -2233,10 +2576,25 @@ public class Frontend {
   }
 
   /**
-   * Opens a Kudu transaction.
+   * Opens or continue a Kudu transaction.
    */
-  private void openKuduTransaction(TQueryCtx queryCtx, AnalysisResult analysisResult,
-      FeTable targetTable, EventSequence timeline) throws TransactionException {
+  private void openOrContinueKuduTransaction(PlanCtx planCtx, TQueryCtx queryCtx,
+      AnalysisResult analysisResult, FeTable targetTable, EventSequence timeline)
+      throws TransactionException {
+
+    byte[] token = planCtx.compilationState_.getKuduTransactionToken();
+    // Continue the transaction by reusing the token.
+    if (token != null) {
+      if (analysisResult.isUpdateStmt()) {
+        analysisResult.getUpdateStmt().setKuduTransactionToken(token);
+      } else if (analysisResult.isDeleteStmt()) {
+        analysisResult.getDeleteStmt().setKuduTransactionToken(token);
+      } else {
+        analysisResult.getInsertStmt().setKuduTransactionToken(token);
+      }
+      return;
+    }
+
     FeKuduTable kuduTable = (FeKuduTable) targetTable;
     KuduClient client = KuduUtil.getKuduClient(kuduTable.getKuduMasterHosts());
     KuduTransaction txn = null;
@@ -2246,15 +2604,19 @@ public class Frontend {
       txn = client.newTransaction();
       timeline.markEvent(
           "Kudu transaction opened with query id: " + queryCtx.getQuery_id().toString());
+      token = txn.serialize();
       if (analysisResult.isUpdateStmt()) {
-        analysisResult.getUpdateStmt().setKuduTransactionToken(txn.serialize());
+        analysisResult.getUpdateStmt().setKuduTransactionToken(token);
       } else if (analysisResult.isDeleteStmt()) {
-        analysisResult.getDeleteStmt().setKuduTransactionToken(txn.serialize());
+        analysisResult.getDeleteStmt().setKuduTransactionToken(token);
       } else {
-        analysisResult.getInsertStmt().setKuduTransactionToken(txn.serialize());
+        analysisResult.getInsertStmt().setKuduTransactionToken(token);
       }
       kuduTxnManager_.addTransaction(queryCtx.getQuery_id(), txn);
       queryCtx.setIs_kudu_transactional(true);
+
+      planCtx.compilationState_.setKuduTransactionToken(token);
+
     } catch (IOException e) {
       if (txn != null) txn.close();
       throw new TransactionException(e.getMessage());

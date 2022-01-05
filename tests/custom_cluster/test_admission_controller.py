@@ -671,6 +671,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     # Remove num_nodes from the options to allow test case runner to set it in one of
     # the test cases.
     del exec_options['num_nodes']
+    # Do not turn the default cluster into 2-group one
+    exec_options['test_replan'] = 0
     exec_options['num_scanner_threads'] = 1  # To make estimates consistently reproducible
     self.run_test_case('QueryTest/dedicated-coord-mem-estimates', vector_copy,
                        unique_database)

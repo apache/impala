@@ -356,6 +356,8 @@ class TestObservability(ImpalaTestSuite):
         r'Distributed plan created:',
         r'Lineage info computed:',
         r'Planning finished:']
+    # Disable auto-scaling as it can produce multiple event sequences in event_regexes
+    self.execute_query_expect_success(self.client, "set enable_replan=0")
     query = "select * from functional.alltypes"
     runtime_profile = self.execute_query(query).runtime_profile
     self.__verify_profile_event_sequence(event_regexes, runtime_profile)
@@ -764,6 +766,18 @@ class TestObservability(ImpalaTestSuite):
       "Expect to see skew details once at the scan node."
       probe_rows_at_hdfs_scan = 'HDFS_SCAN_NODE.*\n.*Skew details: RowsRead'
       assert len(re.findall(probe_rows_at_hdfs_scan, results.runtime_profile, re.M)) == 1
+
+  def test_query_profile_contains_auto_scaling_events(self):
+    """Test that the info about two compilation events appears in the profile."""
+    query = "select * from functional.alltypes"
+    # Specifically turn on test_replan to impose a 2-executor group environment in FE.
+    query_opts = {'enable_replan': 1, 'test_replan': 1}
+    results = self.execute_query(query, query_opts)
+    assert results.success
+    runtime_profile = results.runtime_profile
+    assert len(re.findall('Analysis finished:', runtime_profile, re.M)) == 2
+    assert len(re.findall('Single node plan created:', runtime_profile, re.M)) == 2
+    assert len(re.findall('Distributed plan created:', runtime_profile, re.M)) == 2
 
 class TestQueryStates(ImpalaTestSuite):
   """Test that the 'Query State' and 'Impala Query State' are set correctly in the

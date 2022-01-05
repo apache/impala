@@ -255,6 +255,7 @@ class SkipIfDockerizedCluster:
       IS_DOCKERIZED_TEST_CLUSTER, reason="Daemon would need to access host filesystem.")
   insert_acls = pytest.mark.skipif(IS_DOCKERIZED_TEST_CLUSTER,
       reason="IMPALA-8384: insert ACL tests are broken on dockerised minicluster.")
+  jira = partial(pytest.mark.skipif, IS_DOCKERIZED_TEST_CLUSTER)
 
 
 class SkipIfHive3:

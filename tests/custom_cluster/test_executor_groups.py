@@ -681,6 +681,62 @@ class TestExecutorGroups(CustomClusterTestSuite):
     second_coord_client.close()
 
   @pytest.mark.execute_serially
+  def test_query_assignment_with_two_exec_groups(self):
+    """This test verifies that query assignment works with two executor groups with
+    different number of executors and memory limit in each."""
+    # A small query with estimated memory per host of 10MB that can run on the small
+    # executor group
+    SMALL_QUERY = "select count(*) from tpcds_parquet.date_dim;"
+    # A large query with estimated memory per host of 132MB that can only run on
+    # the large executor group.
+    LARGE_QUERY = "select * from tpcds_parquet.store_sales where ss_item_sk = 1 limit 50;"
+    # The path to resources directory which contains the admission control config files.
+    RESOURCES_DIR = os.path.join(os.environ['IMPALA_HOME'], "fe", "src", "test",
+                                 "resources")
+    # Define two group sets: small and large
+    fs_allocation_path = os.path.join(RESOURCES_DIR, "fair-scheduler-2-groups.xml")
+    # Define the min-query-mem-limit and max-query-mem-limit properties of the two sets:
+    # small: [0, 64MB]
+    # large: [64MB+1Byte, 8PB]
+    llama_site_path = os.path.join(RESOURCES_DIR, "llama-site-2-groups.xml")
+    # Start with a regular admission config with multiple pools and no resource limits.
+    self._restart_coordinators(num_coordinators=1,
+         extra_args="-vmodule admission-controller=3 "
+                    "-expected_executor_group_sets=root.small:2,root.large:3 "
+                    "-fair_scheduler_allocation_path %s "
+                    "-llama_site_path %s" % (
+                      fs_allocation_path, llama_site_path))
+
+    # Create fresh client
+    self.create_impala_clients()
+    # Add an exec group with a single admission slot and 2 executors.
+    self._add_executor_group("group", 2, admission_control_slots=1,
+                             resource_pool="root.small", extra_args="-mem_limit=2g")
+    # Add another exec group with a single admission slot and 3 executors.
+    self._add_executor_group("group", 3, admission_control_slots=1,
+                             resource_pool="root.large", extra_args="-mem_limit=2g")
+    assert self._get_num_executor_groups(only_healthy=True) == 2
+    assert self._get_num_executor_groups(only_healthy=True,
+                                         exec_group_set_prefix="root.small") == 1
+    assert self._get_num_executor_groups(only_healthy=True,
+                                         exec_group_set_prefix="root.large") == 1
+
+    # Expect to run the small query on the small group
+    result = self.execute_query_expect_success(self.client, SMALL_QUERY)
+    assert "Executor Group: root.small-group" in str(result.runtime_profile)
+
+    # Expect to run the large query on the large group
+    result = self.execute_query_expect_success(self.client, LARGE_QUERY)
+    assert "Executor Group: root.large-group" in str(result.runtime_profile)
+
+    # Force to run the large query on the small group should fail
+    self.client.set_configuration({'request_pool': 'small'})
+    result = self.execute_query_expect_failure(self.client, LARGE_QUERY)
+    assert "The query does not fit any executor group set" in str(result)
+
+    self.client.close()
+
+  @pytest.mark.execute_serially
   def test_per_exec_group_set_metrics(self):
     """This test verifies that the metrics for each exec group set are updated
     appropriately."""

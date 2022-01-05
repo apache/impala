@@ -275,6 +275,7 @@ class TestCoordinators(CustomClusterTestSuite):
       self.client = client
 
       client.execute("SET EXPLAIN_LEVEL=2")
+      client.execute("SET TEST_REPLAN=0")
 
       # Ensure that the plan generated always uses only the executor nodes for scanning
       # Multi-partition table

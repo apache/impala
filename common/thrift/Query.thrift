@@ -577,6 +577,17 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   143: optional i32 runtime_in_list_filter_entry_limit = 1024;
+
+  // Indicates whether to enable auto-scaling which is a process to generate a suitable
+  // plan among different-sized executor group sets. The returned plan satisfies the
+  // resource requirement imposed on the executor group set. Default is to enable.
+  144: optional bool enable_replan = true;
+
+  // Set to true to programmatically treat the default executor group as a two-executor
+  // groups in FE as follows.
+  //   1. regular: <num_nodes> nodes with 64MB of per-host estimated memory threshold
+  //   2. large:   <num_nodes> nodes with 8PB of per-host estimated memory threshold
+  145: optional bool test_replan = false;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

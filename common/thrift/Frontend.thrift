@@ -725,6 +725,13 @@ struct TExecutorGroupSet {
   // Note: this will be empty when 'default' executor group is used or
   // 'expected_executor_group_sets' startup flag is not specified.
   3: string exec_group_name_prefix
+
+  // The optional max_mem_limit to determine which executor group set to run for a query.
+  // The max_mem_limit value is set to the max_query_mem_limit attribute of the group set
+  // with name prefix 'exec_group_name_prefix' from the pool service. For each query,
+  // the frontend computes the per host estimated-memory after a compilation with a
+  // number of executor nodes from this group set and compares it with this variable.
+  4: optional i64 max_mem_limit
 }
 
 // Sent from the impalad BE to FE with the latest membership snapshot of the

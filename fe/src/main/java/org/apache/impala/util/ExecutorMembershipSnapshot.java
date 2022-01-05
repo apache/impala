@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.impala.thrift.TExecutorGroupSet;
 import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TExecutorGroupSet;
 import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
 import org.apache.kudu.shaded.com.google.common.base.Preconditions;
 
@@ -67,7 +68,6 @@ public class ExecutorMembershipSnapshot {
   // group size. When not using executor groups (using 'default' excutor group) or
   // when 'expected_executor_group_sets' startup flag is not specified, this will
   // contain a single entry with an empty group name prefix.
-  // TODO: IMPALA-10992: use this info to plan queries for multiple executor group sets.
   private final List<TExecutorGroupSet> exec_group_sets_;
 
   // Used only to construct the initial ExecutorMembershipSnapshot.
@@ -116,4 +116,8 @@ public class ExecutorMembershipSnapshot {
 
   // Return the current singleton snapshot instance.
   public static ExecutorMembershipSnapshot getCluster() { return cluster_.get(); }
+
+  public static List<TExecutorGroupSet> getAllExecutorGroupSets() {
+    return cluster_.get().exec_group_sets_;
+  }
 }
