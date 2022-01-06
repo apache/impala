@@ -53,6 +53,10 @@ under the License.
     <topicmeta><linktext>the Apache HBase documentation</linktext></topicmeta>
   </keydef>
 
+  <keydef href="https://iceberg.apache.org" scope="external" format="html" keys="upstream_iceberg_site">
+    <topicmeta><linktext>the Apache Iceberg site</linktext></topicmeta>
+  </keydef>
+
   <keydef href="https://hbase.apache.org/book.html#security" scope="external" format="html" keys="upstream_hbase_security_docs">
     <topicmeta><linktext>the Security chapter in the Apache HBase documentation</linktext></topicmeta>
   </keydef>
@@ -10521,6 +10525,7 @@ under the License.
   <keydef href="https://issues.apache.org/jira/browse/IMPALA-9999" scope="external" format="html" keys="IMPALA-9999"/>
 
 <!-- Short form of mapping from Impala release to vendor-specific releases, for use in headings. -->
+  <keydef keys="impala41"><topicmeta><keywords><keyword>Impala 4.1</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala40"><topicmeta><keywords><keyword>Impala 4.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala34"><topicmeta><keywords><keyword>Impala 3.4</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala33"><topicmeta><keywords><keyword>Impala 3.3</keyword></keywords></topicmeta></keydef>
