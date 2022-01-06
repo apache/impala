@@ -33,3 +33,56 @@ BIGINT,STRING
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumScannerThreadsStarted): 1
 ====
+---- QUERY
+# IMPALA-11068: without tuning hdfs_scanner_non_reserved_bytes, this query can launch
+# up to 3 threads (compressed_text_est_bytes ~ 211MB).
+set num_nodes=1;
+set mem_limit=750m;
+select l_orderkey, l_shipmode from tpch_text_gzip.lineitem
+where l_comment = 'telets. quickly ';
+---- TYPES
+BIGINT,STRING
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+49824,'RAIL'
+1380737,'AIR'
+2981252,'TRUCK'
+3415170,'MAIL'
+---- RUNTIME_PROFILE
+aggregation(SUM, NumScannerThreadsStarted): 3
+====
+---- QUERY
+# IMPALA-11068: raising hdfs_scanner_non_reserved_bytes above compressed_text_est_bytes
+# will reduce NumScannerThreadsStarted.
+set num_nodes=1;
+set mem_limit=750m;
+set hdfs_scanner_non_reserved_bytes=320m;
+select l_orderkey, l_shipmode from tpch_text_gzip.lineitem
+where l_comment = 'telets. quickly ';
+---- TYPES
+BIGINT,STRING
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+49824,'RAIL'
+1380737,'AIR'
+2981252,'TRUCK'
+3415170,'MAIL'
+---- RUNTIME_PROFILE
+aggregation(SUM, NumScannerThreadsStarted): 2
+====
+---- QUERY
+# IMPALA-11068: high hdfs_scanner_non_reserved_bytes does not impact the first scanner
+# thread.
+set num_nodes=1;
+set mem_limit=750m;
+set hdfs_scanner_non_reserved_bytes=2g;
+select l_orderkey, l_shipmode from tpch_text_gzip.lineitem
+where l_comment = 'telets. quickly ';
+---- TYPES
+BIGINT,STRING
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+49824,'RAIL'
+1380737,'AIR'
+2981252,'TRUCK'
+3415170,'MAIL'
+---- RUNTIME_PROFILE
+aggregation(SUM, NumScannerThreadsStarted): 1
+====

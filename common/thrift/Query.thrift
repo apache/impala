@@ -663,6 +663,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   166: optional bool iceberg_predicate_pushdown_subsetting = true;
+
+  // See comment in ImpalaService.thrift
+  167: optional i64 hdfs_scanner_non_reserved_bytes = -1
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

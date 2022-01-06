@@ -845,6 +845,15 @@ enum TImpalaQueryOptions {
   // Enables predicate subsetting for Iceberg plan nodes. If enabled, expressions
   // evaluated by Iceberg are not pushed down the scanner node.
   ICEBERG_PREDICATE_PUSHDOWN_SUBSETTING = 165;
+
+  // Amount of memory that we approximate a scanner thread will use not including I/O
+  // buffers. The memory used does not vary considerably between file formats (just a
+  // couple of MBs). This amount of memory is not reserved by the planner and only
+  // considered in the old multi-threaded scanner mode (non-MT_DOP) for 2nd and
+  // subsequent additional scanner threads. If this option is not set to a positive
+  // value, the value of flag hdfs_scanner_thread_max_estimated_bytes will be used
+  // (which defaults to 32MB). The default value of this option is -1 (not set).
+  HDFS_SCANNER_NON_RESERVED_BYTES = 166
 }
 
 // The summary of a DML statement.

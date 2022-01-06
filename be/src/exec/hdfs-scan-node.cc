@@ -150,7 +150,7 @@ Status HdfsScanNode::GetNextInternal(
 Status HdfsScanNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(HdfsScanNodeBase::Prepare(state));
-  thread_state_.Prepare(this, EstimateScannerThreadMemConsumption());
+  thread_state_.Prepare(this, EstimateScannerThreadMemConsumption(state));
   scanner_thread_reservations_denied_counter_ =
       ADD_COUNTER(runtime_profile(), "NumScannerThreadReservationsDenied", TUnit::UNIT);
   scanner_thread_workless_loops_counter_ =
@@ -210,17 +210,24 @@ Status HdfsScanNode::AddDiskIoRanges(const vector<ScanRange*>& ranges,
   return Status::OK();
 }
 
-int64_t HdfsScanNode::EstimateScannerThreadMemConsumption() const {
+int64_t HdfsScanNode::EstimateScannerThreadMemConsumption(RuntimeState* state) const {
   // Start with the minimum I/O buffer requirement.
   int64_t est_total_bytes = resource_profile_.min_reservation;
 
   // Next add in the other memory that we estimate the scanner thread will use,
   // e.g. decompression buffers, tuple buffers, etc.
   // For compressed text, we estimate this based on the file size (since the whole file
-  // will need to be decompressed at once). For all other formats, we use a constant.
+  // will need to be decompressed at once). For all other formats, we use a constant from
+  // either of the HDFS_SCANNER_NON_RESERVED_BYTES query option or the
+  // hdfs_scanner_thread_max_estimated_bytes flag, with the query option taking
+  // precedence over the flag if the query option is set to a positive value.
   // Note: this is crude and we could try to refine it by factoring in the number of
   // columns, etc, but it is unclear how beneficial this would be.
   int64_t est_non_reserved_bytes = FLAGS_hdfs_scanner_thread_max_estimated_bytes;
+  if (state->query_options().__isset.hdfs_scanner_non_reserved_bytes
+      && state->query_options().hdfs_scanner_non_reserved_bytes > 0) {
+    est_non_reserved_bytes = state->query_options().hdfs_scanner_non_reserved_bytes;
+  }
   auto it = shared_state_->per_type_files().find(THdfsFileFormat::TEXT);
   if (it != shared_state_->per_type_files().end()) {
     for (HdfsFileDesc* file : it->second) {

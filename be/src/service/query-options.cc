@@ -1144,11 +1144,18 @@ Status impala::SetQueryOption(const string& key, const string& value,
         MemSpec mem_spec_val{};
         RETURN_IF_ERROR(QueryOptionParser::Parse<MemSpec>(option, value, &mem_spec_val));
         query_options->__set_mem_limit_coordinators(mem_spec_val.value);
+        break;
       }
       case TImpalaQueryOptions::ICEBERG_PREDICATE_PUSHDOWN_SUBSETTING: {
         query_options->__set_iceberg_predicate_pushdown_subsetting(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::HDFS_SCANNER_NON_RESERVED_BYTES: {
+        MemSpec mem_spec_val{};
+        RETURN_IF_ERROR(QueryOptionParser::Parse<MemSpec>(option, value, &mem_spec_val));
+        query_options->__set_hdfs_scanner_non_reserved_bytes(mem_spec_val.value);
+        break;
+      };
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";
