@@ -335,7 +335,9 @@ class ImpylaHS2Connection(ImpalaConnection):
     operation_handle.get_handle().close_operation()
 
   def execute(self, sql_stmt, user=None, profile_format=TRuntimeProfileFormat.STRING):
-    handle = self.execute_async(sql_stmt, user)
+    self.__cursor.execute(sql_stmt, configuration=self.__query_options)
+    handle = OperationHandle(self.__cursor, sql_stmt)
+
     r = None
     try:
       r = self.__fetch_results(handle, profile_format=profile_format)
@@ -443,10 +445,6 @@ class ImpylaHS2Connection(ImpalaConnection):
         result_tuples = cursor.fetchall()
       else:
         result_tuples = cursor.fetchmany(max_rows)
-    elif self._is_hive:
-      # For Hive statements that have no result set (eg USE), they may still be
-      # running, and we need to wait for them to finish before we can proceed.
-      cursor._wait_to_finish()
 
     if not self._is_hive:
       log = self.get_log(handle)
