@@ -37,7 +37,11 @@ namespace impala {
 ///   - len: min(n1, n2) - this can be more cheaply passed in by the caller
 static inline int StringCompare(const char* s1, int n1, const char* s2, int n2, int len) {
   // memcmp has undefined behavior when called on nullptr for either pointer
-  const int result = (len == 0) ? 0 : memcmp(s1, s2, len);
+  //
+  // GCC gives a warning about overflowing the size argument of memcmp, because
+  // it thinks 'len' can be negative. 'len' is never negative, so, this just uses
+  // len <= 0 and returns 0 for that case to avoid the warning.
+  const int result = (len <= 0) ? 0 : memcmp(s1, s2, len);
   if (result != 0) return result;
   return n1 - n2;
 }

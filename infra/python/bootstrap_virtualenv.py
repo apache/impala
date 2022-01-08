@@ -152,6 +152,11 @@ def exec_pip_install(args, cc="no-cc-available", env=None):
   current process's command line arguments are inherited.'''
   if not env: env = dict(os.environ)
   env["CC"] = cc
+  # Since gcc is now built with toolchain binutils which may be newer than the
+  # system binutils, we need to include the toolchain binutils on the PATH.
+  toolchain_binutils_dir = toolchain_pkg_dir("binutils")
+  binutils_bin_dir = os.path.join(toolchain_binutils_dir, "bin")
+  env["PATH"] = "{0}:{1}".format(binutils_bin_dir, env["PATH"])
 
   # Parallelize the slow numpy build.
   # Use getconf instead of nproc because it is supported more widely, e.g. on older

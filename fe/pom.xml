@@ -349,9 +349,9 @@ under the License.
     </dependency>
 
     <dependency>
-      <groupId>com.github.davidmoten</groupId>
+      <groupId>com.google.flatbuffers</groupId>
       <artifactId>flatbuffers-java</artifactId>
-      <version>1.6.0.1</version>
+      <version>1.12.0</version>
     </dependency>
 
     <dependency>

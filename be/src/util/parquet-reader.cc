@@ -222,6 +222,11 @@ int main(int argc, char** argv) {
   FileMetaData file_metadata;
   bool status = DeserializeThriftMsg(metadata, &metadata_len, true, &file_metadata);
   assert(status);
+  // This code fixes a warning about status being unused. DeserializeThriftMsg already
+  // would have printed an error, so just return.
+  if (!status) {
+    return -1;
+  }
   cerr << ThriftDebugString(file_metadata) << endl;
   cerr << "Schema: " << endl << GetSchema(file_metadata) << endl;
 

@@ -77,16 +77,16 @@ export IMPALA_VERSION=4.2.0-SNAPSHOT
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=207-21f1a0057a
+export IMPALA_TOOLCHAIN_BUILD_ID=215-9ec4f91d2d
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p5
 unset IMPALA_AVRO_URL
-export IMPALA_BINUTILS_VERSION=2.28
+export IMPALA_BINUTILS_VERSION=2.35.1
 unset IMPALA_BINUTILS_URL
 export IMPALA_BOOST_VERSION=1.74.0-p1
 unset IMPALA_BOOST_URL
-export IMPALA_BREAKPAD_VERSION=97a98836768f8f0154f8f86e5e14c2bb7e74132e-p2
+export IMPALA_BREAKPAD_VERSION=e09741c609dcd5f5274d40182c5e2cc9a002d5ba-p2
 unset IMPALA_BREAKPAD_URL
 export IMPALA_BZIP2_VERSION=1.0.8-p2
 unset IMPALA_BZIP2_URL
@@ -94,17 +94,17 @@ export IMPALA_CCTZ_VERSION=2.2
 unset IMPALA_CCTZ_URL
 export IMPALA_CMAKE_VERSION=3.22.2
 unset IMPALA_CMAKE_URL
-export IMPALA_CRCUTIL_VERSION=440ba7babeff77ffad992df3a10c767f184e946e-p2
+export IMPALA_CRCUTIL_VERSION=2903870057d2f1f109b245650be29e856dc8b646
 unset IMPALA_CRCUTIL_URL
 export IMPALA_CURL_VERSION=7.78.0
 unset IMPALA_CURL_URL
 export IMPALA_CYRUS_SASL_VERSION=2.1.23
 unset IMPALA_CYRUS_SASL_URL
-export IMPALA_FLATBUFFERS_VERSION=1.6.0
+export IMPALA_FLATBUFFERS_VERSION=1.12.0
 unset IMPALA_FLATBUFFERS_URL
-export IMPALA_GCC_VERSION=7.5.0
+export IMPALA_GCC_VERSION=10.4.0
 unset IMPALA_GCC_URL
-export IMPALA_GDB_VERSION=7.9.1-p1
+export IMPALA_GDB_VERSION=12.1
 unset IMPALA_GDB_URL
 export IMPALA_GFLAGS_VERSION=2.2.0-p2
 unset IMPALA_GFLAGS_URL
@@ -118,11 +118,11 @@ export IMPALA_JWT_CPP_VERSION=0.5.0
 unset IMPALA_JWT_CPP_URL
 export IMPALA_LIBEV_VERSION=4.20-p1
 unset IMPALA_LIBEV_URL
-export IMPALA_LIBUNWIND_VERSION=1.3-rc1-p3
+export IMPALA_LIBUNWIND_VERSION=1.5.0-p1
 unset IMPALA_LIBUNWIND_URL
-export IMPALA_LLVM_VERSION=5.0.1-p4
+export IMPALA_LLVM_VERSION=5.0.1-p5
 unset IMPALA_LLVM_URL
-export IMPALA_LLVM_ASAN_VERSION=5.0.1-p4
+export IMPALA_LLVM_ASAN_VERSION=5.0.1-p5
 unset IMPALA_LLVM_ASAN_URL
 
 # Maximum memory available for mini-cluster and CDH cluster
@@ -135,7 +135,7 @@ export IMPALA_LLVM_UBSAN_BASE_VERSION=5.0.1
 
 # Debug builds should use the release+asserts build to get additional coverage.
 # Don't use the LLVM debug build because the binaries are too large to distribute.
-export IMPALA_LLVM_DEBUG_VERSION=5.0.1-asserts-p4
+export IMPALA_LLVM_DEBUG_VERSION=5.0.1-asserts-p5
 unset IMPALA_LLVM_DEBUG_URL
 export IMPALA_LZ4_VERSION=1.9.3
 unset IMPALA_LZ4_URL
@@ -164,7 +164,7 @@ unset IMPALA_SNAPPY_URL
 export IMPALA_SQUEASEL_VERSION=3.3
 unset IMPALA_SQUEASEL_URL
 # TPC utilities used for test/benchmark data generation.
-export IMPALA_TPC_DS_VERSION=2.1.0
+export IMPALA_TPC_DS_VERSION=2.1.0-p1
 unset IMPALA_TPC_DS_URL
 export IMPALA_TPC_H_VERSION=2.17.0
 unset IMPALA_TPC_H_URL

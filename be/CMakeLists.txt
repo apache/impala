@@ -101,6 +101,16 @@ SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -DCALLONCEHACK")
 #    versions of GDB. DWARF 4 requires GDB 7.0 or above.
 #   -Wno-maybe-unitialized: Do not warn for variables that might be uninitialized
 SET(CXX_GCC_FLAGS "-g -Wno-unused-local-typedefs -gdwarf-4 -Wno-maybe-uninitialized")
+# There are some GCC warnings added in recent versions that current code hits.
+# These can be addressed over time, because they also appear in the headers of
+# some of our dependencies:
+#   -Wno-class-memaccess: This warning was added in GCC 8. This impacts a lot of
+#    locations (e.g. Tuple and TimestampValue) as well as rapidjson. This warning
+#    doesn't seem particularly useful for us.
+#   -Wno-init-list-lifetime: This warning was added in GCC 9, and several code pieces
+#    are not clean yet (including some LLVM code).
+# TODO: These should be cleaned up and reenabled.
+SET(CXX_GCC_FLAGS "${CXX_GCC_FLAGS} -Wno-class-memaccess -Wno-init-list-lifetime")
 if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
   # We need to add additional arguments for GCC 7+. We go down this branch if building
   # with a non-GCC compiler of version 7+, but in that case CXX_GCC_FLAGS is not used,
