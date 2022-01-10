@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-set buffer_pool_limit=215m;
+set buffer_pool_limit=110m;
 select count(l1.l_tax)
 from
 lineitem l1,
