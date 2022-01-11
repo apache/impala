@@ -29,7 +29,6 @@ import requests
 
 
 class TestWebPage(ImpalaTestSuite):
-
   ROOT_URL = "http://localhost:{0}/"
   SET_JAVA_LOGLEVEL_URL = "http://localhost:{0}/set_java_loglevel"
   RESET_JAVA_LOGLEVEL_URL = "http://localhost:{0}/reset_java_loglevel"
@@ -180,6 +179,7 @@ class TestWebPage(ImpalaTestSuite):
         assert string_to_search in response.text, "URL: {0} Str:'{1}'\nResp:{2}".format(
           input_url, string_to_search, response.text)
       responses.append(response)
+      assert 'Content-Security-Policy' in response.headers, "CSP header missing"
     return responses
 
   def get_debug_page(self, page_url, port=25000):

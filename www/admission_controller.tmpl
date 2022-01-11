@@ -97,7 +97,7 @@ Example of json received from the impala server
 <strong>{{statestore_update_staleness_detail}}</strong>
 </div>
 {{/statestore_update_staleness_detail}}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js" type="text/javascript"></script>
+<script src='{{ __common__.host-url }}/www/Chart-2.7.3.min.js'></script>
 <script type="text/javascript">
 window.onload = function() {
   renderGraph();

@@ -143,6 +143,10 @@ DEFINE_bool(webserver_ldap_passwords_in_clear_ok, false,
     "(Advanced) If true, allows the webserver to start with LDAP authentication even if "
     "SSL is not enabled, a potentially insecure configuration.");
 
+DEFINE_bool(disable_content_security_policy_header, false,
+    "If true then the webserver will not add the Content-Security-Policy "
+    "HTTP header to HTTP responses");
+
 DECLARE_bool(enable_ldap_auth);
 DECLARE_string(hostname);
 DECLARE_bool(is_coordinator);
@@ -168,6 +172,11 @@ static const char* COMMON_JSON_KEY = "__common__";
 static const char* ERROR_KEY = "__error_msg__";
 
 static const char* CRLF = "\r\n";
+
+// The value to be returned in the Content-Security-Policy header.
+static const char* CSP_HEADER = "default-src 'self'; style-src 'self' 'unsafe-inline'; "
+                                "script-src 'self' 'unsafe-inline'; "
+                                "img-src 'self' data:;";
 
 // Returns $IMPALA_HOME if set, otherwise /tmp/impala_www
 const char* GetDefaultDocumentRoot() {
@@ -226,6 +235,9 @@ void SendResponse(struct sq_connection* connection, const string& response_code_
     oss << h << CRLF;
   }
   oss << "X-Frame-Options: " << FLAGS_webserver_x_frame_options << CRLF;
+  if (!FLAGS_disable_content_security_policy_header) {
+    oss << "Content-Security-Policy: " << CSP_HEADER << CRLF;
+  }
   oss << "Content-Type: " << content_type << CRLF;
   oss << "Content-Length: " << content.size() << CRLF;
   oss << CRLF;

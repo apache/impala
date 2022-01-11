@@ -237,3 +237,19 @@ class TestWebPage(CustomClusterTestSuite):
         assert found_links == expected_statestore_links, msg
       elif port == "25020":
         assert found_links == expected_catalog_links, msg
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--disable_content_security_policy_header=true",
+    statestored_args="--disable_content_security_policy_header=true",
+    catalogd_args="--disable_content_security_policy_header=true"
+  )
+  def test_cdp_header_disabled(self):
+    """Test that if servers are started with the flag
+    --disable_content_security_policy_header=true then the emission of the CDP header is
+    disabled."""
+    ports = ["25000", "25010", "25020"]  # Respectively the impalad, statestore, catalog.
+    for port in ports:
+      response = requests.get("http://localhost:%s" % port)
+      assert 'Content-Security-Policy' not in response.headers, \
+        "CSP header present despite being disabled (port %s)" % port

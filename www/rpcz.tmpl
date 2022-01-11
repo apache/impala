@@ -298,17 +298,17 @@ function update_krpc_conn_metrics_datatable(json) {
   var table = $('#per_conn_metrics').DataTable();
   var rows = $.map(json["per_conn_metrics"], function(row) {
     return [[row["remote_ip"], row["num_calls_in_flight"], row["outbound_queue_size"],
-             row["socket_stats"]["rtt"]],
-             row["socket_stats"]["rttvar"]],
-             row["socket_stats"]["cnd_cwnd"]],
-             row["socket_stats"]["total_retrans"]],
-             row["socket_stats"]["pacing_rate"]],
-             row["socket_stats"]["max_pacing_rate"]],
-             row["socket_stats"]["bytes_acked"]],
-             row["socket_stats"]["bytes_received"]],
-             row["socket_stats"]["segs_out"]],
-             row["socket_stats"]["segs_in"]],
-             row["socket_stats"]["send_queue_bytes"]],
+             row["socket_stats"]["rtt"],
+             row["socket_stats"]["rttvar"],
+             row["socket_stats"]["cnd_cwnd"],
+             row["socket_stats"]["total_retrans"],
+             row["socket_stats"]["pacing_rate"],
+             row["socket_stats"]["max_pacing_rate"],
+             row["socket_stats"]["bytes_acked"],
+             row["socket_stats"]["bytes_received"],
+             row["socket_stats"]["segs_out"],
+             row["socket_stats"]["segs_in"],
+             row["socket_stats"]["send_queue_bytes"],
              row["socket_stats"]["receive_queue_bytes"]]];
   });
 
@@ -319,17 +319,17 @@ function update_krpc_inbound_conn_metrics_datatable(json) {
   var table = $('#inbound_per_conn_metrics').DataTable();
   var rows = $.map(json["inbound_per_conn_metrics"], function(row) {
     return [[row["remote_ip"], row["num_calls_in_flight"],
-             row["socket_stats"]["rtt"]],
-             row["socket_stats"]["rttvar"]],
-             row["socket_stats"]["cnd_cwnd"]],
-             row["socket_stats"]["total_retrans"]],
-             row["socket_stats"]["pacing_rate"]],
-             row["socket_stats"]["max_pacing_rate"]],
-             row["socket_stats"]["bytes_acked"]],
-             row["socket_stats"]["bytes_received"]],
-             row["socket_stats"]["segs_out"]],
-             row["socket_stats"]["segs_in"]],
-             row["socket_stats"]["send_queue_bytes"]],
+             row["socket_stats"]["rtt"],
+             row["socket_stats"]["rttvar"],
+             row["socket_stats"]["cnd_cwnd"],
+             row["socket_stats"]["total_retrans"],
+             row["socket_stats"]["pacing_rate"],
+             row["socket_stats"]["max_pacing_rate"],
+             row["socket_stats"]["bytes_acked"],
+             row["socket_stats"]["bytes_received"],
+             row["socket_stats"]["segs_out"],
+             row["socket_stats"]["segs_in"],
+             row["socket_stats"]["send_queue_bytes"],
              row["socket_stats"]["receive_queue_bytes"]]];
   });
 
