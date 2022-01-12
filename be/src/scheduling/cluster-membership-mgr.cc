@@ -60,6 +60,13 @@ static const string LIVE_EXEC_GROUP_KEY("cluster-membership.executor-groups.tota
 static const string HEALTHY_EXEC_GROUP_KEY(
     "cluster-membership.executor-groups.total-healthy");
 static const string TOTAL_BACKENDS_KEY("cluster-membership.backends.total");
+// Per group set metrics
+static const string LIVE_EXEC_GROUP_KEY_FORMAT(
+    "cluster-membership.group-set.executor-groups.total.$0");
+static const string HEALTHY_EXEC_GROUP_KEY_FORMAT(
+    "cluster-membership.group-set.executor-groups.total-healthy.$0");
+static const string TOTAL_BACKENDS_KEY_FORMAT(
+    "cluster-membership.group-set.backends.total.$0");
 
 ClusterMembershipMgr::ClusterMembershipMgr(
     string local_backend_id, StatestoreSubscriber* subscriber, MetricGroup* metrics)
@@ -71,14 +78,32 @@ ClusterMembershipMgr::ClusterMembershipMgr(
   if(!status.ok()) {
     LOG(FATAL) << "Error populating expected executor group sets: " << status;
   }
-  DCHECK(metrics != nullptr);
-  MetricGroup* metric_grp = metrics->GetOrCreateChildGroup("cluster-membership");
-  total_live_executor_groups_ = metric_grp->AddCounter(LIVE_EXEC_GROUP_KEY, 0);
-  total_healthy_executor_groups_ = metric_grp->AddCounter(HEALTHY_EXEC_GROUP_KEY, 0);
-  total_backends_ = metric_grp->AddCounter(TOTAL_BACKENDS_KEY, 0);
+  InitMetrics(metrics);
   // Register the metric update function as a callback.
   RegisterUpdateCallbackFn([this](
       ClusterMembershipMgr::SnapshotPtr snapshot) { this->UpdateMetrics(snapshot); });
+}
+
+void ClusterMembershipMgr::InitMetrics(MetricGroup* metrics) {
+  DCHECK(metrics != nullptr);
+  MetricGroup* metric_grp = metrics->GetOrCreateChildGroup("cluster-membership");
+  aggregated_group_set_metrics_.total_live_executor_groups_ =
+      metric_grp->AddCounter(LIVE_EXEC_GROUP_KEY, 0);
+  aggregated_group_set_metrics_.total_healthy_executor_groups_ =
+      metric_grp->AddCounter(HEALTHY_EXEC_GROUP_KEY, 0);
+  aggregated_group_set_metrics_.total_backends_ =
+      metric_grp->AddCounter(TOTAL_BACKENDS_KEY, 0);
+
+  for (auto& set : expected_exec_group_sets_) {
+    GroupSetMetrics grp_set_metrics;
+    grp_set_metrics.total_live_executor_groups_ =
+        metric_grp->AddCounter(LIVE_EXEC_GROUP_KEY_FORMAT, 0, set.exec_group_name_prefix);
+    grp_set_metrics.total_healthy_executor_groups_ = metric_grp->AddCounter(
+        HEALTHY_EXEC_GROUP_KEY_FORMAT, 0, set.exec_group_name_prefix);
+    grp_set_metrics.total_backends_ =
+        metric_grp->AddCounter(TOTAL_BACKENDS_KEY_FORMAT, 0, set.exec_group_name_prefix);
+    per_group_set_metrics_.insert({set.exec_group_name_prefix, grp_set_metrics});
+  }
 }
 
 Status ClusterMembershipMgr::Init() {
@@ -565,9 +590,35 @@ void ClusterMembershipMgr::UpdateMetrics(const SnapshotPtr& new_state){
     }
   }
   DCHECK_GE(total_live_executor_groups, healthy_executor_groups);
-  total_live_executor_groups_->SetValue(total_live_executor_groups);
-  total_healthy_executor_groups_->SetValue(healthy_executor_groups);
-  total_backends_->SetValue(new_state->current_backends.size());
+  aggregated_group_set_metrics_.total_live_executor_groups_->SetValue(
+      total_live_executor_groups);
+  aggregated_group_set_metrics_.total_healthy_executor_groups_->SetValue(
+      healthy_executor_groups);
+  aggregated_group_set_metrics_.total_backends_->SetValue(
+      new_state->current_backends.size());
+
+  for (auto& set : expected_exec_group_sets_) {
+    int total_backends = 0;
+    int64_t total_live_exec_groups = 0;
+    int64_t healthy_exec_groups = 0;
+    StringPiece prefix(set.exec_group_name_prefix);
+    for (const auto& group_it : new_state->executor_groups) {
+      StringPiece name(group_it.first);
+      if (!name.starts_with(prefix)) continue;
+      const ExecutorGroup& group = group_it.second;
+      if (group.IsHealthy()) {
+        ++healthy_exec_groups;
+      }
+      if (group.NumHosts() > 0) {
+        ++total_live_exec_groups;
+        total_backends += group.NumExecutors();
+      }
+    }
+    auto& grp_metrics = per_group_set_metrics_[set.exec_group_name_prefix];
+    grp_metrics.total_live_executor_groups_->SetValue(total_live_exec_groups);
+    grp_metrics.total_healthy_executor_groups_->SetValue(healthy_exec_groups);
+    grp_metrics.total_backends_->SetValue(total_backends);
+  }
 }
 
 bool ClusterMembershipMgr::IsBackendInExecutorGroups(

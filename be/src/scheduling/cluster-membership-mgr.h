@@ -176,6 +176,12 @@ class ClusterMembershipMgr {
   }
 
  private:
+  struct GroupSetMetrics {
+    IntCounter* total_live_executor_groups_ = nullptr;
+    IntCounter* total_healthy_executor_groups_ = nullptr;
+    IntCounter* total_backends_ = nullptr;
+  };
+
   /// Serializes and adds the local backend descriptor to 'subscriber_topic_updates'.
   void AddLocalBackendToStatestore(const BackendDescriptorPB& local_be_desc,
       std::vector<TTopicDelta>* subscriber_topic_updates);
@@ -206,7 +212,7 @@ class ClusterMembershipMgr {
   /// Updates the membership metrics. Is registered as an updated callback function to
   /// receive any membership updates. The only exception is that this is called directly
   /// in BlacklistExecutor() where updates are not required to be sent to external
-  /// listeners.
+  /// listeners. InitMetrics() must have been called before registering this method.
   void UpdateMetrics(const SnapshotPtr& new_state);
 
   /// Returns true if the 'be_desc' is in any of the 'executor_groups', false otherwise.
@@ -221,6 +227,10 @@ class ClusterMembershipMgr {
   static Status PopulateExpectedExecGroupSets(
       std::vector<TExecutorGroupSet>& expected_exec_group_sets);
 
+  /// Helper method to initialize metrics. Also initializes metrics for all group sets if
+  /// expected group sets are specified.
+  void InitMetrics(MetricGroup* metrics);
+
   /// An empty group used for scheduling coordinator only queries.
   const ExecutorGroup empty_exec_group_;
 
@@ -233,10 +243,13 @@ class ClusterMembershipMgr {
   /// locks in this class.
   std::mutex update_membership_lock_;
 
-  /// Membership metrics
-  IntCounter* total_live_executor_groups_ = nullptr;
-  IntCounter* total_healthy_executor_groups_ = nullptr;
-  IntCounter* total_backends_ = nullptr;
+  /// Membership metrics for all executor groups regardless of which group set they belong
+  /// to. The value for total backends also includes the coordinators.
+  GroupSetMetrics aggregated_group_set_metrics_;
+
+  /// Maps from the group set prefix to its group set metrics. Is empty if group sets are
+  /// not used.
+  std::unordered_map<string, GroupSetMetrics> per_group_set_metrics_;
 
   /// The snapshot of the current cluster membership. When receiving changes to the
   /// executors configuration from the statestore we will make a copy of the stored

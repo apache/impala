@@ -33,6 +33,7 @@ TEST_QUERY = "select count(*) from functional.alltypes where month + random() < 
 
 DEFAULT_RESOURCE_POOL = "default-pool"
 
+
 class TestExecutorGroups(CustomClusterTestSuite):
   """This class contains tests that exercise the logic related to scaling clusters up and
   down by adding and removing groups of executors. All tests start with a base cluster
@@ -97,7 +98,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
                                expected_num_impalads=num_coordinators,
                                use_exclusive_coordinators=True)
     self.coordinator = self.cluster.impalads[0]
-    self.num_impalads = 2
+    self.num_impalads = num_coordinators
 
   def _get_total_admitted_queries(self):
     """Returns the total number of queries that have been admitted to the default resource
@@ -120,22 +121,32 @@ class TestExecutorGroups(CustomClusterTestSuite):
       return self.coordinator.service.wait_for_metric_value(
         "cluster-membership.executor-groups.total", num_exec_grps, timeout=30)
 
-  def _get_num_executor_groups(self, only_healthy=False):
+  def _get_num_executor_groups(self, only_healthy=False, exec_group_set_prefix=None):
     """Returns the number of executor groups with at least one executor. If
-    'only_healthy' is True, only the number of healthy executor groups is returned."""
-    if only_healthy:
-      return self.coordinator.service.get_metric_value(
-        "cluster-membership.executor-groups.total-healthy")
+    'only_healthy' is True, only the number of healthy executor groups is returned.
+    If exec_group_set_prefix is used, it returns the metric corresponding to that
+    executor group set."""
+    metric_name = ""
+    if exec_group_set_prefix is None:
+      if only_healthy:
+        metric_name = "cluster-membership.executor-groups.total-healthy"
+      else:
+        metric_name = "cluster-membership.executor-groups.total"
     else:
-      return self.coordinator.service.get_metric_value(
-        "cluster-membership.executor-groups.total")
+      if only_healthy:
+        metric_name = "cluster-membership.group-set.executor-groups.total-healthy.{0}"\
+          .format(exec_group_set_prefix)
+      else:
+        metric_name = "cluster-membership.group-set.executor-groups.total.{0}"\
+          .format(exec_group_set_prefix)
+    return self.coordinator.service.get_metric_value(metric_name)
 
-  def _get_num_queries_executing_for_exec_group(self, group_name_suffix):
-    """Returns the number of queries running on the executor group 'group_name_suffix'.
+  def _get_num_queries_executing_for_exec_group(self, group_name_prefix):
+    """Returns the number of queries running on the executor group 'group_name_prefix'.
     None is returned if the group has no executors or does not exist."""
     METRIC_PREFIX = "admission-controller.executor-group.num-queries-executing.{0}"
     return self.coordinator.service.get_metric_value(
-      METRIC_PREFIX.format(self._group_name(DEFAULT_RESOURCE_POOL, group_name_suffix)))
+      METRIC_PREFIX.format(self._group_name(DEFAULT_RESOURCE_POOL, group_name_prefix)))
 
   def _assert_eventually_in_profile(self, query_handle, expected_str):
     """Assert with a timeout of 60 sec and a polling interval of 1 sec that the
@@ -604,10 +615,11 @@ class TestExecutorGroups(CustomClusterTestSuite):
     llama_site_path = os.path.join(RESOURCES_DIR, "llama-site-empty.xml")
     # Start with a regular admission config with multiple pools and no resource limits.
     self._restart_coordinators(num_coordinators=2,
-                               extra_args="-vmodule admission-controller=3 "
-                                          "-fair_scheduler_allocation_path %s "
-                                          "-llama_site_path %s" % (
-                                            fs_allocation_path, llama_site_path))
+         extra_args="-vmodule admission-controller=3 "
+                    "-expected_executor_group_sets=root.queue1:2,root.queue2:1 "
+                    "-fair_scheduler_allocation_path %s "
+                    "-llama_site_path %s" % (
+                      fs_allocation_path, llama_site_path))
 
     # Create fresh clients
     second_coord_client = self.create_client_for_nth_impalad(1)
@@ -619,6 +631,10 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self._add_executor_group("group", 1, admission_control_slots=1,
                              resource_pool="root.queue2", extra_args="-mem_limit=2g")
     assert self._get_num_executor_groups(only_healthy=True) == 2
+    assert self._get_num_executor_groups(only_healthy=True,
+                                         exec_group_set_prefix="root.queue1") == 1
+    assert self._get_num_executor_groups(only_healthy=True,
+                                         exec_group_set_prefix="root.queue2") == 1
 
     # Execute a long running query on group 'queue1'
     self.client.set_configuration({'request_pool': 'queue1'})
@@ -663,3 +679,37 @@ class TestExecutorGroups(CustomClusterTestSuite):
 
     self.client.close()
     second_coord_client.close()
+
+  @pytest.mark.execute_serially
+  def test_per_exec_group_set_metrics(self):
+    """This test verifies that the metrics for each exec group set are updated
+    appropriately."""
+    self._restart_coordinators(num_coordinators=1,
+         extra_args="-expected_executor_group_sets=root.queue1:2,root.queue2:1")
+
+    # Add an unhealthy exec group in queue1 group set
+    self._add_executor_group("group", 2, num_executors=1,
+                             resource_pool="root.queue1", extra_args="-mem_limit=2g")
+    assert self._get_num_executor_groups(only_healthy=True,
+                                         exec_group_set_prefix="root.queue1") == 0
+    assert self._get_num_executor_groups(exec_group_set_prefix="root.queue1") == 1
+    assert self.coordinator.service.get_metric_value(
+      "cluster-membership.group-set.backends.total.root.queue1") == 1
+
+    # Add another executor to the previous group to make healthy again
+    self._add_executor_group("group", 2, num_executors=1,
+                             resource_pool="root.queue1", extra_args="-mem_limit=2g")
+    assert self._get_num_executor_groups(only_healthy=True,
+                                         exec_group_set_prefix="root.queue1") == 1
+    assert self._get_num_executor_groups(exec_group_set_prefix="root.queue1") == 1
+    assert self.coordinator.service.get_metric_value(
+      "cluster-membership.group-set.backends.total.root.queue1") == 2
+
+    # Add a healthy exec group in queue2 group set
+    self._add_executor_group("group", 1,
+                             resource_pool="root.queue2", extra_args="-mem_limit=2g")
+    assert self._get_num_executor_groups(only_healthy=True,
+                                         exec_group_set_prefix="root.queue2") == 1
+    assert self._get_num_executor_groups(exec_group_set_prefix="root.queue2") == 1
+    assert self.coordinator.service.get_metric_value(
+      "cluster-membership.group-set.backends.total.root.queue2") == 1

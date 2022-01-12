@@ -2762,7 +2762,7 @@
     "kind": "COUNTER",
     "key": "cluster-membership.executor-groups.total-healthy"
   },{
-    "description": "Total number of backends registered with the statestore",
+    "description": "Total number of backends (both coordinators and executors) registered with the statestore",
     "contexts": [
       "IMPALAD"
     ],
@@ -2770,6 +2770,35 @@
     "units": "NONE",
     "kind": "COUNTER",
     "key": "cluster-membership.backends.total"
+  },
+  {
+    "description": "Total number of executor groups in the executor group set $0 that have at least one executor",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Total number of executor groups in the executor group set $0 that have at least one executor",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "cluster-membership.group-set.executor-groups.total.$0"
+  },
+  {
+    "description": "Total number of executor groups in the executor group set $0 that are in a healthy state, that is, have at least the configured minimum number of executors to be considered for admission",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Total number of executor groups in the executor group set $0 that are in a healthy state",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "cluster-membership.group-set.executor-groups.total-healthy.$0"
+  },{
+    "description": "Total number of backends in the executor group set $0 registered with the statestore",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Total number of executors in the executor group set $0 registered with the statestore",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "cluster-membership.group-set.backends.total.$0"
   },
   {
   "description": "Total number of queries admitted on this coordinator running on executor group: $0",
