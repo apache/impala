@@ -46,7 +46,7 @@ Status RpcMgr::GetProxy(const TNetworkAddress& address, const std::string& hostn
       address_to_use.hostname == ExecEnv::GetInstance()->krpc_address().hostname) {
     address_to_use.__set_hostname(LOCALHOST_IP_STR);
   }
-  kudu::Sockaddr sockaddr;
+  kudu::Sockaddr sockaddr = kudu::Sockaddr::Wildcard();
   RETURN_IF_ERROR(TNetworkAddressToSockaddr(address_to_use, &sockaddr));
   proxy->reset(new P(messenger_, sockaddr, hostname));
 

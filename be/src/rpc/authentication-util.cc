@@ -171,7 +171,7 @@ bool IsTrustedDomain(const std::string& origin, const std::string& trusted_domai
   if (trusted_domain.empty()) return false;
   vector<string> split = Split(origin, delimiter::Limit(",", 1));
   if (split.empty()) return false;
-  kudu::Sockaddr sock_addr;
+  kudu::Sockaddr sock_addr = kudu::Sockaddr::Wildcard();
   kudu::Status s = sock_addr.ParseString(split[0], 0);
   string host_name;
   if (!s.ok()) {

@@ -201,7 +201,7 @@ Status RpcMgr::StartServices() {
   DCHECK(!services_started_) << "May not call StartServices() twice";
 
   // Convert 'address_' to Kudu's Sockaddr
-  Sockaddr sockaddr;
+  Sockaddr sockaddr = Sockaddr::Wildcard();
   if (FLAGS_rpc_use_loopback) {
     // Listen on all addresses, including loopback.
     sockaddr.set_port(address_.port);

@@ -673,8 +673,8 @@ bool QueryState::ReportExecStatus() {
   // without the profile so that the coordinator can still get the status and won't
   // conclude that the backend has hung and cancel the query.
   if (profile_buf != nullptr) {
-    unique_ptr<kudu::faststring> sidecar_buf = make_unique<kudu::faststring>();
-    sidecar_buf->assign_copy(profile_buf, profile_len);
+    kudu::faststring sidecar_buf;
+    sidecar_buf.assign_copy(profile_buf, profile_len);
     unique_ptr<RpcSidecar> sidecar = RpcSidecar::FromFaststring(move(sidecar_buf));
 
     int sidecar_idx;

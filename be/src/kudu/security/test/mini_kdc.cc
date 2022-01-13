@@ -65,7 +65,9 @@ MiniKdc::MiniKdc(MiniKdcOptions options)
     options_.realm = "KRBTEST.COM";
   }
   if (options_.data_root.empty()) {
-    options_.data_root = JoinPathSegments(GetTestDataDirectory(), "krb5kdc");
+    // We hardcode "/tmp" here since the original function which initializes a random test
+    // directory (GetTestDataDirectory()), depends on gmock.
+    options_.data_root = JoinPathSegments("/tmp", "krb5kdc");
   }
   if (options_.ticket_lifetime.empty()) {
     options_.ticket_lifetime = "24h";
@@ -309,7 +311,9 @@ Status MiniKdc::Kinit(const string& username) {
   RETURN_NOT_OK(GetBinaryPath("kinit", &kinit));
   unique_ptr<WritableFile> tmp_cc_file;
   string tmp_cc_path;
-  const auto tmp_template = Substitute("kinit-temp-$0.XXXXXX", username);
+  string tmp_username = username;
+  StripString(&tmp_username, "/", '_');
+  const auto tmp_template = Substitute("kinit-temp-$0.XXXXXX", tmp_username);
   WritableFileOptions opts;
   opts.is_sensitive = false;
   RETURN_NOT_OK_PREPEND(Env::Default()->NewTempWritableFile(

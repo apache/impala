@@ -64,6 +64,14 @@ class WebCallbackRegistry {
 
     // In the case of a POST, the posted data.
     std::string post_data;
+
+    // The socket address of the requester, <host>:<port>.
+    // Define this variable for IMPALA-9182.
+    std::string source_socket;
+
+    // Authenticated user, or 'anonymous' if no auth used
+    // Define this variable for IMPALA-10779.
+    std::string source_user = "anonymous";
   };
 
   // A response to an HTTP request whose body is rendered by template.

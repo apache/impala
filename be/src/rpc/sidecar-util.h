@@ -82,8 +82,8 @@ Status SetFaststringSidecar(const T& obj, RPC* rpc, int* sidecar_idx) {
   if (serialized_len > FLAGS_rpc_max_message_size) {
     return Status("Serialized sidecar exceeds --rpc_max_message_size.");
   }
-  std::unique_ptr<kudu::faststring> sidecar_str = std::make_unique<kudu::faststring>();
-  sidecar_str->assign_copy(serialized_buf, serialized_len);
+  kudu::faststring sidecar_str;
+  sidecar_str.assign_copy(serialized_buf, serialized_len);
   std::unique_ptr<kudu::rpc::RpcSidecar> rpc_sidecar =
       kudu::rpc::RpcSidecar::FromFaststring(std::move(sidecar_str));
   RETURN_IF_ERROR(FromKuduStatus(

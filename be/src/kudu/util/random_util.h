@@ -27,7 +27,10 @@
 #include <glog/logging.h>
 
 #include "kudu/gutil/map-util.h"
-#include "kudu/util/int128_util.h"
+// Inline functions defined in int128_util.h cause ambiguous overload error for
+// std::ostream& operator<<(std::ostream& os, const unsigned __int128& val),
+// include "kudu/util/int128.h" instead.
+#include "kudu/util/int128.h"
 #include "kudu/util/random.h"
 
 namespace kudu {

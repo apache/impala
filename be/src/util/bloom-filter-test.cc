@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "kudu/rpc/rpc_controller.h"
+#include "kudu/util/random.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/mem-tracker.h"
@@ -117,10 +118,13 @@ namespace impala {
 
 // Test that MaxNdv() and MinLogSpace() are dual
 TEST(BloomFilter, MinSpaceMaxNdv) {
-  for (int log2fpp = -2; log2fpp >= -63; --log2fpp) {
+  for (int log2fpp = -2; log2fpp >= -30; --log2fpp) {
     const double fpp = pow(2, log2fpp);
     for (int given_log_space = 8; given_log_space < 30; ++given_log_space) {
       const size_t derived_ndv = BloomFilter::MaxNdv(given_log_space, fpp);
+      // If NO values can be added without exceeding fpp, then the space needed is
+      // trivially zero. This becomes a useless test; skip to the next iteration.
+      if (0 == derived_ndv) continue;
       int derived_log_space = BloomFilter::MinLogSpace(derived_ndv, fpp);
 
       EXPECT_EQ(derived_log_space, given_log_space) << "fpp: " << fpp
@@ -162,8 +166,8 @@ TEST(BloomFilter, MinSpaceEdgeCase) {
 
 // Check that MinLogSpace() and FalsePositiveProb() are dual
 TEST(BloomFilter, MinSpaceForFpp) {
-  for (size_t ndv = 10000; ndv < 100 * 1000 * 1000; ndv *= 1.01) {
-    for (double fpp = 0.1; fpp > pow(2, -20); fpp *= 0.99) { // NOLINT: loop on double
+  for (size_t ndv = 10000; ndv < 100 * 1000 * 1000; ndv *= 1.1) {
+    for (double fpp = 0.1; fpp > pow(2, -20); fpp *= 0.9) { // NOLINT: loop on double
       // When contructing a Bloom filter, we can request a particular fpp by calling
       // MinLogSpace().
       const int min_log_space = BloomFilter::MinLogSpace(ndv, fpp);
@@ -305,46 +309,54 @@ TEST_F(BloomFilterTest, CumulativeFind) {
 // The empirical false positives we find when looking for random items is with a constant
 // factor of the false positive probability the Bloom filter was constructed for.
 TEST_F(BloomFilterTest, FindInvalid) {
-  srand(0);
-  static const int find_limit = 1 << 20;
+  // We use a deterministic pseudorandom number generator with a set seed. The reason is
+  // that with a run-dependent seed, there will always be inputs that can fail. That's a
+  // potential argument for this to be a benchmark rather than a test, although the
+  // measured quantity would be not time but deviation from predicted fpp.
+  ::kudu::Random rgen(867 + 5309);
+  static const int find_limit = 1 << 22;
   unordered_set<uint32_t> to_find;
   while (to_find.size() < find_limit) {
-    to_find.insert(MakeRand());
+    to_find.insert(rgen.Next64());
   }
   static const int max_log_ndv = 19;
   unordered_set<uint32_t> to_insert;
   while (to_insert.size() < (1ull << max_log_ndv)) {
-    const auto candidate = MakeRand();
+    const auto candidate = rgen.Next64();
     if (to_find.find(candidate) == to_find.end()) {
       to_insert.insert(candidate);
     }
   }
   vector<uint32_t> shuffled_insert(to_insert.begin(), to_insert.end());
   for (int log_ndv = 12; log_ndv < max_log_ndv; ++log_ndv) {
-    for (int log_fpp = 4; log_fpp < 15; ++log_fpp) {
+    for (int log_fpp = 4; log_fpp < 12; ++log_fpp) {
       double fpp = 1.0 / (1 << log_fpp);
       const size_t ndv = 1 << log_ndv;
-      const int log_bufferpool_space = BloomFilter::MinLogSpace(ndv, fpp);
-      BloomFilter* bf = CreateBloomFilter(log_bufferpool_space);
+      const int log_heap_space = BloomFilter::MinLogSpace(ndv, fpp);
+      BloomFilter* bf = CreateBloomFilter(log_heap_space);
       // Fill up a BF with exactly as much ndv as we planned for it:
       for (size_t i = 0; i < ndv; ++i) {
-        BfInsert(*bf, shuffled_insert[i]);
+        bf->Insert( shuffled_insert[i]);
       }
       int found = 0;
       // Now we sample from the set of possible hashes, looking for hits.
       for (const auto& i : to_find) {
-        found += BfFind(*bf, i);
+        found += bf->Find(i);
       }
       EXPECT_LE(found, find_limit * fpp * 2)
-          << "Too many false positives with -log2(fpp) = " << log_fpp;
+          << "Too many false positives with -log2(fpp) = " << log_fpp
+          << " and log_ndv = " << log_ndv << " and log_heap_space = " << log_heap_space;
       // Because the space is rounded up to a power of 2, we might actually get a lower
       // fpp than the one passed to MinLogSpace().
-      const double expected_fpp =
-          BloomFilter::FalsePositiveProb(ndv, log_bufferpool_space);
-      EXPECT_GE(found, find_limit * expected_fpp)
-          << "Too few false positives with -log2(fpp) = " << log_fpp;
-      EXPECT_LE(found, find_limit * expected_fpp * 8)
-          << "Too many false positives with -log2(fpp) = " << log_fpp;
+      const double expected_fpp = BloomFilter::FalsePositiveProb(ndv, log_heap_space);
+      // Fudge factors are present because filter characteristics are true in the limit,
+      // and will deviate for small samples.
+      EXPECT_GE(found, find_limit * expected_fpp * 0.75)
+          << "Too few false positives with -log2(fpp) = " << log_fpp
+          << " expected_fpp = " << expected_fpp;
+      EXPECT_LE(found, find_limit * expected_fpp * 1.25)
+          << "Too many false positives with -log2(fpp) = " << log_fpp
+          << " expected_fpp = " << expected_fpp;
     }
   }
 }

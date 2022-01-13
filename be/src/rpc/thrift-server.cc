@@ -32,7 +32,7 @@
 
 #include <sstream>
 #include "gen-cpp/Types_types.h"
-#include "kudu/security/openssl_util.h"
+#include "kudu/util/openssl_util.h"
 #include "rpc/TAcceptQueueServer.h"
 #include "rpc/auth-provider.h"
 #include "rpc/authentication.h"

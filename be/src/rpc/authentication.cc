@@ -45,7 +45,7 @@
 #include "kudu/rpc/sasl_common.h"
 #include "kudu/security/gssapi.h"
 #include "kudu/security/init.h"
-#include "kudu/security/openssl_util.h"
+#include "kudu/util/openssl_util.h"
 #include "rpc/auth-provider.h"
 #include "rpc/authentication-util.h"
 #include "rpc/thrift-server.h"

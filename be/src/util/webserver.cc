@@ -205,6 +205,8 @@ string HttpStatusCodeToString(HttpStatusCode code) {
   switch (code) {
     case HttpStatusCode::Ok:
       return "200 OK";
+    case HttpStatusCode::TemporaryRedirect:
+      return "307 Temporary Redirect";
     case HttpStatusCode::BadRequest:
       return "400 Bad Request";
     case HttpStatusCode::AuthenticationRequired:
@@ -251,6 +253,7 @@ void SendResponse(struct sq_connection* connection, const string& response_code_
 // Return the address of the remote user from the squeasel request info.
 kudu::Sockaddr GetRemoteAddress(const struct sq_request_info* req) {
   struct sockaddr_in addr;
+  memset(&addr, 0, sizeof(addr));
   addr.sin_family = AF_INET;
   addr.sin_port = NetworkByteOrder::FromHost16(req->remote_port);
   addr.sin_addr.s_addr = NetworkByteOrder::FromHost32(req->remote_ip);
