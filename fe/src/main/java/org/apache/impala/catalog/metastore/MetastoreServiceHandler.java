@@ -1415,14 +1415,7 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
      GetPartitionsPsWithAuthRequest req)
      throws MetaException, NoSuchObjectException, TException {
    try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-     List<Partition> partitions = client.getHiveClient().getThriftClient()
-         .get_partitions_ps_with_auth(MetaStoreUtils
-                 .prependCatalogToDbName(req.getCatName(), req.getDbName(), serverConf_),
-             req.getTblName(), req.getPartVals(), req.getMaxParts(),
-             req.getUserName(), req.getGroupNames());
-     GetPartitionsPsWithAuthResponse res = new GetPartitionsPsWithAuthResponse();
-     res.setPartitions(partitions);
-     return res;
+     return client.getHiveClient().getThriftClient().get_partitions_ps_with_auth_req(req);
    }
  }
 
