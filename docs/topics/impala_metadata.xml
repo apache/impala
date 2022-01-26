@@ -236,8 +236,8 @@ under the License.
       </p>
 
       <note>
-        This is a preview feature in <keyword keyref="impala33_full"/> and not generally
-        available.
+	      This is a preview feature in <keyword keyref="impala33_full"/> and <keyword keyref="impala40"/>
+	      It is generally available and enabled by default from <keyword keyref="impala41"/> onwards.
       </note>
 
       <ul>
@@ -356,7 +356,8 @@ under the License.
 <codeblock> &lt;property>
     &lt;name>hive.metastore.transactional.event.listeners&lt;/name>
     &lt;value>org.apache.hive.hcatalog.listener.DbNotificationListener&lt;/value>
-
+  &lt;/property>
+  &lt;property>
     &lt;name>hive.metastore.dml.events&lt;/name>
     &lt;value>true&lt;/true>
   &lt;/property></codeblock>
