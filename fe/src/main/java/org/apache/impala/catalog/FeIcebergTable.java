@@ -501,20 +501,39 @@ public interface FeIcebergTable extends FeFsTable {
     }
 
     /**
-     * Get all FileDescriptor from iceberg table without any predicates.
+     * Returns the FileDescriptors loaded by the internal HdfsTable. To avoid returning
+     * the metadata files the resulset is limited to the files that are tracked by
+     * Iceberg. Both the HdfsBaseDir and the DataFile path can contain the scheme in their
+     * path, using org.apache.hadoop.fs.Path to normalize the paths.
      */
     public static Map<String, HdfsPartition.FileDescriptor> loadAllPartition(
-        FeIcebergTable table) throws IOException, TableLoadingException {
-      // Empty predicates
+        IcebergTable table) throws IOException, TableLoadingException {
+      Map<String, HdfsPartition.FileDescriptor> hdfsFileDescMap = new HashMap<>();
+      Collection<HdfsPartition> partitions =
+          ((HdfsTable)table.getFeFsTable()).partitionMap_.values();
+      for (HdfsPartition partition : partitions) {
+        for (FileDescriptor fileDesc : partition.getFileDescriptors()) {
+            Path path = new Path(table.getHdfsBaseDir() + Path.SEPARATOR +
+                fileDesc.getRelativePath());
+            hdfsFileDescMap.put(path.toUri().getPath(), fileDesc);
+        }
+      }
+      Map<String, HdfsPartition.FileDescriptor> fileDescMap = new HashMap<>();
       List<DataFile> dataFileList = IcebergUtil.getIcebergDataFiles(table,
           new ArrayList<>(), /*timeTravelSpecl=*/null);
-
-      Map<String, HdfsPartition.FileDescriptor> fileDescMap = new HashMap<>();
-      for (DataFile file : dataFileList) {
-        HdfsPartition.FileDescriptor fileDesc = getFileDescriptor(
-            new Path(file.path().toString()),
-            new Path(table.getIcebergTableLocation()), table.getHostIndex());
-        fileDescMap.put(IcebergUtil.getDataFilePathHash(file), fileDesc);
+      for (DataFile dataFile : dataFileList) {
+          Path path = new Path(dataFile.path().toString());
+          if (hdfsFileDescMap.containsKey(path.toUri().getPath())) {
+            String pathHash = IcebergUtil.getDataFilePathHash(dataFile);
+            fileDescMap.put(pathHash, hdfsFileDescMap.get(path.toUri().getPath()));
+          } else {
+            LOG.warn("Iceberg DataFile '{}' cannot be found in the HDFS recursive file "
+                + "listing results.", path.toString());
+            HdfsPartition.FileDescriptor fileDesc = getFileDescriptor(
+                new Path(dataFile.path().toString()),
+                new Path(table.getIcebergTableLocation()), table.getHostIndex());
+            fileDescMap.put(IcebergUtil.getDataFilePathHash(dataFile), fileDesc);
+          }
       }
       return fileDescMap;
     }
