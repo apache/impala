@@ -355,6 +355,13 @@ def get_option_parser(defaults):
   if '--live_progress' in sys.argv and '--disable_live_progress' in sys.argv:
     parser.error("options --live_progress and --disable_live_progress are mutually "
                  "exclusive")
+
+  if '--strict_hs2_protocol' in sys.argv:
+    if '--live_progress' in sys.argv:
+      parser.error("options --strict_hs2_protocol does not support --live_progress")
+    if '--live_summary' in sys.argv:
+      parser.error("options --strict_hs2_protocol does not support --live_summary")
+
   if '--verbose' in sys.argv and '--quiet' in sys.argv:
     parser.error("options --verbose and --quiet are mutually exclusive")
 

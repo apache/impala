@@ -194,14 +194,24 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     """Test that setting the local shell options works"""
     proc = spawn_shell(get_shell_cmd(vector))
     proc.expect(":{0}] default>".format(get_impalad_port(vector)))
-    self._expect_with_cmd(proc, "set", vector,
-        ("LIVE_PROGRESS: True", "LIVE_SUMMARY: False"))
-    self._expect_with_cmd(proc, "set live_progress=true", vector)
-    self._expect_with_cmd(proc, "set", vector,
-        ("LIVE_PROGRESS: True", "LIVE_SUMMARY: False"))
-    self._expect_with_cmd(proc, "set live_summary=1", vector)
-    self._expect_with_cmd(proc, "set", vector,
-        ("LIVE_PROGRESS: True", "LIVE_SUMMARY: True"))
+    if vector.get_value('strict_hs2_protocol'):
+      self._expect_with_cmd(proc, "set", vector,
+          ("LIVE_PROGRESS: False", "LIVE_SUMMARY: False"))
+      self._expect_with_cmd(proc, "set live_progress=true", vector)
+      self._expect_with_cmd(proc, "set", vector,
+          ("LIVE_PROGRESS: False", "LIVE_SUMMARY: False"))
+      self._expect_with_cmd(proc, "set live_summary=1", vector)
+      self._expect_with_cmd(proc, "set", vector,
+          ("LIVE_PROGRESS: False", "LIVE_SUMMARY: False"))
+    else:
+      self._expect_with_cmd(proc, "set", vector,
+          ("LIVE_PROGRESS: True", "LIVE_SUMMARY: False"))
+      self._expect_with_cmd(proc, "set live_progress=true", vector)
+      self._expect_with_cmd(proc, "set", vector,
+          ("LIVE_PROGRESS: True", "LIVE_SUMMARY: False"))
+      self._expect_with_cmd(proc, "set live_summary=1", vector)
+      self._expect_with_cmd(proc, "set", vector,
+          ("LIVE_PROGRESS: True", "LIVE_SUMMARY: True"))
     self._expect_with_cmd(proc, "set", vector,
         ("WRITE_DELIMITED: False", "VERBOSE: True"))
     self._expect_with_cmd(proc, "set", vector,
@@ -685,6 +695,19 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     args = ['--disable_live_progress', '--config_file=%s' % rcfile_path]
     result = run_impala_shell_interactive(vector, cmds, shell_args=args)
     assert "\tLIVE_PROGRESS: False" in result.stdout
+
+  def test_commandline_flag_strict_hs2_protocol(self, vector):
+    """Test the command line flag strict_hs2_protocol that it disables
+       live_progress and live_summary"""
+    if not vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Test only applies to strict_hs2_protocol.")
+
+    cmds = "set all;"
+    # override the default option through command line argument.
+    args = ['--strict_h2_protocol']
+    result = run_impala_shell_interactive(vector, cmds, shell_args=args)
+    assert "\tLIVE_PROGRESS: False" in result.stdout
+    assert "\tLIVE_SUMMARY: False" in result.stdout
 
   def test_live_option_configuration(self, vector):
     """Test the optional configuration file with live_progress and live_summary."""

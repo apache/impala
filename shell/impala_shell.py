@@ -231,8 +231,21 @@ class ImpalaShell(cmd.Cmd, object):
     # Tracks query handle of the last query executed. Used by the 'profile' command.
     self.last_query_handle = None;
 
-    self.live_summary = options.live_summary
-    self.live_progress = options.live_progress
+    # live_summary and live_progress are turned off in strict_hs2_protocol mode
+    if options.strict_hs2_protocol:
+      if options.live_summary:
+        warning = "WARNING: Unable to track live summary with strict_hs2_protocol"
+        print(warning, file=sys.stderr)
+      if options.live_progress:
+        warning = "WARNING: Unable to track live progress with strict_hs2_protocol"
+        print(warning, file=sys.stderr)
+
+      # do not allow live_progress or live_summary to be changed.
+      self.VALID_SHELL_OPTIONS['LIVE_PROGRESS'] = (lambda x: x in (), "live_progress")
+      self.VALID_SHELL_OPTIONS['LIVE_SUMMARY'] = (lambda x: x in (), "live_summary")
+
+    self.live_summary = options.live_summary and not options.strict_hs2_protocol
+    self.live_progress = options.live_progress and not options.strict_hs2_protocol
 
     self.ignore_query_failure = options.ignore_query_failure
 
