@@ -1325,8 +1325,12 @@ class ImpalaShell(cmd.Cmd, object):
       else:
         error_report = ""
 
-      self._print_if_verbose("%s %d row(s)%s in %2.2fs" %\
-          (verb, num_rows, error_report, time_elapsed))
+      if num_rows is not None:
+        self._print_if_verbose("%s %d row(s)%s in %2.2fs" %
+            (verb, num_rows, error_report, time_elapsed))
+      else:
+        self._print_if_verbose("Time elapsed: %2.2fs" %
+            (time_elapsed))
 
       if not is_dml:
         self.imp_client.close_query(self.last_query_handle)

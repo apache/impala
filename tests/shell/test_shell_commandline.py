@@ -755,8 +755,6 @@ class TestImpalaShell(ImpalaTestSuite):
         assert msg not in result_stderr, result_stderr
 
   def test_query_time_and_link_message(self, vector, unique_database):
-    if vector.get_value('strict_hs2_protocol'):
-      pytest.skip("IMPALA-10827: Messages not sent back is strict hs2 mode.")
     shell_messages = ["Query submitted at: ", "(Coordinator: ",
         "Query progress can be monitored at: "]
     # CREATE statements should not print query time and webserver address.
@@ -797,13 +795,15 @@ class TestImpalaShell(ImpalaTestSuite):
     self._validate_shell_messages(results.stderr, shell_messages, should_exist=False)
 
   def test_insert_status(self, vector, unique_database):
-    if vector.get_value('strict_hs2_protocol'):
-      pytest.skip("No message sent back in strict hs2 mode.")
     run_impala_shell_cmd(
         vector, ['--query=create table %s.insert_test (id int)' % unique_database])
     results = run_impala_shell_cmd(
         vector, ['--query=insert into %s.insert_test values (1)' % unique_database])
-    assert "Modified 1 row(s)" in results.stderr
+
+    if vector.get_value('strict_hs2_protocol'):
+      assert "Time elapsed" in results.stderr
+    else:
+      assert "Modified 1 row(s)" in results.stderr
 
   def _validate_dml_stmt(self, vector, stmt, expected_rows_modified, expected_row_errors):
     results = run_impala_shell_cmd(vector, ['--query=%s' % stmt])

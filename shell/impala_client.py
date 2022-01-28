@@ -1089,7 +1089,8 @@ class StrictHS2Client(ImpalaHS2Client):
     super(StrictHS2Client, self).__init__(*args, **kwargs)
 
   def close_dml(self, last_query_handle):
-    return self.close_query(last_query_handle)
+    self.close_query(last_query_handle)
+    return (None, None)
 
   def close_query(self, last_query_handle):
     # Set a member in the handle to make sure that it is idempotent
@@ -1117,6 +1118,7 @@ class StrictHS2Client(ImpalaHS2Client):
 
   def _populate_query_options(self):
     return
+
 
 class ImpalaBeeswaxClient(ImpalaClient):
   """Legacy Beeswax client. Uses the Beeswax protocol plus Impala-specific extensions.
