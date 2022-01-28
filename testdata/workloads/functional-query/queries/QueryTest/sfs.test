@@ -88,18 +88,76 @@ COMPUTE STATS $DATABASE.test_tbl_02
 'Updated 1 partition(s) and 2 column(s).'
 ====
 ---- QUERY
-CREATE EXTERNAL TABLE test_tbl_03 (s STRING, i INT) STORED AS PARQUET
+CREATE EXTERNAL TABLE test_tbl_03_ext (s STRING, i INT) STORED AS PARQUET
 LOCATION 'sfs+hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/managed/$DATABASE.db/sfs_d3.parq/#SINGLEFILE#'
----- CATCH
-An external table's location should not be located within managed warehouse root directory
+---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
-CREATE EXTERNAL TABLE test_tbl_04 (s STRING, i INT)
+CREATE EXTERNAL TABLE test_tbl_04_ext (s STRING, i INT)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
 STORED AS TEXTFILE
 LOCATION 'sfs+hdfs://$INTERNAL_LISTEN_HOST:20500/test-warehouse/managed/$DATABASE.db/sfs_d4.txt/#SINGLEFILE#'
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# test_tbl_03_ext is considered as an external table. The associated single file will not be deleted
+# after the table is dropped.
+DESCRIBE FORMATTED test_tbl_03_ext
+---- RESULTS: VERIFY_IS_SUBSET
+'Table Type:         ','EXTERNAL_TABLE      ','NULL'
+'','EXTERNAL            ','TRUE                '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# test_tbl_04_ext is considered as an external table. The associated single file will not be deleted
+# after the table is dropped.
+DESCRIBE FORMATTED test_tbl_04_ext
+---- RESULTS: VERIFY_IS_SUBSET
+'Table Type:         ','EXTERNAL_TABLE      ','NULL'
+'','EXTERNAL            ','TRUE                '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# The contents of the table can be correctly retrieved.
+SELECT * FROM test_tbl_03_ext;
+---- RESULTS
+'a',1
+'b',2
+'c',3
+'d',4
+'e',5
+---- TYPES
+STRING, INT
+====
+---- QUERY
+# The contents of the table can be correctly retrieved.
+SELECT * FROM test_tbl_04_ext;
+---- RESULTS
+'u',1
+'v',2
+'w',3
+'x',4
+'y',5
+---- TYPES
+STRING, INT
+====
+---- QUERY
+INSERT INTO TABLE test_tbl_03_ext VALUES ('x', 100);
 ---- CATCH
-An external table's location should not be located within managed warehouse root directory
+row_regex: .*Unable to INSERT into target table .+ because .+ is not a supported filesystem.*
+====
+---- QUERY
+INSERT INTO TABLE test_tbl_04_ext VALUES ('x', 100);
+---- CATCH
+row_regex: .*Unable to INSERT into target table .+ because .+ is not a supported filesystem.*
+====
+---- QUERY
+DROP TABLE test_tbl_03_ext;
+DROP TABLE test_tbl_04_ext;
 ====
 ---- QUERY
 # The table can actually be created.
