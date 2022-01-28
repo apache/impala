@@ -36,7 +36,6 @@ class TestEventProcessing(ImpalaTestSuite):
   PROCESSING_TIMEOUT_S = 10
 
   @SkipIfHive2.acid
-  @pytest.mark.xfail(run=False, reason="IMPALA-9057")
   def test_transactional_insert_events(self, unique_database):
     """Executes 'run_test_insert_events' for transactional tables.
     """
