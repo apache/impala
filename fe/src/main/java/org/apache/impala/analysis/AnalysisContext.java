@@ -556,12 +556,15 @@ public class AnalysisContext {
     if (!shouldReAnalyze) return;
 
     // For SetOperationStmt we must replace the query statement with the rewritten version
-    // before re-analysis.
+    // before re-analysis and set the explain flag of the rewritten version if the
+    // original is explain statement.
     if (analysisResult_.requiresSetOperationRewrite()) {
       if (analysisResult_.isSetOperationStmt()) {
         if (((SetOperationStmt) analysisResult_.getStmt()).hasRewrittenStmt()) {
+          boolean isExplain = analysisResult_.isExplainStmt();
           analysisResult_.stmt_ =
             ((SetOperationStmt) analysisResult_.getStmt()).getRewrittenStmt();
+          if (isExplain) analysisResult_.stmt_.setIsExplain();
         }
       }
     }

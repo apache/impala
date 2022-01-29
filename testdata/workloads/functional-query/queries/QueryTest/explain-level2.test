@@ -85,3 +85,12 @@ where t1.month = 1 and t2.year = 2009 and t3.bool_col = false
 'WARNING: The following tables are missing relevant table and/or column statistics.'
 'functional_avro.alltypes, functional_parquet.alltypessmall'
 ====
+---- QUERY
+# Tests the set operation statement rewrite
+explain select year, month from functional.alltypes
+  intersect
+select year, month from functional.alltypes where year=2009;
+---- RESULTS: VERIFY_IS_SUBSET
+'Per-Host Resources: mem-estimate=13.97MB mem-reservation=5.88MB thread-reservation=1 runtime-filters-memory=2.00MB'
+'04:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]'
+====
