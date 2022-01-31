@@ -474,7 +474,7 @@ class Sorter::TupleSorter {
   Run* run_;
 
   /// Temporarily allocated space to copy and swap tuples (Both are used in
-  /// Partition()). Owned by this TupleSorter instance.
+  /// Partition2way() and Partition3way()). Owned by this TupleSorter instance.
   uint8_t* temp_tuple_buffer_;
   uint8_t* swap_buffer_;
 
@@ -483,10 +483,17 @@ class Sorter::TupleSorter {
   /// high: Mersenne Twister should be more than adequate.
   std::mt19937_64 rng_;
 
+  void IR_ALWAYS_INLINE FreeExprResultPoolIfNeeded();
+
   /// Wrapper around comparator_.Less(). Also call expr_results_pool_.Clear()
   /// on every 'state_->batch_size()' invocations of comparator_.Less(). Returns true
   /// if 'lhs' is less than 'rhs'.
   bool IR_ALWAYS_INLINE Less(const TupleRow* lhs, const TupleRow* rhs);
+
+  /// Wrapper around comparator_.Compare(). Also call expr_results_pool_.Clear()
+  /// on every 'state_->batch_size()' invocations of comparator_.Compare(). Returns -
+  /// if 'lhs' is less than 'rhs', + if 'lhs' is greater than 'rhs' and 0 if equal
+  int IR_ALWAYS_INLINE Compare(const TupleRow* lhs, const TupleRow* rhs);
 
   /// Perform an insertion sort for rows in the range [begin, end) in a run.
   /// Only valid to call for ranges of size at least 1.
@@ -499,19 +506,36 @@ class Sorter::TupleSorter {
   /// groups and the index to the first element in the second group is returned in
   /// 'cut'. Return an error status if any error is encountered or if the query is
   /// cancelled.
-  Status IR_ALWAYS_INLINE Partition(TupleIterator begin, TupleIterator end,
+  Status IR_ALWAYS_INLINE Partition2way(TupleIterator begin, TupleIterator end,
       const Tuple* pivot, TupleIterator* cut);
 
-  /// Performs a quicksort of rows in the range [begin, end) followed by insertion sort
-  /// for smaller groups of elements. Return an error status for any errors or if the
-  /// query is cancelled.
+  /// Partitions the sequence of tuples in the range [begin, end) in a run into three
+  /// groups around the pivot tuple - i.e. tuples in first group are < the pivot,
+  /// tuples in the second group are = pivot, and tuples in the third group are > pivot.
+  /// Tuples are swapped in place to create the groups and the index to
+  /// the first element in the second group is returned in 'cut_left',
+  /// and the index to the first element in the third group is returned in 'cut_right'.
+  /// Returns an error status if any error is encountered or if the query is
+  /// cancelled.
+  Status IR_ALWAYS_INLINE Partition3way(TupleIterator begin, TupleIterator end,
+      const Tuple* pivot, TupleIterator* cut_left, TupleIterator* cut_right);
+
+  /// Performs a modified quicksort of rows in the range [begin, end):
+  /// If duplicates are found during pivot selection, Partition3way
+  /// is called in that iteration, otherwise partitioning goes 2-way.
+  /// This adaptive quicksort is followed by insertion sort for smaller groups
+  /// of elements.
+  /// Return an error status for any errors or if the query is cancelled.
   Status SortHelper(TupleIterator begin, TupleIterator end);
 
   /// Select a pivot to partition [begin, end).
-  Tuple* IR_ALWAYS_INLINE SelectPivot(TupleIterator begin, TupleIterator end);
+  Tuple* IR_ALWAYS_INLINE SelectPivot(TupleIterator begin, TupleIterator end,
+      bool* has_equals);
 
-  /// Return median of three tuples according to the sort comparator.
-  Tuple* IR_ALWAYS_INLINE MedianOfThree(Tuple* t1, Tuple* t2, Tuple* t3);
+  /// Return median of three tuples according to the sort comparator. Sets has_equals
+  /// flag true if duplicates found among the pivot candidates.
+  Tuple* IR_ALWAYS_INLINE MedianOfThree(Tuple* t1, Tuple* t2, Tuple* t3,
+      bool* has_equals);
 
   /// Swaps tuples pointed to by left and right using 'swap_tuple'.
   static void IR_ALWAYS_INLINE Swap(Tuple* RESTRICT left, Tuple* RESTRICT right,

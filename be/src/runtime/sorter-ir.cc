@@ -64,40 +64,51 @@ void IR_ALWAYS_INLINE Sorter::TupleIterator::Prev(Sorter::Run* run, int tuple_si
   if (UNLIKELY(index_ < buffer_start_index_)) PrevPage(run);
 }
 
-// IMPALA-3816: Function is not inlined into Partition() without IR_ALWAYS_INLINE hint.
-bool IR_ALWAYS_INLINE Sorter::TupleSorter::Less(
-    const TupleRow* lhs, const TupleRow* rhs) {
+void IR_ALWAYS_INLINE Sorter::TupleSorter::FreeExprResultPoolIfNeeded() {
   --num_comparisons_till_free_;
   DCHECK_GE(num_comparisons_till_free_, 0);
   if (UNLIKELY(num_comparisons_till_free_ == 0)) {
     parent_->expr_results_pool_.Clear();
     num_comparisons_till_free_ = state_->batch_size();
   }
+}
+
+// IMPALA-3816: Function is not inlined into Partition() without IR_ALWAYS_INLINE hint.
+bool IR_ALWAYS_INLINE Sorter::TupleSorter::Less(
+    const TupleRow* lhs, const TupleRow* rhs) {
+  FreeExprResultPoolIfNeeded();
   return comparator_.Less(lhs, rhs);
 }
 
-Status IR_ALWAYS_INLINE Sorter::TupleSorter::Partition(TupleIterator begin,
+int IR_ALWAYS_INLINE Sorter::TupleSorter::Compare(
+    const TupleRow* lhs, const TupleRow* rhs) {
+  FreeExprResultPoolIfNeeded();
+  return comparator_.Compare(lhs, rhs);
+}
+
+Status IR_ALWAYS_INLINE Sorter::TupleSorter::Partition2way(TupleIterator begin,
     TupleIterator end, const Tuple* pivot, TupleIterator* cut) {
   // Hoist member variable lookups out of loop to avoid extra loads inside loop.
   Run* run = run_;
   int tuple_size = tuple_size_;
-  Tuple* temp_tuple = reinterpret_cast<Tuple*>(temp_tuple_buffer_);
+  Tuple* pivot_tuple = reinterpret_cast<Tuple*>(temp_tuple_buffer_);
+  TupleRow* pivot_tuple_row = reinterpret_cast<TupleRow*>(&pivot_tuple);
   Tuple* swap_tuple = reinterpret_cast<Tuple*>(swap_buffer_);
 
   // Copy pivot into temp_tuple since it points to a tuple within [begin, end).
-  DCHECK(temp_tuple != nullptr);
+  DCHECK(pivot_tuple != nullptr);
   DCHECK(pivot != nullptr);
-  memcpy(temp_tuple, pivot, tuple_size);
+  memcpy(pivot_tuple, pivot, tuple_size);
 
   TupleIterator left = begin;
   TupleIterator right = end;
   right.Prev(run, tuple_size); // Set 'right' to the last tuple in range.
   while (true) {
     // Search for the first and last out-of-place elements, and swap them.
-    while (Less(left.row(), reinterpret_cast<TupleRow*>(&temp_tuple))) {
+    while (Less(left.row(), pivot_tuple_row)) {
       left.Next(run, tuple_size);
     }
-    while (Less(reinterpret_cast<TupleRow*>(&temp_tuple), right.row())) {
+    while (Less(pivot_tuple_row, right.row())) {
       right.Prev(run, tuple_size);
     }
 
@@ -111,6 +122,84 @@ Status IR_ALWAYS_INLINE Sorter::TupleSorter::Partition(TupleIterator begin,
     RETURN_IF_ERROR(state_->GetQueryStatus());
   }
   *cut = left;
+  return Status::OK();
+}
+
+// Partitions the tuples into 3 groups: < pivot, = pivot and > pivot.
+// Similar to 2-way quicksort, but elements that are = pivot are put to the
+// sides while partitioning < pivot and > pivot elements.
+// When all non-equal elements are partitioned, the = pivot elements are
+// moved to their place in the middle between the two groups of < pivot and
+// > pivot elements.
+Status IR_ALWAYS_INLINE Sorter::TupleSorter::Partition3way(TupleIterator begin,
+    TupleIterator end, const Tuple* pivot, TupleIterator* cut_left,
+    TupleIterator* cut_right) {
+  // Hoist member variable lookups out of loop to avoid extra loads inside loop.
+  Run* run = run_;
+  int tuple_size = tuple_size_;
+  Tuple* pivot_tuple = reinterpret_cast<Tuple*>(temp_tuple_buffer_);
+  TupleRow* pivot_tuple_row = reinterpret_cast<TupleRow*>(&pivot_tuple);
+  Tuple* swap_tuple = reinterpret_cast<Tuple*>(swap_buffer_);
+  // Copy pivot into temp_tuple since it points to a tuple within [begin, end).
+  DCHECK(pivot_tuple != nullptr);
+  DCHECK(pivot != nullptr);
+  memcpy(pivot_tuple, pivot, tuple_size);
+  TupleIterator left = begin;
+  TupleIterator right = end;
+  right.Prev(run, tuple_size); // Set 'right' to the last tuple in range.
+  // First tuple that is < pivot after last tuple that is = pivot on the left
+  TupleIterator equals_left = begin;
+  // First tuple that is = pivot after last tuple that is > pivot on the right
+  TupleIterator equals_right = end;
+  while (true) {
+    // Search for elements that are = pivot, and move them to the sides.
+    // Stops at the first and last out-of-place elements, so they
+    // will be swapped.
+    while (left.index() <= right.index()) {
+      int cmp = Compare(left.row(), pivot_tuple_row);
+      if (cmp > 0) {
+        break;
+      } else if (cmp == 0) {
+        Swap(equals_left.tuple(), left.tuple(), swap_tuple, tuple_size);
+        equals_left.Next(run, tuple_size);
+      }
+      left.Next(run, tuple_size);
+    }
+    while (left.index() <= right.index()) {
+      int cmp = Compare(pivot_tuple_row, right.row());
+      if (cmp > 0) {
+        break;
+      } else if (cmp == 0) {
+        equals_right.Prev(run, tuple_size);
+        Swap(equals_right.tuple(), right.tuple(), swap_tuple, tuple_size);
+      }
+      right.Prev(run, tuple_size);
+    }
+    if (left.index() >= right.index()) break;
+    // Swap first and last out-of-place tuples.
+    Swap(left.tuple(), right.tuple(), swap_tuple, tuple_size);
+    left.Next(run, tuple_size);
+    right.Prev(run, tuple_size);
+    RETURN_IF_CANCELLED(state_);
+    RETURN_IF_ERROR(state_->GetQueryStatus());
+  }
+  if(left.index() == right.index()) {
+    DCHECK(Compare(pivot_tuple_row, right.row()) == 0);
+  }
+  // Move equal columns from the sides to the pivot
+  while(equals_left.index() > begin.index()) {
+    equals_left.Prev(run, tuple_size);
+    left.Prev(run, tuple_size);
+    Swap(equals_left.tuple(), left.tuple(), swap_tuple, tuple_size);
+  }
+  while (equals_right.index() < end.index()) {
+    right.Next(run, tuple_size);
+    Swap(equals_right.tuple(), right.tuple(), swap_tuple, tuple_size);
+    equals_right.Next(run, tuple_size);
+  }
+  *cut_left = left;
+  right.Next(run, tuple_size);
+  *cut_right = right;
   return Status::OK();
 }
 
@@ -163,22 +252,35 @@ Status IR_ALWAYS_INLINE Sorter::TupleSorter::InsertionSort(const TupleIterator& 
 Status Sorter::TupleSorter::SortHelper(TupleIterator begin, TupleIterator end) {
   // Use insertion sort for smaller sequences.
   while (end.index() - begin.index() > INSERTION_THRESHOLD) {
-    // Select a pivot and call Partition() to split the tuples in [begin, end) into two
-    // groups (<= pivot and >= pivot) in-place. 'cut' is the index of the first tuple in
-    // the second group.
-    Tuple* pivot = SelectPivot(begin, end);
-    TupleIterator cut;
-    RETURN_IF_ERROR(Partition(begin, end, pivot, &cut));
-
+    // Select a pivot. If duplicates are found during pivot selection,
+    // has_equals == true,  call Partition3way() to split the tuples in
+    // [begin, end) into three groups (< pivot, = pivot and > pivot) in-place.
+    // 'cut_left' is the index of the first tuple in the second group,
+    // 'cut_right' is the first tuple in the third group.
+    // If there are lots of equal values, 3-way quicksort is much faster
+    // than 2-way, otherwise it is slightly slower.
+    bool has_equals = false;
+    Tuple* pivot = SelectPivot(begin, end, &has_equals);
+    TupleIterator cut_left;
+    TupleIterator cut_right;
+    if (has_equals) {
+      RETURN_IF_ERROR(Partition3way(begin, end, pivot, &cut_left, &cut_right));
+    } else {
+      // If no duplicates are found, call Partition2way() to split the tuples
+      // in [begin, end) into two groups (<= pivot and >= pivot) in-place.
+      // 'cut_left' is the index of the first tuple in the second group.
+      RETURN_IF_ERROR(Partition2way(begin, end, pivot, &cut_left));
+      cut_right = cut_left;
+    }
     // Recurse on the smaller partition. This limits stack size to log(n) stack frames.
-    if (cut.index() - begin.index() < end.index() - cut.index()) {
+    if (cut_left.index() - begin.index() < end.index() - cut_right.index()) {
       // Left partition is smaller.
-      RETURN_IF_ERROR(SortHelper(begin, cut));
-      begin = cut;
+      RETURN_IF_ERROR(SortHelper(begin, cut_left));
+      begin = cut_right;
     } else {
       // Right partition is equal or smaller.
-      RETURN_IF_ERROR(SortHelper(cut, end));
-      end = cut;
+      RETURN_IF_ERROR(SortHelper(cut_right, end));
+      end = cut_left;
     }
   }
 
@@ -187,7 +289,7 @@ Status Sorter::TupleSorter::SortHelper(TupleIterator begin, TupleIterator end) {
 }
 
 Tuple* IR_ALWAYS_INLINE Sorter::TupleSorter::SelectPivot(
-    TupleIterator begin, TupleIterator end) {
+    TupleIterator begin, TupleIterator end, bool* has_equals) {
   // Select the median of three random tuples. The random selection avoids pathological
   // behaviour associated with techniques that pick a fixed element (e.g. picking
   // first/last/middle element) and taking the median tends to help us select better
@@ -208,44 +310,50 @@ Tuple* IR_ALWAYS_INLINE Sorter::TupleSorter::SelectPivot(
     tuple = iter.tuple();
   }
 
-  return MedianOfThree(tuples[0], tuples[1], tuples[2]);
+  return MedianOfThree(tuples[0], tuples[1], tuples[2], has_equals);
 }
 
 Tuple* IR_ALWAYS_INLINE Sorter::TupleSorter::MedianOfThree(
-    Tuple* t1, Tuple* t2, Tuple* t3) {
+    Tuple* t1, Tuple* t2, Tuple* t3, bool* has_equals) {
   TupleRow* tr1 = reinterpret_cast<TupleRow*>(&t1);
   TupleRow* tr2 = reinterpret_cast<TupleRow*>(&t2);
   TupleRow* tr3 = reinterpret_cast<TupleRow*>(&t3);
 
-  bool t1_lt_t2 = Less(tr1, tr2);
-  bool t2_lt_t3 = Less(tr2, tr3);
-  bool t1_lt_t3 = Less(tr1, tr3);
-
-  if (t1_lt_t2) {
+  int t1_cmp_t2 = Compare(tr1, tr2);
+  int t2_cmp_t3 = Compare(tr2, tr3);
+  int t1_cmp_t3 = Compare(tr1, tr3);
+  Tuple* pivot;
+  if (t1_cmp_t2 < 0) {
     // t1 < t2
-    if (t2_lt_t3) {
+    if (t2_cmp_t3 < 0) {
       // t1 < t2 < t3
-      return t2;
-    } else if (t1_lt_t3) {
+      pivot = t2;
+    } else if (t1_cmp_t3 < 1) {
       // t1 < t3 <= t2
-      return t3;
+      pivot = t3;
     } else {
       // t3 <= t1 < t2
-      return t1;
+      pivot = t1;
     }
   } else {
     // t2 <= t1
-    if (t1_lt_t3) {
+    if (t1_cmp_t3 < 0) {
       // t2 <= t1 < t3
-      return t1;
-    } else if (t2_lt_t3) {
+      pivot = t1;
+    } else if (t2_cmp_t3 < 1) {
       // t2 < t3 <= t1
-      return t3;
+      pivot = t3;
     } else {
       // t3 <= t2 <= t1
-      return t2;
+      pivot = t2;
     }
   }
+  if (t1_cmp_t2*t1_cmp_t3*t2_cmp_t3 == 0){
+    *has_equals = true;
+  } else {
+    *has_equals = false;
+  }
+  return pivot;
 }
 
 // IMPALA-3816: Function is not inlined into Partition() without IR_ALWAYS_INLINE hint.

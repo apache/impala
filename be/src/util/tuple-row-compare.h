@@ -133,8 +133,14 @@ class TupleRowComparator {
   /// Release resources held by the ordering expressions' evaluators.
   void Close(RuntimeState* state);
 
+  /// 3-way comparator of lhs and rhs. Returns 0 if lhs==rhs
+  /// All exprs (ordering_exprs_lhs_ and ordering_exprs_rhs_) must have been prepared
+  /// and opened before calling this.
+  /// Force inlining because it tends not to be always inlined at callsites, even in
+  /// hot loops.
   int ALWAYS_INLINE Compare(const TupleRow* lhs, const TupleRow* rhs) const {
-    return Compare(nullptr, nullptr, lhs, rhs);
+    return Compare(
+        ordering_expr_evals_lhs_.data(), ordering_expr_evals_rhs_.data(), lhs, rhs);
   }
 
   int ALWAYS_INLINE Compare(const Tuple* lhs, const Tuple* rhs) const {
