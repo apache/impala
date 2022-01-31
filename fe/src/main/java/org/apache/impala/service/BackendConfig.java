@@ -145,10 +145,6 @@ public class BackendConfig {
 
   public boolean isInsertEventsEnabled() { return backendCfg_.enable_insert_events; }
 
-  public boolean isOrcScannerEnabled() {
-    return backendCfg_.enable_orc_scanner;
-  }
-
   /**
    * Returns the value of the `authorization_factory_class` flag or `null` if
    * the flag was not specified.

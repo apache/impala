@@ -31,7 +31,6 @@
 DECLARE_bool(load_catalog_in_background);
 DECLARE_bool(load_auth_to_local_rules);
 DECLARE_bool(enable_stats_extrapolation);
-DECLARE_bool(enable_orc_scanner);
 DECLARE_bool(use_local_catalog);
 DECLARE_int32(local_catalog_cache_expiration_s);
 DECLARE_int32(local_catalog_cache_mb);
@@ -200,7 +199,6 @@ Status GetConfigFromCommand(const string& flag_cmd, string& result) {
 
 Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_load_catalog_in_background(FLAGS_load_catalog_in_background);
-  cfg.__set_enable_orc_scanner(FLAGS_enable_orc_scanner);
   cfg.__set_use_local_catalog(FLAGS_use_local_catalog);
   cfg.__set_local_catalog_cache_mb(FLAGS_local_catalog_cache_mb);
   cfg.__set_local_catalog_cache_expiration_s(

@@ -74,7 +74,7 @@ struct TBackendGflags {
 
   24: required i64 min_buffer_size
 
-  25: required bool enable_orc_scanner
+  // REMOVED: 25: required bool enable_orc_scanner
 
   26: required string authorized_proxy_group_config
 

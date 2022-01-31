@@ -29,11 +29,6 @@ class TestDisableFeatures(CustomClusterTestSuite):
   def get_workload(self):
     return 'functional-query'
 
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--enable_orc_scanner=false")
-  def test_disable_orc_scanner(self, vector):
-    self.run_test_case('QueryTest/disable-orc-scanner', vector)
-
   @SkipIf.not_hdfs
   @pytest.mark.execute_serially
   @UniqueDatabase.parametrize(sync_ddl=True)

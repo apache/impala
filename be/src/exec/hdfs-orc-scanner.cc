@@ -39,9 +39,6 @@
 using namespace impala;
 using namespace impala::io;
 
-DEFINE_bool(enable_orc_scanner, true,
-    "If false, reading from ORC format tables is not supported");
-
 Status HdfsOrcScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const vector<HdfsFileDesc*>& files) {
   DCHECK(!files.empty());
