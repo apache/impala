@@ -31,6 +31,7 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exec/exec-node.inline.h"
+#include "exec/file-metadata-utils.h"
 #include "exec/hdfs-scan-node-base.h"
 #include "exec/scanner-context.h"
 #include "runtime/io/disk-io-mgr.h"
@@ -238,6 +239,9 @@ class HdfsScanner {
 
   /// Context for this scanner
   ScannerContext* context_ = nullptr;
+
+  /// Utility class for handling file metadata.
+  FileMetadataUtils file_metadata_utils_;
 
   /// Object pool for objects with same lifetime as scanner.
   ObjectPool obj_pool_;

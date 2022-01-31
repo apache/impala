@@ -41,6 +41,7 @@ import org.apache.iceberg.DataFile;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
@@ -49,6 +50,8 @@ import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Reference;
 import org.apache.impala.compat.HdfsShim;
+import org.apache.impala.fb.FbFileDesc;
+import org.apache.impala.fb.FbIcebergMetadata;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.THdfsCompression;
@@ -569,18 +572,25 @@ public interface FeIcebergTable extends FeFsTable {
       Map<String, HdfsPartition.FileDescriptor> fileDescMap = new HashMap<>();
       List<DataFile> dataFileList = IcebergUtil.getIcebergDataFiles(table,
           new ArrayList<>(), /*timeTravelSpecl=*/null);
+      Table iceTable = table.getIcebergBaseTable();
       for (DataFile dataFile : dataFileList) {
           Path path = new Path(dataFile.path().toString());
           if (hdfsFileDescMap.containsKey(path.toUri().getPath())) {
             String pathHash = IcebergUtil.getDataFilePathHash(dataFile);
-            fileDescMap.put(pathHash, hdfsFileDescMap.get(path.toUri().getPath()));
+            HdfsPartition.FileDescriptor fsFd = hdfsFileDescMap.get(
+                path.toUri().getPath());
+            HdfsPartition.FileDescriptor iceFd = fsFd.cloneWithFileMetadata(
+                IcebergUtil.createIcebergMetadata(iceTable, dataFile));
+            fileDescMap.put(pathHash, iceFd);
           } else {
             LOG.warn("Iceberg DataFile '{}' cannot be found in the HDFS recursive file "
                 + "listing results.", path.toString());
             HdfsPartition.FileDescriptor fileDesc = getFileDescriptor(
                 new Path(dataFile.path().toString()),
                 new Path(table.getIcebergTableLocation()), table.getHostIndex());
-            fileDescMap.put(IcebergUtil.getDataFilePathHash(dataFile), fileDesc);
+            HdfsPartition.FileDescriptor iceFd = fileDesc.cloneWithFileMetadata(
+                IcebergUtil.createIcebergMetadata(iceTable, dataFile));
+            fileDescMap.put(IcebergUtil.getDataFilePathHash(dataFile), iceFd);
           }
       }
       return fileDescMap;

@@ -160,6 +160,9 @@ class ParquetSchemaResolver {
       const parquet::SchemaElement& first_column = schema[1];
       if (first_column.__isset.field_id) {
         fallback_schema_resolution_ = TSchemaResolutionStrategy::type::FIELD_ID;
+      } else {
+        // Use Name-based schema resolution in case of missing field ids.
+        fallback_schema_resolution_ = TSchemaResolutionStrategy::type::NAME;
       }
     }
     return CreateSchemaTree(file_metadata->schema, &schema_);

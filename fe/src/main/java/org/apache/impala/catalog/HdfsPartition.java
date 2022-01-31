@@ -51,6 +51,7 @@ import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.fb.FbCompression;
 import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.fb.FbFileDesc;
+import org.apache.impala.fb.FbFileMetadata;
 import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TCatalogObject;
@@ -113,10 +114,26 @@ public class HdfsPartition extends CatalogObjectImpl
     // Internal representation of a file descriptor using a FlatBuffer.
     private final FbFileDesc fbFileDescriptor_;
 
-    private FileDescriptor(FbFileDesc fileDescData) { fbFileDescriptor_ = fileDescData; }
+    // Internal representation of additional file metadata, e.g. Iceberg metadata.
+    private final FbFileMetadata fbFileMetadata_;
+
+    private FileDescriptor(FbFileDesc fileDescData) {
+      fbFileDescriptor_ = fileDescData;
+      fbFileMetadata_ = null;
+    }
+
+    private FileDescriptor(FbFileDesc fileDescData, FbFileMetadata fileMetadata) {
+      fbFileDescriptor_ = fileDescData;
+      fbFileMetadata_ = fileMetadata;
+    }
 
     public static FileDescriptor fromThrift(THdfsFileDesc desc) {
       ByteBuffer bb = ByteBuffer.wrap(desc.getFile_desc_data());
+      if (desc.isSetFile_metadata()) {
+        ByteBuffer bbMd = ByteBuffer.wrap(desc.getFile_metadata());
+        return new FileDescriptor(FbFileDesc.getRootAsFbFileDesc(bb),
+                                  FbFileMetadata.getRootAsFbFileMetadata(bbMd));
+      }
       return new FileDescriptor(FbFileDesc.getRootAsFbFileDesc(bb));
     }
 
@@ -145,7 +162,11 @@ public class HdfsPartition extends CatalogObjectImpl
           it.mutateReplicaHostIdxs(j, FileBlock.makeReplicaIdx(isCached, newHostIdx));
         }
       }
-      return new FileDescriptor(cloned);
+      return new FileDescriptor(cloned, fbFileMetadata_);
+    }
+
+    public FileDescriptor cloneWithFileMetadata(FbFileMetadata fileMetadata) {
+      return new FileDescriptor(fbFileDescriptor_, fileMetadata);
     }
 
     /**
@@ -254,10 +275,17 @@ public class HdfsPartition extends CatalogObjectImpl
       return fbFileDescriptor_.fileBlocks(idx);
     }
 
+    public FbFileMetadata getFbFileMetadata() {
+      return fbFileMetadata_;
+    }
+
     public THdfsFileDesc toThrift() {
       THdfsFileDesc fd = new THdfsFileDesc();
       ByteBuffer bb = fbFileDescriptor_.getByteBuffer();
       fd.setFile_desc_data(bb);
+      if (fbFileMetadata_ != null) {
+        fd.setFile_metadata(fbFileMetadata_.getByteBuffer());
+      }
       return fd;
     }
 

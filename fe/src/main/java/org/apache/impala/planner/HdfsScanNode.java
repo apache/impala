@@ -1349,6 +1349,9 @@ public class HdfsScanNode extends ScanNode {
             currentOffset, currentLength, partition.getId(), fileDesc.getFileLength(),
             fileDesc.getFileCompression().toThrift(), fileDesc.getModificationTime(),
             partition.getLocation().hashCode()));
+        if (fileDesc.getFbFileMetadata() != null) {
+          scanRange.setFile_metadata(fileDesc.getFbFileMetadata().getByteBuffer());
+        }
         TScanRangeLocationList scanRangeLocations = new TScanRangeLocationList();
         scanRangeLocations.scan_range = scanRange;
         scanRangeLocations.locations = locations;

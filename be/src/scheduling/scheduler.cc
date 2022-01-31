@@ -136,6 +136,9 @@ Status Scheduler::GenerateScanRanges(const vector<TFileSplitGeneratorSpec>& spec
       hdfs_scan_range.__set_partition_path_hash(spec.partition_path_hash);
       TScanRange scan_range;
       scan_range.__set_hdfs_file_split(hdfs_scan_range);
+      if (spec.file_desc.__isset.file_metadata) {
+        scan_range.__set_file_metadata(spec.file_desc.file_metadata);
+      }
       TScanRangeLocationList scan_range_list;
       scan_range_list.__set_scan_range(scan_range);
 
@@ -1125,6 +1128,9 @@ void TScanRangeToScanRangePB(const TScanRange& tscan_range, ScanRangePB* scan_ra
   }
   if (tscan_range.__isset.kudu_scan_token) {
     scan_range_pb->set_kudu_scan_token(tscan_range.kudu_scan_token);
+  }
+  if (tscan_range.__isset.file_metadata) {
+    scan_range_pb->set_file_metadata(tscan_range.file_metadata);
   }
 }
 

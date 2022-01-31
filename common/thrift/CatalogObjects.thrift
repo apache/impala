@@ -292,6 +292,10 @@ struct THdfsFileDesc {
   // (defined in common/fbs/CatalogObjects.fbs).
   // TODO: Put this in a KRPC sidecar to avoid serialization cost.
   1: required binary file_desc_data
+
+  // Additional file metadata serialized into a FlatBuffer
+  // TODO: Put this in a KRPC sidecar to avoid serialization cost.
+  2: optional binary file_metadata
 }
 
 // Represents an HDFS partition's location in a compressed format. 'prefix_index'

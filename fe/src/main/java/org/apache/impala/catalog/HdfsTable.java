@@ -683,7 +683,10 @@ public class HdfsTable extends Table implements FeFsTable {
 
     List<HdfsPartition.Builder> partBuilders = new ArrayList<>();
     if (msTbl.getPartitionKeysSize() == 0) {
-      Preconditions.checkArgument(msPartitions == null || msPartitions.isEmpty());
+      // Legacy -> Iceberg migrated tables might have HMS partitions (HIVE-25894).
+      if (!IcebergTable.isIcebergTable(msTbl)) {
+        Preconditions.checkArgument(msPartitions == null || msPartitions.isEmpty());
+      }
       // This table has no partition key, which means it has no declared partitions.
       // We model partitions slightly differently to Hive - every file must exist in a
       // partition, so add a single partition with no keys which will get all the

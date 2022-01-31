@@ -532,8 +532,7 @@ inline THdfsCompression::type HdfsOrcScanner::TranslateCompressionKind(
 }
 
 bool HdfsOrcScanner::IsPartitionKeySlot(const SlotDescriptor* slot) {
-  return slot->parent() == scan_node_->tuple_desc() &&
-      slot->col_pos() < scan_node_->num_partition_keys();
+  return file_metadata_utils_.IsValuePartitionCol(slot);
 }
 
 bool HdfsOrcScanner::IsMissingField(const SlotDescriptor* slot) {

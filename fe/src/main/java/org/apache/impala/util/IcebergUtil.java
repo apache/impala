@@ -39,11 +39,19 @@ import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
+import com.google.flatbuffers.FlatBufferBuilder;
 
 import org.apache.impala.common.Pair;
+import org.apache.impala.fb.FbFileMetadata;
+import org.apache.impala.fb.FbIcebergDataFileFormat;
+import org.apache.impala.fb.FbIcebergMetadata;
+import org.apache.impala.fb.FbIcebergPartitionTransformValue;
+import org.apache.impala.fb.FbIcebergTransformType;
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.DataFile;
+import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.TableScan;
 import org.apache.iceberg.expressions.UnboundPredicate;
@@ -66,6 +74,7 @@ import org.apache.impala.analysis.TimeTravelSpec.Kind;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.iceberg.IcebergHadoopCatalog;
@@ -559,11 +568,11 @@ public class IcebergUtil {
   public static org.apache.iceberg.FileFormat fbFileFormatToIcebergFileFormat(
       byte fbFileFormat) throws ImpalaRuntimeException {
     switch (fbFileFormat){
-      case org.apache.impala.fb.FbFileFormat.PARQUET:
+      case org.apache.impala.fb.FbIcebergDataFileFormat.PARQUET:
           return org.apache.iceberg.FileFormat.PARQUET;
       default:
           throw new ImpalaRuntimeException(String.format("Unexpected file format: %s",
-              org.apache.impala.fb.FbFileFormat.name(fbFileFormat)));
+              org.apache.impala.fb.FbIcebergDataFileFormat.name(fbFileFormat)));
     }
   }
 
@@ -822,5 +831,123 @@ public class IcebergUtil {
       snapshot = table.snapshot(parentId);
     }
     return ret;
+  }
+
+  /**
+   * Extracts metadata from Iceberg data file object 'df'. Such metadata is the file
+   * format of the data file, also the partition information the data file belongs.
+   * It creates a flatbuffer so it can be passed between machines and processes without
+   * further de/serialization.
+   */
+  public static FbFileMetadata createIcebergMetadata(Table iceTbl, DataFile df) {
+    FlatBufferBuilder fbb = new FlatBufferBuilder(1);
+    int iceOffset = createIcebergMetadata(fbb, iceTbl, df);
+    fbb.finish(FbFileMetadata.createFbFileMetadata(fbb, iceOffset));
+    ByteBuffer bb = fbb.dataBuffer().slice();
+    ByteBuffer compressedBb = ByteBuffer.allocate(bb.capacity());
+    compressedBb.put(bb);
+    return FbFileMetadata.getRootAsFbFileMetadata((ByteBuffer)compressedBb.flip());
+  }
+
+  private static int createIcebergMetadata(FlatBufferBuilder fbb, Table iceTbl,
+      DataFile df) {
+    int partKeysOffset = -1;
+    PartitionSpec spec = iceTbl.specs().get(df.specId());
+    if (spec != null && !spec.fields().isEmpty()) {
+      partKeysOffset = createPartitionKeys(fbb, spec, df);
+    }
+    FbIcebergMetadata.startFbIcebergMetadata(fbb);
+    byte fileFormat = -1;
+    if (df.format() == FileFormat.PARQUET) fileFormat = FbIcebergDataFileFormat.PARQUET;
+    else if (df.format() == FileFormat.ORC) fileFormat = FbIcebergDataFileFormat.ORC;
+    else if (df.format() == FileFormat.AVRO) fileFormat = FbIcebergDataFileFormat.AVRO;
+    if (fileFormat != -1) {
+      FbIcebergMetadata.addFileFormat(fbb, fileFormat);
+    }
+    if (partKeysOffset != -1) {
+      FbIcebergMetadata.addPartitionKeys(fbb, partKeysOffset);
+    }
+    return FbIcebergMetadata.endFbIcebergMetadata(fbb);
+  }
+
+  private static int createPartitionKeys(FlatBufferBuilder fbb, PartitionSpec spec,
+      DataFile df) {
+    Preconditions.checkState(spec.fields().size() == df.partition().size());
+    int[] partitionKeyOffsets = new int[spec.fields().size()];
+    for (int i = 0; i < spec.fields().size(); ++i) {
+      partitionKeyOffsets[i] =
+          createPartitionTransformValue(fbb, spec, df, i);
+    }
+    return FbIcebergMetadata.createPartitionKeysVector(fbb, partitionKeyOffsets);
+  }
+
+  private static int createPartitionTransformValue(FlatBufferBuilder fbb,
+      PartitionSpec spec, DataFile df, int fieldIndex) {
+    PartitionField field = spec.fields().get(fieldIndex);
+    Pair<Byte, Integer> transform = getFbTransform(spec.schema(), field);
+    int valueOffset = -1;
+    if (transform.first != FbIcebergTransformType.VOID) {
+      Object partValue = df.partition().get(fieldIndex, Object.class);
+      valueOffset = fbb.createString(partValue.toString());
+    }
+    FbIcebergPartitionTransformValue.startFbIcebergPartitionTransformValue(fbb);
+    FbIcebergPartitionTransformValue.addTransformType(fbb, transform.first);
+    if (transform.second != null) {
+      FbIcebergPartitionTransformValue.addTransformParam(fbb, transform.second);
+    }
+    if (valueOffset != -1) {
+      FbIcebergPartitionTransformValue.addTransformValue(fbb, valueOffset);
+    }
+    FbIcebergPartitionTransformValue.addSourceId(fbb, field.sourceId());
+    return FbIcebergPartitionTransformValue.endFbIcebergPartitionTransformValue(fbb);
+  }
+
+  private static Pair<Byte, Integer> getFbTransform(Schema schema,
+      PartitionField field) {
+    return PartitionSpecVisitor.visit(
+      schema, field, new PartitionSpecVisitor<Pair<Byte, Integer>>() {
+      @Override
+      public Pair<Byte, Integer> identity(String sourceName, int sourceId) {
+        return new Pair<Byte, Integer>(FbIcebergTransformType.IDENTITY, null);
+      }
+
+      @Override
+      public Pair<Byte, Integer> bucket(String sourceName, int sourceId,
+          int numBuckets) {
+        return new Pair<Byte, Integer>(FbIcebergTransformType.BUCKET, numBuckets);
+      }
+
+      @Override
+      public Pair<Byte, Integer> truncate(String sourceName, int sourceId,
+          int width) {
+        return new Pair<Byte, Integer>(FbIcebergTransformType.TRUNCATE, width);
+      }
+
+      @Override
+      public Pair<Byte, Integer> year(String sourceName, int sourceId) {
+        return new Pair<Byte, Integer>(FbIcebergTransformType.YEAR, null);
+      }
+
+      @Override
+      public Pair<Byte, Integer> month(String sourceName, int sourceId) {
+        return new Pair<Byte, Integer>(FbIcebergTransformType.MONTH, null);
+      }
+
+      @Override
+      public Pair<Byte, Integer> day(String sourceName, int sourceId) {
+        return new Pair<Byte, Integer>(FbIcebergTransformType.DAY, null);
+      }
+
+      @Override
+      public Pair<Byte, Integer> hour(String sourceName, int sourceId) {
+        return new Pair<Byte, Integer>(FbIcebergTransformType.HOUR, null);
+      }
+
+      @Override
+      public Pair<Byte, Integer> alwaysNull(int fieldId, String sourceName,
+          int sourceId) {
+        return new Pair<Byte, Integer>(FbIcebergTransformType.VOID, null);
+      }
+    });
   }
 }

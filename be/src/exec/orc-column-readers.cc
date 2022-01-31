@@ -459,8 +459,18 @@ Status OrcStructReader::TopLevelReadValueBatch(ScratchTupleBatch* scratch_batch,
          (scanner_->row_batches_need_validation_ &&
           scanner_->scan_node_->IsZeroSlotTableScan());
     if (!valid_empty_children) {
-      return Status(Substitute("Parse error in possibly corrupt ORC file: '$0'",
-          scanner_->filename()));
+      bool only_partitions = true;
+      for (SlotDescriptor* slot : tuple_desc_->slots()) {
+        if (!scanner_->IsPartitionKeySlot(slot)) {
+          only_partitions = false;
+          break;
+        }
+      }
+      if (!only_partitions) {
+        return Status(Substitute("Parse error in possibly corrupt ORC file: '$0'. "
+            "No columns found for this scan.",
+            scanner_->filename()));
+      }
     }
     DCHECK_EQ(0, num_rows_read);
     num_rows_read = std::min(scratch_batch->capacity - scratch_batch->num_tuples,

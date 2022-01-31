@@ -268,6 +268,7 @@ struct TScanRange {
   1: optional THdfsFileSplit hdfs_file_split
   2: optional THBaseKeyRange hbase_key_range
   3: optional binary kudu_scan_token
+  4: optional binary file_metadata
 }
 
 // Specification of an overlap predicate desc.

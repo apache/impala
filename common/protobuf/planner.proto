@@ -73,4 +73,5 @@ message ScanRangePB {
   optional HdfsFileSplitPB hdfs_file_split = 1;
   optional HBaseKeyRangePB hbase_key_range = 2;
   optional bytes kudu_scan_token = 3;
+  optional bytes file_metadata = 4;
 }

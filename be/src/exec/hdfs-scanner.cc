@@ -20,6 +20,7 @@
 #include "codegen/codegen-anyval.h"
 #include "exec/base-sequence-scanner.h"
 #include "exec/exec-node.inline.h"
+#include "exec/file-metadata-utils.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/hdfs-scan-node-mt.h"
 #include "exec/read-write-util.h"
@@ -50,6 +51,7 @@ const char* HdfsScanner::LLVM_CLASS_NAME = "class.impala::HdfsScanner";
 HdfsScanner::HdfsScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
     : scan_node_(scan_node),
       state_(state),
+      file_metadata_utils_(scan_node, state),
       expr_perm_pool_(new MemPool(scan_node->expr_mem_tracker())),
       template_tuple_pool_(new MemPool(scan_node->mem_tracker())),
       tuple_byte_size_(scan_node->tuple_desc()->byte_size()),
@@ -65,6 +67,7 @@ HdfsScanner::HdfsScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
 HdfsScanner::HdfsScanner()
     : scan_node_(nullptr),
       state_(nullptr),
+      file_metadata_utils_(nullptr, nullptr),
       tuple_byte_size_(0) {
   DCHECK(TestInfo::is_test());
 }
@@ -74,6 +77,7 @@ HdfsScanner::~HdfsScanner() {
 
 Status HdfsScanner::Open(ScannerContext* context) {
   context_ = context;
+  file_metadata_utils_.Open(context);
   stream_ = context->GetStream();
 
   // Clone the scan node's conjuncts map. The cloned evaluators must be closed by the
@@ -108,14 +112,7 @@ Status HdfsScanner::Open(ScannerContext* context) {
     }
   }
 
-  // Initialize the template_tuple_, it is copied from the template tuple map in the
-  // HdfsScanNodeBase.
-  Tuple* template_tuple =
-      scan_node_->GetTemplateTupleForPartitionId(context_->partition_descriptor()->id());
-  if (template_tuple != nullptr) {
-    template_tuple_ =
-        template_tuple->DeepCopy(*scan_node_->tuple_desc(), template_tuple_pool_.get());
-  }
+  template_tuple_ = file_metadata_utils_.CreateTemplateTuple(template_tuple_pool_.get());
   template_tuple_map_[scan_node_->tuple_desc()] = template_tuple_;
 
   decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");

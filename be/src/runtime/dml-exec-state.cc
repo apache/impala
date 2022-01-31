@@ -510,7 +510,7 @@ string createIcebergDataFileString(
   flatbuffers::Offset<FbIcebergDataFile> data_file = CreateFbIcebergDataFile(fbb,
       fbb.CreateString(final_path),
       // Currently we can only write Parquet to Iceberg
-      FbFileFormat::FbFileFormat_PARQUET,
+      FbIcebergDataFileFormat::FbIcebergDataFileFormat_PARQUET,
       num_rows,
       file_size,
       fbb.CreateString(partition_name),

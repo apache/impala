@@ -41,6 +41,10 @@
 #include "util/spinlock.h"
 #include "util/unique-id-hash.h"
 
+namespace org { namespace apache { namespace impala { namespace fb {
+struct FbFileMetadata;
+}}}}
+
 namespace impala {
 
 class ScannerContext;
@@ -82,6 +86,9 @@ struct HdfsFileDesc {
 
   /// Splits (i.e. raw byte ranges) for this file, assigned to this scan node.
   std::vector<io::ScanRange*> splits;
+
+  /// Extra file metadata, e.g. Iceberg-related file-level info.
+  const ::org::apache::impala::fb::FbFileMetadata* file_metadata;
 
   /// Some useful typedefs for creating HdfsFileDesc related data structures.
   /// This is a pair for partition ID and filename which uniquely identifies a file.

@@ -50,6 +50,7 @@
 #include "runtime/runtime-state.h"
 #include "util/compression-util.h"
 #include "util/disk-info.h"
+#include "util/flat_buffer.h"
 #include "util/hdfs-util.h"
 #include "util/impalad-metrics.h"
 #include "util/metrics.h"
@@ -250,6 +251,11 @@ Status HdfsScanPlanNode::ProcessScanRangesAndInitSharedState(FragmentState* stat
     for (const ScanRangeParamsPB& params : ranges->second.scan_ranges()) {
       DCHECK(params.scan_range().has_hdfs_file_split());
       const HdfsFileSplitPB& split = params.scan_range().hdfs_file_split();
+      const org::apache::impala::fb::FbFileMetadata* file_metadata = nullptr;
+      if (params.scan_range().has_file_metadata()) {
+        file_metadata = flatbuffers::GetRoot<org::apache::impala::fb::FbFileMetadata>(
+            params.scan_range().file_metadata().c_str());
+      }
       HdfsPartitionDescriptor* partition_desc =
           hdfs_table_->GetPartition(split.partition_id());
       if (template_tuple_map_.find(split.partition_id()) == template_tuple_map_.end()) {
@@ -284,6 +290,7 @@ Status HdfsScanPlanNode::ProcessScanRangesAndInitSharedState(FragmentState* stat
         file_desc->mtime = split.mtime();
         file_desc->file_compression = CompressionTypePBToThrift(split.file_compression());
         file_desc->file_format = partition_desc->file_format();
+        file_desc->file_metadata = file_metadata;
         RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
             native_file_path, &file_desc->fs, &fs_cache));
         shared_state_.per_type_files_[partition_desc->file_format()].push_back(file_desc);

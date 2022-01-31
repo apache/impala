@@ -1,0 +1,106 @@
+====
+---- QUERY
+# Read everything from a partitioned table with all the
+# data types that support partitioning, when the underlying
+# data file format is Parquet.
+select * from functional_parquet.iceberg_alltypes_part
+---- RESULTS
+1,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+2,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+---- TYPES
+INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
+# Read only the partition columns.
+select p_bool, p_int, p_bigint, p_float,
+       p_double, p_decimal, p_date, p_string
+from functional_parquet.iceberg_alltypes_part;
+---- RESULTS
+true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+---- TYPES
+BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
+# Read everything from a partitioned table with all the
+# data types that support partitioning, when the underlying
+# data file format is ORC.
+select * from functional_parquet.iceberg_alltypes_part_orc
+---- RESULTS
+1,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+2,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+---- TYPES
+INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
+# Read only the partition columns.
+select p_bool, p_int, p_bigint, p_float,
+       p_double, p_decimal, p_date, p_string
+from functional_parquet.iceberg_alltypes_part_orc;
+---- RESULTS
+true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+---- TYPES
+BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
+# Read a migrated partitioned Parquet table that had the following schema
+# changes since table migration:
+# * Partition INT column to BIGINT
+# * Partition FLOAT column to DOUBLE
+# * Partition DECIMAL(5,3) column to DECIMAL(8,3)
+# * Non-partition column has been moved to end of the schema
+select * from functional_parquet.iceberg_legacy_partition_schema_evolution
+---- RESULTS
+1,1.100000023841858,2.718,2
+1,1.100000023841858,3.141,1
+---- TYPES
+BIGINT, DOUBLE, DECIMAL, INT
+====
+---- QUERY
+# Read only the partition columns.
+select p_int_long, p_float_double, p_dec_dec
+from functional_parquet.iceberg_legacy_partition_schema_evolution;
+---- RESULTS
+1,1.100000023841858,3.141
+1,1.100000023841858,2.718
+---- TYPES
+BIGINT, DOUBLE, DECIMAL
+====
+---- QUERY
+# Read a migrated partitioned ORC table that had the following schema
+# changes since table migration:
+# * Partition INT column to BIGINT
+# * Partition FLOAT column to DOUBLE
+# * Partition DECIMAL(5,3) column to DECIMAL(8,3)
+# * Non-partition column has been moved to end of the schema
+# Currently this fails due to IMPALA-9410
+select * from functional_parquet.iceberg_legacy_partition_schema_evolution_orc
+---- CATCH
+Parse error in possibly corrupt ORC file
+====
+---- QUERY
+# Read only the partition columns.
+select p_int_long, p_float_double, p_dec_dec
+from functional_parquet.iceberg_legacy_partition_schema_evolution_orc;
+---- RESULTS
+1,1.100000023841858,3.141
+1,1.100000023841858,2.718
+---- TYPES
+BIGINT, DOUBLE, DECIMAL
+====
+---- QUERY
+# Create a table that is identity-partitioned by all of its columns.
+create table only_part_cols (i int, s string)
+partitioned by spec (i, s)
+stored as iceberg;
+insert into only_part_cols values (1, 'i'), (1, 'i'), (2, 's'), (2, 'q');
+select * from only_part_cols;
+---- RESULTS
+1,'i'
+1,'i'
+2,'q'
+2,'s'
+---- TYPES
+INT, STRING
+====

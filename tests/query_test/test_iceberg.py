@@ -99,6 +99,9 @@ class TestIcebergTable(ImpalaTestSuite):
   def test_missing_field_ids(self, vector):
     self.run_test_case('QueryTest/iceberg-missing-field-ids', vector)
 
+  def test_migrated_tables(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-migrated-tables', vector, unique_database)
+
   def test_describe_history(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-table-history', vector, use_db=unique_database)
 

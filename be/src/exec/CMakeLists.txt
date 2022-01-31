@@ -44,6 +44,7 @@ add_library(Exec
   exec-node.cc
   exchange-node.cc
   external-data-source-executor.cc
+  file-metadata-utils.cc
   filter-context.cc
   grouping-aggregator.cc
   grouping-aggregator-ir.cc

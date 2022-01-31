@@ -17,9 +17,36 @@
 
 namespace org.apache.impala.fb;
 
-enum FbFileFormat: byte {
+enum FbIcebergDataFileFormat: byte {
   PARQUET,
-  ORC
+  ORC,
+  // We add AVRO here as a future possibility.
+  // The Iceberg spec allows AVRO data files, but currently Impala
+  // cannot read such Iceberg tables. See IMPALA-11158.
+  AVRO
+}
+
+enum FbIcebergTransformType : byte {
+  IDENTITY,
+  HOUR,
+  DAY,
+  MONTH,
+  YEAR,
+  BUCKET,
+  TRUNCATE,
+  VOID
+}
+
+table FbIcebergPartitionTransformValue {
+  transform_type: FbIcebergTransformType;
+  transform_param: int;
+  transform_value: string;
+  source_id: int;
+}
+
+table FbIcebergMetadata {
+  file_format : FbIcebergDataFileFormat;
+  partition_keys : [FbIcebergPartitionTransformValue];
 }
 
 table FbIcebergColumnStats {
@@ -32,7 +59,7 @@ table FbIcebergColumnStats {
 
 table FbIcebergDataFile {
   path: string;
-  format: FbFileFormat = PARQUET;
+  format: FbIcebergDataFileFormat = PARQUET;
   record_count: long = 0;
   file_size_in_bytes: long = 0;
   partition_path: string;
