@@ -1730,7 +1730,7 @@ public class HdfsTable extends Table implements FeFsTable {
    * as Avro. Additionally, this method also reconciles the schema if the column
    * definitions from the metastore differ from the Avro schema.
    */
-  private void setAvroSchema(IMetaStoreClient client,
+  protected void setAvroSchema(IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws Exception {
     Preconditions.checkState(isSchemaLoaded_);
     String inputFormat = msTbl.getSd().getInputFormat();
