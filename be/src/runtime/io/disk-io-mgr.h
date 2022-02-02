@@ -361,22 +361,19 @@ class DiskIoMgr : public CacheLineAligned {
   void ReleaseExclusiveHdfsFileHandle(std::unique_ptr<ExclusiveHdfsFileHandle> fid);
 
   /// Given a FS handle, name and last modified time of the file, gets a
-  /// CachedHdfsFileHandle from the file handle cache and returns it via 'fid'.
-  /// Records the time spent opening the handle in 'reader'. On success, records
-  /// statistics about whether this was a cache hit or miss in the 'reader' as well as
-  /// at the system level. In case of an error, returns status and 'fid' is untouched.
-  Status GetCachedHdfsFileHandle(const hdfsFS& fs,
-      std::string* fname, int64_t mtime, RequestContext* reader,
-      CachedHdfsFileHandle** fid) WARN_UNUSED_RESULT;
-
-  /// Releases a file handle back to the file handle cache when it is no longer in use.
-  void ReleaseCachedHdfsFileHandle(std::string* fname, CachedHdfsFileHandle* fid);
+  /// CachedHdfsFileHandle accessor from the file handle cache and returns it via
+  /// 'accessor'. Records the time spent opening the handle in 'reader'. On success,
+  /// records statistics about whether this was a cache hit or miss in the 'reader' as
+  /// well as at the system level. In case of an error, returns status and 'accessor' is
+  /// untouched.
+  Status GetCachedHdfsFileHandle(const hdfsFS& fs, std::string* fname, int64_t mtime,
+      RequestContext* reader, FileHandleCache::Accessor* accessor) WARN_UNUSED_RESULT;
 
   /// Reopens a file handle by destroying the file handle and getting a fresh
-  /// file handle from the cache. Records the time spent reopening the handle
+  /// file handle accessor from the cache. Records the time spent reopening the handle
   /// in 'reader'. Returns an error if the file could not be reopened.
   Status ReopenCachedHdfsFileHandle(const hdfsFS& fs, std::string* fname, int64_t mtime,
-      RequestContext* reader, CachedHdfsFileHandle** fid) WARN_UNUSED_RESULT;
+      RequestContext* reader, FileHandleCache::Accessor* accessor) WARN_UNUSED_RESULT;
 
   // Function to change the underlying LocalFileSystem object used for disk I/O.
   // DiskIoMgr will also take responsibility of the received LocalFileSystem pointer.

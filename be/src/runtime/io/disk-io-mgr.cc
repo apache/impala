@@ -873,14 +873,12 @@ void DiskIoMgr::ReleaseExclusiveHdfsFileHandle(unique_ptr<ExclusiveHdfsFileHandl
   fid.reset();
 }
 
-Status DiskIoMgr::GetCachedHdfsFileHandle(const hdfsFS& fs,
-    std::string* fname, int64_t mtime, RequestContext *reader,
-    CachedHdfsFileHandle** handle_out) {
+Status DiskIoMgr::GetCachedHdfsFileHandle(const hdfsFS& fs, std::string* fname,
+    int64_t mtime, RequestContext* reader, FileHandleCache::Accessor* accessor) {
   bool cache_hit;
   SCOPED_TIMER(reader->open_file_timer_);
-  RETURN_IF_ERROR(file_handle_cache_.GetFileHandle(fs, fname, mtime, false, handle_out,
-      &cache_hit));
-  ImpaladMetrics::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING->Increment(1L);
+  RETURN_IF_ERROR(
+      file_handle_cache_.GetFileHandle(fs, fname, mtime, false, accessor, &cache_hit));
   if (cache_hit) {
     ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO->Update(1L);
     ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT->Increment(1L);
@@ -893,24 +891,17 @@ Status DiskIoMgr::GetCachedHdfsFileHandle(const hdfsFS& fs,
   return Status::OK();
 }
 
-void DiskIoMgr::ReleaseCachedHdfsFileHandle(std::string* fname,
-    CachedHdfsFileHandle* fid) {
-  file_handle_cache_.ReleaseFileHandle(fname, fid, false);
-  ImpaladMetrics::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING->Increment(-1L);
-}
-
 Status DiskIoMgr::ReopenCachedHdfsFileHandle(const hdfsFS& fs, std::string* fname,
-    int64_t mtime, RequestContext* reader, CachedHdfsFileHandle** fid) {
+    int64_t mtime, RequestContext* reader, FileHandleCache::Accessor* accessor) {
   bool cache_hit;
   SCOPED_TIMER(reader->open_file_timer_);
   ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_REOPENED->Increment(1L);
-  file_handle_cache_.ReleaseFileHandle(fname, *fid, true);
-  // The old handle has been destroyed, so *fid must be overwritten before returning.
-  *fid = nullptr;
-  Status status = file_handle_cache_.GetFileHandle(fs, fname, mtime, true, fid,
-      &cache_hit);
+
+  accessor->Destroy();
+
+  Status status =
+      file_handle_cache_.GetFileHandle(fs, fname, mtime, true, accessor, &cache_hit);
   if (!status.ok()) {
-    ImpaladMetrics::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING->Increment(-1L);
     return status;
   }
   DCHECK(!cache_hit);

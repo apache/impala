@@ -160,6 +160,7 @@ add_library(UtilTests STATIC
   hdr-histogram-test.cc
   jwt-util-test.cc
   logging-support-test.cc
+  lru-multi-cache-test.cc
   metrics-test.cc
   min-max-filter-test.cc
   openssl-util-test.cc
@@ -230,6 +231,7 @@ ADD_UNIFIED_BE_LSAN_TEST(hdr-histogram-test HdrHistogramTest.*)
 # to use a unified executable
 ADD_BE_LSAN_TEST(internal-queue-test)
 ADD_UNIFIED_BE_LSAN_TEST(jwt-util-test "JwtUtilTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(lru-multi-cache-test "LruMultiCache.*")
 ADD_UNIFIED_BE_LSAN_TEST(logging-support-test "LoggingSupport.*")
 ADD_UNIFIED_BE_LSAN_TEST(metrics-test "MetricsTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(min-max-filter-test "MinMaxFilterTest.*")
