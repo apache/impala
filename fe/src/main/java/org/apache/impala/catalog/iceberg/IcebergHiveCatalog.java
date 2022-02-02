@@ -18,6 +18,7 @@
 package org.apache.impala.catalog.iceberg;
 
 import java.util.Map;
+import java.util.HashMap;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -52,7 +53,9 @@ public class IcebergHiveCatalog implements IcebergCatalog {
   private IcebergHiveCatalog() {
     HiveConf conf = new HiveConf(IcebergHiveCatalog.class);
     conf.setBoolean(ConfigProperties.ENGINE_HIVE_ENABLED, true);
-    hiveCatalog_ = new HiveCatalog(conf);
+    hiveCatalog_ = new HiveCatalog();
+    hiveCatalog_.setConf(conf);
+    hiveCatalog_.initialize("ImpalaHiveCatalog", new HashMap<>());
   }
 
   @Override

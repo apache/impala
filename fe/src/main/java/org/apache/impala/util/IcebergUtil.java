@@ -25,10 +25,12 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -50,6 +52,7 @@ import org.apache.iceberg.expressions.UnboundPredicate;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.StructLike;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
@@ -437,7 +440,7 @@ public class IcebergUtil {
   public static HashMap<String, Integer> getPartitionTransformParams(PartitionSpec spec)
       throws TableLoadingException {
     List<Pair<String, Integer>> transformParams = PartitionSpecVisitor.visit(
-        spec.schema(), spec, new PartitionSpecVisitor<Pair<String, Integer>>() {
+        spec, new PartitionSpecVisitor<Pair<String, Integer>>() {
           @Override
           public Pair<String, Integer> identity(String sourceName, int sourceId) {
             String mappingKey = getPartitonTransformMappingKey(sourceId,
@@ -835,5 +838,17 @@ public class IcebergUtil {
       return pageSize;
     }
     return IcebergTable.UNSET_PARQUET_PAGE_SIZE;
+  }
+
+  public static Set<Long> currentAncestorIds(Table table) {
+    Set<Long> ret = new HashSet<>();
+    Snapshot snapshot = table.currentSnapshot();
+    while (snapshot != null) {
+      ret.add(snapshot.snapshotId());
+      Long parentId = snapshot.parentId();
+      if (parentId == null) break;
+      snapshot = table.snapshot(parentId);
+    }
+    return ret;
   }
 }

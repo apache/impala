@@ -50,7 +50,6 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.HistoryEntry;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.TableMetadata;
-import org.apache.iceberg.util.SnapshotUtil;
 import org.apache.impala.analysis.AlterDbStmt;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
@@ -1120,7 +1119,7 @@ public class Frontend {
     FeIcebergTable feIcebergTable = (FeIcebergTable) feTable;
     TableMetadata metadata = IcebergUtil.getIcebergTableMetadata(feIcebergTable);
     Table table = IcebergUtil.loadTable(feIcebergTable);
-    Set<Long> ancestorIds = Sets.newHashSet(SnapshotUtil.currentAncestors(table));
+    Set<Long> ancestorIds = Sets.newHashSet(IcebergUtil.currentAncestorIds(table));
 
     TGetTableHistoryResult result = new TGetTableHistoryResult();
     result.result = Lists.newArrayList();
