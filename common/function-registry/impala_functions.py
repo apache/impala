@@ -507,6 +507,7 @@ visible_functions = [
   [['repeat'], 'STRING', ['STRING', 'BIGINT'], 'impala::StringFunctions::Repeat'],
   [['lpad'], 'STRING', ['STRING', 'BIGINT', 'STRING'], 'impala::StringFunctions::Lpad'],
   [['rpad'], 'STRING', ['STRING', 'BIGINT', 'STRING'], 'impala::StringFunctions::Rpad'],
+  [['bytes'], 'INT', ['STRING'], 'impala::StringFunctions::Bytes'],
   [['length'], 'INT', ['STRING'], 'impala::StringFunctions::Length'],
   [['length'], 'INT', ['CHAR'], 'impala::StringFunctions::CharLength'],
   [['char_length'], 'INT', ['STRING'], 'impala::StringFunctions::Length'],

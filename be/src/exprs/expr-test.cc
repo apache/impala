@@ -10705,6 +10705,14 @@ TEST_P(ExprTest, Utf8MaskTest) {
   executor_->PopExecOption();
 }
 
+TEST_P(ExprTest, BytesTest) {
+  // Verifies Bytes(exp) counts number of bytes.
+  TestIsNull("Bytes(NULL)", TYPE_INT);
+  TestValue("Bytes('你好')", TYPE_INT, 6);
+  TestValue("Bytes('你好hello')", TYPE_INT, 11);
+  TestValue("Bytes('你好 hello 你好')", TYPE_INT, 19);
+  TestValue("Bytes('hello')", TYPE_INT, 5);
+}
 TEST_P(ExprTest, Utf8Test) {
   // Verifies utf8_length() counts length by UTF-8 characters instead of bytes.
   // '你' and '好' are both encoded into 3 bytes.

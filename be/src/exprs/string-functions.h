@@ -72,6 +72,7 @@ class StringFunctions {
       const StringVal& pad);
   static StringVal Rpad(FunctionContext*, const StringVal& str, const BigIntVal&,
       const StringVal& pad);
+  static IntVal Bytes(FunctionContext*, const StringVal& str);
   static IntVal Length(FunctionContext*, const StringVal& str);
   static IntVal CharLength(FunctionContext*, const StringVal& str);
   static IntVal Utf8Length(FunctionContext*, const StringVal& str);

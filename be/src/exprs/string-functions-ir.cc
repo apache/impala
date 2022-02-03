@@ -258,6 +258,10 @@ IntVal StringFunctions::Length(FunctionContext* context, const StringVal& str) {
   }
   return IntVal(str.len);
 }
+IntVal StringFunctions::Bytes(FunctionContext* context,const StringVal& str){
+  if(str.is_null) return IntVal::null();
+  return IntVal(str.len);
+}
 
 IntVal StringFunctions::CharLength(FunctionContext* context, const StringVal& str) {
   if (str.is_null) return IntVal::null();

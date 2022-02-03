@@ -3201,3 +3201,18 @@ true
 ---- TYPES
 BOOLEAN
 ====
+---- QUERY: IMPALA-955
+# Returns number of bytes in a byte string.
+select bytes(string_col), bytes(date_string_col) from functional.alltypestiny;
+---- RESULTS
+1,8
+1,8
+1,8
+1,8
+1,8
+1,8
+1,8
+1,8
+---- TYPES
+INT, INT
+====
