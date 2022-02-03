@@ -226,6 +226,11 @@ string HashTableCtx::PrintStats() const {
 }
 
 void HashTableCtx::StatsCountersAdd(HashTableStatsProfile* profile) {
+  DCHECK(profile != nullptr);
+  if (profile == nullptr) {
+    LOG(WARNING) << "In HashTableCtx::StatsCountersAdd() 'profile is NULL.'";
+    return;
+  }
   COUNTER_ADD(profile->num_hash_collisions_, num_hash_collisions_);
   COUNTER_ADD(profile->num_hash_probes_, num_probes_);
   COUNTER_ADD(profile->num_hash_travels_, travel_length_);

@@ -849,3 +849,11 @@ select 1 from alltypestiny a join alltypestiny b on a.id != b.id;
 ---- CATCH
 Debug Action: FAIL
 ====
+---- QUERY
+# IMPALA-11105: If PhjBuilder::Prepare() failed after creating the hash table context,
+# Impala crashed.
+set debug_action="PHJ_BUILDER_PREPARE:FAIL@1.0";
+select * from alltypestiny a join alltypestiny b on a.id = b.id;
+---- CATCH
+Debug Action: PHJ_BUILDER_PREPARE:FAIL@1.0
+====

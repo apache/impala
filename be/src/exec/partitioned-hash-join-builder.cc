@@ -226,26 +226,6 @@ PhjBuilder::~PhjBuilder() {}
 
 Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
-  if (is_separate_build_) {
-    const TDebugOptions& instance_debug_options = state->instance_ctx().debug_options;
-    bool debug_option_enabled = instance_debug_options.node_id == -1
-        || instance_debug_options.node_id == join_node_id_;
-    // SET_DENY_RESERVATION_PROBABILITY should behave the same as if it were applied to
-    // the join node.
-    reservation_manager_.Init(Substitute("$0 ptr=$1", name_, this), profile(),
-        state->instance_buffer_reservation(), mem_tracker_.get(), *resource_profile_,
-        debug_option_enabled ? instance_debug_options : TDebugOptions());
-  }
-
-  RETURN_IF_ERROR(HashTableCtx::Create(&obj_pool_, state, hash_table_config_, hash_seed_,
-      MAX_PARTITION_DEPTH, row_desc_->tuple_descriptors().size(), expr_perm_pool_.get(),
-      expr_results_pool_.get(), expr_results_pool_.get(), &ht_ctx_));
-
-  DCHECK_EQ(filter_exprs_.size(), filter_ctxs_.size());
-  for (int i = 0; i < filter_exprs_.size(); ++i) {
-    RETURN_IF_ERROR(ScalarExprEvaluator::Create(*filter_exprs_[i], state, &obj_pool_,
-        expr_perm_pool_.get(), expr_results_pool_.get(), &filter_ctxs_[i].expr_eval));
-  }
 
   partitions_created_ = ADD_COUNTER(profile(), "PartitionsCreated", TUnit::UNIT);
   largest_partition_percent_ =
@@ -261,6 +241,29 @@ Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) 
   num_hash_table_builds_skipped_ =
       ADD_COUNTER(profile(), "NumHashTableBuildsSkipped", TUnit::UNIT);
   repartition_timer_ = ADD_TIMER(profile(), "RepartitionTime");
+
+  if (is_separate_build_) {
+    const TDebugOptions& instance_debug_options = state->instance_ctx().debug_options;
+    bool debug_option_enabled = instance_debug_options.node_id == -1
+        || instance_debug_options.node_id == join_node_id_;
+    // SET_DENY_RESERVATION_PROBABILITY should behave the same as if it were applied to
+    // the join node.
+    reservation_manager_.Init(Substitute("$0 ptr=$1", name_, this), profile(),
+        state->instance_buffer_reservation(), mem_tracker_.get(), *resource_profile_,
+        debug_option_enabled ? instance_debug_options : TDebugOptions());
+  }
+
+  RETURN_IF_ERROR(HashTableCtx::Create(&obj_pool_, state, hash_table_config_, hash_seed_,
+      MAX_PARTITION_DEPTH, row_desc_->tuple_descriptors().size(), expr_perm_pool_.get(),
+      expr_results_pool_.get(), expr_results_pool_.get(), &ht_ctx_));
+
+  RETURN_IF_ERROR(DebugAction(state->query_options(), "PHJ_BUILDER_PREPARE"));
+
+  DCHECK_EQ(filter_exprs_.size(), filter_ctxs_.size());
+  for (int i = 0; i < filter_exprs_.size(); ++i) {
+    RETURN_IF_ERROR(ScalarExprEvaluator::Create(*filter_exprs_[i], state, &obj_pool_,
+        expr_perm_pool_.get(), expr_results_pool_.get(), &filter_ctxs_[i].expr_eval));
+  }
   return Status::OK();
 }
 
