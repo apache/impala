@@ -147,8 +147,8 @@ public class HiveLegacyJavaFunctionTest {
     try {
       testScalar(udfClass, expectedFuncs);
     } catch (CatalogException e) {
-      Assert.assertEquals(e.getMessage(),
-          "No compatible function signatures found.");
+      Assert.assertTrue(e.getMessage().contains(
+          "No compatible function signatures found."));
       return;
     }
     Assert.fail("Extraction should not have succeeded.");

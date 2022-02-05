@@ -147,21 +147,30 @@ public class HiveLegacyJavaFunction implements HiveJavaFunction {
     String jarUri = hiveFn_.getResourceUris().get(0).getUri();
     // Load each method in the UDF class and create the corresponding Impala Function
     // object.
-    for (Method m: UDF_.getClass().getMethods()) {
-      if (m.getName().equals(UDF_FUNCTION_NAME)) {
-        ScalarFunction fn = fromHiveFunction(hiveFn_.getDbName(),
-            hiveFn_.getFunctionName(), hiveFn_.getClassName(),
-            m.getParameterTypes(), m.getReturnType(), jarUri);
-        if (fn != null) {
-          if (!addedSignatures.contains(fn.signatureString())) {
-            result.add(fn);
-            addedSignatures.add(fn.signatureString());
+    try {
+      for (Method m: UDF_.getClass().getMethods()) {
+        if (m.getName().equals(UDF_FUNCTION_NAME)) {
+          ScalarFunction fn = fromHiveFunction(hiveFn_.getDbName(),
+              hiveFn_.getFunctionName(), hiveFn_.getClassName(),
+              m.getParameterTypes(), m.getReturnType(), jarUri);
+          if (fn != null) {
+            if (!addedSignatures.contains(fn.signatureString())) {
+              result.add(fn);
+              addedSignatures.add(fn.signatureString());
+            }
+          } else {
+            LOG.warn("Ignoring incompatible method: " + m.toString() + " during load of "
+                + "Hive UDF:" + hiveFn_.getFunctionName() + " from " + UDF_.getClass());
           }
-        } else {
-          LOG.warn("Ignoring incompatible method: " + m.toString() + " during load of "
-              + "Hive UDF:" + hiveFn_.getFunctionName() + " from " + UDF_.getClass());
         }
       }
+    } catch (Throwable t) {
+      // Catch all runtime exceptions here. One possible runtime exception that can occur
+      // is ClassNotFoundException thrown by UDF_.getClass(). We want to catch all
+      // possible exceptions, mark it as a CatalogException, and let the caller decide on
+      // how to handle it.
+      throw new CatalogException("Error loading function " + hiveFn_.getFunctionName() +
+          ":  " + t);
     }
     if (result.isEmpty()) {
       throw new CatalogException("No compatible function signatures found.");
