@@ -721,8 +721,12 @@ void ClientRequestState::ExecDdlRequestImpl(bool exec_in_worker_thread) {
         ExecQueryOrDmlRequest(exec_request_->query_exec_request, !exec_in_worker_thread));
   }
 
-  // Set the results to be reported to the client.
-  SetResultSet(catalog_op_executor_->ddl_exec_response());
+  // Set the results to be reported to the client. Do this under lock to avoid races
+  // with ImpalaServer::GetResultSetMetadata().
+  {
+    lock_guard<mutex> l(lock_);
+    SetResultSet(catalog_op_executor_->ddl_exec_response());
+  }
 }
 
 bool ClientRequestState::ShouldRunExecDdlAsync() {
