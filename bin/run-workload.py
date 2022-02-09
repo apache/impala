@@ -277,6 +277,6 @@ if __name__ == "__main__":
 
   # Store the results
   with open(options.results_json_file, 'w') as f:
-    json.dump(result_map, f, cls=CustomJSONEncoder)
+    json.dump(result_map, f, cls=CustomJSONEncoder, ensure_ascii=False)
 
   exit(exit_code)

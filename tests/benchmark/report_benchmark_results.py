@@ -32,6 +32,7 @@ from __future__ import division
 import difflib
 import json
 import logging
+import math
 import os
 import prettytable
 import re
@@ -218,7 +219,7 @@ def get_dict_from_json(filename):
     cur[RESULT_LIST].append(query_result)
 
   with open(filename, "r") as f:
-    data = json.load(f)
+    data = json.loads(f.read().decode("utf-8", "ignore"))
     grouped = defaultdict( lambda: defaultdict(
         lambda: defaultdict(lambda: defaultdict(list))))
     for workload_name, workload in data.items():
@@ -296,6 +297,7 @@ def calculate_time_stats(grouped):
 class Report(object):
 
   significant_perf_change = False
+  invalid_t_tests = False
 
   class FileFormatComparisonRow(object):
     """Represents a row in the overview table, where queries are grouped together and
@@ -386,8 +388,13 @@ class Report(object):
 
     def __check_perf_change_significance(self, stat, ref_stat):
       zval = calculate_mwu(stat[SORTED], ref_stat[SORTED])
-      tval = calculate_tval(stat[AVG], stat[STDDEV], stat[ITERATIONS],
-                            ref_stat[AVG], ref_stat[STDDEV], ref_stat[ITERATIONS])
+      try:
+        tval = calculate_tval(stat[AVG], stat[STDDEV], stat[ITERATIONS],
+                              ref_stat[AVG], ref_stat[STDDEV], ref_stat[ITERATIONS])
+      except ZeroDivisionError:
+        # t-test cannot be performed if both standard deviations are 0
+        tval = float('nan')
+        Report.invalid_t_tests = True
       try:
         percent_difference = abs(ref_stat[AVG] - stat[AVG]) * 100 / ref_stat[AVG]
       except ZeroDivisionError:
@@ -408,6 +415,7 @@ class Report(object):
       """
       perf_change_type = ("(R) Regression" if zval >= 0 and tval >= 0
                           else "(I) Improvement" if zval <= 0 and tval <= 0
+                          else "(N/A) Invalid t-test" if math.isnan(tval)
                           else "(?) Anomoly")
       query = result[RESULT_LIST][0][QUERY]
 
@@ -588,7 +596,11 @@ class Report(object):
     output += variability_analysis_str
 
     if Report.significant_perf_change:
-      output += 'Significant perf change detected'
+      output += 'Significant perf change detected.\n'
+
+    if Report.invalid_t_tests:
+      output += 'Invalid t-tests detected. It is not possible to perform t-test with ' \
+                '0 standard deviation. Try increasing the number of iterations.\n'
 
     return output
 

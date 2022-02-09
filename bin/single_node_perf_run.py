@@ -191,7 +191,7 @@ def generate_profile_file(name, hash, base_dir):
   Writes the runtime profiles back in a simple text file in the same directory.
   """
   with open(name) as fid:
-    data = json.load(fid)
+    data = json.loads(fid.read().decode("utf-8", "ignore"))
     with open(os.path.join(base_dir, hash + "_profile.txt"), "w+") as out:
       # For each query
       for key in data:
