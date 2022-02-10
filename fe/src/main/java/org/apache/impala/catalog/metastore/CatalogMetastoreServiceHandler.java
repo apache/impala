@@ -1322,7 +1322,7 @@ public class CatalogMetastoreServiceHandler extends MetastoreServiceHandler {
         // ALTER TABLE/VIEW RENAME is implemented as an ADD + DROP.
         Pair<org.apache.impala.catalog.Table, org.apache.impala.catalog.Table> result =
             catalog_.renameTable(oldTTable, newTTable);
-        if (result.first == null && result.second == null) {
+        if (result == null || result.first == null || result.second == null) {
           throw new CatalogException("failed to rename table " + oldTTable + " to " +
               newTTable + " for " + apiName);
         }
