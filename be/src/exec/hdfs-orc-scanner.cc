@@ -51,7 +51,7 @@ Status HdfsOrcScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
           file->filename, file->file_length));
     }
   }
-  return IssueFooterRanges(scan_node, THdfsFileFormat::ORC, files);
+  return IssueFooterRanges(scan_node, THdfsFileFormat::ORC, files, ORC_FOOTER_SIZE);
 }
 
 HdfsOrcScanner::OrcMemPool::OrcMemPool(HdfsOrcScanner* scanner)

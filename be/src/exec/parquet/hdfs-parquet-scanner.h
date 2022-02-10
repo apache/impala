@@ -381,6 +381,14 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
       const vector<string>& max_vals, int start_page_idx, int end_page_idx,
       vector<PageRange>* skipped_ranges);
 
+  /// Size of the file footer for Parquet. This is a guess. If this value is too
+  /// little, we will need to issue another read.
+  static const int64_t PARQUET_FOOTER_SIZE = 1024 * 100;
+  static_assert(PARQUET_FOOTER_SIZE <= READ_SIZE_MIN_VALUE,
+      "PARQUET_FOOTER_SIZE can not be greater than READ_SIZE_MIN_VALUE.\n"
+      "You can increase PARQUET_FOOTER_SIZE if you want, "
+      "just don't forget to increase READ_SIZE_MIN_VALUE as well.");
+
  private:
   friend class ParquetColumnReader;
   friend class CollectionColumnReader;
@@ -778,7 +786,7 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
       bool materialize_tuple, MemPool* pool, Tuple* tuple) const;
 
   /// Process the file footer and parse file_metadata_.  This should be called with the
-  /// last FOOTER_SIZE bytes in context_.
+  /// last PARQUET_FOOTER_SIZE bytes in context_.
   Status ProcessFooter() WARN_UNUSED_RESULT;
 
   /// Populates 'column_readers' for the slots in 'tuple_desc', including creating child

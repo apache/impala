@@ -155,8 +155,13 @@ public class HdfsScanNode extends ScanNode {
   // TODO: is it worth making this a tunable query option?
   private static final long DEFAULT_COLUMN_SCAN_RANGE_RESERVATION = 4L * 1024L * 1024L;
 
-  // Read size for Parquet and ORC footers. Matches HdfsScanner::FOOTER_SIZE in backend.
-  private static final long FOOTER_SIZE = 100L * 1024L;
+  // Read size for Parquet and ORC footers.
+  // Matches HdfsParquetScanner::PARQUET_FOOTER_SIZE in backend.
+  private static final long PARQUET_FOOTER_SIZE = 100L * 1024L;
+
+  // Read size for ORC footers.
+  // Matches HdfsOrcScanner::ORC_FOOTER_SIZE in backend.
+  private static final long ORC_FOOTER_SIZE = 16L * 1024L;
 
   // When the information of cardinality is not available for the underlying hdfs table,
   // i.e., the field of cardinality_ is equal to -1, we will attempt to compute an
@@ -2102,7 +2107,9 @@ public class HdfsScanNode extends ScanNode {
         for (long columnReservation : columnReservations) {
           formatReservationBytes += columnReservation;
         }
-        formatReservationBytes = Math.max(FOOTER_SIZE, formatReservationBytes);
+        long footerSize =
+            format == HdfsFileFormat.ORC ? ORC_FOOTER_SIZE : PARQUET_FOOTER_SIZE;
+        formatReservationBytes = Math.max(footerSize, formatReservationBytes);
       } else {
         // Scanners for row-oriented formats issue only one IoMgr scan range at a time.
         // Minimum reservation is based on using I/O buffer per IoMgr scan range to get

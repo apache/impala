@@ -46,7 +46,6 @@ DEFINE_double(min_filter_reject_ratio, 0.1, "(Advanced) If the percentage of "
 
 const char* FieldLocation::LLVM_CLASS_NAME = "struct.impala::FieldLocation";
 const char* HdfsScanner::LLVM_CLASS_NAME = "class.impala::HdfsScanner";
-const int64_t HdfsScanner::FOOTER_SIZE;
 
 HdfsScanner::HdfsScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
     : scan_node_(scan_node),
@@ -824,12 +823,14 @@ void HdfsScanner::CheckFiltersEffectiveness() {
 }
 
 Status HdfsScanner::IssueFooterRanges(HdfsScanNodeBase* scan_node,
-    const THdfsFileFormat::type& file_type, const vector<HdfsFileDesc*>& files) {
+    const THdfsFileFormat::type& file_type, const vector<HdfsFileDesc*>& files,
+    int64_t footer_size_estimate) {
   DCHECK(!files.empty());
+  DCHECK_LE(footer_size_estimate, READ_SIZE_MIN_VALUE);
   vector<ScanRange*> footer_ranges;
   for (int i = 0; i < files.size(); ++i) {
     // Compute the offset of the file footer.
-    int64_t footer_size = min(FOOTER_SIZE, files[i]->file_length);
+    int64_t footer_size = min(footer_size_estimate, files[i]->file_length);
     int64_t footer_start = files[i]->file_length - footer_size;
     DCHECK_GE(footer_start, 0);
 

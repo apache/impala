@@ -170,6 +170,15 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   static Status IssueInitialRanges(HdfsScanNodeBase* scan_node,
       const std::vector<HdfsFileDesc*>& files) WARN_UNUSED_RESULT;
 
+  /// Size of the file footer for ORC.
+  /// This is a guess, matched with orc::DIRECTORY_SIZE_GUESS from ORC lib.
+  /// If this value is too little, we will need to issue another read.
+  static const int64_t ORC_FOOTER_SIZE = 1024 * 16;
+  static_assert(ORC_FOOTER_SIZE <= READ_SIZE_MIN_VALUE,
+      "ORC_FOOTER_SIZE can not be greater than READ_SIZE_MIN_VALUE.\n"
+      "You can increase ORC_FOOTER_SIZE if you want, "
+      "just don't forget to increase READ_SIZE_MIN_VALUE as well.");
+
   virtual Status Open(ScannerContext* context) override WARN_UNUSED_RESULT;
   virtual Status ProcessSplit() override WARN_UNUSED_RESULT;
   virtual void Close(RowBatch* row_batch) override;
@@ -334,7 +343,7 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   Status TransferTuples(RowBatch* dst_batch) WARN_UNUSED_RESULT;
 
   /// Process the file footer and parse file_metadata_.  This should be called with the
-  /// last FOOTER_SIZE bytes in context_.
+  /// last ORC_FOOTER_SIZE bytes in context_.
   Status ProcessFileTail() WARN_UNUSED_RESULT;
 
   /// Resolve SchemaPath in TupleDescriptors and translate them to ORC type ids into

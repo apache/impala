@@ -79,7 +79,8 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
           file->filename, file->file_length));
     }
   }
-  return IssueFooterRanges(scan_node, THdfsFileFormat::PARQUET, files);
+  return IssueFooterRanges(
+      scan_node, THdfsFileFormat::PARQUET, files, PARQUET_FOOTER_SIZE);
 }
 
 HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
@@ -2603,7 +2604,7 @@ Status HdfsParquetScanner::ProcessFooter() {
   // expect. Note we can't detect if the file is larger than we expect without attempting
   // to read past the end of the scan range, but in this case we'll fail below trying to
   // parse the footer.
-  DCHECK_LE(scan_range_len, FOOTER_SIZE);
+  DCHECK_LE(scan_range_len, PARQUET_FOOTER_SIZE);
   uint8_t* buffer;
   bool success = stream_->ReadBytes(scan_range_len, &buffer, &parse_status_);
   if (!success) {
