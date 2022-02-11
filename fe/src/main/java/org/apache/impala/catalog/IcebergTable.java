@@ -28,8 +28,8 @@ import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.TableMetadata;
-import org.apache.iceberg.types.Types;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.IcebergPartitionTransform;
@@ -39,7 +39,6 @@ import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
 import org.apache.impala.thrift.THdfsCompression;
-import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
@@ -165,7 +164,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
   // Treat iceberg table as a non-partitioned hdfs table in backend
   private HdfsTable hdfsTable_;
 
-  private long snapshotId_ = -1;
+  // Treat iceberg table as a non-partitioned hdfs table in backend
+  private BaseTable icebergBaseTable_;
 
   protected IcebergTable(org.apache.hadoop.hive.metastore.api.Table msTable,
       Db db, String name, String owner) {
@@ -201,6 +201,11 @@ public class IcebergTable extends Table implements FeIcebergTable {
 
   public HdfsTable getHdfsTable() {
     return hdfsTable_;
+  }
+
+  @Override
+  public BaseTable getIcebergBaseTable() {
+    return icebergBaseTable_;
   }
 
   @Override
@@ -299,11 +304,6 @@ public class IcebergTable extends Table implements FeIcebergTable {
   }
 
   @Override
-  public long snapshotId() {
-    return snapshotId_;
-  }
-
-  @Override
   public TTable toThrift() {
     TTable table = super.toThrift();
     table.setTable_type(TTableType.ICEBERG_TABLE);
@@ -333,10 +333,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
       final Timer.Context ctxStorageLdTime =
           getMetrics().getTimer(Table.LOAD_DURATION_STORAGE_METADATA).time();
       try {
-        TableMetadata metadata = IcebergUtil.getIcebergTableMetadata(this);
-        if (metadata.currentSnapshot() != null) {
-            snapshotId_ = metadata.currentSnapshot().snapshotId();
-        }
+        icebergBaseTable_ = (BaseTable)IcebergUtil.loadTable(this);
+        TableMetadata metadata = getIcebergTableMetadata();
         loadSchemaFromIceberg(metadata);
         // Loading hdfs table after loaded schema from Iceberg,
         // in case we create external Iceberg table skipping column info in sql.
@@ -350,8 +348,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
         pathHashToFileDescMap_ = Utils.loadAllPartition(this);
         loadAllColumnStats(msClient);
       } catch (Exception e) {
-        throw new TableLoadingException("Error loading metadata for Iceberg table " +
-            icebergTableLocation_, e);
+        throw new IcebergTableLoadingException("Error loading metadata for Iceberg table "
+            + icebergTableLocation_, e);
       } finally {
         storageMetadataLoadTime_ = ctxStorageLdTime.stop();
       }
@@ -422,10 +420,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
     // so there's no need for translation.
     pathHashToFileDescMap_ = FeIcebergTable.Utils.loadFileDescMapFromThrift(
         ticeberg.getPath_hash_to_file_descriptor(), null, null);
-    snapshotId_ = ticeberg.getSnapshot_id();
     hdfsTable_.loadFromThrift(thriftTable);
-    TableMetadata metadata = IcebergUtil.getIcebergTableMetadata(this);
-    icebergSchema_ = metadata.schema();
+    icebergBaseTable_ = FeIcebergTable.Utils.deserializeIcebergBaseTable(
+        ticeberg.getIceberg_base_table());
+    icebergSchema_ = icebergBaseTable_.operations().current().schema();
   }
 
   private List<IcebergPartitionSpec> loadPartitionBySpecsFromThrift(
@@ -482,9 +480,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
     Map<HdfsPartition, TPartialPartitionInfo> missingPartialInfos = new HashMap<>();
     TGetPartialCatalogObjectResponse resp =
         getHdfsTable().getPartialInfo(req, missingPartialInfos);
-    if (req.table_info_selector.want_iceberg_snapshot) {
-      resp.table_info.setIceberg_snapshot(
-          FeIcebergTable.Utils.createTIcebergSnapshot(this));
+    if (req.table_info_selector.want_iceberg_table) {
+      resp.table_info.setIceberg_table(Utils.getTIcebergTable(this));
       if (!resp.table_info.isSetNetwork_addresses()) {
         resp.table_info.setNetwork_addresses(getHostIndex().getList());
       }

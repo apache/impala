@@ -54,7 +54,6 @@ import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogDeltaLog;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogObjectCache;
-import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
@@ -84,7 +83,6 @@ import org.apache.impala.thrift.TFunctionName;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
 import org.apache.impala.thrift.THdfsFileDesc;
-import org.apache.impala.thrift.TIcebergSnapshot;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartialPartitionInfo;
 import org.apache.impala.thrift.TPartialTableInfo;
@@ -106,7 +104,6 @@ import org.ehcache.sizeof.SizeOf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
@@ -609,7 +606,7 @@ public class CatalogdMetaProvider implements MetaProvider {
             req.catalog_info_selector.want_db_names = true;
             TGetPartialCatalogObjectResponse resp = sendRequest(req);
             checkResponse(resp.catalog_info != null && resp.catalog_info.db_names != null,
-                req, "missing table names");
+                req, "missing database names");
             return ImmutableList.copyOf(resp.catalog_info.db_names);
           }
     });
@@ -1024,34 +1021,35 @@ public class CatalogdMetaProvider implements MetaProvider {
     return ret;
   }
 
-  /**
-   * Utility function for to retrieve table info with Iceberg snapshot. Exists for testing
-   * purposes, use loadIcebergSnapshot() which translates the file descriptors to the
-   * table's host index.
-   */
-  @VisibleForTesting
-  TPartialTableInfo loadTableInfoWithIcebergSnapshot(final TableMetaRef table)
-      throws TException {
+  @Override
+  public TPartialTableInfo loadIcebergTable(final TableMetaRef table) throws TException {
     Preconditions.checkArgument(table instanceof TableMetaRefImpl);
-    TGetPartialCatalogObjectRequest req = newReqForTable(table);
-    req.table_info_selector.want_iceberg_snapshot = true;
-    TGetPartialCatalogObjectResponse resp = sendRequest(req);
-    return resp.table_info;
+    return loadTableInfoWithIcebergTable(table);
   }
 
-  @Override
-  public FeIcebergTable.Snapshot loadIcebergSnapshot(final TableMetaRef table,
-      ListMap<TNetworkAddress> hostIndex)
+  /**
+   * Utility function for to retrieve table info with Iceberg table metadata.
+   */
+  TPartialTableInfo loadTableInfoWithIcebergTable(final TableMetaRef table)
       throws TException {
-    TPartialTableInfo tableInfo = loadTableInfoWithIcebergSnapshot(table);
-    Map<String, FileDescriptor> pathToFds =
-        FeIcebergTable.Utils.loadFileDescMapFromThrift(
-            tableInfo.getIceberg_snapshot().getIceberg_file_desc_map(),
-            tableInfo.getNetwork_addresses(),
-            hostIndex);
-    return new FeIcebergTable.Snapshot(
-        tableInfo.getIceberg_snapshot().getSnapshot_id(),
-        pathToFds);
+    Preconditions.checkArgument(table instanceof TableMetaRefImpl);
+    TableMetaRefImpl tableRef = (TableMetaRefImpl)table;
+    String itemStr = "iceberg metadata for " + tableRef.dbName_ + "."
+        + tableRef.tableName_;
+    IcebergMetaCacheKey cacheKey = new IcebergMetaCacheKey(tableRef);
+    return loadWithCaching(itemStr, TABLE_METADATA_CACHE_CATEGORY, cacheKey,
+        new Callable<TPartialTableInfo>() {
+          @Override
+          public TPartialTableInfo call() throws Exception {
+            TGetPartialCatalogObjectRequest req = newReqForTable(table);
+            req.table_info_selector.want_iceberg_table = true;
+            TGetPartialCatalogObjectResponse resp = sendRequest(req);
+            checkResponse(resp.table_info != null &&
+                resp.table_info.iceberg_table != null, req,
+                "missing Iceberg table metadata");
+            return resp.getTable_info();
+          }
+    });
   }
 
   private ImmutableList<FileDescriptor> convertThriftFdList(List<THdfsFileDesc> thriftFds,
@@ -1939,6 +1937,18 @@ public class CatalogdMetaProvider implements MetaProvider {
       if (getClass() != obj.getClass()) return false;
       DbCacheKey other = (DbCacheKey) obj;
       return dbName_.equals(other.dbName_) && type_ == other.type_;
+    }
+  }
+
+  /**
+   * Cache key for an entry storing Iceberg table metadata.
+   *
+   * Values for these keys are 'TPartialTableInfo' objects.
+   */
+  private static class IcebergMetaCacheKey extends VersionedTableCacheKey {
+
+    public IcebergMetaCacheKey(TableMetaRefImpl table) {
+      super(table);
     }
   }
 

@@ -17,7 +17,12 @@
 
 package org.apache.impala.catalog;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -31,6 +36,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
@@ -51,7 +57,6 @@ import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
-import org.apache.impala.thrift.TIcebergSnapshot;
 import org.apache.impala.thrift.TIcebergTable;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TResultSet;
@@ -85,6 +90,18 @@ public interface FeIcebergTable extends FeFsTable {
    * Return iceberg catalog type from table properties
    */
   TIcebergCatalog getIcebergCatalog();
+
+  /**
+   * Returns the BaseTable that stores the metadata loaded by Iceberg.
+   */
+  BaseTable getIcebergBaseTable();
+
+  /**
+   * Returns the TableMetadata from the BaseTable.
+   */
+  default TableMetadata getIcebergTableMetadata() {
+    return getIcebergBaseTable().operations().current();
+  }
 
   /**
    * Return Iceberg catalog location, we use this location to load metadata from Iceberg
@@ -266,18 +283,11 @@ public interface FeIcebergTable extends FeFsTable {
   /**
    * Current snapshot id of the table.
    */
-  long snapshotId();
-
-  /**
-   * Utility class to hold information about Iceberg snapshots.
-   */
-  public static class Snapshot {
-    public Snapshot(long snapshotId, Map<String, FileDescriptor> pathHashToFileDescMap) {
-      this.snapshotId = snapshotId;
-      this.pathHashToFileDescMap = pathHashToFileDescMap;
+  default long snapshotId() {
+    if (getIcebergBaseTable().currentSnapshot() != null) {
+      return getIcebergTableMetadata().currentSnapshot().snapshotId();
     }
-    public long snapshotId;
-    public Map<String, FileDescriptor> pathHashToFileDescMap;
+    return -1;
   }
 
   /**
@@ -305,7 +315,7 @@ public interface FeIcebergTable extends FeFsTable {
       resultSchema.addToColumns(new TColumn("Field Partition Transform",
           Type.STRING.toThrift()));
 
-      TableMetadata metadata = IcebergUtil.getIcebergTableMetadata(table);
+      TableMetadata metadata = table.getIcebergTableMetadata();
       if (!metadata.specs().isEmpty()) {
         // Just show the current PartitionSpec from Iceberg table metadata
         PartitionSpec latestSpec = metadata.spec();
@@ -416,7 +426,6 @@ public interface FeIcebergTable extends FeFsTable {
       tIcebergTable.setPath_hash_to_file_descriptor(
           convertPathHashToFileDescMap(icebergTable));
 
-      tIcebergTable.setSnapshot_id(icebergTable.snapshotId());
       tIcebergTable.setParquet_compression_codec(
           icebergTable.getIcebergParquetCompressionCodec());
       tIcebergTable.setParquet_row_group_size(
@@ -424,7 +433,9 @@ public interface FeIcebergTable extends FeFsTable {
       tIcebergTable.setParquet_plain_page_size(
           icebergTable.getIcebergParquetPlainPageSize());
       tIcebergTable.setParquet_dict_page_size(
-          icebergTable.getIcebergParquetDictPageSize());
+      icebergTable.getIcebergParquetDictPageSize());
+      tIcebergTable.setIceberg_base_table(serializeIcebergBaseTable(
+          icebergTable.getIcebergBaseTable()));
       return tIcebergTable;
     }
 
@@ -462,11 +473,48 @@ public interface FeIcebergTable extends FeFsTable {
       return fileDescMap;
     }
 
-    public static TIcebergSnapshot createTIcebergSnapshot(FeIcebergTable icebergTable) {
-      TIcebergSnapshot snapshot = new TIcebergSnapshot();
-      snapshot.setSnapshot_id(icebergTable.snapshotId());
-      snapshot.setIceberg_file_desc_map(convertPathHashToFileDescMap(icebergTable));
-      return snapshot;
+    public static byte[] serializeIcebergBaseTable(BaseTable baseTable) {
+      ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+      ObjectOutputStream objectOutputStream = null;
+      byte[] result = new byte[]{};
+      try {
+        objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
+        objectOutputStream.writeObject(baseTable);
+        objectOutputStream.flush();
+        result = byteArrayOutputStream.toByteArray();
+      } catch (IOException e) {
+        LOG.warn("Failed to serialize Iceberg BaseTable: " + e.getMessage());
+      }
+      finally {
+        try {
+          byteArrayOutputStream.close();
+        } catch (IOException ex) {
+          // ignore close exception
+        }
+      }
+      return result;
+    }
+
+    public static BaseTable deserializeIcebergBaseTable(byte[] serializedBaseTable)
+        throws TableLoadingException {
+      Object baseTable = null;
+      ByteArrayInputStream inputStream = new ByteArrayInputStream(serializedBaseTable);
+      ObjectInput objectInput = null;
+      try {
+        objectInput = new ObjectInputStream(inputStream);
+        baseTable = objectInput.readObject();
+      } catch (Exception e) {
+        throw new TableLoadingException("Failed to deserialize Iceberg BaseTable.", e);
+      } finally {
+        try {
+          if (objectInput != null) {
+            objectInput.close();
+          }
+        } catch (IOException ex) {
+          // ignore close exception
+        }
+      }
+      return (BaseTable)baseTable;
     }
 
     /**

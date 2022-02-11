@@ -239,6 +239,7 @@ drop table iceberg_hive_cat
 ====
 ---- QUERY
 # The data has been purged, so querying the external table fails.
+refresh iceberg_hive_cat_ext_2;
 select * from iceberg_hive_cat_ext_2
 ---- CATCH
 Table does not exist

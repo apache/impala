@@ -40,9 +40,7 @@ import com.google.common.hash.Hashing;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 
-import org.apache.impala.catalog.IcebergStructField;
 import org.apache.impala.common.Pair;
-import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.DataFile;
@@ -55,10 +53,8 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.StructLike;
 import org.apache.iceberg.Table;
-import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.mr.Catalogs;
 import org.apache.iceberg.transforms.PartitionSpecVisitor;
-import org.apache.iceberg.transforms.Transform;
 import org.apache.iceberg.types.Conversions;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
@@ -79,14 +75,12 @@ import org.apache.impala.catalog.iceberg.IcebergCatalog;
 import org.apache.impala.catalog.iceberg.IcebergCatalogs;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TCompressionCodec;
-import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.THdfsCompression;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergPartitionField;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
-import org.apache.impala.thrift.TIcebergPartitionTransform;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
 
 public class IcebergUtil {
@@ -143,27 +137,6 @@ public class IcebergUtil {
   }
 
   /**
-   * Get TableMetadata by FeIcebergTable
-   */
-  public static TableMetadata getIcebergTableMetadata(FeIcebergTable table)
-      throws TableLoadingException {
-    BaseTable iceTable = (BaseTable)IcebergUtil.loadTable(table);
-    return iceTable.operations().current();
-  }
-
-  /**
-   * Get TableMetadata by related info tableName is table full name, usually
-   * database.table
-   */
-  public static TableMetadata getIcebergTableMetadata(TIcebergCatalog catalog,
-      TableIdentifier tableId, String location, Map<String, String> tableProps)
-      throws TableLoadingException {
-    BaseTable baseTable = (BaseTable)IcebergUtil.loadTable(catalog,
-        tableId, location, tableProps);
-    return baseTable.operations().current();
-  }
-
-  /**
    * Get Iceberg table identifier by table property
    */
   public static TableIdentifier getIcebergTableIdentifier(FeIcebergTable table) {
@@ -194,7 +167,7 @@ public class IcebergUtil {
    */
   public static Transaction getIcebergTransaction(FeIcebergTable feTable)
       throws TableLoadingException, ImpalaRuntimeException {
-    return getIcebergCatalog(feTable).loadTable(feTable).newTransaction();
+    return feTable.getIcebergBaseTable().newTransaction();
   }
 
   /**
@@ -557,8 +530,7 @@ public class IcebergUtil {
 
   private static TableScan createScanAsOf(FeIcebergTable table,
       TimeTravelSpec timeTravelSpec) throws TableLoadingException {
-    BaseTable baseTable = (BaseTable)IcebergUtil.loadTable(table);
-    TableScan scan = baseTable.newScan();
+    TableScan scan = table.getIcebergBaseTable().newScan();
     if (timeTravelSpec == null) {
       scan = scan.useSnapshot(table.snapshotId());
     } else {
