@@ -57,6 +57,26 @@ class ParquetDataConverter {
   }
 
  private:
+  int32_t GetScale() const {
+    if (parquet_element_->__isset.logicalType
+        && parquet_element_->logicalType.__isset.DECIMAL) {
+      return parquet_element_->logicalType.DECIMAL.scale;
+    }
+
+    if (parquet_element_->__isset.scale) return parquet_element_->scale;
+
+    // If not specified, the scale is 0
+    return 0;
+  }
+
+  int32_t GetPrecision() const {
+    if (parquet_element_->__isset.logicalType
+        && parquet_element_->logicalType.__isset.DECIMAL) {
+      return parquet_element_->logicalType.DECIMAL.precision;
+    }
+
+    return parquet_element_->precision;
+  }
   /// Returns true if we need to do a conversion from the Parquet type to the slot type.
   bool CheckIfNeedsConversion() {
     if (!MATERIALIZED) return false;
@@ -67,17 +87,16 @@ class ParquetDataConverter {
       return true;
     }
     if (col_type_->type == TYPE_DECIMAL) {
-      if (col_type_->precision != parquet_element_->precision) {
+      if (col_type_->precision != GetPrecision()) {
         // Decimal values can be stored by Decimal4Value (4 bytes), Decimal8Value, and
         // Decimal16Value. We only need to do a conversion for different precision if
         // the values require different types (different byte size).
-        if (ColumnType::GetDecimalByteSize(parquet_element_->precision)
-            != col_type_->GetByteSize()) {
+        if (ColumnType::GetDecimalByteSize(GetPrecision()) != col_type_->GetByteSize()) {
           return true;
         }
       }
       // Different scales require decimal conversion.
-      if (col_type_->scale != parquet_element_->scale) return true;
+      if (col_type_->scale != GetScale()) return true;
     }
     return false;
   }
@@ -170,7 +189,7 @@ template <typename InternalType, bool MATERIALIZED>
 template <typename DecimalType>
 inline bool ParquetDataConverter<InternalType, MATERIALIZED>
     ::ConvertDecimalScale(DecimalType* slot) const {
-  int parquet_file_scale = parquet_element_->scale;
+  int parquet_file_scale = GetScale();
   int slot_scale = col_type_->scale;
   if (LIKELY(parquet_file_scale == slot_scale)) return true;
 

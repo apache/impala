@@ -388,6 +388,10 @@ class TestParquet(ImpalaTestSuite):
     new_vector.get_value('exec_option')['abort_on_error'] = 1
     self.run_test_case('QueryTest/parquet-abort-on-error', new_vector)
 
+  def test_default_scale(self, vector, unique_database):
+    create_table_from_parquet(self.client, unique_database, "no_scale")
+    self.run_test_case('QueryTest/default-scale', vector, unique_database)
+
   def test_timestamp_out_of_range(self, vector, unique_database):
     """IMPALA-4363: Test scanning parquet files with an out of range timestamp.
        Also tests IMPALA-7595: Test Parquet timestamp columns where the time part

@@ -180,6 +180,41 @@ void SetTimestampLogicalType(TParquetTimestampType::type parquet_timestamp_type,
   col_schema->__set_logicalType(logical_type);
 }
 
+bool IsScaleSet(const parquet::SchemaElement& schema_element) {
+  // Scale is required in DecimalType
+  return (schema_element.__isset.logicalType
+             && schema_element.logicalType.__isset.DECIMAL)
+      || schema_element.__isset.scale;
+}
+
+bool IsPrecisionSet(const parquet::SchemaElement& schema_element) {
+  // Precision is required in DecimalType
+  return (schema_element.__isset.logicalType
+             && schema_element.logicalType.__isset.DECIMAL)
+      || schema_element.__isset.precision;
+}
+
+int32_t GetScale(const parquet::SchemaElement& schema_element) {
+  if (schema_element.__isset.logicalType && schema_element.logicalType.__isset.DECIMAL) {
+    return schema_element.logicalType.DECIMAL.scale;
+  }
+
+  if (schema_element.__isset.scale) return schema_element.scale;
+
+  // If not specified, the scale is 0
+  return 0;
+}
+
+// Precision is required, this should be called after checking IsPrecisionSet()
+int32_t GetPrecision(const parquet::SchemaElement& schema_element) {
+  DCHECK(IsPrecisionSet(schema_element));
+  if (schema_element.__isset.logicalType && schema_element.logicalType.__isset.DECIMAL) {
+    return schema_element.logicalType.DECIMAL.precision;
+  }
+
+  return schema_element.precision;
+}
+
 /// Mapping of impala's internal types to parquet storage types. This is indexed by
 /// PrimitiveType enum
 const parquet::Type::type INTERNAL_TO_PARQUET_TYPES[] = {
@@ -329,28 +364,24 @@ Status ParquetMetadataUtils::ValidateColumn(const char* filename,
             filename, schema_element.name, schema_element.type_length));
       }
     }
-    if (!schema_element.__isset.scale) {
-      return Status(Substitute("File '$0' column '$1' does not have the scale set.",
-          filename, schema_element.name));
-    }
 
     // We require that the precision be a positive value, and not larger than the
     // precision in table schema.
-    if (!schema_element.__isset.precision) {
+    if (!IsPrecisionSet(schema_element)) {
       ErrorMsg msg(TErrorCode::PARQUET_MISSING_PRECISION, filename, schema_element.name);
       return Status(msg);
     } else {
-      if (schema_element.precision > slot_desc->type().precision
-          || schema_element.precision <= 0) {
+      int32_t precision = GetPrecision(schema_element);
+      if (precision > slot_desc->type().precision || precision <= 0) {
         ErrorMsg msg(TErrorCode::PARQUET_WRONG_PRECISION, filename, schema_element.name,
-            schema_element.precision, slot_desc->type().precision);
+            precision, slot_desc->type().precision);
         return Status(msg);
       }
-      if (schema_element.scale < 0 || schema_element.scale > schema_element.precision) {
+      int32_t scale = GetScale(schema_element);
+      if (scale < 0 || scale > precision) {
         return Status(
             Substitute("File '$0' column '$1' has invalid scale: $2. Precision is $3.",
-                filename, schema_element.name, schema_element.scale,
-                schema_element.precision));
+                filename, schema_element.name, scale, precision));
       }
     }
 
@@ -361,7 +392,7 @@ Status ParquetMetadataUtils::ValidateColumn(const char* filename,
           schema_element.name);
       RETURN_IF_ERROR(state->LogOrReturnError(msg));
     }
-  } else if (schema_element.__isset.scale || schema_element.__isset.precision
+  } else if (IsScaleSet(schema_element) || IsPrecisionSet(schema_element)
       || is_converted_type_decimal) {
     ErrorMsg msg(TErrorCode::PARQUET_INCOMPATIBLE_DECIMAL, filename, schema_element.name,
         slot_desc->type().DebugString());

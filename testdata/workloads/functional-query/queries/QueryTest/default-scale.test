@@ -1,0 +1,6 @@
+====
+---- QUERY
+SELECT * FROM $DATABASE.no_scale;
+---- RESULTS
+0
+====
