@@ -344,7 +344,7 @@ class Report(object):
       self.query_name = results[RESULT_LIST][0][QUERY][NAME]
       self.file_format = '{0} / {1} / {2}'.format(
           results[RESULT_LIST][0][QUERY][TEST_VECTOR][FILE_FORMAT],
-          results[RESULT_LIST][0][QUERY][TEST_VECTOR][COMPRESSION_TYPE],
+          results[RESULT_LIST][0][QUERY][TEST_VECTOR][COMPRESSION_CODEC],
           results[RESULT_LIST][0][QUERY][TEST_VECTOR][COMPRESSION_TYPE])
       self.avg = results[AVG]
       self.rsd = results[STDDEV] / self.avg if self.avg > 0 else 0.0
