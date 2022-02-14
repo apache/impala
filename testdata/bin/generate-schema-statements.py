@@ -426,7 +426,7 @@ def avro_schema(columns):
   return json.dumps(record)
 
 def build_compression_codec_statement(codec, compression_type, file_format):
-  codec = AVRO_COMPRESSION_MAP[codec] if file_format == 'avro' else COMPRESSION_MAP[codec]
+  codec = (AVRO_COMPRESSION_MAP if file_format == 'avro' else COMPRESSION_MAP).get(codec)
   if not codec:
     return str()
   return (AVRO_COMPRESSION_CODEC % codec) if file_format == 'avro' else (
@@ -688,6 +688,14 @@ def generate_statements(output_name, test_vectors, sections,
           create_file_format == 'orc' and
           'transactional' not in tblproperties):
         tblproperties['transactional'] = 'true'
+      if create_file_format == 'orc' and create_codec != 'def':
+        # The default value of 'orc.compress' is ZLIB which corresponds to 'def'.
+        # We just need it for non-def codec.
+        # The original codec name can be used except snap.
+        if create_codec == 'snap':
+          tblproperties['orc.compress'] = 'SNAPPY'
+        else:
+          tblproperties['orc.compress'] = create_codec
 
       hdfs_location = '{0}.{1}{2}'.format(db_name, table_name, db_suffix)
       # hdfs file names for functional datasets are stored
