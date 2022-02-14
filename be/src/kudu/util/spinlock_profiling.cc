@@ -17,14 +17,13 @@
 
 #include "kudu/util/spinlock_profiling.h"
 
+#include <functional>
 #include <sstream>
-#include <string>
 
-#include <glog/logging.h>
 #include <gflags/gflags.h>
+#include <glog/logging.h>
 
 #include "kudu/gutil/atomicops.h"
-#include "kudu/gutil/bind.h"
 #include "kudu/gutil/casts.h"
 #include "kudu/gutil/macros.h"
 #include "kudu/gutil/once.h"
@@ -273,7 +272,7 @@ void RegisterSpinLockContentionMetrics(const scoped_refptr<MetricEntity>& entity
   InitSpinLockContentionProfiling();
   entity->NeverRetire(
       METRIC_spinlock_contention_time.InstantiateFunctionGauge(
-          entity, Bind(&GetSpinLockContentionMicros)));
+          entity, []() { return GetSpinLockContentionMicros(); }));
 }
 
 uint64_t GetSpinLockContentionMicros() {

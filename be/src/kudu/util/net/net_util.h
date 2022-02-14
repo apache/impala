@@ -82,6 +82,10 @@ class HostPort {
   static Status ParseStrings(
       const std::string& comma_sep_addrs, uint16_t default_port, std::vector<HostPort>* res);
 
+  // Similar to above but uses a vector of strings 'addrs' as input parameter.
+  static Status ParseAddresses(const std::vector<std::string>& addrs, uint16_t default_port,
+                               std::vector<HostPort>* res);
+
   // Similar to above but allow the addresses to have scheme and path,
   // which are ignored.
   static Status ParseStringsWithScheme(
@@ -104,6 +108,9 @@ class HostPort {
 };
 
 bool operator==(const HostPort& hp1, const HostPort& hp2);
+inline bool operator!=(const HostPort& hp1, const HostPort& hp2) {
+  return !(hp1 == hp2);
+}
 
 // Hasher of HostPort objects for UnorderedAssociativeContainers.
 struct HostPortHasher {
@@ -175,6 +182,7 @@ Status GetHostname(std::string* hostname);
 Status GetLocalNetworks(std::vector<Network>* net);
 
 // Return the local machine's FQDN.
+// If domain name is not available, FQDN returns hostname.
 Status GetFQDN(std::string* hostname);
 
 // Returns a single socket address from a HostPort.
@@ -182,12 +190,15 @@ Status GetFQDN(std::string* hostname);
 // list and logs a message in verbose mode.
 Status SockaddrFromHostPort(const HostPort& host_port, Sockaddr* addr);
 
-// Converts the given Sockaddr into a HostPort, substituting the FQDN
-// in the case that the provided address is the wildcard.
+// Converts the given list of Sockaddrs into a list of HostPorts that can be
+// accessed from other machines, i.e. wildcards are replaced with the FQDN, the
+// --host_for_tests gflag is honored with the expectation that 'addrs' is the
+// list of locally bound or advertised addresses.
 //
 // In the case of other addresses, the returned HostPort will contain just the
 // stringified form of the IP.
-Status HostPortFromSockaddrReplaceWildcard(const Sockaddr& addr, HostPort* hp);
+Status HostPortsFromAddrs(const std::vector<Sockaddr>& addrs,
+                          std::vector<HostPort>* hps);
 
 // Try to run 'lsof' to determine which process is preventing binding to
 // the given 'addr'. If pids can be determined, outputs full 'ps' and 'pstree'
@@ -231,6 +242,14 @@ enum class BindMode {
   WILDCARD,
   LOOPBACK
 };
+
+// Gets a random port from the ephemeral range by binding to port 0 on address
+// 'address' and letting the kernel choose an unused one from the ephemeral port
+// range. The socket is then immediately closed and it remains in TIME_WAIT for
+// 2*tcp_fin_timeout (by default 2*60=120 seconds). The kernel won't assign this
+// port until it's in TIME_WAIT but it can still be used by binding it
+// explicitly.
+Status GetRandomPort(const std::string& address, uint16_t* port);
 
 #if defined(__APPLE__)
   static constexpr const BindMode kDefaultBindMode = BindMode::LOOPBACK;

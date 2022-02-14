@@ -20,6 +20,9 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <utility>
+
+#include <glog/logging.h>
 
 #include "kudu/gutil/dynamic_annotations.h"
 #include "kudu/gutil/macros.h"
@@ -55,6 +58,25 @@ class faststring {
     ASAN_POISON_MEMORY_REGION(data_, capacity_);
   }
 
+  faststring(faststring&& other) noexcept
+      : faststring() {
+    *this = std::move(other);
+  }
+
+  faststring& operator=(faststring&& other) noexcept {
+    if (this == &other) return *this;
+
+    if (other.data_ == other.initial_data_) {
+      assign_copy(other.data(), other.size());
+      other.clear();
+    } else {
+      len_ = other.len_;
+      capacity_ = other.capacity_;
+      data_ = other.release();
+    }
+    return *this;
+  }
+
   ~faststring() {
     ASAN_UNPOISON_MEMORY_REGION(initial_data_, arraysize(initial_data_));
     if (data_ != initial_data_) {
@@ -82,6 +104,16 @@ class faststring {
     len_ = newsize;
     ASAN_POISON_MEMORY_REGION(data_ + len_, capacity_ - len_);
     ASAN_UNPOISON_MEMORY_REGION(data_, len_);
+  }
+
+  // Resize to 'newsize'. In contrast to 'resize()', if this requires allocating a new
+  // backing array, the new capacity is rounded up in the same manner as if data had been
+  // appended to the buffer.
+  void resize_with_extra_capacity(size_t newsize) {
+    if (newsize > capacity_) {
+      GrowToAtLeast(newsize);
+    }
+    resize(newsize);
   }
 
   // Releases the underlying array; after this, the buffer is left empty.
@@ -222,6 +254,14 @@ class faststring {
   std::string ToString() const {
     return std::string(reinterpret_cast<const char *>(data()),
                        len_);
+  }
+
+  // Check various internal invariants. Used by tests.
+  void CheckInvariants() {
+    CHECK_LE(len_, capacity_);
+    if (data_ == initial_data_) {
+      CHECK_EQ(capacity_, kInitialCapacity);
+    }
   }
 
  private:

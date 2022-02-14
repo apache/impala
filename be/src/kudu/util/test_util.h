@@ -25,8 +25,8 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
-#include <boost/optional/optional.hpp>
 #include <gtest/gtest.h>
 
 #include "kudu/gutil/port.h"
@@ -35,7 +35,7 @@
 #define SKIP_IF_SLOW_NOT_ALLOWED() do { \
   if (!AllowSlowTests()) { \
     LOG(WARNING) << "test is skipped; set KUDU_ALLOW_SLOW_TESTS=1 to run"; \
-    return; \
+    GTEST_SKIP(); \
   } \
 } while (0)
 
@@ -54,6 +54,10 @@ class Env;
 class Status;
 
 extern const char* kInvalidPath;
+
+class KuduTestEventListener : public ::testing::EmptyTestEventListener {
+  void OnTestIterationStart(const testing::UnitTest& unit_test, int iteration) override;
+};
 
 class KuduTest : public ::testing::Test {
  public:
@@ -91,6 +95,8 @@ bool AllowSlowTests();
 // to true. This is required to pass certain tests in FIPS approved mode.
 bool UseLargeKeys();
 
+bool EnableEncryption();
+
 // Override the given gflag to the new value, only in the case that
 // slow tests are enabled and the user hasn't otherwise overridden
 // it on the command line.
@@ -115,6 +121,13 @@ int SeedRandom();
 // May only be called from within a gtest unit test. Prefer KuduTest::test_dir_
 // if a KuduTest instance is available.
 std::string GetTestDataDirectory();
+
+// Returns a unique socket path for use in tests in the form of:
+//   <test-dir>/<name>-<uuid>.sock
+//
+// The path is in the base test directory because the path to Unix domain
+// socket file cannot be longer than ~100 bytes.
+std::string GetTestSocketPath(const std::string& name);
 
 // Return the directory which contains the test's executable.
 std::string GetTestExecutableDirectory();
@@ -148,16 +161,17 @@ void AssertEventually(const std::function<void(void)>& f,
 // unlike the usual behavior of path globs.
 int CountOpenFds(Env* env, const std::string& path_pattern);
 
-// Waits for the subprocess to bind to any listening TCP port on the provided
-// IP address (if the address is not provided, it is a wildcard binding), and
-// returns the port.
+// Waits for the subprocess to bind to any listening TCP port at least on one
+// of the provided IP addresses and returns the port number. As for values
+// for the 'addresses' parameter, {} (an empty vector) and { "0.0.0.0" }
+// semantically mean the same.
 Status WaitForTcpBind(pid_t pid, uint16_t* port,
-                      const boost::optional<const std::string&>& addr,
+                      const std::vector<std::string>& addresses,
                       MonoDelta timeout) WARN_UNUSED_RESULT;
 
 // Similar to above but binds to any listening UDP port.
 Status WaitForUdpBind(pid_t pid, uint16_t* port,
-                      const boost::optional<const std::string&>& addr,
+                      const std::vector<std::string>& addresses,
                       MonoDelta timeout) WARN_UNUSED_RESULT;
 
 // Find the home directory of a Java-style application, e.g. JAVA_HOME or

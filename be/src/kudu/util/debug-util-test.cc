@@ -19,12 +19,16 @@
 #ifdef __linux__
 #include <link.h>
 #endif
+#include "kudu/util/debug-util.h"
+
 #include <unistd.h>
 
 #include <algorithm>
 #include <csignal>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
+#include <initializer_list>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -36,10 +40,10 @@
 #include <gtest/gtest.h>
 
 #include "kudu/gutil/ref_counted.h"
+#include "kudu/gutil/strings/substitute.h"
 #include "kudu/gutil/walltime.h"
 #include "kudu/util/array_view.h"
 #include "kudu/util/countdown_latch.h"
-#include "kudu/util/debug-util.h"
 #include "kudu/util/kernel_stack_watchdog.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/scoped_cleanup.h"
@@ -50,6 +54,7 @@
 
 using std::string;
 using std::vector;
+using strings::Substitute;
 
 DECLARE_int32(test_timeout_after);
 DECLARE_int32(stress_cpu_threads);
@@ -107,18 +112,28 @@ TEST_F(DebugUtilTest, TestStackTraceMainThread) {
 TEST_F(DebugUtilTest, TestSignalStackTrace) {
   CountDownLatch l(1);
   scoped_refptr<Thread> t;
-  ASSERT_OK(Thread::Create("test", "test thread", &SleeperThread, &l, &t));
-  auto cleanup_thr = MakeScopedCleanup([&]() {
-      // Allow the thread to finish.
-      l.CountDown();
-      t->Join();
-    });
+  ASSERT_OK(Thread::Create("test", "test thread", [&l]() { SleeperThread(&l); }, &t));
+  SCOPED_CLEANUP({
+    // Allow the thread to finish.
+    l.CountDown();
+    t->Join();
+  });
 
   // We have to loop a little bit because it takes a little while for the thread
   // to start up and actually call our function.
+  //
+  // Note: due to RELEASE build inlining, we need to make sure to pick a stack
+  // frame that isn't optimized away. Different compilers behave differently, so
+  // we'll use a regular expression to get maximal coverage.
+  static constexpr const char* kTestThreadOneStackFrame =
+      "SleeperThread";
+  static constexpr const char* kTestThreadAnotherStackFrame =
+      "kudu::ConditionVariable::WaitUntil()";
+  static const string kStackFrameRegExp = Substitute(
+      "$0|$1", kTestThreadOneStackFrame, kTestThreadAnotherStackFrame);
   ASSERT_EVENTUALLY([&]() {
-      ASSERT_STR_CONTAINS(DumpThreadStack(t->tid()), "SleeperThread");
-    });
+    ASSERT_STR_MATCHES(DumpThreadStack(t->tid()), kStackFrameRegExp);
+  });
 
   // Test that we can change the signal and that the stack traces still work,
   // on the new signal.
@@ -132,7 +147,7 @@ TEST_F(DebugUtilTest, TestSignalStackTrace) {
   ASSERT_FALSE(IsSignalHandlerRegistered(SIGUSR2));
 
   // Stack traces should work using the new handler.
-  ASSERT_STR_CONTAINS(DumpThreadStack(t->tid()), "SleeperThread");
+  ASSERT_STR_MATCHES(DumpThreadStack(t->tid()), kStackFrameRegExp);
 
   // Switch back to SIGUSR2 and ensure it changes back.
   ASSERT_OK(SetStackTraceSignal(SIGUSR2));
@@ -140,7 +155,7 @@ TEST_F(DebugUtilTest, TestSignalStackTrace) {
   ASSERT_FALSE(IsSignalHandlerRegistered(SIGHUP));
 
   // Stack traces should work using the new handler.
-  ASSERT_STR_CONTAINS(DumpThreadStack(t->tid()), "SleeperThread");
+  ASSERT_STR_MATCHES(DumpThreadStack(t->tid()), kStackFrameRegExp);
 
   // Register our own signal handler on SIGHUP, and ensure that
   // we get a bad Status if we try to use it.
@@ -193,16 +208,17 @@ TEST_F(DebugUtilTest, TestSnapshot) {
   CountDownLatch l(1);
   vector<scoped_refptr<Thread>> threads(kNumThreads);
   for (int i = 0; i < kNumThreads; i++) {
-    ASSERT_OK(Thread::Create("test", "test thread", &SleeperThread, &l, &threads[i]));
+    ASSERT_OK(Thread::Create("test", "test thread",
+                             [&l]() { SleeperThread(&l); }, &threads[i]));
   }
 
   SCOPED_CLEANUP({
-      // Allow the thread to finish.
-      l.CountDown();
-      for (auto& t : threads) {
-        t->Join();
-      }
-    });
+    // Allow the thread to finish.
+    l.CountDown();
+    for (auto& t : threads) {
+      t->Join();
+    }
+  });
 
   StackTraceSnapshot snap;
   ASSERT_OK(snap.SnapshotAllStacks());
@@ -233,12 +249,12 @@ TEST_F(DebugUtilTest, TestSnapshot) {
 TEST_F(DebugUtilTest, Benchmark) {
   CountDownLatch l(1);
   scoped_refptr<Thread> t;
-  ASSERT_OK(Thread::Create("test", "test thread", &SleeperThread, &l, &t));
+  ASSERT_OK(Thread::Create("test", "test thread", [&l]() { SleeperThread(&l); }, &t));
   SCOPED_CLEANUP({
-      // Allow the thread to finish.
-      l.CountDown();
-      t->Join();
-    });
+    // Allow the thread to finish.
+    l.CountDown();
+    t->Join();
+  });
 
   for (bool symbolize : {false, true}) {
     MonoTime end_time = MonoTime::Now() + MonoDelta::FromSeconds(1);
@@ -309,11 +325,11 @@ enum DangerousOp {
   MALLOC_AND_FREE
 };
 class RaceTest : public DebugUtilTest, public ::testing::WithParamInterface<DangerousOp> {};
-INSTANTIATE_TEST_CASE_P(DifferentRaces, RaceTest,
-                        ::testing::Values(DLOPEN_AND_CLOSE,
-                                          DL_ITERATE_PHDR,
-                                          GET_STACK_TRACE,
-                                          MALLOC_AND_FREE));
+INSTANTIATE_TEST_SUITE_P(DifferentRaces, RaceTest,
+                         ::testing::Values(DLOPEN_AND_CLOSE,
+                                           DL_ITERATE_PHDR,
+                                           GET_STACK_TRACE,
+                                           MALLOC_AND_FREE));
 
 void DangerousOperationThread(DangerousOp op, CountDownLatch* l) {
   while (l->count()) {
@@ -356,14 +372,15 @@ TEST_P(RaceTest, TestStackTraceRaces) {
   DangerousOp op = GetParam();
   CountDownLatch l(1);
   scoped_refptr<Thread> t;
-  ASSERT_OK(Thread::Create("test", "test thread", &DangerousOperationThread, op, &l, &t));
+  ASSERT_OK(Thread::Create("test", "test thread",
+                           [op, &l]() { DangerousOperationThread(op, &l); }, &t));
   SCOPED_CLEANUP({
-      // Allow the thread to finish.
-      l.CountDown();
-      // Crash if we can't join the thread after a reasonable amount of time.
-      // That probably indicates a deadlock.
-      CHECK_OK(ThreadJoiner(t.get()).give_up_after_ms(10000).Join());
-    });
+    // Allow the thread to finish.
+    l.CountDown();
+    // Crash if we can't join the thread after a reasonable amount of time.
+    // That probably indicates a deadlock.
+    CHECK_OK(ThreadJoiner(t.get()).give_up_after_ms(10000).Join());
+  });
   MonoTime end_time = MonoTime::Now() + MonoDelta::FromSeconds(1);
   while (MonoTime::Now() < end_time) {
     StackTrace trace;
@@ -399,12 +416,12 @@ TEST_F(DebugUtilTest, TestTimeouts) {
 
   CountDownLatch l(1);
   scoped_refptr<Thread> t;
-  ASSERT_OK(Thread::Create("test", "test thread", &SleeperThread, &l, &t));
-  auto cleanup_thr = MakeScopedCleanup([&]() {
-      // Allow the thread to finish.
-      l.CountDown();
-      t->Join();
-    });
+  ASSERT_OK(Thread::Create("test", "test thread", [&l]() { SleeperThread(&l); }, &t));
+  SCOPED_CLEANUP({
+    // Allow the thread to finish.
+    l.CountDown();
+    t->Join();
+  });
 
   // First, time a few stack traces to determine how long a non-timed-out stack
   // trace takes.

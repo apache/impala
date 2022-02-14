@@ -21,6 +21,11 @@
 #include <cstddef>
 #include <string>
 
+// This macro is not defined when status.h is consumed by third party applications.
+#ifdef KUDU_HEADERS_USE_SHORT_STATUS_MACROS
+#include <glog/logging.h>
+#endif
+
 #ifdef KUDU_HEADERS_NO_STUBS
 #include "kudu/gutil/macros.h"
 #include "kudu/gutil/port.h"
@@ -224,9 +229,9 @@ class KUDU_EXPORT Status {
   /// @return A success status.
   static Status OK() { return Status(); }
 
-
   /// @name Methods to build status objects for various types of errors.
-  ///
+  ///@{
+
   /// @param [in] msg
   ///   The informational message on the error.
   /// @param [in] msg2
@@ -234,8 +239,6 @@ class KUDU_EXPORT Status {
   /// @param [in] posix_code
   ///   POSIX error code, if applicable (optional).
   /// @return The error status of an appropriate type.
-  ///
-  ///@{
   static Status NotFound(const Slice& msg, const Slice& msg2 = Slice(),
                          int16_t posix_code = -1) {
     return Status(kNotFound, msg, msg2, posix_code);

@@ -17,25 +17,24 @@
 
 #include "kudu/security/crypto.h"
 
+#include <openssl/bn.h>
+#include <openssl/crypto.h>
+#include <openssl/err.h>
+#include <openssl/pem.h>
+#include <openssl/rand.h>
+#include <openssl/ssl.h>
+#include <openssl/x509.h>
+
+#include <functional>
 #include <memory>
 #include <ostream>
 #include <string>
 
 #include <glog/logging.h>
-#include <openssl/bio.h>
-#include <openssl/bn.h>
-#include <openssl/err.h>
-#include <openssl/evp.h>
-#include <openssl/opensslv.h>
-#include <openssl/ossl_typ.h>
-#include <openssl/pem.h>
-#include <openssl/rand.h>
-#include <openssl/rsa.h>
-#include <openssl/x509.h>
 
 #include "kudu/gutil/strings/substitute.h"
-#include "kudu/security/openssl_util.h"
-#include "kudu/security/openssl_util_bio.h"
+#include "kudu/util/openssl_util.h"
+#include "kudu/util/openssl_util_bio.h"
 #include "kudu/util/status.h"
 
 using std::string;
@@ -52,9 +51,7 @@ namespace {
 // signature than the rest of the write functions, so we
 // have to provide this wrapper.
 int PemWritePrivateKey(BIO* bio, EVP_PKEY* key) {
-  auto rsa = ssl_make_unique(EVP_PKEY_get1_RSA(key));
-  return PEM_write_bio_RSAPrivateKey(
-      bio, rsa.get(), nullptr, nullptr, 0, nullptr, nullptr);
+  return PEM_write_bio_PKCS8PrivateKey(bio, key, nullptr, nullptr, 0, nullptr, nullptr);
 }
 
 int PemWritePublicKey(BIO* bio, EVP_PKEY* key) {

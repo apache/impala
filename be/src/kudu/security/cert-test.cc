@@ -15,6 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "kudu/security/cert.h"
+
+#include <openssl/obj_mac.h>
+
 #include <string>
 #include <thread>
 #include <utility>
@@ -25,11 +29,10 @@
 #include <gtest/gtest.h>
 
 #include "kudu/gutil/strings/strip.h"
-#include "kudu/security/cert.h"
 #include "kudu/security/crypto.h"
-#include "kudu/security/openssl_util.h"
 #include "kudu/security/test/test_certs.h"
 #include "kudu/util/barrier.h"
+#include "kudu/util/openssl_util.h"
 #include "kudu/util/status.h"
 #include "kudu/util/test_macros.h"
 #include "kudu/util/test_util.h"

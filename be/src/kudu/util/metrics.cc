@@ -426,6 +426,9 @@ Status MetricEntity::CollectTo(MergedEntityMetrics* collections,
     scoped_refptr<Metric> entry = FindPtrOrNull(entity_collection, prototype);
     if (!entry) {
       scoped_refptr<Metric> new_metric = metric->snapshot();
+      if (!new_metric->invalid_for_merge_) {
+        new_metric->UpdateModificationEpoch();
+      }
       InsertOrDie(&entity_collection, new_metric->prototype(), new_metric);
     } else {
       entry->MergeFrom(metric);
@@ -612,6 +615,35 @@ void MetricPrototypeRegistry::WriteAsJson() const {
   std::cout << s.str() << std::endl;
 }
 
+void MetricPrototypeRegistry::WriteAsXML() const {
+  std::lock_guard<simple_spinlock> l(lock_);
+  std::cout << "<?xml version=\"1.0\"?>" << "\n";
+  // Add a root node for the document.
+  std::cout << "<AllMetrics>" << "\n";
+
+  // Dump metric prototypes.
+  for (const MetricPrototype* p : metrics_) {
+    std::cout << "<metric>";
+    std::cout << "<name>" << p->name() << "</name>";
+    std::cout << "<label>" << p->label() << "</label>";
+    std::cout << "<type>" << MetricType::Name(p->type()) << "</type>";
+    std::cout << "<unit>" << MetricUnit::Name(p->unit()) << "</unit>";
+    std::cout << "<description>" << p->description() << "</description>";
+    std::cout << "<level>" << MetricLevelName(p->level()) << "</level>";
+    std::cout << "<entity_type>" << p->entity_type() << "</entity_type>";
+    std::cout << "</metric>" << "\n";
+  }
+
+  // Dump entity prototypes.
+  for (const MetricEntityPrototype* e : entities_) {
+    std::cout << "<entity>";
+    std::cout << "<name>" << e->name() << "</name>";
+    std::cout << "</entity>" << "\n";
+  }
+
+  std::cout << "</AllMetrics>" << "\n";
+}
+
 //
 // MetricPrototype
 //
@@ -650,8 +682,8 @@ FunctionGaugeDetacher::FunctionGaugeDetacher() {
 }
 
 FunctionGaugeDetacher::~FunctionGaugeDetacher() {
-  for (const Closure& c : callbacks_) {
-    c.Run();
+  for (const auto& f : functions_) {
+    f();
   }
 }
 
@@ -797,6 +829,7 @@ void StringGauge::WriteValue(JsonWriter* writer) const {
 scoped_refptr<Metric> MeanGauge::snapshot() const {
   std::lock_guard<simple_spinlock> l(lock_);
   auto p = new MeanGauge(down_cast<const GaugePrototype<double>*>(prototype_));
+  p->set_value(total_sum_, total_count_);
   p->m_epoch_.store(m_epoch_);
   p->invalid_for_merge_ = invalid_for_merge_;
   p->retire_time_ = retire_time_;
@@ -897,7 +930,7 @@ HistogramPrototype::HistogramPrototype(const MetricPrototype::CtorArgs& args,
   : MetricPrototype(args),
     max_trackable_value_(max_trackable_value),
     num_sig_digits_(num_sig_digits) {
-  // Better to crash at definition time that at instantiation time.
+  // Better to crash at definition time than at instantiation time.
   CHECK(HdrHistogram::IsValidHighestTrackableValue(max_trackable_value))
       << Substitute("Invalid max trackable value on histogram $0: $1",
                     args.name_, max_trackable_value);

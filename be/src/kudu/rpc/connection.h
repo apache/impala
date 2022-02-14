@@ -22,6 +22,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 
@@ -30,12 +31,11 @@
 #include <ev++.h>
 #include <glog/logging.h>
 
-#include "kudu/gutil/port.h"
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/rpc/connection_id.h"
+#include "kudu/rpc/remote_user.h"
 #include "kudu/rpc/rpc_controller.h"
 #include "kudu/rpc/rpc_header.pb.h"
-#include "kudu/rpc/remote_user.h"
 #include "kudu/rpc/transfer.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/net/sockaddr.h"
@@ -50,10 +50,12 @@ namespace rpc {
 class DumpConnectionsRequestPB;
 class InboundCall;
 class OutboundCall;
-class RpcConnectionPB;
 class ReactorThread;
+class RpcConnectionPB;
 class RpczStore;
 class SocketStatsPB;
+class TransportDetailsPB;
+
 enum class CredentialsPolicy;
 
 //
@@ -184,6 +186,26 @@ class Connection : public RefCountedThreadSafe<Connection> {
   // libev callback when we may write to the socket.
   void WriteHandler(ev::io &watcher, int revents);
 
+  enum ProcessOutboundTransfersResult {
+    // All of the transfers in the queue have been sent successfully.
+    // The queue is now empty.
+    kNoMoreToSend,
+    // Not all transfers were able to be sent. The caller should
+    // ensure that write_io_ is enabled in order to continue attempting
+    // to send transfers.
+    kMoreToSend,
+    // An error occurred trying to write to the connection, and the
+    // connection was destroyed. NOTE: 'this' may be deleted if this
+    // value is returned.
+    kConnectionDestroyed
+  };
+
+  // Process any pending outbound transfers in outbound_transfers_.
+  // Result indicates the state of the connection following the attempt.
+  //
+  // NOTE: This may invoke DestroyConnection() on 'this'.
+  ProcessOutboundTransfersResult ProcessOutboundTransfers();
+
   // Safe to be called from other threads.
   std::string ToString() const;
 
@@ -272,13 +294,8 @@ class Connection : public RefCountedThreadSafe<Connection> {
   // and ensuring we roll over from INT32_MAX to 0.
   // Negative numbers are reserved for special purposes.
   int32_t GetNextCallId() {
-    int32_t call_id = next_call_id_;
-    if (PREDICT_FALSE(next_call_id_ == std::numeric_limits<int32_t>::max())) {
-      next_call_id_ = 0;
-    } else {
-      next_call_id_++;
-    }
-    return call_id;
+    static constexpr uint32_t kCallIdMask = std::numeric_limits<int32_t>::max(); // 0x7fffffff
+    return static_cast<int32_t>(++call_id_ & kCallIdMask);
   }
 
   // An incoming packet has completed transferring on the server side.
@@ -304,6 +321,8 @@ class Connection : public RefCountedThreadSafe<Connection> {
   void MaybeInjectCancellation(const std::shared_ptr<OutboundCall> &call);
 
   Status GetSocketStatsPB(SocketStatsPB* pb) const;
+
+  Status GetTransportDetailsPB(TransportDetailsPB* pb) const;
 
   // The reactor thread that created this connection.
   ReactorThread* const reactor_thread_;
@@ -351,8 +370,9 @@ class Connection : public RefCountedThreadSafe<Connection> {
   // being handled.
   inbound_call_map_t calls_being_handled_;
 
-  // the next call ID to use
-  int32_t next_call_id_;
+  // The internal counter to generate next call ID to use. The call ID is
+  // a signed integer: 31 LSBs of the internal counter are used to represent it.
+  uint32_t call_id_;
 
   // Starts as Status::OK, gets set to a shutdown status upon Shutdown().
   Status shutdown_status_;

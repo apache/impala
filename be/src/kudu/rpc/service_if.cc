@@ -48,7 +48,6 @@ TAG_FLAG(enable_exactly_once, hidden);
 
 using google::protobuf::Message;
 using std::string;
-using std::unique_ptr;
 using strings::Substitute;
 
 namespace kudu {
@@ -64,7 +63,7 @@ bool ServiceIf::SupportsFeature(uint32_t feature) const {
   return false;
 }
 
-bool ServiceIf::ParseParam(InboundCall *call, google::protobuf::Message *message) {
+bool ServiceIf::ParseParam(InboundCall* call, Message* message) {
   Slice param(call->serialized_request());
   if (PREDICT_FALSE(!message->ParseFromArray(param.data(), param.size()))) {
     string err = Substitute("invalid parameter for call $0: missing fields: $1",
@@ -78,10 +77,10 @@ bool ServiceIf::ParseParam(InboundCall *call, google::protobuf::Message *message
   return true;
 }
 
-void ServiceIf::RespondBadMethod(InboundCall *call) {
-  Sockaddr local_addr, remote_addr;
-
+void ServiceIf::RespondBadMethod(InboundCall* call) {
+  Sockaddr local_addr;
   CHECK_OK(call->connection()->socket()->GetSocketAddress(&local_addr));
+  Sockaddr remote_addr;
   CHECK_OK(call->connection()->socket()->GetPeerAddress(&remote_addr));
   string err = Substitute("Call on service $0 received at $1 from $2 with an "
                           "invalid method name: $3",
@@ -97,20 +96,19 @@ void ServiceIf::RespondBadMethod(InboundCall *call) {
 GeneratedServiceIf::~GeneratedServiceIf() {
 }
 
-
-void GeneratedServiceIf::Handle(InboundCall *call) {
+void GeneratedServiceIf::Handle(InboundCall* call) {
   const RpcMethodInfo* method_info = call->method_info();
   if (!method_info) {
     RespondBadMethod(call);
     return;
   }
-  unique_ptr<Message> req(method_info->req_prototype->New());
-  if (PREDICT_FALSE(!ParseParam(call, req.get()))) {
+  Message* req = method_info->req_prototype->New(call->pb_arena());
+  if (PREDICT_FALSE(!ParseParam(call, req))) {
     return;
   }
-  Message* resp = method_info->resp_prototype->New();
+  Message* resp = method_info->resp_prototype->New(call->pb_arena());
 
-  RpcContext* ctx = new RpcContext(call, req.release(), resp);
+  RpcContext* ctx = new RpcContext(call, req, resp);
   if (!method_info->authz_method(ctx->request_pb(), resp, ctx)) {
     // The authz_method itself should have responded to the RPC.
     return;
@@ -139,7 +137,6 @@ void GeneratedServiceIf::Handle(InboundCall *call) {
   method_info->func(ctx->request_pb(), resp, ctx);
 }
 
-
 RpcMethodInfo* GeneratedServiceIf::LookupMethod(const RemoteMethod& method) {
   DCHECK_EQ(method.service_name(), service_name());
   const auto& it = methods_by_name_.find(method.method_name());
@@ -149,6 +146,9 @@ RpcMethodInfo* GeneratedServiceIf::LookupMethod(const RemoteMethod& method) {
   return it->second.get();
 }
 
+GeneratedServiceIf::GeneratedServiceIf(const scoped_refptr<ResultTracker>& tracker)
+    : result_tracker_(tracker) {
+}
 
 } // namespace rpc
 } // namespace kudu

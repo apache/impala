@@ -24,18 +24,17 @@
 #include <cstdlib>
 #include <ctime>
 #include <fstream>
+#include <functional>
 #include <initializer_list>
 #include <mutex>
 #include <utility>
 
 #include <boost/uuid/random_generator.hpp>
-#include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include "kudu/gutil/basictypes.h"
-#include "kudu/gutil/callback.h"  // IWYU pragma: keep
 #include "kudu/gutil/port.h"
 #include "kudu/gutil/spinlock.h"
 #include "kudu/gutil/stringprintf.h"
@@ -50,8 +49,9 @@
 #include "kudu/util/signal.h"
 #include "kudu/util/status.h"
 
-// Defined in Impala.
-DECLARE_string(log_filename);
+DEFINE_string(log_filename, "",
+    "Prefix of log filename - "
+    "full path is <log_dir>/<log_filename>.[INFO|WARN|ERROR|FATAL]");
 TAG_FLAG(log_filename, stable);
 
 DEFINE_bool(log_async, true,
@@ -64,20 +64,23 @@ DEFINE_int32(log_async_buffer_bytes_per_level, 2 * 1024 * 1024,
              "level. Only relevant when --log_async is enabled.");
 TAG_FLAG(log_async_buffer_bytes_per_level, hidden);
 
-// Defined in Impala.
-DECLARE_int32(max_log_files);
+DEFINE_int32(max_log_files, 10,
+    "Maximum number of log files to retain per severity level. The most recent "
+    "log files are retained. If set to 0, all log files are retained.");
 TAG_FLAG(max_log_files, runtime);
-TAG_FLAG(max_log_files, experimental);
+TAG_FLAG(max_log_files, stable);
 
 #define PROJ_NAME "kudu"
 
 bool logging_initialized = false;
 
-using namespace std; // NOLINT(*)
-using namespace boost::uuids; // NOLINT(*)
-
 using base::SpinLock;
 using base::SpinLockHolder;
+using boost::uuids::random_generator;
+using std::string;
+using std::ofstream;
+using std::ostream;
+using std::ostringstream;
 
 namespace kudu {
 
@@ -115,7 +118,7 @@ class SimpleSink : public google::LogSink {
       default:
         LOG(FATAL) << "Unknown glog severity: " << severity;
     }
-    cb_.Run(kudu_severity, full_filename, line, tm_time, message, message_len);
+    cb_(kudu_severity, full_filename, line, tm_time, message, message_len);
   }
 
  private:
@@ -273,8 +276,7 @@ void InitGoogleLoggingSafe(const char* arg) {
   IgnoreSigPipe();
 
   // For minidump support. Must be called before logging threads started.
-  // Disabled by Impala, which does not link Kudu's minidump library.
-  //CHECK_OK(BlockSigUSR1());
+  CHECK_OK(BlockSigUSR1());
 
   if (FLAGS_log_async) {
     EnableAsyncLogging();

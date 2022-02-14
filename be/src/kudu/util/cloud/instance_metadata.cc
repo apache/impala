@@ -26,6 +26,7 @@
 #include <glog/logging.h>
 
 #include "kudu/gutil/macros.h"
+#include "kudu/gutil/strings/substitute.h"
 #include "kudu/util/curl_util.h"
 #include "kudu/util/faststring.h"
 #include "kudu/util/flag_tags.h"
@@ -34,9 +35,9 @@
 
 // The timeout should be high enough to work effectively, but as low as possible
 // to avoid slowing down detection of running in non-cloud environments. As of
-// now, the metadata servers of major public cloud providers is robust enough
+// now, the metadata servers of major public cloud providers are robust enough
 // to send the response in a fraction of a second.
-DEFINE_uint32(cloud_metadata_server_request_timeout_ms, 500,
+DEFINE_uint32(cloud_metadata_server_request_timeout_ms, 1000,
               "Timeout for HTTP/HTTPS requests to the instance metadata server "
               "(in milliseconds)");
 TAG_FLAG(cloud_metadata_server_request_timeout_ms, advanced);
@@ -90,6 +91,34 @@ DEFINE_string(cloud_gce_instance_id_url,
 TAG_FLAG(cloud_gce_instance_id_url, advanced);
 TAG_FLAG(cloud_gce_instance_id_url, runtime);
 
+// See https://docs.openstack.org/nova/latest/user/metadata.html#metadata-service
+// and https://docs.openstack.org/nova/latest/user/metadata.html#metadata-openstack-format
+// for details.
+DEFINE_string(cloud_openstack_metadata_url,
+              "http://169.254.169.254/openstack/latest/meta_data.json",
+              "The URL to fetch metadata of an OpenStack instance via Nova "
+              "metadata service. OpenStack Nova metadata server does not "
+              "provide a separate URL to fetch instance UUID, at least with "
+              "12.0.0 (Liberty) release.");
+TAG_FLAG(cloud_openstack_metadata_url, advanced);
+TAG_FLAG(cloud_openstack_metadata_url, runtime);
+
+DEFINE_string(cloud_curl_dns_servers_for_testing, "",
+          "Set the list of DNS servers to be used instead of the system default.");
+TAG_FLAG(cloud_curl_dns_servers_for_testing, hidden);
+TAG_FLAG(cloud_curl_dns_servers_for_testing, runtime);
+
+DEFINE_validator(cloud_metadata_server_request_timeout_ms,
+                 [](const char* name, const uint32_t val) {
+  if (val == 0) {
+    LOG(ERROR) << strings::Substitute(
+        "unlimited timeout for metadata requests (value $0 for flag --$1) "
+        "is not allowed", val, name);
+    return false;
+  }
+  return true;
+});
+
 using std::string;
 using std::vector;
 
@@ -100,6 +129,7 @@ const char* TypeToString(CloudType type) {
   static const char* const kTypeAws = "AWS";
   static const char* const kTypeAzure = "Azure";
   static const char* const kTypeGce = "GCE";
+  static const char* const kTypeOpenStack = "OpenStack";
   switch (type) {
     case CloudType::AWS:
       return kTypeAws;
@@ -107,51 +137,69 @@ const char* TypeToString(CloudType type) {
       return kTypeAzure;
     case CloudType::GCE:
       return kTypeGce;
+    case CloudType::OPENSTACK:
+      return kTypeOpenStack;
     default:
       LOG(FATAL) << static_cast<uint16_t>(type) << ": unknown cloud type";
       break;  // unreachable
   }
 }
 
-InstanceMetadataBase::InstanceMetadataBase()
+InstanceMetadata::InstanceMetadata()
     : is_initialized_(false) {
 }
 
-Status InstanceMetadataBase::Init() {
+Status InstanceMetadata::Init() {
   // As of now, fetching the instance identifier from metadata service is
   // the criterion for successful initialization of the instance metadata.
   DCHECK(!is_initialized_);
-  RETURN_NOT_OK(FetchInstanceId(&id_));
-  DCHECK(!id_.empty());
+  RETURN_NOT_OK(Fetch(instance_id_url(), request_timeout(), request_headers()));
   is_initialized_ = true;
   return Status::OK();
 }
 
-const string& InstanceMetadataBase::id() const {
-  CHECK(is_initialized_);
-  return id_;
-}
-
-MonoDelta InstanceMetadataBase::request_timeout() const {
+MonoDelta InstanceMetadata::request_timeout() const {
   return MonoDelta::FromMilliseconds(
       FLAGS_cloud_metadata_server_request_timeout_ms);
 }
 
-Status InstanceMetadataBase::Fetch(const string& url,
-                                   MonoDelta timeout,
-                                   const vector<string>& headers,
-                                   string* out) {
-  DCHECK(out);
+Status InstanceMetadata::Fetch(const string& url,
+                               MonoDelta timeout,
+                               const vector<string>& headers,
+                               string* out) {
+  if (timeout.ToMilliseconds() == 0) {
+    return Status::NotSupported(
+        "unlimited timeout is not supported when retrieving instance metadata");
+  }
   EasyCurl curl;
   curl.set_timeout(timeout);
+  curl.set_fail_on_http_error(true);
+
+  if (PREDICT_FALSE(!FLAGS_cloud_curl_dns_servers_for_testing.empty())) {
+    curl.set_dns_servers(FLAGS_cloud_curl_dns_servers_for_testing);
+  }
+
   faststring resp;
   RETURN_NOT_OK(curl.FetchURL(url, &resp, headers));
-  *out = resp.ToString();
+  if (out) {
+    *out = resp.ToString();
+  }
   return Status::OK();
 }
 
-Status InstanceMetadataBase::FetchInstanceId(string* id) {
-  return Fetch(instance_id_url(), request_timeout(), request_headers(), id);
+Status AwsInstanceMetadata::Init() {
+  // Try if the metadata server speaks AWS API.
+  RETURN_NOT_OK(InstanceMetadata::Init());
+
+  // If OpenStack instance metadata server is configured to emulate EC2,
+  // one way to tell it apart from a true EC2 instance is to check whether it
+  // speaks OpenStack API:
+  //   https://docs.openstack.org/nova/latest/user/metadata.html#metadata-ec2-format
+  OpenStackInstanceMetadata openstack;
+  if (openstack.Init().ok()) {
+    return Status::ServiceUnavailable("found OpenStack instance, not AWS one");
+  }
+  return Status::OK();
 }
 
 Status AwsInstanceMetadata::GetNtpServer(string* server) const {
@@ -199,6 +247,25 @@ const vector<string>& GceInstanceMetadata::request_headers() const {
 
 const string& GceInstanceMetadata::instance_id_url() const {
   return FLAGS_cloud_gce_instance_id_url;
+}
+
+Status OpenStackInstanceMetadata::GetNtpServer(string* /* server */) const {
+  // OpenStack doesn't provide a dedicated NTP server for an instance.
+  return Status::NotSupported("OpenStack doesn't provide a dedicated NTP server");
+}
+
+const vector<string>& OpenStackInstanceMetadata::request_headers() const {
+  // OpenStack Nova doesn't require any specific headers supplied with a
+  // generic query to the metadata server.
+  static const vector<string> kRequestHeaders = {};
+  return kRequestHeaders;
+}
+
+const string& OpenStackInstanceMetadata::instance_id_url() const {
+  // NOTE: OpenStack Nova metadata server doesn't provide a separate URL to
+  //   fetch ID of an instance (at least with 1.12.0 release):
+  //   https://docs.openstack.org/nova/latest/user/metadata.html#metadata-openstack-format
+  return FLAGS_cloud_openstack_metadata_url;
 }
 
 } // namespace cloud

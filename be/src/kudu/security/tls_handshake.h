@@ -17,15 +17,16 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
-#include <utility>
 
 #include <glog/logging.h>
+#include <gtest/gtest_prod.h>
 
 #include "kudu/gutil/port.h"
 #include "kudu/security/cert.h"
-#include "kudu/security/openssl_util.h"
+#include "kudu/util/openssl_util.h"
 #include "kudu/util/status.h"
 
 namespace kudu {
@@ -64,12 +65,15 @@ enum class TlsVerificationMode {
 // TlsHandshake manages an ongoing TLS handshake between a client and server.
 //
 // TlsHandshake instances are default constructed, but must be initialized
-// before use using TlsContext::InitiateHandshake.
+// before using: call the Init() method to initialize an instance.
 class TlsHandshake {
  public:
-
-   TlsHandshake() = default;
+   explicit TlsHandshake(TlsHandshakeType type);
    ~TlsHandshake() = default;
+
+   // Initialize the instance for the specified type of handshake
+   // using the given SSL handle.
+   Status Init(c_unique_ptr<SSL> s) WARN_UNUSED_RESULT;
 
   // Set the verification mode for this handshake. The default verification mode
   // is VERIFY_REMOTE_CERT_AND_HOST.
@@ -100,6 +104,22 @@ class TlsHandshake {
   //
   // Returns any other status code on error.
   Status Continue(const std::string& recv, std::string* send) WARN_UNUSED_RESULT;
+
+  // Whether an extra step of negotiation is needed at this point given the
+  // return status of a prior call to the Continue() method.
+  bool NeedsExtraStep(const Status& continue_status,
+                      const std::string& token) const;
+
+  // This method is used to store the data produced by the server's final TLS
+  // handshake message. It's not an application data and should be passed by the
+  // encrypted/raw side of the communication channel, not via the regular
+  // SSL_{read,write}() API. Once stored, the data is written to the underlying
+  // socket by the Finish() method upon transitioning from memory-based BIOs
+  // to the socket-based BIOs when the negotiation is complete. Once it's
+  // written to the socket, it will be sent over the wire along with next chunk
+  // of encryped data sent by the server to the client, prepending the encrypted
+  // server's response.
+  void StorePendingData(std::string data);
 
   // Finishes the handshake, wrapping the provided socket in the negotiated TLS
   // channel. This 'TlsHandshake' instance should not be used again after
@@ -135,20 +155,11 @@ class TlsHandshake {
   std::string GetCipherDescription() const;
 
  private:
-  friend class TlsContext;
-
-  bool has_started_ = false;
-  TlsVerificationMode verification_mode_ = TlsVerificationMode::VERIFY_REMOTE_CERT_AND_HOST;
+  FRIEND_TEST(TestTlsHandshake, HandshakeSequenceNoTLSv1dot3);
+  FRIEND_TEST(TestTlsHandshake, HandshakeSequenceTLSv1dot3);
 
   // Set the verification mode on the underlying SSL object.
   void SetSSLVerify();
-
-  // Set the SSL to use during the handshake. Called once by
-  // TlsContext::InitiateHandshake before starting the handshake processes.
-  void adopt_ssl(c_unique_ptr<SSL> ssl) {
-    CHECK(!ssl_);
-    ssl_ = std::move(ssl);
-  }
 
   SSL* ssl() {
     return ssl_.get();
@@ -160,11 +171,21 @@ class TlsHandshake {
   // Verifies that the handshake is valid for the provided socket.
   Status Verify(const Socket& socket) const WARN_UNUSED_RESULT;
 
+  // The type of TLS handshake this wrapper represents: client or server.
+  const TlsHandshakeType type_;
+
   // Owned SSL handle.
   c_unique_ptr<SSL> ssl_;
 
+  bool has_started_ = false;
+  TlsVerificationMode verification_mode_ = TlsVerificationMode::VERIFY_REMOTE_CERT_AND_HOST;
+
   Cert local_cert_;
   Cert remote_cert_;
+
+  // Data which is left pending in the write BIO after the last call to
+  // Continue(), i.e. the data left pending after completing the TLS handshake.
+  std::string rbio_pending_data_;
 };
 
 } // namespace security

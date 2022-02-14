@@ -20,6 +20,7 @@
 #include <atomic>
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <ostream>
@@ -309,8 +310,16 @@ class Descriptor<RWFile> : public RWFile {
     return opened.file()->GetExtentMap(out);
   }
 
+  bool IsEncrypted() const override {
+    return true;
+  }
+
   const string& filename() const override {
     return base_.filename();
+  }
+
+  size_t GetEncryptionHeaderSize() const override {
+    return base_.env()->GetEncryptionHeaderSize();
   }
 
  private:
@@ -341,6 +350,7 @@ class Descriptor<RWFile> : public RWFile {
     // The file was evicted, reopen it.
     RWFileOptions opts;
     opts.mode = Mode;
+    opts.is_sensitive = true;
     unique_ptr<RWFile> f;
     RETURN_NOT_OK(base_.env()->NewRWFile(opts, base_.filename(), &f));
 
@@ -388,6 +398,10 @@ class Descriptor<RandomAccessFile> : public RandomAccessFile {
 
   const string& filename() const override {
     return base_.filename();
+  }
+
+  size_t GetEncryptionHeaderSize() const override {
+    return base_.env()->GetEncryptionHeaderSize();
   }
 
   size_t memory_footprint() const override {
@@ -439,7 +453,9 @@ class Descriptor<RandomAccessFile> : public RandomAccessFile {
 
     // The file was evicted, reopen it.
     unique_ptr<RandomAccessFile> f;
-    RETURN_NOT_OK(base_.env()->NewRandomAccessFile(base_.filename(), &f));
+    RandomAccessFileOptions opts;
+    opts.is_sensitive = true;
+    RETURN_NOT_OK(base_.env()->NewRandomAccessFile(opts, base_.filename(), &f));
 
     // The cache will take ownership of the newly opened file.
     ScopedOpenedDescriptor<RandomAccessFile> opened(
@@ -471,7 +487,7 @@ FileCache::FileCache(const string& cache_name,
       running_(1) {
   if (entity) {
     unique_ptr<FileCacheMetrics> metrics(new FileCacheMetrics(entity));
-    cache_->SetMetrics(std::move(metrics));
+    cache_->SetMetrics(std::move(metrics), Cache::ExistingMetricsPolicy::kKeep);
   }
   LOG(INFO) << Substitute("Constructed file cache $0 with capacity $1",
                           cache_name, max_open_files);
@@ -486,7 +502,7 @@ FileCache::~FileCache() {
 
 Status FileCache::Init() {
   return Thread::Create("cache", Substitute("$0-evict", cache_name_),
-                        &FileCache::RunDescriptorExpiry, this,
+                        [this]() { this->RunDescriptorExpiry(); },
                         &descriptor_expiry_thread_);
 }
 

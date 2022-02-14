@@ -14,8 +14,7 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-#ifndef IMPALA_UTIL_BIT_STREAM_UTILS_H
-#define IMPALA_UTIL_BIT_STREAM_UTILS_H
+#pragma once
 
 #include "kudu/gutil/port.h"
 #include "kudu/util/bit-util.h"
@@ -45,7 +44,7 @@ class BitWriter {
 
   // The number of current bytes written, including the current byte (i.e. may include a
   // fraction of a byte). Includes buffered values.
-  int bytes_written() const { return byte_offset_ + BitUtil::Ceil(bit_offset_, 8); }
+  int bytes_written() const { return byte_offset_ + BitUtil::Ceil<3>(bit_offset_); }
 
   // Writes a value to buffered_values_, flushing to buffer_ if necessary.  This is bit
   // packed. num_bits must be <= 32. If 'v' is larger than 'num_bits' bits, the higher
@@ -93,7 +92,12 @@ class BitReader {
   // 'buffer' is the buffer to read from.  The buffer's length is 'buffer_len'.
   BitReader(const uint8_t* buffer, int buffer_len);
 
-  BitReader() : buffer_(NULL), max_bytes_(0) {}
+  BitReader()
+      : buffer_(nullptr),
+        max_bytes_(0),
+        buffered_values_(0),
+        byte_offset_(0),
+        bit_offset_(0) {}
 
   // Gets the next value from the buffer.  Returns true if 'v' could be read or false if
   // there are not enough bytes left. num_bits must be <= 32.
@@ -113,7 +117,7 @@ class BitReader {
 
   // Returns the number of bytes left in the stream, not including the current byte (i.e.,
   // there may be an additional fraction of a byte).
-  int bytes_left() { return max_bytes_ - (byte_offset_ + BitUtil::Ceil(bit_offset_, 8)); }
+  int bytes_left() { return max_bytes_ - (byte_offset_ + BitUtil::Ceil<3>(bit_offset_)); }
 
   // Current position in the stream, by bit.
   int position() const { return byte_offset_ * 8 + bit_offset_; }
@@ -146,5 +150,3 @@ class BitReader {
 };
 
 } // namespace kudu
-
-#endif

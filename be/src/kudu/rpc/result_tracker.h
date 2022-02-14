@@ -129,18 +129,18 @@ class RpcContext;
 // In order to make sure there is only one driver, there must be an _external_ serialization
 // point, before the final response is produced, after which only one of the handlers will
 // be marked as the driver. For instance, for writes, this serialization point is in
-// TransactionDriver, in a synchronized block where a logic such as this one happens (here
+// OpDriver, in a synchronized block where a logic such as this one happens (here
 // in pseudo-ish code):
 //
 // {
 //   lock_guard<simple_spinlock> l(lock_);
-//   if (follower_transaction) {
+//   if (follower_op) {
 //     result_tracker_->TrackRpcOrChangeDriver(request_id);
-//     continue_with_transaction();
-//   } else if (client_transaction) {
+//     continue_with_op();
+//   } else if (client_op) {
 //     bool is_still_driver = result_tracker_->IsCurrentDriver(request_id);
-//     if (is_still_driver) continue_with_transaction();
-//     else abort_transaction();
+//     if (is_still_driver) continue_with_op();
+//     else abort_op();
 //   }
 // }
 //
@@ -282,8 +282,7 @@ class ResultTracker : public RefCountedThreadSafe<ResultTracker> {
     // Calculates the memory footprint of this struct.
     int64_t memory_footprint() const {
       return kudu_malloc_usable_size(this)
-          + (ongoing_rpcs.capacity() > 0 ? kudu_malloc_usable_size(ongoing_rpcs.data()) :
-                                           0)
+          + (ongoing_rpcs.capacity() > 0 ? kudu_malloc_usable_size(ongoing_rpcs.data()) : 0)
           + (response ? response->SpaceUsedLong() : 0);
     }
   };

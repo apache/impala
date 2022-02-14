@@ -16,7 +16,12 @@
 // under the License.
 #pragma once
 
+#include <sys/types.h>
+
+#include <atomic>
+#include <cstddef>
 #include <deque>
+#include <functional>
 #include <iosfwd>
 #include <memory>
 #include <string>
@@ -26,7 +31,6 @@
 #include <boost/intrusive/list_hook.hpp>
 #include <gtest/gtest_prod.h>
 
-#include "kudu/gutil/callback.h"
 #include "kudu/gutil/macros.h"
 #include "kudu/gutil/port.h"
 #include "kudu/gutil/ref_counted.h"
@@ -36,11 +40,6 @@
 #include "kudu/util/mutex.h"
 #include "kudu/util/status.h"
 
-namespace boost {
-template <typename Signature>
-class function;
-} // namespace boost
-
 namespace kudu {
 
 class Thread;
@@ -48,11 +47,6 @@ class ThreadPool;
 class ThreadPoolToken;
 class Trace;
 
-class Runnable {
- public:
-  virtual void Run() = 0;
-  virtual ~Runnable() {}
-};
 
 // Interesting thread pool metrics. Can be applied to the entire pool (see
 // ThreadPoolBuilder) or to individual tokens.
@@ -123,6 +117,7 @@ class ThreadPoolBuilder {
   ThreadPoolBuilder& set_max_threads(int max_threads);
   ThreadPoolBuilder& set_max_queue_size(int max_queue_size);
   ThreadPoolBuilder& set_idle_timeout(const MonoDelta& idle_timeout);
+  ThreadPoolBuilder& set_queue_overload_threshold(const MonoDelta& threshold);
   ThreadPoolBuilder& set_metrics(ThreadPoolMetrics metrics);
 
   // Instantiate a new ThreadPool with the existing builder arguments.
@@ -136,6 +131,7 @@ class ThreadPoolBuilder {
   int max_threads_;
   int max_queue_size_;
   MonoDelta idle_timeout_;
+  MonoDelta queue_overload_threshold_;
   ThreadPoolMetrics metrics_;
 
   DISALLOW_COPY_AND_ASSIGN(ThreadPoolBuilder);
@@ -164,7 +160,6 @@ class ThreadPoolBuilder {
 //
 // Usage Example:
 //    static void Func(int n) { ... }
-//    class Task : public Runnable { ... }
 //
 //    unique_ptr<ThreadPool> thread_pool;
 //    CHECK_OK(
@@ -174,8 +169,7 @@ class ThreadPoolBuilder {
 //            .set_max_queue_size(10)
 //            .set_idle_timeout(MonoDelta::FromMilliseconds(2000))
 //            .Build(&thread_pool));
-//    thread_pool->Submit(shared_ptr<Runnable>(new Task()));
-//    thread_pool->SubmitFunc(boost::bind(&Func, 10));
+//    thread_pool->Submit([](){ Func(10) });
 class ThreadPool {
  public:
   ~ThreadPool();
@@ -188,14 +182,8 @@ class ThreadPool {
   //       require an explicit "abort" notification to exit from the run loop.
   void Shutdown();
 
-  // Submits a function using the kudu Closure system.
-  Status SubmitClosure(Closure c) WARN_UNUSED_RESULT;
-
-  // Submits a function bound using boost::bind(&FuncName, args...).
-  Status SubmitFunc(boost::function<void()> f) WARN_UNUSED_RESULT;
-
-  // Submits a Runnable class.
-  Status Submit(std::shared_ptr<Runnable> r) WARN_UNUSED_RESULT;
+  // Submits a new task.
+  Status Submit(std::function<void()> f) WARN_UNUSED_RESULT;
 
   // Waits until all the tasks are completed.
   void Wait();
@@ -234,6 +222,13 @@ class ThreadPool {
     return num_threads_ + num_threads_pending_start_;
   }
 
+  // Whether the ThreadPool's queue is overloaded. If queue overload threshold
+  // isn't set, returns 'false'. Otherwise, returns whether the queue is
+  // overloaded. If overloaded, 'overloaded_time' and 'threshold' are both
+  // populated with corresponding information (if not null).
+  bool QueueOverloaded(MonoDelta* overloaded_time = nullptr,
+                       MonoDelta* threshold = nullptr) const;
+
  private:
   FRIEND_TEST(ThreadPoolTest, TestThreadPoolWithNoMinimum);
   FRIEND_TEST(ThreadPoolTest, TestVariableSizeThreadPool);
@@ -243,11 +238,136 @@ class ThreadPool {
 
   // Client-provided task to be executed by this pool.
   struct Task {
-    std::shared_ptr<Runnable> runnable;
+    std::function<void()> func;
     Trace* trace;
 
     // Time at which the entry was submitted to the pool.
     MonoTime submit_time;
+  };
+
+  // This utility class is used to track how busy the ThreadPool is by
+  // monitoring its task queue timings. This class uses logic modeled after
+  // CoDel algorithm (see [1], [2], [3]), detecting whether the queue
+  // of a thread pool with the maximum of M worker threads is overloaded
+  // (it's assumed M > 0). The idea is to keep an eye on the queue times when
+  // the thread pool works at its full capacity. Even if there aren't any idle
+  // threads, we don't want to declare the queue overloaded when it's still able
+  // to dispatch many lightweight tasks pretty fast once they arrived. Instead,
+  // we start declaring the queue overloaded only when we see the evidence of
+  // the newly arrived tasks being stuck in the queue for a time interval longer
+  // than the configured threshold.
+  //
+  // Let's denote the minimum of the queue times of the last N tasks dispatched
+  // by min(QT_historic(N)). If the history of already dispatched tasks is
+  // empty, min(QT_historic(N)) is defined to be 0. The time interval that the
+  // very first element of the queue has been waiting to be dispatched is
+  // denoted by QT_head. The queue time threshold is denoted by T_overload.
+  //
+  // With that, the criterion to detect the 'overloaded' state of a ThreadPool's
+  // queue is defined as the following:
+  //
+  //   all available worker threads are busy
+  //     AND
+  //   max(QT_head, min(QT_historic(M))) > T_overload
+  //
+  // The maximum number of worker threads (M) in a thread pool naturally
+  // provides the proper length of the queue time history. To illustrate, let's
+  // examine one edge case. It's a case of continuous periodic workload of
+  // batches of M tasks, where all M tasks in a batch are scheduled at the same
+  // time and batches of M tasks are separated by T_overload time interval.
+  // Every batch contain (M - 1) heavyweight tasks and a single lightweight one.
+  // Let's assume it takes T_overload to complete a heavyweight task, and a
+  // lightweight one completes instantly. With such a workload running against a
+  // thread pool, it's able to handle many extra lightweight tasks with
+  // resulting queue times well under T_overload threshold. Apparently, the
+  // queue should not be declared overloaded in such case. So, if the queue time
+  // history length were less than M (e.g. (M - 1)), then the pool would be
+  // considered overloaded if capturing a moment when all worker threads are
+  // busy handling a newly arrived batch of M tasks, assuming the thread pool
+  // has already handled at least two batches of tasks since its start (the
+  // history of queue times would be { 0, T_overload, ..., T_overload } repeated
+  // many times).
+  //
+  // From the other side, if the size of the queue time history were greater
+  // than M, it would include not-so-relevant information for some patterns
+  // of scheduled tasks.
+  //
+  // References:
+  //   [1] https://queue.acm.org/detail.cfm?id=2209336
+  //   [2] https://en.wikipedia.org/wiki/CoDel
+  //   [3] https://man7.org/linux/man-pages/man8/CoDel.8.html
+  class QueueLoadMeter {
+   public:
+    // Create an instance of QueueLoadMeter class. The pool to attach to
+    // is specified by the 'tpool' parameter. The 'queue_time_threshold'
+    // parameter corresponds to 'T_overload' parameter from the algorithm
+    // description above, and 'queue_time_history_length' corresponds to 'N',
+    // respectively.
+    explicit QueueLoadMeter(const ThreadPool& tpool,
+                            const MonoDelta& queue_time_threshold,
+                            size_t queue_time_history_length);
+
+    const MonoDelta& queue_time_threshold() const {
+      return queue_time_threshold_;
+    }
+
+    // Check whether the queue is overloaded. If the queue is not overloaded,
+    // this method returns 'false'. If the queue is overloaded, this method
+    // return 'true'. In the latter case, if 'time_overloaded' is not null,
+    // it is populated with the information on how long the queue has been
+    // in the overloaded state. This method is lock-free.
+    bool overloaded(MonoDelta* time_overloaded = nullptr);
+
+    // Notify the meter about updates on the task queue. If a task being
+    // dequeued, the queue time of the task dequeued is specified via the
+    // 'task_queue_time' parameter, otherwise it's not initialized.
+    // Non-initialized 'queue_head_submit_time' means there isn't next task
+    // in the queue. The 'has_spare_thread' parameter conveys information
+    // on whether a "spare" worker thread is available.
+    void UpdateQueueInfoUnlocked(const MonoDelta& task_queue_time,
+                                 const MonoTime& queue_head_submit_time,
+                                 bool has_spare_thread);
+   private:
+    // The pool this meter is attached to.
+    const ThreadPool& tpool_;
+
+    // The threshold for the minimum queue times when determining whether the
+    // thread pool's tasks queue is in overloaded state. This corresponds to the
+    // parameter 'T_overload' in the description of the algorithm above.
+    const MonoDelta queue_time_threshold_;
+
+    // The measurement window to track task queue times. That's the number
+    // of the most recent tasks to check for the queue times. This corresponds
+    // to the parameter 'N' in the description of the algorithm above.
+    const size_t queue_time_history_length_;
+
+    // Number of elements in the queue history measurement window which are
+    // over the threshold specified by 'queue_time_threshold_'. Using the
+    // terminology from above, (min(QT_historic(M) > T_overload) iff
+    // (over_queue_threshold_num_ == M).
+    ssize_t over_queue_threshold_num_;
+
+    // Queue timings of the most recent samples. The size of these containers
+    // is kept under queue_time_history_length_ limit.
+    std::deque<MonoDelta> queue_times_;
+
+    // Below fields are to store the latest snapshot of the information about
+    // the task queue of the pool the meter is attached to.
+
+    // Time when the next queue task was submitted. Set to empty MonoTime() if
+    // there isn't a single element in the queue (i.e. Initialized() returns
+    // false).
+    std::atomic<MonoTime> queue_head_submit_time_;
+
+    // Time when the queue has entered the overloaded state. If the queue isn't
+    // in overloaded state, this member field isn't initialized
+    // (i.e. overloaded_since.Initialized() returns false).
+    std::atomic<MonoTime> overloaded_since_;
+
+    // Whether the TreadPool has a least one "spare" thread: a thread that can
+    // be spawned before reaching the maximum allowed number of threads,
+    // or one of those already spawned but currently idle.
+    std::atomic<bool> has_spare_thread_;
   };
 
   // Creates a new thread pool using a builder.
@@ -269,10 +389,26 @@ class ThreadPool {
   void CheckNotPoolThreadUnlocked();
 
   // Submits a task to be run via token.
-  Status DoSubmit(std::shared_ptr<Runnable> r, ThreadPoolToken* token);
+  Status DoSubmit(std::function<void()> f, ThreadPoolToken* token);
 
   // Releases token 't' and invalidates it.
   void ReleaseToken(ThreadPoolToken* t);
+
+  // Notify the load meter (if enabled) on relevant updates. If no information
+  // on dequeued task is available, 'queue_time' should be omitted (or be an
+  // uninitialized MonoDelta instance).
+  //
+  // The LoadMeter should be notified about events which affect the criterion
+  // to evaluate the state of the queue (overloaded vs normal). The criterion
+  // uses the following information:
+  //   * queue time of a newly dequeued task
+  //   * availability of spare worker threads
+  //   * submit time of the task at the head of the queue
+  // This means that LoadMeter should be notified about the following events:
+  //  * a task at the head of the queue has been dispatched to be run
+  //  * a worker thread completes running a task
+  //  * a new task has been scheduled (i.e. added into the queue)
+  void NotifyLoadMeterUnlocked(const MonoDelta& queue_time = MonoDelta());
 
   const std::string name_;
   const int min_threads_;
@@ -360,6 +496,10 @@ class ThreadPool {
   // ExecutionMode::CONCURRENT token used by the pool for tokenless submission.
   std::unique_ptr<ThreadPoolToken> tokenless_;
 
+  // The meter to track whether the pool's queue is stalled/overloaded.
+  // It's nullptr/none if the queue overload threshold is unset.
+  std::unique_ptr<QueueLoadMeter> load_meter_;
+
   // Metrics for the entire thread pool.
   const ThreadPoolMetrics metrics_;
 
@@ -383,14 +523,8 @@ class ThreadPoolToken {
   // called first to take care of them.
   ~ThreadPoolToken();
 
-  // Submits a function using the kudu Closure system.
-  Status SubmitClosure(Closure c) WARN_UNUSED_RESULT;
-
-  // Submits a function bound using boost::bind(&FuncName, args...).
-  Status SubmitFunc(boost::function<void()> f) WARN_UNUSED_RESULT;
-
-  // Submits a Runnable class.
-  Status Submit(std::shared_ptr<Runnable> r) WARN_UNUSED_RESULT;
+  // Submits a new task.
+  Status Submit(std::function<void()> f) WARN_UNUSED_RESULT;
 
   // Marks the token as unusable for future submissions. Any queued tasks not
   // yet running are destroyed. If tasks are in flight, Shutdown() will wait

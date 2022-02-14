@@ -17,6 +17,8 @@
 
 #include "kudu/security/init.h"
 
+#include <krb5/krb5.h>
+
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
@@ -29,19 +31,17 @@
 #include <ostream>
 #include <random>
 #include <string>
-#include <type_traits>
-#include <utility>
 
 #include <boost/optional/optional.hpp>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include <krb5/krb5.h>
 
 #include "kudu/gutil/macros.h"
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/gutil/strings/substitute.h"
 #include "kudu/gutil/strings/util.h"
 #include "kudu/security/kinit_context.h"
+#include "kudu/util/countdown_latch.h"
 #include "kudu/util/flag_tags.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/net/net_util.h"
@@ -73,6 +73,17 @@ DEFINE_bool(use_system_auth_to_local, kDefaultSystemAuthToLocal,
             "'kudu/foo.example.com@EXAMPLE' will map to 'kudu'.");
 TAG_FLAG(use_system_auth_to_local, advanced);
 
+DEFINE_string(principal, "kudu/_HOST",
+              "Kerberos principal that this daemon will log in as. The special token "
+              "_HOST will be replaced with the FQDN of the local host.");
+TAG_FLAG(principal, advanced);
+TAG_FLAG(principal, stable);
+
+DEFINE_string(keytab_file, "",
+              "Path to the Kerberos Keytab file for this server. Specifying a "
+              "keytab file will cause the server to kinit, and enable Kerberos "
+              "to be used to authenticate RPC connections.");
+TAG_FLAG(keytab_file, stable);
 
 using std::mt19937;
 using std::random_device;
@@ -85,7 +96,7 @@ namespace kudu {
 namespace security {
 
 // Global instance of the context used by the kinit/reacquire thread.
-KinitContext* g_kinit_ctx;
+KinitContext* g_kinit_ctx = nullptr;
 
 namespace {
 
@@ -102,7 +113,7 @@ Status Krb5CallToStatus(krb5_context ctx, krb5_error_code code) {
 
   std::unique_ptr<const char, std::function<void(const char*)>> err_msg(
       krb5_get_error_message(ctx, code),
-      std::bind(krb5_free_error_message, ctx, std::placeholders::_1));
+      [ctx](const char* msg) { krb5_free_error_message(ctx, msg); });
   return Status::RuntimeError(err_msg.get());
 }
 #define KRB5_RETURN_NOT_OK_PREPEND(call, prepend) \
@@ -151,34 +162,13 @@ Status Krb5UnparseName(krb5_principal princ, string* name) {
   return Status::OK();
 }
 
-// Periodically calls DoRenewal().
-void RenewThread() {
-  uint32_t failure_retries = 0;
-  while (true) {
-    // This thread is run immediately after the first Kinit, so sleep first.
-    int64_t renew_interval_s = g_kinit_ctx->GetNextRenewInterval(failure_retries);
-    if (failure_retries > 0) {
-      // Log in the abnormal case where something failed.
-      LOG(INFO) << Substitute("Renew thread sleeping after $0 failures for $1s",
-          failure_retries, renew_interval_s);
-    }
-    SleepFor(MonoDelta::FromSeconds(renew_interval_s));
-
-    Status s = g_kinit_ctx->DoRenewal();
-    WARN_NOT_OK(s, "Kerberos reacquire error: ");
-    if (!s.ok()) {
-      ++failure_retries;
-    } else {
-      failure_retries = 0;
-    }
-  }
-}
 } // anonymous namespace
 
-KinitContext::KinitContext() {}
+KinitContext::KinitContext() : stop_latch_(1) {}
 
 KinitContext::~KinitContext() {
   // Free memory associated with these objects.
+  Kdestroy();
   if (principal_ != nullptr) krb5_free_principal(g_krb5_ctx, principal_);
   if (keytab_ != nullptr) krb5_kt_close(g_krb5_ctx, keytab_);
   if (ccache_ != nullptr) krb5_cc_close(g_krb5_ctx, ccache_);
@@ -320,7 +310,19 @@ Status KinitContext::Kinit(const string& keytab_path, const string& principal) {
 
   KRB5_RETURN_NOT_OK_PREPEND(krb5_get_init_creds_opt_alloc(g_krb5_ctx, &opts_),
                              "unable to allocate get_init_creds_opt struct");
-  return KinitInternal();
+  RETURN_NOT_OK(KinitInternal());
+
+  // Start the thread to renew and reacquire Kerberos tickets.
+  RETURN_NOT_OK(Thread::Create("kerberos", "reacquire thread",
+                               [this]() { this->RenewThread(); }, &reacquire_thread_));
+  return Status::OK();
+}
+
+void KinitContext::Kdestroy() {
+  stop_latch_.CountDown();
+  if (reacquire_thread_.get() != nullptr) {
+    reacquire_thread_->Join();
+  }
 }
 
 Status KinitContext::KinitInternal() {
@@ -363,28 +365,29 @@ Status KinitContext::KinitInternal() {
   return Status::OK();
 }
 
-namespace {
-// 'in_principal' is the user specified principal to use with Kerberos. It may have a token
-// in the string of the form '_HOST', which if present, needs to be replaced with the FQDN of the
-// current host.
-// 'out_principal' has the final principal with which one may Kinit.
-Status GetConfiguredPrincipal(const std::string& in_principal, string* out_principal) {
-  *out_principal = in_principal;
-  const auto& kHostToken = "_HOST";
-  if (in_principal.find(kHostToken) != string::npos) {
-    string hostname;
-    // Try to fill in either the FQDN or hostname.
-    if (!GetFQDN(&hostname).ok()) {
-      RETURN_NOT_OK(GetHostname(&hostname));
+// Periodically calls DoRenewal().
+void KinitContext::RenewThread() {
+  uint32_t failure_retries = 0;
+  int64_t renew_interval_s = GetNextRenewInterval(failure_retries);
+  while (!stop_latch_.WaitFor(MonoDelta::FromSeconds(renew_interval_s))) {
+    Status s = DoRenewal();
+    WARN_NOT_OK(s, "Kerberos reacquire error: ");
+    if (!s.ok()) {
+      ++failure_retries;
+    } else {
+      failure_retries = 0;
     }
-    // Hosts in principal names are canonicalized to lower-case.
-    std::transform(hostname.begin(), hostname.end(), hostname.begin(), tolower);
-    GlobalReplaceSubstring(kHostToken, hostname, out_principal);
-  }
-  return Status::OK();
-}
-} // anonymous namespace
 
+    if (failure_retries > 0) {
+      // Log in the abnormal case where something failed.
+      LOG(INFO) << Substitute("Renew thread sleeping after $0 failures for $1s",
+          failure_retries, renew_interval_s);
+    }
+
+    // This thread is run immediately after the first Kinit, so sleep first.
+    renew_interval_s = GetNextRenewInterval(failure_retries);
+  }
+}
 
 RWMutex* KerberosReinitLock() {
   return g_kerberos_reinit_lock;
@@ -444,6 +447,22 @@ Status MapPrincipalToLocalName(const std::string& principal, std::string* local_
   return Status::OK();
 }
 
+Status GetConfiguredPrincipal(const string& in_principal, string* out_principal) {
+  *out_principal = in_principal;
+  static const auto& kHostToken = "_HOST";
+  if (in_principal.find(kHostToken) != string::npos) {
+    string hostname;
+    // Try to fill in either the FQDN or hostname.
+    if (!GetFQDN(&hostname).ok()) {
+      RETURN_NOT_OK(GetHostname(&hostname));
+    }
+    // Hosts in principal names are canonicalized to lower-case.
+    std::transform(hostname.begin(), hostname.end(), hostname.begin(), tolower);
+    GlobalReplaceSubstring(kHostToken, hostname, out_principal);
+  }
+  return Status::OK();
+}
+
 boost::optional<string> GetLoggedInPrincipalFromKeytab() {
   if (!g_kinit_ctx) return boost::none;
   return g_kinit_ctx->principal_str();
@@ -493,11 +512,23 @@ Status InitKerberosForServer(const std::string& raw_principal, const std::string
   RETURN_NOT_OK_PREPEND(g_kinit_ctx->Kinit(
       keytab_file, configured_principal), "unable to kinit");
 
-  scoped_refptr<Thread> reacquire_thread;
-  // Start the reacquire thread.
-  RETURN_NOT_OK(Thread::Create("kerberos", "reacquire thread", &RenewThread, &reacquire_thread));
-
   return Status::OK();
+}
+
+void DestroyKerberosForServer() {
+  if (g_kinit_ctx == nullptr) return;
+
+  delete g_kinit_ctx;
+  g_kinit_ctx = nullptr;
+}
+
+string GetKrb5ConfigFile() {
+  const char* config_file = getenv("KRB5_CONFIG");
+  if (!config_file) {
+    return "/etc/krb5.conf";
+  }
+
+  return string(config_file);
 }
 
 } // namespace security

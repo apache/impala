@@ -21,10 +21,11 @@
 
 #include <cerrno>
 #include <cstdio>
+#include <functional>
+#include <initializer_list>
 #include <string>
 #include <vector>
 
-#include <boost/bind.hpp>
 #include <glog/logging.h>
 
 #include "kudu/gutil/macros.h"
@@ -50,7 +51,7 @@ using strings::Substitute;
 PstackWatcher::PstackWatcher(MonoDelta timeout)
     : timeout_(timeout), running_(true), cond_(&lock_) {
   CHECK_OK(Thread::Create("pstack_watcher", "pstack_watcher",
-                 boost::bind(&PstackWatcher::Run, this), &thread_));
+                          [this]() { this->Run(); }, &thread_));
 }
 
 PstackWatcher::~PstackWatcher() {

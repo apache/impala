@@ -17,6 +17,11 @@
 
 #pragma once
 
+#include <openssl/asn1.h>
+#include <openssl/crypto.h>
+#include <openssl/ssl.h>
+#include <openssl/x509.h>
+
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -27,8 +32,8 @@
 #include "kudu/gutil/macros.h"
 #include "kudu/gutil/port.h"
 #include "kudu/gutil/strings/stringpiece.h"
-#include "kudu/security/openssl_util.h"
 #include "kudu/util/locks.h"
+#include "kudu/util/openssl_util.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/status.h"
 

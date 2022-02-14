@@ -18,6 +18,7 @@
 #include "kudu/rpc/connection.h"
 
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <string.h>
 
 #include <algorithm>
@@ -32,8 +33,8 @@
 #include <ev.h>
 #include <glog/logging.h>
 
-#include "kudu/gutil/gscoped_ptr.h"
 #include "kudu/gutil/map-util.h"
+#include "kudu/gutil/port.h"
 #include "kudu/gutil/strings/human_readable.h"
 #include "kudu/gutil/strings/substitute.h"
 #include "kudu/rpc/inbound_call.h"
@@ -44,17 +45,20 @@
 #include "kudu/rpc/rpc_header.pb.h"
 #include "kudu/rpc/rpc_introspection.pb.h"
 #include "kudu/rpc/transfer.h"
+#include "kudu/security/tls_socket.h"
+#include "kudu/util/errno.h"
+#include "kudu/util/faststring.h"
 #include "kudu/util/net/sockaddr.h"
 #include "kudu/util/net/socket.h"
 #include "kudu/util/slice.h"
 #include "kudu/util/status.h"
 
+#include <sys/socket.h>
 #ifdef __linux__
 #include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <linux/tcp.h>
 #endif
 
+using kudu::security::TlsSocket;
 using std::includes;
 using std::set;
 using std::shared_ptr;
@@ -206,7 +210,7 @@ Connection::Connection(ReactorThread *reactor_thread,
       direction_(direction),
       last_activity_time_(MonoTime::Now()),
       is_epoll_registered_(false),
-      next_call_id_(1),
+      call_id_(std::numeric_limits<int32_t>::max()),
       credentials_policy_(policy),
       negotiation_complete_(false),
       is_confidential_(false),
@@ -344,10 +348,11 @@ void Connection::QueueOutbound(unique_ptr<OutboundTransfer> transfer) {
   outbound_transfers_.push_back(*transfer.release());
 
   if (negotiation_complete_ && !write_io_.is_active()) {
-    // If we weren't currently in the middle of sending anything,
-    // then our write_io_ interest is stopped. Need to re-start it.
-    // Only do this after connection negotiation is done doing its work.
-    write_io_.start();
+    // Optimistically assume that the socket is writable if we didn't already
+    // have something queued.
+    if (ProcessOutboundTransfers() == kMoreToSend) {
+      write_io_.start();
+    }
   }
 }
 
@@ -478,7 +483,7 @@ void Connection::QueueOutboundCall(shared_ptr<OutboundCall> call) {
 
   // Serialize the actual bytes to be put on the wire.
   TransferPayload tmp_slices;
-  size_t n_slices = call->SerializeTo(&tmp_slices);
+  call->SerializeTo(&tmp_slices);
 
   call->SetQueued();
 
@@ -536,7 +541,7 @@ void Connection::QueueOutboundCall(shared_ptr<OutboundCall> call) {
   TransferCallbacks *cb = new CallTransferCallbacks(std::move(call), this);
   awaiting_response_[call_id] = car.release();
   QueueOutbound(unique_ptr<OutboundTransfer>(
-      OutboundTransfer::CreateForCallRequest(call_id, tmp_slices, n_slices, cb)));
+      OutboundTransfer::CreateForCallRequest(call_id, tmp_slices, cb)));
 }
 
 // Callbacks for sending an RPC call response from the server.
@@ -608,14 +613,14 @@ void Connection::QueueResponseForCall(unique_ptr<InboundCall> call) {
   // ResponseTransferCallbacks::NotifyTransferAborted.
 
   TransferPayload tmp_slices;
-  size_t n_slices = call->SerializeResponseTo(&tmp_slices);
+  call->SerializeResponseTo(&tmp_slices);
 
   TransferCallbacks *cb = new ResponseTransferCallbacks(std::move(call), this);
   // After the response is sent, can delete the InboundCall object.
   // We set a dummy call ID and required feature set, since these are not needed
   // when sending responses.
   unique_ptr<OutboundTransfer> t(
-      OutboundTransfer::CreateForCallResponse(tmp_slices, n_slices, cb));
+      OutboundTransfer::CreateForCallResponse(tmp_slices, cb));
 
   QueueTransferTask *task = new QueueTransferTask(std::move(t), this);
   reactor_thread_->reactor()->ScheduleReactorTask(task);
@@ -646,11 +651,12 @@ void Connection::ReadHandler(ev::io &watcher, int revents) {
   }
   last_activity_time_ = reactor_thread_->cur_time();
 
+  faststring extra_buf;
   while (true) {
     if (!inbound_) {
       inbound_.reset(new InboundTransfer());
     }
-    Status status = inbound_->ReceiveBuffer(*socket_);
+    Status status = inbound_->ReceiveBuffer(socket_.get(), &extra_buf);
     if (PREDICT_FALSE(!status.ok())) {
       if (status.posix_code() == ESHUTDOWN) {
         VLOG(1) << ToString() << " shut down by remote end.";
@@ -674,14 +680,11 @@ void Connection::ReadHandler(ev::io &watcher, int revents) {
       LOG(FATAL) << "Invalid direction: " << direction_;
     }
 
-    // TODO: it would seem that it would be good to loop around and see if
-    // there is more data on the socket by trying another recv(), but it turns
-    // out that it really hurts throughput to do so. A better approach
-    // might be for each InboundTransfer to actually try to read an extra byte,
-    // and if it succeeds, then we'd copy that byte into a new InboundTransfer
-    // and loop around, since it's likely the next call also arrived at the
-    // same time.
-    break;
+    if (extra_buf.size() > 0) {
+      inbound_.reset(new InboundTransfer(std::move(extra_buf)));
+    } else {
+      break;
+    }
   }
 }
 
@@ -748,19 +751,22 @@ void Connection::WriteHandler(ev::io &watcher, int revents) {
   }
   DVLOG(3) << ToString() << ": writeHandler: revents = " << revents;
 
-  OutboundTransfer *transfer;
   if (outbound_transfers_.empty()) {
     LOG(WARNING) << ToString() << " got a ready-to-write callback, but there is "
       "nothing to write.";
     write_io_.stop();
     return;
   }
+  if (ProcessOutboundTransfers() == kNoMoreToSend) {
+    write_io_.stop();
+  }
+}
 
+Connection::ProcessOutboundTransfersResult Connection::ProcessOutboundTransfers() {
   while (!outbound_transfers_.empty()) {
-    transfer = &(outbound_transfers_.front());
+    OutboundTransfer* transfer = &(outbound_transfers_.front());
 
     if (!transfer->TransferStarted()) {
-
       if (transfer->is_for_outbound_call()) {
         CallAwaitingResponse* car = FindOrDie(awaiting_response_, transfer->call_id());
         if (!car->call) {
@@ -799,25 +805,23 @@ void Connection::WriteHandler(ev::io &watcher, int revents) {
     }
 
     last_activity_time_ = reactor_thread_->cur_time();
-    Status status = transfer->SendBuffer(*socket_);
+    Status status = transfer->SendBuffer(socket_.get());
     if (PREDICT_FALSE(!status.ok())) {
       LOG(WARNING) << ToString() << " send error: " << status.ToString();
       reactor_thread_->DestroyConnection(this, status);
-      return;
+      return kConnectionDestroyed;
     }
 
     if (!transfer->TransferFinished()) {
       DVLOG(3) << ToString() << ": writeHandler: xfer not finished.";
-      return;
+      return kMoreToSend;
     }
 
     outbound_transfers_.pop_front();
     delete transfer;
   }
 
-  // If we were able to write all of our outbound transfers,
-  // we don't have any more to write.
-  write_io_.stop();
+  return kNoMoreToSend;
 }
 
 std::string Connection::ToString() const {
@@ -886,7 +890,7 @@ Status Connection::DumpPB(const DumpConnectionsRequestPB& req,
 
   if (direction_ == CLIENT) {
     for (const car_map_t::value_type& entry : awaiting_response_) {
-      CallAwaitingResponse *c = entry.second;
+      CallAwaitingResponse* c = entry.second;
       if (c->call) {
         c->call->DumpPB(req, resp->add_calls_in_flight());
       }
@@ -907,7 +911,7 @@ Status Connection::DumpPB(const DumpConnectionsRequestPB& req,
     LOG(FATAL);
   }
 #ifdef __linux__
-  if (negotiation_complete_) {
+  if (negotiation_complete_ && remote_.is_ip()) {
     // TODO(todd): it's a little strange to not set socket level stats during
     // negotiation, but we don't have access to the socket here until negotiation
     // is complete.
@@ -915,6 +919,11 @@ Status Connection::DumpPB(const DumpConnectionsRequestPB& req,
                 "could not fill in TCP info for RPC connection");
   }
 #endif // __linux__
+
+  if (negotiation_complete_ && remote_.is_ip()) {
+    WARN_NOT_OK(GetTransportDetailsPB(resp->mutable_transport_details()),
+                "could not fill in transport info for RPC connection");
+  }
   return Status::OK();
 }
 
@@ -995,6 +1004,36 @@ Status Connection::GetSocketStatsPB(SocketStatsPB* pb) const {
   return Status::OK();
 }
 #endif // __linux__
+
+Status Connection::GetTransportDetailsPB(TransportDetailsPB* pb) const {
+  DCHECK(reactor_thread_->IsCurrentThread());
+  DCHECK(pb);
+
+  // As for the dynamic_cast below: this is not very elegant or performant code,
+  // but introducing a generic virtual method with vague semantics into the base
+  // Socket class doesn't look like a good choice either. Also, the
+  // GetTransportDetailsPB() method isn't supposed to be a part of any hot path.
+  const TlsSocket* tls_socket = dynamic_cast<TlsSocket*>(socket_.get());
+  if (tls_socket) {
+    auto* tls = pb->mutable_tls();
+    tls->set_protocol(tls_socket->GetProtocolName());
+    tls->set_cipher_suite(tls_socket->GetCipherDescription());
+  }
+
+  int fd = socket_->GetFd();
+  CHECK_GE(fd, 0);
+  int32_t max_seg_size = 0;
+  socklen_t optlen = sizeof(max_seg_size);
+  int ret = ::getsockopt(fd, IPPROTO_TCP, TCP_MAXSEG, &max_seg_size, &optlen);
+  if (ret) {
+    int err = errno;
+    return Status::NetworkError(
+        "getsockopt(TCP_MAXSEG) failed", ErrnoToString(err), err);
+  }
+  pb->mutable_tcp()->set_max_segment_size(max_seg_size);
+
+  return Status::OK();
+}
 
 } // namespace rpc
 } // namespace kudu

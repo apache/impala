@@ -21,6 +21,7 @@
 
 #include <ctime>
 #include <limits>
+#include <ostream>
 
 #include <glog/logging.h>
 
@@ -63,7 +64,7 @@ MonoDelta MonoDelta::FromNanoseconds(int64_t ns) {
 }
 
 MonoDelta::MonoDelta()
-  : nano_delta_(kUninitialized) {
+    : nano_delta_(kUninitialized) {
 }
 
 bool MonoDelta::Initialized() const {
@@ -145,6 +146,10 @@ void MonoDelta::ToTimeVal(struct timeval *tv) const {
   }
 }
 
+void MonoDelta::ToTimeSpec(struct timespec* ts) const {
+  DCHECK(Initialized());
+  NanosToTimeSpec(nano_delta_, ts);
+}
 
 void MonoDelta::NanosToTimeSpec(int64_t nanos, struct timespec* ts) {
   ts->tv_sec = nanos / MonoTime::kNanosecondsPerSecond;
@@ -158,9 +163,14 @@ void MonoDelta::NanosToTimeSpec(int64_t nanos, struct timespec* ts) {
   }
 }
 
-void MonoDelta::ToTimeSpec(struct timespec *ts) const {
-  DCHECK(Initialized());
-  NanosToTimeSpec(nano_delta_, ts);
+MonoDelta& MonoDelta::operator+=(const MonoDelta& delta) {
+  nano_delta_ += delta.nano_delta_;
+  return *this;
+}
+
+MonoDelta& MonoDelta::operator-=(const MonoDelta& delta) {
+  nano_delta_ -= delta.nano_delta_;
+  return *this;
 }
 
 ///
@@ -206,6 +216,7 @@ MonoDelta MonoTime::GetDeltaSince(const MonoTime &rhs) const {
 
 void MonoTime::AddDelta(const MonoDelta &delta) {
   DCHECK(Initialized());
+  DCHECK(delta.Initialized());
   nanos_ += delta.nano_delta_;
 }
 
@@ -238,7 +249,7 @@ MonoTime& MonoTime::operator-=(const MonoDelta& delta) {
   return *this;
 }
 
-MonoTime::MonoTime(const struct timespec &ts) KUDU_MONOTIME_NOEXCEPT {
+MonoTime::MonoTime(const struct timespec& ts) KUDU_MONOTIME_NOEXCEPT {
   // Monotonic time resets when the machine reboots.  The 64-bit limitation
   // means that we can't represent times larger than 292 years, which should be
   // adequate.
@@ -287,6 +298,14 @@ bool operator>=(const MonoDelta &lhs, const MonoDelta &rhs) {
   return lhs.MoreThan(rhs) || lhs.Equals(rhs);
 }
 
+MonoDelta operator-(const MonoDelta &lhs, const MonoDelta &rhs) {
+  return MonoDelta(lhs.nano_delta_ - rhs.nano_delta_);
+}
+
+MonoDelta operator+(const MonoDelta &lhs, const MonoDelta &rhs) {
+  return MonoDelta(lhs.nano_delta_ + rhs.nano_delta_);
+}
+
 bool operator==(const MonoTime& lhs, const MonoTime& rhs) {
   return lhs.Equals(rhs);
 }
@@ -329,6 +348,13 @@ MonoDelta operator-(const MonoTime& t_end, const MonoTime& t_beg) {
   int64_t delta(t_end.nanos_);
   delta -= t_beg.nanos_;
   return MonoDelta(delta);
+}
+
+std::ostream& operator<<(std::ostream& os, const kudu::MonoTime& time) {
+  struct timespec ts;
+  time.ToTimeSpec(&ts);
+  os << ts.tv_nsec << "ns";
+  return os;
 }
 
 } // namespace kudu

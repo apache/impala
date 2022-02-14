@@ -15,13 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "kudu/security/tls_handshake.h"
-
-#include <algorithm>
 #include <pthread.h>
 #include <sched.h>
-#include <sys/uio.h>
+#include <sys/socket.h>
 
+#include <algorithm>
 #include <atomic>
 #include <csignal>
 #include <cstdint>
@@ -38,6 +36,7 @@
 
 #include "kudu/gutil/macros.h"
 #include "kudu/security/tls_context.h"
+#include "kudu/security/tls_handshake.h"
 #include "kudu/util/countdown_latch.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/net/sockaddr.h"
@@ -112,11 +111,11 @@ Status DoNegotiationSide(Socket* sock, TlsHandshake* tls, const char* side) {
 
 void TlsSocketTest::ConnectClient(const Sockaddr& addr, unique_ptr<Socket>* sock) {
   unique_ptr<Socket> client_sock(new Socket());
-  ASSERT_OK(client_sock->Init(0));
+  ASSERT_OK(client_sock->Init(addr.family(), 0));
   ASSERT_OK(client_sock->Connect(addr));
 
-  TlsHandshake client;
-  ASSERT_OK(client_tls_.InitiateHandshake(TlsHandshakeType::CLIENT, &client));
+  TlsHandshake client(TlsHandshakeType::CLIENT);
+  ASSERT_OK(client_tls_.InitiateHandshake(&client));
   ASSERT_OK(DoNegotiationSide(client_sock.get(), &client, "client"));
   ASSERT_OK(client.Finish(&client_sock));
   *sock = std::move(client_sock);
@@ -136,7 +135,7 @@ class EchoServer {
     ASSERT_OK(server_tls_.Init());
     ASSERT_OK(server_tls_.GenerateSelfSignedCertAndKey());
     ASSERT_OK(listen_addr_.ParseString("127.0.0.1", 0));
-    ASSERT_OK(listener_.Init(0));
+    ASSERT_OK(listener_.Init(listen_addr_.family(), 0));
     ASSERT_OK(listener_.BindAndListen(listen_addr_, /*listen_queue_size=*/10));
     ASSERT_OK(listener_.GetSocketAddress(&listen_addr_));
 
@@ -147,8 +146,8 @@ class EchoServer {
         Sockaddr remote;
         CHECK_OK(listener_.Accept(sock.get(), &remote, /*flags=*/0));
 
-        TlsHandshake server;
-        CHECK_OK(server_tls_.InitiateHandshake(TlsHandshakeType::SERVER, &server));
+        TlsHandshake server(TlsHandshakeType::SERVER);
+        CHECK_OK(server_tls_.InitiateHandshake(&server));
         CHECK_OK(DoNegotiationSide(sock.get(), &server, "server"));
         CHECK_OK(server.Finish(&sock));
 

@@ -17,7 +17,6 @@
 
 #include "kudu/util/net/dns_resolver.h"
 
-#include <functional>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -25,7 +24,6 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-#include "kudu/gutil/callback.h"
 #include "kudu/gutil/port.h"
 #include "kudu/util/flag_tags.h"
 #include "kudu/util/malloc.h"
@@ -84,12 +82,33 @@ void DnsResolver::ResolveAddressesAsync(const HostPort& hostport,
                                         vector<Sockaddr>* addresses,
                                         const StatusCallback& cb) {
   if (GetCachedAddresses(hostport, addresses)) {
-    return cb.Run(Status::OK());
+    return cb(Status::OK());
   }
-  const auto s = pool_->SubmitFunc(std::bind(&DnsResolver::DoResolutionCb,
-                                             this, hostport, addresses, cb));
+  const auto s = pool_->Submit([=]() {
+    this->DoResolutionCb(hostport, addresses, cb);
+  });
   if (!s.ok()) {
-    cb.Run(s);
+    cb(s);
+  }
+}
+
+void DnsResolver::RefreshAddressesAsync(const HostPort& hostport,
+                                        vector<Sockaddr>* addresses,
+                                        const StatusCallback& cb) {
+  if (PREDICT_TRUE(cache_)) {
+    cache_->Erase(hostport.host());
+  }
+  const auto s = pool_->Submit([=]() {
+    // Before performing the resolution, check if another task has already
+    // resolved it and cached a new entry.
+    if (this->GetCachedAddresses(hostport, addresses)) {
+      cb(Status::OK());
+      return;
+    }
+    this->DoResolutionCb(hostport, addresses, cb);
+  });
+  if (!s.ok()) {
+    cb(s);
   }
 }
 
@@ -106,7 +125,11 @@ Status DnsResolver::DoResolution(const HostPort& hostport,
         cached_addresses->capacity() > 0
         ? kudu_malloc_usable_size(cached_addresses->data()) : 0;
 #ifndef NDEBUG
-    // Clear the port number.
+    // The port numbers are not relevant when caching the results of DNS
+    // resolution. If it's a debug build, clear the port numbers: this is done
+    // to be able to spot regressions in the code which is responsible for
+    // setting appropriate port numbers when retrieving the cached addresses
+    // (see DnsResolver::GetCachedAddresses()).
     for (auto& addr : *cached_addresses) {
       addr.set_port(0);
     }
@@ -123,7 +146,7 @@ Status DnsResolver::DoResolution(const HostPort& hostport,
 void DnsResolver::DoResolutionCb(const HostPort& hostport,
                                  vector<Sockaddr>* addresses,
                                  const StatusCallback& cb) {
-  cb.Run(DoResolution(hostport, addresses));
+  cb(DoResolution(hostport, addresses));
 }
 
 bool DnsResolver::GetCachedAddresses(const HostPort& hostport,
@@ -132,6 +155,10 @@ bool DnsResolver::GetCachedAddresses(const HostPort& hostport,
     auto handle = cache_->Get(hostport.host());
     if (handle) {
       if (addresses) {
+        // Copy the cached records and set the result port number as necessary:
+        // a cached port number is not relevant and stored in the cache as a
+        // by-product: HostRecordCache stores not just IPs address, but Sockaddr
+        // structures.
         vector<Sockaddr> result_addresses(handle.value());
         for (auto& addr : result_addresses) {
           addr.set_port(hostport.port());

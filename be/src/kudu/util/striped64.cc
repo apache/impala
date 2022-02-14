@@ -17,10 +17,12 @@
 
 #include "kudu/util/striped64.h"
 
-// Aarch64 version gcc doesn't have mm_malloc.h.
-#ifndef __aarch64__
+#ifdef __aarch64__
+#define _mm_free(p) free(p)
+#define _mm_malloc(a, b) malloc(a)
+#else
 #include <mm_malloc.h>
-#endif
+#endif //__aarch64__
 
 #include <unistd.h>
 

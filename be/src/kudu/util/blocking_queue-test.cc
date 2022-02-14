@@ -15,26 +15,49 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "kudu/util/blocking_queue.h"
+
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <map>
+#include <memory>
+#include <numeric>
+#include <ostream>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 #include <gtest/gtest.h>
 
-#include "kudu/gutil/gscoped_ptr.h"
+#include "kudu/gutil/strings/substitute.h"
 #include "kudu/util/countdown_latch.h"
-#include "kudu/util/blocking_queue.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/mutex.h"
+#include "kudu/util/scoped_cleanup.h"
 #include "kudu/util/status.h"
 #include "kudu/util/test_macros.h"
+#include "kudu/util/test_util.h"
 
+DEFINE_uint32(num_blocking_writers, 3,
+              "number of threads calling BlockingQueue::BlockingPut()");
+DEFINE_uint32(num_non_blocking_writers, 2,
+              "number of threads calling BlockingQueue::Put()");
+DEFINE_uint32(num_blocking_readers, 5,
+              "number of threads calling BlockingQueue::BlockingGet()");
+DEFINE_uint32(runtime_sec, 5, "duration of the test (seconds)");
+DEFINE_uint32(queue_capacity, 64, "capacity of the queue (number of elements)");
+
+using std::accumulate;
 using std::string;
 using std::thread;
+using std::unique_ptr;
 using std::vector;
+using strings::Substitute;
 
 namespace kudu {
 
@@ -49,11 +72,11 @@ void InsertSomeThings() {
 TEST(BlockingQueueTest, Test1) {
   thread inserter_thread(InsertSomeThings);
   int32_t i;
-  ASSERT_TRUE(test1_queue.BlockingGet(&i));
+  ASSERT_OK(test1_queue.BlockingGet(&i));
   ASSERT_EQ(1, i);
-  ASSERT_TRUE(test1_queue.BlockingGet(&i));
+  ASSERT_OK(test1_queue.BlockingGet(&i));
   ASSERT_EQ(2, i);
-  ASSERT_TRUE(test1_queue.BlockingGet(&i));
+  ASSERT_OK(test1_queue.BlockingGet(&i));
   ASSERT_EQ(3, i);
   inserter_thread.join();
 }
@@ -79,6 +102,83 @@ TEST(BlockingQueueTest, TestBlockingDrainTo) {
   ASSERT_TRUE(s.IsAborted());
 }
 
+TEST(BlockingQueueTest, TestBlockingPut) {
+  const MonoDelta kShortTimeout = MonoDelta::FromMilliseconds(200);
+  const MonoDelta kEvenShorterTimeout = MonoDelta::FromMilliseconds(100);
+  BlockingQueue<int32_t> test_queue(2);
+
+  // First, a trivial check that we don't do anything if our deadline has
+  // already passed.
+  Status s = test_queue.BlockingPut(1, MonoTime::Now() - kShortTimeout);
+  ASSERT_TRUE(s.IsTimedOut()) << s.ToString();
+
+  // Now put a couple elements onto the queue.
+  ASSERT_OK(test_queue.BlockingPut(1));
+  ASSERT_OK(test_queue.BlockingPut(2));
+
+  // We're at capacity, so further puts should time out...
+  s = test_queue.BlockingPut(3, MonoTime::Now() + kShortTimeout);
+  ASSERT_TRUE(s.IsTimedOut()) << s.ToString();
+
+  // ... until space is freed up before the deadline.
+  thread t([&] {
+    SleepFor(kEvenShorterTimeout);
+    int out;
+    ASSERT_OK(test_queue.BlockingGet(&out));
+  });
+  SCOPED_CLEANUP({
+    t.join();
+  });
+  ASSERT_OK(test_queue.BlockingPut(3, MonoTime::Now() + kShortTimeout));
+
+  // If we shut down, we shouldn't be able to put more elements onto the queue.
+  test_queue.Shutdown();
+  s = test_queue.BlockingPut(3, MonoTime::Now() + kShortTimeout);
+  ASSERT_TRUE(s.IsAborted()) << s.ToString();
+}
+
+TEST(BlockingQueueTest, TestBlockingGet) {
+  const MonoDelta kShortTimeout = MonoDelta::FromMilliseconds(200);
+  const MonoDelta kEvenShorterTimeout = MonoDelta::FromMilliseconds(100);
+  BlockingQueue<int32_t> test_queue(2);
+  ASSERT_OK(test_queue.BlockingPut(1));
+  ASSERT_OK(test_queue.BlockingPut(2));
+
+  // Test that if we have stuff in our queue, regardless of deadlines, we'll be
+  // able to get them out.
+  int32_t val = 0;
+  ASSERT_OK(test_queue.BlockingGet(&val, MonoTime::Now() - kShortTimeout));
+  ASSERT_EQ(1, val);
+  ASSERT_OK(test_queue.BlockingGet(&val, MonoTime::Now() + kShortTimeout));
+  ASSERT_EQ(2, val);
+
+  // But without stuff in the queue, we'll time out...
+  Status s = test_queue.BlockingGet(&val, MonoTime::Now() - kShortTimeout);
+  ASSERT_TRUE(s.IsTimedOut()) << s.ToString();
+  s = test_queue.BlockingGet(&val, MonoTime::Now() + kShortTimeout);
+  ASSERT_TRUE(s.IsTimedOut()) << s.ToString();
+
+  // ... until new elements show up.
+  thread t([&] {
+    SleepFor(kEvenShorterTimeout);
+    ASSERT_OK(test_queue.BlockingPut(3));
+  });
+  SCOPED_CLEANUP({
+    t.join();
+  });
+  ASSERT_OK(test_queue.BlockingGet(&val, MonoTime::Now() + kShortTimeout));
+  ASSERT_EQ(3, val);
+
+  // If we shut down with stuff in our queue, we'll continue to return those
+  // elements. Otherwise, we'll return an error.
+  ASSERT_OK(test_queue.BlockingPut(4));
+  test_queue.Shutdown();
+  ASSERT_OK(test_queue.BlockingGet(&val, MonoTime::Now() + kShortTimeout));
+  ASSERT_EQ(4, val);
+  s = test_queue.BlockingGet(&val, MonoTime::Now() + kShortTimeout);
+  ASSERT_TRUE(s.IsAborted()) << s.ToString();
+}
+
 // Test that, when the queue is shut down with elements still pending,
 // Drain still returns OK until the elements are all gone.
 TEST(BlockingQueueTest, TestGetAndDrainAfterShutdown) {
@@ -91,7 +191,7 @@ TEST(BlockingQueueTest, TestGetAndDrainAfterShutdown) {
 
   // Get() should still return an element.
   int i;
-  ASSERT_TRUE(q.BlockingGet(&i));
+  ASSERT_OK(q.BlockingGet(&i));
   ASSERT_EQ(1, i);
 
   // Drain should still return OK, since it yielded elements.
@@ -102,7 +202,8 @@ TEST(BlockingQueueTest, TestGetAndDrainAfterShutdown) {
   // Now that it's empty, it should return Aborted.
   Status s = q.BlockingDrainTo(&out);
   ASSERT_TRUE(s.IsAborted()) << s.ToString();
-  ASSERT_FALSE(q.BlockingGet(&i));
+  s = q.BlockingGet(&i);
+  ASSERT_FALSE(s.ok()) << s.ToString();
 }
 
 TEST(BlockingQueueTest, TestTooManyInsertions) {
@@ -125,8 +226,11 @@ struct LengthLogicalSize {
 TEST(BlockingQueueTest, TestLogicalSize) {
   BlockingQueue<string, LengthLogicalSize> test_queue(4);
   ASSERT_EQ(test_queue.Put("a"), QUEUE_SUCCESS);
+  ASSERT_EQ(1, test_queue.size());
   ASSERT_EQ(test_queue.Put("bcd"), QUEUE_SUCCESS);
+  ASSERT_EQ(4, test_queue.size());
   ASSERT_EQ(test_queue.Put("e"), QUEUE_FULL);
+  ASSERT_EQ(4, test_queue.size());
 }
 
 TEST(BlockingQueueTest, TestNonPointerParamsMayBeNonEmptyOnDestruct) {
@@ -154,17 +258,18 @@ TEST(BlockingQueueTest, TestGetFromShutdownQueue) {
   test_queue.Shutdown();
   ASSERT_EQ(test_queue.Put(456), QUEUE_SHUTDOWN);
   int64_t i;
-  ASSERT_TRUE(test_queue.BlockingGet(&i));
+  ASSERT_OK(test_queue.BlockingGet(&i));
   ASSERT_EQ(123, i);
-  ASSERT_FALSE(test_queue.BlockingGet(&i));
+  Status s = test_queue.BlockingGet(&i);
+  ASSERT_FALSE(s.ok()) << s.ToString();
 }
 
-TEST(BlockingQueueTest, TestGscopedPtrMethods) {
-  BlockingQueue<int*> test_queue(2);
-  gscoped_ptr<int> input_int(new int(123));
-  ASSERT_EQ(test_queue.Put(&input_int), QUEUE_SUCCESS);
-  gscoped_ptr<int> output_int;
-  ASSERT_TRUE(test_queue.BlockingGet(&output_int));
+TEST(BlockingQueueTest, TestUniquePtrMethods) {
+  BlockingQueue<unique_ptr<int>> test_queue(2);
+  unique_ptr<int> input_int(new int(123));
+  ASSERT_EQ(QUEUE_SUCCESS, test_queue.Put(std::move(input_int)));
+  unique_ptr<int> output_int;
+  ASSERT_OK(test_queue.BlockingGet(&output_int));
   ASSERT_EQ(123, *output_int.get());
   test_queue.Shutdown();
 }
@@ -187,7 +292,7 @@ class MultiThreadTest {
     sync_latch_.CountDown();
     sync_latch_.Wait();
     for (int i = 0; i < blocking_puts_; i++) {
-      ASSERT_TRUE(queue_.BlockingPut(arg));
+      ASSERT_OK(queue_.BlockingPut(arg));
     }
     MutexLock guard(lock_);
     if (--num_inserters_ == 0) {
@@ -198,8 +303,8 @@ class MultiThreadTest {
   void RemoverThread() {
     for (int i = 0; i < puts_ + blocking_puts_; i++) {
       int32_t arg = 0;
-      bool got = queue_.BlockingGet(&arg);
-      if (!got) {
+      Status s = queue_.BlockingGet(&arg);
+      if (!s.ok()) {
         arg = -1;
       }
       MutexLock guard(lock_);
@@ -244,6 +349,143 @@ class MultiThreadTest {
 TEST(BlockingQueueTest, TestMultipleThreads) {
   MultiThreadTest test;
   test.Run();
+}
+
+class BlockingQueueMultiThreadPerfTest : public ::testing::Test {
+ public:
+  void BlockingGetTask(size_t* counter) {
+    barrier_.CountDown();
+    barrier_.Wait();
+
+    uint64_t elem = 0;
+    while (true) {
+      auto s = queue_.BlockingGet(&elem);
+      if (!s.ok()) {
+        CHECK(s.IsAborted()) << s.ToString();
+        return;
+      }
+      ++(*counter);
+    }
+  }
+
+  void BlockingPutTask(size_t* counter) {
+    barrier_.CountDown();
+    barrier_.Wait();
+
+    uint64_t elem = 0;
+    while (true) {
+      auto s = queue_.BlockingPut(elem++);
+      if (!s.ok()) {
+        CHECK(s.IsAborted()) << s.ToString();
+        return;
+      }
+      ++(*counter);
+    }
+  }
+
+  void NonBlockingPutTask(size_t* counter) {
+    barrier_.CountDown();
+    barrier_.Wait();
+
+    uint64_t elem = 0;
+    while (true) {
+      auto result = queue_.Put(elem++);
+      if (result == QUEUE_SHUTDOWN) {
+        return;
+      }
+      switch (result) {
+        case QUEUE_SUCCESS:
+          ++(*counter);
+          continue;
+        case QUEUE_FULL:
+          SleepFor(MonoDelta::FromMicroseconds(25));
+          continue;
+        default:
+          LOG(FATAL) << "unexpected queue status: " << result;
+      }
+    }
+  }
+
+ protected:
+  BlockingQueueMultiThreadPerfTest()
+      : num_blocking_writers_(FLAGS_num_blocking_writers),
+        num_non_blocking_writers_(FLAGS_num_non_blocking_writers),
+        num_blocking_readers_(FLAGS_num_blocking_readers),
+        runtime_(MonoDelta::FromSeconds(FLAGS_runtime_sec)),
+        queue_(FLAGS_queue_capacity),
+        barrier_(num_blocking_writers_ +
+                 num_non_blocking_writers_ +
+                 num_blocking_readers_) {
+  }
+
+  const size_t num_blocking_writers_;
+  const size_t num_non_blocking_writers_;
+  const size_t num_blocking_readers_;
+  const MonoDelta runtime_;
+  BlockingQueue<uint64_t> queue_;
+  vector<thread> threads_;
+  CountDownLatch barrier_;
+};
+
+// This is a test scenario to assess the performance of BlockingQueue in the
+// terms of call rates when multiple concurrent writers and readers are present.
+TEST_F(BlockingQueueMultiThreadPerfTest, RequestRates) {
+  SKIP_IF_SLOW_NOT_ALLOWED();
+
+  vector<size_t> blocking_read_counts(num_blocking_readers_, 0);
+  for (size_t i = 0; i < num_blocking_readers_; ++i) {
+    threads_.emplace_back(&BlockingQueueMultiThreadPerfTest::BlockingGetTask,
+                          this, &blocking_read_counts[i]);
+  }
+
+  vector<size_t> blocking_write_counts(num_blocking_writers_, 0);
+  for (size_t i = 0; i < num_blocking_writers_; ++i) {
+    threads_.emplace_back(&BlockingQueueMultiThreadPerfTest::BlockingPutTask,
+                          this, &blocking_write_counts[i]);
+  }
+
+  vector<size_t> non_blocking_write_counts(num_non_blocking_writers_, 0);
+  for (size_t i = 0; i < num_non_blocking_writers_; ++i) {
+    threads_.emplace_back(&BlockingQueueMultiThreadPerfTest::NonBlockingPutTask,
+                          this, &non_blocking_write_counts[i]);
+  }
+
+  SleepFor(runtime_);
+  queue_.Shutdown();
+
+  for_each(threads_.begin(), threads_.end(), [](thread& t) { t.join(); });
+
+  const auto blocking_reads_num = accumulate(
+      blocking_read_counts.begin(), blocking_read_counts.end(), 0UL);
+  const auto blocking_writes_num = accumulate(
+      blocking_write_counts.begin(), blocking_write_counts.end(), 0UL);
+  const auto non_blocking_writes_num = accumulate(
+      non_blocking_write_counts.begin(), non_blocking_write_counts.end(), 0UL);
+
+  LOG(INFO) << "number of successful BlockingGet() calls: "
+            << blocking_reads_num;
+  LOG(INFO) << "number of successful BlockingPut() calls: "
+            << blocking_writes_num;
+  LOG(INFO) << "number of successful Put() calls: "
+            << non_blocking_writes_num;
+
+  LOG(INFO) << Substitute(
+      "BlockingGet() rate: $0 calls/sec",
+      static_cast<double>(blocking_reads_num) / runtime_.ToSeconds());
+  LOG(INFO) << Substitute(
+      "BlockingPut() rate: $0 calls/sec",
+      static_cast<double>(blocking_writes_num) / runtime_.ToSeconds());
+  LOG(INFO) << Substitute(
+      "Put() (non-blocking) rate: $0 calls/sec",
+      static_cast<double>(non_blocking_writes_num) / runtime_.ToSeconds());
+  LOG(INFO) << Substitute(
+      "total Blocking{Get,Put}() rate: $0 calls/sec",
+      static_cast<double>(blocking_reads_num + blocking_writes_num) / runtime_.ToSeconds());
+  LOG(INFO) << Substitute(
+      "total rate: $0 calls/sec",
+      static_cast<double>(blocking_reads_num +
+                          blocking_writes_num +
+                          non_blocking_writes_num) / runtime_.ToSeconds());
 }
 
 }  // namespace kudu

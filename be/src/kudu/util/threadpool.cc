@@ -17,19 +17,17 @@
 
 #include "kudu/util/threadpool.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <ostream>
 #include <string>
-#include <utility>
 
-#include <boost/function.hpp> // IWYU pragma: keep
 #include <glog/logging.h>
 
-#include "kudu/gutil/callback.h"
-#include "kudu/gutil/macros.h"
 #include "kudu/gutil/map-util.h"
 #include "kudu/gutil/strings/substitute.h"
 #include "kudu/gutil/sysinfo.h"
@@ -47,38 +45,6 @@ using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 using strings::Substitute;
-
-////////////////////////////////////////////////////////
-// FunctionRunnable
-////////////////////////////////////////////////////////
-
-class FunctionRunnable : public Runnable {
- public:
-  explicit FunctionRunnable(boost::function<void()> func) : func_(std::move(func)) {}
-
-  void Run() OVERRIDE {
-    func_();
-  }
-
- private:
-  boost::function<void()> func_;
-};
-
-////////////////////////////////////////////////////////
-// ClosureRunnable
-////////////////////////////////////////////////////////
-
-class ClosureRunnable : public Runnable {
- public:
-  explicit ClosureRunnable(Closure cl) : cl_(std::move(cl)) {}
-
-  void Run() OVERRIDE {
-    cl_.Run();
-  }
-
- private:
-  Closure cl_;
-};
 
 ////////////////////////////////////////////////////////
 // ThreadPoolBuilder
@@ -123,6 +89,12 @@ ThreadPoolBuilder& ThreadPoolBuilder::set_metrics(ThreadPoolMetrics metrics) {
   return *this;
 }
 
+ThreadPoolBuilder& ThreadPoolBuilder::set_queue_overload_threshold(
+    const MonoDelta& threshold) {
+  queue_overload_threshold_ = threshold;
+  return *this;
+}
+
 Status ThreadPoolBuilder::Build(unique_ptr<ThreadPool>* pool) const {
   pool->reset(new ThreadPool(*this));
   return (*pool)->Init();
@@ -148,16 +120,8 @@ ThreadPoolToken::~ThreadPoolToken() {
   pool_->ReleaseToken(this);
 }
 
-Status ThreadPoolToken::SubmitClosure(Closure c) {
-  return Submit(std::make_shared<ClosureRunnable>(std::move(c)));
-}
-
-Status ThreadPoolToken::SubmitFunc(boost::function<void()> f) {
-  return Submit(std::make_shared<FunctionRunnable>(std::move(f)));
-}
-
-Status ThreadPoolToken::Submit(shared_ptr<Runnable> r) {
-  return pool_->DoSubmit(std::move(r), this);
+Status ThreadPoolToken::Submit(std::function<void()> f) {
+  return pool_->DoSubmit(std::move(f), this);
 }
 
 void ThreadPoolToken::Shutdown() {
@@ -199,7 +163,7 @@ void ThreadPoolToken::Shutdown() {
         break;
       }
       Transition(State::QUIESCING);
-      FALLTHROUGH_INTENDED;
+      [[fallthrough]];
     case State::QUIESCING:
       // The token is already quiescing. Just wait for a worker thread to
       // switch it to QUIESCED.
@@ -307,20 +271,20 @@ const char* ThreadPoolToken::StateToString(State s) {
 ////////////////////////////////////////////////////////
 
 ThreadPool::ThreadPool(const ThreadPoolBuilder& builder)
-  : name_(builder.name_),
-    min_threads_(builder.min_threads_),
-    max_threads_(builder.max_threads_),
-    max_queue_size_(builder.max_queue_size_),
-    idle_timeout_(builder.idle_timeout_),
-    pool_status_(Status::Uninitialized("The pool was not initialized.")),
-    idle_cond_(&lock_),
-    no_threads_cond_(&lock_),
-    num_threads_(0),
-    num_threads_pending_start_(0),
-    active_threads_(0),
-    total_queued_tasks_(0),
-    tokenless_(NewToken(ExecutionMode::CONCURRENT)),
-    metrics_(builder.metrics_) {
+    : name_(builder.name_),
+      min_threads_(builder.min_threads_),
+      max_threads_(builder.max_threads_),
+      max_queue_size_(builder.max_queue_size_),
+      idle_timeout_(builder.idle_timeout_),
+      pool_status_(Status::Uninitialized("The pool was not initialized.")),
+      idle_cond_(&lock_),
+      no_threads_cond_(&lock_),
+      num_threads_(0),
+      num_threads_pending_start_(0),
+      active_threads_(0),
+      total_queued_tasks_(0),
+      tokenless_(NewToken(ExecutionMode::CONCURRENT)),
+      metrics_(builder.metrics_) {
   string prefix = !builder.trace_metric_prefix_.empty() ?
       builder.trace_metric_prefix_ : builder.name_;
 
@@ -330,6 +294,11 @@ ThreadPool::ThreadPool(const ThreadPoolBuilder& builder)
       prefix + ".run_wall_time_us");
   run_cpu_time_trace_metric_name_ = TraceMetrics::InternName(
       prefix + ".run_cpu_time_us");
+
+  const auto& ovt = builder.queue_overload_threshold_;
+  if (ovt.Initialized() && ovt.ToNanoseconds() > 0) {
+    load_meter_.reset(new QueueLoadMeter(*this, ovt, max_threads_));
+  }
 }
 
 ThreadPool::~ThreadPool() {
@@ -438,6 +407,17 @@ unique_ptr<ThreadPoolToken> ThreadPool::NewTokenWithMetrics(
   return t;
 }
 
+bool ThreadPool::QueueOverloaded(MonoDelta* overloaded_time,
+                                 MonoDelta* threshold) const {
+  if (!load_meter_) {
+    return false;
+  }
+  if (threshold) {
+    *threshold = load_meter_->queue_time_threshold();
+  }
+  return load_meter_->overloaded(overloaded_time);
+}
+
 void ThreadPool::ReleaseToken(ThreadPoolToken* t) {
   MutexLock guard(lock_);
   CHECK(!t->IsActive()) << Substitute("Token with state $0 may not be released",
@@ -445,21 +425,13 @@ void ThreadPool::ReleaseToken(ThreadPoolToken* t) {
   CHECK_EQ(1, tokens_.erase(t));
 }
 
-Status ThreadPool::SubmitClosure(Closure c) {
-  return Submit(std::make_shared<ClosureRunnable>(std::move(c)));
+Status ThreadPool::Submit(std::function<void()> f) {
+  return DoSubmit(std::move(f), tokenless_.get());
 }
 
-Status ThreadPool::SubmitFunc(boost::function<void()> f) {
-  return Submit(std::make_shared<FunctionRunnable>(std::move(f)));
-}
-
-Status ThreadPool::Submit(shared_ptr<Runnable> r) {
-  return DoSubmit(std::move(r), tokenless_.get());
-}
-
-Status ThreadPool::DoSubmit(shared_ptr<Runnable> r, ThreadPoolToken* token) {
+Status ThreadPool::DoSubmit(std::function<void()> f, ThreadPoolToken* token) {
   DCHECK(token);
-  MonoTime submit_time = MonoTime::Now();
+  const MonoTime submit_time = MonoTime::Now();
 
   MutexLock guard(lock_);
   if (PREDICT_FALSE(!pool_status_.ok())) {
@@ -509,7 +481,7 @@ Status ThreadPool::DoSubmit(shared_ptr<Runnable> r, ThreadPoolToken* token) {
   }
 
   Task task;
-  task.runnable = std::move(r);
+  task.func = std::move(f);
   task.trace = Trace::CurrentTrace();
   // Need to AddRef, since the thread which submitted the task may go away,
   // and we don't want the trace to be destructed while waiting in the queue.
@@ -542,13 +514,22 @@ Status ThreadPool::DoSubmit(shared_ptr<Runnable> r, ThreadPoolToken* token) {
     idle_threads_.front().not_empty.Signal();
     idle_threads_.pop_front();
   }
+  NotifyLoadMeterUnlocked();
+
+  // Update the token's queue length histogram under a lock. Submitting a task
+  // via a pool token and destroying the token might be run concurrently by
+  // differen threads. If updating the metric after releasing the 'lock_', the
+  // destructor for the token might run after 'lock_' is released since the
+  // other thread might already be executing the code of the ThreadPoolToken's
+  // destructor, just waiting to acquire 'lock_' in ThreadPoolToken::Shutdown().
+  if (token->metrics_.queue_length_histogram) {
+    token->metrics_.queue_length_histogram->Increment(length_at_submit);
+  }
+
   guard.Unlock();
 
   if (metrics_.queue_length_histogram) {
     metrics_.queue_length_histogram->Increment(length_at_submit);
-  }
-  if (token->metrics_.queue_length_histogram) {
-    token->metrics_.queue_length_histogram->Increment(length_at_submit);
   }
 
   if (need_a_thread) {
@@ -566,7 +547,6 @@ Status ThreadPool::DoSubmit(shared_ptr<Runnable> r, ThreadPoolToken* token) {
                  << status.ToString();
     }
   }
-
 
   return Status::OK();
 }
@@ -619,6 +599,7 @@ void ThreadPool::DispatchThread() {
       //
       // Note: if FIFO behavior is desired, it's as simple as changing this to push_back().
       idle_threads_.push_front(me);
+      NotifyLoadMeterUnlocked();
       SCOPED_CLEANUP({
         // For some wake ups (i.e. Shutdown or DoSubmit) this thread is
         // guaranteed to be unlinked after being awakened. In others (i.e.
@@ -658,6 +639,10 @@ void ThreadPool::DispatchThread() {
     --total_queued_tasks_;
     ++active_threads_;
 
+    const MonoTime now(MonoTime::Now());
+    const MonoDelta queue_time = now - task.submit_time;
+    NotifyLoadMeterUnlocked(queue_time);
+
     unique_lock.Unlock();
 
     // Release the reference which was held by the queued item.
@@ -666,9 +651,8 @@ void ThreadPool::DispatchThread() {
       task.trace->Release();
     }
 
-    // Update metrics
-    MonoTime now(MonoTime::Now());
-    int64_t queue_time_us = (now - task.submit_time).ToMicroseconds();
+    // Update metrics.
+    const int64_t queue_time_us = queue_time.ToMicroseconds();
     TRACE_COUNTER_INCREMENT(queue_time_trace_metric_name_, queue_time_us);
     if (metrics_.queue_time_us_histogram) {
       metrics_.queue_time_us_histogram->Increment(queue_time_us);
@@ -682,7 +666,7 @@ void ThreadPool::DispatchThread() {
       MicrosecondsInt64 start_wall_us = GetMonoTimeMicros();
       MicrosecondsInt64 start_cpu_us = GetThreadCpuTimeMicros();
 
-      task.runnable->Run();
+      task.func();
 
       int64_t wall_us = GetMonoTimeMicros() - start_wall_us;
       int64_t cpu_us = GetThreadCpuTimeMicros() - start_cpu_us;
@@ -702,7 +686,7 @@ void ThreadPool::DispatchThread() {
     // objects, and we don't want to block submission of the threadpool.
     // In the worst case, the destructor might even try to do something
     // with this threadpool, and produce a deadlock.
-    task.runnable.reset();
+    task.func = nullptr;
     unique_lock.Lock();
 
     // Possible states:
@@ -721,6 +705,15 @@ void ThreadPool::DispatchThread() {
       } else if (token->mode() == ExecutionMode::SERIAL) {
         queue_.emplace_back(token);
       }
+    }
+    if (!queue_.empty()) {
+      // If the queue is empty, the LoadMeter is notified on next iteration of
+      // the outer while() loop under the 'if (queue_.empty())' clause. Here
+      // it's crucial to call NotifyLoadMeter() _before_ decrementing
+      // 'active_threads_' to avoid reporting this thread as a spare one despite
+      // the fact that it will run a task from the non-empty queue immediately
+      // on next iteration of the outer while() loop.
+      NotifyLoadMeterUnlocked();
     }
     if (--active_threads_ == 0) {
       idle_cond_.Broadcast();
@@ -746,7 +739,7 @@ void ThreadPool::DispatchThread() {
 
 Status ThreadPool::CreateThread() {
   return kudu::Thread::Create("thread pool", strings::Substitute("$0 [worker]", name_),
-                              &ThreadPool::DispatchThread, this, nullptr);
+                              [this]() { this->DispatchThread(); }, nullptr);
 }
 
 void ThreadPool::CheckNotPoolThreadUnlocked() {
@@ -756,6 +749,138 @@ void ThreadPool::CheckNotPoolThreadUnlocked() {
         "name '$1' called pool function that would result in deadlock",
         name_, current->name());
   }
+}
+
+void ThreadPool::NotifyLoadMeterUnlocked(const MonoDelta& queue_time) {
+  if (!load_meter_) {
+    return;
+  }
+
+  lock_.AssertAcquired();
+  MonoTime queue_head_submit_time;
+  if (!queue_.empty()) {
+    DCHECK(!queue_.front()->entries_.empty());
+    queue_head_submit_time = queue_.front()->entries_.front().submit_time;
+  }
+  load_meter_->UpdateQueueInfoUnlocked(queue_time,
+                                       queue_head_submit_time,
+                                       active_threads_ < max_threads_);
+}
+
+////////////////////////////////////////////////////////
+// ThreadPool::QueueLoadMeter
+////////////////////////////////////////////////////////
+
+ThreadPool::QueueLoadMeter::QueueLoadMeter(
+    const ThreadPool& tpool,
+    const MonoDelta& queue_time_threshold,
+    size_t queue_time_history_length)
+    : tpool_(tpool),
+      queue_time_threshold_(queue_time_threshold),
+      queue_time_history_length_(queue_time_history_length),
+      over_queue_threshold_num_(0),
+      queue_head_submit_time_(MonoTime()),
+      overloaded_since_(MonoTime()),
+      has_spare_thread_(true) {
+}
+
+bool ThreadPool::QueueLoadMeter::overloaded(MonoDelta* time_overloaded) {
+  // First, check whether the queue was overloaded upon the latest update
+  // on the queue from the ThreadPool's activity. If that's the case, there is
+  // no need to dig further.
+  MonoTime overloaded_since = overloaded_since_.load();
+  if (overloaded_since.Initialized()) {
+    if (time_overloaded) {
+      *time_overloaded = MonoTime::Now() - overloaded_since;
+    }
+    return true;
+  }
+
+  // Even if the queue was not overloaded upon the latest update on the
+  // ThreadPool's activity, the queue might have stalled because all its worker
+  // threads have been busy for long time. If so, 'overloaded_since_' hasn't
+  // been updated by the activity on the thread pool itself. However, it's
+  // possible to detect whether the queue has stalled by checking if the task
+  // at the head of the queue hasn't been dispatched for longer than
+  // queue_time_threshold_ time interval.
+  MonoTime queue_head_submit_time = queue_head_submit_time_.load();
+  if (!queue_head_submit_time.Initialized() || has_spare_thread_.load()) {
+    return false;
+  }
+
+  const auto now = MonoTime::Now();
+  const MonoDelta queue_time = now - queue_head_submit_time;
+  if (queue_time > queue_time_threshold_) {
+    MonoTime overloaded_since;
+    if (overloaded_since_.compare_exchange_strong(overloaded_since, now)) {
+      VLOG(3) << Substitute("state transition: normal --> overloaded");
+      if (time_overloaded) {
+        *time_overloaded = queue_time - queue_time_threshold_;
+      }
+      return true;
+    }
+    DCHECK(overloaded_since.Initialized());
+    if (time_overloaded) {
+      *time_overloaded = now - overloaded_since;
+    }
+    return true;
+  }
+
+  return false;
+}
+
+void ThreadPool::QueueLoadMeter::UpdateQueueInfoUnlocked(
+    const MonoDelta& task_queue_time,
+    const MonoTime& queue_head_submit_time,
+    bool has_spare_thread) {
+  tpool_.lock_.AssertAcquired();
+
+  if (task_queue_time.Initialized()) {
+    queue_times_.emplace_back(task_queue_time);
+    // Given the criterion to detect whether the queue is overloaded, it's not
+    // exactly necessary to track the running minimum of queue times for the
+    // specified history window. It's enough just to keep an eye on whether the
+    // window contains at least one element that's not over the threshold.
+    if (task_queue_time > queue_time_threshold_) {
+      ++over_queue_threshold_num_;
+    }
+    if (queue_times_.size() > queue_time_history_length_) {
+      const auto& elem = queue_times_.front();
+      if (elem > queue_time_threshold_) {
+        --over_queue_threshold_num_;
+      }
+      queue_times_.pop_front();
+    }
+  }
+  queue_head_submit_time_.store(queue_head_submit_time);
+  has_spare_thread_.store(has_spare_thread);
+
+  // Update the load state of the queue, storing appropriate information
+  // in the 'overloaded_since_' field.
+  const auto now = MonoTime::Now();
+  const bool queue_empty = !queue_head_submit_time.Initialized();
+  const auto queue_time = queue_empty
+      ? MonoDelta::FromSeconds(0) : now - queue_head_submit_time;
+  const bool was_overloaded = overloaded_since_.load().Initialized();
+  const bool overloaded = !has_spare_thread &&
+      (over_queue_threshold_num_ == queue_time_history_length_ ||
+       queue_time > queue_time_threshold_);
+  // Track the state transitions and update overloaded_since_.
+  if (!was_overloaded && overloaded) {
+    VLOG(3) << Substitute("state transition: normal --> overloaded");
+    overloaded_since_.store(now);
+  } else if (was_overloaded && !overloaded) {
+    VLOG(3) << Substitute("state transition: overloaded --> normal");
+    overloaded_since_.store(MonoTime());
+  }
+  VLOG(4) << Substitute("state refreshed: overloaded since $0, queue $1, "
+                        "has $2 thread, queue head submit time $3, "
+                        "queue time $4",
+                        overloaded_since_.load().ToString(),
+                        queue_empty ? "empty" : "not empty",
+                        has_spare_thread ? "spare" : "no spare",
+                        queue_head_submit_time.ToString(),
+                        queue_time.ToString());
 }
 
 std::ostream& operator<<(std::ostream& o, ThreadPoolToken::State s) {

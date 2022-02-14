@@ -31,19 +31,16 @@
 #include <vector>
 
 #include <gflags/gflags.h>
-#include <gflags/gflags_declare.h>
 #include <glog/logging.h>
 
 #include "kudu/gutil/atomic_refcount.h"
 #include "kudu/gutil/atomicops.h"
 #include "kudu/gutil/bits.h"
 #include "kudu/gutil/dynamic_annotations.h"
-#include "kudu/gutil/gscoped_ptr.h"
 #include "kudu/gutil/hash/city.h"
 #include "kudu/gutil/macros.h"
 #include "kudu/gutil/port.h"
 #include "kudu/gutil/ref_counted.h"
-#include "kudu/gutil/stl_util.h"
 #include "kudu/gutil/strings/substitute.h"
 #include "kudu/gutil/sysinfo.h"
 #include "kudu/util/cache.h"
@@ -54,6 +51,7 @@
 #include "kudu/util/scoped_cleanup.h"
 #include "kudu/util/slice.h"
 #include "kudu/util/status.h"
+#include "kudu/util/test_util_prod.h"
 
 #ifndef MEMKIND_PMEM_MIN_SIZE
 #define MEMKIND_PMEM_MIN_SIZE (1024 * 1024 * 16) // Taken from memkind 1.9.0.
@@ -73,10 +71,33 @@ DEFINE_bool(nvm_cache_simulate_allocation_failure, false,
             "for testing.");
 TAG_FLAG(nvm_cache_simulate_allocation_failure, unsafe);
 
+DEFINE_double(nvm_cache_usage_ratio, 1.25,
+             "A ratio to set the usage of nvm cache. The charge of an item in the nvm "
+             "cache is equal to the results of memkind_malloc_usable_size multiplied by "
+             "the ratio.");
+TAG_FLAG(nvm_cache_usage_ratio, advanced);
+
 using std::string;
 using std::unique_ptr;
 using std::vector;
 using strings::Substitute;
+
+static bool ValidateNVMCacheUsageRatio(const char* flagname, double value) {
+  if (value < 1.0) {
+    LOG(ERROR) << Substitute("$0 must be greater than or equal to 1.0, value $1 is invalid.",
+                             flagname, value);
+    return false;
+  }
+  if (value < 1.25) {
+    LOG(WARNING) << Substitute("The value of $0 is $1, it is less than recommended "
+                               "value (1.25). Due to memkind fragmentation, an improper "
+                               "ratio will cause allocation failures while capacity-based "
+                               "evictions are not triggered. Raise --nvm_cache_usage_ratio.",
+                               flagname, value);
+  }
+  return true;
+}
+DEFINE_validator(nvm_cache_usage_ratio, &ValidateNVMCacheUsageRatio);
 
 namespace kudu {
 
@@ -569,7 +590,7 @@ int DetermineShardBits() {
 class ShardedLRUCache : public Cache {
  private:
   unique_ptr<CacheMetrics> metrics_;
-  vector<NvmLRUCache*> shards_;
+  vector<unique_ptr<NvmLRUCache>> shards_;
 
   // Number of bits of hash used to determine the shard.
   const int shard_bits_;
@@ -594,14 +615,14 @@ class ShardedLRUCache : public Cache {
     int num_shards = 1 << shard_bits_;
     const size_t per_shard = (capacity + (num_shards - 1)) / num_shards;
     for (int s = 0; s < num_shards; s++) {
-      gscoped_ptr<NvmLRUCache> shard(new NvmLRUCache(vmp_));
+      unique_ptr<NvmLRUCache> shard(new NvmLRUCache(vmp_));
       shard->SetCapacity(per_shard);
-      shards_.push_back(shard.release());
+      shards_.emplace_back(std::move(shard));
     }
   }
 
   virtual ~ShardedLRUCache() {
-    STLDeleteElements(&shards_);
+    shards_.clear();
     // Per the note at the top of this file, our cache is entirely volatile.
     // Hence, when the cache is destructed, we delete the underlying
     // memkind pool.
@@ -636,10 +657,15 @@ class ShardedLRUCache : public Cache {
     return reinterpret_cast<LRUHandle*>(handle->get())->val_ptr();
   }
 
-  virtual void SetMetrics(unique_ptr<CacheMetrics> metrics) OVERRIDE {
+  virtual void SetMetrics(unique_ptr<CacheMetrics> metrics,
+                          Cache::ExistingMetricsPolicy metrics_policy) OVERRIDE {
+    if (metrics_ && metrics_policy == Cache::ExistingMetricsPolicy::kKeep) {
+      CHECK(IsGTest()) << "Metrics should only be set once per Cache";
+      return;
+    }
     metrics_ = std::move(metrics);
-    for (NvmLRUCache* cache : shards_) {
-      cache->SetMetrics(metrics_.get());
+    for (const auto& shard : shards_) {
+      shard->SetMetrics(metrics_.get());
     }
   }
   virtual UniquePendingHandle Allocate(Slice key, int val_len, int charge) OVERRIDE {
@@ -650,9 +676,9 @@ class ShardedLRUCache : public Cache {
     // Try allocating from each of the shards -- if memkind is tight,
     // this can cause eviction, so we might have better luck in different
     // shards.
-    for (NvmLRUCache* cache : shards_) {
+    for (const auto& shard : shards_) {
       UniquePendingHandle ph(static_cast<PendingHandle*>(
-          cache->Allocate(sizeof(LRUHandle) + key_len + val_len)),
+          shard->Allocate(sizeof(LRUHandle) + key_len + val_len)),
           Cache::PendingHandleDeleter(this));
       if (ph) {
         LRUHandle* handle = reinterpret_cast<LRUHandle*>(ph.get());
@@ -660,8 +686,11 @@ class ShardedLRUCache : public Cache {
         handle->kv_data = &buf[sizeof(LRUHandle)];
         handle->val_length = val_len;
         handle->key_length = key_len;
+        // Multiply the results of memkind_malloc_usable_size by a ratio
+        // due to the fragmentation is not counted in.
         handle->charge = (charge == kAutomaticCharge) ?
-            CALL_MEMKIND(memkind_malloc_usable_size, vmp_, buf) : charge;
+            CALL_MEMKIND(memkind_malloc_usable_size, vmp_, buf) * FLAGS_nvm_cache_usage_ratio :
+            charge;
         handle->hash = HashSlice(key);
         memcpy(handle->kv_data, key.data(), key.size());
         return ph;
@@ -677,7 +706,7 @@ class ShardedLRUCache : public Cache {
 
   size_t Invalidate(const InvalidationControl& ctl) override {
     size_t invalidated_count = 0;
-    for (auto& shard: shards_) {
+    for (const auto& shard: shards_) {
       invalidated_count += shard->Invalidate(ctl);
     }
     return invalidated_count;
@@ -701,6 +730,9 @@ Cache* NewCache<Cache::EvictionPolicy::LRU,
   CHECK_GE(capacity, MEMKIND_PMEM_MIN_SIZE)
     << "configured capacity " << capacity << " bytes is less than "
     << "the minimum capacity for an NVM cache: " << MEMKIND_PMEM_MIN_SIZE;
+
+  LOG(INFO) << 1 / FLAGS_nvm_cache_usage_ratio * 100 << "% capacity "
+            << "from nvm block cache is available due to memkind fragmentation.";
 
   memkind* vmp;
   int err = CALL_MEMKIND(memkind_create_pmem, FLAGS_nvm_cache_path.c_str(), capacity, &vmp);

@@ -45,6 +45,15 @@ SANITIZER_HOOK_ATTRIBUTE const char *__asan_default_options() {
   // file paths in symbolized reports.
   "strip_path_prefix=/../ ";
 }
+
+SANITIZER_HOOK_ATTRIBUTE const char *__asan_default_suppressions() {
+  return
+  // Ignore buffer overflow in sasl_seterror() (see: KUDU-3274)
+  // TODO(abukor): remove this suppression once it's fixed upstream and
+  // backported to CentOS 7.
+  "interceptor_via_fun:sasl_seterror";
+}
+
 #endif  // ADDRESS_SANITIZER
 
 #if defined(THREAD_SANITIZER)
@@ -165,7 +174,11 @@ SANITIZER_HOOK_ATTRIBUTE const char *__tsan_default_suppressions() {
   // This is carried out by OPENSSL_cleanup, but TSAN's unwinder doesn't
   // include any stack frame above the libcrypto lock destruction or memory release
   // call for some reason, so we have to do something more generic.
-  "called_from_lib:libcrypto.so\n";
+  "called_from_lib:libcrypto.so\n"
+
+  // KUDU-2059: there may be outstanding reactor threads in DnsResolver at the
+  // time that the KuduClient (and DnsResolver) is destroyed.
+  "race:kudu::DnsResolver::ResolveAddressesAsync\n";
 }
 #endif  // THREAD_SANITIZER
 
@@ -189,6 +202,10 @@ SANITIZER_HOOK_ATTRIBUTE const char *__lsan_default_suppressions() {
   // False positive from krb5 < 1.12
   // Fixed by upstream commit 379d39c17b8930718e98185a5b32a0f7f3e3b4b6
   "leak:krb5_authdata_import_attributes\n"
+
+  // KUDU-2700: OpenSSL 1.1 has a leak in libcrypto.so when running tests
+  // that use the CLI to connect to a remote server.
+  "leak:libcrypto.so.1.1\n"
 
   // KUDU-2653: Memory leak in libgssapi_krb5 [1]. Exists in certain patched
   // versions of krb5-1.12 (such as krb5 in Debian 8).

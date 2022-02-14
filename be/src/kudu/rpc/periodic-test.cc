@@ -15,8 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "kudu/rpc/periodic.h"
+
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -27,7 +30,6 @@
 #include <gtest/gtest.h>
 
 #include "kudu/rpc/messenger.h"
-#include "kudu/rpc/periodic.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/scoped_cleanup.h"
 #include "kudu/util/stopwatch.h"
@@ -97,9 +99,9 @@ class JitteredPeriodicTimerTest : public PeriodicTimerTest,
   shared_ptr<PeriodicTimer> timer_;
 };
 
-INSTANTIATE_TEST_CASE_P(AllJitterModes,
-                        JitteredPeriodicTimerTest,
-                        ::testing::Values(0.0, 0.25));
+INSTANTIATE_TEST_SUITE_P(AllJitterModes,
+                         JitteredPeriodicTimerTest,
+                         ::testing::Values(0.0, 0.25));
 
 TEST_P(JitteredPeriodicTimerTest, TestStartStop) {
   // Before the timer starts, the counter's value should not change.
@@ -208,9 +210,9 @@ class JitteredOneShotPeriodicTimerTest : public JitteredPeriodicTimerTest {
   }
 };
 
-INSTANTIATE_TEST_CASE_P(AllJitterModes,
-                        JitteredOneShotPeriodicTimerTest,
-                        ::testing::Values(0.0, 0.25));
+INSTANTIATE_TEST_SUITE_P(AllJitterModes,
+                         JitteredOneShotPeriodicTimerTest,
+                         ::testing::Values(0.0, 0.25));
 
 TEST_P(JitteredOneShotPeriodicTimerTest, TestBasics) {
   // Kick off the one-shot timer a few times.

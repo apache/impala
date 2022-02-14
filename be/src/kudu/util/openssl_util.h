@@ -17,19 +17,28 @@
 
 #pragma once
 
+#include <openssl/err.h>
+#include <openssl/pem.h>
+#include <openssl/ssl.h>
+#include <openssl/x509.h>
+
 #include <functional>
 #include <memory>
 #include <ostream>
 #include <string>
 
 #include <glog/logging.h>
-#include <openssl/err.h>
-#include <openssl/pem.h>
-#include <openssl/ssl.h>
-#include <openssl/x509.h>
 
 #include "kudu/gutil/port.h"
 #include "kudu/util/status.h"
+
+namespace kudu {
+namespace security {
+namespace internal {
+struct ScopedCheckNoPendingSSLErrors;
+}  // namespace internal
+}  // namespace security
+}  // namespace kudu
 
 // Forward declarations for the OpenSSL typedefs.
 typedef struct X509_req_st X509_REQ;
@@ -44,12 +53,12 @@ typedef struct x509_st X509;
 
 #define OPENSSL_RET_NOT_OK(call, msg) \
   if ((call) <= 0) { \
-    return Status::RuntimeError((msg), GetOpenSSLErrors()); \
+    return Status::RuntimeError((msg), security::GetOpenSSLErrors()); \
   }
 
 #define OPENSSL_RET_IF_NULL(call, msg) \
   if ((call) == nullptr) { \
-    return Status::RuntimeError((msg), GetOpenSSLErrors()); \
+    return Status::RuntimeError((msg), security::GetOpenSSLErrors()); \
   }
 
 // Scoped helper which DCHECKs that on both scope entry and exit, there are no
@@ -107,6 +116,14 @@ std::string GetSSLErrorDescription(int error_code);
 // An error Status object is returned otherwise.
 Status GetPasswordFromShellCommand(const std::string& cmd, std::string* password);
 
+// Retrieve the negotiated TLS protocol version. Only valid after the
+// TLS handshake is complete.
+std::string GetProtocolName(const SSL* ssl);
+
+// Retrive the description of the negotiated TLS cipher.
+// Only valid to call after the handshake is complete.
+std::string GetCipherDescription(const SSL* ssl);
+
 // A generic wrapper for OpenSSL structures.
 template <typename T>
 using c_unique_ptr = std::unique_ptr<T, std::function<void(T*)>>;
@@ -154,6 +171,9 @@ template<> struct SslTypeTraits<EVP_PKEY> {
 };
 template<> struct SslTypeTraits<SSL_CTX> {
   static constexpr auto kFreeFunc = &SSL_CTX_free;
+};
+template<> struct SslTypeTraits<BIO> {
+  static constexpr auto kFreeFunc = &BIO_free;
 };
 
 template<typename SSL_TYPE, typename Traits = SslTypeTraits<SSL_TYPE>>

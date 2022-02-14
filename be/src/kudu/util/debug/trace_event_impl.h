@@ -1,13 +1,13 @@
 // Copyright (c) 2012 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
-#ifndef KUDU_UTIL_DEBUG_TRACE_EVENT_IMPL_H_
-#define KUDU_UTIL_DEBUG_TRACE_EVENT_IMPL_H_
+#pragma once
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <iosfwd>
+#include <memory>
 #include <stack>
 #include <string>
 #include <unordered_map>
@@ -17,9 +17,6 @@
 #include <gtest/gtest_prod.h>
 
 #include "kudu/gutil/atomicops.h"
-#include "kudu/gutil/bind_helpers.h"
-#include "kudu/gutil/callback.h"
-#include "kudu/gutil/gscoped_ptr.h"
 #include "kudu/gutil/macros.h"
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/gutil/spinlock.h"
@@ -89,7 +86,7 @@ struct TraceEventHandle {
 
 const int kTraceMaxNumArgs = 2;
 
-class BASE_EXPORT TraceEvent {
+class TraceEvent {
  public:
   union TraceValue {
     bool as_bool;
@@ -182,7 +179,7 @@ class BASE_EXPORT TraceEvent {
 };
 
 // TraceBufferChunk is the basic unit of TraceBuffer.
-class BASE_EXPORT TraceBufferChunk {
+class TraceBufferChunk {
  public:
   explicit TraceBufferChunk(uint32_t seq)
       : next_free_(0),
@@ -206,7 +203,7 @@ class BASE_EXPORT TraceBufferChunk {
     return &chunk_[index];
   }
 
-  gscoped_ptr<TraceBufferChunk> Clone() const;
+  std::unique_ptr<TraceBufferChunk> Clone() const;
 
   static const size_t kTraceBufferChunkSize = 64;
 
@@ -217,13 +214,13 @@ class BASE_EXPORT TraceBufferChunk {
 };
 
 // TraceBuffer holds the events as they are collected.
-class BASE_EXPORT TraceBuffer {
+class TraceBuffer {
  public:
   virtual ~TraceBuffer() {}
 
-  virtual gscoped_ptr<TraceBufferChunk> GetChunk(size_t *index) = 0;
+  virtual std::unique_ptr<TraceBufferChunk> GetChunk(size_t *index) = 0;
   virtual void ReturnChunk(size_t index,
-                           gscoped_ptr<TraceBufferChunk> chunk) = 0;
+                           std::unique_ptr<TraceBufferChunk> chunk) = 0;
 
   virtual bool IsFull() const = 0;
   virtual size_t Size() const = 0;
@@ -233,7 +230,7 @@ class BASE_EXPORT TraceBuffer {
   // For iteration. Each TraceBuffer can only be iterated once.
   virtual const TraceBufferChunk* NextChunk() = 0;
 
-  virtual gscoped_ptr<TraceBuffer> CloneForIteration() const = 0;
+  virtual std::unique_ptr<TraceBuffer> CloneForIteration() const = 0;
 };
 
 // TraceResultBuffer collects and converts trace fragments returned by TraceLog
@@ -257,7 +254,7 @@ class TraceResultBuffer {
   std::string json_;
 };
 
-class BASE_EXPORT CategoryFilter {
+class CategoryFilter {
  public:
   typedef std::vector<std::string> StringList;
 
@@ -344,7 +341,7 @@ class BASE_EXPORT CategoryFilter {
 
 class TraceSamplingThread;
 
-class BASE_EXPORT TraceLog {
+class TraceLog {
  public:
   enum Mode {
     DISABLED = 0,
@@ -439,7 +436,6 @@ class BASE_EXPORT TraceLog {
   float GetBufferPercentFull() const;
   bool BufferIsFull() const;
 
-  // Not using kudu::Callback because of its limited by 7 parameters.
   // Also, using primitive type allows directly passing callback from WebCore.
   // WARNING: It is possible for the previously set callback to be called
   // after a call to SetEventCallbackEnabled() that replaces or a call to
@@ -473,8 +469,8 @@ class BASE_EXPORT TraceLog {
   // done when tracing is enabled. If called when tracing is enabled, the
   // callback will be called directly with (empty_string, false) to indicate
   // the end of this unsuccessful flush.
-  typedef kudu::Callback<void(const scoped_refptr<kudu::RefCountedString>&,
-                              bool has_more_events)> OutputCallback;
+  typedef std::function<void(const scoped_refptr<kudu::RefCountedString>&,
+                             bool has_more_events)> OutputCallback;
   void Flush(const OutputCallback& cb);
   void FlushButLeaveBufferIntact(const OutputCallback& flush_output_callback);
 
@@ -526,7 +522,7 @@ class BASE_EXPORT TraceLog {
                                 TraceEventHandle handle);
 
   // For every matching event, the callback will be called.
-  typedef kudu::Callback<void()> WatchEventCallback;
+  typedef std::function<void()> WatchEventCallback;
   void SetWatchEvent(const std::string& category_name,
                      const std::string& event_name,
                      const WatchEventCallback& callback);
@@ -591,9 +587,9 @@ class BASE_EXPORT TraceLog {
   // category filter.
   void UpdateSyntheticDelaysFromCategoryFilter();
 
-  struct PerThreadInfo;
   class OptionalAutoLock;
   class ThreadLocalEventBuffer;
+  struct PerThreadInfo;
 
   TraceLog();
   ~TraceLog();
@@ -615,8 +611,8 @@ class BASE_EXPORT TraceLog {
   TraceEvent* GetEventByHandleInternal(TraceEventHandle handle,
                                        OptionalAutoLock* lock);
 
-  void ConvertTraceEventsToTraceFormat(gscoped_ptr<TraceBuffer> logged_events,
-                                       const OutputCallback& flush_output_callback);
+  static void ConvertTraceEventsToTraceFormat(std::unique_ptr<TraceBuffer> logged_events,
+                                              const OutputCallback& flush_output_callback);
   void FinishFlush(int generation,
                    const OutputCallback& flush_output_callback);
 
@@ -654,7 +650,7 @@ class BASE_EXPORT TraceLog {
   int locked_line_;
   Mode mode_;
   int num_traces_recorded_;
-  gscoped_ptr<TraceBuffer> logged_events_;
+  std::unique_ptr<TraceBuffer> logged_events_;
   AtomicWord /* EventCallback */ event_callback_;
   bool dispatching_to_observer_list_;
   std::vector<EnabledStateObserver*> enabled_state_observer_list_;
@@ -684,7 +680,7 @@ class BASE_EXPORT TraceLog {
   AtomicWord /* Options */ trace_options_;
 
   // Sampling thread handles.
-  gscoped_ptr<TraceSamplingThread> sampling_thread_;
+  std::unique_ptr<TraceSamplingThread> sampling_thread_;
   scoped_refptr<kudu::Thread> sampling_thread_handle_;
 
   CategoryFilter category_filter_;
@@ -708,7 +704,7 @@ class BASE_EXPORT TraceLog {
 
   // For events which can't be added into the thread local buffer, e.g. events
   // from threads without a message loop.
-  gscoped_ptr<TraceBufferChunk> thread_shared_chunk_;
+  std::unique_ptr<TraceBufferChunk> thread_shared_chunk_;
   size_t thread_shared_chunk_index_;
 
   // The generation is incremented whenever tracing is enabled, and incremented
@@ -722,5 +718,3 @@ class BASE_EXPORT TraceLog {
 
 }  // namespace debug
 }  // namespace kudu
-
-#endif  // KUDU_UTIL_DEBUG_TRACE_EVENT_IMPL_H_

@@ -66,12 +66,22 @@ void CheckStandardFds() {
 
 Status CheckCPUFlags() {
   base::CPU cpu;
+  if (!cpu.has_broken_neon() && cpu.cpu_brand()=="ARM64") {
+    return Status::OK();
+  }
   if (!cpu.has_sse42()) {
     return BadCPUStatus(cpu, "SSE4.2");
   }
 
   if (!cpu.has_ssse3()) {
     return BadCPUStatus(cpu, "SSSE3");
+  }
+
+  // POPCNT should always be present on machines with SSE4.2 support, but just in case
+  // there's some sort of weird missing support in virtualized environments, we'll check
+  // it explicitly.
+  if (!cpu.has_popcnt()) {
+    return BadCPUStatus(cpu, "POPCNT");
   }
 
   return Status::OK();

@@ -28,6 +28,7 @@
 #include <glog/logging.h>
 
 #include "kudu/gutil/basictypes.h"
+#include "kudu/gutil/port.h"
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/gutil/strings/join.h"
 #include "kudu/gutil/strings/substitute.h"
@@ -89,8 +90,10 @@ ServicePool::~ServicePool() {
 Status ServicePool::Init(int num_threads) {
   for (int i = 0; i < num_threads; i++) {
     scoped_refptr<kudu::Thread> new_thread;
-    CHECK_OK(kudu::Thread::Create("service pool", "rpc worker",
-        &ServicePool::RunThread, this, &new_thread));
+    CHECK_OK(kudu::Thread::Create(
+        Substitute("service pool $0", service_->service_name()),
+        "rpc worker",
+        [this]() { this->RunThread(); }, &new_thread));
     threads_.push_back(new_thread);
   }
   return Status::OK();
@@ -126,6 +129,10 @@ void ServicePool::RejectTooBusy(InboundCall* c) {
                  c->remote_address().ToString(),
                  service_queue_.max_size());
   rpcs_queue_overflow_->Increment();
+  auto* minfo = c->method_info();
+  if (minfo) {
+    minfo->queue_overflow_rejections->Increment();
+  }
   KLOG_EVERY_N_SECS(WARNING, 1) << err_msg << THROTTLE_MSG;
   c->RespondFailure(ErrorStatusPB::ERROR_SERVER_TOO_BUSY,
                     Status::ServiceUnavailable(err_msg));
@@ -226,7 +233,7 @@ void ServicePool::RunThread() {
   }
 }
 
-const string ServicePool::service_name() const {
+const string& ServicePool::service_name() const {
   return service_->service_name();
 }
 

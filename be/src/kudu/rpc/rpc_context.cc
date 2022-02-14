@@ -70,7 +70,7 @@ void RpcContext::SetResultTracker(scoped_refptr<ResultTracker> result_tracker) {
 void RpcContext::RespondSuccess() {
   if (AreResultsTracked()) {
     result_tracker_->RecordCompletionAndRespond(call_->header().request_id(),
-                                                response_pb_.get());
+                                                response_pb_);
   } else {
     VLOG(4) << call_->remote_method().service_name() << ": Sending RPC success response for "
         << call_->ToString() << ":" << std::endl << SecureDebugString(*response_pb_);
@@ -85,7 +85,7 @@ void RpcContext::RespondSuccess() {
 void RpcContext::RespondNoCache() {
   if (AreResultsTracked()) {
     result_tracker_->FailAndRespond(call_->header().request_id(),
-                                    response_pb_.get());
+                                    response_pb_);
   } else {
     VLOG(4) << call_->remote_method().service_name() << ": Sending RPC failure response for "
         << call_->ToString() << ": " << SecureDebugString(*response_pb_);
@@ -143,6 +143,10 @@ const rpc::RequestIdPB* RpcContext::request_id() const {
   return call_->header().has_request_id() ? &call_->header().request_id() : nullptr;
 }
 
+int32_t RpcContext::call_id() const {
+  return call_->call_id();
+}
+
 size_t RpcContext::GetTransferSize() const {
   return call_->GetTransferSize();
 }
@@ -176,11 +180,11 @@ std::string RpcContext::requestor_string() const {
     call_->remote_address().ToString();
 }
 
-std::string RpcContext::method_name() const {
+const std::string& RpcContext::method_name() const {
   return call_->remote_method().method_name();
 }
 
-std::string RpcContext::service_name() const {
+const std::string& RpcContext::service_name() const {
   return call_->remote_method().service_name();
 }
 

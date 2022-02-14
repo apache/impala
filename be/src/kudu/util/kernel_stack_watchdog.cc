@@ -19,14 +19,14 @@
 
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <mutex>
 #include <ostream>
 #include <string>
 #include <utility>
 
-#include <boost/bind.hpp>
-#include <glog/logging.h>
 #include <gflags/gflags.h>
+#include <glog/logging.h>
 
 #include "kudu/gutil/dynamic_annotations.h"
 #include "kudu/gutil/map-util.h"
@@ -70,7 +70,7 @@ KernelStackWatchdog::KernelStackWatchdog()
   // try to call back into initializing the stack watchdog, and will self-deadlock.
   CHECK_OK(Thread::CreateWithFlags(
       "kernel-watchdog", "kernel-watcher",
-      boost::bind(&KernelStackWatchdog::RunThread, this),
+      [this]() { this->RunThread(); },
       Thread::NO_STACK_WATCHDOG,
       &thread_));
 }

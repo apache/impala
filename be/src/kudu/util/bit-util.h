@@ -17,7 +17,8 @@
 #ifndef IMPALA_BIT_UTIL_H
 #define IMPALA_BIT_UTIL_H
 
-#include <stdint.h>
+#include <cstdint>
+
 #include "kudu/gutil/port.h"
 
 namespace kudu {
@@ -29,6 +30,16 @@ class BitUtil {
   // Returns the ceil of value/divisor
   static inline int Ceil(int value, int divisor) {
     return value / divisor + (value % divisor != 0);
+  }
+
+  // Similar to the above, but a bit optimized for the case when the divisor
+  // is a power of two: LOG2_DIV is log2(divisor), e.g. 3 for the divisor of 8.
+  template <int LOG2_DIV>
+  static inline int Ceil(int value) {
+    constexpr int kDivisor = 1 << LOG2_DIV;
+    constexpr int kComplement = kDivisor - 1;
+    constexpr int kComplementMask = -kDivisor;
+    return ((value + kComplement) & kComplementMask) >> LOG2_DIV;
   }
 
   // Returns the 'num_bits' least-significant bits of 'v'.
@@ -48,8 +59,6 @@ class BitUtil {
     if (PREDICT_FALSE(num_bits >= 64)) return 0;
     return v >> num_bits;
   }
-
-
 };
 
 } // namespace kudu

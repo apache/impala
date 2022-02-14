@@ -15,11 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "kudu/util/minidump.h"
+
 #include <unistd.h>
 
 #include <csignal>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
+#include <initializer_list>
 #include <ostream>
 #include <string>
 #include <vector>
@@ -28,11 +32,10 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
-#include "kudu/util/minidump.h"
-#include "kudu/util/path_util.h"
-#include "kudu/util/test_macros.h"
 #include "kudu/util/env.h"
+#include "kudu/util/path_util.h"
 #include "kudu/util/status.h"
+#include "kudu/util/test_macros.h"
 #include "kudu/util/test_util.h"
 
 using std::string;
@@ -143,7 +146,7 @@ TEST_P(MinidumpSignalDeathTest, TestHaveMinidumpAndStackTrace) {
   NO_FATALS(WaitForMinidumps(num_expected_minidumps, minidump_handler.minidump_dir()));
 }
 
-INSTANTIATE_TEST_CASE_P(DeadlySignals, MinidumpSignalDeathTest,
-    ::testing::Values(SIGABRT, SIGBUS, SIGSEGV, SIGILL, SIGFPE, SIGTERM));
+INSTANTIATE_TEST_SUITE_P(DeadlySignals, MinidumpSignalDeathTest,
+                         ::testing::Values(SIGABRT, SIGBUS, SIGSEGV, SIGILL, SIGFPE, SIGTERM));
 
 } // namespace kudu

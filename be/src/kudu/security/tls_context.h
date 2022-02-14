@@ -18,6 +18,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -25,19 +26,17 @@
 #include <boost/optional/optional.hpp>
 
 #include "kudu/gutil/port.h"
-#include "kudu/security/openssl_util.h"
-#include "kudu/security/tls_handshake.h"
+#include "kudu/security/cert.h" // IWYU pragma: keep
 #include "kudu/util/locks.h"
+#include "kudu/util/openssl_util.h"
 #include "kudu/util/rw_mutex.h"
 #include "kudu/util/status.h"
-// IWYU pragma: no_include "kudu/security/cert.h"
 
 namespace kudu {
 namespace security {
 
-class Cert;           // IWYU pragma: keep
-class CertSignRequest;// IWYU pragma: keep
 class PrivateKey;
+class TlsHandshake;
 
 // TlsContext wraps data required by the OpenSSL library for creating and
 // accepting TLS protected channels. A single TlsContext instance should be used
@@ -72,7 +71,19 @@ class TlsContext {
 
   TlsContext();
 
-  TlsContext(std::string tls_ciphers, std::string tls_min_protocol);
+  // Create TLS context using the specified parameters:
+  //  * tls_ciphers
+  //      cipher suites preference list for TLSv1.2 and prior versions
+  //  * tls_ciphersuites
+  //      cipher suites preference list for TLSv1.3
+  //  * tls_min_protocol
+  //      minimum TLS protocol version to enable
+  //  * tls_excluded_protocols
+  //      TLS protocol versions to exclude from the list of enabled ones
+  TlsContext(std::string tls_ciphers,
+             std::string tls_ciphersuites,
+             std::string tls_min_protocol,
+             std::vector<std::string> tls_excluded_protocols = {});
 
   ~TlsContext() = default;
 
@@ -161,8 +172,7 @@ class TlsContext {
   Status LoadCertificateAuthority(const std::string& certificate_path) WARN_UNUSED_RESULT;
 
   // Initiates a new TlsHandshake instance.
-  Status InitiateHandshake(TlsHandshakeType handshake_type,
-                           TlsHandshake* handshake) const WARN_UNUSED_RESULT;
+  Status InitiateHandshake(TlsHandshake* handshake) const WARN_UNUSED_RESULT;
 
   // Return the number of certs that have been marked as trusted.
   // Used by tests.
@@ -177,13 +187,26 @@ class TlsContext {
 
   Status VerifyCertChainUnlocked(const Cert& cert) WARN_UNUSED_RESULT;
 
-  // The cipher suite preferences to use for TLS-secured RPC connections. Uses the OpenSSL
-  // cipher preference list format. See man (1) ciphers for more information.
+  // The cipher suite preferences to use for RPC connections secured with
+  // pre-TLSv1.3 protocols. Uses the OpenSSL cipher preference list format.
+  // See man (1) ciphers for more information.
   std::string tls_ciphers_;
 
-  // The minimum protocol version to allow when for securing RPC connections with TLS. May be
-  // one of 'TLSv1', 'TLSv1.1', or 'TLSv1.2'.
+  // TLSv1.3-specific ciphersuites. These are controlled separately from the
+  // pre-TLSv1.3 ones because the OpenSSL API provides separate calls to set
+  // those and the syntax for the TLSv1.3 list differs from the syntax for
+  // the legacy pre-TLSv1.3 ones. See man (1) ciphers for more information.
+  std::string tls_ciphersuites_;
+
+  // The minimum protocol version to allow for securing RPC connections with
+  // TLS. May be one of 'TLSv1', 'TLSv1.1', 'TLSv1.2', 'TLSv1.3'.
   std::string tls_min_protocol_;
+
+  // TLS protocol versions to exclude from the list of acceptable ones to secure
+  // RPC connections with TLS. An empty container means the set of acceptable
+  // protocol version is defined by 'tls_min_protocol_' and the OpenSSL library
+  // itself.
+  std::vector<std::string> tls_excluded_protocols_;
 
   // Protects all members.
   //

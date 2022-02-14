@@ -17,38 +17,43 @@
 
 #include "kudu/util/maintenance_manager.h"
 
-#include <math.h>
-
 #include <algorithm>
 #include <atomic>
+#include <cmath>
+#include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <list>
 #include <memory>
 #include <mutex>
 #include <ostream>
 #include <string>
+#include <thread>
 #include <utility>
+#include <vector>
 
-#include <boost/bind.hpp> // IWYU pragma: keep
 #include <gflags/gflags_declare.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/gutil/strings/substitute.h"
+#include "kudu/util/countdown_latch.h"
+#include "kudu/util/locks.h"
 #include "kudu/util/maintenance_manager.pb.h"
+#include "kudu/util/maintenance_manager_metrics.h"
 #include "kudu/util/metrics.h"
 #include "kudu/util/monotime.h"
-#include "kudu/util/mutex.h"
 #include "kudu/util/scoped_cleanup.h"
-#include "kudu/util/status.h"
 #include "kudu/util/test_macros.h"
 #include "kudu/util/test_util.h"
-#include "kudu/util/thread.h"
 
 using std::list;
 using std::shared_ptr;
 using std::string;
+using std::thread;
+using std::unique_ptr;
+using std::vector;
 using strings::Substitute;
 
 METRIC_DEFINE_entity(test);
@@ -67,55 +72,22 @@ DECLARE_bool(enable_maintenance_manager);
 DECLARE_int64(log_target_replay_size_mb);
 DECLARE_double(maintenance_op_multiplier);
 DECLARE_int32(max_priority_range);
-
 namespace kudu {
 
-static const int kHistorySize = 7;
+// Set this a bit bigger so that the manager could keep track of all possible completed ops.
+static const int kHistorySize = 10;
 static const char kFakeUuid[] = "12345";
-
-class MaintenanceManagerTest : public KuduTest {
- public:
-  void SetUp() override {
-    StartManager(2);
-  }
-
-  void TearDown() override {
-    StopManager();
-  }
-
-  void StartManager(int32_t num_threads) {
-    MaintenanceManager::Options options;
-    options.num_threads = num_threads;
-    options.polling_interval_ms = 1;
-    options.history_size = kHistorySize;
-    manager_.reset(new MaintenanceManager(options, kFakeUuid));
-    manager_->set_memory_pressure_func_for_tests(
-        [&](double* consumption) {
-          return indicate_memory_pressure_.load();
-        });
-    ASSERT_OK(manager_->Start());
-  }
-
-  void StopManager() {
-    manager_->Shutdown();
-  }
-
- protected:
-  shared_ptr<MaintenanceManager> manager_;
-  std::atomic<bool> indicate_memory_pressure_ { false };
-};
-
-// Just create the MaintenanceManager and then shut it down, to make sure
-// there are no race conditions there.
-TEST_F(MaintenanceManagerTest, TestCreateAndShutdown) {
-}
 
 class TestMaintenanceOp : public MaintenanceOp {
  public:
   TestMaintenanceOp(const std::string& name,
                     IOUsage io_usage,
-                    int32_t priority = 0)
+                    int32_t priority = 0,
+                    CountDownLatch* start_stats_latch = nullptr,
+                    CountDownLatch* continue_stats_latch = nullptr)
     : MaintenanceOp(name, io_usage),
+      start_stats_latch_(start_stats_latch),
+      continue_stats_latch_(continue_stats_latch),
       ram_anchored_(500),
       logs_retained_bytes_(0),
       perf_improvement_(0),
@@ -125,13 +97,16 @@ class TestMaintenanceOp : public MaintenanceOp {
       remaining_runs_(1),
       prepared_runs_(0),
       sleep_time_(MonoDelta::FromSeconds(0)),
-      priority_(priority) {
+      update_stats_time_(MonoDelta::FromSeconds(0)),
+      priority_(priority),
+      workload_score_(0),
+      update_stats_count_(0) {
   }
 
   ~TestMaintenanceOp() override = default;
 
   bool Prepare() override {
-    std::lock_guard<Mutex> guard(lock_);
+    std::lock_guard<simple_spinlock> guard(lock_);
     if (remaining_runs_ == 0) {
       return false;
     }
@@ -143,7 +118,7 @@ class TestMaintenanceOp : public MaintenanceOp {
 
   void Perform() override {
     {
-      std::lock_guard<Mutex> guard(lock_);
+      std::lock_guard<simple_spinlock> guard(lock_);
       DLOG(INFO) << "Performing op " << name();
 
       // Ensure that we don't call Perform() more times than we returned
@@ -153,39 +128,70 @@ class TestMaintenanceOp : public MaintenanceOp {
     }
 
     SleepFor(sleep_time_);
+
+    {
+      std::lock_guard<simple_spinlock> guard(lock_);
+      completed_at_ = MonoTime::Now();
+    }
   }
 
   void UpdateStats(MaintenanceOpStats* stats) override {
-    std::lock_guard<Mutex> guard(lock_);
+    if (start_stats_latch_) {
+      start_stats_latch_->CountDown();
+      DCHECK_NOTNULL(continue_stats_latch_)->Wait();
+    }
+
+    if (update_stats_time_.ToNanoseconds() > 0) {
+      const auto run_until = MonoTime::Now() + update_stats_time_;
+      volatile size_t cnt = 0;
+      while (MonoTime::Now() < run_until) {
+        ++cnt;
+      }
+    }
+
+    std::lock_guard<simple_spinlock> guard(lock_);
     stats->set_runnable(remaining_runs_ > 0);
     stats->set_ram_anchored(ram_anchored_);
     stats->set_logs_retained_bytes(logs_retained_bytes_);
     stats->set_perf_improvement(perf_improvement_);
+    stats->set_workload_score(workload_score_);
+
+    ++update_stats_count_;
   }
 
   void set_remaining_runs(int runs) {
-    std::lock_guard<Mutex> guard(lock_);
+    std::lock_guard<simple_spinlock> guard(lock_);
     remaining_runs_ = runs;
   }
 
   void set_sleep_time(MonoDelta time) {
-    std::lock_guard<Mutex> guard(lock_);
+    std::lock_guard<simple_spinlock> guard(lock_);
     sleep_time_ = time;
   }
 
+  void set_update_stats_time(MonoDelta time) {
+    std::lock_guard<simple_spinlock> guard(lock_);
+    update_stats_time_ = time;
+  }
+
   void set_ram_anchored(uint64_t ram_anchored) {
-    std::lock_guard<Mutex> guard(lock_);
+    std::lock_guard<simple_spinlock> guard(lock_);
     ram_anchored_ = ram_anchored;
   }
 
   void set_logs_retained_bytes(uint64_t logs_retained_bytes) {
-    std::lock_guard<Mutex> guard(lock_);
+    std::lock_guard<simple_spinlock> guard(lock_);
     logs_retained_bytes_ = logs_retained_bytes;
   }
 
   void set_perf_improvement(uint64_t perf_improvement) {
-    std::lock_guard<Mutex> guard(lock_);
+    std::lock_guard<simple_spinlock> guard(lock_);
     perf_improvement_ = perf_improvement;
+  }
+
+  void set_workload_score(uint64_t workload_score) {
+    std::lock_guard<simple_spinlock> guard(lock_);
+    workload_score_ = workload_score;
   }
 
   scoped_refptr<Histogram> DurationHistogram() const override {
@@ -201,12 +207,30 @@ class TestMaintenanceOp : public MaintenanceOp {
   }
 
   int remaining_runs() const {
-    std::lock_guard<Mutex> guard(lock_);
+    std::lock_guard<simple_spinlock> guard(lock_);
     return remaining_runs_;
   }
 
+  uint64_t update_stats_count() const {
+    std::lock_guard<simple_spinlock> guard(lock_);
+    return update_stats_count_;
+  }
+
+  MonoTime completed_at() const {
+    std::lock_guard<simple_spinlock> guard(lock_);
+    return completed_at_;
+  }
+
  private:
-  mutable Mutex lock_;
+  mutable simple_spinlock lock_;
+
+  // Latch used to help other threads wait for us to begin updating stats for
+  // this op. Another thread may wait for this latch, and once the countdown is
+  // complete, the maintenance manager lock will be locked while computing
+  // stats, at which point the scheduler thread will wait for
+  // 'continue_stats_latch_' to be counted down.
+  CountDownLatch* start_stats_latch_;
+  CountDownLatch* continue_stats_latch_;
 
   uint64_t ram_anchored_;
   uint64_t logs_retained_bytes_;
@@ -214,7 +238,7 @@ class TestMaintenanceOp : public MaintenanceOp {
   MetricRegistry metric_registry_;
   scoped_refptr<MetricEntity> metric_entity_;
   scoped_refptr<Histogram> maintenance_op_duration_;
-  scoped_refptr<AtomicGauge<uint32_t> > maintenance_ops_running_;
+  scoped_refptr<AtomicGauge<uint32_t>> maintenance_ops_running_;
 
   // The number of remaining times this operation will run before disabling
   // itself.
@@ -225,9 +249,81 @@ class TestMaintenanceOp : public MaintenanceOp {
   // The amount of time each op invocation will sleep.
   MonoDelta sleep_time_;
 
+  // The amount of time each UpdateStats will sleep.
+  MonoDelta update_stats_time_;
+
   // Maintenance priority.
   int32_t priority_;
+
+  double workload_score_;
+
+  // Number of times the 'UpdateStats()' method is called on this instance.
+  uint64_t update_stats_count_;
+
+  // Timestamp of the monotonous clock when the operation was completed.
+  MonoTime completed_at_;
 };
+
+class MaintenanceManagerTest : public KuduTest {
+ public:
+  MaintenanceManagerTest()
+      : metric_entity_(METRIC_ENTITY_server.Instantiate(
+                       &metric_registry_, "test_entity")) {
+  }
+
+  void SetUp() override {
+    StartManager(2);
+  }
+
+  void TearDown() override {
+    StopManager();
+  }
+
+  void StartManager(int32_t num_threads) {
+    MaintenanceManager::Options options;
+    options.num_threads = num_threads;
+    options.polling_interval_ms = 1;
+    options.history_size = kHistorySize;
+    manager_.reset(new MaintenanceManager(options, kFakeUuid, metric_entity_));
+    manager_->set_memory_pressure_func_for_tests(
+        [&](double* /* consumption */) {
+          return indicate_memory_pressure_.load();
+        });
+    ASSERT_OK(manager_->Start());
+  }
+
+  void StopManager() {
+    manager_->Shutdown();
+  }
+
+  void WaitForSchedulerThreadRunning(const string& op_name) {
+    // Register an op whose sole purpose is to make sure the MM scheduler
+    // thread is running.
+    TestMaintenanceOp canary_op(op_name, MaintenanceOp::HIGH_IO_USAGE, 0);
+    canary_op.set_perf_improvement(1);
+    manager_->RegisterOp(&canary_op);
+    // Unregister the 'canary_op' operation if it goes out of scope to avoid
+    // de-referencing invalid pointers.
+    SCOPED_CLEANUP({
+      manager_->UnregisterOp(&canary_op);
+    });
+    ASSERT_EVENTUALLY([&]() {
+      ASSERT_EQ(0, canary_op.remaining_runs());
+    });
+  }
+
+ protected:
+  MetricRegistry metric_registry_;
+  scoped_refptr<MetricEntity> metric_entity_;
+
+  shared_ptr<MaintenanceManager> manager_;
+  std::atomic<bool> indicate_memory_pressure_ { false };
+};
+
+// Just create the MaintenanceManager and then shut it down, to make sure
+// there are no race conditions there.
+TEST_F(MaintenanceManagerTest, TestCreateAndShutdown) {
+}
 
 // Create an op and wait for it to start running.  Unregister it while it is
 // running and verify that UnregisterOp waits for it to finish before
@@ -239,15 +335,45 @@ TEST_F(MaintenanceManagerTest, TestRegisterUnregister) {
   // already registered.
   op1.set_remaining_runs(0);
   manager_->RegisterOp(&op1);
-  scoped_refptr<kudu::Thread> thread;
-  CHECK_OK(Thread::Create(
-      "TestThread", "TestRegisterUnregister",
-      boost::bind(&TestMaintenanceOp::set_remaining_runs, &op1, 1), &thread));
+  thread thread([&op1]() { op1.set_remaining_runs(1); });
+  SCOPED_CLEANUP({ thread.join(); });
   ASSERT_EVENTUALLY([&]() {
-      ASSERT_EQ(op1.DurationHistogram()->TotalCount(), 1);
-    });
+    ASSERT_EQ(op1.DurationHistogram()->TotalCount(), 1);
+  });
   manager_->UnregisterOp(&op1);
-  ThreadJoiner(thread.get()).Join();
+}
+
+TEST_F(MaintenanceManagerTest, TestRegisterUnregisterWithContention) {
+  CountDownLatch start_latch(1);
+  CountDownLatch continue_latch(1);
+  TestMaintenanceOp op1("1", MaintenanceOp::HIGH_IO_USAGE, 0, &start_latch, &continue_latch);
+  manager_->RegisterOp(&op1);
+  // Wait for the maintenance manager to start updating stats for this op.
+  // This will effectively block the maintenance manager lock until
+  // 'continue_latch' counts down.
+  start_latch.Wait();
+
+  // Register another op while the maintenance manager lock is held.
+  TestMaintenanceOp op2("2", MaintenanceOp::HIGH_IO_USAGE);
+  manager_->RegisterOp(&op2);
+  TestMaintenanceOp op3("3", MaintenanceOp::HIGH_IO_USAGE);
+  manager_->RegisterOp(&op3);
+
+  // Allow UpdateStats() to complete and release the maintenance manager lock.
+  continue_latch.CountDown();
+
+  // We should be able to unregister an op even though, because of the forced
+  // lock contention, it may have been added to the list of ops pending
+  // registration instead of "fully registered" ops.
+  manager_->UnregisterOp(&op3);
+
+  // Even though we blocked registration, when we dump, we'll take the
+  // maintenance manager and merge ops that were pending registration.
+  MaintenanceManagerStatusPB status_pb;
+  manager_->GetMaintenanceManagerStatusDump(&status_pb);
+  ASSERT_EQ(2, status_pb.registered_operations_size());
+  manager_->UnregisterOp(&op1);
+  manager_->UnregisterOp(&op2);
 }
 
 // Regression test for KUDU-1495: when an operation is being unregistered,
@@ -263,8 +389,8 @@ TEST_F(MaintenanceManagerTest, TestNewOpsDontGetScheduledDuringUnregister) {
 
   // Wait until two instances of the ops start running, since we have two MM threads.
   ASSERT_EVENTUALLY([&]() {
-      ASSERT_EQ(op1.RunningGauge()->value(), 2);
-    });
+    ASSERT_EQ(op1.RunningGauge()->value(), 2);
+  });
 
   // Trigger Unregister while they are running. This should wait for the currently-
   // running operations to complete, but no new operations should be scheduled.
@@ -394,20 +520,20 @@ TEST_F(MaintenanceManagerTest, TestPrioritizeLogRetentionUnderMemoryPressure) {
 
   auto op_and_why = manager_->FindBestOp();
   ASSERT_EQ(&op1, op_and_why.first);
-  EXPECT_EQ(op_and_why.second, "under memory pressure (0.00% used), 100 bytes log retention, and "
-                               "flush 100 bytes memory");
+  EXPECT_STR_CONTAINS(
+      op_and_why.second, "100 bytes log retention, and flush 100 bytes memory");
   manager_->UnregisterOp(&op1);
 
   op_and_why = manager_->FindBestOp();
   ASSERT_EQ(&op2, op_and_why.first);
-  EXPECT_EQ(op_and_why.second, "under memory pressure (0.00% used), 100 bytes log retention, and "
-                               "flush 99 bytes memory");
+  EXPECT_STR_CONTAINS(
+      op_and_why.second, "100 bytes log retention, and flush 99 bytes memory");
   manager_->UnregisterOp(&op2);
 
   op_and_why = manager_->FindBestOp();
   ASSERT_EQ(&op3, op_and_why.first);
-  EXPECT_EQ(op_and_why.second, "under memory pressure (0.00% used), 99 bytes log retention, and "
-                               "flush 101 bytes memory");
+  EXPECT_STR_CONTAINS(
+      op_and_why.second, "99 bytes log retention, and flush 101 bytes memory");
   manager_->UnregisterOp(&op3);
 }
 
@@ -440,29 +566,37 @@ TEST_F(MaintenanceManagerTest, TestRunningInstances) {
   ASSERT_EQ(status_pb.running_operations_size(), 0);
 }
 
-// Test adding operations and make sure that the history of recently completed operations
-// is correct in that it wraps around and doesn't grow.
+// Test adding operations and make sure that the history of recently completed
+// operations is correct in that it wraps around and doesn't grow.
 TEST_F(MaintenanceManagerTest, TestCompletedOpsHistory) {
   for (int i = 0; i < kHistorySize + 1; i++) {
-    string name = Substitute("op$0", i);
+    const auto name = Substitute("op$0", i);
     TestMaintenanceOp op(name, MaintenanceOp::HIGH_IO_USAGE);
     op.set_perf_improvement(1);
     op.set_ram_anchored(100);
     manager_->RegisterOp(&op);
 
     ASSERT_EVENTUALLY([&]() {
-        ASSERT_EQ(op.DurationHistogram()->TotalCount(), 1);
-      });
+      ASSERT_EQ(op.DurationHistogram()->TotalCount(), 1);
+    });
     manager_->UnregisterOp(&op);
 
-    MaintenanceManagerStatusPB status_pb;
-    manager_->GetMaintenanceManagerStatusDump(&status_pb);
-    // The size should equal to the current completed OP size,
-    // and should be at most the kHistorySize.
-    ASSERT_EQ(std::min(kHistorySize, i + 1), status_pb.completed_operations_size());
-    // The most recently completed op should always be first, even if we wrap
-    // around.
-    ASSERT_EQ(name, status_pb.completed_operations(0).name());
+    // There might be a race between updating the internal container with the
+    // operations completed so far and serving the request to the embedded
+    // web server: the latter might acquire the lock guarding the container
+    // first and output the information before the operation marked 'complete'.
+    // ASSERT_EVENTUALLY() addresses the transient condition.
+    ASSERT_EVENTUALLY([&]() {
+      MaintenanceManagerStatusPB status_pb;
+      manager_->GetMaintenanceManagerStatusDump(&status_pb);
+      // The size should equal to the current completed OP size,
+      // and should be at most the kHistorySize.
+      ASSERT_EQ(std::min(kHistorySize, i + 1),
+                status_pb.completed_operations_size());
+      // The most recently completed op should always be first, even if we wrap
+      // around.
+      ASSERT_EQ(name, status_pb.completed_operations(0).name());
+    });
   }
 }
 
@@ -479,13 +613,14 @@ TEST_F(MaintenanceManagerTest, TestOpFactors) {
   TestMaintenanceOp op5("op5", MaintenanceOp::HIGH_IO_USAGE, FLAGS_max_priority_range + 1);
 
   ASSERT_DOUBLE_EQ(pow(FLAGS_maintenance_op_multiplier, -FLAGS_max_priority_range),
-                   manager_->PerfImprovement(1, op1.priority()));
+                   manager_->AdjustedPerfScore(1, 0, op1.priority()));
   ASSERT_DOUBLE_EQ(pow(FLAGS_maintenance_op_multiplier, -1),
-                   manager_->PerfImprovement(1, op2.priority()));
-  ASSERT_DOUBLE_EQ(1, manager_->PerfImprovement(1, op3.priority()));
-  ASSERT_DOUBLE_EQ(FLAGS_maintenance_op_multiplier, manager_->PerfImprovement(1, op4.priority()));
+                   manager_->AdjustedPerfScore(1, 0, op2.priority()));
+  ASSERT_DOUBLE_EQ(1, manager_->AdjustedPerfScore(1, 0, op3.priority()));
+  ASSERT_DOUBLE_EQ(FLAGS_maintenance_op_multiplier,
+                   manager_->AdjustedPerfScore(1, 0, op4.priority()));
   ASSERT_DOUBLE_EQ(pow(FLAGS_maintenance_op_multiplier, FLAGS_max_priority_range),
-                   manager_->PerfImprovement(1, op5.priority()));
+                   manager_->AdjustedPerfScore(1, 0, op5.priority()));
 }
 
 // Test priority OP launching.
@@ -493,32 +628,28 @@ TEST_F(MaintenanceManagerTest, TestPriorityOpLaunch) {
   StopManager();
   StartManager(1);
 
-  // Register an op whose sole purpose is to allow us to delay the rest of this
-  // test until we know that the MM scheduler thread is running.
-  TestMaintenanceOp early_op("early", MaintenanceOp::HIGH_IO_USAGE, 0);
-  early_op.set_perf_improvement(1);
-  manager_->RegisterOp(&early_op);
-  // From this point forward if an ASSERT fires, we'll hit a CHECK failure if
-  // we don't unregister an op before it goes out of scope.
-  SCOPED_CLEANUP({
-    manager_->UnregisterOp(&early_op);
-  });
-  ASSERT_EVENTUALLY([&]() {
-    ASSERT_EQ(0, early_op.remaining_runs());
-  });
+  NO_FATALS(WaitForSchedulerThreadRunning("canary"));
 
   // The MM scheduler thread is now running. It is now safe to use
   // FLAGS_enable_maintenance_manager to temporarily disable the MM, thus
   // allowing us to register a group of ops "atomically" and ensuring the op
   // execution order that this test wants to see.
   //
-  // Without the "early op" hack above, there's a small chance that the MM
-  // scheduler thread will not have run at all at the time of
+  // Without the WaitForSchedulerThreadRunning() above, there's a small chance
+  // that the MM scheduler thread will not have run at all at the time of
   // FLAGS_enable_maintenance_manager = false, which would cause the thread
   // to exit entirely instead of sleeping.
 
-  // Ops are listed here in perf improvement order, which is a function of the
-  // op's raw perf improvement as well as its priority.
+  // Ops are listed here in final perf score order, which is a function of the
+  // op's raw perf improvement, workload score and its priority.
+  // The 'op0' would never launch because it has a raw perf improvement 0, even if
+  // it has a high workload_score and a high priority.
+  TestMaintenanceOp op0("op0", MaintenanceOp::HIGH_IO_USAGE, FLAGS_max_priority_range + 1);
+  op0.set_perf_improvement(0);
+  op0.set_workload_score(10);
+  op0.set_remaining_runs(1);
+  op0.set_sleep_time(MonoDelta::FromMilliseconds(1));
+
   TestMaintenanceOp op1("op1", MaintenanceOp::HIGH_IO_USAGE, -FLAGS_max_priority_range - 1);
   op1.set_perf_improvement(10);
   op1.set_remaining_runs(1);
@@ -549,30 +680,40 @@ TEST_F(MaintenanceManagerTest, TestPriorityOpLaunch) {
   op6.set_remaining_runs(1);
   op6.set_sleep_time(MonoDelta::FromMilliseconds(1));
 
+  TestMaintenanceOp op7("op7", MaintenanceOp::HIGH_IO_USAGE, 0);
+  op7.set_perf_improvement(9);
+  op7.set_workload_score(10);
+  op7.set_remaining_runs(1);
+  op7.set_sleep_time(MonoDelta::FromMilliseconds(1));
+
   FLAGS_enable_maintenance_manager = false;
+  manager_->RegisterOp(&op0);
   manager_->RegisterOp(&op1);
   manager_->RegisterOp(&op2);
   manager_->RegisterOp(&op3);
   manager_->RegisterOp(&op4);
   manager_->RegisterOp(&op5);
   manager_->RegisterOp(&op6);
+  manager_->RegisterOp(&op7);
   FLAGS_enable_maintenance_manager = true;
 
   // From this point forward if an ASSERT fires, we'll hit a CHECK failure if
   // we don't unregister an op before it goes out of scope.
   SCOPED_CLEANUP({
+    manager_->UnregisterOp(&op0);
     manager_->UnregisterOp(&op1);
     manager_->UnregisterOp(&op2);
     manager_->UnregisterOp(&op3);
     manager_->UnregisterOp(&op4);
     manager_->UnregisterOp(&op5);
     manager_->UnregisterOp(&op6);
+    manager_->UnregisterOp(&op7);
   });
 
   ASSERT_EVENTUALLY([&]() {
     MaintenanceManagerStatusPB status_pb;
     manager_->GetMaintenanceManagerStatusDump(&status_pb);
-    ASSERT_EQ(status_pb.completed_operations_size(), 7);
+    ASSERT_EQ(8, status_pb.completed_operations_size());
   });
 
   // Wait for instances to complete by shutting down the maintenance manager.
@@ -582,7 +723,7 @@ TEST_F(MaintenanceManagerTest, TestPriorityOpLaunch) {
   // Check that running instances are removed from collection after completion.
   MaintenanceManagerStatusPB status_pb;
   manager_->GetMaintenanceManagerStatusDump(&status_pb);
-  ASSERT_EQ(status_pb.running_operations_size(), 0);
+  ASSERT_EQ(0, status_pb.running_operations_size());
 
   // Check that ops were executed in perf improvement order (from greatest to
   // least improvement). Note that completed ops are listed in _reverse_ execution order.
@@ -592,12 +733,170 @@ TEST_F(MaintenanceManagerTest, TestPriorityOpLaunch) {
                             "op4",
                             "op5",
                             "op6",
-                            "early"});
+                            "op7",
+                            "canary"});
   ASSERT_EQ(ordered_ops.size(), status_pb.completed_operations().size());
   for (const auto& instance : status_pb.completed_operations()) {
     ASSERT_EQ(ordered_ops.front(), instance.name());
     ordered_ops.pop_front();
   }
+}
+
+// Check for MaintenanceManager metrics.
+TEST_F(MaintenanceManagerTest, VerifyMetrics) {
+  // Nothing has failed so far.
+  ASSERT_EQ(0, manager_->metrics_.op_prepare_failed->value());
+
+  // The oppf's Prepare() returns 'false', meaning the operation failed to
+  // prepare. However, the scores for this operation is set higher than the
+  // other two to make sure the scheduler starts working on this task before
+  // the other two.
+  class PrepareFailedMaintenanceOp : public TestMaintenanceOp {
+   public:
+    PrepareFailedMaintenanceOp()
+        : TestMaintenanceOp("oppf", MaintenanceOp::HIGH_IO_USAGE) {
+    }
+
+    bool Prepare() override {
+      set_remaining_runs(0);
+      return false;
+    }
+  } oppf;
+  oppf.set_perf_improvement(3);
+  oppf.set_workload_score(3);
+
+  TestMaintenanceOp op0("op0", MaintenanceOp::HIGH_IO_USAGE);
+  op0.set_perf_improvement(2);
+  op0.set_workload_score(2);
+  op0.set_update_stats_time(MonoDelta::FromMicroseconds(10000));
+
+  TestMaintenanceOp op1("op1", MaintenanceOp::HIGH_IO_USAGE);
+  op1.set_perf_improvement(1);
+  op1.set_workload_score(1);
+
+  manager_->RegisterOp(&oppf);
+  manager_->RegisterOp(&op0);
+  manager_->RegisterOp(&op1);
+  SCOPED_CLEANUP({
+    manager_->UnregisterOp(&op1);
+    manager_->UnregisterOp(&op0);
+    manager_->UnregisterOp(&oppf);
+  });
+
+  ASSERT_EVENTUALLY([&]() {
+    MaintenanceManagerStatusPB status_pb;
+    manager_->GetMaintenanceManagerStatusDump(&status_pb);
+    // Only 2 operations should successfully complete so far: op0, op1.
+    // Operation oppf should fail during Prepare().
+    ASSERT_EQ(2, status_pb.completed_operations_size());
+  });
+
+  {
+    // A sanity check: no operations should be running.
+    MaintenanceManagerStatusPB status_pb;
+    manager_->GetMaintenanceManagerStatusDump(&status_pb);
+    ASSERT_EQ(0, status_pb.running_operations_size());
+
+    ASSERT_EQ(1, op0.DurationHistogram()->TotalCount());
+    ASSERT_EQ(1, op1.DurationHistogram()->TotalCount());
+    ASSERT_EQ(0, oppf.DurationHistogram()->TotalCount());
+  }
+
+  // Exactly one operation has failed prepare: oppf.
+  ASSERT_EQ(1, manager_->metrics_.op_prepare_failed->value());
+
+  // There should be at least 3 runs of the FindBestOp() method by this time
+  // becase 3 operations have been scheduled: oppf, op0, op1,
+  // but it might be many more since the scheduler is still active.
+  ASSERT_LE(3, manager_->metrics_.op_find_duration->TotalCount());
+
+  // Max time taken by FindBestOp() should be at least 10 msec since that's
+  // the mininum duration of op0's UpdateStats().
+  ASSERT_GE(manager_->metrics_.op_find_duration->MaxValueForTests(), 10000);
+}
+
+// This test scenario verifies that maintenance manager is able to process
+// operations with high enough level of concurrency, even if their UpdateStats()
+// method is computationally heavy.
+TEST_F(MaintenanceManagerTest, ManyOperationsHeavyUpdateStats) {
+  SKIP_IF_SLOW_NOT_ALLOWED();
+
+  StopManager();
+  StartManager(4);
+
+  NO_FATALS(WaitForSchedulerThreadRunning("canary"));
+
+  constexpr auto kOpsNum = 1000;
+  vector<unique_ptr<TestMaintenanceOp>> ops;
+  ops.reserve(kOpsNum);
+  for (auto i = 0; i < kOpsNum; ++i) {
+    unique_ptr<TestMaintenanceOp> op(new TestMaintenanceOp(
+        std::to_string(i), MaintenanceOp::HIGH_IO_USAGE));
+    op->set_perf_improvement(i + 1);
+    op->set_workload_score(i + 1);
+    op->set_remaining_runs(1);
+    op->set_sleep_time(MonoDelta::FromMilliseconds(i % 8 + 1));
+    op->set_update_stats_time(MonoDelta::FromMicroseconds(5));
+    ops.emplace_back(std::move(op));
+  }
+
+  // For cleaner timings, disable processing of the registered operations,
+  // and re-enable that after registering all operations.
+  FLAGS_enable_maintenance_manager = false;
+  for (auto& op : ops) {
+    manager_->RegisterOp(op.get());
+  }
+  FLAGS_enable_maintenance_manager = true;
+  MonoTime time_started = MonoTime::Now();
+
+  SCOPED_CLEANUP({
+    for (auto& op : ops) {
+      manager_->UnregisterOp(op.get());
+    }
+  });
+
+  // Given the performance improvement scores and workload scores assigned
+  // to the maintenance operations, the operation scheduled first should
+  // be processed last. Once it's done, no other operations should be running.
+  AssertEventually([&] {
+    ASSERT_EQ(1, ops.front()->DurationHistogram()->TotalCount());
+  }, MonoDelta::FromSeconds(60));
+
+  // A sanity check: verify no operations are left running, but all are still
+  // registered.
+  {
+    MaintenanceManagerStatusPB status_pb;
+    manager_->GetMaintenanceManagerStatusDump(&status_pb);
+    ASSERT_EQ(0, status_pb.running_operations_size());
+    ASSERT_EQ(kOpsNum, status_pb.registered_operations_size());
+  }
+
+  MonoTime time_completed = time_started;
+  for (const auto& op : ops) {
+    const auto op_time_completed = op->completed_at();
+    if (op_time_completed > time_completed) {
+      time_completed = op_time_completed;
+    }
+  }
+  const auto time_spent = time_completed - time_started;
+  LOG(INFO) << Substitute("spent $0 milliseconds to process $1 operations",
+                          time_spent.ToMilliseconds(), kOpsNum);
+  LOG(INFO) << Substitute("number of UpdateStats() calls per operation: $0",
+                          ops.front()->update_stats_count());
+}
+
+// Regression test for KUDU-3268, where the unregistering and destruction of an
+// op may race with the scheduling of that op, resulting in a segfault.
+TEST_F(MaintenanceManagerTest, TestUnregisterWhileScheduling) {
+  TestMaintenanceOp op1("1", MaintenanceOp::HIGH_IO_USAGE);
+  op1.set_perf_improvement(10);
+  // Set a bunch of runs so we continually schedule the op.
+  op1.set_remaining_runs(1000000);
+  manager_->RegisterOp(&op1);
+  ASSERT_EVENTUALLY([&]() {
+    ASSERT_GE(op1.DurationHistogram()->TotalCount(), 1);
+  });
+  op1.Unregister();
 }
 
 } // namespace kudu

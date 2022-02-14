@@ -17,21 +17,24 @@
 
 #include "kudu/security/tls_socket.h"
 
-#include <sys/uio.h>
+#include <openssl/err.h>
+#include <openssl/ssl.h>
+#include <sys/socket.h>
 
 #include <cerrno>
+#include <cstddef>
+#include <functional>
 #include <string>
 #include <utility>
 
 #include <glog/logging.h>
-#include <openssl/err.h>
 
 #include "kudu/gutil/basictypes.h"
 #include "kudu/gutil/strings/substitute.h"
-#include "kudu/security/openssl_util.h"
 #include "kudu/util/errno.h"
 #include "kudu/util/net/sockaddr.h"
 #include "kudu/util/net/socket.h"
+#include "kudu/util/openssl_util.h"
 
 using std::string;
 using strings::Substitute;
@@ -42,6 +45,20 @@ namespace security {
 TlsSocket::TlsSocket(int fd, c_unique_ptr<SSL> ssl)
     : Socket(fd),
       ssl_(std::move(ssl)) {
+  use_cork_ = true;
+
+#ifndef __APPLE__
+// `SO_DOMAIN` is not available on macOS. This code can be safely
+// skipped because SetTcpCork() is a no-op on macOS.
+  if (fd >= 0) {
+    int dom;
+    socklen_t len = sizeof(dom);
+    if (getsockopt(fd, SOL_SOCKET, SO_DOMAIN, &dom, &len) == 0 &&
+        dom == AF_UNIX) {
+      use_cork_ = false;
+    }
+  }
+#endif
 }
 
 TlsSocket::~TlsSocket() {
@@ -83,9 +100,62 @@ Status TlsSocket::Write(const uint8_t *buf, int32_t amt, int32_t *nwritten) {
 Status TlsSocket::Writev(const struct ::iovec *iov, int iov_len, int64_t *nwritten) {
   SCOPED_OPENSSL_NO_PENDING_ERRORS;
   CHECK(ssl_);
+
+  // Since OpenSSL doesn't support any kind of writev() call itself, this function
+  // sets TCP_CORK and then calls Write() for each of the buffers in the iovec,
+  // then unsets TCP_CORK. This causes the Linux kernel to buffer up the packets
+  // while corked and then send a minimal number of packets upon uncorking, whereas
+  // otherwise it would have sent at least packet per Write call. This is beneficial
+  // since it avoids generating lots of small packets, each of which has overhead in
+  // the network stack, etc.
+  //
+  // The downside, though, is that we need to make (iov_len + 2) system calls, each
+  // of which has some significant overhead (even moreso after spectre/meltdown
+  // mitigations were enabled). This can take significant CPU in the reactor thread,
+  // especially when the underlying buffers are small.
+  //
+  // To mitigate this, we handle a common case where the iovec has a few buffers,
+  // but the total iovec length is actually short. This is the case in many types
+  // of RPC requests/responses. In this case, it's cheaper to copy all of the buffers
+  // into a socket-local buffer 'buf_' and do a single Write call, vs doing the
+  // emulated Writev approach described above.
+  if (iov_len > 1) {
+    size_t total_size = 0;
+    for (int i = 0; i < iov_len; i++) {
+      total_size += iov[i].iov_len;
+    }
+    // Assume we can copy about 8 bytes per cycle, and a syscall takes about 1300 cycles,
+    // based on some quick benchmarking of 'setsockopt' on a GCP Sky Lake VM.
+    //
+    // cycles for memcpy and one write = total_size / 8 + syscall
+    // cycles for cork, N writes, uncork = syscall * (2 + iov_len)
+    //
+    // Solve the inequality to find where memcpy is faster:
+    // total_size / 8 + syscall < syscall * (2 + iov_len)
+    // total_size / 8 < syscall * (1 + iov_len)
+    // total_size < 8 * syscall * (1 + iov_len)
+    size_t max_copy_size = 8 * 1300 * (1 + iov_len);
+    if (total_size <= max_copy_size) {
+      buf_.clear();
+      buf_.reserve(total_size);
+      for (int i = 0; i < iov_len; i++) {
+        buf_.append(iov[i].iov_base, iov[i].iov_len);
+      }
+      // TODO(todd) Write()'s 'nwritten' parameter is int32_t* instead of int64_t*
+      // so we need this temporary. We should change Write() to use size_t as well.
+      int32_t n = 0;
+      Status s = Write(buf_.data(), buf_.size(), &n);
+      *nwritten = n;
+      return s;
+    }
+  }
+
   *nwritten = 0;
   // Allows packets to be aggresively be accumulated before sending.
-  RETURN_NOT_OK(SetTcpCork(1));
+  bool do_cork = use_cork_ && iov_len > 1;
+  if (do_cork) {
+    RETURN_NOT_OK(SetTcpCork(1));
+  }
   Status write_status = Status::OK();
   for (int i = 0; i < iov_len; ++i) {
     int32_t frame_size = iov[i].iov_len;
@@ -98,7 +168,9 @@ Status TlsSocket::Writev(const struct ::iovec *iov, int iov_len, int64_t *nwritt
     *nwritten += bytes_written;
     if (bytes_written < frame_size) break;
   }
-  RETURN_NOT_OK(SetTcpCork(0));
+  if (do_cork) {
+    RETURN_NOT_OK(SetTcpCork(0));
+  }
   // If we did manage to write something, but not everything, due to a temporary socket
   // error, then we should still return an OK status indicating a successful _partial_
   // write.
@@ -121,8 +193,8 @@ Status TlsSocket::Recv(uint8_t *buf, int32_t amt, int32_t *nread) {
     const string remote_str = s.ok() ? remote.ToString() : "unknown";
     string kErrString = Substitute("failed to read from TLS socket (remote: $0)",
                                    remote_str);
-
     if (bytes_read == 0 && SSL_get_shutdown(ssl_.get()) == SSL_RECEIVED_SHUTDOWN) {
+      kErrString += GetOpenSSLErrors();
       return Status::NetworkError(kErrString, ErrnoToString(ESHUTDOWN), ESHUTDOWN);
     }
     auto error_code = SSL_get_error(ssl_.get(), bytes_read);
@@ -184,6 +256,15 @@ Status TlsSocket::Close() {
   RETURN_NOT_OK(Socket::Close());
   return ssl_shutdown;
 }
+
+string TlsSocket::GetProtocolName() const {
+  return ::kudu::security::GetProtocolName(ssl_.get());
+}
+
+string TlsSocket::GetCipherDescription() const {
+  return ::kudu::security::GetCipherDescription(ssl_.get());
+}
+
 
 } // namespace security
 } // namespace kudu

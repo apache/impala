@@ -14,8 +14,7 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-#ifndef IMPALA_UTIL_BIT_STREAM_UTILS_INLINE_H
-#define IMPALA_UTIL_BIT_STREAM_UTILS_INLINE_H
+#pragma once
 
 #include <algorithm>
 
@@ -50,7 +49,7 @@ inline void BitWriter::PutValue(uint64_t v, int num_bits) {
 }
 
 inline void BitWriter::Flush(bool align) {
-  int num_bytes = BitUtil::Ceil(bit_offset_, 8);
+  int num_bytes = BitUtil::Ceil<3>(bit_offset_);
   buffer_->reserve(KUDU_ALIGN_UP(byte_offset_ + num_bytes, 8));
   buffer_->resize(byte_offset_ + num_bytes);
   DCHECK_LE(byte_offset_ + num_bytes, buffer_->capacity());
@@ -90,11 +89,11 @@ inline void BitWriter::PutVlqInt(int32_t v) {
 
 
 inline BitReader::BitReader(const uint8_t* buffer, int buffer_len)
-  : buffer_(buffer),
-    max_bytes_(buffer_len),
-    buffered_values_(0),
-    byte_offset_(0),
-    bit_offset_(0) {
+    : buffer_(buffer),
+      max_bytes_(buffer_len),
+      buffered_values_(0),
+      byte_offset_(0),
+      bit_offset_(0) {
   int num_bytes = std::min(8, max_bytes_);
   memcpy(&buffered_values_, buffer_ + byte_offset_, num_bytes);
 }
@@ -173,7 +172,7 @@ inline void BitReader::SeekToBit(uint stream_position) {
 template<typename T>
 inline bool BitReader::GetAligned(int num_bytes, T* v) {
   DCHECK_LE(num_bytes, sizeof(T));
-  int bytes_read = BitUtil::Ceil(bit_offset_, 8);
+  int bytes_read = BitUtil::Ceil<3>(bit_offset_);
   if (PREDICT_FALSE(byte_offset_ + bytes_read + num_bytes > max_bytes_)) return false;
 
   // Advance byte_offset to next unread byte and read num_bytes
@@ -207,5 +206,3 @@ inline bool BitReader::GetVlqInt(int32_t* v) {
 }
 
 } // namespace kudu
-
-#endif

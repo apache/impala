@@ -15,9 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Target including all protobuf-generated code.
-add_custom_target(kudu-rpc-proto-deps)
-
 #### Global header protobufs
 PROTOBUF_GENERATE_CPP(
   RPC_HEADER_PROTO_SRCS RPC_HEADER_PROTO_HDRS RPC_HEADER_PROTO_TGTS
@@ -28,8 +25,6 @@ ADD_EXPORTABLE_LIBRARY(rpc_header_proto
   SRCS ${RPC_HEADER_PROTO_SRCS}
   DEPS protobuf pb_util_proto token_proto
   NONLINK_DEPS ${RPC_HEADER_PROTO_TGTS})
-
-add_dependencies(kudu-rpc-proto-deps ${RPC_HEADER_PROTO_TGTS})
 
 PROTOBUF_GENERATE_CPP(
   RPC_INTROSPECTION_PROTO_SRCS RPC_INTROSPECTION_PROTO_HDRS RPC_INTROSPECTION_PROTO_TGTS
@@ -43,10 +38,6 @@ ADD_EXPORTABLE_LIBRARY(rpc_introspection_proto
   SRCS ${RPC_INTROSPECTION_PROTO_SRCS}
   DEPS ${RPC_INTROSPECTION_PROTO_LIBS}
   NONLINK_DEPS ${RPC_INTROSPECTION_PROTO_TGTS})
-
-add_dependencies(kudu-rpc-proto-deps ${RPC_INTROSPECTION_PROTO_TGTS})
-
-add_definitions(-DKUDU_HEADERS_USE_SHORT_STATUS_MACROS)
 
 ### RPC library
 set(KRPC_SRCS
@@ -99,16 +90,13 @@ ADD_EXPORTABLE_LIBRARY(krpc
   DEPS ${KRPC_LIBS})
 
 ### RPC generator tool
-add_executable(protoc-gen-krpc protoc-gen-krpc.cc
-  # Impala - add stub for kudu::VersionInfo
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../common/kudu_version.cc
-  # Impala - add definition for any flag names shared between Impala / Kudu.
-  # TODO: Consider either removing code that depends on these flags, or namespacing them
-  # somehow.
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../common/global-flags.cc)
-# IMPALA-8642: kudu_version.cc depends on gen-cpp/Status_types.h in target thrift-deps
-add_dependencies(protoc-gen-krpc thrift-deps)
-target_link_libraries(protoc-gen-krpc gutil glog gflags protoc protobuf rpc_header_proto ${KUDU_BASE_LIBS})
+add_executable(protoc-gen-krpc protoc-gen-krpc.cc)
+target_link_libraries(protoc-gen-krpc
+    ${KUDU_BASE_LIBS}
+    rpc_header_proto
+    protoc
+    protobuf
+    gutil)
 
 #### RPC test
 PROTOBUF_GENERATE_CPP(
@@ -141,9 +129,10 @@ ADD_KUDU_TEST(exactly_once_rpc-test PROCESSORS 10)
 ADD_KUDU_TEST(mt-rpc-test RUN_SERIAL true)
 ADD_KUDU_TEST(negotiation-test)
 ADD_KUDU_TEST(periodic-test)
+ADD_KUDU_TEST(proxy-test)
 ADD_KUDU_TEST(reactor-test)
 ADD_KUDU_TEST(request_tracker-test)
 ADD_KUDU_TEST(rpc-bench RUN_SERIAL true)
-ADD_KUDU_TEST(rpc-test)
+ADD_KUDU_TEST(rpc-test NUM_SHARDS 8)
 ADD_KUDU_TEST(rpc_stub-test)
 ADD_KUDU_TEST(service_queue-test RUN_SERIAL true)

@@ -16,6 +16,7 @@
 // under the License.
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -159,9 +160,11 @@ void RetriableRpc<Server, RequestPB, ResponsePB>::SendRpc()  {
   if (sequence_number_ == RequestTracker::kNoSeqNo) {
     CHECK_OK(request_tracker_->NewSeqNo(&sequence_number_));
   }
-  server_picker_->PickLeader(Bind(&RetriableRpc::ReplicaFoundCb,
-                                  Unretained(this)),
-                             retrier().deadline());
+  server_picker_->PickLeader(
+      [this](const Status& status, Server* server) {
+        this->ReplicaFoundCb(status, server);
+      },
+      retrier().deadline());
 }
 
 template <class Server, class RequestPB, class ResponsePB>
@@ -301,7 +304,7 @@ void RetriableRpc<Server, RequestPB, ResponsePB>::ReplicaFoundCb(const Status& s
 
   DCHECK_EQ(result.result, RetriableRpcStatus::OK);
   current_ = server;
-  Try(server, boost::bind(&RetriableRpc::SendRpcCb, this, Status::OK()));
+  Try(server, [this]() { this->SendRpcCb(Status::OK()); });
 }
 
 template <class Server, class RequestPB, class ResponsePB>

@@ -23,6 +23,7 @@
 #include <sys/prctl.h>
 #endif // defined(__linux__)
 #include <sys/resource.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -35,14 +36,11 @@
 #include <utility>
 #include <vector>
 
-#include <boost/bind.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include "kudu/gutil/atomicops.h"
-#include "kudu/gutil/bind.h"
-#include "kudu/gutil/bind_helpers.h"
 #include "kudu/gutil/dynamic_annotations.h"
 #include "kudu/gutil/map-util.h"
 #include "kudu/gutil/mathlimits.h"
@@ -64,8 +62,6 @@
 #include "kudu/util/url-coding.h"
 #include "kudu/util/web_callback_registry.h"
 
-using boost::bind;
-using boost::mem_fn;
 using std::ostringstream;
 using std::pair;
 using std::shared_ptr;
@@ -115,6 +111,12 @@ METRIC_DEFINE_gauge_uint64(server, involuntary_context_switches,
                            kudu::MetricLevel::kInfo,
                            kudu::EXPOSE_AS_COUNTER);
 
+METRIC_DEFINE_gauge_int32(server, scheduling_priority,
+                          "Scheduling Priority",
+                          kudu::MetricUnit::kState,
+                          "The scheduling priority of the process",
+                          kudu::MetricLevel::kDebug);
+
 DEFINE_int32(thread_inject_start_latency_ms, 0,
              "Number of ms to sleep when starting a new thread. (For tests).");
 TAG_FLAG(thread_inject_start_latency_ms, hidden);
@@ -123,27 +125,40 @@ TAG_FLAG(thread_inject_start_latency_ms, unsafe);
 namespace kudu {
 
 static uint64_t GetCpuUTime() {
-  rusage ru;
+  struct rusage ru;
   CHECK_ERR(getrusage(RUSAGE_SELF, &ru));
   return ru.ru_utime.tv_sec * 1000UL + ru.ru_utime.tv_usec / 1000UL;
 }
 
 static uint64_t GetCpuSTime() {
-  rusage ru;
+  struct rusage ru;
   CHECK_ERR(getrusage(RUSAGE_SELF, &ru));
   return ru.ru_stime.tv_sec * 1000UL + ru.ru_stime.tv_usec / 1000UL;
 }
 
 static uint64_t GetVoluntaryContextSwitches() {
-  rusage ru;
+  struct rusage ru;
   CHECK_ERR(getrusage(RUSAGE_SELF, &ru));
   return ru.ru_nvcsw;
 }
 
 static uint64_t GetInVoluntaryContextSwitches() {
-  rusage ru;
+  struct rusage ru;
   CHECK_ERR(getrusage(RUSAGE_SELF, &ru));
   return ru.ru_nivcsw;
+}
+
+static int32_t GetSchedulingPriority() {
+  const int saved_errno = errno;
+  SCOPED_CLEANUP({
+    errno = saved_errno;
+  });
+  errno = 0;
+  int prio = getpriority(PRIO_PROCESS, getpid());
+  // No errors expected here per the manual page for the getpriority() syscall:
+  // see https://man7.org/linux/man-pages/man2/setpriority.2.html.
+  PCHECK(errno == 0);
+  return prio;
 }
 
 class ThreadMgr;
@@ -288,30 +303,35 @@ Status ThreadMgr::StartInstrumentation(const scoped_refptr<MetricEntity>& metric
   // Use function gauges here so that we can register a unique copy of these metrics in
   // multiple tservers, even though the ThreadMgr is itself a singleton.
   metrics->NeverRetire(
-      METRIC_threads_started.InstantiateFunctionGauge(metrics,
-        Bind(&ThreadMgr::ReadThreadsStarted, Unretained(this))));
+      METRIC_threads_started.InstantiateFunctionGauge(
+          metrics, [this]() { return this->ReadThreadsStarted(); }));
   metrics->NeverRetire(
-      METRIC_threads_running.InstantiateFunctionGauge(metrics,
-        Bind(&ThreadMgr::ReadThreadsRunning, Unretained(this))));
+      METRIC_threads_running.InstantiateFunctionGauge(
+          metrics, [this]() { return this->ReadThreadsRunning(); }));
   metrics->NeverRetire(
-      METRIC_cpu_utime.InstantiateFunctionGauge(metrics,
-        Bind(&GetCpuUTime)));
+      METRIC_cpu_utime.InstantiateFunctionGauge(
+          metrics, []() { return GetCpuUTime(); }));
   metrics->NeverRetire(
-      METRIC_cpu_stime.InstantiateFunctionGauge(metrics,
-        Bind(&GetCpuSTime)));
+      METRIC_cpu_stime.InstantiateFunctionGauge(
+          metrics, []() { return GetCpuSTime(); }));
   metrics->NeverRetire(
-      METRIC_voluntary_context_switches.InstantiateFunctionGauge(metrics,
-        Bind(&GetVoluntaryContextSwitches)));
+      METRIC_voluntary_context_switches.InstantiateFunctionGauge(
+          metrics, []() { return GetVoluntaryContextSwitches(); }));
   metrics->NeverRetire(
-      METRIC_involuntary_context_switches.InstantiateFunctionGauge(metrics,
-        Bind(&GetInVoluntaryContextSwitches)));
+      METRIC_involuntary_context_switches.InstantiateFunctionGauge(
+          metrics, []() { return GetInVoluntaryContextSwitches(); }));
+  metrics->NeverRetire(
+      METRIC_scheduling_priority.InstantiateFunctionGauge(
+          metrics, []() { return GetSchedulingPriority(); }));
 
   if (web) {
-    auto thread_callback = bind<void>(mem_fn(&ThreadMgr::ThreadPathHandler),
-                                      this, _1, _2);
-    DCHECK_NOTNULL(web)->RegisterPathHandler("/threadz", "Threads", thread_callback,
-                                             /* is_styled= */ true,
-                                             /* is_on_nav_bar= */ true);
+    DCHECK_NOTNULL(web)->RegisterPathHandler(
+        "/threadz", "Threads", [this](const WebCallbackRegistry::WebRequest& req,
+                                      WebCallbackRegistry::WebResponse* resp) {
+          this->ThreadPathHandler(req, resp);
+        },
+        /* is_styled= */ true,
+        /* is_on_nav_bar= */ true);
   }
   return Status::OK();
 }
@@ -572,10 +592,9 @@ int64_t Thread::WaitForTid() const {
   }
 }
 
-
-Status Thread::StartThread(const string& category, const string& name,
-                           const ThreadFunctor& functor, uint64_t flags,
-                           scoped_refptr<Thread> *holder) {
+Status Thread::StartThread(string category, string name,
+                           std::function<void()> functor, uint64_t flags,
+                           scoped_refptr<Thread>* holder) {
   TRACE_COUNTER_INCREMENT("threads_started", 1);
   TRACE_COUNTER_SCOPE_LATENCY_US("thread_start_us");
   GoogleOnceInit(&once, &InitThreading);
@@ -584,7 +603,8 @@ Status Thread::StartThread(const string& category, const string& name,
   SCOPED_LOG_SLOW_EXECUTION_PREFIX(WARNING, 500 /* ms */, log_prefix, "starting thread");
 
   // Temporary reference for the duration of this function.
-  scoped_refptr<Thread> t(new Thread(category, name, functor));
+  scoped_refptr<Thread> t(new Thread(
+      std::move(category), std::move(name), std::move(functor)));
 
   // Optional, and only set if the thread was successfully created.
   //
@@ -639,7 +659,7 @@ Status Thread::StartThread(const string& category, const string& name,
   t->joinable_ = true;
   cleanup.cancel();
 
-  VLOG(2) << "Started thread " << t->tid()<< " - " << category << ":" << name;
+  VLOG(2) << Substitute("Started thread $0 - $1: $2", t->tid(), t->category(), t->name());
   return Status::OK();
 }
 

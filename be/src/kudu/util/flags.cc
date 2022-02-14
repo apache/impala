@@ -21,17 +21,18 @@
 #include <sys/stat.h>
 #include <unistd.h> // IWYU pragma: keep
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <string>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
-#include <boost/algorithm/string/predicate.hpp>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #ifdef TCMALLOC_ENABLED
@@ -74,9 +75,15 @@ DEFINE_bool(dump_metrics_json, false,
             "by this binary.");
 TAG_FLAG(dump_metrics_json, hidden);
 
+DEFINE_bool(dump_metrics_xml, false,
+            "Dump an XML document describing all of the metrics which may be emitted "
+            "by this binary.");
+TAG_FLAG(dump_metrics_xml, hidden);
+
 #ifdef TCMALLOC_ENABLED
-// Defined in Impala in common/global-flags.cc
-DECLARE_bool(enable_process_lifetime_heap_profiling);
+DEFINE_bool(enable_process_lifetime_heap_profiling, false, "Enables heap "
+    "profiling for the lifetime of the process. Profile output will be stored in the "
+    "directory specified by -heap_profile_path.");
 TAG_FLAG(enable_process_lifetime_heap_profiling, stable);
 TAG_FLAG(enable_process_lifetime_heap_profiling, advanced);
 
@@ -85,12 +92,14 @@ DEFINE_string(heap_profile_path, "", "Output path to store heap profiles. If not
 TAG_FLAG(heap_profile_path, stable);
 TAG_FLAG(heap_profile_path, advanced);
 
-DEFINE_int64(heap_sample_every_n_bytes, 512 * 1024,
+DEFINE_int64(heap_sample_every_n_bytes, 0,
              "Enable heap occupancy sampling. If this flag is set to some positive "
              "value N, a memory allocation will be sampled approximately every N bytes. "
              "Lower values of N incur larger overhead but give more accurate results. "
-             "A value such as 512KB is a reasonable choice with relatively low overhead.");
+             "A value such as 524288 (512KB) is a reasonable choice with relatively "
+             "low overhead.");
 TAG_FLAG(heap_sample_every_n_bytes, advanced);
+TAG_FLAG(heap_sample_every_n_bytes, experimental);
 #endif
 
 DEFINE_bool(disable_core_dumps, false, "Disable core dumps when this process crashes.");
@@ -492,6 +501,9 @@ void HandleCommonFlags() {
   } else if (FLAGS_dump_metrics_json) {
     MetricPrototypeRegistry::get()->WriteAsJson();
     exit(0);
+  } else if (FLAGS_dump_metrics_xml) {
+    MetricPrototypeRegistry::get()->WriteAsXML();
+    exit(0);
   } else if (FLAGS_version) {
     cout << VersionInfo::GetAllVersionInfo() << endl;
     exit(0);
@@ -550,26 +562,38 @@ string CommandlineFlagsIntoString(EscapeMode mode) {
   return ret_value;
 }
 
+vector<CommandLineFlagInfo> GetNonDefaultFlagsHelper() {
+  vector<CommandLineFlagInfo> all_flags;
+  GetAllFlags(&all_flags);
+  vector<CommandLineFlagInfo> non_default_flags;
+  std::copy_if(all_flags.begin(), all_flags.end(), std::back_inserter(non_default_flags),
+               [] (const auto& flag) {
+                 // In addition to checking that the flag has been rewritten with 'is_default',
+                 // we also check that the value is different from the default value.
+                 return !flag.is_default && flag.current_value != flag.default_value;
+               });
+  return non_default_flags;
+}
+
 string GetNonDefaultFlags() {
   ostringstream args;
-  vector<CommandLineFlagInfo> flags;
-  GetAllFlags(&flags);
-  for (const auto& flag : flags) {
-    if (!flag.is_default) {
-      // This only means that the flag has been rewritten.
-      // We need to check that the value is different from the default value.
-      if (flag.current_value != flag.default_value) {
-        if (!args.str().empty()) {
-          args << '\n';
-        }
-
-        // Redact the flags tagged as sensitive, if redaction is enabled.
-        string flag_value = CheckFlagAndRedact(flag, EscapeMode::NONE);
-        args << "--" << flag.name << '=' << flag_value;
-      }
-    }
+  for (const auto& flag : GetNonDefaultFlagsHelper()) {
+    // Redact the flags tagged as sensitive, if redaction is enabled.
+    string flag_value = CheckFlagAndRedact(flag, EscapeMode::NONE);
+    args << "--" << flag.name << '=' << flag_value << "\n";
   }
   return args.str();
+}
+
+GFlagsMap GetNonDefaultFlagsMap() {
+  GFlagsMap flags_by_name;
+  for (auto& flag : GetNonDefaultFlagsHelper()) {
+    // Instead of "flags_by_name.emplace(flag.name, std::move(flag))" using
+    // following approach as order of evaluation of parameters could be different
+    // leading to unexpected value in "flag.name".
+    flags_by_name[flag.name] = std::move(flag);
+  }
+  return flags_by_name;
 }
 
 GFlagsMap GetFlagsMap() {
@@ -577,18 +601,19 @@ GFlagsMap GetFlagsMap() {
   GetAllFlags(&default_flags);
   GFlagsMap flags_by_name;
   for (auto& flag : default_flags) {
-    flags_by_name.emplace(flag.name, std::move(flag));
+    // See the note in GetNonDefaultFlagsMap() above.
+    flags_by_name[flag.name] = std::move(flag);
   }
   return flags_by_name;
 }
 
 Status ParseTriState(const char* flag_name, const std::string& flag_value,
     TriStateFlag* tri_state) {
-  if (boost::iequals(flag_value, "required")) {
+  if (iequals(flag_value, "required")) {
     *tri_state = TriStateFlag::REQUIRED;
-  } else if (boost::iequals(flag_value, "optional")) {
+  } else if (iequals(flag_value, "optional")) {
     *tri_state = TriStateFlag::OPTIONAL;
-  } else if (boost::iequals(flag_value, "disabled")) {
+  } else if (iequals(flag_value, "disabled")) {
     *tri_state = TriStateFlag::DISABLED;
   } else {
     return Status::InvalidArgument(strings::Substitute(

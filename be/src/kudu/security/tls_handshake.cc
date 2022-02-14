@@ -17,24 +17,32 @@
 
 #include "kudu/security/tls_handshake.h"
 
+#include <openssl/crypto.h>
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
-#include <openssl/x509v3.h>
 
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <ostream>
+#include <utility>
 
 #include "kudu/gutil/strings/strip.h"
 #include "kudu/gutil/strings/substitute.h"
 #include "kudu/security/cert.h"
 #include "kudu/security/tls_socket.h"
 #include "kudu/util/net/socket.h"
+#include "kudu/util/openssl_util.h"
 #include "kudu/util/status.h"
 #include "kudu/util/trace.h"
 
 #if OPENSSL_VERSION_NUMBER < 0x10002000L
 #include "kudu/security/x509_check_host.h"
 #endif // OPENSSL_VERSION_NUMBER
+
+#ifndef TLS1_3_VERSION
+#define TLS1_3_VERSION 0x0304
+#endif
 
 using std::string;
 using std::unique_ptr;
@@ -79,22 +87,65 @@ void TlsHandshake::SetSSLVerify() {
   SSL_set_verify(ssl_.get(), ssl_mode, /* callback = */nullptr);
 }
 
+TlsHandshake::TlsHandshake(TlsHandshakeType type)
+    : type_(type) {
+}
+
+Status TlsHandshake::Init(c_unique_ptr<SSL> s) {
+  SCOPED_OPENSSL_NO_PENDING_ERRORS;
+  DCHECK(s);
+
+  if (ssl_) {
+    return Status::IllegalState("TlsHandshake is already initialized");
+  }
+
+  auto rbio = ssl_make_unique(BIO_new(BIO_s_mem()));
+  if (!rbio) {
+    return Status::RuntimeError(
+        "failed to create memory-based read BIO", GetOpenSSLErrors());
+  }
+  auto wbio = ssl_make_unique(BIO_new(BIO_s_mem()));
+  if (!wbio) {
+    return Status::RuntimeError(
+        "failed to create memory-based write BIO", GetOpenSSLErrors());
+  }
+  ssl_ = std::move(s);
+  auto* ssl = ssl_.get();
+  SSL_set_bio(ssl, rbio.release(), wbio.release());
+
+  switch (type_) {
+    case TlsHandshakeType::SERVER:
+      SSL_set_accept_state(ssl);
+      break;
+    case TlsHandshakeType::CLIENT:
+      SSL_set_connect_state(ssl);
+      break;
+  }
+  return Status::OK();
+}
+
 Status TlsHandshake::Continue(const string& recv, string* send) {
   SCOPED_OPENSSL_NO_PENDING_ERRORS;
   if (!has_started_) {
     SetSSLVerify();
     has_started_ = true;
   }
-  CHECK(ssl_);
+  DCHECK(ssl_);
+  auto* ssl = ssl_.get();
 
-  BIO* rbio = SSL_get_rbio(ssl_.get());
+  // +------+                       +-----+
+  // |      |--> BIO_write(rbio) -->|     |--> SSL_read(ssl)  --> IN
+  // | SASL |                       | SSL |
+  // |      |<--  BIO_read(wbio) <--|     |<-- SSL_write(ssl) <-- OUT
+  // +------+                       +-----+
+  BIO* rbio = SSL_get_rbio(ssl);
   int n = BIO_write(rbio, recv.data(), recv.size());
   DCHECK(n == recv.size() || (n == -1 && recv.empty()));
   DCHECK_EQ(BIO_ctrl_pending(rbio), recv.size());
 
-  int rc = SSL_do_handshake(ssl_.get());
+  int rc = SSL_do_handshake(ssl);
   if (rc != 1) {
-    int ssl_err = SSL_get_error(ssl_.get(), rc);
+    int ssl_err = SSL_get_error(ssl, rc);
     // WANT_READ and WANT_WRITE indicate that the handshake is not yet complete.
     if (ssl_err != SSL_ERROR_WANT_READ && ssl_err != SSL_ERROR_WANT_WRITE) {
       return Status::RuntimeError("TLS Handshake error", GetSSLErrorDescription(ssl_err));
@@ -104,23 +155,57 @@ Status TlsHandshake::Continue(const string& recv, string* send) {
     // the ERR error queue, so no need to ERR_clear_error() here.
   }
 
-  BIO* wbio = SSL_get_wbio(ssl_.get());
+  BIO* wbio = SSL_get_wbio(ssl);
   int pending = BIO_ctrl_pending(wbio);
+  DCHECK_GE(pending, 0);
 
   send->resize(pending);
-  BIO_read(wbio, &(*send)[0], send->size());
-  DCHECK_EQ(BIO_ctrl_pending(wbio), 0);
+  if (pending > 0) {
+    int bytes_read = BIO_read(wbio, &(*send)[0], send->size());
+    DCHECK_EQ(bytes_read, send->size());
+    DCHECK_EQ(BIO_ctrl_pending(wbio), 0);
+  }
 
   if (rc == 1) {
-    // The handshake is done, but in the case of the server, we still need to
-    // send the final response to the client.
-    DCHECK_GE(send->size(), 0);
+    // SSL_do_handshake() must have read all the pending data.
+    DCHECK_EQ(0, BIO_ctrl_pending(rbio));
+    VLOG(2) << Substitute("TSL Handshake complete");
     return Status::OK();
   }
   return Status::Incomplete("TLS Handshake incomplete");
 }
 
-Status TlsHandshake::Verify(const Socket& socket) const {
+bool TlsHandshake::NeedsExtraStep(const Status& continue_status,
+                                  const string& token) const {
+  DCHECK(has_started_);
+  DCHECK(ssl_);
+  DCHECK(continue_status.ok() || continue_status.IsIncomplete());
+
+  if (continue_status.IsIncomplete()) {
+    return true;
+  }
+  if (continue_status.ok()) {
+    switch (type_) {
+      case TlsHandshakeType::CLIENT:
+        return !token.empty();
+      case TlsHandshakeType::SERVER:
+        if (SSL_version(ssl_.get()) == TLS1_3_VERSION) {
+          return false;
+        }
+        return !token.empty();
+    }
+  }
+  return false;
+}
+
+void TlsHandshake::StorePendingData(string data) {
+  DCHECK(!data.empty());
+  // This is used only for the TLSv1.3 protocol.
+  DCHECK_EQ(TLS1_3_VERSION, SSL_version(ssl_.get()));
+  rbio_pending_data_ = std::move(data);
+}
+
+Status TlsHandshake::Verify(const Socket& /*socket*/) const {
   SCOPED_OPENSSL_NO_PENDING_ERRORS;
   DCHECK(SSL_is_init_finished(ssl_.get()));
   CHECK(ssl_);
@@ -202,12 +287,43 @@ Status TlsHandshake::Finish(unique_ptr<Socket>* socket) {
   RETURN_NOT_OK(Verify(**socket));
 
   int fd = (*socket)->Release();
+  auto* ssl = ssl_.get();
+
+  // Nothing should left in the memory-based BIOs upon Finish() is called.
+  // Otherwise, the buffered data would be lost because those BIOs are destroyed
+  // when SSL_set_fd() is called below.
+  DCHECK_EQ(0, SSL_pending(ssl));
+
+  BIO* wbio = SSL_get_wbio(ssl);
+  DCHECK_EQ(0, BIO_ctrl_pending(wbio));
+  DCHECK_EQ(0, BIO_ctrl_wpending(wbio));
+
+  BIO* rbio = SSL_get_rbio(ssl);
+  DCHECK_EQ(0, BIO_ctrl_pending(rbio));
+  DCHECK_EQ(0, BIO_ctrl_wpending(rbio));
 
   // Give the socket to the SSL instance. This will automatically free the
   // read and write memory BIO instances.
-  int ret = SSL_set_fd(ssl_.get(), fd);
+  int ret = SSL_set_fd(ssl, fd);
   if (ret != 1) {
     return Status::RuntimeError("TLS handshake error", GetOpenSSLErrors());
+  }
+
+  const auto data_size = rbio_pending_data_.size();
+  if (data_size != 0) {
+    int fd = SSL_get_fd(ssl);
+    Socket sock(fd);
+    uint8_t* data = reinterpret_cast<uint8_t*>(rbio_pending_data_.data());
+    int32_t written = 0;
+    RETURN_NOT_OK(sock.Write(data, data_size, &written));
+    if (written != data_size) {
+      // The socket should be in blocking mode, so Write() should return with
+      // success only if all the data is written.
+      return Status::IllegalState(
+          Substitute("wrote only $0 out of $1 bytes", written, data_size));
+    }
+    sock.Release(); // do not close the descriptor when Socket goes out of scope
+    rbio_pending_data_.clear();
   }
 
   // Transfer the SSL instance to the socket.

@@ -5,13 +5,14 @@
 #include "kudu/util/cache.h"
 
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
 #include <gflags/gflags.h>
-#include <gflags/gflags_declare.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
@@ -162,7 +163,7 @@ class CacheBaseTest : public KuduTest,
       scoped_refptr<MetricEntity> entity = METRIC_ENTITY_server.Instantiate(
           &metric_registry_, "test");
       unique_ptr<BlockCacheMetrics> metrics(new BlockCacheMetrics(entity));
-      cache_->SetMetrics(std::move(metrics));
+      cache_->SetMetrics(std::move(metrics), Cache::ExistingMetricsPolicy::kKeep);
     }
   }
 
@@ -192,7 +193,7 @@ class CacheTest :
   }
 };
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     CacheTypes, CacheTest,
     ::testing::Values(
         make_tuple(Cache::MemoryType::DRAM,
@@ -504,7 +505,7 @@ class LRUCacheTest :
   }
 };
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     CacheTypes, LRUCacheTest,
     ::testing::Combine(::testing::Values(Cache::MemoryType::DRAM,
                                          Cache::MemoryType::NVM),

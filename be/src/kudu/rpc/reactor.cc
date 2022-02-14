@@ -17,31 +17,36 @@
 
 #include "kudu/rpc/reactor.h"
 
+#include <openssl/crypto.h>
+#include <openssl/err.h> // IWYU pragma: keep
+#include <sys/socket.h>
+
 #include <cerrno>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <ostream>
 #include <string>
 #include <utility>
 
-#include <boost/bind.hpp> // IWYU pragma: keep
 #include <boost/intrusive/list.hpp>
-#include <boost/optional.hpp>
 #include <ev++.h>
+#include <ev.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-#include "kudu/gutil/bind.h"
+#include "kudu/gutil/port.h"
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/gutil/stringprintf.h"
 #include "kudu/gutil/strings/substitute.h"
-#include "kudu/rpc/client_negotiation.h"
+#include "kudu/gutil/sysinfo.h"
+#include "kudu/gutil/walltime.h"
 #include "kudu/rpc/connection.h"
 #include "kudu/rpc/messenger.h"
 #include "kudu/rpc/negotiation.h"
 #include "kudu/rpc/outbound_call.h"
+#include "kudu/rpc/rpc_controller.h"
 #include "kudu/rpc/rpc_introspection.pb.h"
-#include "kudu/rpc/server_negotiation.h"
 #include "kudu/util/countdown_latch.h"
 #include "kudu/util/debug/sanitizer_scopes.h"
 #include "kudu/util/flag_tags.h"
@@ -144,7 +149,7 @@ void DoInitLibEv() {
 
 } // anonymous namespace
 
-ReactorThread::ReactorThread(Reactor *reactor, const MessengerBuilder& bld)
+ReactorThread::ReactorThread(Reactor* reactor, const MessengerBuilder& bld)
   : loop_(kDefaultLibEvFlags),
     cur_time_(MonoTime::Now()),
     last_unused_tcp_scan_(cur_time_),
@@ -185,7 +190,8 @@ Status ReactorThread::Init() {
   ev_set_invoke_pending_cb(loop_, &ReactorThread::InvokePendingCb);
 
   // Create Reactor thread.
-  return kudu::Thread::Create("reactor", "rpc reactor", &ReactorThread::RunThread, this, &thread_);
+  return kudu::Thread::Create("reactor", "rpc reactor",
+                              [this]() { this->RunThread(); }, &thread_);
 }
 
 void ReactorThread::InvokePendingCb(struct ev_loop* loop) {
@@ -421,7 +427,7 @@ void ReactorThread::TimerHandler(ev::timer& /*watcher*/, int revents) {
   ScanIdleConnections();
 }
 
-void ReactorThread::RegisterTimeout(ev::timer *watcher) {
+void ReactorThread::RegisterTimeout(ev::timer* watcher) {
   watcher->set(loop_);
 }
 
@@ -474,7 +480,7 @@ void ReactorThread::ScanIdleConnections() {
   VLOG_IF(1, shutdown > 0) << name() << ": shutdown " << shutdown << " TCP connections.";
 }
 
-const std::string& ReactorThread::name() const {
+const string& ReactorThread::name() const {
   return reactor_->name();
 }
 
@@ -482,7 +488,7 @@ MonoTime ReactorThread::cur_time() const {
   return cur_time_;
 }
 
-Reactor *ReactorThread::reactor() {
+Reactor* ReactorThread::reactor() {
   return reactor_;
 }
 
@@ -564,7 +570,7 @@ Status ReactorThread::FindOrStartConnection(const ConnectionId& conn_id,
 
   // Create a new socket and start connecting to the remote.
   Socket sock;
-  RETURN_NOT_OK(CreateClientSocket(&sock));
+  RETURN_NOT_OK(CreateClientSocket(conn_id.remote().family(), &sock));
   RETURN_NOT_OK(StartConnect(&sock, conn_id.remote()));
 
   unique_ptr<Socket> new_socket(new Socket(sock.Release()));
@@ -603,10 +609,14 @@ Status ReactorThread::StartConnectionNegotiation(const scoped_refptr<Connection>
   TRACE("Submitting negotiation task for $0", conn->ToString());
   auto authentication = reactor()->messenger()->authentication();
   auto encryption = reactor()->messenger()->encryption();
+  auto loopback_encryption = reactor()->messenger()->loopback_encryption();
   ThreadPool* negotiation_pool =
       reactor()->messenger()->negotiation_pool(conn->direction());
-  RETURN_NOT_OK(negotiation_pool->SubmitClosure(
-        Bind(&Negotiation::RunNegotiation, conn, authentication, encryption, deadline)));
+  RETURN_NOT_OK(negotiation_pool->Submit([conn, authentication, encryption, loopback_encryption,
+                                          deadline]() {
+        Negotiation::RunNegotiation(conn, authentication, encryption, loopback_encryption,
+                                    deadline);
+      }));
   return Status::OK();
 }
 
@@ -628,7 +638,8 @@ void ReactorThread::CompleteConnectionNegotiation(
     return;
   }
 
-  if (FLAGS_tcp_keepalive_probe_period_s > 0) {
+  if (conn->remote().is_ip() &&
+      FLAGS_tcp_keepalive_probe_period_s > 0) {
     // Try spreading out the idle poll period to avoid thundering herd in case connections
     // are all created at the same time (e.g. after a cluster is restarted).
     Status keepalive_status = conn->SetTcpKeepAlive(
@@ -646,9 +657,9 @@ void ReactorThread::CompleteConnectionNegotiation(
   conn->EpollRegister(loop_);
 }
 
-Status ReactorThread::CreateClientSocket(Socket *sock) {
-  Status ret = sock->Init(Socket::FLAG_NONBLOCKING);
-  if (ret.ok()) {
+Status ReactorThread::CreateClientSocket(int family, Socket* sock) {
+  Status ret = sock->Init(family, Socket::FLAG_NONBLOCKING);
+  if (ret.ok() && family == AF_INET) {
     ret = sock->SetNoDelay(true);
   }
   LOG_IF(WARNING, !ret.ok())
@@ -657,7 +668,7 @@ Status ReactorThread::CreateClientSocket(Socket *sock) {
   return ret;
 }
 
-Status ReactorThread::StartConnect(Socket *sock, const Sockaddr& remote) {
+Status ReactorThread::StartConnect(Socket* sock, const Sockaddr& remote) {
   const Status ret = sock->Connect(remote);
   if (ret.ok()) {
     VLOG(3) << "StartConnect: connect finished immediately for " << remote.ToString();
@@ -675,7 +686,7 @@ Status ReactorThread::StartConnect(Socket *sock, const Sockaddr& remote) {
   return ret;
 }
 
-void ReactorThread::DestroyConnection(Connection *conn,
+void ReactorThread::DestroyConnection(Connection* conn,
                                       const Status& conn_status,
                                       unique_ptr<ErrorStatusPB> rpc_error) {
   DCHECK(IsCurrentThread());
@@ -706,7 +717,7 @@ void ReactorThread::DestroyConnection(Connection *conn,
   }
 }
 
-DelayedTask::DelayedTask(boost::function<void(const Status&)> func,
+DelayedTask::DelayedTask(std::function<void(const Status&)> func,
                          MonoDelta when)
     : func_(std::move(func)),
       when_(when),
@@ -787,7 +798,7 @@ Reactor::~Reactor() {
   Shutdown(Messenger::ShutdownMode::ASYNC);
 }
 
-const std::string& Reactor::name() const {
+const string& Reactor::name() const {
   return name_;
 }
 
@@ -799,7 +810,7 @@ bool Reactor::closing() const {
 // Task to call an arbitrary function within the reactor thread.
 class RunFunctionTask : public ReactorTask {
  public:
-  explicit RunFunctionTask(boost::function<Status()> f)
+  explicit RunFunctionTask(std::function<Status()> f)
       : function_(std::move(f)), latch_(1) {}
 
   void Run(ReactorThread* /*reactor*/) override {
@@ -819,25 +830,24 @@ class RunFunctionTask : public ReactorTask {
   }
 
  private:
-  boost::function<Status()> function_;
+  const std::function<Status()> function_;
   Status status_;
   CountDownLatch latch_;
 };
 
-Status Reactor::GetMetrics(ReactorMetrics *metrics) {
-  return RunOnReactorThread(boost::bind(&ReactorThread::GetMetrics, &thread_, metrics));
+Status Reactor::GetMetrics(ReactorMetrics* metrics) {
+  return RunOnReactorThread([&]() { return this->thread_.GetMetrics(metrics); });
 }
 
-Status Reactor::RunOnReactorThread(const boost::function<Status()>& f) {
-  RunFunctionTask task(f);
+Status Reactor::RunOnReactorThread(std::function<Status()> f) {
+  RunFunctionTask task(std::move(f));
   ScheduleReactorTask(&task);
   return task.Wait();
 }
 
 Status Reactor::DumpConnections(const DumpConnectionsRequestPB& req,
                                 DumpConnectionsResponsePB* resp) {
-  return RunOnReactorThread(boost::bind(&ReactorThread::DumpConnections,
-                                        &thread_, boost::ref(req), resp));
+  return RunOnReactorThread([&]() { return this->thread_.DumpConnections(req, resp); });
 }
 
 class RegisterConnectionTask : public ReactorTask {
@@ -859,10 +869,10 @@ class RegisterConnectionTask : public ReactorTask {
   }
 
  private:
-  scoped_refptr<Connection> conn_;
+  const scoped_refptr<Connection> conn_;
 };
 
-void Reactor::RegisterInboundSocket(Socket *socket, const Sockaddr& remote) {
+void Reactor::RegisterInboundSocket(Socket* socket, const Sockaddr& remote) {
   VLOG(3) << name_ << ": new inbound connection to " << remote.ToString();
   unique_ptr<Socket> new_socket(new Socket(socket->Release()));
   auto task = new RegisterConnectionTask(
@@ -890,17 +900,17 @@ class AssignOutboundCallTask : public ReactorTask {
   }
 
  private:
-  shared_ptr<OutboundCall> call_;
+  const shared_ptr<OutboundCall> call_;
 };
 
-void Reactor::QueueOutboundCall(const shared_ptr<OutboundCall>& call) {
+void Reactor::QueueOutboundCall(shared_ptr<OutboundCall> call) {
   DVLOG(3) << name_ << ": queueing outbound call "
            << call->ToString() << " to remote " << call->conn_id().remote().ToString();
   // Test cancellation when 'call_' is in 'READY' state.
   if (PREDICT_FALSE(call->ShouldInjectCancellation())) {
     QueueCancellation(call);
   }
-  ScheduleReactorTask(new AssignOutboundCallTask(call));
+  ScheduleReactorTask(new AssignOutboundCallTask(std::move(call)));
 }
 
 class CancellationTask : public ReactorTask {
@@ -918,14 +928,15 @@ class CancellationTask : public ReactorTask {
   }
 
  private:
-  shared_ptr<OutboundCall> call_;
+  const shared_ptr<OutboundCall> call_;
 };
 
-void Reactor::QueueCancellation(const shared_ptr<OutboundCall>& call) {
-  ScheduleReactorTask(new CancellationTask(call));
+void Reactor::QueueCancellation(shared_ptr<OutboundCall> call) {
+  ScheduleReactorTask(new CancellationTask(std::move(call)));
 }
 
-void Reactor::ScheduleReactorTask(ReactorTask *task) {
+void Reactor::ScheduleReactorTask(ReactorTask* task) {
+  bool was_empty;
   {
     std::unique_lock<LockType> l(lock_);
     if (closing_) {
@@ -934,12 +945,15 @@ void Reactor::ScheduleReactorTask(ReactorTask *task) {
       task->Abort(ShutdownError(false));
       return;
     }
+    was_empty = pending_tasks_.empty();
     pending_tasks_.push_back(*task);
   }
-  thread_.WakeThread();
+  if (was_empty) {
+    thread_.WakeThread();
+  }
 }
 
-bool Reactor::DrainTaskQueue(boost::intrusive::list<ReactorTask> *tasks) { // NOLINT(*)
+bool Reactor::DrainTaskQueue(boost::intrusive::list<ReactorTask>* tasks) { // NOLINT(*)
   std::lock_guard<LockType> l(lock_);
   if (closing_) {
     return false;

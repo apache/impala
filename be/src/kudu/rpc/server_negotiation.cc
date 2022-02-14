@@ -17,9 +17,13 @@
 
 #include "kudu/rpc/server_negotiation.h"
 
+#include <sasl/sasl.h>
+#include <sys/socket.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <ostream>
@@ -28,9 +32,7 @@
 
 #include <boost/optional/optional.hpp>
 #include <gflags/gflags.h>
-#include <gflags/gflags_declare.h>
 #include <glog/logging.h>
-#include <sasl/sasl.h>
 
 #include "kudu/gutil/macros.h"
 #include "kudu/gutil/map-util.h"
@@ -39,7 +41,6 @@
 #include "kudu/gutil/strings/substitute.h"
 #include "kudu/rpc/blocking_ops.h"
 #include "kudu/rpc/constants.h"
-#include "kudu/rpc/messenger.h"
 #include "kudu/rpc/rpc_verification_util.h"
 #include "kudu/rpc/serialization.h"
 #include "kudu/security/cert.h"
@@ -66,6 +67,7 @@
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif // #if defined(__APPLE__)
 
+using kudu::security::RpcEncryption;
 using std::set;
 using std::string;
 using std::unique_ptr;
@@ -154,12 +156,15 @@ ServerNegotiation::ServerNegotiation(unique_ptr<Socket> socket,
                                      const security::TlsContext* tls_context,
                                      const security::TokenVerifier* token_verifier,
                                      RpcEncryption encryption,
+                                     bool encrypt_loopback,
                                      std::string sasl_proto_name)
     : socket_(std::move(socket)),
       helper_(SaslHelper::SERVER),
       tls_context_(tls_context),
+      tls_handshake_(security::TlsHandshakeType::SERVER),
       encryption_(encryption),
       tls_negotiated_(false),
+      encrypt_loopback_(encrypt_loopback),
       token_verifier_(token_verifier),
       negotiated_authn_(AuthenticationType::INVALID),
       negotiated_mech_(SaslMechanism::INVALID),
@@ -221,8 +226,7 @@ Status ServerNegotiation::Negotiate() {
   if (encryption_ != RpcEncryption::DISABLED &&
       tls_context_->has_cert() &&
       ContainsKey(client_features_, TLS)) {
-    RETURN_NOT_OK(tls_context_->InitiateHandshake(security::TlsHandshakeType::SERVER,
-                                                  &tls_handshake_));
+    RETURN_NOT_OK(tls_context_->InitiateHandshake(&tls_handshake_));
 
     if (negotiated_authn_ != AuthenticationType::CERTIFICATE) {
       // The server does not need to verify the client's certificate unless it's
@@ -234,8 +238,12 @@ Status ServerNegotiation::Negotiate() {
       NegotiatePB request;
       RETURN_NOT_OK(RecvNegotiatePB(&request, &recv_buf));
       Status s = HandleTlsHandshake(request);
-      if (s.ok()) break;
-      if (!s.IsIncomplete()) return s;
+      if (s.ok()) {
+        break;
+      }
+      if (!s.IsIncomplete()) {
+        return s;
+      }
     }
     tls_negotiated_ = true;
   }
@@ -298,7 +306,7 @@ Status ServerNegotiation::PreflightCheckGSSAPI(const std::string& sasl_proto_nam
   // We aren't going to actually send/receive any messages, but
   // this makes it easier to reuse the initialization code.
   ServerNegotiation server(
-      nullptr, nullptr, nullptr, RpcEncryption::OPTIONAL, sasl_proto_name);
+      nullptr, nullptr, nullptr, RpcEncryption::OPTIONAL, false, sasl_proto_name);
   Status s = server.EnableGSSAPI();
   if (!s.ok()) {
     return Status::RuntimeError(s.message());
@@ -315,7 +323,7 @@ Status ServerNegotiation::PreflightCheckGSSAPI(const std::string& sasl_proto_nam
           kSaslMechGSSAPI,
           "", 0,  // Pass a 0-length token.
           &server_out, &server_out_len);
-    });
+    }, "calling sasl_server_start()");
 
   // We expect 'Incomplete' status to indicate that the first step of negotiation
   // was correct.
@@ -333,7 +341,8 @@ Status ServerNegotiation::PreflightCheckGSSAPI(const std::string& sasl_proto_nam
 Status ServerNegotiation::RecvNegotiatePB(NegotiatePB* msg, faststring* recv_buf) {
   RequestHeader header;
   Slice param_buf;
-  RETURN_NOT_OK(ReceiveFramedMessageBlocking(socket(), recv_buf, &header, &param_buf, deadline_));
+  RETURN_NOT_OK(ReceiveFramedMessageBlocking(
+      socket_.get(), recv_buf, &header, &param_buf, deadline_));
   Status s = helper_.CheckNegotiateCallId(header.call_id());
   if (!s.ok()) {
     RETURN_NOT_OK(SendError(ErrorStatusPB::FATAL_INVALID_RPC_HEADER, s));
@@ -359,7 +368,7 @@ Status ServerNegotiation::SendNegotiatePB(const NegotiatePB& msg) {
   DCHECK(msg.has_step()) << "message must have a step";
 
   TRACE("Sending $0 NegotiatePB response", NegotiatePB::NegotiateStep_Name(msg.step()));
-  return SendFramedMessageBlocking(socket(), header, msg, deadline_);
+  return SendFramedMessageBlocking(socket_.get(), header, msg, deadline_);
 }
 
 Status ServerNegotiation::SendError(ErrorStatusPB::RpcErrorCodePB code, const Status& err) {
@@ -376,9 +385,7 @@ Status ServerNegotiation::SendError(ErrorStatusPB::RpcErrorCodePB code, const St
   msg.set_message(err.ToString());
 
   TRACE("Sending RPC error: $0: $1", ErrorStatusPB::RpcErrorCodePB_Name(code), err.ToString());
-  RETURN_NOT_OK(SendFramedMessageBlocking(socket(), header, msg, deadline_));
-
-  return Status::OK();
+  return SendFramedMessageBlocking(socket_.get(), header, msg, deadline_);
 }
 
 Status ServerNegotiation::ValidateConnectionHeader(faststring* recv_buf) {
@@ -413,6 +420,8 @@ Status ServerNegotiation::InitSaslServer() {
     server_fqdn = default_server_fqdn.c_str();
   }
 
+  static constexpr const char* const kDesc = "creating new SASL server";
+  //static constexpr const char* const kDesc = "create "
   RETURN_NOT_OK_PREPEND(WrapSaslCall(nullptr /* no conn */, [&]() {
       return sasl_server_new(
           // Registered name of the service using SASL. Required.
@@ -430,7 +439,7 @@ Status ServerNegotiation::InitSaslServer() {
           // Security flags.
           secflags,
           &sasl_conn);
-    }), "Unable to create new SASL server");
+    }, kDesc), string(kDesc) + " failed");
   sasl_conn_.reset(sasl_conn);
   return Status::OK();
 }
@@ -535,7 +544,7 @@ Status ServerNegotiation::HandleNegotiate(const NegotiatePB& request) {
     server_features_.insert(TLS);
     // If the remote peer is local, then we allow using TLS for authentication
     // without encryption or integrity.
-    if (socket_->IsLoopbackConnection() && !FLAGS_rpc_encrypt_loopback_connections) {
+    if (socket_->IsLoopbackConnection() && !encrypt_loopback_) {
       server_features_.insert(TLS_AUTHENTICATION_ONLY);
     }
   }
@@ -590,17 +599,25 @@ Status ServerNegotiation::HandleTlsHandshake(const NegotiatePB& request) {
   }
 
   string token;
-  Status s = tls_handshake_.Continue(request.tls_handshake(), &token);
-
+  const Status s = tls_handshake_.Continue(request.tls_handshake(), &token);
   if (PREDICT_FALSE(!s.IsIncomplete() && !s.ok())) {
     RETURN_NOT_OK(SendError(ErrorStatusPB::FATAL_UNAUTHORIZED, s));
     return s;
   }
+  const bool needs_extra_step = tls_handshake_.NeedsExtraStep(s, token);
+  if (needs_extra_step) {
+    RETURN_NOT_OK(SendTlsHandshake(std::move(token)));
+  }
 
-  // Regardless of whether this is the final handshake roundtrip (in which case
-  // Continue would have returned OK), we still need to return a response.
-  RETURN_NOT_OK(SendTlsHandshake(std::move(token)));
+  // Check that the handshake step didn't produce an error. It also propagates
+  // any non-OK status.
   RETURN_NOT_OK(s);
+
+  if (!needs_extra_step && !token.empty()) {
+    DCHECK(s.ok());
+    DCHECK(!token.empty());
+    tls_handshake_.StorePendingData(std::move(token));
+  }
 
   // TLS handshake is finished.
   if (ContainsKey(server_features_, TLS_AUTHENTICATION_ONLY) &&
@@ -684,7 +701,7 @@ Status ServerNegotiation::AuthenticateByToken(faststring* recv_buf) {
   security::TokenPB token;
   auto verification_result = token_verifier_->VerifyTokenSignature(pb.authn_token(), &token);
   ErrorStatusPB::RpcErrorCodePB error;
-  Status s = ParseVerificationResult(verification_result,
+  Status s = ParseTokenVerificationResult(verification_result,
       ErrorStatusPB::FATAL_INVALID_AUTHENTICATION_TOKEN, &error);
   if (!s.ok()) {
     RETURN_NOT_OK(SendError(error, s));
@@ -705,26 +722,26 @@ Status ServerNegotiation::AuthenticateByToken(faststring* recv_buf) {
   }
 
   if (PREDICT_FALSE(FLAGS_rpc_inject_invalid_authn_token_ratio > 0)) {
-    security::VerificationResult res;
+    security::TokenVerificationResult res;
     int sel = rand() % 4;
     switch (sel) {
       case 0:
-        res = security::VerificationResult::INVALID_TOKEN;
+        res = security::TokenVerificationResult::INVALID_TOKEN;
         break;
       case 1:
-        res = security::VerificationResult::INVALID_SIGNATURE;
+        res = security::TokenVerificationResult::INVALID_SIGNATURE;
         break;
       case 2:
-        res = security::VerificationResult::EXPIRED_TOKEN;
+        res = security::TokenVerificationResult::EXPIRED_TOKEN;
         break;
       case 3:
-        res = security::VerificationResult::EXPIRED_SIGNING_KEY;
+        res = security::TokenVerificationResult::EXPIRED_SIGNING_KEY;
         break;
       default:
         LOG(FATAL) << "unreachable";
     }
     if (kudu::fault_injection::MaybeTrue(FLAGS_rpc_inject_invalid_authn_token_ratio)) {
-      Status s = Status::NotAuthorized(VerificationResultToString(res));
+      Status s = Status::NotAuthorized(TokenVerificationResultToString(res));
       RETURN_NOT_OK(SendError(ErrorStatusPB::FATAL_INVALID_AUTHENTICATION_TOKEN, s));
       return s;
     }
@@ -808,7 +825,8 @@ Status ServerNegotiation::HandleSaslInitiate(const NegotiatePB& request) {
 
   const char* server_out = nullptr;
   uint32_t server_out_len = 0;
-  TRACE("Calling sasl_server_start()");
+  static constexpr const char* const kDesc = "calling sasl_server_start()";
+  TRACE(kDesc);
 
   Status s = WrapSaslCall(sasl_conn_.get(), [&]() {
       return sasl_server_start(
@@ -818,7 +836,7 @@ Status ServerNegotiation::HandleSaslInitiate(const NegotiatePB& request) {
           request.token().length(), // Client string len.
           &server_out,              // The output of the SASL library, might not be NULL terminated
           &server_out_len);         // Output len.
-    });
+    }, kDesc);
 
   if (PREDICT_FALSE(!s.ok() && !s.IsIncomplete())) {
     RETURN_NOT_OK(SendError(ErrorStatusPB::FATAL_UNAUTHORIZED, s));
@@ -850,9 +868,10 @@ Status ServerNegotiation::HandleSaslResponse(const NegotiatePB& request) {
     return s;
   }
 
+  static constexpr const char* const kDesc = "calling sasl_server_step()";
   const char* server_out = nullptr;
   uint32_t server_out_len = 0;
-  TRACE("Calling sasl_server_step()");
+  TRACE(kDesc);
   Status s = WrapSaslCall(sasl_conn_.get(), [&]() {
       return sasl_server_step(
           sasl_conn_.get(),         // The SASL connection context created by init()
@@ -860,7 +879,7 @@ Status ServerNegotiation::HandleSaslResponse(const NegotiatePB& request) {
           request.token().length(), // Client string len
           &server_out,              // The output of the SASL library, might not be NULL terminated
           &server_out_len);         // Output len
-    });
+    }, kDesc);
 
   if (s.ok()) {
     DCHECK(server_out_len == 0);
@@ -913,15 +932,15 @@ Status ServerNegotiation::SendSaslSuccess() {
     }
   }
 
-  RETURN_NOT_OK(SendNegotiatePB(response));
-  return Status::OK();
+  return SendNegotiatePB(response);
 }
 
 Status ServerNegotiation::RecvConnectionContext(faststring* recv_buf) {
   TRACE("Waiting for connection context");
   RequestHeader header;
   Slice param_buf;
-  RETURN_NOT_OK(ReceiveFramedMessageBlocking(socket(), recv_buf, &header, &param_buf, deadline_));
+  RETURN_NOT_OK(ReceiveFramedMessageBlocking(
+      socket_.get(), recv_buf, &header, &param_buf, deadline_));
   DCHECK(header.IsInitialized());
 
   if (header.call_id() != kConnectionContextCallId) {
@@ -983,6 +1002,7 @@ int ServerNegotiation::PlainAuthCb(sasl_conn_t* /*conn*/,
 }
 
 bool ServerNegotiation::IsTrustedConnection(const Sockaddr& addr) {
+  if (addr.family() == AF_UNIX) return true;
   static std::once_flag once;
   std::call_once(once, [] {
     g_trusted_subnets = new vector<Network>();

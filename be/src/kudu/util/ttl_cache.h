@@ -138,7 +138,7 @@ class TTLCache {
       scrubbing_thread_running_.Reset(1);
       CHECK_OK(Thread::Create(
           "cache", strings::Substitute("$0-scrubbing", cache_name),
-          &TTLCache::ScrubExpiredEntries, this, &scrubbing_thread_));
+          [this]() { this->ScrubExpiredEntries(); }, &scrubbing_thread_));
       VLOG(1) << strings::Substitute(
           "started scrubbing thread for TTL cache '$0' with period of $1",
           cache_name, scrubbing_period_.ToString());
@@ -180,6 +180,10 @@ class TTLCache {
     return EntryHandle(DCHECK_NOTNULL(entry_ptr->val_ptr), std::move(h));
   }
 
+  void Erase(const K& key) {
+    cache_->Erase(key);
+  }
+
   // For the specified key, add an entry into the cache or replace already
   // existing one. The 'charge' parameter specifies the charge to associate
   // with the entry with regard to the cache's capacity. This method returns
@@ -209,7 +213,7 @@ class TTLCache {
   void SetMetrics(std::unique_ptr<TTLCacheMetrics> metrics) {
     // Keep a copy of the pointer to the metrics: the FIFO cache is the owner.
     metrics_ = metrics.get();
-    cache_->SetMetrics(std::move(metrics));
+    cache_->SetMetrics(std::move(metrics), Cache::ExistingMetricsPolicy::kKeep);
   }
 
  private:

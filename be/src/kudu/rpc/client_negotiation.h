@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <sasl/sasl.h>
+
 #include <cstdlib>
 #include <memory>
 #include <set>
@@ -26,19 +28,16 @@
 
 #include <boost/optional/optional.hpp>
 #include <glog/logging.h>
-#include <sasl/sasl.h>
 
-#include "kudu/rpc/messenger.h"
+#include "kudu/gutil/port.h"
 #include "kudu/rpc/negotiation.h"
 #include "kudu/rpc/rpc_header.pb.h"
 #include "kudu/rpc/sasl_common.h"
 #include "kudu/rpc/sasl_helper.h"
 #include "kudu/security/security_flags.h"
 #include "kudu/security/tls_handshake.h"
-#include "kudu/security/token.pb.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/net/socket.h"
-#include "kudu/gutil/port.h"
 #include "kudu/util/status.h"
 
 namespace kudu {
@@ -47,6 +46,7 @@ class Slice;
 class faststring;
 
 namespace security {
+class SignedTokenPB;
 class TlsContext;
 }
 
@@ -65,7 +65,8 @@ class ClientNegotiation {
   ClientNegotiation(std::unique_ptr<Socket> socket,
                     const security::TlsContext* tls_context,
                     boost::optional<security::SignedTokenPB> authn_token,
-                    RpcEncryption encryption,
+                    security::RpcEncryption encryption,
+                    bool encrypt_loopback,
                     std::string sasl_proto_name);
 
   // Enable PLAIN authentication.
@@ -227,8 +228,9 @@ class ClientNegotiation {
   // TLS state.
   const security::TlsContext* tls_context_;
   security::TlsHandshake tls_handshake_;
-  const RpcEncryption encryption_;
+  const security::RpcEncryption encryption_;
   bool tls_negotiated_;
+  bool encrypt_loopback_;
 
   // TSK state.
   boost::optional<security::SignedTokenPB> authn_token_;

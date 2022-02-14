@@ -15,6 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "kudu/security/crypto.h"
+
 #include <cstring>
 #include <string>
 #include <utility>
@@ -24,10 +26,9 @@
 
 #include "kudu/gutil/strings/strip.h"
 #include "kudu/gutil/strings/substitute.h"
-#include "kudu/security/crypto.h"
-#include "kudu/security/openssl_util.h"
 #include "kudu/security/test/test_certs.h"
 #include "kudu/util/env.h"
+#include "kudu/util/openssl_util.h"
 #include "kudu/util/path_util.h"
 #include "kudu/util/slice.h"
 #include "kudu/util/status.h"
@@ -185,7 +186,7 @@ TEST_P(CryptoKeySerDesTest, ToAndFromString) {
   NO_FATALS(CheckToAndFromString(public_key, format));
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     DataFormats, CryptoKeySerDesTest,
     ::testing::Values(DataFormat::DER, DataFormat::PEM));
 

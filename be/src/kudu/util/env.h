@@ -9,25 +9,24 @@
 //
 // All Env implementations are safe for concurrent access from
 // multiple threads without any external synchronization.
-
-#ifndef STORAGE_LEVELDB_INCLUDE_ENV_H_
-#define STORAGE_LEVELDB_INCLUDE_ENV_H_
+#pragma once
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <iosfwd>
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "kudu/gutil/callback_forward.h"
 #include "kudu/gutil/macros.h"
 #include "kudu/util/status.h"
 
 namespace kudu {
 
 class faststring;
+class Fifo;
 class FileLock;
 class RandomAccessFile;
 class RWFile;
@@ -38,6 +37,7 @@ class WritableFile;
 struct RandomAccessFileOptions;
 struct RWFileOptions;
 struct WritableFileOptions;
+struct SequentialFileOptions;
 
 template <typename T>
 class ArrayView;
@@ -46,6 +46,7 @@ class ArrayView;
 struct SpaceInfo {
   int64_t capacity_bytes; // Capacity of a filesystem, in bytes.
   int64_t free_bytes;     // Bytes available to non-privileged processes.
+  uint64_t filesystem_id; // FilesystemID returned by statvfs()
 };
 
 class Env {
@@ -82,6 +83,11 @@ class Env {
   //
   // The returned file will only be accessed by one thread at a time.
   virtual Status NewSequentialFile(const std::string& fname,
+                                   std::unique_ptr<SequentialFile>* result) = 0;
+
+  // Like the previous NewSequentialFile, but allows options to be specified.
+  virtual Status NewSequentialFile(const SequentialFileOptions& opts,
+                                   const std::string& fname,
                                    std::unique_ptr<SequentialFile>* result) = 0;
 
   // Create a brand new random access read-only file with the
@@ -142,11 +148,15 @@ class Env {
                            const std::string& fname,
                            std::unique_ptr<RWFile>* result) = 0;
 
-  // Same as abovoe for NewTempWritableFile(), but for an RWFile.
+  // Same as above for NewTempWritableFile(), but for an RWFile.
   virtual Status NewTempRWFile(const RWFileOptions& opts,
                                const std::string& name_template,
                                std::string* created_filename,
                                std::unique_ptr<RWFile>* res) = 0;
+
+  // Creates a new fifo.
+  virtual Status NewFifo(const std::string& fname,
+                         std::unique_ptr<Fifo>* fifo) = 0;
 
   // Returns true iff the named file exists.
   virtual bool FileExists(const std::string& fname) = 0;
@@ -180,7 +190,7 @@ class Env {
   virtual Status DeleteRecursively(const std::string &dirname) = 0;
 
   // Store the logical size of fname in *file_size.
-  virtual Status GetFileSize(const std::string& fname, uint64_t* file_size) = 0;
+  virtual Status GetFileSize(const std::string& fname, uint64_t* file_size)= 0;
 
   // Store the physical size of fname in *file_size.
   //
@@ -273,7 +283,7 @@ class Env {
   //
   // Returning an error won't halt the walk, but it will cause it to return
   // with an error status when it's done.
-  typedef Callback<Status(FileType, const std::string&, const std::string&)> WalkCallback;
+  typedef std::function<Status(FileType, const std::string&, const std::string&)> WalkCallback;
 
   // Whether to walk directories in pre-order or post-order.
   enum DirectoryOrder {
@@ -361,11 +371,19 @@ class Env {
   // On success, 'result' contains the answer. On failure, 'result' is unset.
   virtual Status IsFileWorldReadable(const std::string& path, bool* result) = 0;
 
+  // Creates symlink 'dst' that points to 'source'.
+  virtual Status CreateSymLink(const std::string& src, const std::string& dst) = 0;
+
+  // Returns the encryption header size.
+  virtual size_t GetEncryptionHeaderSize() const = 0;
+
   // Special string injected into file-growing operations' random failures
   // (if enabled).
   //
   // Only useful for tests.
   static const char* const kInjectedFailureStatusMsg;
+
+  virtual bool IsEncryptionEnabled() const = 0;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(Env);
@@ -376,14 +394,45 @@ class File {
  public:
   virtual ~File();
 
+  // Returns the encryption header size.
+  virtual size_t GetEncryptionHeaderSize() const = 0;
+
   // Returns the filename provided at construction time.
   virtual const std::string& filename() const = 0;
+};
+
+// A simple fifo abstraction.
+class Fifo : public File {
+ public:
+  // Opens the fifo for reads. This will wait until the fifo has also been
+  // opened for writes.
+  virtual Status OpenForReads() = 0;
+
+  // Opens the fifo for writes. This will wait until the fifo has also been
+  // opened for reads.
+  virtual Status OpenForWrites() = 0;
+
+  // Returns the read fd, set when opened for reads. The fifo must have been
+  // opened for reads before calling.
+  virtual int read_fd() const = 0;
+
+  // Returns the write fd, set when opened for writes. The fifo must have been
+  // opened for writes before calling.
+  virtual int write_fd() const = 0;
+};
+
+struct SequentialFileOptions {
+  // Whether the file contains sensitive information. If true, the file is
+  // encrypted if encryption is enabled.
+  bool is_sensitive;
+
+  SequentialFileOptions() : is_sensitive(false) {}
 };
 
 // A file abstraction for reading sequentially through a file
 class SequentialFile : public File {
  public:
-  SequentialFile() { }
+  SequentialFile() {}
 
   // Read up to "result.size" bytes from the file.
   // Sets "result.data" to the data that was read.
@@ -455,14 +504,21 @@ struct WritableFileOptions {
   // See CreateMode for details.
   Env::OpenMode mode;
 
+  // Whether the file contains sensitive information. If true, the file is
+  // encrypted if encryption is enabled.
+  bool is_sensitive;
+
   WritableFileOptions()
-    : sync_on_close(false),
-      mode(Env::CREATE_OR_OPEN_WITH_TRUNCATE) { }
+      : sync_on_close(false), mode(Env::CREATE_OR_OPEN_WITH_TRUNCATE), is_sensitive(false) {}
 };
 
 // Options specified when a file is opened for random access.
 struct RandomAccessFileOptions {
-  RandomAccessFileOptions() {}
+  // Whether the file contains sensitive information. If true, the file is
+  // encrypted if encryption is enabled.
+  bool is_sensitive;
+
+  RandomAccessFileOptions() : is_sensitive(false) {}
 };
 
 // A file abstraction for sequential writing.  The implementation
@@ -522,9 +578,12 @@ struct RWFileOptions {
   // See CreateMode for details.
   Env::OpenMode mode;
 
+  // Whether the file contains sensitive information. If true, the file is
+  // encrypted if encryption is enabled.
+  bool is_sensitive;
+
   RWFileOptions()
-    : sync_on_close(false),
-      mode(Env::CREATE_OR_OPEN_WITH_TRUNCATE) { }
+      : sync_on_close(false), mode(Env::CREATE_OR_OPEN_WITH_TRUNCATE), is_sensitive(false) {}
 };
 
 // A file abstraction for both reading and writing. No notion of a built-in
@@ -636,6 +695,8 @@ class RWFile : public File {
   // Retrieves the file's size.
   virtual Status Size(uint64_t* size) const = 0;
 
+  virtual bool IsEncrypted() const = 0;
+
   // Retrieve a map of the file's live extents.
   //
   // Each map entry is an offset and size representing a section of live file
@@ -665,14 +726,26 @@ class FileLock {
 // A utility routine: write "data" to the named file.
 extern Status WriteStringToFile(Env* env, const Slice& data,
                                 const std::string& fname);
+// Like above but also fsyncs the new file.
+extern Status WriteStringToFileSync(Env* env, const Slice& data,
+                                    const std::string& fname);
+
+// A utility routine: write "data" to the named encrypted file.
+extern Status WriteStringToFileEncrypted(Env* env, const Slice& data,
+                                         const std::string& fname);
+// Like above but also fsyncs the new file.
+extern Status WriteStringToFileEncryptedSync(Env* env, const Slice& data,
+                                             const std::string& fname);
 
 // A utility routine: read contents of named file into *data
 extern Status ReadFileToString(Env* env, const std::string& fname,
                                faststring* data);
 
+// A utility routine: read contents of named encrypted file into *data
+extern Status ReadFileToStringEncrypted(Env* env, const std::string& fname,
+                                        faststring* data);
+
 // Overloaded operator for printing Env::ResourceLimitType.
 std::ostream& operator<<(std::ostream& o, Env::ResourceLimitType t);
 
 }  // namespace kudu
-
-#endif  // STORAGE_LEVELDB_INCLUDE_ENV_H_

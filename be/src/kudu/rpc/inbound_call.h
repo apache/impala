@@ -25,11 +25,13 @@
 #include <vector>
 
 #include <glog/logging.h>
+#include <google/protobuf/arena.h>
 
 #include "kudu/gutil/macros.h"
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/rpc/remote_method.h"
 #include "kudu/rpc/rpc_header.pb.h"
+#include "kudu/rpc/rpc_sidecar.h"
 #include "kudu/rpc/service_if.h"
 #include "kudu/rpc/transfer.h"
 #include "kudu/util/faststring.h"
@@ -55,7 +57,6 @@ class Connection;
 class DumpConnectionsRequestPB;
 class RemoteUser;
 class RpcCallInProgressPB;
-class RpcSidecar;
 
 struct InboundCallTiming {
   MonoTime time_received;   // Time the call was first accepted.
@@ -133,8 +134,7 @@ class InboundCall {
 
   // Serialize the response packet for the finished call into 'slices'.
   // The resulting slices refer to memory in this object.
-  // Returns the number of slices in the serialized response.
-  size_t SerializeResponseTo(TransferPayload* slices) const;
+  void SerializeResponseTo(TransferPayload* slices) const;
 
   // See RpcContext::AddRpcSidecar()
   Status AddOutboundSidecar(std::unique_ptr<RpcSidecar> car, int* idx);
@@ -150,6 +150,10 @@ class InboundCall {
   const scoped_refptr<Connection>& connection() const;
 
   Trace* trace();
+
+  google::protobuf::Arena* pb_arena() {
+    return &arena_;
+  }
 
   const InboundCallTiming& timing() const {
     return timing_;
@@ -265,7 +269,7 @@ class InboundCall {
 
   // Inbound sidecars from the request. The slices are views onto transfer_. There are as
   // many slices as header_.sidecar_offsets_size().
-  Slice inbound_sidecar_slices_[TransferLimits::kMaxSidecars];
+  SidecarSliceVector inbound_sidecar_slices_;
 
   // The trace buffer.
   scoped_refptr<Trace> trace_;
@@ -285,6 +289,8 @@ class InboundCall {
   // A time at which the client will time out, or MonoTime::Max if the
   // client did not pass a timeout.
   MonoTime deadline_;
+
+  google::protobuf::Arena arena_;
 
   DISALLOW_COPY_AND_ASSIGN(InboundCall);
 };

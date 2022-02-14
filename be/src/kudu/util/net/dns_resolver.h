@@ -14,11 +14,10 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-
 #pragma once
 
-#include <stddef.h>
-
+#include <cstddef>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -75,6 +74,12 @@ class DnsResolver {
   // NOTE: in some rare cases, the callback may also be called inline
   // from this function call, on the caller's thread.
   void ResolveAddressesAsync(const HostPort& hostport,
+                             std::vector<Sockaddr>* addresses,
+                             const StatusCallback& cb);
+
+  // Like ResolveAddressesAsync(), but initially removes any existing cached
+  // entry, in favor of resolving the address explicitly.
+  void RefreshAddressesAsync(const HostPort& hostport,
                              std::vector<Sockaddr>* addresses,
                              const StatusCallback& cb);
 

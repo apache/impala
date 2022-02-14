@@ -42,144 +42,46 @@
 #include "kudu/rpc/sasl_common.h"
 #include "kudu/rpc/server_negotiation.h"
 #include "kudu/rpc/service_if.h"
-#include "kudu/security/openssl_util.h"
 #include "kudu/security/tls_context.h"
 #include "kudu/security/token_verifier.h"
 #include "kudu/util/flags.h"
 #include "kudu/util/metrics.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/net/socket.h"
+#include "kudu/util/openssl_util.h"
 #include "kudu/util/status.h"
 #include "kudu/util/thread_restrictions.h"
 #include "kudu/util/threadpool.h"
 
+using kudu::security::RpcAuthentication;
+using kudu::security::RpcEncryption;
 using std::string;
 using std::shared_ptr;
-using std::make_shared;
 using std::unique_ptr;
 using strings::Substitute;
-
-namespace boost {
-template <typename Signature> class function;
-}
 
 namespace kudu {
 namespace rpc {
 
-MessengerBuilder::MessengerBuilder(std::string name)
+const int64_t MessengerBuilder::kRpcNegotiationTimeoutMs = 3000;
+
+MessengerBuilder::MessengerBuilder(string name)
     : name_(std::move(name)),
       connection_keepalive_time_(MonoDelta::FromMilliseconds(65000)),
       num_reactors_(4),
       min_negotiation_threads_(0),
       max_negotiation_threads_(4),
       coarse_timer_granularity_(MonoDelta::FromMilliseconds(100)),
-      rpc_negotiation_timeout_ms_(3000),
+      rpc_negotiation_timeout_ms_(kRpcNegotiationTimeoutMs),
       sasl_proto_name_("kudu"),
       rpc_authentication_("optional"),
       rpc_encryption_("optional"),
+      rpc_loopback_encryption_(false),
       rpc_tls_ciphers_(kudu::security::SecurityDefaults::kDefaultTlsCiphers),
+      rpc_tls_ciphersuites_(kudu::security::SecurityDefaults::kDefaultTlsCipherSuites),
       rpc_tls_min_protocol_(kudu::security::SecurityDefaults::kDefaultTlsMinVersion),
       enable_inbound_tls_(false),
       reuseport_(false) {
-}
-
-MessengerBuilder& MessengerBuilder::set_connection_keepalive_time(const MonoDelta &keepalive) {
-  connection_keepalive_time_ = keepalive;
-  return *this;
-}
-
-MessengerBuilder& MessengerBuilder::set_num_reactors(int num_reactors) {
-  num_reactors_ = num_reactors;
-  return *this;
-}
-
-MessengerBuilder& MessengerBuilder::set_min_negotiation_threads(int min_negotiation_threads) {
-  min_negotiation_threads_ = min_negotiation_threads;
-  return *this;
-}
-
-MessengerBuilder& MessengerBuilder::set_max_negotiation_threads(int max_negotiation_threads) {
-  max_negotiation_threads_ = max_negotiation_threads;
-  return *this;
-}
-
-MessengerBuilder& MessengerBuilder::set_coarse_timer_granularity(const MonoDelta &granularity) {
-  coarse_timer_granularity_ = granularity;
-  return *this;
-}
-
-MessengerBuilder &MessengerBuilder::set_metric_entity(
-    const scoped_refptr<MetricEntity>& metric_entity) {
-  metric_entity_ = metric_entity;
-  return *this;
-}
-
-MessengerBuilder &MessengerBuilder::set_connection_keep_alive_time(int32_t time_in_ms) {
-  connection_keepalive_time_ = MonoDelta::FromMilliseconds(time_in_ms);
-  return *this;
-}
-
-MessengerBuilder &MessengerBuilder::set_rpc_negotiation_timeout_ms(int64_t time_in_ms) {
-  rpc_negotiation_timeout_ms_ = time_in_ms;
-  return *this;
-}
-
-MessengerBuilder &MessengerBuilder::set_sasl_proto_name(const std::string& sasl_proto_name) {
-  sasl_proto_name_ = sasl_proto_name;
-  return *this;
-}
-
-MessengerBuilder &MessengerBuilder::set_rpc_authentication(const std::string& rpc_authentication) {
-  rpc_authentication_ = rpc_authentication;
-  return *this;
-}
-
-MessengerBuilder &MessengerBuilder::set_rpc_encryption(const std::string& rpc_encryption) {
-  rpc_encryption_ = rpc_encryption;
-  return *this;
-}
-
-MessengerBuilder &MessengerBuilder::set_rpc_tls_ciphers(const std::string& rpc_tls_ciphers) {
-  rpc_tls_ciphers_ = rpc_tls_ciphers;
-  return *this;
-}
-
-MessengerBuilder &MessengerBuilder::set_rpc_tls_min_protocol(
-    const std::string& rpc_tls_min_protocol) {
-  rpc_tls_min_protocol_ = rpc_tls_min_protocol;
-  return *this;
-}
-
-MessengerBuilder& MessengerBuilder::set_epki_cert_key_files(
-    const std::string& cert, const std::string& private_key) {
-  rpc_certificate_file_ = cert;
-  rpc_private_key_file_ = private_key;
-  return *this;
-}
-
-MessengerBuilder& MessengerBuilder::set_epki_certificate_authority_file(const std::string& ca) {
-  rpc_ca_certificate_file_ = ca;
-  return *this;
-}
-
-MessengerBuilder& MessengerBuilder::set_epki_private_password_key_cmd(const std::string& cmd) {
-  rpc_private_key_password_cmd_ = cmd;
-  return *this;
-}
-
-MessengerBuilder& MessengerBuilder::set_keytab_file(const std::string& keytab_file) {
-  keytab_file_ = keytab_file;
-  return *this;
-}
-
-MessengerBuilder& MessengerBuilder::enable_inbound_tls() {
-  enable_inbound_tls_ = true;
-  return *this;
-}
-
-MessengerBuilder& MessengerBuilder::set_reuseport() {
-  reuseport_ = true;
-  return *this;
 }
 
 Status MessengerBuilder::Build(shared_ptr<Messenger>* msgr) {
@@ -191,15 +93,13 @@ Status MessengerBuilder::Build(shared_ptr<Messenger>* msgr) {
   // Note: can't use make_shared() as it doesn't support custom deleters.
   shared_ptr<Messenger> new_msgr(new Messenger(*this),
                                  std::mem_fn(&Messenger::AllExternalReferencesDropped));
-
   RETURN_NOT_OK(ParseTriState("--rpc_authentication",
                               rpc_authentication_,
                               &new_msgr->authentication_));
-
   RETURN_NOT_OK(ParseTriState("--rpc_encryption",
                               rpc_encryption_,
                               &new_msgr->encryption_));
-
+  new_msgr->loopback_encryption_ = rpc_loopback_encryption_;
   RETURN_NOT_OK(new_msgr->Init());
   if (new_msgr->encryption_ != RpcEncryption::DISABLED && enable_inbound_tls_) {
     auto* tls_context = new_msgr->mutable_tls_context();
@@ -273,11 +173,11 @@ void Messenger::ShutdownInternal(ShutdownMode mode) {
   RpcServicesMap services_to_release;
   {
     std::lock_guard<percpu_rwlock> guard(lock_);
-    if (closing_) {
+    if (state_ == kClosing) {
       return;
     }
     VLOG(1) << "shutting down messenger " << name_;
-    closing_ = true;
+    state_ = kClosing;
 
     services_to_release = std::move(rpc_services_);
     pools_to_shutdown = std::move(acceptor_pools_);
@@ -300,7 +200,7 @@ void Messenger::ShutdownInternal(ShutdownMode mode) {
   }
 }
 
-Status Messenger::AddAcceptorPool(const Sockaddr &accept_addr,
+Status Messenger::AddAcceptorPool(const Sockaddr& accept_addr,
                                   shared_ptr<AcceptorPool>* pool) {
   // Before listening, if we expect to require Kerberos, we want to verify
   // that everything is set up correctly. This way we'll generate errors on
@@ -311,7 +211,7 @@ Status Messenger::AddAcceptorPool(const Sockaddr &accept_addr,
   }
 
   Socket sock;
-  RETURN_NOT_OK(sock.Init(0));
+  RETURN_NOT_OK(sock.Init(accept_addr.family(), 0));
   RETURN_NOT_OK(sock.SetReuseAddr(true));
   if (reuseport_) {
     RETURN_NOT_OK(sock.SetReusePort(true));
@@ -319,7 +219,7 @@ Status Messenger::AddAcceptorPool(const Sockaddr &accept_addr,
   RETURN_NOT_OK(sock.Bind(accept_addr));
   Sockaddr remote;
   RETURN_NOT_OK(sock.GetSocketAddress(&remote));
-  auto acceptor_pool(make_shared<AcceptorPool>(this, &sock, remote));
+  auto acceptor_pool(std::make_shared<AcceptorPool>(this, &sock, remote));
 
   std::lock_guard<percpu_rwlock> guard(lock_);
   acceptor_pools_.push_back(acceptor_pool);
@@ -332,11 +232,12 @@ Status Messenger::RegisterService(const string& service_name,
                                   const scoped_refptr<RpcService>& service) {
   DCHECK(service);
   std::lock_guard<percpu_rwlock> guard(lock_);
+  DCHECK_NE(kServicesUnregistered, state_);
+  DCHECK_NE(kClosing, state_);
   if (InsertIfNotPresent(&rpc_services_, service_name, service)) {
     return Status::OK();
-  } else {
-    return Status::AlreadyPresent("This service is already present");
   }
+  return Status::AlreadyPresent("This service is already present");
 }
 
 void Messenger::UnregisterAllServices() {
@@ -344,6 +245,7 @@ void Messenger::UnregisterAllServices() {
   {
     std::lock_guard<percpu_rwlock> guard(lock_);
     to_release = std::move(rpc_services_);
+    state_ = kServicesUnregistered;
   }
   // Release the map outside of the lock.
 }
@@ -378,10 +280,16 @@ void Messenger::QueueInboundCall(unique_ptr<InboundCall> call) {
   scoped_refptr<RpcService>* service = FindOrNull(rpc_services_,
                                                   call->remote_method().service_name());
   if (PREDICT_FALSE(!service)) {
-    Status s =  Status::ServiceUnavailable(Substitute("service $0 not registered on $1",
-                                                      call->remote_method().service_name(), name_));
-    LOG(INFO) << s.ToString();
-    call.release()->RespondFailure(ErrorStatusPB::ERROR_NO_SUCH_SERVICE, s);
+    const auto msg = Substitute("service $0 not registered on $1",
+                                call->remote_method().service_name(), name_);
+    if (state_ == kServicesRegistered) {
+      // NOTE: this message is only actually interesting if it's not transient.
+      LOG(INFO) << msg;
+      call.release()->RespondFailure(ErrorStatusPB::ERROR_NO_SUCH_SERVICE, Status::NotFound(msg));
+    } else {
+      call.release()->RespondFailure(
+          ErrorStatusPB::ERROR_UNAVAILABLE, Status::ServiceUnavailable(msg));
+    }
     return;
   }
 
@@ -402,19 +310,22 @@ void Messenger::RegisterInboundSocket(Socket *new_socket, const Sockaddr &remote
 }
 
 Messenger::Messenger(const MessengerBuilder &bld)
-  : name_(bld.name_),
-    closing_(false),
-    authentication_(RpcAuthentication::REQUIRED),
-    encryption_(RpcEncryption::REQUIRED),
-    tls_context_(new security::TlsContext(bld.rpc_tls_ciphers_, bld.rpc_tls_min_protocol_)),
-    token_verifier_(new security::TokenVerifier()),
-    rpcz_store_(new RpczStore()),
-    metric_entity_(bld.metric_entity_),
-    rpc_negotiation_timeout_ms_(bld.rpc_negotiation_timeout_ms_),
-    sasl_proto_name_(bld.sasl_proto_name_),
-    keytab_file_(bld.keytab_file_),
-    reuseport_(bld.reuseport_),
-    retain_self_(this) {
+    : name_(bld.name_),
+      state_(kStarted),
+      authentication_(RpcAuthentication::REQUIRED),
+      encryption_(RpcEncryption::REQUIRED),
+      tls_context_(new security::TlsContext(bld.rpc_tls_ciphers_,
+                                            bld.rpc_tls_ciphersuites_,
+                                            bld.rpc_tls_min_protocol_,
+                                            bld.rpc_tls_excluded_protocols_)),
+      token_verifier_(new security::TokenVerifier),
+      rpcz_store_(new RpczStore),
+      metric_entity_(bld.metric_entity_),
+      rpc_negotiation_timeout_ms_(bld.rpc_negotiation_timeout_ms_),
+      sasl_proto_name_(bld.sasl_proto_name_),
+      keytab_file_(bld.keytab_file_),
+      reuseport_(bld.reuseport_),
+      retain_self_(this) {
   for (int i = 0; i < bld.num_reactors_; i++) {
     reactors_.push_back(new Reactor(retain_self_, i, bld));
   }
@@ -429,16 +340,14 @@ Messenger::Messenger(const MessengerBuilder &bld)
 }
 
 Messenger::~Messenger() {
-  CHECK(closing_) << "Should have already shut down";
+  CHECK_EQ(state_, kClosing) << "Should have already shut down";
   STLDeleteElements(&reactors_);
 }
 
-Reactor* Messenger::RemoteToReactor(const Sockaddr &remote) {
-  uint32_t hashCode = remote.HashCode();
-  int reactor_idx = hashCode % reactors_.size();
+Reactor* Messenger::RemoteToReactor(const Sockaddr& remote) {
   // This is just a static partitioning; we could get a lot
   // fancier with assigning Sockaddrs to Reactors.
-  return reactors_[reactor_idx];
+  return reactors_[remote.HashCode() % reactors_.size()];
 }
 
 Status Messenger::Init() {
@@ -458,7 +367,7 @@ Status Messenger::DumpConnections(const DumpConnectionsRequestPB& req,
   return Status::OK();
 }
 
-void Messenger::ScheduleOnReactor(const boost::function<void(const Status&)>& func,
+void Messenger::ScheduleOnReactor(std::function<void(const Status&)> func,
                                   MonoDelta when) {
   DCHECK(!reactors_.empty());
 
@@ -474,7 +383,7 @@ void Messenger::ScheduleOnReactor(const boost::function<void(const Status&)>& fu
     chosen = reactors_[rand() % reactors_.size()];
   }
 
-  DelayedTask* task = new DelayedTask(func, when);
+  DelayedTask* task = new DelayedTask(std::move(func), when);
   chosen->ScheduleReactorTask(task);
 }
 

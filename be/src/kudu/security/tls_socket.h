@@ -17,15 +17,20 @@
 
 #pragma once
 
+#include <openssl/ssl.h>
+
 #include <cstdint>
 #include <memory>
+#include <string>
 
 #include "kudu/gutil/port.h"
-#include "kudu/security/openssl_util.h" // IWYU pragma: keep
+#include "kudu/util/faststring.h"
 #include "kudu/util/net/socket.h"
+#include "kudu/util/openssl_util.h" // IWYU pragma: keep
 #include "kudu/util/status.h"
 
 struct iovec;
+
 typedef struct ssl_st SSL;
 
 namespace kudu {
@@ -46,6 +51,12 @@ class TlsSocket : public Socket {
 
   Status Close() override WARN_UNUSED_RESULT;
 
+  // Get the name of the negotiated TLS protocol for the connection.
+  std::string GetProtocolName() const;
+
+  // Get the description of the negotiated TLS cipher suite for the connection.
+  std::string GetCipherDescription() const;
+
  private:
 
   friend class TlsHandshake;
@@ -54,6 +65,11 @@ class TlsSocket : public Socket {
 
   // Owned SSL handle.
   c_unique_ptr<SSL> ssl_;
+
+  bool use_cork_;
+
+  // Socket-local buffer used by Writev().
+  faststring buf_;
 };
 
 } // namespace security

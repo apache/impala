@@ -15,9 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Target including all protobuf-generated code.
-add_custom_target(kudu-util-proto-deps)
-
 #######################################
 # block_bloom_filter_proto
 #######################################
@@ -31,8 +28,6 @@ ADD_EXPORTABLE_LIBRARY(block_bloom_filter_proto
   SRCS ${BLOCK_BLOOM_FILTER_PROTO_SRCS}
   DEPS hash_proto pb_util_proto protobuf
   NONLINK_DEPS ${BLOCK_BLOOM_FILTER_PROTO_TGTS})
-
-add_dependencies(kudu-util-proto-deps ${BLOCK_BLOOM_FILTER_PROTO_TGTS})
 
 #######################################
 # util_compression_proto
@@ -48,10 +43,6 @@ ADD_EXPORTABLE_LIBRARY(util_compression_proto
   DEPS protobuf
   NONLINK_DEPS ${UTIL_COMPRESSION_PROTO_TGTS})
 
-add_dependencies(kudu-util-proto-deps ${UTIL_COMPRESSION_PROTO_TGTS})
-
-add_definitions(-DKUDU_HEADERS_USE_SHORT_STATUS_MACROS)
-
 #######################################
 # hash_proto
 #######################################
@@ -65,8 +56,6 @@ ADD_EXPORTABLE_LIBRARY(hash_proto
   SRCS ${HASH_PROTO_SRCS}
   DEPS protobuf
   NONLINK_DEPS ${HASH_PROTO_TGTS})
-
-add_dependencies(kudu-util-proto-deps ${HASH_PROTO_TGTS})
 
 #######################################
 # histogram_proto
@@ -82,8 +71,6 @@ ADD_EXPORTABLE_LIBRARY(histogram_proto
   DEPS protobuf
   NONLINK_DEPS ${HISTOGRAM_PROTO_TGTS})
 
-add_dependencies(kudu-util-proto-deps ${HISTOGRAM_PROTO_TGTS})
-
 #######################################
 # maintenance_manager_proto
 #######################################
@@ -97,8 +84,6 @@ ADD_EXPORTABLE_LIBRARY(maintenance_manager_proto
   SRCS ${MAINTENANCE_MANAGER_PROTO_SRCS}
   DEPS protobuf
   NONLINK_DEPS ${MAINTENANCE_MANAGER_PROTO_TGTS})
-
-add_dependencies(kudu-util-proto-deps ${MAINTENANCE_MANAGER_PROTO_TGTS})
 
 #######################################
 # mem_tracker_proto
@@ -114,8 +99,6 @@ ADD_EXPORTABLE_LIBRARY(mem_tracker_proto
   DEPS protobuf
   NONLINK_DEPS ${MEM_TRACKER_PROTO_TGTS})
 
-add_dependencies(kudu-util-proto-deps ${MEM_TRACKER_PROTO_TGTS})
-
 #######################################
 # pb_util_proto
 #######################################
@@ -130,8 +113,6 @@ ADD_EXPORTABLE_LIBRARY(pb_util_proto
   DEPS protobuf
   NONLINK_DEPS ${PB_UTIL_PROTO_TGTS})
 
-add_dependencies(kudu-util-proto-deps ${PB_UTIL_PROTO_TGTS})
-
 #######################################
 # version_info_proto
 #######################################
@@ -145,8 +126,6 @@ ADD_EXPORTABLE_LIBRARY(version_info_proto
   SRCS ${VERSION_INFO_PROTO_SRCS}
   DEPS protobuf
   NONLINK_DEPS ${VERSION_INFO_PROTO_TGTS})
-
-add_dependencies(kudu-util-proto-deps ${VERSION_INFO_PROTO_TGTS})
 
 ############################################################
 # Version stamp
@@ -186,7 +165,7 @@ set(UTIL_SRCS
   block_bloom_filter.cc
   bloom_filter.cc
   cache.cc
-  #char_util.cc
+  char_util.cc
   coding.cc
   condition_variable.cc
   cow_object.cc
@@ -202,7 +181,7 @@ set(UTIL_SRCS
   errno.cc
   faststring.cc
   fault_injection.cc
-  #file_cache.cc
+  file_cache.cc
   file_cache_metrics.cc
   flags.cc
   flag_tags.cc
@@ -218,6 +197,7 @@ set(UTIL_SRCS
   locks.cc
   logging.cc
   maintenance_manager.cc
+  maintenance_manager_metrics.cc
   malloc.cc
   memcmpable_varint.cc
   memory/arena.cc
@@ -225,7 +205,7 @@ set(UTIL_SRCS
   memory/overwrite.cc
   mem_tracker.cc
   metrics.cc
-  #minidump.cc
+  minidump.cc
   monotime.cc
   mutex.cc
   net/dns_resolver.cc
@@ -235,6 +215,7 @@ set(UTIL_SRCS
   nvm_cache.cc
   oid_generator.cc
   once.cc
+  openssl_util.cc
   os-util.cc
   path_util.cc
   pb_util.cc
@@ -264,13 +245,11 @@ set(UTIL_SRCS
   trace_metrics.cc
   user.cc
   url-coding.cc
-  # Remove from compilation, as it depends on generated method calls. Replaced by
-  # kudu_version.cc in Impala's common library.
-  #version_info.cc
+  version_info.cc
   version_util.cc
   web_callback_registry.cc
   website_util.cc
-  #yamlreader.cc
+  yamlreader.cc
   zlib.cc
 )
 
@@ -314,8 +293,10 @@ set(UTIL_LIBS
   mem_tracker_proto
   pb_util_proto
   protobuf
+  openssl_crypto
+  openssl_ssl
   version_info_proto
-  #yaml
+  yaml
   zlib)
 
 if(NOT APPLE)
@@ -358,7 +339,7 @@ ADD_EXPORTABLE_LIBRARY(kudu_util_compression
 # Define LZ4_DISABLE_DEPRECATE_WARNINGS to mute warnings like:
 # "'int LZ4_compress(const char*, char*, int)' is deprecated".
 target_compile_definitions(kudu_util_compression PUBLIC LZ4_DISABLE_DEPRECATE_WARNINGS)
-#target_compile_definitions(kudu_util_compression_exported PUBLIC LZ4_DISABLE_DEPRECATE_WARNINGS)
+target_compile_definitions(kudu_util_compression_exported PUBLIC LZ4_DISABLE_DEPRECATE_WARNINGS)
 
 #######################################
 # kudu_curl_util
@@ -374,11 +355,11 @@ target_link_libraries(kudu_curl_util
 #######################################
 # kudu_cloud_util
 #######################################
-#add_library(kudu_cloud_util
-#  cloud/instance_detector.cc
-#  cloud/instance_metadata.cc)
-#target_link_libraries(kudu_cloud_util
-#  kudu_curl_util)
+add_library(kudu_cloud_util
+  cloud/instance_detector.cc
+  cloud/instance_metadata.cc)
+target_link_libraries(kudu_cloud_util
+  kudu_curl_util)
 
 # See the comment in sanitizer_options.cc for details on this library's usage.
 # The top-level CMakeLists sets a ${SANITIZER_OPTIONS_OVERRIDE} variable which
@@ -413,9 +394,8 @@ add_library(kudu_test_util
 target_link_libraries(kudu_test_util
   gflags
   glog
-  # Impala doesn't have gmock in its toolchain
+  gmock
   gtest
-  #gmock
   kudu_util)
 
 #######################################
@@ -429,6 +409,7 @@ if(NOT NO_TESTS)
     gflags
     glog
     gmock
+    gtest
     kudu_util
     kudu_test_util)
 
@@ -444,7 +425,7 @@ endif()
 #######################################
 
 add_executable(protoc-gen-insertions protoc-gen-insertions.cc)
-target_link_libraries(protoc-gen-insertions gutil glog gflags protoc protobuf ${KUDU_BASE_LIBS})
+target_link_libraries(protoc-gen-insertions gutil protobuf protoc ${KUDU_BASE_LIBS})
 
 #######################################
 # Unit tests
@@ -461,7 +442,6 @@ ADD_KUDU_TEST(block_bloom_filter-test)
 ADD_KUDU_TEST(bloom_filter-test)
 ADD_KUDU_TEST(cache-bench RUN_SERIAL true)
 ADD_KUDU_TEST(cache-test)
-ADD_KUDU_TEST(callback_bind-test)
 ADD_KUDU_TEST(char_util-test
   DATA_FILES testdata/char_truncate_utf8.txt testdata/char_truncate_ascii.txt)
 ADD_KUDU_TEST(countdown_latch-test)
@@ -472,7 +452,27 @@ ADD_KUDU_TEST(easy_json-test)
 ADD_KUDU_TEST(env-test LABELS no_tsan)
 ADD_KUDU_TEST(env_util-test)
 ADD_KUDU_TEST(errno-test)
+
+# There's a move in faststring-test.cc that looks like this:
+#
+#   f1 = std::move(f1);
+#
+# Self-moves are generally undesirable, and Clang warns about them via the
+# -Wself-move flag. In this particular case, we're explicitly testing self-move
+# behavior, so we don't want any warnings.
+#
+# Unfortunately, if we disable -Wself-move via clang diagnostic pragmas, we'll
+# wind up triggering gcc's -Wunknown-pragmas warning. And due to a long-standing
+# bug[1], we can't disable -Wunknown-pragmas via GCC diagnostic pragmas. So we
+# must disable the warning for the entirety of the compilation unit.
+#
+# 1. https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53431
+if("${COMPILER_FAMILY}" STREQUAL "clang")
+  set_source_files_properties(faststring-test.cc PROPERTIES COMPILE_FLAGS
+    "-Wno-self-move")
+endif()
 ADD_KUDU_TEST(faststring-test)
+
 ADD_KUDU_TEST(file_cache-test)
 ADD_KUDU_TEST(file_cache-stress-test RUN_SERIAL true)
 ADD_KUDU_TEST(flag_tags-test)
@@ -614,8 +614,8 @@ endif()
 #######################################
 # instance_detector-test
 #######################################
-#ADD_KUDU_TEST(cloud/instance_detector-test)
-#if(NOT NO_TESTS)
-#  target_link_libraries(instance_detector-test
-#    kudu_cloud_util)
-#endif()
+ADD_KUDU_TEST(cloud/instance_detector-test)
+if(NOT NO_TESTS)
+  target_link_libraries(instance_detector-test
+    kudu_cloud_util)
+endif()

@@ -25,7 +25,6 @@
 #include "kudu/gutil/macros.h"
 #include "kudu/gutil/strings/stringpiece.h"
 #include "kudu/gutil/strings/substitute.h"
-#include "kudu/gutil/gscoped_ptr.h"
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/gutil/threading/thread_collision_warner.h"
 #include "kudu/gutil/walltime.h"
@@ -100,7 +99,7 @@ class Trace;
 // Construct a constant C string counter name which acts as a sort of
 // coarse-grained histogram for trace metrics.
 #define BUCKETED_COUNTER_NAME(prefix, duration_us)      \
-  [=]() -> const char* {                                \
+  [=]() {                                               \
     if (duration_us >= 100 * 1000) {                    \
       return prefix "_gt_100_ms";                       \
     } else if (duration_us >= 10 * 1000) {              \

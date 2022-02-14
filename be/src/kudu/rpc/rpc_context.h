@@ -16,8 +16,10 @@
 // under the License.
 #pragma once
 
-#include <memory>
 #include <stddef.h>
+#include <stdint.h>
+
+#include <memory>
 #include <string>
 
 #include <glog/logging.h>
@@ -195,13 +197,13 @@ class RpcContext {
   std::string requestor_string() const;
 
   // Return the name of the RPC service method being called.
-  std::string method_name() const;
+  const std::string& method_name() const;
 
   // Return the name of the RPC service being called.
-  std::string service_name() const;
+  const std::string& service_name() const;
 
-  const google::protobuf::Message *request_pb() const { return request_pb_.get(); }
-  google::protobuf::Message *response_pb() const { return response_pb_.get(); }
+  const google::protobuf::Message* request_pb() const { return request_pb_; }
+  google::protobuf::Message* response_pb() const { return response_pb_; }
 
   // Return an upper bound on the client timeout deadline. This does not
   // account for transmission delays between the client and the server.
@@ -226,6 +228,9 @@ class RpcContext {
   // Returns this call's request id, if it is set.
   const rpc::RequestIdPB* request_id() const;
 
+  // Returns this call's call_id.
+  int32_t call_id() const;
+
   // Returns the size of the transfer buffer that backs 'call_'. If the
   // transfer buffer no longer exists (e.g. GetTransferSize() is called after
   // DiscardTransfer()), returns 0.
@@ -242,8 +247,8 @@ class RpcContext {
  private:
   friend class ResultTracker;
   InboundCall* const call_;
-  const std::unique_ptr<const google::protobuf::Message> request_pb_;
-  const std::unique_ptr<google::protobuf::Message> response_pb_;
+  const google::protobuf::Message* const request_pb_;
+  google::protobuf::Message* const response_pb_;
   scoped_refptr<ResultTracker> result_tracker_;
 };
 

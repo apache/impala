@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <sasl/sasl.h>
+
 #include <memory>
 #include <set>
 #include <string>
@@ -25,10 +27,8 @@
 
 #include <boost/optional/optional.hpp>
 #include <glog/logging.h>
-#include <sasl/sasl.h>
 
 #include "kudu/gutil/port.h"
-#include "kudu/rpc/messenger.h"
 #include "kudu/rpc/negotiation.h"
 #include "kudu/rpc/remote_user.h"
 #include "kudu/rpc/rpc_header.pb.h"
@@ -65,7 +65,8 @@ class ServerNegotiation {
   ServerNegotiation(std::unique_ptr<Socket> socket,
                     const security::TlsContext* tls_context,
                     const security::TokenVerifier* token_verifier,
-                    RpcEncryption encryption,
+                    security::RpcEncryption encryption,
+                    bool encrypt_loopback,
                     std::string sasl_proto_name);
 
   // Enable PLAIN authentication.
@@ -213,7 +214,7 @@ class ServerNegotiation {
   Status RecvConnectionContext(faststring* recv_buf) WARN_UNUSED_RESULT;
 
   // Returns true if connection is from trusted subnets or local networks.
-  bool IsTrustedConnection(const Sockaddr& addr);
+  static bool IsTrustedConnection(const Sockaddr& addr);
 
   // The socket to the remote client.
   std::unique_ptr<Socket> socket_;
@@ -227,8 +228,9 @@ class ServerNegotiation {
   // TLS state.
   const security::TlsContext* tls_context_;
   security::TlsHandshake tls_handshake_;
-  const RpcEncryption encryption_;
+  const security::RpcEncryption encryption_;
   bool tls_negotiated_;
+  bool encrypt_loopback_;
 
   // TSK state.
   const security::TokenVerifier* token_verifier_;

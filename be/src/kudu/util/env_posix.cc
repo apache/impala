@@ -7,8 +7,11 @@
 #include <fnmatch.h>
 #include <fts.h>
 #include <glob.h>
+#include <openssl/rand.h>
+#include <openssl/ssl.h>
 #include <pthread.h>
 #include <sys/resource.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <sys/time.h>
@@ -18,18 +21,20 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <climits>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <functional>
 #include <map>
 #include <memory>
 #include <numeric>
 #include <ostream>
 #include <string>
 #include <type_traits>
-#include <utility>
 #include <vector>
 
 #include <gflags/gflags.h>
@@ -37,9 +42,7 @@
 
 #include "kudu/gutil/atomicops.h"
 #include "kudu/gutil/basictypes.h"
-#include "kudu/gutil/bind.h"
-#include "kudu/gutil/bind_helpers.h"
-#include "kudu/gutil/gscoped_ptr.h"
+#include "kudu/gutil/integral_types.h"
 #include "kudu/gutil/macros.h"
 #include "kudu/gutil/map-util.h"
 #include "kudu/gutil/once.h"
@@ -49,6 +52,7 @@
 #include "kudu/gutil/strings/substitute.h"
 #include "kudu/gutil/strings/util.h"
 #include "kudu/util/array_view.h"
+#include "kudu/util/coding-inl.h"
 #include "kudu/util/debug/trace_event.h"
 #include "kudu/util/env.h"
 #include "kudu/util/errno.h"
@@ -58,6 +62,7 @@
 #include "kudu/util/logging.h"
 #include "kudu/util/malloc.h"
 #include "kudu/util/monotime.h"
+#include "kudu/util/openssl_util.h"
 #include "kudu/util/path_util.h"
 #include "kudu/util/scoped_cleanup.h"
 #include "kudu/util/slice.h"
@@ -197,6 +202,14 @@ DEFINE_string(env_inject_lock_failure_globs, "",
               "will fail.");
 TAG_FLAG(env_inject_lock_failure_globs, hidden);
 
+DEFINE_bool(encrypt_data_at_rest, false,
+            "Whether sensitive files should be encrypted on the file system.");
+TAG_FLAG(encrypt_data_at_rest, hidden);
+DEFINE_int32(encryption_key_length, 128, "Encryption key length.");
+TAG_FLAG(encryption_key_length, hidden);
+DEFINE_validator(encryption_key_length,
+                 [](const char* /*n*/, int32 v) { return v == 128 || v == 192 || v == 256; });
+
 static __thread uint64_t thread_local_id;
 static Atomic64 cur_thread_local_id_;
 
@@ -204,7 +217,86 @@ namespace kudu {
 
 const char* const Env::kInjectedFailureStatusMsg = "INJECTED FAILURE";
 
+const uint8_t kEncryptionBlockSize = 16;
+
+const uint8_t kEncryptionHeaderSize = 64;
+
+const char* const kEncryptionHeaderMagic = "kuduenc";
+
+using evp_ctx_unique_ptr = std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>;
+
 namespace {
+
+
+struct FreeDeleter {
+  inline void operator()(void* ptr) const {
+    free(ptr);
+  }
+};
+
+enum class EncryptionAlgorithm {
+  AES128CTR = 0x00,
+  AES192CTR = 0x01,
+  AES256CTR = 0x02,
+  // ECB mode below only used to encrypt keys.
+  AES128ECB = 0xFD,
+  AES192ECB = 0XFE,
+  AES256ECB = 0xFF,
+};
+
+// The encryption header is stored on disk as follows:
+//
+// *----------------------------------------------*
+// | "kuduenc" magic string (7 bytes)             |
+// *----------------------------------------------*
+// | Algorithm and key length (1 byte)            |
+// *----------------------------------------------*
+// | Encrypted File Key (right-padded) (32 bytes) |
+// *----------------------------------------------*
+// | Reserved for future use (24 bytes)           |
+// *----------------------------------------------*
+//
+// The algorithm and key length mapping is:
+//
+// *------*-------------*
+// | 0x00 | AES-128-CTR |
+// *------*-------------*
+// | 0x01 | AES-192-CTR |
+// *------*-------------*
+// | 0x02 | AES-256-CTR |
+// *------*-------------*
+struct EncryptionHeader {
+  EncryptionAlgorithm algorithm;
+  uint8_t key[32];
+};
+
+// KUDU-3316: This is the key temporarily used for all encrypion. Obviously,
+// this is not secure and MUST be removed and replaced with real keys once the
+// key infra is in place.
+// TODO(abukor): delete this.
+const struct EncryptionHeader kDummyEncryptionKey = {
+  EncryptionAlgorithm::AES128ECB,
+  {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 42},
+};
+
+const EVP_CIPHER* GetEVPCipher(EncryptionAlgorithm algorithm) {
+  switch (algorithm) {
+    case EncryptionAlgorithm::AES128CTR:
+      return EVP_aes_128_ctr();
+    case EncryptionAlgorithm::AES192CTR:
+      return EVP_aes_192_ctr();
+    case EncryptionAlgorithm::AES256CTR:
+      return EVP_aes_256_ctr();
+    case EncryptionAlgorithm::AES128ECB:
+      return EVP_aes_128_ecb();
+    case EncryptionAlgorithm::AES192ECB:
+      return EVP_aes_192_ecb();
+    case EncryptionAlgorithm::AES256ECB:
+      return EVP_aes_256_ecb();
+    default:
+      return nullptr;
+  }
+}
 
 #if defined(__APPLE__)
 // Simulates Linux's fallocate file preallocation API on OS X.
@@ -242,8 +334,11 @@ int fallocate(int fd, int mode, off_t offset, off_t len) {
   return 0;
 }
 
+// Implementations for `preadv` and `pwritev` are available in the MacOSX11+ SDK.
+// However, we still use the simulated implementations in order to support older versions.
+
 // Simulates Linux's preadv API on OS X.
-ssize_t preadv(int fd, const struct iovec* iovec, int count, off_t offset) {
+ssize_t preadvsim(int fd, const struct iovec* iovec, int count, off_t offset) {
   ssize_t total_read_bytes = 0;
   for (int i = 0; i < count; i++) {
     ssize_t r;
@@ -261,7 +356,7 @@ ssize_t preadv(int fd, const struct iovec* iovec, int count, off_t offset) {
 }
 
 // Simulates Linux's pwritev API on OS X.
-ssize_t pwritev(int fd, const struct iovec* iovec, int count, off_t offset) {
+ssize_t pwritevsim(int fd, const struct iovec* iovec, int count, off_t offset) {
   ssize_t total_written_bytes = 0;
   for (int i = 0; i < count; i++) {
     ssize_t r;
@@ -277,8 +372,16 @@ ssize_t pwritev(int fd, const struct iovec* iovec, int count, off_t offset) {
   }
   return total_written_bytes;
 }
+
 #endif
 
+void DoClose(int fd) {
+  int err;
+  RETRY_ON_EINTR(err, close(fd));
+  if (PREDICT_FALSE(err != 0)) {
+    PLOG(WARNING) << "Failed to close fd " << fd;
+  }
+}
 
 // Close file descriptor when object goes out of scope.
 class ScopedFdCloser {
@@ -289,11 +392,7 @@ class ScopedFdCloser {
 
   ~ScopedFdCloser() {
     ThreadRestrictions::AssertIOAllowed();
-    int err;
-    RETRY_ON_EINTR(err, ::close(fd_));
-    if (PREDICT_FALSE(err != 0)) {
-      PLOG(WARNING) << "Failed to close fd " << fd_;
-    }
+    DoClose(fd_);
   }
 
  private:
@@ -341,6 +440,102 @@ Status DoSync(int fd, const string& filename) {
   return Status::OK();
 }
 
+Status DoOpen(const string& filename, int flags, const string& reason, int* fd) {
+  int f;
+  RETRY_ON_EINTR(f, open(filename.c_str(), flags));
+  if (f == -1) {
+    return IOError(Substitute("Error opening for $0: $1", reason, filename), errno);
+  }
+  *fd = f;
+  return Status::OK();
+}
+
+// Encrypts the data in 'cleartext' and writes it to 'ciphertext'. It requires
+// 'offset' to be set in the file as it's used to set the initialization vector.
+Status DoEncryptV(const EncryptionHeader* eh,
+                  uint64_t offset,
+                  ArrayView<const Slice> cleartext,
+                  ArrayView<Slice> ciphertext) {
+  DCHECK_EQ(cleartext.size(), ciphertext.size());
+  // Set the initialization vector based on the offset.
+  uint8_t iv[16];
+  InlineBigEndianEncodeFixed64(&iv[0], 0);
+  InlineBigEndianEncodeFixed64(&iv[8], offset / kEncryptionBlockSize);
+
+  evp_ctx_unique_ptr ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
+
+  OPENSSL_RET_NOT_OK(EVP_EncryptInit_ex(ctx.get(), GetEVPCipher(eh->algorithm),
+                                        nullptr, eh->key, iv),
+                     "Failed to initialize encryption");
+  size_t offset_mod = offset % kEncryptionBlockSize;
+  if (offset_mod) {
+    unsigned char scratch_clear[kEncryptionBlockSize];
+    unsigned char scratch_cipher[kEncryptionBlockSize];
+    int out_length;
+    OPENSSL_RET_NOT_OK(EVP_EncryptUpdate(ctx.get(), scratch_cipher, &out_length,
+                                         scratch_clear, offset_mod),
+                       "Failed to encrypt scratch data");
+    DCHECK_LE(out_length, kEncryptionBlockSize);
+  }
+  for (auto i = 0; i < cleartext.size(); ++i) {
+    int out_length;
+    // Normally, EVP_EncryptFinal_ex() would be needed after the last chunk of
+    // data encrypted with EVP_EncryptUpdate(). In Kudu, we only use AES-CTR
+    // which requires no padding or authentication tags, so
+    // EVP_EncryptFinal_ex() doesn't actually add anything.
+    OPENSSL_RET_NOT_OK(EVP_EncryptUpdate(ctx.get(),
+                                         ciphertext[i].mutable_data(),
+                                         &out_length,
+                                         cleartext[i].data(),
+                                         cleartext[i].size()),
+                       "Failed to encrypt data");
+    DCHECK_EQ(out_length, cleartext[i].size());
+    DCHECK_LE(out_length, ciphertext[i].size());
+  }
+  return Status::OK();
+}
+
+// Decrypts 'data'. Uses 'offset' in the file to set the initialization vector.
+Status DoDecryptV(const EncryptionHeader* eh, uint64_t offset, ArrayView<Slice> data) {
+  // Set the initialization vector based on the offset.
+  uint8_t iv[16];
+  InlineBigEndianEncodeFixed64(&iv[0], 0);
+  InlineBigEndianEncodeFixed64(&iv[8], offset / kEncryptionBlockSize);
+
+  evp_ctx_unique_ptr ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
+  OPENSSL_RET_NOT_OK(EVP_DecryptInit_ex(ctx.get(), GetEVPCipher(eh->algorithm),
+                                        nullptr, eh->key, iv),
+                     "Failed to initialize decryption");
+  size_t offset_mod = offset % kEncryptionBlockSize;
+  if (offset_mod) {
+    unsigned char scratch_clear[kEncryptionBlockSize];
+    unsigned char scratch_cipher[kEncryptionBlockSize];
+    int out_length;
+    OPENSSL_RET_NOT_OK(EVP_DecryptUpdate(ctx.get(),
+                                         scratch_clear,
+                                         &out_length,
+                                         scratch_cipher,
+                                         offset_mod),
+                       "Failed to decrypt scratch data");
+  }
+
+  for (auto i = 0; i < data.size(); ++i) {
+    const Slice& ciphertext_slice = data[i];
+    int in_length = ciphertext_slice.size();
+    if (!in_length || IsAllZeros(ciphertext_slice)) continue;
+    int out_length;
+    // We don't call EVP_DecryptFinal_ex() after EVP_DecryptUpdate() for the
+    // same reason we don't call EVP_EncryptFinal_ex().
+    OPENSSL_RET_NOT_OK(EVP_DecryptUpdate(ctx.get(),
+                                         data[i].mutable_data(),
+                                         &out_length,
+                                         ciphertext_slice.data(),
+                                         in_length),
+                       "Failed to decrypt data");
+  }
+  return Status::OK();
+}
+
 Status DoOpen(const string& filename, Env::OpenMode mode, int* fd) {
   MAYBE_RETURN_EIO(filename, IOError(Env::kInjectedFailureStatusMsg, EIO));
   ThreadRestrictions::AssertIOAllowed();
@@ -369,8 +564,12 @@ Status DoOpen(const string& filename, Env::OpenMode mode, int* fd) {
   return Status::OK();
 }
 
-Status DoReadV(int fd, const string& filename, uint64_t offset,
-               ArrayView<Slice> results) {
+Status DoReadV(
+    int fd,
+    const string& filename,
+    uint64_t offset,
+    ArrayView<Slice> results,
+    const EncryptionHeader* eh) {
   MAYBE_RETURN_EIO(filename, IOError(Env::kInjectedFailureStatusMsg, EIO));
   ThreadRestrictions::AssertIOAllowed();
 
@@ -382,7 +581,7 @@ Status DoReadV(int fd, const string& filename, uint64_t offset,
   for (size_t i = 0; i < iov_size; i++) {
     Slice& result = results[i];
     bytes_req += result.size();
-    iov[i] = { result.mutable_data(), result.size() };
+    iov[i] = {result.mutable_data(), result.size()};
   }
 
   uint64_t cur_offset = offset;
@@ -392,8 +591,11 @@ Status DoReadV(int fd, const string& filename, uint64_t offset,
     // Never request more than IOV_MAX in one request
     size_t iov_count = std::min(iov_size - completed_iov, static_cast<size_t>(IOV_MAX));
     ssize_t r;
+#if defined(__APPLE__)
+    RETRY_ON_EINTR(r, preadvsim(fd, iov + completed_iov, iov_count, cur_offset));
+#else
     RETRY_ON_EINTR(r, preadv(fd, iov + completed_iov, iov_count, cur_offset));
-
+#endif
     // Fake a short read for testing
     if (PREDICT_FALSE(FLAGS_env_inject_short_read_bytes > 0 && rem == bytes_req)) {
       DCHECK_LT(FLAGS_env_inject_short_read_bytes, r);
@@ -406,11 +608,17 @@ Status DoReadV(int fd, const string& filename, uint64_t offset,
     }
     if (PREDICT_FALSE(r == 0)) {
       // EOF.
+      if (eh) {
+        RETURN_NOT_OK(DoDecryptV(eh, offset, results));
+      }
       return Status::EndOfFile(
           Substitute("EOF trying to read $0 bytes at offset $1", bytes_req, offset));
     }
     if (PREDICT_TRUE(r == rem)) {
       // All requested bytes were read. This is almost always the case.
+      if (eh) {
+        RETURN_NOT_OK(DoDecryptV(eh, offset, results));
+      }
       return Status::OK();
     }
     DCHECK_LE(r, rem);
@@ -432,11 +640,19 @@ Status DoReadV(int fd, const string& filename, uint64_t offset,
     cur_offset += r;
     rem -= r;
   }
+  if (eh) {
+    RETURN_NOT_OK(DoDecryptV(eh, offset, results));
+  }
   DCHECK_EQ(0, rem);
   return Status::OK();
 }
 
-Status DoWriteV(int fd, const string& filename, uint64_t offset, ArrayView<const Slice> data) {
+Status DoWriteV(
+    int fd,
+    const string& filename,
+    uint64_t offset,
+    ArrayView<const Slice> data,
+    const EncryptionHeader* eh) {
   MAYBE_RETURN_EIO(filename, IOError(Env::kInjectedFailureStatusMsg, EIO));
   ThreadRestrictions::AssertIOAllowed();
 
@@ -445,10 +661,32 @@ Status DoWriteV(int fd, const string& filename, uint64_t offset, ArrayView<const
   size_t bytes_req = 0;
   size_t iov_size = data.size();
   struct iovec iov[iov_size];
-  for (size_t i = 0; i < iov_size; i++) {
-    const Slice& result = data[i];
-    bytes_req += result.size();
-    iov[i] = { const_cast<uint8_t*>(result.data()), result.size() };
+  std::vector<Slice> encrypted_data(iov_size);
+  SCOPED_CLEANUP({
+    if (eh) {
+      delete[] encrypted_data[0].mutable_data();
+    }
+  });
+  if (eh) {
+    for (size_t i = 0; i < iov_size; i++) {
+      bytes_req += data[i].size();
+    }
+    unique_ptr<unsigned char[]> encrypted_buf(new unsigned char[bytes_req]);
+    size_t buffer_offset = 0;
+    for (size_t i = 0; i < iov_size; i++) {
+      size_t size = data[i].size();
+      encrypted_data[i] = Slice(&encrypted_buf[buffer_offset], size);
+      buffer_offset += size;
+      iov[i] = {const_cast<uint8_t*>(encrypted_data[i].data()), size};
+    }
+    RETURN_NOT_OK(DoEncryptV(eh, offset, data, encrypted_data));
+    encrypted_buf.release();
+  } else {
+    for (size_t i = 0; i < iov_size; i++) {
+      const Slice& result = data[i];
+      bytes_req += result.size();
+      iov[i] = {const_cast<uint8_t*>(result.data()), result.size()};
+    }
   }
 
   uint64_t cur_offset = offset;
@@ -458,8 +696,11 @@ Status DoWriteV(int fd, const string& filename, uint64_t offset, ArrayView<const
     // Never request more than IOV_MAX in one request.
     size_t iov_count = std::min(iov_size - completed_iov, static_cast<size_t>(IOV_MAX));
     ssize_t w;
+#if defined(__APPLE__)
+    RETRY_ON_EINTR(w, pwritevsim(fd, iov + completed_iov, iov_count, cur_offset));
+#else
     RETRY_ON_EINTR(w, pwritev(fd, iov + completed_iov, iov_count, cur_offset));
-
+#endif
     // Fake a short write for testing.
     if (PREDICT_FALSE(FLAGS_env_inject_short_write_bytes > 0 && rem == bytes_req)) {
       DCHECK_LT(FLAGS_env_inject_short_write_bytes, w);
@@ -499,6 +740,68 @@ Status DoWriteV(int fd, const string& filename, uint64_t offset, ArrayView<const
   return Status::OK();
 }
 
+Status GenerateHeader(EncryptionHeader* eh) {
+  switch (FLAGS_encryption_key_length) {
+    case 128:
+      eh->algorithm = EncryptionAlgorithm::AES128CTR;
+      break;
+    case 192:
+      eh->algorithm = EncryptionAlgorithm::AES192CTR;
+      break;
+    case 256:
+      eh->algorithm = EncryptionAlgorithm::AES256CTR;
+      break;
+    default:
+      return Status::InvalidArgument(
+          "Supported key lengths for AES encryption are 128, 192, and 256.");
+  }
+  OPENSSL_RET_NOT_OK(RAND_bytes(eh->key, FLAGS_encryption_key_length / 8),
+                     "Failed to generate random key");
+
+  return Status::OK();
+}
+
+Status WriteEncryptionHeader(int fd, const string& filename, const EncryptionHeader& eh) {
+  vector<Slice> headerv = { kEncryptionHeaderMagic };
+  uint32_t key_size;
+  uint8_t algorithm[1];
+  switch (eh.algorithm) {
+    case EncryptionAlgorithm::AES128CTR:
+      algorithm[0] = 0;
+      key_size = 16;
+      break;
+    case EncryptionAlgorithm::AES192CTR:
+      algorithm[0] = 1;
+      // As the keys are encrypted in ECB mode which requires padding, we need
+      // 32 bytes instead of 24 to encrypt and write a 192-bit key.
+      key_size = 32;
+      break;
+    case EncryptionAlgorithm::AES256CTR:
+      algorithm[0] = 2;
+      key_size = 32;
+      break;
+    default:
+      return Status::InvalidArgument(Substitute("Unknown encryption algorithm: $0", algorithm));
+  }
+  headerv.emplace_back(Slice(algorithm, 1));
+  Slice file_key(eh.key, key_size);
+
+  uint8_t encrypted_file_key[32];
+  Slice efk(encrypted_file_key, key_size);
+  vector<Slice> clear = {file_key};
+  vector<Slice> cipher = {efk};
+  RETURN_NOT_OK(DoEncryptV(&kDummyEncryptionKey, 0, clear, cipher));
+
+  // Add the encrypted file key and trailing zeros to the header.
+  headerv.emplace_back(efk);
+  static const uint8_t padding[40] = {0};
+  // 7 bytes of magic + 1 byte of algorithm and key length.
+  constexpr int kMagicAndAlgorithmSize = 8;
+  Slice padding_slice(padding, kEncryptionHeaderSize - kMagicAndAlgorithmSize - key_size);
+  headerv.emplace_back(padding_slice);
+  return DoWriteV(fd, filename, 0, headerv, nullptr);
+}
+
 Status DoIsOnXfsFilesystem(const string& path, bool* result) {
 #ifdef __APPLE__
   *result = false;
@@ -513,6 +816,39 @@ Status DoIsOnXfsFilesystem(const string& path, bool* result) {
   // US-ASCII string 'XFSB' expressed in hexadecimal.
   *result = (buf.f_type == 0x58465342);
 #endif
+  return Status::OK();
+}
+
+Status ReadEncryptionHeader(int fd, const string& filename, EncryptionHeader* eh) {
+  char magic[7];
+  uint8_t algorithm[1];
+  char file_key[32];
+  vector<Slice> headerv({ Slice(magic, 7), Slice(algorithm, 1), Slice(file_key, 32) });
+  RETURN_NOT_OK(DoReadV(fd, filename, 0, headerv, nullptr));
+  if (strncmp(magic, kEncryptionHeaderMagic, 7) != 0) {
+    return Status::Corruption(Substitute("Invalid encryption header: $0", magic));
+  }
+  uint16_t key_size;
+  eh->algorithm = EncryptionAlgorithm(algorithm[0]);
+  switch (eh->algorithm) {
+    case EncryptionAlgorithm::AES128CTR:
+      key_size = 16;
+      break;
+    case EncryptionAlgorithm::AES192CTR:
+      key_size = 24;
+      break;
+    case EncryptionAlgorithm::AES256CTR:
+      key_size = 32;
+      break;
+    default:
+      return Status::Corruption(Substitute("Unknown encryption algorithm: $0", algorithm));
+  }
+  // Round up to the nearest multiple of 16 bytes when reading and decrypting
+  // the file. The actual key size can be used when storing the key in memory.
+  // See WriteEncryptionHeader for more info.
+  vector<Slice> v = {Slice(file_key, (key_size + 15) & -16)};
+  RETURN_NOT_OK(DoDecryptV(&kDummyEncryptionKey, 0, v));
+  memcpy(&eh->key, file_key, key_size);
   return Status::OK();
 }
 
@@ -549,14 +885,69 @@ const char* ResourceLimitTypeToMacosRlimit(Env::ResourceLimitType t) {
 }
 #endif
 
+class PosixFifo : public Fifo {
+ public:
+  explicit PosixFifo(string fname) : filename_(std::move(fname)) {}
+
+  size_t GetEncryptionHeaderSize() const override {
+    return 0;
+  }
+
+  const string& filename() const override {
+    return filename_;
+  }
+
+  Status OpenForReads() override {
+    CHECK_EQ(-1, read_fd_);
+    return DoOpen(filename_, O_RDONLY, "reads", &read_fd_);
+  }
+
+  Status OpenForWrites() override {
+    CHECK_EQ(-1, write_fd_);
+    return DoOpen(filename_, O_WRONLY, "writes", &write_fd_);
+  }
+
+  int read_fd() const override {
+    CHECK_NE(-1, read_fd_);
+    return read_fd_;
+  }
+
+  int write_fd() const override {
+    CHECK_NE(-1, write_fd_);
+    return write_fd_;
+  }
+
+  ~PosixFifo() {
+    if (read_fd_ != -1) {
+      DoClose(read_fd_);
+    }
+    if (write_fd_ != -1) {
+      DoClose(write_fd_);
+    }
+  }
+
+ private:
+  const string filename_;
+  int read_fd_ = -1;
+  int write_fd_ = -1;
+};
+
 class PosixSequentialFile: public SequentialFile {
  private:
   const string filename_;
   FILE* const file_;
+  const bool encrypted_;
+  size_t offset_;
+  const EncryptionHeader encryption_header_;
 
  public:
-  PosixSequentialFile(string fname, FILE* f)
-      : filename_(std::move(fname)), file_(f) {}
+  PosixSequentialFile(string fname, bool encrypted, FILE* f, EncryptionHeader eh)
+    : filename_(std::move(fname)),
+      file_(f),
+      encrypted_(encrypted),
+      offset_(encrypted ? kEncryptionHeaderSize : 0),
+      encryption_header_(eh) {}
+
   ~PosixSequentialFile() {
     int err;
     RETRY_ON_EINTR(err, fclose(file_));
@@ -581,6 +972,10 @@ class PosixSequentialFile: public SequentialFile {
         return IOError(filename_, errno);
       }
     }
+    if (encrypted_) {
+      RETURN_NOT_OK(DoDecryptV(&encryption_header_, offset_, ArrayView<Slice>(result, 1)));
+    }
+    offset_ += r;
     return Status::OK();
   }
 
@@ -591,10 +986,15 @@ class PosixSequentialFile: public SequentialFile {
     if (fseek(file_, n, SEEK_CUR)) {
       return IOError(filename_, errno);
     }
+    offset_ += n;
     return Status::OK();
   }
 
   virtual const string& filename() const OVERRIDE { return filename_; }
+
+  size_t GetEncryptionHeaderSize() const override {
+    return encrypted_ ? kEncryptionHeaderSize : 0;
+  }
 };
 
 // pread() based random-access
@@ -602,24 +1002,29 @@ class PosixRandomAccessFile: public RandomAccessFile {
  private:
   const string filename_;
   const int fd_;
+  const bool encrypted_;
+  const EncryptionHeader encryption_header_;
 
  public:
-  PosixRandomAccessFile(string fname, int fd)
-      : filename_(std::move(fname)), fd_(fd) {}
+  PosixRandomAccessFile(string fname, int fd, bool encrypted, EncryptionHeader eh)
+      : filename_(std::move(fname)),
+        fd_(fd),
+        encrypted_(encrypted),
+        encryption_header_(eh) {}
   ~PosixRandomAccessFile() {
-    int err;
-    RETRY_ON_EINTR(err, close(fd_));
-    if (PREDICT_FALSE(err != 0)) {
-      PLOG(WARNING) << "Failed to close " << filename_;
-    }
+    DoClose(fd_);
   }
 
   virtual Status Read(uint64_t offset, Slice result) const OVERRIDE {
-    return DoReadV(fd_, filename_, offset, ArrayView<Slice>(&result, 1));
+    DCHECK_GE(offset, GetEncryptionHeaderSize());
+    return DoReadV(fd_, filename_, offset, ArrayView<Slice>(&result, 1),
+                   encrypted_ ? &encryption_header_ : nullptr);
   }
 
   virtual Status ReadV(uint64_t offset, ArrayView<Slice> results) const OVERRIDE {
-    return DoReadV(fd_, filename_, offset, results);
+    DCHECK_GE(offset, GetEncryptionHeaderSize());
+    return DoReadV(fd_, filename_, offset, results,
+                   encrypted_ ? &encryption_header_ : nullptr);
   }
 
   virtual Status Size(uint64_t *size) const OVERRIDE {
@@ -636,6 +1041,10 @@ class PosixRandomAccessFile: public RandomAccessFile {
 
   virtual const string& filename() const OVERRIDE { return filename_; }
 
+  size_t GetEncryptionHeaderSize() const override {
+    return encrypted_ ? kEncryptionHeaderSize : 0;
+  }
+
   virtual size_t memory_footprint() const OVERRIDE {
     return kudu_malloc_usable_size(this) + filename_.capacity();
   }
@@ -647,15 +1056,17 @@ class PosixRandomAccessFile: public RandomAccessFile {
 // order to further improve Sync() performance.
 class PosixWritableFile : public WritableFile {
  public:
-  PosixWritableFile(string fname, int fd, uint64_t file_size,
-                    bool sync_on_close)
+  PosixWritableFile(string fname, int fd, uint64_t file_size, bool sync_on_close,
+                     bool encrypted, EncryptionHeader eh)
       : filename_(std::move(fname)),
         fd_(fd),
         sync_on_close_(sync_on_close),
         filesize_(file_size),
         pre_allocated_size_(0),
         pending_sync_(false),
-        closed_(false) {}
+        closed_(false),
+        encrypted_(encrypted),
+        encryption_header_(eh) {}
 
   ~PosixWritableFile() {
     WARN_NOT_OK(Close(), "Failed to close " + filename_);
@@ -667,7 +1078,8 @@ class PosixWritableFile : public WritableFile {
 
   virtual Status AppendV(ArrayView<const Slice> data) OVERRIDE {
     ThreadRestrictions::AssertIOAllowed();
-    RETURN_NOT_OK(DoWriteV(fd_, filename_, filesize_, data));
+    RETURN_NOT_OK(DoWriteV(fd_, filename_, filesize_, data,
+                           encrypted_ ? &encryption_header_ : nullptr));
     // Calculate the amount of data written
     size_t bytes_written = accumulate(data.begin(), data.end(), static_cast<size_t>(0),
                                       [&](int sum, const Slice& curr) {
@@ -780,6 +1192,10 @@ class PosixWritableFile : public WritableFile {
 
   virtual const string& filename() const OVERRIDE { return filename_; }
 
+  size_t GetEncryptionHeaderSize() const override {
+    return encrypted_ ? kEncryptionHeaderSize : 0;
+  }
+
  private:
   const string filename_;
   const int fd_;
@@ -789,27 +1205,36 @@ class PosixWritableFile : public WritableFile {
   uint64_t pre_allocated_size_;
   bool pending_sync_;
   bool closed_;
+  const bool encrypted_;
+  const EncryptionHeader encryption_header_;
 };
 
 class PosixRWFile : public RWFile {
  public:
-  PosixRWFile(string fname, int fd, bool sync_on_close)
+  PosixRWFile(string fname, int fd, bool sync_on_close, bool encrypted,
+              EncryptionHeader eh)
       : filename_(std::move(fname)),
         fd_(fd),
         sync_on_close_(sync_on_close),
         is_on_xfs_(false),
-        closed_(false) {}
+        closed_(false),
+        encrypted_(encrypted),
+        encryption_header_(eh) {}
 
   ~PosixRWFile() {
     WARN_NOT_OK(Close(), "Failed to close " + filename_);
   }
 
   virtual Status Read(uint64_t offset, Slice result) const OVERRIDE {
-    return DoReadV(fd_, filename_, offset, ArrayView<Slice>(&result, 1));
+    DCHECK_GE(offset, GetEncryptionHeaderSize());
+    return DoReadV(fd_, filename_, offset, ArrayView<Slice>(&result, 1),
+                   encrypted_ ? &encryption_header_ : nullptr);
   }
 
   virtual Status ReadV(uint64_t offset, ArrayView<Slice> results) const OVERRIDE {
-    return DoReadV(fd_, filename_, offset, results);
+    DCHECK_GE(offset, GetEncryptionHeaderSize());
+    return DoReadV(fd_, filename_, offset, results,
+                   encrypted_ ? &encryption_header_ : nullptr);
   }
 
   virtual Status Write(uint64_t offset, const Slice& data) OVERRIDE {
@@ -817,7 +1242,9 @@ class PosixRWFile : public RWFile {
   }
 
   virtual Status WriteV(uint64_t offset, ArrayView<const Slice> data) OVERRIDE {
-    return DoWriteV(fd_, filename_, offset, data);
+    DCHECK_GE(offset, GetEncryptionHeaderSize());
+    return DoWriteV(fd_, filename_, offset, data,
+                    encrypted_ ? &encryption_header_ : nullptr);
   }
 
   virtual Status PreAllocate(uint64_t offset,
@@ -887,7 +1314,8 @@ class PosixRWFile : public RWFile {
     } else {
       int ret;
       RETRY_ON_EINTR(ret, fallocate(
-          fd_, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, offset, length));
+          fd_, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE,
+          offset, length));
       if (ret != 0) {
         return IOError(filename_, errno);
       }
@@ -1025,8 +1453,16 @@ class PosixRWFile : public RWFile {
 #endif
   }
 
+  bool IsEncrypted() const override {
+    return encrypted_;
+  }
+
   virtual const string& filename() const OVERRIDE {
     return filename_;
+  }
+
+  size_t GetEncryptionHeaderSize() const override {
+    return encrypted_ ? kEncryptionHeaderSize : 0;
   }
 
  private:
@@ -1050,6 +1486,8 @@ class PosixRWFile : public RWFile {
   GoogleOnceDynamic once_;
   bool is_on_xfs_;
   bool closed_;
+  const bool encrypted_;
+  const EncryptionHeader encryption_header_;
 };
 
 int LockOrUnlock(int fd, bool lock) {
@@ -1079,6 +1517,12 @@ class PosixEnv : public Env {
   }
 
   virtual Status NewSequentialFile(const string& fname,
+                                   unique_ptr<SequentialFile>* result) override {
+    return NewSequentialFile(SequentialFileOptions(), fname, result);
+  }
+
+  virtual Status NewSequentialFile(const SequentialFileOptions& opts,
+                                   const string& fname,
                                    unique_ptr<SequentialFile>* result) OVERRIDE {
     TRACE_EVENT1("io", "PosixEnv::NewSequentialFile", "path", fname);
     MAYBE_RETURN_EIO(fname, IOError(Env::kInjectedFailureStatusMsg, EIO));
@@ -1088,7 +1532,17 @@ class PosixEnv : public Env {
     if (f == nullptr) {
       return IOError(fname, errno);
     }
-    result->reset(new PosixSequentialFile(fname, f));
+    bool encrypted = opts.is_sensitive && IsEncryptionEnabled();
+    EncryptionHeader header;
+    if (encrypted) {
+      int fd;
+      RETURN_NOT_OK(DoOpen(fname, OpenMode::MUST_EXIST, &fd));
+      RETURN_NOT_OK(ReadEncryptionHeader(fd, fname, &header));
+      if (fseek(f, kEncryptionHeaderSize, SEEK_CUR)) {
+        return IOError(fname, errno);
+      }
+    }
+    result->reset(new PosixSequentialFile(fname, encrypted, f, header));
     return Status::OK();
   }
 
@@ -1108,8 +1562,13 @@ class PosixEnv : public Env {
     if (fd < 0) {
       return IOError(fname, errno);
     }
-
-    result->reset(new PosixRandomAccessFile(fname, fd));
+    EncryptionHeader header;
+    bool encrypted = opts.is_sensitive && IsEncryptionEnabled();
+    if (encrypted) {
+      RETURN_NOT_OK(ReadEncryptionHeader(fd, fname, &header));
+    }
+    result->reset(new PosixRandomAccessFile(fname, fd,
+                  encrypted, header));
     return Status::OK();
   }
 
@@ -1150,8 +1609,26 @@ class PosixEnv : public Env {
                            unique_ptr<RWFile>* result) OVERRIDE {
     TRACE_EVENT1("io", "PosixEnv::NewRWFile", "path", fname);
     int fd;
+    bool encrypt = opts.is_sensitive && IsEncryptionEnabled();
+    uint64_t size = 0;
+    if (opts.mode == MUST_EXIST) {
+      RETURN_NOT_OK(GetFileSize(fname, &size));
+    } else if (encrypt) {
+      GetFileSize(fname, &size);
+    }
+
     RETURN_NOT_OK(DoOpen(fname, opts.mode, &fd));
-    result->reset(new PosixRWFile(fname, fd, opts.sync_on_close));
+    EncryptionHeader eh;
+    if (encrypt) {
+      if (size >= kEncryptionHeaderSize) {
+        RETURN_NOT_OK(ReadEncryptionHeader(fd, fname, &eh));
+      } else {
+        RETURN_NOT_OK(GenerateHeader(&eh));
+        RETURN_NOT_OK(WriteEncryptionHeader(fd, fname, eh));
+      }
+    }
+    result->reset(new PosixRWFile(fname, fd, opts.sync_on_close,
+                                  encrypt, eh));
     return Status::OK();
   }
 
@@ -1160,7 +1637,24 @@ class PosixEnv : public Env {
     TRACE_EVENT1("io", "PosixEnv::NewTempRWFile", "template", name_template);
     int fd = 0;
     RETURN_NOT_OK(MkTmpFile(name_template, &fd, created_filename));
-    res->reset(new PosixRWFile(*created_filename, fd, opts.sync_on_close));
+    bool encrypt = opts.is_sensitive && IsEncryptionEnabled();
+    EncryptionHeader eh;
+    if (encrypt) {
+      RETURN_NOT_OK(GenerateHeader(&eh));
+      RETURN_NOT_OK(WriteEncryptionHeader(fd, *created_filename, eh));
+    }
+    res->reset(new PosixRWFile(*created_filename, fd, opts.sync_on_close,
+                               encrypt, eh));
+    return Status::OK();
+  }
+
+  virtual Status NewFifo(const string& fname, unique_ptr<Fifo>* fifo) override {
+    TRACE_EVENT1("io", "PosixEnv::NewFifo", "path", fname);
+    int m = mkfifo(fname.c_str(), 0666);
+    if (m != 0) {
+      return IOError(Substitute("Error creating fifo $0", fname), errno);
+    }
+    fifo->reset(new PosixFifo(fname));
     return Status::OK();
   }
 
@@ -1224,7 +1718,7 @@ class PosixEnv : public Env {
   Status GetCurrentWorkingDir(string* cwd) const override {
     TRACE_EVENT0("io", "PosixEnv::GetCurrentWorkingDir");
     ThreadRestrictions::AssertIOAllowed();
-    unique_ptr<char, FreeDeleter> wd(getcwd(NULL, 0));
+    unique_ptr<char[], FreeDeleter> wd(getcwd(nullptr, 0));
     if (!wd) {
       return IOError("getcwd()", errno);
     }
@@ -1263,11 +1757,14 @@ class PosixEnv : public Env {
   }
 
   virtual Status DeleteRecursively(const string &name) OVERRIDE {
-    return Walk(name, POST_ORDER, Bind(&PosixEnv::DeleteRecursivelyCb,
-                                       Unretained(this)));
+    return Walk(
+        name, POST_ORDER,
+        [this](FileType type, const string& dirname, const string& basename) {
+          return this->DeleteRecursivelyCb(type, dirname, basename);
+        });
   }
 
-  virtual Status GetFileSize(const string& fname, uint64_t* size) OVERRIDE {
+  virtual Status GetFileSize(const string& fname, uint64_t* size) override {
     TRACE_EVENT1("io", "PosixEnv::GetFileSize", "path", fname);
     MAYBE_RETURN_EIO(fname, IOError(Env::kInjectedFailureStatusMsg, EIO));
     ThreadRestrictions::AssertIOAllowed();
@@ -1304,9 +1801,11 @@ class PosixEnv : public Env {
                                               uint64_t* bytes_used) OVERRIDE {
     TRACE_EVENT1("io", "PosixEnv::GetFileSizeOnDiskRecursively", "path", root);
     uint64_t total = 0;
-    RETURN_NOT_OK(Walk(root, Env::PRE_ORDER,
-                       Bind(&PosixEnv::GetFileSizeOnDiskRecursivelyCb,
-                            Unretained(this), &total)));
+    RETURN_NOT_OK(Walk(
+        root, PRE_ORDER,
+        [this, &total](FileType type, const string& dirname, const string& basename) {
+          return this->GetFileSizeOnDiskRecursivelyCb(&total, type, dirname, basename);
+        }));
     *bytes_used = total;
     return Status::OK();
   }
@@ -1360,6 +1859,7 @@ class PosixEnv : public Env {
     RETURN_NOT_OK(StatVfs(path, &buf));
     space_info->capacity_bytes = buf.f_frsize * buf.f_blocks;
     space_info->free_bytes = buf.f_frsize * buf.f_bavail;
+    space_info->filesystem_id = buf.f_fsid;
     return Status::OK();
   }
 
@@ -1390,11 +1890,7 @@ class PosixEnv : public Env {
       result = IOError(fname, errno);
     } else if (LockOrUnlock(fd, true) == -1) {
       result = IOError("lock " + fname, errno);
-      int err;
-      RETRY_ON_EINTR(err, close(fd));
-      if (PREDICT_FALSE(err != 0)) {
-        PLOG(WARNING) << "Failed to close fd " << fd;
-      }
+      DoClose(fd);
     } else {
       auto my_lock = new PosixFileLock;
       my_lock->fd_ = fd;
@@ -1411,11 +1907,7 @@ class PosixEnv : public Env {
     if (LockOrUnlock(my_lock->fd_, false) == -1) {
       result = IOError("unlock", errno);
     }
-    int err;
-    RETRY_ON_EINTR(err, close(my_lock->fd_));
-    if (PREDICT_FALSE(err != 0)) {
-      PLOG(WARNING) << "Failed to close fd " << my_lock->fd_;
-    }
+    DoClose(my_lock->fd_);
     return result;
   }
 
@@ -1514,8 +2006,8 @@ class PosixEnv : public Env {
 
     // FTS requires a non-const copy of the name. strdup it and free() when
     // we leave scope.
-    unique_ptr<char, FreeDeleter> name_dup(strdup(root.c_str()));
-    char *(paths[]) = { name_dup.get(), nullptr };
+    unique_ptr<char[], FreeDeleter> name_dup(strdup(root.c_str()));
+    char* paths[] = { name_dup.get(), nullptr };
 
     // FTS_NOCHDIR is important here to make this thread-safe.
     FTS* ret;
@@ -1526,27 +2018,27 @@ class PosixEnv : public Env {
     }
     unique_ptr<FTS, FtsCloser> tree(ret);
 
-    FTSENT *ent = nullptr;
+    FTSENT* ent = nullptr;
     bool had_errors = false;
     while ((ent = fts_read(tree.get())) != nullptr) {
-      bool doCb = false;
+      bool do_cb = false;
       FileType type = DIRECTORY_TYPE;
       switch (ent->fts_info) {
         case FTS_D:         // Directory in pre-order
           if (order == PRE_ORDER) {
-            doCb = true;
+            do_cb = true;
           }
           break;
         case FTS_DP:        // Directory in post-order
           if (order == POST_ORDER) {
-            doCb = true;
+            do_cb = true;
           }
           break;
         case FTS_F:         // A regular file
         case FTS_SL:        // A symbolic link
         case FTS_SLNONE:    // A broken symbolic link
         case FTS_DEFAULT:   // Unknown type of file
-          doCb = true;
+          do_cb = true;
           type = FILE_TYPE;
           break;
 
@@ -1555,16 +2047,21 @@ class PosixEnv : public Env {
         case FTS_NS:
           LOG(WARNING) << "Unable to access file " << ent->fts_path
                        << " during walk: " << strerror(ent->fts_errno);
+          LOG(WARNING) << Substitute("Unable to access file $0 during walk: $1",
+                                     ent->fts_path, strerror(ent->fts_errno));
           had_errors = true;
           break;
 
         default:
-          LOG(WARNING) << "Unable to access file " << ent->fts_path
-                       << " during walk (code " << ent->fts_info << ")";
+          LOG(WARNING) << Substitute("Unable to access file $0 during walk (code $1)",
+                                     ent->fts_path, ent->fts_info);
           break;
       }
-      if (doCb) {
-        if (!cb.Run(type, DirName(ent->fts_path), ent->fts_name).ok()) {
+      if (do_cb) {
+        Status s = cb(type, DirName(ent->fts_path), ent->fts_name);
+        if (PREDICT_FALSE(!s.ok())) {
+          LOG(WARNING) << Substitute("Error running callback with file $0 during walk: $1",
+                                     ent->fts_path, s.ToString());
           had_errors = true;
         }
       }
@@ -1752,6 +2249,19 @@ class PosixEnv : public Env {
     return Status::OK();
   }
 
+  virtual Status CreateSymLink(const string& src, const string& dst) override {
+    ThreadRestrictions::AssertIOAllowed();
+    TRACE_EVENT2("io", "PosixEnv::CreateSymLink", "src", src, "dst", dst);
+    MAYBE_RETURN_EIO(dst, IOError(Env::kInjectedFailureStatusMsg, EIO));
+    Status result;
+    if (symlink(src.c_str(), dst.c_str()) != 0) {
+      result = IOError(dst, errno);
+    }
+    return result;
+  }
+
+  bool IsEncryptionEnabled() const override { return FLAGS_encrypt_data_at_rest; }
+
  private:
   // unique_ptr Deleter implementation for fts_close
   struct FtsCloser {
@@ -1793,10 +2303,24 @@ class PosixEnv : public Env {
                                     const WritableFileOptions& opts,
                                     unique_ptr<WritableFile>* result) {
     uint64_t file_size = 0;
+    Status s = GetFileSize(fname, &file_size);
     if (opts.mode == MUST_EXIST) {
-      RETURN_NOT_OK(GetFileSize(fname, &file_size));
+      RETURN_NOT_OK(s);
     }
-    result->reset(new PosixWritableFile(fname, fd, file_size, opts.sync_on_close));
+    bool encrypt = opts.is_sensitive && IsEncryptionEnabled();
+    EncryptionHeader eh;
+    if (encrypt) {
+      if (file_size < kEncryptionHeaderSize) {
+        RETURN_NOT_OK(GenerateHeader(&eh));
+        RETURN_NOT_OK(WriteEncryptionHeader(fd, fname, eh));
+        file_size = kEncryptionHeaderSize;
+      } else {
+        RETURN_NOT_OK(ReadEncryptionHeader(fd, fname, &eh));
+      }
+    }
+    result->reset(new PosixWritableFile(fname, fd, file_size, opts.sync_on_close,
+                                        encrypt, eh));
+
     return Status::OK();
   }
 
@@ -1818,8 +2342,12 @@ class PosixEnv : public Env {
     }
   }
 
+  size_t GetEncryptionHeaderSize() const override {
+    return IsEncryptionEnabled() ? kEncryptionHeaderSize : 0;
+  }
+
   Status GetFileSizeOnDiskRecursivelyCb(uint64_t* bytes_used,
-                                        Env::FileType type,
+                                        FileType type,
                                         const string& dirname,
                                         const string& basename) {
     uint64_t file_bytes_used = 0;

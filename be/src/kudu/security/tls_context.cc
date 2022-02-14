@@ -17,6 +17,16 @@
 
 #include "kudu/security/tls_context.h"
 
+#include <openssl/crypto.h>
+#ifndef OPENSSL_NO_ECDH
+#include <openssl/ec.h> // IWYU pragma: keep
+#endif
+#include <openssl/err.h>
+#include <openssl/obj_mac.h> // IWYU pragma: keep
+#include <openssl/ssl.h>
+#include <openssl/x509.h>
+#include <openssl/x509v3.h>
+
 #include <algorithm>
 #include <mutex>
 #include <ostream>
@@ -24,13 +34,8 @@
 #include <type_traits>
 #include <vector>
 
-#include <boost/algorithm/string/predicate.hpp>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include <openssl/err.h>
-#include <openssl/ssl.h>
-#include <openssl/x509.h>
-#include <openssl/x509v3.h>
 
 #include "kudu/gutil/basictypes.h"
 #include "kudu/gutil/macros.h"
@@ -39,13 +44,14 @@
 #include "kudu/security/cert.h"
 #include "kudu/security/crypto.h"
 #include "kudu/security/init.h"
-#include "kudu/security/openssl_util.h"
 #include "kudu/security/security_flags.h"
 #include "kudu/security/tls_handshake.h"
 #include "kudu/util/flag_tags.h"
 #include "kudu/util/net/net_util.h"
+#include "kudu/util/openssl_util.h"
 #include "kudu/util/scoped_cleanup.h"
 #include "kudu/util/status.h"
+#include "kudu/util/string_case.h"
 #include "kudu/util/user.h"
 
 // Hard code OpenSSL flag values from OpenSSL 1.0.1e[1][2] when compiling
@@ -62,6 +68,9 @@
 #ifndef SSL_OP_NO_TLSv1_1
 #define SSL_OP_NO_TLSv1_1 0x10000000U
 #endif
+#ifndef SSL_OP_NO_TLSv1_2
+#define SSL_OP_NO_TLSv1_2 0x08000000U
+#endif
 #ifndef SSL_OP_NO_TLSv1_3
 #define SSL_OP_NO_TLSv1_3 0x20000000U
 #endif
@@ -71,21 +80,29 @@
 #ifndef TLS1_2_VERSION
 #define TLS1_2_VERSION 0x0303
 #endif
+#ifndef TLS1_3_VERSION
+#define TLS1_3_VERSION 0x0304
+#endif
 
-using strings::Substitute;
+using kudu::security::ca::CertRequestGenerator;
 using std::string;
 using std::unique_lock;
 using std::vector;
+using strings::Substitute;
 
 DEFINE_int32(ipki_server_key_size, 2048,
              "the number of bits for server cert's private key. The server cert "
              "is used for TLS connections to and from clients and other servers.");
 TAG_FLAG(ipki_server_key_size, experimental);
 
+DEFINE_int32(openssl_security_level_override, -1,
+             "if set to 0 or greater, overrides the security level for OpenSSL "
+             "library of versions 1.1.0 and newer; for test purposes only");
+TAG_FLAG(openssl_security_level_override, hidden);
+TAG_FLAG(openssl_security_level_override, unsafe);
+
 namespace kudu {
 namespace security {
-
-using ca::CertRequestGenerator;
 
 template<> struct SslTypeTraits<SSL> {
   static constexpr auto kFreeFunc = &SSL_free;
@@ -96,10 +113,15 @@ template<> struct SslTypeTraits<X509_STORE_CTX> {
 
 namespace {
 
+constexpr const char* const kTLSv1 = "TLSv1";
+constexpr const char* const kTLSv1_1 = "TLSv1.1";
+constexpr const char* const kTLSv1_2 = "TLSv1.2";
+constexpr const char* const kTLSv1_3 = "TLSv1.3";
+
 Status CheckMaxSupportedTlsVersion(int tls_version, const char* tls_version_str) {
-  // OpenSSL 1.1 and newer supports all of the TLS versions we care about, so
+  // OpenSSL 1.1.1 and newer supports all of the TLS versions we care about, so
   // the below check is only necessary in older versions of OpenSSL.
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10101000L
   auto max_supported_tls_version = SSLv23_method()->version;
   DCHECK_GE(max_supported_tls_version, TLS1_VERSION);
 
@@ -115,8 +137,9 @@ Status CheckMaxSupportedTlsVersion(int tls_version, const char* tls_version_str)
 } // anonymous namespace
 
 TlsContext::TlsContext()
-    : tls_ciphers_(kudu::security::SecurityDefaults::kDefaultTlsCiphers),
-      tls_min_protocol_(kudu::security::SecurityDefaults::kDefaultTlsMinVersion),
+    : tls_ciphers_(SecurityDefaults::kDefaultTlsCiphers),
+      tls_ciphersuites_(SecurityDefaults::kDefaultTlsCipherSuites),
+      tls_min_protocol_(SecurityDefaults::kDefaultTlsMinVersion),
       lock_(RWMutex::Priority::PREFER_READING),
       trusted_cert_count_(0),
       has_cert_(false),
@@ -124,9 +147,14 @@ TlsContext::TlsContext()
   security::InitializeOpenSSL();
 }
 
-TlsContext::TlsContext(std::string tls_ciphers, std::string tls_min_protocol)
+TlsContext::TlsContext(std::string tls_ciphers,
+                       std::string tls_ciphersuites,
+                       std::string tls_min_protocol,
+                       std::vector<std::string> tls_excluded_protocols)
     : tls_ciphers_(std::move(tls_ciphers)),
+      tls_ciphersuites_(std::move(tls_ciphersuites)),
       tls_min_protocol_(std::move(tls_min_protocol)),
+      tls_excluded_protocols_(std::move(tls_excluded_protocols)),
       lock_(RWMutex::Priority::PREFER_READING),
       trusted_cert_count_(0),
       has_cert_(false),
@@ -147,7 +175,11 @@ Status TlsContext::Init() {
   if (!ctx_) {
     return Status::RuntimeError("failed to create TLS context", GetOpenSSLErrors());
   }
-  SSL_CTX_set_mode(ctx_.get(), SSL_MODE_AUTO_RETRY | SSL_MODE_ENABLE_PARTIAL_WRITE);
+  auto* ctx = ctx_.get();
+  SSL_CTX_set_mode(ctx,
+                   SSL_MODE_AUTO_RETRY |
+                   SSL_MODE_ENABLE_PARTIAL_WRITE |
+                   SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
 
   // Disable SSLv2 and SSLv3 which are vulnerable to various issues such as POODLE.
   // We support versions back to TLSv1.0 since OpenSSL on RHEL 6.4 and earlier does not
@@ -158,26 +190,114 @@ Status TlsContext::Init() {
   //   https://tools.ietf.org/html/rfc7525#section-3.3
   auto options = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION;
 
-  if (boost::iequals(tls_min_protocol_, "TLSv1.2")) {
-    RETURN_NOT_OK(CheckMaxSupportedTlsVersion(TLS1_2_VERSION, "TLSv1.2"));
+  if (iequals(tls_min_protocol_, kTLSv1_3)) {
+    RETURN_NOT_OK(CheckMaxSupportedTlsVersion(TLS1_3_VERSION, kTLSv1_3));
+    options |= SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1 | SSL_OP_NO_TLSv1_2;
+  } else if (iequals(tls_min_protocol_, kTLSv1_2)) {
+    RETURN_NOT_OK(CheckMaxSupportedTlsVersion(TLS1_2_VERSION, kTLSv1_2));
     options |= SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1;
-  } else if (boost::iequals(tls_min_protocol_, "TLSv1.1")) {
-    RETURN_NOT_OK(CheckMaxSupportedTlsVersion(TLS1_1_VERSION, "TLSv1.1"));
+  } else if (iequals(tls_min_protocol_, kTLSv1_1)) {
+    RETURN_NOT_OK(CheckMaxSupportedTlsVersion(TLS1_1_VERSION, kTLSv1_1));
     options |= SSL_OP_NO_TLSv1;
-  } else if (!boost::iequals(tls_min_protocol_, "TLSv1")) {
-    return Status::InvalidArgument("unknown value provided for --rpc_tls_min_protocol flag",
-                                   tls_min_protocol_);
+  } else if (!iequals(tls_min_protocol_, kTLSv1)) {
+    return Status::InvalidArgument("unknown TLS protocol", tls_min_protocol_);
   }
 
-  // We don't currently support TLS 1.3 because the one-and-a-half-RTT negotiation
-  // confuses our RPC negotiation protocol. See KUDU-2871.
-  options |= SSL_OP_NO_TLSv1_3;
+#if OPENSSL_VERSION_NUMBER > 0x1010007fL
+  // KUDU-1926: disable TLS/SSL renegotiation.
+  // See https://www.openssl.org/docs/man1.1.0/man3/SSL_set_options.html for
+  // details. SSL_OP_NO_RENEGOTIATION option was back-ported from 1.1.1-dev to
+  // 1.1.0h, so this is a best-effort approach if the binary compiled with
+  // newer as per information in the CHANGES file for
+  // 'Changes between 1.1.0g and 1.1.0h [27 Mar 2018]':
+  //     Note that if an application built against 1.1.0h headers (or above) is
+  //     run using an older version of 1.1.0 (prior to 1.1.0h) then the option
+  //     will be accepted but nothing will happen, i.e. renegotiation will
+  //     not be prevented.
+  // The case of OpenSSL 1.0.2 and prior is handled by the InitiateHandshake()
+  // method.
+  options |= SSL_OP_NO_RENEGOTIATION;
+#endif
 
-  SSL_CTX_set_options(ctx_.get(), options);
+  for (const auto& proto : tls_excluded_protocols_) {
+    if (iequals(proto, kTLSv1_3)) {
+      options |= SSL_OP_NO_TLSv1_3;
+      continue;
+    }
+    if (iequals(proto, kTLSv1_2)) {
+      options |= SSL_OP_NO_TLSv1_2;
+      continue;
+    }
+    if (iequals(proto, kTLSv1_1)) {
+      options |= SSL_OP_NO_TLSv1_1;
+      continue;
+    }
+    if (iequals(proto, kTLSv1)) {
+      options |= SSL_OP_NO_TLSv1;
+      continue;
+    }
+    return Status::InvalidArgument("unknown TLS protocol", proto);
+  }
 
+  SSL_CTX_set_options(ctx, options);
+
+  // Disable the TLS session cache on both the client and server sides. In Kudu
+  // RPC, connections are not re-established based on TLS sessions anyway. Every
+  // connection attempt from a client to a server results in a new connection
+  // negotiation. Disabling the TLS session cache helps to avoid using extra
+  // resources to store TLS session information and running the automatic check
+  // for expired sessions every 255 connections, as mentioned at
+  // https://www.openssl.org/docs/manmaster/man3/SSL_CTX_set_session_cache_mode.html
+  SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF);
+
+  // The sequence of SSL_CTX_set_ciphersuites() and SSL_CTX_set_cipher_list()
+  // calls below is essential to make sure the TLS engine ends up with usable,
+  // non-empty set of ciphers in case of early 1.1.1 releases of OpenSSL
+  // (like OpenSSL 1.1.1 shipped with Ubuntu 18).
+  //
+  // The SSL_CTX_set_ciphersuites() call cares only about TLSv1.3 ciphers, and
+  // those might be none. From the other side, the implementation of
+  // SSL_CTX_set_cipher_list() verifies that the overall result list of ciphers
+  // is valid and usable, reporting an error otherwise.
+  //
+  // If the sequence is reversed, no error would be reported from
+  // TlsContext::Init() in case of empty list of ciphers for some early-1.1.1
+  // releases of OpenSSL. That's because SSL_CTX_set_cipher_list() would see
+  // a non-empty list of default TLSv1.3 ciphers when given an empty list of
+  // TLSv1.2 ciphers, and SSL_CTX_set_ciphersuites() would allow an empty set
+  // of TLSv1.3 ciphers in a subsequent call.
+
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+  // Set TLSv1.3 ciphers.
   OPENSSL_RET_NOT_OK(
-      SSL_CTX_set_cipher_list(ctx_.get(), tls_ciphers_.c_str()),
-      "failed to set TLS ciphers");
+      SSL_CTX_set_ciphersuites(ctx, tls_ciphersuites_.c_str()),
+      Substitute("failed to set TLSv1.3 ciphers: $0", tls_ciphersuites_));
+#endif
+
+  // It's OK to configure pre-TLSv1.3 ciphers even if all pre-TLSv1.3 protocols
+  // are disabled. At least, SSL_CTX_set_cipher_list() call doesn't report
+  // any errors.
+  OPENSSL_RET_NOT_OK(SSL_CTX_set_cipher_list(ctx, tls_ciphers_.c_str()),
+                     Substitute("failed to set TLS ciphers: $0", tls_ciphers_));
+
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  // OpenSSL 1.1 and newer supports the 'security level' concept:
+  //   https://www.openssl.org/docs/man1.1.0/man3/SSL_CTX_get_security_level.html
+  //
+  // For some Linux distros (e.g. RHEL/CentOS 8.1), the OpenSSL library is
+  // configured to use security level 2 by default, which tightens requirements
+  // on the number of bits used for various algorithms and ciphers (e.g., RSA
+  // key should be at least 2048 bits long with security level 2). However,
+  // in Kudu test environment we strive to use shorter keys because it saves
+  // us time running our tests.
+  auto level = SSL_CTX_get_security_level(ctx_.get());
+  VLOG(1) << Substitute("OpenSSL security level is $0", level);
+  if (FLAGS_openssl_security_level_override >= 0) {
+    SSL_CTX_set_security_level(ctx_.get(), FLAGS_openssl_security_level_override);
+    level = SSL_CTX_get_security_level(ctx_.get());
+    VLOG(1) << Substitute("OpenSSL security level reset to $0", level);
+  }
+#endif
 
   // Enable ECDH curves. For OpenSSL 1.1.0 and up, this is done automatically.
 #ifndef OPENSSL_NO_ECDH
@@ -195,11 +315,9 @@ Status TlsContext::Init() {
   // the best curve to use.
   OPENSSL_RET_NOT_OK(SSL_CTX_set_ecdh_auto(ctx_.get(), 1),
                      "failed to configure ECDH support");
-#endif
-#endif
+#endif // #if OPENSSL_VERSION_NUMBER < 0x10002000L ... #elif ...
+#endif // #ifndef OPENSSL_NO_ECDH ...
 
-  // TODO(KUDU-1926): is it possible to disable client-side renegotiation? it seems there
-  // have been various CVEs related to this feature that we don't need.
   return Status::OK();
 }
 
@@ -498,33 +616,30 @@ Status TlsContext::LoadCertificateAuthority(const string& certificate_path) {
   return AddTrustedCertificate(c);
 }
 
-Status TlsContext::InitiateHandshake(TlsHandshakeType handshake_type,
-                                     TlsHandshake* handshake) const {
+Status TlsContext::InitiateHandshake(TlsHandshake* handshake) const {
   SCOPED_OPENSSL_NO_PENDING_ERRORS;
+  DCHECK(handshake);
   CHECK(ctx_);
-  CHECK(!handshake->ssl_);
+  c_unique_ptr<SSL> ssl;
   {
+    // This lock is to protect against concurrent change of certificates
+    // while calling SSL_new() here.
     shared_lock<RWMutex> lock(lock_);
-    handshake->adopt_ssl(ssl_make_unique(SSL_new(ctx_.get())));
+    ssl = ssl_make_unique(SSL_new(ctx_.get()));
   }
-  if (!handshake->ssl_) {
+  if (!ssl) {
     return Status::RuntimeError("failed to create SSL handle", GetOpenSSLErrors());
   }
 
-  SSL_set_bio(handshake->ssl(),
-              BIO_new(BIO_s_mem()),
-              BIO_new(BIO_s_mem()));
-
-  switch (handshake_type) {
-    case TlsHandshakeType::SERVER:
-      SSL_set_accept_state(handshake->ssl());
-      break;
-    case TlsHandshakeType::CLIENT:
-      SSL_set_connect_state(handshake->ssl());
-      break;
-  }
-
-  return Status::OK();
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+  // KUDU-1926: disable TLS/SSL renegotiation. In version 1.0.2 and prior it's
+  // possible to use the undocumented SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS flag.
+  // TlsContext::Init() takes care of that for OpenSSL version 1.1.0h and newer.
+  // For more context, see a note on the SSL_OP_NO_RENEGOTIATION option in the
+  // $OPENSSL_ROOT/CHANGES and https://github.com/openssl/openssl/issues/4739.
+  ssl->s3->flags |= SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS;
+#endif
+  return handshake->Init(std::move(ssl));
 }
 
 } // namespace security

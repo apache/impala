@@ -52,7 +52,6 @@
 #include "kudu/util/errno.h"
 #include "kudu/util/faststring.h"
 #include "kudu/util/monotime.h"
-#include "kudu/util/path_util.h"
 #include "kudu/util/signal.h"
 #include "kudu/util/status.h"
 #include "kudu/util/stopwatch.h"
@@ -266,8 +265,6 @@ Subprocess::Subprocess(vector<string> argv, int sig_on_destruct)
       fd_state_(),
       child_fds_(),
       sig_on_destruct_(sig_on_destruct) {
-  // By convention, the first argument in argv is the base name of the program.
-  argv_[0] = BaseName(argv_[0]);
 
   fd_state_[STDIN_FILENO]   = PIPED;
   fd_state_[STDOUT_FILENO]  = SHARED;
@@ -553,6 +550,20 @@ Status Subprocess::WaitNoBlock(int* wait_status) {
   return DoWait(wait_status, NON_BLOCKING);
 }
 
+Status Subprocess::WaitAndCheckExitCode() {
+  int wait_status;
+  RETURN_NOT_OK(DoWait(&wait_status, BLOCKING));
+  int exit_status;
+  string info_str;
+
+  RETURN_NOT_OK(GetExitStatus(&exit_status, &info_str));
+
+  return exit_status == 0
+    ? Status::OK()
+    : Status::RuntimeError(Substitute("Exit code: $0 ($1)",
+                                      exit_status, info_str));
+}
+
 Status Subprocess::GetProcfsState(int pid, ProcfsState* state) {
   faststring data;
   string filename = Substitute("/proc/$0/stat", pid);
@@ -630,6 +641,11 @@ Status Subprocess::Kill(int signal) {
 }
 
 Status Subprocess::KillAndWait(int signal) {
+  if (state_ != kRunning) {
+    const string err_str = "Sub-process is not running";
+    LOG(DFATAL) << err_str;
+    return Status::IllegalState(err_str);
+  }
   string procname = Substitute("$0 (pid $1)", argv0(), pid());
 
   // This is a fatal error because all errors in Kill() are signal-independent,
@@ -854,6 +870,10 @@ int Subprocess::ReleaseChildFd(int stdfd) {
   int ret = child_fds_[stdfd];
   child_fds_[stdfd] = -1;
   return ret;
+}
+
+bool Subprocess::IsStarted() {
+  return state_ != kNotStarted;
 }
 
 } // namespace kudu
