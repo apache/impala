@@ -147,21 +147,22 @@ class TestNestedStructsInSelectList(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('orc_schema_resolution', 0, 1))
     cls.ImpalaTestMatrix.add_constraint(orc_schema_resolution_constraint)
 
-  def test_struct_in_select_list(self, vector, unique_database):
+  def test_struct_in_select_list(self, vector):
     """Queries where a struct column is in the select list"""
-    if vector.get_value('table_format').file_format == 'parquet':
-      pytest.skip()
     if vector.get_value('exec_option')['disable_codegen'] == 'False':
       pytest.skip()
-    self.run_test_case('QueryTest/struct-in-select-list', vector, unique_database)
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['convert_legacy_hive_parquet_utc_timestamps'] = 1
+    new_vector.get_value('exec_option')['TIMEZONE'] = '"Europe/Budapest"'
+    self.run_test_case('QueryTest/struct-in-select-list', new_vector)
 
-  def test_nested_struct_in_select_list(self, vector, unique_database):
+  def test_nested_struct_in_select_list(self, vector):
     """Queries where a nested struct column is in the select list"""
-    if vector.get_value('table_format').file_format == 'parquet':
-      pytest.skip()
     if vector.get_value('exec_option')['disable_codegen'] == 'False':
       pytest.skip()
-    self.run_test_case('QueryTest/nested-struct-in-select-list', vector, unique_database)
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['convert_legacy_hive_parquet_utc_timestamps'] = 1
+    self.run_test_case('QueryTest/nested-struct-in-select-list', new_vector)
 
 
 class TestNestedTArraysInSelectList(ImpalaTestSuite):

@@ -25,6 +25,7 @@
 #include "exec/parquet/parquet-data-converter.h"
 #include "exec/parquet/parquet-level-decoder.h"
 #include "exec/parquet/parquet-metadata-utils.h"
+#include "exec/parquet/parquet-struct-column-reader.h"
 #include "exec/scratch-tuple-batch.h"
 #include "parquet-collection-column-reader.h"
 #include "runtime/runtime-state.h"
@@ -85,10 +86,10 @@ class ScalarColumnReader : public BaseScalarColumnReader {
   virtual bool NeedsConversion() override { return NeedsConversionInline(); }
   virtual bool NeedsValidation() override { return NeedsValidationInline(); }
 
- protected:
   template <bool IN_COLLECTION>
   inline bool ReadValue(Tuple* tuple);
 
+ protected:
   /// Implementation of the ReadValueBatch() functions specialized for this
   /// column reader type. This function drives the reading of data pages and
   /// caching of rep/def levels. Once a data page and cached levels are available,
@@ -426,7 +427,7 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ReadValue(
       }
       if (!continue_execution) return false;
     } else {
-      tuple->SetNull(null_indicator_offset_);
+      SetNullSlot(tuple);
     }
   }
   return NextLevels<IN_COLLECTION>();
@@ -569,7 +570,7 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::MaterializeVa
         bool continue_execution = ReadSlot<ENCODING, NEEDS_CONVERSION>(tuple);
         if (UNLIKELY(!continue_execution)) return false;
       } else {
-        tuple->SetNull(null_indicator_offset_);
+        SetNullSlot(tuple);
       }
     }
     curr_tuple += tuple_size;
@@ -705,7 +706,7 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ReadSlot(
     if (UNLIKELY(!parent_->parse_status_.ok())) return false;
     // The value is invalid but execution should continue - set the null indicator and
     // skip conversion.
-    tuple->SetNull(null_indicator_offset_);
+    SetNullSlot(tuple);
     return true;
   }
   return true;
@@ -739,7 +740,7 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ReadAndConver
       if (UNLIKELY(!parent_->parse_status_.ok())) return false;
       // The value or the conversion is invalid but execution should continue - set the
       // null indicator.
-      tuple->SetNull(null_indicator_offset_);
+      SetNullSlot(tuple);
       continue;
     }
   }
@@ -763,7 +764,7 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ReadSlotsNoCo
         if (UNLIKELY(!parent_->parse_status_.ok())) return false;
         // The value is invalid but execution should continue - set the null indicator and
         // skip conversion.
-        tuple->SetNull(null_indicator_offset_);
+        SetNullSlot(tuple);
       }
     }
   }
@@ -1730,6 +1731,8 @@ ParquetColumnReader* ParquetColumnReader::Create(const SchemaNode& node,
             parent, node, slot_desc);
       case TYPE_DECIMAL:
         return CreateDecimalColumnReader(node, slot_desc, parent);
+      case TYPE_STRUCT:
+        return new StructColumnReader(parent, node, slot_desc);
       default:
         DCHECK(false) << slot_desc->type().DebugString();
         return nullptr;

@@ -30,6 +30,7 @@
 #include "exec/parquet/parquet-bloom-filter-util.h"
 #include "exec/parquet/parquet-collection-column-reader.h"
 #include "exec/parquet/parquet-column-readers.h"
+#include "exec/parquet/parquet-struct-column-reader.h"
 #include "exec/scanner-context.inline.h"
 #include "exec/scratch-tuple-batch.h"
 #include "exprs/literal.h"
@@ -305,9 +306,9 @@ void HdfsParquetScanner::Close(RowBatch* row_batch) {
   while (!readers.empty()) {
     ParquetColumnReader* reader = readers.top();
     readers.pop();
-    if (reader->IsCollectionReader()) {
-      CollectionColumnReader* coll_reader = static_cast<CollectionColumnReader*>(reader);
-      for (ParquetColumnReader* r: *coll_reader->children()) readers.push(r);
+    if (reader->IsComplexReader()) {
+      ComplexColumnReader* complex_reader = static_cast<ComplexColumnReader*>(reader);
+      for (ParquetColumnReader* r: *complex_reader->children()) readers.push(r);
       continue;
     }
     BaseScalarColumnReader* scalar_reader = static_cast<BaseScalarColumnReader*>(reader);
@@ -385,10 +386,10 @@ int HdfsParquetScanner::CountScalarColumns(
   while (!readers.empty()) {
     ParquetColumnReader* col_reader = readers.top();
     readers.pop();
-    if (col_reader->IsCollectionReader()) {
-      CollectionColumnReader* collection_reader =
-          static_cast<CollectionColumnReader*>(col_reader);
-      for (ParquetColumnReader* r: *collection_reader->children()) readers.push(r);
+    if (col_reader->IsComplexReader()) {
+      ComplexColumnReader* complex_reader =
+          static_cast<ComplexColumnReader*>(col_reader);
+      for (ParquetColumnReader* r: *complex_reader->children()) readers.push(r);
       continue;
     }
     ++num_columns;
@@ -918,7 +919,7 @@ Status HdfsParquetScanner::NextRowGroup() {
       }
     }
 
-    InitCollectionColumns();
+    InitComplexColumns();
     RETURN_IF_ERROR(InitScalarColumns());
 
     // Start scanning dictionary filtering column readers, so we can read the dictionary
@@ -1656,9 +1657,9 @@ bool HdfsParquetScanner::IsDictFilterable(BaseScalarColumnReader* col_reader) {
 void HdfsParquetScanner::PartitionReaders(
     const vector<ParquetColumnReader*>& readers, bool can_eval_dict_filters) {
   for (auto* reader : readers) {
-    if (reader->IsCollectionReader()) {
-      CollectionColumnReader* col_reader = static_cast<CollectionColumnReader*>(reader);
-      collection_readers_.push_back(col_reader);
+    if (reader->IsComplexReader()) {
+      ComplexColumnReader* col_reader = static_cast<ComplexColumnReader*>(reader);
+        complex_readers_.push_back(col_reader);
       PartitionReaders(*col_reader->children(), can_eval_dict_filters);
     } else {
       BaseScalarColumnReader* scalar_reader =
@@ -2234,7 +2235,8 @@ Status HdfsParquetScanner::AssembleRows(RowBatch* row_batch, bool* skip_row_grou
   DCHECK(scratch_batch_ != nullptr);
 
   if (filter_readers_.empty() || non_filter_readers_.empty() ||
-      late_materialization_threshold_ < 0 || filter_readers_[0]->max_rep_level() > 0) {
+      late_materialization_threshold_ < 0 || filter_readers_[0]->max_rep_level() > 0 ||
+      HasStructColumnReader(non_filter_readers_)) {
     // Late Materialization is either disabled or not applicable for assembling rows here.
     return AssembleRowsWithoutLateMaterialization(column_readers_, row_batch,
         skip_row_group);
@@ -2324,6 +2326,14 @@ Status HdfsParquetScanner::AssembleRows(RowBatch* row_batch, bool* skip_row_grou
   COUNTER_ADD(scan_node_->collection_items_read_counter(), coll_items_read_counter_);
   coll_items_read_counter_ = 0;
   return Status::OK();
+}
+
+bool HdfsParquetScanner::HasStructColumnReader(
+    const std::vector<ParquetColumnReader*>& column_readers) const {
+  for (const ParquetColumnReader* col_reader : column_readers) {
+    if (col_reader->HasStructReader()) return true;
+  }
+  return false;
 }
 
 Status HdfsParquetScanner::SkipRowsForColumns(
@@ -2755,14 +2765,14 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
         *node, slot_desc->type().IsCollectionType(), slot_desc, this);
     column_readers->push_back(col_reader);
 
-    if (col_reader->IsCollectionReader()) {
+    if (col_reader->IsComplexReader()) {
       // Recursively populate col_reader's children
       DCHECK(slot_desc->children_tuple_descriptor() != nullptr);
       const TupleDescriptor* item_tuple_desc = slot_desc->children_tuple_descriptor();
-      CollectionColumnReader* collection_reader =
+      ComplexColumnReader* complex_reader =
           static_cast<CollectionColumnReader*>(col_reader);
       RETURN_IF_ERROR(CreateColumnReaders(
-          *item_tuple_desc, schema_resolver, collection_reader->children()));
+          *item_tuple_desc, schema_resolver, complex_reader->children()));
     } else {
       scalar_reader_map_[node->col_idx] = static_cast<BaseScalarColumnReader*>(
           col_reader);
@@ -2850,8 +2860,8 @@ Status HdfsParquetScanner::CreateCountingReader(const SchemaPath& parent_path,
   return Status::OK();
 }
 
-void HdfsParquetScanner::InitCollectionColumns() {
-  for (CollectionColumnReader* col_reader: collection_readers_) {
+void HdfsParquetScanner::InitComplexColumns() {
+  for (ComplexColumnReader* col_reader: complex_readers_) {
     col_reader->Reset();
   }
 }
@@ -2940,7 +2950,7 @@ Status HdfsParquetScanner::ValidateEndOfRowGroup(
   // Validate scalar column readers' state
   int num_values_read = -1;
   for (int c = 0; c < column_readers.size(); ++c) {
-    if (column_readers[c]->IsCollectionReader()) continue;
+    if (column_readers[c]->IsComplexReader()) continue;
     BaseScalarColumnReader* reader =
         static_cast<BaseScalarColumnReader*>(column_readers[c]);
     // All readers should have exhausted the final data page. This could fail if one

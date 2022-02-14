@@ -17,27 +17,25 @@
 
 #pragma once
 
-#include <vector>
-
-#include "exec/parquet/parquet-column-readers.h"
+#include "exec/parquet/parquet-complex-column-reader.h"
 
 namespace impala {
 
 /// Collections are not materialized directly in parquet files; only scalar values appear
 /// in the file. CollectionColumnReader uses the definition and repetition levels of child
 /// column readers to figure out the boundaries of each collection in this column.
-class CollectionColumnReader : public ParquetColumnReader {
+class CollectionColumnReader : public ComplexColumnReader {
  public:
   CollectionColumnReader(
       HdfsParquetScanner* parent, const SchemaNode& node, const SlotDescriptor* slot_desc)
-    : ParquetColumnReader(parent, node, slot_desc) {
+    : ComplexColumnReader(parent, node, slot_desc) {
     DCHECK(node_.is_repeated());
     if (slot_desc != nullptr) DCHECK(slot_desc->type().IsCollectionType());
   }
 
   virtual ~CollectionColumnReader() {}
 
-  vector<ParquetColumnReader*>* children() { return &children_; }
+  virtual bool IsStructReader() const override { return false; }
 
   virtual bool IsCollectionReader() const override { return true; }
 
@@ -66,41 +64,12 @@ class CollectionColumnReader : public ParquetColumnReader {
   /// reader's state.
   virtual bool NextLevels() override;
 
-  /// This is called once for each row group in the file.
-  void Reset() {
-    def_level_ = ParquetLevel::INVALID_LEVEL;
-    rep_level_ = ParquetLevel::INVALID_LEVEL;
-    pos_current_value_ = ParquetLevel::INVALID_POS;
-  }
-
-  virtual void Close(RowBatch* row_batch) override;
-
   /// Skips the number of encoded values specified by 'num_rows', without materilizing or
   /// decoding them.
   /// Returns true on success, false otherwise.
   virtual bool SkipRows(int64_t num_rows, int64_t skip_row_id) override;
 
-  virtual bool SetRowGroupAtEnd() override {
-    DCHECK(!children_.empty());
-    for (int c = 0; c < children_.size(); ++c) {
-      if (!children_[c]->SetRowGroupAtEnd()) return false;
-    }
-    return true;
-  }
-
-  /// Returns the index of the row that was processed most recently.
-  int64_t LastProcessedRow() const override {
-    DCHECK(!children_.empty());
-    return children_[0]->LastProcessedRow();
-  }
-
  private:
-  /// Column readers of fields contained within this collection. There is at least one
-  /// child reader per collection reader. Child readers either materialize slots in the
-  /// collection item tuples, or there is a single child reader that does not materialize
-  /// any slot and is only used by this reader to read def and rep levels.
-  vector<ParquetColumnReader*> children_;
-
   /// Updates this reader's def_level_, rep_level_, and pos_current_value_ based on child
   /// reader's state.
   void UpdateDerivedState();

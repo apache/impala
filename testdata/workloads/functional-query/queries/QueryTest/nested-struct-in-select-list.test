@@ -2,7 +2,7 @@
 ---- QUERY
 # Select a struct that contains multiple structs.
 select id, outer_struct
-from functional_orc_def.complextypes_nested_structs;
+from complextypes_nested_structs;
 ---- RESULTS
 1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
 2,'{"str":"str","inner_struct1":null,"inner_struct2":{"i":100,"str":"str3"},"inner_struct3":{"s":{"i":321,"s":"dfgs"}}}'
@@ -15,7 +15,7 @@ INT,STRING
 ---- QUERY
 # Select a struct that contains multiple structs using a filter on a non-struct field.
 select id, outer_struct
-from functional_orc_def.complextypes_nested_structs
+from complextypes_nested_structs
 where id > 2;
 ---- RESULTS
 3,'NULL'
@@ -27,7 +27,7 @@ INT,STRING
 ---- QUERY
 # Select a struct that contains multiple structs using a filter on a struct field.
 select id, outer_struct
-from functional_orc_def.complextypes_nested_structs
+from complextypes_nested_structs
 where length(outer_struct.str) > 3;
 ---- RESULTS
 1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
@@ -37,7 +37,7 @@ INT,STRING
 ---- QUERY
 # Select a nested struct with an order by.
 select id, outer_struct
-from functional_orc_def.complextypes_nested_structs
+from complextypes_nested_structs
 order by id;
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
 1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
@@ -51,7 +51,7 @@ INT,STRING
 ---- QUERY
 # Select a nested struct with an order by.
 select id, outer_struct
-from functional_orc_def.complextypes_nested_structs
+from complextypes_nested_structs
 order by id desc;
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
 5,'{"str":null,"inner_struct1":null,"inner_struct2":null,"inner_struct3":null}'
@@ -65,7 +65,7 @@ INT,STRING
 ---- QUERY
 # Select the same nested struct multiple times in one query.
 select id, outer_struct, outer_struct
-from functional_orc_def.complextypes_nested_structs;
+from complextypes_nested_structs;
 ---- RESULTS
 1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}','{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
 2,'{"str":"str","inner_struct1":null,"inner_struct2":{"i":100,"str":"str3"},"inner_struct3":{"s":{"i":321,"s":"dfgs"}}}','{"str":"str","inner_struct1":null,"inner_struct2":{"i":100,"str":"str3"},"inner_struct3":{"s":{"i":321,"s":"dfgs"}}}'
@@ -78,7 +78,7 @@ INT,STRING,STRING
 ---- QUERY
 # Select the same nested struct multiple times in one query and order the results.
 select id, outer_struct, outer_struct
-from functional_orc_def.complextypes_nested_structs
+from complextypes_nested_structs
 order by id desc;
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
 5,'{"str":null,"inner_struct1":null,"inner_struct2":null,"inner_struct3":null}','{"str":null,"inner_struct1":null,"inner_struct2":null,"inner_struct3":null}'
@@ -93,7 +93,7 @@ INT,STRING,STRING
 # Similar to the above query but here the 'id' field is not in the select list but still
 # used in the order by.
 select outer_struct, outer_struct
-from functional_orc_def.complextypes_nested_structs
+from complextypes_nested_structs
 order by id desc;
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
 '{"str":null,"inner_struct1":null,"inner_struct2":null,"inner_struct3":null}','{"str":null,"inner_struct1":null,"inner_struct2":null,"inner_struct3":null}'
@@ -105,9 +105,18 @@ order by id desc;
 STRING,STRING
 ====
 ---- QUERY
+# Select an inner struct where the outer struct is null.
+select outer_struct.inner_struct1 from complextypes_nested_structs
+where id = 3;
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
 # WITH clause creates an inline view containing a nested struct.
 with sub as (
-    select id, outer_struct from functional_orc_def.complextypes_nested_structs)
+    select id, outer_struct from complextypes_nested_structs)
 select sub.id, sub.outer_struct from sub;
 ---- RESULTS
 1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
@@ -122,7 +131,7 @@ INT,STRING
 # WITH clause creates an inline view containing a nested struct and we query a nested
 # field.
 with sub as (
-    select id, outer_struct from functional_orc_def.complextypes_nested_structs)
+    select id, outer_struct from complextypes_nested_structs)
 select sub.id, sub.outer_struct.inner_struct2 from sub;
 ---- RESULTS
 1,'{"i":333222111,"str":"somestr3"}'
@@ -137,7 +146,7 @@ INT,STRING
 # WITH clause creates an inline view containing a nested struct and we query a doubly
 # nested field.
 with sub as (
-    select id, outer_struct from functional_orc_def.complextypes_nested_structs)
+    select id, outer_struct from complextypes_nested_structs)
 select sub.id, sub.outer_struct.inner_struct2.i from sub;
 ---- RESULTS
 1,333222111
@@ -153,7 +162,7 @@ INT,INT
 # that is a struct itself; query both in the main select statement.
 with sub as (
     select id, outer_struct, outer_struct.inner_struct3 inner3
-        from functional_orc_def.complextypes_nested_structs)
+        from complextypes_nested_structs)
 select id, outer_struct, inner3 from sub;
 ---- RESULTS
 1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}','{"s":{"i":112288,"s":null}}'
@@ -170,7 +179,7 @@ INT,STRING,STRING
 # 'outer_struct' as well as 'inner3' in the main select statement.
 with sub as (
     select id, outer_struct, outer_struct.inner_struct3 inner3
-        from functional_orc_def.complextypes_nested_structs)
+        from complextypes_nested_structs)
 select id, outer_struct.inner_struct2, inner3 from sub;
 ---- RESULTS
 1,'{"i":333222111,"str":"somestr3"}','{"s":{"i":112288,"s":null}}'
@@ -187,7 +196,7 @@ INT,STRING,STRING
 # 'outer_struct' as well as a member of 'inner3' in the main select statement.
 with sub as (
     select id, outer_struct, outer_struct.inner_struct3 inner3
-        from functional_orc_def.complextypes_nested_structs)
+        from complextypes_nested_structs)
 select id, outer_struct.inner_struct2, inner3.s from sub;
 ---- RESULTS
 1,'{"i":333222111,"str":"somestr3"}','{"i":112288,"s":null}'
@@ -201,7 +210,7 @@ INT,STRING,STRING
 ---- QUERY
 # WITH clause creates an inline view containing a nested struct; we order by id.
 with sub as (
-    select id, outer_struct from functional_orc_def.complextypes_nested_structs)
+    select id, outer_struct from complextypes_nested_structs)
 select sub.id, sub.outer_struct.inner_struct2 from sub order by sub.id desc;
 ---- RESULTS
 5,'NULL'
@@ -216,7 +225,7 @@ INT,STRING
 # WITH clause creates an inline view containing a nested struct; we order by a nested
 # field.
 with sub as (
-    select id, outer_struct from functional_orc_def.complextypes_nested_structs)
+    select id, outer_struct from complextypes_nested_structs)
 select sub.id, sub.outer_struct.inner_struct2 from sub
 order by sub.outer_struct.inner_struct2.i, sub.id;
 ---- RESULTS
@@ -232,7 +241,7 @@ INT,STRING
 # WITH clause creates an inline view containing a nested struct; we order by a nested
 # field that is not present in the select list.
 with sub as (
-    select id, outer_struct from functional_orc_def.complextypes_nested_structs)
+    select id, outer_struct from complextypes_nested_structs)
 select sub.id, sub.outer_struct.inner_struct1 from sub
 order by sub.outer_struct.inner_struct2.i, sub.id;
 ---- RESULTS
@@ -248,7 +257,7 @@ INT,STRING
 # WITH clause creates an inline view containing a nested struct; filter by a struct field
 # from the inline view.
 with sub as (
-    select id, outer_struct from functional_orc_def.complextypes_nested_structs)
+    select id, outer_struct from complextypes_nested_structs)
 select sub.id, sub.outer_struct.str
 from sub
 where length(sub.outer_struct.str) < 4;
@@ -263,7 +272,7 @@ INT,STRING
 # filter by one of its fields.
 with sub as (
     select id, outer_struct.inner_struct1 s1, outer_struct.inner_struct2 s2
-    from functional_orc_def.complextypes_nested_structs)
+    from complextypes_nested_structs)
 select sub.id, s2
 from sub
 where length(s2.str) < 8;
@@ -277,7 +286,7 @@ INT,STRING
 # WITH clause creates an inline view containing a nested struct; filter by a struct field
 # from the inline view but do not select anything from it.
 with sub as (
-    select id, outer_struct from functional_orc_def.complextypes_nested_structs)
+    select id, outer_struct from complextypes_nested_structs)
 select 1
 from sub
 where length(sub.outer_struct.str) < 4;
@@ -292,7 +301,7 @@ TINYINT
 # the inline view and ordering by a non-complex item from the view.
 with sub as (
     select id, outer_struct
-    from functional_orc_def.complextypes_nested_structs
+    from complextypes_nested_structs
     where length(outer_struct.str) > 3)
 select sub.id, sub.outer_struct from sub order by sub.id desc;
 ---- RESULTS
@@ -303,7 +312,7 @@ INT,STRING
 ---- QUERY
 # Two-level inline view, querying a struct filed.
 with sub as (
-    select id, outer_struct from functional_orc_def.complextypes_nested_structs)
+    select id, outer_struct from complextypes_nested_structs)
 select id, s from (select id, outer_struct.inner_struct1 as s from sub) v
 order by id;
 ---- RESULTS
@@ -318,7 +327,7 @@ INT,STRING
 ---- QUERY
 # Two-level inline view, querying the top level struct.
 with sub as (
-    select id, outer_struct from functional_orc_def.complextypes_nested_structs)
+    select id, outer_struct from complextypes_nested_structs)
 select id, s from (select id, outer_struct as s from sub) v
 order by id;
 ---- RESULTS
@@ -335,7 +344,7 @@ INT,STRING
 # when the struct fields in the predicate are itemTupleDescriptors within the struct(s),
 # not in the main tuple.
 select id, outer_struct
-from functional_orc_def.complextypes_nested_structs
+from complextypes_nested_structs
 where outer_struct.inner_struct2.i > length(outer_struct.str)
 ---- RESULTS
 1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
@@ -349,7 +358,7 @@ INT,STRING
 # enclosing struct is embedded in another one, but the top level struct is not present in
 # the query.
 select id, outer_struct.inner_struct2.i, outer_struct.inner_struct2
-from functional_orc_def.complextypes_nested_structs;
+from complextypes_nested_structs;
 ---- RESULTS
 1,333222111,'{"i":333222111,"str":"somestr3"}'
 2,100,'{"i":100,"str":"str3"}'
@@ -363,8 +372,8 @@ INT,INT,STRING
 # An inner join where struct fields are in the join condition and their parent struct is
 # in the select list.
 select a.outer_struct, b.small_struct
-from functional_orc_def.complextypes_nested_structs a
-    inner join functional_orc_def.complextypes_structs b
+from complextypes_nested_structs a
+    inner join complextypes_structs b
     on b.small_struct.i = a.outer_struct.inner_struct2.i + 19091;
 ---- RESULTS
 '{"str":"str","inner_struct1":null,"inner_struct2":{"i":100,"str":"str3"},"inner_struct3":{"s":{"i":321,"s":"dfgs"}}}','{"i":19191,"s":"small_struct_str"}'
@@ -375,8 +384,8 @@ STRING,STRING
 # An outer join where struct fields are in the join condition and their parent struct is
 # in the select list.
 select a.outer_struct, b.small_struct
-from functional_orc_def.complextypes_nested_structs a
-    full outer join functional_orc_def.complextypes_structs b
+from complextypes_nested_structs a
+    full outer join complextypes_structs b
     on b.small_struct.i = a.outer_struct.inner_struct2.i + 19091;
 ---- RESULTS
 '{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}','NULL'
@@ -394,7 +403,7 @@ STRING,STRING
 ====
 ---- QUERY
 # Checks that "SELECT nested_struct.* ..." omits the nested structs from the output.
-select id, outer_struct.* from functional_orc_def.complextypes_nested_structs;
+select id, outer_struct.* from complextypes_nested_structs;
 ---- RESULTS
 1,'somestr1'
 2,'str'
@@ -406,8 +415,8 @@ INT,STRING
 ====
 ---- QUERY
 # IMPALA-10839: Display nulls at the correct level.
-select id, outer_struct.inner_struct3 from
-functional_orc_def.complextypes_nested_structs;
+select id, outer_struct.inner_struct3
+from complextypes_nested_structs;
 ---- RESULTS
 1,'{"s":{"i":112288,"s":null}}'
 2,'{"s":{"i":321,"s":"dfgs"}}'
@@ -419,8 +428,8 @@ INT,STRING
 ====
 ---- QUERY
 # IMPALA-10839: Display nulls at the correct level.
-select id, outer_struct.inner_struct3.s from
-functional_orc_def.complextypes_nested_structs;
+select id, outer_struct.inner_struct3.s
+from complextypes_nested_structs;
 ---- RESULTS
 1,'{"i":112288,"s":null}'
 2,'{"i":321,"s":"dfgs"}'
@@ -434,10 +443,10 @@ INT,STRING
 # Subquery that returns a complex type is not supported.
 # IMPALA-9500
 select outer_struct
-from functional_orc_def.complextypes_nested_structs
+from complextypes_nested_structs
 where outer_struct in
-(select outer_struct from functional_orc_def.complextypes_nested_structs);
+(select outer_struct from functional_parquet.complextypes_nested_structs);
 ---- CATCH
-AnalysisException: A subquery can't return complex types. (SELECT outer_struct FROM functional_orc_def.complex
+AnalysisException: A subquery can't return complex types. (SELECT outer_struct FROM functional_parquet.complex
 types_nested_structs)
 ====

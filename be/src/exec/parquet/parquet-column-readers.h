@@ -27,9 +27,10 @@
 
 namespace impala {
 
+class ComplexColumnReader;
 class DictDecoderBase;
-class Tuple;
 class MemPool;
+class Tuple;
 
 /// Base class for reading a Parquet column. Reads a logical column, not necessarily a
 /// column materialized in the file (e.g. collections). The two subclasses are
@@ -85,6 +86,17 @@ class ParquetColumnReader {
 
   /// Returns true if this reader materializes collections (i.e. CollectionValues).
   virtual bool IsCollectionReader() const = 0;
+
+  /// Returns true if this reader materializes structs.
+  virtual bool IsStructReader() const = 0;
+
+  /// Returns true if this reader materializes struct or has a child (recursively) that
+  /// does so.
+  virtual bool HasStructReader() const = 0;
+
+  /// Returns true if this reader materializes nested types such as Collections or
+  /// Structs.
+  virtual bool IsComplexReader() const = 0;
 
   const char* filename() const { return parent_->filename(); }
 
@@ -163,7 +175,7 @@ class ParquetColumnReader {
   /// and frees up other resources. If 'row_batch' is NULL frees all resources instead.
   virtual void Close(RowBatch* row_batch) = 0;
 
-  /// Skips the number of encoded values specified by 'num_rows', without materilizing or
+  /// Skips the number of encoded values specified by 'num_rows', without materializing or
   /// decoding them across pages. If page filtering is enabled, then it directly skips to
   /// row after 'skip_row_id' and ignores 'num_rows'.
   /// It invokes 'SkipToLevelRows' for all 'children_'.
@@ -180,6 +192,11 @@ class ParquetColumnReader {
 
   // Returns 'true' if the reader supports page index.
   virtual bool DoesPageFiltering() const { return false; }
+
+  /// Set the reader's slot in the given 'tuple' to NULL
+  virtual void SetNullSlot(Tuple* tuple) {
+    tuple->SetNull(DCHECK_NOTNULL(slot_desc_)->null_indicator_offset());
+  }
 
  protected:
   HdfsParquetScanner* parent_;
@@ -270,6 +287,12 @@ class BaseScalarColumnReader : public ParquetColumnReader {
 
   virtual bool IsCollectionReader() const override { return false; }
 
+  virtual bool IsStructReader() const override { return false; }
+
+  virtual bool HasStructReader() const override { return false; }
+
+  virtual bool IsComplexReader() const override { return false; }
+
   /// Resets the reader for each row group in the file and creates the scan
   /// range for the column, but does not start it. To start scanning,
   /// set_io_reservation() must be called to assign reservation to this
@@ -329,6 +352,10 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   // TODO: Some encodings might benefit a lot from a SkipValues(int num_rows) if
   // we know this row can be skipped. This could be very useful with stats and big
   // sections can be skipped. Implement that when we can benefit from it.
+
+  /// Implementation for NextLevels().
+  template <bool ADVANCE_REP_LEVEL>
+  bool NextLevels();
 
  protected:
   // Friend parent scanner so it can perform validation (e.g. ValidateEndOfRowGroup())
@@ -445,10 +472,6 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// 'num_buffered_values_' based upon header. Need to invoke 'ReadCurrentDataPage'
   /// if page has rows of interest to actually buffer the values.
   bool AdvanceNextPageHeader();
-
-  /// Implementation for NextLevels().
-  template <bool ADVANCE_REP_LEVEL>
-  bool NextLevels();
 
   /// Creates a dictionary decoder from values/size. 'decoder' is set to point to a
   /// dictionary decoder stored in this object. Subclass must implement this. Returns

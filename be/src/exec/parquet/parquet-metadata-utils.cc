@@ -303,6 +303,7 @@ Status ParquetMetadataUtils::ValidateOffsetInFile(const string& filename, int co
 Status ParquetMetadataUtils::ValidateRowGroupColumn(
     const parquet::FileMetaData& file_metadata, const char* filename, int row_group_idx,
     int col_idx, const parquet::SchemaElement& schema_element, RuntimeState* state) {
+  DCHECK_GE(col_idx, 0);
   const parquet::ColumnMetaData& col_chunk_metadata =
       file_metadata.row_groups[row_group_idx].columns[col_idx].meta_data;
 
@@ -709,7 +710,7 @@ Status ParquetSchemaResolver::ResolvePathHelper(ArrayEncoding array_encoding,
       if (*missing_field) return Status::OK();
     } else if (col_type->type == TYPE_STRUCT) {
       DCHECK_GT(col_type->children.size(), 0);
-      // Nothing to do for structs
+      RETURN_IF_ERROR(ResolveStruct(**node, *col_type, path, i));
     } else {
       DCHECK(!col_type->IsComplexType());
       DCHECK_EQ(i, path.size() - 1);
@@ -931,6 +932,16 @@ Status ParquetSchemaResolver::ResolveMap(const SchemaPath& path, int idx,
   if (idx + 1 < path.size()) {
     DCHECK(path[idx + 1] == SchemaPathConstants::MAP_KEY ||
            path[idx + 1] == SchemaPathConstants::MAP_VALUE);
+  }
+  return Status::OK();
+}
+
+Status ParquetSchemaResolver::ResolveStruct(const SchemaNode& node,
+    const ColumnType& col_type, const SchemaPath& path, int idx) const {
+  if (node.children.size() < 1) {
+    ErrorMsg msg(TErrorCode::PARQUET_UNRECOGNIZED_SCHEMA, filename_,
+        PrintSubPath(tbl_desc_, path, idx), "struct", node.DebugString());
+    return Status::Expected(msg);
   }
   return Status::OK();
 }

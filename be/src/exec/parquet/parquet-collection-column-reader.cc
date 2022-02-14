@@ -21,12 +21,6 @@
 
 namespace impala {
 
-void CollectionColumnReader::Close(RowBatch* row_batch) {
-  for (ParquetColumnReader* child_reader : children_) {
-    child_reader->Close(row_batch);
-  }
-}
-
 bool CollectionColumnReader::NextLevels() {
   DCHECK(!children_.empty());
   DCHECK_LE(rep_level_, new_collection_rep_level());
@@ -58,7 +52,7 @@ bool CollectionColumnReader::ReadValue(MemPool* pool, Tuple* tuple) {
       CollectionValue* slot = tuple->GetCollectionSlot(tuple_offset_);
       *slot = CollectionValue();
     } else {
-      tuple->SetNull(null_indicator_offset_);
+      SetNullSlot(tuple);
     }
     return CollectionColumnReader::NextLevels();
   }

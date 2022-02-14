@@ -811,7 +811,7 @@ year int
 month int
 ---- COLUMNS
 id int
-struct_val struct<bool_col:boolean, tinyint_col:tinyint, smallint_col:smallint, int_col:int, bigint_col:bigint, float_col:float, double_col:double, date_string_col:string, string_col:string, timestamp_col:timestamp>
+struct_val struct<bool_col:boolean, tinyint_col:tinyint, smallint_col:smallint, int_col:int, bigint_col:bigint, float_col:float, double_col:double, date_string_col:string, string_col:string>
 ---- DEPENDENT_LOAD_HIVE
 INSERT INTO {db_name}{db_suffix}.{table_name}
 PARTITION (year, month)
@@ -826,11 +826,10 @@ PARTITION (year, month)
             'float_col', float_col,
             'double_col', double_col,
             'date_string_col', date_string_col,
-            'string_col', string_col,
-            'timestamp_col', timestamp_col),
+            'string_col', string_col),
         year,
         month
-    FROM {db_name}{db_suffix}.alltypes;
+    FROM {db_name}.alltypes;
 ---- LOAD
 ====
 ---- DATASET

@@ -31,12 +31,14 @@ add_library(Parquet
   parquet-collection-column-reader.cc
   parquet-column-readers.cc
   parquet-column-stats.cc
+  parquet-complex-column-reader.cc
   parquet-level-decoder.cc
   parquet-metadata-utils.cc
   parquet-column-chunk-reader.cc
   parquet-page-reader.cc
   parquet-common.cc
   parquet-page-index.cc
+  parquet-struct-column-reader.cc
 )
 
 add_dependencies(Parquet gen-deps)

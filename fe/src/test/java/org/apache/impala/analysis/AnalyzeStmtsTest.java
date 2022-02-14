@@ -782,8 +782,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Check the support of struct in the select list for different file formats.
     AnalysisContext ctx = createAnalysisCtx();
     ctx.getQueryOptions().setDisable_codegen(true);
-    AnalysisError("select alltypes from functional_parquet.complextypes_structs", ctx,
-        "Querying STRUCT is only supported for ORC file format.");
+    AnalysisError("select int_struct_col from functional.allcomplextypes", ctx,
+        "Querying STRUCT is only supported for ORC and Parquet file formats.");
     AnalyzesOk("select alltypes from functional_orc_def.complextypes_structs", ctx);
 
     // Check if a struct in the select list raises an error if it contains collections.

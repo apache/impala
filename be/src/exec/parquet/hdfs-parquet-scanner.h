@@ -42,13 +42,15 @@ struct SchemaNode;
 class ParquetLevelDecoder;
 
 /// Per column reader.
-class ParquetColumnReader;
+class BaseScalarColumnReader;
 class CollectionColumnReader;
 class ColumnStatsReader;
-class BaseScalarColumnReader;
+class ComplexColumnReader;
+class ParquetColumnReader;
+class ParquetPageReader;
 template<typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
 class ScalarColumnReader;
-class ParquetPageReader;
+
 
 /// This scanner parses Parquet files located in HDFS, and writes the content as tuples in
 /// the Impala in-memory representation of data, e.g.  (tuples, rows, row batches).
@@ -474,7 +476,7 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   std::vector<BaseScalarColumnReader*> scalar_readers_;
 
   /// Flattened collection column readers that point to readers in column_readers_.
-  std::vector<CollectionColumnReader*> collection_readers_;
+  std::vector<ComplexColumnReader*> complex_readers_;
 
   /// Mapping from Parquet column indexes to scalar readers.
   std::unordered_map<int, BaseScalarColumnReader*> scalar_reader_map_;
@@ -741,6 +743,11 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
       const vector<ParquetColumnReader*>& column_readers, RowBatch* row_batch,
       bool* skip_row_group) WARN_UNUSED_RESULT;
 
+  /// Returns true if any of the 'column_readers' or their children is a Struct column
+  /// reader.
+  bool HasStructColumnReader(
+      const std::vector<ParquetColumnReader*>& column_readers) const;
+
   /// Commit num_rows to the given row batch.
   /// Returns OK if the query is not cancelled and hasn't exceeded any mem limits.
   /// Scanner can call this with 0 rows to flush any pending resources (attached pools
@@ -786,7 +793,7 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
       std::vector<ParquetColumnReader*>* column_readers) WARN_UNUSED_RESULT;
 
   /// Returns the total number of scalar column readers in 'column_readers', including
-  /// the children of collection readers.
+  /// the children of complex readers.
   int CountScalarColumns(const std::vector<ParquetColumnReader*>& column_readers);
 
   /// Creates a column reader that reads one value for each item in the table or
@@ -808,8 +815,8 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// does not start any scan ranges.
   Status InitScalarColumns() WARN_UNUSED_RESULT;
 
-  /// Initializes the column readers in collection_readers_.
-  void InitCollectionColumns();
+  /// Initializes the column readers in complex_readers_.
+  void InitComplexColumns();
 
   /// Initialize dictionaries for all column readers
   Status InitDictionaries(const std::vector<BaseScalarColumnReader*>& column_readers)
@@ -840,7 +847,7 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   bool IsDictFilterable(BaseScalarColumnReader* col_reader);
 
   /// Partitions the readers into scalar and collection readers. The collection readers
-  /// are flattened into collection_readers_. The scalar readers are partitioned into
+  /// are flattened into complex_readers_. The scalar readers are partitioned into
   /// dict_filterable_readers_ and non_dict_filterable_readers_ depending on whether
   /// dictionary filtering is enabled and the reader can be dictionary filtered. All
   /// scalar readers are also flattened into scalar_readers_.
@@ -848,7 +855,7 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
                         bool can_eval_dict_filters);
 
   /// Divides the column readers into dict_filterable_readers_,
-  /// non_dict_filterable_readers_ and collection_readers_. Allocates memory for
+  /// non_dict_filterable_readers_ and complex_readers_. Allocates memory for
   /// dict_filter_tuple_map_.
   Status InitDictFilterStructures() WARN_UNUSED_RESULT;
 

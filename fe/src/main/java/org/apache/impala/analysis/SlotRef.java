@@ -185,9 +185,9 @@ public class SlotRef extends Expr {
       }
       FeFsTable feTable = (FeFsTable)rootTable;
       for (HdfsFileFormat format : feTable.getFileFormats()) {
-        if (format != HdfsFileFormat.ORC) {
-          throw new AnalysisException("Querying STRUCT is only supported for ORC file " +
-              "format.");
+        if (format != HdfsFileFormat.ORC && format != HdfsFileFormat.PARQUET) {
+          throw new AnalysisException("Querying STRUCT is only supported for ORC and " +
+              "Parquet file formats.");
         }
       }
     }

@@ -1005,9 +1005,19 @@ public class HdfsScanNode extends ScanNode {
     // at-a-time. Expect a single slot conjunct to be associated with a single tuple-id.
     if (slotIds.size() != 1) return;
 
+    SlotDescriptor firstSlotDesc = analyzer.getSlotDesc(slotIds.get(0));
     // Check to see if this slot is a collection type. Dictionary pruning is applicable
     // to scalar values nested in collection types, not enclosing collection types.
-    if (analyzer.getSlotDesc(slotIds.get(0)).getType().isCollectionType()) return;
+    if (firstSlotDesc.getType().isCollectionType()) return;
+
+    // If any of the slot descriptors affected by 'conjunct' happens to be a scalar member
+    // of a struct, where the struct is also given in the select list then skip dictionary
+    // filtering as the slot/tuple IDs in the conjunct would mismatch with the ones in the
+    // select list and would result a Precondition check failure later.
+    for (SlotId slotId : slotIds) {
+      SlotDescriptor slotDesc = analyzer.getSlotDesc(slotId);
+      if (IsMemberOfStructInSelectList(slotDesc)) return;
+    }
 
     // Check to see if this conjunct contains any known randomized function
     if (conjunct.contains(Expr.IS_NONDETERMINISTIC_BUILTIN_FN_PREDICATE)) return;
@@ -1036,6 +1046,27 @@ public class HdfsScanNode extends ScanNode {
       dictionaryFilterConjuncts_.put(slotKey, slotList);
     }
     slotList.add(conjunctIdx);
+  }
+
+  /**
+   * Checks if 'slotDesc' is a member of a struct slot where the struct slot is given in
+   * the select list.
+   */
+  private boolean IsMemberOfStructInSelectList(SlotDescriptor slotDesc) {
+    SlotDescriptor parentStructSlot = slotDesc.getParent().getParentSlotDesc();
+    // Check if 'slotDesc' is a member of a struct slot descriptor.
+    if (slotDesc.getType().isScalarType() && parentStructSlot == null) return false;
+
+    if (slotDesc.getType().isStructType()) {
+      // Check if the struct is in the select list.
+      for (SlotDescriptor scannedSlots : desc_.getSlots()) {
+        if (scannedSlots.getId() == slotDesc.getId()) return true;
+      }
+    }
+
+    // Recursively check the parent struct if it's given in the select list.
+    if (parentStructSlot != null) return IsMemberOfStructInSelectList(parentStructSlot);
+    return false;
   }
 
   /**
@@ -1992,6 +2023,7 @@ public class HdfsScanNode extends ScanNode {
       List<Expr> conjuncts;
       TupleDescriptor tupleDescriptor = entry.getKey();
       String tupleName = "";
+
       if (tupleDescriptor == getTupleDesc()) {
         conjuncts = conjuncts_;
       } else {

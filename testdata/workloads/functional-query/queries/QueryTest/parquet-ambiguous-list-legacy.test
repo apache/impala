@@ -48,15 +48,16 @@ int,int,int,int
 ====
 ---- QUERY
 # Incorrect field resolutions with THREE_LEVEL and POSITION
-# because the data file uses the 2-level encoding.
+# because the data file uses the 2-level encoding. We get an error due to unsuccessfully
+# resolving the struct part. The full error message is the following:
+# File '<host_specific_url>/ambig_legacy/AmbiguousList_Legacy.parquet' has an incompatible
+# Parquet schema for column '<DB_name>.ambig_legacy.ambigarray.item.s2'. Column type:
+# struct, Parquet schema: optional int32 f21 [i:0 d:2 r:1]
 set parquet_fallback_schema_resolution=position;
 set parquet_array_resolution=three_level;
 select f11, f12, s2.f21, s2.f22 from ambig_legacy.ambigarray;
----- RESULTS
-22,NULL,NULL,NULL
-220,NULL,NULL,NULL
----- TYPES
-int,int,int,int
+---- CATCH
+has an incompatible Parquet schema for column
 ====
 ---- QUERY
 # All fields are interpreted as missing with THREE_LEVEL and NAME.

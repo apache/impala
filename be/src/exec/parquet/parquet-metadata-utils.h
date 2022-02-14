@@ -239,6 +239,10 @@ class ParquetSchemaResolver {
   Status ResolveMap(const SchemaPath& path, int idx, SchemaNode** node,
       bool* missing_field) const;
 
+  /// The ResolvePathHelper() logic for structs.
+  Status ResolveStruct(const SchemaNode& node, const ColumnType& col_type,
+      const SchemaPath& path, int idx) const;
+
   /// The ResolvePathHelper() logic for scalars (just does validation since there's no
   /// more actual work to be done).
   Status ValidateScalarNode(const SchemaNode& node, const ColumnType& col_type,
