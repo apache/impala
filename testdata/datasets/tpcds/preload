@@ -30,6 +30,11 @@ then
   TPC_DS_DATA=${TPC_DS_DATA}${SCALE_FACTOR}
 fi
 
+if [ -f ${TPC_DS_DATA}/SUCCESS ]; then
+  echo "Reuse existing TPC-DS data in ${TPC_DS_DATA}"
+  exit 0
+fi
+
 TPC_DS_DIRNAME=tpc-ds-${IMPALA_TPC_DS_VERSION}
 TPC_DS_HOME=${IMPALA_TOOLCHAIN_PACKAGES_HOME}/${TPC_DS_DIRNAME}
 
@@ -65,3 +70,5 @@ for FILE in *.dat; do
   mkdir -p ${FILE_DIR}
   mv ${FILE} ${FILE_DIR}
 done
+
+touch SUCCESS

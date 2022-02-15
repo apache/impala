@@ -30,6 +30,11 @@ then
   TPC_H_DATA=${TPC_H_DATA}${SCALE_FACTOR}
 fi
 
+if [ -f ${TPC_H_DATA}/SUCCESS ]; then
+  echo "Reuse existing TPC-H data in ${TPC_H_DATA}"
+  exit 0
+fi
+
 TPC_H_HOME=${IMPALA_TOOLCHAIN_PACKAGES_HOME}/tpc-h-${IMPALA_TPC_H_VERSION}
 TPC_H_DBGEN=${TPC_H_HOME}/bin/dbgen
 
@@ -63,3 +68,5 @@ for FILE in *.tbl; do
   mkdir -p ${FILE_DIR}
   mv ${FILE} ${FILE_DIR}
 done
+
+touch SUCCESS
