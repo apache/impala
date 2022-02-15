@@ -728,3 +728,63 @@ LEFT OUTER JOIN (
 ---- TYPES
 bigint
 ====
+---- QUERY
+# Test inferred predicate propagation
+SELECT count(*)
+FROM (
+  SELECT CASE
+      WHEN id IS NOT NULL
+      AND some_nulls IS NULL THEN true
+      ELSE NULL
+    END AS a
+  FROM (
+    SELECT STRAIGHT_JOIN t1.id, t2.some_nulls
+    FROM functional.nullrows t1
+      LEFT JOIN functional.nullrows t2 ON t1.id = t2.id
+  ) t
+) t
+WHERE a IS NOT NULL
+---- RESULTS
+20
+---- TYPES
+bigint
+====
+---- QUERY
+# Test inferred predicate propagation
+SELECT count(*)
+FROM (
+  SELECT CASE
+      WHEN id IS NOT NULL
+      AND some_nulls IS NULL THEN true
+      ELSE NULL
+    END AS a
+  FROM (
+    SELECT STRAIGHT_JOIN t1.id, t2.some_nulls
+    FROM functional.nullrows t2
+      RIGHT JOIN functional.nullrows t1 ON t1.id = t2.id
+  ) t
+) t
+WHERE a IS NOT NULL
+---- RESULTS
+20
+---- TYPES
+bigint
+====
+---- QUERY
+# Test inferred predicate propagation
+SELECT count(*)
+FROM (
+  SELECT id IS NOT NULL
+      AND some_nulls IS NOT NULL AS a
+  FROM (
+    SELECT STRAIGHT_JOIN t1.id, t2.some_nulls
+    FROM functional.nullrows t1
+      LEFT JOIN functional.nullrows t2 ON t1.id = t2.id
+ ) t
+) t
+WHERE a = 1
+---- RESULTS
+6
+---- TYPES
+bigint
+====

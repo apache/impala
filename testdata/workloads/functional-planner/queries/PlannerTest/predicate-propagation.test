@@ -1590,3 +1590,265 @@ PLAN-ROOT SINK
    predicates: c_custkey % 2 = 0
    row-size=8B cardinality=15.00K
 ====
+# IMPALA-11008: fix incorrect to propagate inferred predicates
+# The predicate 'case when t1.id is not null and t2.some_nulls is null
+# then true else null end is not null' is not null-filtering for t2, so
+# the inferred predicate is not pushable for t2.
+SELECT COUNT(*) FROM
+(
+  SELECT CASE WHEN id IS NOT NULL AND some_nulls IS NULL
+         THEN true ELSE NULL END AS a
+  FROM
+  (
+    SELECT STRAIGHT_JOIN t1.id
+           ,t2.some_nulls
+      FROM functional.nullrows t1
+      LEFT JOIN functional.nullrows t2
+      ON t1.id = t2.id
+   ) t
+) t
+WHERE a IS NOT NULL
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: CASE WHEN t1.id IS NOT NULL AND t2.some_nulls IS NULL THEN TRUE ELSE NULL END IS NOT NULL
+|  row-size=39B cardinality=26
+|
+|--01:SCAN HDFS [functional.nullrows t2]
+|     HDFS partitions=1/1 files=1 size=541B
+|     row-size=26B cardinality=26
+|
+00:SCAN HDFS [functional.nullrows t1]
+   HDFS partitions=1/1 files=1 size=541B
+   row-size=13B cardinality=26
+====
+# IMPALA-11008: fix incorrect to propagate inferred predicates
+# Same as above but with right join
+SELECT COUNT(*) FROM
+(
+  SELECT CASE WHEN id IS NOT NULL AND some_nulls IS NULL
+         THEN true ELSE NULL END AS a
+  FROM
+  (
+    SELECT STRAIGHT_JOIN t2.id
+           ,t1.some_nulls
+      FROM functional.nullrows t1
+      RIGHT JOIN functional.nullrows t2
+      ON t1.id = t2.id
+   ) t
+) t
+WHERE a IS NOT NULL
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: CASE WHEN t2.id IS NOT NULL AND t1.some_nulls IS NULL THEN TRUE ELSE NULL END IS NOT NULL
+|  runtime filters: RF000 <- t2.id
+|  row-size=39B cardinality=26
+|
+|--01:SCAN HDFS [functional.nullrows t2]
+|     HDFS partitions=1/1 files=1 size=541B
+|     row-size=13B cardinality=26
+|
+00:SCAN HDFS [functional.nullrows t1]
+   HDFS partitions=1/1 files=1 size=541B
+   runtime filters: RF000 -> t1.id
+   row-size=26B cardinality=26
+====
+# IMPALA-11008: fix incorrect to propagate inferred predicates
+# It's correct to propagate inferred predicates into an inner join
+SELECT COUNT(*) FROM
+(
+  SELECT CASE WHEN id IS NOT NULL AND some_nulls IS NULL
+         THEN true ELSE NULL END AS a
+  FROM
+  (
+    SELECT t1.id
+           ,t2.some_nulls
+      FROM functional.nullrows t1
+      JOIN functional.nullrows t2
+      ON t1.id = t2.id
+   ) t
+) t
+WHERE a IS NOT NULL
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: CASE WHEN t1.id IS NOT NULL AND t2.some_nulls IS NULL THEN TRUE ELSE NULL END IS NOT NULL
+|  runtime filters: RF000 <- t2.id
+|  row-size=39B cardinality=3
+|
+|--01:SCAN HDFS [functional.nullrows t2]
+|     HDFS partitions=1/1 files=1 size=541B
+|     predicates: CASE WHEN t2.id IS NOT NULL AND t2.some_nulls IS NULL THEN TRUE ELSE NULL END IS NOT NULL
+|     row-size=26B cardinality=3
+|
+00:SCAN HDFS [functional.nullrows t1]
+   HDFS partitions=1/1 files=1 size=541B
+   runtime filters: RF000 -> t1.id
+   row-size=13B cardinality=26
+====
+# IMPALA-11008: fix incorrect to propagate inferred predicates
+# The predicate 'case when t2.id is not null and t2.some_nulls is null
+# then true else null end is not null' is null-filtering for t2.
+SELECT COUNT(*) FROM
+(
+  SELECT CASE WHEN id IS NOT NULL AND some_nulls IS NULL
+         THEN true ELSE NULL END AS a
+  FROM
+  (
+    SELECT t2.id
+           ,t2.some_nulls
+      FROM functional.nullrows t1
+      LEFT JOIN functional.nullrows t2
+      ON t1.id = t2.id
+   ) t
+) t
+WHERE a IS NOT NULL
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: CASE WHEN t2.id IS NOT NULL AND t2.some_nulls IS NULL THEN TRUE ELSE NULL END IS NOT NULL
+|  row-size=39B cardinality=26
+|
+|--01:SCAN HDFS [functional.nullrows t2]
+|     HDFS partitions=1/1 files=1 size=541B
+|     predicates: CASE WHEN t2.id IS NOT NULL AND t2.some_nulls IS NULL THEN TRUE ELSE NULL END IS NOT NULL
+|     row-size=26B cardinality=3
+|
+00:SCAN HDFS [functional.nullrows t1]
+   HDFS partitions=1/1 files=1 size=541B
+   row-size=13B cardinality=26
+====
+# IMPALA-11008: fix incorrect to propagate inferred predicates
+# The predicate 't1.test_id + t2.zip = 2' is null-filtering for t2.
+SELECT *
+FROM (SELECT test_id + zip a FROM
+    (SELECT STRAIGHT_JOIN t1.test_id, t2.zip FROM functional.jointbl t1
+    LEFT JOIN functional.testtbl t2 ON t1.test_id = t2.id
+   ) t
+) t
+WHERE a = 2
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.test_id = t2.id
+|  other predicates: t1.test_id + t2.zip = 2
+|  row-size=20B cardinality=19
+|
+|--01:SCAN HDFS [functional.testtbl t2]
+|     HDFS partitions=1/1 files=0 size=0B
+|     predicates: t2.id + t2.zip = 2
+|     row-size=12B cardinality=0
+|
+00:SCAN HDFS [functional.jointbl t1]
+   HDFS partitions=1/1 files=1 size=433B
+   row-size=8B cardinality=19
+====
+# IMPALA-11008: fix incorrect to propagate inferred predicates
+# The predicate '(t1.id is not null and t2.some_nulls is null) = 1' is
+# not null-filtering for t2.
+SELECT *
+FROM (SELECT id IS NOT NULL AND some_nulls IS NULL AS a
+    FROM (SELECT STRAIGHT_JOIN t1.id, t2.some_nulls
+      FROM functional.nullrows t1
+      LEFT JOIN functional.nullrows t2 ON t1.id = t2.id
+   ) t
+) t
+WHERE a = 1
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: t1.id IS NOT NULL AND t2.some_nulls IS NULL = 1
+|  row-size=39B cardinality=26
+|
+|--01:SCAN HDFS [functional.nullrows t2]
+|     HDFS partitions=1/1 files=1 size=541B
+|     row-size=26B cardinality=26
+|
+00:SCAN HDFS [functional.nullrows t1]
+   HDFS partitions=1/1 files=1 size=541B
+   row-size=13B cardinality=26
+====
+# IMPALA-11008: fix incorrect to propagate inferred predicates
+# Same as above but with right join
+SELECT *
+FROM (SELECT id IS NOT NULL AND some_nulls IS NULL AS a
+    FROM (SELECT STRAIGHT_JOIN t2.id, t1.some_nulls
+      FROM functional.nullrows t1
+      RIGHT JOIN functional.nullrows t2 ON t1.id = t2.id
+   ) t
+) t
+WHERE a = 1
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: t2.id IS NOT NULL AND t1.some_nulls IS NULL = 1
+|  runtime filters: RF000 <- t2.id
+|  row-size=39B cardinality=26
+|
+|--01:SCAN HDFS [functional.nullrows t2]
+|     HDFS partitions=1/1 files=1 size=541B
+|     row-size=13B cardinality=26
+|
+00:SCAN HDFS [functional.nullrows t1]
+   HDFS partitions=1/1 files=1 size=541B
+   runtime filters: RF000 -> t1.id
+   row-size=26B cardinality=26
+====
+# IMPALA-11008: fix incorrect to propagate inferred predicates
+# The predicate '(t1.id is not null and t2.some_nulls is not null) = 1'
+# is null-filtering for t2.
+SELECT *
+FROM (SELECT id IS NOT NULL AND some_nulls IS NOT NULL AS a
+   FROM (SELECT STRAIGHT_JOIN t1.id, t2.some_nulls
+      FROM functional.nullrows t1
+        LEFT JOIN functional.nullrows t2 ON t1.id = t2.id
+   ) t
+) t
+WHERE a = 1
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: t1.id IS NOT NULL AND t2.some_nulls IS NOT NULL = 1
+|  row-size=39B cardinality=26
+|
+|--01:SCAN HDFS [functional.nullrows t2]
+|     HDFS partitions=1/1 files=1 size=541B
+|     predicates: t2.id IS NOT NULL AND t2.some_nulls IS NOT NULL = 1
+|     row-size=26B cardinality=9
+|
+00:SCAN HDFS [functional.nullrows t1]
+   HDFS partitions=1/1 files=1 size=541B
+   row-size=13B cardinality=26
+====

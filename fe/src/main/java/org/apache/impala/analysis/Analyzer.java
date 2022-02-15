@@ -517,6 +517,11 @@ public class Analyzer {
     // ref.
     public Set<TupleId> zippingUnnestTupleIds = new HashSet<>();
 
+    // This holds the nullable side slot ids from the outer join's equi-join conjuncts
+    // e.g. t1 left join t2 on t1.id = t2.id, the slot id of t2.id will be added to
+    // this set.
+    public Set<SlotId> ojNullableSlotsInEquiPreds = new HashSet<>();
+
     public GlobalState(StmtTableCache stmtTableCache, TQueryCtx queryCtx,
         AuthorizationFactory authzFactory, AuthorizationContext authzCtx) {
       this.stmtTableCache = stmtTableCache;
@@ -2131,14 +2136,38 @@ public class Analyzer {
         if (srcSids.containsAll(destSids)) {
           p = srcConjunct;
         } else {
+          // It is incorrect to propagate predicates inferred from equi-join conjuncts
+          // into a plan subtree that is on the nullable side of an outer join if the
+          // predicate is not null-filtering.
+          // For example:
+          // select * from (select id is not null and col is null as a from (select A.id,
+          // B.col from A left join B on A.id = B.id) t ) t where a = 1
+          // In this query the inferred predicate (B.id is not null and B.col is null = 1)
+          // should not be evaluated at the scanner of B.
+          // We use 'ojmap' to save the mapping from src to the outer join equal slot,
+          // eg. B.id. We substitue the non-outer-join slots first and use
+          // 'isNullableConjunct' to do a more strict check on the conjunct before the
+          // final substitution.
           ExprSubstitutionMap smap = new ExprSubstitutionMap();
+          ExprSubstitutionMap ojSmap = new ExprSubstitutionMap();
           for (int i = 0; i < srcSids.size(); ++i) {
-            smap.put(
+            if (globalState_.ojNullableSlotsInEquiPreds.contains(destSids.get(i))) {
+              ojSmap.put(
                 new SlotRef(globalState_.descTbl.getSlotDesc(srcSids.get(i))),
                 new SlotRef(globalState_.descTbl.getSlotDesc(destSids.get(i))));
+            } else {
+              smap.put(
+                  new SlotRef(globalState_.descTbl.getSlotDesc(srcSids.get(i))),
+                  new SlotRef(globalState_.descTbl.getSlotDesc(destSids.get(i))));
+            }
           }
           try {
             p = srcConjunct.trySubstitute(smap, this, false);
+            if (hasOuterJoinedTuple &&
+                isNullableConjunct(p, Arrays.asList(destTid))) continue;
+            if (ojSmap.size() != 0) {
+              p = p.trySubstitute(ojSmap, this, false);
+            }
           } catch (ImpalaException exc) {
             // not an executable predicate; ignore
             continue;
@@ -2714,6 +2743,10 @@ public class Analyzer {
       } else if (tblRef.getJoinOp() == JoinOperator.RIGHT_OUTER_JOIN
           || tblRef.getJoinOp() == JoinOperator.RIGHT_ANTI_JOIN) {
         g.addEdge(innerSlot.asInt(), outerSlot.asInt());
+      }
+      if (tblRef.getJoinOp() == JoinOperator.LEFT_OUTER_JOIN ||
+          tblRef.getJoinOp() == JoinOperator.RIGHT_OUTER_JOIN) {
+        globalState_.ojNullableSlotsInEquiPreds.add(innerSlot);
       }
     }
   }
