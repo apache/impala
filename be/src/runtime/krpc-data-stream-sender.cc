@@ -391,7 +391,8 @@ template <typename ResponsePBType>
 void KrpcDataStreamSender::Channel::LogSlowRpc(
     const char* rpc_name, int64_t total_time_ns, const ResponsePBType& resp) {
   int64_t network_time_ns = total_time_ns - resp.receiver_latency_ns();
-  LOG(INFO) << "Slow " << rpc_name << " RPC to " << address_
+  LOG(INFO) << "Slow " << rpc_name << " RPC (request call id "
+            << rpc_controller_.call_id() << ") to " << address_
             << " (fragment_instance_id=" << PrintId(fragment_instance_id_) << "): "
             << "took " << PrettyPrinter::Print(total_time_ns, TUnit::TIME_NS) << ". "
             << "Receiver time: "
