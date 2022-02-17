@@ -176,11 +176,8 @@ class TestInsertParquetInvalidCodec(ImpalaTestSuite):
         lambda v: v.get_value('table_format').compression_codec == 'none')
 
   @SkipIfLocal.multiple_impalad
-  def test_insert_parquet_invalid_codec(self, vector):
-    vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
-        vector.get_value('compression_codec')
-    self.run_test_case('QueryTest/insert_parquet_invalid_codec', vector,
-                       multiple_impalad=True)
+  def test_insert_parquet_invalid_codec(self, vector, unique_database):
+    self.run_test_case('QueryTest/insert_parquet_invalid_codec', vector, unique_database)
 
 
 class TestInsertParquetVerifySize(ImpalaTestSuite):

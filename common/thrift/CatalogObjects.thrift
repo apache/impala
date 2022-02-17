@@ -150,16 +150,6 @@ struct TCompressionCodec {
   2: optional i32 compression_level
 }
 
-// Mapping from names defined by Avro to values in the THdfsCompression enum.
-const map<string, THdfsCompression> COMPRESSION_MAP = {
-  "": THdfsCompression.NONE,
-  "none": THdfsCompression.NONE,
-  "deflate": THdfsCompression.DEFAULT,
-  "gzip": THdfsCompression.GZIP,
-  "bzip2": THdfsCompression.BZIP2,
-  "snappy": THdfsCompression.SNAPPY
-}
-
 // Represents a single item in a partition spec (column name + value)
 struct TPartitionKeyValue {
   // Partition column name

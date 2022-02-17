@@ -20,6 +20,7 @@
 #include <ostream>
 #include <utility>
 
+#include <boost/algorithm/string.hpp>
 #include <zstd.h>
 
 #include "common/compiler-util.h"
@@ -59,11 +60,8 @@ const Codec::CodecMap Codec::CODEC_MAP = {{"", THdfsCompression::NONE},
     {ZSTD_COMPRESSION, THdfsCompression::ZSTD}};
 
 string Codec::GetCodecName(THdfsCompression::type type) {
-  for (const CodecMap::value_type& codec: g_CatalogObjects_constants.COMPRESSION_MAP) {
-    if (codec.second == type) return codec.first;
-  }
-  DCHECK(false) << "Missing codec in COMPRESSION_MAP: " << type;
-  return "INVALID";
+  return boost::algorithm::to_lower_copy(
+      string(_THdfsCompression_VALUES_TO_NAMES.find(type)->second));
 }
 
 Status Codec::GetHadoopCodecClassName(THdfsCompression::type type, string* out_name) {

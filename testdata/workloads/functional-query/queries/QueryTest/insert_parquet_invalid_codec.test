@@ -1,14 +1,23 @@
 ====
 ---- QUERY
 # Insert parquet table with unsupported codec
-create table if not exists parquet_invalid_codec (x BIGINT) stored as parquet
-location '$FILESYSTEM_PREFIX/test-warehouse/parquet_invalid_codec';
+create table parquet_invalid_codec (x BIGINT) stored as parquet;
 ====
 ---- QUERY
+set compression_codec=bzip2;
 insert overwrite table parquet_invalid_codec select 1;
 ---- CATCH
 Invalid parquet compression codec bzip2
 ====
 ---- QUERY
-drop table parquet_invalid_codec
+set compression_codec=deflate;
+insert overwrite table parquet_invalid_codec select 1;
+---- CATCH
+Invalid parquet compression codec deflate
+====
+---- QUERY
+set compression_codec=brotli;
+insert overwrite table parquet_invalid_codec select 1;
+---- CATCH
+Invalid parquet compression codec brotli
 ====
