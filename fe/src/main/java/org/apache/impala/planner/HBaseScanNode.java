@@ -319,11 +319,12 @@ public class HBaseScanNode extends ScanNode {
         // May return -1 for the estimate if insufficient data is available.
         estimate = tbl.getEstimatedRowStats(startKey_, stopKey_);
       }
+      long rowsFromHms = tbl.getTTableStats().getNum_rows();
       if (estimate.first == -1) {
         // No useful estimate. Rely on HMS row count stats.
         // This works only if HBase stats are available in HMS. This is true
         // for the Impala tests, and may be true for some applications.
-        cardinality_ = tbl.getTTableStats().getNum_rows();
+        cardinality_ = rowsFromHms;
         if (LOG.isTraceEnabled()) {
           LOG.trace("Fallback to use table stats in HMS: num_rows=" + cardinality_);
         }
@@ -336,9 +337,10 @@ public class HBaseScanNode extends ScanNode {
         }
       } else {
         // Use the HBase sampling scan to estimate cardinality. Note that,
-        // in tests, this estimate has proven to be very rough: off by
-        // 2x or more.
-        cardinality_ = estimate.first;
+        // in tests, this estimate has proven to be very rough: off by 2x or more.
+        // Cap the cardinality estimation by the row count from HMS when available.
+        cardinality_ = (rowsFromHms >= 0) ? Long.min(estimate.first, rowsFromHms) :
+                                              estimate.first;
         if (estimate.second > 0) {
           suggestedCaching_ = (int)
               Math.max(MAX_HBASE_FETCH_BATCH_SIZE / estimate.second, 1);
