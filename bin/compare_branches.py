@@ -267,7 +267,8 @@ def main():
       logging.debug("NOT ignoring commit {0} since not in ignored commits ({1},{2})"
                    .format(commit_hash, options.source_branch, options.target_branch))
     if not change_in_target and not ignore_by_config and not ignore_by_commit_message:
-      print u'{0} {1} ({2}) - {3}'.format(commit_hash, msg, date, author)
+      print u'{0} {1} ({2}) - {3}'\
+          .format(commit_hash, msg.decode('utf8'), date, author.decode('utf8'))
       cherry_pick_hashes.append(commit_hash)
       jira_keys += jira_key_pat.findall(msg)
 
