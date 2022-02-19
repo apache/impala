@@ -475,6 +475,8 @@ error_codes = (
   ("JWKS_PARSE_ERROR", 153, "Error parsing JWKS: $0."),
 
   ("JWT_VERIFY_FAILED", 154, "Error verifying JWT Token: $0."),
+
+  ("PARQUET_ROWS_SKIPPING", 155, "Couldn't skip rows in column '$0' in file '$1'."),
 )
 
 import sys

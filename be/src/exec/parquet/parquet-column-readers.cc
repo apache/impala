@@ -1270,7 +1270,8 @@ Status BaseScalarColumnReader::StartPageFiltering() {
     int64_t skip_rows = range_start - current_row_ - 1;
     int64_t remaining = 0;
     if (!SkipTopLevelRows(skip_rows, &remaining)) {
-      return Status(Substitute("Couldn't skip rows in file $0.", filename()));
+      return Status(ErrorMsg(TErrorCode::PARQUET_ROWS_SKIPPING,
+          schema_element().name, filename()));
     }
     DCHECK_EQ(remaining, 0);
     DCHECK_EQ(current_row_, range_start - 1);
@@ -1308,12 +1309,18 @@ bool BaseScalarColumnReader::SkipTopLevelRows(int64_t num_rows, int64_t* remaini
       int repeated_run_length = def_levels_.NextRepeatedRunLength();
       if (repeated_run_length > 0) {
         int read_count = min<int64_t>(num_rows - i, repeated_run_length);
+        // IMPALA-11134: there can be a mismatch between page_header.num_values and
+        // encoded def levels in old Parquet files.
+        read_count = min(num_buffered_values_, read_count);
         int16_t def_level = def_levels_.GetRepeatedValue(read_count);
         if (def_level >= max_def_level_) num_values_to_skip += read_count;
         i += read_count;
         num_buffered_values_ -= read_count;
       } else if (def_levels_.CacheHasNext()) {
         int read_count = min<int64_t>(num_rows - i, def_levels_.CacheRemaining());
+        // IMPALA-11134: there can be a mismatch between page_header.num_values and
+        // encoded def levels in old Parquet files.
+        read_count = min(num_buffered_values_, read_count);
         for (int j = 0; j < read_count; ++j) {
           if (def_levels_.CacheGetNext() >= max_def_level_) ++num_values_to_skip;
         }

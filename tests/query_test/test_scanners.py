@@ -589,6 +589,15 @@ class TestParquet(ImpalaTestSuite):
     self.run_test_case('QueryTest/parquet-num-values-def-levels-mismatch',
         vector, unique_database)
 
+    """IMPALA-11134: Impala returns "Couldn't skip rows in file" error for old
+    (possibly corrupt) Parquet file where there are more def levels than num_values"""
+    create_table_from_parquet(self.client, unique_database,
+        "too_many_def_levels")
+    result = self.client.execute("select i_item_id from {0}."
+        "too_many_def_levels where i_item_sk = 350963".format(unique_database))
+    assert len(result.data) == 1
+    assert "AAAAAAAACPKFFAAA" in result.data
+
   @SkipIfS3.hdfs_block_size
   @SkipIfGCS.hdfs_block_size
   @SkipIfCOS.hdfs_block_size

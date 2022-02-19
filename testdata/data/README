@@ -675,3 +675,6 @@ field ids.
 iceberg_test/hadoop_catalog/ice/airports_orc:
 Regular ORC table converted to Iceberg, which means that the data file doesn't contain
 field ids.
+
+too_many_def_levels.parquet:
+Written by Impala 2.5. The Parquet pages have more encoded def levels than num_values.

@@ -2392,12 +2392,14 @@ Status HdfsParquetScanner::FillScratchMicroBatches(
       if (r == 0) {
         if (micro_batches[0].start > 0) {
           if (UNLIKELY(!col_reader->SkipRows(micro_batches[0].start, -1))) {
-            return Status(Substitute("Couldn't skip rows in file $0.", filename()));
+            return Status(ErrorMsg(TErrorCode::PARQUET_ROWS_SKIPPING,
+                col_reader->schema_element().name, filename()));
           }
         }
       } else {
         if (UNLIKELY(!col_reader->SkipRows(micro_batches[r].start - last - 1, -1))) {
-          return Status(Substitute("Couldn't skip rows in file $0.", filename()));
+          return Status(ErrorMsg(TErrorCode::PARQUET_ROWS_SKIPPING,
+              col_reader->schema_element().name, filename()));
         }
       }
       uint8_t* next_tuple_mem = scratch_batch_->tuple_mem
@@ -2430,7 +2432,8 @@ Status HdfsParquetScanner::FillScratchMicroBatches(
     }
     if (UNLIKELY(last < max_num_tuples - 1)) {
       if (UNLIKELY(!col_reader->SkipRows(max_num_tuples - 1 - last, -1))) {
-        return Status(Substitute("Couldn't skip rows in file $0.", filename()));
+        return Status(ErrorMsg(TErrorCode::PARQUET_ROWS_SKIPPING,
+            col_reader->schema_element().name, filename()));
       }
     }
   }
