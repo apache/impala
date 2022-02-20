@@ -109,7 +109,7 @@ if kerberize:
   #   hive.metastore.kerberos.keytab.file
   #   hive.metastore.kerberos.principal
 
-# Enable Tez and ACID for Hive 3
+# Enable Tez, ACID and proleptic Gregorian calendar DATE types for Hive 3
 if hive_major_version >= 3:
   CONFIG.update({
    'hive.tez.container.size': '512',
@@ -155,7 +155,17 @@ if hive_major_version >= 3:
 
    # Due to HIVE-23102 Hive will wait for at least this amount of time for compactions
    # (the default value is 5 mins which is way too long). Setting it to 2 seconds.
-   'hive.compactor.wait.timeout': '2000'
+   'hive.compactor.wait.timeout': '2000',
+
+   # Since HIVE-22589, Hive uses Julian Calendar for writing dates before 1582-10-15,
+   # whereas Impala uses proleptic Gregorian Calendar. This affects the results Impala
+   # gets when querying tables written by Hive.
+   'hive.avro.proleptic.gregorian': 'true',
+   'hive.avro.proleptic.gregorian.default': 'true',
+   'hive.parquet.date.proleptic.gregorian': 'true',
+   'hive.parquet.date.proleptic.gregorian.default': 'true',
+   'orc.proleptic.gregorian': 'true',
+   'orc.proleptic.gregorian.default': 'true'
   })
 else:
   CONFIG.update({

@@ -518,7 +518,7 @@ aggregation(SUM, RowsRead): 310
 ====
 ---- QUERY
 select count(*) from functional_orc_def.date_tbl
-where date_part in ("2017-11-27", "1399-06-27") and date_col < '0001-06-19';
+where date_part in ("2017-11-27", "1399-06-27") and date_col < '0001-06-21';
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -526,7 +526,7 @@ aggregation(SUM, RowsRead): 0
 ====
 ---- QUERY
 select count(*) from functional_orc_def.date_tbl
-where date_part in ("2017-11-27", "1399-06-27") and date_col <= '0001-06-19';
+where date_part in ("2017-11-27", "1399-06-27") and date_col <= '0001-06-21';
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -725,7 +725,7 @@ aggregation(SUM, RowsRead): 0
 ====
 ---- QUERY
 select count(*) from functional_orc_def.date_tbl
-where date_part in ("2017-11-27", "1399-06-27") and date_col in ('0001-06-19', '2018-12-31');
+where date_part in ("2017-11-27", "1399-06-27") and date_col in ('0001-06-21', '2018-12-31');
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE

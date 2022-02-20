@@ -33,30 +33,32 @@ Avro file '__HDFS_FILENAME__' is corrupt: out of range date value -719164 at off
 ---- HIVE_MAJOR_VERSION
 3
 ---- QUERY
-# Avro table was created by Hive3. Since HIVE-22589 Hive3 also uses Julian calendar for
-# dates before 1582-10-15 by default, therefore we expect the same results as above.
 select id_col, date_part, date_col from date_tbl;
 ---- RESULTS
+0,0001-01-01,0001-01-01
+1,0001-01-01,0001-12-31
+2,0001-01-01,0002-01-01
+3,0001-01-01,1399-12-31
+4,0001-01-01,2017-11-28
+5,0001-01-01,9999-12-31
+6,0001-01-01,NULL
 10,1399-06-27,2017-11-28
 11,1399-06-27,NULL
 12,1399-06-27,2018-12-31
-20,2017-11-27,0001-06-19
-21,2017-11-27,0001-06-20
-22,2017-11-27,0001-06-21
-23,2017-11-27,0001-06-22
-24,2017-11-27,0001-06-23
-25,2017-11-27,0001-06-24
-26,2017-11-27,0001-06-25
-27,2017-11-27,0001-06-26
-28,2017-11-27,0001-06-27
+20,2017-11-27,0001-06-21
+21,2017-11-27,0001-06-22
+22,2017-11-27,0001-06-23
+23,2017-11-27,0001-06-24
+24,2017-11-27,0001-06-25
+25,2017-11-27,0001-06-26
+26,2017-11-27,0001-06-27
+27,2017-11-27,0001-06-28
+28,2017-11-27,0001-06-29
 29,2017-11-27,2017-11-28
 30,9999-12-31,9999-12-01
 31,9999-12-31,9999-12-31
 ---- TYPES
 INT,DATE,DATE
----- ERRORS
-row_regex: .*Problem parsing file __HDFS_FILENAME__ at \d+
-row_regex: .*Avro file '__HDFS_FILENAME__' is corrupt: out of range date value \-?\d+ at offset \d+\. The valid date range is \-719162\.\.2932896 \(0001\-01\-01\.\.9999\-12\-31\)\.
 ====
 ---- HIVE_MAJOR_VERSION
 2
@@ -78,18 +80,14 @@ Avro file '__HDFS_FILENAME__' is corrupt: out of range date value -719164 at off
 ---- HIVE_MAJOR_VERSION
 3
 ---- QUERY
-# Avro table was created by Hive3. Since HIVE-22589 Hive3 also uses Julian calendar for
-# dates before 1582-10-15 by default, therefore we expect the same results as above.
 select date_part, count(date_col) from date_tbl group by date_part;
 ---- RESULTS
 2017-11-27,10
 1399-06-27,2
 9999-12-31,2
+0001-01-01,6
 ---- TYPES
 DATE, BIGINT
----- ERRORS
-row_regex: .*Problem parsing file __HDFS_FILENAME__ at \d+
-row_regex: .*Avro file '__HDFS_FILENAME__' is corrupt: out of range date value \-?\d+ at offset \d+\. The valid date range is \-719162\.\.2932896 \(0001\-01\-01\.\.9999\-12\-31\)\.
 ====
 ---- HIVE_MAJOR_VERSION
 2
@@ -109,16 +107,11 @@ Avro file '__HDFS_FILENAME__' is corrupt: out of range date value -719164 at off
 ---- HIVE_MAJOR_VERSION
 3
 ---- QUERY
-# Avro table was created by Hive3. Since HIVE-22589 Hive3 also uses Julian calendar for
-# dates before 1582-10-15 by default, therefore we expect the same results as above.
 select min(date_part), max(date_part), min(date_col), max(date_col) from date_tbl;
 ---- RESULTS
-1399-06-27,9999-12-31,0001-06-19,9999-12-31
+0001-01-01,9999-12-31,0001-01-01,9999-12-31
 ---- TYPES
 DATE, DATE, DATE, DATE
----- ERRORS
-row_regex: .*Problem parsing file __HDFS_FILENAME__ at \d+
-row_regex: .*Avro file '__HDFS_FILENAME__' is corrupt: out of range date value \-?\d+ at offset \d+\. The valid date range is \-719162\.\.2932896 \(0001\-01\-01\.\.9999\-12\-31\)\.
 ====
 ---- HIVE_MAJOR_VERSION
 2
@@ -140,18 +133,14 @@ Avro file '__HDFS_FILENAME__' is corrupt: out of range date value -719164 at off
 ---- HIVE_MAJOR_VERSION
 3
 ---- QUERY
-# Avro table was created by Hive3. Since HIVE-22589 Hive3 also uses Julian calendar for
-# dates before 1582-10-15 by default, therefore we expect the same results as above.
 select date_part, min(date_col), max(date_col) from date_tbl group by date_part;
 ---- RESULTS
-2017-11-27,0001-06-19,2017-11-28
+2017-11-27,0001-06-21,2017-11-28
 1399-06-27,2017-11-28,2018-12-31
 9999-12-31,9999-12-01,9999-12-31
+0001-01-01,0001-01-01,9999-12-31
 ---- TYPES
 DATE, DATE, DATE
----- ERRORS
-row_regex: .*Problem parsing file __HDFS_FILENAME__ at \d+
-row_regex: .*Avro file '__HDFS_FILENAME__' is corrupt: out of range date value \-?\d+ at offset \d+\. The valid date range is \-719162\.\.2932896 \(0001\-01\-01\.\.9999\-12\-31\)\.
 ====
 ---- QUERY
 select date_part, count(*) from date_tbl group by date_part;
