@@ -313,7 +313,9 @@ Repartitioning did not reduce the size of a spilled partition
 # This test is crafted to always return 0 rows, but with the previous bug
 # would sometimes return rows while spilling. The query needs to have a join
 # key that is more than 256 bytes wide to trigger the bug.
-set buffer_pool_limit=110m;
+# Need to lower buffer_pool_limit just slightly above the Max Per-Host Resource
+# Reservation (104.61MB) for the join to spill consistently.
+set buffer_pool_limit=105m;
 set runtime_filter_mode=0;
 SELECT straight_join o_orderkey
 FROM (
