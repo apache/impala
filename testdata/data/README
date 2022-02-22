@@ -678,3 +678,8 @@ field ids.
 
 too_many_def_levels.parquet:
 Written by Impala 2.5. The Parquet pages have more encoded def levels than num_values.
+
+partition_col_in_parquet.parquet:
+Written by Impala 4.0. Parquet file with INT and DATE column. Values in the DATE columns
+are identical. There's only a single value per page in the Parquet file (written by
+setting query option 'parquet_page_row_count_limit' to 1).

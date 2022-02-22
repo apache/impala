@@ -1464,6 +1464,15 @@ Status HdfsParquetScanner::FindSkipRangesForPagesWithMinMaxFilters(
     }
 
     int col_idx = node->col_idx;
+
+    if (UNLIKELY(scalar_reader_map_.find(col_idx) == scalar_reader_map_.end())) {
+      // IMPALA-11147: It's possible that 'node' is also a partitioning column. In that
+      // case we don't have a scalar reader for it.
+      DCHECK(scan_node_->hdfs_table()->IsIcebergTable() ||
+             slot_desc->col_pos() < scan_node_->num_partition_keys());
+      continue;
+    }
+
     ColumnStatsReader stats_reader =
         CreateStatsReader(file_metadata_, row_group, node, slot_desc->type());
 

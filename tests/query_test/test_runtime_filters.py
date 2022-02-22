@@ -17,6 +17,7 @@
 #
 
 from copy import deepcopy
+import os
 import pytest
 import re
 import time
@@ -319,6 +320,26 @@ class TestOverlapMinMaxFilters(ImpalaTestSuite):
     self.run_test_case('QueryTest/overlap_min_max_filters_on_partition_columns', vector,
                        unique_database,
         test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
+
+  @SkipIfLocal.hdfs_client
+  def test_partition_column_in_parquet_data_file(self, vector, unique_database):
+    """IMPALA-11147: Test that runtime min/max filters still work on data files that
+    contain the partitioning columns."""
+    tbl_name = "part_col_in_data_file"
+    self.execute_query("CREATE TABLE {0}.{1} (i INT) PARTITIONED BY (d DATE) "
+                       "STORED AS PARQUET".format(unique_database, tbl_name))
+    tbl_loc = self._get_table_location("{0}.{1}".format(unique_database, tbl_name),
+        vector)
+    self.filesystem_client.make_dir(tbl_loc[tbl_loc.find('test-warehouse'):] +
+        '/d=2022-02-22/')
+    self.filesystem_client.copy_from_local(os.environ['IMPALA_HOME'] +
+        '/testdata/data/partition_col_in_parquet.parquet', tbl_loc + '/d=2022-02-22/')
+    self.execute_query("ALTER TABLE {0}.{1} RECOVER PARTITIONS".format(
+        unique_database, tbl_name))
+    self.execute_query("SET PARQUET_FALLBACK_SCHEMA_RESOLUTION=NAME")
+    self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=MIN_MAX")
+    self.execute_query("select * from {0}.{1} t1, {0}.{1} t2 where t1.d=t2.d and t2.i=2".
+        format(unique_database, tbl_name))
 
 # Apply both Bloom filter and Minmax filters
 class TestAllRuntimeFilters(ImpalaTestSuite):
