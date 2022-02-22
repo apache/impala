@@ -366,11 +366,11 @@ public class CardinalityTest extends PlannerTestBase {
     // The estimated number of rows caps the output cardinality.
     verifyApproxCardinality(
         "select distinct id, int_col from functional_parquet.alltypes",
-        12760, true, ImmutableSet.of(),
+        12400, true, ImmutableSet.of(),
         pathToFirstAggregationNode, AggregationNode.class);
     verifyApproxCardinality(
         "select distinct id, int_col from functional_parquet.alltypes",
-        12760, true, ImmutableSet.of(),
+        12400, true, ImmutableSet.of(),
         pathToSecondAggregationNode, AggregationNode.class);
     // No column stats available and row estimation disabled - no estimate is possible.
     verifyCardinality(
