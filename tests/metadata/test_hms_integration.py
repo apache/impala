@@ -672,6 +672,25 @@ class TestHmsIntegration(ImpalaTestSuite):
         assert expected == self.hive_columns(table_name)
         assert expected == self.impala_columns(table_name)
 
+  def test_desc_json_table(self, vector):
+    """
+    This is to test whether json tables created in impala be
+     described in hive nad vice versa.
+    """
+
+    with self.ImpalaDbWrapper(self, self.unique_string()) as db_name:
+      with self.ImpalaTableWrapper(self, db_name + '.' + self.unique_string(),
+                                   '(x int) stored as jsonfile') as table_name:
+        expected = self.client.execute('DESC %s' % table_name)
+        assert expected == self.run_stmt_in_hive('DESC %s' % table_name)
+
+    with self.HiveDbWrapper(self, self.unique_string()) as db_name:
+      with self.HiveTableWrapper(self, db_name + '.' + self.unique_string(),
+                                 '(x int) stored as jsonfile') as table_name:
+        expected = self.run_stmt_in_hive('DESC %s' % table_name)
+        self.client.execute('INVALIDATE METADATA %s' % table_name)
+        assert expected == self.client.execute('DESC %s' % table_name)
+
   @pytest.mark.execute_serially
   def test_drop_database(self, vector):
     """

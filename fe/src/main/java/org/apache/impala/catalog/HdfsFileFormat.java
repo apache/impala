@@ -51,7 +51,7 @@ public enum HdfsFileFormat {
       false, false, true),
   JSON("org.apache.hadoop.mapred.TextInputFormat",
       "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
-      "org.apache.hadoop.hive.serde2.lazy.JsonSerDe", false, false, true),
+      "org.apache.hadoop.hive.serde2.JsonSerDe", false, false, true),
   // LZO_TEXT is never used as an actual HdfsFileFormat. It is used only to store the
   // input format class and match against it (e.g. in HdfsCompression). Outside of this
   // file, tables that use the LZO input format class use HdfsFileFormat.TEXT.
@@ -122,7 +122,7 @@ public enum HdfsFileFormat {
       "parquet.hive.MapredParquetInputFormat"
   };
 
-  private static final String JSON_SERDE = "org.apache.hadoop.hive.serde2.lazy.JsonSerDe";
+  private static final String JSON_SERDE = "org.apache.hadoop.hive.serde2.JsonSerDe";
 
   private static Map<String, HdfsFileFormat> VALID_INPUT_FORMATS =
       ImmutableMap.<String, HdfsFileFormat>builder()
