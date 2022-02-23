@@ -128,6 +128,9 @@ class TestAsyncLoadData(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
         disable_codegen_options=[False]))
 
+  # This test subjects the load into either sync or async compilation of the load
+  # query at the backend through beewax or hs2 clients. The objective is to assure
+  # the load query completes successfully.
   def test_async_load(self, vector, unique_database):
     enable_async_load_data = vector.get_value('enable_async_load_data_execution')
     protocol = vector.get_value('protocol')
@@ -182,19 +185,21 @@ class TestAsyncLoadData(ImpalaTestSuite):
       wait_end = time.time()
       wait_time = wait_end - wait_start
       self.close_query_using_client(client, handle)
-      # In sync mode:
-      #  The entire LOAD is processed in the exec step with delay. exec_time should be
-      #  more than 3 seconds.
-      #
-      # In async mode:
-      #  The compilation of LOAD is processed in the exec step without delay. And the
-      #  processing of the LOAD plan is in wait step with delay. The wait time should
-      #  definitely take more time than 3 seconds.
       if enable_async_load_data:
+        # In async mode:
+        #  The compilation of LOAD is processed in the exec step without delay. And the
+        #  processing of the LOAD plan is in wait step with delay. The wait time should
+        #  definitely take more time than 3 seconds.
         assert(exec_end_state == running_state)
         assert(wait_time >= 3)
       else:
-        assert(exec_end_state == finished_state)
+        # In sync mode:
+        #  The entire LOAD is processed in the exec step with delay. exec_time should be
+        #  more than 3 seconds. Since the load query is submitted async, it is possible
+        #  that the exec state returned is still in RUNNING state due to the the wait-for
+        #  thread executing ClientRequestState::Wait() does not have time to set the
+        #  exec state from RUNNING to FINISH.
+        assert(exec_end_state == running_state or exec_end_state == finished_state)
         assert(exec_time >= 3)
     finally:
       client.close()
