@@ -95,6 +95,10 @@ under the License.
       </li>
 
       <li>
+        <xref href="#string_functions/bytes">BYTES</xref>
+      </li>
+
+      <li>
         <xref href="#string_functions/char_length">CHAR_LENGTH</xref>
       </li>
 
@@ -391,6 +395,39 @@ select concat('[',btrim('xyhelxyzlozyzzxx','xyz'),']');
 | [helxyzlo]                                         |
 +----------------------------------------------------+
 </codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="bytes">
+        <dt>BYTES</dt>
+        <dd><b>Purpose:</b> Returns the number of bytes contained in the specified byte string. <p>
+            <b>Syntax:</b> BYTES (<i>byte_expression</i>)</p><p>Where:</p><p><i>byte_expression</i>
+            is the byte string for which the number of bytes is to be returned.</p><p
+            conref="../shared/impala_common.xml#common/usage_notes_blurb"/><p>The BYTES function is
+            similar to the LENGTH() function except that it always returns the number of bytes
+            regardless of the status of UTF-8 mode whether it is turned ON or OFF.</p><p>The
+            following is the list of supported string data types to be used in
+              <i>byte_expression</i>:</p><ul>
+            <li>STRING</li>
+            <li>VARCHAR</li>
+            <li>CHAR</li>
+          </ul><note>The BYTES (<i>byte_expression</i>) function counts the trailing zeros because
+            trailing zero bytes are considered bytes. In the case of a fixed <i>length</i> column,
+            the length of the value is always equal to the length defined for the column whereas the
+            length of the value in a <i>variable</i> length column is always equal to the number of
+            bytes, including any trailing zero bytes, contained in that value.</note><p
+            conref="../shared/impala_common.xml#common/example_blurb"/><p>The following example
+            obtains the number of bytes from “cloudera” by applying the BYTES function to the column
+            “cloudera”, which is type
+            VARCHAR.</p><codeblock>SELECT bytes(cast('cloudera' as varchar(20))) FROM xyz;
+            +----------------------------------------+
+            | bytes(cast('cloudera' as varchar(20))) |
+            +----------------------------------------+
+            | 8                                      |
+            +----------------------------------------+
+          </codeblock><note>Use the TRIM function on the <i>byte_expression</i> to
+            exclude the trailing blanks included in the byte count for a data value.</note>
         </dd>
 
       </dlentry>
