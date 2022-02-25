@@ -41,7 +41,7 @@ class TestShowCreateTable(ImpalaTestSuite):
                            "bucketing_version", "OBJCAPABILITIES",
                            "TRANSLATED_TO_EXTERNAL", "previous_metadata_location",
                            "impala.events.catalogServiceId",
-                           "impala.events.catalogVersion"]
+                           "impala.events.catalogVersion", "uuid"]
 
   @classmethod
   def get_workload(self):
