@@ -20,3 +20,10 @@
 # Enable Kudu transaction.
 -enable_txn_system_client_init
 -unlock_experimental_flags
+
+# Due to KUDU-1973 kudu-tservers produce high CPU consumption (see also KUDU-3134) when
+# there is a high number of table replicas. This means that in the Impala dev
+# environment the CPU consumption can be around 15-20% per kudu-tserver (there are 3
+# kudu-tservers) when all the Kudu tables are loaded. Setting the value to 3 seconds
+# lowers CPU usage to ~5% per kudu-terver.
+--raft_heartbeat_interval_ms=3000
