@@ -435,7 +435,8 @@ Status FileSystemUtil::ApproximateFileSize(
   bool exist = false;
   RETURN_IF_ERROR(PathExists(path, &exist));
   if (!exist) {
-    return Status("Path does not exist!");
+    return Status(
+        ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute("Path $0 does not exist!", path)));
   } else {
     error_code errcode;
     file_size = filesystem::file_size(path, errcode);

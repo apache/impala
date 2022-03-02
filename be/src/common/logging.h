@@ -125,9 +125,9 @@ void CheckAndRotateLogFiles(int max_log_files);
 void AttachStdoutStderr();
 
 /// Check whether INFO or ERROR log size has exceed FLAGS_max_log_size.
-/// If error encountered during individual log size check, print error message to ERROR
-/// log and return false.
-bool CheckLogSize();
+/// Return false if error encountered during individual log size check.
+/// 'log_error' controls whether to log any error occurrence to ERROR log or not.
+bool CheckLogSize(bool log_error);
 
 /// Force glog to do the log rotation.
 void ForceRotateLog();

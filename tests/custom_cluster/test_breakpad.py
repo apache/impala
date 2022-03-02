@@ -400,47 +400,93 @@ class TestLogging(TestBreakpadBase):
     self._start_impala_cluster(cluster_options, cluster_size=cluster_size,
                                expected_num_impalads=cluster_size, impala_log_dir=log_dir)
 
-  def assert_logs(self, daemon, max_count, max_bytes, base_dir=None):
+  def assert_logs(self, daemon, max_count, max_bytes):
     """Assert that there are at most 'max_count' of INFO + ERROR log files for the
-    specified daemon and the individual file size does not exceed 'max_bytes'."""
-    path = base_dir or self.tmp_dir
-    log_paths = glob.glob("%s/%s*log.ERROR.*" % (path, daemon)) \
-                + glob.glob("%s/%s*log.INFO.*" % (path, daemon))
+    specified daemon and the individual file size does not exceed 'max_bytes'.
+    Also assert that stdout/stderr are redirected to correct file on each rotation."""
+    log_dir = self.tmp_dir
+    log_paths = glob.glob("%s/%s*log.ERROR.*" % (log_dir, daemon)) \
+                + glob.glob("%s/%s*log.INFO.*" % (log_dir, daemon))
     assert len(log_paths) <= max_count
-    for path in log_paths:
-      try:
-        log_size = os.path.getsize(path)
-        assert log_size <= max_bytes, "{} exceed {} bytes".format(path, max_bytes)
-      except OSError:
-        # The daemon might delete the log in the middle of assertion.
-        # In that case, do nothing and move on.
-        pass
 
-  @pytest.mark.execute_serially
-  def test_excessive_cerr(self):
+    # group log_paths by pid and kind
+    log_group = {}
+    for path in sorted(log_paths):
+      tok = path.split('.')
+      key = tok[-1] + '.' + tok[-3]  # pid + kind
+      if key in log_group:
+        log_group[key].append(path)
+      else:
+        log_group[key] = [path]
+
+    for key, paths in log_group.items():
+      for i in range(0, len(paths)):
+        try:
+          curr_path = paths[i]
+          # check log size
+          log_size = os.path.getsize(curr_path)
+          assert log_size <= max_bytes, "{} exceed {} bytes".format(curr_path, max_bytes)
+
+          if i < len(paths) - 1:
+            # check that we print the next_path in last line of this log file
+            next_path = paths[i + 1]
+            with open(curr_path, 'rb') as f:
+              f.seek(-2, os.SEEK_END)
+              while f.read(1) != b'\n':
+                f.seek(-2, os.SEEK_CUR)
+              last_line = f.readline().decode()
+              assert next_path in last_line
+        except OSError:
+          # The daemon might delete the log in the middle of assertion.
+          # In that case, do nothing and move on.
+          pass
+
+  def silent_remove(self, filename):
+    try:
+      os.remove(filename)
+    except OSError:
+      pass
+
+  def start_excessive_cerr_cluster(self, test_cluster_size=1, remove_symlink=False):
     """Check that impalad log is kept being rotated when most writing activity is coming
     from stderr stream.
     Along with LogFaultInjectionThread in init.cc, this test will fill impalad error logs
     with approximately 128kb error messages per second."""
-    test_cluster_size = 1
     test_logbufsecs = 3
     test_max_log_files = 2
     test_max_log_size = 1  # 1 MB
     test_error_msg = ('123456789abcde_' * 64)  # 1 KB error message
     test_debug_actions = 'LOG_MAINTENANCE_STDERR:FAIL@1.0@' + test_error_msg
+    daemon = 'impalad'
     os.chmod(self.tmp_dir, 0744)
 
     expected_log_max_bytes = int(1.2 * 1024**2)  # 1.2 MB
-    self.assert_logs('impalad', 0, expected_log_max_bytes)
+    self.assert_logs(daemon, 0, expected_log_max_bytes)
     self.start_cluster_with_args(test_cluster_size, self.tmp_dir,
                                  logbufsecs=test_logbufsecs,
                                  max_log_files=test_max_log_files,
                                  max_log_size=test_max_log_size,
                                  debug_actions=test_debug_actions)
-    self.wait_for_num_processes('impalad', test_cluster_size, 30)
-    expected_log_max_count = test_max_log_files * 2  # Both INFO and ERROR logs
+    self.wait_for_num_processes(daemon, test_cluster_size, 30)
+    # Count both INFO and ERROR logs
+    expected_log_max_count = test_max_log_files * test_cluster_size * 2
     # Wait for log maintenance thread to flush and rotate the logs asynchronously.
     start = time.time()
     while (time.time() - start < 40):
       time.sleep(1)
-      self.assert_logs('impalad', expected_log_max_count, expected_log_max_bytes)
+      self.assert_logs(daemon, expected_log_max_count, expected_log_max_bytes)
+      if (remove_symlink):
+        pattern = self.tmp_dir + '/' + daemon + '*.'
+        symlinks = glob.glob(pattern + '.INFO') + glob.glob(pattern + '.ERROR')
+        for symlink in symlinks:
+          self.silent_remove(symlink)
+
+  @pytest.mark.execute_serially
+  def test_excessive_cerr(self):
+    """Test excessive cerr activity with single node cluster."""
+    self.start_excessive_cerr_cluster()
+
+  @pytest.mark.execute_serially
+  def test_excessive_cerr_no_symlink(self):
+    """Test excessive cerr activity with two node cluster and missing log symlinks."""
+    self.start_excessive_cerr_cluster(2, True)

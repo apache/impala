@@ -162,7 +162,7 @@ extern "C" { void __gcov_flush(); }
     sleep(sleep_duration);
 
     const int64_t now = MonotonicMillis();
-    bool max_log_file_exceeded = RedirectStdoutStderr() && impala::CheckLogSize();
+    bool max_log_file_exceeded = RedirectStdoutStderr() && impala::CheckLogSize(false);
     if ((now - last_flush) / 1000 < FLAGS_logbufsecs && !max_log_file_exceeded) {
       continue;
     }
@@ -171,7 +171,7 @@ extern "C" { void __gcov_flush(); }
 
     // Check log size again and force log rotation this time if they still big after
     // FlushLogFiles.
-    if (max_log_file_exceeded && impala::CheckLogSize()) impala::ForceRotateLog();
+    if (max_log_file_exceeded && impala::CheckLogSize(true)) impala::ForceRotateLog();
 
     // No need to rotate log files in tests.
     if (impala::TestInfo::is_test()) continue;
