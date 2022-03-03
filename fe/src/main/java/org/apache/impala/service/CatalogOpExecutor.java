@@ -392,7 +392,7 @@ public class CatalogOpExecutor {
     Optional<TTableName> tTableName = Optional.empty();
     TDdlType ddl_type = ddlRequest.ddl_type;
     try {
-      boolean syncDdl = ddlRequest.isSync_ddl();
+      boolean syncDdl = ddlRequest.getQuery_options().isSync_ddl();
       switch (ddl_type) {
         case ALTER_DATABASE:
           TAlterDbParams alter_db_params = ddlRequest.getAlter_db_params();
@@ -404,8 +404,8 @@ public class CatalogOpExecutor {
           TAlterTableParams alter_table_params = ddlRequest.getAlter_table_params();
           tTableName = Optional.of(alter_table_params.getTable_name());
           catalogOpMetric_.increment(ddl_type, tTableName);
-          alterTable(alter_table_params, ddlRequest.getDebug_action(), wantMinimalResult,
-              response);
+          alterTable(alter_table_params, ddlRequest.getQuery_options().getDebug_action(),
+              wantMinimalResult, response);
           break;
         case ALTER_VIEW:
           TCreateOrAlterViewParams alter_view_params = ddlRequest.getAlter_view_params();
@@ -480,13 +480,15 @@ public class CatalogOpExecutor {
           catalogOpMetric_.increment(ddl_type, tTableName);
           // Dropped tables and views are already returned as minimal results, so don't
           // need to pass down wantMinimalResult here.
-          dropTableOrView(drop_table_or_view_params, response);
+          dropTableOrView(drop_table_or_view_params, response,
+              ddlRequest.getQuery_options().getLock_max_wait_time_s());
           break;
         case TRUNCATE_TABLE:
           TTruncateParams truncate_params = ddlRequest.getTruncate_params();
           tTableName = Optional.of(truncate_params.getTable_name());
           catalogOpMetric_.increment(ddl_type, tTableName);
-          truncateTable(truncate_params, wantMinimalResult, response);
+          truncateTable(truncate_params, wantMinimalResult, response,
+              ddlRequest.getQuery_options().getLock_max_wait_time_s());
           break;
         case DROP_FUNCTION:
           catalogOpMetric_.increment(ddl_type, Optional.empty());
@@ -2563,8 +2565,8 @@ public class CatalogOpExecutor {
    * In case of transactional tables acquires an exclusive HMS table lock before
    * executing the drop operation.
    */
-  private void dropTableOrView(TDropTableOrViewParams params, TDdlExecResponse resp)
-      throws ImpalaException {
+  private void dropTableOrView(TDropTableOrViewParams params, TDdlExecResponse resp,
+      int lockMaxWaitTime) throws ImpalaException {
     TableName tableName = TableName.fromThrift(params.getTable_name());
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
     Preconditions.checkState(!catalog_.isBlacklistedTable(tableName) || params.if_exists,
@@ -2604,7 +2606,8 @@ public class CatalogOpExecutor {
       HeartbeatContext ctx = new HeartbeatContext(
           String.format("Drop table/view %s.%s", tableName.getDb(), tableName.getTbl()),
           System.nanoTime());
-      lockId = catalog_.lockTableStandalone(tableName.getDb(), tableName.getTbl(), ctx);
+      lockId = catalog_.lockTableStandalone(tableName.getDb(), tableName.getTbl(), ctx,
+          lockMaxWaitTime);
     }
 
     try {
@@ -2790,7 +2793,8 @@ public class CatalogOpExecutor {
    * TODO truncate specified partitions.
    */
   private void truncateTable(TTruncateParams params, boolean wantMinimalResult,
-      TDdlExecResponse resp) throws ImpalaException {
+      TDdlExecResponse resp, int lockMaxWaitTime)
+      throws ImpalaException {
     TTableName tblName = params.getTable_name();
     Table table = null;
     try {
@@ -2819,7 +2823,7 @@ public class CatalogOpExecutor {
       long newCatalogVersion = 0;
       try {
         if (AcidUtils.isTransactionalTable(table.getMetaStoreTable().getParameters())) {
-          newCatalogVersion = truncateTransactionalTable(params, table);
+          newCatalogVersion = truncateTransactionalTable(params, table, lockMaxWaitTime);
         } else if (table instanceof FeIcebergTable) {
           newCatalogVersion = truncateIcebergTable(params, table);
         } else {
@@ -2851,8 +2855,8 @@ public class CatalogOpExecutor {
    * After that empty directory creation it removes stats-related parameters of
    * the table and its partitions.
    */
-  private long truncateTransactionalTable(TTruncateParams params, Table table)
-      throws ImpalaException {
+  private long truncateTransactionalTable(TTruncateParams params, Table table,
+      int lockMaxWaitTime) throws ImpalaException {
     Preconditions.checkState(table.isWriteLockedByCurrentThread());
     Preconditions.checkState(catalog_.getLock().isWriteLockedByCurrentThread());
     catalog_.getLock().writeLock().unlock();
@@ -2871,7 +2875,7 @@ public class CatalogOpExecutor {
         table.releaseWriteLock();
         //TODO: if possible, set DataOperationType to something better than NO_TXN.
         catalog_.lockTableInTransaction(tblName.getDb(), tblName.getTbl(), txn,
-            DataOperationType.NO_TXN, ctx);
+            DataOperationType.NO_TXN, ctx, lockMaxWaitTime);
         tryWriteLock(table, "truncating");
         LOG.trace("Time elapsed after taking write lock on table {}: {} msec",
             table.getFullName(), sw.elapsed(TimeUnit.MILLISECONDS));

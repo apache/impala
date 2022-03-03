@@ -1199,6 +1199,17 @@ Status impala::SetQueryOption(const string& key, const string& value,
               "Only integer value 0 and above is allowed.", value));
         }
         query_options->__set_runtime_in_list_filter_entry_limit(limit);
+      }
+      case TImpalaQueryOptions::LOCK_MAX_WAIT_TIME_S: {
+        StringParser::ParseResult result;
+        const int32_t lock_max_wait =
+            StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
+        if (value == nullptr || result != StringParser::PARSE_SUCCESS ||
+            lock_max_wait < 0) {
+          return Status(Substitute("Invalid value for LOCK_MAX_WAIT_TIME_S: '$0'. "
+              "Only integer value 0 and above is allowed.", value));
+        }
+        query_options->__set_lock_max_wait_time_s(lock_max_wait);
         break;
       }
       case TImpalaQueryOptions::ENABLE_REPLAN: {

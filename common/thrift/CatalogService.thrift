@@ -86,6 +86,18 @@ struct TCatalogUpdateResult {
   6: optional list<CatalogObjects.TCatalogObject> removed_catalog_objects
 }
 
+// Subset of query options passed to DDL operations
+struct TDdlQueryOptions {
+  // True if SYNC_DDL is set in query options
+  1: required bool sync_ddl
+
+  // Passes the debug actions to catalogd if the query option is set.
+  2: optional string debug_action
+
+  // Maximum wait time on an HMS ACID lock in seconds.
+  3: optional i32 lock_max_wait_time_s
+}
+
 // Request for executing a DDL operation (CREATE, ALTER, DROP).
 struct TDdlExecRequest {
   1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
@@ -149,20 +161,17 @@ struct TDdlExecRequest {
   // Parameters for GRANT/REVOKE privilege
   21: optional JniCatalog.TGrantRevokePrivParams grant_revoke_priv_params
 
-  // True if SYNC_DDL is set in query options
-  22: required bool sync_ddl
-
   // Parameters for COMMENT ON
-  23: optional JniCatalog.TCommentOnParams comment_on_params
+  22: optional JniCatalog.TCommentOnParams comment_on_params
 
   // Parameters for ALTER DATABASE
-  24: optional JniCatalog.TAlterDbParams alter_db_params
+  23: optional JniCatalog.TAlterDbParams alter_db_params
 
   // Parameters for replaying an exported testcase.
-  25: optional JniCatalog.TCopyTestCaseReq copy_test_case_params
+  24: optional JniCatalog.TCopyTestCaseReq copy_test_case_params
 
-  // Passes the debug actions to catalogd if the query option is set.
-  26: optional string debug_action
+  // Query options passed to DDL operations.
+  25: required TDdlQueryOptions query_options
 }
 
 // Response from executing a TDdlExecRequest

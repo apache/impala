@@ -730,6 +730,9 @@ enum TImpalaQueryOptions {
 
   // If true, test replan by imposing artificial two executor groups in FE.
   TEST_REPLAN = 144;
+
+  // Maximum wait time on HMS ACID lock in seconds.
+  LOCK_MAX_WAIT_TIME_S = 145
 }
 
 // The summary of a DML statement.

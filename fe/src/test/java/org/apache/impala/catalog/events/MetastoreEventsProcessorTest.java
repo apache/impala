@@ -135,6 +135,7 @@ import org.apache.impala.thrift.TCreateFunctionParams;
 import org.apache.impala.thrift.TCreateTableLikeParams;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.TDdlExecRequest;
+import org.apache.impala.thrift.TDdlQueryOptions;
 import org.apache.impala.thrift.TDdlType;
 import org.apache.impala.thrift.TDropDbParams;
 import org.apache.impala.thrift.TDropFunctionParams;
@@ -3198,6 +3199,7 @@ public class MetastoreEventsProcessorTest {
    */
   private void dropTableFromImpala(String dbName, String tblName) throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.DROP_TABLE);
     TDropTableOrViewParams dropTableParams = new TDropTableOrViewParams();
     dropTableParams.setTable_name(new TTableName(dbName, tblName));
@@ -3212,6 +3214,7 @@ public class MetastoreEventsProcessorTest {
   public static void createDatabaseFromImpala(CatalogOpExecutor catalogOpExecutor,
       String dbName, String desc) throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.CREATE_DATABASE);
     TCreateDbParams createDbParams = new TCreateDbParams();
     createDbParams.setDb(dbName);
@@ -3231,6 +3234,7 @@ public class MetastoreEventsProcessorTest {
   private void alterDbSetOwnerFromImpala(
       String dbName, String owner, TOwnerType ownerType) throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.ALTER_DATABASE);
     TAlterDbParams alterDbParams = new TAlterDbParams();
     alterDbParams.setDb(dbName);
@@ -3248,6 +3252,7 @@ public class MetastoreEventsProcessorTest {
    */
   private void dropDatabaseCascadeFromImpala(String dbName) throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.DROP_DATABASE);
     TDropDbParams dropDbParams = new TDropDbParams();
     dropDbParams.setDb(dbName);
@@ -3264,6 +3269,7 @@ public class MetastoreEventsProcessorTest {
     createTableLikeParams.setTable_name(new TTableName(destDb, destTbl));
     createTableLikeParams.setIs_external(false);
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.CREATE_TABLE_LIKE);
     req.create_table_like_params = createTableLikeParams;
     catalogOpExecutor_.execDdlRequest(req);
@@ -3282,6 +3288,7 @@ public class MetastoreEventsProcessorTest {
       String tblName, Map<String, String> tblParams, boolean isPartitioned)
       throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.CREATE_TABLE);
     TCreateTableParams createTableParams = new TCreateTableParams();
     createTableParams.setTable_name(new TTableName(dbName, tblName));
@@ -3317,6 +3324,7 @@ public class MetastoreEventsProcessorTest {
   private void createScalarFunctionFromImpala(ScalarFunction fn) throws
       ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.CREATE_FUNCTION);
     TCreateFunctionParams createFunctionParams = new TCreateFunctionParams();
     createFunctionParams.setFn(fn.toThrift());
@@ -3329,6 +3337,7 @@ public class MetastoreEventsProcessorTest {
    */
   private void dropScalarFunctionFromImapala(ScalarFunction fn) throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.DROP_FUNCTION);
     TDropFunctionParams dropFunctionParams = new TDropFunctionParams();
     dropFunctionParams.setFn_name(fn.getFunctionName().toThrift());
@@ -3343,6 +3352,7 @@ public class MetastoreEventsProcessorTest {
   private void renameTableFromImpala(String oldTblName, String newTblName)
       throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.ALTER_TABLE);
     TAlterTableOrViewRenameParams renameParams = new TAlterTableOrViewRenameParams();
     renameParams.new_table_name = new TTableName(TEST_DB_NAME, newTblName);
@@ -3360,6 +3370,7 @@ public class MetastoreEventsProcessorTest {
   private void alterTableAddColsFromImpala(String dbName, String tblName, String colName,
       TPrimitiveType colType) throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.ALTER_TABLE);
     TAlterTableParams alterTableParams = new TAlterTableParams();
     alterTableParams.setTable_name(new TTableName(dbName, tblName));
@@ -3379,6 +3390,7 @@ public class MetastoreEventsProcessorTest {
   private void alterTableRemoveColFromImpala(
       String dbName, String tblName, String colName) throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.ALTER_TABLE);
     TAlterTableParams alterTableParams = new TAlterTableParams();
     alterTableParams.setTable_name(new TTableName(dbName, tblName));
@@ -3395,6 +3407,7 @@ public class MetastoreEventsProcessorTest {
   private void alterTableReplaceColFromImpala(
       String dbName, String tblName, List<TColumn> newCols) throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.ALTER_TABLE);
     TAlterTableParams alterTableParams = new TAlterTableParams();
     alterTableParams.setTable_name(new TTableName(dbName, tblName));
@@ -3415,6 +3428,7 @@ public class MetastoreEventsProcessorTest {
   private void alterTableAddPartition(
       String dbName, String tblName, TPartitionDef partitionDef) throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.ALTER_TABLE);
     TAlterTableParams alterTableParams = new TAlterTableParams();
     alterTableParams.setTable_name(new TTableName(dbName, tblName));
@@ -3433,6 +3447,7 @@ public class MetastoreEventsProcessorTest {
   private void alterTableDropPartition(String dbName, String tblName,
       List<TPartitionKeyValue> keyValue) throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.ALTER_TABLE);
     TAlterTableParams alterTableParams = new TAlterTableParams();
     alterTableParams.setTable_name(new TTableName(dbName, tblName));
@@ -3451,6 +3466,7 @@ public class MetastoreEventsProcessorTest {
   private void alterTableSetFileFormatFromImpala(
       String dbName, String tblName, THdfsFileFormat fileformat) throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.ALTER_TABLE);
     TAlterTableParams alterTableParams = new TAlterTableParams();
     alterTableParams.setTable_name(new TTableName(dbName, tblName));
@@ -3469,6 +3485,7 @@ public class MetastoreEventsProcessorTest {
   private void alterTableSetRowFormatFromImpala(
       String dbName, String tblName, String fieldTerminator) throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.ALTER_TABLE);
     TAlterTableParams alterTableParams = new TAlterTableParams();
     alterTableParams.setTable_name(new TTableName(dbName, tblName));
@@ -3488,6 +3505,7 @@ public class MetastoreEventsProcessorTest {
   private void alterTableSetOwnerFromImpala(String dbName, String tblName, String owner)
       throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.ALTER_TABLE);
     TAlterTableParams alterTableParams = new TAlterTableParams();
     alterTableParams.setTable_name(new TTableName(dbName, tblName));
@@ -3507,6 +3525,7 @@ public class MetastoreEventsProcessorTest {
   private void alterTableSetLocationFromImpala(
       String dbName, String tblName, String location) throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.ALTER_TABLE);
     TAlterTableParams alterTableParams = new TAlterTableParams();
     alterTableParams.setTable_name(new TTableName(dbName, tblName));
@@ -3524,6 +3543,7 @@ public class MetastoreEventsProcessorTest {
   private void alterTableRenameFromImpala(String dbName, String tblName, String newTable)
       throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.ALTER_TABLE);
     TAlterTableParams alterTableParams = new TAlterTableParams();
     alterTableParams.setTable_name(new TTableName(dbName, tblName));
@@ -3541,6 +3561,7 @@ public class MetastoreEventsProcessorTest {
   private void alterTableSetTblPropertiesFromImpala(String tblName)
       throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.ALTER_TABLE);
     TAlterTableParams alterTableParams = new TAlterTableParams();
     alterTableParams.setTable_name(new TTableName(TEST_DB_NAME, tblName));
@@ -3564,6 +3585,7 @@ public class MetastoreEventsProcessorTest {
   private void alterTableComputeStats(String tblName, List<List<String>> partValsList)
       throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.ALTER_TABLE);
 
     TAlterTableParams alterTableParams = new TAlterTableParams();
@@ -3595,6 +3617,7 @@ public class MetastoreEventsProcessorTest {
   private void alterTableSetPartitionPropertiesFromImpala(
       String tblName, List<TPartitionKeyValue> partKeyVal) throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
+    req.setQuery_options(new TDdlQueryOptions());
     req.setDdl_type(TDdlType.ALTER_TABLE);
     TAlterTableParams alterTableParams = new TAlterTableParams();
     alterTableParams.setTable_name(new TTableName(TEST_DB_NAME, tblName));

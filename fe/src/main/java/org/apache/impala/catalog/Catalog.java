@@ -710,11 +710,14 @@ public abstract class Catalog implements AutoCloseable {
    * 'releaseTableLock()'.
    * @param dbName Name of the DB where the particular table is.
    * @param tableName Name of the table where the lock is acquired.
+   * @param lockMaxWaitTime Maximum wait time on the ACID lock.
    * @throws TransactionException
    */
-  public long lockTableStandalone(String dbName, String tableName, HeartbeatContext ctx)
+  public long lockTableStandalone(String dbName, String tableName, HeartbeatContext ctx,
+      int lockMaxWaitTime)
       throws TransactionException {
-    return lockTableInternal(dbName, tableName, 0L, DataOperationType.NO_TXN, ctx);
+    return lockTableInternal(dbName, tableName, 0L, DataOperationType.NO_TXN, ctx,
+        lockMaxWaitTime);
   }
 
   /**
@@ -724,13 +727,16 @@ public abstract class Catalog implements AutoCloseable {
    * @param dbName Name of the DB where the particular table is.
    * @param tableName Name of the table where the lock is acquired.
    * @param transaction the transaction that needs to lock the table.
+   * @param lockMaxWaitTime Maximum wait time on the ACID lock.
    * @throws TransactionException
    */
   public void lockTableInTransaction(String dbName, String tableName,
-      Transaction transaction, DataOperationType opType, HeartbeatContext ctx)
+      Transaction transaction, DataOperationType opType, HeartbeatContext ctx,
+      int lockMaxWaitTime)
       throws TransactionException {
     Preconditions.checkState(transaction.getId() > 0);
-    lockTableInternal(dbName, tableName, transaction.getId(), opType, ctx);
+    lockTableInternal(dbName, tableName, transaction.getId(), opType, ctx,
+        lockMaxWaitTime);
   }
 
   /**
@@ -739,10 +745,12 @@ public abstract class Catalog implements AutoCloseable {
    * @param dbName Name of the DB where the particular table is.
    * @param tableName Name of the table where the lock is acquired.
    * @param txnId id of the transaction, 0 for standalone locks.
+   * @param lockMaxWaitTime Maximum wait time on the ACID lock.
    * @throws TransactionException
    */
   private long lockTableInternal(String dbName, String tableName, long txnId,
-      DataOperationType opType, HeartbeatContext ctx) throws TransactionException {
+      DataOperationType opType, HeartbeatContext ctx, int lockMaxWaitTime)
+      throws TransactionException {
     Preconditions.checkState(txnId >= 0);
     LockComponent lockComponent = new LockComponent();
     lockComponent.setDbname(dbName);
@@ -753,7 +761,8 @@ public abstract class Catalog implements AutoCloseable {
     List<LockComponent> lockComponents = Arrays.asList(lockComponent);
     long lockId = -1L;
     try (MetaStoreClient client = metaStoreClientPool_.getClient()) {
-      lockId = MetastoreShim.acquireLock(client.getHiveClient(), txnId, lockComponents);
+      lockId = MetastoreShim.acquireLock(client.getHiveClient(), txnId, lockComponents,
+          lockMaxWaitTime);
       if (txnId == 0L) transactionKeepalive_.addLock(lockId, ctx);
     }
     return lockId;

@@ -103,11 +103,8 @@ public class Hive3MetastoreShimBase {
   protected static final long MAJOR_VERSION = 3;
   protected static boolean capabilitiestSet_ = false;
 
-  // Number of retries to acquire an HMS ACID lock.
-  private static final int LOCK_RETRIES = 10;
-
-  // Time interval between retries of acquiring an HMS ACID lock
-  private static final int LOCK_RETRY_WAIT_SECONDS = 3;
+  // Max sleep interval during acquiring an ACID lock.
+  private static final long MAX_SLEEP_INTERVAL_MS = 30000;
 
   protected final static String HMS_RPC_ERROR_FORMAT_STR =
       "Error making '%s' RPC to Hive Metastore: ";
@@ -618,15 +615,16 @@ public class Hive3MetastoreShimBase {
    * Creates a lock for the given lock components. Returns the acquired lock, this might
    * involve some waiting.
    *
-   * @param client         is the HMS client to be used.
-   * @param txnId          The transaction ID associated with the lock. Zero if the lock
-   *                       doesn't belong to a transaction.
-   * @param lockComponents the lock components to include in this lock.
+   * @param client               is the HMS client to be used.
+   * @param txnId                The transaction ID associated with the lock. Zero if the
+   *                             lock doesn't belong to a transaction.
+   * @param lockComponents       the lock components to include in this lock.
+   * @param maxWaitTimeInSeconds Maximum wait time to acquire the lock.
    * @return the lock id
    * @throws TransactionException in case of failure
    */
   public static long acquireLock(IMetaStoreClient client, long txnId,
-      List<LockComponent> lockComponents)
+      List<LockComponent> lockComponents, int maxWaitTimeInSeconds)
       throws TransactionException {
     LockRequestBuilder lockRequestBuilder = new LockRequestBuilder();
     lockRequestBuilder.setUser(TRANSACTION_USER_ID);
@@ -638,22 +636,28 @@ public class Hive3MetastoreShimBase {
     }
     LockRequest lockRequest = lockRequestBuilder.build();
     try {
+      long startTime = System.currentTimeMillis();
+      long timeoutTime = startTime + maxWaitTimeInSeconds * 1000;
+      long sleepIntervalMs = 100;
       LockResponse lockResponse = client.lock(lockRequest);
       long lockId = lockResponse.getLockid();
-      int retries = 0;
-      while (lockResponse.getState() == LockState.WAITING && retries < LOCK_RETRIES) {
+      while (lockResponse.getState() == LockState.WAITING &&
+             System.currentTimeMillis() < timeoutTime) {
         try {
           //TODO: add profile counter for lock waits.
-          LOG.info("Waiting " + String.valueOf(LOCK_RETRY_WAIT_SECONDS) +
-              " seconds for lock " + String.valueOf(lockId) + " of transaction " +
+          // Sleep 'sleepIntervalMs', or the amount of time left until 'timeoutTime'.
+          long sleepMs = Math.min(sleepIntervalMs,
+                                  Math.abs(timeoutTime - System.currentTimeMillis()));
+          LOG.debug("Waiting " + String.valueOf(sleepMs) +
+              " milliseconds for lock " + String.valueOf(lockId) + " of transaction " +
               Long.toString(txnId));
-          Thread.sleep(LOCK_RETRY_WAIT_SECONDS * 1000);
-          ++retries;
+          Thread.sleep(sleepMs);
+          sleepIntervalMs = Math.min(MAX_SLEEP_INTERVAL_MS,
+                                     sleepIntervalMs * 2);
           lockResponse = client.checkLock(lockId);
         } catch (InterruptedException e) {
-          // Since wait time and number of retries is configurable it wouldn't add
-          // much value to make acquireLock() interruptible so we just swallow the
-          // exception here.
+          // Since wait time is configurable it wouldn't add much value to make
+          // acquireLock() interruptible so we just swallow the exception here.
         }
       }
       if (lockResponse.getState() == LockState.ACQUIRED) {
@@ -781,5 +785,4 @@ public class Hive3MetastoreShimBase {
     return wh.getDefaultTablePath(db, tbl.getTableName().toLowerCase(), isExternal)
         .toString();
   }
-
 }

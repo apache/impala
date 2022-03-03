@@ -21,7 +21,7 @@ import os
 import pytest
 import time
 
-from hive_metastore.ttypes import CommitTxnRequest, OpenTxnRequest
+from hive_metastore.ttypes import CommitTxnRequest, LockType, OpenTxnRequest
 from subprocess import check_call
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIf, SkipIfHive2, SkipIfCatalogV2, SkipIfS3, SkipIfABFS,
@@ -303,6 +303,52 @@ class TestAcid(ImpalaTestSuite):
     commit_req = CommitTxnRequest()
     commit_req.txnid = txn_id
     return self.hive_client.commit_txn(commit_req)
+
+  @SkipIfS3.hive
+  @SkipIfGCS.hive
+  @SkipIfCOS.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
+  def test_lock_timings(self, vector, unique_database):
+    def elapsed_time_for_query(query):
+      t_start = time.time()
+      self.execute_query_expect_failure(self.client, query)
+      return time.time() - t_start
+
+    tbl_name = "test_lock"
+    tbl = "{0}.{1}".format(unique_database, tbl_name)
+    self.execute_query("create table {} (i int) tblproperties"
+        "('transactional'='true',"
+        "'transactional_properties'='insert_only')".format(tbl))
+    acid_util = AcidTxn(self.hive_client)
+    lock_resp = acid_util.lock(0, unique_database, tbl_name, LockType.EXCLUSIVE)
+    try:
+      if self.exploration_strategy() == 'exhaustive':
+        elapsed = elapsed_time_for_query("insert into {} values (1)".format(tbl))
+        assert elapsed > 300 and elapsed < 305
+      self.execute_query("set lock_max_wait_time_s=20")
+      elapsed = elapsed_time_for_query("insert into {} values (1)".format(tbl))
+      assert elapsed > 20 and elapsed < 25
+
+      self.execute_query("set lock_max_wait_time_s=0")
+      elapsed = elapsed_time_for_query("insert into {} values (1)".format(tbl))
+      assert elapsed < 5
+
+      self.execute_query("set lock_max_wait_time_s=10")
+      elapsed = elapsed_time_for_query("insert into {} values (1)".format(tbl))
+      assert elapsed > 10 and elapsed < 15
+
+      self.execute_query("set lock_max_wait_time_s=2")
+      elapsed = elapsed_time_for_query("truncate table {}".format(tbl))
+      assert elapsed > 2 and elapsed < 7
+
+      self.execute_query("set lock_max_wait_time_s=5")
+      elapsed = elapsed_time_for_query("drop table {}".format(tbl))
+      assert elapsed > 5 and elapsed < 10
+    finally:
+      acid_util.unlock(lock_resp.lockid)
 
   @SkipIfHive2.acid
   @SkipIfS3.hive

@@ -588,6 +588,9 @@ struct TQueryOptions {
   //   1. regular: <num_nodes> nodes with 64MB of per-host estimated memory threshold
   //   2. large:   <num_nodes> nodes with 8PB of per-host estimated memory threshold
   145: optional bool test_replan = false;
+
+  // See comment in ImpalaService.thrift
+  146: optional i32 lock_max_wait_time_s = 300
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

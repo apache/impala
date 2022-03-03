@@ -145,6 +145,7 @@ import org.apache.impala.thrift.TCommentOnParams;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDdlExecRequest;
+import org.apache.impala.thrift.TDdlQueryOptions;
 import org.apache.impala.thrift.TDdlType;
 import org.apache.impala.thrift.TDescribeHistoryParams;
 import org.apache.impala.thrift.TDescribeOutputStyle;
@@ -828,12 +829,15 @@ public class Frontend {
       header.setWant_minimal_response(
           BackendConfig.INSTANCE.getBackendCfg().use_local_catalog);
       ddl.getDdl_params().setHeader(header);
-      ddl.getDdl_params().setSync_ddl(ddl.isSync_ddl());
-      // forward debug_actions to the catalogd
+      // Forward relevant query options to the catalogd.
+      TDdlQueryOptions ddlQueryOpts = new TDdlQueryOptions();
+      ddlQueryOpts.setSync_ddl(result.getQuery_options().isSync_ddl());
       if (result.getQuery_options().isSetDebug_action()) {
-        ddl.getDdl_params()
-            .setDebug_action(result.getQuery_options().getDebug_action());
+        ddlQueryOpts.setDebug_action(result.getQuery_options().getDebug_action());
       }
+      ddlQueryOpts.setLock_max_wait_time_s(
+          result.getQuery_options().lock_max_wait_time_s);
+      ddl.getDdl_params().setQuery_options(ddlQueryOpts);
     } else if (ddl.getOp_type() == TCatalogOpType.RESET_METADATA) {
       ddl.getReset_metadata_params().setSync_ddl(ddl.isSync_ddl());
       ddl.getReset_metadata_params().setRefresh_updated_hms_partitions(
@@ -2057,7 +2061,7 @@ public class Frontend {
                   insertStmt.getPartitionKeyValues());
             }
             createLockForInsert(txnId, tables, targetTable, insertStmt.isOverwrite(),
-                staticPartitionTarget);
+                staticPartitionTarget, queryOptions);
             long writeId = allocateWriteId(queryCtx, targetTable);
             insertStmt.setWriteId(writeId);
 
@@ -2544,10 +2548,12 @@ public class Frontend {
    * @param isOverwrite true when the INSERT stmt is an INSERT OVERWRITE
    * @param staticPartitionTarget the static partition target in case of static partition
    *   INSERT
+   * @param queryOptions the query options for this INSERT statement
    * @throws TransactionException
    */
   private void createLockForInsert(Long txnId, Collection<FeTable> tables,
-      FeTable targetTable, boolean isOverwrite, String staticPartitionTarget)
+      FeTable targetTable, boolean isOverwrite, String staticPartitionTarget,
+      TQueryOptions queryOptions)
       throws TransactionException {
     Preconditions.checkState(
         AcidUtils.isTransactionalTable(targetTable.getMetaStoreTable().getParameters()));
@@ -2583,7 +2589,8 @@ public class Frontend {
     }
     try (MetaStoreClient client = metaStoreClientPool_.getClient()) {
       IMetaStoreClient hmsClient = client.getHiveClient();
-      MetastoreShim.acquireLock(hmsClient, txnId, lockComponents);
+      MetastoreShim.acquireLock(hmsClient, txnId, lockComponents,
+          queryOptions.lock_max_wait_time_s);
     }
   }
 
