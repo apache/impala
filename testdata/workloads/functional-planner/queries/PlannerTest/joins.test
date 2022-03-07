@@ -358,10 +358,10 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypesagg.id = functional_hbase.alltypessmall.id, functional.alltypesagg.int_col = functional_hbase.alltypessmall.int_col
 |  runtime filters: RF000 <- functional_hbase.alltypessmall.id, RF001 <- functional_hbase.alltypessmall.int_col
-|  row-size=184B cardinality=53
+|  row-size=184B cardinality=106
 |
 |--01:SCAN HBASE [functional_hbase.alltypessmall]
-|     row-size=89B cardinality=50
+|     row-size=89B cardinality=100
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
@@ -375,12 +375,12 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypesagg.id = functional_hbase.alltypessmall.id, functional.alltypesagg.int_col = functional_hbase.alltypessmall.int_col
 |  runtime filters: RF000 <- functional_hbase.alltypessmall.id, RF001 <- functional_hbase.alltypessmall.int_col
-|  row-size=184B cardinality=53
+|  row-size=184B cardinality=106
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HBASE [functional_hbase.alltypessmall]
-|     row-size=89B cardinality=50
+|     row-size=89B cardinality=100
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
