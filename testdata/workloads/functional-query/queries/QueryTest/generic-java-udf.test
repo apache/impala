@@ -1,0 +1,306 @@
+====
+---- QUERY
+select hive_bround(cast(3.14 as double))
+---- RESULTS
+3.0
+---- TYPES
+DOUBLE
+====
+---- QUERY
+select hive_bround(cast(3.14 as int))
+---- RESULTS
+3
+---- TYPES
+INT
+====
+---- QUERY
+select hive_upper('hello')
+---- RESULTS
+'HELLO'
+---- TYPES
+STRING
+====
+---- QUERY
+#Test GenericUDF functions
+select generic_identity(true), generic_identity(cast(NULL as boolean));
+---- TYPES
+boolean, boolean
+---- RESULTS
+true,NULL
+====
+---- QUERY
+select generic_identity(cast(10 as tinyint)), generic_identity(cast(NULL as tinyint));
+---- TYPES
+tinyint, tinyint
+---- RESULTS
+10,NULL
+====
+---- QUERY
+select generic_identity(cast(10 as smallint)), generic_identity(cast(NULL as smallint));
+---- TYPES
+smallint, smallint
+---- RESULTS
+10,NULL
+====
+---- QUERY
+select generic_identity(cast(10 as int)), generic_identity(cast(NULL as int));
+---- TYPES
+int, int
+---- RESULTS
+10,NULL
+====
+---- QUERY
+select generic_identity(cast(10 as bigint)), generic_identity(cast(NULL as bigint));
+---- TYPES
+bigint, bigint
+---- RESULTS
+10,NULL
+====
+---- QUERY
+select generic_identity(cast(10.0 as float)), generic_identity(cast(NULL as float));
+---- TYPES
+float, float
+---- RESULTS
+10,NULL
+====
+---- QUERY
+select generic_identity(cast(10.0 as double)), generic_identity(cast(NULL as double));
+---- TYPES
+double, double
+---- RESULTS
+10,NULL
+====
+---- QUERY
+# IMPALA-1134. Tests that strings are copied correctly
+select length(generic_identity("0123456789")),
+       length(generic_add("0123456789", "0123456789")),
+       length(generic_add("0123456789", "0123456789", "0123456789"));
+---- TYPES
+int, int, int
+---- RESULTS
+10,20,30
+====
+---- QUERY
+# IMPALA-1392: Hive UDFs that throw exceptions should return NULL
+select generic_throws_exception();
+---- TYPES
+boolean
+---- RESULTS
+NULL
+====
+---- QUERY
+select generic_throws_exception() from functional.alltypestiny;
+---- TYPES
+boolean
+---- RESULTS
+NULL
+NULL
+NULL
+NULL
+NULL
+NULL
+NULL
+NULL
+====
+---- QUERY
+select generic_add(cast(1 as int), cast(2 as int));
+---- TYPES
+int
+---- RESULTS
+3
+====
+---- QUERY
+select generic_add(generic_add(cast(1 as int), cast(2 as int)), cast(2 as int));
+---- TYPES
+int
+---- RESULTS
+5
+====
+---- QUERY
+select generic_add(cast(generic_add(cast(1 as int), cast(2 as int)) - generic_add(cast(2 as int), cast(1 as int)) as int), cast(2 as int));
+---- TYPES
+int
+---- RESULTS
+2
+====
+---- QUERY
+select generic_add(cast(1 as smallint), cast(2 as smallint));
+---- TYPES
+smallint
+---- RESULTS
+3
+====
+---- QUERY
+select generic_add(cast(3.0 as float), cast(4.0 as float));
+---- TYPES
+float
+---- RESULTS
+7.0
+====
+---- QUERY
+select generic_add(cast(1.0 as double), cast(2.0 as double));
+---- TYPES
+double
+---- RESULTS
+3.0
+====
+---- QUERY
+select generic_add(cast(1 as boolean), cast(0 as boolean));
+---- TYPES
+boolean
+---- RESULTS
+true
+====
+---- QUERY
+select generic_add(cast(1 as boolean), cast(1 as boolean));
+---- TYPES
+boolean
+---- RESULTS
+true
+====
+---- QUERY
+# IMPALA-3378: test many Java UDFs being opened and run concurrently
+select * from
+(select max(int_col) from functional.alltypesagg
+ where generic_identity(bool_col) union all
+(select max(int_col) from functional.alltypesagg
+ where generic_identity(tinyint_col) > 1 union all
+(select max(int_col) from functional.alltypesagg
+ where generic_identity(smallint_col) > 1 union all
+(select max(int_col) from functional.alltypesagg
+ where generic_identity(int_col) > 1 union all
+(select max(int_col) from functional.alltypesagg
+ where generic_identity(bigint_col) > 1 union all
+(select max(int_col) from functional.alltypesagg
+ where generic_identity(float_col) > 1.0 union all
+(select max(int_col) from functional.alltypesagg
+ where generic_identity(double_col) > 1.0 union all
+(select max(int_col) from functional.alltypesagg
+ where generic_identity(string_col) > '1' union all
+(select max(int_col) from functional.alltypesagg
+ where not generic_identity(bool_col) union all
+(select max(int_col) from functional.alltypesagg
+ where generic_identity(tinyint_col) > 2 union all
+(select max(int_col) from functional.alltypesagg
+ where generic_identity(smallint_col) > 2 union all
+(select max(int_col) from functional.alltypesagg
+ where generic_identity(int_col) > 2 union all
+(select max(int_col) from functional.alltypesagg
+ where generic_identity(bigint_col) > 2 union all
+(select max(int_col) from functional.alltypesagg
+ where generic_identity(float_col) > 2.0 union all
+(select max(int_col) from functional.alltypesagg
+ where generic_identity(double_col) > 2.0 union all
+(select max(int_col) from functional.alltypesagg
+ where generic_identity(string_col) > '2'
+)))))))))))))))) v
+---- TYPES
+INT
+---- RESULTS
+998
+999
+999
+999
+999
+999
+999
+999
+999
+999
+999
+999
+999
+999
+999
+999
+====
+---- QUERY
+drop table if exists replace_string_input
+====
+---- QUERY
+create table replace_string_input as
+values('toast'), ('scone'), ('stuff'), ('sssss'), ('yes'), ('scone'), ('stuff');
+====
+---- QUERY
+# Regression test for IMPALA-4266: memory management bugs with output strings from
+# Java UDFS, exposed by using the UDF as a grouping key in an aggregation.
+# The UDF replaces "s" with "ss" in the strings.
+select distinct generic_replace_string(_c0) as es
+from replace_string_input
+order by 1;
+---- TYPES
+string
+---- RESULTS
+'sscone'
+'ssssssssss'
+'sstuff'
+'toasst'
+'yess'
+====
+---- QUERY
+# Regression test for IMPALA-8016; this UDF loads another class in the same jar.
+select generic_import_nearby_classes("placeholder");
+---- TYPES
+string
+---- RESULTS
+'Hello'
+====
+---- QUERY
+# Java Generic UDFs for DATE are not allowed yet
+create function identity(Date) returns Date
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+---- CATCH
+AnalysisException: Type DATE is not supported for Java UDFs.
+====
+---- QUERY
+# Java Generic UDFs for DECIMAL are not allowed yet
+create function identity(decimal(5,0)) returns decimal(5,0)
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+---- CATCH
+AnalysisException: Type DECIMAL(5,0) is not supported for Java UDFs.
+====
+---- QUERY
+# Java Generic UDFs for TIMESTAMP are not allowed yet
+create function identity(Timestamp) returns Timestamp
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+---- CATCH
+AnalysisException: Type TIMESTAMP is not supported for Java UDFs.
+====
+---- QUERY
+create function identity(ARRAY<STRING>) returns INT
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+---- CATCH
+AnalysisException: Type 'ARRAY<STRING>' is not supported in UDFs/UDAs.
+====
+---- QUERY
+create function identity(MAP<STRING, STRING>) returns INT
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+---- CATCH
+AnalysisException: Type 'MAP<STRING,STRING>' is not supported in UDFs/UDAs.
+====
+---- QUERY
+create function identity(STRUCT<employer: STRING>) returns INT
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+---- CATCH
+AnalysisException: Type 'STRUCT<employer:STRING>' is not supported in UDFs/UDAs.
+====
+---- QUERY
+create function generic_add_fail(smallint, smallint) returns int
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+---- CATCH
+CatalogException: Function expected return type smallint but was created with INT
+====
+---- QUERY
+create function var_args_func(int...) returns int
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestUdf';
+---- CATCH
+CatalogException: Variable arguments not supported in Hive UDFs.
+====

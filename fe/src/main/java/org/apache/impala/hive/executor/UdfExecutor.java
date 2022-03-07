@@ -120,10 +120,17 @@ public class UdfExecutor {
                     HiveUdfExecutor.getParameterTypes(request));
             return new HiveUdfExecutorLegacy(request, function);
           }
+        case GENERIC_UDF: {
+            HiveGenericJavaFunction function =
+                new HiveGenericJavaFunction(udfLoader.getUDFClass(),
+                    HiveUdfExecutor.getRetType(request),
+                    HiveUdfExecutor.getParameterTypes(request));
+            return new HiveUdfExecutorGeneric(request, function);
+          }
         default:
           throw new ImpalaRuntimeException("The class " + request.fn.scalar_fn.symbol +
-              " does not derive " + "from a known supported Hive UDF class " +
-              "(UDF).");
+              " does not derive from a known supported Hive UDF class " +
+              "(UDF or GenericUDF).");
       }
     } catch (CatalogException e) {
       throw new ImpalaRuntimeException(e.getMessage(), e);

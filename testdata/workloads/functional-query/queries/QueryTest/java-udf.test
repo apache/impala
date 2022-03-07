@@ -346,3 +346,10 @@ symbol='org.apache.impala.TestUdf';
 ---- CATCH
 AnalysisException: Type TIMESTAMP is not supported for Java UDFs.
 ====
+---- QUERY
+create function var_args_func(int...) returns int
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestUdf';
+---- CATCH
+CatalogException: Variable arguments not supported in Hive UDFs.
+====

@@ -49,6 +49,9 @@ public class HiveJavaFunctionFactoryImpl implements HiveJavaFunctionFactory {
       case UDF:
         return new HiveLegacyJavaFunction(javaClass.getUDFClass(), hiveFn, retType,
             paramTypes);
+      case GENERIC_UDF:
+        return new HiveGenericJavaFunction(javaClass.getUDFClass(), hiveFn, retType,
+            paramTypes);
       default:
         throw new CatalogException("Function " + fnName + ": The class "
             + jarUri + " does not derive "
@@ -58,6 +61,9 @@ public class HiveJavaFunctionFactoryImpl implements HiveJavaFunctionFactory {
 
   public HiveJavaFunction create(String localLibPath,
       ScalarFunction fn) throws CatalogException {
+    if (fn.hasVarArgs()) {
+      throw new CatalogException("Variable arguments not supported in Hive UDFs.");
+    }
     return create(localLibPath, HiveJavaFunction.toHiveFunction((ScalarFunction) fn),
         fn.getReturnType(), fn.getArgs());
   }

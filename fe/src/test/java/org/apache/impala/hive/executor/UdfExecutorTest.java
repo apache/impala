@@ -53,6 +53,8 @@ import org.apache.hadoop.hive.ql.udf.UDFSqrt;
 import org.apache.hadoop.hive.ql.udf.UDFSubstr;
 import org.apache.hadoop.hive.ql.udf.UDFTan;
 import org.apache.hadoop.hive.ql.udf.UDFUnhex;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFBRound;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFUpper;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
@@ -199,6 +201,7 @@ public class UdfExecutorTest {
   // are allowed.
   void validateArgType(Object w) {
     if (w instanceof String ||
+        w instanceof Text ||
         w instanceof ImpalaIntWritable ||
         w instanceof ImpalaFloatWritable ||
         w instanceof ImpalaBigIntWritable ||
@@ -265,7 +268,7 @@ public class UdfExecutorTest {
       if (args[i] instanceof String) {
         // For authoring the test, we'll just pass string and make the proper
         // object here.
-        if (method.getParameterTypes()[i] == Text.class) {
+        if (method != null && method.getParameterTypes()[i] == Text.class) {
           inputArgs[i] = createText((String)args[i]);
         } else {
           inputArgs[i] = createBytes((String)args[i]);
@@ -375,7 +378,9 @@ public class UdfExecutorTest {
         List<String> argTypeStrs = Lists.newArrayList();
         for (Object arg: args) argTypeStrs.add(arg.getClass().getSimpleName());
         errMsgs.add("Argument types:  " + Joiner.on(",").join(argTypeStrs));
-        errMsgs.add("Resolved method: " + e.getMethod().toGenericString());
+        if (e.getMethod() != null) {
+          errMsgs.add("Resolved method: " + e.getMethod().toGenericString());
+        }
         Assert.fail("\n" + Joiner.on("\n").join(errMsgs));
       }
     }
@@ -455,6 +460,53 @@ public class UdfExecutorTest {
     TestHiveUdf(UDFSpace.class, createText("    "), createInt(4));
     TestHiveUdf(UDFSubstr.class, createText("World"),
         "HelloWorld", createInt(6), createInt(5));
+    freeAllocations();
+  }
+
+  @Test
+  public void HiveGenericTest()
+      throws ImpalaException, MalformedURLException, TException {
+    TestHiveUdf(GenericUDFBRound.class, createInt(1), createInt(1));
+    TestHiveUdf(GenericUDFBRound.class, createDouble(1.0), createDouble(1.1));
+    TestHiveUdf(GenericUDFUpper.class, createText("HELLO"), createText("Hello"));
+  }
+
+  @Test
+  // Test GenericUDF for all supported types
+  public void BasicGenericTest()
+      throws ImpalaException, MalformedURLException, TException {
+    TestUdf(null, TestGenericUdf.class, createBoolean(true), createBoolean(true));
+    TestUdf(null, TestGenericUdf.class, createTinyInt(1), createTinyInt(1));
+    TestUdf(null, TestGenericUdf.class, createSmallInt(1), createSmallInt(1));
+    TestUdf(null, TestGenericUdf.class, createInt(1), createInt(1));
+    TestUdf(null, TestGenericUdf.class, createBigInt(1), createBigInt(1));
+    TestUdf(null, TestGenericUdf.class, createFloat(1.1f), createFloat(1.1f));
+    TestUdf(null, TestGenericUdf.class, createDouble(1.1), createDouble(1.1));
+    TestUdf(null, TestGenericUdf.class, createText("ABCD"), createText("ABCD"));
+    TestUdf(null, TestGenericUdf.class, createDouble(3),
+        createDouble(1), createDouble(2));
+    TestUdf(null, TestGenericUdf.class, createText("ABCXYZ"), createText("ABC"),
+        createText("XYZ"));
+    TestUdf(null, TestGenericUdf.class, createInt(3), createInt(1), createInt(2));
+    TestUdf(null, TestGenericUdf.class, createFloat(1.1f + 1.2f),
+        createFloat(1.1f), createFloat(1.2f));
+    TestUdf(null, TestGenericUdf.class, createDouble(1.1 + 1.2 + 1.3),
+        createDouble(1.1), createDouble(1.2), createDouble(1.3));
+    TestUdf(null, TestGenericUdf.class, createSmallInt(1 + 2), createSmallInt(1),
+        createSmallInt(2));
+    TestUdf(null, TestGenericUdf.class, createBoolean(true),
+        createBoolean(true), createBoolean(false));
+    TestUdf(null, TestGenericUdf.class, createInt(5 + 6 + 7), createInt(5),
+        createInt(6), createInt(7));
+    TestUdf(null, TestGenericUdf.class, createBoolean(true),
+        createBoolean(false), createBoolean(false), createBoolean(true));
+    TestUdf(null, TestGenericUdf.class, createFloat(1.1f + 1.2f + 1.3f),
+        createFloat(1.1f), createFloat(1.2f), createFloat(1.3f));
+    TestUdf(null, TestGenericUdf.class, createInt(5 + 6 + 7 + 8), createInt(5),
+        createInt(6), createInt(7), createInt(8));
+    TestUdf(null, TestGenericUdf.class, createBoolean(true),
+        createBoolean(true), createBoolean(true), createBoolean(true),
+        createBoolean(true));
     freeAllocations();
   }
 

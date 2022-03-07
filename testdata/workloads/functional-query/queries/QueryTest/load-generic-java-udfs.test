@@ -1,0 +1,86 @@
+====
+---- QUERY
+create function hive_bround(int) returns int
+location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
+symbol='org.apache.hadoop.hive.ql.udf.generic.GenericUDFBRound';
+
+create function hive_bround(double) returns double
+location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
+symbol='org.apache.hadoop.hive.ql.udf.generic.GenericUDFBRound';
+
+create function hive_upper(string) returns string
+location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
+symbol='org.apache.hadoop.hive.ql.udf.generic.GenericUDFUpper';
+
+create function generic_identity(boolean) returns boolean
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+
+create function generic_identity(tinyint) returns tinyint
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+
+create function generic_identity(smallint) returns smallint
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+
+create function generic_identity(int) returns int
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+
+create function generic_identity(bigint) returns bigint
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+
+create function generic_add(boolean, boolean) returns boolean
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+
+create function generic_identity(float) returns float
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+
+create function generic_identity(double) returns double
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+
+create function generic_identity(string) returns string
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+
+create function generic_add(string, string) returns string
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+
+create function generic_add(string, string, string) returns string
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+
+create function generic_add(smallint, smallint) returns smallint
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+
+create function generic_add(int, int) returns int
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+
+create function generic_add(float, float) returns float
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+
+create function generic_add(double, double) returns double
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+
+create function generic_throws_exception() returns boolean
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdfException';
+
+create function generic_replace_string(string) returns string
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.GenericReplaceStringUdf';
+
+create function generic_import_nearby_classes(string) returns string
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.GenericImportsNearbyClassesUdf';
+====

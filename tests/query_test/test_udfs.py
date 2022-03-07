@@ -330,6 +330,10 @@ class TestUdfExecution(TestUdfBase):
     self.run_test_case('QueryTest/load-java-udfs-fail', vector, use_db=unique_database)
     self.run_test_case('QueryTest/java-udf', vector, use_db=unique_database)
 
+  def test_generic_java_udfs(self, vector, unique_database):
+    self.run_test_case('QueryTest/load-generic-java-udfs', vector, use_db=unique_database)
+    self.run_test_case('QueryTest/generic-java-udf', vector, use_db=unique_database)
+
   def test_udf_errors(self, vector, unique_database):
     # Only run with codegen disabled to force interpretation path to be taken.
     # Aim to exercise two failure cases:
