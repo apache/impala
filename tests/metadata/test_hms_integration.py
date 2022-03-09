@@ -104,6 +104,31 @@ class TestHmsIntegrationSanity(ImpalaTestSuite):
       self.client.execute("invalidate metadata hms_sanity_db.test_tbl")
     assert 'test_tbl' in self.client.execute("show tables in hms_sanity_db").data
 
+  def test_desc_json_tbl(self, unique_database):
+    """
+    This function tests if JSON tables created in impala can be
+    described in hive.
+    """
+    self.client.execute("create table {0}.json_tbl (x int) stored as jsonfile"
+                        .format(unique_database))
+    assert "col_name,data_type,comment\nx,int,from deserializer\n"\
+           == self.run_stmt_in_hive("DESCRIBE {0}.json_tbl"
+                                    .format(unique_database))
+
+  def test_desc_json_tbl_hive(self, unique_database):
+    """
+    This function tests if JSON tables created in hive can be
+    described in impala.
+    """
+    self.run_stmt_in_hive("create table {0}.json_tbl (x int) stored as jsonfile"
+                          .format(unique_database))
+    self.client.execute("INVALIDATE METADATA {0}.json_tbl"
+                        .format(unique_database))
+    # If the below query runs without throwing exception, then
+    # JSON tables created in hive can be described in impala.
+    self.client.execute("DESCRIBE {0}.json_tbl"
+                        .format(unique_database))
+
 @SkipIfS3.hive
 @SkipIfGCS.hive
 @SkipIfCOS.hive
@@ -671,25 +696,6 @@ class TestHmsIntegration(ImpalaTestSuite):
         expected['z'] = int_column
         assert expected == self.hive_columns(table_name)
         assert expected == self.impala_columns(table_name)
-
-  def test_desc_json_table(self, vector):
-    """
-    This is to test whether json tables created in impala be
-     described in hive nad vice versa.
-    """
-
-    with self.ImpalaDbWrapper(self, self.unique_string()) as db_name:
-      with self.ImpalaTableWrapper(self, db_name + '.' + self.unique_string(),
-                                   '(x int) stored as jsonfile') as table_name:
-        expected = self.client.execute('DESC %s' % table_name)
-        assert expected == self.run_stmt_in_hive('DESC %s' % table_name)
-
-    with self.HiveDbWrapper(self, self.unique_string()) as db_name:
-      with self.HiveTableWrapper(self, db_name + '.' + self.unique_string(),
-                                 '(x int) stored as jsonfile') as table_name:
-        expected = self.run_stmt_in_hive('DESC %s' % table_name)
-        self.client.execute('INVALIDATE METADATA %s' % table_name)
-        assert expected == self.client.execute('DESC %s' % table_name)
 
   @pytest.mark.execute_serially
   def test_drop_database(self, vector):
