@@ -52,7 +52,7 @@ Tuple* FileMetadataUtils::CreateTemplateTuple(MemPool* mem_pool) {
   }
   using namespace org::apache::impala::fb;
   TextConverter text_converter(/* escape_char = */ '\\',
-      scan_node_->hdfs_table()->null_column_value(),
+      scan_node_->hdfs_table()->null_partition_key_value(),
       /* check_null = */ true, /* strict_mode = */ true);
   const FbFileMetadata* file_metadata = file_desc_->file_metadata;
   const FbIcebergMetadata* ice_metadata = file_metadata->iceberg_metadata();
@@ -83,9 +83,11 @@ Tuple* FileMetadataUtils::CreateTemplateTuple(MemPool* mem_pool) {
                                     mem_pool)) {
         ErrorMsg error_msg(TErrorCode::GENERAL,
             Substitute("Could not parse partition value for "
-                "column '$0' in file '$1'. Partition string is '$2'",
+                "column '$0' in file '$1'. Partition string is '$2' "
+                "NULL Partition key value is '$3'",
                 col_desc.name(), file_desc_->filename,
-                transform->transform_value()->c_str()));
+                transform->transform_value()->c_str(),
+                scan_node_->hdfs_table()->null_partition_key_value()));
         // Dates are stored as INTs in the partition data in Iceberg, so let's try
         // to parse them as INTs.
         if (col_desc.type().type == PrimitiveType::TYPE_DATE) {

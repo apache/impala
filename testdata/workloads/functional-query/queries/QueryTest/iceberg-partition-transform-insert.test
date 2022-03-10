@@ -7,7 +7,7 @@ partitioned by spec (bucket(7, s))
 stored as iceberg;
 ====
 ---- QUERY
-insert into single_col_bucket values ('a'), ('b'), ('c'), ('d'), ('e'), ('f');
+insert into single_col_bucket values ('a'), ('b'), ('c'), ('d'), ('e'), ('f'), (NULL);
 select * from single_col_bucket;
 ---- RESULTS
 'a'
@@ -16,6 +16,7 @@ select * from single_col_bucket;
 'd'
 'e'
 'f'
+'NULL'
 ---- TYPES
 STRING
 ====
@@ -26,6 +27,7 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=2/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=4/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=6/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=__HIVE_DEFAULT_PARTITION__/.*.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
 ====
@@ -153,7 +155,7 @@ stored as iceberg;
 ---- QUERY
 insert into single_col_truncate
 values (1.1234), (10.5432), (200.786), (314.1592), (98765.4321),
-       (1.1235), (10.5433), (200.789), (314.1598), (98765.43);
+       (1.1235), (10.5433), (200.789), (314.1598), (98765.43), (NULL);
 select * from single_col_truncate;
 ---- RESULTS
 1.1234
@@ -166,6 +168,7 @@ select * from single_col_truncate;
 314.1598
 98765.4300
 98765.4321
+NULL
 ---- TYPES
 DECIMAL
 ====
@@ -177,6 +180,7 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trun
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=200.7800/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=314.1500/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=98765.4300/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=__HIVE_DEFAULT_PARTITION__/.*.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
 ====
@@ -236,7 +240,8 @@ insert into multi_col_truncate values
 (2, 222, 421,            'the quick brown fox jumps over the lazy dog'),
 (6, 333, 113211.2,       'the quick brown fox over the lazy dog the quick'),
 (7, 444, 1111154.11432,  'the quick fox brown jump impala over the quick fox brown the over jump'),
-(18, 555, 9999913.232432,'the quick impala fox dog parrot lion');
+(18, 555, 9999913.232432,'the quick impala fox dog parrot lion'),
+(NULL, NULL, NULL, NULL);
 select * from multi_col_truncate;
 ---- RESULTS
 1,11,11111.111111,'the quick brown fox jumps over the lazy dog'
@@ -244,6 +249,7 @@ select * from multi_col_truncate;
 6,333,113211.200000,'the quick brown fox over the lazy dog the quick'
 7,444,1111154.114320,'the quick fox brown jump impala over the quick fox brown the over jump'
 18,555,9999913.232432,'the quick impala fox dog parrot lion'
+NULL,NULL,NULL,'NULL'
 ---- TYPES
 INT,BIGINT,DECIMAL,STRING
 ====
@@ -255,6 +261,7 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick brown/i_trunc=5/b_trunc=330/d_trunc=113211.200000/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick fox b/i_trunc=5/b_trunc=440/d_trunc=1111154.100000/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick impal/i_trunc=15/b_trunc=550/d_trunc=9999913.200000/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=__HIVE_DEFAULT_PARTITION__/i_trunc=__HIVE_DEFAULT_PARTITION__/b_trunc=__HIVE_DEFAULT_PARTITION__/d_trunc=__HIVE_DEFAULT_PARTITION__/.*.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
 ====
@@ -293,7 +300,7 @@ where i < 5;
 INT,BIGINT,DECIMAL,STRING
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 2
-aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumRowGroups): 3
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -335,6 +342,15 @@ aggregation(SUM, RowsRead): 1
 aggregation(SUM, NumRowGroups): 1
 ====
 ---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from multi_col_truncate
+where b is NULL;
+---- RESULTS
+NULL,NULL,NULL,'NULL'
+---- TYPES
+INT,BIGINT,DECIMAL,STRING
+====
+---- QUERY
 # Create table with YEAR partition transform
 create table year_transform(t timestamp, d date)
 partitioned by spec (year(t), year(d))
@@ -347,7 +363,8 @@ insert into year_transform values
 ('1970-01-01 00:00:00', '1970-01-01'),
 ('1970-11-01 00:00:00', '1970-11-01'),
 ('1969-12-15 13:55:03', '1969-12-15'),
-('1969-02-15 13:55:03', '1969-02-15');
+('1969-02-15 13:55:03', '1969-02-15'),
+(NULL, NULL);
 select * from year_transform;
 ---- RESULTS
 2021-01-08 14:04:03,2021-01-08
@@ -356,6 +373,7 @@ select * from year_transform;
 1970-11-01 00:00:00,1970-11-01
 1969-12-15 13:55:03,1969-12-15
 1969-02-15 13:55:03,1969-02-15
+NULL,NULL
 ---- TYPES
 TIMESTAMP,DATE
 ====
@@ -365,6 +383,7 @@ show files in year_transform;
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/year_transform/data/t_year=1969/d_year=1969/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/year_transform/data/t_year=1970/d_year=1970/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/year_transform/data/t_year=2021/d_year=2021/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/year_transform/data/t_year=__HIVE_DEFAULT_PARTITION__/d_year=__HIVE_DEFAULT_PARTITION__/.*.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
 ====
@@ -416,7 +435,7 @@ where t <= '1970-01-01 00:00:00';
 TIMESTAMP,DATE
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 4
-aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumRowGroups): 3
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -467,7 +486,8 @@ insert into month_transform values
 ('1970-01-01 00:00:00', '1970-01-01'),
 ('1970-11-01 00:00:00', '1970-11-01'),
 ('1969-12-15 13:55:03', '1969-12-15'),
-('1969-02-15 13:55:03', '1969-02-15');
+('1969-02-15 13:55:03', '1969-02-15'),
+(NULL, NULL);
 select * from month_transform;
 ---- RESULTS
 2021-01-08 14:04:03,2021-01-08
@@ -476,6 +496,7 @@ select * from month_transform;
 1970-11-01 00:00:00,1970-11-01
 1969-12-15 13:55:03,1969-12-15
 1969-02-15 13:55:03,1969-02-15
+NULL,NULL
 ---- TYPES
 TIMESTAMP,DATE
 ====
@@ -487,6 +508,7 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=19
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=1970-01/d_month=1970-01/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=1970-11/d_month=1970-11/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=2021-01/d_month=2021-01/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=__HIVE_DEFAULT_PARTITION__/d_month=__HIVE_DEFAULT_PARTITION__/.*.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
 ====
@@ -576,7 +598,8 @@ insert into day_transform values
 ('1970-01-01 00:00:00', '1970-01-01'),
 ('1970-11-01 00:00:00', '1970-11-01'),
 ('1969-12-15 13:55:03', '1969-12-15'),
-('1969-02-15 13:55:03', '1969-02-15');
+('1969-02-15 13:55:03', '1969-02-15'),
+(NULL, NULL);
 select * from day_transform;
 ---- RESULTS
 2021-01-08 14:04:03,2021-01-08
@@ -586,6 +609,7 @@ select * from day_transform;
 1970-11-01 00:00:00,1970-11-01
 1969-12-15 13:55:03,1969-12-15
 1969-02-15 13:55:03,1969-02-15
+NULL,NULL
 ---- TYPES
 TIMESTAMP,DATE
 ====
@@ -599,6 +623,7 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=1970-1
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=2021-01-07/d_day=2021-01-07/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=2021-01-08/d_day=2021-01-08/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=2021-01-08/d_day=2021-01-08/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=__HIVE_DEFAULT_PARTITION__/d_day=__HIVE_DEFAULT_PARTITION__/.*.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
 ====
@@ -702,7 +727,8 @@ insert into hour_transform values
 ('1970-01-01 01:00:00'),
 ('2021-01-08 14:04:03'),
 ('2021-01-08 15:04:03'),
-('2021-01-08 15:04:33');
+('2021-01-08 15:04:33'),
+(NULL);
 select * from hour_transform;
 ---- RESULTS
 1969-12-31 22:55:03
@@ -714,6 +740,7 @@ select * from hour_transform;
 2021-01-08 14:04:03
 2021-01-08 15:04:03
 2021-01-08 15:04:33
+NULL
 ---- TYPES
 TIMESTAMP
 ====
@@ -726,6 +753,7 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=1970
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=1970-01-01-01/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=2021-01-08-14/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=2021-01-08-15/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=__HIVE_DEFAULT_PARTITION__/.*.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
 ====
@@ -767,7 +795,7 @@ where t < '1970-01-01 01:00:00';
 TIMESTAMP
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 5
-aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumRowGroups): 4
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -795,7 +823,8 @@ insert into mixed_and_shuffled values
 ('quick brown impala', 54321, 543.21, '2021-01-01 02:03:04', '2021-01-01'),
 ('quick brown dog', 31, 3333.45, '2020-01-06 05:06:07', '2020-01-06'),
 ('pink parrot', 9999777999, 9.9, '1999-09-09 09:09:09', '1999-09-09'),
-('green python', 717171, 71, '1971-07-01 07:07:07', '1971-07-01');
+('green python', 717171, 71, '1971-07-01 07:07:07', '1971-07-01'),
+(NULL, NULL, NULL, NULL, NULL);
 select * from mixed_and_shuffled;
 ---- RESULTS
 'quick brown fox',12345,123.45,2021-01-01 01:02:03,2021-01-01
@@ -803,6 +832,7 @@ select * from mixed_and_shuffled;
 'quick brown dog',31,3333.45,2020-01-06 05:06:07,2020-01-06
 'pink parrot',9999777999,9.90,1999-09-09 09:09:09,1999-09-09
 'green python',717171,71.00,1971-07-01 07:07:07,1971-07-01
+'NULL',NULL,NULL,NULL,NULL
 ---- TYPES
 STRING,BIGINT,DECIMAL,TIMESTAMP,DATE
 ====
@@ -814,6 +844,7 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=1
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=2020-01-06/da_year=2020/s_trunc=quick/b_bucket=1/de_trunc=3333.00/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=2021-01-01/da_year=2021/s_trunc=quick/b_bucket=1/de_trunc=543.00/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=2021-01-01/da_year=2021/s_trunc=quick/b_bucket=2/de_trunc=123.00/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=__HIVE_DEFAULT_PARTITION__/da_year=__HIVE_DEFAULT_PARTITION__/s_trunc=__HIVE_DEFAULT_PARTITION__/b_bucket=__HIVE_DEFAULT_PARTITION__/de_trunc=__HIVE_DEFAULT_PARTITION__/.*.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
 ====
@@ -866,4 +897,24 @@ STRING,BIGINT,DECIMAL,TIMESTAMP,DATE
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 3
 aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+select * from mixed_and_shuffled
+where s is null;
+---- RESULTS
+'NULL',NULL,NULL,NULL,NULL
+---- TYPES
+STRING,BIGINT,DECIMAL,TIMESTAMP,DATE
+====
+---- QUERY
+select * from mixed_and_shuffled
+where da is not null;
+---- RESULTS
+'quick brown fox',12345,123.45,2021-01-01 01:02:03,2021-01-01
+'quick brown impala',54321,543.21,2021-01-01 02:03:04,2021-01-01
+'quick brown dog',31,3333.45,2020-01-06 05:06:07,2020-01-06
+'pink parrot',9999777999,9.90,1999-09-09 09:09:09,1999-09-09
+'green python',717171,71.00,1971-07-01 07:07:07,1971-07-01
+---- TYPES
+STRING,BIGINT,DECIMAL,TIMESTAMP,DATE
 ====

@@ -139,12 +139,12 @@ public class IcebergScanNode extends HdfsScanNode {
         }
         // Add file descriptor to the cache.
         try {
-          org.apache.iceberg.Table iceTable = IcebergUtil.loadTable(icebergTable_);
           fileDesc = fileDesc.cloneWithFileMetadata(
-              IcebergUtil.createIcebergMetadata(iceTable, dataFile));
-        } catch (TableLoadingException ex) {
+              IcebergUtil.createIcebergMetadata(icebergTable_, dataFile));
+        } catch (TableLoadingException e) {
+          // TODO: get rid of try-catch TableLoadingException once we have IMPALA-10737.
           throw new ImpalaRuntimeException(String.format(
-              "Cannot load Iceberg table for: %s", icebergTable_.getFullName()), ex);
+              "Failed to load Iceberg table: %s", icebergTable_.getFullName()), e);
         }
         icebergTable_.getPathHashToFileDescMap().put(
             IcebergUtil.getDataFilePathHash(dataFile), fileDesc);

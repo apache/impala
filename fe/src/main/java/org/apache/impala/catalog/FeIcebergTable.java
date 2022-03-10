@@ -524,7 +524,6 @@ public interface FeIcebergTable extends FeFsTable {
       Map<String, HdfsPartition.FileDescriptor> fileDescMap = new HashMap<>();
       List<DataFile> dataFileList = IcebergUtil.getIcebergDataFiles(table,
           new ArrayList<>(), /*timeTravelSpecl=*/null);
-      Table iceTable = IcebergUtil.loadTable(table);
       for (DataFile dataFile : dataFileList) {
           Path path = new Path(dataFile.path().toString());
           if (hdfsFileDescMap.containsKey(path.toUri().getPath())) {
@@ -532,7 +531,7 @@ public interface FeIcebergTable extends FeFsTable {
             HdfsPartition.FileDescriptor fsFd = hdfsFileDescMap.get(
                 path.toUri().getPath());
             HdfsPartition.FileDescriptor iceFd = fsFd.cloneWithFileMetadata(
-                IcebergUtil.createIcebergMetadata(iceTable, dataFile));
+                IcebergUtil.createIcebergMetadata(table, dataFile));
             fileDescMap.put(pathHash, iceFd);
           } else {
             LOG.warn("Iceberg DataFile '{}' cannot be found in the HDFS recursive file "
@@ -541,7 +540,7 @@ public interface FeIcebergTable extends FeFsTable {
                 new Path(dataFile.path().toString()),
                 new Path(table.getIcebergTableLocation()), table.getHostIndex());
             HdfsPartition.FileDescriptor iceFd = fileDesc.cloneWithFileMetadata(
-                IcebergUtil.createIcebergMetadata(iceTable, dataFile));
+                IcebergUtil.createIcebergMetadata(table, dataFile));
             fileDescMap.put(IcebergUtil.getDataFilePathHash(dataFile), iceFd);
           }
       }

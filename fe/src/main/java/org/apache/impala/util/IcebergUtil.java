@@ -865,9 +865,10 @@ public class IcebergUtil {
    * It creates a flatbuffer so it can be passed between machines and processes without
    * further de/serialization.
    */
-  public static FbFileMetadata createIcebergMetadata(Table iceTbl, DataFile df) {
+  public static FbFileMetadata createIcebergMetadata(FeIcebergTable feTbl, DataFile df)
+      throws TableLoadingException {
     FlatBufferBuilder fbb = new FlatBufferBuilder(1);
-    int iceOffset = createIcebergMetadata(fbb, iceTbl, df);
+    int iceOffset = createIcebergMetadata(feTbl, fbb, df);
     fbb.finish(FbFileMetadata.createFbFileMetadata(fbb, iceOffset));
     ByteBuffer bb = fbb.dataBuffer().slice();
     ByteBuffer compressedBb = ByteBuffer.allocate(bb.capacity());
@@ -875,12 +876,14 @@ public class IcebergUtil {
     return FbFileMetadata.getRootAsFbFileMetadata((ByteBuffer)compressedBb.flip());
   }
 
-  private static int createIcebergMetadata(FlatBufferBuilder fbb, Table iceTbl,
-      DataFile df) {
+  private static int createIcebergMetadata(FeIcebergTable feTbl, FlatBufferBuilder fbb,
+      DataFile df) throws TableLoadingException {
+    //TODO: avoid loading the table once we have IMPALA-10737 again:
+    Table iceTbl = loadTable(feTbl);
     int partKeysOffset = -1;
     PartitionSpec spec = iceTbl.specs().get(df.specId());
     if (spec != null && !spec.fields().isEmpty()) {
-      partKeysOffset = createPartitionKeys(fbb, spec, df);
+      partKeysOffset = createPartitionKeys(feTbl, fbb, spec, df);
     }
     FbIcebergMetadata.startFbIcebergMetadata(fbb);
     byte fileFormat = -1;
@@ -896,25 +899,31 @@ public class IcebergUtil {
     return FbIcebergMetadata.endFbIcebergMetadata(fbb);
   }
 
-  private static int createPartitionKeys(FlatBufferBuilder fbb, PartitionSpec spec,
-      DataFile df) {
+  private static int createPartitionKeys(FeIcebergTable feTbl, FlatBufferBuilder fbb,
+      PartitionSpec spec, DataFile df) {
     Preconditions.checkState(spec.fields().size() == df.partition().size());
     int[] partitionKeyOffsets = new int[spec.fields().size()];
     for (int i = 0; i < spec.fields().size(); ++i) {
       partitionKeyOffsets[i] =
-          createPartitionTransformValue(fbb, spec, df, i);
+          createPartitionTransformValue(feTbl, fbb, spec, df, i);
     }
     return FbIcebergMetadata.createPartitionKeysVector(fbb, partitionKeyOffsets);
   }
 
-  private static int createPartitionTransformValue(FlatBufferBuilder fbb,
-      PartitionSpec spec, DataFile df, int fieldIndex) {
+  private static int createPartitionTransformValue(FeIcebergTable feTbl,
+      FlatBufferBuilder fbb, PartitionSpec spec, DataFile df, int fieldIndex) {
     PartitionField field = spec.fields().get(fieldIndex);
     Pair<Byte, Integer> transform = getFbTransform(spec.schema(), field);
     int valueOffset = -1;
     if (transform.first != FbIcebergTransformType.VOID) {
       Object partValue = df.partition().get(fieldIndex, Object.class);
-      valueOffset = fbb.createString(partValue.toString());
+      String partValueString;
+      if (partValue != null) {
+        partValueString = partValue.toString();
+      } else {
+        partValueString = feTbl.getNullPartitionKeyValue();
+      }
+      valueOffset = fbb.createString(partValueString);
     }
     FbIcebergPartitionTransformValue.startFbIcebergPartitionTransformValue(fbb);
     FbIcebergPartitionTransformValue.addTransformType(fbb, transform.first);
