@@ -26,11 +26,9 @@ import java.util.Set;
 
 import com.google.common.base.Preconditions;
 
-import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
-import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.types.TypeUtil;
@@ -254,16 +252,6 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
   @Override
   public long snapshotId() {
     return -1;
-  }
-
-  @Override
-  public BaseTable getIcebergBaseTable() {
-    return null;
-  }
-
-  @Override
-  public TableMetadata getIcebergTableMetadata() {
-    return null;
   }
 
   public void addColumn(IcebergColumn col) {

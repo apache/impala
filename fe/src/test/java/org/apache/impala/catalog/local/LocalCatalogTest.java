@@ -26,6 +26,7 @@ import java.util.Set;
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hive.service.rpc.thrift.TGetColumnsReq;
+import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ToSqlUtils;
@@ -45,12 +46,14 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.service.Frontend;
+import org.apache.impala.service.MetadataOp;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TMetadataOpcode;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartialTableInfo;
+import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.MetaStoreUtil;
@@ -58,6 +61,7 @@ import org.apache.impala.util.PatternMatcher;
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.google.common.base.Joiner;
@@ -260,12 +264,12 @@ public class LocalCatalogTest {
     LocalIcebergTable t = (LocalIcebergTable)catalog_.getTable(
         "functional_parquet", "iceberg_partitioned");
     Map<String, FileDescriptor> localTblFdMap = t.getPathHashToFileDescMap();
-    TPartialTableInfo tblInfo = provider_.loadTableInfoWithIcebergTable(t.ref_);
+    TPartialTableInfo tblInfo = provider_.loadTableInfoWithIcebergSnapshot(t.ref_);
     ListMap<TNetworkAddress> catalogdHostIndexes = new ListMap<>();
     catalogdHostIndexes.populate(tblInfo.getNetwork_addresses());
     Map<String, FileDescriptor> catalogFdMap =
         FeIcebergTable.Utils.loadFileDescMapFromThrift(
-            tblInfo.getIceberg_table().getPath_hash_to_file_descriptor(),
+            tblInfo.getIceberg_snapshot().getIceberg_file_desc_map(),
             null, null);
     for (Map.Entry<String, FileDescriptor> entry : localTblFdMap.entrySet()) {
       String path = entry.getKey();

@@ -1117,7 +1117,7 @@ public class Frontend {
     FeTable feTable = getCatalog().getTable(dbName, tableName);
     Preconditions.checkState(feTable instanceof FeIcebergTable);
     FeIcebergTable feIcebergTable = (FeIcebergTable) feTable;
-    TableMetadata metadata = feIcebergTable.getIcebergTableMetadata();
+    TableMetadata metadata = IcebergUtil.getIcebergTableMetadata(feIcebergTable);
     Table table = IcebergUtil.loadTable(feIcebergTable);
     Set<Long> ancestorIds = Sets.newHashSet(IcebergUtil.currentAncestorIds(table));
 

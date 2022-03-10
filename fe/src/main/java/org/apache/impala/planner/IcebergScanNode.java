@@ -138,9 +138,14 @@ public class IcebergScanNode extends HdfsScanNode {
               "Cannot load file descriptor for: " + dataFile.path());
         }
         // Add file descriptor to the cache.
-        org.apache.iceberg.Table iceTable = icebergTable_.getIcebergBaseTable();
-        fileDesc = fileDesc.cloneWithFileMetadata(
-            IcebergUtil.createIcebergMetadata(iceTable, dataFile));
+        try {
+          org.apache.iceberg.Table iceTable = IcebergUtil.loadTable(icebergTable_);
+          fileDesc = fileDesc.cloneWithFileMetadata(
+              IcebergUtil.createIcebergMetadata(iceTable, dataFile));
+        } catch (TableLoadingException ex) {
+          throw new ImpalaRuntimeException(String.format(
+              "Cannot load Iceberg table for: %s", icebergTable_.getFullName()), ex);
+        }
         icebergTable_.getPathHashToFileDescMap().put(
             IcebergUtil.getDataFilePathHash(dataFile), fileDesc);
       }

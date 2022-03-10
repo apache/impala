@@ -578,19 +578,18 @@ struct TIcebergTable {
   2: required list<TIcebergPartitionSpec> partition_spec
   3: required i32 default_partition_spec_id
   // Map from 128-bit Murmur3 hash of data file path to its file descriptor
-  4: optional map<string, THdfsFileDesc> path_hash_to_file_descriptor
+  4: optional map<string,THdfsFileDesc> path_hash_to_file_descriptor
+  // Iceberg snapshot id of the table
+  5: optional i64 snapshot_id
   // Iceberg 'write.parquet.compression-codec' and 'write.parquet.compression-level' table
   // properties
-  5: optional TCompressionCodec parquet_compression_codec
+  6: optional TCompressionCodec parquet_compression_codec
   // Iceberg 'write.parquet.row-group-size-bytes' table property
-  6: optional i64 parquet_row_group_size
+  7: optional i64 parquet_row_group_size
   // Iceberg 'write.parquet.page-size-bytes' and 'write.parquet.dict-size-bytes' table
   // properties
-  7: optional i64 parquet_plain_page_size;
-  8: optional i64 parquet_dict_page_size;
-  // Serialized org.apache.iceberg.BaseTable object, it is used to execute operations
-  // on the encapsulated Iceberg org.apache.iceberg.TableMetadata.
-  9: optional binary iceberg_base_table;
+  8: optional i64 parquet_plain_page_size;
+  9: optional i64 parquet_dict_page_size;
 }
 
 // Represents a table or view.

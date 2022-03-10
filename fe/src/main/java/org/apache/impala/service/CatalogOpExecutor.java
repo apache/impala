@@ -102,7 +102,6 @@ import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FileMetadataLoadOpts;
 import org.apache.impala.catalog.IcebergTable;
-import org.apache.impala.catalog.IcebergTableLoadingException;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
@@ -6062,13 +6061,8 @@ public class CatalogOpExecutor {
               //     ACID tables, there is a Jira to cover this: HIVE-22062.
               //   2: If no need for a full table reload then fetch partition level
               //     writeIds and reload only the ones that changed.
-              try {
-                updatedThriftTable = catalog_.reloadTable(tbl, req, resultType, cmdString,
-                    -1);
-              } catch (IcebergTableLoadingException e) {
-                updatedThriftTable = catalog_.invalidateTable(
-                    req.getTable_name(), tblWasRemoved, dbWasAdded);
-              }
+              updatedThriftTable = catalog_.reloadTable(tbl, req, resultType, cmdString,
+                  -1);
             }
           } else {
             // Table was loaded from scratch, so it's already "refreshed".

@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog.local;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -25,8 +26,8 @@ import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
-import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.TableMetadata;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.catalog.CatalogObject;
 import org.apache.impala.catalog.Column;
@@ -41,12 +42,13 @@ import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
-import org.apache.impala.thrift.TIcebergTable;
-import org.apache.impala.thrift.TPartialTableInfo;
+import org.apache.impala.thrift.TIcebergSnapshot;
+import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.util.IcebergUtil;
+import org.apache.thrift.TException;
 
 import com.google.common.base.Preconditions;
 import com.google.errorprone.annotations.Immutable;
@@ -68,32 +70,29 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   private int defaultPartitionSpecId_;
   private Map<String, FileDescriptor> pathHashToFileDescMap_;
   private LocalFsTable localFsTable_;
+  private long snapshotId_ = -1;
   private Schema icebergSchema_;
 
-  // BaseTable contains the metadata that Iceberg keeps track of.
-  private BaseTable icebergBaseTable_;
-
-  /**
-   * Loads the Iceberg metadata from the CatalogD then initializes a LocalIcebergTable.
-   */
-  static LocalTable loadIcebergTableViaMetaProvider(LocalDb db, Table msTable,
+  static LocalTable loadFromIceberg(LocalDb db, Table msTable,
       MetaProvider.TableMetaRef ref) throws TableLoadingException {
     Preconditions.checkNotNull(db);
     Preconditions.checkNotNull(msTable);
     try {
-      TPartialTableInfo tableInfo =
-          db.getCatalog().getMetaProvider().loadIcebergTable(ref);
-      TIcebergTable table = tableInfo.getIceberg_table();
-      BaseTable icebergBaseTable = FeIcebergTable.Utils.deserializeIcebergBaseTable(
-          table.getIceberg_base_table());
-      List<Column> iceColumns = IcebergSchemaConverter.convertToImpalaSchema(
-          icebergBaseTable.operations().current().schema());
+      TableParams params = new TableParams(msTable);
+      TableMetadata metadata =
+          IcebergUtil.getIcebergTableMetadata(params.icebergCatalog_,
+              IcebergUtil.getIcebergTableIdentifier(msTable),
+              params.icebergCatalogLocation_,
+              msTable.getParameters());
+      List<Column> iceColumns =
+          IcebergSchemaConverter.convertToImpalaSchema(metadata.schema());
       validateColumns(iceColumns, msTable.getSd().getCols());
       ColumnMap colMap = new ColumnMap(iceColumns,
           /*numClusteringCols=*/ 0,
           db.getName() + "." + msTable.getTableName(),
           /*isFullAcidSchema=*/false);
-      return new LocalIcebergTable(db, msTable, ref, colMap, tableInfo, icebergBaseTable);
+
+      return new LocalIcebergTable(db, msTable, ref, colMap, metadata);
     } catch (Exception e) {
       String fullTableName = msTable.getDbName() + "." + msTable.getTableName();
       throw new TableLoadingException(
@@ -102,20 +101,25 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   }
 
   private LocalIcebergTable(LocalDb db, Table msTable, MetaProvider.TableMetaRef ref,
-      ColumnMap cmap, TPartialTableInfo tableInfo, BaseTable icebergBaseTable)
+      ColumnMap cmap, TableMetadata metadata)
       throws TableLoadingException {
     super(db, msTable, ref, cmap);
-    Preconditions.checkNotNull(tableInfo);
     localFsTable_ = LocalFsTable.load(db, msTable, ref);
     tableParams_ = new TableParams(msTable);
-    pathHashToFileDescMap_ = FeIcebergTable.Utils.loadFileDescMapFromThrift(
-        tableInfo.getIceberg_table().getPath_hash_to_file_descriptor(),
-        tableInfo.getNetwork_addresses(),
-        getHostIndex());
-    icebergBaseTable_ = icebergBaseTable;
-    partitionSpecs_ = Utils.loadPartitionSpecByIceberg(getIcebergTableMetadata());
-    defaultPartitionSpecId_ = getIcebergTableMetadata().defaultSpecId();
-    icebergSchema_ = getIcebergTableMetadata().schema();
+    FeIcebergTable.Snapshot snapshot;
+    try {
+      snapshot = db_.getCatalog().getMetaProvider().loadIcebergSnapshot(
+          ref, getHostIndex());
+      Preconditions.checkNotNull(snapshot);
+      snapshotId_ = snapshot.snapshotId;
+      pathHashToFileDescMap_ = snapshot.pathHashToFileDescMap;
+    } catch (TException e) {
+      throw new TableLoadingException(String.format(
+          "Failed to load table: %s.%s", msTable.getDbName(), msTable.getTableName()), e);
+    }
+    partitionSpecs_ = Utils.loadPartitionSpecByIceberg(metadata);
+    defaultPartitionSpecId_ = metadata.defaultSpecId();
+    icebergSchema_ = metadata.schema();
     icebergFileFormat_ = IcebergUtil.getIcebergFileFormat(msTable);
     icebergParquetCompressionCodec_ = Utils.getIcebergParquetCompressionCodec(msTable);
     icebergParquetRowGroupSize_ = Utils.getIcebergParquetRowGroupSize(msTable);
@@ -200,8 +204,8 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   }
 
   @Override
-  public BaseTable getIcebergBaseTable() {
-    return icebergBaseTable_;
+  public long snapshotId() {
+    return snapshotId_;
   }
 
   @Override

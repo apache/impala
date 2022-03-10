@@ -19,13 +19,18 @@ package org.apache.impala.catalog.local;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import com.google.common.base.Stopwatch;
+import com.google.common.collect.Iterables;
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
@@ -39,6 +44,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TableMeta;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FileMetadataLoader;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCachePool;
@@ -54,8 +60,8 @@ import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TBriefTableMeta;
+import org.apache.impala.thrift.TIcebergSnapshot;
 import org.apache.impala.thrift.TNetworkAddress;
-import org.apache.impala.thrift.TPartialTableInfo;
 import org.apache.impala.thrift.TValidWriteIdList;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.ListMap;
@@ -540,9 +546,10 @@ class DirectMetaProvider implements MetaProvider {
   }
 
   @Override
-  public TPartialTableInfo loadIcebergTable(final TableMetaRef table)
+  public FeIcebergTable.Snapshot loadIcebergSnapshot(final TableMetaRef table,
+      ListMap<TNetworkAddress> hostIndex)
       throws TException {
     throw new NotImplementedException(
-        "loadIcebergTable() is not implemented for DirectMetaProvider");
+        "loadIcebergSnapshot() is not implemented for DirectMetaProvider");
   }
 }

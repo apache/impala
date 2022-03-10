@@ -104,7 +104,7 @@ abstract class LocalTable implements FeTable {
     } else if (KuduTable.isKuduTable(msTbl)) {
       t = LocalKuduTable.loadFromKudu(db, msTbl, ref);
     } else if (IcebergTable.isIcebergTable(msTbl)) {
-      t = LocalIcebergTable.loadIcebergTableViaMetaProvider(db, msTbl, ref);
+      t = LocalIcebergTable.loadFromIceberg(db, msTbl, ref);
     } else if (DataSourceTable.isDataSourceTable(msTbl)) {
       // TODO(todd) support datasource table
     } else if (HdfsFileFormat.isHdfsInputFormatClass(
