@@ -39,9 +39,7 @@ namespace impala {
 /// Super class for templatized thrift clients.
 class ThriftClientImpl {
  public:
-  ~ThriftClientImpl() {
-    Close();
-  }
+  virtual ~ThriftClientImpl() { Close(); }
 
   const TNetworkAddress& address() const { return address_; }
 

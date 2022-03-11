@@ -453,6 +453,7 @@ class ClientCache {
 
  private:
   friend class ClientConnection<T>;
+  friend class ClientCacheTest;
 
   /// Most operations in this class are thin wrappers around the
   /// equivalent in ClientCacheHelper, which is a non-templated cache

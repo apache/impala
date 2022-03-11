@@ -95,6 +95,7 @@ add_library(RuntimeTests STATIC
   decimal-test.cc
   free-pool-test.cc
   hdfs-fs-cache-test.cc
+  client-cache-test.cc
   mem-pool-test.cc
   mem-tracker-test.cc
   multi-precision-test.cc
@@ -113,6 +114,7 @@ add_dependencies(RuntimeTests gen-deps)
 
 ADD_UNIFIED_BE_LSAN_TEST(coordinator-backend-state-test CoordinatorBackendStateTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(mem-pool-test MemPoolTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(client-cache-test ClientCacheTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(free-pool-test FreePoolTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(string-buffer-test StringBufferTest.*)
 # Exception to unified be tests: Custom main function (initializes LLVM)
