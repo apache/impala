@@ -180,7 +180,9 @@ bool useAsyncIoForStream(orc::StreamKind kind) {
     case orc::StreamKind_BLOOM_FILTER_UTF8:
       return false;
     default:
-      DCHECK(false);
+      // We might have bogus StreamKind if we are reading corrupted ORC file.
+      // Return false and let ORC lib deals with it.
+      return false;
   }
 }
 
