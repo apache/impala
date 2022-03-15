@@ -36,8 +36,13 @@ mkdir -p "${RESULTS_DIR}"
 cd "${IMPALA_HOME}/tests"
 . "${IMPALA_HOME}/bin/set-classpath.sh" &> /dev/null
 
+: ${CLUSTER_TEST_FILES:=}
+if [[ "$CLUSTER_TEST_FILES" != "" ]]; then
+  ARGS=($CLUSTER_TEST_FILES)
+else
+  ARGS=(custom_cluster/ authorization/)
+fi
 AUX_CUSTOM_DIR="${IMPALA_AUX_TEST_HOME}/tests/aux_custom_cluster_tests/"
-ARGS=(custom_cluster/ authorization/)
 if [[ -d "${AUX_CUSTOM_DIR}" ]]
 then
   ARGS+=("${AUX_CUSTOM_DIR}")

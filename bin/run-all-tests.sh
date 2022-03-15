@@ -51,6 +51,7 @@ fi
 : ${JDBC_TEST:=true}
 # Run Cluster Tests
 : ${CLUSTER_TEST:=true}
+: ${CLUSTER_TEST_FILES:=}
 # Extra arguments passed to start-impala-cluster for tests. These do not apply to custom
 # cluster tests.
 : ${TEST_START_CLUSTER_ARGS:=}
@@ -192,12 +193,22 @@ run_ee_tests() {
 
 for i in $(seq 1 $NUM_TEST_ITERATIONS)
 do
+  echo "Test iteration $i"
   TEST_RET_CODE=0
 
   # Store a list of the files at the beginning of each iteration.
   hdfs dfs -ls -R /test-warehouse > ${IMPALA_LOGS_DIR}/file-list-begin-${i}.log 2>&1
 
-  start_impala_cluster
+  # Try not restarting the cluster to save time. BE, FE, JDBC and EE tests require
+  # running on a cluster with default flags. We just need to restart the cluster when
+  # there are custom-cluster tests which will leave the cluster running with specifit
+  # flags.
+  if [[ "$BE_TEST" == true || "$FE_TEST" == true || "$EE_TEST" == true
+      || "$JDBC_TEST" == true ]]; then
+    if [[ $i == 1 || "$CLUSTER_TEST" == true ]]; then
+      start_impala_cluster
+    fi
+  fi
 
   if [[ "$BE_TEST" == true ]]; then
     if [[ "$TARGET_FILESYSTEM" == "local" ]]; then
@@ -325,12 +336,16 @@ do
   # the list of files is from dataload.
   hdfs dfs -ls -R /test-warehouse > ${IMPALA_LOGS_DIR}/file-list-end-${i}.log 2>&1
 
-  # Finally, kill the spawned timeout process and its child sleep process.
-  # There may not be a sleep process, so ignore failure.
-  pkill -P $TIMEOUT_PID || true
-  kill $TIMEOUT_PID
-
   if [[ $TEST_RET_CODE == 1 ]]; then
-    exit $TEST_RET_CODE
+    break
   fi
 done
+
+# Finally, kill the spawned timeout process and its child sleep process.
+# There may not be a sleep process, so ignore failure.
+pkill -P $TIMEOUT_PID || true
+kill $TIMEOUT_PID
+
+if [[ $TEST_RET_CODE == 1 ]]; then
+  exit $TEST_RET_CODE
+fi
