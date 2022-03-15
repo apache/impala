@@ -42,6 +42,20 @@ using namespace impala::io;
 
 namespace impala {
 
+/// Generic wrapper to catch exceptions thrown from the ORC lib.
+/// ResourceError is thrown by the OrcMemPool of our orc-scanner.
+/// Other exceptions, e.g. orc::ParseError, are thrown by the ORC lib.
+#define RETURN_ON_ORC_EXCEPTION(msg_format)                       \
+  catch (ResourceError& e) {                                      \
+    parse_status_ = e.GetStatus();                                \
+    return parse_status_;                                         \
+  } catch (std::exception& e) {                                   \
+    string msg = Substitute(msg_format, filename(), e.what());    \
+    parse_status_ = Status(msg);                                  \
+    VLOG_QUERY << parse_status_.msg().msg();                      \
+    return parse_status_;                                         \
+  }
+
 Status HdfsOrcScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const vector<HdfsFileDesc*>& files) {
   DCHECK(!files.empty());
@@ -203,15 +217,7 @@ Status HdfsOrcScanner::StartColumnReading(const orc::StripeInformation& stripe) 
       columnRanges_.emplace_back(stream->getLength(), stream->getOffset(),
           stream->getKind(), stream->getColumnId(), this);
     }
-  } catch (ResourceError& e) { // errors throw from the orc scanner
-    parse_status_ = e.GetStatus();
-    return parse_status_;
-  } catch (std::exception& e) { // other errors throw from the orc library
-    string msg = Substitute(
-        "Encountered parse error in tail of ORC file $0: $1", filename(), e.what());
-    parse_status_ = Status(msg);
-    return parse_status_;
-  }
+  } RETURN_ON_ORC_EXCEPTION("Encountered parse error in tail of ORC file $0: $1");
 
   // Sort and check that there is no overlapping range in columnRanges_.
   sort(columnRanges_.begin(), columnRanges_.end());
@@ -431,12 +437,9 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
     }
     orc_root_reader_ = this->obj_pool_.Add(
         new OrcStructReader(root_type, scan_node_->tuple_desc(), this));
-  } catch (std::exception& e) {
-    string msg = Substitute("Encountered parse error during schema selection in "
-        "ORC file $0: $1", filename(), e.what());
-    parse_status_ = Status(msg);
-    return parse_status_;
-  }
+  } RETURN_ON_ORC_EXCEPTION(
+      "Encountered parse error during schema selection in ORC file $0: $1");
+
   // Set top-level template tuple.
   template_tuple_ = template_tuple_map_[scan_node_->tuple_desc()];
   return Status::OK();
@@ -499,15 +502,7 @@ Status HdfsOrcScanner::ProcessFileTail() {
     VLOG_FILE << "Processing FileTail of ORC file: " << input_stream->getName()
               << ", file_length: " << input_stream->getLength();
     reader_ = orc::createReader(move(input_stream), reader_options_);
-  } catch (ResourceError& e) {  // errors throw from the orc scanner
-    parse_status_ = e.GetStatus();
-    return parse_status_;
-  } catch (std::exception& e) { // other errors throw from the orc library
-    string msg = Substitute("Encountered parse error in tail of ORC file $0: $1",
-        filename(), e.what());
-    parse_status_ = Status(msg);
-    return parse_status_;
-  }
+  } RETURN_ON_ORC_EXCEPTION("Encountered parse error in tail of ORC file $0: $1");
 
   if (reader_->getNumberOfRows() == 0)  return Status::OK();
   if (reader_->getNumberOfStripes() == 0) {
@@ -921,15 +916,7 @@ Status HdfsOrcScanner::NextStripe() {
     RETURN_IF_ERROR(PrepareSearchArguments());
     try {
       row_reader_ = reader_->createRowReader(row_reader_options_);
-    } catch (ResourceError& e) {  // errors throw from the orc scanner
-      parse_status_ = e.GetStatus();
-      return parse_status_;
-    } catch (std::exception& e) { // errors throw from the orc library
-      parse_status_ = Status(Substitute(
-          "Error in creating column readers for ORC file $0: $1.", filename(), e.what()));
-      VLOG_QUERY << parse_status_.msg().msg();
-      return parse_status_;
-    }
+    } RETURN_ON_ORC_EXCEPTION("Error in creating column readers for ORC file $0: $1.");
     end_of_stripe_ = false;
     VLOG_ROW << Substitute("Created RowReader for stripe(offset=$0, len=$1) in file $2",
         stripe->getOffset(), stripe_len, filename());
@@ -947,8 +934,10 @@ Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
   // We're going to free the previous batch. Clear the reference first.
   RETURN_IF_ERROR(orc_root_reader_->UpdateInputBatch(nullptr));
 
-  orc_root_batch_ = row_reader_->createRowBatch(row_batch->capacity());
-  DCHECK_EQ(orc_root_batch_->numElements, 0);
+  try {
+    orc_root_batch_ = row_reader_->createRowBatch(row_batch->capacity());
+    DCHECK_EQ(orc_root_batch_->numElements, 0);
+  } RETURN_ON_ORC_EXCEPTION("Encounter error in creating ORC row batch for file $0: $1.");
 
   int64_t num_rows_read = 0;
   while (continue_execution) {  // one ORC batch (ColumnVectorBatch) in a round
@@ -963,16 +952,8 @@ Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
           orc_root_reader_->SetFileRowIndex(row_reader_->getRowNumber());
         }
         if (end_of_stripe_) break; // no more data to process
-      } catch (ResourceError& e) {
-        parse_status_ = e.GetStatus();
-        return parse_status_;
-      } catch (std::exception& e) {
-        parse_status_ = Status(Substitute(
-            "Encounter parse error in ORC file $0: $1.", filename(), e.what()));
-        VLOG_QUERY << parse_status_.msg().msg();
-        eos_ = true;
-        return parse_status_;
-      }
+      } RETURN_ON_ORC_EXCEPTION("Encounter parse error in ORC file $0: $1.");
+
       if (orc_root_batch_->numElements == 0) {
         RETURN_IF_ERROR(CommitRows(0, row_batch));
         end_of_stripe_ = true;
@@ -1390,12 +1371,8 @@ Status HdfsOrcScanner::PrepareSearchArguments() {
       VLOG_FILE << "Built search arguments for ORC file: " << filename() << ": "
           << final_sarg->toString() << ". File schema: " << reader_->getType().toString();
       row_reader_options_.searchArgument(std::move(final_sarg));
-    } catch (std::exception& e) {
-      string msg = Substitute("Encountered parse error during building search arguments "
-          "in ORC file $0: $1", filename(), e.what());
-      parse_status_ = Status(msg);
-      return parse_status_;
-    }
+    } RETURN_ON_ORC_EXCEPTION(
+        "Encountered parse error during building search arguments in ORC file $0: $1");
   }
   // Free any expr result allocations accumulated during conjunct evaluation.
   context_->expr_results_pool()->Clear();
