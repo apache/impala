@@ -254,15 +254,19 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
       # evaluated for all formats that don't have a commented section for this query.
       if subsection_name == 'RUNTIME_PROFILE':
         if subsection_comment is not None and subsection_comment is not "":
-          allowed_formats = ['kudu']
+          allowed_formats = ['kudu', 'parquet', 'orc']
           if not subsection_comment.startswith("table_format="):
-            raise RuntimeError, 'RUNTIME_PROFILE comment (%s) must be of the form ' \
-              '"table_format=FORMAT"' % subsection_comment
-          table_format = subsection_comment[13:]
-          if table_format not in allowed_formats:
-            raise RuntimeError, 'RUNTIME_PROFILE table format (%s) must be in: %s' % \
-                (table_format, allowed_formats)
-          subsection_name = 'RUNTIME_PROFILE_%s' % table_format
+            raise RuntimeError('RUNTIME_PROFILE comment (%s) must be of the form '
+              '"table_format=FORMAT[,FORMAT2,...]"' % subsection_comment)
+          parsed_formats = subsection_comment[13:].split(',')
+          for table_format in parsed_formats:
+            if table_format not in allowed_formats:
+              raise RuntimeError('RUNTIME_PROFILE table format (%s) must be in: %s' %
+                  (table_format, allowed_formats))
+            else:
+              subsection_name_for_format = 'RUNTIME_PROFILE_%s' % table_format
+              parsed_sections[subsection_name_for_format] = subsection_str
+          continue
 
       parsed_sections[subsection_name] = subsection_str
 

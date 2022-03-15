@@ -686,7 +686,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     different number of executors and memory limit in each."""
     # A small query with estimated memory per host of 10MB that can run on the small
     # executor group
-    SMALL_QUERY = "select count(*) from tpcds_parquet.date_dim;"
+    SMALL_QUERY = "select count(*) from tpcds_parquet.date_dim where d_year=2022;"
     # A large query with estimated memory per host of 132MB that can only run on
     # the large executor group.
     LARGE_QUERY = "select * from tpcds_parquet.store_sales where ss_item_sk = 1 limit 50;"

@@ -19,7 +19,8 @@ select count(*) from ice_types1;
 ---- TYPES
 BIGINT
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 3
 ====
 ---- QUERY
 show files in ice_types1;
@@ -250,7 +251,8 @@ select count(*) from ice_types2;
 ---- TYPES
 BIGINT
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 3
 ====
 ---- QUERY
 show files in ice_types2;
@@ -367,7 +369,8 @@ select count(*) from ice_types3;
 ---- TYPES
 BIGINT
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 3
 ====
 ---- QUERY
 show files in ice_types3;

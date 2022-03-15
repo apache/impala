@@ -89,6 +89,7 @@ import org.apache.impala.thrift.TScanRangeLocationList;
 import org.apache.impala.thrift.TScanRangeSpec;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTableStats;
+import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.BitUtil;
 import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.apache.impala.util.MathUtil;
@@ -330,6 +331,8 @@ public class HdfsScanNode extends ScanNode {
   // Used only to display EXPLAIN information.
   private final List<Expr> partitionConjuncts_;
 
+  private boolean isFullAcidTable_ = false;
+
   /**
    * Construct a node to scan given data files into tuples described by 'desc',
    * with 'conjuncts' being the unevaluated conjuncts bound by the tuple and
@@ -349,6 +352,8 @@ public class HdfsScanNode extends ScanNode {
     randomReplica_ = hdfsTblRef.getRandomReplica();
     FeFsTable hdfsTable = (FeFsTable)hdfsTblRef.getTable();
     Preconditions.checkState(tbl_ == hdfsTable);
+    isFullAcidTable_ =
+        AcidUtils.isFullAcidTable(hdfsTable.getMetaStoreTable().getParameters());
     StringBuilder error = new StringBuilder();
     aggInfo_ = aggInfo;
     skipHeaderLineCount_ = tbl_.parseSkipHeaderLineCount(error);
@@ -392,13 +397,14 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * Returns true if the Parquet count(*) optimization can be applied to the query block
+   * Returns true if the count(*) optimization can be applied to the query block
    * of this scan node.
    */
   protected boolean canApplyCountStarOptimization(Analyzer analyzer,
       Set<HdfsFileFormat> fileFormats) {
     if (fileFormats.size() != 1) return false;
-    if (!hasParquet(fileFormats)) return false;
+    if (isFullAcidTable_) return false;
+    if (!hasParquet(fileFormats) && !hasOrc(fileFormats)) return false;
     return canApplyCountStarOptimization(analyzer);
   }
 
@@ -1482,6 +1488,13 @@ public class HdfsScanNode extends ScanNode {
           numRangesAdjusted :
           Math.min(inputCardinality_, numRangesAdjusted);
     }
+
+    if (countStarSlot_ != null) {
+      // We are doing optimized count star. Override cardinality with total num files.
+      long totalFiles = sumValues(totalFilesPerFs_);
+      inputCardinality_ = totalFiles;
+      cardinality_ = totalFiles;
+    }
     if (LOG.isTraceEnabled()) {
       LOG.trace("HdfsScan: cardinality_=" + Long.toString(cardinality_));
     }
@@ -1775,8 +1788,7 @@ public class HdfsScanNode extends ScanNode {
     msg.hdfs_scan_node.setUse_mt_scan_node(useMtScanNode_);
     Preconditions.checkState((optimizedAggSmap_ == null) == (countStarSlot_ == null));
     if (countStarSlot_ != null) {
-      msg.hdfs_scan_node.setParquet_count_star_slot_offset(
-          countStarSlot_.getByteOffset());
+      msg.hdfs_scan_node.setCount_star_slot_offset(countStarSlot_.getByteOffset());
     }
     if (!statsConjuncts_.isEmpty()) {
       for (Expr e: statsConjuncts_) {

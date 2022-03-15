@@ -548,7 +548,7 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   int64_t LastRowIdxInCurrentPage() const {
     DCHECK(!candidate_data_pages_.empty());
     int64_t num_rows =
-        parent_->file_metadata_.row_groups[parent_->row_group_idx_].num_rows;
+        parent_->file_metadata_.row_groups[parent_->group_idx_].num_rows;
     // Find the next valid page.
     int page_idx = candidate_data_pages_[candidate_page_idx_] + 1;
     while (page_idx < offset_index_.page_locations.size()) {

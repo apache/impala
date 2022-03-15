@@ -1515,7 +1515,8 @@ class TestOrc(ImpalaTestSuite):
   def _misaligned_orc_stripes_helper(
           self, table_name, rows_in_table, num_scanners_with_no_reads=0):
     """Checks if 'num_scanners_with_no_reads' indicates the expected number of scanners
-    that don't read anything because the underlying file is poorly formatted
+    that don't read anything because the underlying file is poorly formatted.
+    Additionally, test that select count(star) match with expected number of rows.
     """
     query = 'select * from %s' % table_name
     result = self.client.execute(query)
@@ -1535,6 +1536,11 @@ class TestOrc(ImpalaTestSuite):
     for n in num_scanners_with_no_reads_list[1:]:
       total += int(n)
     assert total == num_scanners_with_no_reads
+
+    # Test that select count(star) match with expected number of rows.
+    query = 'select count(*) from %s' % table_name
+    result = self.client.execute(query)
+    assert int(result.data[0]) == rows_in_table
 
   # Skip this test on non-HDFS filesystems, because orc-type-check.test contains Hive
   # queries that hang in some cases (IMPALA-9345). It would be possible to separate
@@ -1681,13 +1687,13 @@ class TestOrc(ImpalaTestSuite):
         "CREATE TABLE {db}.{tbl} (id BIGINT) STORED AS ORC",
         unique_database, test_name, test_files)
     err = self.execute_query_expect_failure(self.client,
-        "select count(*) from {0}.{1}".format(unique_database, test_name))
+        "select count(id) from {0}.{1}".format(unique_database, test_name))
     assert expected_error in str(err)
 
   def test_invalid_schema(self, vector, unique_database):
     """Test scanning of ORC file with malformed schema."""
     self._run_invalid_schema_test(unique_database, "corrupt_schema",
-        "Encountered parse error during schema selection")
+        "Encountered parse error in tail of ORC file")
     self._run_invalid_schema_test(unique_database, "corrupt_root_type",
         "Root of the selected type returned by the ORC lib is not STRUCT: boolean.")
 

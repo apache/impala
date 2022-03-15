@@ -307,8 +307,7 @@ HdfsOrcScanner::HdfsOrcScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
   : HdfsColumnarScanner(scan_node, state),
     dictionary_pool_(new MemPool(scan_node->mem_tracker())),
     data_batch_pool_(new MemPool(scan_node->mem_tracker())),
-    search_args_pool_(new MemPool(scan_node->mem_tracker())),
-    assemble_rows_timer_(scan_node_->materialize_tuple_timer()) {
+    search_args_pool_(new MemPool(scan_node->mem_tracker())) {
   assemble_rows_timer_.Stop();
 }
 
@@ -401,9 +400,9 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
     row_batches_need_validation_ = rows_valid == ValidWriteIdList::SOME;
   }
 
-  if (UNLIKELY(scan_node_->optimize_parquet_count_star())) {
-    DCHECK(false);
-    return Status("Internal ERROR: ORC scanner cannot optimize count star slot.");
+  if (scan_node_->optimize_count_star() && !row_batches_need_validation_) {
+    template_tuple_ = template_tuple_map_[scan_node_->tuple_desc()];
+    return Status::OK();
   }
 
   // Update 'row_reader_options_' based on the tuple descriptor so the ORC lib can skip
@@ -766,29 +765,20 @@ Status HdfsOrcScanner::ProcessSplit() {
 }
 
 Status HdfsOrcScanner::GetNextInternal(RowBatch* row_batch) {
-  // In case 'row_batches_need_validation_' is true, we need to look at the row
-  // batches and check their validity. In that case 'currentTransaction' is the only
-  // selected field from the file (in case of zero slot scans).
-  if (scan_node_->IsZeroSlotTableScan() && !row_batches_need_validation_) {
-    uint64_t file_rows = reader_->getNumberOfRows();
-    // There are no materialized slots, e.g. count(*) over the table.  We can serve
+  if (row_batches_need_validation_) {
+    // In case 'row_batches_need_validation_' is true, we need to look at the row
+    // batches and check their validity. This might be a zero slot scan, which
+    // 'currentTransaction' is the only selected field from the file. And this should
+    // not be an optimized count(*) because it is disabled for full acid table.
+    DCHECK(!scan_node_->optimize_count_star());
+  } else if (scan_node_->optimize_count_star()) {
+    // This is an optimized count(*) case.
+    // For each file, populate one slot with the footer's numberOfRows statistic.
+    return GetNextWithCountStarOptimization(row_batch);
+  } else if (scan_node_->IsZeroSlotTableScan()) {
+    // There are no materialized slots, e.g. "select 1" over the table.  We can serve
     // this query from just the file metadata.  We don't need to read the column data.
-    if (stripe_rows_read_ == file_rows) {
-      eos_ = true;
-      return Status::OK();
-    }
-    assemble_rows_timer_.Start();
-    DCHECK_LT(stripe_rows_read_, file_rows);
-    int64_t rows_remaining = file_rows - stripe_rows_read_;
-    int max_tuples = min<int64_t>(row_batch->capacity(), rows_remaining);
-    TupleRow* current_row = row_batch->GetRow(row_batch->AddRow());
-    int num_to_commit = WriteTemplateTuples(current_row, max_tuples);
-    Status status = CommitRows(num_to_commit, row_batch);
-    assemble_rows_timer_.Stop();
-    RETURN_IF_ERROR(status);
-    stripe_rows_read_ += max_tuples;
-    COUNTER_ADD(scan_node_->rows_read_counter(), num_to_commit);
-    return Status::OK();
+    return GetNextWithTemplateTuple(row_batch);
   }
 
   if (!scratch_batch_->AtEnd()) {
@@ -820,7 +810,7 @@ Status HdfsOrcScanner::GetNextInternal(RowBatch* row_batch) {
   // 'advance_stripe_' is updated in 'NextStripe', meaning the current stripe we advance
   // to can be skip. 'end_of_stripe_' marks whether current stripe is drained. It's only
   // set to true in 'AssembleRows'.
-  while (advance_stripe_ || end_of_stripe_) {
+  while (advance_group_ || end_of_stripe_) {
     // The next stripe will use a new dictionary blob so transfer the memory to row_batch.
     row_batch->tuple_data_pool()->AcquireData(dictionary_pool_.get(), false);
     context_->ReleaseCompletedResources(/* done */ true);
@@ -828,8 +818,8 @@ Status HdfsOrcScanner::GetNextInternal(RowBatch* row_batch) {
     RETURN_IF_ERROR(CommitRows(0, row_batch));
 
     RETURN_IF_ERROR(NextStripe());
-    DCHECK_LE(stripe_idx_, reader_->getNumberOfStripes());
-    if (stripe_idx_ == reader_->getNumberOfStripes()) {
+    DCHECK_LE(group_idx_, reader_->getNumberOfStripes());
+    if (group_idx_ == reader_->getNumberOfStripes()) {
       eos_ = true;
       DCHECK(parse_status_.ok());
       return Status::OK();
@@ -869,19 +859,19 @@ Status HdfsOrcScanner::NextStripe() {
   int64_t split_offset = split_range->offset();
   int64_t split_length = split_range->len();
 
-  bool start_with_first_stripe = stripe_idx_ == -1;
+  bool start_with_first_stripe = group_idx_ == -1;
   bool misaligned_stripe_skipped = false;
 
-  advance_stripe_ = false;
-  stripe_rows_read_ = 0;
+  advance_group_ = false;
+  rows_read_in_group_ = 0;
 
   // Loop until we have found a non-empty stripe.
   while (true) {
     // Reset the parse status for the next stripe.
     parse_status_ = Status::OK();
 
-    ++stripe_idx_;
-    if (stripe_idx_ >= reader_->getNumberOfStripes()) {
+    ++group_idx_;
+    if (group_idx_ >= reader_->getNumberOfStripes()) {
       if (start_with_first_stripe && misaligned_stripe_skipped) {
         // We started with the first stripe and skipped all the stripes because they were
         // misaligned. The execution flow won't reach this point if there is at least one
@@ -890,7 +880,7 @@ Status HdfsOrcScanner::NextStripe() {
       }
       break;
     }
-    unique_ptr<orc::StripeInformation> stripe = reader_->getStripe(stripe_idx_);
+    unique_ptr<orc::StripeInformation> stripe = reader_->getStripe(group_idx_);
     // Also check 'footer_.numberOfRows' to make sure 'select count(*)' and 'select *'
     // behave consistently for corrupt files that have 'footer_.numberOfRows == 0'
     // but some data in stripe.
@@ -963,7 +953,7 @@ Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
     if (row_batch->AtCapacity()) break;
     continue_execution &= !scan_node_->ReachedLimitShared() && !context_->cancelled();
   }
-  stripe_rows_read_ += num_rows_read;
+  rows_read_in_group_ += num_rows_read;
   COUNTER_ADD(scan_node_->rows_read_counter(), num_rows_read);
   // Merge Scanner-local counter into HdfsScanNode counter and reset.
   COUNTER_ADD(scan_node_->collection_items_read_counter(), coll_items_read_counter_);

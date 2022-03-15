@@ -48,7 +48,6 @@ class ColumnStatsReader;
 class BaseScalarColumnReader;
 template<typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
 class ScalarColumnReader;
-class BoolColumnReader;
 class ParquetPageReader;
 
 /// This scanner parses Parquet files located in HDFS, and writes the content as tuples in
@@ -346,9 +345,9 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
                                    const std::vector<HdfsFileDesc*>& files)
                                    WARN_UNUSED_RESULT;
 
-  virtual Status Open(ScannerContext* context) WARN_UNUSED_RESULT;
-  virtual Status ProcessSplit() WARN_UNUSED_RESULT;
-  virtual void Close(RowBatch* row_batch);
+  virtual Status Open(ScannerContext* context) override WARN_UNUSED_RESULT;
+  virtual Status ProcessSplit() override WARN_UNUSED_RESULT;
+  virtual void Close(RowBatch* row_batch) override;
 
   /// Helper function to create ColumnStatsReader object. 'col_order' might be NULL.
   ColumnStatsReader CreateColumnStatsReader(
@@ -389,29 +388,21 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
       "You can increase PARQUET_FOOTER_SIZE if you want, "
       "just don't forget to increase READ_SIZE_MIN_VALUE as well.");
 
+ protected:
+  virtual int64_t GetNumberOfRowsInFile() const override {
+    return file_metadata_.num_rows;
+  }
+
  private:
   friend class ParquetColumnReader;
   friend class CollectionColumnReader;
   friend class BaseScalarColumnReader;
   template<typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
   friend class ScalarColumnReader;
-  friend class BoolColumnReader;
   friend class HdfsParquetScannerTest;
   friend class ParquetPageIndex;
   friend class ParquetColumnChunkReader;
   friend class ParquetPageReader;
-
-  /// Index of the current row group being processed. Initialized to -1 which indicates
-  /// that we have not started processing the first row group yet (GetNext() has not yet
-  /// been called).
-  int32_t row_group_idx_;
-
-  /// Counts the number of rows processed for the current row group.
-  int64_t row_group_rows_read_;
-
-  /// Indicates whether we should advance to the next row group in the next GetNext().
-  /// Starts out as true to move to the very first row group.
-  bool advance_row_group_;
 
   boost::scoped_ptr<ParquetSchemaResolver> schema_resolver_;
 
@@ -495,9 +486,6 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// perm_pool_.
   std::unordered_map<const TupleDescriptor*, Tuple*> dict_filter_tuple_map_;
 
-  /// Timer for materializing rows.  This ignores time getting the next buffer.
-  ScopedTimer<MonotonicStopWatch> assemble_rows_timer_;
-
   /// Average and min/max time spent processing the page index for each row group.
   RuntimeProfile::SummaryStatsCounter* process_page_index_stats_;
 
@@ -573,7 +561,7 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// that spans entire batch of length 'scratch_batch_->capacity'.
   ScratchMicroBatch complete_micro_batch_;
 
-  virtual Status GetNextInternal(RowBatch* row_batch) WARN_UNUSED_RESULT;
+  virtual Status GetNextInternal(RowBatch* row_batch) override WARN_UNUSED_RESULT;
 
   /// Return true if we can evaluate this type of predicate on parquet statistic.
   /// FE could populate stats-predicates that can't be evaluated here if the table
@@ -833,7 +821,7 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
       int row_group_idx, int64_t rows_read) WARN_UNUSED_RESULT;
 
   /// Part of the HdfsScanner interface, not used in Parquet.
-  Status InitNewRange() WARN_UNUSED_RESULT { return Status::OK(); }
+  Status InitNewRange() override WARN_UNUSED_RESULT { return Status::OK(); }
 
   /// Transfers the remaining resources backing tuples such as IO buffers and memory
   /// from mem pools to the given row batch. Closes all column readers.

@@ -7,6 +7,30 @@ from functional_parquet.alltypes
 7300
 ---- TYPES
 bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 24
+aggregation(SUM, RowsRead): 0
+=====
+---- QUERY
+# Tests the correctness of zero slot scan over Parquet.
+# Not checking 'NumFileMetadataRead' here since codegen vs non-codegen yield
+# different number.
+select 1 from functional_orc_def.alltypestiny
+---- RESULTS
+1
+1
+1
+1
+1
+1
+1
+1
+---- TYPES
+tinyint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, RowsRead): 0
 =====
 ---- QUERY
 # Parquet count(*) optimization with predicates on the partition columns.
@@ -16,6 +40,10 @@ from functional_parquet.alltypes where year < 2010 and month > 8
 1220
 ---- TYPES
 bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 4
+aggregation(SUM, RowsRead): 0
 =====
 ---- QUERY
 # Parquet count(*) optimization with group by partition columns.
@@ -48,6 +76,10 @@ from functional_parquet.alltypes group by year, month
 2010,12,310
 ---- TYPES
 int, int, bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 24
+aggregation(SUM, RowsRead): 0
 =====
 ---- QUERY
 # Parquet count(*) optimization with both group by and predicates on partition columns.
@@ -61,6 +93,10 @@ group by month
 300
 ---- TYPES
 bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 4
+aggregation(SUM, RowsRead): 0
 =====
 ---- QUERY
 # Parquet count(*) optimization with the result going into a join.
@@ -73,6 +109,10 @@ select x.bigint_col from functional.alltypes x
 0
 ---- TYPES
 bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 24
+aggregation(SUM, RowsRead): 7300
 =====
 ---- QUERY
 # Parquet count(*) optimization with the agg function in the having clause.
@@ -81,6 +121,10 @@ select 1 from functional_parquet.alltypes having count(*) > 1
 1
 ---- TYPES
 tinyint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 24
+aggregation(SUM, RowsRead): 0
 ====
 ---- QUERY
 # Verify that 0 is returned for count(*) on an empty table.
@@ -89,6 +133,10 @@ select count(1) from functional_parquet.emptytable
 0
 ---- TYPES
 bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+aggregation(SUM, RowsRead): 0
 =====
 ---- QUERY
 # Verify that 0 is returned when all partitions are pruned.
@@ -97,6 +145,10 @@ select count(1) from functional_parquet.alltypes where year = -1
 0
 ---- TYPES
 bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+aggregation(SUM, RowsRead): 0
 =====
 ---- QUERY
 # Test different row group size combinations.
@@ -114,6 +166,10 @@ select count(*) from tpch_parquet.lineitem
 6001215
 ---- TYPES
 bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 6
+aggregation(SUM, RowsRead): 0
 =====
 ---- QUERY
 # IMPALA-5679: Count(*) with group by on a string partition column.
@@ -136,4 +192,8 @@ select string_col, count(*) from $DATABASE.string_partitioned_table group by str
 '9',730
 ---- TYPES
 string, bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 10
+aggregation(SUM, RowsRead): 0
 =====

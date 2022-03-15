@@ -257,24 +257,6 @@ class TestAggregationQueries(ImpalaTestSuite):
       # Verify codegen was enabled for all four stages of the aggregation.
       assert_codegen_enabled(result.runtime_profile, [1, 2, 4, 6])
 
-  def test_parquet_count_star_optimization(self, vector, unique_database):
-    if (vector.get_value('table_format').file_format != 'text' or
-        vector.get_value('table_format').compression_codec != 'none'):
-      # No need to run this test on all file formats
-      pytest.skip()
-    self.run_test_case('QueryTest/parquet-stats-agg', vector, unique_database)
-    vector.get_value('exec_option')['batch_size'] = 1
-    self.run_test_case('QueryTest/parquet-stats-agg', vector, unique_database)
-
-  def test_kudu_count_star_optimization(self, vector, unique_database):
-    if (vector.get_value('table_format').file_format != 'text' or
-       vector.get_value('table_format').compression_codec != 'none'):
-      # No need to run this test on all file formats
-      pytest.skip()
-    self.run_test_case('QueryTest/kudu-stats-agg', vector, unique_database)
-    vector.get_value('exec_option')['batch_size'] = 1
-    self.run_test_case('QueryTest/kudu-stats-agg', vector, unique_database)
-
   def test_ndv(self):
     """Test the version of NDV() that accepts a scale value argument against
     different column data types. The scale argument is an integer in range
@@ -318,17 +300,55 @@ class TestAggregationQueries(ImpalaTestSuite):
       for j in xrange(0, 11):
         assert(ndv_results[i - 1][j] == int(ndv_vals[j]))
 
-  def test_sampled_ndv(self, vector, unique_database):
+  def test_grouping_sets(self, vector):
+    """Tests for ROLLUP, CUBE and GROUPING SETS."""
+    if vector.get_value('table_format').file_format == 'hbase':
+      pytest.xfail(reason="IMPALA-283 - HBase null handling is inconsistent")
+    self.run_test_case('QueryTest/grouping-sets', vector)
+
+
+class TestAggregationQueriesRunOnce(ImpalaTestSuite):
+  """Run the aggregation test suite similarly as TestAggregationQueries, but with stricter
+  constraint. Each test in this class only run once by setting uncompressed text dimension
+  for all exploration strategy. However, they may not necessarily target uncompressed text
+  table format. This also run with codegen enabled and disabled to exercise our
+  non-codegen code"""
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestAggregationQueriesRunOnce, cls).add_test_dimensions()
+
+    cls.ImpalaTestMatrix.add_dimension(
+      create_exec_option_dimension(disable_codegen_options=[False, True]))
+
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
+
+  def test_parquet_count_star_optimization(self, vector, unique_database):
+    self.run_test_case('QueryTest/parquet-stats-agg', vector, unique_database)
+    vector.get_value('exec_option')['batch_size'] = 1
+    self.run_test_case('QueryTest/parquet-stats-agg', vector, unique_database)
+
+  def test_kudu_count_star_optimization(self, vector):
+    self.run_test_case('QueryTest/kudu-stats-agg', vector)
+    vector.get_value('exec_option')['batch_size'] = 1
+    self.run_test_case('QueryTest/kudu-stats-agg', vector)
+
+  def test_orc_count_star_optimization(self, vector):
+    self.run_test_case('QueryTest/orc-stats-agg', vector)
+    vector.get_value('exec_option')['batch_size'] = 1
+    self.run_test_case('QueryTest/orc-stats-agg', vector)
+
+  def test_sampled_ndv(self, vector):
     """The SAMPLED_NDV() function is inherently non-deterministic and cannot be
     reasonably made deterministic with existing options so we test it separately.
     The goal of this test is to ensure that SAMPLED_NDV() works on all data types
     and returns approximately sensible estimates. It is not the goal of this test
     to ensure tight error bounds on the NDV estimates. SAMPLED_NDV() is expected
     be inaccurate on small data sets like the ones we use in this test."""
-    if (vector.get_value('table_format').file_format != 'text' or
-        vector.get_value('table_format').compression_codec != 'none'):
-      # No need to run this test on all file formats
-      pytest.skip()
 
     # NDV() is used a baseline to compare SAMPLED_NDV(). Both NDV() and SAMPLED_NDV()
     # are based on HyperLogLog so NDV() is roughly the best that SAMPLED_NDV() can do.
@@ -381,12 +401,6 @@ class TestAggregationQueries(ImpalaTestSuite):
       # with a sampling percent of 0.1 to be approximately 10x of the NDV().
       for i in xrange(14, 16):
         self.appx_equals(int(sampled_ndv_vals[i]) * sample_perc, int(ndv_vals[i]), 2.0)
-
-  def test_grouping_sets(self, vector):
-    """Tests for ROLLUP, CUBE and GROUPING SETS."""
-    if vector.get_value('table_format').file_format == 'hbase':
-      pytest.xfail(reason="IMPALA-283 - HBase null handling is inconsistent")
-    self.run_test_case('QueryTest/grouping-sets', vector)
 
 
 class TestDistinctAggregation(ImpalaTestSuite):

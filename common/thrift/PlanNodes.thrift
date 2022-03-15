@@ -313,9 +313,8 @@ struct THdfsScanNode {
   // The conjuncts that are eligible for dictionary filtering.
   9: optional map<Types.TSlotId, list<i32>> dictionary_filter_conjuncts
 
-  // The byte offset of the slot for Parquet metadata if Parquet count star optimization
-  // is enabled.
-  10: optional i32 parquet_count_star_slot_offset
+  // The byte offset of the slot for counter if count star optimization is enabled.
+  10: optional i32 count_star_slot_offset
 
   // If true, the backend only needs to return one row per partition.
   11: optional bool is_partition_key_scan

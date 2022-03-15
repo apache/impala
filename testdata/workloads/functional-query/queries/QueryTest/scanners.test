@@ -238,4 +238,7 @@ tinyint
 1
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 100
+---- RUNTIME_PROFILE: table_format=parquet,orc
+aggregation(SUM, RowsRead): 0
+aggregation(SUM, RowsReturned): 200
 ====

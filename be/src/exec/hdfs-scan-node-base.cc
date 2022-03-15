@@ -408,9 +408,8 @@ HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const HdfsScanPlanNode& pno
             hdfs_scan_node.skip_header_line_count :
             0),
     tuple_id_(pnode.tuple_id_),
-    parquet_count_star_slot_offset_(
-        hdfs_scan_node.__isset.parquet_count_star_slot_offset ?
-            hdfs_scan_node.parquet_count_star_slot_offset :
+    count_star_slot_offset_(hdfs_scan_node.__isset.count_star_slot_offset ?
+            hdfs_scan_node.count_star_slot_offset :
             -1),
     is_partition_key_scan_(hdfs_scan_node.is_partition_key_scan),
     tuple_desc_(pnode.tuple_desc_),

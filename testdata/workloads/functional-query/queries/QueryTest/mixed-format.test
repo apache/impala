@@ -25,16 +25,17 @@ bigint, bigint
 280,1260
 ====
 ---- QUERY
-# IMPALA-5861: RowsRead counter should be accurate for table scan that returns
-# zero slots. This test is run with various batch_size values, which helps
-# reproduce the bug. Scanning multiple file formats triggers the bug because
-# the Parquet count(*) rewrite is disabled when non-Parquet file formats are
-# present.
+# IMPALA-11123: IMPALA-5861 add this test to verify that 'RowRead' counter is not double
+# counted for zero slot scan. IMPALA-11123 remove incerement of 'RowRead' counter
+# in case of optimized count(star) and zero slot scan query. This cause reduction of
+# 'RowsRead' value from 1200 to 900 since the other 300 are served through
+# zero slot scan. We do not verify 'NumFileMetadataRead' since it does not stay the same
+# over different test vector permutation.
 select count(*) from functional.alltypesmixedformat
 ---- TYPES
 bigint
 ---- RESULTS
 1200
 ---- RUNTIME_PROFILE
-aggregation(SUM, RowsRead): 1200
+aggregation(SUM, RowsRead): 900
 ====

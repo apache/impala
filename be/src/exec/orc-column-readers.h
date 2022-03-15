@@ -337,8 +337,8 @@ class OrcStringColumnReader : public OrcPrimitiveColumnReader<OrcStringColumnRea
     }
     DCHECK(static_cast<orc::EncodedStringVectorBatch*>(batch_) ==
         dynamic_cast<orc::EncodedStringVectorBatch*>(orc_batch));
-    if (last_stripe_idx_ != scanner_->stripe_idx_) {
-      last_stripe_idx_ = scanner_->stripe_idx_;
+    if (last_stripe_idx_ != scanner_->group_idx_) {
+      last_stripe_idx_ = scanner_->group_idx_;
       auto current_batch = static_cast<orc::EncodedStringVectorBatch*>(batch_);
       return InitBlob(&current_batch->dictionary->dictionaryBlob,
           scanner_->dictionary_pool_.get());
