@@ -465,6 +465,16 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkNotNull(desc_);
     Preconditions.checkNotNull(desc_.getTable());
 
+    // Since JSON file format is not yet supported, this block throws an
+    // exception. Once JSON file format will be supported, appropriate changes
+    // can be made under this block.
+    for (FeFsPartition part: partitions_) {
+      HdfsFileFormat format = part.getFileFormat();
+      if (format.equals(HdfsFileFormat.JSON)) {
+        throw new NotImplementedException("Scan of table " + desc_.getTableName() +
+                " in format 'JSON' is not supported.");
+      }
+    }
     Column firstComplexTypedCol = null;
     for (Column col: desc_.getTable().getColumns()) {
       if (col.getType().isComplexType()) {
