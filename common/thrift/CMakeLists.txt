@@ -15,9 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-
-cmake_minimum_required(VERSION 2.6)
-
 # Helper function to generate build rules.  For each input thrift file, this function will
 # generate a rule that maps the input file to the output c++ file.
 # Thrift will generate multiple output files for each input (including java files) and

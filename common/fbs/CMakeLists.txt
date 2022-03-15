@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-cmake_minimum_required(VERSION 2.6)
-
 # Helper function to generate build rules. For each input flatbuffer file (*.fbs), this
 # function will generate a rule that maps the input file to an output c++ file.
 # The flatbuffers compiler will generate multiple output files for each input file. In

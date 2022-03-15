@@ -85,7 +85,7 @@ set(UTIL_SRCS
   parquet-bloom-filter.cc
   parse-util.cc
   path-builder.cc
-  periodic-counter-updater
+  periodic-counter-updater.cc
   pprof-path-handlers.cc
   progress-updater.cc
   process-state-info.cc

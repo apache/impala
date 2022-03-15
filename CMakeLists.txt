@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-cmake_minimum_required(VERSION 3.2.3)
+cmake_minimum_required(VERSION 3.14)
 
 # This is a Kudu-specific flag that disables Kudu targets that are test-only.
 set(NO_TESTS 1)
@@ -35,6 +35,13 @@ set(IMPALA_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
 
 # Build compile commands database
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Codegen-dependent executables need to be linked with -rdynamic; otherwise LLVM
+# can't find dependent symbols at runtime.
+#
+# Rather than setting ENABLE_EXPORTS for each target, this enables it by default,
+# as most backend tests depend on codegen. See CMake CMP0065 for more information.
+set(CMAKE_ENABLE_EXPORTS ON)
 
 # generate CTest input files
 enable_testing()

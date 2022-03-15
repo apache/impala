@@ -30,10 +30,12 @@
 set -euxo pipefail
 
 # Install non-java dependencies:
-sudo apt-get update
-sudo apt-get --yes install g++ gcc git libsasl2-dev libssl-dev make \
-    python-dev python-setuptools python3-dev python3-setuptools libffi-dev libkrb5-dev
-
+# Kerberos setup would pop up dialog boxes without this
+export DEBIAN_FRONTEND=noninteractive
+sudo -E apt-get update
+sudo -E apt-get --yes install g++ gcc git libsasl2-dev libssl-dev make python-dev \
+     python-setuptools python3-dev python3-setuptools libffi-dev libkrb5-dev \
+     krb5-admin-server krb5-kdc krb5-user
 
 source /etc/lsb-release
 

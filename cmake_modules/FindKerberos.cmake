@@ -32,4 +32,4 @@ find_library(KERBEROS_LIBRARY NAMES krb5 ${_KRB5_SEARCH_DIRS} PATH_SUFFIXES lib)
 # handle the QUIETLY and REQUIRED arguments and set KERBEROS_FOUND to TRUE if
 # all listed variables are TRUE
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(KERBEROS DEFAULT_MSG KERBEROS_LIBRARY KERBEROS_INCLUDE_DIR)
+find_package_handle_standard_args(Kerberos DEFAULT_MSG KERBEROS_LIBRARY KERBEROS_INCLUDE_DIR)

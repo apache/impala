@@ -39,5 +39,5 @@ find_program(FLATBUFFERS_COMPILER flatc
   NO_SYSTEM_ENVIRONMENT_PATH)
 
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(FLATBUFFERS REQUIRED_VARS
+find_package_handle_standard_args(FlatBuffers REQUIRED_VARS
   FLATBUFFERS_INCLUDE_DIR FLATBUFFERS_STATIC_LIB FLATBUFFERS_COMPILER)
