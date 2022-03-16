@@ -151,6 +151,10 @@ extern "C" { void __gcov_flush(); }
         std::cerr << now << " " << i << " "
                   << " LOG_MAINTENANCE_STDERR " << status.msg().msg() << endl;
       }
+
+      // Check that impalad can always find INFO and ERROR log path.
+      DCHECK(impala::HasLog(google::INFO));
+      DCHECK(impala::HasLog(google::ERROR));
     }
   }
 }

@@ -135,6 +135,10 @@ void ForceRotateLog();
 /// Return true if FLAGS_redirect_stdout_stderr is true and TestInfo::is_test() is false.
 bool RedirectStdoutStderr();
 
+/// Return true if we have log for given 'severity' in file system.
+/// Only used in testing.
+bool HasLog(google::LogSeverity severity);
+
 #endif // IR_COMPILE
 
 /// Prints v in base 10.

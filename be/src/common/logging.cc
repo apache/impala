@@ -95,14 +95,19 @@ impala::Status ResolveLogSymlink(const string& symlink_path, string& canonical_p
   return impala::Status::OK();
 }
 
+// We specifically target the base file name created by glog.
+// Glog's default base file name follow this pattern:
+// "<program name>.<hostname>.<user name>.log.<severity level>.<date>-<time>.<pid>"
+inline string GlobPatternForLog(google::LogSeverity severity) {
+  return strings::Substitute("$0/$1*.log.$2.*.$3", FLAGS_log_dir,
+      google::ProgramInvocationShortName(), google::GetLogSeverityName(severity),
+      getpid());
+}
+
 impala::Status GetLatestCanonicalLogPath(
     google::LogSeverity severity, std::string& log_path) {
   log_path = "";
-  // We specifically target the base file name created by glog.
-  // Glog's default base file name follow this pattern:
-  // "<program name>.<hostname>.<user name>.log.<severity level>.<date>-<time>.<pid>"
-  string path_pattern = strings::Substitute("$0/$1*.log.$2.*.$3", FLAGS_log_dir,
-      FLAGS_log_filename, google::GetLogSeverityName(severity), getpid());
+  string path_pattern = GlobPatternForLog(severity);
   glob_t result;
   int glob_ret = glob(path_pattern.c_str(), GLOB_TILDE, NULL, &result);
   if (glob_ret != 0) {
@@ -130,6 +135,12 @@ impala::Status GetLatestCanonicalLogPath(
   }
   globfree(&result);
   return impala::Status::OK();
+}
+
+bool impala::HasLog(google::LogSeverity severity) {
+  string log_path;
+  Status status = GetLatestCanonicalLogPath(severity, log_path);
+  return status.ok();
 }
 
 // The main implementation of AttachStdoutStderr().
@@ -335,10 +346,9 @@ void impala::CheckAndRotateLogFiles(int max_log_files) {
   if (max_log_files <= 1) return;
   // Check log files for all severities
   for (int severity = 0; severity < google::NUM_SEVERITIES; ++severity) {
-    // Build glob pattern for input
-    // e.g. /tmp/impalad.*.INFO.*
-    string fname = strings::Substitute("$0/$1.*.$2*", FLAGS_log_dir, FLAGS_log_filename,
-        google::GetLogSeverityName(severity));
+    // Build glob pattern for target severity
+    // e.g. /tmp/impalad.*.log.INFO.*.5477
+    string fname = GlobPatternForLog(severity);
 
     impala::LoggingSupport::DeleteOldLogs(fname, max_log_files);
   }

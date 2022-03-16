@@ -476,7 +476,7 @@ class TestLogging(TestBreakpadBase):
       time.sleep(1)
       self.assert_logs(daemon, expected_log_max_count, expected_log_max_bytes)
       if (remove_symlink):
-        pattern = self.tmp_dir + '/' + daemon + '*.'
+        pattern = self.tmp_dir + '/' + daemon + '*'
         symlinks = glob.glob(pattern + '.INFO') + glob.glob(pattern + '.ERROR')
         for symlink in symlinks:
           self.silent_remove(symlink)
