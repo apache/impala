@@ -29,7 +29,6 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterables;
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.hadoop.fs.Path;
@@ -55,7 +54,6 @@ import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.common.Pair;
-import org.apache.impala.common.PrintUtils;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TBackendGflags;
@@ -535,13 +533,10 @@ class DirectMetaProvider implements MetaProvider {
       TableMetaRef table, Map<PartitionRef, PartitionMetadata> metas) throws TException {
     Preconditions.checkNotNull(table, "TableMetaRef must be non-null");
     Preconditions.checkNotNull(metas, "Partition map must be non-null");
-    Stopwatch sw = Stopwatch.createStarted();
 
     List<PartitionRef> stalePartitions = MetastoreShim.checkLatestCompaction(
         msClientPool_, dbName, tableName, table, metas,
         PartitionRefImpl.UNPARTITIONED_NAME);
-    LOG.debug("Checked the latest compaction id for {}.{} Time taken: {}", dbName,
-        tableName, PrintUtils.printTimeMs(sw.stop().elapsed(TimeUnit.MILLISECONDS)));
     return stalePartitions;
   }
 

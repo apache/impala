@@ -292,6 +292,13 @@ public class HdfsTable extends Table implements FeFsTable {
   // null in the case that this table is not transactional.
   protected MutableValidWriteIdList validWriteIds_ = null;
 
+  // The last committed compaction id in the table level. It will be sent as a filter to
+  // retrieve only the latest compaction that is not seen by this instance. This value is
+  // updated whenever a partition is added to the table so that it is guaranteed to be
+  // up-to-date.
+  // -1 means there is no previous compaction event or compaction is not supported.
+  private long lastCompactionId_ = -1;
+
   // Partitions are marked as "dirty" indicating there are in-progress modifications on
   // their metadata. The corresponding partition builder contains the new version of the
   // metadata so represents the in-progress modifications. The modifications will be
@@ -967,6 +974,7 @@ public class HdfsTable extends Table implements FeFsTable {
     fileMetadataStats_.totalFileBytes += partition.getSize();
     fileMetadataStats_.numFiles += partition.getNumFileDescriptors();
     updatePartitionMdAndColStats(partition);
+    lastCompactionId_ = Math.max(lastCompactionId_, partition.getLastCompactionId());
     return true;
   }
 
@@ -3013,6 +3021,10 @@ public class HdfsTable extends Table implements FeFsTable {
         throw new CatalogException("Unknown write id status " + status + " for table "
             + getFullName());
     }
+  }
+
+  public long getLastCompactionId() {
+    return lastCompactionId_;
   }
 
   /**

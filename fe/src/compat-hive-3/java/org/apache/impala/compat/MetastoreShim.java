@@ -108,6 +108,7 @@ import org.apache.impala.catalog.metastore.CatalogMetastoreServer;
 import org.apache.impala.catalog.metastore.ICatalogMetastoreServer;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Metrics;
+import org.apache.impala.common.PrintUtils;
 import org.apache.impala.hive.common.MutableValidWriteIdList;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.CatalogOpExecutor;
@@ -609,19 +610,12 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
   public static List<HdfsPartition.Builder> getPartitionsForRefreshingFileMetadata(
       CatalogServiceCatalog catalog, HdfsTable hdfsTable) throws CatalogException {
     List<HdfsPartition.Builder> partBuilders = new ArrayList<>();
-    List<HdfsPartition> hdfsPartitions = hdfsTable.getPartitions()
-        .stream()
-        .map(p -> (HdfsPartition) p)
-        .collect(Collectors.toList());
     // fetch the latest compaction info from HMS
     GetLatestCommittedCompactionInfoRequest request =
         new GetLatestCommittedCompactionInfoRequest(
             hdfsTable.getDb().getName(), hdfsTable.getName());
-    if (hdfsTable.isPartitioned()) {
-      List<String> partNames = hdfsPartitions.stream()
-          .map(HdfsPartition::getPartitionName)
-          .collect(Collectors.toList());
-      request.setPartitionnames(partNames);
+    if (hdfsTable.getLastCompactionId() > 0) {
+      request.setLastCompactionId(hdfsTable.getLastCompactionId());
     }
 
     GetLatestCommittedCompactionInfoResponse response;
@@ -645,12 +639,9 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
       }
     }
 
-    for (HdfsPartition partition : hdfsPartitions) {
-      long latestCompactionId =
-          partNameToCompactionId.getOrDefault(partition.getPartitionName(), -1L);
-      if (partition.getLastCompactionId() >= latestCompactionId) {
-        continue;
-      }
+    for (HdfsPartition partition : hdfsTable.getPartitionsForNames(
+        partNameToCompactionId.keySet())) {
+      long latestCompactionId = partNameToCompactionId.get(partition.getPartitionName());
       HdfsPartition.Builder builder = new HdfsPartition.Builder(partition);
       LOG.debug(
           "Cached compaction id for {} partition {}: {} but the latest compaction id: {}",
@@ -672,6 +663,10 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
       throws TException {
     Preconditions.checkNotNull(table, "TableMetaRef must be non-null");
     Preconditions.checkNotNull(metas, "Partition map must be non-null");
+    if (metas.isEmpty()) {
+      return Collections.emptyList();
+    }
+    Stopwatch sw = Stopwatch.createStarted();
     List<PartitionRef> stalePartitions = new ArrayList<>();
     if (!table.isTransactional() || metas.isEmpty()) return stalePartitions;
     GetLatestCommittedCompactionInfoRequest request =
@@ -680,13 +675,17 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
       request.setPartitionnames(metas.keySet().stream()
           .map(PartitionRef::getName).collect(Collectors.toList()));
     }
+    long lastCompactionId = metas.values().stream()
+        .mapToLong(p -> p.getLastCompactionId()).max().orElse(-1);
+    if (lastCompactionId > 0) {
+      request.setLastCompactionId(lastCompactionId);
+    }
+
     GetLatestCommittedCompactionInfoResponse response;
     try (MetaStoreClientPool.MetaStoreClient client = msClientPool.getClient()) {
       response = CompactionInfoLoader.getLatestCompactionInfo(client, request);
     }
     Map<String, Long> partNameToCompactionId = new HashMap<>();
-    // If the table is partitioned, we must set partition name, otherwise empty result
-    // will be returned.
     if (table.isPartitioned()) {
       for (CompactionInfoStruct ci : response.getCompactions()) {
         partNameToCompactionId.put(
@@ -703,13 +702,13 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
         metas.entrySet().iterator();
     while (iter.hasNext()) {
       Map.Entry<PartitionRef, PartitionMetadata> entry = iter.next();
-      long latestCompactionId = partNameToCompactionId.getOrDefault(
-          entry.getKey().getName(), -1L);
-      if (entry.getValue().getLastCompactionId() < latestCompactionId) {
+      if (partNameToCompactionId.containsKey(entry.getKey().getName())) {
         stalePartitions.add(entry.getKey());
         iter.remove();
       }
     }
+    LOG.debug("Checked the latest compaction info for {}.{}. Time taken: {}", dbName,
+        tableName, PrintUtils.printTimeMs(sw.stop().elapsed(TimeUnit.MILLISECONDS)));
     return stalePartitions;
   }
 
