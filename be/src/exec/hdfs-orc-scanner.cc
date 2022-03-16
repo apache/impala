@@ -437,6 +437,8 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
     }
     orc_root_reader_ = this->obj_pool_.Add(
         new OrcStructReader(root_type, scan_node_->tuple_desc(), this));
+    orc_root_batch_ = tmp_row_reader->createRowBatch(state_->batch_size());
+    DCHECK_EQ(orc_root_batch_->numElements, 0);
   } RETURN_ON_ORC_EXCEPTION(
       "Encountered parse error during schema selection in ORC file $0: $1");
 
@@ -933,11 +935,6 @@ Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
 
   // We're going to free the previous batch. Clear the reference first.
   RETURN_IF_ERROR(orc_root_reader_->UpdateInputBatch(nullptr));
-
-  try {
-    orc_root_batch_ = row_reader_->createRowBatch(row_batch->capacity());
-    DCHECK_EQ(orc_root_batch_->numElements, 0);
-  } RETURN_ON_ORC_EXCEPTION("Encounter error in creating ORC row batch for file $0: $1.");
 
   int64_t num_rows_read = 0;
   while (continue_execution) {  // one ORC batch (ColumnVectorBatch) in a round
