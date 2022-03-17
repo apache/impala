@@ -191,7 +191,7 @@ class TestScannersFuzzing(ImpalaTestSuite):
       table_loc = self._get_table_location(fq_fuzz_table_name, vector)
       check_call(['hdfs', 'dfs', '-copyToLocal', table_loc + "/*", tmp_table_dir])
       partitions = self.walk_and_corrupt_table_data(tmp_table_dir, num_copies, rng)
-      self.path_aware_copy_files_to_hdfs(tmp_table_dir, table_loc)
+      self.filesystem_client.copy_from_local(tmp_table_dir, table_loc)
     else:
       self.execute_query("create table %s.%s like %s.%s" % (fuzz_db, fuzz_table,
           src_db, src_table))
