@@ -70,7 +70,7 @@ class ClientCacheTest : public testing::Test {
   uint64_t GetProcessVMSize() {
     // vm size, https://man7.org/linux/man-pages/man5/proc.5.html
     const int vm_size_pos = 22;
-    ifstream stream("/proc/thread-self/stat");
+    ifstream stream("/proc/self/stat");
     string line;
     string space_delimiter = " ";
     vector<string> words{};
