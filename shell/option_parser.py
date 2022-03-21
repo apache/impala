@@ -271,6 +271,10 @@ def get_option_parser(defaults):
                     help="Timeout in milliseconds after which impala-shell will time out"
                     " if it fails to connect to Impala server. Set to 0 to disable any"
                     " timeout.")
+  parser.add_option("--http_socket_timeout_s",
+                    help="Timeout in seconds after which the socket will time out"
+                    " if the associated operation cannot be completed. Set to None to"
+                    " disable any timeout. Only supported for hs2-http mode.")
   parser.add_option("--protocol", dest="protocol", default="hs2",
                     help="Protocol to use for client/server connection. Valid inputs are "
                          "['hs2', 'hs2-http', 'beeswax']. 'hs2-http' uses HTTP transport "

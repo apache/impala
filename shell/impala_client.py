@@ -132,7 +132,7 @@ class ImpalaClient(object):
                kerberos_service_name="impala", use_ssl=False, ca_cert=None, user=None,
                ldap_password=None, use_ldap=False, client_connect_timeout_ms=60000,
                verbose=True, use_http_base_transport=False, http_path=None,
-               http_cookie_names=None):
+               http_cookie_names=None, http_socket_timeout_s=None):
     self.connected = False
     self.impalad_host = impalad[0]
     self.impalad_port = int(impalad[1])
@@ -146,6 +146,7 @@ class ImpalaClient(object):
     self.user, self.ldap_password = user, ldap_password
     self.use_ldap = use_ldap
     self.client_connect_timeout_ms = int(client_connect_timeout_ms)
+    self.http_socket_timeout_s = http_socket_timeout_s
     self.default_query_options = {}
     self.query_option_levels = {}
     self.fetch_size = fetch_size
@@ -380,6 +381,13 @@ class ImpalaClient(object):
       print("Warning: --connect_timeout_ms is currently ignored with HTTP transport.",
             file=sys.stderr)
 
+    # Notes on http socket timeout:
+    # https://docs.python.org/3/library/socket.html#socket-timeouts
+    # Having a default timeout of 'None' (blocking mode) could result in hang like
+    # symptoms in case of a problematic remote endpoint. It's better to have a finite
+    # timeout so that in case of any connection errors, the client retries have a better
+    # chance of succeeding.
+
     # HTTP server implemententations do not support SPNEGO yet.
     # TODO: when we add support for Kerberos+HTTP, we need to re-enable the automatic
     # kerberos retry logic in impala_shell.py that was disabled for HTTP because of
@@ -401,10 +409,12 @@ class ImpalaClient(object):
         ssl_ctx.verify_mode = ssl.CERT_NONE
       url = "https://{0}/{1}".format(host_and_port, self.http_path)
       transport = ImpalaHttpClient(url, ssl_context=ssl_ctx,
-                                   http_cookie_names=self.http_cookie_names)
+                                   http_cookie_names=self.http_cookie_names,
+                                   socket_timeout_s=self.http_socket_timeout_s)
     else:
       url = "http://{0}/{1}".format(host_and_port, self.http_path)
-      transport = ImpalaHttpClient(url, http_cookie_names=self.http_cookie_names)
+      transport = ImpalaHttpClient(url, http_cookie_names=self.http_cookie_names,
+                                   socket_timeout_s=self.http_socket_timeout_s)
 
     if self.use_ldap:
       # Set the BASIC auth header

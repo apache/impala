@@ -1000,15 +1000,18 @@ class TestImpalaShell(ImpalaTestSuite):
 
     # --connect_timeout_ms not supported with HTTP transport. Refer to the comment
     # in ImpalaClient::_get_http_transport() for details.
-    if vector.get_value('protocol') == 'hs2-http': pytest.skip("THRIFT-4600")
+    # --http_socket_timeout_s not supported for strict_hs2_protocol.
+    if (vector.get_value('protocol') == 'hs2-http' and
+          vector.get_value('strict_hs2_protocol')):
+        pytest.skip("THRIFT-4600")
 
     with closing(socket.socket()) as s:
       s.bind(("", 0))
       # maximum number of queued connections on this socket is 1.
       s.listen(1)
       test_port = s.getsockname()[1]
-      args = ['-q', 'select foo; select bar;', '--ssl', '-t', '2000', '-i',
-              'localhost:%d' % (test_port)]
+      args = ['-q', 'select foo; select bar;', '--ssl', '-t', '2000',
+              '--http_socket_timeout_s', '2', '-i', 'localhost:%d' % (test_port)]
       run_impala_shell_cmd(vector, args, expect_success=False)
 
   def test_client_identifier(self, vector):
@@ -1178,3 +1181,34 @@ class TestImpalaShell(ImpalaTestSuite):
     with open(tmp_file, "r") as f:
       rows_from_file = [line.rstrip() for line in f]
       assert rows_from_stdout == rows_from_file
+
+  def test_http_socket_timeout(self, vector):
+    """Test setting different http_socket_timeout_s values."""
+    if (vector.get_value('strict_hs2_protocol') or
+          vector.get_value('protocol') != 'hs2-http'):
+        pytest.skip("http socket timeout not supported in strict hs2 mode."
+                    " Only supported with hs2-http protocol.")
+    # Test http_socket_timeout_s=0, expect errors
+    args = ['--quiet', '-B', '--query', 'select 0;']
+    result = run_impala_shell_cmd(vector, args + ['--http_socket_timeout_s=0'],
+                                  expect_success=False)
+    expected_err = ("Caught exception [Errno 115] Operation now in progress, "
+                   "type=<class 'socket.error'> in OpenSession. Num remaining tries: 3")
+    assert result.stderr.splitlines()[0] == expected_err
+
+    # Test http_socket_timeout_s=-1, expect errors
+    result = run_impala_shell_cmd(vector, args + ['--http_socket_timeout_s=-1'],
+                                  expect_success=False)
+    expected_err = ("http_socket_timeout_s must be a nonnegative floating point number"
+                    " expressing seconds, or None")
+    assert result.stderr.splitlines()[0] == expected_err
+
+    # Test http_socket_timeout_s>0, expect success
+    result = run_impala_shell_cmd(vector, args + ['--http_socket_timeout_s=2'])
+    assert result.stderr == ""
+    assert result.stdout == "0\n"
+
+    # Test http_socket_timeout_s=None, expect success
+    result = run_impala_shell_cmd(vector, args + ['--http_socket_timeout_s=None'])
+    assert result.stderr == ""
+    assert result.stdout == "0\n"

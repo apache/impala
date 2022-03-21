@@ -52,7 +52,7 @@ class ImpalaHttpClient(TTransportBase):
   MIN_REQUEST_SIZE_FOR_EXPECT = 1024
 
   def __init__(self, uri_or_host, port=None, path=None, cafile=None, cert_file=None,
-      key_file=None, ssl_context=None, http_cookie_names=None):
+      key_file=None, ssl_context=None, http_cookie_names=None, socket_timeout_s=None):
     """ImpalaHttpClient supports two different types of construction:
 
     ImpalaHttpClient(host, port, path) - deprecated
@@ -122,7 +122,7 @@ class ImpalaHttpClient(TTransportBase):
     self.__wbuf = BytesIO()
     self.__http = None
     self.__http_response = None
-    self.__timeout = None
+    self.__timeout = socket_timeout_s
     self.__custom_headers = None
 
   @staticmethod

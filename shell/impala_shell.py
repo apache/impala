@@ -195,6 +195,10 @@ class ImpalaShell(cmd.Cmd, object):
     self.use_ldap = options.use_ldap or \
         (self.strict_hs2_protocol and not self.use_kerberos)
     self.client_connect_timeout_ms = options.client_connect_timeout_ms
+    self.http_socket_timeout_s = None
+    if (options.http_socket_timeout_s != 'None' and
+          options.http_socket_timeout_s is not None):
+        self.http_socket_timeout_s = float(options.http_socket_timeout_s)
     self.verbose = options.verbose
     self.prompt = ImpalaShell.DISCONNECTED_PROMPT
     self.server_version = ImpalaShell.UNKNOWN_SERVER_VERSION
@@ -612,7 +616,8 @@ class ImpalaShell(cmd.Cmd, object):
                           self.ca_cert, self.user, self.ldap_password, self.use_ldap,
                           self.client_connect_timeout_ms, self.verbose,
                           use_http_base_transport=True, http_path=self.http_path,
-                          http_cookie_names=self.http_cookie_names)
+                          http_cookie_names=self.http_cookie_names,
+                          http_socket_timeout_s=self.http_socket_timeout_s)
     elif protocol == 'beeswax':
       return ImpalaBeeswaxClient(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
@@ -2062,6 +2067,13 @@ def impala_shell_main():
     except IOError as e:
       print('Error opening output file for writing: %s' % e, file=sys.stderr)
       raise FatalShellException()
+
+  if options.http_socket_timeout_s is not None:
+    if (options.http_socket_timeout_s != 'None' and
+          float(options.http_socket_timeout_s) < 0):
+        print("http_socket_timeout_s must be a nonnegative floating point number"
+              " expressing seconds, or None", file=sys.stderr)
+        raise FatalShellException()
 
   options.variables = parse_variables(options.keyval)
 
