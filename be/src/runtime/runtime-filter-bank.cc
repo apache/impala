@@ -283,7 +283,8 @@ void RuntimeFilterBank::UpdateFilterFromLocal(
       DCHECK_EQ(type, TRuntimeFilterType::IN_LIST);
       InListFilter::ToProtobuf(in_list_filter, params.mutable_in_list_filter());
     }
-    const TNetworkAddress& krpc_address = query_state_->query_ctx().coord_ip_address;
+    const NetworkAddressPB& krpc_address =
+        FromTNetworkAddress(query_state_->query_ctx().coord_ip_address);
     const std::string& hostname = query_state_->query_ctx().coord_hostname;
 
     // Use 'proxy' to send the filter to the coordinator.

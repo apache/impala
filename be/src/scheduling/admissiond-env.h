@@ -65,6 +65,9 @@ class AdmissiondEnv {
  private:
   static AdmissiondEnv* admissiond_env_;
 
+  /// Address of the KRPC backend service: ip_address + krpc_port and UDS address.
+  NetworkAddressPB krpc_address_;
+
   std::unique_ptr<AdmissionController> admission_controller_;
   std::unique_ptr<AdmissionControlService> admission_control_svc_;
   std::unique_ptr<ClusterMembershipMgr> cluster_membership_mgr_;

@@ -206,7 +206,9 @@ class DataStreamTest : public testing::Test {
 
     IpAddr ip;
     ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
-    krpc_address_ = MakeNetworkAddress(ip, FLAGS_port);
+    UUIDToUniqueIdPB(boost::uuids::random_generator()(), &backend_id_);
+    krpc_address_ = MakeNetworkAddressPB(
+        ip, FLAGS_port, backend_id_, exec_env_->rpc_mgr()->GetUdsAddressUniqueId());
     StartKrpcBackend();
   }
 
@@ -270,8 +272,11 @@ class DataStreamTest : public testing::Test {
   int next_val_;
   int64_t* tuple_mem_;
 
+  // Backend Id
+  UniqueIdPB backend_id_;
+
   // Only used for KRPC. Not owned.
-  TNetworkAddress krpc_address_;
+  NetworkAddressPB krpc_address_;
 
   // The test service implementation. Owned by this class.
   unique_ptr<ImpalaKRPCTestBackend> test_service_;
@@ -321,8 +326,9 @@ class DataStreamTest : public testing::Test {
   void GetNextInstanceId(TUniqueId* instance_id) {
     PlanFragmentDestinationPB* dest = dest_.Add();
     *dest->mutable_fragment_instance_id() = next_instance_id_;
-    *dest->mutable_address() = MakeNetworkAddressPB("localhost", FLAGS_port);
-    *dest->mutable_krpc_backend() = FromTNetworkAddress(krpc_address_);
+    *dest->mutable_address() = MakeNetworkAddressPB("localhost", FLAGS_port, backend_id_,
+        exec_env_->rpc_mgr()->GetUdsAddressUniqueId());
+    *dest->mutable_krpc_backend() = krpc_address_;
     UniqueIdPBToTUniqueId(next_instance_id_, instance_id);
     next_instance_id_.set_lo(next_instance_id_.lo() + 1);
   }

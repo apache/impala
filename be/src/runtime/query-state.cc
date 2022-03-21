@@ -269,8 +269,9 @@ Status QueryState::Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
   RETURN_IF_ERROR(InitBufferPoolState());
 
   // Initialize the RPC proxy once and report any error.
-  RETURN_IF_ERROR(ControlService::GetProxy(
-      query_ctx().coord_ip_address, query_ctx().coord_hostname, &proxy_));
+  NetworkAddressPB coord_addr = FromTNetworkAddress(query_ctx().coord_ip_address);
+  RETURN_IF_ERROR(
+      ControlService::GetProxy(coord_addr, query_ctx().coord_hostname, &proxy_));
 
   // don't copy query_ctx, it's large and we already did that in the c'tor
   exec_rpc_params_.set_coord_state_idx(exec_rpc_params->coord_state_idx());

@@ -98,7 +98,7 @@ class Planner {
     query_ctx.client_request.__set_stmt(query);
     query_ctx.client_request.__set_query_options(query_options_);
     string dummy_hostname = "";
-    TNetworkAddress dummy_addr;
+    NetworkAddressPB dummy_addr;
     ImpalaServer::PrepareQueryContext(dummy_hostname, dummy_addr, &query_ctx);
 
     RuntimeState* state = pool_.Add(new RuntimeState(query_ctx, &exec_env_));

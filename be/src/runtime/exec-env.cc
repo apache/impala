@@ -225,9 +225,9 @@ ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
   ABORT_IF_ERROR(HostnameToIpAddr(FLAGS_hostname, &ip_address_));
 
   // KRPC relies on resolved IP address.
-  krpc_address_.__set_hostname(ip_address_);
-  krpc_address_.__set_port(krpc_port);
   rpc_mgr_.reset(new RpcMgr(IsInternalTlsConfigured()));
+  krpc_address_ = MakeNetworkAddressPB(
+      ip_address_, krpc_port, backend_id_, rpc_mgr_->GetUdsAddressUniqueId());
   stream_mgr_.reset(new KrpcDataStreamMgr(metrics_.get()));
 
   request_pool_service_.reset(new RequestPoolService(metrics_.get()));
@@ -266,13 +266,12 @@ ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
   }
 
   if (AdmissionServiceEnabled()) {
-    admission_service_address_ =
-        MakeNetworkAddress(FLAGS_admission_service_host, FLAGS_admission_service_port);
-    if (!IsResolvedAddress(admission_service_address_)) {
-      IpAddr ip;
-      ABORT_IF_ERROR(HostnameToIpAddr(FLAGS_admission_service_host, &ip));
-      admission_service_address_ = MakeNetworkAddress(ip, FLAGS_admission_service_port);
-    }
+    IpAddr ip;
+    ABORT_IF_ERROR(HostnameToIpAddr(FLAGS_admission_service_host, &ip));
+    // TODO: get BackendId of admissiond in global admission control mode.
+    // Use admissiond's IP address as unique ID for UDS now.
+    admission_service_address_ = MakeNetworkAddressPB(
+        ip, FLAGS_admission_service_port, UdsAddressUniqueIdPB::IP_ADDRESS);
   }
 
   exec_env_ = this;

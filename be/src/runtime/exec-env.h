@@ -158,7 +158,7 @@ class ExecEnv {
 
   const IpAddr& ip_address() const { return ip_address_; }
 
-  const TNetworkAddress& krpc_address() const { return krpc_address_; }
+  const NetworkAddressPB& krpc_address() const { return krpc_address_; }
 
   /// Initializes the exec env for running FE tests.
   Status InitForFeSupport() WARN_UNUSED_RESULT;
@@ -182,7 +182,7 @@ class ExecEnv {
   int64_t admit_mem_limit() const { return admit_mem_limit_; }
   int64_t admission_slots() const { return admission_slots_; }
 
-  const TNetworkAddress& admission_service_address() const {
+  const NetworkAddressPB& admission_service_address() const {
     return admission_service_address_;
   }
 
@@ -256,8 +256,8 @@ class ExecEnv {
   /// Resolved IP address of the host name.
   IpAddr ip_address_;
 
-  /// IP address of the KRPC backend service: ip_address + krpc_port.
-  TNetworkAddress krpc_address_;
+  /// Address of the KRPC backend service: ip_address + krpc_port and UDS address.
+  NetworkAddressPB krpc_address_;
 
   /// fs.defaultFs value set in core-site.xml
   std::string default_fs_;
@@ -292,7 +292,7 @@ class ExecEnv {
 
   /// If the admission control service is enabled, the resolved IP address and port where
   /// the service is running.
-  TNetworkAddress admission_service_address_;
+  NetworkAddressPB admission_service_address_;
 
   /// Initialize ExecEnv based on Hadoop config from frontend.
   Status InitHadoopConfig();

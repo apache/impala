@@ -365,6 +365,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--shutdown_grace_period_s={grace_period} \
+          --rpc_use_unix_domain_socket=false \
           --hostname={hostname}".format(grace_period=IDLE_SHUTDOWN_GRACE_PERIOD_S,
             hostname=socket.gethostname()))
   def test_shutdown_idle(self):
@@ -381,6 +382,72 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     ex = self.execute_query_expect_failure(self.client, ":shutdown('localhost:100000')")
     assert "invalid port:" in str(ex)
     assert ("This may be because the port specified is wrong.") not in str(ex)
+
+    # Test that pointing to the wrong thrift service (the HS2 port) fails gracefully-ish.
+    thrift_port = 21051  # HS2 port.
+    ex = self.execute_query_expect_failure(self.client,
+        ":shutdown('localhost:{0}')".format(thrift_port))
+    assert ("failed with error 'RemoteShutdown() RPC failed") in str(ex)
+    assert ("This may be because the port specified is wrong.") in str(ex)
+
+    # Test RPC error handling with debug action.
+    ex = self.execute_query_expect_failure(self.client, ":shutdown('localhost:27001')",
+        query_options={'debug_action': 'CRS_SHUTDOWN_RPC:FAIL'})
+    assert 'Rpc to 127.0.0.1:27001 failed with error \'Debug Action: ' \
+        'CRS_SHUTDOWN_RPC:FAIL' in str(ex)
+
+    # Test remote shutdown.
+    LOG.info("Start remote shutdown {0}".format(time.time()))
+    self.execute_query_expect_success(self.client, ":shutdown('localhost:27001')",
+        query_options={})
+
+    # Remote shutdown does not require statestore.
+    self.cluster.statestored.kill()
+    self.cluster.statestored.wait_for_exit()
+    self.execute_query_expect_success(self.client, ":shutdown('localhost:27002')",
+        query_options={})
+
+    # Test local shutdown, which should succeed even with injected RPC error.
+    LOG.info("Start local shutdown {0}".format(time.time()))
+    self.execute_query_expect_success(self.client,
+        ":shutdown('{0}:27000')".format(socket.gethostname()),
+        query_options={'debug_action': 'CRS_SHUTDOWN_RPC:FAIL'})
+
+    # Make sure that the impala daemons exit after the shutdown grace period plus a 10
+    # second margin of error.
+    start_time = time.time()
+    LOG.info("Waiting for impalads to exit {0}".format(start_time))
+    impalad1.wait()
+    LOG.info("First impalad exited {0}".format(time.time()))
+    impalad2.wait()
+    LOG.info("Second impalad exited {0}".format(time.time()))
+    impalad3.wait()
+    LOG.info("Third impalad exited {0}".format(time.time()))
+    shutdown_duration = time.time() - start_time
+    assert shutdown_duration <= self.IDLE_SHUTDOWN_GRACE_PERIOD_S + 10
+
+  @SkipIfGCS.jira(reason="IMPALA-10562")
+  @SkipIfCOS.jira(reason="IMPALA-10562")
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--shutdown_grace_period_s={grace_period} \
+          --rpc_use_unix_domain_socket=true \
+          --hostname={hostname}".format(grace_period=IDLE_SHUTDOWN_GRACE_PERIOD_S,
+            hostname=socket.gethostname()))
+  def test_shutdown_idle_rpc_use_uds(self):
+    """Test that idle impalads shut down in a timely manner after the shutdown grace
+    period elapses."""
+    impalad1 = psutil.Process(self.cluster.impalads[0].get_pid())
+    impalad2 = psutil.Process(self.cluster.impalads[1].get_pid())
+    impalad3 = psutil.Process(self.cluster.impalads[2].get_pid())
+
+    # Test that a failed shut down from a bogus host or port fails gracefully.
+    ex = self.execute_query_expect_failure(self.client,
+        ":shutdown('e6c00ca5cd67b567eb96c6ecfb26f05')")
+    assert "Could not find IPv4 address for:" in str(ex)
+    ex = self.execute_query_expect_failure(self.client, ":shutdown('localhost:100000')")
+    # IMPALA-11129: RPC return different error message for socket over Unix domain socket.
+    assert "Connection refused" in str(ex)
 
     # Test that pointing to the wrong thrift service (the HS2 port) fails gracefully-ish.
     thrift_port = 21051  # HS2 port.

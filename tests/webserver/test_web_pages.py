@@ -596,6 +596,10 @@ class TestWebPage(ImpalaTestSuite):
         functional.alltypestiny join functional.alltypessmall c2"
     SVC_NAME = 'impala.DataStreamService'
 
+    def is_krpc_use_unix_domain_socket():
+      rpcz = self.get_debug_page(self.RPCZ_URL)
+      return rpcz['rpc_use_unix_domain_socket']
+
     def get_per_conn_metrics(inbound):
       """Get inbound or outbound per-connection metrics"""
       rpcz = self.get_debug_page(self.RPCZ_URL)
@@ -615,6 +619,8 @@ class TestWebPage(ImpalaTestSuite):
           return sorted(s['rpc_method_metrics'], key=lambda m: m['method_name'])
       assert False, 'Could not find metrics for %s' % svc_name
 
+    krpc_use_uds = is_krpc_use_unix_domain_socket()
+
     svc_before = get_svc_metrics(SVC_NAME)
     inbound_before = get_per_conn_metrics(True)
     outbound_before = get_per_conn_metrics(False)
@@ -624,23 +630,26 @@ class TestWebPage(ImpalaTestSuite):
     outbound_after = get_per_conn_metrics(False)
 
     assert svc_before != svc_after
-    assert inbound_before != inbound_after
-    assert outbound_before != outbound_after
+    if not krpc_use_uds:
+      assert inbound_before != inbound_after
+      assert outbound_before != outbound_after
 
     # Some connections should have metrics after executing query
     assert len(inbound_after) > 0
     assert len(outbound_after) > 0
     # Spot-check some fields, including socket stats.
     for conn in itertools.chain(inbound_after, outbound_after):
-      assert conn["remote_ip"] != ""
+      assert conn["remote_addr"] != ""
       assert conn["num_calls_in_flight"] >= 0
       assert conn["num_calls_in_flight"] == len(conn["calls_in_flight"])
       # Check rtt, which should be present in 'struct tcp_info' even in old kernels
       # like 2.6.32.
-      assert conn["socket_stats"]["rtt"] > 0, conn
-      # send_queue_bytes uses TIOCOUTQ, which is also present in 2.6.32 and even older
-      # kernels.
-      assert conn["socket_stats"]["send_queue_bytes"] >= 0, conn
+      # Skip these checking if using UDS.
+      if not krpc_use_uds:
+        assert conn["socket_stats"]["rtt"] > 0, conn
+        # send_queue_bytes uses TIOCOUTQ, which is also present in 2.6.32 and even older
+        # kernels.
+        assert conn["socket_stats"]["send_queue_bytes"] >= 0, conn
 
   @pytest.mark.execute_serially
   def test_admission_page(self):

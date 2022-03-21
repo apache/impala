@@ -22,9 +22,18 @@ syntax="proto2";
 package impala;
 
 // Refer to Types.thrift for documentation.
+// UDS is limited to KRPC.
 message NetworkAddressPB {
   required string hostname = 1;
   required int32 port = 2;
+  optional string uds_address = 3;
+}
+
+// Unique-id used for setting UDS address.
+enum UdsAddressUniqueIdPB {
+  IP_ADDRESS = 0;
+  BACKEND_ID = 1;
+  NO_UNIQUE_ID = 2;
 }
 
 // Proto-serialized version of Impala's Status object.

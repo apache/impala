@@ -38,12 +38,26 @@
 DECLARE_string(ssl_server_certificate);
 DECLARE_string(ssl_private_key);
 DECLARE_int32(krpc_port);
+DECLARE_bool(rpc_use_unix_domain_socket);
 
 using namespace apache::thrift;
 using namespace impala;
 
 Status InProcessImpalaServer::StartWithEphemeralPorts(const string& statestore_host,
     int statestore_port, InProcessImpalaServer** server) {
+  if (FLAGS_rpc_use_unix_domain_socket) {
+    // IMPALA-11129: This test utility function call WaitForServer() to wait KRPC server
+    // to start. WaitForServer(), which is defined in be/src/rpc/thrift-util.c, use
+    // TSocket (Thrift Socket) to connect KRPC server. Even TSocket provide a constructor
+    // with Unix Domain Socket address as parameter, but TSocket don't support UDS
+    // address in the form of name in "Abstract Namespace". So we have to disable KRPC
+    // running over UDS for this unit-test by setting FLAGS_rpc_use_unix_domain_socket
+    // as false.
+    // This function is called by backend unit tests:
+    //   be/src/service/session-expiry-test.cc and be/src/exprs/expr-test.cc.
+    FLAGS_rpc_use_unix_domain_socket = false;
+  }
+
   // This flag is read directly in several places to find the address of the backend
   // interface, so we must set it here.
   FLAGS_krpc_port = FindUnusedEphemeralPort();

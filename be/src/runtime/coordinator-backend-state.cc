@@ -280,8 +280,8 @@ void Coordinator::BackendState::ExecAsync(const DebugOptions& debug_options,
     }
 
     std::unique_ptr<ControlServiceProxy> proxy;
-    Status get_proxy_status = ControlService::GetProxy(
-        FromNetworkAddressPB(krpc_host_), host_.hostname(), &proxy);
+    Status get_proxy_status =
+        ControlService::GetProxy(krpc_host_, host_.hostname(), &proxy);
     if (!get_proxy_status.ok()) {
       SetExecError(get_proxy_status, exec_status_barrier);
       goto done;
@@ -660,8 +660,8 @@ Coordinator::BackendState::CancelResult Coordinator::BackendState::Cancel(
     VLogForBackend("Sending CancelQueryFInstances rpc");
 
     std::unique_ptr<ControlServiceProxy> proxy;
-    Status get_proxy_status = ControlService::GetProxy(
-        FromNetworkAddressPB(krpc_host_), host_.hostname(), &proxy);
+    Status get_proxy_status =
+        ControlService::GetProxy(krpc_host_, host_.hostname(), &proxy);
     if (!get_proxy_status.ok()) {
       status_.MergeStatus(get_proxy_status);
       result.became_done = true;
@@ -712,8 +712,8 @@ void Coordinator::BackendState::PublishFilter(FilterState* state,
   Status status;
 
   std::unique_ptr<DataStreamServiceProxy> proxy;
-  Status get_proxy_status = DataStreamService::GetProxy(
-      FromNetworkAddressPB(krpc_host_), host_.hostname(), &proxy);
+  Status get_proxy_status =
+      DataStreamService::GetProxy(krpc_host_, host_.hostname(), &proxy);
   if (!get_proxy_status.ok()) {
     // Failing to send a filter is not a query-wide error - the remote fragment will
     // continue regardless.

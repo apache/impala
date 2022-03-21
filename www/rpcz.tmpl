@@ -90,7 +90,7 @@ under the License.
 <table class="table table-bordered table-hover" id="per_conn_metrics">
   <thead>
     <tr>
-      <th>Remote IP</th>
+      <th>Remote Address</th>
       <th># Calls in Flight</th>
       <th>Outbound Queue Size (count)</th>
       <th>Socket RTT (us)</th>
@@ -110,7 +110,7 @@ under the License.
   <tbody>
     {{#per_conn_metrics}}
     <tr>
-      <td>{{remote_ip}}</td>
+      <td>{{remote_addr}}</td>
       <td>{{num_calls_in_flight}}</td>
       <td>{{outbound_queue_size}}</td>
       <td>{{socket_stats.rtt}}</td>
@@ -134,7 +134,7 @@ under the License.
 <table class="table table-bordered table-hover" id="inbound_per_conn_metrics">
   <thead>
     <tr>
-      <th>Remote IP</th>
+      <th>Remote Address</th>
       <th># Calls in Flight</th>
       <th>Socket RTT (us)</th>
       <th>Socket RTT Variance (us)</th>
@@ -153,7 +153,7 @@ under the License.
   <tbody>
     {{#inbound_per_conn_metrics}}
     <tr>
-      <td>{{remote_ip}}</td>
+      <td>{{remote_addr}}</td>
       <td>{{num_calls_in_flight}}</td>
       <td>{{socket_stats.rtt}}</td>
       <td>{{socket_stats.rttvar}}</td>
@@ -296,8 +296,9 @@ function update_krpc_services(json) {
 
 function update_krpc_conn_metrics_datatable(json) {
   var table = $('#per_conn_metrics').DataTable();
-  var rows = $.map(json["per_conn_metrics"], function(row) {
-    return [[row["remote_ip"], row["num_calls_in_flight"], row["outbound_queue_size"],
+  if (!json["rpc_use_unix_domain_socket"]) {
+    var rows = $.map(json["per_conn_metrics"], function(row) {
+      return [[row["remote_addr"], row["num_calls_in_flight"], row["outbound_queue_size"],
              row["socket_stats"]["rtt"] ?? '',
              row["socket_stats"]["rttvar"] ?? '',
              row["socket_stats"]["snd_cwnd"] ?? '',
@@ -310,15 +311,23 @@ function update_krpc_conn_metrics_datatable(json) {
              row["socket_stats"]["segs_in"] ?? '',
              row["socket_stats"]["send_queue_bytes"] ?? '',
              row["socket_stats"]["receive_queue_bytes"] ?? '']];
-  });
+    });
+  } else {
+    var rows = $.map(json["per_conn_metrics"], function(row) {
+      return [[row["remote_addr"], row["num_calls_in_flight"], row["outbound_queue_size"],
+             'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A',
+             'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A']];
+    });
+  }
 
   table.clear().rows.add(rows).draw();
 }
 
 function update_krpc_inbound_conn_metrics_datatable(json) {
   var table = $('#inbound_per_conn_metrics').DataTable();
-  var rows = $.map(json["inbound_per_conn_metrics"], function(row) {
-    return [[row["remote_ip"], row["num_calls_in_flight"],
+  if (!json["rpc_use_unix_domain_socket"]) {
+    var rows = $.map(json["inbound_per_conn_metrics"], function(row) {
+      return [[row["remote_addr"], row["num_calls_in_flight"],
              row["socket_stats"]["rtt"] ?? '',
              row["socket_stats"]["rttvar"] ?? '',
              row["socket_stats"]["snd_cwnd"] ?? '',
@@ -331,7 +340,14 @@ function update_krpc_inbound_conn_metrics_datatable(json) {
              row["socket_stats"]["segs_in"] ?? '',
              row["socket_stats"]["send_queue_bytes"] ?? '',
              row["socket_stats"]["receive_queue_bytes"] ?? '']];
-  });
+    });
+  } else {
+    var rows = $.map(json["inbound_per_conn_metrics"], function(row) {
+      return [[row["remote_addr"], row["num_calls_in_flight"],
+             'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A',
+             'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A']];
+    });
+  }
 
   table.clear().rows.add(rows).draw();
 }

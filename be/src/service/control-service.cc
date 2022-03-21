@@ -89,7 +89,7 @@ Status ControlService::Init() {
   return Status::OK();
 }
 
-Status ControlService::GetProxy(const TNetworkAddress& address, const string& hostname,
+Status ControlService::GetProxy(const NetworkAddressPB& address, const string& hostname,
     unique_ptr<ControlServiceProxy>* proxy) {
   // Create a ControlService proxy to the destination.
   RETURN_IF_ERROR(ExecEnv::GetInstance()->rpc_mgr()->GetProxy(address, hostname, proxy));

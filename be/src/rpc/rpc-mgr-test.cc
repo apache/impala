@@ -37,18 +37,19 @@ DECLARE_string(debug_actions);
 namespace impala {
 
 // Test multiple services managed by an Rpc Manager using TLS.
-TEST_F(RpcMgrTest, MultipleServicesTls) {
+TEST_P(RpcMgrTest, MultipleServicesTls) {
   // TODO: We're starting a separate RpcMgr here instead of configuring
   // RpcTestBase::rpc_mgr_ to use TLS. To use RpcTestBase::rpc_mgr_, we need to introduce
   // new gtest params to turn on TLS which needs to be a coordinated change across
   // rpc-mgr-test and thrift-server-test.
   RpcMgr tls_rpc_mgr(IsInternalTlsConfigured());
-  TNetworkAddress tls_krpc_address;
+  NetworkAddressPB tls_krpc_address;
   IpAddr ip;
   ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
 
   int32_t tls_service_port = FindUnusedEphemeralPort();
-  tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
+  tls_krpc_address =
+      MakeNetworkAddressPB(ip, tls_service_port, tls_rpc_mgr.GetUdsAddressUniqueId());
 
   ScopedSetTlsFlags s(SERVER_CERT, PRIVATE_KEY, SERVER_CERT);
   ASSERT_OK(tls_rpc_mgr.Init(tls_krpc_address));
@@ -58,55 +59,58 @@ TEST_F(RpcMgrTest, MultipleServicesTls) {
 }
 
 // Test multiple services managed by an Rpc Manager.
-TEST_F(RpcMgrTest, MultipleServices) {
+TEST_P(RpcMgrTest, MultipleServices) {
   ASSERT_OK(RunMultipleServicesTest(&rpc_mgr_, krpc_address_));
 }
 
 // Test with a misconfigured TLS certificate and verify that an error is thrown.
-TEST_F(RpcMgrTest, BadCertificateTls) {
+TEST_P(RpcMgrTest, BadCertificateTls) {
   ScopedSetTlsFlags s(SERVER_CERT, PRIVATE_KEY, "unknown");
 
   RpcMgr tls_rpc_mgr(IsInternalTlsConfigured());
-  TNetworkAddress tls_krpc_address;
+  NetworkAddressPB tls_krpc_address;
   IpAddr ip;
   ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
 
   int32_t tls_service_port = FindUnusedEphemeralPort();
-  tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
+  tls_krpc_address =
+      MakeNetworkAddressPB(ip, tls_service_port, tls_rpc_mgr.GetUdsAddressUniqueId());
 
   ASSERT_FALSE(tls_rpc_mgr.Init(tls_krpc_address).ok());
   tls_rpc_mgr.Shutdown();
 }
 
 // Test with a bad password command for the password protected private key.
-TEST_F(RpcMgrTest, BadPasswordTls) {
+TEST_P(RpcMgrTest, BadPasswordTls) {
   ScopedSetTlsFlags s(SERVER_CERT, PASSWORD_PROTECTED_PRIVATE_KEY, SERVER_CERT,
       "echo badpassword");
 
   RpcMgr tls_rpc_mgr(IsInternalTlsConfigured());
-  TNetworkAddress tls_krpc_address;
+  NetworkAddressPB tls_krpc_address;
   IpAddr ip;
   ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
 
   int32_t tls_service_port = FindUnusedEphemeralPort();
-  tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
+  tls_krpc_address =
+      MakeNetworkAddressPB(ip, tls_service_port, tls_rpc_mgr.GetUdsAddressUniqueId());
 
   ASSERT_FALSE(tls_rpc_mgr.Init(tls_krpc_address).ok());
   tls_rpc_mgr.Shutdown();
 }
 
 // Test with a correct password command for the password protected private key.
-TEST_F(RpcMgrTest, CorrectPasswordTls) {
+TEST_P(RpcMgrTest, CorrectPasswordTls) {
   ScopedSetTlsFlags s(SERVER_CERT, PASSWORD_PROTECTED_PRIVATE_KEY, SERVER_CERT,
       "echo password");
 
   RpcMgr tls_rpc_mgr(IsInternalTlsConfigured());
-  TNetworkAddress tls_krpc_address;
+  NetworkAddressPB tls_krpc_address;
   IpAddr ip;
   ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
 
   int32_t tls_service_port = FindUnusedEphemeralPort();
-  tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
+  tls_krpc_address =
+      MakeNetworkAddressPB(ip, tls_service_port, tls_rpc_mgr.GetUdsAddressUniqueId());
 
   ASSERT_OK(tls_rpc_mgr.Init(tls_krpc_address));
   ASSERT_OK(RunMultipleServicesTest(&tls_rpc_mgr, tls_krpc_address));
@@ -115,16 +119,17 @@ TEST_F(RpcMgrTest, CorrectPasswordTls) {
 
 #ifndef __aarch64__
 // Test with a bad TLS cipher and verify that an error is thrown.
-TEST_F(RpcMgrTest, BadCiphersTls) {
+TEST_P(RpcMgrTest, BadCiphersTls) {
   ScopedSetTlsFlags s(SERVER_CERT, PRIVATE_KEY, SERVER_CERT, "", "not_a_cipher");
 
   RpcMgr tls_rpc_mgr(IsInternalTlsConfigured());
-  TNetworkAddress tls_krpc_address;
+  NetworkAddressPB tls_krpc_address;
   IpAddr ip;
   ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
 
   int32_t tls_service_port = FindUnusedEphemeralPort();
-  tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
+  tls_krpc_address =
+      MakeNetworkAddressPB(ip, tls_service_port, tls_rpc_mgr.GetUdsAddressUniqueId());
 
   ASSERT_FALSE(tls_rpc_mgr.Init(tls_krpc_address).ok());
   tls_rpc_mgr.Shutdown();
@@ -132,17 +137,18 @@ TEST_F(RpcMgrTest, BadCiphersTls) {
 #endif
 
 // Test with a valid TLS cipher.
-TEST_F(RpcMgrTest, ValidCiphersTls) {
+TEST_P(RpcMgrTest, ValidCiphersTls) {
   ScopedSetTlsFlags s(SERVER_CERT, PRIVATE_KEY, SERVER_CERT, "",
       TLS1_0_COMPATIBLE_CIPHER);
 
   RpcMgr tls_rpc_mgr(IsInternalTlsConfigured());
-  TNetworkAddress tls_krpc_address;
+  NetworkAddressPB tls_krpc_address;
   IpAddr ip;
   ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
 
   int32_t tls_service_port = FindUnusedEphemeralPort();
-  tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
+  tls_krpc_address =
+      MakeNetworkAddressPB(ip, tls_service_port, tls_rpc_mgr.GetUdsAddressUniqueId());
 
   ASSERT_OK(tls_rpc_mgr.Init(tls_krpc_address));
   ASSERT_OK(RunMultipleServicesTest(&tls_rpc_mgr, tls_krpc_address));
@@ -150,18 +156,19 @@ TEST_F(RpcMgrTest, ValidCiphersTls) {
 }
 
 // Test with multiple valid TLS ciphers.
-TEST_F(RpcMgrTest, ValidMultiCiphersTls) {
+TEST_P(RpcMgrTest, ValidMultiCiphersTls) {
   const string cipher_list = Substitute("$0,$1", TLS1_0_COMPATIBLE_CIPHER,
       TLS1_0_COMPATIBLE_CIPHER_2);
   ScopedSetTlsFlags s(SERVER_CERT, PRIVATE_KEY, SERVER_CERT, "", cipher_list);
 
   RpcMgr tls_rpc_mgr(IsInternalTlsConfigured());
-  TNetworkAddress tls_krpc_address;
+  NetworkAddressPB tls_krpc_address;
   IpAddr ip;
   ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
 
   int32_t tls_service_port = FindUnusedEphemeralPort();
-  tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
+  tls_krpc_address =
+      MakeNetworkAddressPB(ip, tls_service_port, tls_rpc_mgr.GetUdsAddressUniqueId());
 
   ASSERT_OK(tls_rpc_mgr.Init(tls_krpc_address));
   ASSERT_OK(RunMultipleServicesTest(&tls_rpc_mgr, tls_krpc_address));
@@ -169,7 +176,7 @@ TEST_F(RpcMgrTest, ValidMultiCiphersTls) {
 }
 
 // Test behavior with a slow service.
-TEST_F(RpcMgrTest, SlowCallback) {
+TEST_P(RpcMgrTest, SlowCallback) {
   // Use a callback which is slow to respond.
   auto slow_cb = [](RpcContext* ctx) {
     SleepForMs(300);
@@ -207,7 +214,7 @@ TEST_F(RpcMgrTest, SlowCallback) {
 }
 
 // Test async calls.
-TEST_F(RpcMgrTest, AsyncCall) {
+TEST_P(RpcMgrTest, AsyncCall) {
   GeneratedServiceIf* scan_mem_impl =
       TakeOverService(make_unique<ScanMemServiceImpl>(&rpc_mgr_));
   ASSERT_OK(rpc_mgr_.RegisterService(10, 10, scan_mem_impl,
@@ -243,17 +250,18 @@ TEST_F(RpcMgrTest, AsyncCall) {
 // Run a test with the negotiation timeout as 0 ms and ensure that connection
 // establishment fails.
 // This is to verify that FLAGS_rpc_negotiation_timeout_ms is actually effective.
-TEST_F(RpcMgrTest, NegotiationTimeout) {
+TEST_P(RpcMgrTest, NegotiationTimeout) {
   // Set negotiation timeout to 0 milliseconds.
   auto s = ScopedFlagSetter<int32_t>::Make(&FLAGS_rpc_negotiation_timeout_ms, 0);
 
   RpcMgr secondary_rpc_mgr(IsInternalTlsConfigured());
-  TNetworkAddress secondary_krpc_address;
+  NetworkAddressPB secondary_krpc_address;
   IpAddr ip;
   ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
 
   int32_t secondary_service_port = FindUnusedEphemeralPort();
-  secondary_krpc_address = MakeNetworkAddress(ip, secondary_service_port);
+  secondary_krpc_address = MakeNetworkAddressPB(
+      ip, secondary_service_port, secondary_rpc_mgr.GetUdsAddressUniqueId());
 
   ASSERT_OK(secondary_rpc_mgr.Init(secondary_krpc_address));
   ASSERT_FALSE(RunMultipleServicesTest(&secondary_rpc_mgr, secondary_krpc_address).ok());
@@ -261,7 +269,7 @@ TEST_F(RpcMgrTest, NegotiationTimeout) {
 }
 
 // Test RpcMgr::DoRpcWithRetry using a fake proxy.
-TEST_F(RpcMgrTest, DoRpcWithRetry) {
+TEST_P(RpcMgrTest, DoRpcWithRetry) {
   TQueryCtx query_ctx;
   const int num_retries = 10;
   const int64_t timeout_ms = 10 * MILLIS_PER_SEC;
@@ -292,7 +300,7 @@ TEST_F(RpcMgrTest, DoRpcWithRetry) {
 }
 
 // Test RpcMgr::DoRpcWithRetry by injecting service-too-busy failures.
-TEST_F(RpcMgrTest, BusyService) {
+TEST_P(RpcMgrTest, BusyService) {
   TQueryCtx query_ctx;
   auto cb = [](RpcContext* ctx) { ctx->RespondSuccess(); };
   GeneratedServiceIf* ping_impl =
@@ -325,7 +333,7 @@ TEST_F(RpcMgrTest, BusyService) {
   // service is too busy.
   auto s = ScopedFlagSetter<string>::Make(&FLAGS_debug_actions,
       Substitute("IMPALA_SERVICE_POOL:$0:$1:Ping:FAIL@0.5@REJECT_TOO_BUSY",
-          krpc_address_.hostname, krpc_address_.port));
+          krpc_address_.hostname(), krpc_address_.port()));
   PingRequestPB request;
   PingResponsePB response;
   const int64_t timeout_ms = 10 * MILLIS_PER_SEC;
@@ -341,6 +349,10 @@ TEST_F(RpcMgrTest, BusyService) {
   // (1/2)^num_retries.
   ASSERT_GT(overflow_metric->GetValue(), 0);
 }
+
+// Run tests with Unix domain socket and TCP socket by setting
+// FLAGS_rpc_use_unix_domain_socket as true and false.
+INSTANTIATE_TEST_CASE_P(UdsOnAndOff, RpcMgrTest, ::testing::Values(true, false));
 
 } // namespace impala
 

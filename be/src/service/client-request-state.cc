@@ -42,6 +42,7 @@
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "scheduling/admission-control-client.h"
+#include "scheduling/cluster-membership-mgr.h"
 #include "scheduling/scheduler.h"
 #include "service/frontend.h"
 #include "service/impala-server.h"
@@ -861,21 +862,49 @@ Status ClientRequestState::ExecShutdownRequest() {
             << " to ip address, error: " << ip_status.GetDetail();
     return ip_status;
   }
-  TNetworkAddress krpc_addr = MakeNetworkAddress(ip_address, port);
-
+  // Find BackendId for the given remote ip address and port from cluster membership.
+  // The searching is not efficient, but Shutdown Requests are not called frequently.
+  // The BackendId is used to generate UDS address for Unix domain socket. Leave the
+  // Id value as 0 if it's not found in cluster membership.
+  // Note that UDS is only used when FLAGS_rpc_use_unix_domain_socket is set as true.
+  UniqueIdPB backend_id;
+  backend_id.set_hi(0);
+  backend_id.set_lo(0);
+  string krpc_error;
+  if (ExecEnv::GetInstance()->rpc_mgr()->IsKrpcUsingUDS()) {
+    if (ExecEnv::GetInstance()->rpc_mgr()->GetUdsAddressUniqueId()
+        == UdsAddressUniqueIdPB::BACKEND_ID) {
+      ClusterMembershipMgr::SnapshotPtr membership_snapshot =
+          ExecEnv::GetInstance()->cluster_membership_mgr()->GetSnapshot();
+      DCHECK(membership_snapshot.get() != nullptr);
+      for (const auto& it : membership_snapshot->current_backends) {
+        // Compare resolved IP addresses and ports.
+        if (it.second.ip_address() == ip_address && it.second.address().port() == port) {
+          DCHECK(it.second.has_backend_id());
+          backend_id = it.second.backend_id();
+          break;
+        }
+      }
+    }
+    krpc_error = "RemoteShutdown() RPC failed: Network error";
+  } else {
+    krpc_error = "RemoteShutdown() RPC failed: Timed out: connection negotiation to";
+  }
+  NetworkAddressPB krpc_addr = MakeNetworkAddressPB(ip_address, port, backend_id,
+      ExecEnv::GetInstance()->rpc_mgr()->GetUdsAddressUniqueId());
   std::unique_ptr<ControlServiceProxy> proxy;
   Status get_proxy_status =
       ControlService::GetProxy(krpc_addr, request.backend.hostname, &proxy);
   if (!get_proxy_status.ok()) {
     return Status(
         Substitute("Could not get Proxy to ControlService at $0 with error: $1.",
-            TNetworkAddressToString(krpc_addr), get_proxy_status.msg().msg()));
+            NetworkAddressPBToString(krpc_addr), get_proxy_status.msg().msg()));
   }
 
   RemoteShutdownParamsPB params;
   if (request.__isset.deadline_s) params.set_deadline_s(request.deadline_s);
   RemoteShutdownResultPB resp;
-  VLOG_QUERY << "Sending Shutdown RPC to " << TNetworkAddressToString(krpc_addr);
+  VLOG_QUERY << "Sending Shutdown RPC to " << NetworkAddressPBToString(krpc_addr);
 
   const int num_retries = 3;
   const int64_t timeout_ms = 10 * MILLIS_PER_SEC;
@@ -887,14 +916,12 @@ Status ClientRequestState::ExecShutdownRequest() {
   if (!rpc_status.ok()) {
     const string& msg = rpc_status.msg().msg();
     VLOG_QUERY << "RemoteShutdown query_id= " << PrintId(query_id())
-               << " failed to send RPC to " << TNetworkAddressToString(krpc_addr) << " :"
+               << " failed to send RPC to " << NetworkAddressPBToString(krpc_addr) << " :"
                << msg;
     string err_string = Substitute(
-        "Rpc to $0 failed with error '$1'", TNetworkAddressToString(krpc_addr), msg);
+        "Rpc to $0 failed with error '$1'", NetworkAddressPBToString(krpc_addr), msg);
     // Attempt to detect if the the failure is because of not using a KRPC port.
-    if (backend_port_specified
-        && msg.find("RemoteShutdown() RPC failed: Timed out: connection negotiation to")
-            != string::npos) {
+    if (backend_port_specified && msg.find(krpc_error) != string::npos) {
       // Prior to IMPALA-7985 :shutdown() used the backend port.
       err_string.append(" This may be because the port specified is wrong. You may have"
                         " specified the backend (thrift) port which :shutdown() can no"

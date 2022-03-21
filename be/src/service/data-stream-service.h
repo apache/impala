@@ -18,6 +18,7 @@
 #ifndef IMPALA_SERVICE_DATA_STREAM_SERVICE_H
 #define IMPALA_SERVICE_DATA_STREAM_SERVICE_H
 
+#include "gen-cpp/common.pb.h"
 #include "gen-cpp/data_stream_service.service.h"
 
 #include "common/status.h"
@@ -88,7 +89,7 @@ class DataStreamService : public DataStreamServiceIf {
 
   /// Gets a DataStreamService proxy to a server with 'address' and 'hostname'.
   /// The newly created proxy is returned in 'proxy'. Returns error status on failure.
-  static Status GetProxy(const TNetworkAddress& address, const std::string& hostname,
+  static Status GetProxy(const NetworkAddressPB& address, const std::string& hostname,
       std::unique_ptr<DataStreamServiceProxy>* proxy);
 
  private:

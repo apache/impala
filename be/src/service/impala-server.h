@@ -380,7 +380,7 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Static helper for PrepareQueryContext() that is used from expr-benchmark.
   static void PrepareQueryContext(const std::string& hostname,
-      const TNetworkAddress& krpc_addr, TQueryCtx* query_ctx);
+      const NetworkAddressPB& krpc_addr, TQueryCtx* query_ctx);
 
   /// SessionHandlerIf methods
 

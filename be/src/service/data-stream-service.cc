@@ -82,8 +82,8 @@ Status DataStreamService::Init() {
   return Status::OK();
 }
 
-Status DataStreamService::GetProxy(const TNetworkAddress& address, const string& hostname,
-    unique_ptr<DataStreamServiceProxy>* proxy) {
+Status DataStreamService::GetProxy(const NetworkAddressPB& address,
+    const string& hostname, unique_ptr<DataStreamServiceProxy>* proxy) {
   // Create a DataStreamService proxy to the destination.
   RETURN_IF_ERROR(ExecEnv::GetInstance()->rpc_mgr()->GetProxy(address, hostname, proxy));
   (*proxy)->set_network_plane("datastream");

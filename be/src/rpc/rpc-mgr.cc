@@ -93,10 +93,44 @@ DEFINE_int32(rpc_negotiation_thread_count, 64,
 DEFINE_bool(rpc_use_loopback, false,
     "Always use loopback for local connections. This requires binding to all addresses, "
     "not just the KRPC address.");
+// Cannot set rpc_use_unix_domain_socket as true when rpc_use_loopback is set as true.
+DEFINE_bool(rpc_use_unix_domain_socket, false,
+    "Whether the KRPC client and server should use Unix domain socket. If enabled, "
+    "each daemon is identified with Unix Domain Socket address in the unique name in "
+    "\"Abstract Namespace\", in format @impala-krpc:<BackendId>. The KRPC server bind "
+    "to a Unix domain socket. KRPC Client attempt to connect to KRPC server via a Unix "
+    "domain socket.");
+DEFINE_string(uds_address_unique_id, "ip_address",
+    "Specify unique Id for UDS address. It could be \"ip_address\", \"backend_id\", or "
+    "\"none\"");
 
 namespace impala {
 
-Status RpcMgr::Init(const TNetworkAddress& address) {
+RpcMgr::RpcMgr(bool use_tls) : use_tls_(use_tls) {
+  krpc_use_uds_ = FLAGS_rpc_use_unix_domain_socket;
+  if (krpc_use_uds_ && FLAGS_rpc_use_loopback) {
+    LOG(WARNING) << "Cannot use Unix Domain Socket when using loopback address.";
+    krpc_use_uds_ = false;
+  }
+  if (krpc_use_uds_) {
+    if (strcasecmp("backend_id", FLAGS_uds_address_unique_id.c_str()) == 0) {
+      uds_addr_unique_id_ = UdsAddressUniqueIdPB::BACKEND_ID;
+    } else if (strcasecmp("none", FLAGS_uds_address_unique_id.c_str()) == 0) {
+      uds_addr_unique_id_ = UdsAddressUniqueIdPB::NO_UNIQUE_ID;
+    } else if (strcasecmp("ip_address", FLAGS_uds_address_unique_id.c_str()) == 0) {
+      uds_addr_unique_id_ = UdsAddressUniqueIdPB::IP_ADDRESS;
+    } else {
+      LOG(ERROR) << "Invalid unique Id for UDS address.";
+      uds_addr_unique_id_ = UdsAddressUniqueIdPB::NO_UNIQUE_ID;
+      invalid_uds_config_ = true;
+    }
+  } else {
+    uds_addr_unique_id_ = UdsAddressUniqueIdPB::NO_UNIQUE_ID;
+  }
+}
+
+Status RpcMgr::Init(const NetworkAddressPB& address) {
+  if (krpc_use_uds_ && invalid_uds_config_) return Status("Invalid UDS configuration");
   DCHECK(IsResolvedAddress(address));
   address_ = address;
 
@@ -204,11 +238,15 @@ Status RpcMgr::StartServices() {
   Sockaddr sockaddr = Sockaddr::Wildcard();
   if (FLAGS_rpc_use_loopback) {
     // Listen on all addresses, including loopback.
-    sockaddr.set_port(address_.port);
+    sockaddr.set_port(address_.port());
     DCHECK(sockaddr.IsWildcard()) << sockaddr.ToString();
   } else {
     // Only listen on the canonical address for KRPC.
-    RETURN_IF_ERROR(TNetworkAddressToSockaddr(address_, &sockaddr));
+    RETURN_IF_ERROR(NetworkAddressPBToSockaddr(address_, krpc_use_uds_, &sockaddr));
+    if (krpc_use_uds_) {
+      // KRPC server bind to Unix domain socket if krpc_use_uds_ is true.
+      LOG(INFO) << "KRPC server bind to Unix domain socket: " << sockaddr.ToString();
+    }
   }
 
   // Call the messenger to create an AcceptorPool for us.
@@ -247,6 +285,9 @@ bool RpcMgr::IsServerTooBusy(const RpcController& rpc_controller) {
 
 void RpcMgr::ToJson(Document* document) {
   if (messenger_.get() == nullptr) return;
+  // Add rpc_use_unix_domain_socket.
+  document->AddMember(
+      "rpc_use_unix_domain_socket", krpc_use_uds_, document->GetAllocator());
   // Add acceptor metrics.
   int64_t num_accepted = 0;
   if (acceptor_pool_.get() != nullptr) {
@@ -263,9 +304,11 @@ void RpcMgr::ToJson(Document* document) {
   Value inbound_per_conn_metrics(kArrayType);
   for (const RpcConnectionPB& conn : response.inbound_connections()) {
     Value per_conn_metrics_entry(kObjectType);
-    Value remote_ip_str(conn.remote_ip().c_str(), document->GetAllocator());
+    // Remote addresses for UDS inbound connections are not available.
+    Value remote_addr_str(
+        (!krpc_use_uds_ ? conn.remote_ip().c_str() : "*"), document->GetAllocator());
     per_conn_metrics_entry.AddMember(
-        "remote_ip", remote_ip_str, document->GetAllocator());
+        "remote_addr", remote_addr_str, document->GetAllocator());
     per_conn_metrics_entry.AddMember(
         "num_calls_in_flight", conn.calls_in_flight().size(), document->GetAllocator());
     num_inbound_calls_in_flight += conn.calls_in_flight().size();
@@ -297,9 +340,9 @@ void RpcMgr::ToJson(Document* document) {
 
     // Add per connection metrics to an array.
     Value per_conn_metrics_entry(kObjectType);
-    Value remote_ip_str(conn.remote_ip().c_str(), document->GetAllocator());
+    Value remote_addr_str(conn.remote_ip().c_str(), document->GetAllocator());
     per_conn_metrics_entry.AddMember(
-        "remote_ip", remote_ip_str, document->GetAllocator());
+        "remote_addr", remote_addr_str, document->GetAllocator());
     per_conn_metrics_entry.AddMember(
         "num_calls_in_flight", conn.calls_in_flight().size(), document->GetAllocator());
     per_conn_metrics_entry.AddMember(

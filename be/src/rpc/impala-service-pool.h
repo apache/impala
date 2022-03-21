@@ -49,7 +49,7 @@ class ImpalaServicePool : public kudu::rpc::RpcService {
   /// 'address' is the ip address and port that 'service' runs on.
   ImpalaServicePool(const scoped_refptr<kudu::MetricEntity>& entity,
       int service_queue_length, kudu::rpc::GeneratedServiceIf* service,
-      MemTracker* service_mem_tracker, const TNetworkAddress& address,
+      MemTracker* service_mem_tracker, const NetworkAddressPB& address,
       MetricGroup* rpc_metrics);
 
   virtual ~ImpalaServicePool();

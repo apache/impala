@@ -59,14 +59,14 @@ const char * ImpalaServicePool::RPC_QUEUE_OVERFLOW_METRIC_KEY =
 
 ImpalaServicePool::ImpalaServicePool(const scoped_refptr<kudu::MetricEntity>& entity,
     int service_queue_length, kudu::rpc::GeneratedServiceIf* service,
-    MemTracker* service_mem_tracker, const TNetworkAddress& address,
+    MemTracker* service_mem_tracker, const NetworkAddressPB& address,
     MetricGroup* rpc_metrics)
   : service_mem_tracker_(service_mem_tracker),
     service_(service),
     service_queue_(service_queue_length),
     incoming_queue_time_(METRIC_impala_incoming_queue_time.Instantiate(entity)),
-    hostname_(address.hostname),
-    port_(SimpleItoa(address.port)) {
+    hostname_(address.hostname()),
+    port_(SimpleItoa(address.port())) {
   DCHECK(service_mem_tracker_ != nullptr);
   const TMetricDef& overflow_metric_def =
       MetricDefs::Get(RPC_QUEUE_OVERFLOW_METRIC_KEY, service_->service_name());

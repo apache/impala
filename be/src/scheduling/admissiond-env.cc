@@ -88,12 +88,13 @@ Status AdmissiondEnv::Init() {
 
   http_handler_->RegisterHandlers(DaemonEnv::GetInstance()->webserver());
 
-  string ip_address;
+  IpAddr ip_address;
   RETURN_IF_ERROR(HostnameToIpAddr(FLAGS_hostname, &ip_address));
-  TNetworkAddress ip_addr_port;
-  ip_addr_port.__set_hostname(ip_address);
-  ip_addr_port.__set_port(FLAGS_admission_service_port);
-  RETURN_IF_ERROR(rpc_mgr_->Init(ip_addr_port));
+  // TODO: advertise BackendId of admissiond to coordinators via heartbeats.
+  // Use admissiond's IP address as unique ID for UDS now.
+  krpc_address_ = MakeNetworkAddressPB(
+      ip_address, FLAGS_admission_service_port, UdsAddressUniqueIdPB::IP_ADDRESS);
+  RETURN_IF_ERROR(rpc_mgr_->Init(krpc_address_));
   admission_control_svc_.reset(
       new AdmissionControlService(DaemonEnv::GetInstance()->metrics()));
   RETURN_IF_ERROR(admission_control_svc_->Init());

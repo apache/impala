@@ -27,11 +27,14 @@
 #include <random>
 #include <vector>
 #include <boost/algorithm/string.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
 
 #include "exec/kudu-util.h"
 #include "kudu/util/net/sockaddr.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
+#include "util/uid-util.h"
 #include <util/string-parser.h>
 
 #include "common/names.h"
@@ -169,6 +172,54 @@ NetworkAddressPB MakeNetworkAddressPB(const string& hostname, int port) {
   return ret;
 }
 
+string GetUDSAddress(const std::string& hostname, int port, const UniqueIdPB& backend_id,
+    const UdsAddressUniqueIdPB& uds_addr_unique_id) {
+  stringstream ss;
+  switch (uds_addr_unique_id) {
+    case UdsAddressUniqueIdPB::IP_ADDRESS: {
+      string ip_addr = hostname;
+      kudu::Sockaddr sock;
+      // Check if the hostname is resolved IP address.
+      if (!sock.ParseString(hostname, port).ok()) {
+        IpAddr ip;
+        Status status = HostnameToIpAddr(hostname, &ip);
+        if (status.ok()) ip_addr = ip;
+      }
+      ss << "@impala-krpc:" << ip_addr << ":" << port;
+      break;
+    }
+    case UdsAddressUniqueIdPB::BACKEND_ID:
+      ss << "@impala-krpc:" << PrintId(backend_id);
+      break;
+    case UdsAddressUniqueIdPB::NO_UNIQUE_ID:
+      ss << "@impala-krpc";
+      break;
+  }
+  return ss.str();
+}
+
+NetworkAddressPB MakeNetworkAddressPB(const std::string& hostname, int port,
+    const UniqueIdPB& backend_id, const UdsAddressUniqueIdPB& uds_addr_unique_id) {
+  NetworkAddressPB ret;
+  ret.set_hostname(hostname);
+  ret.set_port(port);
+  ret.set_uds_address(GetUDSAddress(hostname, port, backend_id, uds_addr_unique_id));
+  return ret;
+}
+
+NetworkAddressPB MakeNetworkAddressPB(const std::string& hostname, int port,
+    const UdsAddressUniqueIdPB& uds_addr_unique_id) {
+  NetworkAddressPB ret;
+  UniqueIdPB backend_id;
+  if (uds_addr_unique_id == UdsAddressUniqueIdPB::BACKEND_ID) {
+    UUIDToUniqueIdPB(boost::uuids::random_generator()(), &backend_id);
+  }
+  ret.set_hostname(hostname);
+  ret.set_port(port);
+  ret.set_uds_address(GetUDSAddress(hostname, port, backend_id, uds_addr_unique_id));
+  return ret;
+}
+
 bool IsWildcardAddress(const string& ipaddress) {
   return ipaddress == "0.0.0.0";
 }
@@ -189,6 +240,7 @@ TNetworkAddress FromNetworkAddressPB(const NetworkAddressPB& address) {
   TNetworkAddress t_address;
   t_address.__set_hostname(address.hostname());
   t_address.__set_port(address.port());
+  t_address.__set_uds_address(address.uds_address());
   return t_address;
 }
 
@@ -196,6 +248,7 @@ NetworkAddressPB FromTNetworkAddress(const TNetworkAddress& address) {
   NetworkAddressPB address_pb;
   address_pb.set_hostname(address.hostname);
   address_pb.set_port(address.port);
+  address_pb.set_uds_address(address.uds_address);
   return address_pb;
 }
 
@@ -225,13 +278,18 @@ int FindUnusedEphemeralPort() {
   return -1;
 }
 
-Status TNetworkAddressToSockaddr(const TNetworkAddress& address,
-    kudu::Sockaddr* sockaddr) {
-  DCHECK(IsResolvedAddress(address));
-  KUDU_RETURN_IF_ERROR(
-      sockaddr->ParseString(TNetworkAddressToString(address), address.port),
-      "Failed to parse address to Kudu Sockaddr.");
+Status NetworkAddressPBToSockaddr(
+    const NetworkAddressPB& address, bool use_uds, kudu::Sockaddr* sockaddr) {
+  if (use_uds) {
+    DCHECK(!address.uds_address().empty());
+    KUDU_RETURN_IF_ERROR(sockaddr->ParseUnixDomainPath(address.uds_address()),
+        "Invalid UNIX domain socket address.");
+  } else {
+    DCHECK(IsResolvedAddress(address));
+    KUDU_RETURN_IF_ERROR(
+        sockaddr->ParseString(NetworkAddressPBToString(address), address.port()),
+        "Failed to parse IP address to Kudu Sockaddr.");
+  }
   return Status::OK();
 }
-
 }

@@ -18,6 +18,7 @@
 #ifndef IMPALA_SERVICE_CONTROL_SERVICE_H
 #define IMPALA_SERVICE_CONTROL_SERVICE_H
 
+#include "gen-cpp/common.pb.h"
 #include "gen-cpp/control_service.service.h"
 
 #include "kudu/rpc/rpc_context.h"
@@ -77,7 +78,7 @@ class ControlService : public ControlServiceIf {
 
   /// Gets a ControlService proxy to a server with 'address' and 'hostname'.
   /// The newly created proxy is returned in 'proxy'. Returns error status on failure.
-  static Status GetProxy(const TNetworkAddress& address, const std::string& hostname,
+  static Status GetProxy(const NetworkAddressPB& address, const std::string& hostname,
       std::unique_ptr<ControlServiceProxy>* proxy);
 
  private:

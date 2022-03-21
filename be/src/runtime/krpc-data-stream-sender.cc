@@ -373,8 +373,7 @@ Status KrpcDataStreamSender::Channel::Init(RuntimeState* state) {
   batch_.reset(new RowBatch(row_desc_, capacity, parent_->mem_tracker()));
 
   // Create a DataStreamService proxy to the destination.
-  RETURN_IF_ERROR(
-      DataStreamService::GetProxy(FromNetworkAddressPB(address_), hostname_, &proxy_));
+  RETURN_IF_ERROR(DataStreamService::GetProxy(address_, hostname_, &proxy_));
   return Status::OK();
 }
 

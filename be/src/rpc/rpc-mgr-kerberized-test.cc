@@ -68,18 +68,19 @@ class RpcMgrKerberizedTest : public RpcMgrTest {
   }
 };
 
-TEST_F(RpcMgrKerberizedTest, MultipleServicesTls) {
+TEST_P(RpcMgrKerberizedTest, MultipleServicesTls) {
   // TODO: We're starting a seperate RpcMgr here instead of configuring
   // RpcTestBase::rpc_mgr_ to use TLS. To use RpcTestBase::rpc_mgr_, we need to introduce
   // new gtest params to turn on TLS which needs to be a coordinated change across
   // rpc-mgr-test and thrift-server-test.
   RpcMgr tls_rpc_mgr(IsInternalTlsConfigured());
-  TNetworkAddress tls_krpc_address;
+  NetworkAddressPB tls_krpc_address;
   IpAddr ip;
   ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
 
   int32_t tls_service_port = FindUnusedEphemeralPort();
-  tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
+  tls_krpc_address =
+      MakeNetworkAddressPB(ip, tls_service_port, tls_rpc_mgr.GetUdsAddressUniqueId());
 
   // Enable TLS.
   ScopedSetTlsFlags s(SERVER_CERT, PRIVATE_KEY, SERVER_CERT);
@@ -91,7 +92,7 @@ TEST_F(RpcMgrKerberizedTest, MultipleServicesTls) {
 
 // This test aims to exercise the authorization function in RpcMgr by accessing
 // services with a principal different from FLAGS_be_principal.
-TEST_F(RpcMgrKerberizedTest, AuthorizationFail) {
+TEST_P(RpcMgrKerberizedTest, AuthorizationFail) {
   GeneratedServiceIf* ping_impl =
       TakeOverService(make_unique<PingServiceImpl>(&rpc_mgr_));
   GeneratedServiceIf* scan_mem_impl =
@@ -145,7 +146,7 @@ TEST_F(RpcMgrKerberizedTest, AuthorizationFail) {
 }
 
 // Test cases in which bad Kerberos credentials cache path is specified.
-TEST_F(RpcMgrKerberizedTest, BadCredentialsCachePath) {
+TEST_P(RpcMgrKerberizedTest, BadCredentialsCachePath) {
   FLAGS_krb5_ccname = "MEMORY:foo";
   Status status = InitAuth(CURRENT_EXECUTABLE_PATH);
   ASSERT_TRUE(!status.ok());
@@ -166,7 +167,7 @@ TEST_F(RpcMgrKerberizedTest, BadCredentialsCachePath) {
 }
 
 // Test cases in which bad keytab path is specified.
-TEST_F(RpcMgrKerberizedTest, BadKeytabPath) {
+TEST_P(RpcMgrKerberizedTest, BadKeytabPath) {
   FLAGS_keytab_file = "non_existent_file_for_testing";
   Status status = InitAuth(CURRENT_EXECUTABLE_PATH);
   ASSERT_TRUE(!status.ok());
@@ -183,7 +184,7 @@ TEST_F(RpcMgrKerberizedTest, BadKeytabPath) {
 
 // Test that configurations are passed through via env variables even if kerberos
 // is disabled for internal auth (i.e. --principal is not set).
-TEST_F(RpcMgrKerberizedTest, DisabledKerberosConfigs) {
+TEST_P(RpcMgrKerberizedTest, DisabledKerberosConfigs) {
   // These flags are reset in Setup, so just overwrite them.
   FLAGS_principal = FLAGS_be_principal = "";
   FLAGS_keytab_file = "/tmp/DisabledKerberosConfigsKeytab";
@@ -222,7 +223,7 @@ TEST_F(RpcMgrKerberizedTest, DisabledKerberosConfigs) {
 // Test that we kinit even with --skip_internal_kerberos_auth and
 // --skip_external_kerberos_auth set. We do this indirectly by checking for
 // kinit success/failure.
-TEST_F(RpcMgrKerberizedTest, KinitWhenIncomingAuthDisabled) {
+TEST_P(RpcMgrKerberizedTest, KinitWhenIncomingAuthDisabled) {
   auto ia =
       ScopedFlagSetter<bool>::Make(&FLAGS_skip_internal_kerberos_auth, true);
   auto ea =
@@ -247,7 +248,7 @@ TEST_F(RpcMgrKerberizedTest, KinitWhenIncomingAuthDisabled) {
 
 // This test confirms that auth is bypassed on KRPC services when
 // --skip_external_kerberos_auth=true
-TEST_F(RpcMgrKerberizedTest, InternalAuthorizationSkip) {
+TEST_P(RpcMgrKerberizedTest, InternalAuthorizationSkip) {
   auto ia =
       ScopedFlagSetter<bool>::Make(&FLAGS_skip_internal_kerberos_auth, true);
   GeneratedServiceIf* ping_impl =
@@ -280,6 +281,11 @@ TEST_F(RpcMgrKerberizedTest, InternalAuthorizationSkip) {
   controller.Reset();
   EXPECT_OK(FromKuduStatus(ping_proxy->Ping(ping_request, &ping_response, &controller)));
 }
+
+// Run tests with Unix domain socket and TCP socket by setting
+// FLAGS_rpc_use_unix_domain_socket as true and false.
+INSTANTIATE_TEST_CASE_P(
+    UdsOnAndOff, RpcMgrKerberizedTest, ::testing::Values(true, false));
 
 } // namespace impala
 

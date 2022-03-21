@@ -1474,8 +1474,8 @@ void TmpFileGroup::WriteComplete(
   // instances, <port> is the BE krpc port (default 27000).
   const Status* p_write_status = &write_status;
   Status debug_status = DebugAction(debug_action_, "IMPALA_TMP_FILE_WRITE",
-      {ExecEnv::GetInstance()->krpc_address().hostname,
-          SimpleItoa(ExecEnv::GetInstance()->krpc_address().port)});
+      {ExecEnv::GetInstance()->krpc_address().hostname(),
+          SimpleItoa(ExecEnv::GetInstance()->krpc_address().port())});
   if (UNLIKELY(!debug_status.ok())) p_write_status = &debug_status;
 
   if (!p_write_status->ok()) {

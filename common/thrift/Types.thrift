@@ -142,9 +142,14 @@ enum TPrefetchMode {
 // A TNetworkAddress is the standard host, port representation of a
 // network address. The hostname field must be resolvable to an IPv4
 // address.
+// uds_address is Unix Domain Socket address. UDS is limited to KRPC.
+// We use the unique name in "Abstract Namespace" as UDS address in the form of
+// "@impala-krpc:<unique-id>". This field is optional. It is only used for KRPC
+// bind/listen/connect when FLAGS_rpc_use_unix_domain_socket is set as true.
 struct TNetworkAddress {
   1: required string hostname
   2: required i32 port
+  3: optional string uds_address
 }
 
 // Wire format for UniqueId

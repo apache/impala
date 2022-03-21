@@ -32,6 +32,7 @@
 #include "util/disk-info.h"
 #include "util/impalad-metrics.h"
 #include "util/memory-metrics.h"
+#include "util/uid-util.h"
 
 #include "common/names.h"
 
@@ -81,7 +82,7 @@ Status TestEnv::Init() {
   // Initialize RpcMgr and control service.
   IpAddr ip_address;
   RETURN_IF_ERROR(HostnameToIpAddr(FLAGS_hostname, &ip_address));
-  exec_env_->krpc_address_.__set_hostname(ip_address);
+  exec_env_->krpc_address_.set_hostname(ip_address);
   RETURN_IF_ERROR(exec_env_->rpc_mgr_->Init(exec_env_->krpc_address_));
   exec_env_->control_svc_.reset(new ControlService(exec_env_->rpc_metrics_));
   RETURN_IF_ERROR(exec_env_->control_svc_->Init());
@@ -147,9 +148,10 @@ Status TestEnv::CreateQueryState(
   query_ctx.query_id.lo = query_id;
   query_ctx.request_pool = "test-pool";
   query_ctx.coord_hostname = exec_env_->configured_backend_address_.hostname;
-  query_ctx.coord_ip_address = exec_env_->krpc_address_;
-  query_ctx.coord_backend_id.hi = 0;
-  query_ctx.coord_backend_id.lo = 0;
+  query_ctx.coord_ip_address = FromNetworkAddressPB(exec_env_->krpc_address_);
+  TUniqueId backend_id;
+  UniqueIdPBToTUniqueId(exec_env_->backend_id(), &backend_id);
+  query_ctx.__set_coord_backend_id(backend_id);
   TQueryOptions* query_options_to_use = &query_ctx.client_request.query_options;
   int64_t mem_limit =
       query_options_to_use->__isset.mem_limit && query_options_to_use->mem_limit > 0 ?

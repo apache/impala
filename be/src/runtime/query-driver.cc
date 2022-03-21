@@ -83,7 +83,8 @@ Status QueryDriver::SetExternalPlan(
   // Update coordinator related internal addresses in the external request
   exec_request_->query_exec_request.query_ctx.__set_coord_hostname(
       ExecEnv::GetInstance()->configured_backend_address().hostname);
-  const TNetworkAddress& address = ExecEnv::GetInstance()->krpc_address();
+  const TNetworkAddress& address =
+      FromNetworkAddressPB(ExecEnv::GetInstance()->krpc_address());
   DCHECK(IsResolvedAddress(address));
   exec_request_->query_exec_request.query_ctx.__set_coord_ip_address(address);
   // Update local_time_zone in the external request
