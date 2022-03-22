@@ -93,6 +93,8 @@ class ClientCacheTest : public testing::Test {
 // The memory is not supposed to increase after multiple rounds of client creation and
 // destruction.
 TEST_F(ClientCacheTest, MemLeak) {
+// IMPALA-11196 Testcase will fail in ASAN and TSAN build, therefore disabled.
+#if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
   int64_t create_num = 1000;
   TNetworkAddress* addr;
   InitAddr(&addr);
@@ -110,5 +112,6 @@ TEST_F(ClientCacheTest, MemLeak) {
   }
   uint64_t mem_after = GetProcessVMSize();
   EXPECT_EQ(mem_before, mem_after);
+#endif
 }
 } // namespace impala
