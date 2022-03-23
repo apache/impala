@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Impala 3.4.1 Change Log</title>
+</head>
+<body>
+<h1>Impala 3.4.1 Change Log</h1>
+        Release Notes - IMPALA - Version Impala 3.4.1
+<p><i>
+The changes in this log are in comparison to Impala 3.4.0.
+</i></p>
+<h2>        Sub-task
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9739'>IMPALA-9739</a>] -         TSAN data races during impalad shutdown
+</li>
+</ul>
+
+<h2>        Bug
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7833'>IMPALA-7833</a>] -         Audit and fix other string builtins for long string handling
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9398'>IMPALA-9398</a>] -         When pressing Ctrl+C the content of the shell history gets doubled
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9602'>IMPALA-9602</a>] -         Local catalog cache treats db and table names as case-sensitive
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9612'>IMPALA-9612</a>] -         Runtime filter wait longer than it should be
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9618'>IMPALA-9618</a>] -         Usability issues with dev env setup.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9643'>IMPALA-9643</a>] -         Local runtime filters can go missing when mt_dop &gt; 1
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9650'>IMPALA-9650</a>] -         RuntimeFilterTest appears to be flaky
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9721'>IMPALA-9721</a>] -         Fix python 3 compatibility regression in impala-shell
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9725'>IMPALA-9725</a>] -         LEFT ANTI JOIN produces wrong result when PHJ build spills
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9727'>IMPALA-9727</a>] -         Explain output for Hbase Scans isn&#39;t formatted correctly
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9787'>IMPALA-9787</a>] -         Catalog spins on one core when memory-based invalidation is enabled
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9809'>IMPALA-9809</a>] -         A query with multi-aggregation functions on  particular dataset crashes impala daemon
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9815'>IMPALA-9815</a>] -         Intermittent failure downloading org.apache.hive:hive-exec:jar:3.1.3000.xxxx during build
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9858'>IMPALA-9858</a>] -         Wrong partition hit/request metrics in profile of LocalCatalog
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9921'>IMPALA-9921</a>] -         Parse errors in ToSqlUtils.hiveNeedsQuotes should not be printed to impalad.ERROR
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10044'>IMPALA-10044</a>] -         bin/bootstrap_toolchain.py error handling can delete the toolchain directory
+</li>
+<li>Revert [<a href='https://issues.apache.org/jira/browse/IMPALA-9242'>IMPALA-9242</a>] -         Access check should only check against the privileges of the authorizable
+</li>
+</ul>
+
+<h2>        Improvement
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9483'>IMPALA-9483</a>] -         Add logs for debugging builtin functions throw unknown exception randomly
+</li>
+</ul>
+
+</body>
+</html>
