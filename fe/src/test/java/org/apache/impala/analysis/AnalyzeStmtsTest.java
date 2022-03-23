@@ -4944,6 +4944,35 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   }
 
   @Test
+  public void testIcebergDescribeHistory() throws ImpalaException {
+    TableName iceT = new TableName("functional_parquet", "iceberg_non_partitioned");
+    TableName nonIceT = new TableName("functional", "allcomplextypes");
+
+    // Analyze without predicate.
+    TblsAnalyzeOk("DESCRIBE HISTORY $TBL", iceT);
+
+    // Analyze with predicates.
+    TblsAnalyzeOk("DESCRIBE HISTORY $TBL FROM \"2022-02-14 13:31:09.819\"", iceT);
+    TblsAnalyzeOk("DESCRIBE HISTORY $TBL FROM " +
+        "cast('2021-08-09 15:52:45' as timestamp) - interval 2 days + interval 3 days",
+        iceT);
+    TblsAnalyzeOk("DESCRIBE HISTORY $TBL FROM now() + interval 3 days", iceT);
+    TblsAnalyzeOk("DESCRIBE HISTORY $TBL BETWEEN '2021-02-22' AND '2021-02-22'", iceT);
+
+    // Analyze should fail with unsupported expression types.
+    TblsAnalysisError("DESCRIBE HISTORY $TBL FROM 42 ", iceT,
+        "FROM <expression> must be a timestamp type");
+    TblsAnalysisError("DESCRIBE HISTORY $TBL FROM id", iceT,
+        "Unsupported expression: 'id'");
+    TblsAnalysisError("DESCRIBE HISTORY $TBL FROM '2021-02-32 15:52:45'", iceT,
+        "Invalid TIMESTAMP expression");
+
+    // DESCRIBE HISTORY is only supported for Iceberg tables.
+    TblsAnalysisError("DESCRIBE HISTORY $TBL", nonIceT,
+        "DESCRIBE HISTORY must specify an Iceberg table:");
+  }
+
+  @Test
   public void testCreatePartitionedIcebergTable() throws ImpalaException {
     String tblProperties = " TBLPROPERTIES ('iceberg.catalog'='hadoop.tables')";
     AnalyzesOk("CREATE TABLE tbl1 (i int, p1 int, p2 timestamp) " +

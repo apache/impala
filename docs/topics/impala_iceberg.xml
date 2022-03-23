@@ -460,10 +460,20 @@ SELECT * FROM ice_t FOR SYSTEM_VERSION AS OF 123456;
 
       <p>
         If one needs to check the available snapshots of a table they can use the <codeph>DESCRIBE HISTORY</codeph>
-        statement:
+        statement with the following syntax:
         <codeblock>
-DESCRIBE HISTORY ice_t;
+DESCRIBE HISTORY [<varname>db_name</varname>.]<varname>table_name</varname>
+  [FROM <varname>timestamp</varname>];
+
+DESCRIBE HISTORY [<varname>db_name</varname>.]<varname>table_name</varname>
+  [BETWEEN <varname>timestamp</varname> AND <varname>timestamp</varname>]
         </codeblock>
+        For example:
+<codeblock>
+DESCRIBE HISTORY ice_t FROM '2022-01-04 10:00:00';
+DESCRIBE HISTORY ice_t FROM now() - interval 5 days;
+DESCRIBE HISTORY ice_t BETWEEN '2022-01-04 10:00:00' AND '2022-01-05 10:00:00';
+</codeblock>
       </p>
 
       <p>

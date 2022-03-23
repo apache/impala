@@ -336,9 +336,7 @@ public class JniFrontend {
     Preconditions.checkNotNull(frontend_);
     TDescribeHistoryParams params = new TDescribeHistoryParams();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftParams);
-    TGetTableHistoryResult result = frontend_.getTableHistory(
-        params.getTable_name().getDb_name(), params.getTable_name().getTable_name());
-
+    TGetTableHistoryResult result = frontend_.getTableHistory(params);
     TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(result);

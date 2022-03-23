@@ -2858,6 +2858,16 @@ describe_stmt ::=
     parser.checkIdentKeyword("HISTORY", history_id);
     RESULT = new DescribeHistoryStmt(table);
   :}
+  | KW_DESCRIBE IDENT:history_id table_name:table KW_FROM expr:e
+  {:
+    parser.checkIdentKeyword("HISTORY", history_id);
+    RESULT = new DescribeHistoryStmt(table, e);
+  :}
+  | KW_DESCRIBE IDENT:history_id table_name:table KW_BETWEEN expr:e1 KW_AND expr:e2
+  {:
+    parser.checkIdentKeyword("HISTORY", history_id);
+    RESULT = new DescribeHistoryStmt(table, e1, e2);
+  :}
   ;
 
 describe_output_style ::=

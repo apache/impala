@@ -226,6 +226,9 @@ struct TShowStatsParams {
 // Parameters for DESCRIBE HISTORY command
 struct TDescribeHistoryParams {
   1: CatalogObjects.TTableName table_name
+  2: optional i64 between_start_time
+  3: optional i64 between_end_time
+  4: optional i64 from_time
 }
 
 // Parameters for SHOW FUNCTIONS commands

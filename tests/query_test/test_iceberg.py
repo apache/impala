@@ -124,6 +124,87 @@ class TestIcebergTable(ImpalaTestSuite):
     # Check "is_current_ancestor" column.
     assert(first_snapshot[3] == "TRUE" and second_snapshot[3] == "TRUE")
 
+  def test_describe_history_params(self, vector, unique_database):
+    tbl_name = unique_database + ".describe_history"
+    time_format = '%Y-%m-%d %H:%M:%S.%f'
+
+    def execute_query_ts(query):
+      impalad_client.execute(query)
+      return datetime.datetime.now()
+
+    def expect_results_from(ts, expected_result_size):
+      query = "DESCRIBE HISTORY {0} FROM {1};".format(tbl_name, cast_ts(ts))
+      data = impalad_client.execute(query)
+      assert len(data.data) == expected_result_size
+      for i in range(len(data.data)):
+        result_ts = data.data[i].split('\t')[0][:- 3]
+        result_ts_dt = datetime.datetime.strptime(result_ts, time_format)
+        assert result_ts_dt > ts
+
+    def expect_results_between(ts_start, ts_end, expected_result_size):
+      query = "DESCRIBE HISTORY {0} BETWEEN {1} AND {2};".format(
+        tbl_name, cast_ts(ts_start), cast_ts(ts_end))
+      data = impalad_client.execute(query)
+      assert len(data.data) == expected_result_size
+      for i in range(len(data.data)):
+        result_ts = data.data[i].split('\t')[0][:- 3]
+        result_ts_dt = datetime.datetime.strptime(result_ts, time_format)
+        assert result_ts_dt > ts_start and result_ts_dt < ts_end
+
+    def quote(s):
+      return "'{0}'".format(s)
+
+    def cast_ts(ts):
+      return "CAST({0} as timestamp)".format(quote(ts))
+
+    def impala_now():
+      now_data = impalad_client.execute("select now()")
+      now_data_ts = now_data.data[0][:- 3]
+      now_data_ts_dt = datetime.datetime.strptime(now_data_ts, time_format)
+      return now_data_ts_dt
+
+    # We are setting the TIMEZONE query option in this test, so let's create a local
+    # impala client.
+    with self.create_impala_client() as impalad_client:
+      # Iceberg doesn't create a snapshot entry for the initial empty table
+      impalad_client.execute("create table {0} (i int) stored as iceberg"
+          .format(tbl_name))
+      ts_1 = execute_query_ts("insert into {0} values (1)".format(tbl_name))
+      time.sleep(5)
+      ts_2 = execute_query_ts("insert into {0} values (2)".format(tbl_name))
+      time.sleep(5)
+      ts_3 = execute_query_ts("insert into {0} values (3)".format(tbl_name))
+      # Describe history without predicate
+      data = impalad_client.execute("DESCRIBE HISTORY {0}".format(tbl_name))
+      assert len(data.data) == 3
+
+      # Describe history with FROM predicate
+      expect_results_from(ts_1 - datetime.timedelta(hours=1), 3)
+      expect_results_from(ts_1, 2)
+      expect_results_from(ts_3, 0)
+
+      # Describe history with BETWEEN <ts> AND <ts> predicate
+      expect_results_between(ts_1, ts_2, 1)
+      expect_results_between(ts_1 - datetime.timedelta(hours=1), ts_2, 2)
+      expect_results_between(ts_1 - datetime.timedelta(hours=1), ts_2 +
+          datetime.timedelta(hours=1), 3)
+
+      # Check that timezone is interpreted in local timezone controlled by query option
+      # TIMEZONE. Persist the local times first and create a new snapshot.
+      impalad_client.execute("SET TIMEZONE='Asia/Tokyo'")
+      now_tokyo = impala_now()
+      impalad_client.execute("SET TIMEZONE='Europe/Budapest'")
+      now_budapest = impala_now()
+      execute_query_ts("insert into {0} values (4)".format(tbl_name))
+      expect_results_from(now_budapest, 1)
+
+      # Let's switch to Tokyo time. Tokyo time is always greater than Budapest time.
+      impalad_client.execute("SET TIMEZONE='Asia/Tokyo'")
+      expect_results_from(now_tokyo, 1)
+
+      # Interpreting Budapest time in Tokyo time points to the past.
+      expect_results_from(now_budapest, 4)
+
   def test_time_travel(self, vector, unique_database):
     tbl_name = unique_database + ".time_travel"
 

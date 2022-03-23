@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -100,7 +101,6 @@ import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDataSource;
 import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeDb;
-import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeIcebergTable;
@@ -110,12 +110,10 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.ImpaladTableUsageTracker;
 import org.apache.impala.catalog.MetaStoreClientPool;
-import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
-import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
@@ -148,6 +146,7 @@ import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDdlExecRequest;
 import org.apache.impala.thrift.TDdlType;
+import org.apache.impala.thrift.TDescribeHistoryParams;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TDescribeResult;
 import org.apache.impala.thrift.TExecRequest;
@@ -186,10 +185,8 @@ import org.apache.impala.thrift.TTruncateParams;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
-import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.EventSequence;
-import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.PatternMatcher;
@@ -1224,18 +1221,33 @@ public class Frontend {
   /**
    *  Handles DESCRIBE HISTORY queries.
    */
-  public TGetTableHistoryResult getTableHistory(String dbName, String tableName)
+  public TGetTableHistoryResult getTableHistory(TDescribeHistoryParams params)
       throws DatabaseNotFoundException, TableLoadingException {
-    FeTable feTable = getCatalog().getTable(dbName, tableName);
-    Preconditions.checkState(feTable instanceof FeIcebergTable);
+    FeTable feTable = getCatalog().getTable(params.getTable_name().db_name,
+        params.getTable_name().table_name);
     FeIcebergTable feIcebergTable = (FeIcebergTable) feTable;
     TableMetadata metadata = IcebergUtil.getIcebergTableMetadata(feIcebergTable);
     Table table = IcebergUtil.loadTable(feIcebergTable);
     Set<Long> ancestorIds = Sets.newHashSet(IcebergUtil.currentAncestorIds(table));
+    TGetTableHistoryResult historyResult = new TGetTableHistoryResult();
 
-    TGetTableHistoryResult result = new TGetTableHistoryResult();
-    result.result = Lists.newArrayList();
-    for (HistoryEntry historyEntry : metadata.snapshotLog()) {
+    List<HistoryEntry> filteredHistoryEntries =
+        metadata.snapshotLog().stream().collect(Collectors.toList());
+    if (params.isSetFrom_time()) {
+      // DESCRIBE HISTORY <table> FROM <ts>
+      filteredHistoryEntries = metadata.snapshotLog().stream()
+          .filter(c -> c.timestampMillis() >= params.from_time)
+          .collect(Collectors.toList());
+    } else if (params.isSetBetween_start_time() && params.isSetBetween_end_time()) {
+      // DESCRIBE HISTORY <table> BETWEEN <ts> AND <ts>
+      filteredHistoryEntries = metadata.snapshotLog().stream()
+          .filter(x -> x.timestampMillis() >= params.between_start_time &&
+              x.timestampMillis() <= params.between_end_time)
+          .collect(Collectors.toList());
+    }
+
+    List<TGetTableHistoryResultItem> result = Lists.newArrayList();
+    for (HistoryEntry historyEntry : filteredHistoryEntries) {
       TGetTableHistoryResultItem resultItem = new TGetTableHistoryResultItem();
       long snapshotId = historyEntry.snapshotId();
       resultItem.setCreation_time(historyEntry.timestampMillis());
@@ -1245,9 +1257,10 @@ public class Frontend {
         resultItem.setParent_id(snapshot.parentId());
       }
       resultItem.setIs_current_ancestor(ancestorIds.contains(snapshotId));
-      result.result.add(resultItem);
+      result.add(resultItem);
     }
-    return result;
+    historyResult.setResult(result);
+    return historyResult;
   }
 
   /**
