@@ -3789,6 +3789,13 @@ static pthread_mutex_t *ssl_mutexes;
 
 static int sslize(struct sq_connection *conn, SSL_CTX *s, int (*func)(SSL *)) {
   return (conn->ssl = SSL_new(s)) != NULL &&
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+  // IMPALA-11195: disable TLS/SSL renegotiation. In version 1.0.2 and prior it's
+  // possible to use the undocumented SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS flag.
+  // For more context, see a note on the SSL_OP_NO_RENEGOTIATION option in the
+  // $OPENSSL_ROOT/CHANGES and https://github.com/openssl/openssl/issues/4739.
+  (conn->ssl->s3->flags |= SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS) &&
+#endif
     SSL_set_fd(conn->ssl, conn->client.sock) == 1 &&
     func(conn->ssl) == 1;
 }
@@ -3897,6 +3904,20 @@ static int set_ssl_option(struct sq_context *ctx) {
     cry(fc(ctx), "SSL_CTX_new (server) error: %s", ssl_error());
     return 0;
   }
+
+#if OPENSSL_VERSION_NUMBER > 0x1010007fL
+  // IMPALA-11195: disable TLS/SSL renegotiation.
+  // See https://www.openssl.org/docs/man1.1.0/man3/SSL_set_options.html for
+  // details. SSL_OP_NO_RENEGOTIATION option was back-ported from 1.1.1-dev to
+  // 1.1.0h, so this is a best-effort approach if the binary compiled with
+  // newer as per information in the CHANGES file for
+  // 'Changes between 1.1.0g and 1.1.0h [27 Mar 2018]':
+  //     Note that if an application built against 1.1.0h headers (or above) is
+  //     run using an older version of 1.1.0 (prior to 1.1.0h) then the option
+  //     will be accepted but nothing will happen, i.e. renegotiation will
+  //     not be prevented.
+  options |= SSL_OP_NO_RENEGOTIATION;
+#endif
 
   if ((SSL_CTX_set_options(ctx->ssl_ctx, options) & options) != options) {
     cry(fc(ctx), "SSL_CTX_set_options (server) error: could not set options (%d)",
