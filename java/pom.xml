@@ -67,12 +67,14 @@ under the License.
     <jackson-databind.version>2.10.5.1</jackson-databind.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <iceberg.version>${env.IMPALA_ICEBERG_VERSION}</iceberg.version>
-    <pac4j.version>4.0.3</pac4j.version>
+    <pac4j.version>4.5.5</pac4j.version>
     <!-- xmlsec, bcprov-jdk15on and springframework are not used by Impala directly,
-         but needed to replace pac4j 4.0.3's unsafe versions -->
-    <xmlsec.version>2.2.1</xmlsec.version>
-    <bcprov-jdk15on.version>1.64</bcprov-jdk15on.version>
-    <springframework.version>4.3.29.RELEASE</springframework.version>
+         but they are needed by pac4j. This uses a newer xmlsec to address a CVE,
+         but bcprov-jdk15on and springframework versions match the versions from
+         pac4j 4.5.5. -->
+    <xmlsec.version>2.2.3</xmlsec.version>
+    <bcprov-jdk15on.version>1.68</bcprov-jdk15on.version>
+    <springframework.version>5.2.9.RELEASE</springframework.version>
     <json-smart.version>2.4.7</json-smart.version>
   </properties>
 
