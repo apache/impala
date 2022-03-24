@@ -420,7 +420,7 @@ echo ">>> Checking out Impala-lzo"
 : ${IMPALA_LZO_HOME:="${IMPALA_HOME}/../Impala-lzo"}
 if ! [[ -d "$IMPALA_LZO_HOME" ]]
 then
-  git clone --branch master https://github.com/cloudera/impala-lzo.git "$IMPALA_LZO_HOME"
+  git clone --branch asf-3.4 https://github.com/cloudera/impala-lzo.git "$IMPALA_LZO_HOME"
 fi
 
 echo ">>> Checking out and building hadoop-lzo"
