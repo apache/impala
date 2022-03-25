@@ -50,7 +50,6 @@ import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.HistoryEntry;
 import org.apache.iceberg.Snapshot;
-import org.apache.iceberg.TableMetadata;
 import org.apache.impala.analysis.AlterDbStmt;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
@@ -1228,21 +1227,19 @@ public class Frontend {
     FeTable feTable = getCatalog().getTable(params.getTable_name().db_name,
         params.getTable_name().table_name);
     FeIcebergTable feIcebergTable = (FeIcebergTable) feTable;
-    TableMetadata metadata = IcebergUtil.getIcebergTableMetadata(feIcebergTable);
-    Table table = IcebergUtil.loadTable(feIcebergTable);
+    Table table = feIcebergTable.getIcebergApiTable();
     Set<Long> ancestorIds = Sets.newHashSet(IcebergUtil.currentAncestorIds(table));
     TGetTableHistoryResult historyResult = new TGetTableHistoryResult();
 
-    List<HistoryEntry> filteredHistoryEntries =
-        metadata.snapshotLog().stream().collect(Collectors.toList());
+    List<HistoryEntry> filteredHistoryEntries = table.history();
     if (params.isSetFrom_time()) {
       // DESCRIBE HISTORY <table> FROM <ts>
-      filteredHistoryEntries = metadata.snapshotLog().stream()
+      filteredHistoryEntries = table.history().stream()
           .filter(c -> c.timestampMillis() >= params.from_time)
           .collect(Collectors.toList());
     } else if (params.isSetBetween_start_time() && params.isSetBetween_end_time()) {
       // DESCRIBE HISTORY <table> BETWEEN <ts> AND <ts>
-      filteredHistoryEntries = metadata.snapshotLog().stream()
+      filteredHistoryEntries = table.history().stream()
           .filter(x -> x.timestampMillis() >= params.between_start_time &&
               x.timestampMillis() <= params.between_end_time)
           .collect(Collectors.toList());
@@ -1254,7 +1251,7 @@ public class Frontend {
       long snapshotId = historyEntry.snapshotId();
       resultItem.setCreation_time(historyEntry.timestampMillis());
       resultItem.setSnapshot_id(snapshotId);
-      Snapshot snapshot = metadata.snapshot(snapshotId);
+      Snapshot snapshot = table.snapshot(snapshotId);
       if (snapshot != null && snapshot.parentId() != null) {
         resultItem.setParent_id(snapshot.parentId());
       }

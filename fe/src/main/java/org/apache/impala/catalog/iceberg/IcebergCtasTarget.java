@@ -254,6 +254,11 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
     return -1;
   }
 
+  @Override
+  public org.apache.iceberg.Table getIcebergApiTable() {
+    return null;
+  }
+
   public void addColumn(IcebergColumn col) {
     colsByPos_.add(col);
     colsByName_.put(col.getName().toLowerCase(), col);

@@ -47,7 +47,6 @@ import org.apache.impala.fb.FbIcebergDataFileFormat;
 import org.apache.impala.fb.FbIcebergMetadata;
 import org.apache.impala.fb.FbIcebergPartitionTransformValue;
 import org.apache.impala.fb.FbIcebergTransformType;
-import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.DataFile;
@@ -61,10 +60,8 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.StructLike;
 import org.apache.iceberg.Table;
-import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.mr.Catalogs;
 import org.apache.iceberg.transforms.PartitionSpecVisitor;
-import org.apache.iceberg.transforms.Transform;
 import org.apache.iceberg.types.Conversions;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
@@ -76,7 +73,6 @@ import org.apache.impala.analysis.TimeTravelSpec.Kind;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsFileFormat;
-import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.iceberg.IcebergHadoopCatalog;
@@ -86,14 +82,12 @@ import org.apache.impala.catalog.iceberg.IcebergCatalog;
 import org.apache.impala.catalog.iceberg.IcebergCatalogs;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TCompressionCodec;
-import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.THdfsCompression;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergPartitionField;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
-import org.apache.impala.thrift.TIcebergPartitionTransform;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
 
 public class IcebergUtil {
@@ -150,27 +144,6 @@ public class IcebergUtil {
   }
 
   /**
-   * Get TableMetadata by FeIcebergTable
-   */
-  public static TableMetadata getIcebergTableMetadata(FeIcebergTable table)
-      throws TableLoadingException {
-    BaseTable iceTable = (BaseTable)IcebergUtil.loadTable(table);
-    return iceTable.operations().current();
-  }
-
-  /**
-   * Get TableMetadata by related info tableName is table full name, usually
-   * database.table
-   */
-  public static TableMetadata getIcebergTableMetadata(TIcebergCatalog catalog,
-      TableIdentifier tableId, String location, Map<String, String> tableProps)
-      throws TableLoadingException {
-    BaseTable baseTable = (BaseTable)IcebergUtil.loadTable(catalog,
-        tableId, location, tableProps);
-    return baseTable.operations().current();
-  }
-
-  /**
    * Get Iceberg table identifier by table property
    */
   public static TableIdentifier getIcebergTableIdentifier(FeIcebergTable table) {
@@ -201,7 +174,7 @@ public class IcebergUtil {
    */
   public static Transaction getIcebergTransaction(FeIcebergTable feTable)
       throws TableLoadingException, ImpalaRuntimeException {
-    return getIcebergCatalog(feTable).loadTable(feTable).newTransaction();
+    return feTable.getIcebergApiTable().newTransaction();
   }
 
   /**
@@ -564,8 +537,7 @@ public class IcebergUtil {
 
   private static TableScan createScanAsOf(FeIcebergTable table,
       TimeTravelSpec timeTravelSpec) throws TableLoadingException {
-    BaseTable baseTable = (BaseTable)IcebergUtil.loadTable(table);
-    TableScan scan = baseTable.newScan();
+    TableScan scan = table.getIcebergApiTable().newScan();
     if (timeTravelSpec == null) {
       scan = scan.useSnapshot(table.snapshotId());
     } else {
@@ -865,10 +837,9 @@ public class IcebergUtil {
    * It creates a flatbuffer so it can be passed between machines and processes without
    * further de/serialization.
    */
-  public static FbFileMetadata createIcebergMetadata(FeIcebergTable feTbl,
-      Table iceTbl, DataFile df) throws TableLoadingException {
+  public static FbFileMetadata createIcebergMetadata(FeIcebergTable feTbl, DataFile df) {
     FlatBufferBuilder fbb = new FlatBufferBuilder(1);
-    int iceOffset = createIcebergMetadata(feTbl, iceTbl, fbb, df);
+    int iceOffset = createIcebergMetadata(feTbl, fbb, df);
     fbb.finish(FbFileMetadata.createFbFileMetadata(fbb, iceOffset));
     ByteBuffer bb = fbb.dataBuffer().slice();
     ByteBuffer compressedBb = ByteBuffer.allocate(bb.capacity());
@@ -876,10 +847,10 @@ public class IcebergUtil {
     return FbFileMetadata.getRootAsFbFileMetadata((ByteBuffer)compressedBb.flip());
   }
 
-  private static int createIcebergMetadata(FeIcebergTable feTbl, Table iceTbl,
-      FlatBufferBuilder fbb, DataFile df) throws TableLoadingException {
+  private static int createIcebergMetadata(FeIcebergTable feTbl, FlatBufferBuilder fbb,
+      DataFile df) {
     int partKeysOffset = -1;
-    PartitionSpec spec = iceTbl.specs().get(df.specId());
+    PartitionSpec spec = feTbl.getIcebergApiTable().specs().get(df.specId());
     if (spec != null && !spec.fields().isEmpty()) {
       partKeysOffset = createPartitionKeys(feTbl, fbb, spec, df);
     }

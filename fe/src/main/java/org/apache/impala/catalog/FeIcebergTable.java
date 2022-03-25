@@ -35,8 +35,6 @@ import org.apache.iceberg.DataFile;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
-import org.apache.iceberg.Table;
-import org.apache.iceberg.TableMetadata;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.LiteralExpr;
@@ -44,8 +42,6 @@ import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Reference;
 import org.apache.impala.compat.HdfsShim;
-import org.apache.impala.fb.FbFileDesc;
-import org.apache.impala.fb.FbIcebergMetadata;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.THdfsCompression;
@@ -54,7 +50,6 @@ import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
-import org.apache.impala.thrift.TIcebergSnapshot;
 import org.apache.impala.thrift.TIcebergTable;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TResultSet;
@@ -88,6 +83,11 @@ public interface FeIcebergTable extends FeFsTable {
    * Return iceberg catalog type from table properties
    */
   TIcebergCatalog getIcebergCatalog();
+
+  /**
+   * Returns the cached Iceberg Table object that stores the metadata loaded by Iceberg.
+   */
+  org.apache.iceberg.Table getIcebergApiTable();
 
   /**
    * Return Iceberg catalog location, we use this location to load metadata from Iceberg
@@ -146,7 +146,9 @@ public interface FeIcebergTable extends FeFsTable {
   /**
    * @return the Iceberg schema.
    */
-  Schema getIcebergSchema();
+  default Schema getIcebergSchema() {
+    return getIcebergApiTable().schema();
+  }
 
   @Override
   default boolean isCacheable() {
@@ -267,20 +269,14 @@ public interface FeIcebergTable extends FeFsTable {
   }
 
   /**
-   * Current snapshot id of the table.
+   * Returns the current snapshot id of the Iceberg API table if it exists, otherwise
+   * returns -1.
    */
-  long snapshotId();
-
-  /**
-   * Utility class to hold information about Iceberg snapshots.
-   */
-  public static class Snapshot {
-    public Snapshot(long snapshotId, Map<String, FileDescriptor> pathHashToFileDescMap) {
-      this.snapshotId = snapshotId;
-      this.pathHashToFileDescMap = pathHashToFileDescMap;
+  default long snapshotId() {
+    if (getIcebergApiTable() != null && getIcebergApiTable().currentSnapshot() != null) {
+      return getIcebergApiTable().currentSnapshot().snapshotId();
     }
-    public long snapshotId;
-    public Map<String, FileDescriptor> pathHashToFileDescMap;
+    return -1;
   }
 
   /**
@@ -308,10 +304,9 @@ public interface FeIcebergTable extends FeFsTable {
       resultSchema.addToColumns(new TColumn("Field Partition Transform",
           Type.STRING.toThrift()));
 
-      TableMetadata metadata = IcebergUtil.getIcebergTableMetadata(table);
-      if (!metadata.specs().isEmpty()) {
+      if (!table.getIcebergApiTable().specs().isEmpty()) {
         // Just show the current PartitionSpec from Iceberg table metadata
-        PartitionSpec latestSpec = metadata.spec();
+        PartitionSpec latestSpec = table.getIcebergApiTable().spec();
         HashMap<String, Integer> transformParams =
             IcebergUtil.getPartitionTransformParams(latestSpec);
         for(PartitionField field : latestSpec.fields()) {
@@ -419,7 +414,7 @@ public interface FeIcebergTable extends FeFsTable {
       tIcebergTable.setPath_hash_to_file_descriptor(
           convertPathHashToFileDescMap(icebergTable));
 
-      tIcebergTable.setSnapshot_id(icebergTable.snapshotId());
+      tIcebergTable.setCatalog_snapshot_id(icebergTable.snapshotId());
       tIcebergTable.setParquet_compression_codec(
           icebergTable.getIcebergParquetCompressionCodec());
       tIcebergTable.setParquet_row_group_size(
@@ -463,13 +458,6 @@ public interface FeIcebergTable extends FeFsTable {
         }
       }
       return fileDescMap;
-    }
-
-    public static TIcebergSnapshot createTIcebergSnapshot(FeIcebergTable icebergTable) {
-      TIcebergSnapshot snapshot = new TIcebergSnapshot();
-      snapshot.setSnapshot_id(icebergTable.snapshotId());
-      snapshot.setIceberg_file_desc_map(convertPathHashToFileDescMap(icebergTable));
-      return snapshot;
     }
 
     /**
@@ -521,8 +509,6 @@ public interface FeIcebergTable extends FeFsTable {
             hdfsFileDescMap.put(path.toUri().getPath(), fileDesc);
         }
       }
-      // TODO: remove Iceberg table load once IMPALA-10737 is resolved.
-      Table iceTbl = IcebergUtil.loadTable(table);
       Map<String, HdfsPartition.FileDescriptor> fileDescMap = new HashMap<>();
       List<DataFile> dataFileList = IcebergUtil.getIcebergDataFiles(table,
           new ArrayList<>(), /*timeTravelSpecl=*/null);
@@ -533,7 +519,7 @@ public interface FeIcebergTable extends FeFsTable {
             HdfsPartition.FileDescriptor fsFd = hdfsFileDescMap.get(
                 path.toUri().getPath());
             HdfsPartition.FileDescriptor iceFd = fsFd.cloneWithFileMetadata(
-                IcebergUtil.createIcebergMetadata(table, iceTbl, dataFile));
+                IcebergUtil.createIcebergMetadata(table, dataFile));
             fileDescMap.put(pathHash, iceFd);
           } else {
             LOG.warn("Iceberg DataFile '{}' cannot be found in the HDFS recursive file "
@@ -542,7 +528,7 @@ public interface FeIcebergTable extends FeFsTable {
                 new Path(dataFile.path().toString()),
                 new Path(table.getIcebergTableLocation()), table.getHostIndex());
             HdfsPartition.FileDescriptor iceFd = fileDesc.cloneWithFileMetadata(
-                IcebergUtil.createIcebergMetadata(table, iceTbl, dataFile));
+                IcebergUtil.createIcebergMetadata(table, dataFile));
             fileDescMap.put(IcebergUtil.getDataFilePathHash(dataFile), iceFd);
           }
       }
@@ -553,9 +539,9 @@ public interface FeIcebergTable extends FeFsTable {
      * Get iceberg partition spec by iceberg table metadata
      */
     public static List<IcebergPartitionSpec> loadPartitionSpecByIceberg(
-        TableMetadata metadata) throws TableLoadingException {
+        FeIcebergTable table) throws TableLoadingException {
       List<IcebergPartitionSpec> ret = new ArrayList<>();
-      for (PartitionSpec spec : metadata.specs()) {
+      for (PartitionSpec spec : table.getIcebergApiTable().specs().values()) {
         ret.add(convertPartitionSpec(spec));
       }
       return ret;
@@ -579,7 +565,7 @@ public interface FeIcebergTable extends FeFsTable {
       List<IcebergPartitionSpec> specs = feIcebergTable.getPartitionSpecs();
       Preconditions.checkState(specs != null);
       if (specs.isEmpty()) return null;
-      int defaultSpecId = feIcebergTable.getDefaultPartitionSpecId();
+      int defaultSpecId = feIcebergTable.getIcebergApiTable().spec().specId();
       Preconditions.checkState(specs.size() > defaultSpecId);
       return specs.get(defaultSpecId);
     }

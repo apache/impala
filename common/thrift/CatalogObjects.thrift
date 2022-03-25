@@ -568,9 +568,9 @@ struct TIcebergTable {
   2: required list<TIcebergPartitionSpec> partition_spec
   3: required i32 default_partition_spec_id
   // Map from 128-bit Murmur3 hash of data file path to its file descriptor
-  4: optional map<string,THdfsFileDesc> path_hash_to_file_descriptor
-  // Iceberg snapshot id of the table
-  5: optional i64 snapshot_id
+  4: optional map<string, THdfsFileDesc> path_hash_to_file_descriptor
+  // Snapshot id of the org.apache.iceberg.Table object cached in the CatalogD
+  5: optional i64 catalog_snapshot_id;
   // Iceberg 'write.parquet.compression-codec' and 'write.parquet.compression-level' table
   // properties
   6: optional TCompressionCodec parquet_compression_codec

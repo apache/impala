@@ -18,7 +18,6 @@
 package org.apache.impala.service;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,15 +39,11 @@ import org.apache.iceberg.UpdateProperties;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.expressions.Expressions;
-import org.apache.iceberg.types.Types;
-import org.apache.iceberg.hadoop.HadoopCatalog;
-import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.TableNotFoundException;
-import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.iceberg.IcebergCatalog;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.fb.FbIcebergColumnStats;
@@ -94,9 +89,7 @@ public class IcebergCatalogOpExecutor {
   public static void populateExternalTableCols(
       org.apache.hadoop.hive.metastore.api.Table msTbl, Table iceTbl)
       throws TableLoadingException {
-    TableMetadata metadata = ((BaseTable)iceTbl).operations().current();
-    Schema schema = metadata.schema();
-    msTbl.getSd().setCols(IcebergSchemaConverter.convertToHiveSchema(schema));
+    msTbl.getSd().setCols(IcebergSchemaConverter.convertToHiveSchema(iceTbl.schema()));
   }
 
   /**
@@ -166,10 +159,9 @@ public class IcebergCatalogOpExecutor {
   public static void alterTableSetPartitionSpec(FeIcebergTable feTable,
       TIcebergPartitionSpec partSpec, String catalogServiceId, long catalogVersion)
       throws TableLoadingException, ImpalaRuntimeException {
-    BaseTable iceTable = (BaseTable)IcebergUtil.loadTable(feTable);
+    BaseTable iceTable = (BaseTable)feTable.getIcebergApiTable();
     TableOperations tableOp = iceTable.operations();
     TableMetadata metadata = tableOp.current();
-
     Schema schema = metadata.schema();
     PartitionSpec newPartSpec = IcebergUtil.createIcebergPartition(schema, partSpec);
     TableMetadata newMetadata = metadata.updatePartitionSpec(newPartSpec);
@@ -280,8 +272,7 @@ public class IcebergCatalogOpExecutor {
   public static void appendFiles(FeIcebergTable feIcebergTable, Transaction txn,
       TIcebergOperationParam icebergOp) throws ImpalaRuntimeException,
       TableLoadingException {
-    org.apache.iceberg.Table nativeIcebergTable =
-        IcebergUtil.loadTable(feIcebergTable);
+    org.apache.iceberg.Table nativeIcebergTable = feIcebergTable.getIcebergApiTable();
     List<ByteBuffer> dataFilesFb = icebergOp.getIceberg_data_files_fb();
     BatchWrite batchWrite;
     if (icebergOp.isIs_overwrite()) {

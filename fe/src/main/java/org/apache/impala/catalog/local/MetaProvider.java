@@ -28,17 +28,17 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogException;
-import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsPartitionLocationCompressor;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.SqlConstraints;
+import org.apache.impala.catalog.local.LocalIcebergTable.TableParams;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TBriefTableMeta;
-import org.apache.impala.thrift.TIcebergSnapshot;
 import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TPartialTableInfo;
 import org.apache.impala.thrift.TValidWriteIdList;
 import org.apache.impala.util.ListMap;
 import org.apache.thrift.TException;
@@ -126,11 +126,16 @@ public interface MetaProvider {
       List<String> colNames) throws TException;
 
   /**
-   * Loads Iceberg snapshot information, i.e. snapshot id and file descriptors.
+   * Loads Iceberg related table metadata.
    */
-  public FeIcebergTable.Snapshot loadIcebergSnapshot(final TableMetaRef table,
-      ListMap<TNetworkAddress> hostIndex)
-      throws TException;
+  public TPartialTableInfo loadIcebergTable(
+      final TableMetaRef table) throws TException;
+
+  /**
+   * Loads the Iceberg API table metadata through the Iceberg library.
+   */
+  public org.apache.iceberg.Table loadIcebergApiTable(
+      final TableMetaRef table, TableParams param, Table msTable) throws TException;
 
   /**
    * Reference to a table as returned by loadTable(). This reference must be passed
