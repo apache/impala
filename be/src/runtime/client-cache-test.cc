@@ -21,29 +21,23 @@
 #include <sstream>
 #include <string>
 
-#include "common/init.h"
-#include "runtime/client-cache.h"
-#include "runtime/test-env.h"
-#include "statestore/statestore-service-client-wrapper.h"
 #include "testutil/gtest-util.h"
-#include "util/bit-util.h"
-
-#include "common/names.h"
+#include "common/init.h"
+#include "codegen/llvm-codegen.h"
+#include "runtime/test-env.h"
+#include "service/fe-support.h"
+#include "runtime/client-cache.h"
+#include "statestore/statestore-service-client-wrapper.h"
 
 using namespace std;
 
 namespace impala {
 class ClientCacheTest : public testing::Test {
  protected:
-  unique_ptr<TestEnv> test_env_;
   // Pool for objects to be destroyed during test teardown.
   ObjectPool pool_;
 
-  virtual void SetUp() {
-    // Establish a TestEnv so that ExecEnv works in tests.
-    test_env_.reset(new TestEnv);
-    ASSERT_OK(test_env_->Init());
-  }
+  virtual void SetUp() {}
 
   virtual void TearDown() { pool_.Clear(); }
 
@@ -111,7 +105,15 @@ TEST_F(ClientCacheTest, MemLeak) {
     DestroyClient(client_cache, &ck);
   }
   uint64_t mem_after = GetProcessVMSize();
-  EXPECT_EQ(mem_before, mem_after);
+  EXPECT_GE(mem_before, mem_after);
 #endif
 }
 } // namespace impala
+
+int main(int argc, char **argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  impala::InitFeSupport();
+  ABORT_IF_ERROR(impala::LlvmCodeGen::InitializeLlvm());
+  return RUN_ALL_TESTS();
+}
