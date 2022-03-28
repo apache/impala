@@ -19,8 +19,6 @@ package org.apache.impala.catalog;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -53,6 +51,7 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PrimaryKeysRequest;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
+import org.apache.hadoop.hive.metastore.utils.FileUtils;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
@@ -2469,8 +2468,7 @@ public class HdfsTable extends Table implements FeFsTable {
    * keys of this table. This is useful to convert the string values which are received
    * from metastore events to {@link LiteralExpr}.
    */
-  public List<LiteralExpr> getTypeCompatiblePartValues(List<String> values)
-      throws UnsupportedEncodingException {
+  public List<LiteralExpr> getTypeCompatiblePartValues(List<String> values) {
     List<LiteralExpr> result = new ArrayList<>();
     List<Column> partitionColumns = getClusteringColumns();
     Preconditions.checkState(partitionColumns.size() == values.size());
@@ -2494,8 +2492,8 @@ public class HdfsTable extends Table implements FeFsTable {
    * original value, the second element is the LiteralExpr created from the original
    * value.
    */
-  private Pair<String, LiteralExpr> getTypeCompatibleValue(Path path,
-      String partitionKey) throws UnsupportedEncodingException {
+  private Pair<String, LiteralExpr> getTypeCompatibleValue(
+      Path path, String partitionKey) {
     String partName[] = path.getName().split("=");
     if (partName.length != 2 || !partName[0].equals(partitionKey)) return null;
 
@@ -2513,13 +2511,12 @@ public class HdfsTable extends Table implements FeFsTable {
    * @param type Type of the partition column
    * @return Pair which contains the partition value and its equivalent
    * {@link LiteralExpr} according to the type provided.
-   * @throws UnsupportedEncodingException
    */
-  private Pair<String, LiteralExpr> getPartitionExprFromValue(String partValue, Type type)
-      throws UnsupportedEncodingException {
+  private Pair<String, LiteralExpr> getPartitionExprFromValue(
+      String partValue, Type type) {
     LiteralExpr expr;
     // URL decode the partition value since it may contain encoded URL.
-    String value = URLDecoder.decode(partValue, StandardCharsets.UTF_8.name());
+    String value = FileUtils.unescapePathName(partValue);
     if (!value.equals(getNullPartitionKeyValue())) {
       try {
         expr = LiteralExpr.createFromUnescapedStr(value, type);
@@ -2745,7 +2742,7 @@ public class HdfsTable extends Table implements FeFsTable {
       // them in the result of getPartitionsByNames.
       throw new TableLoadingException(
           "Error when reloading partitions for table " + getFullName(), e);
-    } catch (TException | UnsupportedEncodingException e2) {
+    } catch (TException e2) {
       throw new CatalogException(
           "Unexpected error while retrieving partitions for table " + getFullName(), e2);
     }
@@ -2769,24 +2766,19 @@ public class HdfsTable extends Table implements FeFsTable {
         + "held before reloadPartitionsFromEvent");
     LOG.info("Reloading partition metadata for table: {} ({})", getFullName(), reason);
     Map<Partition, HdfsPartition> hmsPartToHdfsPart = new HashMap<>();
-    try {
-      for (Partition partition : partsFromEvent) {
-        List<LiteralExpr> partExprs = getTypeCompatiblePartValues(partition.getValues());
-        HdfsPartition hdfsPartition = getPartition(partExprs);
-        // only reload partitions that have more recent write id
-        if (hdfsPartition != null &&
-            (!AcidUtils.isTransactionalTable(msTable_.getParameters())
-                || hdfsPartition.getWriteId() <= MetastoreShim
-                .getWriteIdFromMSPartition(partition))) {
-          hmsPartToHdfsPart.put(partition, hdfsPartition);
-        }
+    for (Partition partition : partsFromEvent) {
+      List<LiteralExpr> partExprs = getTypeCompatiblePartValues(partition.getValues());
+      HdfsPartition hdfsPartition = getPartition(partExprs);
+      // only reload partitions that have more recent write id
+      if (hdfsPartition != null
+          && (!AcidUtils.isTransactionalTable(msTable_.getParameters())
+                 || hdfsPartition.getWriteId()
+                     <= MetastoreShim.getWriteIdFromMSPartition(partition))) {
+        hmsPartToHdfsPart.put(partition, hdfsPartition);
       }
-      reloadPartitions(client, hmsPartToHdfsPart, loadFileMetadata);
-      return hmsPartToHdfsPart.size();
-    } catch (UnsupportedEncodingException e) {
-      throw new CatalogException(
-          "Unexpected error while retrieving partitions for table " + getFullName(), e);
     }
+    reloadPartitions(client, hmsPartToHdfsPart, loadFileMetadata);
+    return hmsPartToHdfsPart.size();
   }
 
   /**
