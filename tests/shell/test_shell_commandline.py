@@ -297,17 +297,25 @@ class TestImpalaShell(ImpalaTestSuite):
         result.stderr
 
   def test_output_format(self, vector):
-    expected_output = ['1'] * 3
-    args = ['-q', 'select 1,1,1', '-B', '--quiet']
-    result = run_impala_shell_cmd(vector, args)
+    expected_output = ['1', '2', '3']
+    args = ['-q', 'select 1 as col_00001, 2 as col_2, 3 as col_03', '--quiet']
+    result = run_impala_shell_cmd(vector, args + ['-B'])
     actual_output = [r.strip() for r in result.stdout.split('\t')]
     assert actual_output == expected_output
-    result = run_impala_shell_cmd(vector, args + ['--output_delim=|'])
+    result = run_impala_shell_cmd(vector, args + ['-B', '--output_delim=|'])
     actual_output = [r.strip() for r in result.stdout.split('|')]
     assert actual_output == expected_output
-    result = run_impala_shell_cmd(vector, args + ['--output_delim=||'],
+    result = run_impala_shell_cmd(vector, args + ['-B', '--output_delim=||'],
                                   expect_success=False)
     assert "Illegal delimiter" in result.stderr
+    result = run_impala_shell_cmd(vector, args + ['-E'])
+    result_rows = result.stdout.strip().split('\n')
+    assert len(result_rows) == 4
+    assert "************************************** " \
+      "1.row **************************************" == result_rows[0]
+    assert "col_00001: 1" == result_rows[1]
+    assert "    col_2: 2" == result_rows[2]
+    assert "   col_03: 3" == result_rows[3]
 
   def test_do_methods(self, vector, empty_table):
     """Ensure that the do_ methods in the shell work.

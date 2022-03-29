@@ -70,7 +70,8 @@ class DelimitedOutputFormatter(object):
         field_delim_bytes = bytearray(field_delim, 'utf-8')
         self.field_delim = field_delim_bytes.decode('unicode_escape')
       else:
-        self.field_delim = field_delim.decode('unicode_escape')
+        # csv.writer in python2 requires an ascii string delimiter
+        self.field_delim = field_delim.decode('unicode_escape').encode('ascii', 'ignore')
       # IMPALA-8652, the delimiter should be a 1-character string and verified already
       assert len(self.field_delim) == 1
 
@@ -78,12 +79,7 @@ class DelimitedOutputFormatter(object):
     """Returns string containing UTF-8-encoded representation of the table data."""
     # csv.writer expects a file handle to the input.
     temp_buffer = StringIO()
-    if sys.version_info.major == 2:
-      # csv.writer in python2 requires an ascii string delimiter
-      delim = self.field_delim.encode('ascii', 'ignore')
-    else:
-      delim = self.field_delim
-    writer = csv.writer(temp_buffer, delimiter=delim,
+    writer = csv.writer(temp_buffer, delimiter=self.field_delim,
                         lineterminator='\n', quoting=csv.QUOTE_MINIMAL)
     for row in rows:
       if sys.version_info.major == 2:
@@ -98,6 +94,32 @@ class DelimitedOutputFormatter(object):
       rows = temp_buffer.getvalue().rstrip(b'\n')
     else:
       rows = temp_buffer.getvalue().rstrip('\n')
+    temp_buffer.close()
+    return rows
+
+
+class VerticalOutputFormatter(DelimitedOutputFormatter):
+  def __init__(self, column_names):
+    DelimitedOutputFormatter.__init__(self, field_delim="\n")
+    self.column_names = column_names
+    self.column_name_max_len = max([len(s) for s in column_names])
+
+  def format(self, rows):
+    """Returns string containing UTF-8-encoded representation of the table data."""
+    # csv.writer expects a file handle to the input.
+    temp_buffer = StringIO()
+    writer = csv.writer(temp_buffer, delimiter=self.field_delim,
+                        lineterminator='\n', quoting=csv.QUOTE_MINIMAL)
+    for r, row in enumerate(rows):
+      if sys.version_info.major == 2:
+        row = [val.encode('utf-8', 'replace') if isinstance(val, unicode) else val
+            for val in row]
+      writer.writerow(["************************************** " +
+        str(r + 1) + ".row **************************************"])
+      for c, val in enumerate(row):
+        row[c] = self.column_names[c].rjust(self.column_name_max_len) + ": " + val
+      writer.writerow(row)
+    rows = temp_buffer.getvalue().rstrip()
     temp_buffer.close()
     return rows
 

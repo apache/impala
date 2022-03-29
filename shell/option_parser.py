@@ -191,6 +191,10 @@ def get_option_parser(defaults):
                     action="store_true",
                     help="Print column names in delimited mode"
                          " when pretty-printed.")
+  parser.add_option("-E", "--vertical",
+                    dest="vertical",
+                    action="store_true",
+                    help="Print the output of a query (rows) vertically.")
   parser.add_option("--output_delimiter", dest="output_delimiter",
                     help="Field delimiter to use for output in delimited mode")
   parser.add_option("-s", "--kerberos_service_name",

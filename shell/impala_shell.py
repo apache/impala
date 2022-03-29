@@ -44,7 +44,7 @@ from impala_client import ImpalaHS2Client, StrictHS2Client, \
 from impala_shell_config_defaults import impala_shell_defaults
 from option_parser import get_option_parser, get_config_from_file
 from shell_output import (DelimitedOutputFormatter, OutputStream, PrettyOutputFormatter,
-                          OverwritingStdErrOutputStream)
+                          OverwritingStdErrOutputStream, VerticalOutputFormatter)
 from subprocess import call
 from shell_exceptions import (RPCException, DisconnectedException, QueryStateException,
     QueryCancelledByShellException, MissingThriftMethodException)
@@ -167,6 +167,7 @@ class ImpalaShell(cmd.Cmd, object):
     'VERBOSE' : (lambda x: x in ImpalaShell.TRUE_STRINGS, "verbose"),
     'DELIMITER' : (lambda x: " " if x == '\\s' else x, "output_delimiter"),
     'OUTPUT_FILE' : (lambda x: None if x == '' else x, "output_file"),
+    'VERTICAL': (lambda x: x in ImpalaShell.TRUE_STRINGS, "vertical"),
   }
 
   # Minimum time in seconds between two calls to get the exec summary.
@@ -219,6 +220,7 @@ class ImpalaShell(cmd.Cmd, object):
         else options.output_delimiter
     self.write_delimited = options.write_delimited
     self.print_header = options.print_header
+    self.vertical = options.vertical
 
     self.progress_stream = OverwritingStdErrOutputStream()
 
@@ -1200,6 +1202,9 @@ class ImpalaShell(cmd.Cmd, object):
       # print the column names
       if self.print_header:
         self.output_stream.write([column_names])
+    elif self.vertical:
+      formatter = VerticalOutputFormatter(column_names)
+      self.output_stream = OutputStream(formatter, filename=self.output_file)
     else:
       prettytable = self.construct_table_with_header(column_names)
       formatter = PrettyOutputFormatter(prettytable)

@@ -254,6 +254,19 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     result = p.get_result()
     assert "21,VIETNAM,2" in result.stdout
 
+  def test_vertical(self, vector):
+    """Test output rows in vertical mode"""
+    p = ImpalaShell(vector)
+    p.send_cmd("use tpch")
+    p.send_cmd("set vertical=true")
+    p.send_cmd("select N_NATIONKEY, N_NAME from nation limit 1")
+    result = p.get_result()
+    assert "+----------------+" not in result.stdout
+    assert "************************************** " \
+      "1.row **************************************" in result.stdout, result.stdout
+    assert "n_nationkey: " in result.stdout, result.stdout
+    assert "n_name: " in result.stdout, result.stdout
+
   @pytest.mark.execute_serially
   def test_print_to_file(self, vector):
     """Test print to output file and unset"""

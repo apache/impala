@@ -190,6 +190,22 @@ under the License.
             </row>
             <row>
               <entry>
+                <p> -E or </p>
+                <p>--vertical </p>
+              </entry>
+              <entry rev="2.0.0">
+                <p>
+                  vertical=true
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  Print the output of a query (rows) vertically, no effects if <codeph>-B</codeph> is specified. Added in Impala 4.2.
+                </p>
+              </entry>
+            </row>
+            <row>
+              <entry>
                 <p> -p or </p>
                 <p>--show_profiles </p>
               </entry>
