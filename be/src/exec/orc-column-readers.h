@@ -346,10 +346,29 @@ class OrcStringColumnReader : public OrcPrimitiveColumnReader<OrcStringColumnRea
     return Status::OK();
   }
 
-  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) final WARN_UNUSED_RESULT;
+  /// Overrides the method to invoke templated ReadValueBatchInternal().
+  Status ReadValueBatch(int row_idx, ScratchTupleBatch* scratch_batch,
+      MemPool* pool, int scratch_batch_idx) override WARN_UNUSED_RESULT;
+
+  /// Overrides ReadValue() to invoke templated ReadValueBatchInternal().
+  /// It's only used in materializing collection (i.e. list/map) values.
+  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
 
  private:
   friend class OrcPrimitiveColumnReader<OrcStringColumnReader>;
+
+  /// Template implementation for ReadValueBatch() to avoid checks inside the inner loop.
+  /// When 'ENCODED' is true, the orc string vector batch is expected to be dictionary
+  /// encoded.
+  template<PrimitiveType SLOT_TYPE, bool ENCODED>
+  Status ReadValueBatchInternal(int row_idx, ScratchTupleBatch* scratch_batch,
+      int scratch_batch_idx) WARN_UNUSED_RESULT;
+
+  /// Template implementation for ReadValue(). We use this method instead of ReadValue()
+  /// in ReadValueBatch() so we can check types out of the loop.
+  template<PrimitiveType SLOT_TYPE, bool ENCODED>
+  ALWAYS_INLINE inline Status ReadValueInternal(int row_idx, Tuple* tuple)
+      WARN_UNUSED_RESULT;
 
   orc::StringVectorBatch* batch_ = nullptr;
   // We copy the blob from the batch, so the memory will be handled by Impala, and not

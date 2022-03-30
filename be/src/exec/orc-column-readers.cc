@@ -181,7 +181,77 @@ Status OrcStringColumnReader::InitBlob(orc::DataBuffer<char>* blob, MemPool* poo
   return Status::OK();
 }
 
+Status OrcStringColumnReader::ReadValueBatch(int row_idx,
+    ScratchTupleBatch* scratch_batch, MemPool* pool, int scratch_batch_idx) {
+  switch (slot_desc_->type().type) {
+    case TYPE_STRING:
+      if (batch_->isEncoded) {
+        return ReadValueBatchInternal<TYPE_STRING, true>(
+            row_idx, scratch_batch, scratch_batch_idx);
+      }
+      return ReadValueBatchInternal<TYPE_STRING, false>(
+          row_idx, scratch_batch, scratch_batch_idx);
+    case TYPE_CHAR:
+      if (batch_->isEncoded) {
+        return ReadValueBatchInternal<TYPE_CHAR, true>(
+            row_idx, scratch_batch, scratch_batch_idx);
+      }
+      return ReadValueBatchInternal<TYPE_CHAR, false>(
+          row_idx, scratch_batch, scratch_batch_idx);
+    case TYPE_VARCHAR:
+      if (batch_->isEncoded) {
+        return ReadValueBatchInternal<TYPE_VARCHAR, true>(
+            row_idx, scratch_batch, scratch_batch_idx);
+      }
+      return ReadValueBatchInternal<TYPE_VARCHAR, false>(
+          row_idx, scratch_batch, scratch_batch_idx);
+    default:
+      return Status("Illegal string type: " + TypeToString(slot_desc_->type().type));
+  }
+}
+
 Status OrcStringColumnReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool) {
+  switch (slot_desc_->type().type) {
+    case TYPE_STRING:
+      if (batch_->isEncoded) {
+        return ReadValueInternal<TYPE_STRING, true>(row_idx, tuple);
+      }
+      return ReadValueInternal<TYPE_STRING, false>(row_idx, tuple);
+    case TYPE_CHAR:
+      if (batch_->isEncoded) {
+        return ReadValueInternal<TYPE_CHAR, true>(row_idx, tuple);
+      }
+      return ReadValueInternal<TYPE_CHAR, false>(row_idx, tuple);
+    case TYPE_VARCHAR:
+      if (batch_->isEncoded) {
+        return ReadValueInternal<TYPE_VARCHAR, true>(row_idx, tuple);
+      }
+      return ReadValueInternal<TYPE_VARCHAR, false>(row_idx, tuple);
+    default:
+      return Status("Illegal string type: " + TypeToString(slot_desc_->type().type));
+  }
+}
+
+template<PrimitiveType SLOT_TYPE, bool ENCODED>
+Status OrcStringColumnReader::ReadValueBatchInternal(int row_idx,
+    ScratchTupleBatch* scratch_batch, int scratch_batch_idx) {
+  int num_to_read = std::min<int>(scratch_batch->capacity - scratch_batch_idx,
+      NumElements() - row_idx);
+  DCHECK_LE(row_idx + num_to_read, NumElements());
+  for (int i = 0; i < num_to_read; ++i) {
+    int scratch_batch_pos = i + scratch_batch_idx;
+    uint8_t* next_tuple = scratch_batch->tuple_mem +
+        scratch_batch_pos * OrcColumnReader::scanner_->tuple_byte_size();
+    Tuple* tuple = reinterpret_cast<Tuple*>(next_tuple);
+    Status s = ReadValueInternal<SLOT_TYPE, ENCODED>(row_idx + i, tuple);
+    RETURN_IF_ERROR(s);
+  }
+  scratch_batch->num_tuples = scratch_batch_idx + num_to_read;
+  return Status::OK();
+}
+
+template<PrimitiveType SLOT_TYPE, bool ENCODED>
+Status OrcStringColumnReader::ReadValueInternal(int row_idx, Tuple* tuple) {
   if (IsNull(DCHECK_NOTNULL(batch_), row_idx)) {
     SetNullSlot(tuple);
     return Status::OK();
@@ -189,7 +259,8 @@ Status OrcStringColumnReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool
   char* src_ptr;
   int src_len;
 
-  if (batch_->isEncoded) {
+  if (ENCODED) {
+    DCHECK(batch_->isEncoded);
     orc::EncodedStringVectorBatch* currentBatch =
         static_cast<orc::EncodedStringVectorBatch*>(batch_);
 
@@ -207,7 +278,8 @@ Status OrcStringColumnReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool
     src_len = batch_->length[row_idx];
   }
   int dst_len = slot_desc_->type().len;
-  if (slot_desc_->type().type == TYPE_CHAR) {
+  if (SLOT_TYPE == TYPE_CHAR) {
+    DCHECK_EQ(slot_desc_->type().type, TYPE_CHAR);
     int unpadded_len = min(dst_len, static_cast<int>(src_len));
     char* dst_char = reinterpret_cast<char*>(GetSlot(tuple));
     memcpy(dst_char, src_ptr, unpadded_len);
@@ -215,7 +287,7 @@ Status OrcStringColumnReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool
     return Status::OK();
   }
   StringValue* dst = reinterpret_cast<StringValue*>(GetSlot(tuple));
-  if (slot_desc_->type().type == TYPE_VARCHAR && src_len > dst_len) {
+  if (SLOT_TYPE == TYPE_VARCHAR && src_len > dst_len) {
     dst->len = dst_len;
   } else {
     dst->len = src_len;
