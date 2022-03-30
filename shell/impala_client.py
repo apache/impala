@@ -840,8 +840,11 @@ class ImpalaHS2Client(ImpalaClient):
       # for the display code. This is somewhat inefficient, but performance is comparable
       # to the old Beeswax code.
       yield self._transpose(col_value_converters, resp.results.columns)
-      if not resp.hasMoreRows:
+      if not self._hasMoreRows(resp, col_value_converters):
         return
+
+  def _hasMoreRows(self, resp, col_value_converters):
+    return resp.hasMoreRows
 
   def _transpose(self, col_value_converters, columns):
     """Transpose the columns from a TFetchResultsResp into the row format returned
@@ -1128,6 +1131,10 @@ class StrictHS2Client(ImpalaHS2Client):
 
   def _populate_query_options(self):
     return
+
+  def _hasMoreRows(self, resp, col_value_converters):
+    tcol = col_value_converters[0][0](resp.results.columns[0])
+    return len(tcol.values)
 
 
 class ImpalaBeeswaxClient(ImpalaClient):

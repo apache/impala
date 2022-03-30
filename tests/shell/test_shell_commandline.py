@@ -1099,6 +1099,17 @@ class TestImpalaShell(ImpalaTestSuite):
 
     assert "4\t4\t40.4" in result.stdout, result.stdout
 
+  def test_large_fetch(self, vector):
+    query = "select ss_sold_time_sk from tpcds.store_sales limit 50000"
+    output = run_impala_shell_cmd(vector, ['-q', query, '-B', '--output_delimiter=;'])
+    assert "Fetched 50000 row(s)" in output.stderr
+
+  def test_single_null_fetch(self, vector):
+    query = "select null"
+    output = run_impala_shell_cmd(vector, ['-q', query, '-B', '--output_delimiter=;'])
+    assert "NULL" in output.stdout
+    assert "Fetched 1 row(s)" in output.stderr
+
   def test_fetch_size(self, vector):
     """Test the --fetch_size option with and without result spooling enabled."""
     if vector.get_value('strict_hs2_protocol'):
