@@ -507,3 +507,17 @@ Path,Size,Partition
 ---- TYPES
 STRING,STRING,STRING
 ====
+---- QUERY
+describe formatted iceberg_uppercase_col;
+---- RESULTS: VERIFY_IS_SUBSET
+'region','string','from deserializer'
+'nested_struct','struct<a:int,b:array<int>,c:struct<d:array<array<struct<e:int,f:string>>>>,g:map<string,struct<h:struct<i:array<double>>>>>','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+SELECT * FROM iceberg_uppercase_col;
+---- RESULTS
+---- TYPES
+STRING
+====

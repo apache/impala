@@ -115,7 +115,7 @@ public class IcebergSchemaConverter {
     for (Types.NestedField column : schema.columns()) {
       Type colType = toImpalaType(column.type());
       // Update sd cols by iceberg NestedField
-      ret.add(new FieldSchema(column.name(), colType.toSql().toLowerCase(),
+      ret.add(new FieldSchema(column.name().toLowerCase(), colType.toSql().toLowerCase(),
           column.doc()));
     }
     return ret;

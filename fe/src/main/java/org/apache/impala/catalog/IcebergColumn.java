@@ -41,7 +41,7 @@ public class IcebergColumn extends Column {
 
   public IcebergColumn(String name, Type type, String comment, int position,
       int fieldId, int fieldMapKeyId, int fieldMapValueId, boolean isNullable) {
-    super(name, type, comment, position);
+    super(name.toLowerCase(), type, comment, position);
     fieldId_ = fieldId;
     fieldMapKeyId_ = fieldMapKeyId;
     fieldMapValueId_ = fieldMapValueId;
