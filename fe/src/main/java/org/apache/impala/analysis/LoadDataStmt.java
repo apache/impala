@@ -158,6 +158,7 @@ public class LoadDataStmt extends StatementBase {
       // TODO: Disable permission checking for S3A as well (HADOOP-13892)
       boolean shouldCheckPerms =
           FileSystemUtil.FsType.getFsType(fs.getScheme()) != FileSystemUtil.FsType.ADLS;
+      boolean authzEnabled = analyzer.isAuthzEnabled();
 
       if (fs.isDirectory(source)) {
         if (FileSystemUtil.getTotalNumVisibleFiles(source) == 0) {
@@ -169,8 +170,8 @@ public class LoadDataStmt extends StatementBase {
               "INPATH location '%s' cannot contain non-hidden subdirectories.",
               sourceDataPath_));
         }
-        if (!checker.getPermissions(fs, source).checkPermissions(
-            FsAction.READ_WRITE) && shouldCheckPerms) {
+        if (shouldCheckPerms && !checker
+          .checkAccess(source, fs, FsAction.READ_WRITE, authzEnabled)) {
           throw new AnalysisException(String.format("Unable to LOAD DATA from %s " +
               "because Impala does not have READ and WRITE permissions on this directory",
               source));
@@ -182,15 +183,15 @@ public class LoadDataStmt extends StatementBase {
               "INPATH location '%s' points to a hidden file.", source));
         }
 
-        if (!checker.getPermissions(fs, source.getParent()).checkPermissions(
-            FsAction.WRITE) && shouldCheckPerms) {
+        if (shouldCheckPerms && !checker
+          .checkAccess(source.getParent(), fs, FsAction.WRITE, authzEnabled)) {
           throw new AnalysisException(String.format("Unable to LOAD DATA from %s " +
               "because Impala does not have WRITE permissions on its parent " +
               "directory %s", source, source.getParent()));
         }
 
-        if (!checker.getPermissions(fs, source).checkPermissions(
-            FsAction.READ) && shouldCheckPerms) {
+        if (shouldCheckPerms && !checker
+          .checkAccess(source, fs, FsAction.READ, authzEnabled)) {
           throw new AnalysisException(String.format("Unable to LOAD DATA from %s " +
               "because Impala does not have READ permissions on this file", source));
         }
