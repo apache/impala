@@ -103,6 +103,13 @@ struct PageRange {
   }
 };
 
+inline bool IsValidPageLocation(const parquet::PageLocation& page_loc,
+    const int64_t num_rows) {
+  return page_loc.offset >= 0 &&
+         page_loc.first_row_index >= 0 &&
+         page_loc.first_row_index < num_rows;
+}
+
 /// Returns the row range for a given page range using information from the row group
 /// and offset index.
 void GetRowRangeForPageRange(const parquet::RowGroup& row_group,

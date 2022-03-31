@@ -2374,7 +2374,11 @@ Status HdfsParquetScanner::SkipRowsForColumns(
       // Skipping may fail for corrupted Parquet file due to mismatch of rows
       // among columns.
       if (UNLIKELY(!col_reader->SkipRows(*num_rows_to_skip, *skip_to_row))) {
-        return Status(Substitute("Error in skipping rows in file $0.", filename()));
+        return Status(Substitute(
+            "Parquet file might be corrupted: Error in skipping $0 values to row $1 "
+            "in column $2 of file $3.",
+            *num_rows_to_skip, *skip_to_row, col_reader->schema_element().name,
+            filename()));
       }
     }
     *num_rows_to_skip = 0;

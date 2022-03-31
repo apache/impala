@@ -1523,6 +1523,8 @@ void BaseScalarColumnReader::SetLevelDecodeError(
 /// For page filtering, we keep track of first and last page indexes and keep
 /// traversing to next page until we find a page that contains 'skip_row_id'.
 /// At that point, we can just skip to the required row id.
+/// If the page of 'skip_row_id' is not a candidate page, we will stop at the
+/// next candidate page and 'skip_row_id' is skipped by the way.
 /// Difference between scenario 2 and 3 is that in scenario 2, we end up
 /// decompressing all the pages being skipped, whereas in scenario 3 we only
 /// decompress pages required and avoid decompression needed. This is possible
@@ -1538,22 +1540,23 @@ bool BaseScalarColumnReader::SkipRowsInternal(int64_t num_rows, int64_t skip_row
         return false;
       }
     }
-    int last_row_idx = LastRowIdxInCurrentPage();
-    // Keep advancing until we hit reach required page containing 'skip_row_id'
-    while (skip_row_id > last_row_idx) {
+    // Keep advancing until we hit reach required page containing 'skip_row_id' or
+    // jump over it if that page is not a candidate page.
+    while (skip_row_id > LastRowIdxInCurrentPage()) {
       COUNTER_ADD(parent_->num_pages_skipped_by_late_materialization_counter_, 1);
       if (UNLIKELY(!JumpToNextPage())) {
         return false;
       }
-      last_row_idx = LastRowIdxInCurrentPage();
     }
-    DCHECK_GE(skip_row_id, FirstRowIdxInCurrentPage());
     int64_t last_row = LastProcessedRow();
     int64_t remaining = 0;
-    // Skip to the required row id within the page.
-    if (last_row < skip_row_id) {
-      if (UNLIKELY(!SkipTopLevelRows(skip_row_id - last_row, &remaining))) {
-        return false;
+    if (skip_row_id >= FirstRowIdxInCurrentPage()) {
+      // Skip to the required row id within the page. Only needs this when row id locates
+      // in current page.
+      if (last_row < skip_row_id) {
+        if (UNLIKELY(!SkipTopLevelRows(skip_row_id - last_row, &remaining))) {
+          return false;
+        }
       }
     }
     // also need to adjust 'candidate_row_ranges' as we skipped to new row id.

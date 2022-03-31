@@ -101,7 +101,7 @@ class TestParquetStats(ImpalaTestSuite):
       self.run_test_case('QueryTest/parquet-page-index-alltypes-tiny-pages-plain',
                          new_vector, unique_database)
 
-    for batch_size in [0, 32]:
+    for batch_size in [0, 1, 2, 3, 4, 8, 16, 32, 64, 128, 256, 512]:
       new_vector.get_value('exec_option')['batch_size'] = batch_size
       self.run_test_case('QueryTest/parquet-page-index-large', new_vector,
                          unique_database)

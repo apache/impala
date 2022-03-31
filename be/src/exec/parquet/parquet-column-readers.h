@@ -380,7 +380,7 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// Collection of page indexes that we are going to read. When we use page filtering,
   /// we issue a scan-range with sub-ranges that belong to the candidate data pages, i.e.
   /// we will not even see the bytes of the filtered out pages.
-  /// It is set in HdfsParquetScanner::CalculateCandidatePagesForColumns().
+  /// It is set in HdfsParquetScanner::ComputeCandidatePagesForColumns().
   std::vector<int> candidate_data_pages_;
 
   /// Stores an index to 'candidate_data_pages_'. It is the currently read data page when
@@ -544,19 +544,21 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   }
 
   // Returns the last row index of the current page. It is one less than first row index
-  // of next page. For last page, it is one less than 'num_rows' of row group.
+  // of the next valid page. For last page, it is one less than 'num_rows' of row group.
   int64_t LastRowIdxInCurrentPage() const {
     DCHECK(!candidate_data_pages_.empty());
-    DCHECK_LE(candidate_page_idx_, candidate_data_pages_.size() - 1) ;
-    if (candidate_page_idx_ == candidate_data_pages_.size() - 1) {
-      parquet::RowGroup& row_group =
-          parent_->file_metadata_.row_groups[parent_->row_group_idx_];
-      return row_group.num_rows - 1;
-    } else {
-      return offset_index_.page_locations[candidate_data_pages_[candidate_page_idx_ + 1]]
-                 .first_row_index
-          - 1;
+    int64_t num_rows =
+        parent_->file_metadata_.row_groups[parent_->row_group_idx_].num_rows;
+    // Find the next valid page.
+    int page_idx = candidate_data_pages_[candidate_page_idx_] + 1;
+    while (page_idx < offset_index_.page_locations.size()) {
+      const auto& page_loc = offset_index_.page_locations[page_idx];
+      if (IsValidPageLocation(page_loc, num_rows)) {
+        return page_loc.first_row_index - 1;
+      }
+      ++page_idx;
     }
+    return num_rows - 1;
   }
 
   /// Wrapper around 'SkipTopLevelRows' to skip across multiple pages.

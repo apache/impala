@@ -133,13 +133,6 @@ bool ComputeCandidateRanges(const int64_t num_rows, vector<RowRange>* skip_range
   return true;
 }
 
-inline bool IsValidPageLocation(const parquet::PageLocation& page_loc,
-    const int64_t num_rows) {
-  return page_loc.offset >= 0 &&
-         page_loc.first_row_index >= 0 &&
-         page_loc.first_row_index < num_rows;
-}
-
 static bool ValidatePageLocations(const vector<parquet::PageLocation>& page_locations,
     const int64_t num_rows) {
   int last_valid_idx = -1;
