@@ -114,6 +114,7 @@ public class IcebergScanNode extends HdfsScanNode {
     }
     long dataFilesCacheMisses = 0;
     List<FileDescriptor> fileDescList = new ArrayList<>();
+    org.apache.iceberg.Table iceTbl = null;
     for (DataFile dataFile : dataFileList) {
       FileDescriptor fileDesc = icebergTable_.getPathHashToFileDescMap()
           .get(IcebergUtil.getDataFilePathHash(dataFile));
@@ -139,8 +140,12 @@ public class IcebergScanNode extends HdfsScanNode {
         }
         // Add file descriptor to the cache.
         try {
+          if (iceTbl == null) {
+            // TODO: remove Iceberg table load once IMPALA-10737 is resolved.
+            iceTbl = IcebergUtil.loadTable(icebergTable_);
+          }
           fileDesc = fileDesc.cloneWithFileMetadata(
-              IcebergUtil.createIcebergMetadata(icebergTable_, dataFile));
+              IcebergUtil.createIcebergMetadata(icebergTable_, iceTbl, dataFile));
         } catch (TableLoadingException e) {
           // TODO: get rid of try-catch TableLoadingException once we have IMPALA-10737.
           throw new ImpalaRuntimeException(String.format(

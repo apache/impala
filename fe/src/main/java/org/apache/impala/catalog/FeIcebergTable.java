@@ -521,6 +521,8 @@ public interface FeIcebergTable extends FeFsTable {
             hdfsFileDescMap.put(path.toUri().getPath(), fileDesc);
         }
       }
+      // TODO: remove Iceberg table load once IMPALA-10737 is resolved.
+      Table iceTbl = IcebergUtil.loadTable(table);
       Map<String, HdfsPartition.FileDescriptor> fileDescMap = new HashMap<>();
       List<DataFile> dataFileList = IcebergUtil.getIcebergDataFiles(table,
           new ArrayList<>(), /*timeTravelSpecl=*/null);
@@ -531,7 +533,7 @@ public interface FeIcebergTable extends FeFsTable {
             HdfsPartition.FileDescriptor fsFd = hdfsFileDescMap.get(
                 path.toUri().getPath());
             HdfsPartition.FileDescriptor iceFd = fsFd.cloneWithFileMetadata(
-                IcebergUtil.createIcebergMetadata(table, dataFile));
+                IcebergUtil.createIcebergMetadata(table, iceTbl, dataFile));
             fileDescMap.put(pathHash, iceFd);
           } else {
             LOG.warn("Iceberg DataFile '{}' cannot be found in the HDFS recursive file "
@@ -540,7 +542,7 @@ public interface FeIcebergTable extends FeFsTable {
                 new Path(dataFile.path().toString()),
                 new Path(table.getIcebergTableLocation()), table.getHostIndex());
             HdfsPartition.FileDescriptor iceFd = fileDesc.cloneWithFileMetadata(
-                IcebergUtil.createIcebergMetadata(table, dataFile));
+                IcebergUtil.createIcebergMetadata(table, iceTbl, dataFile));
             fileDescMap.put(IcebergUtil.getDataFilePathHash(dataFile), iceFd);
           }
       }

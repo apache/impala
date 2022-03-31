@@ -865,10 +865,10 @@ public class IcebergUtil {
    * It creates a flatbuffer so it can be passed between machines and processes without
    * further de/serialization.
    */
-  public static FbFileMetadata createIcebergMetadata(FeIcebergTable feTbl, DataFile df)
-      throws TableLoadingException {
+  public static FbFileMetadata createIcebergMetadata(FeIcebergTable feTbl,
+      Table iceTbl, DataFile df) throws TableLoadingException {
     FlatBufferBuilder fbb = new FlatBufferBuilder(1);
-    int iceOffset = createIcebergMetadata(feTbl, fbb, df);
+    int iceOffset = createIcebergMetadata(feTbl, iceTbl, fbb, df);
     fbb.finish(FbFileMetadata.createFbFileMetadata(fbb, iceOffset));
     ByteBuffer bb = fbb.dataBuffer().slice();
     ByteBuffer compressedBb = ByteBuffer.allocate(bb.capacity());
@@ -876,10 +876,8 @@ public class IcebergUtil {
     return FbFileMetadata.getRootAsFbFileMetadata((ByteBuffer)compressedBb.flip());
   }
 
-  private static int createIcebergMetadata(FeIcebergTable feTbl, FlatBufferBuilder fbb,
-      DataFile df) throws TableLoadingException {
-    //TODO: avoid loading the table once we have IMPALA-10737 again:
-    Table iceTbl = loadTable(feTbl);
+  private static int createIcebergMetadata(FeIcebergTable feTbl, Table iceTbl,
+      FlatBufferBuilder fbb, DataFile df) throws TableLoadingException {
     int partKeysOffset = -1;
     PartitionSpec spec = iceTbl.specs().get(df.specId());
     if (spec != null && !spec.fields().isEmpty()) {

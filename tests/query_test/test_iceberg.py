@@ -31,7 +31,7 @@ import json
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import SkipIf
 
-from tests.util.filesystem_utils import get_fs_path
+from tests.util.filesystem_utils import get_fs_path, IS_HDFS
 from tests.util.get_parquet_metadata import get_parquet_metadata
 
 class TestIcebergTable(ImpalaTestSuite):
@@ -548,6 +548,25 @@ class TestIcebergTable(ImpalaTestSuite):
       pytest.skip('runs only in exhaustive')
     self.run_test_case('QueryTest/iceberg-write-many-files-stress', vector,
         use_db=unique_database)
+
+  @pytest.mark.execute_serially
+  def test_table_load_time_for_many_files(self, vector, unique_database):
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+    tbl_name = unique_database + ".iceberg_many_files"
+    self.execute_query("""CREATE TABLE {}
+        PARTITIONED BY SPEC (bucket(2039, l_orderkey))
+        STORED AS ICEBERG
+        AS SELECT * FROM tpch_parquet.lineitem""".format(tbl_name))
+    self.execute_query("invalidate metadata")
+    start_time = time.time()
+    self.execute_query("describe formatted {}".format(tbl_name))
+    elapsed_time = time.time() - start_time
+    if IS_HDFS:
+      time_limit = 3
+    else:
+      time_limit = 10
+    assert elapsed_time < time_limit
 
   def test_consistent_scheduling(self, vector, unique_database):
     """IMPALA-10914: This test verifies that Impala schedules scan ranges consistently for
