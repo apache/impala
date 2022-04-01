@@ -126,7 +126,6 @@ class TestIcebergTable(ImpalaTestSuite):
 
   def test_describe_history_params(self, vector, unique_database):
     tbl_name = unique_database + ".describe_history"
-    time_format = '%Y-%m-%d %H:%M:%S.%f'
 
     def execute_query_ts(query):
       impalad_client.execute(query)
@@ -137,9 +136,8 @@ class TestIcebergTable(ImpalaTestSuite):
       data = impalad_client.execute(query)
       assert len(data.data) == expected_result_size
       for i in range(len(data.data)):
-        result_ts = data.data[i].split('\t')[0][:- 3]
-        result_ts_dt = datetime.datetime.strptime(result_ts, time_format)
-        assert result_ts_dt > ts
+        result_ts_dt = parse_timestamp(data.data[i].split('\t')[0])
+        assert result_ts_dt >= ts
 
     def expect_results_between(ts_start, ts_end, expected_result_size):
       query = "DESCRIBE HISTORY {0} BETWEEN {1} AND {2};".format(
@@ -147,9 +145,18 @@ class TestIcebergTable(ImpalaTestSuite):
       data = impalad_client.execute(query)
       assert len(data.data) == expected_result_size
       for i in range(len(data.data)):
-        result_ts = data.data[i].split('\t')[0][:- 3]
-        result_ts_dt = datetime.datetime.strptime(result_ts, time_format)
-        assert result_ts_dt > ts_start and result_ts_dt < ts_end
+        result_ts_dt = parse_timestamp(data.data[i].split('\t')[0])
+        assert result_ts_dt >= ts_start and result_ts_dt <= ts_end
+
+    def parse_timestamp(ts_string):
+      """The client can receive the timestamp in two formats, if the timestamp has
+      fractional seconds "yyyy-MM-dd HH:mm:ss.SSSSSSSSS" pattern is used, otherwise
+      "yyyy-MM-dd HH:mm:ss". Additionally, Python's datetime library cannot handle
+      nanoseconds, therefore in that case the timestamp has to be trimmed."""
+      if len(ts_string.split('.')) > 1:
+        return datetime.datetime.strptime(ts_string[:-3], '%Y-%m-%d %H:%M:%S.%f')
+      else:
+        return datetime.datetime.strptime(ts_string, '%Y-%m-%d %H:%M:%S')
 
     def quote(s):
       return "'{0}'".format(s)
@@ -159,8 +166,7 @@ class TestIcebergTable(ImpalaTestSuite):
 
     def impala_now():
       now_data = impalad_client.execute("select now()")
-      now_data_ts = now_data.data[0][:- 3]
-      now_data_ts_dt = datetime.datetime.strptime(now_data_ts, time_format)
+      now_data_ts_dt = parse_timestamp(now_data.data[0])
       return now_data_ts_dt
 
     # We are setting the TIMEZONE query option in this test, so let's create a local
