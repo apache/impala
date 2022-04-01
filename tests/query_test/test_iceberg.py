@@ -563,9 +563,9 @@ class TestIcebergTable(ImpalaTestSuite):
     self.execute_query("describe formatted {}".format(tbl_name))
     elapsed_time = time.time() - start_time
     if IS_HDFS:
-      time_limit = 3
-    else:
       time_limit = 10
+    else:
+      time_limit = 20
     assert elapsed_time < time_limit
 
   def test_consistent_scheduling(self, vector, unique_database):
