@@ -51,6 +51,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.util.IcebergUtil;
 
 import com.google.common.base.Preconditions;
@@ -105,8 +106,16 @@ public class IcebergScanNode extends HdfsScanNode {
       throws ImpalaRuntimeException {
     List<DataFile> dataFileList;
     try {
-      dataFileList = IcebergUtil.getIcebergDataFiles(icebergTable_, icebergPredicates_,
+      Pair<List<DataFile>, Boolean> dataFileListAndDeletePair =
+          IcebergUtil.getIcebergDataFiles(icebergTable_, icebergPredicates_,
           timeTravelSpec_);
+      dataFileList = dataFileListAndDeletePair.first;
+      Boolean hasDeleteFile = dataFileListAndDeletePair.second;
+      if (hasDeleteFile) {
+        throw new TableLoadingException(String.format("Unsupported Iceberg V2 feature, "
+            + "table '%s' with snapshot id '%s' contains delete files.",
+            icebergTable_.getFullName(), icebergTable_.snapshotId()));
+      }
     } catch (TableLoadingException e) {
       throw new ImpalaRuntimeException(String.format(
           "Failed to load data files for Iceberg table: %s", icebergTable_.getFullName()),

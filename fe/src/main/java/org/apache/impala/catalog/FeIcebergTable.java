@@ -511,7 +511,7 @@ public interface FeIcebergTable extends FeFsTable {
       }
       Map<String, HdfsPartition.FileDescriptor> fileDescMap = new HashMap<>();
       List<DataFile> dataFileList = IcebergUtil.getIcebergDataFiles(table,
-          new ArrayList<>(), /*timeTravelSpecl=*/null);
+          new ArrayList<>(), /*timeTravelSpecl=*/null).first;
       for (DataFile dataFile : dataFileList) {
           Path path = new Path(dataFile.path().toString());
           if (hdfsFileDescMap.containsKey(path.toUri().getPath())) {

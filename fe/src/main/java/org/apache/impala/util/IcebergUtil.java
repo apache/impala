@@ -17,6 +17,7 @@
 
 package org.apache.impala.util;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -54,6 +55,7 @@ import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.TableScan;
 import org.apache.iceberg.expressions.UnboundPredicate;
+import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -516,12 +518,14 @@ public class IcebergUtil {
   }
 
   /**
-   * Get iceberg data file by file system table location and iceberg predicates
+   * Returns a Pair, the first element is the DataFiles by file system table location and
+   * iceberg predicates, the second element is whether or not a DeleteFile exists for the
+   * DataFiles in the first element.
    */
-  public static List<DataFile> getIcebergDataFiles(FeIcebergTable table,
+  public static Pair<List<DataFile>, Boolean> getIcebergDataFiles(FeIcebergTable table,
       List<UnboundPredicate> predicates, TimeTravelSpec timeTravelSpec)
         throws TableLoadingException {
-    if (table.snapshotId() == -1) return Collections.emptyList();
+    if (table.snapshotId() == -1) return new Pair<>(Collections.emptyList(), false);
 
     TableScan scan = createScanAsOf(table, timeTravelSpec);
     for (UnboundPredicate predicate : predicates) {
@@ -529,10 +533,18 @@ public class IcebergUtil {
     }
 
     List<DataFile> dataFileList = new ArrayList<>();
-    for (FileScanTask task : scan.planFiles()) {
-      dataFileList.add(task.file());
+    Boolean hasDeleteFile = false;
+    try (CloseableIterable<FileScanTask> fileScanTasks = scan.planFiles()) {
+      for (FileScanTask task : fileScanTasks) {
+        if (!task.deletes().isEmpty()) {
+          hasDeleteFile = true;
+        }
+        dataFileList.add(task.file());
+      }
+    } catch (IOException e) {
+      throw new TableLoadingException("Data file list collection failed.", e);
     }
-    return dataFileList;
+    return new Pair<>(dataFileList, hasDeleteFile);
   }
 
   private static TableScan createScanAsOf(FeIcebergTable table,

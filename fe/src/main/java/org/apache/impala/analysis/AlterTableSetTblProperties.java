@@ -182,7 +182,7 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     try {
       FeIcebergTable iceTable = (FeIcebergTable)getTargetTable();
       List<DataFile> dataFiles = IcebergUtil.getIcebergDataFiles(iceTable,
-          new ArrayList<>(), /*timeTravelSpec=*/null);
+          new ArrayList<>(), /*timeTravelSpec=*/null).first;
       if (dataFiles.isEmpty()) return;
       DataFile firstFile = dataFiles.get(0);
       String errorMsg = "Attempt to set Iceberg data file format to %s, but found data " +
