@@ -122,7 +122,6 @@ Status Aggregator::Prepare(RuntimeState* state) {
 }
 
 Status Aggregator::Open(RuntimeState* state) {
-  runtime_profile_->AppendExecOption(config_.codegen_status_msg_);
   RETURN_IF_ERROR(AggFnEvaluator::Open(agg_fn_evals_, state));
   RETURN_IF_ERROR(ScalarExprEvaluator::Open(conjunct_evals_, state));
   return Status::OK();
@@ -137,6 +136,8 @@ void Aggregator::Close(RuntimeState* state) {
   if (expr_results_pool_.get() != nullptr) expr_results_pool_->FreeAll();
   if (expr_mem_tracker_.get() != nullptr) expr_mem_tracker_->Close();
   if (mem_tracker_.get() != nullptr) mem_tracker_->Close();
+
+  runtime_profile_->AppendExecOption(config_.codegen_status_msg_);
 }
 
 // TODO: codegen this function.

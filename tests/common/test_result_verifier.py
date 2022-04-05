@@ -607,9 +607,14 @@ def verify_runtime_profile(expected, actual, update_section=False):
   expected_lines = remove_comments(expected).splitlines()
   matched = [False] * len(expected_lines)
   expected_regexes = []
+  unexpected_regexes = []
+  unexpected_matched_lines = []
   expected_aggregations = []
   for expected_line in expected_lines:
-    expected_regexes.append(try_compile_regex(expected_line))
+    negate_regex = expected_line and expected_line[0] == '!'
+    regex = try_compile_regex(expected_line[1:] if negate_regex else expected_line)
+    unexpected_regexes.append(regex if negate_regex else None)
+    expected_regexes.append(regex if not negate_regex else None)
     expected_aggregations.append(try_compile_aggregation(expected_line))
 
   # Check the expected and actual rows pairwise.
@@ -621,6 +626,10 @@ def verify_runtime_profile(expected, actual, update_section=False):
       elif expected_aggregations[i] is not None:
         # Aggregations are enforced separately
         match = True
+      elif unexpected_regexes[i] is not None:
+        if unexpected_regexes[i].match(line):
+          unexpected_matched_lines.append(line)
+        match = False
       else:
         match = expected_lines[i].strip() == line.strip()
       if match:
@@ -629,11 +638,14 @@ def verify_runtime_profile(expected, actual, update_section=False):
 
   unmatched_lines = []
   for i in xrange(len(expected_lines)):
-    if not matched[i]:
+    if not matched[i] and unexpected_regexes[i] is None:
       unmatched_lines.append(expected_lines[i])
   assert len(unmatched_lines) == 0, ("Did not find matches for lines in runtime profile:"
       "\nEXPECTED LINES:\n%s\n\nACTUAL PROFILE:\n%s" % ('\n'.join(unmatched_lines),
         actual))
+  assert len(unexpected_matched_lines) == 0, ("Found unexpected matches in "
+      "runtime profile:\n%s\n\nACTUAL PROFILE:\n%s"
+          % ('\n'.join(unexpected_matched_lines), actual))
 
   updated_aggregations = []
   # Compute the aggregations and check against values

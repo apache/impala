@@ -290,9 +290,6 @@ Status ExecNode::Prepare(RuntimeState* state) {
 Status ExecNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
   DCHECK_EQ(conjunct_evals_.size(), conjuncts_.size());
-  for (const string& codegen_msg : plan_node_.codegen_status_msgs_) {
-    runtime_profile_->AppendExecOption(codegen_msg);
-  }
   return ScalarExprEvaluator::Open(conjunct_evals_, state);
 }
 
@@ -330,6 +327,11 @@ void ExecNode::Close(RuntimeState* state) {
     }
     mem_tracker_->Close();
   }
+
+  for (const string& codegen_msg : plan_node_.codegen_status_msgs_) {
+    runtime_profile_->AppendExecOption(codegen_msg);
+  }
+
   if (events_ != nullptr) events_->MarkEvent("Closed");
 }
 
