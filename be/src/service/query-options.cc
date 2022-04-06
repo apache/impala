@@ -1099,6 +1099,15 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_max_fragment_instances_per_node(max_num);
         break;
       }
+      case TImpalaQueryOptions::MAX_SORT_RUN_SIZE: {
+        int32_t int32_t_val = 0;
+        RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckNonNegative<int32_t>(
+            option, value, &int32_t_val));
+        RETURN_IF_ERROR(
+            QueryOptionValidator<int32_t>::NotEquals(option, int32_t_val, 1));
+        query_options->__set_max_sort_run_size(int32_t_val);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

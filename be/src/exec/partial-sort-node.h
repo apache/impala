@@ -86,6 +86,9 @@ class PartialSortNode : public ExecNode {
 
   const TupleRowComparatorConfig& tuple_row_comparator_config_;
 
+  /// Min, max, and avg time spent in calling GetNext on child
+  RuntimeProfile::SummaryStatsCounter* child_get_next_timer_;
+
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
 

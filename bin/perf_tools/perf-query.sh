@@ -64,7 +64,7 @@ sudo echo "test sudo"
 sudo perf record -F 99 -g -a &
 perf_pid=$!
 
-~/Impala/bin/impala-shell.sh -q "$1"
+${IMPALA_HOME}/bin/impala-shell.sh -q "$1"
 
 # Send interrupt to 'perf record'. We need to issue 'kill' in a new session/process
 # group via 'setsid', otherwise 'perf record' won't get the signal (because it's

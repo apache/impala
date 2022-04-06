@@ -614,6 +614,7 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   150: optional bool disable_codegen_cache = false;
+
   151: optional TCodeGenCacheMode codegen_cache_mode = TCodeGenCacheMode.NORMAL;
 
   // See comment in ImpalaService.thrift
@@ -633,6 +634,10 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   157: optional i32 max_fragment_instances_per_node = MAX_FRAGMENT_INSTANCES_PER_NODE
+
+  // Configures the in-memory sort algorithm used in the sorter.
+  // See comment in ImpalaService.thrift
+  158: optional i32 max_sort_run_size = 0;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

@@ -66,6 +66,7 @@ PartialSortNode::PartialSortNode(
     input_eos_(false),
     sorter_eos_(true) {
   runtime_profile()->AddInfoString("SortType", "Partial");
+  child_get_next_timer_ = ADD_SUMMARY_STATS_TIMER(runtime_profile(), "ChildGetNextTime");
 }
 
 PartialSortNode::~PartialSortNode() {
@@ -143,7 +144,12 @@ Status PartialSortNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
     if (input_batch_index_ == input_batch_->num_rows()) {
       input_batch_->Reset();
       input_batch_index_ = 0;
-      RETURN_IF_ERROR(child(0)->GetNext(state, input_batch_.get(), &input_eos_));
+      MonotonicStopWatch timer;
+      timer.Start();
+      Status status = child(0)->GetNext(state, input_batch_.get(), &input_eos_);
+      timer.Stop();
+      RETURN_IF_ERROR(status);
+      child_get_next_timer_->UpdateCounter(timer.ElapsedTime());
     }
 
     int num_processed;

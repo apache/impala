@@ -114,13 +114,22 @@ class Sorter::Page {
 ///
 /// Runs are either "initial runs" constructed from the sorter's input by evaluating
 /// the expressions in 'sort_tuple_exprs_' or "intermediate runs" constructed
-/// by merging already-sorted runs. Initial runs are sorted in-place in memory. Once
-/// sorted, runs can be spilled to disk to free up memory. Sorted runs are merged by
+/// by merging already-sorted runs. Initial runs are sorted in-place in memory.
+/// Once sorted, runs can be spilled to disk to free up memory. Sorted runs are merged by
 /// SortedRunMerger, either to produce the final sorted output or to produce another
 /// sorted run.
+/// By default, the size of initial runs is determined by the available memory: the
+/// sorter tries to add batches to the run until some (memory) limit is reached.
+/// Some query options can also limit the size of an initial (or in-memory) run.
+/// SORT_RUN_BYTES_LIMIT triggers spilling after the size of data in the run exceeds the
+/// given threshold (usually expressed in MB or GB).
+/// MAX_SORT_RUN_SIZE allows constructing runs up to a certain size by limiting the
+/// number of pages in the initial runs. These smaller in-memory runs are also referred
+/// to as 'miniruns'. Miniruns are not spilled immediately, but sorted in-place first,
+/// and collected to be merged in memory before spilling the produced output run to disk.
 ///
 /// The expected calling sequence of functions is as follows:
-/// * Init() to initialize the run and allocate initial pages.
+/// * Init() or TryInit() to initialize the run and allocate initial pages.
 /// * Add*Batch() to add batches of tuples to the run.
 /// * FinalizeInput() to signal that no more batches will be added.
 /// * If the run is unsorted, it must be sorted. After that set_sorted() must be called.
@@ -141,13 +150,23 @@ class Sorter::Run {
   /// var-len data into var_len_copy_page_.
   Status Init();
 
+  /// Similar to Init(), except for the following differences:
+  /// It is only used to initialize miniruns (query option MAX_SORT_RUN_SIZE > 0 cases).
+  /// The first in-memory run is always initialized by calling Init(), because that must
+  /// succeed. The following ones are initialized by TryInit().
+  /// TryInit() allocates one fixed-len page and one var-len page if 'has_var_len_slots_'
+  /// is true. There is no need for var_len_copy_page here. Returns false if
+  /// initialization was successful, returns true, if reservation was not enough.
+  Status TryInit(bool* allocation_failed);
+
   /// Add the rows from 'batch' starting at 'start_index' to the current run. Returns
   /// the number of rows actually added in 'num_processed'. If the run is full (no more
   /// pages can be allocated), 'num_processed' may be less than the number of remaining
   /// rows in the batch. AddInputBatch() materializes the input rows using the
   /// expressions in sorter_->sort_tuple_expr_evals_, while AddIntermediateBatch() just
   /// copies rows.
-  Status AddInputBatch(RowBatch* batch, int start_index, int* num_processed);
+  Status AddInputBatch(
+      RowBatch* batch, int start_index, int* num_processed, bool* allocation_failed);
 
   Status AddIntermediateBatch(RowBatch* batch, int start_index, int* num_processed);
 
@@ -199,6 +218,9 @@ class Sorter::Run {
   bool is_finalized() const { return is_finalized_; }
   bool is_sorted() const { return is_sorted_; }
   void set_sorted() { is_sorted_ = true; }
+  int max_num_of_pages() const { return max_num_of_pages_; }
+  int fixed_len_size() { return fixed_len_pages_.size(); }
+  int run_size() { return fixed_len_pages_.size() + var_len_pages_.size(); }
   int64_t num_tuples() const { return num_tuples_; }
   /// Returns true if we have var-len pages in the run.
   bool HasVarLenPages() const {
@@ -215,8 +237,8 @@ class Sorter::Run {
   /// INITIAL_RUN and HAS_VAR_LEN_SLOTS are template arguments for performance and must
   /// match 'initial_run_' and 'has_var_len_slots_'.
   template <bool HAS_VAR_LEN_SLOTS, bool INITIAL_RUN>
-  Status AddBatchInternal(
-      RowBatch* batch, int start_index, int* num_processed);
+  Status AddBatchInternal(RowBatch* batch, int start_index, int* num_processed,
+        bool* allocation_failed);
 
   /// Finalize the list of pages: delete empty final pages and unpin the previous page
   /// if the run is unpinned.
@@ -351,6 +373,12 @@ class Sorter::Run {
 
   /// Used to implement GetNextBatch() interface required for the merger.
   boost::scoped_ptr<RowBatch> buffered_batch_;
+
+  /// Max number of fixed-len + var-len pages in an in-memory minirun. It defines the
+  /// length of a minirun.
+  /// The default value is 0 which means that only 1 in-memory run will be created, and
+  /// its size will be determined by other limits eg. memory or sort_run_bytes_limit.
+  int max_num_of_pages_;
 
   /// Members used when a run is read in GetNext().
   /// The index into 'fixed_' and 'var_len_pages_' of the pages being read in GetNext().

@@ -21,6 +21,10 @@ from copy import copy, deepcopy
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfNotHdfsMinicluster
+from tests.common.test_vector import ImpalaTestDimension
+
+# Run sizes (number of pages per run) in sorter
+MAX_SORT_RUN_SIZE = [0, 2, 20]
 
 
 def split_result_rows(result):
@@ -55,6 +59,8 @@ class TestQueryFullSort(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestQueryFullSort, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('max_sort_run_size',
+        *MAX_SORT_RUN_SIZE))
 
     if cls.exploration_strategy() == 'core':
       cls.ImpalaTestMatrix.add_constraint(lambda v:\
@@ -229,10 +235,21 @@ class TestQueryFullSort(ImpalaTestSuite):
 class TestRandomSort(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
-    return 'functional'
+    return 'functional-query'
 
-  def test_order_by_random(self):
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestRandomSort, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('max_sort_run_size',
+        *MAX_SORT_RUN_SIZE))
+
+    if cls.exploration_strategy() == 'core':
+      cls.ImpalaTestMatrix.add_constraint(lambda v:
+          v.get_value('table_format').file_format == 'parquet')
+
+  def test_order_by_random(self, vector):
     """Tests that 'order by random()' works as expected."""
+    exec_option = copy(vector.get_value('exec_option'))
     # "order by random()" with different seeds should produce different orderings.
     seed_query = "select * from functional.alltypestiny order by random(%s)"
     results_seed0 = self.execute_query(seed_query % "0")
@@ -242,8 +259,8 @@ class TestRandomSort(ImpalaTestSuite):
 
     # Include "random()" in the select list to check that it's sorted correctly.
     results = transpose_results(self.execute_query(
-        "select random() as r from functional.alltypessmall order by r").data,
-        lambda x: float(x))
+        "select random() as r from functional.alltypessmall order by r",
+        exec_option).data, lambda x: float(x))
     assert(results[0] == sorted(results[0]))
 
     # Like above, but with a limit.
@@ -254,22 +271,40 @@ class TestRandomSort(ImpalaTestSuite):
 
     # "order by random()" inside an inline view.
     query = "select r from (select random() r from functional.alltypessmall) v order by r"
-    results = transpose_results(self.execute_query(query).data, lambda x: float(x))
+    results = transpose_results(self.execute_query(query, exec_option).data,
+        lambda x: float(x))
     assert (results == sorted(results))
 
-  def test_analytic_order_by_random(self):
+  def test_analytic_order_by_random(self, vector):
     """Tests that a window function over 'order by random()' works as expected."""
+    exec_option = copy(vector.get_value('exec_option'))
     # Since we use the same random seed, the results should be returned in order.
     query = """select last_value(rand(2)) over (order by rand(2)) from
       functional.alltypestiny"""
-    results = transpose_results(self.execute_query(query).data, lambda x: float(x))
+    results = transpose_results(self.execute_query(query, exec_option).data,
+        lambda x: float(x))
     assert (results == sorted(results))
+
 
 
 class TestPartialSort(ImpalaTestSuite):
   """Test class to do functional validation of partial sorts."""
 
-  def test_partial_sort_min_reservation(self, unique_database):
+  @classmethod
+  def get_workload(self):
+    return 'tpch'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestPartialSort, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('max_sort_run_size',
+        *MAX_SORT_RUN_SIZE))
+
+    if cls.exploration_strategy() == 'core':
+      cls.ImpalaTestMatrix.add_constraint(lambda v:
+          v.get_value('table_format').file_format == 'parquet')
+
+  def test_partial_sort_min_reservation(self, vector, unique_database):
     """Test that the partial sort node can operate if it only gets its minimum
     memory reservation."""
     table_name = "%s.kudu_test" % unique_database
@@ -277,9 +312,35 @@ class TestPartialSort(ImpalaTestSuite):
         "debug_action", "-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0")
     self.execute_query("""create table %s (col0 string primary key)
         partition by hash(col0) partitions 8 stored as kudu""" % table_name)
+    exec_option = copy(vector.get_value('exec_option'))
     result = self.execute_query(
-        "insert into %s select string_col from functional.alltypessmall" % table_name)
+        "insert into %s select string_col from functional.alltypessmall" % table_name,
+        exec_option)
     assert "PARTIAL SORT" in result.runtime_profile, result.runtime_profile
+
+  def test_partial_sort_kudu_insert(self, vector, unique_database):
+    table_name = "%s.kudu_partial_sort_test" % unique_database
+    self.execute_query("""create table %s (l_linenumber INT, l_orderkey BIGINT,
+      l_partkey BIGINT, l_shipdate STRING, l_quantity DECIMAL(12,2),
+      l_comment STRING, PRIMARY KEY(l_linenumber, l_orderkey) )
+      PARTITION BY RANGE (l_linenumber)
+      (
+        PARTITION VALUE = 1,
+        PARTITION VALUE = 2,
+        PARTITION VALUE = 3,
+        PARTITION VALUE = 4,
+        PARTITION VALUE = 5,
+        PARTITION VALUE = 6,
+        PARTITION VALUE = 7
+      )
+      STORED AS KUDU""" % table_name)
+    exec_option = copy(vector.get_value('exec_option'))
+    result = self.execute_query(
+        """insert into %s SELECT l_linenumber, l_orderkey, l_partkey, l_shipdate,
+        l_quantity, l_comment FROM tpch.lineitem limit 300000""" % table_name,
+        exec_option)
+    assert "NumModifiedRows: 300000" in result.runtime_profile, result.runtime_profile
+    assert "NumRowErrors: 0" in result.runtime_profile, result.runtime_profile
 
 
 class TestArraySort(ImpalaTestSuite):
@@ -292,7 +353,8 @@ class TestArraySort(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestArraySort, cls).add_test_dimensions()
-
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('max_sort_run_size',
+        *MAX_SORT_RUN_SIZE))
     # The table we use is a parquet table.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'parquet')

@@ -105,7 +105,7 @@ class Sorter {
   /// 'enable_spilling' should be set to false to reduce the number of requested buffers
   /// if the caller will use AddBatchNoSpill().
   /// 'codegend_sort_helper_fn' is a reference to the codegen version of
-  /// the Sorter::TupleSorter::SortHelp() method.
+  /// the Sorter::TupleSorter::SortHelper() method.
   /// 'estimated_input_size' is the total rows in bytes that are estimated to get added
   /// into this sorter. This is used to decide if sorter needs to proactively spill for
   /// the first run. -1 value means estimate is unavailable.
@@ -166,20 +166,39 @@ class Sorter {
   /// Return true if the sorter has any spilled runs.
   bool HasSpilledRuns() const;
 
+  /// The logic in AddBatchNoSpill() that handles the different cases when
+  /// AddBatchInternal() returns without processing the entire batch.
+  /// In this case we need to initialize a new minirun for the incoming rows.
+  /// Tries initializing a new minirun. If the initialization was successful,
+  /// allocation_failed is set to false, otherwise (e.g. a memory limit is hit) true.
+  Status InitializeNewMinirun(bool* allocation_failed) WARN_UNUSED_RESULT;
+
  private:
   class Page;
   class Run;
 
-  /// Minimum value for sot_run_bytes_limit query option.
+  /// Minimum value for sort_run_bytes_limit query option.
   static const int64_t MIN_SORT_RUN_BYTES_LIMIT = 32 << 20; // 32 MB
+
+  /// Merges multiple smaller runs in sorted_inmem_runs_ into a single larger merged
+  /// run that can be spilled page by page during the process, until all pages from
+  /// sorted_inmem_runs are consumed and freed.
+  /// Always performs one-level merge and spills the output run to disc. Therefore there
+  /// is no need to deep-copy the input, since the pages containing var-len data
+  /// remain in the memory until the end of the in-memory merge.
+  /// TODO: delete pages that are consumed during merge asap.
+  Status MergeInMemoryRuns() WARN_UNUSED_RESULT;
 
   /// Create a SortedRunMerger from sorted runs in 'sorted_runs_' and assign it to
   /// 'merger_'. 'num_runs' indicates how many runs should be covered by the current
-  /// merging attempt. Returns error if memory allocation fails during in
-  /// Run::PrepareRead(). The runs to be merged are removed from 'sorted_runs_'. The
+  /// merging attempt. Returns error if memory allocation fails in Run::PrepareRead().
+  /// The runs to be merged are removed from 'sorted_runs_'.
+  /// If 'external' is set to true, it performs an external merge, and the
   /// Sorter sets the 'deep_copy_input' flag to true for the merger, since the pages
   /// containing input run data will be deleted as input runs are read.
-  Status CreateMerger(int num_runs) WARN_UNUSED_RESULT;
+  /// If 'external' is false, it creates an in-memory merger for the in-memory miniruns.
+  /// In this case, 'deep_copy_input' is set to false.
+  Status CreateMerger(int num_runs, bool external) WARN_UNUSED_RESULT;
 
   /// Repeatedly replaces multiple smaller runs in sorted_runs_ with a single larger
   /// merged run until there are few enough runs to be merged with a single merger.
@@ -192,6 +211,10 @@ class Sorter {
   /// Execute a single step of the intermediate merge, pulling rows from 'merger_'
   /// and adding them to 'merged_run'.
   Status ExecuteIntermediateMerge(Sorter::Run* merged_run) WARN_UNUSED_RESULT;
+
+  /// Handles cases in AddBatch where a memory limit is reached and spilling must start.
+  /// Used only in case of multiple in-memory runs set by query option MAX_SORT_RUN_SIZE.
+  inline Status MergeAndSpill() WARN_UNUSED_RESULT;
 
   /// Called once there no more rows to be added to 'unsorted_run_'. Sorts
   /// 'unsorted_run_' and appends it to the list of sorted runs.
@@ -266,8 +289,8 @@ class Sorter {
   const CodegenFnPtr<SortedRunMerger::HeapifyHelperFn>& codegend_heapify_helper_fn_;
 
   /// A default codegened function pointer storing nullptr, which is used when the
-  /// merger is not needed. Used as a default value in constructor, when the CodegenFnPtr
-  /// is not provided.
+  /// merger is not needed. Used as a default value in the constructor, when the
+  /// CodegenFnPtr is not provided.
   static const CodegenFnPtr<SortedRunMerger::HeapifyHelperFn> default_heapify_helper_fn_;
 
   /// Client used to allocate pages from the buffer pool. Not owned.
@@ -302,9 +325,13 @@ class Sorter {
   /// When it is added to sorted_runs_, it is set to NULL.
   Run* unsorted_run_;
 
-  /// List of sorted runs that have been produced but not merged. unsorted_run_ is added
-  /// to this list after an in-memory sort. Sorted runs produced by intermediate merges
-  /// are also added to this list during the merge. Runs are added to the object pool.
+  /// List of quicksorted miniruns before merging in memory.
+  std::deque<Run*> sorted_inmem_runs_;
+
+  /// List of sorted runs that have been produced but not merged. 'unsorted_run_' is
+  /// added to this list after an in-memory sort. Sorted runs produced by intermediate
+  /// merges are also added to this list during the merge. Runs are added to the
+  /// object pool.
   std::deque<Run*> sorted_runs_;
 
   /// Merger object (intermediate or final) currently used to produce sorted runs.
@@ -345,6 +372,9 @@ class Sorter {
   /// Time spent sorting initial runs in memory.
   RuntimeProfile::Counter* in_mem_sort_timer_;
 
+  /// Time spent merging initial miniruns in memory.
+  RuntimeProfile::Counter* in_mem_merge_timer_;
+
   /// Total size of the initial runs in bytes.
   RuntimeProfile::Counter* sorted_data_size_;
 
@@ -353,6 +383,12 @@ class Sorter {
 
   /// Flag to enforce sort_run_bytes_limit.
   bool enforce_sort_run_bytes_limit_ = false;
+
+  /// Maximum number of fixed-length + variable-length pages in an in-memory run set by
+  /// Query Option MAX_SORT_RUN_SIZE.
+  /// The default value is 0 which means that only 1 in-memory run will be created, and
+  /// its size will be determined by other limits eg. memory or sort_run_bytes_limit.
+  int inmem_run_max_pages_ = 0;
 };
 
 } // namespace impala

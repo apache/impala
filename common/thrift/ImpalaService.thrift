@@ -785,6 +785,16 @@ enum TImpalaQueryOptions {
   // PROCESSING_COST_MIN_THREADS option has higher value.
   // Valid values are in [1, 128]. Default to 128.
   MAX_FRAGMENT_INSTANCES_PER_NODE = 156
+
+  // Configures the in-memory sort algorithm used in the sorter. Determines the
+  // maximum number of pages in an initial in-memory run (fixed + variable length).
+  // 0 means unlimited, which will create 1 big run with no in-memory merge phase.
+  // Setting any other other value can create multiple miniruns which leads to an
+  // in-memory merge phase. The minimum value in that case is 2.
+  // Generally, with larger workloads the recommended value is 10 or more to avoid
+  // high fragmentation of variable length data.
+  MAX_SORT_RUN_SIZE = 157;
+
 }
 
 // The summary of a DML statement.

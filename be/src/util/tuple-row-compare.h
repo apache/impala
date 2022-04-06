@@ -59,6 +59,8 @@ class ComparatorWrapper {
   }
 };
 
+class TupleRowComparator;
+
 /// TupleRowComparatorConfig contains the static state initialized from its corresponding
 /// thrift structure. It serves as an input for creating instances of the
 /// TupleRowComparator class.
@@ -102,8 +104,8 @@ class TupleRowComparatorConfig {
   std::vector<int8_t> nulls_first_;
 
   /// Codegened version of TupleRowComparator::Compare().
-  typedef int (*CompareFn)(ScalarExprEvaluator* const*, ScalarExprEvaluator* const*,
-      const TupleRow*, const TupleRow*);
+  typedef int (*CompareFn)(const TupleRowComparator*, ScalarExprEvaluator* const*,
+      ScalarExprEvaluator* const*, const TupleRow*, const TupleRow*);
   CodegenFnPtr<CompareFn> codegend_compare_fn_;
 
  private:
@@ -156,8 +158,19 @@ class TupleRowComparator {
   /// hot loops.
   bool ALWAYS_INLINE Less(const TupleRow* lhs, const TupleRow* rhs) const {
     return Compare(
-               ordering_expr_evals_lhs_.data(), ordering_expr_evals_rhs_.data(), lhs, rhs)
-        < 0;
+        ordering_expr_evals_lhs_.data(), ordering_expr_evals_rhs_.data(), lhs, rhs) < 0;
+  }
+
+  bool ALWAYS_INLINE LessCodegend(const TupleRow* lhs, const TupleRow* rhs) const {
+    if (codegend_compare_fn_non_atomic_ != nullptr) {
+      return codegend_compare_fn_non_atomic_(this,
+          ordering_expr_evals_lhs_.data(), ordering_expr_evals_rhs_.data(), lhs, rhs) < 0;
+    } else {
+      TupleRowComparatorConfig::CompareFn fn = codegend_compare_fn_.load();
+      if (fn != nullptr) codegend_compare_fn_non_atomic_ = fn;
+    }
+    return Compare(
+        ordering_expr_evals_lhs_.data(), ordering_expr_evals_rhs_.data(), lhs, rhs) < 0;
   }
 
   bool ALWAYS_INLINE Less(const Tuple* lhs, const Tuple* rhs) const {
@@ -197,6 +210,7 @@ class TupleRowComparator {
   /// Reference to the codegened function pointer owned by the TupleRowComparatorConfig
   /// object that was used to create this instance.
   const CodegenFnPtr<TupleRowComparatorConfig::CompareFn>& codegend_compare_fn_;
+  mutable TupleRowComparatorConfig::CompareFn codegend_compare_fn_non_atomic_ = nullptr;
 
  private:
   /// Interpreted implementation of Compare().

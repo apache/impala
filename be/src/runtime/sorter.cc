@@ -121,11 +121,12 @@ Sorter::Run::Run(Sorter* parent, TupleDescriptor* sort_tuple_desc, bool initial_
     is_pinned_(initial_run),
     is_finalized_(false),
     is_sorted_(!initial_run),
-    num_tuples_(0) {}
+    num_tuples_(0),
+    max_num_of_pages_(initial_run ? parent->inmem_run_max_pages_ : 0) {}
 
 Status Sorter::Run::Init() {
-  int num_to_create = 1 + has_var_len_slots_
-      + (has_var_len_slots_ && initial_run_ && sorter_->enable_spilling_);
+  int num_to_create = 1 + has_var_len_slots_ + (has_var_len_slots_ && initial_run_ &&
+      (sorter_->enable_spilling_ && max_num_of_pages_ == 0));
   int64_t required_mem = num_to_create * sorter_->page_len_;
   if (!sorter_->buffer_pool_client_->IncreaseReservationToFit(required_mem)) {
     return Status(Substitute(
@@ -152,9 +153,32 @@ Status Sorter::Run::Init() {
   return Status::OK();
 }
 
+Status Sorter::Run::TryInit(bool* allocation_failed) {
+  *allocation_failed = true;
+  DCHECK_GT(sorter_->inmem_run_max_pages_, 0);
+  // No need for additional copy page because var-len data is not reordered.
+  // The in-memory merger can copy var-len data directly from the in-memory runs,
+  // which are kept until the merge is finished
+  int num_to_create = 1 + has_var_len_slots_;
+  int64_t required_mem = num_to_create * sorter_->page_len_;
+  if (!sorter_->buffer_pool_client_->IncreaseReservationToFit(required_mem)) {
+    return Status::OK();
+  }
+
+  RETURN_IF_ERROR(AddPage(&fixed_len_pages_));
+  if (has_var_len_slots_) {
+    RETURN_IF_ERROR(AddPage(&var_len_pages_));
+  }
+  if (initial_run_) {
+    sorter_->initial_runs_counter_->Add(1);
+  }
+  *allocation_failed = false;
+  return Status::OK();
+}
+
 template <bool HAS_VAR_LEN_SLOTS, bool INITIAL_RUN>
 Status Sorter::Run::AddBatchInternal(
-    RowBatch* batch, int start_index, int* num_processed) {
+    RowBatch* batch, int start_index, int* num_processed, bool* allocation_failed) {
   DCHECK(!is_finalized_);
   DCHECK(!fixed_len_pages_.empty());
   DCHECK_EQ(HAS_VAR_LEN_SLOTS, has_var_len_slots_);
@@ -226,6 +250,7 @@ Status Sorter::Run::AddBatchInternal(
             // There was not enough space in the last var-len page for this tuple, and
             // the run could not be extended. Return the fixed-len allocation and exit.
             cur_fixed_len_page->FreeBytes(sort_tuple_size_);
+            *allocation_failed = true;
             return Status::OK();
           }
         }
@@ -246,13 +271,21 @@ Status Sorter::Run::AddBatchInternal(
 
     // If there are still rows left to process, get a new page for the fixed-length
     // tuples. If the run is already too long, return.
+    if (INITIAL_RUN && max_num_of_pages_ > 0 && run_size() >= max_num_of_pages_){
+      *allocation_failed = false;
+      return Status::OK();
+    }
     if (cur_input_index < batch->num_rows()) {
       bool added;
       RETURN_IF_ERROR(TryAddPage(add_mode, &fixed_len_pages_, &added));
-      if (!added) return Status::OK();
+      if (!added) {
+        *allocation_failed = true;
+        return Status::OK();
+      }
       cur_fixed_len_page = &fixed_len_pages_.back();
     }
   }
+  *allocation_failed = false;
   return Status::OK();
 }
 
@@ -773,22 +806,28 @@ int64_t Sorter::Run::TotalBytes() const {
   return total_bytes;
 }
 
-Status Sorter::Run::AddInputBatch(RowBatch* batch, int start_index, int* num_processed) {
+Status Sorter::Run::AddInputBatch(RowBatch* batch, int start_index, int* num_processed,
+    bool* allocation_failed) {
   DCHECK(initial_run_);
   if (has_var_len_slots_) {
-    return AddBatchInternal<true, true>(batch, start_index, num_processed);
+    return AddBatchInternal<true, true>(
+        batch, start_index, num_processed, allocation_failed);
   } else {
-    return AddBatchInternal<false, true>(batch, start_index, num_processed);
+    return AddBatchInternal<false, true>(
+        batch, start_index, num_processed, allocation_failed);
   }
 }
 
 Status Sorter::Run::AddIntermediateBatch(
     RowBatch* batch, int start_index, int* num_processed) {
   DCHECK(!initial_run_);
+  bool allocation_failed = false;
   if (has_var_len_slots_) {
-    return AddBatchInternal<true, false>(batch, start_index, num_processed);
+    return AddBatchInternal<true, false>(
+        batch, start_index, num_processed, &allocation_failed);
   } else {
-    return AddBatchInternal<false, false>(batch, start_index, num_processed);
+    return AddBatchInternal<false, false>(
+        batch, start_index, num_processed, &allocation_failed);
   }
 }
 
@@ -909,8 +948,10 @@ Sorter::Sorter(const TupleRowComparatorConfig& tuple_row_comparator_config,
     initial_runs_counter_(nullptr),
     num_merges_counter_(nullptr),
     in_mem_sort_timer_(nullptr),
+    in_mem_merge_timer_(nullptr),
     sorted_data_size_(nullptr),
-    run_sizes_(nullptr) {
+    run_sizes_(nullptr),
+    inmem_run_max_pages_(state->query_options().max_sort_run_size) {
   switch (tuple_row_comparator_config.sorting_order_) {
     case TSortingOrder::LEXICAL:
       compare_less_than_.reset(
@@ -922,13 +963,13 @@ Sorter::Sorter(const TupleRowComparatorConfig& tuple_row_comparator_config,
     default:
       DCHECK(false);
   }
-
   if (estimated_input_size > 0) ComputeSpillEstimate(estimated_input_size);
 }
 
 Sorter::~Sorter() {
   DCHECK(sorted_runs_.empty());
   DCHECK(merging_runs_.empty());
+  DCHECK(sorted_inmem_runs_.empty());
   DCHECK(unsorted_run_ == nullptr);
   DCHECK(merge_output_run_ == nullptr);
 }
@@ -977,6 +1018,7 @@ Status Sorter::Prepare(ObjectPool* obj_pool) {
     initial_runs_counter_ = ADD_COUNTER(profile_, "RunsCreated", TUnit::UNIT);
   }
   in_mem_sort_timer_ = ADD_TIMER(profile_, "InMemorySortTime");
+  in_mem_merge_timer_ = ADD_TIMER(profile_, "InMemoryMergeTime");
   sorted_data_size_ = ADD_COUNTER(profile_, "SortDataSize", TUnit::BYTES);
   run_sizes_ = ADD_SUMMARY_STATS_COUNTER(profile_, "NumRowsPerRun", TUnit::UNIT);
 
@@ -1016,12 +1058,23 @@ Status Sorter::AddBatch(RowBatch* batch) {
     RETURN_IF_ERROR(AddBatchNoSpill(batch, cur_batch_index, &num_processed));
 
     cur_batch_index += num_processed;
+
     if (MustSortAndSpill(cur_batch_index, batch->num_rows())) {
-      // The current run is full. Sort it, spill it and begin the next one.
-      int64_t unsorted_run_bytes = unsorted_run_->TotalBytes();
       RETURN_IF_ERROR(state_->StartSpilling(mem_tracker_));
-      RETURN_IF_ERROR(SortCurrentInputRun());
-      RETURN_IF_ERROR(sorted_runs_.back()->UnpinAllPages());
+      int64_t unsorted_run_bytes = unsorted_run_->TotalBytes();
+
+      if (inmem_run_max_pages_ == 0) {
+        // The current run is full. Sort it and spill it.
+        RETURN_IF_ERROR(SortCurrentInputRun());
+        sorted_runs_.push_back(unsorted_run_);
+        unsorted_run_ = nullptr;
+        RETURN_IF_ERROR(sorted_runs_.back()->UnpinAllPages());
+      } else {
+        // The memory is full with miniruns. Sort, merge and spill them.
+        RETURN_IF_ERROR(MergeAndSpill());
+      }
+
+      // After we freed memory by spilling, initialize the next run.
       unsorted_run_ =
           run_pool_.Add(new Run(this, output_row_desc_->tuple_descriptors()[0], true));
       RETURN_IF_ERROR(unsorted_run_->Init());
@@ -1058,6 +1111,70 @@ int64_t Sorter::GetSortRunBytesLimit() const {
   }
 }
 
+Status Sorter::InitializeNewMinirun(bool* allocation_failed) {
+  // The minirun reached its size limit (max_num_of_pages).
+  // We should sort the run, append to the sorted miniruns, and start a new minirun.
+  DCHECK(!*allocation_failed && unsorted_run_->run_size() == inmem_run_max_pages_);
+
+  // When the first minirun is full, and there are more tuples to come, we first
+  // need to ensure that these in-memory miniruns can be merged later, by trying
+  // to reserve pages for the output run of the in-memory merger. Only if this
+  // initialization was successful, can we move on to create the 2nd inmem run.
+  // If it fails and/or only 1 inmem_run could fit into memory, start spilling.
+  // No need to initialize 'merge_output_run_' if spilling is disabled, because the
+  // output will be read directly from the merger in GetNext().
+  if (enable_spilling_ && sorted_inmem_runs_.empty()) {
+    DCHECK(merge_output_run_ == nullptr) << "Should have finished previous merge.";
+    merge_output_run_ = run_pool_.Add(
+        new Run(this, output_row_desc_->tuple_descriptors()[0], false));
+    RETURN_IF_ERROR(merge_output_run_->TryInit(allocation_failed));
+    if (*allocation_failed) {
+      return Status::OK();
+    }
+  }
+  RETURN_IF_ERROR(SortCurrentInputRun());
+  sorted_inmem_runs_.push_back(unsorted_run_);
+  unsorted_run_ =
+      run_pool_.Add(new Run(this, output_row_desc_->tuple_descriptors()[0], true));
+  RETURN_IF_ERROR(unsorted_run_->TryInit(allocation_failed));
+  if (*allocation_failed) {
+    unsorted_run_->CloseAllPages();
+  }
+  return Status::OK();
+}
+
+Status Sorter::MergeAndSpill() {
+  // The last minirun might have been created just before we ran out of memory.
+  // In this case it should not be sorted and merged.
+  if (unsorted_run_->run_size() == 0){
+    unsorted_run_ = nullptr;
+  } else {
+    RETURN_IF_ERROR(SortCurrentInputRun());
+    sorted_inmem_runs_.push_back(unsorted_run_);
+  }
+
+  // If only 1 run was created, do not merge.
+  if (sorted_inmem_runs_.size() == 1) {
+    sorted_runs_.push_back(sorted_inmem_runs_.back());
+    sorted_inmem_runs_.clear();
+    DCHECK_GT(sorted_runs_.back()->fixed_len_size(), 0);
+    RETURN_IF_ERROR(sorted_runs_.back()->UnpinAllPages());
+    // If 'merge_output_run_' was initialized but no merge was executed,
+    // set it back to nullptr.
+    if (merge_output_run_ != nullptr){
+      merge_output_run_->CloseAllPages();
+      merge_output_run_ = nullptr;
+    }
+  } else {
+    DCHECK(merge_output_run_ != nullptr) << "Should have reserved memory for the merger.";
+    RETURN_IF_ERROR(MergeInMemoryRuns());
+    DCHECK(merge_output_run_ == nullptr) << "Should have finished previous merge.";
+  }
+
+  DCHECK(sorted_inmem_runs_.empty());
+  return Status::OK();
+}
+
 bool Sorter::MustSortAndSpill(const int rows_added, const int batch_num_rows) {
   if (rows_added < batch_num_rows) {
     return true;
@@ -1086,7 +1203,28 @@ void Sorter::TryLowerMemUpToSortRunBytesLimit() {
 
 Status Sorter::AddBatchNoSpill(RowBatch* batch, int start_index, int* num_processed) {
   DCHECK(batch != nullptr);
-  RETURN_IF_ERROR(unsorted_run_->AddInputBatch(batch, start_index, num_processed));
+  bool allocation_failed = false;
+
+  RETURN_IF_ERROR(unsorted_run_->AddInputBatch(batch, start_index, num_processed,
+      &allocation_failed));
+
+  if (inmem_run_max_pages_ > 0) {
+    start_index += *num_processed;
+    // We try to add the entire input batch. If it does not fit into 1 minirun,
+    // initialize a new one.
+    while (!allocation_failed && start_index < batch->num_rows()) {
+      RETURN_IF_ERROR(InitializeNewMinirun(&allocation_failed));
+      if (allocation_failed) {
+        break;
+      }
+      int processed = 0;
+      RETURN_IF_ERROR(unsorted_run_->AddInputBatch(batch, start_index, &processed,
+          &allocation_failed));
+      start_index += processed;
+      *num_processed += processed;
+    }
+  }
+
   // Clear any temporary allocations made while materializing the sort tuples.
   expr_results_pool_.Clear();
   return Status::OK();
@@ -1095,6 +1233,45 @@ Status Sorter::AddBatchNoSpill(RowBatch* batch, int start_index, int* num_proces
 Status Sorter::InputDone() {
   // Sort the tuples in the last run.
   RETURN_IF_ERROR(SortCurrentInputRun());
+
+  if (inmem_run_max_pages_ > 0) {
+    sorted_inmem_runs_.push_back(unsorted_run_);
+    unsorted_run_ = nullptr;
+    if (!HasSpilledRuns()) {
+      if (sorted_inmem_runs_.size() == 1) {
+        DCHECK(sorted_inmem_runs_.back()->is_pinned());
+        DCHECK(merge_output_run_ == nullptr);
+        RETURN_IF_ERROR(sorted_inmem_runs_.back()->PrepareRead());
+        return Status::OK();
+      }
+      if (enable_spilling_) {
+        DCHECK(merge_output_run_ != nullptr);
+        merge_output_run_->CloseAllPages();
+        merge_output_run_ = nullptr;
+      }
+      // 'merge_output_run_' is not initialized for partial sort, because the output
+      // will be read directly from the merger.
+      DCHECK(enable_spilling_ || merge_output_run_ == nullptr);
+      return CreateMerger(sorted_inmem_runs_.size(), false);
+    }
+    DCHECK(enable_spilling_);
+
+    if (sorted_inmem_runs_.size() == 1) {
+      sorted_runs_.push_back(sorted_inmem_runs_.back());
+      sorted_inmem_runs_.clear();
+      DCHECK_GT(sorted_runs_.back()->run_size(), 0);
+      RETURN_IF_ERROR(sorted_runs_.back()->UnpinAllPages());
+    } else {
+      RETURN_IF_ERROR(MergeInMemoryRuns());
+    }
+    DCHECK(sorted_inmem_runs_.empty());
+    // Merge intermediate runs until we have a final merge set-up.
+    return MergeIntermediateRuns();
+  } else {
+    sorted_runs_.push_back(unsorted_run_);
+  }
+
+  unsorted_run_ = nullptr;
 
   if (sorted_runs_.size() == 1) {
     // The entire input fit in one run. Read sorted rows in GetNext() directly from the
@@ -1114,10 +1291,19 @@ Status Sorter::InputDone() {
   return MergeIntermediateRuns();
 }
 
+
 Status Sorter::GetNext(RowBatch* output_batch, bool* eos) {
-  if (sorted_runs_.size() == 1) {
+  if (sorted_inmem_runs_.size() == 1 && !HasSpilledRuns()) {
+    DCHECK(sorted_inmem_runs_.back()->is_pinned());
+    return sorted_inmem_runs_.back()->GetNext<false>(output_batch, eos);
+  } else if (inmem_run_max_pages_ == 0 && sorted_runs_.size() == 1) {
     DCHECK(sorted_runs_.back()->is_pinned());
     return sorted_runs_.back()->GetNext<false>(output_batch, eos);
+  } else if (inmem_run_max_pages_ > 0 && !HasSpilledRuns()) {
+    RETURN_IF_ERROR(merger_->GetNext(output_batch, eos));
+    // Clear any temporary allocations made by the merger.
+    expr_results_pool_.Clear();
+    return Status::OK();
   } else {
     RETURN_IF_ERROR(merger_->GetNext(output_batch, eos));
     // Clear any temporary allocations made by the merger.
@@ -1144,6 +1330,7 @@ void Sorter::Close(RuntimeState* state) {
 }
 
 void Sorter::CleanupAllRuns() {
+  Run::CleanupRuns(&sorted_inmem_runs_);
   Run::CleanupRuns(&sorted_runs_);
   Run::CleanupRuns(&merging_runs_);
   if (unsorted_run_ != nullptr) unsorted_run_->CloseAllPages();
@@ -1160,10 +1347,8 @@ Status Sorter::SortCurrentInputRun() {
     SCOPED_TIMER(in_mem_sort_timer_);
     RETURN_IF_ERROR(in_mem_tuple_sorter_->Sort(unsorted_run_));
   }
-  sorted_runs_.push_back(unsorted_run_);
   sorted_data_size_->Add(unsorted_run_->TotalBytes());
   run_sizes_->UpdateCounter(unsorted_run_->num_tuples());
-  unsorted_run_ = nullptr;
 
   RETURN_IF_CANCELLED(state_);
   return Status::OK();
@@ -1236,8 +1421,31 @@ int Sorter::GetNumOfRunsForMerge() const {
   return max_runs_in_next_merge;
 }
 
+Status Sorter::MergeInMemoryRuns() {
+  DCHECK_GE(sorted_inmem_runs_.size(), 2);
+  DCHECK_GT(sorted_inmem_runs_.back()->run_size(), 0);
+
+  // No need to allocate more memory before doing in-memory merges, because the
+  // buffers of the in-memory runs are already open and they fit into memory.
+  // The merge output run is already initialized, too.
+
+  DCHECK(merge_output_run_ != nullptr) << "Should have initialized output run for merge.";
+  RETURN_IF_ERROR(CreateMerger(sorted_inmem_runs_.size(), false));
+  {
+    SCOPED_TIMER(in_mem_merge_timer_);
+    RETURN_IF_ERROR(ExecuteIntermediateMerge(merge_output_run_));
+  }
+  spilled_runs_counter_->Add(1);
+  sorted_runs_.push_back(merge_output_run_);
+  DCHECK_GT(sorted_runs_.back()->fixed_len_size(), 0);
+  merge_output_run_ = nullptr;
+  DCHECK(sorted_inmem_runs_.empty());
+  return Status::OK();
+}
+
 Status Sorter::MergeIntermediateRuns() {
   DCHECK_GE(sorted_runs_.size(), 2);
+  DCHECK_GT(sorted_runs_.back()->fixed_len_size(), 0);
 
   // Attempt to allocate more memory before doing intermediate merges. This may
   // be possible if other operators have relinquished memory after the sort has built
@@ -1248,7 +1456,7 @@ Status Sorter::MergeIntermediateRuns() {
     int num_of_runs_to_merge = GetNumOfRunsForMerge();
 
     DCHECK(merge_output_run_ == nullptr) << "Should have finished previous merge.";
-    RETURN_IF_ERROR(CreateMerger(num_of_runs_to_merge));
+    RETURN_IF_ERROR(CreateMerger(num_of_runs_to_merge, true));
 
     // If CreateMerger() consumed all the sorted runs, we have set up the final merge.
     if (sorted_runs_.empty()) return Status::OK();
@@ -1263,9 +1471,16 @@ Status Sorter::MergeIntermediateRuns() {
   return Status::OK();
 }
 
-Status Sorter::CreateMerger(int num_runs) {
+Status Sorter::CreateMerger(int num_runs, bool external) {
+  std::deque<impala::Sorter::Run *>* runs_to_merge;
+
+  if (external) {
+    DCHECK_GE(sorted_runs_.size(), 2);
+    runs_to_merge = &sorted_runs_;
+  } else {
+    runs_to_merge = &sorted_inmem_runs_;
+  }
   DCHECK_GE(num_runs, 2);
-  DCHECK_GE(sorted_runs_.size(), 2);
   // Clean up the runs from the previous merge.
   Run::CleanupRuns(&merging_runs_);
 
@@ -1273,24 +1488,25 @@ Status Sorter::CreateMerger(int num_runs) {
   // from the runs being merged. This is unnecessary overhead that is not required if we
   // correctly transfer resources.
   merger_.reset(
-      new SortedRunMerger(*compare_less_than_, output_row_desc_, profile_, true,
+      new SortedRunMerger(*compare_less_than_, output_row_desc_, profile_, external,
           codegend_heapify_helper_fn_));
 
   vector<function<Status (RowBatch**)>> merge_runs;
   merge_runs.reserve(num_runs);
   for (int i = 0; i < num_runs; ++i) {
-    Run* run = sorted_runs_.front();
+    Run* run = runs_to_merge->front();
     RETURN_IF_ERROR(run->PrepareRead());
 
     // Run::GetNextBatch() is used by the merger to retrieve a batch of rows to merge
     // from this run.
     merge_runs.emplace_back(bind<Status>(mem_fn(&Run::GetNextBatch), run, _1));
-    sorted_runs_.pop_front();
+    runs_to_merge->pop_front();
     merging_runs_.push_back(run);
   }
   RETURN_IF_ERROR(merger_->Prepare(merge_runs));
-
-  num_merges_counter_->Add(1);
+  if (external) {
+    num_merges_counter_->Add(1);
+  }
   return Status::OK();
 }
 
