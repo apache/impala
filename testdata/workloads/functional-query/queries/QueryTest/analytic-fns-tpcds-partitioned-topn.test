@@ -323,3 +323,17 @@ STRING, STRING, STRING, STRING, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DEC
 # Confirm that heaps were actually evicted due to memory pressure.
 row_regex: .*InMemoryHeapsEvicted: .* \([1-9][0-9]*\)
 ====
+---- QUERY
+# IMPALA-11230: This is a minimal reproducing case for a crash in
+# partitioned top-n codegen. This query requires a valid ScalarExprEvaluator
+# in the TupleRowComparator::Compare() call. This was fixed by IMPALA-10961.
+select count(*)
+from (
+  select row_number() OVER (PARTITION BY ss_sold_date_sk ORDER BY CASE WHEN ss_promo_sk IN (101, 84) THEN 1 ELSE 0 END DESC) RN
+  from tpcds.store_sales) c
+where c.rn = 1;
+---- RESULTS
+1824
+---- TYPES
+BIGINT
+====
