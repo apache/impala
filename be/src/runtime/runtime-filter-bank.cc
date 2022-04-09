@@ -380,7 +380,7 @@ void RuntimeFilterBank::PublishGlobalFilter(
     DCHECK(query_state_->query_options().__isset.runtime_in_list_filter_entry_limit);
     int entry_limit = query_state_->query_options().runtime_in_list_filter_entry_limit;
     in_list_filter = InListFilter::Create(params.in_list_filter(),
-        fs->consumed_filter->type(), entry_limit, &obj_pool_);
+        fs->consumed_filter->type(), entry_limit, &obj_pool_, filter_mem_tracker_);
     fs->in_list_filters.push_back(in_list_filter);
     total_in_list_filter_items_->Add(params.in_list_filter().value_size());
     details = Substitute(" with $0 items", params.in_list_filter().value_size());
@@ -442,7 +442,7 @@ InListFilter* RuntimeFilterBank::AllocateScratchInListFilter(
   DCHECK(query_state_->query_options().__isset.runtime_in_list_filter_entry_limit);
   int32_t entry_limit = query_state_->query_options().runtime_in_list_filter_entry_limit;
   InListFilter* in_list_filter =
-      InListFilter::Create(type, entry_limit, &obj_pool_);
+      InListFilter::Create(type, entry_limit, &obj_pool_, filter_mem_tracker_);
   fs->in_list_filters.push_back(in_list_filter);
   return in_list_filter;
 }

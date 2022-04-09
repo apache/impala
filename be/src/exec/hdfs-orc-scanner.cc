@@ -1423,31 +1423,8 @@ bool HdfsOrcScanner::UpdateSearchArgumentWithFilters(orc::SearchArgumentBuilder*
 
     VLOG_FILE << "Generating ORC IN-list for filter " << filter->id();
     std::vector<orc::Literal> in_list;
+    in_list_filter->ToOrcLiteralList(&in_list);
     const ColumnType& col_type = filter->type();
-    switch(col_type.type) {
-      case TYPE_TINYINT:
-      case TYPE_SMALLINT:
-      case TYPE_INT:
-      case TYPE_BIGINT: {
-        for (int64_t v : in_list_filter->values_) {
-          in_list.emplace_back(v);
-        }
-        break;
-      }
-      case TYPE_DATE: {
-        for (int64_t v : in_list_filter->values_) {
-          in_list.emplace_back(orc::PredicateDataType::DATE, v);
-        }
-        break;
-      }
-      case TYPE_STRING: {
-        for (const string& str : in_list_filter->str_values_) {
-          in_list.emplace_back(str.c_str(), str.length());
-        }
-        break;
-      }
-      default: break;
-    }
     if (in_list_filter->ContainsNull()) {
       // Add a null literal with type.
       in_list.emplace_back(GetOrcPredicateDataType(col_type));

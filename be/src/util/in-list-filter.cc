@@ -18,96 +18,64 @@
 #include "util/in-list-filter.h"
 
 #include "common/object-pool.h"
+#include "runtime/string-value.inline.h"
 
 namespace impala {
 
-bool InListFilter::AlwaysFalse() {
-  return !always_true_ && !contains_null_ && values_.empty() && str_values_.empty();
+InListFilter::InListFilter(uint32_t entry_limit, bool contains_null):
+  entry_limit_(entry_limit), always_true_(false), contains_null_(contains_null) {
 }
 
 bool InListFilter::AlwaysFalse(const InListFilterPB& filter) {
   return !filter.always_true() && !filter.contains_null() && filter.value_size() == 0;
 }
 
-bool InListFilter::Find(void* val, const ColumnType& col_type) const noexcept {
-  if (always_true_) return true;
-  if (val == nullptr) return contains_null_;
-  DCHECK_EQ(type_, col_type.type);
-  int64_t v;
-  const StringValue* s;
-  switch (col_type.type) {
+InListFilter* InListFilter::Create(ColumnType type, uint32_t entry_limit,
+    ObjectPool* pool, MemTracker* mem_tracker, bool contains_null) {
+  InListFilter* res;
+  switch (type.type) {
     case TYPE_TINYINT:
-      v = *reinterpret_cast<const int8_t*>(val);
+      res = new InListFilterImpl<int8_t, TYPE_TINYINT>(entry_limit, contains_null);
       break;
     case TYPE_SMALLINT:
-      v = *reinterpret_cast<const int16_t*>(val);
+      res = new InListFilterImpl<int16_t, TYPE_SMALLINT>(entry_limit, contains_null);
       break;
     case TYPE_INT:
-      v = *reinterpret_cast<const int32_t*>(val);
+      res = new InListFilterImpl<int32_t, TYPE_INT>(entry_limit, contains_null);
       break;
     case TYPE_BIGINT:
-      v = *reinterpret_cast<const int64_t*>(val);
+      res = new InListFilterImpl<int64_t, TYPE_BIGINT>(entry_limit, contains_null);
       break;
     case TYPE_DATE:
-      v = reinterpret_cast<const DateValue*>(val)->Value();
+      // We use int32_t for DATE type as well
+      res = new InListFilterImpl<int32_t, TYPE_DATE>(entry_limit, contains_null);
       break;
     case TYPE_STRING:
+      res = new InListFilterImpl<StringValue, TYPE_STRING>(type, entry_limit,
+          mem_tracker, contains_null);
+      break;
     case TYPE_VARCHAR:
-      s = reinterpret_cast<const StringValue*>(val);
-      return str_values_.find(string(s->ptr, s->len)) != str_values_.end();
+      res = new InListFilterImpl<StringValue, TYPE_VARCHAR>(type, entry_limit,
+          mem_tracker, contains_null);
+      break;
     case TYPE_CHAR:
-      return str_values_.find(string(reinterpret_cast<const char*>(val), col_type.len))
-          != str_values_.end();
+      res = new InListFilterImpl<StringValue, TYPE_CHAR>(type, entry_limit,
+          mem_tracker, contains_null);
+      break;
     default:
-      DCHECK(false) << "Not support IN-list filter type: " << TypeToString(type_);
-      return false;
+      DCHECK(false) << "Not support IN-list filter type: " << TypeToString(type.type);
+      return nullptr;
   }
-  return values_.find(v) != values_.end();
-}
-
-InListFilter::InListFilter(ColumnType type, uint32_t entry_limit, bool contains_null):
-  always_true_(false), contains_null_(contains_null), type_(type.type),
-  entry_limit_(entry_limit) {
-  if (type.type == TYPE_CHAR) type_len_ = type.len;
-}
-
-InListFilter* InListFilter::Create(ColumnType type, uint32_t entry_limit,
-    ObjectPool* pool) {
-  return pool->Add(new InListFilter(type, entry_limit));
+  return pool->Add(res);
 }
 
 InListFilter* InListFilter::Create(const InListFilterPB& protobuf, ColumnType type,
-    uint32_t entry_limit, ObjectPool* pool) {
-  InListFilter* filter = pool->Add(
-      new InListFilter(type, entry_limit, protobuf.contains_null()));
+    uint32_t entry_limit, ObjectPool* pool, MemTracker* mem_tracker) {
+  InListFilter* filter = InListFilter::Create(type, entry_limit, pool, mem_tracker,
+      protobuf.contains_null());
   filter->always_true_ = protobuf.always_true();
-  for (const ColumnValuePB& v : protobuf.value()) {
-    switch (type.type) {
-      case TYPE_TINYINT:
-      case TYPE_SMALLINT:
-      case TYPE_INT:
-      case TYPE_BIGINT:
-      case TYPE_DATE:
-        DCHECK(v.has_long_val());
-        filter->values_.insert(v.long_val());
-        break;
-      case TYPE_STRING:
-      case TYPE_CHAR:
-      case TYPE_VARCHAR:
-        DCHECK(v.has_string_val());
-        // TODO(IMPALA-11143): use mem_tracker
-        filter->str_values_.insert(v.string_val());
-        break;
-      default:
-        DCHECK(false) << "Not support IN-list filter type: " << TypeToString(type.type);
-        return nullptr;
-    }
-  }
-  if (type.IsStringType()) {
-    DCHECK(filter->values_.empty());
-  } else {
-    DCHECK(filter->str_values_.empty());
-  }
+  filter->InsertBatch(protobuf.value());
+  filter->MaterializeValues();
   return filter;
 }
 
@@ -120,59 +88,10 @@ void InListFilter::ToProtobuf(const InListFilter* filter, InListFilterPB* protob
   filter->ToProtobuf(protobuf);
 }
 
-void InListFilter::ToProtobuf(InListFilterPB* protobuf) const {
-  protobuf->set_always_true(always_true_);
-  if (always_true_) return;
-  protobuf->set_contains_null(contains_null_);
-  if (type_ == TYPE_STRING || type_ == TYPE_VARCHAR || type_ == TYPE_CHAR) {
-    for (const string& s : str_values_) {
-      ColumnValuePB* proto = protobuf->add_value();
-      proto->set_string_val(s);
-    }
-  } else {
-    for (int64_t v : values_) {
-      ColumnValuePB* proto = protobuf->add_value();
-      proto->set_long_val(v);
-    }
-  }
-}
-
-int InListFilter::NumItems() const noexcept {
-  int res = contains_null_ ? 1 : 0;
-  if (type_ == TYPE_STRING || type_ == TYPE_VARCHAR || type_ == TYPE_CHAR) {
-    return res + str_values_.size();
-  }
-  return res + values_.size();
-}
-
 string InListFilter::DebugString() const noexcept {
   std::stringstream ss;
-  bool first_value = true;
-  ss << "IN-list filter: [";
-  if (type_ == TYPE_STRING) {
-    for (const string &s : str_values_) {
-      if (first_value) {
-        first_value = false;
-      } else {
-        ss << ',';
-      }
-      ss << "\"" << s << "\"";
-    }
-  } else {
-    for (int64_t v : values_) {
-      if (first_value) {
-        first_value = false;
-      } else {
-        ss << ',';
-      }
-      ss << v;
-    }
-  }
-  if (contains_null_) {
-    if (!first_value) ss << ',';
-    ss << "NULL";
-  }
-  ss << ']';
+  ss << "IN-list filter of " << total_entries_ << " items";
+  if (contains_null_) ss << " with NULL";
   return ss.str();
 }
 
@@ -192,22 +111,115 @@ string InListFilter::DebugStringOfList(const InListFilterPB& filter) {
     } else {
       ss << ',';
     }
-    if (v.has_byte_val()) {
-      ss << v.byte_val();
-    } else if (v.has_short_val()) {
-      ss << v.short_val();
-    } else if (v.has_int_val()) {
-      ss << v.int_val();
-    } else if (v.has_long_val()) {
-      ss << v.long_val();
-    } else if (v.has_date_val()) {
-      ss << v.date_val();
-    } else if (v.has_string_val()) {
-      ss << "\"" << v.string_val() << "\"";
-    }
+    ss << v.ShortDebugString();
   }
   ss << ']';
   return ss.str();
 }
+
+template<PrimitiveType SLOT_TYPE>
+void InListFilterImpl<StringValue, SLOT_TYPE>::MaterializeValues() {
+  if (newly_inserted_values_.total_len == 0) {
+    if (!newly_inserted_values_.values.empty()) {
+      // Newly inserted values are all empty strings. Don't need to allocate memory.
+      values_.values.insert(
+          newly_inserted_values_.values.begin(), newly_inserted_values_.values.end());
+    }
+    return;
+  }
+  uint8_t* buffer = mem_pool_.Allocate(newly_inserted_values_.total_len);
+  if (buffer == nullptr) {
+    VLOG_QUERY << "Not enough memory in materializing string IN-list filters. "
+        << "Fallback to always true. New string batch size: "
+        << newly_inserted_values_.total_len << "\n" << mem_pool_.DebugString();
+    always_true_ = true;
+    values_.clear();
+    newly_inserted_values_.clear();
+    total_entries_ = 0;
+    return;
+  }
+  // Transfer values to the finial set. Don't need to update total_entries_ since it's
+  // already done in Insert().
+  for (const StringValue& s : newly_inserted_values_.values) {
+    Ubsan::MemCpy(buffer, s.ptr, s.len);
+    values_.insert(StringValue(reinterpret_cast<char*>(buffer), s.len));
+    buffer += s.len;
+  }
+  newly_inserted_values_.clear();
+}
+
+#define IN_LIST_FILTER_INSERT_BATCH(TYPE, SLOT_TYPE, PB_VAL_METHOD)                      \
+  template<>                                                                             \
+  void InListFilterImpl<TYPE, SLOT_TYPE>::InsertBatch(const ColumnValueBatchPB& batch) { \
+    for (const ColumnValuePB& v : batch) {                                               \
+      DCHECK(v.has_##PB_VAL_METHOD());                                                   \
+      values_.insert(v.PB_VAL_METHOD());                                                 \
+    }                                                                                    \
+  }
+
+IN_LIST_FILTER_INSERT_BATCH(int8_t, TYPE_TINYINT, byte_val)
+IN_LIST_FILTER_INSERT_BATCH(int16_t, TYPE_SMALLINT, short_val)
+IN_LIST_FILTER_INSERT_BATCH(int32_t, TYPE_INT, int_val)
+IN_LIST_FILTER_INSERT_BATCH(int64_t, TYPE_BIGINT, long_val)
+IN_LIST_FILTER_INSERT_BATCH(int32_t, TYPE_DATE, int_val)
+IN_LIST_FILTER_INSERT_BATCH(StringValue, TYPE_STRING, string_val)
+IN_LIST_FILTER_INSERT_BATCH(StringValue, TYPE_VARCHAR, string_val)
+IN_LIST_FILTER_INSERT_BATCH(StringValue, TYPE_CHAR, string_val)
+
+#define NUMERIC_IN_LIST_FILTER_TO_PROTOBUF(TYPE, SLOT_TYPE, PB_VAL_METHOD)             \
+  template<>                                                                           \
+  void InListFilterImpl<TYPE, SLOT_TYPE>::ToProtobuf(InListFilterPB* protobuf) const { \
+    protobuf->set_always_true(always_true_);                                           \
+    if (always_true_) return;                                                          \
+    protobuf->set_contains_null(contains_null_);                                       \
+    for (TYPE v : values_) {                                                           \
+      ColumnValuePB* proto = protobuf->add_value();                                    \
+      proto->set_##PB_VAL_METHOD(v);                                                   \
+    }                                                                                  \
+  }
+
+NUMERIC_IN_LIST_FILTER_TO_PROTOBUF(int8_t, TYPE_TINYINT, byte_val)
+NUMERIC_IN_LIST_FILTER_TO_PROTOBUF(int16_t, TYPE_SMALLINT, short_val)
+NUMERIC_IN_LIST_FILTER_TO_PROTOBUF(int32_t, TYPE_INT, int_val)
+NUMERIC_IN_LIST_FILTER_TO_PROTOBUF(int64_t, TYPE_BIGINT, long_val)
+NUMERIC_IN_LIST_FILTER_TO_PROTOBUF(int32_t, TYPE_DATE, long_val)
+
+#define STRING_IN_LIST_FILTER_TO_PROTOBUF(SLOT_TYPE)                                   \
+  template<>                                                                           \
+  void InListFilterImpl<StringValue, SLOT_TYPE>::ToProtobuf(InListFilterPB* protobuf)  \
+      const {                                                                          \
+    protobuf->set_always_true(always_true_);                                           \
+    if (always_true_) return;                                                          \
+    protobuf->set_contains_null(contains_null_);                                       \
+    for (const StringValue& v : values_.values) {                                      \
+      ColumnValuePB* proto = protobuf->add_value();                                    \
+      proto->set_string_val(v.ptr, v.len);                                             \
+    }                                                                                  \
+  }
+
+STRING_IN_LIST_FILTER_TO_PROTOBUF(TYPE_STRING)
+STRING_IN_LIST_FILTER_TO_PROTOBUF(TYPE_VARCHAR)
+STRING_IN_LIST_FILTER_TO_PROTOBUF(TYPE_CHAR)
+
+template<>
+void InListFilterImpl<int32_t, TYPE_DATE>::ToOrcLiteralList(
+    vector<orc::Literal>* in_list) {
+  for (int32_t v : values_) {
+    in_list->emplace_back(orc::PredicateDataType::DATE, v);
+  }
+}
+
+#define STRING_IN_LIST_FILTER_TO_ORC_LITERAL_LIST(SLOT_TYPE)            \
+  template<>                                                            \
+  void InListFilterImpl<StringValue, SLOT_TYPE>::ToOrcLiteralList(      \
+      vector<orc::Literal>* in_list) {                                  \
+    for (const StringValue& s : values_.values) {                       \
+      in_list->emplace_back(s.ptr, s.len);                              \
+    }                                                                   \
+  }
+
+STRING_IN_LIST_FILTER_TO_ORC_LITERAL_LIST(TYPE_STRING)
+STRING_IN_LIST_FILTER_TO_ORC_LITERAL_LIST(TYPE_VARCHAR)
+STRING_IN_LIST_FILTER_TO_ORC_LITERAL_LIST(TYPE_CHAR)
 
 } // namespace impala

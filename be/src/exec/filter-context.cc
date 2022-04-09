@@ -127,6 +127,8 @@ void FilterContext::InsertPerCompareOp(TupleRow* row) const noexcept {
 void FilterContext::MaterializeValues() const {
   if (filter->is_min_max_filter() && local_min_max_filter != nullptr) {
     local_min_max_filter->MaterializeValues();
+  } else if (filter->is_in_list_filter() && local_in_list_filter != nullptr) {
+    local_in_list_filter->MaterializeValues();
   }
 }
 
@@ -388,6 +390,8 @@ Status FilterContext::CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_exp
   llvm::Value* row_arg = args[1];
 
   llvm::Value* local_filter_arg;
+  // The function for inserting into the in-list filter.
+  llvm::Function* insert_in_list_filter_fn = nullptr;
   if (filter_desc.type == TRuntimeFilterType::BLOOM) {
     // Load 'local_bloom_filter' from 'this_arg' FilterContext object.
     llvm::Value* local_bloom_filter_ptr =
@@ -410,6 +414,51 @@ Status FilterContext::CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_exp
     // Load 'local_in_list_filter' from 'this_arg' FilterContext object.
     llvm::Value* local_in_list_filter_ptr =
         builder.CreateStructGEP(nullptr, this_arg, 5, "local_in_list_filter_ptr");
+    switch (filter_expr->type().type) {
+      case TYPE_TINYINT:
+        insert_in_list_filter_fn = codegen->GetFunction(
+            IRFunction::TINYINT_IN_LIST_FILTER_INSERT, false);
+        break;
+      case TYPE_SMALLINT:
+        insert_in_list_filter_fn = codegen->GetFunction(
+            IRFunction::SMALLINT_IN_LIST_FILTER_INSERT, false);
+        break;
+      case TYPE_INT:
+        insert_in_list_filter_fn = codegen->GetFunction(
+            IRFunction::INT_IN_LIST_FILTER_INSERT, false);
+        break;
+      case TYPE_BIGINT:
+        insert_in_list_filter_fn = codegen->GetFunction(
+            IRFunction::BIGINT_IN_LIST_FILTER_INSERT, false);
+        break;
+      case TYPE_DATE:
+        insert_in_list_filter_fn = codegen->GetFunction(
+            IRFunction::DATE_IN_LIST_FILTER_INSERT, false);
+        break;
+      case TYPE_STRING:
+        insert_in_list_filter_fn = codegen->GetFunction(
+            IRFunction::STRING_IN_LIST_FILTER_INSERT, false);
+        break;
+      case TYPE_CHAR:
+        insert_in_list_filter_fn = codegen->GetFunction(
+            IRFunction::CHAR_IN_LIST_FILTER_INSERT, false);
+        break;
+      case TYPE_VARCHAR:
+        insert_in_list_filter_fn = codegen->GetFunction(
+            IRFunction::VARCHAR_IN_LIST_FILTER_INSERT, false);
+        break;
+      default:
+        DCHECK(false);
+        break;
+    }
+    // Get type of the InListFilterImpl class from the first arg of the Insert() method.
+    // We can't hardcode the class name since it's a template class. The class name will
+    // be something like "class.impala::InListFilterImpl.1408". The last number is a
+    // unique id appended by LLVM at runtime.
+    llvm::Type* filter_impl_type = insert_in_list_filter_fn->arg_begin()->getType();
+    llvm::PointerType* in_list_filter_type = codegen->GetPtrType(filter_impl_type);
+    local_in_list_filter_ptr = builder.CreatePointerCast(
+        local_in_list_filter_ptr, in_list_filter_type, "cast_in_list_filter_ptr");
     local_filter_arg =
         builder.CreateLoad(local_in_list_filter_ptr, "local_in_list_filter_arg");
   }
@@ -534,11 +583,7 @@ Status FilterContext::CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_exp
     builder.CreateCall(min_max_insert_fn, insert_filter_args);
   } else {
     DCHECK(filter_desc.type == TRuntimeFilterType::IN_LIST);
-    // The function for inserting into the in-list filter.
-    llvm::Function* insert_in_list_filter_fn =
-        codegen->GetFunction(IRFunction::IN_LIST_FILTER_INSERT, false);
     DCHECK(insert_in_list_filter_fn != nullptr);
-
     llvm::Value* insert_filter_args[] = {local_filter_arg, val_ptr_phi};
     builder.CreateCall(insert_in_list_filter_fn, insert_filter_args);
   }
