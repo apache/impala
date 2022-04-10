@@ -90,15 +90,14 @@ suspend=n,address=30010"
 if [[ $ENABLE_RANGER_AUTH -eq 1 ]]; then
   export HIVE_CONF_DIR="$HADOOP_CONF_DIR/hive-site-ranger-auth/"
   for f in "$RANGER_HOME"/ews/webapp/WEB-INF/classes/ranger-plugins/hive/ranger-*.jar \
-      "$RANGER_HOME"/ews/webapp/WEB-INF/lib/*.jar \
+      "$RANGER_HOME"/ews/webapp/WEB-INF/lib/ranger-*.jar \
       "$RANGER_HOME"/ews/lib/ranger-*.jar; do
     FILE_NAME=$(basename $f)
-    # Exclude unneccessary jars.
-    if [[ ! $FILE_NAME == hive* && ! $FILE_NAME == hadoop* && ! $FILE_NAME == hbase* \
-        && ! $FILE_NAME == zookeeper* ]]; then
-      export HADOOP_CLASSPATH=${HADOOP_CLASSPATH}:${f}
-    fi
+    export HADOOP_CLASSPATH=${HADOOP_CLASSPATH}:${f}
   done
+  # The following jar is needed by RangerRESTUtils.java.
+  export HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:\
+      ${RANGER_HOME}/ews/webapp/WEB-INF/lib/gethostname4j-*.jar"
 fi
 
 # For Hive 3, we use Tez for execution. We have to add it to the classpath.
