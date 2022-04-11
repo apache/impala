@@ -26,9 +26,11 @@ import java.util.ListIterator;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.iceberg.DataFile;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.expressions.Expression.Operation;
 import org.apache.iceberg.expressions.UnboundPredicate;
+import org.apache.iceberg.types.Types;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BoolLiteral;
@@ -46,16 +48,19 @@ import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.util.IcebergUtil;
+import org.apache.impala.util.ExprUtil;
 
 import com.google.common.base.Preconditions;
-import org.apache.impala.util.ExprUtil;
+
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -205,7 +210,9 @@ public class IcebergScanNode extends HdfsScanNode {
     // If predicate contains map/struct, this column would be null
     if (ref.getDesc().getColumn() == null) return false;
 
-    String colName = ref.getDesc().getColumn().getName();
+    IcebergColumn iceCol = (IcebergColumn)ref.getDesc().getColumn();
+    Schema iceSchema = icebergTable_.getIcebergSchema();
+    String colName = iceCol.getName();
     UnboundPredicate unboundPredicate = null;
     switch (literal.getType().getPrimitiveType()) {
       case BOOLEAN: {
@@ -243,9 +250,26 @@ public class IcebergScanNode extends HdfsScanNode {
         break;
       }
       case TIMESTAMP: {
-        // TODO(IMPALA-10850): interpret timestamps in local timezone.
-        long unixMicros = ExprUtil.utcTimestampToUnixTimeMicros(analyzer, literal);
-        unboundPredicate = Expressions.predicate(op, colName, unixMicros);
+        try {
+          org.apache.iceberg.types.Type iceType = iceSchema.findType(iceCol.getFieldId());
+          Preconditions.checkState(iceType instanceof Types.TimestampType);
+          Types.TimestampType tsType = (Types.TimestampType)iceType;
+          long unixMicros = 0;
+          if (tsType.shouldAdjustToUTC()) {
+            unixMicros = ExprUtil.localTimestampToUnixTimeMicros(analyzer, literal);
+          } else {
+            unixMicros = ExprUtil.utcTimestampToUnixTimeMicros(analyzer, literal);
+          }
+          unboundPredicate = Expressions.predicate(op, colName, unixMicros);
+        } catch (InternalException ex) {
+          // We cannot interpret the timestamp literal. Maybe the timestamp is invalid,
+          // or the local timestamp ambigously converts to UTC due to daylight saving
+          // time backward turn. E.g. '2021-10-31 02:15:00 Europe/Budapest' converts to
+          // either '2021-10-31 00:15:00 UTC' or '2021-10-31 01:15:00 UTC'.
+          LOG.warn("Exception occurred during timestamp conversion: " + ex.toString() +
+              "\nThis means timestamp predicate is not pushed to Iceberg, let Impala " +
+              "backend handle it.");
+        }
         break;
       }
       case DATE: {

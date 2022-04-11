@@ -521,3 +521,638 @@ SELECT * FROM iceberg_uppercase_col;
 ---- TYPES
 STRING
 ====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamptz_part
+order by i;
+---- RESULTS
+-2,1969-01-01 00:00:00
+-1,1969-01-01 00:15:00
+0,2021-10-31 00:15:00
+1,2021-10-31 01:15:00
+2,2021-01-10 11:00:00
+3,2022-04-10 22:04:00
+4,2022-04-11 10:04:55
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamptz_part
+order by i;
+---- RESULTS
+-2,1969-01-01 01:00:00
+-1,1969-01-01 01:15:00
+0,2021-10-31 02:15:00
+1,2021-10-31 02:15:00
+2,2021-01-10 12:00:00
+3,2022-04-11 00:04:00
+4,2022-04-11 12:04:55
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts = '1969-01-01 00:00:00';
+---- RESULTS
+-2,1969-01-01 00:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts = '1969-01-01 00:15:00';
+---- RESULTS
+-1,1969-01-01 00:15:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts = '2021-10-31 00:15:00';
+---- RESULTS
+0,2021-10-31 00:15:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts = '2021-10-31 01:15:00';
+---- RESULTS
+1,2021-10-31 01:15:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts = '2021-01-10 11:00:00';
+---- RESULTS
+2,2021-01-10 11:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts = '2022-04-10 22:04:00';
+---- RESULTS
+3,2022-04-10 22:04:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts = '2022-04-11 10:04:55';
+---- RESULTS
+4,2022-04-11 10:04:55
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts < '2021-10-31 01:15:00'
+order by i;
+---- RESULTS
+-2,1969-01-01 00:00:00
+-1,1969-01-01 00:15:00
+0,2021-10-31 00:15:00
+2,2021-01-10 11:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts > '1969-01-01 00:00:00'
+order by i;
+---- RESULTS
+-1,1969-01-01 00:15:00
+0,2021-10-31 00:15:00
+1,2021-10-31 01:15:00
+2,2021-01-10 11:00:00
+3,2022-04-10 22:04:00
+4,2022-04-11 10:04:55
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 6
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts > '1969-01-01 00:15:00' and  ts < '2021-10-31 01:15:00'
+order by i;
+---- RESULTS
+0,2021-10-31 00:15:00
+2,2021-01-10 11:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts >= '1969-01-01 00:15:00' and  ts <= '2021-10-31 01:15:00'
+order by i;
+---- RESULTS
+-1,1969-01-01 00:15:00
+0,2021-10-31 00:15:00
+1,2021-10-31 01:15:00
+2,2021-01-10 11:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts between '1969-01-01 00:15:00' and '2021-10-31 01:15:00'
+order by i;
+---- RESULTS
+-1,1969-01-01 00:15:00
+0,2021-10-31 00:15:00
+1,2021-10-31 01:15:00
+2,2021-01-10 11:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts = '1969-01-01 01:00:00';
+---- RESULTS
+-2,1969-01-01 01:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts = '1969-01-01 01:15:00';
+---- RESULTS
+-1,1969-01-01 01:15:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Query ambigous timestamp. '2021-10-31 02:15:00' converts
+# to '2021-10-31 00:15:00 UTC' and '2021-10-31 01:15:00 UTC' due to DST.
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts = '2021-10-31 02:15:00';
+---- RESULTS
+0,2021-10-31 02:15:00
+1,2021-10-31 02:15:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 6
+aggregation(SUM, NumStatsFilteredRowGroups): 4
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts = '2021-01-10 12:00:00';
+---- RESULTS
+2,2021-01-10 12:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts = '2022-04-11 00:04:00';
+---- RESULTS
+3,2022-04-11 00:04:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts = '2022-04-11 12:04:55';
+---- RESULTS
+4,2022-04-11 12:04:55
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamp_part
+order by i;
+---- RESULTS
+-2,1969-01-01 01:00:00
+-1,1969-01-01 01:15:00
+1,2021-10-31 02:15:00
+2,2021-01-10 12:00:00
+3,2022-04-11 00:04:00
+4,2022-04-11 12:04:55
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamp_part
+order by i;
+---- RESULTS
+-2,1969-01-01 01:00:00
+-1,1969-01-01 01:15:00
+1,2021-10-31 02:15:00
+2,2021-01-10 12:00:00
+3,2022-04-11 00:04:00
+4,2022-04-11 12:04:55
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts < '2021-10-31 02:15:00'
+order by i;
+---- RESULTS
+-2,1969-01-01 01:00:00
+-1,1969-01-01 01:15:00
+2,2021-01-10 12:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 6
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts > '1969-01-01 01:00:00'
+order by i;
+---- RESULTS
+-1,1969-01-01 01:15:00
+0,2021-10-31 02:15:00
+1,2021-10-31 02:15:00
+2,2021-01-10 12:00:00
+3,2022-04-11 00:04:00
+4,2022-04-11 12:04:55
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 6
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts > '1969-01-01 00:15:00' and  ts < '2021-10-31 02:15:00'
+order by i;
+---- RESULTS
+-2,1969-01-01 01:00:00
+-1,1969-01-01 01:15:00
+2,2021-01-10 12:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 6
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts >= '1969-01-01 00:15:00' and  ts <= '2021-10-31 02:15:00'
+order by i;
+---- RESULTS
+-2,1969-01-01 01:00:00
+-1,1969-01-01 01:15:00
+0,2021-10-31 02:15:00
+1,2021-10-31 02:15:00
+2,2021-01-10 12:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 6
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamptz_part
+WHERE ts between '1969-01-01 00:15:00' and '2021-10-31 02:15:00'
+order by i;
+---- RESULTS
+-2,1969-01-01 01:00:00
+-1,1969-01-01 01:15:00
+0,2021-10-31 02:15:00
+1,2021-10-31 02:15:00
+2,2021-01-10 12:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 6
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts = '1969-01-01 01:00:00';
+---- RESULTS
+-2,1969-01-01 01:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts = '1969-01-01 01:15:00';
+---- RESULTS
+-1,1969-01-01 01:15:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts = '2021-10-31 02:15:00';
+---- RESULTS
+1,2021-10-31 02:15:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts = '2021-01-10 12:00:00';
+---- RESULTS
+2,2021-01-10 12:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts = '2022-04-11 00:04:00';
+---- RESULTS
+3,2022-04-11 00:04:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts = '2022-04-11 12:04:55';
+---- RESULTS
+4,2022-04-11 12:04:55
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts < '2021-10-31 02:15:00'
+order by i;
+---- RESULTS
+-2,1969-01-01 01:00:00
+-1,1969-01-01 01:15:00
+2,2021-01-10 12:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts > '1969-01-01 01:00:00'
+order by i;
+---- RESULTS
+-1,1969-01-01 01:15:00
+1,2021-10-31 02:15:00
+2,2021-01-10 12:00:00
+3,2022-04-11 00:04:00
+4,2022-04-11 12:04:55
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 5
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts > '1969-01-01 00:15:00' and  ts < '2021-10-31 01:15:00'
+order by i;
+---- RESULTS
+-2,1969-01-01 01:00:00
+-1,1969-01-01 01:15:00
+2,2021-01-10 12:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts >= '1969-01-01 00:15:00' and  ts <= '2021-10-31 01:15:00'
+order by i;
+---- RESULTS
+-2,1969-01-01 01:00:00
+-1,1969-01-01 01:15:00
+2,2021-01-10 12:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+SET TIMEZONE='UTC';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts between '1969-01-01 00:15:00' and '2021-10-31 01:15:00'
+order by i;
+---- RESULTS
+-2,1969-01-01 01:00:00
+-1,1969-01-01 01:15:00
+2,2021-01-10 12:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts = '1969-01-01 01:00:00';
+---- RESULTS
+-2,1969-01-01 01:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts = '1969-01-01 01:15:00';
+---- RESULTS
+-1,1969-01-01 01:15:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts = '2021-10-31 02:15:00';
+---- RESULTS
+1,2021-10-31 02:15:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts = '2021-01-10 12:00:00';
+---- RESULTS
+2,2021-01-10 12:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts = '2022-04-11 00:04:00';
+---- RESULTS
+3,2022-04-11 00:04:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts = '2022-04-11 12:04:55';
+---- RESULTS
+4,2022-04-11 12:04:55
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts < '2021-10-31 02:15:00'
+order by i;
+---- RESULTS
+-2,1969-01-01 01:00:00
+-1,1969-01-01 01:15:00
+2,2021-01-10 12:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts > '1969-01-01 01:00:00'
+order by i;
+---- RESULTS
+-1,1969-01-01 01:15:00
+1,2021-10-31 02:15:00
+2,2021-01-10 12:00:00
+3,2022-04-11 00:04:00
+4,2022-04-11 12:04:55
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 5
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts > '1969-01-01 00:15:00' and  ts < '2021-10-31 02:15:00'
+order by i;
+---- RESULTS
+-2,1969-01-01 01:00:00
+-1,1969-01-01 01:15:00
+2,2021-01-10 12:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts >= '1969-01-01 00:15:00' and  ts <= '2021-10-31 02:15:00'
+order by i;
+---- RESULTS
+-2,1969-01-01 01:00:00
+-1,1969-01-01 01:15:00
+1,2021-10-31 02:15:00
+2,2021-01-10 12:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+SELECT * FROM iceberg_timestamp_part
+WHERE ts between '1969-01-01 00:15:00' and '2021-10-31 02:15:00'
+order by i;
+---- RESULTS
+-2,1969-01-01 01:00:00
+-1,1969-01-01 01:15:00
+1,2021-10-31 02:15:00
+2,2021-01-10 12:00:00
+---- TYPES
+INT, TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====

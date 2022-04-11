@@ -559,7 +559,6 @@ public class KuduScanNode extends ScanNode {
       case TIMESTAMP: {
         try {
           // TODO: Simplify when Impala supports a 64-bit TIMESTAMP type.
-          // TODO(IMPALA-10850): interpret timestamps in local timezone.
           kuduPredicate = KuduPredicate.newComparisonPredicate(column, op,
               ExprUtil.utcTimestampToUnixTimeMicros(analyzer, literal));
         } catch (Exception e) {
