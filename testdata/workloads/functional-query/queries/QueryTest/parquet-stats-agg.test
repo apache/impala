@@ -168,7 +168,6 @@ select count(*) from tpch_parquet.lineitem
 bigint
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
-aggregation(SUM, NumFileMetadataRead): 6
 aggregation(SUM, RowsRead): 0
 =====
 ---- QUERY
