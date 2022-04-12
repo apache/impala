@@ -46,13 +46,11 @@ class OrcComplexColumnReader;
 ///   * 'ProcessFileTail' to create orc::Reader with OrcMemPool and ScanRangeInputStream
 ///   * Resolve TupleDescriptors to get a list of mapped orc::Types (a.k.a column/node).
 ///     Init 'row_reader_options_' with these selected type ids.
-///   * Build a map 'col_id_path_map_' from each orc::Type id to a SchemaPath. Will be
-///     used in creating OrcColumnReaders.
 ///   * Create temporary orc::RowReader with 'row_reader_options_' to get the selected
 ///     subset of the schema (a tree of the selected orc::Types, i.e. the local variable
 ///     'root_type' in 'HdfsOrcScanner::Open').
-///   * Create OrcColumnReaders recursively with 'root_type', 'col_id_path_map_' and
-///     TupleDescriptors (HdfsOrcScanner::Open)
+///   * Create OrcColumnReaders recursively with 'root_type' and TupleDescriptors
+///     (HdfsOrcScanner::Open)
 ///   * At the begining of processing a Stripe, we update 'row_reader_options_' to have
 ///     the range of the Stripe boundaries. Then create a orc::RowReader for this Stripe
 ///     (HdfsOrcScanner::NextStripe)

@@ -69,7 +69,7 @@ class OrcColumnReader {
  public:
   /// Create a column reader for the given 'slot_desc' based on the ORC 'node'. We say
   /// the 'slot_desc' and ORC 'node' match iff
-  ///     scanner->col_id_path_map_[node->getColumnId()] == slot_desc->col_path
+  ///     scanner->slot_to_col_id_[slot_desc] == node->getColumnId()
   /// Caller should guarantee that 'slot_desc' matches to ORC 'node' or one of its
   /// descendants. If 'node' is a primitive type, 'slot_desc' should match it since
   /// primitive types don't have descendants.

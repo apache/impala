@@ -130,6 +130,7 @@ select sub.id, sub.outer_struct from sub order by sub.id desc;
 1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
 ---- TYPES
 INT,STRING
+====
 ---- QUERY
 # Checks that "SELECT nested_struct.* ..." omits the nested structs from the output.
 select id, outer_struct.* from functional_orc_def.complextypes_nested_structs;
@@ -138,6 +139,32 @@ select id, outer_struct.* from functional_orc_def.complextypes_nested_structs;
 2,'str'
 3,'NULL'
 4,''
+5,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# IMPALA-10839: Display nulls at the correct level.
+select id, outer_struct.inner_struct3 from
+functional_orc_def.complextypes_nested_structs;
+---- RESULTS
+1,'{"s":{"i":112288,"s":null}}'
+2,'{"s":{"i":321,"s":"dfgs"}}'
+3,'NULL'
+4,'{"s":null}'
+5,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# IMPALA-10839: Display nulls at the correct level.
+select id, outer_struct.inner_struct3.s from
+functional_orc_def.complextypes_nested_structs;
+---- RESULTS
+1,'{"i":112288,"s":null}'
+2,'{"i":321,"s":"dfgs"}'
+3,'NULL'
+4,'NULL'
 5,'NULL'
 ---- TYPES
 INT,STRING

@@ -48,12 +48,20 @@ OrcColumnReader* OrcColumnReader::Create(const orc::Type* node,
   DCHECK(slot_desc != nullptr);
   OrcColumnReader* reader = nullptr;
   if (node->getKind() == orc::TypeKind::STRUCT) {
-    if (slot_desc->type().IsStructType() &&
-        slot_desc->children_tuple_descriptor() != nullptr) {
-      // This is the case where we should materialize the struct and its children.
+    DCHECK_EQ(scanner->slot_to_col_id_.count(slot_desc), 1);
+    const bool node_matches_slot_desc =
+        scanner->slot_to_col_id_[slot_desc] == node->getColumnId();
+    if (node_matches_slot_desc && slot_desc->type().IsStructType()) {
+      // 'node' corresponds to 'slot_desc' and 'slot_desc' refers to a struct: this is the
+      // case where we should materialize the struct and its children.
+      // Note: 'node' could also correspond to 'slot_desc' if 'slot_desc' refers to an
+      // array.
+      DCHECK(slot_desc->children_tuple_descriptor() != nullptr);
       reader = new OrcStructReader(node, slot_desc,
           slot_desc->children_tuple_descriptor(), scanner);
     } else {
+      // A descendant of 'node' corresponds to 'slot_desc'. The struct referenced by
+      // 'node' will not be materialised.
       reader = new OrcStructReader(node, slot_desc, scanner);
     }
   } else if (node->getKind() == orc::TypeKind::LIST) {
