@@ -22,13 +22,13 @@
   <parent>
     <groupId>org.apache.impala</groupId>
     <artifactId>impala-parent</artifactId>
-    <version>0.1-SNAPSHOT</version>
+    <version>3.4.2-RELEASE</version>
     <relativePath>../../impala-parent/pom.xml</relativePath>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.impala</groupId>
   <artifactId>yarn-extras</artifactId>
-  <version>0.1-SNAPSHOT</version>
+  <version>3.4.2-RELEASE</version>
   <name>YARN Extras</name>
   <description>Extra Hadoop classes from YARN needed by Impala</description>
   <packaging>jar</packaging>

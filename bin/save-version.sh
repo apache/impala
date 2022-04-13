@@ -21,7 +21,7 @@
 # Note: for internal (aka pre-release) versions, the version should have
 # "-INTERNAL" appended. Parts of the code will look for this to distinguish
 # between released and internal versions.
-VERSION=3.4.1-RELEASE
+VERSION=${IMPALA_VERSION}
 GIT_HASH=eb1ed66fa435a722fa8c6a7c58ff53edc10c572e
 if [ -z $GIT_HASH ]
 then

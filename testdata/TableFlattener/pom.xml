@@ -22,14 +22,14 @@
   <parent>
     <groupId>org.apache.impala</groupId>
     <artifactId>impala-parent</artifactId>
-    <version>0.1-SNAPSHOT</version>
+    <version>3.4.2-RELEASE</version>
     <relativePath>../../impala-parent/pom.xml</relativePath>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.impala</groupId>
   <artifactId>nested-table-flattener</artifactId>
   <name>Impala Nested Table Flattener</name>
-  <version>1.0-SNAPSHOT</version>
+  <version>3.4.2-RELEASE</version>
   <packaging>jar</packaging>
 
   <build>

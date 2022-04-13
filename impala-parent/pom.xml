@@ -21,7 +21,7 @@ under the License.
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.impala</groupId>
   <artifactId>impala-parent</artifactId>
-  <version>0.1-SNAPSHOT</version>
+  <version>3.4.2-RELEASE</version>
   <packaging>pom</packaging>
   <name>Apache Impala Parent POM</name>
 
@@ -45,8 +45,8 @@ under the License.
     <kite.version>${env.IMPALA_KITE_VERSION}</kite.version>
     <knox.version>${env.IMPALA_KNOX_VERSION}</knox.version>
     <thrift.version>0.9.3-1</thrift.version>
-    <impala.extdatasrc.api.version>1.0-SNAPSHOT</impala.extdatasrc.api.version>
-    <impala.query.event.hook.api.version>1.0-SNAPSHOT</impala.query.event.hook.api.version>
+    <impala.extdatasrc.api.version>${project.version}</impala.extdatasrc.api.version>
+    <impala.query.event.hook.api.version>${project.version}</impala.query.event.hook.api.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <kudu.version>${env.IMPALA_KUDU_JAVA_VERSION}</kudu.version>
     <commons-io.version>2.6</commons-io.version>

@@ -23,18 +23,18 @@
   <parent>
     <groupId>org.apache.impala</groupId>
     <artifactId>impala-data-source</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>3.4.2-RELEASE</version>
   </parent>
   <groupId>org.apache.impala</groupId>
   <artifactId>impala-data-source-test</artifactId>
-  <version>0.1-SNAPSHOT</version>
+  <version>3.4.2-RELEASE</version>
   <name>Apache Impala External Data Source Test Library</name>
   <description>Test External Data Source</description>
   <packaging>jar</packaging>
   <url>.</url>
 
   <properties>
-    <impala.extdatasrc.api.version>1.0-SNAPSHOT</impala.extdatasrc.api.version>
+    <impala.extdatasrc.api.version>${project.version}</impala.extdatasrc.api.version>
   </properties>
 
   <dependencies>

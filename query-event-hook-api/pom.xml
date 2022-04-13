@@ -22,14 +22,14 @@
   <parent>
     <groupId>org.apache.impala</groupId>
     <artifactId>impala-parent</artifactId>
-    <version>0.1-SNAPSHOT</version>
+    <version>3.4.2-RELEASE</version>
     <relativePath>../impala-parent/pom.xml</relativePath>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.impala</groupId>
   <artifactId>query-event-hook-api</artifactId>
   <name>Apache Impala Query Event Hook API</name>
-  <version>1.0-SNAPSHOT</version>
+  <version>3.4.2-RELEASE</version>
   <packaging>jar</packaging>
   <url>.</url>
 
