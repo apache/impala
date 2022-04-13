@@ -107,6 +107,10 @@ if [[ $# == 1 && $1 == "--dryrun" ]]; then
   echo $DESCRIPTION
 else
   # Note: this command modifies files in the git checkout
+  pushd bin
+  sed "s#export IMPALA_VERSION=.*#export IMPALA_VERSION=${NEW_MAVEN_VERSION}#g"\
+      -i impala-config.sh
+  popd
   pushd java
   mvn versions:set -DnewVersion=${NEW_MAVEN_VERSION}
   popd
