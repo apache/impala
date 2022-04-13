@@ -64,6 +64,38 @@ class AggregateFunctions {
   static StringVal StringValSerializeOrFinalize(
       FunctionContext* ctx, const StringVal& src);
 
+  /// Implementation of Corr()
+  static void CorrInit(FunctionContext* ctx, StringVal* dst);
+  static void CorrUpdate(FunctionContext* ctx, const DoubleVal& src1,
+      const DoubleVal& src2, StringVal* dst);
+  static void CorrRemove(FunctionContext* ctx, const DoubleVal& src1,
+      const DoubleVal& src2, StringVal* dst);
+  static void TimestampCorrUpdate(FunctionContext* ctx,
+      const TimestampVal& src1, const TimestampVal& src2, StringVal* dst);
+  static void TimestampCorrRemove(FunctionContext* ctx,
+      const TimestampVal& src1, const TimestampVal& src2, StringVal* dst);
+  static void CorrMerge(FunctionContext* ctx, const StringVal& src, StringVal* dst);
+  static DoubleVal CorrGetValue(FunctionContext* ctx, const StringVal& src);
+  static DoubleVal CorrFinalize(FunctionContext* ctx, const StringVal& src);
+
+  /// Implementation of Covar_samp() and Covar_pop()
+  static void CovarInit(FunctionContext* ctx, StringVal* dst);
+  static void CovarUpdate(FunctionContext* ctx, const DoubleVal& src1,
+      const DoubleVal& src2, StringVal* dst);
+  static void CovarRemove(FunctionContext* ctx, const DoubleVal& src1,
+      const DoubleVal& src2, StringVal* dst);
+  static void TimestampCovarUpdate(FunctionContext* ctx,
+      const TimestampVal& src1, const TimestampVal& src2, StringVal* dst);
+  static void TimestampCovarRemove(FunctionContext* ctx,
+      const TimestampVal& src1, const TimestampVal& src2, StringVal* dst);
+  static void CovarMerge(FunctionContext* ctx, const StringVal& src, StringVal* dst);
+  static DoubleVal CovarSampleGetValue(FunctionContext* ctx, const StringVal& src);
+  static DoubleVal CovarPopulationGetValue(FunctionContext* ctx, const StringVal& src);
+  static DoubleVal CovarSampleFinalize(FunctionContext* ctx,
+      const StringVal& src);
+  static DoubleVal CovarPopulationFinalize(FunctionContext* ctx,
+      const StringVal& src);
+
   /// Implementation of Count and Count(*)
   static void CountUpdate(FunctionContext*, const AnyVal& src, BigIntVal* dst);
   static void CountStarUpdate(FunctionContext*, BigIntVal* dst);

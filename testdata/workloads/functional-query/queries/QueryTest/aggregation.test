@@ -1427,3 +1427,614 @@ select count(*) from tpch_parquet.orders o group by o.o_clerk limit 10
 ---- TYPES
 bigint
 ====
+---- QUERY
+# CORR() function examples
+select corr(ps_availqty, ps_supplycost) from tpch.partsupp;
+---- RESULTS
+0.000321849166315
+---- TYPES
+double
+====
+---- QUERY
+# Behavior of CORR() on null table
+select corr(d, e) from functional.nulltable;
+---- RESULTS
+NULL
+---- TYPES
+double
+====
+---- QUERY
+# Behavior of CORR() on empty table
+select corr(f2, f2) from functional.emptytable;
+---- RESULTS
+NULL
+---- TYPES
+double
+====
+---- QUERY
+# CORR() on different datatypes
+select corr(tinyint_col, tinyint_col), corr(smallint_col, smallint_col),
+ corr(int_col, int_col), corr(bigint_col, bigint_col), corr(float_col, float_col),
+ corr(double_col, double_col), corr(timestamp_col, timestamp_col) from functional.alltypes;
+---- RESULTS
+1.0,1.0,1.0,1.0,1.0,1.0,1.0
+---- TYPES
+double,double,double,double,double,double,double
+====
+---- QUERY
+# CORR() on timestamp columns
+select corr(utctime, localtime) from functional.alltimezones;
+---- RESULTS
+0.999995807708
+---- TYPES
+double
+====
+---- QUERY
+# Since group by id will result in a single row, this test shows that corr() returns null in case of a single row.
+select id, corr(int_col, int_col) from functional.alltypestiny group by id;
+---- RESULTS
+2,NULL
+4,NULL
+0,NULL
+6,NULL
+1,NULL
+7,NULL
+3,NULL
+5,NULL
+---- TYPES
+int,double
+====
+---- QUERY
+# CORR() on decimal datatype
+select corr(d3, d4) from functional.decimal_tbl;
+---- RESULTS
+NULL
+---- TYPES
+double
+====
+---- QUERY
+select year, corr(double_col, double_col) from functional.alltypes group by year;
+---- RESULTS
+2009,1.0
+2010,1.0
+---- TYPES
+int,double
+====
+---- QUERY
+select corr(double_col, -double_col) from functional.alltypes;
+---- RESULTS
+-1.0
+---- TYPES
+double
+====
+---- QUERY
+select corr(double_col, double_col) from functional.alltypes;
+---- RESULTS
+1.0
+---- TYPES
+double
+====
+---- QUERY
+select corr(ss_sold_time_sk, ss_quantity) from tpcds.store_sales;
+---- RESULTS
+0.000136790587885
+---- TYPES
+double
+====
+---- QUERY
+select s_store_sk, corr(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk)
+ from tpcds.store;
+---- RESULTS
+5,NULL
+8,1.0
+12,-0.328248435346
+1,NULL
+2,-1.0
+3,-0.511481796057
+4,-0.881269090479
+6,-0.853760432996
+7,0.0825005896565
+9,0.0282032912339
+10,0.223462144551
+11,0.325760965741
+---- TYPES
+int,double
+====
+---- QUERY
+select id, double_col, corr(double_col, int_col) over (partition by month order by id) from functional.alltypes
+ order by id limit 10;
+---- RESULTS
+0,0.0,NULL
+1,10.1,1.0
+2,20.2,1.0
+3,30.3,1.0
+4,40.4,1.0
+5,50.5,1.0
+6,60.6,1.0
+7,70.7,1.0
+8,80.8,1.0
+9,90.9,1.0
+---- TYPES
+int,double,double
+====
+---- QUERY
+# CORR() when one column is filled with null
+select corr(null_int, rand()), corr(rand(), null_int) from functional.nullrows;
+---- RESULTS
+NULL,NULL
+---- TYPES
+double,double
+====
+---- QUERY
+# CORR() supporting join
+select corr(A.double_col, B.double_col) from functional.alltypes A, functional.alltypes B where A.id=B.id;
+---- RESULTS
+1.0
+---- TYPES
+double
+====
+---- QUERY
+# Tests functioning of CorrRemoveState()
+select s_store_sk, corr(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between 5 preceding and 2 following) from tpcds.store;
+---- RESULTS
+5,-0.328248435346
+8,-0.328248435346
+12,-0.328248435346
+1,-0.511481796057
+2,-0.881269090479
+3,-0.853760432996
+4,0.0825005896565
+6,0.0282032912339
+7,0.223462144551
+9,0.294637370885
+10,0.115190500757
+11,-0.0690212865931
+---- TYPES
+int,double
+====
+---- QUERY
+# Mathematical operations on double can lead to variance becoming negative by a very small amount (around +1e-13),
+# to avoid that a check is added (state->xvar <= 0.0 || state->yvar <= 0.0), without which the below test will
+# result in nan for certain cases.
+select s_store_sk, corr(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between 1 preceding and 1 following) from tpcds.store;
+---- RESULTS
+5,1.0
+8,-0.328248435346
+12,-1.0
+1,-1.0
+2,-0.511481796057
+3,-0.829250636825
+4,-0.884750027905
+6,-0.735742100541
+7,-0.165224541153
+9,0.97066733931
+10,1.0
+11,NULL
+---- TYPES
+int,double
+====
+---- QUERY
+# Corr() when window size is 2
+select s_store_sk, corr(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between 1 preceding and current row) from tpcds.store;
+---- RESULTS
+5,NULL
+8,1.0
+12,-1.0
+1,NULL
+2,-1.0
+3,NULL
+4,-1.0
+6,-1.0
+7,-1.0
+9,1.0
+10,1.0
+11,NULL
+---- TYPES
+int,double
+====
+---- QUERY
+select s_store_sk, corr(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between current row and 1 following) from tpcds.store;
+---- RESULTS
+5,1.0
+8,-1.0
+12,NULL
+1,-1.0
+2,NULL
+3,-1.0
+4,-1.0
+6,-1.0
+7,1.0
+9,1.0
+10,NULL
+11,NULL
+---- TYPES
+int,double
+====
+---- QUERY
+select s_store_sk, corr(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between current row and unbounded following) from tpcds.store;
+---- RESULTS
+12,NULL
+8,-1.0
+5,-0.328248435346
+11,NULL
+10,NULL
+9,1.0
+7,0.965705311825
+6,0.17735847272
+4,-0.0690212865931
+3,0.115190500757
+2,0.294637370885
+1,0.325760965741
+---- TYPES
+int,double
+====
+---- QUERY
+select s_store_sk, corr(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between unbounded preceding and current row) from tpcds.store;
+---- RESULTS
+5,NULL
+8,1.0
+12,-0.328248435346
+1,NULL
+2,-1.0
+3,-0.511481796057
+4,-0.881269090479
+6,-0.853760432996
+7,0.0825005896565
+9,0.0282032912339
+10,0.223462144551
+11,0.325760965741
+---- TYPES
+int,double
+====
+---- QUERY
+# Sample and population covariance
+select covar_samp(ps_availqty, ps_supplycost), covar_pop(ps_availqty, ps_supplycost) from tpch.partsupp;
+---- RESULTS
+267.607127282,267.606792773
+---- TYPES
+double,double
+====
+---- QUERY
+# covar_samp() and covar_pop() on null table
+select covar_samp(d, e), covar_pop(d, e) from functional.nulltable;
+---- RESULTS
+NULL,NULL
+---- TYPES
+double,double
+====
+---- QUERY
+# covar_samp() on different datatypes
+select covar_samp(tinyint_col, tinyint_col), covar_samp(smallint_col, smallint_col),
+ covar_samp(int_col, int_col), covar_samp(bigint_col, bigint_col), covar_samp(float_col, float_col),
+ covar_samp(double_col, double_col) from functional.alltypes;
+---- RESULTS
+8.251130291820797,8.251130291820797,8.251130291820797,825.1130291820797,9.983867246543589,841.6978010686292
+---- TYPES
+double,double,double,double,double,double
+====
+---- QUERY
+# covar_pop() on different datatypes
+select covar_pop(tinyint_col, tinyint_col), covar_pop(smallint_col, smallint_col),
+ covar_pop(int_col, int_col), covar_pop(bigint_col, bigint_col), covar_pop(float_col, float_col),
+ covar_pop(double_col, double_col) from functional.alltypes;
+---- RESULTS
+8.25,8.25,8.25,825.0,9.9824995935,841.5825
+---- TYPES
+double,double,double,double,double,double
+====
+---- QUERY
+# Behavior of covar_samp() and covar_pop on empty table
+select covar_samp(f2, f2), covar_pop(f2, f2) from functional.emptytable;
+---- RESULTS
+NULL,NULL
+---- TYPES
+double,double
+====
+---- QUERY
+# covar_samp() and covar_pop() on timestamp datatype. The expression is divided by a large number like 1E+10
+# because unlike overfow in int, overflow in double looses precision
+select covar_samp(utctime, localtime)/1E+10, covar_pop(utctime, localtime)/1E+10 from functional.alltimezones;
+---- RESULTS
+5502.915940016994,5496.494801230509
+---- TYPES
+double,double
+====
+---- QUERY
+# Since group by id will result in a single row, this test shows
+# behavior of covar_samp() and covar_pop() on a single row
+select id, covar_samp(int_col, int_col), covar_pop(int_col, int_col) from functional.alltypestiny group by id;
+---- RESULTS
+2,NULL,0.0
+4,NULL,0.0
+0,NULL,0.0
+6,NULL,0.0
+1,NULL,0.0
+7,NULL,0.0
+3,NULL,0.0
+5,NULL,0.0
+---- TYPES
+int,double,double
+====
+---- QUERY
+# covar_samp() and covar_pop() on decimal type
+select covar_samp(d3, d4), covar_pop(d3, d4) from functional.decimal_tbl;
+---- RESULTS
+0.0,0.0
+---- TYPES
+double,double
+====
+---- QUERY
+# covar_samp() and covar_pop() with group by clause
+select year, covar_samp(double_col, double_col),
+ covar_pop(double_col, double_col) from functional.alltypes group by year;
+---- RESULTS
+2009,841.813133735,841.5825
+2010,841.813133735,841.5825
+---- TYPES
+int,double,double
+====
+---- QUERY
+# Example of negative covar_samp() and covar_pop()
+select covar_samp(double_col, -double_col), covar_pop(double_col, -double_col) from functional.alltypes;
+---- RESULTS
+-841.697801069,-841.5825
+---- TYPES
+double,double
+====
+---- QUERY
+select covar_samp(double_col, double_col), covar_pop(double_col, double_col) from functional.alltypes;
+---- RESULTS
+841.697801069,841.5825
+---- TYPES
+double,double
+====
+---- QUERY
+select covar_samp(ss_sold_time_sk, ss_quantity), covar_pop(ss_sold_time_sk, ss_quantity) from tpcds.store_sales;
+---- RESULTS
+50.2400502845,50.2400315775
+---- TYPES
+double,double
+====
+---- QUERY
+# covar_samp() on analytic query
+select s_store_sk, covar_samp(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk)
+ from tpcds.store;
+---- RESULTS
+5,NULL
+8,10414050.0
+12,-5125047.666666668
+1,NULL
+2,-158355.0
+3,-3513583.5
+4,-19719420.0
+6,-16848393.6
+7,4309087.100000003
+9,1337692.761904765
+10,11663050.25
+11,17362201.83333334
+---- TYPES
+int,double
+====
+---- QUERY
+# covar_pop() on analytic query
+select s_store_sk, covar_pop(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk)
+ from tpcds.store;
+---- RESULTS
+5,0.0
+8,5207025.0
+12,-3416698.444444445
+1,0.0
+2,-79177.5
+3,-2342389.0
+4,-14789565.0
+6,-13478714.88
+7,3590905.916666669
+9,1146593.79591837
+10,10205168.96875
+11,15433068.2962963
+---- TYPES
+int,double
+====
+---- QUERY
+select id, double_col, covar_samp(double_col, int_col) over (partition by month order by id) from
+ functional.alltypes order by id limit 10;
+---- RESULTS
+0,0.0,NULL
+1,10.1,5.05
+2,20.2,10.1
+3,30.3,16.8333333333
+4,40.4,25.25
+5,50.5,35.35
+6,60.6,47.1333333333
+7,70.7,60.6
+8,80.8,75.75
+9,90.9,92.5833333333
+---- TYPES
+int,double,double
+====
+---- QUERY
+select id, double_col, covar_pop(double_col, int_col) over (partition by month order by id) from
+ functional.alltypes order by id limit 10;
+---- RESULTS
+0,0.0,0.0
+1,10.1,2.525
+2,20.2,6.73333333333
+3,30.3,12.625
+4,40.4,20.2
+5,50.5,29.4583333333
+6,60.6,40.4
+7,70.7,53.025
+8,80.8,67.3333333333
+9,90.9,83.325
+---- TYPES
+int,double,double
+====
+---- QUERY
+# covar_samp() and covar_pop() when one column is filled with null
+select covar_samp(null_int, rand()), covar_samp(rand(), null_int), covar_pop(null_int, rand()),
+ covar_pop(rand(), null_int) from functional.nullrows;
+---- RESULTS
+NULL,NULL,NULL,NULL
+---- TYPES
+double,double,double,double
+====
+---- QUERY
+# covar_samp() and covar_pop() supporting join
+select covar_samp(A.double_col, B.double_col), covar_pop(A.double_col, B.double_col) from functional.alltypes A,
+ functional.alltypes B where A.id=B.id;
+---- RESULTS
+841.697801069,841.5825
+---- TYPES
+double,double
+====
+---- QUERY
+# covar_samp() and covar_pop() supporting timestamp datatype
+select covar_samp(timestamp_col, timestamp_col)/1E+13, covar_pop(timestamp_col, timestamp_col)/1E+13
+ from functional.alltypes;
+---- RESULTS
+33.1559162368,33.1513743305
+---- TYPES
+double,double
+====
+---- QUERY
+# corr(), covar_samp(), covar_pop() when both columns are filled with 0
+select corr(double_col*0, double_col*0), covar_samp(double_col*0, double_col*0),
+ covar_pop(double_col*0, double_col*0) from functional.alltypes;
+---- RESULTS
+NULL,0.0,0.0
+---- TYPES
+double,double,double
+====
+---- QUERY
+# corr(), covar_samp(), covar_pop() when one column is filled with 0
+select corr(double_col, double_col*0), covar_samp(double_col, double_col*0),
+ covar_pop(double_col, double_col*0) from functional.alltypes;
+---- RESULTS
+NULL,0.0,0.0
+---- TYPES
+double,double,double
+====
+---- QUERY
+select s_store_sk, covar_samp(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between unbounded preceding and current row) from tpcds.store;
+---- RESULTS
+5,NULL
+8,10414050.0
+12,-5125047.666666668
+1,NULL
+2,-158355.0
+3,-3513583.5
+4,-19719420.0
+6,-16848393.6
+7,4309087.100000003
+9,1337692.761904765
+10,11663050.25
+11,17362201.83333334
+---- TYPES
+int,double
+====
+---- QUERY
+select s_store_sk, covar_pop(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between unbounded preceding and current row) from tpcds.store;
+---- RESULTS
+5,0.0
+8,5207025.0
+12,-3416698.444444445
+1,0.0
+2,-79177.5
+3,-2342389.0
+4,-14789565.0
+6,-13478714.88
+7,3590905.916666669
+9,1146593.79591837
+10,10205168.96875
+11,15433068.2962963
+---- TYPES
+int,double
+====
+---- QUERY
+# Tests functioning of CovarRemoveState()
+select s_store_sk, covar_samp(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between 5 preceding and 2 following) from tpcds.store;
+---- RESULTS
+5,-5125047.666666668
+8,-5125047.666666668
+12,-5125047.666666668
+1,-3513583.5
+2,-19719420.0
+3,-16848393.6
+4,4309087.100000003
+6,1337692.761904765
+7,11663050.25
+9,14424596.67857143
+10,3770362.571428577
+11,-2206709.166666666
+---- TYPES
+int,double
+====
+---- QUERY
+# Tests functioning of CovarRemoveState()
+select s_store_sk, covar_pop(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between 5 preceding and 2 following) from tpcds.store;
+---- RESULTS
+5,-3416698.444444445
+8,-3416698.444444445
+12,-3416698.444444445
+1,-2342389.0
+2,-14789565.0
+3,-13478714.88
+4,3590905.916666669
+6,1146593.79591837
+7,10205168.96875
+9,12621522.09375001
+10,3231739.346938781
+11,-1838924.305555555
+---- TYPES
+int,double
+====
+---- QUERY
+# Covar_samp() when window size is 2
+select s_store_sk, covar_samp(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between 1 preceding and current row) from tpcds.store;
+---- RESULTS
+5,NULL
+8,10414050.0
+12,-14211464
+1,NULL
+2,-158355.0
+3,0
+4,-16051572
+6,-1733847.5
+7,-2425526
+9,25465544
+10,26428357
+11,0
+---- TYPES
+int,double
+====
+---- QUERY
+# Covar_pop() when window size is 2
+select s_store_sk, covar_pop(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between 1 preceding and current row) from tpcds.store;
+---- RESULTS
+5,0.0
+8,5207025.0
+12,-7105732
+1,0.0
+2,-79177.5
+3,0
+4,-8025786
+6,-866923.75
+7,-1212763
+9,12732772
+10,13214178.5
+11,0
+---- TYPES
+int,double
+====

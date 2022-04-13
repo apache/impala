@@ -288,6 +288,362 @@ void AggregateFunctions::CountMerge(FunctionContext*, const BigIntVal& src,
   dst->val += src.val;
 }
 
+// Implementation of CORR() function which takes two arguments of numeric type
+// and returns the Pearson's correlation coefficient between them using the Welford's
+// online algorithm. This is calculated using a stable one-pass algorithm, based on
+// work by Philippe Pébay and Donald Knuth.
+// Implementation of CORR() is independent of the implementation of COVAR_SAMP() and
+// COVAR_POP() so changes in one would probably need to be reflected in the other as well.
+// Few useful links :
+// https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online
+// https://www.osti.gov/biblio/1028931
+// Correlation coefficient formula used:
+// r = covar / (√(xvar * yvar)
+struct CorrState {
+  int64_t count; // number of elements
+  double xavg; // average of x elements
+  double yavg; // average of y elements
+  double xvar; // n times the variance of x elements
+  double yvar; // n times the variance of y elements
+  double covar; // n times the covariance
+};
+
+void AggregateFunctions::CorrInit(FunctionContext* ctx, StringVal* dst) {
+  dst->is_null = false;
+  dst->len = sizeof(CorrState);
+  dst->ptr = ctx->Allocate(dst->len);
+  memset(dst->ptr, 0, dst->len);
+}
+
+static inline void CorrUpdateState(double x, double y, CorrState* state) {
+  double deltaX = x - state->xavg;
+  double deltaY = y - state->yavg;
+  ++state->count;
+  // mx_n = mx_(n - 1) + [x_n - mx_(n - 1)] / n
+  state->xavg += deltaX / state->count;
+  // my_n = my_(n - 1) + [y_n - my_(n - 1)] / n
+  state->yavg += deltaY / state->count;
+  if (state->count > 1) {
+    // c_n = c_(n - 1) + (x_n - mx_n) * (y_n - my_(n - 1)) OR
+    // c_n = c_(n - 1) + (x_n - mx_(n - 1)) * (y_n - my_n)
+    // The apparent asymmetry in the equations is due to the fact that,
+    // x_n - mx_n = (n - 1) * (x_n - mx_(n - 1)) / n, so both update terms are equal to
+    // (n - 1) * (x_n - mx_(n - 1)) * (y_n - my_(n - 1)) / n
+    state->covar += deltaX * (y - state->yavg);
+    // vx_n = vx_(n - 1) + (x_n - mx_(n - 1)) * (x_n - mx_n)
+    state->xvar += deltaX * (x - state->xavg);
+    // vy_n = vy_(n - 1) + (y_n - my_(n - 1)) * (y_n - my_n)
+    state->yvar += deltaY * (y - state->yavg);
+  }
+}
+
+static inline void CorrRemoveState(double x, double y, CorrState* state) {
+  double deltaX = x - state->xavg;
+  double deltaY = y - state->yavg;
+  if (state->count <= 1) {
+    memset(state, 0, sizeof(CorrState));
+  } else {
+    --state->count;
+    // mx_(n - 1) = mx_n - (x_n - mx_n) / (n - 1)
+    state->xavg -= deltaX / state->count;
+    // my_(n - 1) = my_n - (y_n - my_n) / (n - 1)
+    state->yavg -= deltaY / state->count;
+    // c_(n - 1) = c_n - (x_n - mx_n) * (y_n - my_(n -1))
+    state->covar -= deltaX * (y - state->yavg);
+    // vx_(n - 1) = vx_n - (x_n - mx_n) * (x_n - mx_(n - 1))
+    state->xvar -= deltaX * (x - state->xavg);
+    // vy_(n - 1) = vy_n - (y_n - my_n) * (y_n - my_(n - 1))
+    state->yvar -= deltaY * (y - state->yavg);
+  }
+}
+
+void AggregateFunctions::CorrUpdate(FunctionContext* ctx,
+    const DoubleVal& src1, const DoubleVal& src2, StringVal* dst) {
+  if (src1.is_null || src2.is_null) return;
+  DCHECK(dst->ptr != nullptr);
+  DCHECK_EQ(sizeof(CorrState), dst->len);
+  CorrState* state = reinterpret_cast<CorrState*>(dst->ptr);
+  CorrUpdateState(src1.val, src2.val, state);
+}
+
+void AggregateFunctions::CorrRemove(FunctionContext* ctx,
+    const DoubleVal& src1, const DoubleVal& src2, StringVal* dst) {
+  // Remove doesn't need to explicitly check the number of calls to Update() or Remove()
+  // because Finalize() returns NULL if count is 0. In other words, it's not needed to
+  // check if num_removes() >= num_updates() as it's accounted for in Finalize().
+  if (src1.is_null || src2.is_null) return;
+  DCHECK(dst->ptr != nullptr);
+  DCHECK_EQ(sizeof(CorrState), dst->len);
+  CorrState* state = reinterpret_cast<CorrState*>(dst->ptr);
+  CorrRemoveState(src1.val, src2.val, state);
+}
+
+void AggregateFunctions::TimestampCorrUpdate(FunctionContext* ctx,
+    const TimestampVal& src1, const TimestampVal& src2, StringVal* dst) {
+  if (src1.is_null || src2.is_null) return;
+  CorrState* state = reinterpret_cast<CorrState*>(dst->ptr);
+  const TimestampValue& tm_src1 = TimestampValue::FromTimestampVal(src1);
+  const TimestampValue& tm_src2 = TimestampValue::FromTimestampVal(src2);
+  double val1, val2;
+  if (tm_src1.ToSubsecondUnixTime(UTCPTR, &val1) &&
+      tm_src2.ToSubsecondUnixTime(UTCPTR, &val2)) {
+    CorrUpdateState(val1, val2, state);
+  }
+}
+
+void AggregateFunctions::TimestampCorrRemove(FunctionContext* ctx,
+    const TimestampVal& src1, const TimestampVal& src2, StringVal* dst) {
+  // Remove doesn't need to explicitly check the number of calls to Update() or Remove()
+  // because Finalize() returns NULL if count is 0. In other words, it's not needed to
+  // check if num_removes() >= num_updates() as it's accounted for in Finalize().
+  if (src1.is_null || src2.is_null) return;
+  CorrState* state = reinterpret_cast<CorrState*>(dst->ptr);
+  const TimestampValue& tm_src1 = TimestampValue::FromTimestampVal(src1);
+  const TimestampValue& tm_src2 = TimestampValue::FromTimestampVal(src2);
+  double val1, val2;
+  if (tm_src1.ToSubsecondUnixTime(UTCPTR, &val1) &&
+      tm_src2.ToSubsecondUnixTime(UTCPTR, &val2)) {
+    CorrRemoveState(val1, val2, state);
+  }
+}
+
+void AggregateFunctions::CorrMerge(FunctionContext* ctx,
+    const StringVal& src, StringVal* dst) {
+  CorrState* src_state = reinterpret_cast<CorrState*>(src.ptr);
+  DCHECK(dst->ptr != nullptr);
+  DCHECK_EQ(sizeof(CorrState), dst->len);
+  CorrState* dst_state = reinterpret_cast<CorrState*>(dst->ptr);
+  if (src.ptr != nullptr) {
+    int64_t nA = dst_state->count;
+    int64_t nB = src_state->count;
+    if (nA == 0) {
+      memcpy(dst_state, src_state, sizeof(CorrState));
+      return;
+    }
+    if (nA != 0 && nB != 0) {
+      double xavgA = dst_state->xavg;
+      double yavgA = dst_state->yavg;
+      double xavgB = src_state->xavg;
+      double yavgB = src_state->yavg;
+      double xvarB = src_state->xvar;
+      double yvarB = src_state->yvar;
+      double covarB = src_state->covar;
+
+      dst_state->count += nB;
+      dst_state->xavg = (xavgA * nA + xavgB * nB) / dst_state->count;
+      dst_state->yavg = (yavgA * nA + yavgB * nB) / dst_state->count;
+      // vx_(A,B) = vx_A + vx_B + (mx_A - mx_B) * (mx_A - mx_B) * n_A * n_B / (n_A + n_B)
+      dst_state->xvar +=
+          xvarB + (xavgA - xavgB) * (xavgA - xavgB) * nA * nB / dst_state->count;
+      // vy_(A,B) = vy_A + vy_B + (my_A - my_B) * (my_A - my_B) * n_A * n_B / (n_A + n_B)
+      dst_state->yvar +=
+          yvarB + (yavgA - yavgB) * (yavgA - yavgB) * nA * nB / dst_state->count;
+      // c_(A,B) = c_A + c_B + (mx_A - mx_B) * (my_A - my_B) * n_A * n_B / (n_A + n_B)
+      dst_state->covar += covarB
+          + (xavgA - xavgB) * (yavgA - yavgB) * ((double)(nA * nB)) / (dst_state->count);
+    }
+  }
+}
+
+DoubleVal AggregateFunctions::CorrGetValue(FunctionContext* ctx, const StringVal& src) {
+  CorrState* state = reinterpret_cast<CorrState*>(src.ptr);
+  // Calculating Pearson's correlation coefficient
+  // xvar and yvar become negative in certain cases due to floating point rounding error.
+  // Since these values are very small, they can be ignored and rounded to 0.
+  DCHECK(state->xvar >= -1E-8);
+  DCHECK(state->yvar >= -1E-8);
+  if (state->count == 0 || state->count == 1 || state->xvar <= 0.0 ||
+      state->yvar <= 0.0) {
+    return DoubleVal::null();
+  }
+  double r = sqrt(state->xvar * state->yvar);
+  if (r == 0.0) return DoubleVal::null();
+  double corr = state->covar / r;
+  return DoubleVal(corr);
+}
+
+DoubleVal AggregateFunctions::CorrFinalize(FunctionContext* ctx, const StringVal& src) {
+  CorrState* state = reinterpret_cast<CorrState*>(src.ptr);
+  if (UNLIKELY(src.is_null) || state->count == 0 || state->count == 1) {
+    ctx->Free(src.ptr);
+    return DoubleVal::null();
+  }
+  DoubleVal r = CorrGetValue(ctx, src);
+  ctx->Free(src.ptr);
+  return r;
+}
+
+// Implementation of COVAR_SAMP() and COVAR_POP() which calculates sample and
+// population covariance between two columns of numeric types respectively using
+// the Welford's online algorithm.
+// Sample covariance:
+// r = covar / (n-1)
+// Population covariance:
+// r = covar / (n)
+struct CovarState {
+  int64_t count; // number of elements
+  double xavg; // average of x elements
+  double yavg; // average of y elements
+  double covar; // n times the covariance
+};
+
+void AggregateFunctions::CovarInit(FunctionContext* ctx, StringVal* dst) {
+  dst->is_null = false;
+  dst->len = sizeof(CovarState);
+  dst->ptr = ctx->Allocate(dst->len);
+  memset(dst->ptr, 0, dst->len);
+}
+
+static inline void CovarUpdateState(double x, double y, CovarState* state) {
+  ++state->count;
+  // my_n = my_(n - 1) + [y_n - my_(n - 1)] / n
+  state->yavg += (y - state->yavg) / state->count;
+  // c_n = c_(n - 1) + (x_n - mx_(n - 1)) * (y_n - my_n) OR
+  // c_n = c_(n - 1) + (x_n - mx_n) * (y_n - my_(n - 1))
+  // The apparent asymmetry in the equations is due to the fact that,
+  // x_n - mx_n = (n - 1) * (x_n - mx_(n - 1)) / n, so both terms are equal to
+  // (n - 1) * (x_n - mx_(n - 1)) * (y_n - my_(n - 1)) / n
+  if (state->count > 1) state->covar += (x - state->xavg) * (y - state->yavg);
+  // mx_n = mx_(n - 1) + [x_n - mx_(n - 1)] / n
+  state->xavg += (x - state->xavg) / state->count;
+}
+
+static inline void CovarRemoveState(double x, double y, CovarState* state){
+  if (state->count <= 1) {
+    memset(state, 0, sizeof(CovarState));
+  } else {
+    --state->count;
+    // my_(n - 1) = my_n - (y_n - my_n) / (n - 1)
+    state->yavg -= (y - state->yavg) / state->count;
+    // c_(n - 1) = c_n - (x_n - mx_(n - 1)) * (y_n - my_n)
+    state->covar -= (x - state->xavg) * (y - state->yavg);
+    // mx_(n - 1) = mx_n - (x_n - mx_n) / (n - 1)
+    state->xavg -= (x - state->xavg) / state->count;
+  }
+}
+
+void AggregateFunctions::CovarUpdate(FunctionContext* ctx,
+    const DoubleVal& src1, const DoubleVal& src2, StringVal* dst) {
+  if (src1.is_null || src2.is_null) return;
+  DCHECK(dst->ptr != nullptr);
+  DCHECK_EQ(sizeof(CovarState), dst->len);
+  CovarState* state = reinterpret_cast<CovarState*>(dst->ptr);
+  CovarUpdateState(src1.val, src2.val, state);
+}
+
+void AggregateFunctions::CovarRemove(FunctionContext* ctx,
+    const DoubleVal& src1, const DoubleVal& src2, StringVal* dst) {
+  // Remove doesn't need to explicitly check the number of calls to Update() or Remove()
+  // because Finalize() returns NULL if count is 0. In other words, it's not needed to
+  // check if num_removes() >= num_updates() as it's accounted for in Finalize().
+  if (src1.is_null || src2.is_null) return;
+  DCHECK(dst->ptr != nullptr);
+  DCHECK_EQ(sizeof(CovarState), dst->len);
+  CovarState* state = reinterpret_cast<CovarState*>(dst->ptr);
+  CovarRemoveState(src1.val, src2.val, state);
+}
+
+void AggregateFunctions::TimestampCovarUpdate(FunctionContext* ctx,
+    const TimestampVal& src1, const TimestampVal& src2, StringVal* dst) {
+  if (src1.is_null || src2.is_null) return;
+  CovarState* state = reinterpret_cast<CovarState*>(dst->ptr);
+  const TimestampValue& tm_src1 = TimestampValue::FromTimestampVal(src1);
+  const TimestampValue& tm_src2 = TimestampValue::FromTimestampVal(src2);
+  double val1, val2;
+  if (tm_src1.ToSubsecondUnixTime(UTCPTR, &val1) &&
+      tm_src2.ToSubsecondUnixTime(UTCPTR, &val2)) {
+    CovarUpdateState(val1, val2, state);
+  }
+}
+
+void AggregateFunctions::TimestampCovarRemove(FunctionContext* ctx,
+    const TimestampVal& src1, const TimestampVal& src2, StringVal* dst) {
+  // Remove doesn't need to explicitly check the number of calls to Update() or Remove()
+  // because Finalize() returns NULL if count is 0. In other words, it's not needed to
+  // check if num_removes() >= num_updates() as it's accounted for in Finalize().
+  if (src1.is_null || src2.is_null) return;
+  CovarState* state = reinterpret_cast<CovarState*>(dst->ptr);
+  const TimestampValue& tm_src1 = TimestampValue::FromTimestampVal(src1);
+  const TimestampValue& tm_src2 = TimestampValue::FromTimestampVal(src2);
+  double val1, val2;
+  if (tm_src1.ToSubsecondUnixTime(UTCPTR, &val1) &&
+      tm_src2.ToSubsecondUnixTime(UTCPTR, &val2)) {
+    CovarRemoveState(val1, val2, state);
+  }
+}
+
+void AggregateFunctions::CovarMerge(FunctionContext* ctx,
+    const StringVal& src, StringVal* dst) {
+  CovarState* src_state = reinterpret_cast<CovarState*>(src.ptr);
+  DCHECK(dst->ptr != nullptr);
+  DCHECK_EQ(sizeof(CovarState), dst->len);
+  CovarState* dst_state = reinterpret_cast<CovarState*>(dst->ptr);
+  if (src.ptr != nullptr) {
+    int64_t nA = dst_state->count;
+    int64_t nB = src_state->count;
+    if (nA == 0) {
+      memcpy(dst_state, src_state, sizeof(CovarState));
+      return;
+    }
+    if (nA != 0 && nB != 0) {
+      double xavgA = dst_state->xavg;
+      double yavgA = dst_state->yavg;
+      double xavgB = src_state->xavg;
+      double yavgB = src_state->yavg;
+      double covarB = src_state->covar;
+
+      dst_state->count += nB;
+      dst_state->xavg = (xavgA * nA + xavgB * nB) / dst_state->count;
+      dst_state->yavg = (yavgA * nA + yavgB * nB) / dst_state->count;
+      // c_(A,B) = c_A + c_B + (mx_A - mx_B) * (my_A - my_B) * n_A * n_B / (n_A + n_B)
+      dst_state->covar += covarB
+          + (xavgA - xavgB) * (yavgA - yavgB) * ((double)(nA * nB)) / (dst_state->count);
+    }
+  }
+}
+
+DoubleVal AggregateFunctions::CovarSampleGetValue(FunctionContext* ctx,
+    const StringVal& src) {
+  // Calculating sample covariance
+  CovarState* state = reinterpret_cast<CovarState*>(src.ptr);
+  if (state->count == 0 || state->count == 1) return DoubleVal::null();
+  double covar_samp = state->covar / (state->count - 1);
+  return DoubleVal(covar_samp);
+}
+
+DoubleVal AggregateFunctions::CovarPopulationGetValue(FunctionContext* ctx,
+    const StringVal& src) {
+  // Calculating population covariance
+  CovarState* state = reinterpret_cast<CovarState*>(src.ptr);
+  if (state->count == 0) return DoubleVal::null();
+  double covar_pop = state->covar / (state->count);
+  return DoubleVal(covar_pop);
+}
+
+DoubleVal AggregateFunctions::CovarSampleFinalize(FunctionContext* ctx,
+    const StringVal& src) {
+  CovarState* state = reinterpret_cast<CovarState*>(src.ptr);
+  if (UNLIKELY(src.is_null) || state->count == 0 || state->count == 1) {
+    ctx->Free(src.ptr);
+    return DoubleVal::null();
+  }
+  DoubleVal r = CovarSampleGetValue(ctx, src);
+  ctx->Free(src.ptr);
+  return r;
+}
+
+DoubleVal AggregateFunctions::CovarPopulationFinalize(FunctionContext* ctx,
+    const StringVal& src) {
+  CovarState* state = reinterpret_cast<CovarState*>(src.ptr);
+  if (UNLIKELY(src.is_null) || state->count == 0) {
+    ctx->Free(src.ptr);
+    return DoubleVal::null();
+  }
+  DoubleVal r = CovarPopulationGetValue(ctx, src);
+  ctx->Free(src.ptr);
+  return r;
+}
+
 struct AvgState {
   double sum;
   int64_t count;
