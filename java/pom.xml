@@ -21,7 +21,7 @@ under the License.
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.impala</groupId>
   <artifactId>impala-parent</artifactId>
-  <version>4.1.0-SNAPSHOT</version>
+  <version>4.1.1-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Apache Impala Parent POM</name>
 

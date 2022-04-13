@@ -23,7 +23,7 @@
   <parent>
     <groupId>org.apache.impala</groupId>
     <artifactId>impala-data-source</artifactId>
-    <version>4.1.0-SNAPSHOT</version>
+    <version>4.1.1-SNAPSHOT</version>
   </parent>
   <artifactId>impala-data-source-test</artifactId>
   <name>Apache Impala External Data Source Test Library</name>
