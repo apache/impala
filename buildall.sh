@@ -86,6 +86,8 @@ export MAKE_CMD=make
 : ${CMAKE_BUILD_TYPE:=Debug}
 
 # parse command line options
+# Note: if you add a new build type, please also add it to 'VALID_BUILD_TYPES' in
+# tests/common/environ.py.
 while [ -n "$*" ]
 do
   case "$1" in

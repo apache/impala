@@ -105,6 +105,8 @@ class ImpalaBuildFlavors:
   ADDRESS_SANITIZER = 'address_sanitizer'
   # ./buildall.sh
   DEBUG = 'debug'
+  # ./buildall.sh -debug_noopt
+  DEBUG_NOOPT = 'debug_noopt'
   # ./buildall.sh -release
   RELEASE = 'release'
   # ./buildall.sh -codecoverage
@@ -122,8 +124,8 @@ class ImpalaBuildFlavors:
   # ./buildall.sh -full_ubsan
   UBSAN_FULL = 'ubsan_full'
 
-  VALID_BUILD_TYPES = [ADDRESS_SANITIZER, DEBUG, CODE_COVERAGE_DEBUG, RELEASE,
-      CODE_COVERAGE_RELEASE, TIDY, TSAN, TSAN_FULL, UBSAN, UBSAN_FULL]
+  VALID_BUILD_TYPES = [ADDRESS_SANITIZER, DEBUG, DEBUG_NOOPT, CODE_COVERAGE_DEBUG,
+       RELEASE, CODE_COVERAGE_RELEASE, TIDY, TSAN, TSAN_FULL, UBSAN, UBSAN_FULL]
 
 
 class LinkTypes:
