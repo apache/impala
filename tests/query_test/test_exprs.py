@@ -164,6 +164,9 @@ class TestExprLimits(ImpalaTestSuite):
     err = self.execute_query_expect_failure(self.client, invalid_sql)
     assert re.search(expected_err_tmpl.format(len(invalid_sql), size_16mb), str(err))
 
+  # This test can take ~2GB memory while it takes only ~10 seconds. It caused OOM
+  # in the past, so it is safer to run it serially.
+  @pytest.mark.execute_serially
   def test_statement_expression_limit(self):
     """Generate a huge case statement that barely fits within the 16MB limit but exceeds
        the statement expression limit. Verify that it fails."""
