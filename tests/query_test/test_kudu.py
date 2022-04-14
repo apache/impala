@@ -554,6 +554,7 @@ class TestKuduOperations(KuduTestSuite):
     """This test verifies that scans work as expected with different replica selection.
     """
     table_name = "%s.replica_selection" % unique_database
+    cursor.execute("set kudu_read_mode=READ_AT_SNAPSHOT")
     cursor.execute("""create table %s (a int primary key, b string) partition by hash(a)
         partitions 8 stored as kudu""" % table_name)
     cursor.execute("""insert into %s select id, string_col from functional.alltypes
