@@ -195,14 +195,22 @@ void Coordinator::BackendState::SetExecError(
 
 void Coordinator::BackendState::WaitOnExecRpc() {
   unique_lock<mutex> l(lock_);
-  WaitOnExecLocked(&l);
+  discard_result(WaitOnExecLocked(&l));
 }
 
-void Coordinator::BackendState::WaitOnExecLocked(unique_lock<mutex>* l) {
+bool Coordinator::BackendState::WaitOnExecLocked(
+    unique_lock<mutex>* l, int64_t timeout_ms) {
   DCHECK(l->owns_lock());
-  while (!exec_done_) {
-    exec_done_cv_.Wait(*l);
+  bool timed_out = false;
+  while (!exec_done_ && !timed_out) {
+    if (timeout_ms <= 0) {
+      exec_done_cv_.Wait(*l);
+    } else {
+      // WaitFor returns true if notified in time.
+      timed_out = !exec_done_cv_.WaitFor(*l, timeout_ms * MICROS_PER_MILLI);
+    }
   }
+  return !timed_out;
 }
 
 void Coordinator::BackendState::ExecCompleteCb(
@@ -210,6 +218,15 @@ void Coordinator::BackendState::ExecCompleteCb(
   {
     lock_guard<mutex> l(lock_);
     exec_rpc_status_ = exec_rpc_controller_.status();
+
+    Status complete_cb_debug_status =
+        DebugAction(exec_params_.query_options(), "IMPALA_MISS_EXEC_COMPLETE_CB");
+    if (UNLIKELY(exec_rpc_status_.ok() && !complete_cb_debug_status.ok())) {
+      // Simulate the missing of callback for successful RPC.
+      LOG(ERROR) << "Debug action: missing ExecComplete callback";
+      return;
+    }
+
     rpc_latency_ = MonotonicMillis() - start_ms;
 
     if (!exec_rpc_status_.ok()) {
@@ -579,101 +596,108 @@ Coordinator::BackendState::CancelResult Coordinator::BackendState::Cancel(
     bool fire_and_forget) {
   // Update 'result' based on the actions we take in this function and/or errors we hit.
   CancelResult result;
-  unique_lock<mutex> l(lock_);
+  bool notify_exec_done = false;
+  {
+    unique_lock<mutex> l(lock_);
 
-  // Nothing to cancel if the exec rpc was not sent.
-  if (!exec_rpc_sent_) {
-    if (status_.ok()) {
-      status_ = Status::CANCELLED;
-      result.became_done = true;
+    // Nothing to cancel if the exec rpc was not sent.
+    if (!exec_rpc_sent_) {
+      if (status_.ok()) {
+        status_ = Status::CANCELLED;
+        result.became_done = true;
+      }
+      VLogForBackend("Not sending Cancel() rpc because nothing was started.");
+      exec_done_ = true;
+      notify_exec_done = true;
+      goto done;
     }
-    VLogForBackend("Not sending Cancel() rpc because nothing was started.");
-    exec_done_ = true;
-    // Notify after releasing 'lock_' so that we don't wake up a thread just to have it
-    // immediately block again.
-    l.unlock();
-    exec_done_cv_.NotifyAll();
-    return result;
-  }
 
-  // If the exec rpc was sent but the callback hasn't been executed, try to cancel the rpc
-  // and then wait for it to be done.
-  if (!exec_done_) {
-    VLogForBackend("Attempting to cancel Exec() rpc");
-    cancel_exec_rpc_ = true;
-    exec_rpc_controller_.Cancel();
-    WaitOnExecLocked(&l);
-  }
-
-  // Don't cancel if we're done or already sent an RPC. Note that its possible the
-  // backend is still running, eg. if the rpc layer reported that the Exec() rpc failed
-  // but it actually reached the backend. In that case, the backend will cancel itself
-  // the first time it tries to send a status report and the coordinator responds with
-  // an error.
-  if (IsDoneLocked(l)) {
-    VLogForBackend(Substitute(
-        "Not cancelling because the backend is already done: $0", status_.GetDetail()));
-    return result;
-  } else if (sent_cancel_rpc_) {
-    DCHECK(status_.ok());
-    // If we did a fire_and_forget=false followed by fire_and_forget=true.
-    if (fire_and_forget) {
-      status_ = Status::CANCELLED;
-      result.became_done = true;
+    // If the exec rpc was sent but the callback hasn't been executed, try to cancel the
+    // rpc and then wait for it to be done.
+    if (!exec_done_) {
+      VLogForBackend("Attempting to cancel Exec() rpc");
+      cancel_exec_rpc_ = true;
+      exec_rpc_controller_.Cancel();
+      if (!WaitOnExecLocked(&l, (int64_t)FLAGS_backend_client_rpc_timeout_ms)) {
+        VLogForBackend(Substitute(
+            "Exec() rpc was not responsive after waiting for $0 ms",
+            FLAGS_backend_client_rpc_timeout_ms));
+        exec_done_ = true;
+        notify_exec_done = true;
+      }
     }
-    VLogForBackend(Substitute(
-        "Not cancelling because cancel RPC already sent: $0", status_.GetDetail()));
-    return result;
+
+    // Don't cancel if we're done or already sent an RPC. Note that its possible the
+    // backend is still running, eg. if the rpc layer reported that the Exec() rpc failed
+    // but it actually reached the backend. In that case, the backend will cancel itself
+    // the first time it tries to send a status report and the coordinator responds with
+    // an error.
+    if (IsDoneLocked(l)) {
+      VLogForBackend(Substitute(
+          "Not cancelling because the backend is already done: $0", status_.GetDetail()));
+      goto done;
+    } else if (sent_cancel_rpc_) {
+      DCHECK(status_.ok());
+      // If we did a fire_and_forget=false followed by fire_and_forget=true.
+      if (fire_and_forget) {
+        status_ = Status::CANCELLED;
+        result.became_done = true;
+      }
+      VLogForBackend(Substitute(
+          "Not cancelling because cancel RPC already sent: $0", status_.GetDetail()));
+      goto done;
+    }
+
+    // Avoid sending redundant cancel RPCs.
+    sent_cancel_rpc_ = true;
+    result.cancel_attempted = true;
+    // Set the status to CANCELLED if we are firing and forgetting.
+    if (fire_and_forget && status_.ok()) {
+      result.became_done = true;
+      status_ = Status::CANCELLED;
+    }
+
+    VLogForBackend("Sending CancelQueryFInstances rpc");
+
+    std::unique_ptr<ControlServiceProxy> proxy;
+    Status get_proxy_status = ControlService::GetProxy(
+        FromNetworkAddressPB(krpc_host_), host_.hostname(), &proxy);
+    if (!get_proxy_status.ok()) {
+      status_.MergeStatus(get_proxy_status);
+      result.became_done = true;
+      VLogForBackend(Substitute("Could not get proxy: $0", get_proxy_status.msg().msg()));
+      goto done;
+    }
+
+    CancelQueryFInstancesRequestPB request;
+    *request.mutable_query_id() = query_id_;
+    CancelQueryFInstancesResponsePB response;
+
+    const int num_retries = 3;
+    const int64_t timeout_ms = 10 * MILLIS_PER_SEC;
+    const int64_t backoff_time_ms = 3 * MILLIS_PER_SEC;
+    Status rpc_status =
+        RpcMgr::DoRpcWithRetry(proxy, &ControlServiceProxy::CancelQueryFInstances,
+            request, &response, query_ctx_, "Cancel() RPC failed", num_retries,
+            timeout_ms, backoff_time_ms, "COORD_CANCEL_QUERY_FINSTANCES_RPC");
+
+    if (!rpc_status.ok()) {
+      status_.MergeStatus(rpc_status);
+      result.became_done = true;
+      VLogForBackend(
+          Substitute("CancelQueryFInstances rpc failed: $0", rpc_status.msg().msg()));
+      goto done;
+    }
+    Status cancel_status = Status(response.status());
+    if (!cancel_status.ok()) {
+      status_.MergeStatus(cancel_status);
+      result.became_done = true;
+      VLogForBackend(
+          Substitute("CancelQueryFInstances failed: $0", cancel_status.msg().msg()));
+    }
   }
-
-  // Avoid sending redundant cancel RPCs.
-  sent_cancel_rpc_ = true;
-  result.cancel_attempted = true;
-  // Set the status to CANCELLED if we are firing and forgetting.
-  if (fire_and_forget && status_.ok()) {
-    result.became_done = true;
-    status_ = Status::CANCELLED;
-  }
-
-  VLogForBackend("Sending CancelQueryFInstances rpc");
-
-  std::unique_ptr<ControlServiceProxy> proxy;
-  Status get_proxy_status = ControlService::GetProxy(
-      FromNetworkAddressPB(krpc_host_), host_.hostname(), &proxy);
-  if (!get_proxy_status.ok()) {
-    status_.MergeStatus(get_proxy_status);
-    result.became_done = true;
-    VLogForBackend(Substitute("Could not get proxy: $0", get_proxy_status.msg().msg()));
-    return result;
-  }
-
-  CancelQueryFInstancesRequestPB request;
-  *request.mutable_query_id() = query_id_;
-  CancelQueryFInstancesResponsePB response;
-
-  const int num_retries = 3;
-  const int64_t timeout_ms = 10 * MILLIS_PER_SEC;
-  const int64_t backoff_time_ms = 3 * MILLIS_PER_SEC;
-  Status rpc_status =
-      RpcMgr::DoRpcWithRetry(proxy, &ControlServiceProxy::CancelQueryFInstances, request,
-          &response, query_ctx_, "Cancel() RPC failed", num_retries, timeout_ms,
-          backoff_time_ms, "COORD_CANCEL_QUERY_FINSTANCES_RPC");
-
-  if (!rpc_status.ok()) {
-    status_.MergeStatus(rpc_status);
-    result.became_done = true;
-    VLogForBackend(
-        Substitute("CancelQueryFInstances rpc failed: $0", rpc_status.msg().msg()));
-    return result;
-  }
-  Status cancel_status = Status(response.status());
-  if (!cancel_status.ok()) {
-    status_.MergeStatus(cancel_status);
-    result.became_done = true;
-    VLogForBackend(
-        Substitute("CancelQueryFInstances failed: $0", cancel_status.msg().msg()));
-    return result;
-  }
+done:
+  if (notify_exec_done) exec_done_cv_.NotifyAll();
   return result;
 }
 

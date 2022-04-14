@@ -450,8 +450,11 @@ class Coordinator::BackendState {
   void SetExecError(
       const Status& status, TypedCountingBarrier<Status>* exec_status_barrier);
 
-  /// Same as WaitOnExecRpc(), except 'l' must own 'lock_'.
-  void WaitOnExecLocked(std::unique_lock<std::mutex>* l);
+  /// Waits until the ExecQueryFInstances() rpc has completed, or been timeout.
+  /// 'l' must own 'lock_'. 'timeout_ms' specifies timeout in milli-seconds. Wait
+  /// indefinitely until rpc has completed if 'timeout_ms' is less or equal to 0.
+  /// Return true if the rpc has completed in time, return false otherwise.
+  bool WaitOnExecLocked(std::unique_lock<std::mutex>* l, int64_t timeout_ms = 0);
 
   /// Called when the ExecQueryFInstances() rpc completes. Notifies 'exec_status_barrier'
   /// with the status. 'start' is the MonotonicMillis() timestamp when the rpc was sent.

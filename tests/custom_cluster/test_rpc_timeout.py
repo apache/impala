@@ -19,8 +19,16 @@ import pytest
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_cluster import ImpalaCluster
-from tests.common.skip import SkipIfBuildType
+from tests.common.skip import SkipIfBuildType, SkipIfGCS, SkipIfCOS
 from tests.verifiers.metric_verifier import MetricVerifier
+
+# The BE krpc port of the impalad to simulate rpc errors in tests.
+FAILED_KRPC_PORT = 27001
+
+
+def _get_rpc_fail_action(port):
+  return "IMPALA_SERVICE_POOL:127.0.0.1:{port}:ExecQueryFInstances:FAIL" \
+      .format(port=port)
 
 @SkipIfBuildType.not_dev_build
 class TestRPCTimeout(CustomClusterTestSuite):
@@ -194,6 +202,29 @@ class TestRPCTimeout(CustomClusterTestSuite):
     self.execute_query_verify_metrics(self.SLOW_TEST_QUERY,
         expected_exception="cancelled due to unresponsive backend")
 
+  @SkipIfGCS.jira(reason="IMPALA-10562")
+  @SkipIfCOS.jira(reason="IMPALA-10562")
+  @SkipIfBuildType.not_dev_build
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--backend_client_rpc_timeout_ms=1000 --debug_actions=" +
+      _get_rpc_fail_action(FAILED_KRPC_PORT),
+      statestored_args="--statestore_heartbeat_frequency_ms=1000 \
+          --statestore_max_missed_heartbeats=2")
+  def test_miss_complete_cb(self, unique_database):
+    """Test verify cancellation should not be blocked if the callback of ExecComplate
+    are missing."""
+
+    rpc_not_accessible_impalad = self.cluster.impalads[1]
+    assert rpc_not_accessible_impalad.service.krpc_port == FAILED_KRPC_PORT
+
+    # The 2nd node cannot be accessible through KRPC so that it's added to blacklist
+    # and the query should be aborted without hanging.
+    query = "select count(*) from tpch_parquet.lineitem where l_orderkey < 50"
+    debug_action = 'IMPALA_MISS_EXEC_COMPLETE_CB:FAIL@1.0'
+    ex = self.execute_query_expect_failure(self.client, query,
+        query_options={'retry_failed_queries': 'false', 'debug_action': debug_action})
+    assert "Query aborted" in str(ex)
 
 class TestCatalogRPCTimeout(CustomClusterTestSuite):
   """"Tests RPC timeout and retry handling for catalogd operations."""
