@@ -660,7 +660,11 @@ public class Hive3MetastoreShimBase {
           // acquireLock() interruptible so we just swallow the exception here.
         }
       }
-      if (lockResponse.getState() == LockState.ACQUIRED) {
+      LockState lockState = lockResponse.getState();
+      LOG.info("It took " + String.valueOf(System.currentTimeMillis() - startTime) +
+          " ms to wait for lock " + String.valueOf(lockId) + " of transaction " +
+          String.valueOf(txnId) + ". Final lock state is " + lockState.name());
+      if (lockState == LockState.ACQUIRED) {
         return lockId;
       }
       if (lockId > 0) {

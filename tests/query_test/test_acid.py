@@ -327,26 +327,26 @@ class TestAcid(ImpalaTestSuite):
     try:
       if self.exploration_strategy() == 'exhaustive':
         elapsed = elapsed_time_for_query("insert into {} values (1)".format(tbl))
-        assert elapsed > 300 and elapsed < 305
+        assert elapsed > 300 and elapsed < 310
       self.execute_query("set lock_max_wait_time_s=20")
       elapsed = elapsed_time_for_query("insert into {} values (1)".format(tbl))
-      assert elapsed > 20 and elapsed < 25
+      assert elapsed > 20 and elapsed < 28
 
       self.execute_query("set lock_max_wait_time_s=0")
       elapsed = elapsed_time_for_query("insert into {} values (1)".format(tbl))
-      assert elapsed < 5
+      assert elapsed < 8
 
       self.execute_query("set lock_max_wait_time_s=10")
       elapsed = elapsed_time_for_query("insert into {} values (1)".format(tbl))
-      assert elapsed > 10 and elapsed < 15
+      assert elapsed > 10 and elapsed < 18
 
       self.execute_query("set lock_max_wait_time_s=2")
       elapsed = elapsed_time_for_query("truncate table {}".format(tbl))
-      assert elapsed > 2 and elapsed < 7
+      assert elapsed > 2 and elapsed < 10
 
       self.execute_query("set lock_max_wait_time_s=5")
       elapsed = elapsed_time_for_query("drop table {}".format(tbl))
-      assert elapsed > 5 and elapsed < 10
+      assert elapsed > 5 and elapsed < 13
     finally:
       acid_util.unlock(lock_resp.lockid)
 
