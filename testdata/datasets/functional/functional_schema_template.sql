@@ -2541,32 +2541,6 @@ SELECT * from functional.{table_name};
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
-alltypes_transactional
----- CREATE
-CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
-  id INT,
-  bool_col BOOLEAN,
-  tinyint_col TINYINT,
-  smallint_col SMALLINT,
-  int_col INT,
-  bigint_col BIGINT,
-  float_col FLOAT,
-  double_col DOUBLE,
-  date_string_col STRING,
-  string_col STRING,
-  timestamp_col TIMESTAMP,
-  year int,
-  month int
-)
-STORED AS {file_format}
-TBLPROPERTIES ('transactional'='true', 'transactional_properties'='insert_only');
----- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}{db_suffix}.alltypes;
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
 materialized_view
 ---- HIVE_MAJOR_VERSION
 3
@@ -3433,23 +3407,6 @@ hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/ice/i
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
-jointbl_transactional
----- CREATE
-CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
-  test_id BIGINT,
-  test_name STRING,
-  test_zip INT,
-  alltypes_id INT
-)
-STORED AS {file_format}
-TBLPROPERTIES ('transactional'='true', 'transactional_properties'='insert_only');
----- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}{db_suffix}.jointbl;
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
 mv1_alltypes_jointbl
 ---- HIVE_MAJOR_VERSION
 3
@@ -3457,11 +3414,13 @@ mv1_alltypes_jointbl
 CREATE MATERIALIZED VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name}
 STORED AS {file_format} AS SELECT t1.smallint_col c1, t1.bool_col c2,
 t2.test_id c3, min(t1.bigint_col) min_bigint, min(t2.test_zip) min_zip
-FROM {db_name}{db_suffix}.alltypes_transactional t1
-JOIN {db_name}{db_suffix}.jointbl_transactional t2 ON (t1.id=t2.alltypes_id)
+FROM {db_name}{db_suffix}.alltypes t1
+JOIN {db_name}{db_suffix}.jointbl t2 ON (t1.id=t2.alltypes_id)
 group by t1.smallint_col, t1.bool_col, t2.test_id;
 ---- DEPENDENT_LOAD_HIVE
 ALTER MATERIALIZED VIEW {db_name}{db_suffix}.{table_name} REBUILD;
+-- do a count to confirm if the rebuild populated rows in the MV
+select count(*) as mv_count from {db_name}{db_suffix}.{table_name};
 =====
 ---- DATASET
 functional
@@ -3476,9 +3435,11 @@ mv2_alltypes_jointbl
 CREATE MATERIALIZED VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name}
 STORED AS {file_format} AS SELECT t1.smallint_col c1, t1.bool_col c2,
 t2.test_id c3, max(t1.bigint_col) max_bigint, max(t2.test_zip) max_zip
-FROM {db_name}{db_suffix}.alltypes_transactional t1
-JOIN {db_name}{db_suffix}.jointbl_transactional t2 ON (t1.id=t2.alltypes_id)
+FROM {db_name}{db_suffix}.alltypes t1
+JOIN {db_name}{db_suffix}.jointbl t2 ON (t1.id=t2.alltypes_id)
 group by t1.smallint_col, t1.bool_col, t2.test_id;
 ---- DEPENDENT_LOAD_HIVE
 ALTER MATERIALIZED VIEW {db_name}{db_suffix}.{table_name} REBUILD;
+-- do a count to confirm if the rebuild populated rows in the MV
+select count(*) as mv_count from {db_name}{db_suffix}.{table_name};
 ====

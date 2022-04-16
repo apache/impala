@@ -3143,8 +3143,8 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
       // Add an unmasked policy. It should not block updates.
       createColumnMaskingPolicy("alltypessmall_id_unmask", "functional", "alltypessmall",
           "id", user_.getShortName(), "MASK_NONE", /*maskExpr*/null);
-      createColumnMaskingPolicy("alltypes_transactional_sint_mask", "functional_orc_def",
-          "alltypes_transactional", "smallint_col", user_.getShortName(), "MASK_NULL",
+      createColumnMaskingPolicy("alltypes_sint_mask", "functional_orc_def",
+          "alltypes", "smallint_col", user_.getShortName(), "MASK_NULL",
           /*maskExpr*/null);
       // Create a column mask on a materialized view column. Since this
       // MV references source table with a column masking policy (defined
@@ -3284,7 +3284,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
       deleteRangerPolicy("alltypestiny_id_mask");
       deleteRangerPolicy("kudu_id_mask");
       deleteRangerPolicy("alltypessmall_id_unmask");
-      deleteRangerPolicy("alltypes_transactional_sint_mask");
+      deleteRangerPolicy("alltypes_sint_mask");
       deleteRangerPolicy("mv1_alltypes_jointbl_c2_mask");
     }
   }
