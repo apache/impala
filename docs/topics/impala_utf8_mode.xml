@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="utf8_mode">
+
+ <title>UTF8_MODE Query Option</title>
+ <titlealts audience="PDF"><navtitle>UTF8_MODE</navtitle></titlealts>
+ <prolog>
+  <metadata>
+   <data name="Category" value="Impala"/>
+   <data name="Category" value="Impala Query Options"/>
+   <data name="Category" value="Troubleshooting"/>
+   <data name="Category" value="Querying"/>
+   <data name="Category" value="Developers"/>
+   <data name="Category" value="Data Analysts"/>
+  </metadata>
+ </prolog>
+
+ <conbody>
+  <p>
+   <indexterm audience="hidden">UTF8_MODE Query Option</indexterm> UTF-8 support allows string
+   functions to recognize the UTF-8 characters, thus processing strings in a compatible way as other
+   engines.</p>
+  <p>You can use the new query option, UTF8_MODE, to turn on/off the UTF-8 aware behavior. The query
+   option can be set globally, or at per session level. Only queries with UTF8_MODE=true will have
+   UTF-8 aware behaviors. If the query option UTF8_MODE is turned on globally, existing queries that
+   depend on the original binary behavior need to be explicitly set to UTF8_MODE=false.</p>
+
+  <p><b>Type:</b>BOOLEAN</p>
+  <p><b>Default:</b>FALSE</p>
+  <p><b>Added in:</b>Impala 4.1</p>
+  <p conref="../shared/impala_common.xml#common/related_info"/>
+  <p>
+   <xref href="impala_string.xml"/>,
+   <xref href="impala_utf_8.xml"/>
+  </p>
+ </conbody>
+</concept>

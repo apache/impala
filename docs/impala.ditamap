@@ -256,6 +256,7 @@ under the License.
           <topicref href="topics/impala_thread_reservation_limit.xml"/>
           <topicref href="topics/impala_timezone.xml"/>
           <topicref href="topics/impala_topn_bytes_limit.xml"/>
+          <topicref href="topics/impala_utf8_mode.xml"/>
         </topicref>
       </topicref>
       <topicref href="topics/impala_show.xml"/>
@@ -292,6 +293,7 @@ under the License.
     <topicref href="topics/impala_udf.xml"/>
     <topicref href="topics/impala_langref_unsupported.xml"/>
     <topicref href="topics/impala_porting.xml"/>
+    <topicref href="topics/impala_utf_8.xml"/>
   </topicref>
   
   <topicref href="topics/impala_performance.xml">

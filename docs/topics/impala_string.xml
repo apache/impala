@@ -147,9 +147,7 @@ under the License.
     </p>
 
     <ul>
-      <li>
-        String manipulation functions.
-      </li>
+      <li>CHAR/VARCHAR truncating/padding.</li>
 
       <li>
         Comparison operators.
@@ -171,6 +169,8 @@ under the License.
       those national language characteristics of string data, use logic on the
       application side.
     </p>
+    <p>If you just need Hive-compatible string function behaviors on UTF-8 encoded strings, turn on
+      the query option UTF8_MODE. See more in <xref href="impala_utf_8.xml"/>.</p>
     <p>
       <b>Conversions:</b>
     </p>
