@@ -1477,6 +1477,7 @@ class TestOrc(ImpalaTestSuite):
     super(TestOrc, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format == 'orc')
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('orc_schema_resolution', 0, 1))
 
   @SkipIfS3.hdfs_block_size
   @SkipIfGCS.hdfs_block_size

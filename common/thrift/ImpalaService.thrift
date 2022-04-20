@@ -733,6 +733,9 @@ enum TImpalaQueryOptions {
 
   // Maximum wait time on HMS ACID lock in seconds.
   LOCK_MAX_WAIT_TIME_S = 145
+
+  // Determines how to resolve ORC files' schemas. Valid values are "position" and "name".
+  ORC_SCHEMA_RESOLUTION = 146;
 }
 
 // The summary of a DML statement.

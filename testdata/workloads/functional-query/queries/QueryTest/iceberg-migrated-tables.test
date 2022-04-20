@@ -74,10 +74,12 @@ BIGINT, DOUBLE, DECIMAL
 # * Partition FLOAT column to DOUBLE
 # * Partition DECIMAL(5,3) column to DECIMAL(8,3)
 # * Non-partition column has been moved to end of the schema
-# Currently this fails due to IMPALA-9410
 select * from functional_parquet.iceberg_legacy_partition_schema_evolution_orc
----- CATCH
-Parse error in possibly corrupt ORC file
+---- RESULTS
+1,1.100000023841858,2.718,2
+1,1.100000023841858,3.141,1
+---- TYPES
+BIGINT, DOUBLE, DECIMAL, INT
 ====
 ---- QUERY
 # Read only the partition columns.

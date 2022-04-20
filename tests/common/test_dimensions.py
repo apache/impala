@@ -164,6 +164,13 @@ def hs2_text_constraint(v):
           v.get_value('table_format').file_format == 'text' and
           v.get_value('table_format').compression_codec == 'none')
 
+
+def orc_schema_resolution_constraint(v):
+  """ Constraint to use multiple orc_schema_resolution only in case of orc files"""
+  file_format = v.get_value('table_format').file_format
+  orc_schema_resolution = v.get_value('orc_schema_resolution')
+  return file_format == 'orc' or orc_schema_resolution == 0
+
 # Common sets of values for the exec option vectors
 ALL_BATCH_SIZES = [0]
 

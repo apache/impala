@@ -37,16 +37,21 @@ inline int GetFieldIdFromStr(const std::string& str) {
 }
 
 OrcSchemaResolver::OrcSchemaResolver(const HdfsTableDescriptor& tbl_desc,
-    const orc::Type* root, const char* filename, bool is_table_acid) :
-    tbl_desc_(tbl_desc), root_(root), filename_(filename),
+    const orc::Type* root, const char* filename, bool is_table_acid,
+    TSchemaResolutionStrategy::type schema_resolution)
+  : schema_resolution_strategy_(schema_resolution),
+    tbl_desc_(tbl_desc),
+    root_(root),
+    filename_(filename),
     is_table_full_acid_(is_table_acid) {
   DetermineFullAcidSchema();
-  schema_resolution_strategy_ = TSchemaResolutionStrategy::POSITION;
   if (tbl_desc_.IsIcebergTable() && root_->getSubtypeCount() > 0) {
     // Use FIELD_ID-based column resolution for Iceberg tables if possible.
     const orc::Type* first_child =  root_->getSubtype(0);
     if (first_child->hasAttributeKey(ICEBERG_FIELD_ID)) {
       schema_resolution_strategy_ = TSchemaResolutionStrategy::FIELD_ID;
+    } else {
+      schema_resolution_strategy_ = TSchemaResolutionStrategy::NAME;
     }
   }
 }
@@ -55,6 +60,8 @@ Status OrcSchemaResolver::ResolveColumn(const SchemaPath& col_path,
     const orc::Type** node, bool* pos_field, bool* missing_field) const {
   if (schema_resolution_strategy_ == TSchemaResolutionStrategy::POSITION) {
     return ResolveColumnByPosition(col_path, node, pos_field, missing_field);
+  } else if (schema_resolution_strategy_ == TSchemaResolutionStrategy::NAME) {
+    return ResolveColumnByName(col_path, node, pos_field, missing_field);
   } else if (schema_resolution_strategy_ == TSchemaResolutionStrategy::FIELD_ID) {
     return ResolveColumnByIcebergFieldId(col_path, node, pos_field, missing_field);
   } else {
@@ -160,6 +167,86 @@ Status OrcSchemaResolver::ValidateMap(const ColumnType& type,
         orc_type.toString());
   }
   return Status::OK();
+}
+
+Status OrcSchemaResolver::ResolveColumnByName(const SchemaPath& col_path,
+    const orc::Type** node, bool* pos_field, bool* missing_field) const {
+  const ColumnType* table_col_type = nullptr;
+  *node = root_;
+  *pos_field = false;
+  *missing_field = false;
+  if (col_path.empty()) return Status::OK();
+  SchemaPath table_path, file_path;
+  TranslateColPaths(col_path, &table_path, &file_path);
+
+  int i = 0;
+
+  // Resolve table and file ACID differences
+  int table_idx = table_path[i];
+  int file_idx = file_path[i];
+  if (table_idx == -1 || file_idx == -1) {
+    DCHECK_NE(table_idx, file_idx);
+    if (table_idx == -1) {
+      DCHECK_EQ(*node, root_);
+      *node = (*node)->getSubtype(file_idx);
+    } else {
+      DCHECK(table_col_type == nullptr);
+      table_col_type = &tbl_desc_.col_descs()[table_idx].type();
+    }
+    i++;
+  }
+
+  for (; i < table_path.size(); ++i) {
+    table_idx = table_path[i];
+    if (table_col_type == nullptr) {
+      // non ACID table, or top level user column in ACID table
+      table_col_type = &tbl_desc_.col_descs()[table_idx].type();
+      const std::string& name = tbl_desc_.col_descs()[table_idx].name();
+      *node = FindChildWithName(*node, name);
+      if (*node == nullptr) {
+        *missing_field = true;
+        return Status::OK();
+      }
+      RETURN_IF_ERROR(ValidateType(*table_col_type, **node, table_path, i));
+      continue;
+    } else if (table_col_type->type == TYPE_STRUCT) {
+      // Resolve struct field by name.
+      DCHECK_LT(table_idx, table_col_type->field_names.size());
+      const std::string& name = table_col_type->field_names[table_idx];
+      *node = FindChildWithName(*node, name);
+    } else if (table_col_type->type == TYPE_ARRAY) {
+      if (table_idx == SchemaPathConstants::ARRAY_POS) {
+        *pos_field = true;
+        break; // return *node as the ARRAY node
+      }
+      DCHECK_EQ(table_idx, SchemaPathConstants::ARRAY_ITEM);
+      *node = (*(node))->getSubtype(table_idx);
+    } else if (table_col_type->type == TYPE_MAP) {
+      DCHECK(table_idx == SchemaPathConstants::MAP_KEY
+          || table_idx == SchemaPathConstants::MAP_VALUE);
+      // At this point we've found a MAP with a matching name. It's safe to resolve
+      // the child (key or value) by position.
+      *node = (*(node))->getSubtype(table_idx);
+    }
+    if (*node == nullptr) {
+      *missing_field = true;
+      return Status::OK();
+    }
+    table_col_type = &table_col_type->children[table_idx];
+    RETURN_IF_ERROR(ValidateType(*table_col_type, **node, table_path, i));
+  }
+  return Status::OK();
+}
+
+const orc::Type* OrcSchemaResolver::FindChildWithName(
+    const orc::Type* node, const std::string& name) const {
+  for (int i = 0; i < node->getSubtypeCount(); ++i) {
+    const orc::Type* child = node->getSubtype(i);
+    DCHECK(child != nullptr);
+    const std::string& fieldName = node->getFieldName(i);
+    if (iequals(fieldName, name)) return child;
+  }
+  return nullptr;
 }
 
 Status OrcSchemaResolver::ResolveColumnByIcebergFieldId(const SchemaPath& col_path,

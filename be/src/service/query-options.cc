@@ -1222,6 +1222,13 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_test_replan(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::ORC_SCHEMA_RESOLUTION: {
+        TSchemaResolutionStrategy::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "orc schema resolution",
+            _TSchemaResolutionStrategy_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_orc_schema_resolution(enum_type);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";
