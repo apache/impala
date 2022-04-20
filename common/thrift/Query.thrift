@@ -591,6 +591,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   146: optional i32 lock_max_wait_time_s = 300
+
+  // See comment in ImpalaService.thrift
+  147: optional TSchemaResolutionStrategy orc_schema_resolution = 0;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

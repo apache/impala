@@ -42,7 +42,8 @@ constexpr int CURRENT_TRANSCACTION_TYPE_ID = 5;
 class OrcSchemaResolver {
  public:
   OrcSchemaResolver(const HdfsTableDescriptor& tbl_desc, const orc::Type* root,
-      const char* filename, bool is_table_acid);
+      const char* filename, bool is_table_acid,
+      TSchemaResolutionStrategy::type schema_resolution);
 
   /// Resolve SchemaPath into orc::Type (ORC column representation)
   /// 'pos_field' is set to true if 'col_path' reference the index field of an array
@@ -94,11 +95,19 @@ class OrcSchemaResolver {
   Status ResolveColumnByPosition(const SchemaPath& col_path, const orc::Type** node,
       bool* pos_field, bool* missing_field) const;
 
+  /// Resolve column based on name.
+  Status ResolveColumnByName(const SchemaPath& col_path, const orc::Type** node,
+      bool* pos_field, bool* missing_field) const;
+
   /// Resolve column based on the Iceberg field ids. This way we will retrieve the
   /// Iceberg field ids from the HMS table via 'col_path', then find the corresponding
   /// field in the ORC file.
   Status ResolveColumnByIcebergFieldId(const SchemaPath& col_path, const orc::Type** node,
       bool* pos_field, bool* missing_field) const;
+
+  /// Finds child of 'node' whose column name matches to provided 'name'.
+  const orc::Type* FindChildWithName(
+      const orc::Type* node, const std::string& name) const;
 
   /// Finds child of 'node' that has Iceberg field id equals to 'field_id'.
   const orc::Type* FindChildWithFieldId(const orc::Type* node, const int field_id) const;
