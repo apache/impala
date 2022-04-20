@@ -462,13 +462,20 @@ struct TCatalogOpRequest {
   19: optional TDescribeHistoryParams describe_history_params
 }
 
+// Query options type
+enum TQueryOptionType {
+  SET_ONE = 0
+  SET_ALL = 1
+  UNSET_ALL = 2
+}
+
 // Parameters for the SET query option command
 struct TSetQueryOptionRequest {
   // Set for "SET key=value", unset for "SET" and "SET ALL" statements.
   1: optional string key
   2: optional string value
-  // Set true for "SET ALL"
-  3: optional bool is_set_all
+  // query option type
+  3: optional TQueryOptionType query_option_type
 }
 
 struct TShutdownParams {

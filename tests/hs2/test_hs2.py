@@ -145,6 +145,22 @@ class TestHS2(HS2TestSuite):
     # Removed options are returned by "SET ALL" for the benefit of impala-shell.
     assert levels["MAX_IO_BUFFERS"] == "REMOVED"
 
+  @needs_session()
+  def test_session_option_levels_via_unset_all(self):
+    self.execute_statement("SET COMPRESSION_CODEC=gzip")
+    self.execute_statement("SET SYNC_DDL=1")
+    vals, levels = self.get_session_options("SET")
+    assert vals["COMPRESSION_CODEC"] == "GZIP"
+    assert vals["SYNC_DDL"] == "1"
+
+    # Unset all query options
+    self.execute_statement("UNSET ALL")
+    vals2, levels = self.get_session_options("SET")
+
+    # Reset to default value
+    assert vals2["COMPRESSION_CODEC"] == ""
+    assert vals2["SYNC_DDL"] == "0"
+
   @SkipIfDockerizedCluster.internal_hostname
   def test_open_session_http_addr(self):
     """Check that OpenSession returns the coordinator's http address."""

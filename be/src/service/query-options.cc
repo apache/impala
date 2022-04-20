@@ -1304,3 +1304,24 @@ void impala::PopulateQueryOptionLevels(QueryOptionLevels* query_option_levels)
 #undef QUERY_OPT_FN
 #undef REMOVED_QUERY_OPT_FN
 }
+
+Status impala::ResetAllQueryOptions(
+    TQueryOptions* query_options, QueryOptionsMask* set_query_options_mask) {
+  static const TQueryOptions defaults = DefaultQueryOptions();
+#define QUERY_OPT_FN(NAME, ENUM, LEVEL)                  \
+  if (query_options->NAME != defaults.NAME) {            \
+    query_options->__isset.NAME = defaults.__isset.NAME; \
+    query_options->NAME = defaults.NAME;                 \
+    int option = GetQueryOptionForKey(#NAME);            \
+    DCHECK_GE(option, 0);                                \
+    if (set_query_options_mask != nullptr) {             \
+      DCHECK_LT(option, set_query_options_mask->size()); \
+      set_query_options_mask->reset(option);             \
+    }                                                    \
+  }
+#define REMOVED_QUERY_OPT_FN(NAME, ENUM)
+  QUERY_OPTS_TABLE
+#undef QUERY_OPT_FN
+#undef REMOVED_QUERY_OPT_FN
+  return Status::OK();
+}

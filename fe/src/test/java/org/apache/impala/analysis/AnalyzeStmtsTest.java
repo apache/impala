@@ -4637,6 +4637,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   public void TestSetQueryOption() {
     AnalyzesOk("set foo=true");
     AnalyzesOk("set");
+    AnalyzesOk("unset all");
   }
 
   @Test

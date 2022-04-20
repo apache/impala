@@ -700,6 +700,16 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     # Verify that query options under [impala] override those under [impala.query_options]
     assert "\tDEFAULT_FILE_FORMAT: avro" in result.stdout
 
+    # unset all query options
+    cmds = "unset all;set all;"
+    result = run_impala_shell_interactive(vector, cmds, shell_args=args)
+    assert "\tMT_DOP: " in result.stdout
+    assert "\tMAX_ERRORS: [100]" in result.stdout
+    assert "\tEXPLAIN_LEVEL: [STANDARD]" in result.stdout
+    assert "INVALID_QUERY_OPTION is not supported for the impalad being connected to, "\
+           "ignoring." in result.stdout
+    assert "\tDEFAULT_FILE_FORMAT: [TEXT]" in result.stdout
+
   def test_commandline_flag_disable_live_progress(self, vector):
     """Test the command line flag disable_live_progress with live_progress."""
     if vector.get_value('strict_hs2_protocol'):

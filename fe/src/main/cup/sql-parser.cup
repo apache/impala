@@ -57,6 +57,7 @@ import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TOwnerType;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.thrift.TQueryOptionType;
 import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TTablePropertyType;
 import org.apache.impala.thrift.TPrincipalType;
@@ -359,6 +360,7 @@ nonterminal List<SetOperand> values_operand_list;
 // USE stmt
 nonterminal UseStmt use_stmt;
 nonterminal SetStmt set_stmt;
+nonterminal SetStmt unset_stmt;
 nonterminal ShowTablesStmt show_tables_stmt;
 nonterminal ShowDbsStmt show_dbs_stmt;
 nonterminal ShowStatsStmt show_stats_stmt, show_partitions_stmt,
@@ -712,6 +714,8 @@ stmt ::=
   {: RESULT = reset_metadata; :}
   | set_stmt:set
   {: RESULT = set; :}
+  | unset_stmt:unset
+  {: RESULT = unset; :}
   | show_roles_stmt:show_roles
   {: RESULT = show_roles; :}
   | show_grant_principal_stmt:show_grant_principal
@@ -2919,19 +2923,24 @@ select_clause ::=
 
 set_stmt ::=
   KW_SET ident_or_default:key EQUAL numeric_literal:l
-  {: RESULT = new SetStmt(key, l.getStringValue(), false); :}
+  {: RESULT = new SetStmt(key, l.getStringValue(), TQueryOptionType.SET_ONE); :}
   | KW_SET ident_or_default:key EQUAL STRING_LITERAL:l
-  {: RESULT = new SetStmt(key, l, false); :}
+  {: RESULT = new SetStmt(key, l, TQueryOptionType.SET_ONE); :}
   | KW_SET ident_or_default:key EQUAL SUBTRACT numeric_literal:l
   {:
     l.swapSign();
-    RESULT = new SetStmt(key, l.getStringValue(), false); :}
+    RESULT = new SetStmt(key, l.getStringValue(), TQueryOptionType.SET_ONE); :}
   | KW_SET ident_or_default:key EQUAL word:value
-  {: RESULT = new SetStmt(key, value, false); :}
+  {: RESULT = new SetStmt(key, value, TQueryOptionType.SET_ONE); :}
   | KW_SET KW_ALL
-  {: RESULT = new SetStmt(null, null, true); :}
+  {: RESULT = new SetStmt(null, null, TQueryOptionType.SET_ALL); :}
   | KW_SET
-  {: RESULT = new SetStmt(null, null, false); :}
+  {: RESULT = new SetStmt(null, null, TQueryOptionType.SET_ONE); :}
+  ;
+
+unset_stmt ::=
+  KW_UNSET KW_ALL
+  {: RESULT = new SetStmt(null, null, TQueryOptionType.UNSET_ALL); :}
   ;
 
 // Top-level function call, e.g. ": shutdown()", used for admin commands, etc.

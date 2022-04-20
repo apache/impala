@@ -894,6 +894,10 @@ class ImpalaShell(cmd.Cmd, object):
       del self.set_query_options[option]
     elif self._handle_unset_shell_options(option):
       print('Unsetting shell option %s' % option)
+    elif option == 'ALL':
+      print('Unsetting all option')
+      for key in list(self.set_query_options.keys()):
+        del self.set_query_options[key]
     else:
       print("No option called %s is set" % option)
 

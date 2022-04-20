@@ -281,10 +281,19 @@ Status ClientRequestState::Exec() {
           VLOG_QUERY << "ClientRequestState::Exec() SET: idle_session_timeout="
                      << PrettyPrinter::Print(session_->session_timeout, TUnit::TIME_S);
         }
+      } else if (exec_request_->set_query_option_request.__isset.query_option_type
+          && exec_request_->set_query_option_request.query_option_type
+              == TQueryOptionType::UNSET_ALL) {
+        // "UNSET ALL"
+        RETURN_IF_ERROR(ResetAllQueryOptions(
+            &session_->set_query_options, &session_->set_query_options_mask));
+        SetResultSet({}, {}, {});
       } else {
         // "SET" or "SET ALL"
-        bool is_set_all = exec_request_->set_query_option_request.__isset.is_set_all &&
-            exec_request_->set_query_option_request.is_set_all;
+        bool is_set_all =
+            exec_request_->set_query_option_request.__isset.query_option_type
+            && exec_request_->set_query_option_request.query_option_type
+                == TQueryOptionType::SET_ALL;
         PopulateResultForSet(is_set_all);
       }
       break;

@@ -333,6 +333,10 @@ Status ParseQueryOptions(const std::string& options, TQueryOptions* query_option
 /// entries.
 void PopulateQueryOptionLevels(QueryOptionLevels* query_option_levels);
 
+/// Reset all query options to its default value if they are not equal to default value.
+/// The bit corresponding to query option 'key' in set_query_options_mask is unset.
+Status ResetAllQueryOptions(
+    TQueryOptions* query_options, QueryOptionsMask* set_query_options_mask);
 }
 
 #endif
