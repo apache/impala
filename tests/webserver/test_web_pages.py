@@ -20,6 +20,7 @@ from tests.common.file_utils import grep_dir
 from tests.common.skip import SkipIfBuildType, SkipIfDockerizedCluster
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
+from datetime import datetime
 import itertools
 import json
 import os
@@ -478,7 +479,8 @@ class TestWebPage(ImpalaTestSuite):
       if expected_result in json_part['stmt']:
         check_if_contains = True
         break
-    assert check_if_contains, "No matching statement found in the jsons."
+    assert check_if_contains, "No matching statement found in the jsons at {}: {}".format(
+        datetime.now(), response_json)
 
   def __run_query_and_get_debug_page(self, query, page_url, query_options=None,
                                      expected_state=None):
