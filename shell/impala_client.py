@@ -388,14 +388,6 @@ class ImpalaClient(object):
     # timeout so that in case of any connection errors, the client retries have a better
     # chance of succeeding.
 
-    # HTTP server implemententations do not support SPNEGO yet.
-    # TODO: when we add support for Kerberos+HTTP, we need to re-enable the automatic
-    # kerberos retry logic in impala_shell.py that was disabled for HTTP because of
-    # IMPALA-8932.
-    if self.use_kerberos or self.kerberos_host_fqdn:
-      print("Kerberos not supported with HTTP endpoints.", file=sys.stderr)
-      raise NotImplementedError()
-
     host_and_port = "{0}:{1}".format(self.impalad_host, self.impalad_port)
     assert self.http_path
     # ImpalaHttpClient relies on the URI scheme (http vs https) to open an appropriate
@@ -417,10 +409,20 @@ class ImpalaClient(object):
                                    socket_timeout_s=self.http_socket_timeout_s)
 
     if self.use_ldap:
-      # Set the BASIC auth header
+      # Set the BASIC authorization
       user_passwd = "{0}:{1}".format(self.user, self.ldap_password)
       auth = base64.encodestring(user_passwd.encode()).decode().strip('\n')
-      transport.setCustomHeaders({"Authorization": "Basic {0}".format(auth)})
+      transport.setLdapAuth(auth)
+    elif self.use_kerberos or self.kerberos_host_fqdn:
+      # Set the Kerberos service
+      if self.kerberos_host_fqdn is not None:
+        kerb_host = self.kerberos_host_fqdn.split(':')[0].encode('ascii', 'ignore')
+      else:
+        kerb_host = self.impalad_host
+      kerb_service = "{0}@{1}".format(self.kerberos_service_name, kerb_host)
+      transport.setKerberosAuth(kerb_service)
+    else:
+      transport.setNoneAuth()
 
     # Without buffering Thrift would call socket.recv() each time it deserializes
     # something (e.g. a member in a struct).
