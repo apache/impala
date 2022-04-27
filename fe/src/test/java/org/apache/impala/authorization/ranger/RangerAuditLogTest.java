@@ -108,12 +108,61 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
 
     authzOk(events -> {
       // Table event and 2 column events
-      assertEquals(3, events.size());
+      assertEquals(2, events.size());
       assertEventEquals("@table", "select", "functional/alltypes", 1, events.get(0));
+      assertEventEquals("@column", "select","functional/alltypes/id,string_col", 1,
+          events.get(1));
       assertEquals("select id, string_col from functional.alltypes",
           events.get(0).getRequestData());
     }, "select id, string_col from functional.alltypes",
         onTable("functional", "alltypes", TPrivilegeLevel.SELECT));
+
+    // Audit log entries are not consolidated since each of them corresponds to a
+    // different policy.
+    authzOk(events -> {
+      assertEquals(13, events.size());
+      assertEventEquals("@column", "select",
+          "functional/alltypes/id", 1, events.get(0));
+      assertEventEquals("@column", "select",
+          "functional/alltypes/bool_col", 1, events.get(1));
+      assertEventEquals("@column", "select",
+          "functional/alltypes/tinyint_col", 1, events.get(2));
+      assertEventEquals("@column", "select",
+          "functional/alltypes/smallint_col", 1, events.get(3));
+      assertEventEquals("@column", "select",
+          "functional/alltypes/int_col", 1, events.get(4));
+      assertEventEquals("@column", "select",
+          "functional/alltypes/bigint_col", 1, events.get(5));
+      assertEventEquals("@column", "select",
+          "functional/alltypes/float_col", 1, events.get(6));
+      assertEventEquals("@column", "select",
+          "functional/alltypes/double_col", 1, events.get(7));
+      assertEventEquals("@column", "select",
+          "functional/alltypes/date_string_col", 1, events.get(8));
+      assertEventEquals("@column", "select",
+          "functional/alltypes/string_col", 1, events.get(9));
+      assertEventEquals("@column", "select",
+          "functional/alltypes/timestamp_col", 1, events.get(10));
+      assertEventEquals("@column", "select",
+          "functional/alltypes/year", 1, events.get(11));
+      assertEventEquals("@column", "select",
+          "functional/alltypes/month", 1, events.get(12));
+      assertEquals("select * from functional.alltypes",
+          events.get(0).getRequestData());
+    }, "select * from functional.alltypes",
+        onColumn("functional", "alltypes", "id", TPrivilegeLevel.SELECT),
+        onColumn("functional", "alltypes", "bool_col", TPrivilegeLevel.SELECT),
+        onColumn("functional", "alltypes", "tinyint_col", TPrivilegeLevel.SELECT),
+        onColumn("functional", "alltypes", "smallint_col", TPrivilegeLevel.SELECT),
+        onColumn("functional", "alltypes", "int_col", TPrivilegeLevel.SELECT),
+        onColumn("functional", "alltypes", "bigint_col", TPrivilegeLevel.SELECT),
+        onColumn("functional", "alltypes", "float_col", TPrivilegeLevel.SELECT),
+        onColumn("functional", "alltypes", "double_col", TPrivilegeLevel.SELECT),
+        onColumn("functional", "alltypes", "date_string_col", TPrivilegeLevel.SELECT),
+        onColumn("functional", "alltypes", "string_col", TPrivilegeLevel.SELECT),
+        onColumn("functional", "alltypes", "timestamp_col", TPrivilegeLevel.SELECT),
+        onColumn("functional", "alltypes", "year", TPrivilegeLevel.SELECT),
+        onColumn("functional", "alltypes", "month", TPrivilegeLevel.SELECT));
 
     authzOk(events -> {
       // Only the column events. We don't want to log the failing table event used for
@@ -132,11 +181,11 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
 
     authzOk(events -> {
       assertEquals(3, events.size());
-      assertEventEquals("@column", "refresh", "*/*/*", 1, events.get(0));
+      assertEventEquals("@udf", "refresh", "*/*", 1, events.get(0));
       assertEquals("invalidate metadata", events.get(0).getRequestData());
-      assertEventEquals("@udf", "refresh", "*/*", 1, events.get(1));
+      assertEventEquals("@url", "refresh", "*", 1, events.get(1));
       assertEquals("invalidate metadata", events.get(1).getRequestData());
-      assertEventEquals("@url", "refresh", "*", 1, events.get(2));
+      assertEventEquals("@column", "refresh", "*/*/*", 1, events.get(2));
       assertEquals("invalidate metadata", events.get(2).getRequestData());
     }, "invalidate metadata", onServer(TPrivilegeLevel.REFRESH));
 
@@ -201,6 +250,34 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
         onTable("functional", "complex_view", TPrivilegeLevel.SELECT),
         onTable("functional", "alltypesagg", TPrivilegeLevel.SELECT),
         onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT));
+
+    // We won't have duplicate events for a column in multiple FunctionCallExpr's since
+    // Analyzer#registerSlotRef() would return if the SlotDescriptor associated with the
+    // fully-qualified path to the column has already been added to 'slotPathMap_'. Hence
+    // Analyzer#createAndRegisterSlotDesc(), the method that registers the
+    // PrivilegeRequest for the column, would not be called again to produce another
+    // AuthzAuditEvent for the same column.
+    authzOk(events -> {
+      assertEquals(2, events.size());
+      assertEventEquals("@table", "select", "functional/alltypes", 1,
+          events.get(0));
+      assertEventEquals("@column", "select", "functional/alltypes/id", 1,
+          events.get(1));
+    }, "select min(id), max(id), avg(id) from functional.alltypes",
+        onTable("functional", "alltypes", TPrivilegeLevel.SELECT));
+
+    // We won't have duplicate events for a column even if the column appears in multiple
+    // SelectStmt's in a query since we are using a Set to register the
+    // PrivilegeRequest's in the query.
+    authzOk(events -> {
+      assertEquals(2, events.size());
+      assertEventEquals("@table", "select", "functional/alltypes", 1,
+          events.get(0));
+      assertEventEquals("@column", "select", "functional/alltypes/id", 1,
+          events.get(1));
+    }, "select min(id) from functional.alltypes union all " +
+        "select max(id) from functional.alltypes",
+        onTable("functional", "alltypes", TPrivilegeLevel.SELECT));
   }
 
   @Test
@@ -342,61 +419,36 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       }
 
       authzOk(events -> {
-        assertEquals(5, events.size());
+        assertEquals(3, events.size());
         assertEquals("select id, bool_col, string_col from functional.alltypestiny",
         events.get(0).getRequestData());
         assertEventEquals("@table", "select", "functional/alltypestiny", 1,
             events.get(0));
-        assertEventEquals("@column", "select", "functional/alltypestiny/id", 1,
+        assertEventEquals("@column", "select",
+            "functional/alltypestiny/id,bool_col,string_col", 1,
             events.get(1));
-        assertEventEquals("@column", "select", "functional/alltypestiny/bool_col", 1,
-            events.get(2));
-        assertEventEquals("@column", "select", "functional/alltypestiny/string_col", 1,
-            events.get(3));
         assertEventEquals("@column", "custom", "functional/alltypestiny/string_col", 1,
-            events.get(4));
-        assertEquals(events.get(4).getPolicyId(), policyIds[0]);
+            events.get(2));
+        assertEquals(events.get(2).getPolicyId(), policyIds[0]);
       }, "select id, bool_col, string_col from functional.alltypestiny",
           onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT));
 
       authzOk(events -> {
-        assertEquals(16, events.size());
+        assertEquals(4, events.size());
         assertEquals("select * from functional.alltypestiny",
             events.get(0).getRequestData());
         assertEventEquals("@table", "select", "functional/alltypestiny", 1,
             events.get(0));
-        assertEventEquals("@column", "select", "functional/alltypestiny/id", 1,
-            events.get(1));
-        assertEventEquals("@column", "select", "functional/alltypestiny/bool_col", 1,
-            events.get(2));
-        assertEventEquals("@column", "select", "functional/alltypestiny/tinyint_col", 1,
-            events.get(3));
-        assertEventEquals("@column", "select", "functional/alltypestiny/smallint_col", 1,
-            events.get(4));
-        assertEventEquals("@column", "select", "functional/alltypestiny/int_col", 1,
-            events.get(5));
-        assertEventEquals("@column", "select", "functional/alltypestiny/bigint_col", 1,
-            events.get(6));
-        assertEventEquals("@column", "select", "functional/alltypestiny/float_col", 1,
-            events.get(7));
-        assertEventEquals("@column", "select", "functional/alltypestiny/double_col", 1,
-            events.get(8));
-        assertEventEquals("@column", "select", "functional/alltypestiny/date_string_col",
-            1, events.get(9));
-        assertEventEquals("@column", "select", "functional/alltypestiny/string_col", 1,
-            events.get(10));
-        assertEventEquals("@column", "select", "functional/alltypestiny/timestamp_col", 1,
-            events.get(11));
-        assertEventEquals("@column", "select", "functional/alltypestiny/year", 1,
-            events.get(12));
-        assertEventEquals("@column", "select", "functional/alltypestiny/month", 1,
-            events.get(13));
+        assertEventEquals("@column", "select",
+            "functional/alltypestiny/id,bool_col,tinyint_col,smallint_col,int_col," +
+            "bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col," +
+            "year,month", 1, events.get(1));
         assertEventEquals("@column", "mask_null",
-            "functional/alltypestiny/date_string_col", 1, events.get(14));
-        assertEquals(events.get(14).getPolicyId(), policyIds[1]);
+            "functional/alltypestiny/date_string_col", 1, events.get(2));
+        assertEquals(events.get(2).getPolicyId(), policyIds[1]);
         assertEventEquals("@column", "custom", "functional/alltypestiny/string_col", 1,
-            events.get(15));
-        assertEquals(events.get(15).getPolicyId(), policyIds[0]);
+            events.get(3));
+        assertEquals(events.get(3).getPolicyId(), policyIds[0]);
       }, "select * from functional.alltypestiny", onTable("functional", "alltypestiny",
           TPrivilegeLevel.SELECT));
 
@@ -407,40 +459,36 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       // this column. This test verifies that the duplicate event is indeed removed,
       // i.e., only one entry for the column of 'string_col' having accessType as
       // 'custom'.
-      authzOk(events -> {assertEquals(5, events.size());
+      authzOk(events -> {assertEquals(3, events.size());
         assertEquals("with iv as (select id, bool_col, string_col from " +
                 "functional.alltypestiny) select * from iv",
             events.get(0).getRequestData());
         assertEventEquals("@table", "select", "functional/alltypestiny", 1,
             events.get(0));
-        assertEventEquals("@column", "select", "functional/alltypestiny/id", 1,
+        assertEventEquals("@column", "select",
+            "functional/alltypestiny/id,bool_col,string_col", 1,
             events.get(1));
-        assertEventEquals("@column", "select", "functional/alltypestiny/bool_col", 1,
-            events.get(2));
-        assertEventEquals("@column", "select", "functional/alltypestiny/string_col", 1,
-            events.get(3));
         assertEventEquals("@column", "custom", "functional/alltypestiny/string_col", 1,
-            events.get(4));
-        assertEquals(events.get(4).getPolicyId(), policyIds[0]);
+            events.get(2));
+        assertEquals(events.get(2).getPolicyId(), policyIds[0]);
       }, "with iv as (select id, bool_col, string_col from functional.alltypestiny) " +
           "select * from iv", onTable("functional", "alltypestiny",
           TPrivilegeLevel.SELECT));
 
       // Test on masking subquery. No redundant audit events.
-      authzOk(events -> {assertEquals(4, events.size());
+      authzOk(events -> {assertEquals(3, events.size());
         assertEquals("select id, string_col from functional.alltypestiny a " +
                 "where exists (select id from functional.alltypestiny where id = a.id) " +
                 "order by id;",
             events.get(0).getRequestData());
         assertEventEquals("@table", "select", "functional/alltypestiny", 1,
             events.get(0));
-        assertEventEquals("@column", "select", "functional/alltypestiny/id", 1,
+        assertEventEquals("@column", "select",
+            "functional/alltypestiny/id,string_col", 1,
             events.get(1));
-        assertEventEquals("@column", "select", "functional/alltypestiny/string_col", 1,
-            events.get(2));
         assertEventEquals("@column", "custom", "functional/alltypestiny/string_col", 1,
-            events.get(3));
-        assertEquals(events.get(3).getPolicyId(), policyIds[0]);
+            events.get(2));
+        assertEquals(events.get(2).getPolicyId(), policyIds[0]);
       }, "select id, string_col from functional.alltypestiny a where exists " +
           "(select id from functional.alltypestiny where id = a.id) order by id;",
           onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT));
@@ -584,18 +632,16 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       // Verify row filter audits. Note that columns used in the row filter also creates
       // column access audits.
       authzOk(events -> {
-        assertEquals(4, events.size());
+        assertEquals(3, events.size());
         assertEquals("select bool_col from functional.alltypestiny",
             events.get(0).getRequestData());
         assertEventEquals("@table", "select", "functional/alltypestiny", 1,
             events.get(0));
-        assertEventEquals("@column", "select", "functional/alltypestiny/bool_col", 1,
+        assertEventEquals("@column", "select", "functional/alltypestiny/bool_col,id", 1,
             events.get(1));
-        assertEventEquals("@column", "select", "functional/alltypestiny/id", 1,
-            events.get(2));
         assertEventEquals("@table", "row_filter", "functional/alltypestiny", 1,
-            events.get(3));
-        assertEquals(events.get(3).getPolicyId(), policyIds[0]);
+            events.get(2));
+        assertEquals(events.get(2).getPolicyId(), policyIds[0]);
       }, "select bool_col from functional.alltypestiny",
           onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT));
 
@@ -638,76 +684,32 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
           onTable("functional", "alltypes", TPrivilegeLevel.SELECT));
 
       authzOk(events -> {
-        assertEquals(15, events.size());
+        assertEquals(3, events.size());
         assertEquals("select * from functional.alltypestiny",
             events.get(0).getRequestData());
         assertEventEquals("@table", "select", "functional/alltypestiny", 1,
             events.get(0));
-        assertEventEquals("@column", "select", "functional/alltypestiny/id", 1,
-            events.get(1));
-        assertEventEquals("@column", "select", "functional/alltypestiny/bool_col", 1,
-            events.get(2));
-        assertEventEquals("@column", "select", "functional/alltypestiny/tinyint_col", 1,
-            events.get(3));
-        assertEventEquals("@column", "select", "functional/alltypestiny/smallint_col", 1,
-            events.get(4));
-        assertEventEquals("@column", "select", "functional/alltypestiny/int_col", 1,
-            events.get(5));
-        assertEventEquals("@column", "select", "functional/alltypestiny/bigint_col", 1,
-            events.get(6));
-        assertEventEquals("@column", "select", "functional/alltypestiny/float_col", 1,
-            events.get(7));
-        assertEventEquals("@column", "select", "functional/alltypestiny/double_col", 1,
-            events.get(8));
         assertEventEquals("@column", "select",
-            "functional/alltypestiny/date_string_col", 1, events.get(9));
-        assertEventEquals("@column", "select", "functional/alltypestiny/string_col", 1,
-            events.get(10));
-        assertEventEquals("@column", "select", "functional/alltypestiny/timestamp_col", 1,
-            events.get(11));
-        assertEventEquals("@column", "select", "functional/alltypestiny/year", 1,
-            events.get(12));
-        assertEventEquals("@column", "select", "functional/alltypestiny/month", 1,
-            events.get(13));
+            "functional/alltypestiny/id,bool_col,tinyint_col,smallint_col,int_col," +
+            "bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col," +
+            "year,month", 1, events.get(1));
         assertEventEquals("@table", "row_filter", "functional/alltypestiny", 1,
-            events.get(14));
-        assertEquals(events.get(14).getPolicyId(), policyIds[0]);
+            events.get(2));
+        assertEquals(events.get(2).getPolicyId(), policyIds[0]);
       }, "select * from functional.alltypestiny", onTable("functional", "alltypestiny",
           TPrivilegeLevel.SELECT));
 
       // No row filters applied to current user. So no audits of row_filter.
       authzOk(events -> {
-        assertEquals(14, events.size());
+        assertEquals(2, events.size());
         assertEquals("select * from functional.alltypes",
             events.get(0).getRequestData());
         assertEventEquals("@table", "select", "functional/alltypes", 1,
             events.get(0));
-        assertEventEquals("@column", "select", "functional/alltypes/id", 1,
-            events.get(1));
-        assertEventEquals("@column", "select", "functional/alltypes/bool_col", 1,
-            events.get(2));
-        assertEventEquals("@column", "select", "functional/alltypes/tinyint_col", 1,
-            events.get(3));
-        assertEventEquals("@column", "select", "functional/alltypes/smallint_col", 1,
-            events.get(4));
-        assertEventEquals("@column", "select", "functional/alltypes/int_col", 1,
-            events.get(5));
-        assertEventEquals("@column", "select", "functional/alltypes/bigint_col", 1,
-            events.get(6));
-        assertEventEquals("@column", "select", "functional/alltypes/float_col", 1,
-            events.get(7));
-        assertEventEquals("@column", "select", "functional/alltypes/double_col", 1,
-            events.get(8));
-        assertEventEquals("@column", "select", "functional/alltypes/date_string_col", 1,
-            events.get(9));
-        assertEventEquals("@column", "select", "functional/alltypes/string_col", 1,
-            events.get(10));
-        assertEventEquals("@column", "select", "functional/alltypes/timestamp_col", 1,
-            events.get(11));
-        assertEventEquals("@column", "select", "functional/alltypes/year", 1,
-            events.get(12));
-        assertEventEquals("@column", "select", "functional/alltypes/month", 1,
-            events.get(13));
+        assertEventEquals("@column", "select",
+            "functional/alltypes/id,bool_col,tinyint_col,smallint_col,int_col," +
+            "bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col," +
+            "year,month", 1, events.get(1));
       }, "select * from functional.alltypes", onTable("functional", "alltypes",
           TPrivilegeLevel.SELECT));
 

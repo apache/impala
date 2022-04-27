@@ -22,10 +22,14 @@ import org.apache.impala.authorization.AuthorizationContext;
 import org.apache.impala.thrift.TSessionState;
 import org.apache.impala.util.EventSequence;
 import org.apache.ranger.audit.model.AuthzAuditEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -34,6 +38,8 @@ import java.util.Set;
  * Ranger specific {@link AuthorizationContext}.
  */
 public class RangerAuthorizationContext extends AuthorizationContext {
+  private static final Logger LOG = LoggerFactory.getLogger(
+      RangerAuthorizationContext.class);
   private final TSessionState sessionState_;
   // Audit handler can be null meaning we don't want to do an audit log.
   private @Nullable RangerBufferAuditHandler auditHandler_;
@@ -84,6 +90,50 @@ public class RangerAuthorizationContext extends AuthorizationContext {
       deduplicatedAuditEvents_.put(event.getEventKey(), event);
     }
     auditHandler_.getAuthzEvents().clear();
+  }
+
+  /**
+   * Consolidate the audit log entries of column accesses granted by the same policy in
+   * the same table.
+   */
+  public void consolidateAuthzEvents() {
+    Map<String, AuthzAuditEvent> consolidatedEvents = new LinkedHashMap<>();
+    List<AuthzAuditEvent> unconsolidatedEvents = new LinkedList<>();
+    for (AuthzAuditEvent event : auditHandler_.getAuthzEvents()) {
+      String resourceType = event.getResourceType();
+      if ("@column".equals(resourceType)) {
+        String[] parsedNames = event.getResourcePath().split("/", 3);
+        if (parsedNames.length < 3) {
+          LOG.error("The column resource path " + event.getResourcePath() + " could " +
+              "not be parsed into the form of " +
+              "<database name>/<table name>/<column name>.");
+          continue;
+        }
+        long policyId = event.getPolicyId();
+        String databaseName = parsedNames[0];
+        String tableName = parsedNames[1];
+        String columnName = parsedNames[2];
+        // Currently the access type can only be "select" for a non-column masking audit
+        // log entry. We include the access type as part of the key to avoid accidentally
+        // combining audit log entries corresponding to the same column but of different
+        // access types in the future.
+        String accessType = event.getAccessType();
+        String key = policyId + "/" + databaseName + "/" + tableName + "/" + accessType;
+        if (!consolidatedEvents.containsKey(key)) {
+          consolidatedEvents.put(key, event);
+        } else {
+          AuthzAuditEvent consolidatedEvent = consolidatedEvents.get(key);
+          consolidatedEvent
+              .setResourcePath(consolidatedEvent.getResourcePath() + "," + columnName);
+          consolidatedEvents.put(key, consolidatedEvent);
+        }
+      } else {
+        unconsolidatedEvents.add(event);
+      }
+    }
+    auditHandler_.getAuthzEvents().clear();
+    auditHandler_.getAuthzEvents().addAll(unconsolidatedEvents);
+    auditHandler_.getAuthzEvents().addAll(consolidatedEvents.values());
   }
 
   public void applyDeduplicatedAuthzEvents() {

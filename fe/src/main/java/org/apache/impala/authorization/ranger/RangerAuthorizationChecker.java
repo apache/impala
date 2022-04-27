@@ -180,9 +180,16 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   public void postAuthorize(AuthorizationContext authzCtx, boolean authzOk) {
     Preconditions.checkArgument(authzCtx instanceof RangerAuthorizationContext);
     super.postAuthorize(authzCtx, authzOk);
-    // Apply the deduplicated column masking events to update the List of all
-    // AuthzAuditEvent's only if the authorization is successful.
+    // Consolidate the audit log entries and apply the deduplicated column masking events
+    // to update the List of all AuthzAuditEvent's only if the authorization is
+    // successful.
     if (authzOk) {
+      // We consolidate the audit log entries before invoking
+      // applyDeduplicatedAuthzEvents() where we add the deduplicated table
+      // masking-related log entries to 'auditHandler' because currently a Ranger column
+      // masking policy can be applied to only one single column in a table. Thus, we do
+      // not need to combine log entries produced due to column masking policies.
+      ((RangerAuthorizationContext) authzCtx).consolidateAuthzEvents();
       ((RangerAuthorizationContext) authzCtx).applyDeduplicatedAuthzEvents();
     }
     RangerBufferAuditHandler auditHandler =
