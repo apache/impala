@@ -78,8 +78,17 @@ INT
 # Test resolving nested columns in expanding star expression.
 set EXPAND_COMPLEX_TYPES=1;
 select nested_struct.* from complextypestbl
----- CATCH
-AnalysisException: Struct type in select list is not allowed when Codegen is ON. You might want to set DISABLE_CODEGEN=true
+---- RESULTS
+-1,'[-1]','{"d":[[{"e":-1,"f":"nonnullable"}]]}','{}'
+1,'[1]','{"d":[[{"e":10,"f":"aaa"},{"e":-10,"f":"bbb"}],[{"e":11,"f":"c"}]]}','{"foo":{"h":{"i":[1.1]}}}'
+NULL,'[null]','{"d":[[{"e":null,"f":null},{"e":10,"f":"aaa"},{"e":null,"f":null},{"e":-10,"f":"bbb"},{"e":null,"f":null}],[{"e":11,"f":"c"},null],[],null]}','{"g1":{"h":{"i":[2.2,null]}},"g2":{"h":{"i":[]}},"g3":null,"g4":{"h":{"i":null}},"g5":{"h":null}}'
+NULL,'NULL','{"d":[]}','{}'
+NULL,'NULL','{"d":null}','NULL'
+NULL,'NULL','NULL','{"foo":{"h":{"i":[2.2,3.3]}}}'
+NULL,'NULL','NULL','NULL'
+7,'[2,3,null]','{"d":[[],[null],null]}','NULL'
+---- TYPES
+INT,STRING,STRING,STRING
 ====
 ---- QUERY
 # Test resolving explicit STAR path on a nested struct column inside array

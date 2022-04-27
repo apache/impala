@@ -54,3 +54,9 @@ void* FunctionContext::GetFunctionState(FunctionStateScope scope) const {
       return NULL;
   }
 }
+
+uint8_t* FnCtxAllocateForResults(FunctionContext* ctx, int64_t byte_size) {
+  assert(ctx != nullptr);
+  uint8_t* ptr = ctx->impl()->AllocateForResults(byte_size);
+  return ptr;
+}

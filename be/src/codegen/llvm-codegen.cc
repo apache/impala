@@ -684,6 +684,19 @@ void LlvmCodeGen::CreateIfElseBlocks(llvm::Function* fn, const string& if_name,
   *else_block = llvm::BasicBlock::Create(context(), else_name, fn, insert_before);
 }
 
+llvm::PHINode* LlvmCodeGen::CreateBinaryPhiNode(LlvmBuilder* builder, llvm::Value* value1,
+    llvm::Value* value2, llvm::BasicBlock* incoming_block1,
+    llvm::BasicBlock* incoming_block2, std::string name) {
+  std::string node_name = name == "" ? (value1->getName().str() + "_phi") : name;
+
+  llvm::PHINode* res = builder->CreatePHI(value1->getType(), 2, node_name);
+
+  res->addIncoming(value1, incoming_block1);
+  res->addIncoming(value2, incoming_block2);
+
+  return res;
+}
+
 Status LlvmCodeGen::MaterializeFunction(llvm::Function* fn) {
   DCHECK(!is_compiled_);
   if (fn->isIntrinsic() || !fn->isMaterializable()) return Status::OK();

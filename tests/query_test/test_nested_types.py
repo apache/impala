@@ -128,15 +128,19 @@ class TestNestedStructsInSelectList(ImpalaTestSuite):
         ImpalaTestDimension('mt_dop', 0, 2))
     cls.ImpalaTestMatrix.add_dimension(
         create_exec_option_dimension_from_dict({
-            'disable_codegen': ['False', 'True']}))
+            # Putting 'True' first because this way in non-exhaustive runs there are more
+            # test cases with codegen enabled.
+            'disable_codegen': ['True', 'False'],
+            # The below two options are set to prevent the planner from disabling codegen
+            # because of the small data size even when 'disable_codegen' is False.
+            'disable_codegen_rows_threshold': [0],
+            'exec_single_node_rows_threshold': [0]}))
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('orc_schema_resolution', 0, 1))
     cls.ImpalaTestMatrix.add_constraint(orc_schema_resolution_constraint)
 
   def test_struct_in_select_list(self, vector):
     """Queries where a struct column is in the select list"""
-    if vector.get_value('exec_option')['disable_codegen'] == 'False':
-      pytest.skip()
     new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['convert_legacy_hive_parquet_utc_timestamps'] = 1
     new_vector.get_value('exec_option')['TIMEZONE'] = '"Europe/Budapest"'
@@ -144,8 +148,6 @@ class TestNestedStructsInSelectList(ImpalaTestSuite):
 
   def test_nested_struct_in_select_list(self, vector):
     """Queries where a nested struct column is in the select list"""
-    if vector.get_value('exec_option')['disable_codegen'] == 'False':
-      pytest.skip()
     new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['convert_legacy_hive_parquet_utc_timestamps'] = 1
     self.run_test_case('QueryTest/nested-struct-in-select-list', new_vector)
@@ -183,9 +185,6 @@ class TestNestedCollectionsInSelectList(ImpalaTestSuite):
     """Queries where a map has null keys. Is only possible in ORC, not Parquet."""
     if vector.get_value('table_format').file_format == 'parquet':
       pytest.skip()
-    # Structs in select list are not supported with codegen enabled: see IMPALA-10851.
-    if vector.get_value('exec_option')['disable_codegen'] == 'False':
-      pytest.skip()
     self.run_test_case('QueryTest/map_null_keys', vector)
 
 
@@ -212,9 +211,6 @@ class TestMixedCollectionsAndStructsInSelectList(ImpalaTestSuite):
 
   def test_mixed_complex_types_in_select_list(self, vector, unique_database):
     """Queries where structs and collections are embedded into one another."""
-    # Structs in select list are not supported with codegen enabled: see IMPALA-10851.
-    if vector.get_value('exec_option')['disable_codegen'] == 'False':
-      pytest.skip()
     self.run_test_case('QueryTest/mixed-collections-and-structs', vector)
 
 
@@ -907,7 +903,7 @@ class TestNestedTypesStarExpansion(ImpalaTestSuite):
         v.get_value('protocol') == 'hs2')
     cls.ImpalaTestMatrix.add_dimension(
         create_exec_option_dimension_from_dict({
-            'disable_codegen': ['True']}))
+            'disable_codegen': ['False', 'True']}))
     cls.ImpalaTestMatrix.add_mandatory_exec_option(
             'convert_legacy_hive_parquet_utc_timestamps', 'true')
     cls.ImpalaTestMatrix.add_mandatory_exec_option('TIMEZONE', '"Europe/Budapest"')

@@ -28,6 +28,7 @@ set(LEGACY_AVX_IR_C_FILE $ENV{IMPALA_HOME}/be/generated-sources/impala-ir/impala
 
 add_library(CodeGen
   codegen-anyval.cc
+  codegen-anyval-read-write-info.cc
   codegen-callgraph.cc
   codegen-symbol-emitter.cc
   codegen-util.cc

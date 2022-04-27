@@ -320,9 +320,9 @@ struct CollectionVal : public AnyVal {
 struct StructVal : public AnyVal {
   int num_children;
 
-  /// Pointer to the start of the vector of children pointers. These children pointers in
-  /// fact are AnyVal pointers where a null pointer means that this child is NULL.
-  /// The buffer is not null-terminated.
+  /// Pointer to the start of the vector of children pointers. The set of types that the
+  /// pointed-to values can have is types of the members of 'ExprValue'. A null pointer
+  /// means that this child is NULL. The buffer is not null-terminated.
   /// Memory allocation to 'ptr' is done using FunctionContext. As a result it's not
   /// needed to take care of memory deallocation in StructVal as it will be done through
   /// FunctionContext automatically.
@@ -353,4 +353,9 @@ static_assert(sizeof(CollectionVal) == sizeof(StringVal), "Wrong size.");
 static_assert(
     offsetof(CollectionVal, num_tuples) == offsetof(StringVal, len), "Wrong offset.");
 static_assert(offsetof(CollectionVal, ptr) == offsetof(StringVal, ptr), "Wrong offset.");
+
+static_assert(sizeof(StructVal) == sizeof(StringVal), "Wrong size.");
+static_assert(
+    offsetof(StructVal, num_children) == offsetof(StringVal, len), "Wrong offset.");
+static_assert(offsetof(StructVal, ptr) == offsetof(StringVal, ptr), "Wrong offset.");
 } // namespace impala_udf

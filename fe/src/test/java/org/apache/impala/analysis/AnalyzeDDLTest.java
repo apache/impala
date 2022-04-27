@@ -3223,9 +3223,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "from functional.allcomplextypes");
     // It's allowed to do the same with struct as it is supported in the select list.
     AnalysisContext ctx = createAnalysisCtx();
-    // TODO: Turning Codegen OFF could be removed once the Codegen support is implemented
-    // for structs given in the select list.
-    ctx.getQueryOptions().setDisable_codegen(true);
     AnalyzesOk("create view functional.foo (a) as " +
         "select tiny_struct from functional_orc_def.complextypes_structs", ctx);
 

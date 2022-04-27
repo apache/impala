@@ -432,10 +432,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
    */
   private void testSlotRefPath(String sql, List<Integer> expectedAbsPath) {
     AnalysisContext ctx = createAnalysisCtx();
-    // TODO: Turning Codegen OFF could be removed once the Codegen support is implemented
-    // for structs given in the select list.
-    ctx.getQueryOptions().setDisable_codegen(true);
-
     SelectStmt stmt = (SelectStmt) AnalyzesOk(sql, ctx);
     Expr e = stmt.getResultExprs().get(stmt.getResultExprs().size() - 1);
     Preconditions.checkState(e instanceof SlotRef);
@@ -776,7 +772,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // Check the support of struct in the select list for different file formats.
     AnalysisContext ctx = createAnalysisCtx();
-    ctx.getQueryOptions().setDisable_codegen(true);
     AnalysisError("select int_struct_col from functional.allcomplextypes", ctx,
         "Querying STRUCT is only supported for ORC and Parquet file formats.");
     AnalyzesOk("select alltypes from functional_orc_def.complextypes_structs", ctx);
@@ -804,7 +799,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // Slot path is not ambiguous and resolves to a struct.
     AnalysisContext ctx = createAnalysisCtx();
-    ctx.getQueryOptions().setDisable_codegen(true);
     AnalyzesOk("select a from a.a", ctx);
     AnalyzesOk("select t.a from a.a t", ctx);
     AnalyzesOk("select t.a.a from a.a t", ctx);
@@ -1025,11 +1019,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // Struct in select list works only if codegen is OFF.
     AnalysisContext ctx = createAnalysisCtx();
-    ctx.getQueryOptions().setDisable_codegen(false);
-    AnalysisError("select alltypes from functional_orc_def.complextypes_structs", ctx,
-        "Struct type in select list is not allowed when Codegen is ON. You might want " +
-        "to set DISABLE_CODEGEN=true");
-    ctx.getQueryOptions().setDisable_codegen(true);
     AnalyzesOk("select alltypes from functional_orc_def.complextypes_structs", ctx);
     AnalyzesOk("select int_array_col from functional.allcomplextypes");
     AnalyzesOk("select int_array_col from functional.allcomplextypes " +
@@ -1070,8 +1059,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     //Make complex types available in star queries
     ctx.getQueryOptions().setExpand_complex_types(true);
-    //TODO: Once IMPALA-10851 is resolved it can be removed
-    ctx.getQueryOptions().setDisable_codegen(true);
 
     AnalyzesOk("select * from functional_parquet.complextypes_structs",ctx);
     AnalyzesOk("select * from functional_parquet.complextypes_nested_structs",ctx);

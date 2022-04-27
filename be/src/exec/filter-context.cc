@@ -132,44 +132,48 @@ void FilterContext::MaterializeValues() const {
   }
 }
 
-// An example of the generated code for TPCH-Q2: RF002 -> n_regionkey
+// An example of the generated code for the following query:
 //
-// @expr_type_arg = constant %"struct.impala::ColumnType" { i32 4, i32 -1, i32 -1,
-//     i32 -1, %"class.std::vector.422" zeroinitializer,
-//     %"class.std::vector.101" zeroinitializer }
+// select a.outer_struct, b.small_struct
+// from functional_orc_def.complextypes_nested_structs a
+//     inner join functional_orc_def.complextypes_structs b
+//     on b.small_struct.i = a.outer_struct.inner_struct2.i + 19091;
 //
-// ; Function Attrs: alwaysinline
 // define i1 @FilterContextEval(%"struct.impala::FilterContext"* %this,
-//                              %"class.impala::TupleRow"* %row) #41 {
+//     %"class.impala::TupleRow"* %row) #50 {
 // entry:
-//   %0 = alloca i16
+//   %0 = alloca i64
 //   %expr_eval_ptr = getelementptr inbounds %"struct.impala::FilterContext",
 //       %"struct.impala::FilterContext"* %this, i32 0, i32 0
 //   %expr_eval_arg = load %"class.impala::ScalarExprEvaluator"*,
 //       %"class.impala::ScalarExprEvaluator"** %expr_eval_ptr
-//   %result = call i32 @GetSlotRef(%"class.impala::ScalarExprEvaluator"* %expr_eval_arg,
+//   %result = call { i8, i64 } @"impala::Operators::Add_BigIntVal_BigIntValWrapper"(
+//       %"class.impala::ScalarExprEvaluator"* %expr_eval_arg,
 //       %"class.impala::TupleRow"* %row)
-//   %is_null1 = trunc i32 %result to i1
-//   br i1 %is_null1, label %is_null, label %not_null
+//   br label %entry1
 //
-// not_null:                                         ; preds = %entry
-//   %1 = ashr i32 %result, 16
-//   %2 = trunc i32 %1 to i16
-//   store i16 %2, i16* %0
-//   %native_ptr = bitcast i16* %0 to i8*
+// entry1:                                           ; preds = %entry
+//   %1 = extractvalue { i8, i64 } %result, 0
+//   %is_null = trunc i8 %1 to i1
+//   br i1 %is_null, label %null, label %non_null
+//
+// non_null:                                         ; preds = %entry1
+//   %val = extractvalue { i8, i64 } %result, 1
+//   store i64 %val, i64* %0
+//   %native_ptr = bitcast i64* %0 to i8*
 //   br label %eval_filter
 //
-// is_null:                                          ; preds = %entry
+// null:                                             ; preds = %entry1
 //   br label %eval_filter
 //
-// eval_filter:                                      ; preds = %not_null, %is_null
-//   %val_ptr_phi = phi i8* [ %native_ptr, %not_null ], [ null, %is_null ]
+// eval_filter:                                      ; preds = %non_null, %null
+//   %native_ptr_phi = phi i8* [ %native_ptr, %non_null ], [ null, %null ]
 //   %filter_ptr = getelementptr inbounds %"struct.impala::FilterContext",
 //       %"struct.impala::FilterContext"* %this, i32 0, i32 1
 //   %filter_arg = load %"class.impala::RuntimeFilter"*,
 //       %"class.impala::RuntimeFilter"** %filter_ptr
 //   %passed_filter = call i1 @_ZNK6impala13RuntimeFilter4EvalEPvRKNS_10ColumnTypeE(
-//       %"class.impala::RuntimeFilter"* %filter_arg, i8* %val_ptr_phi,
+//       %"class.impala::RuntimeFilter"* %filter_arg, i8* %native_ptr_phi,
 //       %"struct.impala::ColumnType"* @expr_type_arg)
 //   ret i1 %passed_filter
 // }
@@ -191,13 +195,6 @@ Status FilterContext::CodegenEval(
   llvm::Value* this_arg = args[0];
   llvm::Value* row_arg = args[1];
 
-  llvm::BasicBlock* not_null_block =
-      llvm::BasicBlock::Create(context, "not_null", eval_filter_fn);
-  llvm::BasicBlock* is_null_block =
-      llvm::BasicBlock::Create(context, "is_null", eval_filter_fn);
-  llvm::BasicBlock* eval_filter_block =
-      llvm::BasicBlock::Create(context, "eval_filter", eval_filter_fn);
-
   llvm::Function* compute_fn;
   RETURN_IF_ERROR(filter_expr->GetCodegendComputeFn(codegen, false, &compute_fn));
   DCHECK(compute_fn != nullptr);
@@ -217,26 +214,27 @@ Status FilterContext::CodegenEval(
   CodegenAnyVal result = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
       filter_expr->type(), compute_fn, compute_fn_args, "result");
 
-  // Check if the result is NULL
-  llvm::Value* is_null = result.GetIsNull();
-  builder.CreateCondBr(is_null, is_null_block, not_null_block);
+  CodegenAnyValReadWriteInfo rwi = result.ToReadWriteInfo();
+  rwi.entry_block().BranchTo(&builder);
+
+  llvm::BasicBlock* eval_filter_block =
+      llvm::BasicBlock::Create(context, "eval_filter", eval_filter_fn);
 
   // Set the pointer to NULL in case it evaluates to NULL.
-  builder.SetInsertPoint(is_null_block);
+  builder.SetInsertPoint(rwi.null_block());
   llvm::Value* null_ptr = codegen->null_ptr_value();
   builder.CreateBr(eval_filter_block);
 
   // Saves 'result' on the stack and passes a pointer to it to 'runtime_filter_fn'.
-  builder.SetInsertPoint(not_null_block);
-  llvm::Value* native_ptr = result.ToNativePtr();
+  builder.SetInsertPoint(rwi.non_null_block());
+  llvm::Value* native_ptr = SlotDescriptor::CodegenStoreNonNullAnyValToNewAlloca(rwi);
   native_ptr = builder.CreatePointerCast(native_ptr, codegen->ptr_type(), "native_ptr");
   builder.CreateBr(eval_filter_block);
 
   // Get the arguments in place to call 'runtime_filter_fn' to see if the row passes.
   builder.SetInsertPoint(eval_filter_block);
-  llvm::PHINode* val_ptr_phi = builder.CreatePHI(codegen->ptr_type(), 2, "val_ptr_phi");
-  val_ptr_phi->addIncoming(native_ptr, not_null_block);
-  val_ptr_phi->addIncoming(null_ptr, is_null_block);
+  llvm::PHINode* val_ptr_phi = rwi.CodegenNullPhiNode(native_ptr, null_ptr,
+      "val_ptr_phi");
 
   // Create a global constant of the filter expression's ColumnType. It needs to be a
   // constant for constant propagation and dead code elimination in 'runtime_filter_fn'.
@@ -504,13 +502,6 @@ Status FilterContext::CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_exp
   }
   builder.SetInsertPoint(check_val_block);
 
-  // Check null on the input value 'val' to be computed first
-  llvm::BasicBlock* val_not_null_block =
-      llvm::BasicBlock::Create(context, "val_not_null", insert_filter_fn);
-  llvm::BasicBlock* val_is_null_block =
-      llvm::BasicBlock::Create(context, "val_is_null", insert_filter_fn);
-  llvm::BasicBlock* insert_filter_block =
-      llvm::BasicBlock::Create(context, "insert_filter", insert_filter_fn);
 
   llvm::Function* compute_fn;
   RETURN_IF_ERROR(filter_expr->GetCodegendComputeFn(codegen, false, &compute_fn));
@@ -526,26 +517,27 @@ Status FilterContext::CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_exp
   CodegenAnyVal result = CodegenAnyVal::CreateCallWrapped(
       codegen, &builder, filter_expr->type(), compute_fn, compute_fn_args, "result");
 
-  // Check if the result is NULL
-  llvm::Value* val_is_null = result.GetIsNull();
-  builder.CreateCondBr(val_is_null, val_is_null_block, val_not_null_block);
+  CodegenAnyValReadWriteInfo rwi = result.ToReadWriteInfo();
+  rwi.entry_block().BranchTo(&builder);
+
+  llvm::BasicBlock* insert_filter_block =
+      llvm::BasicBlock::Create(context, "insert_filter", insert_filter_fn);
 
   // Set the pointer to NULL in case it evaluates to NULL.
-  builder.SetInsertPoint(val_is_null_block);
+  builder.SetInsertPoint(rwi.null_block());
   llvm::Value* null_ptr = codegen->null_ptr_value();
   builder.CreateBr(insert_filter_block);
 
   // Saves 'result' on the stack and passes a pointer to it to Insert().
-  builder.SetInsertPoint(val_not_null_block);
-  llvm::Value* native_ptr = result.ToNativePtr();
+  builder.SetInsertPoint(rwi.non_null_block());
+  llvm::Value* native_ptr = SlotDescriptor::CodegenStoreNonNullAnyValToNewAlloca(rwi);
   native_ptr = builder.CreatePointerCast(native_ptr, codegen->ptr_type(), "native_ptr");
   builder.CreateBr(insert_filter_block);
 
   // Get the arguments in place to call Insert().
   builder.SetInsertPoint(insert_filter_block);
-  llvm::PHINode* val_ptr_phi = builder.CreatePHI(codegen->ptr_type(), 2, "val_ptr_phi");
-  val_ptr_phi->addIncoming(native_ptr, val_not_null_block);
-  val_ptr_phi->addIncoming(null_ptr, val_is_null_block);
+  llvm::PHINode* val_ptr_phi = rwi.CodegenNullPhiNode(native_ptr, null_ptr,
+      "val_ptr_phi");
 
   // Insert into the bloom filter.
   if (filter_desc.type == TRuntimeFilterType::BLOOM) {

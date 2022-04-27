@@ -527,6 +527,13 @@ class LlvmCodeGen {
       llvm::BasicBlock** if_block, llvm::BasicBlock** else_block,
       llvm::BasicBlock* insert_before = NULL);
 
+  // Creates a PHI node with two incoming blocks that will have the value 'value1' for the
+  // incoming block 'incoming_block1' and the value 'value2' for incoming block
+  // 'incoming_block2'.
+  static llvm::PHINode* CreateBinaryPhiNode(LlvmBuilder* builder, llvm::Value* value1,
+      llvm::Value* value2, llvm::BasicBlock* incoming_block1,
+      llvm::BasicBlock* incoming_block2, std::string name = "");
+
   /// Returns a constant int of 'byte_size' bytes based on 'low_bits' and 'high_bits'
   /// which stand for the lower and upper 64-bits of the constant respectively. For
   /// values less than or equal to 64-bits, 'high_bits' is not used. This function

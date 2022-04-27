@@ -4,8 +4,6 @@
 # select list.
 # Note1, functional_orc_def is hard-coded here. Once we implement struct direct read
 # support for Parquet as well then we can remove the DB name here. IMPALA-9496
-# Note2, turning off codegen support could be removed once we implement the support for
-# that. IMPALA-10851
 select id, str, alltypes from functional_orc_def.complextypes_structs
 ---- RESULTS
 1,'NULL','{"ti":100,"si":12348,"i":156789012,"bi":163234345342,"b":true,"f":1234.56005859375,"do":65323423.33,"da":"2021-05-30","ts":"2021-06-01 10:19:04","s1":"some string","s2":"another str","c1":"x","c2":"xyz","vc":"somevarcha","de1":12345,"de2":null}'

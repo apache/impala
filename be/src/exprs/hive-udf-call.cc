@@ -286,29 +286,32 @@ Status HiveUdfCall::CodegenEvalChildren(LlvmCodeGen* codegen, LlvmBuilder* build
      RETURN_IF_ERROR(child_expr->GetCodegendComputeFn(codegen, false, &child_fn));
 
      builder->SetInsertPoint(current_eval_child_block);
-     llvm::BasicBlock* next_eval_child_block = llvm::BasicBlock::Create(
-         context, "eval_child", function);
 
      const ColumnType& child_type = child_expr->type();
      CodegenAnyVal child_wrapped = CodegenAnyVal::CreateCallWrapped(
          codegen, builder, child_type, child_fn, *args, "child");
 
-     llvm::BasicBlock* const child_not_null_block = llvm::BasicBlock::Create(
-         context, "child_not_null", function, next_eval_child_block);
+     CodegenAnyValReadWriteInfo rwi = child_wrapped.ToReadWriteInfo();
+     rwi.entry_block().BranchTo(builder);
 
-     llvm::Value* const child_is_null = child_wrapped.GetIsNull("child_is_null");
-     llvm::Value* const child_is_null_i8 = builder->CreateZExtOrTrunc(
-         child_is_null, codegen->i8_type(), "child_is_null_i8");
+     llvm::BasicBlock* next_eval_child_block = llvm::BasicBlock::Create(
+         context, "eval_child", function);
+
+     // Child is null
+     builder->SetInsertPoint(rwi.null_block());
      builder->CreateCall(set_input_null_buff_elem_fn,
-         {jni_ctx, codegen->GetI32Constant(i), child_is_null_i8});
-     builder->CreateCondBr(child_is_null, next_eval_child_block, child_not_null_block);
+         {jni_ctx, codegen->GetI32Constant(i), codegen->GetI8Constant(1)});
+     builder->CreateBr(next_eval_child_block);
 
      // Child is not null.
-     builder->SetInsertPoint(child_not_null_block);
+     builder->SetInsertPoint(rwi.non_null_block());
+     builder->CreateCall(set_input_null_buff_elem_fn,
+         {jni_ctx, codegen->GetI32Constant(i), codegen->GetI8Constant(0)});
      llvm::Value* const input_ptr = builder->CreateCall(get_input_val_buff_at_offset_fn,
          {jni_ctx, codegen->GetI32Constant(input_byte_offsets_[i])}, "input_ptr");
 
-     llvm::Value* const child_val_ptr = child_wrapped.ToNativePtr();
+     llvm::Value* const child_val_ptr =
+         SlotDescriptor::CodegenStoreNonNullAnyValToNewAlloca(rwi);
      const std::size_t size = CodeGenUtil::GetTypeSize(child_type.type);
      codegen->CodegenMemcpy(builder, input_ptr, child_val_ptr, size);
      builder->CreateBr(next_eval_child_block);
@@ -334,116 +337,172 @@ llvm::Value* CastPtrAndLoad(LlvmCodeGen* codegen, LlvmBuilder* builder,
 ///   return a + b + c;
 /// }
 ///
+/// To reproduce, create the following function:
+///
+/// create function concatenate(string, string, string) returns string
+/// location '/test-warehouse/impala-hive-udfs.jar'
+/// symbol='org.apache.impala.TestUdf';
+///
+/// then run the following query:
+///
+/// select default.concatenate(date_string_col, string_col, cast(double_col as string))
+/// from functional.alltypes;
+///
 /// define { i64, i8* } @HiveUdfCall(%"class.impala::ScalarExprEvaluator"* %eval,
-///                                  %"class.impala::TupleRow"* %row) #49 {
+///                                  %"class.impala::TupleRow"* %row) #47 {
 /// entry:
 ///   %0 = alloca %"struct.impala::ColumnType"
 ///   %1 = alloca %"struct.impala::StringValue"
 ///   %2 = alloca %"struct.impala::StringValue"
 ///   %3 = alloca %"struct.impala::StringValue"
 ///   %fn_ctx = call %"class.impala_udf::FunctionContext"*
-///       @_ZN6impala11HiveUdfCall18GetFunctionContextEPNS_19ScalarExprEvaluatorEi(
-///       %"class.impala::ScalarExprEvaluator"* %eval, i32 0)
+///       @_ZN6impala19ScalarExprEvaluator18GetFunctionContextEPS0_i
+///           %"class.impala::ScalarExprEvaluator"* %eval,
+///           i32 0)
 ///   %jni_ctx = call %"struct.impala::HiveUdfCall::JniContext"*
 ///       @_ZN6impala11HiveUdfCall13GetJniContextEPN10impala_udf15FunctionContextE(
-///       %"class.impala_udf::FunctionContext"* %fn_ctx)
+///           %"class.impala_udf::FunctionContext"* %fn_ctx)
 ///   br label %eval_child
 ///
-/// eval_child:                                  ; preds = %entry
+/// eval_child:                                       ; preds = %entry
 ///   %child = call { i64, i8* } @GetSlotRef(%"class.impala::ScalarExprEvaluator"* %eval,
 ///                                          %"class.impala::TupleRow"* %row)
-///   %4 = extractvalue { i64, i8* } %child, 0
-///   %child_is_null = trunc i64 %4 to i1
-///   %child_is_null_i8 = zext i1 %child_is_null to i8
-///   call void @_ZN6impala11HiveUdfCall10JniContext26SetInputNullsBufferElementEPS1_ih(
-///       %"struct.impala::HiveUdfCall::JniContext"* %jni_ctx,
-///       i32 0, i8 %child_is_null_i8)
-///   br i1 %child_is_null, label %eval_child1, label %child_not_null
+///   br label %entry1
 ///
-/// child_not_null:                              ; preds = %eval_child
-///   %input_ptr = call i8*
-///       @_ZN6impala11HiveUdfCall10JniContext28GetInputValuesBufferAtOffsetEPS1_i(
-///       %"struct.impala::HiveUdfCall::JniContext"* %jni_ctx, i32 0)
+/// entry1:                                           ; preds = %eval_child
+///   %4 = extractvalue { i64, i8* } %child, 0
+///   %is_null = trunc i64 %4 to i1
+///   br i1 %is_null, label %null, label %non_null
+///
+/// non_null:                                         ; preds = %entry1
+///   %child2 = extractvalue { i64, i8* } %child, 1
 ///   %5 = extractvalue { i64, i8* } %child, 0
 ///   %6 = ashr i64 %5, 32
 ///   %7 = trunc i64 %6 to i32
+///   call void @_ZN6impala11HiveUdfCall10JniContext26SetInputNullsBufferElementEPS1_ih(
+///       %"struct.impala::HiveUdfCall::JniContext"* %jni_ctx,
+///       i32 0,
+///       i8 0)
+///   %input_ptr = call i8*
+///       @_ZN6impala11HiveUdfCall10JniContext28GetInputValuesBufferAtOffsetEPS1_i(
+///           %"struct.impala::HiveUdfCall::JniContext"* %jni_ctx,
+///           i32 0)
 ///   %8 = insertvalue %"struct.impala::StringValue" zeroinitializer, i32 %7, 1
-///   %child2 = extractvalue { i64, i8* } %child, 1
 ///   %9 = insertvalue %"struct.impala::StringValue" %8, i8* %child2, 0
 ///   store %"struct.impala::StringValue" %9, %"struct.impala::StringValue"* %3
 ///   %10 = bitcast %"struct.impala::StringValue"* %3 to i8*
-///   call void @llvm.memcpy.p0i8.p0i8.i64(i8* %input_ptr, i8* %10,
-///                                        i64 12, i32 0, i1 false)
-///   br label %eval_child1
+///   call void @llvm.memcpy.p0i8.p0i8.i64(i8* %input_ptr,
+///                                        i8* %10,
+///                                        i64 12,
+///                                        i32 0,
+///                                        i1 false)
+///   br label %eval_child3
 ///
-/// eval_child1:                                 ; preds = %child_not_null, %eval_child
-///   %child4 = call { i64, i8* } @GetSlotRef.5(
-///       %"class.impala::ScalarExprEvaluator"* %eval, %"class.impala::TupleRow"* %row)
-///   %11 = extractvalue { i64, i8* } %child4, 0
-///   %child_is_null6 = trunc i64 %11 to i1
-///   %child_is_null_i87 = zext i1 %child_is_null6 to i8
+/// null:                                             ; preds = %entry1
 ///   call void @_ZN6impala11HiveUdfCall10JniContext26SetInputNullsBufferElementEPS1_ih(
 ///       %"struct.impala::HiveUdfCall::JniContext"* %jni_ctx,
-///       i32 1, i8 %child_is_null_i87)
-///   br i1 %child_is_null6, label %eval_child3, label %child_not_null5
+///       i32 0,
+///       i8 1)
+///   br label %eval_child3
 ///
-/// child_not_null5:                             ; preds = %eval_child1
-///   %input_ptr8 = call i8*
-///       @_ZN6impala11HiveUdfCall10JniContext28GetInputValuesBufferAtOffsetEPS1_i(
-///       %"struct.impala::HiveUdfCall::JniContext"* %jni_ctx, i32 16)
+/// eval_child3:                                      ; preds = %non_null, %null
+///   %child4 = call { i64, i8* } @GetSlotRef.1(
+///       %"class.impala::ScalarExprEvaluator"* %eval,
+///       %"class.impala::TupleRow"* %row)
+///   br label %entry5
+///
+/// entry5:                                           ; preds = %eval_child3
+///   %11 = extractvalue { i64, i8* } %child4, 0
+///   %is_null8 = trunc i64 %11 to i1
+///   br i1 %is_null8, label %null7, label %non_null6
+///
+/// non_null6:                                        ; preds = %entry5
+///   %child9 = extractvalue { i64, i8* } %child4, 1
 ///   %12 = extractvalue { i64, i8* } %child4, 0
 ///   %13 = ashr i64 %12, 32
 ///   %14 = trunc i64 %13 to i32
+///   call void @_ZN6impala11HiveUdfCall10JniContext26SetInputNullsBufferElementEPS1_ih(
+///       %"struct.impala::HiveUdfCall::JniContext"* %jni_ctx,
+///       i32 1,
+///       i8 0)
+///   %input_ptr11 = call i8*
+///       @_ZN6impala11HiveUdfCall10JniContext28GetInputValuesBufferAtOffsetEPS1_i(
+///           %"struct.impala::HiveUdfCall::JniContext"* %jni_ctx,
+///           i32 16)
 ///   %15 = insertvalue %"struct.impala::StringValue" zeroinitializer, i32 %14, 1
-///   %child9 = extractvalue { i64, i8* } %child4, 1
 ///   %16 = insertvalue %"struct.impala::StringValue" %15, i8* %child9, 0
 ///   store %"struct.impala::StringValue" %16, %"struct.impala::StringValue"* %2
 ///   %17 = bitcast %"struct.impala::StringValue"* %2 to i8*
-///   call void @llvm.memcpy.p0i8.p0i8.i64(i8* %input_ptr8, i8* %17,
-///                                        i64 12, i32 0, i1 false)
-///   br label %eval_child3
+///   call void @llvm.memcpy.p0i8.p0i8.i64(i8* %input_ptr11,
+///                                        i8* %17,
+///                                        i64 12,
+///                                        i32 0,
+///                                        i1 false)
+///   br label %eval_child10
 ///
-/// eval_child3:                                 ; preds = %child_not_null5, %eval_child1
-///   %child11 = call { i64, i8* } @GetSlotRef.6(
-///       %"class.impala::ScalarExprEvaluator"* %eval, %"class.impala::TupleRow"* %row)
-///   %18 = extractvalue { i64, i8* } %child11, 0
-///   %child_is_null13 = trunc i64 %18 to i1
-///   %child_is_null_i814 = zext i1 %child_is_null13 to i8
+/// null7:                                            ; preds = %entry5
 ///   call void @_ZN6impala11HiveUdfCall10JniContext26SetInputNullsBufferElementEPS1_ih(
 ///       %"struct.impala::HiveUdfCall::JniContext"* %jni_ctx,
-///       i32 2, i8 %child_is_null_i814)
-///   br i1 %child_is_null13, label %call_java, label %child_not_null12
+///       i32 1,
+///       i8 1)
+///   br label %eval_child10
 ///
-/// child_not_null12:                            ; preds = %eval_child3
-///   %input_ptr15 = call i8*
-///       @_ZN6impala11HiveUdfCall10JniContext28GetInputValuesBufferAtOffsetEPS1_i(
-///       %"struct.impala::HiveUdfCall::JniContext"* %jni_ctx, i32 32)
-///   %19 = extractvalue { i64, i8* } %child11, 0
+/// eval_child10:                                     ; preds = %non_null6, %null7
+///   %child12 = call { i64, i8* } @"impala::CastFunctions::CastToStringValWrapper"(
+///       %"class.impala::ScalarExprEvaluator"* %eval,
+///       %"class.impala::TupleRow"* %row)
+///   br label %entry13
+///
+/// entry13:                                          ; preds = %eval_child10
+///   %18 = extractvalue { i64, i8* } %child12, 0
+///   %is_null16 = trunc i64 %18 to i1
+///   br i1 %is_null16, label %null15, label %non_null14
+///
+/// non_null14:                                       ; preds = %entry13
+///   %child17 = extractvalue { i64, i8* } %child12, 1
+///   %19 = extractvalue { i64, i8* } %child12, 0
 ///   %20 = ashr i64 %19, 32
 ///   %21 = trunc i64 %20 to i32
+///   call void @_ZN6impala11HiveUdfCall10JniContext26SetInputNullsBufferElementEPS1_ih(
+///       %"struct.impala::HiveUdfCall::JniContext"* %jni_ctx,
+///       i32 2,
+///       i8 0)
+///   %input_ptr19 = call i8*
+///       @_ZN6impala11HiveUdfCall10JniContext28GetInputValuesBufferAtOffsetEPS1_i(
+///           %"struct.impala::HiveUdfCall::JniContext"* %jni_ctx,
+///           i32 32)
 ///   %22 = insertvalue %"struct.impala::StringValue" zeroinitializer, i32 %21, 1
-///   %child16 = extractvalue { i64, i8* } %child11, 1
-///   %23 = insertvalue %"struct.impala::StringValue" %22, i8* %child16, 0
+///   %23 = insertvalue %"struct.impala::StringValue" %22, i8* %child17, 0
 ///   store %"struct.impala::StringValue" %23, %"struct.impala::StringValue"* %1
 ///   %24 = bitcast %"struct.impala::StringValue"* %1 to i8*
-///   call void @llvm.memcpy.p0i8.p0i8.i64(i8* %input_ptr15, i8* %24,
-///                                        i64 12, i32 0, i1 false)
+///   call void @llvm.memcpy.p0i8.p0i8.i64(i8* %input_ptr19,
+///                                        i8* %24,
+///                                        i64 12,
+///                                        i32 0,
+///                                        i1 false)
 ///   br label %call_java
 ///
-/// call_java:                                   ; preds = %child_not_null12, %eval_child3
+/// null15:                                           ; preds = %entry13
+///   call void @_ZN6impala11HiveUdfCall10JniContext26SetInputNullsBufferElementEPS1_ih(
+///       %"struct.impala::HiveUdfCall::JniContext"* %jni_ctx,
+///       i32 2,
+///       i8 1)
+///   br label %call_java
+///
+/// call_java:                                        ; preds = %non_null14, %null15
 ///   store %"struct.impala::ColumnType" {
-///       i32 10, i32 -1, i32 -1, i32 -1,
-///       %"class.std::vector.13" zeroinitializer,
-///       %"class.std::vector.18" zeroinitializer,
-///       %"class.std::vector.23" zeroinitializer },
+///           i32 10, i32 -1, i32 -1, i32 -1,
+///           %"class.std::vector.13" zeroinitializer,
+///           %"class.std::vector.18" zeroinitializer,
+///           %"class.std::vector.23" zeroinitializer },
 ///       %"struct.impala::ColumnType"* %0
 ///   %ret_ptr = call %"struct.impala_udf::AnyVal"*
 ///   ; The next two lines should be one line but the name of the identifier is too long.
 ///       @_ZN6impala11HiveUdfCall22CallJavaAndStoreResultEPKNS_10ColumnTypeEPN10
 ///impala_udf15FunctionContextEPNS0_10JniContextE(
-///       %"struct.impala::ColumnType"* %0,
-///       %"class.impala_udf::FunctionContext"* %fn_ctx,
-///       %"struct.impala::HiveUdfCall::JniContext"* %jni_ctx)
+///           %"struct.impala::ColumnType"* %0,
+///           %"class.impala_udf::FunctionContext"* %fn_ctx,
+///           %"struct.impala::HiveUdfCall::JniContext"* %jni_ctx)
 ///   %ret_ptr_cast = bitcast %"struct.impala_udf::AnyVal"* %ret_ptr to { i64, i8* }*
 ///   %ret = load { i64, i8* }, { i64, i8* }* %ret_ptr_cast
 ///   ret { i64, i8* } %ret

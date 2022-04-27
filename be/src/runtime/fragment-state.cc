@@ -22,6 +22,7 @@
 #include "codegen/llvm-codegen.h"
 #include "exec/exec-node.h"
 #include "exec/data-sink.h"
+#include "exprs/slot-ref.h"
 #include "runtime/exec-env.h"
 #include "runtime/query-state.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
@@ -168,12 +169,16 @@ Status FragmentState::CreateCodegen() {
 
 Status FragmentState::CodegenScalarExprs() {
   for (auto& item : scalar_exprs_to_codegen_) {
-    llvm::Function* fn;
-    RETURN_IF_ERROR(item.first->GetCodegendComputeFn(codegen_.get(), item.second, &fn));
+    ScalarExpr* expr = item.first;
+    // We don't need to codegen GetSlotRef() for struct children because the struct takes
+    // care of its members.
+    if (!ScalarExprIsWithinStruct(expr)) {
+      llvm::Function* fn;
+      RETURN_IF_ERROR(expr->GetCodegendComputeFn(codegen_.get(), item.second, &fn));
+    }
   }
   return Status::OK();
 }
-
 
 std::string FragmentState::GenerateCodegenMsg(
     bool codegen_enabled, const Status& codegen_status, const std::string& extra_label) {
@@ -188,6 +193,14 @@ std::string FragmentState::GenerateCodegenMsg(bool codegen_enabled,
   str << (codegen_enabled ? "Codegen Enabled" : "Codegen Disabled");
   if (!extra_info.empty()) str << ": " + extra_info;
   return str.str();
+}
+
+bool FragmentState::ScalarExprIsWithinStruct(const ScalarExpr* expr) const {
+  if (!expr->IsSlotRef()) return false;
+  const SlotRef* slot_ref_expr = static_cast<const SlotRef*>(expr);
+  const SlotDescriptor* slot_desc = desc_tbl().GetSlotDescriptor(
+      slot_ref_expr->slot_id());
+  return slot_desc->parent()->isTupleOfStructSlot();
 }
 
 }

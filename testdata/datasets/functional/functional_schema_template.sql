@@ -3941,7 +3941,6 @@ functional
 ---- BASE_TABLE_NAME
 collection_struct_mix_view
 ---- CREATE
-SET disable_codegen=1;
 DROP VIEW IF EXISTS {db_name}{db_suffix}.{table_name};
 CREATE VIEW {db_name}{db_suffix}.{table_name}
 AS SELECT id, arr_contains_struct, arr_contains_nested_struct, struct_contains_nested_arr FROM {db_name}{db_suffix}.collection_struct_mix;

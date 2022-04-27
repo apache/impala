@@ -468,7 +468,7 @@ class TestFetchFirst(HS2TestSuite):
     """Regression test for IMPALA-11447. Returning complex types in select list
     was crashing in hs2 if result caching was enabled.
     """
-    options = {self.IMPALA_RESULT_CACHING_OPT: "1024", "disable_codegen": "true"}
+    options = {self.IMPALA_RESULT_CACHING_OPT: "1024"}
     handle = self.run_query_expect_success(
         "select int_array from functional_parquet.complextypestbl", options)
     self.fetch_until(handle, TCLIService.TFetchOrientation.FETCH_NEXT, 10, 8)

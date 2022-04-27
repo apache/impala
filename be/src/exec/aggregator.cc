@@ -431,7 +431,7 @@ Status AggregatorConfig::CodegenUpdateSlot(LlvmCodeGen* codegen, int agg_fn_idx,
         dst.SetIsNull(slot_desc->CodegenIsNull(codegen, &builder, agg_tuple_arg));
       }
     }
-    dst.LoadFromNativePtr(dst_slot_ptr);
+    SlotDescriptor::CodegenLoadAnyVal(&dst, dst_slot_ptr);
 
     // Get the FunctionContext object for the AggFnEvaluator.
     llvm::Function* get_agg_fn_ctx_fn =
@@ -448,7 +448,7 @@ Status AggregatorConfig::CodegenUpdateSlot(LlvmCodeGen* codegen, int agg_fn_idx,
     // Copy the value back to the slot. In the FIXED_UDA_INTERMEDIATE case, the
     // UDA function writes directly to the slot so there is nothing to copy.
     if (dst_type.type != TYPE_FIXED_UDA_INTERMEDIATE) {
-      updated_dst_val.StoreToNativePtr(dst_slot_ptr);
+      SlotDescriptor::CodegenStoreNonNullAnyVal(updated_dst_val, dst_slot_ptr);
     }
 
     if (slot_desc->is_nullable() && !special_null_handling) {

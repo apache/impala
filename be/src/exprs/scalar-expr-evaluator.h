@@ -255,7 +255,8 @@ class ScalarExprEvaluator {
   const ScalarExpr& root_;
 
   /// Stores the result of evaluation for this expr tree (or any sub-expression).
-  /// This is used in interpreted path when we need to return a void*.
+  /// This is used in interpreted path when we need to return a void* and to store the
+  /// children of a struct expression in both interpreted and codegen mode.
   ExprValue result_;
 
   /// For a struct scalar expression there is one evaluator created for each child of
@@ -284,6 +285,14 @@ class ScalarExprEvaluator {
   /// which need FunctionContext.
   void CreateFnCtxs(RuntimeState* state, const ScalarExpr& expr, MemPool* expr_perm_pool,
       MemPool* expr_results_pool);
+
+  // Helper functions for codegen.
+
+  // Converts and stores 'val' to 'result_' according to its type. Intended to be called
+  // from codegen code.
+  void* StoreResult(const AnyVal& val, const ColumnType& type);
+  static FunctionContext* GetFunctionContext(ScalarExprEvaluator* eval, int fn_ctx_idx);
+  static ScalarExprEvaluator* GetChildEvaluator(ScalarExprEvaluator* eval, int idx);
 };
 }
 

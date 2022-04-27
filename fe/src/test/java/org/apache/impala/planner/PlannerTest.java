@@ -802,9 +802,7 @@ public class PlannerTest extends PlannerTestBase {
     // Also tests that selecting the whole struct or fields from an inline view or
     // directly from the table give the same row size.
 
-    // For comlex types in the select list, we have to turn codegen off.
     TQueryOptions queryOpts = defaultQueryOptions();
-    queryOpts.setDisable_codegen(true);
 
     String queryWholeStruct =
         "select outer_struct from functional_orc_def.complextypes_nested_structs";
@@ -854,12 +852,7 @@ public class PlannerTest extends PlannerTestBase {
     // the select list, no extra slots are generated in the row for the struct fields but
     // the memory of the struct is reused, i.e. the row size is the same as when only the
     // struct is queried.
-
-    // For complex types in the select list, we have to turn codegen off.
-    // TODO: Remove this when IMPALA-10851 is fixed.
     TQueryOptions queryOpts = defaultQueryOptions();
-    queryOpts.setDisable_codegen(true);
-
     String queryTemplate =
         "select %s from functional_orc_def.complextypes_nested_structs";
 
@@ -887,9 +880,6 @@ public class PlannerTest extends PlannerTestBase {
     // star expansion.
 
     TQueryOptions queryOpts = defaultQueryOptions();
-    // For complex types in the select list, we have to turn codegen off.
-    // TODO: Remove this when IMPALA-10851 is fixed.
-    queryOpts.setDisable_codegen(true);
     // Enable star-expandion of complex types.
     queryOpts.setExpand_complex_types(true);
 
