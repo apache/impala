@@ -118,7 +118,7 @@ INT
 ====
 ---- QUERY
 show files in iceberg_hadoop_cat;
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hadoop_catalog_test/$DATABASE/iceberg_hadoop_cat/data/.*.0.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
@@ -145,7 +145,7 @@ INT
 ====
 ---- QUERY
 show files in iceberg_hadoop_cat_ti;
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hadoop_catalog_test/test/custom_db/int_table/data/.*.0.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
@@ -265,7 +265,7 @@ INT
 ====
 ---- QUERY
 show files in iceberg_hive_cat_custom_loc;
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/custom_hive_cat/data/.*.0.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING

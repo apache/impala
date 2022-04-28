@@ -46,7 +46,7 @@ STRING,DECIMAL
 ====
 ---- QUERY
 SHOW FILES IN iceberg_hadoop_catalogs_with_id;
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/ice_hadoop_cat/org/db/tbl/data/label=ice/.*.0.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
@@ -117,7 +117,7 @@ STRING,DECIMAL
 ====
 ---- QUERY
 SHOW FILES IN iceberg_hive_catalogs;
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_hive_catalogs/data/label=ice/.*.0.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING

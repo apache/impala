@@ -24,7 +24,9 @@ INT
 ====
 ---- QUERY
 show files in ice_only_part;
----- RESULTS: VERIFY_IS_SUBSET
+---- LABELS
+Path,Size,Partition
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=1/.*.0.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=2/.*.0.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=3/.*.0.parq','.*',''
@@ -140,8 +142,17 @@ BIGINT
 ====
 ---- QUERY
 show files in alltypes_part;
----- RESULTS: VERIFY_IS_SUBSET
+---- LABELS
+Path,Size,Partition
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=0/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-01-01/string_col=0/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=1/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-01-01/string_col=1/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=2/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-02-01/string_col=0/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=3/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-02-01/string_col=1/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=4/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-03-01/string_col=0/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=5/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-03-01/string_col=1/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=6/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-04-01/string_col=0/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=7/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-04-01/string_col=1/.*.0.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
 ====
@@ -249,7 +260,9 @@ aggregation(SUM, NumRowGroups): 1
 ====
 ---- QUERY
 show files in ice_part_non_order;
----- RESULTS: VERIFY_IS_SUBSET
+---- LABELS
+Path,Size,Partition
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_non_order/data/s=first/d=2020-12-07/.*.0.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_non_order/data/s=second/d=2020-12-08/.*.0.parq','.*',''
 ---- TYPES
@@ -310,7 +323,9 @@ INT, DATE, STRING
 ====
 ---- QUERY
 show files in ice_alter_part;
----- RESULTS: VERIFY_IS_SUBSET
+---- LABELS
+Path,Size,Partition
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/[^=]*.0.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/i=3/d=2020-12-09/.*.0.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/i=4/d=2020-12-10/.*.0.parq','.*',''
@@ -338,7 +353,9 @@ INT, STRING, DATE
 ====
 ---- QUERY
 show files in ice_void;
----- RESULTS: VERIFY_IS_SUBSET
+---- LABELS
+Path,Size,Partition
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*',''
@@ -360,7 +377,9 @@ INT, STRING, DATE
 ====
 ---- QUERY
 show files in ice_void;
----- RESULTS: VERIFY_IS_SUBSET
+---- LABELS
+Path,Size,Partition
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*',''
@@ -385,7 +404,9 @@ INT, STRING, DATE
 ====
 ---- QUERY
 show files in ice_void;
----- RESULTS: VERIFY_IS_SUBSET
+---- LABELS
+Path,Size,Partition
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*',''
@@ -413,7 +434,9 @@ INT, STRING, DATE
 ====
 ---- QUERY
 show files in ice_void;
----- RESULTS: VERIFY_IS_SUBSET
+---- LABELS
+Path,Size,Partition
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*',''

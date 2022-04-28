@@ -22,7 +22,7 @@ STRING
 ====
 ---- QUERY
 show files in single_col_bucket;
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=0/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=2/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=4/.*.parq','.*',''
@@ -78,7 +78,7 @@ INT,STRING,DATE,TIMESTAMP
 ====
 ---- QUERY
 show files in multi_col_bucket;
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_bucket/data/i_bucket=0/s_bucket=1/d_bucket=2/t_bucket=4/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_bucket/data/i_bucket=0/s_bucket=2/d_bucket=3/t_bucket=0/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_bucket/data/i_bucket=0/s_bucket=4/d_bucket=1/t_bucket=3/.*.parq','.*',''
@@ -174,7 +174,7 @@ DECIMAL
 ====
 ---- QUERY
 show files in single_col_truncate;
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=1.1200/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=10.5400/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=200.7800/.*.parq','.*',''
@@ -255,7 +255,7 @@ INT,BIGINT,DECIMAL,STRING
 ====
 ---- QUERY
 show files in multi_col_truncate;
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick brown/i_trunc=0/b_trunc=11/d_trunc=11111.100000/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick brown/i_trunc=0/b_trunc=220/d_trunc=421.000000/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick brown/i_trunc=5/b_trunc=330/d_trunc=113211.200000/.*.parq','.*',''
@@ -379,7 +379,7 @@ TIMESTAMP,DATE
 ====
 ---- QUERY
 show files in year_transform;
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/year_transform/data/t_year=1969/d_year=1969/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/year_transform/data/t_year=1970/d_year=1970/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/year_transform/data/t_year=2021/d_year=2021/.*.parq','.*',''
@@ -502,7 +502,7 @@ TIMESTAMP,DATE
 ====
 ---- QUERY
 show files in month_transform;
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=1969-02/d_month=1969-02/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=1969-12/d_month=1969-12/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=1970-01/d_month=1970-01/.*.parq','.*',''
@@ -615,13 +615,12 @@ TIMESTAMP,DATE
 ====
 ---- QUERY
 show files in day_transform;
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=1969-02-15/d_day=1969-02-15/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=1969-12-15/d_day=1969-12-15/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=1970-01-01/d_day=1970-01-01/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=1970-11-01/d_day=1970-11-01/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=2021-01-07/d_day=2021-01-07/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=2021-01-08/d_day=2021-01-08/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=2021-01-08/d_day=2021-01-08/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=__HIVE_DEFAULT_PARTITION__/d_day=__HIVE_DEFAULT_PARTITION__/.*.parq','.*',''
 ---- TYPES
@@ -746,7 +745,7 @@ TIMESTAMP
 ====
 ---- QUERY
 show files in hour_transform;
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=1969-12-31-22/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=1969-12-31-23/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=1970-01-01-00/.*.parq','.*',''
@@ -838,7 +837,7 @@ STRING,BIGINT,DECIMAL,TIMESTAMP,DATE
 ====
 ---- QUERY
 show files in mixed_and_shuffled;
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=1971-07-01/da_year=1971/s_trunc=green/b_bucket=1/de_trunc=71.00/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=1999-09-09/da_year=1999/s_trunc=pink /b_bucket=1/de_trunc=9.00/.*.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=2020-01-06/da_year=2020/s_trunc=quick/b_bucket=1/de_trunc=3333.00/.*.parq','.*',''

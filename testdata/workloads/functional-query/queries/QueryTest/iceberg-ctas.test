@@ -14,7 +14,7 @@ INT,BIGINT
 ====
 ---- QUERY
 show files in ice_ctas;
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_ctas/data/.*.0.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
@@ -31,7 +31,7 @@ STRING,TIMESTAMP,DATE
 ====
 ---- QUERY
 show files in ice_ctas_part;
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_ctas_part/data/d=2021-02-26/.*.0.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
@@ -48,7 +48,7 @@ STRING,TIMESTAMP,DATE
 ====
 ---- QUERY
 show files in ice_ctas_part;
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_ctas_part/data/d=2021-02-26/.*.0.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_ctas_part/data/d=2021-02-27/.*.0.parq','.*',''
 ---- TYPES
@@ -70,7 +70,7 @@ STRING,TIMESTAMP,DATE
 ====
 ---- QUERY
 show files in ice_ctas_hadoop_tables_part;
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/loc_test/data/d_month=2021-02/.*.0.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
@@ -97,7 +97,7 @@ INT,STRING,DATE
 ====
 ---- QUERY
 show files in ice_ctas_hadoop_catalog_part;
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/cat_loc/ns1/ns2/ctas/data/s_trunc=imp/.*.0.parq','.*',''
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/cat_loc/ns1/ns2/ctas/data/s_trunc=lio/.*.0.parq','.*',''
 ---- TYPES
