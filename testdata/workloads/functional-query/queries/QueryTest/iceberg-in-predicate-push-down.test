@@ -1,0 +1,624 @@
+====
+---- QUERY
+# Test INT/BIGINT/FLOAT/DOUBLE/STRING/TIMESTAMP/DATE InPredicate push-down
+create table ice_pred_pd1 (
+  col_i INT,
+  col_bi BIGINT,
+  col_f FLOAT,
+  col_db DOUBLE,
+  col_str STRING,
+  col_ts TIMESTAMP,
+  col_dt DATE
+) partitioned by spec (col_i) stored as iceberg tblproperties ('write.format.default' = 'parquet');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into
+  ice_pred_pd1
+values
+  (0, 12345678900, 3.140, 2.71820, 'Leonhard_A', '1400-01-01 00:00:00', DATE'1400-01-01'),
+  (0, 12345678901, 3.141, 2.71821, 'Leonhard_B', '1400-01-01 01:01:01', DATE'1400-01-01'),
+  (0, 12345678902, 3.142, 2.71822, 'Leonhard_C', '1400-01-01 02:02:02', DATE'1400-01-01'),
+  (1, 12345678903, 3.143, 2.71823, 'Leonhard_D', '1500-01-01 00:00:00', DATE'1500-01-01'),
+  (1, 12345678904, 3.144, 2.71824, 'Leonhard_E', '1500-01-01 01:01:01', DATE'1500-01-01'),
+  (1, 12345678905, 3.145, 2.71825, 'Leonhard_F', '1500-01-01 02:02:02', DATE'1500-01-01'),
+  (2, 12345678906, 3.146, 2.71826, 'Leonhard_G', '1600-01-01 00:00:00', DATE'1600-01-01'),
+  (2, 12345678907, 3.147, 2.71827, 'Leonhard_H', '1600-01-01 01:01:01', DATE'1600-01-01'),
+  (2, 12345678908, 3.148, 2.71828, 'Leonhard_I', '1600-01-01 02:02:02', DATE'1600-01-01');
+select count(1) from ice_pred_pd1;
+---- RESULTS
+9
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 3
+====
+---- QUERY
+show files in ice_pred_pd1;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_pred_pd1/data/col_i=0/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_pred_pd1/data/col_i=1/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_pred_pd1/data/col_i=2/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Start testing predicate push-down for int column
+# The IN predicate matches all row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_i in (0, 1, 2);
+---- RESULTS
+9
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# The IN predicate matches two row group
+# InList: constant expr
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_i in (ceil(-0.1), 1 * 2);
+---- RESULTS
+6
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+# The IN predicate matches one row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_i in (0);
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# The IN predicate does not match any row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_i in (-1, 3);
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+====
+---- QUERY
+# The IN predicate will not push down
+# InList: implicit cast
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_i in (0, 2.0);
+---- RESULTS
+6
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# The IN predicate will not push down
+# InList: non-constant expr
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_i in (col_bi);
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# The IN predicate will not push down
+# InList: mixed constant and non-constant exprs
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_i in (cast(col_bi as int), 2);
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+create table ice_pred_pd1_int (
+  col_i INT
+) stored as iceberg tblproperties ('write.format.default' = 'parquet');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into
+  ice_pred_pd1_int
+values
+  (1),
+  (3),
+  (5);
+select
+  count(1)
+from
+  ice_pred_pd1_int;
+---- RESULTS
+3
+====
+---- QUERY
+# The IN predicate will not push down
+# InList: select clause
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_i in (select distinct col_i from ice_pred_pd1_int);
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+====
+---- QUERY
+# Start testing predicate push-down for bigint column
+# The IN predicate matches all row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_bi in (12345678900, 12345678903, 12345678906);
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# The IN predicate matches one row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_bi in (12345678900);
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# The IN predicate does not match any row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_bi in (12345678909);
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+====
+---- QUERY
+# Start testing predicate push-down for float column
+# The IN predicate matches all row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_f in (3.140, 3.143, 3.146);
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# The IN predicate matches one row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_f in (3.140);
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# The IN predicate does not match any row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_f in (3.149);
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+====
+---- QUERY
+# Start testing predicate push-down for double column
+# The IN predicate matches all row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_db in (2.71820, 2.71823, 2.71826);
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# The IN predicate matches one row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_db in (2.71820);
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# The IN predicate does not match any row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_db in (2.71829);
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+====
+---- QUERY
+# Start testing predicate push-down for string column
+# The IN predicate matches all row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_str in ('Leonhard_A', 'Leonhard_D', 'Leonhard_G');
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# The IN predicate matches one row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_str in ('Leonhard_A');
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# The IN predicate does not match any row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_str in ('Leonhard_J');
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+====
+---- QUERY
+# Start testing predicate push-down for timestamp column
+# The IN predicate matches all row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_ts in ('1400-01-01 00:00:00', '1500-01-01 00:00:00', '1600-01-01 00:00:00');
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# The IN predicate matches one row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_ts in ('1400-01-01 00:00:00');
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# The IN predicate does not match any row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_ts in ('1700-01-01 00:00:00');
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+====
+---- QUERY
+# Start testing predicate push-down for date column
+# The IN predicate matches all row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_dt in (DATE'1400-01-01', DATE'1500-01-01', DATE'1600-01-01');
+---- RESULTS
+9
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# The IN predicate matches one row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_dt in (DATE'1400-01-01');
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# The IN predicate does not match any row group
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_dt in (DATE'1700-01-01');
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+====
+---- QUERY
+# Test DECIMAL(9, 3)/DECIMAL(18, 3)/DECIMAL(38, 3) InPredicate push-down
+create table ice_pred_pd2 (
+  p INT,
+  d1 DECIMAL(9, 3),
+  d2 DECIMAL(18, 3),
+  d3 DECIMAL(38, 3)
+) partitioned by spec (p) stored as iceberg tblproperties ('write.format.default' = 'parquet');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into
+  ice_pred_pd2
+values
+  (
+    0,
+    123.450,
+    1234567890.120,
+    1234567890123456789.010
+  ),
+  (
+    0,
+    123.451,
+    1234567890.121,
+    1234567890123456789.011
+  ),
+  (
+    0,
+    123.452,
+    1234567890.122,
+    1234567890123456789.012
+  ),
+  (
+    1,
+    123.453,
+    1234567890.123,
+    1234567890123456789.013
+  ),
+  (
+    1,
+    123.454,
+    1234567890.124,
+    1234567890123456789.014
+  ),
+  (
+    1,
+    123.455,
+    1234567890.125,
+    1234567890123456789.015
+  ),
+  (
+    2,
+    123.456,
+    1234567890.126,
+    1234567890123456789.016
+  ),
+  (
+    2,
+    123.457,
+    1234567890.127,
+    1234567890123456789.017
+  ),
+  (
+    2,
+    123.458,
+    1234567890.128,
+    1234567890123456789.018
+  );
+select count(1) from ice_pred_pd2;
+---- RESULTS
+9
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 3
+====
+---- QUERY
+show files in ice_pred_pd2;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_pred_pd2/data/p=0/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_pred_pd2/data/p=1/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_pred_pd2/data/p=2/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Start testing predicate push-down for decimal(9, 3) column
+# The IN predicate matches all row group
+select
+  count(1)
+from
+  ice_pred_pd2
+where
+  d1 in (123.450, 123.453, 123.456);
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# The IN predicate matches one row group
+select
+  count(1)
+from
+  ice_pred_pd2
+where
+  d1 in (123.450, 123.451, 123.452);
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# The IN predicate does not match any row group
+select
+  count(1)
+from
+  ice_pred_pd2
+where
+  d1 in (123.459);
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+====
+---- QUERY
+# Start testing predicate push-down for decimal(18, 3) column
+# The IN predicate matches all row group
+select
+  count(1)
+from
+  ice_pred_pd2
+where
+  d2 in (1234567890.120, 1234567890.123, 1234567890.126);
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# The IN predicate matches one row group
+select
+  count(1)
+from
+  ice_pred_pd2
+where
+  d2 in (1234567890.120, 1234567890.121, 1234567890.122);
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# The IN predicate does not match any row group
+select
+  count(1)
+from
+  ice_pred_pd2
+where
+  d2 in (1234567890.129);
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+====
+---- QUERY
+# Start testing predicate push-down for decimal(38, 3) column
+# The IN predicate matches all row group
+select
+  count(1)
+from
+  ice_pred_pd2
+where
+  d3 in (1234567890123456789.010, 1234567890123456789.013, 1234567890123456789.016);
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# The IN predicate matches one row group
+select
+  count(1)
+from
+  ice_pred_pd2
+where
+  d3 in (1234567890123456789.010, 1234567890123456789.011, 1234567890123456789.012);
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# The IN predicate does not match any row group
+select
+  count(1)
+from
+  ice_pred_pd2
+where
+  d3 in (1234567890123456789.019);
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+====

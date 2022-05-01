@@ -22,7 +22,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.ListIterator;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.iceberg.DataFile;
@@ -36,6 +35,7 @@ import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.DateLiteral;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.NumericLiteral;
@@ -44,6 +44,7 @@ import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TableRef;
 import org.apache.impala.analysis.TimeTravelSpec;
 import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
@@ -52,6 +53,7 @@ import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.InternalException;
@@ -184,117 +186,9 @@ public class IcebergScanNode extends HdfsScanNode {
    * please refer: https://iceberg.apache.org/spec/#scan-planning
    */
   private void extractIcebergConjuncts(Analyzer analyzer) throws ImpalaException {
-    ListIterator<Expr> it = conjuncts_.listIterator();
-    while (it.hasNext()) {
-      tryConvertBinaryIcebergPredicate(analyzer, it.next());
+    for (Expr expr : conjuncts_) {
+      tryConvertIcebergPredicate(analyzer, expr);
     }
-  }
-
-  /**
-   * Transform impala binary predicate to iceberg predicate
-   */
-  private boolean tryConvertBinaryIcebergPredicate(Analyzer analyzer, Expr expr)
-      throws ImpalaException {
-    if (! (expr instanceof BinaryPredicate)) return false;
-
-    BinaryPredicate predicate = (BinaryPredicate) expr;
-    Operation op = getIcebergOperator(predicate.getOp());
-    if (op == null) return false;
-
-    if (!(predicate.getChild(0) instanceof SlotRef)) return false;
-    SlotRef ref = (SlotRef) predicate.getChild(0);
-
-    if (!(predicate.getChild(1) instanceof LiteralExpr)) return false;
-    LiteralExpr literal = (LiteralExpr) predicate.getChild(1);
-
-    // If predicate contains map/struct, this column would be null
-    if (ref.getDesc().getColumn() == null) return false;
-
-    IcebergColumn iceCol = (IcebergColumn)ref.getDesc().getColumn();
-    Schema iceSchema = icebergTable_.getIcebergSchema();
-    String colName = iceCol.getName();
-    UnboundPredicate unboundPredicate = null;
-    switch (literal.getType().getPrimitiveType()) {
-      case BOOLEAN: {
-        unboundPredicate = Expressions.predicate(op, colName,
-            ((BoolLiteral) literal).getValue());
-        break;
-      }
-      case TINYINT:
-      case SMALLINT:
-      case INT: {
-        unboundPredicate = Expressions.predicate(op, colName,
-            ((NumericLiteral) literal).getIntValue());
-        break;
-      }
-      case BIGINT: {
-        unboundPredicate = Expressions.predicate(op, colName,
-            ((NumericLiteral) literal).getLongValue());
-        break;
-      }
-      case FLOAT: {
-        unboundPredicate = Expressions.predicate(op, colName,
-            (float)((NumericLiteral) literal).getDoubleValue());
-        break;
-      }
-      case DOUBLE: {
-        unboundPredicate = Expressions.predicate(op, colName,
-            ((NumericLiteral) literal).getDoubleValue());
-        break;
-      }
-      case STRING:
-      case DATETIME:
-      case CHAR: {
-        unboundPredicate = Expressions.predicate(op, colName,
-            ((StringLiteral) literal).getUnescapedValue());
-        break;
-      }
-      case TIMESTAMP: {
-        try {
-          org.apache.iceberg.types.Type iceType = iceSchema.findType(iceCol.getFieldId());
-          Preconditions.checkState(iceType instanceof Types.TimestampType);
-          Types.TimestampType tsType = (Types.TimestampType)iceType;
-          long unixMicros = 0;
-          if (tsType.shouldAdjustToUTC()) {
-            unixMicros = ExprUtil.localTimestampToUnixTimeMicros(analyzer, literal);
-          } else {
-            unixMicros = ExprUtil.utcTimestampToUnixTimeMicros(analyzer, literal);
-          }
-          unboundPredicate = Expressions.predicate(op, colName, unixMicros);
-        } catch (InternalException ex) {
-          // We cannot interpret the timestamp literal. Maybe the timestamp is invalid,
-          // or the local timestamp ambigously converts to UTC due to daylight saving
-          // time backward turn. E.g. '2021-10-31 02:15:00 Europe/Budapest' converts to
-          // either '2021-10-31 00:15:00 UTC' or '2021-10-31 01:15:00 UTC'.
-          LOG.warn("Exception occurred during timestamp conversion: " + ex.toString() +
-              "\nThis means timestamp predicate is not pushed to Iceberg, let Impala " +
-              "backend handle it.");
-        }
-        break;
-      }
-      case DATE: {
-        int daysSinceEpoch = ((DateLiteral) literal).getValue();
-        unboundPredicate = Expressions.predicate(op, colName, daysSinceEpoch);
-        break;
-      }
-      case DECIMAL: {
-        Type colType = ref.getDesc().getColumn().getType();
-        int scale = colType.getDecimalDigits();
-        BigDecimal literalValue = ((NumericLiteral) literal).getValue();
-        if (literalValue.scale() <= scale) {
-          // Iceberg DecimalLiteral needs to have the exact same scale.
-          if (literalValue.scale() < scale) literalValue = literalValue.setScale(scale);
-          unboundPredicate = Expressions.predicate(op, colName, literalValue);
-        }
-        break;
-      }
-      default: break;
-    }
-    if (unboundPredicate == null) return false;
-
-    icebergPredicates_.add(unboundPredicate);
-
-    return true;
   }
 
   /**
@@ -311,5 +205,131 @@ public class IcebergScanNode extends HdfsScanNode {
       case GT: return Operation.GT;
       default: return null;
     }
+  }
+
+  /**
+   * Transform impala predicate to iceberg predicate
+   */
+  private void tryConvertIcebergPredicate(Analyzer analyzer, Expr expr)
+      throws ImpalaException {
+    if (expr instanceof BinaryPredicate) {
+      convertIcebergPredicate(analyzer, (BinaryPredicate) expr);
+    } else if (expr instanceof InPredicate) {
+      convertIcebergPredicate(analyzer, (InPredicate) expr);
+    }
+  }
+
+  private void convertIcebergPredicate(Analyzer analyzer, BinaryPredicate predicate)
+      throws ImpalaException {
+    Operation op = getIcebergOperator(predicate.getOp());
+    if (op == null) return;
+
+    // Do not convert if there is an implicit cast
+    if (!(predicate.getChild(0) instanceof SlotRef)) return;
+    SlotRef ref = (SlotRef) predicate.getChild(0);
+
+    if (!(predicate.getChild(1) instanceof LiteralExpr)) return;
+    LiteralExpr literal = (LiteralExpr) predicate.getChild(1);
+
+    // If predicate contains map/struct, this column would be null
+    Column col = ref.getDesc().getColumn();
+    if (col == null) return;
+
+    Object value = getIcebergValue(analyzer, ref, literal);
+    if (value == null) return;
+
+    icebergPredicates_.add(Expressions.predicate(op, col.getName(), value));
+  }
+
+  private void convertIcebergPredicate(Analyzer analyzer, InPredicate predicate)
+      throws ImpalaException {
+    // TODO: convert NOT_IN predicate
+    if (predicate.isNotIn()) return;
+
+    // Do not convert if there is an implicit cast
+    if (!(predicate.getChild(0) instanceof SlotRef)) return;
+    SlotRef ref = (SlotRef) predicate.getChild(0);
+
+    // If predicate contains map/struct, this column would be null
+    Column col = ref.getDesc().getColumn();
+    if (col == null) return;
+
+    // Expressions takes a list of values as Objects
+    List<Object> values = new ArrayList<>();
+    for (int i = 1; i < predicate.getChildren().size(); ++i) {
+      if (!Expr.IS_LITERAL.apply(predicate.getChild(i))) return;
+      LiteralExpr literal = (LiteralExpr) predicate.getChild(i);
+
+      // Cannot push IN or NOT_IN predicate with null literal values
+      if (Expr.IS_NULL_LITERAL.apply(literal)) return;
+
+      Object value = getIcebergValue(analyzer, ref, literal);
+      if (value == null) return;
+
+      values.add(value);
+    }
+
+    icebergPredicates_.add(Expressions.in(col.getName(), values));
+  }
+
+  private Object getIcebergValue(Analyzer analyzer, SlotRef ref, LiteralExpr literal)
+      throws ImpalaException {
+    IcebergColumn iceCol = (IcebergColumn) ref.getDesc().getColumn();
+    Schema iceSchema = icebergTable_.getIcebergSchema();
+    switch (literal.getType().getPrimitiveType()) {
+      case BOOLEAN: return ((BoolLiteral) literal).getValue();
+      case TINYINT:
+      case SMALLINT:
+      case INT: return ((NumericLiteral) literal).getIntValue();
+      case BIGINT: return ((NumericLiteral) literal).getLongValue();
+      case FLOAT: return (float) ((NumericLiteral) literal).getDoubleValue();
+      case DOUBLE: return ((NumericLiteral) literal).getDoubleValue();
+      case STRING:
+      case DATETIME:
+      case CHAR: return ((StringLiteral) literal).getUnescapedValue();
+      case TIMESTAMP: return getIcebergTsValue(analyzer, literal, iceCol, iceSchema);
+      case DATE: return ((DateLiteral) literal).getValue();
+      case DECIMAL: return getIcebergDecimalValue(ref, (NumericLiteral) literal);
+      default: {
+        Preconditions.checkState(false,
+            "Unsupported iceberg type considered for predicate: %s",
+            literal.getType().toSql());
+      }
+    }
+    return null;
+  }
+
+  private BigDecimal getIcebergDecimalValue(SlotRef ref, NumericLiteral literal) {
+    Type colType = ref.getDesc().getColumn().getType();
+    int scale = colType.getDecimalDigits();
+    BigDecimal literalValue = literal.getValue();
+
+    if (literalValue.scale() > scale) return null;
+    // Iceberg DecimalLiteral needs to have the exact same scale.
+    if (literalValue.scale() < scale) return literalValue.setScale(scale);
+    return literalValue;
+  }
+
+  private Object getIcebergTsValue(Analyzer analyzer, LiteralExpr literal,
+      IcebergColumn iceCol, Schema iceSchema) throws AnalysisException {
+    try {
+      org.apache.iceberg.types.Type iceType = iceSchema.findType(iceCol.getFieldId());
+      Preconditions.checkState(iceType instanceof Types.TimestampType);
+      Types.TimestampType tsType = (Types.TimestampType) iceType;
+      if (tsType.shouldAdjustToUTC()) {
+        return ExprUtil.localTimestampToUnixTimeMicros(analyzer, literal);
+      } else {
+        return ExprUtil.utcTimestampToUnixTimeMicros(analyzer, literal);
+      }
+    } catch (InternalException ex) {
+      // We cannot interpret the timestamp literal. Maybe the timestamp is invalid,
+      // or the local timestamp ambigously converts to UTC due to daylight saving
+      // time backward turn. E.g. '2021-10-31 02:15:00 Europe/Budapest' converts to
+      // either '2021-10-31 00:15:00 UTC' or '2021-10-31 01:15:00 UTC'.
+      LOG.warn("Exception occurred during timestamp conversion: " + ex.toString() +
+          "\nThis means timestamp predicate is not pushed to Iceberg, let Impala " +
+          "backend handle it.");
+    }
+    return null;
   }
 }
