@@ -67,6 +67,7 @@ public class Column {
   public int getPosition() { return position_; }
   public void setPosition(int position) { this.position_ = position; }
   public ColumnStats getStats() { return stats_; }
+  public boolean isVirtual() { return false; }
 
   public boolean updateStats(ColumnStatisticsData statsData) {
     boolean statsDataCompatibleWithColType = stats_.update(type_, statsData);

@@ -353,6 +353,42 @@ public class AnalyzerTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestVirtualColumnInputFileName() {
+    // Select virtual columns.
+    AnalyzesOk("select input__file__name from functional.alltypes");
+    AnalyzesOk("select input__file__name, id from functional_parquet.alltypes");
+    AnalyzesOk("select input__file__name, * from functional_orc_def.alltypes");
+    AnalyzesOk("select input__file__name, * from " +
+        "(select input__file__name, * from functional_avro.alltypes) v");
+    AnalyzesOk(
+        "select id, input__file__name from functional_parquet.iceberg_partitioned");
+    AnalyzesOk(
+            "select input__file__name, * from functional_parquet.complextypestbl c, " +
+            "c.int_array");
+    AnalyzesOk(
+        "select c.input__file__name, c.int_array.* " +
+        "from functional_parquet.complextypestbl c, c.int_array");
+
+    // Error cases:
+    AnalysisError(
+        "select id, nested_struct.input__file__name " +
+        "from functional_parquet.complextypestbl",
+        "Could not resolve column/field reference: 'nested_struct.input__file__name'");
+    AnalysisError(
+        "select c.int_array.input__file__name, c.int_array.* " +
+        "from functional_parquet.complextypestbl c, c.int_array",
+        "Could not resolve column/field reference: 'c.int_array.input__file__name'");
+    AnalysisError(
+        "select id, nested_struct.input__file__name " +
+        "from functional_parquet.complextypestbl",
+        "Could not resolve column/field reference: 'nested_struct.input__file__name'");
+    AnalysisError("select input__file__name from functional_kudu.alltypes",
+        "Could not resolve column/field reference: 'input__file__name'");
+    AnalysisError("select input__file__name from functional_hbase.alltypes",
+        "Could not resolve column/field reference: 'input__file__name'");
+  }
+
+  @Test
   public void TestCopyTestCase() {
     AnalyzesOk("copy testcase to 'hdfs:///tmp' select * from functional.alltypes");
     AnalyzesOk("copy testcase to 'hdfs:///tmp' select * from functional.alltypes union " +

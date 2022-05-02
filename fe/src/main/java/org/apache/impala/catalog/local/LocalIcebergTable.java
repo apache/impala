@@ -34,6 +34,7 @@ import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
@@ -105,6 +106,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
       ColumnMap cmap, TPartialTableInfo tableInfo, TableParams tableParams,
       org.apache.iceberg.Table icebergApiTable) throws TableLoadingException {
     super(db, msTable, ref, cmap);
+
     Preconditions.checkNotNull(tableInfo);
     localFsTable_ = LocalFsTable.load(db, msTable, ref);
     tableParams_ = tableParams;
@@ -121,6 +123,11 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     icebergParquetRowGroupSize_ = Utils.getIcebergParquetRowGroupSize(msTable);
     icebergParquetPlainPageSize_ = Utils.getIcebergParquetPlainPageSize(msTable);
     icebergParquetDictPageSize_ = Utils.getIcebergParquetDictPageSize(msTable);
+    addVirtualColumns();
+  }
+
+  private void addVirtualColumns() {
+    addVirtualColumn(VirtualColumn.INPUT_FILE_NAME);
   }
 
   static void validateColumns(List<Column> impalaCols, List<FieldSchema> hmsCols) {

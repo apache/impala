@@ -45,6 +45,7 @@ import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -76,6 +77,9 @@ abstract class LocalTable implements FeTable {
   protected final Table msTable_;
 
   private final TTableStats tableStats_;
+
+  // Virtual columns of this table.
+  protected final ArrayList<VirtualColumn> virtualCols_ = new ArrayList<>();
 
   /**
    * Table reference as provided by the initial call to the metadata provider.
@@ -168,6 +172,9 @@ abstract class LocalTable implements FeTable {
     this.tableStats_ = null;
   }
 
+  protected void addVirtualColumn(VirtualColumn col) {
+    virtualCols_.add(col);
+  }
 
   @Override
   public boolean isLoaded() {
@@ -242,6 +249,9 @@ abstract class LocalTable implements FeTable {
   public List<Column> getNonClusteringColumns() {
     return cols_ == null ? Collections.emptyList() : cols_.getNonClusteringColumns();
   }
+
+  @Override
+  public List<VirtualColumn> getVirtualColumns() { return virtualCols_; }
 
   @Override
   public int getNumClusteringCols() {

@@ -279,6 +279,9 @@ class HdfsScanPlanNode : public ScanPlanNode {
   void ComputeSlotMaterializationOrder(
       const DescriptorTbl& desc_tbl, std::vector<int>* order) const;
 
+ /// Returns true if it has a virtual column that we can materialize in the template tuple
+  bool HasVirtualColumnInTemplateTuple() const;
+
   /// Conjuncts for each materialized tuple (top-level row batch tuples and collection
   /// item tuples). Includes a copy of PlanNode.conjuncts_.
   typedef std::unordered_map<TupleId, std::vector<ScalarExpr*>> ConjunctsMap;
@@ -317,6 +320,9 @@ class HdfsScanPlanNode : public ScanPlanNode {
 
   /// Vector containing slot descriptors for all partition key slots.
   std::vector<SlotDescriptor*> partition_key_slots_;
+
+  /// Vector containing slot descriptors for virtual columns.
+  std::vector<SlotDescriptor*> virtual_column_slots_;
 
   /// Descriptor for the hdfs table, including partition and format metadata.
   /// Set in Init, owned by QueryState
@@ -419,6 +425,10 @@ class HdfsScanNodeBase : public ScanNode {
 
   const std::vector<SlotDescriptor*>& materialized_slots()
       const { return materialized_slots_; }
+
+  const std::vector<SlotDescriptor*>& virtual_column_slots() const {
+      return virtual_column_slots_;
+  }
 
   /// Returns number of partition keys in the table.
   int num_partition_keys() const { return hdfs_table_->num_clustering_cols(); }
@@ -734,6 +744,8 @@ class HdfsScanNodeBase : public ScanNode {
 
   /// Vector containing slot descriptors for all partition key slots.
   const std::vector<SlotDescriptor*>& partition_key_slots_;
+
+  const std::vector<SlotDescriptor*>& virtual_column_slots_;
 
   /// Counters which track the number of scanners that have codegen enabled for the
   /// materialize and conjuncts evaluation code paths.

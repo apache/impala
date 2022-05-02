@@ -775,6 +775,7 @@ public class SelectStmt extends QueryStmt {
         } else {
           // Default star expansion.
           for (StructField f: structType.getFields()) {
+            if (f.isHidden()) continue;
             addStarResultExpr(resolvedPath, f.getName());
           }
         }

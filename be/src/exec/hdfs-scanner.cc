@@ -597,10 +597,20 @@ Status HdfsScanner::CodegenInitTuple(
   DCHECK(*init_tuple_fn != nullptr);
 
   // Replace all of the constants in InitTuple() to specialize the code.
-  bool materialized_partition_keys_exist = !node->partition_key_slots_.empty();
-  int replaced = codegen->ReplaceCallSitesWithBoolConst(
-      *init_tuple_fn, materialized_partition_keys_exist, "has_template_tuple");
-  DCHECK_REPLACE_COUNT(replaced, 1);
+  bool has_template_tuple = !node->partition_key_slots_.empty();
+  if (!has_template_tuple) {
+    has_template_tuple = node->HasVirtualColumnInTemplateTuple();
+  }
+  int replaced = 0;
+  // If has_template_tuple is true, then we can certainly replace the callsites.
+  // If has_template_tuple is false, then we should only replace the callsites for
+  // non-Iceberg tables, as for Iceberg tables we might still create a template
+  // tuple based on the partitioning in the data files.
+  if (has_template_tuple || !node->hdfs_table_->IsIcebergTable()) {
+    replaced = codegen->ReplaceCallSitesWithBoolConst(
+      *init_tuple_fn, has_template_tuple, "has_template_tuple");
+    DCHECK_REPLACE_COUNT(replaced, 1);
+  }
 
   const TupleDescriptor* tuple_desc = node->tuple_desc_;
   replaced = codegen->ReplaceCallSitesWithValue(*init_tuple_fn,

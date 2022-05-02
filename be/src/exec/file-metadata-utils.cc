@@ -47,9 +47,35 @@ Tuple* FileMetadataUtils::CreateTemplateTuple(MemPool* mem_pool) {
     template_tuple =
         template_tuple->DeepCopy(*scan_node_->tuple_desc(), mem_pool);
   }
-  if (!scan_node_->hdfs_table()->IsIcebergTable()) {
-    return template_tuple;
+  if (UNLIKELY(!scan_node_->virtual_column_slots().empty())) {
+    AddFileLevelVirtualColumns(mem_pool, template_tuple);
   }
+  if (scan_node_->hdfs_table()->IsIcebergTable()) {
+    AddIcebergColumns(mem_pool, &template_tuple);
+  }
+  return template_tuple;
+}
+
+void FileMetadataUtils::AddFileLevelVirtualColumns(MemPool* mem_pool,
+    Tuple* template_tuple) {
+  DCHECK(template_tuple != nullptr);
+  for (int i = 0; i < scan_node_->virtual_column_slots().size(); ++i) {
+    const SlotDescriptor* slot_desc = scan_node_->virtual_column_slots()[i];
+    if (slot_desc->virtual_column_type() != TVirtualColumnType::INPUT_FILE_NAME) {
+      continue;
+    }
+    StringValue* slot = template_tuple->GetStringSlot(slot_desc->tuple_offset());
+    const char* filename = context_->GetStream()->filename();
+    int len = strlen(filename);
+    char* filename_copy = reinterpret_cast<char*>(mem_pool->Allocate(len));
+    Ubsan::MemCpy(filename_copy, filename, len);
+    slot->ptr = filename_copy;
+    slot->len = len;
+    template_tuple->SetNotNull(slot_desc->null_indicator_offset());
+  }
+}
+
+void FileMetadataUtils::AddIcebergColumns(MemPool* mem_pool, Tuple** template_tuple) {
   using namespace org::apache::impala::fb;
   TextConverter text_converter(/* escape_char = */ '\\',
       scan_node_->hdfs_table()->null_partition_key_value(),
@@ -57,11 +83,11 @@ Tuple* FileMetadataUtils::CreateTemplateTuple(MemPool* mem_pool) {
   const FbFileMetadata* file_metadata = file_desc_->file_metadata;
   const FbIcebergMetadata* ice_metadata = file_metadata->iceberg_metadata();
   auto transforms = ice_metadata->partition_keys();
-  if (transforms == nullptr) return template_tuple;
+  if (transforms == nullptr) return;
 
   const TupleDescriptor* tuple_desc = scan_node_->tuple_desc();
-  if (template_tuple == nullptr) {
-    template_tuple = Tuple::Create(tuple_desc->byte_size(), mem_pool);
+  if (*template_tuple == nullptr) {
+    *template_tuple = Tuple::Create(tuple_desc->byte_size(), mem_pool);
   }
   for (const SlotDescriptor* slot_desc : scan_node_->tuple_desc()->slots()) {
     const SchemaPath& path = slot_desc->col_path();
@@ -76,7 +102,7 @@ Tuple* FileMetadataUtils::CreateTemplateTuple(MemPool* mem_pool) {
         continue;
       }
       if (field_id != transform->source_id()) continue;
-      if (!text_converter.WriteSlot(slot_desc, template_tuple,
+      if (!text_converter.WriteSlot(slot_desc, *template_tuple,
                                     transform->transform_value()->c_str(),
                                     transform->transform_value()->size(),
                                     true, false,
@@ -91,14 +117,14 @@ Tuple* FileMetadataUtils::CreateTemplateTuple(MemPool* mem_pool) {
         // Dates are stored as INTs in the partition data in Iceberg, so let's try
         // to parse them as INTs.
         if (col_desc.type().type == PrimitiveType::TYPE_DATE) {
-          int32_t* slot = template_tuple->GetIntSlot(slot_desc->tuple_offset());
+          int32_t* slot = (*template_tuple)->GetIntSlot(slot_desc->tuple_offset());
           StringParser::ParseResult parse_result;
           *slot = StringParser::StringToInt<int32_t>(
               transform->transform_value()->c_str(),
               transform->transform_value()->size(),
               &parse_result);
           if (parse_result == StringParser::ParseResult::PARSE_SUCCESS) {
-            template_tuple->SetNotNull(slot_desc->null_indicator_offset());
+            (*template_tuple)->SetNotNull(slot_desc->null_indicator_offset());
           } else {
             state_->LogError(error_msg);
           }
@@ -108,14 +134,14 @@ Tuple* FileMetadataUtils::CreateTemplateTuple(MemPool* mem_pool) {
       }
     }
   }
-  return template_tuple;
 }
 
 bool FileMetadataUtils::IsValuePartitionCol(const SlotDescriptor* slot_desc) {
   DCHECK(context_ != nullptr);
   DCHECK(file_desc_ != nullptr);
   if (slot_desc->parent() != scan_node_->tuple_desc()) return false;
-  if (slot_desc->col_pos() < scan_node_->num_partition_keys()) {
+  if (slot_desc->col_pos() < scan_node_->num_partition_keys() &&
+      !slot_desc->IsVirtual()) {
     return true;
   }
 
@@ -140,6 +166,12 @@ bool FileMetadataUtils::IsValuePartitionCol(const SlotDescriptor* slot_desc) {
     }
   }
   return false;
+}
+
+bool FileMetadataUtils::NeedDataInFile(const SlotDescriptor* slot_desc) {
+  if (IsValuePartitionCol(slot_desc)) return false;
+  if (slot_desc->IsVirtual()) return false;
+  return true;
 }
 
 } // namespace impala

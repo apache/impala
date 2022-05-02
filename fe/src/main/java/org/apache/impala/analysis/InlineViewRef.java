@@ -160,9 +160,19 @@ public class InlineViewRef extends TableRef {
     List<Column> columns = tableMask.getRequiredColumns();
     List<SelectListItem> items = Lists.newArrayListWithCapacity(columns.size());
     for (Column col: columns) {
-      items.add(new SelectListItem(
-          tableMask.createColumnMask(col.getName(), col.getType(), authzCtx),
-          /*alias*/ col.getName()));
+      Expr maskExpr = tableMask.createColumnMask(col.getName(), col.getType(), authzCtx);
+      // Virtual columns are hidden in the masking view, which means they don't
+      // participate in star expansion.
+      // E.g. during masking the following query is rewritten (where vc is a virtual col):
+      // SELECT vc, * FROM t; ===>
+      //     SELECT vc, * FROM (SELECT MASK(vc) as vc, c1, c2, ... FROM t) v;
+      // In which case the '*' in the outer "SELECT vc, *" shouldn't contain 'v.vc'
+      // because in that case it would be doubled:
+      // SELECT vc, vc, c1, c2, ... FROM (...);
+      // Hence virtual columns are hidden select list items. They are also hidden
+      // when they are not masked, but other columns are.
+      boolean isHidden = col.isVirtual();
+      items.add(new SelectListItem(maskExpr, /*alias*/ col.getName(), isHidden));
     }
     if (tableMask.hasComplexColumnMask()) {
       throw new AnalysisException("Column masking is not supported for complex types");
@@ -446,7 +456,18 @@ public class InlineViewRef extends TableRef {
         throw new AnalysisException("duplicated inline view column alias: '" +
             colAlias + "'" + " in inline view " + "'" + getUniqueAlias() + "'");
       }
-      fields.add(new StructField(colAlias, selectItemExpr.getType(), null));
+      boolean isHidden = false;
+      if (queryStmt_ instanceof SelectStmt) {
+        SelectStmt selectStmt = (SelectStmt)queryStmt_;
+        List<SelectListItem> itemList = selectStmt.getSelectList().getItems();
+        if (itemList.size() == numColLabels) {
+          // 'itemList.size() == numColLabels' is true for table masking views as they
+          // cannot contain '*' (because they need to mask some columns).
+          isHidden = itemList.get(i).isHidden();
+        }
+      }
+      fields.add(new StructField(colAlias, selectItemExpr.getType(), null,
+          isHidden));
     }
 
     // Create the non-materialized tuple and set its type.

@@ -137,6 +137,9 @@ class SlotDescriptor {
   bool is_nullable() const { return null_indicator_offset_.bit_mask != 0; }
   int slot_size() const { return slot_size_; }
 
+  TVirtualColumnType::type virtual_column_type() const { return virtual_column_type_; }
+  bool IsVirtual() const { return virtual_column_type_ != TVirtualColumnType::NONE; }
+
   /// Comparison function for ordering slot descriptors by their col_path_.
   /// Returns true if 'a' comes before 'b'.
   /// Orders the paths as in a depth-first traversal of the schema tree, as follows:
@@ -191,6 +194,8 @@ class SlotDescriptor {
   /// the byte size of this slot.
   const int slot_size_;
 
+  const TVirtualColumnType::type virtual_column_type_;
+
   /// 'children_tuple_descriptor' should be non-NULL iff this is a complex type slot.
   SlotDescriptor(const TSlotDescriptor& tdesc, const TupleDescriptor* parent,
       const TupleDescriptor* children_tuple_descriptor);
@@ -234,7 +239,8 @@ class TableDescriptor {
   /// columns.
   bool IsClusteringCol(const SlotDescriptor* slot_desc) const {
     return slot_desc->col_path().size() == 1 &&
-        slot_desc->col_path()[0] < num_clustering_cols_;
+        slot_desc->col_path()[0] < num_clustering_cols_ &&
+        !slot_desc->IsVirtual();
   }
 
   const std::string& name() const { return name_; }

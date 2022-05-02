@@ -439,8 +439,9 @@ OrcStructReader::OrcStructReader(const orc::Type* node,
   if (materialize_tuple_) {
     for (SlotDescriptor* child_slot : tuple_desc_->slots()) {
       // Skip partition columns and missed columns
-      if (scanner->IsPartitionKeySlot(child_slot)
-          || scanner->IsMissingField(child_slot)) {
+      if (scanner->IsPartitionKeySlot(child_slot) ||
+          scanner->IsMissingField(child_slot) ||
+          child_slot->IsVirtual()) {
         continue;
       }
       CreateChildForSlot(node, child_slot);

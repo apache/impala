@@ -2717,7 +2717,7 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
 
   for (SlotDescriptor* slot_desc: tuple_desc.slots()) {
     // Skip partition columns
-    if (file_metadata_utils_.IsValuePartitionCol(slot_desc)) continue;
+    if (!file_metadata_utils_.NeedDataInFile(slot_desc)) continue;
 
     SchemaNode* node = nullptr;
     bool pos_field;

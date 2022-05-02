@@ -16,6 +16,7 @@
 // under the License.
 package org.apache.impala.catalog;
 
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
@@ -78,6 +79,13 @@ public interface FeTable {
    * @return the columns in this table
    */
   List<Column> getColumns();
+
+  /**
+   * @return the virtual columns of this table
+   */
+  default List<VirtualColumn> getVirtualColumns() {
+    return Collections.emptyList();
+  }
 
   /**
    * @return an unmodifiable list of all columns, but with partition columns at the end of

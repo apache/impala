@@ -432,3 +432,156 @@ compute stats functional.alltypestiny
 ---- CATCH
 AuthorizationException: User '$USER' does not have privileges to execute 'ALTER' on: functional.alltypestiny
 ====
+---- QUERY
+# Select masked INPUT_FILE__NAME plus all cols
+select input__file__name, * from alltypestiny order by id;
+---- RESULTS
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090101.txt',0,NULL,0,0,0,0,0,0,'01/01/09','0aaa',2009-01-01 00:00:00,2009,1
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090101.txt',100,NULL,1,1,1,10,1.100000023841858,10.1,'01/01/09','1aaa',2009-01-01 00:01:00,2009,1
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090201.txt',200,NULL,0,0,0,0,0,0,'02/01/09','0aaa',2009-02-01 00:00:00,2009,2
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090201.txt',300,NULL,1,1,1,10,1.100000023841858,10.1,'02/01/09','1aaa',2009-02-01 00:01:00,2009,2
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090301.txt',400,NULL,0,0,0,0,0,0,'03/01/09','0aaa',2009-03-01 00:00:00,2009,3
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090301.txt',500,NULL,1,1,1,10,1.100000023841858,10.1,'03/01/09','1aaa',2009-03-01 00:01:00,2009,3
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090401.txt',600,NULL,0,0,0,0,0,0,'04/01/09','0aaa',2009-04-01 00:00:00,2009,4
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090401.txt',700,NULL,1,1,1,10,1.100000023841858,10.1,'04/01/09','1aaa',2009-04-01 00:01:00,2009,4
+---- TYPES
+STRING, INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+====
+---- QUERY
+# Select masked INPUT_FILE__NAME plus a few cols
+select input__file__name, id, bool_col from alltypestiny order by id;
+---- RESULTS
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090101.txt',0,NULL
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090101.txt',100,NULL
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090201.txt',200,NULL
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090201.txt',300,NULL
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090301.txt',400,NULL
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090301.txt',500,NULL
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090401.txt',600,NULL
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090401.txt',700,NULL
+---- TYPES
+STRING, INT, BOOLEAN
+====
+---- QUERY
+# Select masked INPUT_FILE__NAME from a VIEW
+select input__file__name, id, bool_col from (
+    select input__file__name, * from alltypestiny) v
+order by id;
+---- RESULTS
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090101.txt',0,NULL
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090101.txt',100,NULL
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090201.txt',200,NULL
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090201.txt',300,NULL
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090301.txt',400,NULL
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090301.txt',500,NULL
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090401.txt',600,NULL
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090401.txt',700,NULL
+---- TYPES
+STRING, INT, BOOLEAN
+====
+---- QUERY
+# Select masked INPUT_FILE__NAME and * from a VIEW.
+# This doubles input__file__name in the output, as the outer '*' includes v.input__file__name.
+select input__file__name, * from (select input__file__name, * from alltypestiny) v order by id;
+---- RESULTS
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090101.txt',regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090101.txt',0,NULL,0,0,0,0,0,0,'01/01/09','0aaa',2009-01-01 00:00:00,2009,1
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090101.txt',regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090101.txt',100,NULL,1,1,1,10,1.100000023841858,10.1,'01/01/09','1aaa',2009-01-01 00:01:00,2009,1
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090201.txt',regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090201.txt',200,NULL,0,0,0,0,0,0,'02/01/09','0aaa',2009-02-01 00:00:00,2009,2
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090201.txt',regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090201.txt',300,NULL,1,1,1,10,1.100000023841858,10.1,'02/01/09','1aaa',2009-02-01 00:01:00,2009,2
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090301.txt',regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090301.txt',400,NULL,0,0,0,0,0,0,'03/01/09','0aaa',2009-03-01 00:00:00,2009,3
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090301.txt',regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090301.txt',500,NULL,1,1,1,10,1.100000023841858,10.1,'03/01/09','1aaa',2009-03-01 00:01:00,2009,3
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090401.txt',regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090401.txt',600,NULL,0,0,0,0,0,0,'04/01/09','0aaa',2009-04-01 00:00:00,2009,4
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090401.txt',regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090401.txt',700,NULL,1,1,1,10,1.100000023841858,10.1,'04/01/09','1aaa',2009-04-01 00:01:00,2009,4
+---- TYPES
+STRING, STRING, INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+====
+---- QUERY
+# Select unmasked INPUT__FILE__NAME and masked table cols
+select input__file__name, id, string_col from alltypes
+order by id
+limit 10;
+---- RESULTS
+'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt',0,'0ttt'
+'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt',100,'1ttt'
+'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt',200,'2ttt'
+'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt',300,'3ttt'
+'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt',400,'4ttt'
+'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt',500,'5ttt'
+'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt',600,'6ttt'
+'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt',700,'7ttt'
+'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt',800,'8ttt'
+'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt',900,'9ttt'
+---- TYPES
+STRING, INT, STRING
+====
+---- QUERY
+# Select unmasked INPUT__FILE__NAME and all table cols
+select *, input__file__name from alltypes
+order by id
+limit 10;
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0ttt',2009-01-01 00:00:00,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+100,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1ttt',2009-01-01 00:01:00,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+200,true,2,2,2,20,2.200000047683716,20.2,'01/01/09','2ttt',2009-01-01 00:02:00.100000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+300,false,3,3,3,30,3.299999952316284,30.3,'01/01/09','3ttt',2009-01-01 00:03:00.300000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+400,true,4,4,4,40,4.400000095367432,40.4,'01/01/09','4ttt',2009-01-01 00:04:00.600000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+500,false,5,5,5,50,5.5,50.5,'01/01/09','5ttt',2009-01-01 00:05:00.100000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+600,true,6,6,6,60,6.599999904632568,60.59999999999999,'01/01/09','6ttt',2009-01-01 00:06:00.150000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+700,false,7,7,7,70,7.699999809265137,70.7,'01/01/09','7ttt',2009-01-01 00:07:00.210000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+800,true,8,8,8,80,8.800000190734863,80.8,'01/01/09','8ttt',2009-01-01 00:08:00.280000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+900,false,9,9,9,90,9.899999618530273,90.89999999999999,'01/01/09','9ttt',2009-01-01 00:09:00.360000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT, STRING
+====
+---- QUERY
+# Select unmasked INPUT__FILE__NAME and all table cols from a VIEW
+# The outer '*' must include input__file__name in this case.
+select * from (select *, input__file__name from alltypes) v
+order by id
+limit 10;
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0ttt',2009-01-01 00:00:00,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+100,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1ttt',2009-01-01 00:01:00,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+200,true,2,2,2,20,2.200000047683716,20.2,'01/01/09','2ttt',2009-01-01 00:02:00.100000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+300,false,3,3,3,30,3.299999952316284,30.3,'01/01/09','3ttt',2009-01-01 00:03:00.300000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+400,true,4,4,4,40,4.400000095367432,40.4,'01/01/09','4ttt',2009-01-01 00:04:00.600000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+500,false,5,5,5,50,5.5,50.5,'01/01/09','5ttt',2009-01-01 00:05:00.100000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+600,true,6,6,6,60,6.599999904632568,60.59999999999999,'01/01/09','6ttt',2009-01-01 00:06:00.150000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+700,false,7,7,7,70,7.699999809265137,70.7,'01/01/09','7ttt',2009-01-01 00:07:00.210000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+800,true,8,8,8,80,8.800000190734863,80.8,'01/01/09','8ttt',2009-01-01 00:08:00.280000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+900,false,9,9,9,90,9.899999618530273,90.89999999999999,'01/01/09','9ttt',2009-01-01 00:09:00.360000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT, STRING
+====
+---- QUERY
+# Do a join between masked tables
+select att.input__file__name, aty.input__file__name from alltypestiny att, alltypes aty
+where att.id=aty.id;
+---- RESULTS
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090101.txt','$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090101.txt','$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090201.txt','$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090201.txt','$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090301.txt','$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090301.txt','$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090401.txt','$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090401.txt','$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+# Do a join between masked tables, and select every with *.
+select att.input__file__name, *, aty.input__file__name from alltypestiny att, alltypes aty
+where att.id=aty.id;
+---- RESULTS
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090101.txt',0,NULL,0,0,0,0,0,0,'01/01/09','0aaa',2009-01-01 00:00:00,2009,1,0,true,0,0,0,0,0,0,'01/01/09','0ttt',2009-01-01 00:00:00,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090101.txt',100,NULL,1,1,1,10,1.100000023841858,10.1,'01/01/09','1aaa',2009-01-01 00:01:00,2009,1,100,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1ttt',2009-01-01 00:01:00,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090201.txt',200,NULL,0,0,0,0,0,0,'02/01/09','0aaa',2009-02-01 00:00:00,2009,2,200,true,2,2,2,20,2.200000047683716,20.2,'01/01/09','2ttt',2009-01-01 00:02:00.100000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090201.txt',300,NULL,1,1,1,10,1.100000023841858,10.1,'02/01/09','1aaa',2009-02-01 00:01:00,2009,2,300,false,3,3,3,30,3.299999952316284,30.3,'01/01/09','3ttt',2009-01-01 00:03:00.300000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090301.txt',400,NULL,0,0,0,0,0,0,'03/01/09','0aaa',2009-03-01 00:00:00,2009,3,400,true,4,4,4,40,4.400000095367432,40.4,'01/01/09','4ttt',2009-01-01 00:04:00.600000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090301.txt',500,NULL,1,1,1,10,1.100000023841858,10.1,'03/01/09','1aaa',2009-03-01 00:01:00,2009,3,500,false,5,5,5,50,5.5,50.5,'01/01/09','5ttt',2009-01-01 00:05:00.100000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090401.txt',600,NULL,0,0,0,0,0,0,'04/01/09','0aaa',2009-04-01 00:00:00,2009,4,600,true,6,6,6,60,6.599999904632568,60.59999999999999,'01/01/09','6ttt',2009-01-01 00:06:00.150000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090401.txt',700,NULL,1,1,1,10,1.100000023841858,10.1,'04/01/09','1aaa',2009-04-01 00:01:00,2009,4,700,false,7,7,7,70,7.699999809265137,70.7,'01/01/09','7ttt',2009-01-01 00:07:00.210000000,2009,1,'$NAMENODE/test-warehouse/alltypes/year=2009/month=1/090101.txt'
+---- TYPES
+STRING, INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT, INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT, STRING
+====

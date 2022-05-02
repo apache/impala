@@ -65,6 +65,7 @@ import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.local.LocalKuduTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.IdGenerator;
@@ -1709,9 +1710,15 @@ public class Analyzer {
     TupleDescriptor tupleDesc = slotDesc.getParent();
     // Pass the full path for nested types even though these are ignore currently.
     // TODO: RANGER-3525: Clarify handling of column masks on nested types
-    Column column = new Column(
-        String.join(".", slotDesc.getPath().getRawPath()), slotDesc.getType(),
-           /*position*/-1);
+    Column column;
+    if (slotDesc.isVirtualColumn()) {
+      column = VirtualColumn.getVirtualColumn(slotDesc.getVirtualColumnType());
+    }
+    else {
+      column = new Column(
+          String.join(".", slotDesc.getPath().getRawPath()), slotDesc.getType(),
+            /*position*/-1);
+    }
     Analyzer analyzer = this;
     TableRef tblRef;
     do {

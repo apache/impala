@@ -1,0 +1,183 @@
+====
+---- QUERY
+# Select INPUT_FILE__NAME plus all cols
+select input__file__name, * from alltypestiny;
+---- RESULTS
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=1(/base_\d*/|/).*',0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=1(/base_\d*/|/).*',1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=2(/base_\d*/|/).*',2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=2(/base_\d*/|/).*',3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=3(/base_\d*/|/).*',4,true,0,0,0,0,0,0,'03/01/09','0',2009-03-01 00:00:00,2009,3
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=3(/base_\d*/|/).*',5,false,1,1,1,10,1.100000023841858,10.1,'03/01/09','1',2009-03-01 00:01:00,2009,3
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=4(/base_\d*/|/).*',6,true,0,0,0,0,0,0,'04/01/09','0',2009-04-01 00:00:00,2009,4
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=4(/base_\d*/|/).*',7,false,1,1,1,10,1.100000023841858,10.1,'04/01/09','1',2009-04-01 00:01:00,2009,4
+---- TYPES
+STRING, INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+====
+---- QUERY
+# Select INPUT_FILE__NAME plus non-clustering col
+select input__file__name, id from alltypestiny;
+---- RESULTS
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=1(/base_\d*/|/).*',0
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=1(/base_\d*/|/).*',1
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=2(/base_\d*/|/).*',2
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=2(/base_\d*/|/).*',3
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=3(/base_\d*/|/).*',4
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=3(/base_\d*/|/).*',5
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=4(/base_\d*/|/).*',6
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=4(/base_\d*/|/).*',7
+---- TYPES
+STRING, INT
+====
+---- QUERY
+# Select INPUT_FILE__NAME plus clustering col
+select input__file__name, month from alltypestiny;
+---- RESULTS
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=1(/base_\d*/|/).*',1
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=1(/base_\d*/|/).*',1
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=2(/base_\d*/|/).*',2
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=2(/base_\d*/|/).*',2
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=3(/base_\d*/|/).*',3
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=3(/base_\d*/|/).*',3
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=4(/base_\d*/|/).*',4
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=4(/base_\d*/|/).*',4
+---- TYPES
+STRING, INT
+====
+---- QUERY
+# Select INPUT_FILE__NAME only
+select input__file__name from alltypestiny;
+---- RESULTS
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=1(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=1(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=2(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=2(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=3(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=3(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=4(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=4(/base_\d*/|/).*'
+---- TYPES
+STRING
+====
+---- QUERY
+# Select INPUT_FILE__NAME multiple times
+select input__file__name, input__file__name from alltypestiny;
+---- RESULTS
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=1(/base_\d*/|/).*',regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=1(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=1(/base_\d*/|/).*',regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=1(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=2(/base_\d*/|/).*',regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=2(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=2(/base_\d*/|/).*',regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=2(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=3(/base_\d*/|/).*',regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=3(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=3(/base_\d*/|/).*',regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=3(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=4(/base_\d*/|/).*',regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=4(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=4(/base_\d*/|/).*',regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=4(/base_\d*/|/).*'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+# Select INPUT_FILE__NAME from two tables
+select att.input__file__name, att.id, ats.input__file__name from alltypestiny att join alltypessmall ats on att.id=ats.id;
+---- RESULTS
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*alltypestiny[^/]*/year=2009/month=1(/base_\d*/|/).*',0,regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*alltypessmall[^/]*/year=2009/month=1(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*alltypestiny[^/]*/year=2009/month=1(/base_\d*/|/).*',1,regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*alltypessmall[^/]*/year=2009/month=1(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*alltypestiny[^/]*/year=2009/month=2(/base_\d*/|/).*',2,regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*alltypessmall[^/]*/year=2009/month=1(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*alltypestiny[^/]*/year=2009/month=2(/base_\d*/|/).*',3,regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*alltypessmall[^/]*/year=2009/month=1(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*alltypestiny[^/]*/year=2009/month=3(/base_\d*/|/).*',4,regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*alltypessmall[^/]*/year=2009/month=1(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*alltypestiny[^/]*/year=2009/month=3(/base_\d*/|/).*',5,regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*alltypessmall[^/]*/year=2009/month=1(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*alltypestiny[^/]*/year=2009/month=4(/base_\d*/|/).*',6,regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*alltypessmall[^/]*/year=2009/month=1(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*alltypestiny[^/]*/year=2009/month=4(/base_\d*/|/).*',7,regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*alltypessmall[^/]*/year=2009/month=1(/base_\d*/|/).*'
+---- TYPES
+STRING, INT, STRING
+====
+---- QUERY
+# Group by INPUT__FILE__NAME
+select input__file__name, count(*) from alltypes
+group by input__file__name
+order by input__file__name;
+---- RESULTS
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=1(/base_\d*/|/).*',310
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=10(/base_\d*/|/).*',310
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=11(/base_\d*/|/).*',300
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=12(/base_\d*/|/).*',310
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=2(/base_\d*/|/).*',280
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=3(/base_\d*/|/).*',310
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=4(/base_\d*/|/).*',300
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=5(/base_\d*/|/).*',310
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=6(/base_\d*/|/).*',300
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=7(/base_\d*/|/).*',310
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=8(/base_\d*/|/).*',310
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=9(/base_\d*/|/).*',300
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2010/month=1(/base_\d*/|/).*',310
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2010/month=10(/base_\d*/|/).*',310
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2010/month=11(/base_\d*/|/).*',300
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2010/month=12(/base_\d*/|/).*',310
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2010/month=2(/base_\d*/|/).*',280
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2010/month=3(/base_\d*/|/).*',310
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2010/month=4(/base_\d*/|/).*',300
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2010/month=5(/base_\d*/|/).*',310
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2010/month=6(/base_\d*/|/).*',300
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2010/month=7(/base_\d*/|/).*',310
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2010/month=8(/base_\d*/|/).*',310
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2010/month=9(/base_\d*/|/).*',300
+---- TYPES
+STRING, BIGINT
+====
+---- QUERY
+# Filter results by LIKE
+select input__file__name, count(*) from alltypes
+where input__file__name like '%year=2009/month=1%'
+group by input__file__name
+order by input__file__name;
+---- RESULTS
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=1(/base_\d*/|/).*',310
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=10(/base_\d*/|/).*',310
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=11(/base_\d*/|/).*',300
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=12(/base_\d*/|/).*',310
+---- TYPES
+STRING, BIGINT
+====
+---- QUERY
+# REGEXP_LIKE
+select input__file__name, count(*) from alltypes
+where regexp_like(input__file__name, 'year=2010/month=2')
+group by input__file__name
+order by input__file__name;
+---- RESULTS
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2010/month=2(/base_\d*/|/).*',280
+---- TYPES
+STRING, BIGINT
+====
+---- QUERY
+# REGEXP_EXTRACT
+select regexp_extract(input__file__name, 'year=\\d+/month=\\d+', 0)
+from alltypestiny;
+---- RESULTS
+'year=2009/month=1'
+'year=2009/month=1'
+'year=2009/month=2'
+'year=2009/month=2'
+'year=2009/month=3'
+'year=2009/month=3'
+'year=2009/month=4'
+'year=2009/month=4'
+---- TYPES
+STRING
+====
+---- QUERY
+# REGEXP_REPLACE
+select regexp_replace(regexp_extract(input__file__name, 'year=\\d+/month=\\d+', 0),
+                      'year=(\\d+)/month=(\\d+)',
+                      '\\2/\\1')
+from alltypestiny;
+---- RESULTS
+'1/2009'
+'1/2009'
+'2/2009'
+'2/2009'
+'3/2009'
+'3/2009'
+'4/2009'
+'4/2009'
+---- TYPES
+STRING
+====

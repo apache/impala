@@ -44,12 +44,20 @@ public:
   /// for transform-based partition columns and non-partition columns.
   bool IsValuePartitionCol(const SlotDescriptor* slot_desc);
 
+  /// Returns true if the file should contain the column described by 'slot_desc'.
+  /// Returns false when the data can be retrieved from other sources, e.g. value-based
+  /// partition columns, virtual columns.
+  bool NeedDataInFile(const SlotDescriptor* slot_desc);
+
 private:
+  void AddFileLevelVirtualColumns(MemPool* mem_pool, Tuple* template_tuple);
+  void AddIcebergColumns(MemPool* mem_pool, Tuple** template_tuple);
+
   HdfsScanNodeBase* scan_node_;
   RuntimeState* state_;
 
   // Members below are set in Open()
-  const ScannerContext* context_ = nullptr;
+  ScannerContext* context_ = nullptr;
   const HdfsFileDesc* file_desc_ = nullptr;
 };
 

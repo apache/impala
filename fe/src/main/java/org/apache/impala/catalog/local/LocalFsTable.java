@@ -48,6 +48,7 @@ import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.catalog.SqlConstraints;
+import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.local.MetaProvider.PartitionMetadata;
 import org.apache.impala.catalog.local.MetaProvider.PartitionRef;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
@@ -182,6 +183,11 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
 
     avroSchema_ = explicitAvroSchema;
     isMarkedCached_ = (ref != null && ref.isMarkedCached());
+    addVirtualColumns();
+  }
+
+  private void addVirtualColumns() {
+    addVirtualColumn(VirtualColumn.INPUT_FILE_NAME);
   }
 
   private static String loadAvroSchema(Table msTbl) throws AnalysisException {

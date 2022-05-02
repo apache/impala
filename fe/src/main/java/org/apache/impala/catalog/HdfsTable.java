@@ -629,6 +629,10 @@ public class HdfsTable extends Table implements FeFsTable {
     addColumnsFromFieldSchemas(fieldSchemas);
   }
 
+  private void addVirtualColumns() {
+    addVirtualColumn(VirtualColumn.INPUT_FILE_NAME);
+  }
+
   /**
    * Clear the partitions of an HdfsTable and the associated metadata.
    * Declared as protected to allow third party extension visibility.
@@ -1785,6 +1789,7 @@ public class HdfsTable extends Table implements FeFsTable {
         clearColumns();
         addColumnsFromFieldSchemas(msTbl.getPartitionKeys());
         addColumnsFromFieldSchemas(nonPartFieldSchemas_);
+        addVirtualColumns();
         loadAllColumnStats(client);
       }
     }
@@ -1816,6 +1821,7 @@ public class HdfsTable extends Table implements FeFsTable {
     } else {
       addColumnsFromFieldSchemas(nonPartFieldSchemas_);
     }
+    addVirtualColumns();
     isSchemaLoaded_ = true;
   }
 

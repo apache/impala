@@ -117,6 +117,9 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   // the clustering columns.
   protected final ArrayList<Column> colsByPos_ = new ArrayList<>();
 
+  // Virtual columns of this table.
+  protected final ArrayList<VirtualColumn> virtualCols_ = new ArrayList<>();
+
   // map from lowercase column name to Column object.
   protected final Map<String, Column> colsByName_ = new HashMap<>();
 
@@ -420,6 +423,11 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     colsByPos_.clear();
     colsByName_.clear();
     ((StructType) type_.getItemType()).clearFields();
+    virtualCols_.clear();
+  }
+
+  protected void addVirtualColumn(VirtualColumn col) {
+    virtualCols_.add(col);
   }
 
   // Returns a list of all column names for this table which we expect to have column
@@ -540,6 +548,11 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
         colsByName_.put(col.getName().toLowerCase(), col);
         ((StructType) type_.getItemType()).addField(getStructFieldFromColumn(col));
       }
+      virtualCols_.clear();
+      virtualCols_.ensureCapacity(thriftTable.getVirtual_columns().size());
+      for (TColumn tvCol : thriftTable.getVirtual_columns()) {
+        virtualCols_.add(VirtualColumn.fromThrift(tvCol));
+      }
     } catch (ImpalaRuntimeException e) {
       throw new TableLoadingException(String.format("Error loading schema for " +
           "table '%s'", getName()), e);
@@ -615,6 +628,10 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
       } else {
         table.addToColumns(colDesc);
       }
+    }
+    table.setVirtual_columns(new ArrayList<>());
+    for (VirtualColumn vCol : getVirtualColumns()) {
+      table.addToVirtual_columns(vCol.toThrift());
     }
 
     org.apache.hadoop.hive.metastore.api.Table msTable = getMetaStoreTable();
@@ -768,6 +785,9 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
   @Override // FeTable
   public List<Column> getColumns() { return colsByPos_; }
+
+  @Override // FeTable
+  public List<VirtualColumn> getVirtualColumns() { return virtualCols_; }
 
   @Override // FeTable
   public SqlConstraints getSqlConstraints()  { return sqlConstraints_; }

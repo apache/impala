@@ -28,6 +28,8 @@ import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.VirtualColumn;
+import org.apache.impala.thrift.TVirtualColumnType;
 import org.apache.impala.util.AcidUtils;
 
 import com.google.common.base.Joiner;
@@ -157,6 +159,8 @@ public class Path {
   // Caches the result of getAbsolutePath() to avoid re-computing it.
   private List<Integer> absolutePath_ = null;
 
+  private TVirtualColumnType virtualColType_ = TVirtualColumnType.NONE;
+
   // Resolved path before we resolved it again inside the table masking view.
   private Path pathBeforeMasking_ = null;
 
@@ -206,11 +210,20 @@ public class Path {
 
   /**
    * Resolves this path in the context of the root tuple descriptor / root table
-   * or continues resolving this relative path from an existing root path.
+   * or continues resolving this relative path from an existing root path. If normal
+   * path resolution fails it tries to resolve the path as a virtual column.
    * Returns true if the path could be fully resolved, false otherwise.
    * A failed resolution leaves this Path in a partially resolved state.
    */
   public boolean resolve() {
+    if (!resolveNonVirtualPath()) {
+      return resolveVirtualColumn();
+    } else {
+      return true;
+    }
+  }
+
+  private boolean resolveNonVirtualPath() {
     if (isResolved_) return true;
     Preconditions.checkState(rootDesc_ != null || rootTable_ != null);
     Type currentType = null;
@@ -269,6 +282,32 @@ public class Path {
     return true;
   }
 
+  private boolean resolveVirtualColumn() {
+    if (isResolved_) return true;
+    if (rootTable_ == null) return false;
+    if (rootDesc_ != null) {
+      if (rootDesc_.getType() != rootTable_.getType().getItemType()) {
+        // 'rootDesc_' describes a collection tuple. Currently we only allow virtual
+        // columns at the table-level.
+        return false;
+      }
+    }
+    if (rawPath_.size() != 1) return false;
+
+    String colName = rawPath_.get(0);
+    List<VirtualColumn> virtualColumns = rootTable_.getVirtualColumns();
+    for (VirtualColumn vCol : virtualColumns) {
+      if (vCol.getName().equalsIgnoreCase(colName)) {
+        virtualColType_ = vCol.getVirtualColumnType();
+        matchedTypes_.add(vCol.getType());
+        matchedPositions_.add(vCol.getPosition());
+        isResolved_ = true;
+        return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * If the given type is a collection, returns a collection struct type representing
    * named fields of its explicit path. Returns the given type itself if it is already
@@ -313,6 +352,10 @@ public class Path {
   public boolean isRootedAtTuple() { return rootDesc_ != null; }
   public List<String> getRawPath() { return rawPath_; }
   public boolean isResolved() { return isResolved_; }
+  public TVirtualColumnType getVirtualColumnType() { return virtualColType_; }
+  public boolean isVirtualColumn() {
+    return virtualColType_ != TVirtualColumnType.NONE;
+  }
   public boolean isMaskedPath() { return pathBeforeMasking_ != null; }
   public Path getPathBeforeMasking() { return pathBeforeMasking_; }
   public void setPathBeforeMasking(Path p) {
@@ -492,6 +535,7 @@ public class Path {
   private void convertToFullAcidFilePath() {
     // For Full ACID tables we need to create a schema path that corresponds to the
     // ACID file schema.
+    if (virtualColType_ != TVirtualColumnType.NONE) return;
     int numPartitions = rootTable_.getNumClusteringCols();
     if (absolutePath_.get(0) == numPartitions) {
       // The path refers to the synthetic "row__id" column.

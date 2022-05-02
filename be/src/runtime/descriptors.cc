@@ -107,7 +107,8 @@ SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc,
     tuple_offset_(tdesc.byteOffset),
     null_indicator_offset_(tdesc.nullIndicatorByte, tdesc.nullIndicatorBit),
     slot_idx_(tdesc.slotIdx),
-    slot_size_(type_.GetSlotSize()) {
+    slot_size_(type_.GetSlotSize()),
+    virtual_column_type_(tdesc.virtual_col_type) {
   DCHECK(parent_ != nullptr) << tdesc.parent;
   if (type_.IsComplexType()) {
     DCHECK(tdesc.__isset.itemTupleId);
@@ -141,8 +142,11 @@ string SlotDescriptor::DebugString() const {
     out << " children_tuple_id=" << children_tuple_descriptor_->id();
   }
   out << " offset=" << tuple_offset_ << " null=" << null_indicator_offset_.DebugString()
-      << " slot_idx=" << slot_idx_ << " field_idx=" << slot_idx_
-      << ")";
+      << " slot_idx=" << slot_idx_ << " field_idx=" << slot_idx_;
+  if (IsVirtual()) {
+    out << " virtual_column_type=" << virtual_column_type_;
+  }
+  out << ")";
   return out.str();
 }
 

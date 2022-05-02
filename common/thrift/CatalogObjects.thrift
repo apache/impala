@@ -71,6 +71,11 @@ enum THdfsFileFormat {
   JSON = 9
 }
 
+enum TVirtualColumnType {
+  NONE,
+  INPUT_FILE_NAME
+}
+
 // TODO: Since compression is also enabled for Kudu columns, we should
 // rename this enum to not be Hdfs specific.
 enum THdfsCompression {
@@ -249,31 +254,32 @@ struct TColumn {
   4: optional TColumnStats col_stats
   // Ordinal position in the source table
   5: optional i32 position
+  6: optional TVirtualColumnType virtual_column_type = TVirtualColumnType.NONE
 
   // Indicates whether this is an HBase column. If true, implies
   // all following HBase-specific fields are set.
-  6: optional bool is_hbase_column
-  7: optional string column_family
-  8: optional string column_qualifier
-  9: optional bool is_binary
+  7: optional bool is_hbase_column
+  8: optional string column_family
+  9: optional string column_qualifier
+  10: optional bool is_binary
 
   // The followings are Kudu-specific column properties
-  10: optional bool is_kudu_column
-  11: optional bool is_key
-  12: optional bool is_nullable
-  13: optional TColumnEncoding encoding
-  14: optional THdfsCompression compression
-  15: optional Exprs.TExpr default_value
-  16: optional i32 block_size
+  11: optional bool is_kudu_column
+  12: optional bool is_key
+  13: optional bool is_nullable
+  14: optional TColumnEncoding encoding
+  15: optional THdfsCompression compression
+  16: optional Exprs.TExpr default_value
+  17: optional i32 block_size
   // The column name, in the case that it appears in Kudu.
-  17: optional string kudu_column_name
+  18: optional string kudu_column_name
 
   // Here come the Iceberg-specific fields.
-  18: optional bool is_iceberg_column
-  19: optional i32 iceberg_field_id
+  19: optional bool is_iceberg_column
+  20: optional i32 iceberg_field_id
   // Key and value field id for Iceberg column with Map type.
-  20: optional i32 iceberg_field_map_key_id
-  21: optional i32 iceberg_field_map_value_id
+  21: optional i32 iceberg_field_map_key_id
+  22: optional i32 iceberg_field_map_value_id
 }
 
 // Represents an HDFS file in a partition.
@@ -605,34 +611,37 @@ struct TTable {
   // List of clustering columns (empty list if table has no clustering columns)
   6: optional list<TColumn> clustering_columns
 
+  // List of virtual columns (empty list if table has no virtual columns)
+  7: optional list<TColumn> virtual_columns
+
   // Table stats data for the table.
-  7: optional TTableStats table_stats
+  8: optional TTableStats table_stats
 
   // Determines the table type - either HDFS, HBASE, or VIEW.
-  8: optional TTableType table_type
+  9: optional TTableType table_type
 
   // Set iff this is an HDFS table
-  9: optional THdfsTable hdfs_table
+  10: optional THdfsTable hdfs_table
 
   // Set iff this is an Hbase table
-  10: optional THBaseTable hbase_table
+  11: optional THBaseTable hbase_table
 
   // The Hive Metastore representation of this table. May not be set if there were
   // errors loading the table metadata
-  11: optional hive_metastore.Table metastore_table
+  12: optional hive_metastore.Table metastore_table
 
   // Set iff this is a table from an external data source
-  12: optional TDataSourceTable data_source_table
+  13: optional TDataSourceTable data_source_table
 
   // Set iff this a kudu table
-  13: optional TKuduTable kudu_table
+  14: optional TKuduTable kudu_table
 
   // Set if this table needs storage access during metadata load.
   // Time used for storage loading in nanoseconds.
-  15: optional i64 storage_metadata_load_time_ns
+  16: optional i64 storage_metadata_load_time_ns
 
   // Set if this a iceberg table
-  16: optional TIcebergTable iceberg_table
+  17: optional TIcebergTable iceberg_table
 }
 
 // Represents a database.

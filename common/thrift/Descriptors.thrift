@@ -49,6 +49,8 @@ struct TSlotDescriptor {
   7: required i32 nullIndicatorByte
   8: required i32 nullIndicatorBit
   9: required i32 slotIdx
+  10: required CatalogObjects.TVirtualColumnType virtual_col_type =
+      CatalogObjects.TVirtualColumnType.NONE
 }
 
 struct TColumnDescriptor {

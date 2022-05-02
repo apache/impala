@@ -1043,6 +1043,12 @@ class TestRanger(CustomClusterTestSuite):
         unique_name + str(policy_cnt), user, "functional", "alltypesagg", "bigint_col",
         "CUSTOM", "(select count(*) from functional.alltypestiny)")
       policy_cnt += 1
+      # Add column masking policy for virtual column INPUT__FILE__NAME
+      TestRanger._add_column_masking_policy(
+        unique_name + str(policy_cnt), user, "functional", "alltypestiny",
+        "input__file__name",
+        "CUSTOM", "mask_show_last_n({col}, 10, 'x', 'x', 'x', -1, '1')")
+      policy_cnt += 1
       self.execute_query_expect_success(admin_client, "refresh authorization",
                                         user=ADMIN)
       self.run_test_case("QueryTest/ranger_column_masking", vector,

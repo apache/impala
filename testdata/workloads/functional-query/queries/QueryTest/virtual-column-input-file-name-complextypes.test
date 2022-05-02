@@ -1,0 +1,72 @@
+====
+---- QUERY
+select input__file__name, id from complextypestbl
+order by id;
+---- RESULTS
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',1
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',2
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',3
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',4
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',5
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',6
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',7
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nonnullable.parq|bucket_.*)',8
+---- TYPES
+STRING, BIGINT
+====
+---- QUERY
+select input__file__name, item from complextypestbl c, c.int_array
+order by item;
+---- RESULTS
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nonnullable.parq|bucket_.*)',-1
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',1
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',1
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',2
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',2
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',3
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',3
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',NULL
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',NULL
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',NULL
+---- TYPES
+STRING, INT
+====
+---- QUERY
+select c.input__file__name, item from complextypestbl c, c.int_array
+order by item;
+---- RESULTS
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nonnullable.parq|bucket_.*)',-1
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',1
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',1
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',2
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',2
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',3
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',3
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',NULL
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',NULL
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',NULL
+---- TYPES
+STRING, INT
+====
+---- QUERY
+select input__file__name, item from complextypestbl c, c.int_array_array.item
+order by item;
+---- RESULTS
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nonnullable.parq|bucket_.*)',-2
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nonnullable.parq|bucket_.*)',-1
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',1
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',1
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',2
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',2
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',3
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',3
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',4
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',4
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',5
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',6
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',NULL
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',NULL
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/(base_\d*/)?(nullable.parq|bucket_.*)',NULL
+---- TYPES
+STRING, INT
+====

@@ -377,6 +377,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
    */
   public void loadSchemaFromIceberg() throws TableLoadingException {
     loadSchema();
+    addVirtualColumns();
     partitionSpecs_ = Utils.loadPartitionSpecByIceberg(this);
     defaultPartitionSpecId_ = icebergApiTable_.spec().specId();
   }
@@ -402,6 +403,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
     ((StructType) type_.getItemType()).addField(
         new IcebergStructField(col.getName(), col.getType(), col.getComment(),
             iCol.getFieldId()));
+  }
+
+  private void addVirtualColumns() {
+    addVirtualColumn(VirtualColumn.INPUT_FILE_NAME);
   }
 
   @Override

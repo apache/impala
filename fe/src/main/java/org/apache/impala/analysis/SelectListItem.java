@@ -31,14 +31,20 @@ public class SelectListItem {
   // for "[path.]*" (excludes trailing '*')
   private final List<String> rawPath_;
   private final boolean isStar_;
+  // True if the item shouldn't be included in star expansion
+  private final boolean isHidden_;
 
-  public SelectListItem(Expr expr, String alias) {
-    super();
+  public SelectListItem(Expr expr, String alias, boolean isHidden) {
     Preconditions.checkNotNull(expr);
     expr_ = expr;
     alias_ = alias;
     isStar_ = false;
     rawPath_ = null;
+    isHidden_ = isHidden;
+  }
+
+  public SelectListItem(Expr expr, String alias) {
+    this(expr, alias, false);
   }
 
   // select list item corresponding to path_to_struct.*
@@ -47,10 +53,10 @@ public class SelectListItem {
   }
 
   private SelectListItem(List<String> path) {
-    super();
     expr_ = null;
     isStar_ = true;
     rawPath_ = path;
+    isHidden_ = false;
   }
 
   public Expr getExpr() { return expr_; }
@@ -58,6 +64,7 @@ public class SelectListItem {
   public boolean isStar() { return isStar_; }
   public String getAlias() { return alias_; }
   public List<String> getRawPath() { return rawPath_; }
+  public boolean isHidden() { return isHidden_; }
 
   @Override
   public String toString() {

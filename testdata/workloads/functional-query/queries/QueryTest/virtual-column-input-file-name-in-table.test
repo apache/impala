@@ -1,0 +1,25 @@
+====
+---- QUERY
+# User column INPUT__FILE__NAME hides virtual column INPUT__FILE__NAME
+create table i_n_f (input__file__name string);
+insert into table i_n_f values ('impala');
+select input__file__name from i_n_f;
+---- RESULTS
+'impala'
+---- TYPES
+STRING
+====
+---- QUERY
+select * from i_n_f;
+---- RESULTS
+'impala'
+---- TYPES
+STRING
+====
+---- QUERY
+select input__file__name, * from i_n_f;
+---- RESULTS
+'impala','impala'
+---- TYPES
+STRING, STRING
+====

@@ -598,8 +598,8 @@ Status HdfsOrcScanner::ResolveColumns(const TupleDescriptor& tuple_desc,
   // slot.
   SlotDescriptor* pos_slot_desc = nullptr;
   for (SlotDescriptor* slot_desc : tuple_desc.slots()) {
-    // Skip partition columns
-    if (IsPartitionKeySlot(slot_desc)) continue;
+    // Skip columns not (necessarily) stored in the data files.
+    if (!file_metadata_utils_.NeedDataInFile(slot_desc)) continue;
 
     node = nullptr;
     pos_field = false;

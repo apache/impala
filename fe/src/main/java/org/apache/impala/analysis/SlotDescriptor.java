@@ -28,6 +28,7 @@ import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.thrift.TSlotDescriptor;
+import org.apache.impala.thrift.TVirtualColumnType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -177,6 +178,16 @@ public class SlotDescriptor {
   public Path getPath() { return path_; }
   public boolean isScanSlot() { return path_ != null && path_.isRootedAtTable(); }
   public Column getColumn() { return !isScanSlot() ? null : path_.destColumn(); }
+
+  public boolean isVirtualColumn() {
+    if (path_ == null) return false;
+    return path_.getVirtualColumnType() != TVirtualColumnType.NONE;
+  }
+
+  public TVirtualColumnType getVirtualColumnType() {
+    if (path_ == null) return TVirtualColumnType.NONE;
+    return path_.getVirtualColumnType();
+  }
 
   public ColumnStats getStats() {
     if (stats_ == null) {
@@ -362,7 +373,7 @@ public class SlotDescriptor {
     TSlotDescriptor result = new TSlotDescriptor(
         id_.asInt(), parent_.getId().asInt(), type_.toThrift(),
         materializedPath, byteOffset_, nullIndicatorByte_, nullIndicatorBit_,
-        slotIdx_);
+        slotIdx_, getVirtualColumnType());
     if (itemTupleDesc_ != null) {
       // Check for recursive or otherwise invalid item tuple descriptors. Since we assign
       // tuple ids globally in increasing order, the id of an item tuple descriptor must

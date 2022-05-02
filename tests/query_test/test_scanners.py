@@ -123,6 +123,18 @@ class TestScannersAllTableFormats(ImpalaTestSuite):
     else:
       self.run_test_case('QueryTest/string-escaping', vector)
 
+  def test_virtual_column_input_file_name(self, vector, unique_database):
+    file_format = vector.get_value('table_format').file_format
+    if file_format in ['hbase', 'kudu']:
+      # Virtual column INPUT__FILE__NAME is only supported for filesystem-based tables.
+      pytest.skip()
+    self.run_test_case('QueryTest/virtual-column-input-file-name', vector)
+    if file_format in ['orc', 'parquet']:
+      self.run_test_case('QueryTest/virtual-column-input-file-name-complextypes', vector)
+    if file_format == 'text':
+      self.run_test_case('QueryTest/virtual-column-input-file-name-in-table', vector,
+          use_db=unique_database)
+
 # Test all the scanners with a simple limit clause. The limit clause triggers
 # cancellation in the scanner code paths.
 class TestScannersAllTableFormatsWithLimit(ImpalaTestSuite):

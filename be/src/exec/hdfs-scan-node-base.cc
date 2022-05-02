@@ -176,7 +176,9 @@ Status HdfsScanPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
   // Gather materialized partition-key slots and non-partition slots.
   const vector<SlotDescriptor*>& slots = tuple_desc_->slots();
   for (size_t i = 0; i < slots.size(); ++i) {
-    if (hdfs_table_->IsClusteringCol(slots[i])) {
+    if (UNLIKELY(slots[i]->IsVirtual())) {
+      virtual_column_slots_.push_back(slots[i]);
+    } else if (hdfs_table_->IsClusteringCol(slots[i])) {
       partition_key_slots_.push_back(slots[i]);
     } else {
       materialized_slots_.push_back(slots[i]);
@@ -353,7 +355,7 @@ Status HdfsScanPlanNode::ProcessScanRangesAndInitSharedState(FragmentState* stat
 
 Tuple* HdfsScanPlanNode::InitTemplateTuple(
     const std::vector<ScalarExprEvaluator*>& evals, MemPool* pool) const {
-  if (partition_key_slots_.empty()) return nullptr;
+  if (partition_key_slots_.empty() && !HasVirtualColumnInTemplateTuple()) return nullptr;
   Tuple* template_tuple = Tuple::Create(tuple_desc_->byte_size(), pool);
   for (int i = 0; i < partition_key_slots_.size(); ++i) {
     const SlotDescriptor* slot_desc = partition_key_slots_[i];
@@ -423,6 +425,7 @@ HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const HdfsScanPlanNode& pno
     is_materialized_col_(pnode.is_materialized_col_),
     materialized_slots_(pnode.materialized_slots_),
     partition_key_slots_(pnode.partition_key_slots_),
+    virtual_column_slots_(pnode.virtual_column_slots_),
     disks_accessed_bitmap_(TUnit::UNIT, 0),
     active_hdfs_read_thread_counter_(TUnit::UNIT, 0),
     shared_state_(const_cast<ScanRangeSharedState*>(&(pnode.shared_state_))) {}
@@ -986,6 +989,20 @@ void HdfsScanPlanNode::ComputeSlotMaterializationOrder(
       }
     }
   }
+}
+
+bool HdfsScanPlanNode::HasVirtualColumnInTemplateTuple() const {
+  for (SlotDescriptor* sd : virtual_column_slots_) {
+    DCHECK(sd->IsVirtual());
+    if (sd->virtual_column_type() == TVirtualColumnType::INPUT_FILE_NAME) {
+      return true;
+    } else {
+      // Adding DCHECK here so we don't forget to update this when adding new virtual
+      // column.
+      DCHECK(false);
+    }
+  }
+  return false;
 }
 
 void HdfsScanNodeBase::TransferToScanNodePool(MemPool* pool) {
