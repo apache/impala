@@ -5,3 +5,10 @@ log4j.properties
 sentry-site*.xml
 yarn-site.xml
 copy-mem-limit-test-*.xml
+hive-site-events-cleanup/
+hive-site-ranger-auth/
+hive-site-without-hms/
+hive-site_events_cleanup.xml
+hive-site_ranger_auth.xml
+hive-site_without_hms.xml
+

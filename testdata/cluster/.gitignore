@@ -4,3 +4,6 @@
 /cdh7
 /ranger/setup/impala_user.json
 /ranger/setup/impala_group.json
+/ranger/setup/impala_group_owner.json
+/ranger/setup/impala_user_non_owner.json
+/ranger/setup/impala_user_owner.json
