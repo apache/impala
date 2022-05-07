@@ -617,3 +617,8 @@ class TestIcebergTable(ImpalaTestSuite):
   def test_in_predicate_push_down(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-in-predicate-push-down', vector,
                        use_db=unique_database)
+
+  @pytest.mark.execute_serially
+  def test_is_null_predicate_push_down(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-is-null-predicate-push-down', vector,
+                       use_db=unique_database)

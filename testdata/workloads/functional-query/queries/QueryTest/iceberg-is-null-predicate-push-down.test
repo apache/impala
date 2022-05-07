@@ -1,0 +1,403 @@
+====
+---- QUERY
+# Test BIGINT/DOUBLE/STRING/TIMESTAMP/DATE/DECIMAL IsNullPredicate push-down
+create table ice_is_null_pred_pd (
+  col_i INT,
+  col_bi BIGINT,
+  col_db DOUBLE,
+  col_str STRING,
+  col_ts TIMESTAMP,
+  col_dt DATE,
+  col_dc1 DECIMAL(9, 3),
+  col_dc2 DECIMAL(18, 3),
+  col_dc3 DECIMAL(38, 3)
+) partitioned by spec (col_i) stored as iceberg tblproperties ('write.format.default' = 'parquet');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into
+  ice_is_null_pred_pd
+values
+  (0, NULL, 2.71820, '_1700-01-01 00:00:00', '1400-01-01 00:00:00', DATE'1400-01-01', 123.450, 1234567890.120, 1234567890123456789.010),
+  (1, 12345678901, NULL, 'A1700-01-01 00:00:00', '1400-01-01 01:01:01', DATE'1400-01-01', 123.450, 1234567890.120, 1234567890123456789.010),
+  (2, 12345678902, 2.71822, NULL, '1400-01-01 02:02:02', DATE'1400-01-01', 123.450, 1234567890.120, 1234567890123456789.010),
+  (3, 12345678903, 2.71823, '1700-01-01 00:00:00', '1500-01-01 00:00:00', DATE'1500-01-01', 123.450, 1234567890.120, 1234567890123456789.010),
+  (4, 12345678904, 2.71824, '1700-01-01 00:00:00', NULL, DATE'1500-01-01', 123.450, 1234567890.120, 1234567890123456789.010),
+  (5, 12345678905, 2.71825, '1700-01-01 00:00:00', '1500-01-01 02:02:02', NULL, 123.450, 1234567890.120, 1234567890123456789.010),
+  (6, 12345678906, 2.71826, '1700-01-01 00:00:00', '1600-01-01 00:00:00', DATE'1600-01-01', NULL, 1234567890.120, 1234567890123456789.010),
+  (7, 12345678907, 2.71827, '1700-01-01 00:00:00', '1600-01-01 01:01:01', DATE'1600-01-01', 123.450, NULL, 1234567890123456789.010),
+  (8, 12345678908, 2.71828, '1700-01-01 00:00:00', '1600-01-01 02:02:02', DATE'1600-01-01', 123.450, 1234567890.120, NULL);
+select count(1) from ice_is_null_pred_pd;
+---- RESULTS
+9
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 9
+====
+---- QUERY
+show files in ice_is_null_pred_pd;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_is_null_pred_pd/data/col_i=0/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_is_null_pred_pd/data/col_i=1/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_is_null_pred_pd/data/col_i=2/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_is_null_pred_pd/data/col_i=3/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_is_null_pred_pd/data/col_i=4/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_is_null_pred_pd/data/col_i=5/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_is_null_pred_pd/data/col_i=6/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_is_null_pred_pd/data/col_i=7/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_is_null_pred_pd/data/col_i=8/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Start testing predicate push-down for bigint column
+# The IS_NULL predicate matches 1 row group
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  col_bi is null;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# The IS_NULL predicate will not push down
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  cast(col_bi as double) is null;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 9
+====
+---- QUERY
+# The IS_NULL predicate will not push down
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  cast(col_bi as TIMESTAMP) is null;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 9
+====
+---- QUERY
+# The IS_NULL predicate will not push down
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  col_bi + 1 is null;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 9
+====
+---- QUERY
+# The NOT_NULL predicate matches 8 row group
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  col_bi is not null;
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 8
+====
+---- QUERY
+# Start testing predicate push-down for double column
+# The IS_NULL predicate matches 1 row group
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  col_db is null;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# The IS_NULL predicate will not push down
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  cast(col_db as decimal(6,5)) is null;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 9
+====
+---- QUERY
+# The NOT_NULL predicate matches 8 row group
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  col_db is not null;
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 8
+====
+---- QUERY
+# Start testing predicate push-down for string column
+# The IS_NULL predicate matches 1 row group
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  col_str is null;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# The IS_NULL predicate will not push down
+select
+  col_i
+from
+  ice_is_null_pred_pd
+where
+  cast(col_str as TIMESTAMP) is null
+order by 1;
+---- RESULTS
+0
+1
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 9
+====
+---- QUERY
+# The NOT_NULL predicate matches 8 row group
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  col_str is not null;
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 8
+====
+---- QUERY
+# Start testing predicate push-down for timestamp column
+# The IS_NULL predicate matches 1 row group
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  col_ts is null;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# The IS_NULL predicate will not push down
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  cast(col_ts as string) is null;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 9
+====
+---- QUERY
+# The NOT_NULL predicate matches 8 row group
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  col_ts is not null;
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 8
+====
+---- QUERY
+# Start testing predicate push-down for date column
+# The IS_NULL predicate matches 1 row group
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  col_dt is null;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# The IS_NULL predicate will not push down
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  cast(col_dt as string) is null;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 9
+====
+---- QUERY
+# The NOT_NULL predicate matches 8 row group
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  col_dt is not null;
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 8
+====
+---- QUERY
+# Start testing predicate push-down for decimal(9,3) column
+# The IS_NULL predicate matches 1 row group
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  col_dc1 is null;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# The IS_NULL predicate will not push down
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  cast(col_dc1 as double) is null;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 9
+====
+---- QUERY
+# The NOT_NULL predicate matches 8 row group
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  col_dc1 is not null;
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 8
+====
+---- QUERY
+# Start testing predicate push-down for decimal(18,3) column
+# The IS_NULL predicate matches 1 row group
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  col_dc2 is null;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# The IS_NULL predicate will not push down
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  cast(col_dc2 as double) is null;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 9
+====
+---- QUERY
+# The NOT_NULL predicate matches 8 row group
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  col_dc2 is not null;
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 8
+====
+---- QUERY
+# Start testing predicate push-down for decimal(38,3) column
+# The IS_NULL predicate matches 1 row group
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  col_dc3 is null;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# The IS_NULL predicate will not push down
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  cast(col_dc3 as string) is null;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 9
+====
+---- QUERY
+# The NOT_NULL predicate matches 8 row group
+select
+  count(1)
+from
+  ice_is_null_pred_pd
+where
+  col_dc3 is not null;
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 8
+====

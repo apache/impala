@@ -36,6 +36,7 @@ import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.DateLiteral;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.InPredicate;
+import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.NumericLiteral;
@@ -216,6 +217,8 @@ public class IcebergScanNode extends HdfsScanNode {
       convertIcebergPredicate(analyzer, (BinaryPredicate) expr);
     } else if (expr instanceof InPredicate) {
       convertIcebergPredicate(analyzer, (InPredicate) expr);
+    } else if (expr instanceof IsNullPredicate) {
+      convertIcebergPredicate((IsNullPredicate) expr);
     }
   }
 
@@ -270,6 +273,22 @@ public class IcebergScanNode extends HdfsScanNode {
     }
 
     icebergPredicates_.add(Expressions.in(col.getName(), values));
+  }
+
+  private void convertIcebergPredicate(IsNullPredicate predicate) {
+    // Do not convert if there is an implicit cast
+    if (!(predicate.getChild(0) instanceof SlotRef)) return;
+    SlotRef ref = (SlotRef) predicate.getChild(0);
+
+    // If predicate contains map/struct, this column would be null
+    Column col = ref.getDesc().getColumn();
+    if (col == null) return;
+
+    if (predicate.isNotNull()) {
+      icebergPredicates_.add(Expressions.notNull(col.getName()));
+    } else{
+      icebergPredicates_.add(Expressions.isNull(col.getName()));
+    }
   }
 
   private Object getIcebergValue(Analyzer analyzer, SlotRef ref, LiteralExpr literal)
