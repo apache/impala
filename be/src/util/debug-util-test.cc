@@ -37,6 +37,21 @@ TEST(DebugUtil, UniqueID) {
   EXPECT_EQ("feedbeeff00d7777:0000000000000020", PrintId(unique_id));
 }
 
+TEST(DebugUtil, UniqueIDCompromised) {
+  TUniqueId unique_id;
+  unique_id.hi = 0xfeedbeeff00d7777ULL;
+  unique_id.lo = 0x2020202020202020ULL;
+  char out[TUniqueIdBufferSize+1];
+  out[TUniqueIdBufferSize] = '\0';
+
+  PrintIdCompromised(unique_id, out);
+  EXPECT_EQ(string("feedbeeff00d7777:2020202020202020"), out);
+
+  unique_id.lo = 0x20ULL;
+  PrintIdCompromised(unique_id, out);
+  EXPECT_EQ(string("feedbeeff00d7777:0000000000000020"), out);
+}
+
 string RecursionStack(int level) {
   if (level == 0) return GetStackTrace();
   return RecursionStack(level - 1);

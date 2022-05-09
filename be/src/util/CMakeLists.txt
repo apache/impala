@@ -164,6 +164,7 @@ add_library(UtilTests STATIC
   lru-multi-cache-test.cc
   metrics-test.cc
   min-max-filter-test.cc
+  minidump-test.cc
   openssl-util-test.cc
   os-info-test.cc
   os-util-test.cc
@@ -237,6 +238,7 @@ ADD_UNIFIED_BE_LSAN_TEST(lru-multi-cache-test "LruMultiCache.*")
 ADD_UNIFIED_BE_LSAN_TEST(logging-support-test "LoggingSupport.*")
 ADD_UNIFIED_BE_LSAN_TEST(metrics-test "MetricsTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(min-max-filter-test "MinMaxFilterTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(minidump-test "Minidump.*")
 ADD_UNIFIED_BE_LSAN_TEST(openssl-util-test "OpenSSLUtilTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(os-info-test "OsInfo.*")
 ADD_UNIFIED_BE_LSAN_TEST(os-util-test "OsUtil.*")
