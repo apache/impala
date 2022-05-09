@@ -32,7 +32,9 @@
 #include <sstream>
 
 #include "common/logging.h"
+#include "common/thread-debug-info.h"
 #include "common/version.h"
+#include "util/debug-util.h"
 #include "util/filesystem-util.h"
 #include "util/time.h"
 
@@ -64,31 +66,77 @@ static bool FilterCallback(void* context) {
   return minidumps_enabled;
 }
 
+static void write_dump_threadinfo(int fd, ThreadDebugInfo* thread_info) {
+  constexpr char thread_msg[] = "Minidump in thread ";
+  // pid_t is signed, but valid process IDs must always be positive.
+  const int64_t thread_id = thread_info->GetSystemThreadId();
+  // 20 characters needed for UINT64_MAX.
+  char thread_id_str[20];
+  const unsigned int thread_id_len = my_uint_len(thread_id);
+  my_uitos(thread_id_str, thread_id, thread_id_len);
+  const char* thread_name = thread_info->GetThreadName();
+
+  constexpr char query_msg[] = " running query ";
+  const TUniqueId& query_id = thread_info->GetQueryId();
+  char query_id_str[TUniqueIdBufferSize];
+  PrintIdCompromised(query_id, query_id_str);
+
+  constexpr char instance_msg[] = ", fragment instance ";
+  const TUniqueId& instance_id = thread_info->GetInstanceId();
+  // Format TUniqueId according to PrintId from util/debug-util.h
+  char instance_id_str[TUniqueIdBufferSize];
+  PrintIdCompromised(instance_id, instance_id_str);
+
+  // Example:
+  // > Minidump in thread [1790536]async-exec-thread running query 1a47cc1e2df94cb4:
+  //   88dfa08200000000, fragment instance 0000000000000000:0000000000000000
+  sys_write(fd, thread_msg, sizeof(thread_msg) / sizeof(thread_msg[0]) - 1);
+  sys_write(fd, "[", 1);
+  sys_write(fd, thread_id_str, thread_id_len);
+  sys_write(fd, "]", 1);
+  sys_write(fd, thread_name, my_strlen(thread_name));
+  sys_write(fd, query_msg, sizeof(query_msg) / sizeof(query_msg[0]) - 1);
+  sys_write(fd, query_id_str, TUniqueIdBufferSize);
+  sys_write(fd, instance_msg, sizeof(instance_msg) / sizeof(instance_msg[0]) - 1);
+  sys_write(fd, instance_id_str, TUniqueIdBufferSize);
+  sys_write(fd, "\n", 1);
+}
+
+static void write_dump_path(int fd, const char* path) {
+  // We use the linux syscall support methods from chromium here as per the
+  // recommendation of the breakpad docs to avoid calling into other shared libraries.
+  const char msg[] = "Wrote minidump to ";
+  sys_write(fd, msg, sizeof(msg) / sizeof(msg[0]) - 1);
+    // We use breakpad's reimplementation of strlen to avoid calling into libc.
+  sys_write(fd, path, my_strlen(path));
+  sys_write(fd, "\n", 1);
+}
+
 /// Callback for breakpad. It is called by breakpad whenever a minidump file has been
 /// written and should not be called directly. It logs the event before breakpad crashes
 /// the process. Due to the process being in a failed state we write to stdout/stderr and
 /// let the surrounding redirection make sure the output gets logged. The calls might
 /// still fail in unknown scenarios as the process is in a broken state. However we don't
 /// rely on them as the minidump file has been written already.
-static bool DumpCallback(const google_breakpad::MinidumpDescriptor& descriptor,
-    void* context, bool succeeded) {
+bool DumpCallback(const google_breakpad::MinidumpDescriptor& descriptor, void* context,
+    bool succeeded) {
   // See if a file was written successfully.
   if (succeeded) {
-    // Write message to stdout/stderr, which will usually be captured in the INFO/ERROR
-    // log.
-    const char msg[] = "Wrote minidump to ";
-    const int msg_len = sizeof(msg) / sizeof(msg[0]) - 1;
+    // Write to stdout/stderr, which will usually be captured in the INFO/ERROR log.
+    ThreadDebugInfo* thread_info = GetThreadDebugInfo();
+    if (thread_info != nullptr) {
+      write_dump_threadinfo(STDOUT_FILENO, thread_info);
+      write_dump_threadinfo(STDERR_FILENO, thread_info);
+    } else {
+      const char msg[] = "Minidump with no thread info available.\n";
+      const int msg_len = sizeof(msg) / sizeof(msg[0]) - 1;
+      sys_write(STDOUT_FILENO, msg, msg_len);
+      sys_write(STDERR_FILENO, msg, msg_len);
+    }
+
     const char* path = descriptor.path();
-    // We use breakpad's reimplementation of strlen to avoid calling into libc.
-    const int path_len = my_strlen(path);
-    // We use the linux syscall support methods from chromium here as per the
-    // recommendation of the breakpad docs to avoid calling into other shared libraries.
-    sys_write(STDOUT_FILENO, msg, msg_len);
-    sys_write(STDOUT_FILENO, path, path_len);
-    sys_write(STDOUT_FILENO, "\n", 1);
-    sys_write(STDERR_FILENO, msg, msg_len);
-    sys_write(STDERR_FILENO, path, path_len);
-    sys_write(STDERR_FILENO, "\n", 1);
+    write_dump_path(STDOUT_FILENO, path);
+    write_dump_path(STDERR_FILENO, path);
   }
   // Return the value received in the call as described in the minidump documentation. If
   // this values is true, then no other handlers will be called. Breakpad will still crash

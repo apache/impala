@@ -143,6 +143,10 @@ class TestBreakpadBase(CustomClusterTestSuite):
         expected_count=expected_count)
     self.assert_impalad_log_contains('ERROR', 'Wrote minidump to ',
         expected_count=expected_count)
+    self.assert_impalad_log_contains('INFO', 'Minidump with no thread info available.',
+        expected_count=expected_count)
+    self.assert_impalad_log_contains('ERROR', 'Minidump with no thread info available.',
+        expected_count=expected_count)
 
 
 class TestBreakpadCore(TestBreakpadBase):

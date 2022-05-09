@@ -87,10 +87,17 @@ std::string PrintThriftEnum(const TParquetBloomFilterWrite::type& value);
 std::string PrintTuple(const Tuple* t, const TupleDescriptor& d);
 std::string PrintRow(TupleRow* row, const RowDescriptor& d);
 std::string PrintBatch(RowBatch* batch);
-/// Converts id to a string represantation. If necessary, the gdb equivalent is:
+/// Converts id to a string representation. If necessary, the gdb equivalent is:
 ///    printf "%lx:%lx\n", id.hi, id.lo
 std::string PrintId(const TUniqueId& id, const std::string& separator = ":");
 std::string PrintId(const UniqueIdPB& id, const std::string& separator = ":");
+
+/// Converts id to a string representation without using any shared library calls.
+/// Follows Breakpad's guidance for compromised contexts, see
+/// https://github.com/google/breakpad/blob/main/docs/linux_starter_guide.md
+constexpr int TUniqueIdBufferSize = 33;
+void PrintIdCompromised(const TUniqueId& id, char out[TUniqueIdBufferSize],
+    const char separator = ':');
 
 inline ostream& operator<<(ostream& os, const UniqueIdPB& id) {
   return os << PrintId(id);

@@ -120,6 +120,20 @@ string PrintId(const UniqueIdPB& id, const string& separator) {
   return out.str();
 }
 
+static void my_i64tohex(int64_t w, char out[16]) {
+  static const char* digits = "0123456789abcdef";
+  for (size_t i = 0, j=60; i < 16; ++i, j -= 4) {
+    out[i] = digits[(w>>j) & 0x0f];
+  }
+}
+
+void PrintIdCompromised(const TUniqueId& id, char out[TUniqueIdBufferSize],
+    const char separator) {
+  my_i64tohex(id.hi, out);
+  out[16] = separator;
+  my_i64tohex(id.lo, out+17);
+}
+
 bool ParseId(const string& s, TUniqueId* id) {
   // For backwards compatibility, this method parses two forms of query ID from text:
   //  - <hex-int64_t><colon><hex-int64_t> - this format is the standard going forward
