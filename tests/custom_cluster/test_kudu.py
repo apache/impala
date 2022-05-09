@@ -334,9 +334,9 @@ class TestKuduHMSIntegration(CustomKuduTest):
     self.run_test_case('QueryTest/kudu_hms_alter', vector, use_db=unique_database)
 
 
-class TestKuduTransaction(CustomClusterTestSuite):
+class TestKuduTransactionBase(CustomClusterTestSuite):
   """
-  This suite tests the Kudu transaction when inserting rows to kudu table.
+  This is a base class of other TestKuduTransaction classes.
   """
 
   # query to create Kudu table.
@@ -366,9 +366,7 @@ class TestKuduTransaction(CustomClusterTestSuite):
   def get_workload(cls):
     return 'functional-query'
 
-  @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
-  def test_kudu_txn_succeed(self, cursor, unique_database):
+  def _test_kudu_txn_succeed(self, cursor, unique_database):
     # Create Kudu table.
     table_name = "%s.test_kudu_txn_succeed" % unique_database
     self.execute_query(self._create_kudu_table_query.format(table_name))
@@ -393,9 +391,7 @@ class TestKuduTransaction(CustomClusterTestSuite):
     cursor.execute(self._row_num_query.format(table_name))
     assert cursor.fetchall() == [(103,)]
 
-  @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
-  def test_kudu_txn_not_implemented(self, cursor, unique_database):
+  def _test_kudu_txn_not_implemented(self, cursor, unique_database):
     # Create Kudu table.
     table_name = "%s.test_kudu_txn_succeed" % unique_database
     self.execute_query(self._create_kudu_table_query.format(table_name))
@@ -430,9 +426,8 @@ class TestKuduTransaction(CustomClusterTestSuite):
     cursor.execute(self._row_num_query.format(table_name))
     assert cursor.fetchall() == [(3,)]
 
-  @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
-  def test_kudu_txn_abort_dup_key(self, cursor, unique_database):
+  def _test_kudu_txn_abort_dup_key(self, cursor, unique_database,
+      expect_fail_on_conflict, expected_error_msg):
     # Create Kudu table.
     table_name = "%s.test_kudu_txn_abort_dup_key" % unique_database
     self.execute_query(self._create_kudu_table_query.format(table_name))
@@ -442,11 +437,11 @@ class TestKuduTransaction(CustomClusterTestSuite):
     self.execute_query("set ENABLE_KUDU_TRANSACTION=true")
     try:
       self.execute_query(self._insert_dup_key_query.format(table_name))
-      assert False, "query was expected to fail"
+      assert (not expect_fail_on_conflict), "query was expected to fail"
     except ImpalaBeeswaxException as e:
-      assert "Key already present in Kudu table" in str(e)
+      assert expected_error_msg in str(e)
     cursor.execute(self._row_num_query.format(table_name))
-    assert cursor.fetchall() == [(0,)]
+    assert cursor.fetchall() == [(0 if expect_fail_on_conflict else 2,)]
 
     # Disable Kudu transactions and run the same query. Part of rows are inserted into
     # Kudu table.
@@ -470,11 +465,11 @@ class TestKuduTransaction(CustomClusterTestSuite):
     # Transaction should be aborted and no rows are inserted into Kudu table.
     try:
       self.execute_query(self._insert_select_query2.format(table_name, table_name2))
-      assert False, "query was expected to fail"
+      assert (not expect_fail_on_conflict), "query was expected to fail"
     except ImpalaBeeswaxException as e:
-      assert "Key already present in Kudu table" in str(e)
+      assert expected_error_msg in str(e)
     cursor.execute(self._row_num_query.format(table_name))
-    assert cursor.fetchall() == [(0,)]
+    assert cursor.fetchall() == [(0 if expect_fail_on_conflict else 2,)]
 
     # Disable Kudu transactions and run the same query. Part of rows are inserted into
     # Kudu table.
@@ -483,9 +478,8 @@ class TestKuduTransaction(CustomClusterTestSuite):
     cursor.execute(self._row_num_query.format(table_name))
     assert cursor.fetchall() == [(2,)]
 
-  @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
-  def test_kudu_txn_ctas(self, cursor, unique_database):
+  def _test_kudu_txn_ctas(self, cursor, unique_database, expect_fail_on_conflict,
+      expected_error_msg):
     # Enable Kudu transactions
     self.execute_query("set ENABLE_KUDU_TRANSACTION=true")
 
@@ -514,11 +508,11 @@ class TestKuduTransaction(CustomClusterTestSuite):
     table_name4 = "%s.test_kudu_txn_ctas4" % unique_database
     try:
       self.execute_query(self._ctas_query.format(table_name4, table_name3))
-      assert False, "query was expected to fail"
+      assert (not expect_fail_on_conflict), "query was expected to fail"
     except ImpalaBeeswaxException as e:
-      assert "Key already present in Kudu table" in str(e)
+      assert expected_error_msg in str(e)
     cursor.execute(self._row_num_query.format(table_name4))
-    assert cursor.fetchall() == [(0,)]
+    assert cursor.fetchall() == [(0 if expect_fail_on_conflict else 2,)]
 
     # Disable Kudu transactions and run the same CTAS query. Part of rows are inserted
     # into Kudu table.
@@ -528,10 +522,7 @@ class TestKuduTransaction(CustomClusterTestSuite):
     cursor.execute(self._row_num_query.format(table_name5))
     assert cursor.fetchall() == [(2,)]
 
-  @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
-  @SkipIfBuildType.not_dev_build
-  def test_kudu_txn_abort_row_batch(self, cursor, unique_database):
+  def _test_kudu_txn_abort_row_batch(self, cursor, unique_database):
     # Create Kudu table.
     table_name = "%s.test_kudu_txn_abort_row_batch" % unique_database
     self.execute_query(self._create_kudu_table_query.format(table_name))
@@ -549,10 +540,7 @@ class TestKuduTransaction(CustomClusterTestSuite):
     cursor.execute(self._row_num_query.format(table_name))
     assert cursor.fetchall() == [(0,)]
 
-  @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
-  @SkipIfBuildType.not_dev_build
-  def test_kudu_txn_abort_partial_rows(self, cursor, unique_database):
+  def _test_kudu_txn_abort_partial_rows(self, cursor, unique_database):
     # Create Kudu table.
     table_name = "%s.test_kudu_txn_abort_partial_rows" % unique_database
     self.execute_query(self._create_kudu_table_query.format(table_name))
@@ -570,10 +558,7 @@ class TestKuduTransaction(CustomClusterTestSuite):
     cursor.execute(self._row_num_query.format(table_name))
     assert cursor.fetchall() == [(0,)]
 
-  @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
-  @SkipIfBuildType.not_dev_build
-  def test_kudu_txn_abort_partition_lock(self, cursor, unique_database):
+  def _test_kudu_txn_abort_partition_lock(self, cursor, unique_database):
     # Running two separate queries that are inserting to the same Kudu partitions.
     # Verify that one of the queries should fail, given Kudu's current implementation
     # of partition locking.
@@ -601,6 +586,135 @@ class TestKuduTransaction(CustomClusterTestSuite):
           "another transaction" in str(e)
     # Close the first query.
     self.client.close_query(handle)
+
+
+class TestKuduTransaction(TestKuduTransactionBase):
+  """
+  This suite tests the Kudu transaction when inserting rows to kudu table.
+  """
+
+  # expected error message from kudu on duplicate key.
+  _duplicate_key_error = "Kudu reported write operation errors during transaction."
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  def test_kudu_txn_succeed(self, cursor, unique_database):
+    self._test_kudu_txn_succeed(cursor, unique_database)
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  def test_kudu_txn_not_implemented(self, cursor, unique_database):
+    self._test_kudu_txn_not_implemented(cursor, unique_database)
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  def test_kudu_txn_abort_dup_key(self, cursor, unique_database):
+    self._test_kudu_txn_abort_dup_key(cursor, unique_database, True,
+        self._duplicate_key_error)
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  def test_kudu_txn_ctas(self, cursor, unique_database):
+    self._test_kudu_txn_ctas(cursor, unique_database, True, self._duplicate_key_error)
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  @SkipIfBuildType.not_dev_build
+  def test_kudu_txn_abort_row_batch(self, cursor, unique_database):
+    self._test_kudu_txn_abort_row_batch(cursor, unique_database)
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  @SkipIfBuildType.not_dev_build
+  def test_kudu_txn_abort_partial_rows(self, cursor, unique_database):
+    self._test_kudu_txn_abort_partial_rows(cursor, unique_database)
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  @SkipIfBuildType.not_dev_build
+  def test_kudu_txn_abort_partition_lock(self, cursor, unique_database):
+    self._test_kudu_txn_abort_partial_rows(cursor, unique_database)
+
+
+class TestKuduTransactionNoIgnore(TestKuduTransactionBase):
+  """
+  This suite tests the Kudu transaction when inserting rows to kudu table with
+  kudu_ignore_conflicts flag set to false.
+  """
+
+  # impalad args to start the cluster.
+  _impalad_args = "--kudu_ignore_conflicts=false"
+  # expected error message from kudu on duplicated key.
+  _duplicate_key_error = "Key already present in Kudu table"
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
+  def test_kudu_txn_succeed(self, cursor, unique_database):
+    self._test_kudu_txn_succeed(cursor, unique_database)
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
+  def test_kudu_txn_not_implemented(self, cursor, unique_database):
+    self._test_kudu_txn_not_implemented(cursor, unique_database)
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
+  def test_kudu_txn_abort_dup_key(self, cursor, unique_database):
+    self._test_kudu_txn_abort_dup_key(cursor, unique_database, True,
+        self._duplicate_key_error)
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
+  def test_kudu_txn_ctas(self, cursor, unique_database):
+    self._test_kudu_txn_ctas(cursor, unique_database, True, self._duplicate_key_error)
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  @SkipIfBuildType.not_dev_build
+  @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
+  def test_kudu_txn_abort_row_batch(self, cursor, unique_database):
+    self._test_kudu_txn_abort_row_batch(cursor, unique_database)
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  @SkipIfBuildType.not_dev_build
+  @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
+  def test_kudu_txn_abort_partial_rows(self, cursor, unique_database):
+    self._test_kudu_txn_abort_partial_rows(cursor, unique_database)
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  @SkipIfBuildType.not_dev_build
+  @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
+  def test_kudu_txn_abort_partition_lock(self, cursor, unique_database):
+    self._test_kudu_txn_abort_partial_rows(cursor, unique_database)
+
+
+class TestKuduTransactionIgnoreConflict(TestKuduTransactionBase):
+  """
+  This suite tests the Kudu transaction when inserting rows to kudu table with
+  kudu_ignore_conflicts=true and kudu_ignore_conflicts_in_transaction=true.
+  """
+
+  # impalad args to start the cluster.
+  _impalad_args = "--kudu_ignore_conflicts=true " \
+      "--kudu_ignore_conflicts_in_transaction=true"
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
+  def test_kudu_txn_dup_key(self, cursor, unique_database):
+    self._test_kudu_txn_abort_dup_key(cursor, unique_database, False, "no error")
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
+  def test_kudu_txn_ctas(self, cursor, unique_database):
+    self._test_kudu_txn_ctas(cursor, unique_database, False, "no error")
 
 
 class TestKuduTxnKeepalive(CustomKuduTest):
@@ -649,3 +763,139 @@ class TestKuduTxnKeepalive(CustomKuduTest):
     self.execute_query(self._insert_3_rows_query.format(table_name), query_options)
     cursor.execute(self._row_num_query.format(table_name))
     assert cursor.fetchall() == [(3,)]
+
+
+class TestKuduDmlConflictBase(CustomClusterTestSuite):
+  """
+  This is a base class of other TestKuduDml classes.
+  """
+
+  # query to create Kudu table.
+  _create_kudu_table_query = ("create table {0} "
+      "(a int primary key, b timestamp not null) "
+      "partition by hash(a) partitions 8 stored as kudu")
+  # queries to insert rows into Kudu table.
+  _insert_dup_key_query = ("insert into {0} values "
+      "(0, '1400-01-01'), (0, '1400-01-02'), "
+      "(1, '1400-01-01'), (1, '1400-01-02'), "
+      "(2, '1400-01-01'), (2, '1400-01-02')")
+  # query to update rows in Kudu table with some constraint violation.
+  _update_violate_constraint_query = ("update {0} set b = "
+      "case when b <= '2022-01-01' then NULL else '1400-01-01' end")
+  # query to update row by primary key.
+  _update_by_key_query = "update {0} set b = '1400-02-02' where a = {1}"
+  # query to delete row by primary key.
+  _delete_by_key_query = "delete from {0} where a = {1}"
+  # query to drop all rows from Kudu table.
+  _delete_all_query = "delete from {0}"
+  # query to get number of rows.
+  _row_num_query = "select count(*) from {0}"
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  def _check_errors(self, query_profile, expect_error, error_message, num_row_erros):
+    """
+    Check ocurrence of error_message and num_row_errors in query_profile.
+    """
+
+    error_line = "  Errors: {0}".format(error_message)
+    num_row_error_line = "NumRowErrors: {0}".format(num_row_erros)
+    assert expect_error == (error_line in query_profile)
+    assert num_row_error_line in query_profile
+
+  def _race_queries(self, fast_query, slow_query, expect_error_on_slow_query,
+      error_message, num_row_erros):
+    """
+    Race two queries and check for error message in the slow query's profile.
+    """
+
+    fast_sleep = {'debug_action': 'FIS_KUDU_TABLE_SINK_WRITE_BEGIN:SLEEP@1000'}
+    slow_sleep = {'debug_action': 'FIS_KUDU_TABLE_SINK_WRITE_BEGIN:SLEEP@3000'}
+    timeout = 10
+
+    fast_handle = self.execute_query_async(fast_query, fast_sleep)
+    slow_handle = self.execute_query_async(slow_query, slow_sleep)
+    try:
+      # Wait for both queries to finish.
+      self.wait_for_state(fast_handle, self.client.QUERY_STATES['FINISHED'], timeout)
+      self.wait_for_state(slow_handle, self.client.QUERY_STATES['FINISHED'], timeout)
+      self._check_errors(self.client.get_runtime_profile(slow_handle),
+          expect_error_on_slow_query, error_message, num_row_erros)
+    finally:
+      self.client.close_query(fast_handle)
+      self.client.close_query(slow_handle)
+
+  def _test_insert_update_delete(self, cursor, unique_database,
+      expect_log_on_conflict):
+    """
+    Do sequence of insert, update, and delete query with conflicting primary keys.
+    """
+
+    # Create Kudu table.
+    table_name = "%s.insert_update_delete" % unique_database
+    self.execute_query(self._create_kudu_table_query.format(table_name))
+
+    # Insert rows with duplicate primary key.
+    # Error message should exist in profile if kudu_ignore_conflicts=true.
+    result = self.execute_query(self._insert_dup_key_query.format(table_name))
+    self._check_errors(result.runtime_profile, expect_log_on_conflict,
+        "Key already present in Kudu table", 3)
+    cursor.execute(self._row_num_query.format(table_name))
+    assert cursor.fetchall() == [(3,)]
+
+    # Update rows with some constraint violation.
+    # Error message should exist in profile regardless of kudu_ignore_conflicts value.
+    result = self.execute_query(self._update_violate_constraint_query.format(table_name))
+    self._check_errors(result.runtime_profile, True,
+        "Row with null value violates nullability constraint on table", 3)
+
+    # Update row with non-existent primary key by racing it against concurrent delete
+    # query.
+    delete_query = self._delete_by_key_query.format(table_name, 1)
+    update_query = self._update_by_key_query.format(table_name, 1)
+    self._race_queries(delete_query, update_query, expect_log_on_conflict,
+        "Not found in Kudu table", 1)
+    cursor.execute(self._row_num_query.format(table_name))
+    assert cursor.fetchall() == [(2,)]
+
+    # Delete row with non-existent primary key by racing it against another concurrent
+    # delete.
+    delete_query = self._delete_by_key_query.format(table_name, 2)
+    self._race_queries(delete_query, delete_query, expect_log_on_conflict,
+        "Not found in Kudu table", 1)
+    cursor.execute(self._row_num_query.format(table_name))
+    assert cursor.fetchall() == [(1,)]
+
+    # Delete all rows. Expect no errors.
+    result = self.execute_query(self._delete_all_query.format(table_name))
+    self._check_errors(result.runtime_profile, True, "\n", 0)
+    cursor.execute(self._row_num_query.format(table_name))
+    assert cursor.fetchall() == [(0,)]
+
+
+class TestKuduDmlConflictNoError(TestKuduDmlConflictBase):
+  """
+  Test that Kudu DML ignore conflict and does not log the conflict error message.
+  """
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  def test_insert_update_delete(self, cursor, unique_database):
+    self._test_insert_update_delete(cursor, unique_database, False)
+
+
+class TestKuduDmlConflictLogError(TestKuduDmlConflictBase):
+  """
+  Test that Kudu DML not ignore conflict and log the conflict error message.
+  """
+
+  # impalad args to start the cluster.
+  _impalad_args = "--kudu_ignore_conflicts=false"
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
+  def test_insert_update_delete(self, cursor, unique_database):
+    self._test_insert_update_delete(cursor, unique_database, True)

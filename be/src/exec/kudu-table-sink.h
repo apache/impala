@@ -84,6 +84,9 @@ class KuduTableSink : public DataSink {
   /// Create a new write operation according to the sink type.
   kudu::client::KuduWriteOperation* NewWriteOp();
 
+  /// Create a new write ignore operation according to the sink type.
+  kudu::client::KuduWriteOperation* NewWriteIgnoreOp();
+
   /// Checks for any errors buffered in the Kudu session, and increments
   /// appropriate counters for ignored errors.
   //
@@ -138,6 +141,13 @@ class KuduTableSink : public DataSink {
 
   /// True if it's in Kudu transaction. It's valid only after Open() succeeds.
   bool is_transactional_ = false;
+
+  /// True if this sink should ignore duplicate and absent key conflicts during Kudu
+  /// write operations. It's valid only after Open() succeeds.
+  bool ignore_conflicts_ = false;
+
+  /// Number of ignored write error operations during the lifetime of 'session_'.
+  int64_t total_ignored_errors_ = 0;
 };
 
 }  // namespace impala

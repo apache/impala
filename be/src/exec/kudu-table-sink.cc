@@ -21,6 +21,7 @@
 
 #include <boost/bind.hpp>
 #include <kudu/client/client.h>
+#include <kudu/client/resource_metrics.h>
 #include <kudu/client/write_op.h>
 #include <thrift/protocol/TDebugProtocol.h>
 
@@ -53,6 +54,23 @@ DEFINE_int32(kudu_error_buffer_size, DEFAULT_KUDU_ERROR_BUFFER_SIZE,
     "The size (bytes) of the Kudu client buffer for returning errors, with a min of 1KB."
     "If the actual errors exceed this size the query will fail.");
 
+// IMPALA-10465: This change the behavior of KuduTableSink to use the IGNORE variant of
+// Kudu API rather than using the non-IGNORE and discarding the Kudu error messages
+// manually. Set 'false' to return to the old behavior.
+DEFINE_bool(kudu_ignore_conflicts, true,
+    "Control whether Impala should ignore Kudu conflict error on duplicate and absent "
+    "primary keys during write operations. If this flag is set to true and Kudu cluster "
+    "supports ignore operations, Impala will use {INSERT,UPDATE,DELETE}_IGNORE "
+    "operations of Kudu API. Otherwise, Impala will use regular {INSERT,UPDATE,DELETE} "
+    "operations and logs any occurrences of such conflict error. "
+    "See also kudu_ignore_conflicts_in_transaction flag.");
+
+DEFINE_bool(kudu_ignore_conflicts_in_transaction, false,
+    "Control whether Kudu transaction should ignore conflict error on duplicate and "
+    "absent primary keys during write operations. If set to true, the Kudu transaction "
+    "will not be aborted for hitting such a conflict error. This flag is only "
+    "considered if kudu_ignore_conflicts flag is true.");
+
 DECLARE_int32(kudu_operation_timeout_ms);
 
 using kudu::client::KuduColumnSchema;
@@ -64,6 +82,7 @@ using kudu::client::KuduTransaction;
 using kudu::client::KuduInsert;
 using kudu::client::KuduUpdate;
 using kudu::client::KuduError;
+using kudu::client::ResourceMetrics;
 
 namespace impala {
 
@@ -179,6 +198,10 @@ Status KuduTableSink::Open(RuntimeState* state) {
     session_ = client_->NewSession();
   }
 
+  ignore_conflicts_ =
+      FLAGS_kudu_ignore_conflicts && kudu_table_sink_.ignore_not_found_or_duplicate;
+  if (!ignore_conflicts_) profile()->AppendExecOption("Log Kudu Conflicts");
+
   session_->SetTimeoutMillis(FLAGS_kudu_operation_timeout_ms);
 
   // KuduSession Set* methods here and below return a status for API compatibility.
@@ -236,6 +259,20 @@ kudu::client::KuduWriteOperation* KuduTableSink::NewWriteOp() {
   }
 }
 
+kudu::client::KuduWriteOperation* KuduTableSink::NewWriteIgnoreOp() {
+  if (sink_action_ == TSinkAction::INSERT) {
+    return table_->NewInsertIgnore();
+  } else if (sink_action_ == TSinkAction::UPDATE) {
+    return table_->NewUpdateIgnore();
+  } else if (sink_action_ == TSinkAction::UPSERT) {
+    return table_->NewUpsert();
+  } else {
+    DCHECK(sink_action_ == TSinkAction::DELETE)
+        << "Sink type not supported: " << sink_action_;
+    return table_->NewDeleteIgnore();
+  }
+}
+
 Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
   SCOPED_TIMER(profile()->total_time_counter());
   expr_results_pool_->Clear();
@@ -249,10 +286,14 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
   // violations.
   int num_null_violations = 0;
 
+  RETURN_IF_ERROR(
+      DebugAction(state->query_options(), "FIS_KUDU_TABLE_SINK_WRITE_BEGIN"));
+
   // Since everything is set up just forward everything to the writer.
   for (int i = 0; i < batch->num_rows(); ++i) {
     TupleRow* current_row = batch->GetRow(i);
-    unique_ptr<kudu::client::KuduWriteOperation> write(NewWriteOp());
+    unique_ptr<kudu::client::KuduWriteOperation> write(
+        ignore_conflicts_ ? NewWriteIgnoreOp() : NewWriteOp());
     bool add_row = true;
 
     for (int j = 0; j < output_expr_evals_.size(); ++j) {
@@ -317,6 +358,27 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
 
 Status KuduTableSink::CheckForErrors(RuntimeState* state) {
   RETURN_IF_ERROR(state->CheckQueryState());
+
+  if (ignore_conflicts_) {
+    const ResourceMetrics& metrics = session_->GetWriteOpMetrics();
+    int64_t ignored_errors = metrics.GetMetric("insert_ignore_errors")
+        + metrics.GetMetric("update_ignore_errors")
+        + metrics.GetMetric("delete_ignore_errors");
+    DCHECK(ignored_errors >= total_ignored_errors_);
+    if (ignored_errors > total_ignored_errors_) {
+      total_ignored_errors_ = ignored_errors;
+      COUNTER_SET(num_row_errors_, total_ignored_errors_);
+      if (is_transactional_ && !FLAGS_kudu_ignore_conflicts_in_transaction) {
+        // Return general status error to abort transaction.
+        return Status("Kudu reported write operation errors during transaction.");
+      }
+    }
+  }
+
+  // Regardless of ignore_conflicts_ value, we still need to check for pending errors
+  // existence for the following possible scenarios:
+  // - sink_action_ is UPSERT.
+  // - Received other Kudu error such as timeouts or column constraint violations.
   if (session_->CountPendingErrors() == 0) return Status::OK();
 
   vector<KuduError*> errors;
@@ -380,6 +442,7 @@ Status KuduTableSink::FlushFinal(RuntimeState* state) {
 void KuduTableSink::Close(RuntimeState* state) {
   if (closed_) return;
   session_.reset();
+  total_ignored_errors_ = 0;
   mem_tracker_->Release(client_tracked_bytes_);
   txn_.reset();
   client_.reset();
