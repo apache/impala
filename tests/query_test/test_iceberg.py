@@ -479,6 +479,14 @@ class TestIcebergTable(ImpalaTestSuite):
          {'key': 5, 'value': 39},
          {'key': 6, 'value': 39},
          {'key': 7, 'value': 39}]
+    assert datafiles[0]['value_counts'] == \
+        [{'key': 1, 'value': 2},
+         {'key': 2, 'value': 2},
+         {'key': 3, 'value': 2},
+         {'key': 4, 'value': 2},
+         {'key': 5, 'value': 2},
+         {'key': 6, 'value': 2},
+         {'key': 7, 'value': 2}]
     assert datafiles[0]['null_value_counts'] == \
         [{'key': 1, 'value': 2},
          {'key': 2, 'value': 2},
@@ -501,6 +509,14 @@ class TestIcebergTable(ImpalaTestSuite):
          {'key': 5, 'value': 68},
          {'key': 6, 'value': 56},
          {'key': 7, 'value': 53}]
+    assert datafiles[1]['value_counts'] == \
+        [{'key': 1, 'value': 4},
+         {'key': 2, 'value': 4},
+         {'key': 3, 'value': 4},
+         {'key': 4, 'value': 4},
+         {'key': 5, 'value': 4},
+         {'key': 6, 'value': 4},
+         {'key': 7, 'value': 4}]
     assert datafiles[1]['null_value_counts'] == \
         [{'key': 1, 'value': 1},
          {'key': 2, 'value': 1},

@@ -52,6 +52,7 @@ table FbIcebergMetadata {
 table FbIcebergColumnStats {
   field_id: int;
   total_compressed_byte_size: long;
+  value_count: long;
   null_count: long;
   lower_bound: [ubyte];
   upper_bound: [ubyte];

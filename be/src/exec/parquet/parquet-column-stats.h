@@ -115,7 +115,8 @@ class ColumnStatsBase {
 
   /// Writes the current values into IcebergColumnStats struct.
   /// Min and max stats are Single-value serialized.
-  virtual void GetIcebergStats(int64_t column_size, IcebergColumnStats* out) const = 0;
+  virtual void GetIcebergStats(int64_t column_size, int64_t value_count,
+                               IcebergColumnStats* out) const = 0;
 
   /// Resets the state of this object.
   void Reset();
@@ -208,7 +209,7 @@ class ColumnStats : public ColumnStatsBase {
   virtual int64_t BytesNeeded() const override;
   virtual void EncodeToThrift(parquet::Statistics* out) const override;
 
-  virtual void GetIcebergStats(int64_t column_size,
+  virtual void GetIcebergStats(int64_t column_size, int64_t value_count,
       IcebergColumnStats* out) const override;
 
   /// Decodes the plain encoded stats value from 'buffer' and writes the result into the

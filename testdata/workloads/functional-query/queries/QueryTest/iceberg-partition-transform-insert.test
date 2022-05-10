@@ -300,7 +300,7 @@ where i < 5;
 INT,BIGINT,DECIMAL,STRING
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 2
-aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumRowGroups): 2
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -435,7 +435,7 @@ where t <= '1970-01-01 00:00:00';
 TIMESTAMP,DATE
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 4
-aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumRowGroups): 2
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -794,7 +794,7 @@ where t < '1970-01-01 01:00:00';
 TIMESTAMP
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 5
-aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumRowGroups): 3
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.

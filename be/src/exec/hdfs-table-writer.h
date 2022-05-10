@@ -43,6 +43,7 @@ struct IcebergColumnStats {
   bool has_min_max_values;
   std::string min_binary;
   std::string max_binary;
+  int64_t value_count;
   int64_t null_count;
   int64_t column_size;
 };

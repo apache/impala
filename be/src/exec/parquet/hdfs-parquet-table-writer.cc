@@ -1678,7 +1678,8 @@ void HdfsParquetTableWriter::CollectIcebergDmlFileColumnStats(int field_id,
   // Each data file consists of a single row group, so row group null_count / min / max
   // stats can be used as data file stats.
   // Get column_size from column writer.
-  col_writer->row_group_stats_base_->GetIcebergStats(col_writer->total_compressed_size(),
+  col_writer->row_group_stats_base_->GetIcebergStats(
+      col_writer->total_compressed_size(), col_writer->num_values(),
       &iceberg_file_stats_[field_id]);
 }
 

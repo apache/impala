@@ -270,8 +270,7 @@ public class IcebergCatalogOpExecutor {
    * API.
    */
   public static void appendFiles(FeIcebergTable feIcebergTable, Transaction txn,
-      TIcebergOperationParam icebergOp) throws ImpalaRuntimeException,
-      TableLoadingException {
+      TIcebergOperationParam icebergOp) throws ImpalaRuntimeException {
     org.apache.iceberg.Table nativeIcebergTable = feIcebergTable.getIcebergApiTable();
     List<ByteBuffer> dataFilesFb = icebergOp.getIceberg_data_files_fb();
     BatchWrite batchWrite;
@@ -284,7 +283,7 @@ public class IcebergCatalogOpExecutor {
       FbIcebergDataFile dataFile = FbIcebergDataFile.getRootAsFbIcebergDataFile(buf);
 
       PartitionSpec partSpec = nativeIcebergTable.specs().get(icebergOp.getSpec_id());
-      Metrics metrics = buildDataFileMetrics(feIcebergTable, dataFile);
+      Metrics metrics = buildDataFileMetrics(dataFile);
       DataFiles.Builder builder =
           DataFiles.builder(partSpec)
           .withMetrics(metrics)
@@ -301,9 +300,9 @@ public class IcebergCatalogOpExecutor {
     batchWrite.commit();
   }
 
-  private static Metrics buildDataFileMetrics(FeIcebergTable feIcebergTable,
-      FbIcebergDataFile dataFile) {
+  private static Metrics buildDataFileMetrics(FbIcebergDataFile dataFile) {
     Map<Integer, Long> columnSizes = new HashMap<>();
+    Map<Integer, Long> valueCounts = new HashMap<>();
     Map<Integer, Long> nullValueCounts = new HashMap<>();
     Map<Integer, ByteBuffer> lowerBounds = new HashMap<>();
     Map<Integer, ByteBuffer> upperBounds = new HashMap<>();
@@ -313,6 +312,7 @@ public class IcebergCatalogOpExecutor {
         int fieldId = stats.fieldId();
         if (fieldId != -1) {
           columnSizes.put(fieldId, stats.totalCompressedByteSize());
+          valueCounts.put(fieldId, stats.valueCount());
           nullValueCounts.put(fieldId, stats.nullCount());
           if (stats.lowerBoundLength() > 0) {
             lowerBounds.put(fieldId, stats.lowerBoundAsByteBuffer());
@@ -323,7 +323,7 @@ public class IcebergCatalogOpExecutor {
         }
       }
     }
-    return new Metrics(dataFile.recordCount(), columnSizes, null,
+    return new Metrics(dataFile.recordCount(), columnSizes, valueCounts,
         nullValueCounts, null, lowerBounds, upperBounds);
   }
 

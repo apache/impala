@@ -315,13 +315,14 @@ inline Status ColumnStats<StringValue>::MaterializeStringValuesToInternalBuffers
 
 template <typename T>
 inline void ColumnStats<T>::GetIcebergStats(
-    int64_t column_size, IcebergColumnStats* out) const {
+    int64_t column_size, int64_t value_count, IcebergColumnStats* out) const {
   DCHECK(out != nullptr);
   out->has_min_max_values = has_min_max_values_;
   if (out->has_min_max_values) {
     SerializeIcebergSingleValue(min_value_, &out->min_binary);
     SerializeIcebergSingleValue(max_value_, &out->max_binary);
   }
+  out->value_count = value_count;
   out->null_count = null_count_;
   // Column size is not traced by ColumnStats.
   out->column_size = column_size;
