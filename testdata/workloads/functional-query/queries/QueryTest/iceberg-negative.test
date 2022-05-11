@@ -602,3 +602,13 @@ select * from functional_parquet.iceberg_v2_delete_positional;
 ---- CATCH
 row_regex:.*CAUSED BY: TableLoadingException: Unsupported Iceberg V2 feature, table .* contains delete files..*
 ====
+---- QUERY
+CREATE TABLE ice_clone LIKE functional_parquet.iceberg_non_partitioned;
+---- CATCH
+Cloning an Iceberg table using CREATE TABLE LIKE is not supported.
+====
+---- QUERY
+CREATE TABLE clone_ice LIKE functional_parquet.alltypestiny STORED AS ICEBERG;
+---- CATCH
+CREATE TABLE LIKE is not supported for Iceberg tables.
+====
