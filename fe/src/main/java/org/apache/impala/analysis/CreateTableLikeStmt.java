@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
@@ -170,6 +171,12 @@ public class CreateTableLikeStmt extends StatementBase {
     if (fileFormat_ == THdfsFileFormat.KUDU) {
       throw new AnalysisException("CREATE TABLE LIKE is not supported for Kudu tables");
     }
+    // We currently don't support creating an Iceberg table using a CREATE TABLE LIKE
+    // statement (see IMPALA-11287).
+    if (fileFormat_ == THdfsFileFormat.ICEBERG) {
+      throw new AnalysisException(
+          "CREATE TABLE LIKE is not supported for Iceberg tables.");
+    }
 
     // Make sure the source table exists and the user has permission to access it.
     FeTable srcTable = analyzer.getTable(srcTableName_, Privilege.VIEW_METADATA);
@@ -178,6 +185,10 @@ public class CreateTableLikeStmt extends StatementBase {
 
     if (KuduTable.isKuduTable(srcTable.getMetaStoreTable())) {
       throw new AnalysisException("Cloning a Kudu table using CREATE TABLE LIKE is " +
+          "not supported.");
+    }
+    if (IcebergTable.isIcebergTable(srcTable.getMetaStoreTable())) {
+      throw new AnalysisException("Cloning an Iceberg table using CREATE TABLE LIKE is " +
           "not supported.");
     }
     srcDbName_ = srcTable.getDb().getName();
