@@ -48,7 +48,7 @@ fi
 
 CLASSPATH=$(cat $FE_CP_FILE):"$CLASSPATH"
 
-if [ "${1:-notest}" == "test" ]; then
+if [[ "${1:-notest}" = "test" ]]; then
   FE_TEST_CP_FILE="$IMPALA_HOME/fe/target/test-classpath.txt"
   CLASSPATH=$(cat $FE_TEST_CP_FILE):"$CLASSPATH"
 fi
