@@ -126,7 +126,7 @@ if [[ $SKIP_METADATA_LOAD -eq 0  && "$SNAPSHOT_FILE" = "" ]]; then
   run-step "Generating HBase data" create-hbase.log \
       ${IMPALA_HOME}/testdata/bin/create-hbase.sh
   run-step "Creating /test-warehouse HDFS directory" create-test-warehouse-dir.log \
-      hadoop fs -mkdir /test-warehouse
+      hadoop fs -mkdir -p /test-warehouse
 elif [ $SKIP_SNAPSHOT_LOAD -eq 0 ]; then
   run-step "Loading HDFS data from snapshot: $SNAPSHOT_FILE" \
       load-test-warehouse-snapshot.log \
