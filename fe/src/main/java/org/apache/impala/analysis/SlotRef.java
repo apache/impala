@@ -50,9 +50,9 @@ public class SlotRef extends Expr {
   // The resolved path after resolving 'rawPath_'.
   protected Path resolvedPath_ = null;
 
-  // Indicates if this SlotRef is coming from zipping unnest where the unest is given in
-  // the FROM clause. Note, when the unnest in in the select list then an UnnestExpr would
-  // be used instead of a SlotRef.
+  // Indicates if this SlotRef is coming from zipping unnest where the unnest is given in
+  // the FROM clause. Note, when the unnest is in the select list then an UnnestExpr
+  // would be used instead of a SlotRef.
   protected boolean isZippingUnnest_ = false;
 
   public SlotRef(List<String> rawPath) {
@@ -446,4 +446,8 @@ public class SlotRef extends Expr {
       return super.uncheckedCastTo(targetType);
     }
   }
+
+  // Return true since SlotRefs should be easy to access.
+  @Override
+  public boolean shouldConvertToCNF() { return true; }
 }

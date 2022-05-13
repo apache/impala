@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.Optional;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function.CompareMode;
 import org.apache.impala.catalog.ScalarFunction;
@@ -75,6 +76,9 @@ public class ArithmeticExpr extends Expr {
   }
 
   private final Operator op_;
+  // cache prior shouldConvertToCNF checks to avoid repeat tree walking
+  // omitted from clone in case cloner plans to mutate the expr
+  protected Optional<Boolean> shouldConvertToCNF_ = Optional.empty();
 
   public Operator getOp() { return op_; }
 
@@ -265,6 +269,26 @@ public class ArithmeticExpr extends Expr {
   @Override
   protected float computeEvalCost() {
     return hasChildCosts() ? getChildCosts() + ARITHMETIC_OP_COST : UNKNOWN_COST;
+  }
+
+  private boolean lookupShouldConvertToCNF() {
+    for (int i = 0; i < children_.size(); ++i) {
+      if (!getChild(i).shouldConvertToCNF()) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Return true if this expression's children should be converted to CNF.
+   */
+  @Override
+  public boolean shouldConvertToCNF() {
+    if (shouldConvertToCNF_.isPresent()) {
+      return shouldConvertToCNF_.get();
+    }
+    boolean result = lookupShouldConvertToCNF();
+    shouldConvertToCNF_ = Optional.of(result);
+    return result;
   }
 
   @Override

@@ -323,6 +323,8 @@ visible_functions = [
   [['months_between'], 'DOUBLE', ['DATE', 'DATE'], "_ZN6impala13DateFunctions13MonthsBetweenEPN10impala_udf15FunctionContextERKNS1_7DateValES6_"],
 
   # Math builtin functions
+  # Add new math builtins that operate on scalar values to
+  # org.apache.impala.analysis.FunctionCallExpr::builtinMathScalarFunctionNames_.
   [['pi'], 'DOUBLE', [], 'impala::MathFunctions::Pi'],
   [['e'], 'DOUBLE', [], 'impala::MathFunctions::E'],
   [['abs'], 'BIGINT', ['BIGINT'], 'impala::MathFunctions::Abs'],

@@ -83,4 +83,8 @@ public class ExistsPredicate extends Predicate {
     strBuilder.append(getChild(0).toSql(options));
     return strBuilder.toString();
   }
+
+  // Return false since existence can be expensive to determine.
+  @Override
+  public boolean shouldConvertToCNF() { return false; }
 }

@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.Optional;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
@@ -26,6 +27,9 @@ public abstract class Predicate extends Expr {
   protected boolean isEqJoinConjunct_;
   // true if this predicate has an always_true hint
   protected boolean hasAlwaysTrueHint_;
+  // cache prior shouldConvertToCNF checks to avoid repeat tree walking
+  // omitted from clone in case cloner plans to mutate the expr
+  protected Optional<Boolean> shouldConvertToCNF_ = Optional.empty();
 
   public Predicate() {
     super();
@@ -80,6 +84,27 @@ public abstract class Predicate extends Expr {
     if (slotRefRef != null) slotRefRef.setRef(slotRef);
     if (idxRef != null) idxRef.setRef(Integer.valueOf(i));
     return true;
+  }
+
+  private boolean lookupShouldConvertToCNF() {
+    for (int i = 0; i < children_.size(); ++i) {
+      if (!getChild(i).shouldConvertToCNF()) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Return true if this predicate's children should be converted to CNF.
+   * Predicates that are considered expensive can override to return false.
+   */
+  @Override
+  public boolean shouldConvertToCNF() {
+    if (shouldConvertToCNF_.isPresent()) {
+      return shouldConvertToCNF_.get();
+    }
+    boolean result = lookupShouldConvertToCNF();
+    shouldConvertToCNF_ = Optional.of(result);
+    return result;
   }
 
   public static boolean isEquivalencePredicate(Expr expr) {

@@ -17,7 +17,12 @@
 
 package org.apache.impala.analysis;
 
+import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Optional;
+import java.util.Set;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.AggregateFunction;
@@ -51,6 +56,17 @@ public class FunctionCallExpr extends Expr {
   private final FunctionParams params_;
   private boolean isAnalyticFnCall_ = false;
   private boolean isInternalFnCall_ = false;
+
+  // cache prior shouldConvertToCNF checks to avoid repeat tree walking
+  // omitted from clone in case cloner plans to mutate the expr
+  protected Optional<Boolean> shouldConvertToCNF_ = Optional.empty();
+  private static Set<String> builtinMathScalarFunctionNames_ =
+      new HashSet<String>(Arrays.asList("abs", "acos", "asin", "atan", "atan2", "bin",
+          "ceil", "ceiling", "conv", "cos", "cosh", "cot", "dceil", "degrees", "dexp",
+          "dfloor", "dlog1", "dlog10", "dpow", "dround", "dsqrt", "dtrunc", "e", "exp",
+          "floor", "fmod", "fpow", "hex", "ln", "log", "log10", "log2", "mod", "pi",
+          "pmod", "pow", "power", "quotient", "radians", "rand", "random", "round",
+          "sign", "sin", "sinh", "sqrt", "tan", "tanh", "trunc", "truncate", "unhex"));
 
   // Non-null iff this is an aggregation function that executes the Merge() step. This
   // is an analyzed clone of the FunctionCallExpr that executes the Update() function
@@ -803,4 +819,32 @@ public class FunctionCallExpr extends Expr {
     return e;
   }
 
+  public boolean isBuiltinMathScalarFunction() {
+    return (fnName_.isBuiltin()
+        && builtinMathScalarFunctionNames_.contains(fnName_.getFunction()));
+  }
+
+  private boolean lookupShouldConvertToCNF() {
+    if (isBuiltinCastFunction() || isBuiltinMathScalarFunction()) {
+      for (int i = 0; i < children_.size(); ++i) {
+        if (!getChild(i).shouldConvertToCNF()) return false;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Returns true if the function call is considered inexpensive to duplicate
+   * and the arguments should also be converted.
+   */
+  @Override
+  public boolean shouldConvertToCNF() {
+    if (shouldConvertToCNF_.isPresent()) {
+      return shouldConvertToCNF_.get();
+    }
+    boolean result = lookupShouldConvertToCNF();
+    shouldConvertToCNF_ = Optional.of(result);
+    return result;
+  }
 }

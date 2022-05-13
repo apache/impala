@@ -26,6 +26,9 @@ import org.apache.impala.analysis.TableRef;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.common.AnalysisException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -73,6 +76,7 @@ import java.util.List;
  *   a AND b
  */
 public class ConvertToCNFRule implements ExprRewriteRule {
+  private final static Logger LOG = LoggerFactory.getLogger(ConvertToCNFRule.class);
 
   // maximum number of CNF exprs (each AND is counted as 1) allowed
   private final int maxCnfExprs_;
@@ -91,6 +95,11 @@ public class ConvertToCNFRule implements ExprRewriteRule {
 
   private Expr convertToCNF(Expr pred, Analyzer analyzer) throws AnalysisException {
     if (!(pred instanceof CompoundPredicate)) {
+      return pred;
+    }
+
+    if (!((CompoundPredicate)pred).shouldConvertToCNF()) {
+      LOG.debug("It is not feasible to rewrite predicate " + pred.toSql() + " to CNF.");
       return pred;
     }
 
