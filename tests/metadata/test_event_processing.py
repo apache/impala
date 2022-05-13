@@ -14,7 +14,6 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-import pytest
 from tests.common.skip import SkipIfHive2, SkipIfCatalogV2
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
@@ -180,7 +179,6 @@ class TestEventProcessing(ImpalaTestSuite):
   def test_empty_partition_events(self, unique_database):
     self._run_test_empty_partition_events(unique_database, False)
 
-  @pytest.mark.xfail(run=False, reason="IMPALA-9057")
   def test_event_based_replication(self):
     self.__run_event_based_replication_tests()
 
