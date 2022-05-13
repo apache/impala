@@ -373,3 +373,91 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=1 size=718.94MB
    row-size=8B cardinality=6.00M
 ====
+
+# IMPALA-11274: Test with string functions in the disjunctive predicate.
+# In this case the predicate is not converted to CNF
+select count(*) from lineitem, orders
+ where l_orderkey = o_orderkey and
+  ((upper(l_returnflag) = 'Y' and upper(o_orderpriority) = 'HIGH')
+    or (upper(l_returnflag) = 'N' and upper(o_orderpriority) = 'LOW'))
+  and l_partkey > 0;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: o_orderkey = l_orderkey
+|  other predicates: ((upper(l_returnflag) = 'Y' AND upper(o_orderpriority) = 'HIGH') OR (upper(l_returnflag) = 'N' AND upper(o_orderpriority) = 'LOW'))
+|  runtime filters: RF000 <- l_orderkey
+|  row-size=57B cardinality=600.12K
+|
+|--00:SCAN HDFS [tpch_parquet.lineitem]
+|     HDFS partitions=1/1 files=3 size=193.99MB
+|     predicates: l_partkey > 0
+|     row-size=29B cardinality=600.12K
+|
+01:SCAN HDFS [tpch_parquet.orders]
+   HDFS partitions=1/1 files=2 size=54.21MB
+   runtime filters: RF000 -> o_orderkey
+   row-size=28B cardinality=1.50M
+====
+
+# IMPALA-11274: Functions like CAST should still be eligible for CNF
+select count(*) from lineitem, orders
+ where l_orderkey = o_orderkey and
+  ((cast(l_returnflag as varchar(2)) = 'Y' and cast(o_orderpriority as varchar(5)) = 'HIGH')
+    or (cast(l_returnflag as varchar(2)) = 'N' and cast(o_orderpriority as varchar(5)) = 'LOW'))
+  and l_partkey > 0;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  other predicates: CAST(l_returnflag AS VARCHAR(2)) = 'Y' OR CAST(o_orderpriority AS VARCHAR(5)) = 'LOW', CAST(o_orderpriority AS VARCHAR(5)) = 'HIGH' OR CAST(l_returnflag AS VARCHAR(2)) = 'N'
+|  runtime filters: RF000 <- o_orderkey
+|  row-size=57B cardinality=57.58K
+|
+|--01:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     predicates: CAST(o_orderpriority AS VARCHAR(5)) IN ('HIGH', 'LOW')
+|     row-size=28B cardinality=150.00K
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=193.99MB
+   predicates: l_partkey > 0, CAST(l_returnflag AS VARCHAR(2)) IN ('Y', 'N')
+   runtime filters: RF000 -> l_orderkey
+   row-size=29B cardinality=600.12K
+====
+
+# IMPALA-11274: Simple arithmetic expressions should still be eligible for CNF
+select count(*) from lineitem, orders
+ where l_orderkey = o_orderkey and
+  (2 * log10(l_quantity) < 3 and cast(l_returnflag as varchar(2)) = 'Y')
+   or l_quantity >= 50;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:NESTED LOOP JOIN [INNER JOIN]
+|  predicates: l_orderkey = o_orderkey OR l_quantity >= 50
+|  row-size=37B cardinality=600.12K
+|
+|--01:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     row-size=8B cardinality=1.50M
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=193.99MB
+   predicates: (2 * log10(l_quantity) < 3 AND CAST(l_returnflag AS VARCHAR(2)) = 'Y') OR l_quantity >= 50
+   row-size=29B cardinality=600.12K
+====

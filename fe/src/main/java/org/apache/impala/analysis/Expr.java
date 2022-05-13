@@ -1883,4 +1883,11 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     }
     return null;
   }
+
+  /**
+   * Returns true if 'this' is a constant.
+   */
+  public boolean shouldConvertToCNF() {
+    return isConstant();
+  }
 }

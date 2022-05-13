@@ -68,4 +68,8 @@ public class IsNotEmptyPredicate extends Predicate {
 
   @Override
   public Expr clone() { return new IsNotEmptyPredicate(getChild(0).clone()); }
+
+  // Return false since emptiness can be expensive to determine.
+  @Override
+  public boolean shouldConvertToCNF() { return false; }
 }

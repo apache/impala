@@ -409,6 +409,12 @@ public class CastExpr extends Expr {
         && type_.equals(other.type_);
   }
 
+  // Pass through since cast's are cheap.
+  @Override
+  public boolean shouldConvertToCNF() {
+    return getChild(0).shouldConvertToCNF();
+  }
+
   @Override
   public Expr clone() { return new CastExpr(this); }
 }

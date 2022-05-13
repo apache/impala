@@ -197,4 +197,8 @@ public class TupleIsNullPredicate extends Predicate {
 
   @Override
   public Expr clone() { return new TupleIsNullPredicate(this); }
+
+  // Return true since only tuples are involved during evaluation.
+  @Override
+  public boolean shouldConvertToCNF() { return true; }
 }

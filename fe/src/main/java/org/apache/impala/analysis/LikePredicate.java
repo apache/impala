@@ -168,4 +168,8 @@ public class LikePredicate extends Predicate {
   public Expr clone() { return new LikePredicate(this); }
 
   public Operator getOp() { return op_; }
+
+  // Return false since comparison can be expensive.
+  @Override
+  public boolean shouldConvertToCNF() { return false; }
 }
