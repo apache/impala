@@ -1,0 +1,461 @@
+====
+---- QUERY
+create table ice_compound_pred_pd (
+  col_i INT,
+  col_bi BIGINT,
+  col_db DOUBLE,
+  col_str STRING,
+  col_ts TIMESTAMP
+) partitioned by spec (col_i) stored as iceberg tblproperties ('write.format.default' = 'parquet');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into
+  ice_compound_pred_pd
+values
+  (0, NULL, 2.71820, '_1700-01-01 00:00:00', '1400-01-01 00:00:00'),
+  (1, 12345678901, NULL, 'A1700-01-01 00:00:00', '1400-01-01 01:01:01'),
+  (2, 12345678902, 2.71822, NULL, '1400-01-01 02:02:02'),
+  (3, 12345678903, 2.71823, '1700-01-01 00:00:00', '1500-01-01 00:00:00'),
+  (4, 12345678904, 2.71824, '1700-01-01 00:00:00', NULL),
+  (5, 12345678908, 2.71828, '1700-01-01 00:00:00', '1600-01-01 02:02:02'),
+  (0, NULL, 2.71820, '_1700-01-01 00:00:00', '1400-01-01 00:00:00'),
+  (1, 12345678901, NULL, 'A1700-01-01 00:00:00', '1400-01-01 01:01:01'),
+  (2, 12345678902, 2.71822, NULL, '1400-01-01 02:02:02'),
+  (3, 12345678903, 2.71823, '1700-01-01 00:00:00', '1500-01-01 00:00:00'),
+  (4, 12345678904, 2.71824, '1700-01-01 00:00:00', NULL),
+  (5, 12345678908, 2.71828, '1700-01-01 00:00:00', '1600-01-01 02:02:02'),
+  (6, NULL, 2.71820, '_1700-01-01 00:00:00', '1400-01-01 00:00:00'),
+  (7, 12345678901, NULL, 'A1700-01-01 00:00:00', '1400-01-01 01:01:01'),
+  (8, 12345678902, 2.71822, NULL, '1400-01-01 02:02:02'),
+  (9, 12345678903, 2.71823, '1700-01-01 00:00:00', '1500-01-01 00:00:00'),
+  (10, 12345678904, 2.71824, '1700-01-01 00:00:00', NULL),
+  (11, 12345678908, 2.71828, '1700-01-01 00:00:00', '1600-01-01 02:02:02');
+select count(1) from ice_compound_pred_pd;
+---- RESULTS
+18
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 12
+====
+---- QUERY
+show files in ice_compound_pred_pd;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd/data/col_i=0/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd/data/col_i=1/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd/data/col_i=10/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd/data/col_i=11/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd/data/col_i=2/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd/data/col_i=3/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd/data/col_i=4/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd/data/col_i=5/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd/data/col_i=6/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd/data/col_i=7/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd/data/col_i=8/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd/data/col_i=9/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# icebergPredicates_:
+# 0: in_list
+# 1: in_list or eq
+select
+  count(1)
+from
+  ice_compound_pred_pd
+where
+  col_str in ('1700-01-01 00:00:00')
+  and (
+    col_ts in ('1500-01-01 00:00:00')
+    or col_db = 2.71823
+  );
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+# icebergPredicates_:
+# 0: eq or in_list
+# 1: in_list
+select
+  count(1)
+from
+  ice_compound_pred_pd
+where
+  (
+    col_db = 2.71823
+    or col_ts in ('1500-01-01 00:00:00')
+  )
+  and col_str in ('1700-01-01 00:00:00');
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+# icebergPredicates_:
+# 0: eq or is_null
+# 1: not_null or eq
+select
+  count(1)
+from
+  ice_compound_pred_pd
+where
+  (
+    col_bi = 12345678902
+    or col_str is null
+  )
+  and (
+    col_ts is not null
+    or col_db = 2.71823
+  );
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+# icebergPredicates_:
+# 0: eq or in_list
+select
+  count(1)
+from
+  ice_compound_pred_pd
+where
+  (
+    col_bi != -1
+    or cast(col_str as timestamp) in ('1700-01-01 00:00:00')
+  )
+  and (
+    col_db = 2.71823
+    or col_ts in ('1500-01-01 00:00:00')
+  );
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+# icebergPredicates_:
+# 0: in_list or eq
+select
+  count(1)
+from
+  ice_compound_pred_pd
+where
+  cast(col_str as timestamp) in ('1700-01-01 00:00:00')
+  and (
+    col_ts in ('1500-01-01 00:00:00')
+    or cast(col_db as double) = 2.71823
+  );
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+# icebergPredicates_:
+select
+  count(1)
+from
+  ice_compound_pred_pd
+where
+  cast(col_str as timestamp) in ('1700-01-01 00:00:00')
+  and (
+    cast(col_db as bigint) = 2.71823
+    or col_ts in ('1500-01-01 00:00:00')
+  );
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 12
+====
+---- QUERY
+# icebergPredicates_:
+# 0: eq or in_list
+select
+  count(1)
+from
+  ice_compound_pred_pd
+where
+  col_bi = 12345678902
+  or col_db in (2.71823);
+---- RESULTS
+6
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+====
+---- QUERY
+# icebergPredicates_:
+# 0: in_list or (in_list and eq)
+select
+  count(1)
+from
+  ice_compound_pred_pd
+where
+  col_bi in (12345678902)
+  or (
+    col_ts in ('1500-01-01 00:00:00')
+    and col_db = 2.71823
+  );
+---- RESULTS
+6
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+====
+---- QUERY
+# icebergPredicates_:
+# 0: (eq and in_list) or in_list
+select
+  count(1)
+from
+  ice_compound_pred_pd
+where
+  (
+    col_db = 2.71823
+    and col_ts in ('1500-01-01 00:00:00')
+  )
+  or col_bi in (12345678902);
+---- RESULTS
+6
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+====
+---- QUERY
+# icebergPredicates_:
+# 0: (eq and in_list) or (in_list and not_null)
+select
+  count(1)
+from
+  ice_compound_pred_pd
+where
+  (
+    col_db = 1.71823 + 1
+    and col_ts in ('1500-01-01 00:00:00')
+  )
+  or (
+    col_bi in (12345678902)
+    and col_str is not null
+  );
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+# icebergPredicates_:
+select
+  count(1)
+from
+  ice_compound_pred_pd
+where
+  (
+    col_db = 2.71823
+    and cast(col_ts as string) in ('1500-01-01 00:00:00')
+  )
+  or (
+    col_bi in (12345678902)
+    and col_str is not null
+  );
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 12
+====
+---- QUERY
+# icebergPredicates_:
+select
+  count(1)
+from
+  ice_compound_pred_pd
+where
+  (
+    col_db = 1.71823 + col_db
+    and col_ts in ('1500-01-01 00:00:00')
+  )
+  or (
+    col_bi in (12345678902)
+    and col_str is not null
+  );
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 12
+====
+---- QUERY
+# icebergPredicates_:
+# 0: not(not_null)
+select
+  count(1)
+from
+  ice_compound_pred_pd
+where
+  not col_bi is not null;
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+# icebergPredicates_:
+# 0: (not(not_null)) or (eq)
+select
+  count(1)
+from
+  ice_compound_pred_pd
+where
+  not col_bi is not null
+  or col_bi = 12345678908;
+---- RESULTS
+6
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+====
+---- QUERY
+# icebergPredicates_:
+# 0: not(not_eq)
+select
+  count(1)
+from
+  ice_compound_pred_pd
+where
+  not (col_bi != 12345678901);
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+# icebergPredicates_:
+# 0: not(not_eq or eq)
+select
+  count(1)
+from
+  ice_compound_pred_pd
+where
+  not (
+    col_bi != 123
+    or col_db = 2.71822
+  );
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+====
+---- QUERY
+# icebergPredicates_:
+select
+  count(1)
+from
+  ice_compound_pred_pd
+where
+  not (
+    col_bi + 1 != 123
+    or col_db = 2.71822
+  );
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 12
+====
+---- QUERY
+# icebergPredicates_:
+# 0: is_null or (gt_eq and lt_eq)
+select
+  count(1)
+from
+  ice_compound_pred_pd
+where
+  col_bi is null
+  or col_bi between 12345678901
+  and 12345678902;
+---- RESULTS
+9
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 6
+====
+---- QUERY
+create table ice_compound_pred_pd1 (
+  col_i INT,
+  col_bi_0 BIGINT,
+  col_bi_1 BIGINT,
+  col_bi_2 BIGINT,
+  col_bi_3 BIGINT,
+  col_bi_4 BIGINT,
+  col_bi_5 BIGINT,
+  col_bi_6 BIGINT,
+  col_bi_7 BIGINT,
+  col_bi_8 BIGINT,
+  col_bi_9 BIGINT
+) partitioned by spec (col_i) stored as iceberg tblproperties ('write.format.default' = 'parquet');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into
+  ice_compound_pred_pd1
+values
+  (0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
+  (1, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19),
+  (2, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29),
+  (3, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39),
+  (4, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49),
+  (5, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59),
+  (6, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69),
+  (7, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79),
+  (8, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89),
+  (9, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99);
+select count(1) from ice_compound_pred_pd1;
+---- RESULTS
+10
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 10
+====
+---- QUERY
+show files in ice_compound_pred_pd1;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd1/data/col_i=0/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd1/data/col_i=1/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd1/data/col_i=2/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd1/data/col_i=3/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd1/data/col_i=4/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd1/data/col_i=5/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd1/data/col_i=6/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd1/data/col_i=7/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd1/data/col_i=8/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_compound_pred_pd1/data/col_i=9/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+select
+  count(1)
+from
+  ice_compound_pred_pd1
+where
+  col_bi_0 = 0
+  or col_bi_1 is null
+  or not(
+    col_bi_2 < 22
+    or col_bi_2 > 22
+  )
+  or col_bi_3 is null
+  or col_bi_4 = 44
+  or col_bi_5 is null
+  or col_bi_6 = 66
+  or col_bi_7 is null
+  or col_bi_8 = 88
+  or col_bi_9 is null;
+---- RESULTS
+5
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 5
+====

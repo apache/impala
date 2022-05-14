@@ -17,6 +17,14 @@
 
 package org.apache.impala.util;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
+import com.google.common.hash.Hasher;
+import com.google.common.hash.Hashing;
+import com.google.common.primitives.Ints;
+import com.google.common.primitives.Longs;
+import com.google.flatbuffers.FlatBufferBuilder;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Instant;
@@ -32,36 +40,20 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
-import com.google.common.hash.Hasher;
-import com.google.common.hash.Hashing;
-import com.google.common.primitives.Ints;
-import com.google.common.primitives.Longs;
-import com.google.flatbuffers.FlatBufferBuilder;
-
-import org.apache.impala.common.Pair;
-import org.apache.impala.fb.FbFileMetadata;
-import org.apache.impala.fb.FbIcebergDataFileFormat;
-import org.apache.impala.fb.FbIcebergMetadata;
-import org.apache.impala.fb.FbIcebergPartitionTransformValue;
-import org.apache.impala.fb.FbIcebergTransformType;
-import org.apache.iceberg.Transaction;
-import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.FileScanTask;
-import org.apache.iceberg.TableScan;
-import org.apache.iceberg.expressions.UnboundPredicate;
-import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.StructLike;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableScan;
+import org.apache.iceberg.Transaction;
+import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.expressions.Expression;
+import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.mr.Catalogs;
 import org.apache.iceberg.transforms.PartitionSpecVisitor;
 import org.apache.iceberg.types.Conversions;
@@ -77,12 +69,18 @@ import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.iceberg.IcebergCatalog;
+import org.apache.impala.catalog.iceberg.IcebergCatalogs;
 import org.apache.impala.catalog.iceberg.IcebergHadoopCatalog;
 import org.apache.impala.catalog.iceberg.IcebergHadoopTables;
 import org.apache.impala.catalog.iceberg.IcebergHiveCatalog;
-import org.apache.impala.catalog.iceberg.IcebergCatalog;
-import org.apache.impala.catalog.iceberg.IcebergCatalogs;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.Pair;
+import org.apache.impala.fb.FbFileMetadata;
+import org.apache.impala.fb.FbIcebergDataFileFormat;
+import org.apache.impala.fb.FbIcebergMetadata;
+import org.apache.impala.fb.FbIcebergPartitionTransformValue;
+import org.apache.impala.fb.FbIcebergTransformType;
 import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.THdfsCompression;
 import org.apache.impala.thrift.THdfsFileFormat;
@@ -523,17 +521,17 @@ public class IcebergUtil {
    * DataFiles in the first element.
    */
   public static Pair<List<DataFile>, Boolean> getIcebergDataFiles(FeIcebergTable table,
-      List<UnboundPredicate> predicates, TimeTravelSpec timeTravelSpec)
+      List<Expression> predicates, TimeTravelSpec timeTravelSpec)
         throws TableLoadingException {
     if (table.snapshotId() == -1) return new Pair<>(Collections.emptyList(), false);
 
     TableScan scan = createScanAsOf(table, timeTravelSpec);
-    for (UnboundPredicate predicate : predicates) {
+    for (Expression predicate : predicates) {
       scan = scan.filter(predicate);
     }
 
     List<DataFile> dataFileList = new ArrayList<>();
-    Boolean hasDeleteFile = false;
+    boolean hasDeleteFile = false;
     try (CloseableIterable<FileScanTask> fileScanTasks = scan.planFiles()) {
       for (FileScanTask task : fileScanTasks) {
         if (!task.deletes().isEmpty()) {

@@ -26,6 +26,7 @@ import java.util.List;
 import org.apache.hadoop.fs.Path;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.expressions.Expression;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.expressions.Expression.Operation;
 import org.apache.iceberg.expressions.UnboundPredicate;
@@ -33,6 +34,7 @@ import org.apache.iceberg.types.Types;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BoolLiteral;
+import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.DateLiteral;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.InPredicate;
@@ -76,8 +78,8 @@ public class IcebergScanNode extends HdfsScanNode {
 
   private final FeIcebergTable icebergTable_;
 
-  // Exprs in icebergConjuncts_ converted to UnboundPredicate.
-  private final List<UnboundPredicate> icebergPredicates_ = new ArrayList<>();
+  // Exprs in icebergConjuncts_ converted to Expression.
+  private final List<Expression> icebergPredicates_ = new ArrayList<>();
 
   private TimeTravelSpec timeTravelSpec_;
 
@@ -209,86 +211,161 @@ public class IcebergScanNode extends HdfsScanNode {
   }
 
   /**
+   * Returns Iceberg operator by CompoundPredicate operator, or null if the operation
+   * is not supported by Iceberg.
+   */
+  private Operation getIcebergOperator(CompoundPredicate.Operator op) {
+    switch (op) {
+      case AND: return Operation.AND;
+      case OR: return Operation.OR;
+      case NOT: return Operation.NOT;
+      default: return null;
+    }
+  }
+
+  /**
    * Transform impala predicate to iceberg predicate
    */
   private void tryConvertIcebergPredicate(Analyzer analyzer, Expr expr)
       throws ImpalaException {
-    if (expr instanceof BinaryPredicate) {
-      convertIcebergPredicate(analyzer, (BinaryPredicate) expr);
-    } else if (expr instanceof InPredicate) {
-      convertIcebergPredicate(analyzer, (InPredicate) expr);
-    } else if (expr instanceof IsNullPredicate) {
-      convertIcebergPredicate((IsNullPredicate) expr);
+    Expression predicate = convertIcebergPredicate(analyzer, expr);
+    if (predicate != null) {
+      icebergPredicates_.add(predicate);
+      LOG.debug("Push down the predicate: " + predicate + " to iceberg");
     }
   }
 
-  private void convertIcebergPredicate(Analyzer analyzer, BinaryPredicate predicate)
+  private Expression convertIcebergPredicate(Analyzer analyzer, Expr expr)
       throws ImpalaException {
+    if (expr instanceof BinaryPredicate) {
+      return convertIcebergPredicate(analyzer, (BinaryPredicate) expr);
+    } else if (expr instanceof InPredicate) {
+      return convertIcebergPredicate(analyzer, (InPredicate) expr);
+    } else if (expr instanceof IsNullPredicate) {
+      return convertIcebergPredicate((IsNullPredicate) expr);
+    } else if (expr instanceof CompoundPredicate) {
+      return convertIcebergPredicate(analyzer, (CompoundPredicate) expr);
+    } else {
+      return null;
+    }
+  }
+
+  private UnboundPredicate<Object> convertIcebergPredicate(Analyzer analyzer,
+      BinaryPredicate predicate) throws ImpalaException {
     Operation op = getIcebergOperator(predicate.getOp());
-    if (op == null) return;
+    if (op == null) {
+      return null;
+    }
 
     // Do not convert if there is an implicit cast
-    if (!(predicate.getChild(0) instanceof SlotRef)) return;
+    if (!(predicate.getChild(0) instanceof SlotRef)) {
+      return null;
+    }
     SlotRef ref = (SlotRef) predicate.getChild(0);
 
-    if (!(predicate.getChild(1) instanceof LiteralExpr)) return;
+    if (!(predicate.getChild(1) instanceof LiteralExpr)) {
+      return null;
+    }
     LiteralExpr literal = (LiteralExpr) predicate.getChild(1);
 
     // If predicate contains map/struct, this column would be null
     Column col = ref.getDesc().getColumn();
-    if (col == null) return;
+    if (col == null) {
+      return null;
+    }
 
     Object value = getIcebergValue(analyzer, ref, literal);
-    if (value == null) return;
+    if (value == null) {
+      return null;
+    }
 
-    icebergPredicates_.add(Expressions.predicate(op, col.getName(), value));
+    return Expressions.predicate(op, col.getName(), value);
   }
 
-  private void convertIcebergPredicate(Analyzer analyzer, InPredicate predicate)
-      throws ImpalaException {
+  private UnboundPredicate<Object> convertIcebergPredicate(Analyzer analyzer,
+      InPredicate predicate) throws ImpalaException {
     // TODO: convert NOT_IN predicate
-    if (predicate.isNotIn()) return;
+    if (predicate.isNotIn()) {
+      return null;
+    }
 
     // Do not convert if there is an implicit cast
-    if (!(predicate.getChild(0) instanceof SlotRef)) return;
+    if (!(predicate.getChild(0) instanceof SlotRef)) {
+      return null;
+    }
     SlotRef ref = (SlotRef) predicate.getChild(0);
 
     // If predicate contains map/struct, this column would be null
     Column col = ref.getDesc().getColumn();
-    if (col == null) return;
+    if (col == null) {
+      return null;
+    }
 
     // Expressions takes a list of values as Objects
     List<Object> values = new ArrayList<>();
     for (int i = 1; i < predicate.getChildren().size(); ++i) {
-      if (!Expr.IS_LITERAL.apply(predicate.getChild(i))) return;
+      if (!Expr.IS_LITERAL.apply(predicate.getChild(i))) {
+        return null;
+      }
       LiteralExpr literal = (LiteralExpr) predicate.getChild(i);
 
       // Cannot push IN or NOT_IN predicate with null literal values
-      if (Expr.IS_NULL_LITERAL.apply(literal)) return;
+      if (Expr.IS_NULL_LITERAL.apply(literal)) {
+        return null;
+      }
 
       Object value = getIcebergValue(analyzer, ref, literal);
-      if (value == null) return;
+      if (value == null) {
+        return null;
+      }
 
       values.add(value);
     }
 
-    icebergPredicates_.add(Expressions.in(col.getName(), values));
+    return Expressions.in(col.getName(), values);
   }
 
-  private void convertIcebergPredicate(IsNullPredicate predicate) {
+  private UnboundPredicate<Object> convertIcebergPredicate(IsNullPredicate predicate) {
     // Do not convert if there is an implicit cast
-    if (!(predicate.getChild(0) instanceof SlotRef)) return;
+    if (!(predicate.getChild(0) instanceof SlotRef)) {
+      return null;
+    }
     SlotRef ref = (SlotRef) predicate.getChild(0);
 
     // If predicate contains map/struct, this column would be null
     Column col = ref.getDesc().getColumn();
-    if (col == null) return;
+    if (col == null) {
+      return null;
+    }
 
     if (predicate.isNotNull()) {
-      icebergPredicates_.add(Expressions.notNull(col.getName()));
+      return Expressions.notNull(col.getName());
     } else{
-      icebergPredicates_.add(Expressions.isNull(col.getName()));
+      return Expressions.isNull(col.getName());
     }
+  }
+
+  private Expression convertIcebergPredicate(Analyzer analyzer,
+      CompoundPredicate predicate) throws ImpalaException {
+    Operation op = getIcebergOperator(predicate.getOp());
+    if (op == null) {
+      return null;
+    }
+
+    Expression left = convertIcebergPredicate(analyzer, predicate.getChild(0));
+    if (left == null) {
+      return null;
+    }
+    if (op.equals(Operation.NOT)) {
+      return Expressions.not(left);
+    }
+
+    Expression right = convertIcebergPredicate(analyzer, predicate.getChild(1));
+    if (right == null) {
+      return null;
+    }
+    return op.equals(Operation.AND) ? Expressions.and(left, right)
+        : Expressions.or(left, right);
   }
 
   private Object getIcebergValue(Analyzer analyzer, SlotRef ref, LiteralExpr literal)

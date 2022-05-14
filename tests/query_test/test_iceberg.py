@@ -613,12 +613,14 @@ class TestIcebergTable(ImpalaTestSuite):
         split_stats = collect_split_stats(profile)
         assert ref_split_stats == split_stats
 
-  @pytest.mark.execute_serially
   def test_in_predicate_push_down(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-in-predicate-push-down', vector,
                        use_db=unique_database)
 
-  @pytest.mark.execute_serially
   def test_is_null_predicate_push_down(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-is-null-predicate-push-down', vector,
                        use_db=unique_database)
+
+  def test_compound_predicate_push_down(self, vector, unique_database):
+      self.run_test_case('QueryTest/iceberg-compound-predicate-push-down', vector,
+                         use_db=unique_database)
