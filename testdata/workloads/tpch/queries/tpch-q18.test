@@ -97,4 +97,6 @@ limit 100
 'Customer#000088703',88703,2995076,'1994-01-30',363812.12,302.00
 ---- TYPES
 STRING, BIGINT, BIGINT, STRING, DECIMAL, DECIMAL
+---- RUNTIME_PROFILE
+!row_regex: .*CollectionItemsRead: [^0].*
 ====

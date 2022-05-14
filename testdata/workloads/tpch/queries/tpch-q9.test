@@ -210,4 +210,6 @@ order by
 'VIETNAM',1992,47846355.6485
 ---- TYPES
 STRING, INT, DECIMAL
+---- RUNTIME_PROFILE
+!row_regex: .*CollectionItemsRead: [^0].*
 ====

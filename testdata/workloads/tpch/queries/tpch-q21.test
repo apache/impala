@@ -144,4 +144,6 @@ limit 100
 'Supplier#000002483',12
 ---- TYPES
 string, bigint
+---- RUNTIME_PROFILE
+!row_regex: .*CollectionItemsRead: [^0].*
 ====

@@ -33,4 +33,6 @@ order by
 'JAPAN',45410175.6954
 ---- TYPES
 string, decimal
+---- RUNTIME_PROFILE
+!row_regex: .*CollectionItemsRead: [^0].*
 ====

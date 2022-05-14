@@ -1085,4 +1085,6 @@ order by
 5182,7874521.73
 ---- TYPES
 BIGINT, decimal
+---- RUNTIME_PROFILE
+!row_regex: .*CollectionItemsRead: [^0].*
 ====

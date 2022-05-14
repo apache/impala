@@ -15,6 +15,10 @@ select id, a.item from complextypestbl t, t.int_array a
 8,-1
 ---- TYPES
 bigint,int
+---- RUNTIME_PROFILE
+row_regex: .*CollectionItemsRead: 5 \(5\).*
+row_regex: .*CollectionItemsRead: 1 \(1\).*
+row_regex: .*CollectionItemsRead: 9 \(9\).*
 ====
 ---- QUERY
 -- Materialize array (for now, may be optimized away someday)
@@ -32,6 +36,10 @@ NULL
 -1
 ---- TYPES
 int
+---- RUNTIME_PROFILE
+row_regex: .*CollectionItemsRead: 5 \(5\).*
+row_regex: .*CollectionItemsRead: 1 \(1\).*
+row_regex: .*CollectionItemsRead: 9 \(9\).*
 ====
 ---- QUERY
 -- Materialize scalar and array

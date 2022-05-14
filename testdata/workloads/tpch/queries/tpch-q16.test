@@ -18348,4 +18348,6 @@ order by
 'Brand#55','STANDARD PLATED TIN',49,3
 ---- TYPES
 STRING, STRING, INT, BIGINT
+---- RUNTIME_PROFILE
+!row_regex: .*CollectionItemsRead: [^0].*
 ====

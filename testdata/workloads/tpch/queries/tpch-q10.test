@@ -59,4 +59,6 @@ limit 20
 23431,'Customer#000023431',554269.5360,3381.86,'ROMANIA','HgiV0phqhaIa9aydNoIlb','29-915-458-2654','nusual, even instructions: furiously stealthy n'
 ---- TYPES
 bigint, string, decimal, decimal, string, string, string, string
+---- RUNTIME_PROFILE
+!row_regex: .*CollectionItemsRead: [^0].*
 ====
