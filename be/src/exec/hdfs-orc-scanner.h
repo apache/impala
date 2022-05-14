@@ -299,7 +299,7 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   /// used to reduce the frequency of updating HdfsScanNode counter. It is updated by the
   /// callees of AssembleRows() and is merged into the HdfsScanNode counter at the end of
   /// AssembleRows() and then is reset to 0.
-  int64_t coll_items_read_counter_;
+  int64_t coll_items_read_counter_ = 0;
 
   const char *filename() const { return metadata_range_->file(); }
 

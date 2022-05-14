@@ -226,4 +226,6 @@ order by
 'Supplier#000009974','7wJ,J5DKcxSU4Kp1cQLpbcAvB5AsvKT'
 ---- TYPES
 string, string
+---- RUNTIME_PROFILE
+!row_regex: .*CollectionItemsRead: [^0].*
 ====

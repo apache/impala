@@ -66,4 +66,6 @@ order by
 39,1
 ---- TYPES
 BIGINT, BIGINT
+---- RUNTIME_PROFILE
+!row_regex: .*CollectionItemsRead: [^0].*
 ====

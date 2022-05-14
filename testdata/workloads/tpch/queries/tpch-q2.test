@@ -148,4 +148,6 @@ limit 100
 7843.52,'Supplier#000006683','FRANCE',11680,'Manufacturer#4','2Z0JGkiv01Y00oCFwUGfviIbhzCdy','16-464-517-8943',' express, final pinto beans x-ray slyly asymptotes. unusual, unusual'
 ---- TYPES
 DECIMAL, STRING, STRING, BIGINT, STRING, STRING, STRING, STRING
+---- RUNTIME_PROFILE
+!row_regex: .*CollectionItemsRead: [^0].*
 ====

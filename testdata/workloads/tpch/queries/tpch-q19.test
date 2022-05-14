@@ -40,4 +40,6 @@ where
 3083843.0578
 ---- TYPES
 decimal
+---- RUNTIME_PROFILE
+!row_regex: .*CollectionItemsRead: [^0].*
 ====

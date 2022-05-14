@@ -46,4 +46,6 @@ order by
 'GERMANY','FRANCE',1996,52520549.0224
 ---- TYPES
 STRING, STRING, INT, DECIMAL
+---- RUNTIME_PROFILE
+!row_regex: .*CollectionItemsRead: [^0].*
 ====

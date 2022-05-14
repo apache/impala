@@ -39,4 +39,6 @@ limit 10
 2300070,367371.1452,'1995-03-13',0
 ---- TYPES
 BIGINT, DECIMAL, STRING, INT
+---- RUNTIME_PROFILE
+!row_regex: .*CollectionItemsRead: [^0].*
 ====

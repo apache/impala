@@ -43,4 +43,6 @@ order by
 1996,0.041486
 ---- TYPES
 int, decimal
+---- RUNTIME_PROFILE
+!row_regex: .*CollectionItemsRead: [^0].*
 ====

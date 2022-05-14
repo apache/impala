@@ -30,4 +30,6 @@ order by
 '5-LOW',10487
 ---- TYPES
 string, bigint
+---- RUNTIME_PROFILE
+!row_regex: .*CollectionItemsRead: [^0].*
 ====

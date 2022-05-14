@@ -29,4 +29,6 @@ order by
 'R','F',37719753.00,56568041380.90,53741292684.6040,55889619119.831932,25.505794,38250.854626,0.050009,1478870
 ---- TYPES
 string, string, decimal, decimal, decimal, decimal, decimal, decimal, decimal, bigint
+---- RUNTIME_PROFILE
+!row_regex: .*CollectionItemsRead: [^0].*
 ====

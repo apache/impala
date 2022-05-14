@@ -45,4 +45,6 @@ order by
 '31',922,6806670.18
 ---- TYPES
 string, bigint, decimal
+---- RUNTIME_PROFILE
+!row_regex: .*CollectionItemsRead: [^0].*
 ====

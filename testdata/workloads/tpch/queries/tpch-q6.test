@@ -14,4 +14,6 @@ where
 123141078.2283
 ---- TYPES
 decimal
+---- RUNTIME_PROFILE
+!row_regex: .*CollectionItemsRead: [^0].*
 ====

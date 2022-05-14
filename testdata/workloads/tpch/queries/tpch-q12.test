@@ -34,4 +34,6 @@ order by
 'SHIP',6200,9262
 ---- TYPES
 string, bigint, bigint
+---- RUNTIME_PROFILE
+!row_regex: .*CollectionItemsRead: [^0].*
 ====
