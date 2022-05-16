@@ -22,7 +22,9 @@
 #include <gtest/gtest.h>
 
 #include "client/linux/handler/minidump_descriptor.h"
+#include "common/init.h"
 #include "common/thread-debug-info.h"
+#include "util/test-info.h"
 
 namespace impala {
 
@@ -44,10 +46,12 @@ TEST(Minidump, DumpCallback) {
   for (std::string output : {stdout, stderr}) {
     std::vector<std::string> lines;
     boost::split(lines, output, boost::is_any_of("\n\r"), boost::token_compress_on);
-    EXPECT_EQ(3, lines.size());
-    EXPECT_EQ("Minidump with no thread info available.", lines[0]);
-    EXPECT_TRUE(boost::regex_match(lines[1], wrote_minidump));
-    EXPECT_EQ("", lines[2]);
+    EXPECT_EQ(3, lines.size()) << output;
+    EXPECT_EQ("Minidump with no thread info available.", lines[0])
+        << lines[0] << "\nOutput:\n" << output;
+    EXPECT_TRUE(boost::regex_match(lines[1], wrote_minidump))
+        << lines[1] << "\nOutput:\n" << output;
+    EXPECT_EQ("", lines[2]) << output;
   }
 }
 
@@ -73,11 +77,19 @@ TEST(Minidump, DumpCallbackWithThread) {
   for (std::string output : {stdout, stderr}) {
     std::vector<std::string> lines;
     boost::split(lines, output, boost::is_any_of("\n\r"), boost::token_compress_on);
-    EXPECT_EQ(3, lines.size());
-    EXPECT_TRUE(boost::regex_match(lines[0], minidump_in_thread));
-    EXPECT_TRUE(boost::regex_match(lines[1], wrote_minidump));
-    EXPECT_EQ("", lines[2]);
+    EXPECT_EQ(3, lines.size()) << output;
+    EXPECT_TRUE(boost::regex_match(lines[0], minidump_in_thread))
+        << lines[0] << "\nOutput:\n" << output;
+    EXPECT_TRUE(boost::regex_match(lines[1], wrote_minidump))
+        << lines[1] << "\nOutput:\n" << output;
+    EXPECT_EQ("", lines[2]) << output;
   }
 }
 
 } // namespace impala
+
+int main(int argc, char **argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  impala::InitCommonRuntime(argc, argv, /*init_jvm*/ false, impala::TestInfo::BE_TEST);
+  return RUN_ALL_TESTS();
+}
