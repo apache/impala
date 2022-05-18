@@ -270,7 +270,8 @@ public class BinaryPredicate extends Predicate {
       if (op_ == Operator.DISTINCT_FROM && rChildIsNull) {
         selectivity_ = 1.0;
       } else {
-        selectivity_ = 1.0 - 1.0 / distinctValues;
+        // avoid 0.0 selectivity if ndv == 1 (IMPALA-11301).
+        selectivity_ = distinctValues == 1 ? 0.5 : (1.0 - 1.0 / distinctValues);
       }
     } else {
       return;

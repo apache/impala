@@ -101,6 +101,10 @@ public class CardinalityTest extends PlannerTestBase {
         "SELECT COUNT(*) FROM functional.alltypes GROUP BY id", 7300);
     verifyCardinality(
         "SELECT COUNT(*) FROM functional.alltypes GROUP BY bool_col", 2);
+
+    // Regression test for IMPALA-11301.
+    verifyCardinality(
+        "SELECT * FROM tpcds_parquet.date_dim WHERE d_current_day != 'a'", 36525);
   }
 
   /**
@@ -396,6 +400,12 @@ public class CardinalityTest extends PlannerTestBase {
     verifyApproxCardinality("SELECT SUM(int_col) OVER() int_col "
         + "FROM functional_parquet.alltypestiny", 742, true,
         ImmutableSet.of(), path, AnalyticEvalNode.class);
+
+    // Regression test for IMPALA-11301. row_number() is (incorrectly) assumed to have
+    // NDV=1, which was leading to selectivity=0.0 in rn != 5. Will break if someone
+    // implements correct ndv estimates for analytic functions.
+    verifyCardinality("SELECT * FROM (SELECT *, row_number() OVER(order by id) "
+        + "as rn FROM functional.alltypestiny) v where rn != 5", 4);
   }
 
   @Test
