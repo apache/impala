@@ -1,0 +1,62 @@
+<html>
+<head>
+<title>Impala 4.1 Release Notes</title>
+</head>
+<body>
+<h1>Impala 4.1 Release Notes</h1>
+
+<h2>New Features</h2>
+<ul>
+  <li>Documentation on Iceberg support has been created, Apache Impala has been added to the list of query engines that support Apache Iceberg.<br>
+    Apache Iceberg support includes:
+    <ul>
+      <li>Reading/writing Iceberg V1 tables:</li>
+      <ul>
+        <li>(write support is only available for Iceberg tables with Parquet data files)</li>
+        <li>(V2 tables are also readable if they don’t contain delete delta files)</li>
+        <li>(AVRO and mixed file format tables are not yet supported)</li>
+      </ul>
+      <li>Support for all partition transforms with unified syntax with Hive</li>
+      <li>Partition evolution</li>
+      <li>Schema evolution</li>
+      <li>Time travel function is available with FOR SYSTEM_TIME AS OF and FOR SYSTEM_VERSION AS OF clauses for Iceberg tables. FOR SYSTEM_TIME AS OF conforms to the SQL2011 standard (<a href="https://issues.apache.org/jira/browse/IMPALA-10840">IMPALA-10840</a>).</li>
+    </ul>
+  </li>
+  <li>Hive compatible UTF-8 support in string functions. Turned on by setting the query option UTF8_MODE=true (<a href="https://issues.apache.org/jira/browse/IMPALA-2019">IMPALA-2019</a>).</li>
+  <li>Complex types enhancements:
+  <ul>
+    <li>Allow arrays in the select list (<a href="https://issues.apache.org/jira/browse/IMPALA-9497">IMPALA-9497</a>, <a href="https://issues.apache.org/jira/browse/IMPALA-9498">IMPALA-9498</a>).</li>
+    <li>Allow structs in the select list for ORC files (<a href="https://issues.apache.org/jira/browse/IMPALA-9495">IMPALA-9495</a>).</li>
+    <li>Zipping unnest for arrays (<a href="https://issues.apache.org/jira/browse/IMPALA-10920">IMPALA-10920</a>, <a href="https://issues.apache.org/jira/browse/IMPALA-11038">IMPALA-11038</a>).</li>
+  </ul>
+  </li>
+  <li>Support ALTER TABLE UNSET TBLPROPERTIES/SERDEPROPERTIES (<a href="https://issues.apache.org/jira/browse/IMPALA-5569">IMPALA-5569</a>).</li>
+  <li>Support reading/writing Parquet Bloom filters for the most common types (<a href="https://issues.apache.org/jira/browse/IMPALA-10640">IMPALA-10640</a>, <a href="https://issues.apache.org/jira/browse/IMPALA-10642">IMPALA-10642</a>).</li>
+</ul>
+
+<h2>Improvements</h2>
+<ul>
+  <li>Several improvements in scanning ORC tables:
+    <ul>
+      <li>Async IO in ORC scanner (<a href="https://issues.apache.org/jira/browse/IMPALA-6636">IMPALA-6636</a>).</li>
+      <li>Predicate pushdown into the ORC lib (<a href="https://issues.apache.org/jira/browse/IMPALA-6505">IMPALA-6505</a>, <a href="https://issues.apache.org/jira/browse/IMPALA-10873">IMPALA-10873</a>).</li>
+      <li>Runtime IN-list filters for ORC tables (<a href="https://issues.apache.org/jira/browse/IMPALA-10898">IMPALA-10898</a>).</li>
+      <li>Optimize count(star) for ORC scans (<a href="https://issues.apache.org/jira/browse/IMPALA-11123">IMPALA-11123</a>).</li>
+    </ul>
+    See more in the Epic <a href="https://issues.apache.org/jira/browse/IMPALA-9040">IMPALA-9040</a> (login to see all jiras linked to it).
+  </li>
+  <li>​​Reducing HashTable size by packing its buckets efficiently (<a href="https://issues.apache.org/jira/browse/IMPALA-7635">IMPALA-7635</a>).</li>
+  <li>​​Avoid materialization of columns for filtered out rows in Parquet tables (<a href="https://issues.apache.org/jira/browse/IMPALA-9873">IMPALA-9873</a>).</li>
+  <li>​​Improve TimestampValue to String casting (<a href="https://issues.apache.org/jira/browse/IMPALA-10984">IMPALA-10984</a>).</li>
+  <li>​​ACID lock timeouts are now configurable (<a href="https://issues.apache.org/jira/browse/IMPALA-11153">IMPALA-11153</a>).</li>
+  <li>Implementing adaptive 3-way quicksort in sorter. Improves quicksort performance when there is a large number of duplicates (<a href="https://issues.apache.org/jira/browse/IMPALA-10961">IMPALA-10961</a>).</li>
+  <li>Fine grained table refreshing in catalogd at partition level for transactional tables (<a href="https://issues.apache.org/jira/browse/IMPALA-10923">IMPALA-10923</a>).</li>
+  <li>Improve metadata consistency and self events detection in catalogd (<a href="https://issues.apache.org/jira/browse/IMPALA-10925">IMPALA-10925</a>).</li>
+  <li>Skip file metadata reloading in processing AlterPartition events in EventProcessor in catalogd (<a href="https://issues.apache.org/jira/browse/IMPALA-11050">IMPALA-11050</a>).</li>
+</ul>
+
+<h2>Fixed Issues</h2>
+<p>See <a href="./changelog-4.1.html">change log</a></p>
+
+</body>
+</html>
