@@ -235,7 +235,7 @@ CREATE TABLE ice_ctas_part_spec PARTITIONED BY SPEC (truncate(3, s)) STORED AS I
 
       <p>
         You can get information about the supported Iceberg data tyeps in
-        <xref href="https://iceberg.apache.org/#spec/%23schemas-and-data-types" scope="external" format="html">
+        <xref href="https://iceberg.apache.org/docs/latest/schemas/" scope="external" format="html">
           the Iceberg spec</xref>.
       </p>
 
@@ -352,7 +352,7 @@ CREATE TABLE ice_ctas_part_spec PARTITIONED BY SPEC (truncate(3, s)) STORED AS I
       </p>
       <p>
         See
-        <xref href="https://iceberg.apache.org/#spec/%23schema-evolution" scope="external" format="html">
+        <xref href="https://iceberg.apache.org/docs/latest/evolution/#schema-evolution" scope="external" format="html">
         schema evolution </xref> for more details.
       </p>
     </conbody>
@@ -362,7 +362,7 @@ CREATE TABLE ice_ctas_part_spec PARTITIONED BY SPEC (truncate(3, s)) STORED AS I
     <title>Partitioning Iceberg tables</title>
     <conbody>
       <p>
-        <xref href="https://iceberg.apache.org/#spec/%23partitioning" scope="external" format="html">
+        <xref href="https://iceberg.apache.org/docs/latest/partitioning/" scope="external" format="html">
         The Iceberg spec </xref> has information about partitioning Iceberg tables. With Iceberg,
         we are not limited to value-based partitioning, we can also partition our tables via
         several partition transforms.
@@ -379,7 +379,7 @@ STORED AS ICEBERG;
       </p>
       <p>
         Iceberg also supports
-        <xref href="https://iceberg.apache.org/#spec/%23partition-evolution" scope="external" format="html">
+        <xref href="https://iceberg.apache.org/docs/latest/evolution/#partition-evolution" scope="external" format="html">
         partition evolution</xref> which means that the partitioning of a table can be changed, even
         without the need of rewriting existing data files. You can change an existing table's
         partitioning via an <codeph>ALTER TABLE SET PARTITION SPEC</codeph> statement, e.g.:
