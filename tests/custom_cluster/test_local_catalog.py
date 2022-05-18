@@ -273,8 +273,9 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
           q = random.choice(queries)
           attempt += 1
           try:
+            print 'Attempt', attempt, 'client', str(client)
             ret = self.execute_query_unchecked(client, q)
-          except Exception, e:
+          except Exception as e:
             if 'InconsistentMetadataFetchException' in str(e):
               with inconsistent_seen_lock:
                 inconsistent_seen[0] += 1
@@ -287,7 +288,8 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
         t.start()
       for t in threads:
         # When there are failures, they're observed quickly.
-        t.join(30)
+        # 600s is enough for 200 attempts.
+        t.join(600)
 
       assert failed_queries.empty(),\
           "Failed query count non zero: %s" % list(failed_queries.queue)
@@ -318,7 +320,8 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args="--use_local_catalog=true --local_catalog_max_fetch_retries=0",
+      impalad_args="--use_local_catalog=true --local_catalog_max_fetch_retries=0"
+                   " --inject_latency_before_catalog_fetch_ms=500",
       catalogd_args="--catalog_topic_mode=minimal")
   def test_replan_limit(self):
     """
@@ -326,7 +329,8 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
     an inconsistent metadata exception when running concurrent reads/writes
     is seen. With the max retries set to 0, no retries are expected and with
     the concurrent read/write workload, an inconsistent metadata exception is
-    expected.
+    expected. Setting inject_latency_before_catalog_fetch_ms to increases the
+    possibility of a stale request which throws the expected exception.
     """
     queries = [
       'refresh functional.alltypes',
