@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2021" />
-<meta name="DC.rights.owner" content="(C) Copyright 2021" />
+<meta name="copyright" content="(C) Copyright 2022" />
+<meta name="DC.rights.owner" content="(C) Copyright 2022" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="STRING Data Type" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html" />
@@ -163,9 +163,7 @@
 
 
     <ul class="ul">
-      <li class="li">
-        String manipulation functions.
-      </li>
+      <li class="li">CHAR/VARCHAR truncating/padding.</li>
 
 
       <li class="li">
@@ -192,6 +190,9 @@
       those national language characteristics of string data, use logic on the
       application side.
     </p>
+
+    <p class="p">If you just need Hive-compatible string function behaviors on UTF-8 encoded strings, turn on
+      the query option UTF8_MODE. See more in <a class="xref" href="impala_utf_8.html">UTF-8 Support</a>.</p>
 
     <p class="p">
       <strong class="ph b">Conversions:</strong>

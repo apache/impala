@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2021" />
-<meta name="DC.rights.owner" content="(C) Copyright 2021" />
+<meta name="copyright" content="(C) Copyright 2022" />
+<meta name="DC.rights.owner" content="(C) Copyright 2022" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Scalability Considerations for Impala" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_scaling_limits.html" />
@@ -289,6 +289,80 @@
             the interval longer between heartbeat messages.
             <p class="p">
               <strong class="ph b">Default:</strong> 1000 (one heartbeat message every second)
+            </p>
+
+          </dd>
+
+
+        
+
+        
+
+          <dt class="dt dlterm" id="statestore_scalability__statestore_heartbeat_tcp_timeout_seconds">
+            <code class="ph codeph">-statestore_heartbeat_tcp_timeout_seconds</code>
+          </dt>
+
+
+          <dd class="dd">
+            The time after which a heartbeat RPC to a subscriber will timeout. This setting
+            protects against badly hung machines that are not able to respond to the heartbeat
+            RPC in short order. Increase this if there are intermittent heartbeat RPC timeouts
+            shown in statestore's log. You can reference the max value of
+            "statestore.priority-topic-update-durations" metric on statestore to get a
+            reasonable value. Note that priority topic updates are assumed to be small amounts
+            of data that take a small amount of time to process (similar to the heartbeat
+            complexity).
+            <p class="p">
+              <strong class="ph b">Default:</strong> 3
+            </p>
+
+          </dd>
+
+
+        
+
+        
+
+          <dt class="dt dlterm" id="statestore_scalability__statestore_max_missed_heartbeats">
+            <code class="ph codeph">-statestore_max_missed_heartbeats</code>
+          </dt>
+
+
+          <dd class="dd">
+            Maximum number of consecutive heartbeat messages an impalad can miss before being
+            declared failed by the statestore. You should not typically need to change this
+            value.
+            <p class="p">
+              <strong class="ph b">Default:</strong> 10
+            </p>
+
+          </dd>
+
+
+        
+
+        
+
+          <dt class="dt dlterm" id="statestore_scalability__statestore_subscriber_timeout_secs">
+            <code class="ph codeph">-statestore_subscriber_timeout_secs</code>
+          </dt>
+
+
+          <dd class="dd">
+            The amount of time (in seconds) that may elapse before the connection with the
+            statestore is considered lost by subscribers (impalad/catalogd). Impalad will
+            reregister itself to statestore, which may cause its absence in the next round of
+            cluster membership update. This will cause query failures like "Cancelled due to
+            unreachable impalad(s)". The value of this flag should be comparable to
+            <code class="ph codeph">
+            (statestore_heartbeat_frequency_ms / 1000 + statestore_heartbeat_tcp_timeout_seconds)
+            * statestore_max_missed_heartbeats</code>,
+            so subscribers won't reregister themselves too early and allow statestore to
+            resend heartbeats. You can also reference the max value of
+            "statestore-subscriber.heartbeat-interval-time" metrics on impalads to get a
+            reasonable value.
+            <p class="p">
+              <strong class="ph b">Default:</strong> 30
             </p>
 
           </dd>

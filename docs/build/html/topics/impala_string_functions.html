@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2021" />
-<meta name="DC.rights.owner" content="(C) Copyright 2021" />
+<meta name="copyright" content="(C) Copyright 2022" />
+<meta name="DC.rights.owner" content="(C) Copyright 2022" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Impala String Functions" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html" />
@@ -94,6 +94,11 @@
 
       <li class="li">
         <a class="xref" href="#string_functions__btrim">BTRIM</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#string_functions__bytes">BYTES</a>
       </li>
 
 
@@ -656,6 +661,57 @@ select concat('[',btrim('xyhelxyzlozyzzxx','xyz'),']');
 | [helxyzlo]                                         |
 +----------------------------------------------------+
 </code></pre>
+        </dd>
+
+
+      
+
+      
+        <dt class="dt dlterm" id="string_functions__bytes">BYTES</dt>
+
+        <dd class="dd"><strong class="ph b">Purpose:</strong> Returns the number of bytes contained in the specified byte string. <p class="p">
+            <strong class="ph b">Syntax:</strong> BYTES (<em class="ph i">byte_expression</em>)</p>
+<p class="p">Where:</p>
+<p class="p"><em class="ph i">byte_expression</em>
+            is the byte string for which the number of bytes is to be returned.</p>
+<p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+<p class="p">The BYTES function is
+            similar to the LENGTH() function except that it always returns the number of bytes
+            regardless of the status of UTF-8 mode whether it is turned ON or OFF.</p>
+<p class="p">The
+            following is the list of supported string data types to be used in
+              <em class="ph i">byte_expression</em>:</p>
+<ul class="ul">
+            <li class="li">STRING</li>
+
+            <li class="li">VARCHAR</li>
+
+            <li class="li">CHAR</li>
+
+          </ul>
+<div class="note note"><span class="notetitle">Note:</span> The BYTES (<em class="ph i">byte_expression</em>) function counts the trailing zeros because
+            trailing zero bytes are considered bytes. In the case of a fixed <em class="ph i">length</em> column,
+            the length of the value is always equal to the length defined for the column whereas the
+            length of the value in a <em class="ph i">variable</em> length column is always equal to the number of
+            bytes, including any trailing zero bytes, contained in that value.</div>
+<p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+<p class="p">The following example
+            obtains the number of bytes from “cloudera” by applying the BYTES function to the column
+            “cloudera”, which is type
+            VARCHAR.</p>
+<pre class="pre codeblock"><code>SELECT bytes(cast('cloudera' as varchar(20))) FROM xyz;
+            +----------------------------------------+
+            | bytes(cast('cloudera' as varchar(20))) |
+            +----------------------------------------+
+            | 8                                      |
+            +----------------------------------------+
+          </code></pre><div class="note note"><span class="notetitle">Note:</span> Use the TRIM function on the <em class="ph i">byte_expression</em> to
+            exclude the trailing blanks included in the byte count for a data value.</div>
+
         </dd>
 
 
