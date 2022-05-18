@@ -55,6 +55,8 @@ DECLARE_int32(catalog_client_connection_num_retries);
 DECLARE_int32(catalog_client_rpc_timeout_ms);
 DECLARE_int32(catalog_client_rpc_retry_interval_ms);
 
+DEFINE_int32_hidden(inject_latency_before_catalog_fetch_ms, 0,
+    "Latency (ms) to be injected before fetching catalog data from the catalogd");
 DEFINE_int32_hidden(inject_latency_after_catalog_fetch_ms, 0,
     "Latency (ms) to be injected after fetching catalog data from the catalogd");
 
@@ -366,6 +368,9 @@ Status CatalogOpExecutor::GetPartialCatalogObject(
   DCHECK(FLAGS_use_local_catalog || TestInfo::is_test());
   const TNetworkAddress& address =
       MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);
+  if (FLAGS_inject_latency_before_catalog_fetch_ms > 0) {
+    SleepForMs(FLAGS_inject_latency_before_catalog_fetch_ms);
+  }
   int attempt = 0; // Used for debug action only.
   CatalogServiceConnection::RpcStatus rpc_status =
       CatalogServiceConnection::DoRpcWithRetry(env_->catalogd_client_cache(), address,
