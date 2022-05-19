@@ -42,6 +42,12 @@ echo "Generating TPC-DS data into ${TPC_DS_DATA}"
 # Delete any preexisting data or symlinks
 rm -rf ${TPC_DS_DATA}
 mkdir -p ${TPC_DS_DATA}
+# Create symlink if scale factor is 1
+if [ ${SCALE_FACTOR} -eq 1 ]
+then
+  rm -rf ${TPC_DS_DATA}${SCALE_FACTOR}
+  ln -s ${TPC_DS_DATA} ${TPC_DS_DATA}${SCALE_FACTOR}
+fi
 cd ${TPC_DS_DATA}
 
 # dsdgen uses fixed size buffers that cause bizarre issues if the path to the

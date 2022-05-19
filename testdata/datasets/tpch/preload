@@ -50,6 +50,12 @@ echo "Generating TPC-H data into ${TPC_H_DATA}"
 chmod +w ${TPC_H_DATA} || true
 rm -rf ${TPC_H_DATA}
 mkdir -p ${TPC_H_DATA}
+# Create symlink if scale factor is 1
+if [ ${SCALE_FACTOR} -eq 1 ]
+then
+  rm -rf ${TPC_H_DATA}${SCALE_FACTOR}
+  ln -s ${TPC_H_DATA} ${TPC_H_DATA}${SCALE_FACTOR}
+fi
 cd ${TPC_H_DATA}
 
 if [ -t 1 ]
