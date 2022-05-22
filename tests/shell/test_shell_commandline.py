@@ -1206,9 +1206,14 @@ class TestImpalaShell(ImpalaTestSuite):
     args = ['--quiet', '-B', '--query', 'select 0;']
     result = run_impala_shell_cmd(vector, args + ['--http_socket_timeout_s=0'],
                                   expect_success=False)
-    expected_err = ("Caught exception [Errno 115] Operation now in progress, "
-                   "type=<class 'socket.error'> in OpenSession. Num remaining tries: 3")
-    assert result.stderr.splitlines()[0] == expected_err
+    expected_err_py2 = (
+      "Caught exception [Errno 115] Operation now in progress, "
+      "type=<class 'socket.error'> in OpenSession. Num remaining tries: 3")
+    expected_err_py3 = (
+      "Caught exception [Errno 115] Operation now in progress, "
+      "type=<class 'BlockingIOError'> in OpenSession. Num remaining tries: 3")
+    actual_err = result.stderr.splitlines()[0]
+    assert actual_err == expected_err_py2 or actual_err == expected_err_py3
 
     # Test http_socket_timeout_s=-1, expect errors
     result = run_impala_shell_cmd(vector, args + ['--http_socket_timeout_s=-1'],

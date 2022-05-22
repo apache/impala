@@ -1503,7 +1503,10 @@ class ImpalaShell(cmd.Cmd, object):
     if self.readline and self.readline.get_current_history_length() > 0:
       for index in xrange(1, self.readline.get_current_history_length() + 1):
         cmd = self.readline.get_history_item(index)
-        print('[%d]: %s' % (index, cmd.decode('utf-8', 'replace')), file=sys.stderr)
+        if sys.version_info.major == 2:
+          print('[%d]: %s' % (index, cmd.decode('utf-8', 'replace')), file=sys.stderr)
+        else:
+          print('[%d]: %s' % (index, cmd), file=sys.stderr)
     else:
       print(READLINE_UNAVAILABLE_ERROR, file=sys.stderr)
 
