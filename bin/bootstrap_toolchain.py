@@ -71,8 +71,6 @@ from string import Template
 
 # Maps return values from 'lsb_release -irs' to the corresponding OS labels for both the
 # toolchain and the CDP components.
-# For Ubuntu20.04, the toolchain and CDP components to be mapped to are still 18.04
-# based, due to the unavailability of 20.04 parts on EC2.
 OsMapping = namedtuple('OsMapping', ['lsb_release', 'toolchain', 'cdh'])
 OS_MAPPING = [
   OsMapping("centos5", "ec2-package-centos-5", None),
@@ -96,7 +94,7 @@ OS_MAPPING = [
   OsMapping("ubuntu15.10", "ec2-package-ubuntu-14-04", None),
   OsMapping('ubuntu16.04', "ec2-package-ubuntu-16-04", "ubuntu1604"),
   OsMapping('ubuntu18.04', "ec2-package-ubuntu-18-04", "ubuntu1804"),
-  OsMapping('ubuntu20.04', "ec2-package-ubuntu-18-04", "ubuntu1804")
+  OsMapping('ubuntu20.04', "ec2-package-ubuntu-20-04", "ubuntu2004")
 ]
 
 

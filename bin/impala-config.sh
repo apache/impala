@@ -77,7 +77,7 @@ export IMPALA_VERSION=4.1.0-SNAPSHOT
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=158-18c815af9d
+export IMPALA_TOOLCHAIN_BUILD_ID=162-3b0a0d993a
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p5
@@ -120,9 +120,9 @@ export IMPALA_LIBEV_VERSION=4.20-p1
 unset IMPALA_LIBEV_URL
 export IMPALA_LIBUNWIND_VERSION=1.3-rc1-p3
 unset IMPALA_LIBUNWIND_URL
-export IMPALA_LLVM_VERSION=5.0.1-p3
+export IMPALA_LLVM_VERSION=5.0.1-p4
 unset IMPALA_LLVM_URL
-export IMPALA_LLVM_ASAN_VERSION=5.0.1-p3
+export IMPALA_LLVM_ASAN_VERSION=5.0.1-p4
 unset IMPALA_LLVM_ASAN_URL
 
 # Maximum memory available for mini-cluster and CDH cluster
@@ -135,7 +135,7 @@ export IMPALA_LLVM_UBSAN_BASE_VERSION=5.0.1
 
 # Debug builds should use the release+asserts build to get additional coverage.
 # Don't use the LLVM debug build because the binaries are too large to distribute.
-export IMPALA_LLVM_DEBUG_VERSION=5.0.1-asserts-p3
+export IMPALA_LLVM_DEBUG_VERSION=5.0.1-asserts-p4
 unset IMPALA_LLVM_DEBUG_URL
 export IMPALA_LZ4_VERSION=1.9.3
 unset IMPALA_LZ4_URL
