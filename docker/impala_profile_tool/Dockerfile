@@ -14,20 +14,20 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-ARG BASE_IMAGE=ubuntu:16.04
+
+# This uses an invalid BASE_IMAGE, because this needs to be overridden.
+ARG BASE_IMAGE=REPLACED_WITH_BASE_IMAGE
 FROM ${BASE_IMAGE}
+
+# If set to "--install-debug-tools", then extra utilities will be installed
+ARG INSTALL_OS_PACKAGES_ARGS="--install-debug-tools"
 
 # Install dependencies required for Impala utility binaries to run, plus
 # some useful utilities.
 # TODO: ideally we wouldn't depend on the JVM libraries, but currently the JNI code
 # in be/ is not cleanly separated from the code that doesn't use JNI.
-RUN apt-get update && \
-  apt-get install -y openjdk-8-jre-headless \
-  libsasl2-2 libsasl2-modules libsasl2-modules-gssapi-mit \
-  sudo netcat-openbsd less curl iproute2 vim iputils-ping \
-  krb5-user && \
-  apt-get clean && \
-  rm -rf /var/lib/apt/lists/*
+ADD helper/install_os_packages.sh /root
+RUN /root/install_os_packages.sh ${INSTALL_OS_PACKAGES_ARGS}
 
 # Use a non-privileged impala user to run the processes in the container.
 # That user should own everything in the /opt/impala subdirectory.

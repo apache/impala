@@ -53,7 +53,22 @@ BINUTILS_HOME = os.path.join(
     IMPALA_TOOLCHAIN_PACKAGES_HOME, "binutils-{0}".format(IMPALA_BINUTILS_VERSION))
 STRIP = os.path.join(BINUTILS_HOME, "bin/strip")
 KUDU_HOME = os.environ["IMPALA_KUDU_HOME"]
-KUDU_LIB_DIR = os.path.join(KUDU_HOME, "release/lib")
+KUDU_CLIENT_DIR = os.environ.get("KUDU_CLIENT_DIR")
+# Different distributions put Kudu libraries in different places.
+# Allow for libkudu_client.so to be in any of these locations:
+#  - release/lib (used on Ubuntu)
+#  - release/lib64 (used on Redhat)
+#  - release/lib/exported
+#
+# Also, respect KUDU_CLIENT_DIR if it is set. With KUDU_CLIENT_DIR, the output
+# is under KUDU_CLIENT_DIR/usr/local, but also varies on "lib" vs "lib64"
+if KUDU_CLIENT_DIR:
+  kudu_lib_dirs = [os.path.join(KUDU_CLIENT_DIR, "usr/local/lib"),
+                   os.path.join(KUDU_CLIENT_DIR, "usr/local/lib64")]
+else:
+  kudu_lib_dirs = [os.path.join(KUDU_HOME, "release/lib"),
+                   os.path.join(KUDU_HOME, "release/lib64"),
+                   os.path.join(KUDU_HOME, "release/lib/exported")]
 
 # Ensure the output directory exists and is empty.
 if os.path.exists(OUTPUT_DIR):
@@ -61,6 +76,9 @@ if os.path.exists(OUTPUT_DIR):
 os.makedirs(OUTPUT_DIR)
 
 BIN_DIR = os.path.join(OUTPUT_DIR, "bin")
+
+# Contains helper install scripts used during Docker build
+HELPER_DIR = os.path.join(OUTPUT_DIR, "helper")
 
 # Contains all library dependencies for Impala Executors.
 EXEC_LIB_DIR = os.path.join(OUTPUT_DIR, "exec-lib")
@@ -80,6 +98,7 @@ else:
   TARGET_LIB_DIRS = [LIB_DIR, EXEC_LIB_DIR, STATESTORE_LIB_DIR]
 
 os.mkdir(BIN_DIR)
+os.mkdir(HELPER_DIR)
 for lib_dir in TARGET_LIB_DIRS:
   os.mkdir(lib_dir)
 
@@ -122,39 +141,67 @@ else:
     strip_debug_symbols(IMPALAD_BINARY, [BIN_DIR])
 
 # Add libstc++ binaries to LIB_DIR. Strip debug symbols for release builds.
+found_libstdcpp_so = False
 for libstdcpp_so in glob.glob(os.path.join(
     GCC_HOME, "lib64/{0}*.so*".format("libstdc++"))):
   # Ignore 'libstdc++.so.*-gdb.py'.
   if not os.path.basename(libstdcpp_so).endswith(".py"):
+    found_libstdcpp_so = True
     dst_dirs = TARGET_LIB_DIRS
     if args.debug_build:
       symlink_file_into_dirs(libstdcpp_so, dst_dirs)
     else:
       strip_debug_symbols(libstdcpp_so, dst_dirs)
 
+if not found_libstdcpp_so:
+  raise Exception("No libstdc++.so found in search path: {0}".format(
+      os.path.join(GCC_HOME, "lib64")))
+
 # Add libgcc binaries to LIB_DIR.
+found_libgcc_so = False
 for libgcc_so in glob.glob(os.path.join(GCC_HOME, "lib64/{0}*.so*".format("libgcc_s"))):
+  found_libgcc_so = True
   symlink_file_into_dirs(libgcc_so, TARGET_LIB_DIRS)
 
+if not found_libgcc_so:
+  raise Exception("No libgcc.so found in search path: {0}".format(
+      os.path.join(GCC_HOME, "lib64")))
+
 # Add libkudu_client binaries to LIB_DIR. Strip debug symbols for release builds.
-for kudu_client_so in glob.glob(os.path.join(KUDU_LIB_DIR, "libkudu_client.so*")):
-  # All backend binaries currently link against libkudu_client.so even if they don't need
-  # them.
-  dst_dirs = TARGET_LIB_DIRS
-  if args.debug_build:
-    symlink_file_into_dirs(kudu_client_so, dst_dirs)
-  else:
-    strip_debug_symbols(kudu_client_so, dst_dirs)
+found_kudu_so = False
+for kudu_lib_dir in kudu_lib_dirs:
+  for kudu_client_so in glob.glob(os.path.join(kudu_lib_dir, "libkudu_client.so*")):
+    # All backend binaries currently link against libkudu_client.so even if they don't
+    # need them.
+    found_kudu_so = True
+    dst_dirs = TARGET_LIB_DIRS
+    if args.debug_build:
+      symlink_file_into_dirs(kudu_client_so, dst_dirs)
+    else:
+      strip_debug_symbols(kudu_client_so, dst_dirs)
+
+if not found_kudu_so:
+  raise Exception("No Kudu shared object found in search path: {0}".format(kudu_lib_dirs))
+
+# Add script for installing OS packages
+symlink_file_into_dir(
+    os.path.join(IMPALA_HOME, "docker/install_os_packages.sh"), HELPER_DIR)
 
 if args.utility_context:
   symlink_file_into_dir(
       os.path.join(IMPALA_HOME, "docker/utility_entrypoint.sh"), BIN_DIR)
 else:
   # Impala Coordinator dependencies.
+  num_jars_on_classpath = 0
   dep_classpath = file(os.path.join(IMPALA_HOME, "fe/target/build-classpath.txt")).read()
   for jar in dep_classpath.split(":"):
+    num_jars_on_classpath += 1
     assert os.path.exists(jar), "missing jar from classpath: {0}".format(jar)
     symlink_file_into_dir(jar, LIB_DIR)
+
+  if num_jars_on_classpath == 0:
+    raise Exception("No jars listed in {0}".format(os.path.join(IMPALA_HOME,
+        "fe/target/build-classpath.txt")))
 
   # Impala Coordinator jars.
   num_frontend_jars = 0

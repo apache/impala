@@ -20,6 +20,12 @@ FROM ${BASE_IMAGE}
 
 COPY --chown=impala lib /opt/impala/lib
 
+# Run the daemon_entrypoint.sh script as a sanity check. This verifies that
+# daemon_entrypoint.sh is detecting Java appropriately and constructing a
+# LD_LIBRARY_PATH that allows impalad to start. The --version flag exits
+# before starting the JVM, so that is the limit of this check.
+RUN /opt/impala/bin/daemon_entrypoint.sh /opt/impala/bin/impalad --version
+
 # Externally-facing ports
 # Beeswax
 EXPOSE 21000

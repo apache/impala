@@ -35,17 +35,34 @@ execute_process(COMMAND ${LSB_RELEASE_EXEC} -rs
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-if(${LSB_RELEASE_ID} STREQUAL "Ubuntu" AND ${LSB_RELEASE_VERSION} STREQUAL "16.04")
-  set(DISTRO_BASE_IMAGE "ubuntu:16.04")
-  set(PIP "python-pip")
-elseif(${LSB_RELEASE_ID} STREQUAL "Ubuntu" AND ${LSB_RELEASE_VERSION} STREQUAL "18.04")
-  set(DISTRO_BASE_IMAGE "ubuntu:18.04")
-  set(PIP "python-pip")
-elseif(${LSB_RELEASE_ID} STREQUAL "Ubuntu" AND ${LSB_RELEASE_VERSION} STREQUAL "20.04")
-  set(DISTRO_BASE_IMAGE "ubuntu:20.04")
-  set(PIP "python3-pip")
-else()
-  set(DISTRO_BASE_IMAGE "UNSUPPORTED")
+set(QUICKSTART_BASE_IMAGE "UNSUPPORTED")
+set(DISTRO_BASE_IMAGE "UNSUPPORTED")
+
+if(${LSB_RELEASE_ID} STREQUAL "Ubuntu")
+  if(${LSB_RELEASE_VERSION} STREQUAL "16.04" OR
+     ${LSB_RELEASE_VERSION} STREQUAL "18.04" OR
+     ${LSB_RELEASE_VERSION} STREQUAL "20.04")
+    set(DISTRO_BASE_IMAGE "ubuntu:${LSB_RELEASE_VERSION}")
+    set(QUICKSTART_BASE_IMAGE "ubuntu:${LSB_RELEASE_VERSION}")
+  endif()
+  if (${LSB_RELEASE_VERSION} STREQUAL "16.04" OR
+      ${LSB_RELEASE_VERSION} STREQUAL "18.04")
+    set(PIP "python-pip")
+  elseif (${LSB_RELEASE_VERSION} STREQUAL "20.04")
+    set(PIP "python3-pip")
+  endif()
+elseif(${LSB_RELEASE_ID} STREQUAL "RedHatEnterpriseServer" OR
+       ${LSB_RELEASE_ID} STREQUAL "RedHatEnterprise" OR
+       ${LSB_RELEASE_ID} STREQUAL "Rocky" OR
+       ${LSB_RELEASE_ID} STREQUAL "AlmaLinux" OR
+       ${LSB_RELEASE_ID} STREQUAL "CentOS")
+  # The Quickstart images currently don't support using a Redhat
+  # base image, so this doesn't set QUICKSTART_BASE_IMAGE.
+  if(${LSB_RELEASE_VERSION} MATCHES "7.*")
+    set(DISTRO_BASE_IMAGE "$ENV{IMPALA_REDHAT7_DOCKER_BASE}")
+  elseif(${LSB_RELEASE_VERSION} MATCHES "8.*")
+    set(DISTRO_BASE_IMAGE "$ENV{IMPALA_REDHAT8_DOCKER_BASE}")
+  endif()
 endif()
 MESSAGE(STATUS "Picked docker base image based on host OS: ${DISTRO_BASE_IMAGE}")
 
@@ -64,6 +81,13 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
       COMMENT "Creating impala base build context build_type=${build_type}."
       VERBATIM
     )
+    # The base image Dockerfile takes an argument INSTALL_OS_PACKAGES_ARGS to specify
+    # arguments for install_os_packages.sh. This can can be set to "--install-debug-tools"
+    # to add extra utilities. Enable this for debug builds.
+    set(INSTALL_OS_PACKAGES_ARGS "")
+    if (${build_type} STREQUAL "debug")
+      set(INSTALL_OS_PACKAGES_ARGS "--install-debug-tools")
+    endif()
     # Target for the base Impala image.
     add_custom_target(impala_base_image_${build_type}
       # Run docker build inside the build context directory so that all dependencies are
@@ -71,11 +95,13 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
       # dependencies.
       COMMAND tar cvh . -C ${CMAKE_SOURCE_DIR}/docker/impala_base/ . |
               ${DOCKER_BUILD} -t impala_base_${build_type}
-                  --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE} -
+                --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE}
+                --build-arg INSTALL_OS_PACKAGES_ARGS=${INSTALL_OS_PACKAGES_ARGS} -
       WORKING_DIRECTORY ${IMPALA_BASE_BUILD_CONTEXT_DIR}/${build_type}
       DEPENDS impala_base_build_context_${build_type} ${CMAKE_SOURCE_DIR}/docker/impala_base/Dockerfile
       DEPENDS ${CMAKE_SOURCE_DIR}/docker/daemon_entrypoint.sh
       DEPENDS ${CMAKE_SOURCE_DIR}/bin/graceful_shutdown_backends.sh
+      DEPENDS ${CMAKE_SOURCE_DIR}/docker/install_os_packages.sh
       COMMENT "Building Impala base docker image build_type=${build_type}."
       VERBATIM
     )
@@ -134,40 +160,45 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
   add_daemon_docker_images(statestored)
   add_daemon_docker_images(admissiond)
 
-  # HMS quickstart image, which requires Hive and Hadoop builds.
-  set(QUICKSTART_HMS_IMAGE impala_quickstart_hms)
-  set(quickstart_hms_build_dir ${CMAKE_SOURCE_DIR}/docker/quickstart_hms)
-  add_custom_target(quickstart_hms_build_setup
-    COMMAND rm -f ${quickstart_hms_build_dir}/hive ${quickstart_hms_build_dir}/hadoop
-    COMMAND ${CMAKE_COMMAND} -E create_symlink $ENV{HIVE_HOME} ${quickstart_hms_build_dir}/hive
-    COMMAND ${CMAKE_COMMAND} -E create_symlink $ENV{HADOOP_HOME} ${quickstart_hms_build_dir}/hadoop
-  )
-  add_custom_target(quickstart_hms_image
-    # Supply the appropriate base image as an argument for the Dockerfile.
-    # Use tar with -h flag to assemble a tarball including all the symlinked files and
-    # directories in the build context.
-    COMMAND tar cvh . -C ${quickstart_hms_build_dir} . | ${DOCKER_BUILD} --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE} -t ${QUICKSTART_HMS_IMAGE} -
-    DEPENDS ${quickstart_hms_build_dir}/Dockerfile quickstart_hms_build_setup
-    COMMENT "Building quickstart HMS docker image."
-    VERBATIM
-  )
-  ADD_DEPENDENCIES(quickstart_docker_images quickstart_hms_image)
-  set(exported_image_names "${exported_image_names} ${QUICKSTART_HMS_IMAGE}")
+  # Quickstart is only supported on Ubuntu, so skip generating the Quickstart targets
+  # on other distributions.
+  # TODO: Support Quickstart images on Redhat
+  if (NOT ${QUICKSTART_BASE_IMAGE} STREQUAL "UNSUPPORTED")
+    # HMS quickstart image, which requires Hive and Hadoop builds.
+    set(QUICKSTART_HMS_IMAGE impala_quickstart_hms)
+    set(quickstart_hms_build_dir ${CMAKE_SOURCE_DIR}/docker/quickstart_hms)
+    add_custom_target(quickstart_hms_build_setup
+      COMMAND rm -f ${quickstart_hms_build_dir}/hive ${quickstart_hms_build_dir}/hadoop
+      COMMAND ${CMAKE_COMMAND} -E create_symlink $ENV{HIVE_HOME} ${quickstart_hms_build_dir}/hive
+      COMMAND ${CMAKE_COMMAND} -E create_symlink $ENV{HADOOP_HOME} ${quickstart_hms_build_dir}/hadoop
+    )
+    add_custom_target(quickstart_hms_image
+      # Supply the appropriate base image as an argument for the Dockerfile.
+      # Use tar with -h flag to assemble a tarball including all the symlinked files and
+      # directories in the build context.
+      COMMAND tar cvh . -C ${quickstart_hms_build_dir} . | ${DOCKER_BUILD} --build-arg BASE_IMAGE=${QUICKSTART_BASE_IMAGE} -t ${QUICKSTART_HMS_IMAGE} -
+      DEPENDS ${quickstart_hms_build_dir}/Dockerfile quickstart_hms_build_setup
+      COMMENT "Building quickstart HMS docker image."
+      VERBATIM
+    )
+    ADD_DEPENDENCIES(quickstart_docker_images quickstart_hms_image)
+    set(exported_image_names "${exported_image_names} ${QUICKSTART_HMS_IMAGE}")
 
-  # Client quickstart image, which only requires some scripts.
-  set(QUICKSTART_CLIENT_IMAGE impala_quickstart_client)
-  set(quickstart_client_build_dir ${CMAKE_SOURCE_DIR}/docker/quickstart_client)
-  add_custom_target(quickstart_client_image
-    # Supply the appropriate base image as an argument for the Dockerfile.
-    # Use tar with -h flag to assemble a tarball including all the symlinked files and
-    # directories in the build context.
-    COMMAND tar cvh . -C ${quickstart_client_build_dir} . | ${DOCKER_BUILD} ${COMMON_DOCKER_BUILD_ARGS} --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE} --build-arg PIP=${PIP}  -t ${QUICKSTART_CLIENT_IMAGE} -
-    DEPENDS ${quickstart_client_build_dir}/Dockerfile ${quickstart_client_build_dir}/data-load-entrypoint.sh
-    COMMENT "Building quickstart client docker image."
-    VERBATIM
-  )
-  ADD_DEPENDENCIES(quickstart_docker_images quickstart_client_image)
-  set(exported_image_names "${exported_image_names} ${QUICKSTART_CLIENT_IMAGE}")
+    # Client quickstart image, which only requires some scripts.
+    set(QUICKSTART_CLIENT_IMAGE impala_quickstart_client)
+    set(quickstart_client_build_dir ${CMAKE_SOURCE_DIR}/docker/quickstart_client)
+    add_custom_target(quickstart_client_image
+      # Supply the appropriate base image as an argument for the Dockerfile.
+      # Use tar with -h flag to assemble a tarball including all the symlinked files and
+      # directories in the build context.
+      COMMAND tar cvh . -C ${quickstart_client_build_dir} . | ${DOCKER_BUILD} ${COMMON_DOCKER_BUILD_ARGS} --build-arg BASE_IMAGE=${QUICKSTART_BASE_IMAGE} --build-arg PIP=${PIP} -t ${QUICKSTART_CLIENT_IMAGE} -
+      DEPENDS ${quickstart_client_build_dir}/Dockerfile ${quickstart_client_build_dir}/data-load-entrypoint.sh
+      COMMENT "Building quickstart client docker image."
+      VERBATIM
+    )
+    ADD_DEPENDENCIES(quickstart_docker_images quickstart_client_image)
+    set(exported_image_names "${exported_image_names} ${QUICKSTART_CLIENT_IMAGE}")
+  endif()
 
   # Add a target to build utility docker images for 'build_type'. 'build_context_args' are
   # passed to the setup_build_context.py script.
@@ -187,12 +218,15 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
       # Run docker build inside the build context directory so that all dependencies are
       # sent to the docker daemon. This allows the Dockerfile build to copy all necessary
       # dependencies.
+      # Note: This currently does not specify INSTALL_OS_PACKAGES_ARGS, so it uses the
+      # default value, which installs extra debugging tools.
       COMMAND tar cvh . -C ${CMAKE_SOURCE_DIR}/docker/impala_profile_tool/ . |
               ${DOCKER_BUILD} -t ${profile_tool_image}
                   --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE} -
       WORKING_DIRECTORY ${IMPALA_UTILITY_BUILD_CONTEXT_DIR}/${build_type}
       DEPENDS impala_utility_build_context_${build_type} ${CMAKE_SOURCE_DIR}/docker/impala_profile_tool/Dockerfile
       DEPENDS ${CMAKE_SOURCE_DIR}/docker/utility_entrypoint.sh
+      DEPENDS ${CMAKE_SOURCE_DIR}/docker/install_os_packages.sh
       COMMENT "Building Impala profile tool docker image build_type=${build_type}."
       VERBATIM
     )

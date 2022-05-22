@@ -226,6 +226,16 @@ export IMPALA_KITE_VERSION=1.1.0
 export IMPALA_ORC_JAVA_VERSION=1.7.6
 export IMPALA_COS_VERSION=3.1.0-5.9.3
 
+# When Impala is building docker images on Redhat-based distributions,
+# it is useful to be able to customize the base image. Some users will
+# want to use open source / free distributions like Centos/Rocky/Alma/etc.
+# Some users will want to produce images on top of official Redhat UBI
+# images (which have certain guarantees about maintenance, CVEs, etc).
+# These environment variables control the base images. They default to
+# free distributions, but Redhat UBI images are known to work.
+export IMPALA_REDHAT7_DOCKER_BASE=${IMPALA_REDHAT7_DOCKER_BASE:-"centos:centos7.9.2009"}
+export IMPALA_REDHAT8_DOCKER_BASE=${IMPALA_REDHAT8_DOCKER_BASE:-"rockylinux:8.5"}
+
 # When IMPALA_(CDP_COMPONENT)_URL are overridden, they may contain '$(platform_label)'
 # which will be substituted for the CDP platform label in bootstrap_toolchain.py
 unset IMPALA_HADOOP_URL

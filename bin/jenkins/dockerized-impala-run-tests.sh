@@ -32,15 +32,22 @@ source_impala_config() {
   set -u
 }
 
+source_impala_config
+
 onexit() {
+  # Get the logs from all docker containers
+  DOCKER_LOGS_DIR="${IMPALA_HOME}/logs/docker_logs"
+  mkdir -p "${DOCKER_LOGS_DIR}"
+  for container in $(docker ps -a -q); do
+    docker logs ${container} > "${DOCKER_LOGS_DIR}/${container}.log" 2>&1 || true
+  done
+
   # Clean up docker containers and networks that may have been created by
   # these tests.
   docker rm -f $(docker ps -a -q) || true
   docker network rm $DOCKER_NETWORK || true
 }
 trap onexit EXIT
-
-source_impala_config
 
 # Check that docker is running and that our user can interact with it.
 docker run hello-world

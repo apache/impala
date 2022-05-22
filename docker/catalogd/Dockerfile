@@ -23,6 +23,12 @@ FROM ${BASE_IMAGE}
 # size would be to only copy in jars required by catalogd.
 COPY --chown=impala lib /opt/impala/lib
 
+# Run the daemon_entrypoint.sh script as a sanity check. This verifies that
+# daemon_entrypoint.sh is detecting Java appropriately and constructing a
+# LD_LIBRARY_PATH that allows catalogd to start. The --version flag exits
+# before starting the JVM, so that is the limit of this check.
+RUN /opt/impala/bin/daemon_entrypoint.sh /opt/impala/bin/catalogd --version
+
 # Externally-facing ports
 # Debug webserver
 EXPOSE 25020
