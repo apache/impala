@@ -34,8 +34,9 @@ from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_PORT
 from tests.common.skip import SkipIf
-from tests.common.test_dimensions import create_client_protocol_dimension
-from tests.common.test_dimensions import create_client_protocol_strict_dimension
+from tests.common.test_dimensions import (
+  create_client_protocol_dimension, create_client_protocol_strict_dimension,
+  create_uncompressed_text_dimension, create_single_exec_option_dimension)
 from time import sleep, time
 from util import (get_impalad_host_port, assert_var_substitution, run_impala_shell_cmd,
                   ImpalaShell, IMPALA_SHELL_EXECUTABLE, SHELL_IS_PYTHON_2,
@@ -134,6 +135,11 @@ class TestImpalaShell(ImpalaTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
+    super(TestImpalaShell, cls).add_test_dimensions()
+    # Limit to uncompressed text with default exec options
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
     # Run with both beeswax and HS2 to ensure that behaviour is the same.
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_strict_dimension())

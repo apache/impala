@@ -1591,12 +1591,20 @@ class TestRangerColumnMaskingComplexTypesInSelectList(CustomClusterTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
+    super(TestRangerColumnMaskingComplexTypesInSelectList, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
     cls.ImpalaTestMatrix.add_dimension(create_orc_dimension(cls.get_workload()))
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('protocol') == 'hs2')
     cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
         disable_codegen_options=[True]))
+
+  @classmethod
+  def add_custom_cluster_constraints(cls):
+    # Do not call the super() implementation, because this class needs to relax
+    # the set of constraints. The usual constraints only run on uncompressed text.
+    # This disables that constraint to let us run against only ORC.
+    return
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

@@ -140,6 +140,7 @@ class TestClientSsl(CustomClusterTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
+    super(TestClientSsl, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
 
   @pytest.mark.execute_serially

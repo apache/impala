@@ -36,7 +36,8 @@ from tests.common.skip import (
     SkipIfNotHdfsMinicluster
     )
 from tests.common.test_dimensions import (create_exec_option_dimension,
-    create_exec_option_dimension_from_dict, create_client_protocol_dimension)
+    create_exec_option_dimension_from_dict, create_client_protocol_dimension,
+    create_orc_dimension)
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path, IS_HDFS
 
@@ -185,9 +186,11 @@ class TestNestedTypesInSelectListWithBeeswax(ImpalaTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
+    super(TestNestedTypesInSelectListWithBeeswax, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('protocol') == 'beeswax')
+    cls.ImpalaTestMatrix.add_dimension(create_orc_dimension(cls.get_workload()))
     cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
         disable_codegen_options=[True]))
 
