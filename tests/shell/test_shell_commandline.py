@@ -533,8 +533,11 @@ class TestImpalaShell(ImpalaTestSuite):
     result = run_impala_shell_cmd(vector, ['-B', '-q', "select unhex('aa')"])
     assert 'UnicodeDecodeError' not in result.stderr
     # Same as above, the result using thrift <0.10.0 is '\xaa'. The result using
-    # thrift >=0.10.0 is '\xef\xbf\xbd'.
-    assert '\xef\xbf\xbd' in result.stdout or '\xaa' in result.stdout
+    # thrift >=0.10.0 is '\xef\xbf\xbd'. When testing with strict_hs2_protocol, this
+    # is running against Hive which is another variable. On thrift 0.14 and higher,
+    # talking to Hive, the result is b'\\xaa', so allow this as another possibility.
+    assert '\xef\xbf\xbd' in result.stdout or '\xaa' in result.stdout or \
+           '\\xaa' in result.stdout
 
   def test_global_config_file(self, vector):
     """Test global and user configuration files."""
