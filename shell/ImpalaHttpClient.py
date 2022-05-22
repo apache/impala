@@ -271,5 +271,5 @@ class ImpalaHttpClient(TTransportBase):
     if self.code >= 300:
       # Report any http response code that is not 1XX (informational response) or
       # 2XX (successful).
-      body = self.readBody()
+      body = self.readBody().decode('utf-8')
       raise HttpError(self.code, self.message, body, self.headers)
