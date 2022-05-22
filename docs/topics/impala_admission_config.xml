@@ -224,6 +224,7 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
     &lt;name>impala.admission-control.<b>clamp-mem-limit-query-option</b>.root.default.regularPool&lt;/name>
     &lt;value>true&lt;/value>
   &lt;/property>
+&lt;/configuration>
 </codeblock>
 
       </conbody>
