@@ -40,8 +40,9 @@ from tempfile import NamedTemporaryFile
 from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
-from tests.common.test_dimensions import create_client_protocol_dimension
-from tests.common.test_dimensions import create_client_protocol_strict_dimension
+from tests.common.test_dimensions import (
+  create_client_protocol_dimension, create_client_protocol_strict_dimension,
+  create_uncompressed_text_dimension, create_single_exec_option_dimension)
 from tests.shell.util import get_unused_port
 from util import (assert_var_substitution, ImpalaShell, get_impalad_port, get_shell_cmd,
                   get_open_sessions_metric, IMPALA_SHELL_EXECUTABLE, spawn_shell)
@@ -165,6 +166,11 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
+    super(TestImpalaShellInteractive, cls).add_test_dimensions()
+    # Limit to uncompressed text with default exec options
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
     # Run with both beeswax and HS2 to ensure that behaviour is the same.
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_strict_dimension())
@@ -681,6 +687,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
 
   def test_commandline_flag_disable_live_progress(self, vector):
     """Test the command line flag disable_live_progress with live_progress."""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Live option not supported in strict hs2 mode.")
     # By default, shell option live_progress is set to True in the interactive mode.
     cmds = "set all;"
     result = run_impala_shell_interactive(vector, cmds)
@@ -704,13 +712,15 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
 
     cmds = "set all;"
     # override the default option through command line argument.
-    args = ['--strict_h2_protocol']
+    args = ['--strict_hs2_protocol']
     result = run_impala_shell_interactive(vector, cmds, shell_args=args)
     assert "\tLIVE_PROGRESS: False" in result.stdout
     assert "\tLIVE_SUMMARY: False" in result.stdout
 
   def test_live_option_configuration(self, vector):
     """Test the optional configuration file with live_progress and live_summary."""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Live option not supported in strict hs2 mode.")
     # Positive tests
     # set live_summary and live_progress as True with config file
     rcfile_path = os.path.join(QUERY_FILE_PATH, 'good_impalarc3')

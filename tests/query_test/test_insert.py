@@ -29,7 +29,9 @@ from tests.common.skip import SkipIfABFS, SkipIfEC, SkipIfLocal, \
     SkipIfHive2, SkipIfNotHdfsMinicluster, SkipIfS3, SkipIfDockerizedCluster
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
-    create_uncompressed_text_dimension)
+    create_uncompressed_text_dimension,
+    create_single_exec_option_dimension,
+    is_supported_insert_format)
 from tests.common.test_result_verifier import (
     QueryTestResult,
     parse_result_rows)
@@ -335,20 +337,26 @@ class TestInsertFileExtension(ImpalaTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension(
-        'table_format_and_file_extension',
-        *[('parquet', '.parq'), ('textfile', '.txt')]))
+    super(TestInsertFileExtension, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        is_supported_insert_format(v.get_value('table_format')))
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
 
   @classmethod
   def setup_class(cls):
     super(TestInsertFileExtension, cls).setup_class()
 
   def test_file_extension(self, vector, unique_database):
-    table_format = vector.get_value('table_format_and_file_extension')[0]
-    file_extension = vector.get_value('table_format_and_file_extension')[1]
+    table_format = vector.get_value('table_format').file_format
+    if table_format == 'parquet':
+      file_extension = '.parq'
+      stored_as_format = 'parquet'
+    else:
+      file_extension = '.txt'
+      stored_as_format = 'textfile'
     table_name = "{0}_table".format(table_format)
     ctas_query = "create table {0}.{1} stored as {2} as select 1".format(
-        unique_database, table_name, table_format)
+        unique_database, table_name, stored_as_format)
     self.execute_query_expect_success(self.client, ctas_query)
     for path in self.filesystem_client.ls("test-warehouse/{0}.db/{1}".format(
         unique_database, table_name)):

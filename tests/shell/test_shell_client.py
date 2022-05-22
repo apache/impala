@@ -20,8 +20,9 @@
 
 from shell.impala_client import ImpalaBeeswaxClient, ImpalaHS2Client
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import create_client_protocol_dimension
-from tests.common.test_dimensions import create_client_protocol_no_strict_dimension
+from tests.common.test_dimensions import (
+  create_client_protocol_dimension, create_client_protocol_no_strict_dimension,
+  create_uncompressed_text_dimension, create_single_exec_option_dimension)
 from util import get_impalad_host_port
 
 
@@ -34,6 +35,12 @@ class TestShellClient(ImpalaTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
+    super(TestShellClient, cls).add_test_dimensions()
+    # Limit to uncompressed text with default exec options
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    # Run with beeswax and HS2
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_no_strict_dimension())
 
