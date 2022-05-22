@@ -373,7 +373,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     # IMPALA-10415: Multiline query with history enabled and unicode chars.
     # readline gets its input from tty, so using stdin does not work.
     shell_cmd = get_shell_cmd(vector)
-    child_proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
+    child_proc = spawn_shell(shell_cmd)
     child_proc.expect(PROMPT_REGEX)
     child_proc.sendline("select '{0}'\n;".format(unicode_bytes))
     child_proc.expect("Fetched 1 row\(s\) in [0-9]+\.?[0-9]*s")
