@@ -87,7 +87,8 @@ export MAKE_CMD=make
 
 # parse command line options
 # Note: if you add a new build type, please also add it to 'VALID_BUILD_TYPES' in
-# tests/common/environ.py.
+# tests/common/environ.py and set correct BUILD_OUTPUT_ROOT_DIRECTORY directory in
+# be/CMakeLists.txt.
 while [ -n "$*" ]
 do
   case "$1" in
