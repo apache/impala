@@ -347,7 +347,17 @@ public class StmtMetadataLoader {
   private Set<TableName> collectTableCandidates(StatementBase stmt) {
     Preconditions.checkNotNull(stmt);
     List<TableRef> tblRefs = new ArrayList<>();
-    stmt.collectTableRefs(tblRefs);
+    // The information about whether table masking is supported is not available to
+    // ResetMetadataStmt so we collect the TableRef for ResetMetadataStmt whenever
+    // applicable.
+    if (stmt instanceof ResetMetadataStmt
+        && fe_.getAuthzFactory().getAuthorizationConfig().isEnabled()
+        && fe_.getAuthzFactory().supportsTableMasking()) {
+      TableName tableName = ((ResetMetadataStmt) stmt).getTableName();
+      if (tableName != null) tblRefs.add(new TableRef(tableName.toPath(), null));
+    } else {
+      stmt.collectTableRefs(tblRefs);
+    }
     Set<TableName> tableNames = new HashSet<>();
     for (TableRef ref: tblRefs) {
       tableNames.addAll(Path.getCandidateTables(ref.getPath(), sessionDb_));

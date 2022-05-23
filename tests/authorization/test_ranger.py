@@ -1076,6 +1076,35 @@ class TestRanger(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_block_metadata_update(self, vector, unique_name):
+    """Test that the metadata update operation on a table by a requesting user is denied
+       if there exists a column masking policy defined on any column in the table for the
+       requesting user even when the table metadata (e.g., list of columns) have been
+       invalidated immediately before the requesting user tries to invalidate the table
+       metadata again. This test would have failed if we did not load the table metadata
+       for ResetMetadataStmt."""
+    user = getuser()
+    admin_client = self.create_impala_client()
+    non_owner_client = self.create_impala_client()
+    try:
+      TestRanger._add_column_masking_policy(
+          unique_name, user, "functional", "alltypestiny", "id",
+          "CUSTOM", "id * 100")
+      self.execute_query_expect_success(admin_client,
+          "invalidate metadata functional.alltypestiny", user=ADMIN)
+      admin_client.execute("grant all on server to user {0}".format(user))
+      result = self.execute_query_expect_failure(
+          non_owner_client, "invalidate metadata functional.alltypestiny", user=user)
+      assert "User '{0}' does not have privileges to execute " \
+          "'INVALIDATE METADATA/REFRESH' on: functional.alltypestiny".format(user) \
+          in str(result)
+    finally:
+      TestRanger._remove_policy(unique_name)
+      admin_client.execute("revoke all on server from user {0}".format(user))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
   def test_masking_overload_coverage(self, vector, unique_name):
     """Test that we have cover all the overloads of the masking functions that could
        appear in using default policies."""
