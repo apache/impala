@@ -79,6 +79,23 @@ TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
 AnalysisException: Table property 'iceberg.catalog_location' is necessary for Iceberg table with 'hadoop.catalog'.
 ====
 ---- QUERY
+CREATE EXTERNAL TABLE iceberg_hadoop_tbls_external(
+  level STRING
+)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
+---- CATCH
+Set LOCATION for external Iceberg tables stored in hadoop.tables. For creating a completely new Iceberg table, use 'CREATE TABLE' (no EXTERNAL keyword).
+====
+---- QUERY
+CREATE EXTERNAL TABLE iceberg_hive_tbls_external(
+  level STRING
+)
+STORED AS ICEBERG;
+---- CATCH
+Table property 'iceberg.table_identifier' is necessary for external Iceberg tables stored in hive.catalog. For creating a completely new Iceberg table, use 'CREATE TABLE' (no EXTERNAL keyword).
+====
+---- QUERY
 CREATE EXTERNAL TABLE fake_iceberg_table_hadoop_catalog
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
