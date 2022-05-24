@@ -66,15 +66,6 @@ DESCRIBE iceberg_hadoop_tables;
 STRING,STRING,STRING,STRING
 ====
 ---- QUERY
-CREATE EXTERNAL TABLE iceberg_hadoop_tbls_external(
-  level STRING
-)
-STORED AS ICEBERG
-TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
----- RESULTS
-'Location is necessary for external iceberg table.'
-====
----- QUERY
 CREATE TABLE iceberg_hadoop_tbls_with_loc(
   level STRING
 )

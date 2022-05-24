@@ -340,8 +340,7 @@ public class CreateTableStmt extends StatementBase {
     }
 
     analyzeKuduTableProperties(analyzer);
-    if (isExternal() && !Boolean.parseBoolean(getTblProperties().get(
-        Table.TBL_PROP_EXTERNAL_TABLE_PURGE))) {
+    if (isExternalWithNoPurge()) {
       // this is an external table
       analyzeExternalKuduTableParams(analyzer);
     } else {
@@ -736,6 +735,19 @@ public class CreateTableStmt extends StatementBase {
       throw new AnalysisException(String.format("%s cannot be set for Iceberg table " +
           "stored in hive.catalog", IcebergTable.ICEBERG_CATALOG_LOCATION));
     }
+    if (isExternalWithNoPurge()) {
+      String tableId = getTblProperties().get(IcebergTable.ICEBERG_TABLE_IDENTIFIER);
+      if (tableId == null || tableId.isEmpty()) {
+        tableId = getTblProperties().get(Catalogs.NAME);
+      }
+      if (tableId == null || tableId.isEmpty()) {
+        throw new AnalysisException(String.format("Table property '%s' is necessary " +
+            "for external Iceberg tables stored in hive.catalog. " +
+            "For creating a completely new Iceberg table, use 'CREATE TABLE' " +
+            "(no EXTERNAL keyword).",
+            IcebergTable.ICEBERG_TABLE_IDENTIFIER));
+      }
+    }
   }
 
   private void validateTableInHadoopCatalog() throws AnalysisException {
@@ -756,6 +768,11 @@ public class CreateTableStmt extends StatementBase {
     if (getTblProperties().get(IcebergTable.ICEBERG_CATALOG_LOCATION) != null) {
       throw new AnalysisException(String.format("%s cannot be set for Iceberg table " +
           "stored in hadoop.tables", IcebergTable.ICEBERG_CATALOG_LOCATION));
+    }
+    if (isExternalWithNoPurge() && getLocation() == null) {
+      throw new AnalysisException("Set LOCATION for external Iceberg tables " +
+          "stored in hadoop.tables. For creating a completely new Iceberg table, use " +
+          "'CREATE TABLE' (no EXTERNAL keyword).");
     }
   }
 
@@ -828,5 +845,13 @@ public class CreateTableStmt extends StatementBase {
     getIcebergPartitionSpecs().add(new IcebergPartitionSpec(partFields));
     getColumnDefs().addAll(getPartitionColumnDefs());
     getPartitionColumnDefs().clear();
+  }
+
+  /**
+   * @return true for external tables that don't have "external.table.purge" set to true.
+   */
+  private boolean isExternalWithNoPurge() {
+    return isExternal() && !Boolean.parseBoolean(getTblProperties().get(
+      Table.TBL_PROP_EXTERNAL_TABLE_PURGE));
   }
 }
