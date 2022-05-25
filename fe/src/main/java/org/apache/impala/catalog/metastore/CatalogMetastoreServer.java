@@ -350,12 +350,7 @@ public class CatalogMetastoreServer extends ThriftHiveMetastore implements
   }
 
   /**
-<<<<<<< HEAD
-   * Returns the RPC and connection metrics for this metastore server. //TODO hook this
-   * method to the Catalog's debug UI
-=======
    * Returns the RPC and connection metrics for this metastore server.
->>>>>>> c4a8633759... IMPALA-10645: Log catalogd HMS API metrics
    */
   @Override
   public TCatalogdHmsCacheMetrics getCatalogdHmsCacheMetrics() {
