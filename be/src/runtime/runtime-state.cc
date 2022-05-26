@@ -59,7 +59,11 @@
 
 using strings::Substitute;
 
-DECLARE_int32(max_errors);
+DEFINE_int32(max_error_logs_per_instance, 2000,
+    "Maximum number of non-fatal error to be logged in log level 1 (INFO). "
+    "Once this number exceeded, further non-fatal error will be logged at log level 2 "
+    "(DEBUG) severity. This flag is ignored if user set negative max_errors query "
+    "option. Default to 2000");
 
 namespace impala {
 
@@ -190,11 +194,37 @@ string RuntimeState::ErrorLog() {
 
 bool RuntimeState::LogError(const ErrorMsg& message, int vlog_level) {
   lock_guard<SpinLock> l(error_log_lock_);
-  // All errors go to the log, unreported_error_count_ is counted independently of the
-  // size of the error_log to account for errors that were already reported to the
-  // coordinator
-  VLOG(vlog_level) << "Error from query " << PrintId(query_id()) << ": " << message.msg();
-  if (ErrorCount(error_log_) < query_options().max_errors) {
+  // All errors go to the log. If the amount of errors logged to vlog level 1 exceed
+  // or equal max_error_logs_per_instance, then that error will be downgraded to vlog
+  // level 2.
+  int user_max_errors = query_options().max_errors;
+  if (vlog_level == 1 && user_max_errors >= 0
+      && vlog_1_errors >= FLAGS_max_error_logs_per_instance) {
+    vlog_level = 2;
+  }
+
+  if (VLOG_IS_ON(vlog_level)) {
+    VLOG(vlog_level) << "Error from query " << PrintId(query_id()) << ": "
+                     << message.msg();
+  }
+
+  if (vlog_level == 1 && user_max_errors >= 0) {
+    vlog_1_errors++;
+    DCHECK_LE(vlog_1_errors, FLAGS_max_error_logs_per_instance);
+    if (vlog_1_errors == FLAGS_max_error_logs_per_instance) {
+      VLOG(vlog_level) << "Query " << PrintId(query_id()) << " printed "
+                       << FLAGS_max_error_logs_per_instance
+                       << " non-fatal error to log level 1 (INFO). Further non-fatal "
+                       << "error will be downgraded to log level 2 (DEBUG).";
+    }
+  }
+
+  TErrorCode::type code = message.error();
+  if (ErrorCount(error_log_) < max_errors()
+      || (code != TErrorCode::GENERAL && error_log_.find(code) != error_log_.end())) {
+    // Appending general error is expensive since it writes the entire message to the
+    // error_log_ map. Meanwhile, appending non-general (specific) error that already
+    // exist in error_log_ is cheap since it only increment count.
     AppendError(&error_log_, message);
     return true;
   }
