@@ -118,12 +118,6 @@ QueryState::QueryState(
   }
   TQueryOptions& query_options =
       const_cast<TQueryOptions&>(query_ctx_.client_request.query_options);
-  // max_errors does not indicate how many errors in total have been recorded, but rather
-  // how many are distinct. It is defined as the sum of the number of generic errors and
-  // the number of distinct other errors.
-  if (query_options.max_errors <= 0) {
-    query_options.max_errors = 100;
-  }
   if (query_options.batch_size <= 0) {
     query_options.__set_batch_size(DEFAULT_BATCH_SIZE);
   }
