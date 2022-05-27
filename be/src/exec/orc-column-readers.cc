@@ -406,6 +406,13 @@ Status OrcStructReader::TopLevelReadValueBatch(ScratchTupleBatch* scratch_batch,
     }
   }
   row_idx_ += scratch_batch->num_tuples - scratch_batch_idx;
+  if (children_.empty()) {
+    DCHECK_EQ(scratch_batch_idx, scratch_batch->num_tuples);
+    int num_to_fake_read = std::min(scratch_batch->capacity - scratch_batch->num_tuples,
+                                    (int)batch_->numElements - row_idx_);
+    scratch_batch->num_tuples += num_to_fake_read;
+    row_idx_ += num_to_fake_read;
+  }
   return Status::OK();
 }
 
