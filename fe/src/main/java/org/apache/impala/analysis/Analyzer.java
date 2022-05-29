@@ -33,8 +33,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.stream.Stream;
-import java.util.stream.Collectors;
 
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
@@ -48,7 +46,6 @@ import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.authorization.TableMask;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Column;
-import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeDataSourceTable;
@@ -77,6 +74,7 @@ import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.planner.JoinNode;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
+import org.apache.impala.rewrite.CountStarToConstRule;
 import org.apache.impala.rewrite.SimplifyCastExprRule;
 import org.apache.impala.rewrite.ConvertToCNFRule;
 import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
@@ -229,6 +227,9 @@ public class Analyzer {
   // authorization on its source tables and set the field below to non-null if
   // if an exception was encountered.
   private String mvAuthExceptionMsg_ = null;
+
+  // Total records num of the Iceberg table.
+  private long totalRecordsNum_;
 
   // Required Operation type: Read, write, any(read or write).
   public enum OperationType {
@@ -572,6 +573,7 @@ public class Analyzer {
         rules.add(DefaultNdvScaleRule.INSTANCE);
         rules.add(SimplifyCastExprRule.INSTANCE);
       }
+      rules.add(CountStarToConstRule.INSTANCE);
       exprRewriter_ = new ExprRewriter(rules);
     }
   };
@@ -982,6 +984,19 @@ public class Analyzer {
   public String getMVAuthExceptionMsg() {
     return mvAuthExceptionMsg_;
   }
+
+  public void setTotalRecordsNum(long totalRecordsNum) {
+    totalRecordsNum_ = totalRecordsNum;
+  }
+
+  public long getTotalRecordsNum() { return totalRecordsNum_; }
+
+  /**
+   * Check if 'count(*)' FunctionCallExpr can be rewritten as LiteralExpr. When
+   * totalRecordsNum_ is 0, no optimization 'count(*)' is still very fast, so return true
+   * only if totalRecordsNum_ is greater than 0.
+   */
+  public boolean canRewriteCountStarToConst() { return totalRecordsNum_ > 0; }
 
   /**
    * Register conjuncts that are outer joined by a full outer join. For a given

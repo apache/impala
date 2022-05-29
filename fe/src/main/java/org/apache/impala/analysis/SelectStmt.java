@@ -29,15 +29,17 @@ import java.util.Set;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
+import org.apache.iceberg.SnapshotSummary;
 import org.apache.impala.analysis.Path.PathType;
-import org.apache.impala.analysis.TableRef.ZippingUnnestType;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.DatabaseNotFoundException;
+import org.apache.impala.catalog.FeFsTable.Utils;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
-import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
@@ -267,6 +269,7 @@ public class SelectStmt extends QueryStmt {
     if (isAnalyzed()) return;
     super.analyze(analyzer);
     new SelectAnalyzer(analyzer).analyze();
+    this.optimizePlainCountStarQuery();
   }
 
   /**
@@ -1302,6 +1305,70 @@ public class SelectStmt extends QueryStmt {
     } else {
       return rewrittenExpr;
     }
+  }
+
+
+  /**
+   * Set totalRecordsNum_ in analyzer_ for the plain count(*) queries of Iceberg tables.
+   * Queries that can be rewritten need to meet the following requirements:
+   *  - stmt does not have WHERE clause
+   *  - stmt does not have GROUP BY clause
+   *  - stmt does not have HAVING clause
+   *  - tableRefs contains only one BaseTableRef
+   *  - table is the Iceberg table
+   *  - SelectList must contains 'count(*)' or 'count(constant)'
+   *  - SelectList can contain other agg functions, e.g. min, sum, etc
+   *  - SelectList can contain constant
+   *
+   * e.g. 'SELECT count(*) FROM iceberg_tbl' would be rewritten as 'SELECT constant'.
+   */
+  public void optimizePlainCountStarQuery() throws AnalysisException {
+    if (this.hasWhereClause()) return;
+    if (this.hasGroupByClause()) return;
+    if (this.hasHavingClause()) return;
+
+    List<TableRef> tables = this.getTableRefs();
+    if (tables.size() != 1) return;
+    TableRef tableRef = tables.get(0);
+    if (!(tableRef instanceof BaseTableRef)) return;
+
+    TableName tableName = tableRef.getDesc().getTableName();
+    FeTable table;
+    try {
+      table = analyzer_.getCatalog().getTable(tableName.getDb(), tableName.getTbl());
+    } catch (DatabaseNotFoundException e) {
+      throw new AnalysisException(
+          Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + tableName.getDb(), e);
+    }
+    if (!(table instanceof FeIcebergTable)) return;
+
+    boolean hasCountStarFunc = false;
+    boolean hasAggFunc = false;
+    analyzer_.checkStmtExprLimit();
+    for (SelectListItem selectItem : this.getSelectList().getItems()) {
+      Expr expr = selectItem.getExpr();
+      if (expr == null) continue;
+      if (expr.isConstant()) continue;
+      if (FunctionCallExpr.isCountStarFunctionCallExpr(expr)) {
+        hasCountStarFunc = true;
+      } else if (expr.isAggregate()) {
+        hasAggFunc = true;
+      } else {
+        return;
+      }
+    }
+    if (!hasCountStarFunc) return;
+
+    long num = Utils.getSnapshotSummaryPropOfTypeLong(
+        ((FeIcebergTable) table).getIcebergApiTable(), tableRef.getTimeTravelSpec(),
+        SnapshotSummary.TOTAL_RECORDS_PROP);
+    if (num <= 0) return;
+    analyzer_.setTotalRecordsNum(num);
+
+    if (hasAggFunc) return;
+    // When all select items are 'count(*)' or constant, 'select count(*) from ice_tbl;'
+    // would need to be rewritten as 'select const;'
+    fromClause_.getTableRefs().clear();
   }
 
   @Override

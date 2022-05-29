@@ -18,7 +18,6 @@
 package org.apache.impala.analysis;
 
 import java.util.Arrays;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.HashSet;
 import java.util.Optional;
@@ -179,6 +178,24 @@ public class FunctionCallExpr extends Expr {
     }
     Preconditions.checkState(!result.type_.isWildcardDecimal());
     return result;
+  }
+
+  /**
+   * Return true if an Expr is count star FunctionCallExpr.
+   * e.g. count(*), count(<literal>).
+   */
+  public static boolean isCountStarFunctionCallExpr(Expr expr) {
+    if (!(expr instanceof FunctionCallExpr)) return false;
+    FunctionCallExpr func = (FunctionCallExpr) expr;
+    if (!func.getFnName().getFunction().equalsIgnoreCase("count")) {
+      return false;
+    }
+    if (func.getParams().isStar()) return true;
+    if (func.getParams().isDistinct()) return false;
+    if (func.getParams().exprs().size() != 1) return false;
+    Expr child = func.getChild(0);
+    if (!Expr.IS_LITERAL.apply(child)) return false;
+    return !Expr.IS_NULL_VALUE.apply(child);
   }
 
   /**

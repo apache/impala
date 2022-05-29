@@ -1,0 +1,235 @@
+====
+---- QUERY
+create table ice_tbl (
+  col_i INT,
+  col_s STRING
+) partitioned by spec (col_s) stored as iceberg tblproperties ('write.format.default' = 'parquet');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+select count(*) from ice_tbl;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+insert into
+  ice_tbl
+values
+  (1, "odd"),
+  (3, "odd"),
+  (5, "odd");
+show files in ice_tbl;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=odd/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+select count(*) from ice_tbl;
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+create table ice_tbl_u1 stored as iceberg as select * from ice_tbl;
+---- RESULTS
+'Inserted 3 row(s)'
+====
+---- QUERY
+select count(*) from ice_tbl_u1;
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+insert into
+  ice_tbl
+values
+  (2, "even"),
+  (4, "even"),
+  (6, "even");
+show files in ice_tbl;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=even/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=odd/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+select count(*) from ice_tbl;
+---- RESULTS
+6
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+create table ice_tbl_u2 stored as iceberg as select * from ice_tbl;
+---- RESULTS
+'Inserted 6 row(s)'
+====
+---- QUERY
+select count(*) from ice_tbl_u2;
+---- RESULTS
+6
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+insert into
+  ice_tbl
+values
+  (1, "odd"),
+  (2, "even");
+show files in ice_tbl;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=even/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=even/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=odd/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=odd/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+select count(*) from ice_tbl;
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+select count(*) from ice_tbl for system_time as of now();
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+set explain_level=3;
+explain select count(col_i), count(*) from ice_tbl;
+---- RESULTS: VERIFY_IS_SUBSET
+'Analyzed query: SELECT count(col_i), CAST(8 AS BIGINT) FROM'
+'$DATABASE.ice_tbl'
+====
+---- QUERY
+set explain_level=3;
+explain select count(distinct col_i), count(*) from ice_tbl;
+---- RESULTS: VERIFY_IS_SUBSET
+'Analyzed query: SELECT count(DISTINCT col_i), CAST(8 AS BIGINT) FROM'
+'$DATABASE.ice_tbl'
+====
+---- QUERY
+set explain_level=3;
+explain select min(col_i), count(*), max(col_i) from ice_tbl;
+---- RESULTS: VERIFY_IS_SUBSET
+'Analyzed query: SELECT min(col_i), CAST(8 AS BIGINT), max(col_i) FROM'
+'$DATABASE.ice_tbl'
+====
+---- QUERY
+set explain_level=3;
+explain select 123, count(*), 321 from ice_tbl;
+---- RESULTS: VERIFY_IS_SUBSET
+'Analyzed query: SELECT CAST(123 AS TINYINT), CAST(8 AS BIGINT), CAST(321 AS'
+'SMALLINT)'
+====
+---- QUERY
+select
+  count(*)
+from
+  ice_tbl
+where
+  col_s = 'odd';
+---- RESULTS
+4
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+select
+  count(*)
+from
+  ice_tbl
+having
+  avg(col_i) < 0;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+select
+  count(*)
+from
+  ice_tbl
+group by
+  col_s;
+---- RESULTS
+4
+4
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+select
+  count(distinct col_i)
+from
+  ice_tbl;
+---- RESULTS
+6
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+truncate ice_tbl;
+---- RESULTS
+'Table has been truncated.'
+====
+---- QUERY
+select count(*) from ice_tbl;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+create table parq_tbl(col_i INT, col_s STRING) PARTITIONED BY(x INT) STORED AS PARQUET;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into parq_tbl PARTITION(x = 12340) values (0, "a");
+insert into parq_tbl PARTITION(x = 12341) values (1, "b");
+insert into parq_tbl PARTITION(x = 12342) values (2, "c");
+select count(*) from parq_tbl;
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 3
+====
+---- QUERY
+select count(*) as c from ice_tbl_u1  union all (select count(*) c from ice_tbl_u2) order by c;
+---- RESULTS
+3
+6
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====

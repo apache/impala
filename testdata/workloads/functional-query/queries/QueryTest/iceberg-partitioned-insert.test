@@ -91,7 +91,7 @@ select count(*) from ice_bigints;
 BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
-aggregation(SUM, NumFileMetadataRead): 6
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 select count(*) from ice_bigints

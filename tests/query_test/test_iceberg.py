@@ -224,15 +224,33 @@ class TestIcebergTable(ImpalaTestSuite):
       for r in expected_results:
         assert r in data.data
 
+    def expect_for_count_star(query, expected):
+      data = impalad_client.execute(query)
+      assert len(data.data) == 1
+      assert expected in data.data
+      assert "NumRowGroups" not in data.runtime_profile
+      assert "NumFileMetadataRead" not in data.runtime_profile
+
     def expect_results_t(ts, expected_results):
       expect_results(
           "select * from {0} for system_time as of {1}".format(tbl_name, ts),
           expected_results)
 
+    def expect_for_count_star_t(ts, expected):
+      expect_for_count_star(
+          "select count(*) from {0} for system_time as of {1}".format(tbl_name, ts),
+          expected)
+
     def expect_results_v(snapshot_id, expected_results):
       expect_results(
           "select * from {0} for system_version as of {1}".format(tbl_name, snapshot_id),
           expected_results)
+
+    def expect_for_count_star_v(snapshot_id, expected):
+      expect_for_count_star(
+          "select count(*) from {0} for system_version as of {1}".format(
+              tbl_name, snapshot_id),
+          expected)
 
     def quote(s):
       return "'{0}'".format(s)
@@ -278,6 +296,21 @@ class TestIcebergTable(ImpalaTestSuite):
       expect_results_v(snapshots[1], ['1', '2'])
       expect_results_v(snapshots[2], [])
       expect_results_v(snapshots[3], ['100'])
+
+      # Test of plain count star optimization
+      # 'NumRowGroups' and 'NumFileMetadataRead' should not appear in profile
+      expect_for_count_star_t("now()", '1')
+      expect_for_count_star_t(quote(ts_1), '1')
+      expect_for_count_star_t(quote(ts_2), '2')
+      expect_for_count_star_t(quote(ts_3), '0')
+      expect_for_count_star_t(cast_ts(ts_3) + " + interval 1 seconds", '0')
+      expect_for_count_star_t(quote(ts_4), '1')
+      expect_for_count_star_t(cast_ts(ts_4) + " - interval 5 seconds", '0')
+      expect_for_count_star_t(cast_ts(ts_4) + " + interval 1 hours", '1')
+      expect_for_count_star_v(snapshots[0], '1')
+      expect_for_count_star_v(snapshots[1], '2')
+      expect_for_count_star_v(snapshots[2], '0')
+      expect_for_count_star_v(snapshots[3], '1')
 
       # SELECT diff
       expect_results("""SELECT * FROM {tbl} FOR SYSTEM_TIME AS OF '{ts_new}'
@@ -623,4 +656,8 @@ class TestIcebergTable(ImpalaTestSuite):
 
   def test_compound_predicate_push_down(self, vector, unique_database):
       self.run_test_case('QueryTest/iceberg-compound-predicate-push-down', vector,
+                         use_db=unique_database)
+
+  def test_plain_count_star_optimization(self, vector, unique_database):
+      self.run_test_case('QueryTest/iceberg-plain-count-star-optimization', vector,
                          use_db=unique_database)
