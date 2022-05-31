@@ -1202,6 +1202,23 @@ class TestImpalaShell(ImpalaTestSuite):
       rows_from_file = [line.rstrip() for line in f]
       assert rows_from_stdout == rows_from_file
 
+  def test_output_file_utf8(self, vector, tmp_file):
+    """Test that writing UTF-8 output to a file using '--output_file' produces the
+    same output as written to stdout."""
+    # This is purely about UTF-8 output, so it doesn't need multiple rows.
+    query = "select '引'"
+    # Run the query normally and keep the stdout
+    output = run_impala_shell_cmd(vector, ['-q', query, '-B', '--output_delimiter=;'])
+    assert "Fetched 1 row(s)" in output.stderr
+    rows_from_stdout = output.stdout.strip().split('\n')
+    # Run the query with output sent to a file using '--output_file'.
+    result = run_impala_shell_cmd(vector, ['-q', query, '-B', '--output_delimiter=;',
+                                           '--output_file=%s' % tmp_file])
+    assert "Fetched 1 row(s)" in result.stderr
+    with open(tmp_file, "r") as f:
+      rows_from_file = [line.rstrip() for line in f]
+      assert rows_from_stdout == rows_from_file
+
   def test_http_socket_timeout(self, vector):
     """Test setting different http_socket_timeout_s values."""
     if (vector.get_value('strict_hs2_protocol') or

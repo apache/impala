@@ -112,7 +112,15 @@ class OutputStream(object):
         with open(self.filename, 'ab') as out_file:
           # Note that instances of this class do not persist, so it's fine to
           # close the we close the file handle after each write.
-          out_file.write(formatted_data.encode('utf-8'))  # file opened in binary mode
+          # The file is opened in binary mode. Python 2 returns Unicode bytes
+          # that can be written directly. Python 3 returns a string, which
+          # we need to encode before writing.
+          # TODO: Reexamine the contract of the format() function and see if
+          # we can remove this.
+          if sys.version_info.major == 2 and isinstance(formatted_data, str):
+            out_file.write(formatted_data)
+          else:
+            out_file.write(formatted_data.encode('utf-8'))
           out_file.write(b'\n')
       except IOError as err:
         file_err_msg = "Error opening file %s: %s" % (self.filename, str(err))
