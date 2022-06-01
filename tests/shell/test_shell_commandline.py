@@ -1240,3 +1240,13 @@ class TestImpalaShell(ImpalaTestSuite):
     result = run_impala_shell_cmd(vector, args + ['--http_socket_timeout_s=None'])
     assert result.stderr == ""
     assert result.stdout == "0\n"
+
+  def test_trailing_whitespace(self, vector):
+    """Test CSV output with trailing whitespace"""
+
+    # Ten trailing spaces
+    query = "select 'Trailing Whitespace          '"
+    # Only one column, no need for output_delimiter
+    output = run_impala_shell_cmd(vector, ['-q', query, '-B'])
+    assert "Fetched 1 row(s)" in output.stderr
+    assert "Trailing Whitespace          \n" in output.stdout
