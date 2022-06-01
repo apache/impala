@@ -574,12 +574,23 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     // Check if this is an inferred identity predicate i.e for c1 = c2 both
     // sides are pointing to the same source slot. In such cases it is wrong
     // to add the predicate to the SELECT node because it will incorrectly
-    // eliminate rows with NULL values.
+    // eliminate rows with NULL values. We also check if both sides are pointing
+    // to equal constant values.
     for (Expr e : conjuncts) {
       if (e instanceof BinaryPredicate && ((BinaryPredicate) e).isInferred()) {
-        SlotDescriptor lhs = ((BinaryPredicate) e).getChild(0).findSrcScanSlot();
-        SlotDescriptor rhs = ((BinaryPredicate) e).getChild(1).findSrcScanSlot();
-        if (lhs != null && rhs != null && lhs.equals(rhs)) continue;
+        Expr lhsSrcExpr = ((BinaryPredicate) e).getChild(0).findSrcExpr();
+        Expr rhsSrcExpr  = ((BinaryPredicate) e).getChild(1).findSrcExpr();
+        if (lhsSrcExpr != null && rhsSrcExpr != null) {
+          if (lhsSrcExpr.isConstant() && rhsSrcExpr.isConstant() &&
+              lhsSrcExpr.equals(rhsSrcExpr)) {
+            continue;
+          }
+          if (lhsSrcExpr instanceof SlotRef && rhsSrcExpr instanceof SlotRef) {
+            SlotRef lhsSlotRef = (SlotRef) lhsSrcExpr;
+            SlotRef rhsSlotRef = (SlotRef) rhsSrcExpr;
+            if (lhsSlotRef.getDesc().equals(rhsSlotRef.getDesc())) continue;
+          }
+        }
       }
       finalConjuncts.add(e);
     }

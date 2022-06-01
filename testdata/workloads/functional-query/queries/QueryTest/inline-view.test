@@ -579,3 +579,17 @@ NULL,NULL
 ---- TYPES
 INT, INT
 ====
+---- QUERY
+# IMPALA-11323: Constant expressions should get filtered out so they
+# don't get placed in the select node in the planner.
+with t as (select 1 a), v as
+  (select distinct a, cast(null as smallint) b, cast(null as smallint) c from t)
+select distinct a,b,c from v
+  union all
+select distinct a,b,c from v;
+---- RESULTS
+1,NULL,NULL
+1,NULL,NULL
+---- TYPES
+TINYINT, SMALLINT, SMALLINT
+====
