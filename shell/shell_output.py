@@ -90,7 +90,14 @@ class DelimitedOutputFormatter(object):
         row = [val.encode('utf-8', 'replace') if isinstance(val, unicode) else val
             for val in row]
       writer.writerow(row)
-    rows = temp_buffer.getvalue().rstrip()
+    # The CSV writer produces an extra newline. Strip that extra newline (and
+    # only that extra newline). csv wraps newlines for data values in quotes,
+    # so rstrip will be limited to the extra newline.
+    if sys.version_info.major == 2:
+      # Python 2 is in encoded Unicode bytes, so this needs to be a bytes \n.
+      rows = temp_buffer.getvalue().rstrip(b'\n')
+    else:
+      rows = temp_buffer.getvalue().rstrip('\n')
     temp_buffer.close()
     return rows
 
