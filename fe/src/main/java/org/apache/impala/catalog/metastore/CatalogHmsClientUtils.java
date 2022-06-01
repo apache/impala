@@ -142,7 +142,12 @@ public class CatalogHmsClientUtils {
     List<TNetworkAddress> networkAddresses = Lists
         .newArrayListWithCapacity(serializedNetAddresses.size());
     int index = 0;
-    TDeserializer deserializer = new TDeserializer(new Factory());
+    TDeserializer deserializer = null;
+    try {
+      deserializer = new TDeserializer(new Factory());
+    } catch (TException e) {
+      throw new CatalogException("Could not create deserializer. " + e.getMessage());
+    }
     for (ByteBuffer serializedData : serializedNetAddresses) {
       TNetworkAddress networkAddress = new TNetworkAddress();
       try {

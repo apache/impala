@@ -466,8 +466,12 @@ public class CatalogHmsAPIHelper {
     ObjectDictionary result = new ObjectDictionary(Maps.newHashMap());
     if (networkAddresses.isEmpty()) return result;
     List<ByteBuffer> serializedAddresses = new ArrayList<>();
-    TSerializer serializer =
-        new TSerializer(new TCompactProtocol.Factory());
+    TSerializer serializer = null;
+    try {
+      serializer = new TSerializer(new TCompactProtocol.Factory());
+    } catch (TException e) {
+      throw new CatalogException("Could not create serializer. " + e.getMessage());
+    }
     for (TNetworkAddress networkAddress : networkAddresses) {
       byte[] serializedNetAddress;
       try {

@@ -145,9 +145,9 @@ public class FeSupport {
   public static TCacheJarResult CacheJar(String hdfsLocation) throws InternalException {
     Preconditions.checkNotNull(hdfsLocation);
     TCacheJarParams params = new TCacheJarParams(hdfsLocation);
-    TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     byte[] result;
     try {
+      TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
       result = CacheJar(serializer.serialize(params));
       Preconditions.checkNotNull(result);
       TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
@@ -186,9 +186,9 @@ public class FeSupport {
     Preconditions.checkState(!expr.contains(SlotRef.class));
     TExprBatch exprBatch = new TExprBatch();
     exprBatch.addToExprs(expr.treeToThrift());
-    TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     byte[] result;
     try {
+      TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
       result = EvalExprsWithoutRowBounded(
           serializer.serialize(exprBatch), serializer.serialize(queryCtx), maxResultSize);
       Preconditions.checkNotNull(result);
@@ -217,8 +217,8 @@ public class FeSupport {
 
   public static TSymbolLookupResult LookupSymbol(TSymbolLookupParams params)
       throws InternalException {
-    TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     try {
+      TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
       byte[] resultBytes = LookupSymbol(serializer.serialize(params));
       Preconditions.checkNotNull(resultBytes);
       TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
@@ -276,7 +276,6 @@ public class FeSupport {
    */
   public static TResultRow EvalPredicateBatch(List<Expr> exprs,
       TQueryCtx queryCtx) throws InternalException {
-    TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     TExprBatch exprBatch = new TExprBatch();
     for (Expr expr: exprs) {
       // Make sure we only process boolean exprs.
@@ -286,6 +285,7 @@ public class FeSupport {
     }
     byte[] result;
     try {
+      TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
       result = EvalExprsWithoutRow(
           serializer.serialize(exprBatch), serializer.serialize(queryCtx));
       Preconditions.checkNotNull(result);
@@ -327,8 +327,8 @@ public class FeSupport {
     request.setHeader(new TCatalogServiceRequestHeader());
     request.setObject_descs(objectDescs);
 
-    TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     try {
+      TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
       byte[] result = PrioritizeLoad(serializer.serialize(request));
       Preconditions.checkNotNull(result);
       TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
@@ -362,8 +362,8 @@ public class FeSupport {
     TGetPartitionStatsRequest request = new TGetPartitionStatsRequest();
     request.setTable_name(table.toThrift());
     TGetPartitionStatsResponse response = new TGetPartitionStatsResponse();
-    TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     try {
+      TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
       byte[] result = GetPartitionStats(serializer.serialize(request));
       Preconditions.checkNotNull(result);
       TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
@@ -404,8 +404,8 @@ public class FeSupport {
     Preconditions.checkNotNull(csvQueryOptions);
     Preconditions.checkNotNull(queryOptions);
 
-    TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     try {
+      TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
       byte[] result = ParseQueryOptions(csvQueryOptions,
           serializer.serialize(queryOptions));
       Preconditions.checkNotNull(result);

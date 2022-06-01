@@ -168,8 +168,8 @@ public class JniFrontend {
     }
 
     // TODO: avoid creating serializer for each query?
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(result);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -208,8 +208,8 @@ public class JniFrontend {
     TLoadDataReq request = new TLoadDataReq();
     JniUtil.deserializeThrift(protocolFactory_, request, thriftLoadTableDataParams);
     TLoadDataResp response = frontend_.loadTableData(request);
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(response);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -232,8 +232,8 @@ public class JniFrontend {
   public byte[] getCatalogMetrics() throws ImpalaException {
     Preconditions.checkNotNull(frontend_);
     TGetCatalogMetricsResult metrics = frontend_.getCatalogMetrics();
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(metrics);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -269,8 +269,8 @@ public class JniFrontend {
     TGetTablesResult result = new TGetTablesResult();
     result.setTables(tables);
 
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(result);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -289,8 +289,8 @@ public class JniFrontend {
     JniUtil.deserializeThrift(protocolFactory_, params, thriftShowFilesParams);
     TResultSet result = frontend_.getTableFiles(params);
 
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(result);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -320,8 +320,8 @@ public class JniFrontend {
     List<TDatabase> tDbs = Lists.newArrayListWithCapacity(dbs.size());
     for (FeDb db: dbs) tDbs.add(db.toThrift());
     result.setDbs(tDbs);
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(result);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -337,8 +337,8 @@ public class JniFrontend {
     TDescribeHistoryParams params = new TDescribeHistoryParams();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftParams);
     TGetTableHistoryResult result = frontend_.getTableHistory(params);
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(result);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -368,8 +368,8 @@ public class JniFrontend {
       result.addToClass_names(dataSource.getClassName());
       result.addToApi_versions(dataSource.getApiVersion());
     }
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(result);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -391,8 +391,8 @@ public class JniFrontend {
       result = frontend_.getTableStats(params.getTable_name().getDb_name(),
           params.getTable_name().getTable_name(), params.op);
     }
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(result);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -427,8 +427,8 @@ public class JniFrontend {
     result.setFn_ret_types(retTypes);
     result.setFn_binary_types(fnBinaryTypes);
     result.setFn_persistence(fnIsPersistent);
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(result);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -462,8 +462,8 @@ public class JniFrontend {
     TDescribeResult result = frontend_.describeDb(
         params.getDb(), params.getOutput_style());
 
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(result);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -492,8 +492,8 @@ public class JniFrontend {
       result = DescribeResultFactory.buildDescribeMinimalResult(structType);
     }
 
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(result);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -536,8 +536,8 @@ public class JniFrontend {
     Preconditions.checkNotNull(params.slot_types);
     TDescriptorTable result =
         DescriptorTable.buildTestDescriptorTable(params.slot_types);
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       byte[] ret = serializer.serialize(result);
       return ret;
     } catch (TException e) {
@@ -552,8 +552,8 @@ public class JniFrontend {
     Preconditions.checkNotNull(frontend_);
     TShowRolesParams params = new TShowRolesParams();
     JniUtil.deserializeThrift(protocolFactory_, params, showRolesParams);
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(frontend_.getAuthzManager().getRoles(params));
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -568,8 +568,8 @@ public class JniFrontend {
     Preconditions.checkNotNull(frontend_);
     TShowGrantPrincipalParams params = new TShowGrantPrincipalParams();
     JniUtil.deserializeThrift(protocolFactory_, params, showGrantPrincipalParams);
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(frontend_.getAuthzManager().getPrivileges(params));
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -586,8 +586,8 @@ public class JniFrontend {
     JniUtil.deserializeThrift(protocolFactory_, params, metadataOpsParams);
     TResultSet result = frontend_.execHiveServer2MetadataOp(params);
 
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(result);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -619,8 +619,8 @@ public class JniFrontend {
     }
     TGetAllHadoopConfigsResponse result = new TGetAllHadoopConfigsResponse();
     result.setConfigs(configs);
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(result);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -637,8 +637,8 @@ public class JniFrontend {
     JniUtil.deserializeThrift(protocolFactory_, request, serializedRequest);
     TGetHadoopConfigResponse result = new TGetHadoopConfigResponse();
     result.setValue(CONF.get(request.getName()));
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(result);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -665,8 +665,8 @@ public class JniFrontend {
         throw new InternalException(e.getMessage());
       }
     }
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(result);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -728,8 +728,8 @@ public class JniFrontend {
     JniUtil.deserializeThrift(protocolFactory_, request, serializedRequest);
     WrappedWebContext webContext = new WrappedWebContext(request, response);
     frontend_.getSaml2Client().setRedirect(webContext);
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(response);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -744,8 +744,8 @@ public class JniFrontend {
     JniUtil.deserializeThrift(protocolFactory_, request, serializedRequest);
     WrappedWebContext webContext = new WrappedWebContext(request, response);
     frontend_.getSaml2Client().validateAuthnResponse(webContext);
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(response);
     } catch (TException e) {
       throw new InternalException(e.getMessage());

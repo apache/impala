@@ -102,8 +102,8 @@ public class JniUtil {
    */
   public static <T extends TBase<?, ?>>
   byte[] serializeToThrift(T input) throws ImpalaException {
-    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(input);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -115,8 +115,8 @@ public class JniUtil {
    */
   public static <T extends TBase<?, ?>, F extends TProtocolFactory>
   byte[] serializeToThrift(T input, F protocolFactory) throws ImpalaException {
-    TSerializer serializer = new TSerializer(protocolFactory);
     try {
+      TSerializer serializer = new TSerializer(protocolFactory);
       return serializer.serialize(input);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
@@ -135,8 +135,8 @@ public class JniUtil {
   void deserializeThrift(F protocolFactory, T result, byte[] thriftData)
       throws ImpalaException {
     // TODO: avoid creating deserializer for each query?
-    TDeserializer deserializer = new TDeserializer(protocolFactory);
     try {
+      TDeserializer deserializer = new TDeserializer(protocolFactory);
       deserializer.deserialize(result, thriftData);
     } catch (TException e) {
       throw new InternalException(e.getMessage());

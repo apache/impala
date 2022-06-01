@@ -253,10 +253,10 @@ public class JniCatalog {
     long start = System.currentTimeMillis();
     TDdlExecRequest params = new TDdlExecRequest();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftDdlExecReq);
-    TSerializer serializer = new TSerializer(protocolFactory_);
     String shortDesc = CatalogOpUtil.getShortDescForExecDdl(params);
     LOG.info("execDdl request: " + shortDesc);
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(shortDesc)) {
+      TSerializer serializer = new TSerializer(protocolFactory_);
       byte[] res = serializer.serialize(catalogOpExecutor_.execDdlRequest(params));
       JniUtil.logResponse(res.length, start, params, "execDdl");
       long duration = System.currentTimeMillis() - start;

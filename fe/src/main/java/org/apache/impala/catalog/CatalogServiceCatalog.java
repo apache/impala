@@ -126,6 +126,7 @@ import org.apache.impala.util.ThreadNameAnnotator;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.transport.TTransportException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -749,7 +750,7 @@ public class CatalogServiceCatalog extends Catalog {
     TSerializer serializer;
 
     GetCatalogDeltaContext(long nativeCatalogServerPtr, long fromVersion, long toVersion,
-        long lastResetStartVersion)
+        long lastResetStartVersion) throws TTransportException
     {
       this.nativeCatalogServerPtr = nativeCatalogServerPtr;
       this.fromVersion = fromVersion;
