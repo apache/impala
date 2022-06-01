@@ -22,7 +22,7 @@
 # a distributable python package of the Impala shell. The resulting
 # archive will be saved to:
 #
-#   ${IMPALA_HOME}/shell/dist/impala_shell-<version>.tar.gz
+#   ${DIST_DIR}/impala_shell-<version>.tar.gz
 #
 # Until the thrift-generated python files in ${IMPALA_HOME}/shell/gen-py
 # have been created by the build process, this script will not work.
@@ -37,7 +37,7 @@ set -eu -o pipefail
 WORKING_DIR="$(cd "$(dirname "$0")" ; pwd -P )"
 SHELL_HOME="${IMPALA_HOME}"/shell
 STAGING_DIR="${WORKING_DIR}"/staging
-DIST_DIR="${DIST_DIR:-$WORKING_DIR/dist}"
+DIST_DIR="${DIST_DIR:-$SHELL_HOME/dist}"
 PACKAGE_DIR="${STAGING_DIR}"/impala_shell_package
 MODULE_LIB_DIR="${PACKAGE_DIR}"/impala_shell
 NO_CLEAN_DIST="${NO_CLEAN_DIST:-}"
@@ -72,7 +72,7 @@ assemble_package_files() {
 }
 
 create_distributable_python_package() {
-  # Generate a new python package tarball in ${IMPALA_HOME}/shell/dist
+  # Generate a new python package tarball in ${DIST_DIR}
   if [[ "${NO_CLEAN_DIST}" != "true" ]]; then
     rm -rf "${DIST_DIR}"
   fi

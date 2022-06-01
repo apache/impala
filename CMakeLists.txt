@@ -463,7 +463,7 @@ add_custom_target(shell_tarball DEPENDS gen-deps
 )
 
 add_custom_target(shell_pypi_package DEPENDS shell_tarball
-  COMMAND "DIST_DIR=${CMAKE_SOURCE_DIR}/shell/dist CLEAN_DIST=true ${CMAKE_SOURCE_DIR}/shell/packaging/make_python_package.sh"
+  COMMAND "${CMAKE_SOURCE_DIR}/shell/packaging/make_python_package.sh"
 )
 
 add_custom_target(cscope ALL DEPENDS gen-deps
