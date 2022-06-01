@@ -1642,22 +1642,45 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
+   * Returns the source expression for this expression. Traverses the source
+   * exprs of intermediate slot descriptors to resolve materialization points
+   * (e.g., aggregations). Returns null if there are multiple source Exprs
+   * mapped to the expression at any given point.
+   */
+  public Expr findSrcExpr() {
+    // If the source expression is a constant expression, it won't have a scanSlotRef
+    // and we can return this.
+    if (isConstant()) {
+      return this;
+    }
+    SlotRef slotRef = unwrapSlotRef(false);
+    if (slotRef == null) return null;
+    SlotDescriptor slotDesc = slotRef.getDesc();
+    if (slotDesc.isScanSlot()) return slotRef;
+    if (slotDesc.getSourceExprs().size() == 1) {
+      return slotDesc.getSourceExprs().get(0).findSrcExpr();
+    }
+    // No known source expr, or there are several source exprs meaning the slot is
+    // has no single source table.
+    return null;
+  }
+
+  /**
    * Returns the descriptor of the scan slot that directly or indirectly produces
    * the values of 'this' SlotRef. Traverses the source exprs of intermediate slot
    * descriptors to resolve materialization points (e.g., aggregations).
    * Returns null if 'e' or any source expr of 'e' is not a SlotRef or cast SlotRef.
    */
   public SlotDescriptor findSrcScanSlot() {
-    SlotRef slotRef = unwrapSlotRef(false);
-    if (slotRef == null) return null;
-    SlotDescriptor slotDesc = slotRef.getDesc();
-    if (slotDesc.isScanSlot()) return slotDesc;
-    if (slotDesc.getSourceExprs().size() == 1) {
-      return slotDesc.getSourceExprs().get(0).findSrcScanSlot();
+    Expr sourceExpr = findSrcExpr();
+    if (sourceExpr == null) {
+      return null;
     }
-    // No known source expr, or there are several source exprs meaning the slot is
-    // has no single source table.
-    return null;
+    SlotRef slotRef = sourceExpr.unwrapSlotRef(false);
+    if (slotRef == null) {
+      return null;
+    }
+    return slotRef.getDesc();
   }
 
   /**
