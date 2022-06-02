@@ -467,8 +467,10 @@ add_custom_target(impala_python ALL
   COMMAND "${CMAKE_SOURCE_DIR}/bin/init-impala-python.sh"
 )
 
+add_custom_target(impala_shell_pypi ALL DEPENDS shell_python2_install shell_python3_install)
+
 add_custom_target(notests_independent_targets DEPENDS
-  java cscope tarballs impala_python shell_python2_install
+  java cscope tarballs impala_python impala_shell_pypi
 )
 add_custom_target(notests_regular_targets DEPENDS
   impalad statestored catalogd admissiond fesupport loggingsupport ImpalaUdf udasample udfsample impala-profile-tool

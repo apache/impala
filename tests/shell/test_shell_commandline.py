@@ -145,7 +145,7 @@ class TestImpalaShell(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_strict_dimension())
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('protocol') != 'beeswax' or not v.get_value('strict_hs2_protocol'))
-    # Test with python2 and the raw tarball
+    # Test with python2, python3, and the raw tarball
     cls.ImpalaTestMatrix.add_dimension(create_impala_shell_executable_dimension())
 
   def test_no_args(self, vector):

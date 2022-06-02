@@ -324,7 +324,7 @@ def get_dev_impala_shell_executable():
 def create_impala_shell_executable_dimension():
   _, include_pypi = get_dev_impala_shell_executable()
   if include_pypi:
-    return ImpalaTestDimension('impala_shell', 'dev', 'python2')
+    return ImpalaTestDimension('impala_shell', 'dev', 'python2', 'python3')
   else:
     return ImpalaTestDimension('impala_shell', 'dev')
 
@@ -335,5 +335,6 @@ def get_impala_shell_executable(vector):
   impala_shell_executable, _ = get_dev_impala_shell_executable()
   return {
     'dev': impala_shell_executable,
-    'python2': os.path.join(IMPALA_HOME, 'shell/build/py2_venv/bin/impala-shell')
+    'python2': os.path.join(IMPALA_HOME, 'shell/build/py2_venv/bin/impala-shell'),
+    'python3': os.path.join(IMPALA_HOME, 'shell/build/py3_venv/bin/impala-shell')
   }[vector.get_value_with_default('impala_shell', 'dev')]

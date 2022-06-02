@@ -35,11 +35,20 @@ add_custom_target(shell_pypi_test_package DEPENDS shell_tarball
 )
 
 set(PYTHON2_VENV "${CMAKE_SOURCE_DIR}/shell/build/py2_venv")
+set(PYTHON3_VENV "${CMAKE_SOURCE_DIR}/shell/build/py3_venv")
 
 add_custom_command(OUTPUT "${PYTHON2_VENV}" DEPENDS impala_python
   COMMAND impala-virtualenv --python python2 "${PYTHON2_VENV}"
 )
 
-add_custom_target(shell_python2_install ALL DEPENDS "${PYTHON2_VENV}" shell_pypi_test_package
+add_custom_target(shell_python2_install DEPENDS "${PYTHON2_VENV}" shell_pypi_test_package
   COMMAND "${PYTHON2_VENV}/bin/pip" install "${SHELL_TEST_PKG}"
+)
+
+add_custom_command(OUTPUT "${PYTHON3_VENV}" DEPENDS impala_python
+  COMMAND impala-virtualenv --python python3 "${PYTHON3_VENV}"
+)
+
+add_custom_target(shell_python3_install DEPENDS "${PYTHON3_VENV}" shell_pypi_test_package
+  COMMAND "${PYTHON3_VENV}/bin/pip" install "${SHELL_TEST_PKG}"
 )
