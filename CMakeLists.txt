@@ -451,20 +451,13 @@ add_subdirectory(common/protobuf)
 add_subdirectory(be)
 add_subdirectory(docker)
 add_subdirectory(java)
+add_subdirectory(shell)
 
 # Build target for all generated files which most backend code depends on
 add_custom_target(gen-deps ALL DEPENDS thrift-deps proto-deps fb-deps
   kudu-util-proto-deps kudu-rpc-proto-deps kudu-security-proto-deps)
 
 add_custom_target(tarballs ALL DEPENDS shell_tarball)
-
-add_custom_target(shell_tarball DEPENDS gen-deps
-  COMMAND "${CMAKE_SOURCE_DIR}/shell/make_shell_tarball.sh"
-)
-
-add_custom_target(shell_pypi_package DEPENDS shell_tarball
-  COMMAND "${CMAKE_SOURCE_DIR}/shell/packaging/make_python_package.sh"
-)
 
 add_custom_target(cscope ALL DEPENDS gen-deps
   COMMAND "${CMAKE_SOURCE_DIR}/bin/gen-cscope.sh"
@@ -475,7 +468,7 @@ add_custom_target(impala_python ALL
 )
 
 add_custom_target(notests_independent_targets DEPENDS
-  java cscope tarballs impala_python
+  java cscope tarballs impala_python shell_python2_install
 )
 add_custom_target(notests_regular_targets DEPENDS
   impalad statestored catalogd admissiond fesupport loggingsupport ImpalaUdf udasample udfsample impala-profile-tool

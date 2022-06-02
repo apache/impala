@@ -32,7 +32,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_service import ImpaladService
 from tests.common.test_dimensions import create_client_protocol_dimension
 from tests.shell.util import run_impala_shell_cmd, run_impala_shell_cmd_no_expect, \
-    ImpalaShell
+    ImpalaShell, create_impala_shell_executable_dimension
 
 REQUIRED_MIN_OPENSSL_VERSION = 0x10001000L
 # Python supports TLSv1.2 from 2.7.9 officially but on Red Hat/CentOS Python2.7.5
@@ -142,6 +142,7 @@ class TestClientSsl(CustomClusterTestSuite):
   def add_test_dimensions(cls):
     super(TestClientSsl, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_impala_shell_executable_dimension())
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args=WEBSERVER_SSL_ARGS,

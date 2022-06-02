@@ -24,7 +24,7 @@ from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfLocal, Sk
                                SkipIfCOS)
 from tests.common.test_dimensions import (create_exec_option_dimension_from_dict,
     create_client_protocol_dimension, hs2_parquet_constraint)
-from tests.shell.util import ImpalaShell
+from tests.shell.util import create_impala_shell_executable_dimension
 
 
 class TestDateQueries(ImpalaTestSuite):
@@ -50,6 +50,7 @@ class TestDateQueries(ImpalaTestSuite):
     # via both protocols.
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
     cls.ImpalaTestMatrix.add_constraint(hs2_parquet_constraint)
+    cls.ImpalaTestMatrix.add_dimension(create_impala_shell_executable_dimension())
 
   def test_queries(self, vector):
     if vector.get_value('table_format').file_format == 'avro':

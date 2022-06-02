@@ -43,9 +43,9 @@ from tests.common.skip import SkipIfLocal
 from tests.common.test_dimensions import (
   create_client_protocol_dimension, create_client_protocol_strict_dimension,
   create_uncompressed_text_dimension, create_single_exec_option_dimension)
-from tests.shell.util import get_unused_port
 from util import (assert_var_substitution, ImpalaShell, get_impalad_port, get_shell_cmd,
-                  get_open_sessions_metric, IMPALA_SHELL_EXECUTABLE, spawn_shell)
+                  get_open_sessions_metric, spawn_shell, get_unused_port,
+                  create_impala_shell_executable_dimension, get_impala_shell_executable)
 import SimpleHTTPServer
 import SocketServer
 
@@ -175,7 +175,9 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_strict_dimension())
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-          v.get_value('protocol') != 'beeswax' or not v.get_value('strict_hs2_protocol'))
+        v.get_value('protocol') != 'beeswax' or not v.get_value('strict_hs2_protocol'))
+    # Test with python2 and the raw tarball
+    cls.ImpalaTestMatrix.add_dimension(create_impala_shell_executable_dimension())
 
   def _expect_with_cmd(self, proc, cmd, vector, expectations=(), db="default"):
     """Executes a command on the expect process instance and verifies a set of
@@ -899,7 +901,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
   def test_line_with_leading_comment(self, vector, unique_database):
     # IMPALA-2195: A line with a comment produces incorrect command.
     if vector.get_value('strict_hs2_protocol'):
-      pytest.skip("Leading omments not supported in strict hs2 mode.")
+      pytest.skip("Leading comments not supported in strict hs2 mode.")
     table = "{0}.leading_comment".format(unique_database)
     run_impala_shell_interactive(vector, 'create table {0} (i int);'.format(table))
     result = run_impala_shell_interactive(vector, '-- comment\n'
@@ -983,30 +985,6 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
 
   def test_fix_infinite_loop(self, vector):
     # IMPALA-6337: Fix infinite loop.
-
-    # In case of TL;DR:
-    # - see IMPALA-9362 for details
-    # - see tests/shell/util.py for explanation of IMPALA_SHELL_EXECUTABLE
-    if os.getenv("IMPALA_HOME") not in IMPALA_SHELL_EXECUTABLE:
-      # The fix for IMPALA-6337 involved patching our internal verison of
-      # sqlparse 0.1.19 in ${IMPALA_HOME}/shell/ext-py. However, when we
-      # create the the stand-alone python package of the impala-shell for PyPI,
-      # we don't include the bundled 3rd party libs -- we expect users to
-      # install 3rd upstream libraries from PyPI.
-      #
-      # We could try to bundle sqlparse with the PyPI package, but there we
-      # run into the issue that the our bundled version is not python 3
-      # compatible. The real fix for this would be to upgrade to sqlparse 0.3.0,
-      # but that's not without complications. See IMPALA-9362 for details.
-      #
-      # For the time being, what this means is that IMPALA-6337 is fixed for
-      # people who are running the shell locally from any host/node that's part
-      # of a cluster where Impala is installed, but if they are running a
-      # standalone version of the shell on a client outside of a cluster, then
-      # they will still be relying on the upstream version of sqlparse 0.1.19,
-      # and so they may still be affected by the IMPALA-6337.
-      #
-      pytest.skip("Test will fail if shell is not part of dev environment.")
 
     result = run_impala_shell_interactive(vector, "select 1 + 1; \"\n;\";")
     if vector.get_value('strict_hs2_protocol'):
@@ -1194,9 +1172,10 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       pytest.skip()
 
     # Check that we get a message about the 503 error when we try to connect.
+    impala_shell_executable = get_impala_shell_executable(vector)
     shell_args = ["--protocol={0}".format(protocol),
                   "-i{0}:{1}".format(http_503_server.HOST, http_503_server.PORT)]
-    shell_proc = spawn_shell([IMPALA_SHELL_EXECUTABLE] + shell_args)
+    shell_proc = spawn_shell([impala_shell_executable] + shell_args)
     shell_proc.expect("HTTP code 503", timeout=10)
 
   def test_http_interactions_extra(self, vector, http_503_server_extra):
@@ -1208,10 +1187,11 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       pytest.skip()
 
     # Check that we get a message about the 503 error when we try to connect.
+    impala_shell_executable = get_impala_shell_executable(vector)
     shell_args = ["--protocol={0}".format(protocol),
                   "-i{0}:{1}".format(http_503_server_extra.HOST,
                                      http_503_server_extra.PORT)]
-    shell_proc = spawn_shell([IMPALA_SHELL_EXECUTABLE] + shell_args)
+    shell_proc = spawn_shell([impala_shell_executable] + shell_args)
     shell_proc.expect("HTTP code 503: Service Unavailable \[EXTRA\]", timeout=10)
 
 

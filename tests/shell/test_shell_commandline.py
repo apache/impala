@@ -39,8 +39,8 @@ from tests.common.test_dimensions import (
   create_uncompressed_text_dimension, create_single_exec_option_dimension)
 from time import sleep, time
 from util import (get_impalad_host_port, assert_var_substitution, run_impala_shell_cmd,
-                  ImpalaShell, IMPALA_SHELL_EXECUTABLE, SHELL_IS_PYTHON_2,
-                  build_shell_env, wait_for_query_state)
+                  ImpalaShell, build_shell_env, wait_for_query_state,
+                  create_impala_shell_executable_dimension, get_impala_shell_executable)
 from contextlib import closing
 
 
@@ -144,7 +144,9 @@ class TestImpalaShell(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_strict_dimension())
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-          v.get_value('protocol') != 'beeswax' or not v.get_value('strict_hs2_protocol'))
+        v.get_value('protocol') != 'beeswax' or not v.get_value('strict_hs2_protocol'))
+    # Test with python2 and the raw tarball
+    cls.ImpalaTestMatrix.add_dimension(create_impala_shell_executable_dimension())
 
   def test_no_args(self, vector):
     args = ['-q', DEFAULT_QUERY]
@@ -867,7 +869,8 @@ class TestImpalaShell(ImpalaTestSuite):
     # Building an one-off shell command instead of using Util::ImpalaShell since we need
     # to customize the impala daemon socket.
     protocol = vector.get_value("protocol")
-    shell_cmd = [IMPALA_SHELL_EXECUTABLE, "--protocol={0}".format(protocol)]
+    impala_shell_executable = get_impala_shell_executable(vector)
+    shell_cmd = [impala_shell_executable, "--protocol={0}".format(protocol)]
     if protocol == 'beeswax':
       expected_output = "get_default_configuration"
     else:
@@ -1103,16 +1106,13 @@ class TestImpalaShell(ImpalaTestSuite):
     assert "1\t1\t10.1" in result.stdout, result.stdout
     assert "2\t2\t20.2" in result.stdout, result.stdout
 
-    if (vector.get_value("protocol") in ('hs2', 'hs2-http')) and not SHELL_IS_PYTHON_2:
-      # The HS2 client returns binary values for float/double types, and these must
-      # be converted to strings for display. However, due to differences between the
-      # way that python2 and python3 represent floating point values, the output
-      # from the shell will differ with regard to which version of python the
-      # shell is running under.
-      assert "3\t3\t30.299999999999997" in result.stdout, result.stdout
-    else:
-      # python 2, or python 3 with beeswax protocol
-      assert "3\t3\t30.3" in result.stdout, result.stdout
+    # The HS2 client returns binary values for float/double types, and these must
+    # be converted to strings for display. However, due to differences between the
+    # way that python2 and python3 represent floating point values, the output
+    # from the shell will differ with regard to which version of python the
+    # shell is running under.
+    assert("3\t3\t30.299999999999997" in result.stdout or
+      "3\t3\t30.3" in result.stdout), result.stdout
 
     assert "4\t4\t40.4" in result.stdout, result.stdout
 

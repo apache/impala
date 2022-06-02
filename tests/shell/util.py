@@ -37,28 +37,13 @@ from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import (IMPALAD_BEESWAX_HOST_PORT,
     IMPALAD_HS2_HOST_PORT, IMPALAD_HS2_HTTP_HOST_PORT,
     STRICT_HS2_HOST_PORT, STRICT_HS2_HTTP_HOST_PORT)
+from tests.common.test_vector import ImpalaTestDimension
 
 LOG = logging.getLogger('tests/shell/util.py')
 LOG.addHandler(logging.StreamHandler())
 
 SHELL_HISTORY_FILE = os.path.expanduser("~/.impalahistory")
 IMPALA_HOME = os.environ['IMPALA_HOME']
-
-# Note that pytest.config.getoption is deprecated usage. We use this
-# in a couple of other places. Ultimately, it needs to be addressed if
-# we ever want to get off of pytest 2.9.2.
-IMPALA_SHELL_EXECUTABLE = pytest.config.getoption('shell_executable')
-
-if IMPALA_SHELL_EXECUTABLE is None:
-  if ImpalaTestClusterProperties.get_instance().is_remote_cluster():
-    # With remote cluster testing, we cannot assume that the shell was built locally.
-    IMPALA_SHELL_EXECUTABLE = os.path.join(IMPALA_HOME, "bin/impala-shell.sh")
-  else:
-    # Test the locally built shell distribution.
-    IMPALA_SHELL_EXECUTABLE = os.path.join(
-        IMPALA_HOME, "shell/build", "impala-shell-" + IMPALA_LOCAL_BUILD_VERSION,
-        "impala-shell")
-
 
 def build_shell_env(env=None):
   """ Construct the environment for the shell to run in based on 'env', or the current
@@ -72,41 +57,6 @@ def build_shell_env(env=None):
   if "LD_LIBRARY_PATH" in env:
     del env["LD_LIBRARY_PATH"]
   return env
-
-
-def get_python_version_for_shell_env():
-  """
-  Return the version of python belonging to the tested IMPALA_SHELL_EXECUTABLE.
-
-  We need this because some tests behave differently based on the version of
-  python being used to execute the impala-shell. However, since the test
-  framework itself is still being run with python2.7.x, sys.version_info
-  alone can't help us to determine the python version for the environment of
-  the shell executable. Instead, we have to invoke the shell, and then parse
-  the python version from the output. This information is present even in the
-  case of a fatal shell exception, e.g., not being unable to establish a
-  connection to an impalad.
-  """
-  version_check = Popen([IMPALA_SHELL_EXECUTABLE, '-q', 'version()'],
-                        stdout=PIPE, stderr=PIPE, env=build_shell_env())
-  stdout, stderr = version_check.communicate()
-
-  # e.g. Starting Impala with Kerberos authentication using Python 3.7.6
-  start_msg_line = stderr.split('\n')[0]
-  py_version = start_msg_line.split()[-1]   # e.g. 3.7.6
-  try:
-    major_version, minor_version, micro_version = py_version.split('.')
-    ret_val = int(major_version)
-  except (ValueError, UnboundLocalError) as e:
-    LOG.error(stderr)
-    sys.exit("Could not determine python version in shell env: {}".format(str(e)))
-
-  return ret_val
-
-
-# Since both test_shell_commandline and test_shell_interactive import from
-# this file, this check will be forced before any tests are run.
-SHELL_IS_PYTHON_2 = True if (get_python_version_for_shell_env() == 2) else False
 
 
 def assert_var_substitution(result):
@@ -222,15 +172,16 @@ def get_impalad_port(vector):
 def get_shell_cmd(vector):
   """Get the basic shell command to start the shell, given the provided test vector.
   Returns the command as a list of string arguments."""
+  impala_shell_executable = get_impala_shell_executable(vector)
   if vector.get_value_with_default("strict_hs2_protocol", False):
     protocol = vector.get_value("protocol")
-    return [IMPALA_SHELL_EXECUTABLE,
+    return [impala_shell_executable,
             "--protocol={0}".format(protocol),
             "--strict_hs2_protocol",
             "--use_ldap_test_password",
             "-i{0}".format(get_impalad_host_port(vector))]
   else:
-    return [IMPALA_SHELL_EXECUTABLE,
+    return [impala_shell_executable,
             "--protocol={0}".format(vector.get_value("protocol")),
             "-i{0}".format(get_impalad_host_port(vector))]
 
@@ -257,7 +208,7 @@ class ImpalaShellResult(object):
 
 
 class ImpalaShell(object):
-  """A single instance of the Impala shell. The proces is started when this object is
+  """A single instance of the Impala shell. The process is started when this object is
      constructed, and then users should repeatedly call send_cmd(), followed eventually by
      get_result() to retrieve the process output. This constructor will wait until
      Impala shell is connected for the specified timeout unless wait_until_connected is
@@ -349,3 +300,40 @@ def wait_for_query_state(vector, stmt, state, max_retry=15):
     retry_count += 1
     time.sleep(1.0)
   raise Exception("Query didn't reach desired state: " + state)
+
+
+# Returns shell executable, and whether to include pypi variants
+def get_dev_impala_shell_executable():
+  # Note that pytest.config.getoption is deprecated usage. We use this
+  # in a couple of other places. Ultimately, it needs to be addressed if
+  # we ever want to get off of pytest 2.9.2.
+  impala_shell_executable = pytest.config.getoption('shell_executable')
+
+  if impala_shell_executable is not None:
+    return impala_shell_executable, False
+
+  if ImpalaTestClusterProperties.get_instance().is_remote_cluster():
+    # With remote cluster testing, we cannot assume that the shell was built locally.
+    return os.path.join(IMPALA_HOME, "bin/impala-shell.sh"), False
+  else:
+    # Test the locally built shell distribution.
+    return os.path.join(IMPALA_HOME, "shell/build",
+        "impala-shell-" + IMPALA_LOCAL_BUILD_VERSION, "impala-shell"), True
+
+
+def create_impala_shell_executable_dimension():
+  _, include_pypi = get_dev_impala_shell_executable()
+  if include_pypi:
+    return ImpalaTestDimension('impala_shell', 'dev', 'python2')
+  else:
+    return ImpalaTestDimension('impala_shell', 'dev')
+
+
+def get_impala_shell_executable(vector):
+  # impala-shell is invoked some places where adding a test vector may not make sense;
+  # use 'dev' as the default.
+  impala_shell_executable, _ = get_dev_impala_shell_executable()
+  return {
+    'dev': impala_shell_executable,
+    'python2': os.path.join(IMPALA_HOME, 'shell/build/py2_venv/bin/impala-shell')
+  }[vector.get_value_with_default('impala_shell', 'dev')]
