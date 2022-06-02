@@ -228,6 +228,15 @@ DEFINE_int32(max_log_files, 10, "Maximum number of log files to retain per sever
     "level. The most recent log files are retained. If set to 0, all log files are "
     "retained.");
 
+static const string re2_mem_limit_help_msg =
+    "Maximum bytes of memory to be used by re2's regex engine "
+    "to hold the compiled form of the regexp. For more memory-consuming patterns, "
+    "this can be set to be a higher number."
+    + Substitute(MEM_UNITS_HELP_MSG, "memory limit for RE2 max_mem opt")
+    + "Default to 8MB. Using percentage is discouraged.";
+
+DEFINE_string(re2_mem_limit, "8MB", re2_mem_limit_help_msg.c_str());
+
 // The read size is the preferred size of the reads issued to HDFS or the local FS.
 // There is a trade off of latency and throughput, trying to keep disks busy but
 // not introduce seeks.  The literature seems to agree that with 8 MB reads, random

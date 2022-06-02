@@ -49,6 +49,8 @@ namespace impala {
 const char* ERROR_CHARACTER_LIMIT_EXCEEDED =
   "$0 is larger than allowed limit of $1 character data.";
 
+uint64_t StringFunctions::re2_mem_limit_ = 8 << 20;
+
 // This behaves identically to the mysql implementation, namely:
 //  - 1-indexed positions
 //  - supported negative positions (count from the end of the string)
@@ -880,6 +882,8 @@ re2::RE2* CompileRegex(const StringVal& pattern, string* error_str,
   options.set_log_errors(false);
   // Return the leftmost longest match (rather than the first match).
   options.set_longest_match(true);
+  // Set the maximum memory used by re2's regex engine for storage
+  StringFunctions::SetRE2MemOpt(&options);
   if (!match_parameter.is_null &&
       !StringFunctions::SetRE2Options(match_parameter, error_str, &options)) {
     return NULL;
@@ -924,6 +928,19 @@ bool StringFunctions::SetRE2Options(const StringVal& match_parameter,
     }
   }
   return true;
+}
+
+void StringFunctions::SetRE2MemLimit(int64_t re2_mem_limit) {
+  // TODO: include the memory requirement for re2 in the memory planner estimates
+  DCHECK(re2_mem_limit > 0);
+  StringFunctions::re2_mem_limit_ = re2_mem_limit;
+}
+
+// Set the maximum memory used by re2's regex engine for a compiled regex expression's
+// storage. By default, it uses 8 MiB. This can be used to avoid DFA state cache flush
+// resulting in slower execution
+void StringFunctions::SetRE2MemOpt(re2::RE2::Options* opts) {
+  opts->set_max_mem(StringFunctions::re2_mem_limit_);
 }
 
 void StringFunctions::RegexpPrepare(

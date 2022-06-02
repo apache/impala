@@ -26,6 +26,7 @@
 #include "common/status.h"
 #include "exec/kudu-util.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/string-functions.h"
 #include "exprs/timezone_db.h"
 #include "gutil/atomicops.h"
 #include "gutil/strings/substitute.h"
@@ -50,6 +51,7 @@
 #include "util/network-util.h"
 #include "util/openssl-util.h"
 #include "util/os-info.h"
+#include "util/parse-util.h"
 #include "util/periodic-counter-updater.h"
 #include "util/pretty-printer.h"
 #include "util/redactor.h"
@@ -72,6 +74,7 @@ DECLARE_int32(max_log_files);
 DECLARE_int32(max_minidumps);
 DECLARE_string(redaction_rules_file);
 DECLARE_bool(redirect_stdout_stderr);
+DECLARE_string(re2_mem_limit);
 DECLARE_string(reserved_words_version);
 DECLARE_bool(symbolize_stacktrace);
 DECLARE_string(debug_actions);
@@ -338,6 +341,16 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
     CLEAN_EXIT_WITH_ERROR(Substitute("read_size can not be lower than $0",
         READ_SIZE_MIN_VALUE));
   }
+
+  bool is_percent = false; // not used
+  int64_t re2_mem_limit = ParseUtil::ParseMemSpec(FLAGS_re2_mem_limit, &is_percent, 0);
+  if (re2_mem_limit <= 0) {
+    CLEAN_EXIT_WITH_ERROR(
+        Substitute("Invalid mem limit for re2's regex engine: $0", FLAGS_re2_mem_limit));
+  } else {
+    StringFunctions::SetRE2MemLimit(re2_mem_limit);
+  }
+
   if (FLAGS_reserved_words_version != "2.11.0" && FLAGS_reserved_words_version != "3.0.0")
   {
     CLEAN_EXIT_WITH_ERROR(Substitute("Invalid flag reserved_words_version. The value must"

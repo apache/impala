@@ -128,6 +128,7 @@ class StringFunctions {
 
   static bool SetRE2Options(const StringVal& match_parameter, std::string* error_str,
       re2::RE2::Options* opts);
+  static void SetRE2MemOpt(re2::RE2::Options* opts);
   static void RegexpPrepare(FunctionContext*, FunctionContext::FunctionStateScope);
   static void RegexpClose(FunctionContext*, FunctionContext::FunctionStateScope);
   static StringVal RegexpEscape(FunctionContext*, const StringVal& str);
@@ -154,6 +155,8 @@ class StringFunctions {
   static StringVal ParseUrlKey(FunctionContext*, const StringVal& url,
       const StringVal& key, const StringVal& part);
   static void ParseUrlClose(FunctionContext*, FunctionContext::FunctionStateScope);
+
+  static void SetRE2MemLimit(int64_t re2_mem_limit);
 
   /// Converts ASCII 'val' to corresponding character.
   static StringVal Chr(FunctionContext* context, const IntVal& val);
@@ -201,6 +204,7 @@ class StringFunctions {
       const DoubleVal& boost_threshold);
 
  private:
+  static uint64_t re2_mem_limit_;
   /// Templatized implementation of the actual string trimming function.
   /// The first parameter, 'D', is one of StringFunctions::TrimPosition values.
   /// The second parameter, 'IS_IMPLICIT_WHITESPACE', is true when the set of characters

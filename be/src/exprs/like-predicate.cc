@@ -101,6 +101,7 @@ void LikePredicate::LikePrepareInternal(FunctionContext* context,
       opts.set_never_nl(false);
       opts.set_dot_nl(true);
       opts.set_case_sensitive(case_sensitive);
+      StringFunctions::SetRE2MemOpt(&opts);
       state->regex_.reset(new RE2(re_pattern, opts));
       if (!state->regex_->ok()) {
         context->SetError(Substitute("Invalid regex: $0", pattern_str).c_str());
@@ -164,6 +165,7 @@ void LikePredicate::RegexPrepareInternal(FunctionContext* context,
     } else {
       RE2::Options opts;
       opts.set_case_sensitive(case_sensitive);
+      StringFunctions::SetRE2MemOpt(&opts);
       state->regex_.reset(new RE2(pattern_str, opts));
       if (!state->regex_->ok()) {
         context->SetError(
@@ -196,6 +198,7 @@ void LikePredicate::RegexpLikePrepare(FunctionContext* context,
     }
     RE2::Options opts;
     string error_str;
+    StringFunctions::SetRE2MemOpt(&opts);
     if (!StringFunctions::SetRE2Options(*match_parameter, &error_str, &opts)) {
       context->SetError(error_str.c_str());
       return;
@@ -220,6 +223,7 @@ BooleanVal LikePredicate::RegexpLikeInternal(FunctionContext* context,
     if (match_parameter.is_null) return BooleanVal::null();
     RE2::Options opts;
     string error_str;
+    StringFunctions::SetRE2MemOpt(&opts);
     if (!StringFunctions::SetRE2Options(match_parameter, &error_str, &opts)) {
       context->SetError(error_str.c_str());
       return BooleanVal(false);
@@ -340,6 +344,7 @@ BooleanVal LikePredicate::RegexMatch(FunctionContext* context,
   } else {
     string re_pattern;
     RE2::Options opts;
+    StringFunctions::SetRE2MemOpt(&opts);
     if (is_like_pattern) {
       ConvertLikePattern(context, pattern_value, &re_pattern);
       opts.set_never_nl(false);
