@@ -141,3 +141,21 @@ select cast("0.43149576573887316" as double)
 ---- TYPES
 DOUBLE
 ====
+---- QUERY
+# IMPALA-11284: Don't skip rewrites for || and BETWEEN operator as the backend cannot
+# execute them directly.
+select * from
+(
+  values (concat("a", "b" || "c"), 1 <= 2 AND ((0.5 BETWEEN 0 AND 1) AND (true || false))),
+         ("hello" || "world", 0 <= 1 || 0.5 < 0.6),
+         ("impala", 4.0 BETWEEN 3.2 AND 4.1),
+         ("sql", 'a' NOT BETWEEN 'b' AND 'c')
+) t;
+---- RESULTS
+'abc',true
+'helloworld',true
+'impala',true
+'sql',true
+---- TYPES
+string,boolean
+====

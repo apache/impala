@@ -149,8 +149,20 @@ public class ExprRewriterTest extends AnalyzerTest {
         stmt_, stmt_), 47, 23);
     // Constant select.
     RewritesOk("select 1, 2, 3, 4", 4, 4);
-    // Values stmt - expression rewrites are disabled.
-    RewritesOk("values(1, '2', 3, 4.1), (1, '2', 3, 4.1)", 0, 0);
+    // Values stmt - expression rewrites are not required in this test cases.
+    RewritesOk("values(1, '2', 3, 4.1), (1, '2', 3, 4.1),"
+            + "(CAST(true OR false AS INT), '2', 3*1+2-4, 1.1%1)",
+        0, 0);
+    RewritesOk("values(CONCAT('a', 'b'), true OR true)", 0, 0);
+    // Values stmt - expression rewrites are required for || and Between predicate.
+    RewritesOk("values(1 <= 2 || 'impala' <> 'IMPALA'), (0.5 BETWEEN 0 AND 1),"
+            + "('a' NOT BETWEEN 'b' AND 'c')",
+        3, 0);
+    // Values stmt - expression rewrites are required for || and Between predicate that
+    // is not at root Expr.
+    RewritesOk("values(1 <= 2 AND ((0.5 BETWEEN 0 AND 1) AND "
+            + "(('a' || 'b') = 'ab' AND (true || false))))",
+        3, 0);
     // Test WHERE-clause subqueries.
     RewritesOk("select id, int_col from functional.alltypes a " +
         "where exists (select 1 from functional.alltypes " +

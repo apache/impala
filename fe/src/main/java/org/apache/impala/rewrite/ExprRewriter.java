@@ -91,6 +91,13 @@ public class ExprRewriter {
     for (int i = 0; i < exprs.size(); ++i) exprs.set(i, rewrite(exprs.get(i), analyzer));
   }
 
+  /**
+   * Add numChanges_ of otherRewriter to this rewriter's numChanges_.
+   */
+  public void addNumChanges(ExprRewriter otherRewriter) {
+    numChanges_ += otherRewriter.numChanges_;
+  }
+
   public void reset() { numChanges_ = 0; }
   public boolean changed() { return numChanges_ > 0; }
   public int getNumChanges() { return numChanges_; }

@@ -17,13 +17,16 @@
 
 package org.apache.impala.analysis;
 
+import java.util.Arrays;
 import java.util.List;
 
 import com.google.common.base.Preconditions;
 
 import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.rewrite.BetweenToCompoundRule;
 import org.apache.impala.rewrite.ExprRewriter;
+import org.apache.impala.rewrite.ExtractCompoundVerticalBarExprRule;
 
 /**
  * Representation of a values() statement with a list of constant-expression lists.
@@ -84,11 +87,18 @@ public class ValuesStmt extends UnionStmt {
   @Override
   public ValuesStmt clone() { return new ValuesStmt(this); }
 
-  /**
-   * Intentionally left empty to disable expression rewrite for values clause.
-   */
   @Override
-  public void rewriteExprs(ExprRewriter rewriter) {}
+  public void rewriteExprs(ExprRewriter rewriter) throws AnalysisException {
+    // IMPALA-11284: Expression rewrites for VALUES() could result in performance
+    // regression since overhead can be huge and there is virtually no benefit of
+    // rewrite if the expression will only ever be evaluated once (IMPALA-6590).
+    // The following code only does the non-optional rewrites for || and BETWEEN
+    // operator as the backend cannot execute them directly.
+    ExprRewriter mandatoryRewriter = new ExprRewriter(Arrays.asList(
+        BetweenToCompoundRule.INSTANCE, ExtractCompoundVerticalBarExprRule.INSTANCE));
+    super.rewriteExprs(mandatoryRewriter);
+    rewriter.addNumChanges(mandatoryRewriter);
+  }
 
   @Override
   protected boolean shouldAvoidLossyCharPadding(Analyzer analyzer) {
