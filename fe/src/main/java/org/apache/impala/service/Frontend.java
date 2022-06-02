@@ -2065,10 +2065,10 @@ public class Frontend {
               staticPartitionTarget = FeCatalogUtils.getPartitionName(
                   insertStmt.getPartitionKeyValues());
             }
-            createLockForInsert(txnId, tables, targetTable, insertStmt.isOverwrite(),
-                staticPartitionTarget, queryOptions);
             long writeId = allocateWriteId(queryCtx, targetTable);
             insertStmt.setWriteId(writeId);
+            createLockForInsert(txnId, tables, targetTable, insertStmt.isOverwrite(),
+                staticPartitionTarget, queryOptions);
 
             planCtx.compilationState_.setWriteId(writeId);
           } else {
