@@ -359,6 +359,12 @@ export SKIP_TOOLCHAIN_BOOTSTRAP=${SKIP_TOOLCHAIN_BOOTSTRAP-false}
 # If true, will not download python dependencies.
 export SKIP_PYTHON_DOWNLOAD=${SKIP_PYTHON_DOWNLOAD-false}
 
+# Provide isolated python egg location and ensure it's only writable by user to avoid
+# Python warnings during testing.
+export PYTHON_EGG_CACHE="${IMPALA_HOME}/shell/build/.python-eggs"
+mkdir -p "${PYTHON_EGG_CACHE}"
+chmod 755 "${PYTHON_EGG_CACHE}"
+
 # This flag is used in $IMPALA_HOME/cmake_modules/toolchain.cmake.
 # If it's 0, Impala will be built with the compiler in the toolchain directory.
 export USE_SYSTEM_GCC=${USE_SYSTEM_GCC-0}
