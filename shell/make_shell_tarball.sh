@@ -158,5 +158,5 @@ cp ${SHELL_HOME}/compatibility.py ${TARBALL_ROOT}
 
 pushd ${BUILD_DIR} > /dev/null
 echo "Making tarball in ${BUILD_DIR}"
-tar czf ${BUILD_DIR}/impala-shell-${VERSION}.tar.gz ./impala-shell-${VERSION}/\
-    --exclude="*.pyc" || popd 2>&1 > /dev/null
+tar czf ${BUILD_DIR}/impala-shell-${VERSION}.tar.gz --exclude="*.pyc" \
+    ./impala-shell-${VERSION}/ || popd 2>&1 > /dev/null
