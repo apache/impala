@@ -71,7 +71,6 @@ public class IcebergPartitionTransform extends StmtNode {
               "accept a parameter.");
         }
       }
-      return;
     }
 
   @Override
@@ -83,7 +82,7 @@ public class IcebergPartitionTransform extends StmtNode {
   public String toSql(ToSqlOptions options) {
     StringBuilder builder = new StringBuilder();
     builder.append(transformType_.toString());
-    if (transformParam_ != null) builder.append(" " + transformParam_.toString());
+    if (transformParam_ != null) builder.append("[").append(transformParam_).append("]");
     return builder.toString();
   }
 

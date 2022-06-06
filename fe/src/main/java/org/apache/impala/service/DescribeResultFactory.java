@@ -27,11 +27,13 @@ import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeGrantInfo;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TDescribeOutputStyle;
@@ -197,7 +199,7 @@ public class DescribeResultFactory {
    * list of columns the user is authorized to view.
    */
   public static TDescribeResult buildDescribeFormattedResult(FeTable table,
-      List<Column> filteredColumns) {
+      List<Column> filteredColumns) throws TableLoadingException {
     TDescribeResult result = new TDescribeResult();
     result.results = Lists.newArrayList();
 
@@ -232,6 +234,10 @@ public class DescribeResultFactory {
     // First add all the columns (includes partition columns).
     sb.append(MetastoreShim.getAllColumnsInformation(msTable.getSd().getCols(),
         msTable.getPartitionKeys(), true, false, true));
+    if (table instanceof FeIcebergTable) {
+      sb.append(MetastoreShim.getPartitionTransformInformation(
+          FeIcebergTable.Utils.getPartitionTransformKeys((FeIcebergTable) table)));
+    }
     // Add the extended table metadata information.
     sb.append(MetastoreShim.getTableInformation(msTable));
     sb.append(MetastoreShim.getConstraintsInformation(pki, fki));

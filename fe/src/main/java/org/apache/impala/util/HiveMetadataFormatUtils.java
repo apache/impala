@@ -97,6 +97,22 @@ public class HiveMetadataFormatUtils {
     return columnInformation.toString();
   }
 
+  /**
+   * Write formatted information about the given partition transform columns to a string
+   *
+   * @param partCols - the field schema list of the current PartitionSpec from
+   *     the Iceberg table
+   * @return string with formatted partition transform information
+   */
+  public static String getPartitionTransformInformation(List<FieldSchema> partCols) {
+    StringBuilder info = new StringBuilder(DEFAULT_STRINGBUILDER_SIZE);
+    if (partCols == null || partCols.isEmpty()) return info.toString();
+    info.append("# Partition Transform Information").append(LINE_DELIM);
+    formatColumnsHeader(info, null);
+    formatAllFields(info, partCols, false, null);
+    return info.toString();
+  }
+
   private static void formatColumnsHeader(StringBuilder columnInformation,
       List<ColumnStatisticsObj> colStats) {
     columnInformation.append("# "); // Easy for shell scripts to ignore

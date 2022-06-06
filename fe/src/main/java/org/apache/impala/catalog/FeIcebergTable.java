@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog;
 
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -31,10 +32,12 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Table;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.LiteralExpr;
@@ -320,6 +323,33 @@ public interface FeIcebergTable extends FeFsTable {
         }
       }
       return result;
+    }
+
+    /**
+     * Get the field schema list of the current PartitionSpec from Iceberg table.
+     *
+     * @return a list of {@link org.apache.hadoop.hive.metastore.api.FieldSchema}
+     */
+    public static List<FieldSchema> getPartitionTransformKeys(FeIcebergTable table)
+        throws TableLoadingException {
+      Table icebergTable = table.getIcebergApiTable();
+
+      if (icebergTable.specs().isEmpty()) {
+        return null;
+      }
+
+      PartitionSpec latestSpec = icebergTable.spec();
+      HashMap<String, Integer> transformParams = IcebergUtil.getPartitionTransformParams(
+          latestSpec);
+      List<FieldSchema> fieldSchemaList = Lists.newArrayList();
+      for (PartitionField field : latestSpec.fields()) {
+        FieldSchema fieldSchema = new FieldSchema();
+        fieldSchema.setName(table.getIcebergSchema().findColumnName(field.sourceId()));
+        fieldSchema.setType(
+            IcebergUtil.getPartitionTransform(field, transformParams).toSql());
+        fieldSchemaList.add(fieldSchema);
+      }
+      return fieldSchemaList;
     }
 
     /**

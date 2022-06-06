@@ -40,10 +40,10 @@ STRING,STRING,STRING,STRING
 SHOW PARTITIONS iceberg_hadoop_tables;
 ---- RESULTS
 0,1,1000,'level','IDENTITY'
-0,1,1001,'level_trunc','TRUNCATE 10'
+0,1,1001,'level_trunc','TRUNCATE[10]'
 0,2,1002,'event_time','IDENTITY'
 0,2,1003,'event_time_hour','HOUR'
-0,2,1004,'event_time_bucket','BUCKET 1000'
+0,2,1004,'event_time_bucket','BUCKET[1000]'
 0,3,1005,'register_time_day','DAY'
 ---- TYPES
 BIGINT,BIGINT,BIGINT,STRING,STRING
@@ -107,8 +107,8 @@ STRING,STRING,STRING,STRING
 SHOW PARTITIONS iceberg_hadoop_tbls_external;
 ---- RESULTS
 0,1,1000,'level','IDENTITY'
-0,1,1001,'level_bucket','BUCKET 12345'
-0,1,1002,'level_trunc','TRUNCATE 15'
+0,1,1001,'level_bucket','BUCKET[12345]'
+0,1,1002,'level_trunc','TRUNCATE[15]'
 ---- TYPES
 BIGINT,BIGINT,BIGINT,STRING,STRING
 ====
@@ -131,8 +131,8 @@ STRING,STRING,STRING,STRING
 SHOW PARTITIONS iceberg_hadoop_tbls_external_empty_col;
 ---- RESULTS
 0,1,1000,'level','IDENTITY'
-0,1,1001,'level_bucket','BUCKET 12345'
-0,1,1002,'level_trunc','TRUNCATE 15'
+0,1,1001,'level_bucket','BUCKET[12345]'
+0,1,1002,'level_trunc','TRUNCATE[15]'
 ---- TYPES
 BIGINT,BIGINT,BIGINT,STRING,STRING
 ====
@@ -185,10 +185,10 @@ STRING,STRING,STRING,STRING
 SHOW PARTITIONS iceberg_hadoop_catalog;
 ---- RESULTS
 0,1,1000,'level','IDENTITY'
-0,1,1001,'level_trunc','TRUNCATE 10'
+0,1,1001,'level_trunc','TRUNCATE[10]'
 0,2,1002,'event_time','IDENTITY'
 0,2,1003,'event_time_hour','HOUR'
-0,2,1004,'event_time_bucket','BUCKET 1000'
+0,2,1004,'event_time_bucket','BUCKET[1000]'
 0,3,1005,'register_time_day','DAY'
 ---- TYPES
 BIGINT,BIGINT,BIGINT,STRING,STRING
@@ -231,8 +231,8 @@ STRING,STRING,STRING,STRING
 SHOW PARTITIONS iceberg_hadoop_cat_external;
 ---- RESULTS
 0,1,1000,'level','IDENTITY'
-0,1,1001,'level_bucket','BUCKET 12345'
-0,1,1002,'level_trunc','TRUNCATE 10'
+0,1,1001,'level_bucket','BUCKET[12345]'
+0,1,1002,'level_trunc','TRUNCATE[10]'
 ---- TYPES
 BIGINT,BIGINT,BIGINT,STRING,STRING
 ====
@@ -481,4 +481,124 @@ SHOW PARTITIONS iceberg_old_style_partitions;
 0,7,1001,'event_id','IDENTITY'
 ---- TYPES
 BIGINT,BIGINT,BIGINT,STRING,STRING
+====
+---- QUERY
+create table ice_part_hadoop_tbl (
+  col_year date,
+  col_month date,
+  col_day date,
+  col_hour timestamp,
+  col_truncate string,
+  col_bucket int,
+  col_identity int
+) partitioned by spec (
+  year(col_year),
+  month(col_month),
+  day(col_day),
+  hour(col_hour),
+  truncate(2, col_truncate),
+  bucket(2, col_bucket),
+  col_identity
+) stored as iceberg TBLPROPERTIES('iceberg.catalog' = 'hadoop.tables');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe formatted ice_part_hadoop_tbl;
+---- RESULTS: VERIFY_IS_SUBSET
+'# Partition Transform Information','NULL','NULL'
+'col_year','YEAR','NULL'
+'col_month','MONTH','NULL'
+'col_day','DAY','NULL'
+'col_hour','HOUR','NULL'
+'col_truncate','TRUNCATE[2]','NULL'
+'col_bucket','BUCKET[2]','NULL'
+'col_identity','IDENTITY','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+create table ice_part_hadoop_catalog (
+  col_year date,
+  col_month date,
+  col_day date,
+  col_hour timestamp,
+  col_truncate string,
+  col_bucket int,
+  col_identity int
+) partitioned by spec (
+  year(col_year),
+  month(col_month),
+  day(col_day),
+  hour(col_hour),
+  truncate(2, col_truncate),
+  bucket(2, col_bucket),
+  col_identity
+) stored as iceberg TBLPROPERTIES(
+  'iceberg.catalog' = 'hadoop.catalog',
+  'iceberg.catalog_location' = '/$DATABASE/hadoop_catalog_test'
+);
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe formatted ice_part_hadoop_catalog;
+---- RESULTS: VERIFY_IS_SUBSET
+'# Partition Transform Information','NULL','NULL'
+'col_year','YEAR','NULL'
+'col_month','MONTH','NULL'
+'col_day','DAY','NULL'
+'col_hour','HOUR','NULL'
+'col_truncate','TRUNCATE[2]','NULL'
+'col_bucket','BUCKET[2]','NULL'
+'col_identity','IDENTITY','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+create table ice_part_catalogs (
+  col_year date,
+  col_month date,
+  col_day date,
+  col_hour timestamp,
+  col_truncate string,
+  col_bucket int,
+  col_identity int
+) partitioned by spec (
+  year(col_year),
+  month(col_month),
+  day(col_day),
+  hour(col_hour),
+  truncate(2, col_truncate),
+  bucket(2, col_bucket),
+  col_identity
+) stored as iceberg TBLPROPERTIES('iceberg.catalog' = 'ice_hadoop_cat');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe formatted ice_part_catalogs;
+---- RESULTS: VERIFY_IS_SUBSET
+'# Partition Transform Information','NULL','NULL'
+'col_year','YEAR','NULL'
+'col_month','MONTH','NULL'
+'col_day','DAY','NULL'
+'col_hour','HOUR','NULL'
+'col_truncate','TRUNCATE[2]','NULL'
+'col_bucket','BUCKET[2]','NULL'
+'col_identity','IDENTITY','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+create table ice_non_partition (i int, s string, ts timestamp, d date) stored as iceberg;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe formatted ice_non_partition;
+---- RESULTS: VERIFY_IS_NOT_IN
+'# Partition Transform Information','NULL','NULL'
+---- TYPES
+string, string, string
 ====

@@ -17,13 +17,10 @@
 
 package org.apache.impala.analysis;
 
+import com.google.common.base.Joiner;
 import java.util.ArrayList;
 import java.util.List;
-
-import com.google.common.base.Joiner;
-
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
 
 /**

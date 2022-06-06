@@ -417,8 +417,7 @@ public class IcebergUtil {
    * expose the interface of the transform types outside of their package and the only
    * way to get the transform's parameter is implementing this visitor class.
    */
-  public static HashMap<String, Integer> getPartitionTransformParams(PartitionSpec spec)
-      throws TableLoadingException {
+  public static HashMap<String, Integer> getPartitionTransformParams(PartitionSpec spec) {
     List<Pair<String, Integer>> transformParams = PartitionSpecVisitor.visit(
         spec, new PartitionSpecVisitor<Pair<String, Integer>>() {
           @Override

@@ -313,6 +313,15 @@ public class Hive3MetastoreShimBase {
   }
 
   /**
+   * Converts a List of FieldSchema to String
+   */
+  public static String getPartitionTransformInformation(
+      List<FieldSchema> partitionTransformCols) {
+    return HiveMetadataFormatUtils.getPartitionTransformInformation(
+        partitionTransformCols);
+  }
+
+  /**
    * Wrapper method around Hive's MetadataFormatUtils.getTableInformation which has
    * changed significantly in Hive-3
    *
