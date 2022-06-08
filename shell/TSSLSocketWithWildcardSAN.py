@@ -55,6 +55,10 @@ class TSSLSocketWithWildcardSAN(TSSLSocket.TSSLSocket):
                                    ca_certs=ca_certs, unix_socket=unix_socket,
                                    ssl_version=ssl.PROTOCOL_SSLv23)
 
+  # THRIFT-5595: override TSocket.isOpen because it's broken for TSSLSocket
+  def isOpen(self):
+    return self.handle is not None
+
   def _validate_cert(self):
     cert = self.handle.getpeercert()
     self.peercert = cert
