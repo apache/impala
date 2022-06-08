@@ -44,7 +44,17 @@ function run-step {
     ELAPSED_TIME=$(($SECONDS - $START_TIME))
     echo "    FAILED (Took: $(($ELAPSED_TIME/60)) min $(($ELAPSED_TIME%60)) sec)"
     echo "    '$@' failed. Tail of log:"
-    tail -n50 ${LOG}
+    tail -n100 ${LOG}
+
+    # Also print the data-loading log files
+    if [ -n "$(grep 'Error executing.*.log' ${LOG})" ]; then
+      grep "Error executing.*.log" ${LOG} | while read -r ERROR_LINE; do
+        SQL_LOG_FILE=$(echo $ERROR_LINE | awk '{print $NF}')
+        echo "------------------------------------------------------------------------"
+        echo "    Tail of $SQL_LOG_FILE:"
+        tail -n100 ${SQL_LOG_FILE}
+      done
+    fi
     return 1
   fi
   ELAPSED_TIME=$(($SECONDS - $START_TIME))
