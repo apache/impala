@@ -11,6 +11,54 @@ select * from functional_parquet.iceberg_alltypes_part
 INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
 ====
 ---- QUERY
+# Queries with WHERE clauses
+select * from functional_parquet.iceberg_alltypes_part
+where i = 1;
+---- RESULTS
+1,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+---- TYPES
+INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part
+where i = 3;
+---- RESULTS
+---- TYPES
+INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part
+where p_int = 1;
+---- RESULTS
+1,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+2,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+---- TYPES
+INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part
+where p_int = 2;
+---- RESULTS
+---- TYPES
+INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part
+where p_bool = true;
+---- RESULTS
+1,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+2,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+---- TYPES
+INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part
+where p_bool = false;
+---- RESULTS
+---- TYPES
+INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
 # Read only the partition columns.
 select p_bool, p_int, p_bigint, p_float,
        p_double, p_decimal, p_date, p_string
@@ -29,6 +77,54 @@ select * from functional_parquet.iceberg_alltypes_part_orc
 ---- RESULTS
 1,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
 2,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+---- TYPES
+INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
+# Queries with WHERE clauses
+select * from functional_parquet.iceberg_alltypes_part_orc
+where i = 1;
+---- RESULTS
+1,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+---- TYPES
+INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part_orc
+where i = 3;
+---- RESULTS
+---- TYPES
+INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part_orc
+where p_int = 1;
+---- RESULTS
+1,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+2,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+---- TYPES
+INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part_orc
+where p_int = 2;
+---- RESULTS
+---- TYPES
+INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part_orc
+where p_bool = true;
+---- RESULTS
+1,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+2,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+---- TYPES
+INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part_orc
+where p_bool = false;
+---- RESULTS
 ---- TYPES
 INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
 ====
@@ -58,6 +154,23 @@ select * from functional_parquet.iceberg_legacy_partition_schema_evolution
 BIGINT, DOUBLE, DECIMAL, INT
 ====
 ---- QUERY
+select * from functional_parquet.iceberg_legacy_partition_schema_evolution
+where p_int_long = 1;
+---- RESULTS
+1,1.100000023841858,2.718,2
+1,1.100000023841858,3.141,1
+---- TYPES
+BIGINT, DOUBLE, DECIMAL, INT
+====
+---- QUERY
+select * from functional_parquet.iceberg_legacy_partition_schema_evolution
+where p_dec_dec = 2.718;
+---- RESULTS
+1,1.100000023841858,2.718,2
+---- TYPES
+BIGINT, DOUBLE, DECIMAL, INT
+====
+---- QUERY
 # Read only the partition columns.
 select p_int_long, p_float_double, p_dec_dec
 from functional_parquet.iceberg_legacy_partition_schema_evolution;
@@ -82,6 +195,23 @@ select * from functional_parquet.iceberg_legacy_partition_schema_evolution_orc
 BIGINT, DOUBLE, DECIMAL, INT
 ====
 ---- QUERY
+select * from functional_parquet.iceberg_legacy_partition_schema_evolution_orc
+where p_int_long = 1;
+---- RESULTS
+1,1.100000023841858,2.718,2
+1,1.100000023841858,3.141,1
+---- TYPES
+BIGINT, DOUBLE, DECIMAL, INT
+====
+---- QUERY
+select * from functional_parquet.iceberg_legacy_partition_schema_evolution_orc
+where p_dec_dec = 2.718;
+---- RESULTS
+1,1.100000023841858,2.718,2
+---- TYPES
+BIGINT, DOUBLE, DECIMAL, INT
+====
+---- QUERY
 # Read only the partition columns.
 select p_int_long, p_float_double, p_dec_dec
 from functional_parquet.iceberg_legacy_partition_schema_evolution_orc;
@@ -102,6 +232,14 @@ select * from only_part_cols;
 1,'i'
 1,'i'
 2,'q'
+2,'s'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+select * from only_part_cols
+where i = 2 and s = 's'
+---- RESULTS
 2,'s'
 ---- TYPES
 INT, STRING

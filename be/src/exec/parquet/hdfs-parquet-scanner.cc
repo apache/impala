@@ -566,6 +566,7 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
     RETURN_IF_ERROR(ResolveSchemaForStatFiltering(slot_desc, &missing_field, &node));
 
     if (missing_field) {
+      if (!file_metadata_utils_.NeedDataInFile(slot_desc)) continue;
       // We are selecting a column that is not in the file. We would set its slot to NULL
       // during the scan, so any predicate would evaluate to false. Return early. NULL
       // comparisons cannot happen here, since predicates with NULL literals are filtered
@@ -707,6 +708,7 @@ Status HdfsParquetScanner::EvaluateOverlapForRowGroup(
     RETURN_IF_ERROR(ResolveSchemaForStatFiltering(slot_desc, &missing_field, &node));
 
     if (missing_field) {
+      if (!file_metadata_utils_.NeedDataInFile(slot_desc)) continue;
       // We are selecting a column that is not in the file. We would set its slot to NULL
       // during the scan, so any predicate would evaluate to false. Return early. NULL
       // comparisons cannot happen here, since predicates with NULL literals are filtered
@@ -1981,6 +1983,8 @@ Status HdfsParquetScanner::CreateColIdx2EqConjunctMap() {
       }
 
       if (missing_field) {
+        if (!file_metadata_utils_.NeedDataInFile(slot_desc)) continue;
+
         return Status(Substitute(
             "Unable to find SchemaNode for path '$0' in the schema of file '$1'.",
             PrintPath(*scan_node_->hdfs_table(), slot_desc->col_path()), filename()));
