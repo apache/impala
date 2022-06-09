@@ -114,7 +114,6 @@ Tuple* FileMetadataUtils::CreateTemplateTuple(MemPool* mem_pool) {
 bool FileMetadataUtils::IsValuePartitionCol(const SlotDescriptor* slot_desc) {
   DCHECK(context_ != nullptr);
   DCHECK(file_desc_ != nullptr);
-  if (slot_desc->parent() != scan_node_->tuple_desc()) return false;
   if (slot_desc->col_pos() < scan_node_->num_partition_keys()) {
     return true;
   }
