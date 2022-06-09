@@ -502,8 +502,15 @@ Status HdfsAvroScanner::ProcessRange(RowBatch* row_batch) {
   DCHECK_GT(row_batch->capacity(), row_batch->num_rows());
   while (!eos_ && !scan_node_->ReachedLimitShared()) {
     if (record_pos_ == num_records_in_block_) {
-      // Read new data block
-      RETURN_IF_FALSE(stream_->ReadZLong(&num_records_in_block_, &parse_status_));
+      // Read new data block. Reset members first to avoid corrupt state after
+      // recovery from parse error.
+      record_pos_ = 0;
+      num_records_in_block_ = 0;
+      data_block_len_ = 0;
+      data_block_ = nullptr;
+      data_block_end_ = nullptr;
+      int64_t num_records_in_block;
+      RETURN_IF_FALSE(stream_->ReadZLong(&num_records_in_block, &parse_status_));
       if (num_records_in_block_ < 0) {
         return Status(TErrorCode::AVRO_INVALID_RECORD_COUNT, stream_->filename(),
             num_records_in_block_, stream_->file_offset());
@@ -531,8 +538,8 @@ Status HdfsAvroScanner::ProcessRange(RowBatch* row_batch) {
         data_block_ = compressed_data;
         data_block_len_ = compressed_size;
       }
+      num_records_in_block_ = num_records_in_block;
       data_block_end_ = data_block_ + data_block_len_;
-      record_pos_ = 0;
     }
 
     int64_t prev_record_pos = record_pos_;
