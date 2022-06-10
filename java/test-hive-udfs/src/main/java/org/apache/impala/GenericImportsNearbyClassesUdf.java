@@ -30,6 +30,8 @@ import org.apache.hadoop.io.Text;
 
 public class GenericImportsNearbyClassesUdf extends GenericUDF {
   public GenericImportsNearbyClassesUdf() {
+    // Ensure that new classes can be loaded in constructor.
+    UtilForUdfConstructor.getHello();
   }
 
   @Override
@@ -45,12 +47,15 @@ public class GenericImportsNearbyClassesUdf extends GenericUDF {
     if (poi.getPrimitiveCategory() != PrimitiveCategory.STRING) {
       throw new UDFArgumentException("GenericImports needs one STRING arg.");
     }
+    // Ensure that new classes can be loaded in initialize().
+    UtilForUdfInitialize.getHello();
     return PrimitiveObjectInspectorFactory.writableStringObjectInspector;
   }
 
   @Override
   public Object evaluate(DeferredObject[] arguments)
       throws HiveException {
+    // Ensure that new classes can be loaded in evaluate().
     return new Text(UtilForUdf.getHello());
   }
 

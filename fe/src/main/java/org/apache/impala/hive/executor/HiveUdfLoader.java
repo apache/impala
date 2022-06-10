@@ -38,7 +38,7 @@ import org.apache.log4j.Logger;
  * Class responsible for the Java reflection needed to fetch the UDF
  * class and function.
  */
-public class HiveUdfLoader {
+public class HiveUdfLoader implements AutoCloseable {
   private static final Logger LOG = Logger.getLogger(HiveUdfLoader.class);
   private final Class<?> udfClass_;
 
@@ -58,24 +58,20 @@ public class HiveUdfLoader {
    *     more classes, so we allow this flexibility. In this case, the caller is
    *     responsible to call "close" on this object.
    */
-  public HiveUdfLoader(String localJarPath, String className,
-      boolean persistLoader) throws CatalogException {
+  public HiveUdfLoader(String localJarPath, String className) throws CatalogException {
     LOG.debug("Loading UDF '" + className + "' from " + localJarPath);
     // If the localJarPath is not set, we use the System ClassLoader which
     // does not need to be tracked for closing.
     classLoader_ = getClassLoader(localJarPath);
     udfClass_  = loadUDFClass(className, classLoader_);
     classType_ = FunctionUtils.getUDFClassType(udfClass_);
-
-    if (!persistLoader) {
-      close();
-    }
   }
 
   public Class<?> getUDFClass() {
     return udfClass_;
   }
 
+  @Override
   public void close() {
     // We only need to close URLClassLoaders. If no jar was present at instantiation,
     // it uses the SystemClassLoader (leaving this in for legacy purposes, but I'm not
@@ -152,7 +148,7 @@ public class HiveUdfLoader {
         }
         localJarPathString = localJarPath.toString();
       }
-      return new HiveUdfLoader(localJarPathString, fn.getClassName(), false);
+      return new HiveUdfLoader(localJarPathString, fn.getClassName());
     } catch (Exception e) {
       String errorMsg = "Could not load class " + fn.getClassName() + " from "
           + "jar " + uri + ": " + e.getMessage();
