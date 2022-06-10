@@ -44,15 +44,17 @@ public class HiveJavaFunctionFactoryImpl implements HiveJavaFunctionFactory {
     checkValidFunction(hiveFn);
     String jarUri = hiveFn.getResourceUris().get(0).getUri();
     String fnName = hiveFn.getDbName() + "." + hiveFn.getFunctionName();
-    HiveUdfLoader javaClass = HiveUdfLoader.createWithLocalPath(localLibPath, hiveFn);
-    switch (javaClass.getUDFClassType()) {
-      case UDF:
-        return new HiveLegacyJavaFunction(javaClass.getUDFClass(), hiveFn, retType,
-            paramTypes);
-      default:
-        throw new CatalogException("Function " + fnName + ": The class "
-            + jarUri + " does not derive "
-            + "from a known supported Hive UDF class (UDF).");
+    try (HiveUdfLoader javaClass
+        = HiveUdfLoader.createWithLocalPath(localLibPath, hiveFn)) {
+      switch (javaClass.getUDFClassType()) {
+        case UDF:
+          return new HiveLegacyJavaFunction(javaClass.getUDFClass(), hiveFn, retType,
+              paramTypes);
+        default:
+          throw new CatalogException("Function " + fnName + ": The class "
+              + jarUri + " does not derive "
+              + "from a known supported Hive UDF class (UDF).");
+      }
     }
   }
 

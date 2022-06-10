@@ -64,7 +64,7 @@ public class UdfExecutor {
     }
     try {
       checkValidRequest(request);
-      udfLoader_ = new HiveUdfLoader(location, request.fn.scalar_fn.symbol, true);
+      udfLoader_ = new HiveUdfLoader(location, request.fn.scalar_fn.symbol);
       hiveUdfExecutor_ = createHiveUdfExecutor(request, udfLoader_);
       LOG.debug("Loaded UDF '" + request.fn.scalar_fn.symbol + "' from "
           + request.local_location);

@@ -21,18 +21,9 @@ import java.text.ParseException;
 import org.apache.hadoop.hive.ql.exec.UDF;
 import org.apache.hadoop.io.Text;
 
-/**
- * Helper for a regression test for IMPALA-8016: this
- * uses another class (from the same jar) at evaluate() time, needing
- * the class loader.
- */
-public class ImportsNearbyClassesUdf extends UDF {
-  public ImportsNearbyClassesUdf() {
-    // Ensure that new classes can be loaded in constructor.
-    UtilForUdfConstructor.getHello();
-  }
-
-  public Text evaluate(Text para) throws ParseException {
-    return new Text(UtilForUdf.getHello());
+/** IMPALA-11342 regression test: Helper for ImportNearbyClasses. */
+public class UtilForUdfConstructor extends UDF {
+  public static String getHello() {
+    return "Hello";
   }
 }
