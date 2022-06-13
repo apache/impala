@@ -115,14 +115,17 @@ def assert_pattern(pattern, result, text, message):
 
 
 def run_impala_shell_cmd(vector, shell_args, env=None, expect_success=True,
-                         stdin_input=None, wait_until_connected=True):
+                         stdin_input=None, wait_until_connected=True,
+                         stdout_file=None, stderr_file=None):
   """Runs the Impala shell on the commandline.
 
   'shell_args' is a string which represents the commandline options.
   Returns a ImpalaShellResult.
   """
   result = run_impala_shell_cmd_no_expect(vector, shell_args, env, stdin_input,
-                                          expect_success and wait_until_connected)
+                                          expect_success and wait_until_connected,
+                                          stdout_file=stdout_file,
+                                          stderr_file=stderr_file)
   if expect_success:
     assert result.rc == 0, "Cmd %s was expected to succeed: %s" % (shell_args,
                                                                    result.stderr)
@@ -132,7 +135,8 @@ def run_impala_shell_cmd(vector, shell_args, env=None, expect_success=True,
 
 
 def run_impala_shell_cmd_no_expect(vector, shell_args, env=None, stdin_input=None,
-                                   wait_until_connected=True):
+                                   wait_until_connected=True, stdout_file=None,
+                                   stderr_file=None):
   """Runs the Impala shell on the commandline.
 
   'shell_args' is a string which represents the commandline options.
@@ -140,7 +144,8 @@ def run_impala_shell_cmd_no_expect(vector, shell_args, env=None, stdin_input=Non
 
   Does not assert based on success or failure of command.
   """
-  p = ImpalaShell(vector, shell_args, env=env, wait_until_connected=wait_until_connected)
+  p = ImpalaShell(vector, shell_args, env=env, wait_until_connected=wait_until_connected,
+                  stdout_file=stdout_file, stderr_file=stderr_file)
   result = p.get_result(stdin_input)
   return result
 
@@ -213,11 +218,16 @@ class ImpalaShell(object):
      get_result() to retrieve the process output. This constructor will wait until
      Impala shell is connected for the specified timeout unless wait_until_connected is
      set to False or --quiet is passed into the args."""
-  def __init__(self, vector, args=None, env=None, wait_until_connected=True, timeout=60):
-    self.shell_process = self._start_new_shell_process(vector, args, env=env)
+  def __init__(self, vector, args=None, env=None, wait_until_connected=True, timeout=60,
+               stdout_file=None, stderr_file=None):
+    self.shell_process = self._start_new_shell_process(vector, args, env=env,
+                                                       stdout_file=stdout_file,
+                                                       stderr_file=stderr_file)
     # When --quiet option is passed to Impala shell, we should not wait until we see
-    # "Connected to" because it will never be printed to stderr.
-    if wait_until_connected and (args is None or "--quiet" not in args):
+    # "Connected to" because it will never be printed to stderr. The same is true
+    # if stderr is redirected.
+    if wait_until_connected and (args is None or "--quiet" not in args) and \
+       stderr_file is None:
       start_time = time.time()
       connected = False
       while time.time() - start_time < timeout and not connected:
@@ -262,11 +272,14 @@ class ImpalaShell(object):
     result.rc = self.shell_process.returncode
     return result
 
-  def _start_new_shell_process(self, vector, args=None, env=None):
+  def _start_new_shell_process(self, vector, args=None, env=None, stdout_file=None,
+                               stderr_file=None):
     """Starts a shell process and returns the process handle"""
     cmd = get_shell_cmd(vector)
     if args is not None: cmd += args
-    return Popen(cmd, shell=False, stdout=PIPE, stdin=PIPE, stderr=PIPE,
+    stdout_arg = stdout_file if stdout_file is not None else PIPE
+    stderr_arg = stderr_file if stderr_file is not None else PIPE
+    return Popen(cmd, shell=False, stdout=stdout_arg, stdin=PIPE, stderr=stderr_arg,
                  env=build_shell_env(env))
 
 

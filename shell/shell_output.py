@@ -159,6 +159,12 @@ class OutputStream(object):
       # If filename is None, then just print to stdout
       print(formatted_data)
 
+  def flush(self):
+    # When outputing to a file, the file is currently closed with each write,
+    # so the flush doesn't need to do anything.
+    if self.filename is None:
+      sys.stdout.flush()
+
 
 class OverwritingStdErrOutputStream(object):
   """This class is used to write output to stderr and overwrite the previous text as

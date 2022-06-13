@@ -1272,3 +1272,24 @@ class TestImpalaShell(ImpalaTestSuite):
     output = run_impala_shell_cmd(vector, ['-q', query, '-B'])
     assert "Fetched 1 row(s)" in output.stderr
     assert "Trailing Whitespace          \n" in output.stdout
+
+  def test_shell_flush(self, vector, tmp_file):
+    """Verify that the rows are flushed before the Fetch X row(s) message"""
+
+    # Run a simple "select 1" with stdout and stderr redirected to the same file.
+    with open(tmp_file, "w") as f:
+      output = run_impala_shell_cmd(vector, ['-q', DEFAULT_QUERY, '-B'], stdout_file=f,
+                                    stderr_file=f)
+      # Stdout and stderr should be empty
+      assert output.stderr is None
+      assert output.stdout is None
+
+    # Verify the file contents
+    # The output should be in this order:
+    # 1\n
+    # Fetched 1 row(s) in ...\n
+    with open(tmp_file, "r") as f:
+      lines = f.readlines()
+      assert len(lines) >= 2
+      assert "1\n" in lines[len(lines) - 2]
+      assert "Fetched 1 row(s)" in lines[len(lines) - 1]
