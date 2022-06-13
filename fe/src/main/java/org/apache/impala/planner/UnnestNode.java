@@ -83,6 +83,9 @@ public class UnnestNode extends PlanNode {
   }
 
   @Override
+  protected boolean shouldPickUpZippingUnnestConjuncts() { return true; }
+
+  @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     cardinality_ = PlannerContext.AVG_COLLECTION_SIZE;

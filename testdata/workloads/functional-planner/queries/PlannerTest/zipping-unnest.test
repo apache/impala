@@ -204,3 +204,83 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=1 size=1.06KB
    row-size=16B cardinality=1.35K
 ====
+# IMPALA-11280. There is a join involved here by using the IN operator, and multiple
+# arrays are unnested. Checks that the predicate on an unnested array is not picked up by
+# the join node.
+select id, unnested_arr1, unnested_arr2
+from (
+    select id, unnest(arr1) as unnested_arr1, unnest(arr2) as unnested_arr2
+    from functional_parquet.complextypes_arrays
+    where id % 2 = 1 and id in (select id from functional_parquet.alltypestiny)
+) a
+where a.unnested_arr1 < 5;
+---- PLAN
+PLAN-ROOT SINK
+|
+06:SUBPLAN
+|  row-size=44B cardinality=1.35K
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=44B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=28B cardinality=1
+|  |
+|  03:UNNEST [functional_parquet.complextypes_arrays.arr1 arr1, functional_parquet.complextypes_arrays.arr2 arr2]
+|     predicates: UNNEST(arr1) < 5
+|     row-size=0B cardinality=10
+|
+05:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: id = id
+|  runtime filters: RF000 <- id
+|  row-size=28B cardinality=135
+|
+|--01:SCAN HDFS [functional_parquet.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=11.92KB
+|     predicates: functional_parquet.alltypestiny.id % 2 = 1
+|     row-size=4B cardinality=76
+|
+00:SCAN HDFS [functional_parquet.complextypes_arrays]
+   HDFS partitions=1/1 files=1 size=1.06KB
+   predicates: id % 2 = 1
+   runtime filters: RF000 -> id
+   row-size=28B cardinality=135
+====
+# Similar as above but here the join is explicitly included in the query string and is not
+# a result of a query rewrite.
+select a.id, unnested_arr1, unnested_arr2
+from (
+    select cta.id, unnest(arr1) as unnested_arr1, unnest(arr2) as unnested_arr2
+    from functional_parquet.complextypes_arrays cta left join functional_parquet.alltypestiny ti on cta.id = ti.id
+    where cta.id % 2 = 1) a
+where a.unnested_arr1 < 5;
+---- PLAN
+PLAN-ROOT SINK
+|
+06:SUBPLAN
+|  row-size=44B cardinality=1.35K
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=44B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=28B cardinality=1
+|  |
+|  03:UNNEST [cta.arr1 arr1, cta.arr2 arr2]
+|     predicates: UNNEST(arr1) < 5
+|     row-size=0B cardinality=10
+|
+05:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: cta.id = ti.id
+|  row-size=32B cardinality=135
+|
+|--01:SCAN HDFS [functional_parquet.alltypestiny ti]
+|     HDFS partitions=4/4 files=4 size=11.92KB
+|     predicates: ti.id % 2 = 1
+|     row-size=4B cardinality=76
+|
+00:SCAN HDFS [functional_parquet.complextypes_arrays cta]
+   HDFS partitions=1/1 files=1 size=1.06KB
+   predicates: cta.id % 2 = 1
+   row-size=28B cardinality=135
+====

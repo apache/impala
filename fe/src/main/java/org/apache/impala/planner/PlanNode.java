@@ -548,7 +548,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     analyzer.markConjunctsAssigned(unassigned);
   }
 
-  protected boolean shouldPickUpZippingUnnestConjuncts() { return true; }
+  protected boolean shouldPickUpZippingUnnestConjuncts() { return false; }
 
   /**
    * Apply the provided conjuncts to the this node, returning the new root of

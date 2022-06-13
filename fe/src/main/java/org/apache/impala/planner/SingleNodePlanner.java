@@ -2054,6 +2054,7 @@ public class SingleNodePlanner {
         Preconditions.checkState(hasNullMatchingEqOperator);
       }
     }
+    PlanNode.removeZippingUnnestConjuncts(otherJoinConjuncts, analyzer);
     analyzer.markConjunctsAssigned(otherJoinConjuncts);
 
     if (analyzer.getQueryOptions().isEnable_distinct_semi_join_optimization() &&
