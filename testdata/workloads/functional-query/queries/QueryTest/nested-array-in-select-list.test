@@ -334,11 +334,52 @@ BIGINT,INT
 select item from complextypes_arrays_only_view.int_array
 ---- CATCH
 AnalysisException: Non-relative collections are currently not supported on collections from views.
-=====
+====
 ---- QUERY
 # IMPALA-11052: allow using collections returned from views as non-relative table refs
 with s as (select int_array a from complextypestbl t)
 select item from s.a
 ---- CATCH
 AnalysisException: Could not resolve table reference: 's.a
-=====
+====
+---- QUERY
+# IMPALA-11280. There is a join involved here by using the IN operator, and multiple
+# arrays are unnested. Checks that the predicate on an unnested array is evaluated
+# correctly.
+select id, unnested_arr1, unnested_arr2
+from (
+    select id, unnest(arr1) as unnested_arr1, unnest(arr2) as unnested_arr2
+    from complextypes_arrays
+    where id % 2 = 1 and id in (select id from alltypestiny)
+) a
+where a.unnested_arr1 < 5;
+---- RESULTS
+1,1,'one'
+1,2,'two'
+1,3,'three'
+1,4,'four'
+7,1,'NULL'
+7,2,'NULL'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Similar as above but here the join is explicitly included in the query string and is not
+# a result of a query rewrite.
+select a.id, unnested_arr1, unnested_arr2
+from (
+    select cta.id, unnest(arr1) as unnested_arr1, unnest(arr2) as unnested_arr2
+    from functional_parquet.complextypes_arrays cta
+        left join functional_parquet.alltypestiny ti on cta.id = ti.id
+    where cta.id % 2 = 1) a
+where a.unnested_arr1 < 5;
+---- RESULTS
+1,1,'one'
+1,2,'two'
+1,3,'three'
+1,4,'four'
+7,1,'NULL'
+7,2,'NULL'
+---- TYPES
+INT,INT,STRING
+====

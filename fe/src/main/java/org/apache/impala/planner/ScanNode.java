@@ -85,6 +85,9 @@ abstract public class ScanNode extends PlanNode {
 
   public TupleDescriptor getTupleDesc() { return desc_; }
 
+  @Override
+  protected boolean shouldPickUpZippingUnnestConjuncts() { return true; }
+
   /**
    * Checks if this scan is supported based on the types of scanned columns and the
    * underlying file formats, in particular, whether complex types are supported.
