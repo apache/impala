@@ -1328,6 +1328,10 @@ class ImpalaShell(cmd.Cmd, object):
         # retrieve the error log
         warning_log = self.imp_client.get_warning_log(self.last_query_handle)
 
+        # Flush the row output. This is important so that the row output will not
+        # come after the "Fetch X row(s)" message.
+        self.output_stream.flush()
+
       end_time = time.time()
 
       if warning_log:
