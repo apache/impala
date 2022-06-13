@@ -21,7 +21,10 @@
 #include <fstream>
 #include <gflags/gflags.h>
 #include <rapidjson/document.h>
+#include <sys/stat.h>
 #include <sys/sysinfo.h>
+#include <sys/sysmacros.h>
+#include <sys/types.h>
 
 #include "gutil/strings/join.h"
 #include "gutil/strings/util.h"
@@ -33,6 +36,7 @@
 #include "testutil/gtest-util.h"
 #include "testutil/scoped-flag-setter.h"
 #include "util/counting-barrier.h"
+#include "util/disk-info.h"
 #include "util/filesystem-util.h"
 #include "util/simple-logger.h"
 #include "util/thread.h"
@@ -132,6 +136,29 @@ class DataCacheBaseTest : public testing::Test {
     ASSERT_OK(cache->CloseFilesAndVerifySizes());
   }
 
+  void MockDisk(std::string name, bool is_rotational) {
+    mock_fs_ = "/tmp" / boost::filesystem::unique_path();
+    ASSERT_OK(FileSystemUtil::RemoveAndCreateDirectory(mock_fs_.string()));
+    boost::filesystem::path proc_fs = mock_fs_ / "proc";
+    ASSERT_OK(FileSystemUtil::RemoveAndCreateDirectory(proc_fs.string()));
+    boost::filesystem::path sys_fs = mock_fs_ / "sys";
+    boost::filesystem::path dev_queue = sys_fs / "block" / name / "queue";
+    ASSERT_OK(FileSystemUtil::RemoveAndCreateDirectory(dev_queue.string()));
+
+    {
+      struct stat s;
+      stat(BASE_CACHE_DIR, &s);
+      std::ofstream partitions((proc_fs / "partitions").string());
+      partitions << "major minor #blocks name\n";
+      partitions << major(s.st_dev) << " " << minor(s.st_dev) << " 1 " << name << "\n";
+
+      std::ofstream rotational((dev_queue / "rotational").string());
+      rotational << (is_rotational ? "1" : "0");
+    }
+
+    DiskInfo::Init(proc_fs.string(), sys_fs.string());
+  }
+
  protected:
   DataCacheBaseTest() {
     // Create a buffer of random characters.
@@ -178,6 +205,13 @@ class DataCacheBaseTest : public testing::Test {
     boost::filesystem::remove_all(path(data_cache_trace_dir_));
     flag_saver_.reset();
     test_env_.reset();
+
+    // Reset DiskInfo in case it was mocked.
+    if (!mock_fs_.empty()) {
+      boost::filesystem::remove_all(mock_fs_);
+      mock_fs_.clear();
+    }
+    DiskInfo::Init();
   }
 
  private:
@@ -185,6 +219,7 @@ class DataCacheBaseTest : public testing::Test {
   char test_buffer_[TEST_BUFFER_SIZE];
   vector<string> data_cache_dirs_;
   string data_cache_trace_dir_;
+  boost::filesystem::path mock_fs_;
 
   // Saved configuration flags for restoring the values at the end of the test.
   std::unique_ptr<google::FlagSaver> flag_saver_;
@@ -335,6 +370,18 @@ TEST_P(DataCacheTest, TestBasics) {
   // Test with bad 'buffer_len' to make sure the entry is not stored.
   ASSERT_FALSE(cache.Store(FNAME, MTIME, 0, test_buffer(), -5000));
   ASSERT_EQ(0, cache.Lookup(FNAME, MTIME, 0, -5000, buffer));
+}
+
+TEST_P(DataCacheTest, NonCanonicalPath) {
+  DataCache cache("/noncanonical/../file/./system/path:1M");
+  ASSERT_ERROR_MSG(cache.Init(), "/noncanonical/../file/./system/path is not a canonical"
+      " path");
+}
+
+TEST_P(DataCacheTest, NonExistantPath) {
+  DataCache cache("/invalid/file/system/path:1M");
+  ASSERT_ERROR_MSG(cache.Init(), "Encountered exception while verifying existence of "
+      "directory path /invalid/file/system/path: No such file or directory");
 }
 
 // Tests backing file rotation by setting FLAGS_data_cache_file_max_size_bytes to be 1/4
@@ -677,6 +724,39 @@ TEST_P(DataCacheTest, AccessTraceSubsetPercentage) {
       replay_stats.misses + replay_stats.stores + replay_stats.failed_stores;
     EXPECT_EQ(num_original_trace_events, num_replay_trace_events);
   }
+}
+
+TEST_P(DataCacheTest, RotationalDisk) {
+  // Set to default to test disk detection and mock disk access.
+  FLAGS_data_cache_write_concurrency = 0;
+  MockDisk("sda", /*is_rotational*/ true);
+
+  const int64_t cache_size = DEFAULT_CACHE_SIZE;
+  DataCache cache(Substitute("$0:$1", data_cache_dirs()[0], std::to_string(cache_size)));
+  ASSERT_OK(cache.Init());
+  ASSERT_EQ(1, cache.partitions_[0]->data_cache_write_concurrency_);
+}
+
+TEST_P(DataCacheTest, NonRotationalDisk) {
+  // Set to default to test disk detection and mock disk access.
+  FLAGS_data_cache_write_concurrency = 0;
+  MockDisk("nvme0n1", /*is_rotational*/ false);
+
+  const int64_t cache_size = DEFAULT_CACHE_SIZE;
+  DataCache cache(Substitute("$0:$1", data_cache_dirs()[0], std::to_string(cache_size)));
+  ASSERT_OK(cache.Init());
+  ASSERT_EQ(8, cache.partitions_[0]->data_cache_write_concurrency_);
+}
+
+TEST_P(DataCacheTest, InvalidDisk) {
+  // Set to default to test disk detection and mock disk access.
+  FLAGS_data_cache_write_concurrency = 0;
+  MockDisk("won't parse", /*is_rotational*/ false);
+
+  const int64_t cache_size = DEFAULT_CACHE_SIZE;
+  DataCache cache(Substitute("$0:$1", data_cache_dirs()[0], std::to_string(cache_size)));
+  ASSERT_OK(cache.Init());
+  ASSERT_EQ(1, cache.partitions_[0]->data_cache_write_concurrency_);
 }
 
 } // namespace io

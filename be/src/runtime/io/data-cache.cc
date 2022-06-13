@@ -37,6 +37,7 @@
 #include "runtime/io/data-cache-trace.h"
 #include "util/bit-util.h"
 #include "util/cache/cache.h"
+#include "util/disk-info.h"
 #include "util/error-util.h"
 #include "util/filesystem-util.h"
 #include "util/hash-util.h"
@@ -72,15 +73,23 @@ using strings::Split;
 #define ENABLE_CHECKSUMMING (true)
 #endif
 
+// Rotational disks should have 1 thread per disk to minimize seeks. Non-rotational
+// don't have this penalty and benefit from multiple concurrent IO requests.
+static const int THREADS_PER_ROTATIONAL_DISK = 1;
+static const int THREADS_PER_SOLID_STATE_DISK = 8;
+
 DEFINE_int64(data_cache_file_max_size_bytes, 1L << 40 /* 1TB */,
     "(Advanced) The maximum size which a cache file can grow to before data stops being "
     "appended to it.");
 DEFINE_int32(data_cache_max_opened_files, 1000,
     "(Advanced) The maximum number of allowed opened files. This must be at least the "
     "number of specified partitions.");
-DEFINE_int32(data_cache_write_concurrency, 1,
-    "(Advanced) Number of concurrent threads allowed to insert into the cache per "
-    "partition.");
+static const std::string data_cache_write_concurrency_help_msg = Substitute("(Advanced) "
+    "Number of concurrent threads allowed to insert into the cache per partition; unset "
+    "uses $0 for rotational disks and $1 for solid state disks.",
+    THREADS_PER_ROTATIONAL_DISK, THREADS_PER_SOLID_STATE_DISK);
+DEFINE_int32(data_cache_write_concurrency, 0,
+    data_cache_write_concurrency_help_msg.c_str());
 DEFINE_bool(data_cache_checksum, ENABLE_CHECKSUMMING,
     "(Advanced) Enable checksumming for the cached buffer.");
 
@@ -377,6 +386,32 @@ static Cache::EvictionPolicy GetCacheEvictionPolicy(const std::string& policy_st
   return policy;
 }
 
+static int32_t DeviceWriteConcurrency(const string& path) {
+  if (FLAGS_data_cache_write_concurrency > 0) {
+    return FLAGS_data_cache_write_concurrency;
+  }
+
+  int path_disk_id = DiskInfo::disk_id(path.c_str());
+  if (path_disk_id < 0) {
+    LOG(WARNING) << "Device for path " << path << " could not be determined. "
+                 << "Setting data_cache_write_concurrency="
+                 << THREADS_PER_ROTATIONAL_DISK << ".";
+    return THREADS_PER_ROTATIONAL_DISK;
+  }
+
+  const std::string& device_name = DiskInfo::device_name(path_disk_id);
+
+  int32_t write_concurrency = THREADS_PER_ROTATIONAL_DISK;
+  const char* disk_type = "rotational";
+  if (!DiskInfo::is_rotational(path_disk_id)) {
+    write_concurrency = THREADS_PER_SOLID_STATE_DISK;
+    disk_type = "solid state";
+  }
+  LOG(INFO) << "Default data_cache_write_concurrency=" << write_concurrency
+            << " for " << disk_type << " disk " << device_name;
+  return write_concurrency;
+}
+
 DataCache::Partition::Partition(
     int32_t index, const string& path, int64_t capacity, int max_opened_files,
     bool trace_replay)
@@ -474,6 +509,8 @@ Status DataCache::Partition::Init() {
         FLAGS_data_cache_anonymize_trace));
     RETURN_IF_ERROR(tracer_->Init());
   }
+
+  data_cache_write_concurrency_ = DeviceWriteConcurrency(path_);
 
   // Create metrics for this partition
   InitMetrics();
@@ -709,7 +746,7 @@ bool DataCache::Partition::Store(const CacheKey& cache_key, const uint8_t* buffe
     // TODO: defer the writes to another thread which writes asynchronously. Need to bound
     // the extra memory consumption for holding the temporary buffer though.
     const bool exceed_concurrency =
-        pending_insert_set_.size() >= FLAGS_data_cache_write_concurrency;
+        pending_insert_set_.size() >= data_cache_write_concurrency_;
     if (exceed_concurrency ||
         pending_insert_set_.find(key.ToString()) != pending_insert_set_.end()) {
       ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_DROPPED_BYTES->Increment(buffer_len);
@@ -809,9 +846,10 @@ Status DataCache::Init() {
     return Status(Substitute("Misconfigured --data_cache_file_max_size_bytes: $0 bytes. "
         "Must be at least $1 bytes", FLAGS_data_cache_file_max_size_bytes, PAGE_SIZE));
   }
-  if (FLAGS_data_cache_write_concurrency < 1) {
+  if (FLAGS_data_cache_write_concurrency < 0) {
     return Status(Substitute("Misconfigured --data_cache_write_concurrency: $0. "
-        "Must be at least 1.", FLAGS_data_cache_write_concurrency));
+        "Must be at least 0; 0 uses a device-specific default.",
+        FLAGS_data_cache_write_concurrency));
   }
 
   // The expected form of the configuration string is: dir1,dir2,..,dirN:capacity

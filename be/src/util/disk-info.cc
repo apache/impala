@@ -67,12 +67,16 @@ bool DiskInfo::TryNVMETrim(const std::string& name_in, std::string* basename_out
 // Parses /proc/partitions to get the number of disks.  A bit of looking around
 // seems to indicate this as the best way to do this.
 // TODO: is there not something better than this?
-void DiskInfo::GetDeviceNames() {
+void DiskInfo::GetDeviceNames(const std::string &proc, const std::string &sys) {
+  disks_.clear();
+  device_id_to_disk_id_.clear();
+  disk_name_to_disk_id_.clear();
+
   // Format of this file is:
   //    major, minor, #blocks, name
   // We are only interesting in name which is formatted as device_name<partition #>
   // The same device will show up multiple times for each partition (e.g. sda1, sda2).
-  ifstream partitions("/proc/partitions", ios::in);
+  ifstream partitions(Substitute("$0/partitions", proc), ios::in);
   while (partitions.good() && !partitions.eof()) {
     string line;
     getline(partitions, line);
@@ -88,8 +92,8 @@ void DiskInfo::GetDeviceNames() {
     // name of the top-level block device.
     bool found_device = false;
     string dev_name = partition_name;
-    Status status =
-      FileSystemUtil::PathExists(Substitute("/sys/block/$0", dev_name), &found_device);
+    Status status = FileSystemUtil::PathExists(
+      Substitute("$0/block/$1", sys, dev_name), &found_device);
     if (!status.ok()) LOG(WARNING) << status.GetDetail();
     if (!found_device) {
       // NVME devices have a special format. Try to detect that, falling back to the normal
@@ -138,23 +142,23 @@ void DiskInfo::GetDeviceNames() {
     // We can check if it is rotational by reading:
     // /sys/block/<device>/queue/rotational
     // If the file is missing or has unexpected data, default to rotational.
-    stringstream ss;
-    ss << "/sys/block/" << disks_[i].name << "/queue/rotational";
-    ifstream rotational(ss.str().c_str(), ios::in);
+    std::string block_rot =
+      Substitute("$0/block/$1/queue/rotational", sys, disks_[i].name);
+    ifstream rotational(block_rot, ios::in);
     if (rotational.good()) {
       string line;
       getline(rotational, line);
       if (line == "0") disks_[i].is_rotational = false;
     } else {
-      LOG(INFO) << "Could not read " << ss.str() << " for " << disks_[i].name
+      LOG(INFO) << "Could not read " << block_rot << " for " << disks_[i].name
                 << " , assuming rotational.";
     }
     if (rotational.is_open()) rotational.close();
   }
 }
 
-void DiskInfo::Init() {
-  GetDeviceNames();
+void DiskInfo::Init(std::string proc, std::string sys) {
+  GetDeviceNames(proc, sys);
   initialized_ = true;
 }
 

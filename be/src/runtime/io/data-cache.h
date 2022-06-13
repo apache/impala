@@ -193,7 +193,9 @@ class DataCache {
  private:
   friend class DataCacheBaseTest;
   friend class DataCacheTest;
-  FRIEND_TEST(DataCacheTest, TestAccessTrace);
+  FRIEND_TEST(DataCacheTest, RotationalDisk);
+  FRIEND_TEST(DataCacheTest, NonRotationalDisk);
+  FRIEND_TEST(DataCacheTest, InvalidDisk);
 
   class CacheFile;
   struct CacheKey;
@@ -264,7 +266,9 @@ class DataCache {
    private:
     friend class DataCacheBaseTest;
     friend class DataCacheTest;
-    FRIEND_TEST(DataCacheTest, TestAccessTrace);
+    FRIEND_TEST(DataCacheTest, RotationalDisk);
+    FRIEND_TEST(DataCacheTest, NonRotationalDisk);
+    FRIEND_TEST(DataCacheTest, InvalidDisk);
 
     /// Index of this partition. This is used for naming metrics or other items that
     /// need separate values for each partition. It does not impact cache behavior.
@@ -278,6 +282,9 @@ class DataCache {
 
     /// Maximum number of opened files allowed in a partition.
     const int max_opened_files_;
+
+    /// Device-specific write concurrency
+    int32_t data_cache_write_concurrency_ = 1;
 
     /// Whether this is only a trace replay. For trace replay, this is only
     /// performing the metadata operations to determine the hit/miss rate.
