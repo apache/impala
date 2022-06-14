@@ -17,6 +17,8 @@
 
 #include "exec/orc-metadata-utils.h"
 
+#include <stack>
+
 #include <boost/algorithm/string.hpp>
 
 #include "util/debug-util.h"
@@ -45,13 +47,12 @@ OrcSchemaResolver::OrcSchemaResolver(const HdfsTableDescriptor& tbl_desc,
     filename_(filename),
     is_table_full_acid_(is_table_acid) {
   DetermineFullAcidSchema();
-  if (tbl_desc_.IsIcebergTable() && root_->getSubtypeCount() > 0) {
-    // Use FIELD_ID-based column resolution for Iceberg tables if possible.
-    const orc::Type* first_child =  root_->getSubtype(0);
-    if (first_child->hasAttributeKey(ICEBERG_FIELD_ID)) {
-      schema_resolution_strategy_ = TSchemaResolutionStrategy::FIELD_ID;
-    } else {
-      schema_resolution_strategy_ = TSchemaResolutionStrategy::NAME;
+  if (tbl_desc_.IsIcebergTable()) {
+    schema_resolution_strategy_ = TSchemaResolutionStrategy::FIELD_ID;
+
+    if (root_->getSubtypeCount() > 0
+        && !root_->getSubtype(0)->hasAttributeKey(ICEBERG_FIELD_ID)) {
+      GenerateFieldIDs();
     }
   }
 }
@@ -303,13 +304,55 @@ const orc::Type* OrcSchemaResolver::FindChildWithFieldId(const orc::Type* node,
   for (int i = 0; i < node->getSubtypeCount(); ++i) {
     const orc::Type* child = node->getSubtype(i);
     DCHECK(child != nullptr);
-    if (!child->hasAttributeKey(ICEBERG_FIELD_ID)) return nullptr;
-    std::string field_id_str = child->getAttributeValue(ICEBERG_FIELD_ID);
-    int64_t child_field_id = GetFieldIdFromStr(field_id_str);
+
+    int child_field_id = 0;
+
+    if (LIKELY(child->hasAttributeKey(ICEBERG_FIELD_ID))) {
+      std::string field_id_str = child->getAttributeValue(ICEBERG_FIELD_ID);
+      child_field_id = GetFieldIdFromStr(field_id_str);
+    } else {
+      child_field_id = GetGeneratedFieldID(child);
+    }
+
     if (child_field_id == -1) return nullptr;
     if (child_field_id == field_id) return child;
   }
   return nullptr;
+}
+
+void OrcSchemaResolver::GenerateFieldIDs() {
+  std::stack<const orc::Type*> nodes;
+
+  nodes.push(root_);
+
+  int fieldID = 1;
+
+  while (!nodes.empty()) {
+    const orc::Type* current = nodes.top();
+    nodes.pop();
+
+    uint64_t size = current->getSubtypeCount();
+
+    for (uint64_t i = 0; i < size; i++) {
+      auto retval = orc_type_to_field_id_.emplace(current->getSubtype(i), fieldID++);
+
+      // Emplace has to be successful, otherwise we visited the same node twice
+      DCHECK(retval.second);
+
+      // Push children in reverse order to the stack so they are processed in the original
+      // order
+      nodes.push(current->getSubtype(size - i - 1));
+    }
+  }
+}
+
+int OrcSchemaResolver::GetGeneratedFieldID(const orc::Type* type) const {
+  auto it = orc_type_to_field_id_.find(type);
+
+  // First column has field ID, this one does not, file is corrupted
+  if (UNLIKELY(it == orc_type_to_field_id_.end())) return -1;
+
+  return it->second;
 }
 
 SchemaPath OrcSchemaResolver::GetCanonicalSchemaPath(const SchemaPath& col_path,

@@ -1,0 +1,208 @@
+====
+---- QUERY
+select * from iceberg_migrated_alter_test;
+---- RESULTS
+0,'A',0.5
+1,'B',1.5
+2,'C',2.5
+---- TYPES
+INT, STRING, DOUBLE
+====
+---- QUERY
+alter table iceberg_migrated_alter_test drop column string_col;
+select * from iceberg_migrated_alter_test;
+---- RESULTS
+0,0.5
+1,1.5
+2,2.5
+---- TYPES
+INT, DOUBLE
+====
+---- QUERY
+alter table iceberg_migrated_alter_test add column string_col string;
+select * from iceberg_migrated_alter_test;
+---- RESULTS
+0,0.5,'NULL'
+1,1.5,'NULL'
+2,2.5,'NULL'
+---- TYPES
+INT, DOUBLE, STRING
+====
+---- QUERY
+alter table iceberg_migrated_alter_test change column double_col renamed_double_col double;
+select * from iceberg_migrated_alter_test;
+---- RESULTS
+0,0.5,'NULL'
+1,1.5,'NULL'
+2,2.5,'NULL'
+---- TYPES
+INT, DOUBLE, STRING
+====
+---- QUERY
+alter table iceberg_migrated_alter_test add column double_col double;
+select * from iceberg_migrated_alter_test;
+---- RESULTS
+0,0.5,'NULL',NULL
+1,1.5,'NULL',NULL
+2,2.5,'NULL',NULL
+---- TYPES
+INT, DOUBLE, STRING, DOUBLE
+====
+---- QUERY
+insert into iceberg_migrated_alter_test values (3,3.5,"D",3.8);
+select * from iceberg_migrated_alter_test;
+---- RESULTS
+3,3.5,'D',3.8
+0,0.5,'NULL',NULL
+1,1.5,'NULL',NULL
+2,2.5,'NULL',NULL
+---- TYPES
+INT, DOUBLE, STRING, DOUBLE
+====
+---- QUERY
+select * from iceberg_migrated_alter_test_orc;
+---- RESULTS
+0,'A',0.5
+1,'B',1.5
+2,'C',2.5
+---- TYPES
+INT, STRING, DOUBLE
+====
+---- QUERY
+alter table iceberg_migrated_alter_test_orc drop column string_col;
+select * from iceberg_migrated_alter_test_orc;
+---- RESULTS
+0,0.5
+1,1.5
+2,2.5
+---- TYPES
+INT, DOUBLE
+====
+---- QUERY
+alter table iceberg_migrated_alter_test_orc add column string_col string;
+select * from iceberg_migrated_alter_test_orc;
+---- RESULTS
+0,0.5,'NULL'
+1,1.5,'NULL'
+2,2.5,'NULL'
+---- TYPES
+INT, DOUBLE, STRING
+====
+---- QUERY
+alter table iceberg_migrated_alter_test_orc change column double_col renamed_double_col double;
+select * from iceberg_migrated_alter_test_orc;
+---- RESULTS
+0,0.5,'NULL'
+1,1.5,'NULL'
+2,2.5,'NULL'
+---- TYPES
+INT, DOUBLE, STRING
+====
+---- QUERY
+alter table iceberg_migrated_alter_test_orc add column double_col double;
+select * from iceberg_migrated_alter_test_orc;
+---- RESULTS
+0,0.5,'NULL',NULL
+1,1.5,'NULL',NULL
+2,2.5,'NULL',NULL
+---- TYPES
+INT, DOUBLE, STRING, DOUBLE
+====
+---- QUERY
+select struct_1_col.string_col, struct_2_col.struct_3_col.float_col from iceberg_migrated_complex_test;
+---- RESULTS
+'A',0.5
+---- TYPES
+STRING, FLOAT
+====
+---- QUERY
+select my_array_1.pos, my_array_1.item from iceberg_migrated_complex_test, iceberg_migrated_complex_test.struct_1_col.int_array_col as my_array_1;
+---- RESULTS
+0,0
+---- TYPES
+BIGINT, INT
+====
+---- QUERY
+select my_array_2.pos, my_array_2.item from iceberg_migrated_complex_test, iceberg_migrated_complex_test.struct_2_col.struct_3_col.bigint_array_col as my_array_2;
+---- RESULTS
+0,4
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+select my_map_1.key, my_map_1.value from iceberg_migrated_complex_test, iceberg_migrated_complex_test.struct_1_col.bool_int_map_col as my_map_1;
+---- RESULTS
+true,1
+---- TYPES
+BOOLEAN, INT
+====
+---- QUERY
+select my_map_2.key, my_map_2.value from iceberg_migrated_complex_test, iceberg_migrated_complex_test.int_bigint_map_col as my_map_2;
+---- RESULTS
+2,3
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
+select my_map_3.key, my_map_3.value from iceberg_migrated_complex_test, iceberg_migrated_complex_test.struct_2_col.struct_3_col.string_double_map_col as my_map_3;
+---- RESULTS
+'B',1.5
+---- TYPES
+STRING, DOUBLE
+====
+---- QUERY
+select my_map_4.key, my_map_4.value from iceberg_migrated_complex_test, iceberg_migrated_complex_test.struct_2_col.int_int_map_col as my_map_4;
+---- RESULTS
+5,6
+---- TYPES
+INT, INT
+====
+---- QUERY
+select struct_1_col.string_col, struct_2_col.struct_3_col.float_col from iceberg_migrated_complex_test_orc;
+---- RESULTS
+'A',0.5
+---- TYPES
+STRING, FLOAT
+====
+---- QUERY
+select my_array_1.pos, my_array_1.item from iceberg_migrated_complex_test_orc, iceberg_migrated_complex_test_orc.struct_1_col.int_array_col as my_array_1;
+---- RESULTS
+0,0
+---- TYPES
+BIGINT, INT
+====
+---- QUERY
+select my_array_2.pos, my_array_2.item from iceberg_migrated_complex_test_orc, iceberg_migrated_complex_test_orc.struct_2_col.struct_3_col.bigint_array_col as my_array_2;
+---- RESULTS
+0,4
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+select my_map_1.key, my_map_1.value from iceberg_migrated_complex_test_orc, iceberg_migrated_complex_test_orc.struct_1_col.bool_int_map_col as my_map_1;
+---- RESULTS
+true,1
+---- TYPES
+BOOLEAN, INT
+====
+---- QUERY
+select my_map_2.key, my_map_2.value from iceberg_migrated_complex_test_orc, iceberg_migrated_complex_test_orc.int_bigint_map_col as my_map_2;
+---- RESULTS
+2,3
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
+select my_map_3.key, my_map_3.value from iceberg_migrated_complex_test_orc, iceberg_migrated_complex_test_orc.struct_2_col.struct_3_col.string_double_map_col as my_map_3;
+---- RESULTS
+'B',1.5
+---- TYPES
+STRING, DOUBLE
+====
+---- QUERY
+select my_map_4.key, my_map_4.value from iceberg_migrated_complex_test_orc, iceberg_migrated_complex_test_orc.struct_2_col.int_int_map_col as my_map_4;
+---- RESULTS
+5,6
+---- TYPES
+INT, INT
+====

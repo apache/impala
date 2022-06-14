@@ -19,6 +19,7 @@
 
 #include <strings.h>
 #include <sstream>
+#include <stack>
 #include <string>
 #include <vector>
 
@@ -811,6 +812,13 @@ SchemaNode* ParquetSchemaResolver::NextSchemaNode(
     *missing_field = true;
     return NULL;
   }
+
+  if (UNLIKELY(file_idx == INVALID_ID)) {
+    VLOG_FILE << Substitute("File '$0' is corrupted", filename_);
+    *missing_field = true;
+    return NULL;
+  }
+
   return &node->children[file_idx];
 }
 
@@ -827,7 +835,17 @@ int ParquetSchemaResolver::FindChildWithFieldId(SchemaNode* node,
     const int& field_id) const {
   int idx;
   for (idx = 0; idx < node->children.size(); ++idx) {
-    if (node->children[idx].element->field_id == field_id) break;
+    SchemaNode* child = &node->children[idx];
+
+    int child_field_id = 0;
+
+    if (LIKELY(child->element->__isset.field_id)) {
+      child_field_id = child->element->field_id;
+    } else {
+      child_field_id = GetGeneratedFieldID(child);
+    }
+    if (child_field_id == field_id) return idx;
+    if (UNLIKELY(child_field_id == INVALID_ID)) return INVALID_ID;
   }
   return idx;
 }
@@ -961,4 +979,53 @@ Status ParquetSchemaResolver::ValidateScalarNode(const SchemaNode& node,
   return Status::OK();
 }
 
+void ParquetSchemaResolver::GenerateFieldIDs() {
+  std::stack<SchemaNode*> nodes;
+
+  nodes.push(&schema_);
+
+  int fieldID = 1;
+
+  while (!nodes.empty()) {
+    SchemaNode* current = nodes.top();
+    nodes.pop();
+
+    uint64_t size = current->children.size();
+
+    for (uint64_t i = 0; i < size; i++) {
+      auto retval = schema_node_to_field_id_.emplace(&current->children[i], fieldID++);
+
+      // Emplace has to be successful, otherwise we visited the same node twice
+      DCHECK(retval.second);
+
+      // Push children in reverse order to the stack so they are processed in the original
+      // order
+      const uint64_t reverse_idx = size - i - 1;
+
+      SchemaNode& current_child = current->children[reverse_idx];
+
+      const parquet::ConvertedType::type child_type =
+          current_child.element->converted_type;
+
+      if (child_type == parquet::ConvertedType::type::LIST
+          || child_type == parquet::ConvertedType::type::MAP) {
+        // Skip middle level
+        DCHECK(current_child.children.size() == 1);
+
+        nodes.push(&current_child.children[0]);
+      } else {
+        nodes.push(&current_child);
+      }
+    }
+  }
+}
+
+int ParquetSchemaResolver::GetGeneratedFieldID(SchemaNode* node) const {
+  auto it = schema_node_to_field_id_.find(node);
+
+  // First column has field ID, this one does not, file is corrupted
+  if (UNLIKELY(it == schema_node_to_field_id_.end())) return INVALID_ID;
+
+  return it->second;
+}
 }
