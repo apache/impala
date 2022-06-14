@@ -324,7 +324,10 @@ def get_dev_impala_shell_executable():
 def create_impala_shell_executable_dimension():
   _, include_pypi = get_dev_impala_shell_executable()
   if include_pypi:
-    return ImpalaTestDimension('impala_shell', 'dev', 'python2', 'python3')
+    if 'DISABLE_PYTHON3_TEST' in os.environ:
+      return ImpalaTestDimension('impala_shell', 'dev', 'python2')
+    else:
+      return ImpalaTestDimension('impala_shell', 'dev', 'python2', 'python3')
   else:
     return ImpalaTestDimension('impala_shell', 'dev')
 

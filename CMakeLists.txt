@@ -467,7 +467,12 @@ add_custom_target(impala_python ALL
   COMMAND "${CMAKE_SOURCE_DIR}/bin/init-impala-python.sh"
 )
 
-add_custom_target(impala_shell_pypi ALL DEPENDS shell_python2_install shell_python3_install)
+if(NOT $ENV{DISABLE_PYTHON3_TEST} EQUAL "")
+  message(STATUS "DISABLE_PYTHON3_TEST is set, disabling Python3 virtualenv and tests")
+  add_custom_target(impala_shell_pypi ALL DEPENDS shell_python2_install)
+else()
+  add_custom_target(impala_shell_pypi ALL DEPENDS shell_python2_install shell_python3_install)
+endif()
 
 add_custom_target(notests_independent_targets DEPENDS
   java cscope tarballs impala_python impala_shell_pypi
