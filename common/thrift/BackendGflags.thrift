@@ -223,4 +223,6 @@ struct TBackendGflags {
   99: required bool auto_check_compaction
 
   100: required bool enable_sync_to_latest_event_on_ddls
+
+  101: required bool pull_table_types_and_comments
 }

@@ -53,6 +53,9 @@ enum TTableType {
   DATA_SOURCE_TABLE = 3
   KUDU_TABLE = 4
   ICEBERG_TABLE = 5
+  // Type for tables that we haven't loaded its full metadata so we don't know whether
+  // it's a HDFS or Kudu table, etc. We just know it's not a view.
+  UNLOADED_TABLE = 6
 }
 
 // TODO: Separate the storage engines (e.g. Kudu) from the file formats.
@@ -642,6 +645,10 @@ struct TTable {
 
   // Set if this a iceberg table
   17: optional TIcebergTable iceberg_table
+
+  // Comment of the table/view. Set only for FeIncompleteTable where msTable doesn't
+  // exists.
+  18: optional string tbl_comment
 }
 
 // Represents a database.

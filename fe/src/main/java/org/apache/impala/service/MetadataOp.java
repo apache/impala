@@ -45,11 +45,11 @@ import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
-import org.apache.impala.catalog.local.LocalIncompleteTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnValue;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
@@ -75,9 +75,7 @@ public class MetadataOp {
   // Static column values
   private static final TColumnValue NULL_COL_VAL = new TColumnValue();
   private static final TColumnValue EMPTY_COL_VAL = createTColumnValue("");
-  public static final String TABLE_TYPE_TABLE = "TABLE";
-  public static final String TABLE_TYPE_VIEW = "VIEW";
-  public static final String TABLE_COMMENT_KEY = "comment";
+  private static final String TABLE_COMMENT_KEY = "comment";
 
   // Result set schema for each of the metadata operations.
   private final static TResultSetMetadata GET_CATALOGS_MD = new TResultSetMetadata();
@@ -379,8 +377,8 @@ public class MetadataOp {
             continue;
           }
 
-          String comment = getTableComment(table);
-          String tableType = getTableType(table);
+          String comment = table.getTableComment();
+          String tableType = getTableTypeString(table);
           List<Column> columns = Lists.newArrayList();
           List<SQLPrimaryKey> primaryKeys = Lists.newArrayList();
           List<SQLForeignKey> foreignKeys = Lists.newArrayList();
@@ -416,32 +414,26 @@ public class MetadataOp {
     return result;
   }
 
-  public static String getTableType(FeTable table) {
+  public static String getTableTypeString(FeTable table) {
     String msTableType;
-    if (table instanceof LocalIncompleteTable) {
-      // LocalIncompleteTable doesn't have a msTable object but it contains the HMS table
+    if (table instanceof FeIncompleteTable) {
+      // FeIncompleteTable doesn't have a msTable object but it contains the Impala table
       // type if the table is loaded in catalogd.
-      msTableType = ((LocalIncompleteTable) table).getMsTableType();
-    } else {
-      Table msTbl = table.getMetaStoreTable();
-      msTableType = (msTbl == null || msTbl.getTableType() == null) ?
-          null : msTbl.getTableType().toUpperCase();
+      return table.getTableType().name();
     }
-    return getImpalaTableType(msTableType);
+    Table msTbl = table.getMetaStoreTable();
+    msTableType = msTbl == null ? null : msTbl.getTableType();
+    return getImpalaTableType(msTableType).name();
   }
 
-  public static String getImpalaTableType(@Nullable String msTableType) {
-    return MetastoreShim.HMS_TO_IMPALA_TYPE.getOrDefault(msTableType, TABLE_TYPE_TABLE);
+  public static TImpalaTableType getImpalaTableType(@Nullable String msTableType) {
+    if (msTableType != null) msTableType = msTableType.toUpperCase();
+    return MetastoreShim.HMS_TO_IMPALA_TYPE.getOrDefault(msTableType,
+        TImpalaTableType.TABLE);
   }
 
   @Nullable
-  public static String getTableComment(FeTable table) {
-    if (table instanceof LocalIncompleteTable) {
-      // LocalIncompleteTable doesn't have a msTable object but it contains the comment
-      // if the table is loaded in catalogd.
-      return ((LocalIncompleteTable) table).getTableComment();
-    }
-    Table msTbl = table.getMetaStoreTable();
+  public static String getTableComment(Table msTbl) {
     return msTbl == null ? null : msTbl.getParameters().get(TABLE_COMMENT_KEY);
   }
 
@@ -603,8 +595,8 @@ public class MetadataOp {
       for (String tableType : tableTypes) {
         tableType = tableType.toUpperCase();
         upperCaseTableTypes.add(tableType);
-        if (tableType.equals(TABLE_TYPE_TABLE)) hasValidTableType = true;
-        if (tableType.equals(TABLE_TYPE_VIEW)) hasValidTableType = true;
+        if (tableType.equals(TImpalaTableType.TABLE.name())) hasValidTableType = true;
+        if (tableType.equals(TImpalaTableType.VIEW.name())) hasValidTableType = true;
       }
       if (!hasValidTableType) return result;
     }
@@ -924,11 +916,11 @@ public class MetadataOp {
   private static void createGetTableTypesResults() {
     TResultRow row = new TResultRow();
     row.colVals = Lists.newArrayList();
-    row.colVals.add(createTColumnValue(TABLE_TYPE_TABLE));
+    row.colVals.add(createTColumnValue(TImpalaTableType.TABLE.name()));
     GET_TABLE_TYPES_RESULTS.add(row);
     row = new TResultRow();
     row.colVals = Lists.newArrayList();
-    row.colVals.add(createTColumnValue(TABLE_TYPE_VIEW));
+    row.colVals.add(createTColumnValue(TImpalaTableType.VIEW.name()));
     GET_TABLE_TYPES_RESULTS.add(row);
   }
 

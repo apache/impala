@@ -355,4 +355,8 @@ public class BackendConfig {
   public void setEnableSyncToLatestEventOnDdls(boolean flag) {
     backendCfg_.enable_sync_to_latest_event_on_ddls = flag;
   }
+
+  public boolean pullTableTypesAndComments() {
+    return backendCfg_.pull_table_types_and_comments;
+  }
 }

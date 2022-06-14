@@ -21,8 +21,6 @@ import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.ACCES
 import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.ACCESSTYPE_READONLY;
 import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.ACCESSTYPE_READWRITE;
 import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.ACCESSTYPE_WRITEONLY;
-import static org.apache.impala.service.MetadataOp.TABLE_TYPE_TABLE;
-import static org.apache.impala.service.MetadataOp.TABLE_TYPE_VIEW;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -45,7 +43,6 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
-import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.CompactionInfoStruct;
@@ -188,34 +185,6 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
     ColumnStatistics colStats = new ColumnStatistics();
     colStats.setEngine(IMPALA_ENGINE);
     return colStats;
-  }
-
-  /**
-   * Method which maps Metastore's TableType to Impala's table type. In metastore 2
-   * Materialized view is not supported
-   */
-  public static String mapToInternalTableType(String typeStr) {
-    String defaultTableType = TABLE_TYPE_TABLE;
-    TableType tType;
-
-    if (typeStr == null) return defaultTableType;
-    try {
-      tType = TableType.valueOf(typeStr.toUpperCase());
-    } catch (Exception e) {
-      return defaultTableType;
-    }
-    switch (tType) {
-      case EXTERNAL_TABLE:
-      case MANAGED_TABLE:
-      //Deprecated and removed in Hive-3.. //TODO throw exception?
-      case INDEX_TABLE:
-        return TABLE_TYPE_TABLE;
-      case VIRTUAL_VIEW:
-      case MATERIALIZED_VIEW:
-        return TABLE_TYPE_VIEW;
-      default:
-        return defaultTableType;
-    }
   }
 
   //hive-3 has a different class to encode and decode event messages

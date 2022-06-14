@@ -494,16 +494,28 @@ struct TPartialTableInfo {
   12: optional CatalogObjects.TIcebergTable iceberg_table
 }
 
+// Table types in the user's perspective. Though we treat materialized view as table
+// internally, materialized views are shown in view type to the users.
+enum TImpalaTableType {
+  TABLE,
+  VIEW,
+  UNKNOWN
+}
+
 struct TBriefTableMeta {
   // Name of the table
   1: required string name
 
   // HMS table type of the table: EXTERNAL_TABLE, MANAGED_TABLE, VIRTUAL_VIEW, etc.
   // Unset if the table is unloaded.
+  // Deprecated since 4.2 (IMPALA-9670).
   2: optional string msType
 
   // Comment(remark) of the table. Unset if the table is unloaded.
   3: optional string comment
+
+  // Impala table type of the table: TABLE, VIEW, UNKNOWN
+  4: optional TImpalaTableType tblType
 }
 
 // Selector for partial information about a Database.

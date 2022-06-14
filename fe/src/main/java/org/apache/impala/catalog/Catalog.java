@@ -638,10 +638,13 @@ public abstract class Catalog implements AutoCloseable {
       case DATABASE:
         return "DATABASE:" + catalogObject.getDb().getDb_name().toLowerCase();
       case TABLE:
-      case VIEW:
         TTable tbl = catalogObject.getTable();
         return "TABLE:" + tbl.getDb_name().toLowerCase() + "." +
             tbl.getTbl_name().toLowerCase();
+      case VIEW:
+        TTable view = catalogObject.getTable();
+        return "VIEW:" + view.getDb_name().toLowerCase() + "." +
+            view.getTbl_name().toLowerCase();
       case HDFS_PARTITION:
         THdfsPartition part = catalogObject.getHdfs_partition();
         return "HDFS_PARTITION:" + part.getDb_name().toLowerCase() + "." +

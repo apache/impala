@@ -27,6 +27,7 @@ import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableStats;
@@ -162,6 +163,11 @@ public class View extends Table implements FeView {
 
   @Override // FeView
   public boolean isLocalView() { return isLocalView_; }
+
+  @Override
+  public TImpalaTableType getTableType() {
+    return TImpalaTableType.VIEW;
+  }
 
   /**
    * Returns the column labels the user specified in the WITH-clause.

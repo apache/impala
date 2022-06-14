@@ -50,11 +50,13 @@ import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnDescriptor;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TPartialTableInfo;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableInfoSelector;
 import org.apache.impala.thrift.TTableStats;
+import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.HdfsCachingUtil;
 
@@ -483,8 +485,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     CatalogInterners.internFieldsInPlace(msTbl);
     Table table = null;
     // Create a table of appropriate type
-    if (MetadataOp.TABLE_TYPE_VIEW.equals(
-          MetastoreShim.mapToInternalTableType(msTbl.getTableType()))) {
+    if (TImpalaTableType.VIEW ==
+        MetastoreShim.mapToInternalTableType(msTbl.getTableType())) {
       if (msTbl.getTableType().equalsIgnoreCase("MATERIALIZED_VIEW") &&
           HdfsFileFormat.isHdfsInputFormatClass(msTbl.getSd().getInputFormat())) {
         table = new MaterializedViewHdfsTable(msTbl, db, msTbl.getTableName(),
@@ -521,8 +523,17 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     if (!thriftTable.isSetLoad_status() && thriftTable.isSetMetastore_table())  {
       newTable = Table.fromMetastoreTable(parentDb, thriftTable.getMetastore_table());
     } else {
+      TImpalaTableType tblType;
+      if (thriftTable.getTable_type() == TTableType.VIEW) {
+        tblType = TImpalaTableType.VIEW;
+      } else {
+        // If the table is unloaded or --pull_table_types_and_comments flag is not set,
+        // keep the legacy behavior as showing the table type as TABLE.
+        tblType = TImpalaTableType.TABLE;
+      }
       newTable =
-          IncompleteTable.createUninitializedTable(parentDb, thriftTable.getTbl_name());
+          IncompleteTable.createUninitializedTable(parentDb, thriftTable.getTbl_name(),
+              tblType, MetadataOp.getTableComment(thriftTable.getMetastore_table()));
     }
     newTable.loadFromThrift(thriftTable);
     newTable.validate();
@@ -658,7 +669,9 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   private TCatalogObject toMinimalTCatalogObjectHelper() {
     TCatalogObject catalogObject =
         new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
-    catalogObject.setTable(new TTable(getDb().getName(), getName()));
+    TTable table = new TTable(getDb().getName(), getName());
+    table.setTbl_comment(getTableComment());
+    catalogObject.setTable(table);
     return catalogObject;
   }
 
@@ -781,6 +794,17 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   @Override // FeTable
   public TableName getTableName() {
     return new TableName(db_ != null ? db_.getName() : null, name_);
+  }
+
+  @Override
+  public TImpalaTableType getTableType() {
+    if (msTable_ == null) return TImpalaTableType.TABLE;
+    return MetastoreShim.mapToInternalTableType(msTable_.getTableType());
+  }
+
+  @Override
+  public String getTableComment() {
+    return MetadataOp.getTableComment(msTable_);
   }
 
   @Override // FeTable

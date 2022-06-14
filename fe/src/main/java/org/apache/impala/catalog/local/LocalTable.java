@@ -48,7 +48,10 @@ import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.common.Pair;
+import org.apache.impala.compat.MetastoreShim;
+import org.apache.impala.service.MetadataOp;
 import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.AcidUtils;
 import org.apache.log4j.Logger;
@@ -71,6 +74,8 @@ abstract class LocalTable implements FeTable {
   protected final LocalDb db_;
   /** The lower-case name of the table. */
   protected final String name_;
+  protected final TImpalaTableType tableType_;
+  protected final String tableComment_;
 
   private final ColumnMap cols_;
 
@@ -149,6 +154,8 @@ abstract class LocalTable implements FeTable {
   public LocalTable(LocalDb db, Table msTbl, TableMetaRef ref, ColumnMap cols) {
     this.db_ = Preconditions.checkNotNull(db);
     this.name_ = msTbl.getTableName();
+    this.tableType_ = MetastoreShim.mapToInternalTableType(msTbl.getTableType());
+    this.tableComment_ = MetadataOp.getTableComment(msTbl);
     this.cols_ = cols;
     this.ref_ = ref;
     this.msTable_ = msTbl;
@@ -166,6 +173,8 @@ abstract class LocalTable implements FeTable {
   protected LocalTable(LocalDb db, String tblName) {
     this.db_ = Preconditions.checkNotNull(db);
     this.name_ = tblName;
+    this.tableType_ = TImpalaTableType.TABLE;
+    this.tableComment_ = null;
     this.ref_ = null;
     this.msTable_ = null;
     this.cols_ = null;
@@ -216,6 +225,16 @@ abstract class LocalTable implements FeTable {
   @Override
   public TableName getTableName() {
     return new TableName(db_.getName(), name_);
+  }
+
+  @Override
+  public TImpalaTableType getTableType() {
+    return tableType_;
+  }
+
+  @Override
+  public String getTableComment() {
+    return tableComment_;
   }
 
   @Override

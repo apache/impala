@@ -123,14 +123,15 @@ public class LocalDb implements FeDb {
     FeTable tbl = getTableIfCached(tblName);
     if (tbl instanceof LocalIncompleteTable) {
       // The table exists but hasn't been loaded yet.
-      try{
+      try {
         tbl = LocalTable.load(this, tblName);
       } catch (TableLoadingException tle) {
         // If the table fails to load (eg a Kudu table that doesn't have
         // a backing table, or some other catalogd-side issue), turn it into
         // an IncompleteTable. This allows statements like DROP TABLE to still
         // analyze.
-        tbl = new FailedLoadLocalTable(this, tblName, tle);
+        tbl = new FailedLoadLocalTable(this, tblName, tbl.getTableType(),
+            tbl.getTableComment(), tle);
       }
       tables_.put(tblName, tbl);
     }

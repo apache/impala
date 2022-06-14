@@ -25,6 +25,7 @@ import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableStats;
 
@@ -74,6 +75,16 @@ public interface FeTable {
    * @return the table name in structured form
    */
   TableName getTableName();
+
+  /**
+   * @return the general type of this table (e.g. "TABLE" or "VIEW")
+   */
+  TImpalaTableType getTableType();
+
+  /**
+   * @return the comment of this table
+   */
+  String getTableComment();
 
   /**
    * @return the columns in this table

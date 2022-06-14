@@ -330,6 +330,14 @@ class ImpylaHS2Connection(ImpalaConnection):
       if not (self.__use_http_transport and 'NoneType' in str(e)):
         raise
 
+  def get_tables(self, database=None):
+    """Trigger the GetTables() HS2 request on the given database (None means all dbs).
+    Returns a list of (catalogName, dbName, tableName, tableType, tableComment).
+    """
+    LOG.info("-- getting tables for database: {0}".format(database))
+    self.__cursor.get_tables(database_name=database)
+    return self.__cursor.fetchall()
+
   def close_query(self, operation_handle):
     LOG.info("-- closing query for operation handle: {0}".format(operation_handle))
     operation_handle.get_handle().close_operation()

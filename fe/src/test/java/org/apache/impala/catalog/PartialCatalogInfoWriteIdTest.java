@@ -18,7 +18,6 @@
 package org.apache.impala.catalog;
 
 import java.sql.SQLException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
@@ -36,6 +35,7 @@ import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
 import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.THdfsTable;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TPartialPartitionInfo;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableInfoSelector;
@@ -536,7 +536,8 @@ public class PartialCatalogInfoWriteIdTest {
         "insert into " + getTestFullAcidTblName() + " " + partition + " values (1)");
     executeHiveSql("delete from " + getTestFullAcidTblName() + " where c1 = 1");
     // add incompleteTable so that the table will be loaded
-    catalog_.addIncompleteTable(testDbName, testAcidTblName);
+    catalog_.addIncompleteTable(testDbName, testAcidTblName, TImpalaTableType.TABLE,
+        /*tblComment*/null);
     // After major compaction, the partition should return only base file
     testFileMetadataAfterCompaction(testAcidTblName, partition, true, 1);
   }
@@ -551,7 +552,8 @@ public class PartialCatalogInfoWriteIdTest {
         "insert into " + getTestFullAcidTblName() + " " + partition + " values (1)");
     executeHiveSql("delete from " + getTestFullAcidTblName() + " where c1 = 1");
     // add incompleteTable so that the table will be loaded
-    catalog_.addIncompleteTable(testDbName, testAcidTblName);
+    catalog_.addIncompleteTable(testDbName, testAcidTblName, TImpalaTableType.TABLE,
+        /*tblComment*/null);
     // After minor compaction, the partition should return one delta file and one delete
     // delta file
     testFileMetadataAfterCompaction(testAcidTblName, partition, false, 2);

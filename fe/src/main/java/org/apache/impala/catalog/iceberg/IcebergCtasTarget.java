@@ -53,6 +53,7 @@ import org.apache.impala.catalog.local.LocalDb;
 import org.apache.impala.catalog.local.LocalFsTable;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.catalog.StructType;
+import org.apache.impala.service.MetadataOp;
 import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
@@ -62,6 +63,7 @@ import org.apache.impala.thrift.THdfsStorageDescriptor;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.IcebergSchemaConverter;
@@ -317,5 +319,15 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
   @Override
   public TCatalogObjectType getCatalogObjectType() {
     return TCatalogObjectType.TABLE;
+  }
+
+  @Override
+  public TImpalaTableType getTableType() {
+    return TImpalaTableType.TABLE;
+  }
+
+  @Override
+  public String getTableComment() {
+    return MetadataOp.getTableComment(msTable_);
   }
 }

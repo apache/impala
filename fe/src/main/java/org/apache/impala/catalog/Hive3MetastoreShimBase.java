@@ -17,9 +17,6 @@
 
 package org.apache.impala.catalog;
 
-import static org.apache.impala.service.MetadataOp.TABLE_TYPE_TABLE;
-import static org.apache.impala.service.MetadataOp.TABLE_TYPE_VIEW;
-
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -72,6 +69,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.common.TransactionException;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.service.MetadataOp;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TValidWriteIdList;
@@ -262,13 +260,39 @@ public class Hive3MetastoreShimBase {
   /**
    * mapping between the HMS-3 type the Impala types
    */
-  public static final ImmutableMap<String, String> HMS_TO_IMPALA_TYPE =
-      new ImmutableMap.Builder<String, String>()
-          .put("EXTERNAL_TABLE", TABLE_TYPE_TABLE)
-          .put("MANAGED_TABLE", TABLE_TYPE_TABLE)
-          .put("INDEX_TABLE", TABLE_TYPE_TABLE)
-          .put("VIRTUAL_VIEW", TABLE_TYPE_VIEW)
-          .put("MATERIALIZED_VIEW", TABLE_TYPE_VIEW).build();
+  public static final ImmutableMap<String, TImpalaTableType>
+      HMS_TO_IMPALA_TYPE = new ImmutableMap.Builder<String, TImpalaTableType>()
+          .put("EXTERNAL_TABLE", TImpalaTableType.TABLE)
+          .put("MANAGED_TABLE", TImpalaTableType.TABLE)
+          .put("INDEX_TABLE", TImpalaTableType.TABLE)
+          .put("VIRTUAL_VIEW", TImpalaTableType.VIEW)
+          .put("MATERIALIZED_VIEW", TImpalaTableType.VIEW).build();
+
+  /**
+   * Method which maps Metastore's TableType to Impala's table type. In metastore 2
+   * Materialized view is not supported
+   */
+  public static TImpalaTableType mapToInternalTableType(String typeStr) {
+    TImpalaTableType defaultTableType = TImpalaTableType.TABLE;
+    TableType tType;
+
+    if (typeStr == null) return defaultTableType;
+    try {
+      tType = TableType.valueOf(typeStr.toUpperCase());
+    } catch (Exception e) {
+      return defaultTableType;
+    }
+    switch (tType) {
+      case EXTERNAL_TABLE:
+      case MANAGED_TABLE:
+        return TImpalaTableType.TABLE;
+      case VIRTUAL_VIEW:
+      case MATERIALIZED_VIEW:
+        return TImpalaTableType.VIEW;
+      default:
+        return defaultTableType;
+    }
+  }
 
   // hive-3 introduces a catalog object in hive
   // Impala only supports the default catalog of hive

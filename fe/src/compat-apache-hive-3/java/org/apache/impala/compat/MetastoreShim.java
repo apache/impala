@@ -17,9 +17,6 @@
 
 package org.apache.impala.compat;
 
-import static org.apache.impala.service.MetadataOp.TABLE_TYPE_TABLE;
-import static org.apache.impala.service.MetadataOp.TABLE_TYPE_VIEW;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
@@ -39,7 +36,6 @@ import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.RetryingMetaStoreClient;
-import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -161,32 +157,6 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
   public static ColumnStatistics createNewHiveColStats() {
     ColumnStatistics colStats = new ColumnStatistics();
     return colStats;
-  }
-
-  /**
-   * Method which maps Metastore's TableType to Impala's table type. In metastore 2
-   * Materialized view is not supported
-   */
-  public static String mapToInternalTableType(String typeStr) {
-    String defaultTableType = TABLE_TYPE_TABLE;
-    TableType tType;
-
-    if (typeStr == null) return defaultTableType;
-    try {
-      tType = TableType.valueOf(typeStr.toUpperCase());
-    } catch (Exception e) {
-      return defaultTableType;
-    }
-    switch (tType) {
-      case EXTERNAL_TABLE:
-      case MANAGED_TABLE:
-        return TABLE_TYPE_TABLE;
-      case VIRTUAL_VIEW:
-      case MATERIALIZED_VIEW:
-        return TABLE_TYPE_VIEW;
-      default:
-        return defaultTableType;
-    }
   }
 
   /**

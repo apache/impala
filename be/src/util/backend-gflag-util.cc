@@ -100,6 +100,7 @@ DECLARE_bool(invalidate_hms_cache_on_ddls);
 DECLARE_bool(hms_event_incremental_refresh_transactional_table);
 DECLARE_bool(auto_check_compaction);
 DECLARE_bool(enable_sync_to_latest_event_on_ddls);
+DECLARE_bool(pull_table_types_and_comments);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -322,6 +323,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_auto_check_compaction(FLAGS_auto_check_compaction);
   cfg.__set_enable_sync_to_latest_event_on_ddls(
       FLAGS_enable_sync_to_latest_event_on_ddls);
+  cfg.__set_pull_table_types_and_comments(FLAGS_pull_table_types_and_comments);
   return Status::OK();
 }
 

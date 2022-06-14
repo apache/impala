@@ -51,6 +51,7 @@ import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.TableMeta;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.AuthorizationDelta;
@@ -59,7 +60,6 @@ import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.FeFsTable.Utils;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import org.apache.impala.catalog.events.EventFactory;
 import org.apache.impala.catalog.events.ExternalEventsProcessor;
 import org.apache.impala.catalog.events.MetastoreEvents.EventFactoryForSyncToLatestEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
@@ -102,6 +102,7 @@ import org.apache.impala.thrift.TGetPartitionStatsRequest;
 import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TPartialCatalogInfo;
 import org.apache.impala.thrift.TPartialPartitionInfo;
 import org.apache.impala.thrift.TPartitionKeyValue;
@@ -1555,6 +1556,10 @@ public class CatalogServiceCatalog extends Catalog {
       } else {
         catalogTbl.setTable(tbl.toThrift());
       }
+      // Update catalog object type from TABLE to VIEW if it's indeed a view.
+      if (TImpalaTableType.VIEW == tbl.getTableType()) {
+        catalogTbl.setType(TCatalogObjectType.VIEW);
+      }
     } catch (Exception e) {
       LOG.error(String.format("Error calling toThrift() on table %s: %s",
           tbl.getFullName(), e.getMessage()), e);
@@ -1828,6 +1833,37 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * Load the list of TableMeta from Hive. If pull_table_types_and_comments=true, the list
+   * will contain the table types and comments. Otherwise, we just fetch the table names
+   * and set nulls on the types and comments.
+   *
+   * @param msClient HMS client for fetching metadata
+   * @param dbName Database name of the required tables. Should not be null.
+   * @param tblName Nullable table name. If it's null, all tables of the required database
+   *               will be fetched. If it's not null, the list will contain only one item.
+   */
+  private List<TableMeta> getTableMetaFromHive(MetaStoreClient msClient, String dbName,
+      @Nullable String tblName) throws TException {
+    // Load the exact TableMeta list if pull_table_types_and_comments is set to true.
+    if (BackendConfig.INSTANCE.pullTableTypesAndComments()) {
+      return msClient.getHiveClient().getTableMeta(dbName, tblName, /*tableTypes*/ null);
+    }
+    // Unloaded tables are all treated as TABLEs. Simply set its type and comment to null.
+    // It doesn't matter actually. The real table type will be refreshed after the table
+    // is loaded.
+    List<TableMeta> res = Lists.newArrayList();
+    if (tblName == null) {
+      // request for getting all table names
+      for (String tableName : msClient.getHiveClient().getAllTables(dbName)) {
+        res.add(new TableMeta(dbName, tableName, /*tableType*/ null));
+      }
+    } else if (msClient.getHiveClient().tableExists(dbName, tblName)) {
+      res.add(new TableMeta(dbName, tblName, /*tableType*/ null));
+    }
+    return res;
+  }
+
+  /**
    * Invalidates the database 'db'. This method can have potential race
    * conditions with external changes to the Hive metastore and hence any
    * conflicting changes to the objects can manifest in the form of exceptions
@@ -1863,16 +1899,20 @@ public class CatalogServiceCatalog extends Catalog {
       newDb.setCatalogVersion(incrementAndGetCatalogVersion());
 
       List<TTableName> tblsToBackgroundLoad = new ArrayList<>();
-      for (String tableName: msClient.getHiveClient().getAllTables(dbName)) {
-        if (isBlacklistedTable(dbName, tableName.toLowerCase())) {
+      for (TableMeta tblMeta: getTableMetaFromHive(msClient, dbName, /*tblName*/null)) {
+        String tableName = tblMeta.getTableName().toLowerCase();
+        if (isBlacklistedTable(dbName, tableName)) {
           LOG.info("skip blacklisted table: " + dbName + "." + tableName);
           continue;
         }
-        Table incompleteTbl = IncompleteTable.createUninitializedTable(newDb, tableName);
+        LOG.trace("Get {}", tblMeta);
+        Table incompleteTbl = IncompleteTable.createUninitializedTable(newDb, tableName,
+            MetastoreShim.mapToInternalTableType(tblMeta.getTableType()),
+            tblMeta.getComments());
         incompleteTbl.setCatalogVersion(incrementAndGetCatalogVersion());
         newDb.addTable(incompleteTbl);
         if (loadInBackground_) {
-          tblsToBackgroundLoad.add(new TTableName(dbName, tableName.toLowerCase()));
+          tblsToBackgroundLoad.add(new TTableName(dbName, tableName));
         }
       }
 
@@ -1894,8 +1934,8 @@ public class CatalogServiceCatalog extends Catalog {
         Set<String> newTableNames = Sets.newHashSet(newDb.getAllTableNames());
         oldTableNames.removeAll(newTableNames);
         for (String removedTableName: oldTableNames) {
-          Table removedTable = IncompleteTable.createUninitializedTable(existingDb,
-              removedTableName);
+          Table removedTable = IncompleteTable.createUninitializedTableForRemove(
+              existingDb, removedTableName);
           removedTable.setCatalogVersion(incrementAndGetCatalogVersion());
           deleteLog_.addRemovedObject(removedTable.toTCatalogObject());
         }
@@ -2094,14 +2134,16 @@ public class CatalogServiceCatalog extends Catalog {
     deleteLog_.addRemovedObject(db.toTCatalogObject());
   }
 
-  public Table addIncompleteTable(String dbName, String tblName) {
-    return addIncompleteTable(dbName, tblName, -1L);
+  public Table addIncompleteTable(String dbName, String tblName, TImpalaTableType tblType,
+      String tblComment) {
+    return addIncompleteTable(dbName, tblName, tblType, tblComment, -1L);
   }
 
   /**
    * Adds a table with the given name to the catalog and returns the new table.
    */
-  public Table addIncompleteTable(String dbName, String tblName, long createEventId) {
+  public Table addIncompleteTable(String dbName, String tblName, TImpalaTableType tblType,
+      String tblComment, long createEventId) {
     versionLock_.writeLock().lock();
     try {
       // IMPALA-9211: get db object after holding the writeLock in case of getting stale
@@ -2115,7 +2157,8 @@ public class CatalogServiceCatalog extends Catalog {
         existingTbl.setCatalogVersion(incrementAndGetCatalogVersion());
         deleteLog_.addRemovedObject(existingTbl.toMinimalTCatalogObject());
       }
-      Table incompleteTable = IncompleteTable.createUninitializedTable(db, tblName);
+      Table incompleteTable = IncompleteTable.createUninitializedTable(
+          db, tblName, tblType, tblComment);
       incompleteTable.setCatalogVersion(incrementAndGetCatalogVersion());
       incompleteTable.setCreateEventId(createEventId);
       db.addTable(incompleteTable);
@@ -2418,6 +2461,7 @@ public class CatalogServiceCatalog extends Catalog {
       if (oldTable == null) return Pair.create(null, null);
       return Pair.create(oldTable,
           addIncompleteTable(newTableName.getDb_name(), newTableName.getTable_name(),
+              oldTable.getTableType(), oldTable.getTableComment(),
               oldTable.getCreateEventId()));
     } finally {
       versionLock_.writeLock().unlock();
@@ -2591,27 +2635,26 @@ public class CatalogServiceCatalog extends Catalog {
     LOG.info(String.format("Invalidating table metadata: %s.%s", dbName, tblName));
 
     // Stores whether the table exists in the metastore. Can have three states:
-    // 1) true - Table exists in metastore.
-    // 2) false - Table does not exist in metastore.
+    // 1) Non empty - Table exists in metastore.
+    // 2) Empty - Table does not exist in metastore.
     // 3) unknown (null) - There was exception thrown by the metastore client.
-    Boolean tableExistsInMetaStore;
+    List<TableMeta> metaRes = null;
     org.apache.hadoop.hive.metastore.api.Table msTbl = null;
     Db db = null;
     try (MetaStoreClient msClient = getMetaStoreClient()) {
       org.apache.hadoop.hive.metastore.api.Database msDb = null;
       try {
+        metaRes = getTableMetaFromHive(msClient, dbName, tblName);
         msTbl = msClient.getHiveClient().getTable(dbName, tblName);
-        tableExistsInMetaStore = (msTbl != null);
       } catch (UnknownDBException | NoSuchObjectException e) {
         // The parent database does not exist in the metastore. Treat this the same
         // as if the table does not exist.
-        tableExistsInMetaStore = false;
+        metaRes = Collections.emptyList();
       } catch (TException e) {
         LOG.error("Error executing tableExists() metastore call: " + tblName, e);
-        tableExistsInMetaStore = null;
       }
 
-      if (tableExistsInMetaStore != null && !tableExistsInMetaStore) {
+      if (metaRes != null && metaRes.isEmpty()) {
         Table result = removeTable(dbName, tblName);
         if (result == null) return null;
         tblWasRemoved.setRef(true);
@@ -2624,11 +2667,11 @@ public class CatalogServiceCatalog extends Catalog {
       }
 
       db = getDb(dbName);
-      if ((db == null || !db.containsTable(tblName)) && tableExistsInMetaStore == null) {
+      if ((db == null || !db.containsTable(tblName)) && metaRes == null) {
         // The table does not exist in our cache AND it is unknown whether the
         // table exists in the Metastore. Do nothing.
         return null;
-      } else if (db == null && tableExistsInMetaStore) {
+      } else if (db == null && !metaRes.isEmpty()) {
         // The table exists in the Metastore, but our cache does not contain the parent
         // database. A new db will be added to the cache along with the new table. msDb
         // must be valid since tableExistsInMetaStore is true.
@@ -2644,12 +2687,17 @@ public class CatalogServiceCatalog extends Catalog {
         }
       }
     }
+    Preconditions.checkState(metaRes != null);
+    Preconditions.checkState(metaRes.size() == 1);
+    TableMeta tblMeta = metaRes.get(0);
 
     // Add a new uninitialized table to the table cache, effectively invalidating
     // any existing entry. The metadata for the table will be loaded lazily, on the
     // on the next access to the table.
     Preconditions.checkNotNull(msTbl);
-    Table newTable = addIncompleteTable(dbName, tblName);
+    Table newTable = addIncompleteTable(dbName, tblName,
+        MetastoreShim.mapToInternalTableType(tblMeta.getTableType()),
+        tblMeta.getComments());
     Preconditions.checkNotNull(newTable);
     if (loadInBackground_) {
       tableLoadingMgr_.backgroundLoad(new TTableName(dbName.toLowerCase(),
@@ -2679,7 +2727,8 @@ public class CatalogServiceCatalog extends Catalog {
       if (db == null) return null;
       Table existingTbl = db.getTable(tblName);
       if (existingTbl == null) return null;
-      incompleteTable = IncompleteTable.createUninitializedTable(db, tblName);
+      incompleteTable = IncompleteTable.createUninitializedTable(db, tblName,
+          existingTbl.getTableType(), existingTbl.getTableComment());
       incompleteTable.setCatalogVersion(incrementAndGetCatalogVersion());
       incompleteTable.setCreateEventId(existingTbl.getCreateEventId());
       db.addTable(incompleteTable);

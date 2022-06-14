@@ -207,6 +207,7 @@ import org.apache.impala.thrift.TGrantRevokeRoleParams;
 import org.apache.impala.thrift.THdfsCachingOp;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TIcebergCatalog;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TPartitionDef;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TPartitionStats;
@@ -771,7 +772,9 @@ public class CatalogOpExecutor {
             "EventId: {} Table was not added since it was removed later", eventId);
         return false;
       }
-      Table incompleteTable = IncompleteTable.createUninitializedTable(db, tblName);
+      Table incompleteTable = IncompleteTable.createUninitializedTable(db, tblName,
+          MetastoreShim.mapToInternalTableType(msTbl.getTableType()),
+          MetadataOp.getTableComment(msTbl));
       incompleteTable.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
       // set the createEventId of the table to eventId since we are adding table
       // due to the given eventId.
@@ -2744,7 +2747,8 @@ public class CatalogOpExecutor {
     } finally {
       getMetastoreDdlLock().unlock();
     }
-    removedObject.setType(TCatalogObjectType.TABLE);
+    removedObject.setType(params.is_table ?
+        TCatalogObjectType.TABLE : TCatalogObjectType.VIEW);
     removedObject.setTable(new TTable());
     removedObject.getTable().setTbl_name(tableName.getTbl());
     removedObject.getTable().setDb_name(tableName.getDb());
@@ -3333,7 +3337,7 @@ public class CatalogOpExecutor {
       // Add the table to the catalog cache
       Table newTbl = catalog_
           .addIncompleteTable(newTable.getDbName(), newTable.getTableName(),
-              createEventId);
+              TImpalaTableType.TABLE, params.getComment(), createEventId);
       LOG.debug("Created a Kudu table {} with create event id {}", newTbl.getFullName(),
           createEventId);
       addTableToCatalogUpdate(newTbl, wantMinimalResult, response.result);
@@ -3430,7 +3434,10 @@ public class CatalogOpExecutor {
             String.format(HMS_RPC_ERROR_FORMAT_STR, "createTable"), e);
       }
       Table newTbl = catalog_.addIncompleteTable(msTable.getDbName(),
-          msTable.getTableName(), eventIdTblPair.first);
+          msTable.getTableName(),
+          MetastoreShim.mapToInternalTableType(msTable.getTableType()),
+          MetadataOp.getTableComment(msTable),
+          eventIdTblPair.first);
       Preconditions.checkNotNull(newTbl);
       LOG.debug("Created catalog table {} with create event id {}", newTbl.getFullName(),
           eventIdTblPair.first);
@@ -3594,7 +3601,8 @@ public class CatalogOpExecutor {
       long createEventId = eventTblPair == null ? -1 : eventTblPair.first;
       // Add the table to the catalog cache
       Table newTbl = catalog_.addIncompleteTable(newTable.getDbName(),
-          newTable.getTableName(), createEventId);
+          newTable.getTableName(), TImpalaTableType.TABLE, params.getComment(),
+          createEventId);
       LOG.debug("Created a iceberg table {} in catalog with create event Id {} ",
           newTbl.getFullName(), createEventId);
       addTableToCatalogUpdate(newTbl, wantMinimalResult, response.result);

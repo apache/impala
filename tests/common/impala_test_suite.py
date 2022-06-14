@@ -107,12 +107,30 @@ IMPALAD_HOST_PORT_LIST = pytest.config.option.impalad.split(',')
 assert len(IMPALAD_HOST_PORT_LIST) > 0, 'Must specify at least 1 impalad to target'
 IMPALAD = IMPALAD_HOST_PORT_LIST[0]
 IMPALAD_HOSTNAME = IMPALAD.split(':')[0]
-
+IMPALAD_HOSTNAME_LIST = [s.split(':')[0] for s in IMPALAD_HOST_PORT_LIST]
+IMPALAD_BEESWAX_PORT_LIST = [int(s.split(':')[1]) for s in IMPALAD_HOST_PORT_LIST]
+IMPALAD_BEESWAX_PORT = IMPALAD_BEESWAX_PORT_LIST[0]
 IMPALAD_BEESWAX_HOST_PORT = IMPALAD_HOST_PORT_LIST[0]
-IMPALAD_HS2_HOST_PORT =\
-    IMPALAD_HOSTNAME + ":" + pytest.config.option.impalad_hs2_port
-IMPALAD_HS2_HTTP_HOST_PORT =\
-    IMPALAD_HOSTNAME + ":" + pytest.config.option.impalad_hs2_http_port
+
+IMPALAD_HS2_PORT = int(pytest.config.option.impalad_hs2_port)
+IMPALAD_HS2_HOST_PORT = IMPALAD_HOSTNAME + ":" + str(IMPALAD_HS2_PORT)
+# Calculate the hs2 ports based on the first hs2 port and the deltas of the beeswax ports
+IMPALAD_HS2_HOST_PORT_LIST = [
+    IMPALAD_HOSTNAME_LIST[i] + ':' +
+    str(IMPALAD_BEESWAX_PORT_LIST[i] - IMPALAD_BEESWAX_PORT + IMPALAD_HS2_PORT)
+    for i in range(len(IMPALAD_HOST_PORT_LIST))
+]
+
+IMPALAD_HS2_HTTP_PORT = int(pytest.config.option.impalad_hs2_http_port)
+IMPALAD_HS2_HTTP_HOST_PORT = IMPALAD_HOSTNAME + ":" + str(IMPALAD_HS2_HTTP_PORT)
+# Calculate the hs2-http ports based on the first hs2-http port and the deltas of the
+# beeswax ports
+IMPALAD_HS2_HTTP_HOST_PORT_LIST = [
+    IMPALAD_HOSTNAME_LIST[i] + ':' +
+    str(IMPALAD_BEESWAX_PORT_LIST[i] - IMPALAD_BEESWAX_PORT + IMPALAD_HS2_HTTP_PORT)
+    for i in range(len(IMPALAD_HOST_PORT_LIST))
+]
+
 STRICT_HS2_HOST_PORT =\
     IMPALAD_HOSTNAME + ":" + pytest.config.option.strict_hs2_port
 STRICT_HS2_HTTP_HOST_PORT =\
@@ -280,9 +298,7 @@ class ImpalaTestSuite(BaseTestSuite):
     return len(cls.__get_cluster_host_ports('beeswax'))
 
   @classmethod
-  def create_client_for_nth_impalad(cls, nth=0):
-    # TODO Extended it to other protocols
-    protocol = 'beeswax'
+  def create_client_for_nth_impalad(cls, nth=0, protocol='beeswax'):
     host_port = cls.__get_cluster_host_ports(protocol)[nth]
     return ImpalaTestSuite.create_impala_client(host_port, protocol=protocol)
 
@@ -334,13 +350,12 @@ class ImpalaTestSuite(BaseTestSuite):
     """Return a list of host/port combinations for all impalads in the cluster."""
     if protocol == 'beeswax':
       return IMPALAD_HOST_PORT_LIST
+    elif protocol == 'hs2':
+      return IMPALAD_HS2_HOST_PORT_LIST
+    elif protocol == 'hs2-http':
+      return IMPALAD_HS2_HTTP_HOST_PORT_LIST
     else:
-      assert protocol in ('hs2', 'hs2-http')
-      # TODO: support running tests against multiple coordinators for HS2. It should work,
-      # we just need to update all test runners to pass in all host/port combinations for
-      # the cluster and then handle it here.
-      raise NotImplementedError(
-          "Not yet implemented: only one HS2 host/port can be configured")
+      raise NotImplementedError("Not yet implemented: protocol=" + protocol)
 
   @classmethod
   def create_impala_service(

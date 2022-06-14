@@ -281,7 +281,7 @@ def parse_table_properties(file_format, table_properties):
   return tblproperties
 
 
-def build_table_template(file_format, columns, partition_columns, row_format,
+def build_table_template(file_format, columns, partition_columns, row_format, tbl_comment,
                          avro_schema_dir, table_name, tblproperties):
   if file_format == 'hbase':
     return build_hbase_create_stmt_in_hive(columns, partition_columns, table_name)
@@ -291,6 +291,10 @@ def build_table_template(file_format, columns, partition_columns, row_format,
   partitioned_by = str()
   if partition_columns:
     partitioned_by = 'PARTITIONED BY (%s)' % ', '.join(partition_columns.split('\n'))
+
+  table_comment_stmt = str()
+  if tbl_comment:
+    table_comment_stmt = 'COMMENT "%s"' % tbl_comment
 
   row_format_stmt = str()
   if row_format and file_format != 'kudu':
@@ -339,12 +343,14 @@ CREATE {external} TABLE IF NOT EXISTS {{db_name}}{{db_suffix}}.{{table_name}} (
 {columns}
 {primary_keys})
 {partitioned_by}
+{table_comment}
 {row_format}
 {file_format_string}
 LOCATION '{{hdfs_location}}'
 {tblproperties}
 """.format(
     external=external,
+    table_comment=table_comment_stmt,
     row_format=row_format_stmt,
     columns=',\n'.join(columns.split('\n')),
     primary_keys=primary_keys_clause,
@@ -656,6 +662,7 @@ def generate_statements(output_name, test_vectors, sections,
       columns = eval_section(section['COLUMNS']).strip()
       partition_columns = section['PARTITION_COLUMNS'].strip()
       row_format = section['ROW_FORMAT'].strip()
+      table_comment = section['COMMENT'].strip()
 
       # Force reloading of the table if the user specified the --force option or
       # if the table is partitioned and there was no ALTER section specified. This is to
@@ -738,7 +745,7 @@ def generate_statements(output_name, test_vectors, sections,
         avro_schema_dir = "%s/%s" % (AVRO_SCHEMA_DIR, data_set)
         table_template = build_table_template(
           create_file_format, columns, partition_columns,
-          row_format, avro_schema_dir, table_name, tblproperties)
+          row_format, table_comment, avro_schema_dir, table_name, tblproperties)
         # Write Avro schema to local file
         if file_format == 'avro':
           if not os.path.exists(avro_schema_dir):
@@ -831,7 +838,7 @@ def is_transactional(table_properties):
 
 def parse_schema_template_file(file_name):
   VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'COLUMNS', 'PARTITION_COLUMNS',
-                         'ROW_FORMAT', 'CREATE', 'CREATE_HIVE', 'CREATE_KUDU',
+                         'ROW_FORMAT', 'CREATE', 'CREATE_HIVE', 'CREATE_KUDU', 'COMMENT',
                          'DEPENDENT_LOAD', 'DEPENDENT_LOAD_KUDU', 'DEPENDENT_LOAD_HIVE',
                          'DEPENDENT_LOAD_ACID', 'LOAD', 'ALTER', 'HBASE_COLUMN_FAMILIES',
                          'TABLE_PROPERTIES', 'HBASE_REGION_SPLITS', 'HIVE_MAJOR_VERSION']

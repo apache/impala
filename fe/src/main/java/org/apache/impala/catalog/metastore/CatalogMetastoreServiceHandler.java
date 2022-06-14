@@ -19,13 +19,11 @@ package org.apache.impala.catalog.metastore;
 
 import static org.apache.impala.catalog.metastore.HmsApiNameEnum.GET_PARTITION_BY_NAMES;
 
-import com.facebook.fb303.fb_status;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang.exception.ExceptionUtils;
-import org.apache.hadoop.hive.metastore.PartitionExpressionProxy;
 import org.apache.hadoop.hive.metastore.api.AddPartitionsRequest;
 import org.apache.hadoop.hive.metastore.api.AddPartitionsResult;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
@@ -34,30 +32,23 @@ import org.apache.hadoop.hive.metastore.api.AlterPartitionsResponse;
 import org.apache.hadoop.hive.metastore.api.AlterTableRequest;
 import org.apache.hadoop.hive.metastore.api.AlterTableResponse;
 import org.apache.hadoop.hive.metastore.api.CreateTableRequest;
-import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.DropPartitionsRequest;
 import org.apache.hadoop.hive.metastore.api.DropPartitionsResult;
 import org.apache.hadoop.hive.metastore.api.EnvironmentContext;
 import org.apache.hadoop.hive.metastore.api.GetPartitionsByNamesRequest;
 import org.apache.hadoop.hive.metastore.api.GetPartitionsByNamesResult;
-import org.apache.hadoop.hive.metastore.api.GetPartitionsRequest;
 import org.apache.hadoop.hive.metastore.api.GetTableRequest;
 import org.apache.hadoop.hive.metastore.api.GetTableResult;
-import org.apache.hadoop.hive.metastore.api.GetTablesRequest;
-import org.apache.hadoop.hive.metastore.api.GetTablesResult;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.MetaException;
-import org.apache.hadoop.hive.metastore.api.NoSuchLockException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PartitionSpec;
 import org.apache.hadoop.hive.metastore.api.PartitionsByExprRequest;
 import org.apache.hadoop.hive.metastore.api.PartitionsByExprResult;
-import org.apache.hadoop.hive.metastore.api.PartitionsRequest;
-import org.apache.hadoop.hive.metastore.api.PartitionsResponse;
 import org.apache.hadoop.hive.metastore.api.RenamePartitionRequest;
 import org.apache.hadoop.hive.metastore.api.RenamePartitionResponse;
 import org.apache.hadoop.hive.metastore.api.SQLCheckConstraint;
@@ -66,23 +57,18 @@ import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLNotNullConstraint;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.SQLUniqueConstraint;
-import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TruncateTableRequest;
 import org.apache.hadoop.hive.metastore.api.TruncateTableResponse;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 import org.apache.impala.catalog.CatalogHmsAPIHelper;
 import org.apache.impala.catalog.events.DeleteEventLog;
-import org.apache.impala.catalog.events.EventFactory;
 import org.apache.impala.catalog.events.MetastoreEvents;
-import org.apache.impala.catalog.events.MetastoreEvents.CreateTableEvent;
-import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
-import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
-import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Pair;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.CatalogOpExecutor;
+import org.apache.impala.service.MetadataOp;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TTableName;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
@@ -90,7 +76,6 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.CatalogException;
-import org.apache.impala.compat.MetastoreShim;
 
 /**
  * This class implements the HMS APIs that are served by CatalogD
@@ -327,7 +312,8 @@ public class CatalogMetastoreServiceHandler extends MetastoreServiceHandler {
       }
     };
     String apiName = HmsApiNameEnum.CREATE_TABLE.apiName();
-    createTableCore(table.getDbName(), table.getTableName(), apiName, task);
+    createTableCore(apiName, table.getDbName(), table.getTableName(),
+        MetadataOp.getImpalaTableType(table.getTableType()), task);
   }
 
   @Override
@@ -347,7 +333,8 @@ public class CatalogMetastoreServiceHandler extends MetastoreServiceHandler {
     };
     String apiName = HmsApiNameEnum.CREATE_TABLE_REQ.apiName();
     org.apache.hadoop.hive.metastore.api.Table table = req.getTable();
-    createTableCore(table.getDbName(), table.getTableName(), apiName, task);
+    createTableCore(apiName, table.getDbName(), table.getTableName(),
+        MetadataOp.getImpalaTableType(table.getTableType()), task);
   }
 
 
@@ -376,7 +363,8 @@ public class CatalogMetastoreServiceHandler extends MetastoreServiceHandler {
       }
     };
     String apiName = HmsApiNameEnum.CREATE_TABLE_WITH_CONSTRAINTS.apiName();
-    createTableCore(table.getDbName(), table.getTableName(), apiName, task);
+    createTableCore(apiName, table.getDbName(), table.getTableName(),
+        MetadataOp.getImpalaTableType(table.getTableType()), task);
   }
 
   @Override
@@ -397,7 +385,8 @@ public class CatalogMetastoreServiceHandler extends MetastoreServiceHandler {
       }
     };
     String apiName = HmsApiNameEnum.CREATE_TABLE_WITH_ENVIRONMENT_CONTEXT.apiName();
-    createTableCore(table.getDbName(), table.getTableName(), apiName, task);
+    createTableCore(apiName, table.getDbName(), table.getTableName(),
+        MetadataOp.getImpalaTableType(table.getTableType()), task);
   }
 
   @Override
@@ -1355,8 +1344,8 @@ public class CatalogMetastoreServiceHandler extends MetastoreServiceHandler {
     return null;
   }
 
-  private void createTableCore(String dbNameWithCatalog, String tblName, String apiName,
-      CreateTableTask task) throws TException {
+  private void createTableCore(String apiName, String dbNameWithCatalog, String tblName,
+      TImpalaTableType tblType, CreateTableTask task) throws TException {
     String dbName = MetaStoreUtils.parseDbName(dbNameWithCatalog, serverConf_)[1];
     catalogOpExecutor_.getMetastoreDdlLock().lock();
     org.apache.impala.catalog.Table tbl = null;
@@ -1391,9 +1380,10 @@ public class CatalogMetastoreServiceHandler extends MetastoreServiceHandler {
               "while the current table creation was in progress", dbName, tblName,
           fromEventId);
       long createEventId = events.get(0).getEventId();
-      catalog_.addIncompleteTable(dbName, tblName, createEventId);
-      LOG.info("Added incomplete table {}.{} with create event id: {}", dbName, tblName,
+      catalog_.addIncompleteTable(dbName, tblName, tblType, /*tblComment*/null,
           createEventId);
+      LOG.info("Added incomplete table {}.{} (type={}) with create event id: {}",
+          dbName, tblName, tblType, createEventId);
       // sync to latest event ID
       tbl = getTableAndAcquireWriteLock(dbName, tblName, apiName);
       catalog_.getLock().writeLock().unlock();

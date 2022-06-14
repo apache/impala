@@ -228,6 +228,8 @@ double_col double
 date_string_col string
 string_col string
 timestamp_col timestamp
+---- COMMENT
+Tiny table
 ---- ROW_FORMAT
 delimited fields terminated by ','  escaped by '\\'
 ---- ALTER
@@ -1249,6 +1251,7 @@ functional
 alltypes_view
 ---- CREATE
 CREATE VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+COMMENT 'View on alltypes'
 AS SELECT * FROM {db_name}{db_suffix}.alltypes;
 ---- LOAD
 ====

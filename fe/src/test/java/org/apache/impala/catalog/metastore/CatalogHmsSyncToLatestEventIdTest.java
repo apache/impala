@@ -36,6 +36,7 @@ import org.apache.impala.catalog.events.NoOpEventProcessor;
 import org.apache.impala.catalog.events.SynchronousHMSEventProcessorForTests;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.CatalogOpExecutor;
+import org.apache.impala.service.MetadataOp;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.testutil.CatalogTestMetastoreServer;
 import org.apache.thrift.TException;
@@ -541,7 +542,7 @@ public class CatalogHmsSyncToLatestEventIdTest extends AbstractCatalogMetastoreT
             createTableInHms(TEST_DB_NAME, tblName, true);
             IncompleteTable tbl =
                 IncompleteTable.createUninitializedTable(catalog_.getDb(TEST_DB_NAME),
-                    tblName);
+                    tblName, MetadataOp.getImpalaTableType(tableType_), null);
             tbl.setCreateEventId(getLatestEventIdFromHMS());
             catalog_.addTable(catalog_.getDb(TEST_DB_NAME), tbl);
             long prevLastSyncedEventId =

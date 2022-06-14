@@ -359,6 +359,13 @@ DEFINE_bool(enable_legacy_avx_support, false,
     "without AVX2 support. This is a legacy mode that will be removed in a "
     "future release.");
 
+DEFINE_bool(pull_table_types_and_comments, false,
+    "When set, catalogd will always load the table types and comments at startup and in "
+    "executing INVALIDATE METADATA commands. In other words, unloaded tables will not "
+    "just contain the table names, but also the table types and comments. This is a "
+    "catalogd-only flag. Required if users want GET_TABLES requests return correct table "
+    "types or comments.");
+
 // ++========================++
 // || Startup flag graveyard ||
 // ++========================++

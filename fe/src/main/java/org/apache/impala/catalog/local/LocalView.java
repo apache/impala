@@ -27,6 +27,7 @@ import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.View;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TTableDescriptor;
 
 /**
@@ -46,6 +47,11 @@ public class LocalView extends LocalTable implements FeView {
     } catch (TableLoadingException e) {
       throw new LocalCatalogException(e);
     }
+  }
+
+  @Override
+  public TImpalaTableType getTableType() {
+    return TImpalaTableType.VIEW;
   }
 
   @Override

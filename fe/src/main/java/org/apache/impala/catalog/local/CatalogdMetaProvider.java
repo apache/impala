@@ -122,8 +122,6 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import com.google.errorprone.annotations.Immutable;
 import com.google.errorprone.annotations.concurrent.GuardedBy;
 
-import static org.apache.impala.service.MetadataOp.TABLE_COMMENT_KEY;
-
 /**
  * MetaProvider which fetches metadata in a granular fashion from the catalogd.
  *
@@ -764,15 +762,15 @@ public class CatalogdMetaProvider implements MetaProvider {
     if (dbValue instanceof ImmutableMap) {
       TBriefTableMeta cachedMeta = ((ImmutableMap<String, TBriefTableMeta>) dbValue).get(
           latestMeta.tableName_);
-      String latestComment = latestMeta.msTable_.getParameters().get(TABLE_COMMENT_KEY);
+      String latestComment = MetadataOp.getTableComment(latestMeta.msTable_);
       boolean hasStaleComment = !StringUtils.equals(latestComment, cachedMeta.comment);
       // It's possible that the cached type is null (due to previously unloaded) and the
       // latest msType we get is a table type (e.g. MANAGED_TABLE, EXTERNAL_TABLE).
       // This is the most usual case and we don't consider the cached type is stale since
       // they have the same result after applying MetadataOp.getImpalaTableType().
-      boolean hasStaleType = !StringUtils.equals(
-          MetadataOp.getImpalaTableType(cachedMeta.msType),
-          MetadataOp.getImpalaTableType(latestMeta.msTable_.getTableType()));
+      boolean hasStaleType =
+          MetadataOp.getImpalaTableType(cachedMeta.msType) !=
+          MetadataOp.getImpalaTableType(latestMeta.msTable_.getTableType());
       if (hasStaleType || hasStaleComment) {
         List<String> invalidated = new ArrayList<>();
         invalidateCacheForDb(dbName, ImmutableList.of(DbCacheKey.DbInfoType.TABLE_LIST),

@@ -54,8 +54,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
-import static org.apache.impala.service.MetadataOp.TABLE_COMMENT_KEY;
-
 /**
  * Internal representation of db-related metadata. Owned by Catalog instance.
  * Not thread safe.
@@ -530,10 +528,13 @@ public class Db extends CatalogObjectImpl implements FeDb {
           tableCache_.keySet().size());
       for (Table tbl : tableCache_.getValues()) {
         TBriefTableMeta meta = new TBriefTableMeta(tbl.getName());
+        meta.setTblType(tbl.getTableType());
+        meta.setComment(tbl.getTableComment());
         org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable();
         if (msTbl != null) {
+          // This is only used in old versions of impalad. Set it in case of rolling
+          // upgrade.
           meta.setMsType(msTbl.getTableType());
-          meta.setComment(msTbl.getParameters().get(TABLE_COMMENT_KEY));
         }
         briefTableMetaList.add(meta);
       }

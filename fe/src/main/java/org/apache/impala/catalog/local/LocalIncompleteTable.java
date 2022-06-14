@@ -19,6 +19,7 @@ package org.apache.impala.catalog.local;
 import org.apache.impala.catalog.FeIncompleteTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TBriefTableMeta;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TTableDescriptor;
 
 import javax.annotation.Nullable;
@@ -31,18 +32,21 @@ import java.util.Set;
 public class LocalIncompleteTable extends LocalTable implements FeIncompleteTable {
   // These are null if the table is unloaded in catalogd.
   @Nullable
-  private final String msTableType;
+  private final TImpalaTableType tableType_;
   @Nullable
-  private final String tableComment;
+  private final String tableComment_;
 
   public LocalIncompleteTable(LocalDb db, TBriefTableMeta tableMeta) {
     super(db, tableMeta.getName());
-    msTableType = tableMeta.getMsType();
-    tableComment = tableMeta.getComment();
+    tableType_ = tableMeta.getTblType();
+    tableComment_ = tableMeta.getComment();
   }
 
-  public String getMsTableType() { return msTableType; }
-  public String getTableComment() { return tableComment; }
+  @Override
+  public TImpalaTableType getTableType() { return tableType_; }
+
+  @Override
+  public String getTableComment() { return tableComment_; }
 
   @Override
   public ImpalaException getCause() { return null; }

@@ -36,6 +36,7 @@ import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.util.EventSequence;
 import org.junit.Assert;
 import org.junit.Assume;
@@ -253,6 +254,7 @@ public class StmtMetadataLoaderTest {
         new StmtMetadataLoader(fe, Catalog.DEFAULT_DB, timeline, user);
     LocalDb db = new LocalDb(catalog, "default");
     mdLoader.collectPolicyTables(new FailedLoadLocalTable(
-        db, "tbl", new TableLoadingException("error", /*cause=*/new Exception())));
+        db, "tbl", TImpalaTableType.TABLE, "comment",
+        new TableLoadingException("error", /*cause=*/new Exception())));
   }
 }

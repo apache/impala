@@ -21,6 +21,7 @@ import java.util.Set;
 import org.apache.impala.catalog.FeIncompleteTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TTableDescriptor;
 
 import com.google.common.base.Preconditions;
@@ -33,10 +34,25 @@ import com.google.common.base.Preconditions;
  */
 public class FailedLoadLocalTable extends LocalTable implements FeIncompleteTable {
   private final TableLoadingException cause_;
+  private TImpalaTableType tableType_;
+  private String comment_;
 
-  public FailedLoadLocalTable(LocalDb db, String tblName, TableLoadingException cause) {
+  public FailedLoadLocalTable(LocalDb db, String tblName, TImpalaTableType type,
+      String comment, TableLoadingException cause) {
     super(db, tblName);
     this.cause_ = Preconditions.checkNotNull(cause);
+    this.tableType_ = type;
+    this.comment_ = comment;
+  }
+
+  @Override
+  public TImpalaTableType getTableType() {
+    return tableType_;
+  }
+
+  @Override
+  public String getTableComment() {
+    return comment_;
   }
 
   @Override
