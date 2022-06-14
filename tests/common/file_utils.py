@@ -26,6 +26,40 @@ from subprocess import check_call
 from tests.util.filesystem_utils import get_fs_path
 
 
+def create_iceberg_table_from_directory(impala_client, unique_database, table_name,
+                                        file_format):
+  """Utility function to create an iceberg table from a directory. The directory must
+  exist in $IMPALA_HOME/testdata/data/iceberg_test with the name 'table_name'"""
+
+  # Only orc and parquet tested/supported
+  assert file_format == "orc" or file_format == "parquet"
+
+  local_dir = os.path.join(
+    os.environ['IMPALA_HOME'], 'testdata/data/iceberg_test/{0}'.format(table_name))
+  assert os.path.isdir(local_dir)
+
+  # Put the directory in the database's directory (not the table directory)
+  hdfs_parent_dir = get_fs_path("/test-warehouse")
+
+  hdfs_dir = os.path.join(hdfs_parent_dir, table_name)
+
+  # Purge existing files if any
+  check_call(['hdfs', 'dfs', '-rm', '-f', '-r', hdfs_dir])
+
+  # Note: -d skips a staging copy
+  check_call(['hdfs', 'dfs', '-put', '-d', local_dir, hdfs_parent_dir])
+
+  # Create external table
+  qualified_table_name = '{0}.{1}'.format(unique_database, table_name)
+  impala_client.execute("""create external table {0} stored as iceberg location '{1}'
+                        tblproperties('write.format.default'='{2}', 'iceberg.catalog'=
+                        'hadoop.tables')""".format(qualified_table_name, hdfs_dir,
+                                                   file_format))
+
+  # Automatic clean up after drop table
+  impala_client.execute("""alter table {0} set tblproperties ('external.table.purge'=
+                        'True');""".format(qualified_table_name))
+
 def create_table_from_parquet(impala_client, unique_database, table_name):
   """Utility function to create a database table from a Parquet file. A Parquet file must
   exist in $IMPALA_HOME/testdata/data with the name 'table_name'.parquet"""

@@ -18,7 +18,6 @@
 #pragma once
 
 #include <orc/OrcFile.hh>
-#include <queue>
 
 #include "runtime/descriptors.h"
 
@@ -112,6 +111,13 @@ class OrcSchemaResolver {
   /// Finds child of 'node' that has Iceberg field id equals to 'field_id'.
   const orc::Type* FindChildWithFieldId(const orc::Type* node, const int field_id) const;
 
+  /// Generates field ids for the columns in the same order as Iceberg. The traversal is
+  /// preorder, but the assigned field IDs are not in that order. When a node is
+  /// processed, its child nodes are assigned an ID, hence the difference.
+  void GenerateFieldIDs();
+
+  inline int GetGeneratedFieldID(const orc::Type* type) const;
+
   SchemaPath GetCanonicalSchemaPath(const SchemaPath& col_path, int last_idx) const;
 
   /// Sets 'is_file_full_acid_' based on the file schema.
@@ -122,6 +128,7 @@ class OrcSchemaResolver {
   const char* const filename_ = nullptr;
   const bool is_table_full_acid_;
   bool is_file_full_acid_;
+  std::unordered_map<const orc::Type*, int> orc_type_to_field_id_;
 
   /// Validate whether the ColumnType is compatible with the orc type
   Status ValidateType(const ColumnType& type, const orc::Type& orc_type,

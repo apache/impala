@@ -33,6 +33,7 @@ from tests.common.skip import SkipIf
 
 from tests.util.filesystem_utils import get_fs_path, IS_HDFS
 from tests.util.get_parquet_metadata import get_parquet_metadata
+from tests.common.file_utils import create_iceberg_table_from_directory
 
 class TestIcebergTable(ImpalaTestSuite):
   """Tests related to Iceberg tables."""
@@ -101,6 +102,18 @@ class TestIcebergTable(ImpalaTestSuite):
 
   def test_migrated_tables(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-migrated-tables', vector, unique_database)
+
+  def test_migrated_table_field_id_resolution(self, vector, unique_database):
+    create_iceberg_table_from_directory(self.client, unique_database,
+                                        "iceberg_migrated_alter_test", "parquet")
+    create_iceberg_table_from_directory(self.client, unique_database,
+                                        "iceberg_migrated_complex_test", "parquet")
+    create_iceberg_table_from_directory(self.client, unique_database,
+                                        "iceberg_migrated_alter_test_orc", "orc")
+    create_iceberg_table_from_directory(self.client, unique_database,
+                                        "iceberg_migrated_complex_test_orc", "orc")
+    self.run_test_case('QueryTest/iceberg-migrated-table-field-id-resolution',
+                       vector, unique_database)
 
   def test_describe_history(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-table-history', vector, use_db=unique_database)
