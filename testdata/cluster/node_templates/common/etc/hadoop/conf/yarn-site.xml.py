@@ -67,7 +67,10 @@ CONFIG = {
   'yarn.nodemanager.resource.memory-mb': _get_yarn_nm_ram_mb(),
 
   # Increase YARN container resources to 2GB to avoid dataload failures
-  'yarn.app.mapreduce.am.resource.mb': 2048
+  'yarn.app.mapreduce.am.resource.mb': 2048,
+
+  # Increase YARN minimum container size to 2GB to avoid dataload failures
+  'yarn.scheduler.minimum-allocation-mb': 2048
 }
 
 app_classpath = [
