@@ -121,6 +121,33 @@ Status TopNPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const 
   return Status::OK();
 }
 
+/// In the TopNNode constructor if 'pnode.partition_comparator_config_' is NULL, we use
+/// this dummy comparator to avoid 'partition_cmp_' becoming a null pointer. This is
+/// needed because 'partition_cmp_' is wrapped in a
+/// 'ComparatorWrapper<TupleRowComparator>' that takes a reference to the underlying
+/// comparator, so we cannot pass in a null pointer or dereference it.
+class DummyTupleRowComparator: public TupleRowComparator {
+ public:
+  DummyTupleRowComparator()
+   : TupleRowComparator(dummy_scalar_exprs_, dummy_codegend_compare_fn_) {
+  }
+ private:
+  static const std::vector<ScalarExpr*> dummy_scalar_exprs_;
+  static const CodegenFnPtr<TupleRowComparatorConfig::CompareFn>
+      dummy_codegend_compare_fn_;
+
+  int CompareInterpreted(const TupleRow* lhs, const TupleRow* rhs) const override {
+    // This function should never be called as this is a dummy comparator.
+    DCHECK(false);
+    return std::less<const TupleRow*>{}(lhs, rhs);
+  }
+};
+
+/// Initialise vector length to 0 so no buffer needs to be allocated.
+const std::vector<ScalarExpr*> DummyTupleRowComparator::dummy_scalar_exprs_{0};
+const CodegenFnPtr<TupleRowComparatorConfig::CompareFn>
+DummyTupleRowComparator::dummy_codegend_compare_fn_{};
+
 TopNNode::TopNNode(
     ObjectPool* pool, const TopNPlanNode& pnode, const DescriptorTbl& descs)
   : ExecNode(pool, pnode, descs),
@@ -129,7 +156,7 @@ TopNNode::TopNNode(
     output_tuple_desc_(pnode.output_tuple_desc_),
     order_cmp_(new TupleRowLexicalComparator(*pnode.ordering_comparator_config_)),
     partition_cmp_(pnode.partition_comparator_config_ == nullptr ?
-            nullptr :
+            static_cast<TupleRowComparator*>(new DummyTupleRowComparator()) :
             new TupleRowLexicalComparator(*pnode.partition_comparator_config_)),
     intra_partition_order_cmp_(pnode.intra_partition_comparator_config_ == nullptr ?
             nullptr :
