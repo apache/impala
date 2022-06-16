@@ -259,8 +259,6 @@ class SkipIfDockerizedCluster:
 
 
 class SkipIfHive3:
-  kudu_hms_notifications_not_supported = pytest.mark.skipif(HIVE_MAJOR_VERSION >= 3,
-      reason="Kudu is not tested with Hive 3 notifications yet, see IMPALA-8751.")
   col_stat_separated_by_engine = pytest.mark.skipif(HIVE_MAJOR_VERSION >= 3,
       reason="Hive 3 separates column statistics by engine")
   without_hms_not_supported = pytest.mark.skipif(HIVE_MAJOR_VERSION >= 3,

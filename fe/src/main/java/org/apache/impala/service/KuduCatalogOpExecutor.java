@@ -254,8 +254,10 @@ public class KuduCatalogOpExecutor {
       tableOpts.setNumReplicas(parsedReplicas);
     }
 
-    // Set the table's owner.
+    // Set the table's owner and table comment.
     tableOpts.setOwner(msTbl.getOwner());
+    if (params.getComment() != null) tableOpts.setComment(params.getComment());
+
     return tableOpts;
   }
 
