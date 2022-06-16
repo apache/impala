@@ -179,6 +179,12 @@ class TupleRowComparator {
   static const char* LLVM_CLASS_NAME;
 
  protected:
+  TupleRowComparator(const std::vector<ScalarExpr*>& ordering_exprs,
+      const CodegenFnPtr<TupleRowComparatorConfig::CompareFn>& codegend_compare_fn)
+    : ordering_exprs_(ordering_exprs),
+      codegend_compare_fn_(codegend_compare_fn) {
+  }
+
   /// References to ordering expressions owned by the plan node which owns the
   /// TupleRowComparatorConfig used to create this instance.
   const std::vector<ScalarExpr*>& ordering_exprs_;
