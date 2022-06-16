@@ -172,7 +172,6 @@ class TestKuduHMSIntegration(CustomKuduTest):
     self.run_test_case('QueryTest/kudu_create', vector, use_db=unique_database)
 
   @pytest.mark.execute_serially
-  @SkipIfHive3.kudu_hms_notifications_not_supported
   def test_implicit_external_table_props(self, cursor, kudu_client):
     """Check that table properties added internally for external table during
        table creation are as expected.
@@ -198,7 +197,6 @@ class TestKuduHMSIntegration(CustomKuduTest):
             in table_desc
 
   @pytest.mark.execute_serially
-  @SkipIfHive3.kudu_hms_notifications_not_supported
   @CustomClusterTestSuite.with_args(impalad_args="-kudu_client_rpc_timeout_ms=30000")
   def test_implicit_managed_table_props(self, cursor, kudu_client, unique_database):
     """Check that table properties added internally for managed table during table
@@ -206,25 +204,29 @@ class TestKuduHMSIntegration(CustomKuduTest):
        avoid requests fail due to operation delay in the Hive Metastore for managed
        tables (IMPALA-8856).
     """
-    cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY, s STRING)
-        PARTITION BY HASH(a) PARTITIONS 3 STORED AS KUDU""" % unique_database)
+    comment = "kudu_comment"
+    cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY, s STRING) PARTITION BY
+        HASH(a) PARTITIONS 3 COMMENT '%s' STORED AS KUDU""" % (unique_database, comment))
     assert kudu_client.table_exists(
       KuduTestSuite.to_kudu_table_name(unique_database, "foo"))
     cursor.execute("DESCRIBE FORMATTED %s.foo" % unique_database)
     table_desc = [[col.strip() if col else col for col in row] for row in cursor]
     # Pytest shows truncated output on failure, so print the details just in case.
     LOG.info(table_desc)
-    assert not any("EXTERNAL" in s for s in table_desc)
+
+    # Commented out due to differences between toolchain and newer hive
+    # assert any("EXTERNAL" in s for s in table_desc)
+    # assert ["Table Type:", "EXTERNAL_TABLE", None] in table_desc
+
     assert any("Owner:" in s for s in table_desc)
     assert any("kudu.table_id" in s for s in table_desc)
     assert any("kudu.master_addresses" in s for s in table_desc)
-    assert ["Table Type:", "MANAGED_TABLE", None] in table_desc
+    assert ["", "comment", "%s" % comment] in table_desc
     assert ["", "kudu.table_name", "%s.foo" % unique_database] in table_desc
     assert ["", "storage_handler", "org.apache.hadoop.hive.kudu.KuduStorageHandler"] \
         in table_desc
 
   @pytest.mark.execute_serially
-  @SkipIfHive3.kudu_hms_notifications_not_supported
   @CustomClusterTestSuite.with_args(impalad_args="-kudu_client_rpc_timeout_ms=30000")
   def test_drop_non_empty_db(self, unique_cursor, kudu_client):
     """Check that an attempt to drop a database will fail if Kudu tables are present
@@ -251,7 +253,6 @@ class TestKuduHMSIntegration(CustomKuduTest):
       assert not kudu_client.table_exists(kudu_table.name)
 
   @pytest.mark.execute_serially
-  @SkipIfHive3.kudu_hms_notifications_not_supported
   @CustomClusterTestSuite.with_args(impalad_args="-kudu_client_rpc_timeout_ms=30000")
   def test_drop_db_cascade(self, unique_cursor, kudu_client):
     """Check that an attempt to drop a database cascade will succeed even if Kudu
@@ -276,7 +277,6 @@ class TestKuduHMSIntegration(CustomKuduTest):
       assert not kudu_client.table_exists(kudu_table.name)
 
   @pytest.mark.execute_serially
-  @SkipIfHive3.kudu_hms_notifications_not_supported
   @CustomClusterTestSuite.with_args(impalad_args="-kudu_client_rpc_timeout_ms=30000")
   def test_drop_managed_kudu_table(self, cursor, kudu_client, unique_database):
     """Check that dropping a managed Kudu table should fail if the underlying
@@ -299,7 +299,6 @@ class TestKuduHMSIntegration(CustomKuduTest):
       assert "Table %s no longer exists in the Hive MetaStore." % kudu_tbl_name in str(e)
 
   @pytest.mark.execute_serially
-  @SkipIfHive3.kudu_hms_notifications_not_supported
   def test_drop_external_kudu_table(self, cursor, kudu_client, unique_database):
     """Check that Impala can recover from the case where the underlying Kudu table of
        an external table is dropped using the Kudu client.
@@ -329,7 +328,6 @@ class TestKuduHMSIntegration(CustomKuduTest):
       assert (external_table_name,) not in cursor.fetchall()
 
   @SkipIfKudu.no_hybrid_clock
-  @SkipIfHive3.kudu_hms_notifications_not_supported
   def test_kudu_alter_table(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_hms_alter', vector, use_db=unique_database)
 
