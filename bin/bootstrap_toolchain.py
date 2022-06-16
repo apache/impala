@@ -212,10 +212,11 @@ class TemplatedDownloadUnpackTarball(DownloadUnpackTarball):
 class EnvVersionedPackage(TemplatedDownloadUnpackTarball):
   def __init__(self, name, url_prefix_tmpl, destination_basedir, explicit_version=None,
                archive_basename_tmpl=None, unpack_directory_tmpl=None, makedir=False,
-               template_subs_in={}):
+               template_subs_in={}, target_comp=None):
     template_subs = template_subs_in
     template_subs["name"] = name
-    template_subs["version"] = self.__compute_version(name, explicit_version)
+    template_subs["version"] = self.__compute_version(name, explicit_version,
+        target_comp)
     # The common case is that X.tar.gz unpacks to X directory. archive_basename_tmpl
     # allows overriding the value of X (which defaults to ${name}-${version}).
     # If X.tar.gz unpacks to Y directory, then unpack_directory_tmpl allows overriding Y.
@@ -224,17 +225,19 @@ class EnvVersionedPackage(TemplatedDownloadUnpackTarball):
     archive_name_tmpl = archive_basename_tmpl + ".tar.gz"
     if unpack_directory_tmpl is None:
       unpack_directory_tmpl = archive_basename_tmpl
-    url_tmpl = self.__compute_url(name, archive_name_tmpl, url_prefix_tmpl)
+    url_tmpl = self.__compute_url(name, archive_name_tmpl, url_prefix_tmpl, target_comp)
     super(EnvVersionedPackage, self).__init__(url_tmpl, archive_name_tmpl,
         destination_basedir, unpack_directory_tmpl, makedir, template_subs)
 
-  def __compute_version(self, name, explicit_version):
+  def __compute_version(self, name, explicit_version, target_comp=None):
     if explicit_version is not None:
       return explicit_version
     else:
       # When getting the version from the environment, we need to standardize the name
       # to match expected environment variables.
       std_env_name = name.replace("-", "_").upper()
+      if target_comp:
+        std_env_name += '_' + target_comp.upper()
       version_env_var = "IMPALA_{0}_VERSION".format(std_env_name)
       env_version = os.environ.get(version_env_var)
       if not env_version:
@@ -242,10 +245,12 @@ class EnvVersionedPackage(TemplatedDownloadUnpackTarball):
           name, version_env_var))
       return env_version
 
-  def __compute_url(self, name, archive_name_tmpl, url_prefix_tmpl):
+  def __compute_url(self, name, archive_name_tmpl, url_prefix_tmpl, target_comp=None):
     # The URL defined in the environment (IMPALA_*_URL) takes precedence. If that is
     # not defined, use the standard URL (url_prefix + archive_name)
     std_env_name = name.replace("-", "_").upper()
+    if target_comp:
+      std_env_name += '_' + target_comp.upper()
     url_env_var = "IMPALA_{0}_URL".format(std_env_name)
     url_tmpl = os.environ.get(url_env_var)
     if not url_tmpl:
@@ -260,6 +265,11 @@ class ToolchainPackage(EnvVersionedPackage):
       logging.error("Impala environment not set up correctly, make sure "
           "$IMPALA_TOOLCHAIN_PACKAGES_HOME is set.")
       sys.exit(1)
+    target_comp = None
+    if ":" in name:
+      parts = name.split(':')
+      name = parts[0]
+      target_comp = parts[1]
     compiler = get_toolchain_compiler()
     label = get_platform_release_label(release=platform_release).toolchain
     toolchain_build_id = os.environ["IMPALA_TOOLCHAIN_BUILD_ID"]
@@ -276,7 +286,8 @@ class ToolchainPackage(EnvVersionedPackage):
                                            explicit_version=explicit_version,
                                            archive_basename_tmpl=archive_basename_tmpl,
                                            unpack_directory_tmpl=unpack_directory_tmpl,
-                                           template_subs_in=template_subs)
+                                           template_subs_in=template_subs,
+                                           target_comp=target_comp)
 
   def needs_download(self):
     # If the directory doesn't exist, we need the download
@@ -451,6 +462,17 @@ def create_directory_from_env_var(env_var):
     os.makedirs(dir_name)
 
 
+def get_unique_toolchain_downloads(packages):
+  toolchain_packages = map(ToolchainPackage, packages)
+  unique_pkg_directories = set()
+  unique_packages = []
+  for p in toolchain_packages:
+    if p.pkg_directory() not in unique_pkg_directories:
+      unique_packages.append(p)
+      unique_pkg_directories.add(p.pkg_directory())
+  return unique_packages
+
+
 def get_toolchain_downloads():
   toolchain_packages = []
   # The LLVM and GCC packages are the largest packages in the toolchain (Kudu is handled
@@ -464,8 +486,9 @@ def get_toolchain_downloads():
       ["avro", "binutils", "boost", "breakpad", "bzip2", "calloncehack", "cctz", "cmake",
        "crcutil", "curl", "flatbuffers", "gdb", "gflags", "glog", "gperftools", "gtest",
        "jwt-cpp", "libev", "libunwind", "lz4", "openldap", "openssl", "orc", "protobuf",
-       "python", "rapidjson", "re2", "snappy", "thrift", "tpc-h", "tpc-ds", "zlib",
-       "zstd"])
+       "python", "rapidjson", "re2", "snappy", "tpc-h", "tpc-ds", "zlib", "zstd"])
+  toolchain_packages += get_unique_toolchain_downloads(
+      ["thrift:cpp", "thrift:java", "thrift:py"])
   protobuf_package_clang = ToolchainPackage(
       "protobuf", explicit_version=os.environ.get("IMPALA_PROTOBUF_CLANG_VERSION"))
   toolchain_packages += [protobuf_package_clang]

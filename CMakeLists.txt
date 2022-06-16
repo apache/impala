@@ -87,6 +87,18 @@ function(set_dep_root NAME)
       PARENT_SCOPE)
 endfunction()
 
+# Helper function that, given a package name and target component, constructs the
+# package_target_ROOT variable based on the version number extracted from the
+# environment. Mainly used for thrift resolution.
+function(set_dep_root_for_target NAME TARGET)
+  string(TOLOWER ${NAME} NAME_LOWER)
+  string(TOLOWER ${TARGET} TARGET_LOWER)
+  string(REPLACE "_" "-" NAME_LOWER ${NAME_LOWER})
+  set(VAL_NAME "IMPALA_${NAME}_${TARGET}_VERSION")
+  set(${NAME}_${TARGET}_ROOT $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/${NAME_LOWER}-$ENV{${VAL_NAME}}
+      PARENT_SCOPE)
+endfunction()
+
 # Define root path for all dependencies, this is in the form of
 # set_dep_root(PACKAGE) ->
 #   PACKAGE_ROOT set to $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/PACKAGE-$ENV{IMPALA_PACKAGE_VERSION}
@@ -117,7 +129,9 @@ set(PROTOBUF_CLANG_ROOT
 set_dep_root(RE2)
 set_dep_root(RAPIDJSON)
 set_dep_root(SNAPPY)
-set_dep_root(THRIFT)
+set_dep_root_for_target(THRIFT CPP)
+set_dep_root_for_target(THRIFT JAVA)
+set_dep_root_for_target(THRIFT PY)
 set_dep_root(ZLIB)
 set_dep_root(CCTZ)
 set_dep_root(CURL)
@@ -258,19 +272,39 @@ find_package(Ldap REQUIRED)
 IMPALA_ADD_THIRDPARTY_LIB(ldap ${LDAP_INCLUDE_DIR} ${LDAP_STATIC_LIBRARY} "")
 IMPALA_ADD_THIRDPARTY_LIB(lber "" ${LBER_STATIC_LIBRARY} "")
 
-# The environment variable $THRIFT_HOME is set in impala-config.sh
-# Make sure it's consistent with $THRIFT_ROOT.
-if (NOT ($ENV{THRIFT_HOME} STREQUAL ${THRIFT_ROOT}))
-  message(FATAL_ERROR "THRIFT_ROOT (${THRIFT_ROOT}) differs from environment "
-      "variable THRIFT_HOME ($ENV{THRIFT_HOME}).")
+# The environment variable $THRIFT_CPP_HOME is set in impala-config.sh
+# Make sure it's consistent with $THRIFT_CPP_ROOT.
+if (NOT ($ENV{THRIFT_CPP_HOME} STREQUAL ${THRIFT_CPP_ROOT}))
+  message(FATAL_ERROR "THRIFT_CPP_ROOT (${THRIFT_CPP_ROOT}) differs from environment "
+      "variable THRIFT_CPP_HOME ($ENV{THRIFT_CPP_HOME}).")
 endif()
 # find thrift headers and libs
-set(THRIFT_FIND_QUIETLY TRUE)
-find_package(Thrift REQUIRED)
-IMPALA_ADD_THIRDPARTY_LIB(thrift ${THRIFT_INCLUDE_DIR} ${THRIFT_STATIC_LIB} "")
-message(STATUS "Thrift version: ${THRIFT_VERSION}")
-message(STATUS "Thrift contrib dir: ${THRIFT_CONTRIB_DIR}")
-message(STATUS "Thrift compiler: ${THRIFT_COMPILER}")
+set(THRIFT_CPP_FIND_QUIETLY TRUE)
+find_package(ThriftCpp REQUIRED)
+IMPALA_ADD_THIRDPARTY_LIB(thrift ${THRIFT_CPP_INCLUDE_DIR} ${THRIFT_CPP_STATIC_LIB} "")
+message(STATUS "Thrift CPP version: ${THRIFT_CPP_VERSION}")
+message(STATUS "Thrift CPP contrib dir: ${THRIFT_CPP_CONTRIB_DIR}")
+message(STATUS "Thrift CPP compiler: ${THRIFT_CPP_COMPILER}")
+
+# The environment variable $THRIFT_JAVA_HOME is set in impala-config.sh
+# Make sure it's consistent with $THRIFT_JAVA_ROOT.
+if (NOT ($ENV{THRIFT_JAVA_HOME} STREQUAL ${THRIFT_JAVA_ROOT}))
+  message(FATAL_ERROR "THRIFT_JAVA_ROOT (${THRIFT_JAVA_ROOT}) differs from environment "
+      "variable THRIFT_JAVA_HOME ($ENV{THRIFT_JAVA_HOME}).")
+endif()
+find_package(ThriftJava REQUIRED)
+message(STATUS "Thrift JAVA version: ${THRIFT_JAVA_VERSION}")
+message(STATUS "Thrift JAVA compiler: ${THRIFT_JAVA_COMPILER}")
+
+# The environment variable $THRIFT_PY_HOME is set in impala-config.sh
+# Make sure it's consistent with $THRIFT_PY_ROOT.
+if (NOT ($ENV{THRIFT_PY_HOME} STREQUAL ${THRIFT_PY_ROOT}))
+  message(FATAL_ERROR "THRIFT_PY_ROOT (${THRIFT_PY_ROOT}) differs from environment "
+      "variable THRIFT_PY_HOME ($ENV{THRIFT_PY_HOME}).")
+endif()
+find_package(ThriftPython REQUIRED)
+message(STATUS "Thrift PY version: ${THRIFT_PY_VERSION}")
+message(STATUS "Thrift PY compiler: ${THRIFT_PY_COMPILER}")
 
 # find flatbuffers headers, lib and compiler
 find_package(FlatBuffers REQUIRED)

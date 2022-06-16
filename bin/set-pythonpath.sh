@@ -32,11 +32,11 @@ PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/infra/python/env-gcc${IMPALA_GCC_VERSION
 # There should be just a single version of python that created the
 # site-packages directory. We find it by performing shell independent expansion
 # of the following pattern:
-# ${THRIFT_HOME}/python/lib{64,}/python*/site-packages
+# ${THRIFT_PY_HOME}/python/lib{64,}/python*/site-packages
 # Note: this could go wrong if we have used two different versions of
 # Python to build Thrift on this machine, and the first version is not
 # compatible with the second.
-for PYTHON_DIR in ${THRIFT_HOME}/python/lib{64,}; do
+for PYTHON_DIR in ${THRIFT_PY_HOME}/python/lib{64,}; do
     [[ -d ${PYTHON_DIR} ]] || continue
     for PKG_DIR in ${PYTHON_DIR}/python*/site-packages; do
       PYTHONPATH=${PYTHONPATH}:${PKG_DIR}/

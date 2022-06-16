@@ -35,7 +35,7 @@ can do so through the environment variables and scripts listed below.
 | JAVA_VERSION | "java-7-oracle-amd64" | Can override to set a local Java version. |
 | JAVA | "${JAVA_HOME}/bin/java" | Java binary location. |
 | CLASSPATH | | See bin/set-classpath.sh for details. |
-| PYTHONPATH |  Will be changed to include: "${IMPALA_HOME}/shell/gen-py" "${IMPALA_HOME}/testdata" "${THRIFT_HOME}/python/lib/python2.7/site-packages" "${HIVE_HOME}/lib/py" |
+| PYTHONPATH |  Will be changed to include: "${IMPALA_HOME}/shell/gen-py" "${IMPALA_HOME}/testdata" "${THRIFT_PY_HOME}/python/lib/python2.7/site-packages" "${HIVE_HOME}/lib/py" |
 
 ## Source Directories for Impala
 
@@ -64,7 +64,9 @@ can do so through the environment variables and scripts listed below.
 | HADOOP_LIB_DIR       | "${HADOOP_HOME}/lib" | For 'libhdfs.a' or 'libhdfs.so' |
 | HIVE_HOME            | "${CDP_COMPONENTS_HOME}/{hive-${IMPALA_HIVE_VERSION}/" | |
 | HBASE_HOME           | "${CDP_COMPONENTS_HOME}/hbase-${IMPALA_HBASE_VERSION}/" | |
-| THRIFT_HOME          | "${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_VERSION}" | |
+| THRIFT_CPP_HOME      | "${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_CPP_VERSION}" | |
+| THRIFT_JAVA_HOME     | "${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_JAVA_VERSION}" | |
+| THRIFT_PY_HOME       | "${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_PY_VERSION}" | |
 
 ## Hive Dependency Overrides
 Typically used together to specify a local build of Apache Hive. Care should be taken

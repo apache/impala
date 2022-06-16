@@ -168,12 +168,22 @@ export IMPALA_TPC_DS_VERSION=2.1.0
 unset IMPALA_TPC_DS_URL
 export IMPALA_TPC_H_VERSION=2.17.0
 unset IMPALA_TPC_H_URL
-export IMPALA_THRIFT_VERSION=0.11.0-p5
-unset IMPALA_THRIFT_URL
 export IMPALA_ZLIB_VERSION=1.2.11
 unset IMPALA_ZLIB_URL
 export IMPALA_CALLONCEHACK_VERSION=1.0.0
 unset IMPALA_CALLONCEHACK_URL
+# Thrift related environment variables.
+# IMPALA_THRIFT_POM_VERSION is used to populate IMPALA_THRIFT_JAVA_VERSION and
+# thrift.version in java/pom.xml.
+# If upgrading IMPALA_THRIFT_PY_VERSION, remember to also upgrade thrift version in
+# shell/packaging/requirements.txt
+export IMPALA_THRIFT_CPP_VERSION=0.11.0-p5
+unset IMPALA_THRIFT_CPP_URL
+export IMPALA_THRIFT_POM_VERSION=0.11.0
+export IMPALA_THRIFT_JAVA_VERSION=${IMPALA_THRIFT_POM_VERSION}-p5
+unset IMPALA_THRIFT_JAVA_URL
+export IMPALA_THRIFT_PY_VERSION=0.11.0-p5
+unset IMPALA_THRIFT_PY_URL
 
 if [[ $OSTYPE == "darwin"* ]]; then
   IMPALA_CYRUS_SASL_VERSION=2.1.26
@@ -748,8 +758,10 @@ export IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY=\
 "file://${IMPALA_KUDU_JAVA_HOME}/repository"
 export IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY_ENABLED=true
 
-# Set $THRIFT_HOME to the Thrift directory in toolchain.
-export THRIFT_HOME="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/thrift-${IMPALA_THRIFT_VERSION}"
+# Set $THRIFT_XXX_HOME to the Thrift directory in toolchain.
+export THRIFT_CPP_HOME="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/thrift-${IMPALA_THRIFT_CPP_VERSION}"
+export THRIFT_JAVA_HOME="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/thrift-${IMPALA_THRIFT_JAVA_VERSION}"
+export THRIFT_PY_HOME="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/thrift-${IMPALA_THRIFT_PY_VERSION}"
 
 # ASAN needs a matching version of llvm-symbolizer to symbolize stack traces.
 export ASAN_SYMBOLIZER_PATH="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-${IMPALA_LLVM_ASAN_VERSION}/bin/llvm-symbolizer"
@@ -801,7 +813,9 @@ echo "HBASE_HOME              = $HBASE_HOME"
 echo "HBASE_CONF_DIR          = $HBASE_CONF_DIR"
 echo "RANGER_HOME             = $RANGER_HOME"
 echo "RANGER_CONF_DIR         = $RANGER_CONF_DIR "
-echo "THRIFT_HOME             = $THRIFT_HOME"
+echo "THRIFT_CPP_HOME         = $THRIFT_CPP_HOME"
+echo "THRIFT_JAVA_HOME        = $THRIFT_JAVA_HOME"
+echo "THRIFT_PY_HOME          = $THRIFT_PY_HOME"
 echo "CLASSPATH               = $CLASSPATH"
 echo "LIBHDFS_OPTS            = $LIBHDFS_OPTS"
 echo "JAVA_HOME               = $JAVA_HOME"

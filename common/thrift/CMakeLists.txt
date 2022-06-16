@@ -58,7 +58,7 @@ function(THRIFT_GEN VAR)
     # It depends on hive_meta_store, which in turn depends on fb303.
     # The java dependency is handled by maven.
     # We need to generate C++ src file for the parent dependencies using the "-r" option.
-    set(CPP_ARGS ${THRIFT_INCLUDE_DIR_OPTION}
+    set(CPP_ARGS ${THRIFT_CPP_INCLUDE_DIR_OPTION}
         --gen cpp:moveable_types,no_default_operators,templates -o ${BE_OUTPUT_DIR})
     IF (THRIFT_FILE STREQUAL "beeswax.thrift")
       set(CPP_ARGS -r ${CPP_ARGS})
@@ -69,8 +69,8 @@ function(THRIFT_GEN VAR)
       # from Hive or Parquet.
       add_custom_command(
         OUTPUT ${OUTPUT_BE_FILE}
-        COMMAND ${THRIFT_COMPILER} ${CPP_ARGS} ${THRIFT_FILE}
-        COMMAND ${THRIFT_COMPILER} ${PYTHON_ARGS} ${THRIFT_FILE}
+        COMMAND ${THRIFT_CPP_COMPILER} ${CPP_ARGS} ${THRIFT_FILE}
+        COMMAND ${THRIFT_PY_COMPILER} ${PYTHON_ARGS} ${THRIFT_FILE}
         DEPENDS ${ABS_THRIFT_FILE}
         COMMENT "Running thrift compiler on ${THRIFT_FILE}"
         VERBATIM
@@ -78,9 +78,9 @@ function(THRIFT_GEN VAR)
     ELSE (THRIFT_FILE STREQUAL ${TCLI_SERVICE_THRIFT} OR THRIFT_FILE STREQUAL "parquet.thrift")
       add_custom_command(
         OUTPUT ${OUTPUT_BE_FILE}
-        COMMAND ${THRIFT_COMPILER} ${CPP_ARGS} ${THRIFT_FILE}
-        COMMAND ${THRIFT_COMPILER} ${JAVA_FE_ARGS} ${THRIFT_FILE}
-        COMMAND ${THRIFT_COMPILER} ${PYTHON_ARGS} ${THRIFT_FILE}
+        COMMAND ${THRIFT_CPP_COMPILER} ${CPP_ARGS} ${THRIFT_FILE}
+        COMMAND ${THRIFT_JAVA_COMPILER} ${JAVA_FE_ARGS} ${THRIFT_FILE}
+        COMMAND ${THRIFT_PY_COMPILER} ${PYTHON_ARGS} ${THRIFT_FILE}
         DEPENDS ${ABS_THRIFT_FILE}
         COMMENT "Running thrift compiler on ${THRIFT_FILE}"
         VERBATIM
@@ -113,7 +113,7 @@ function(THRIFT_GEN_DS VAR)
     list(APPEND ${VAR} ${OUTPUT_FILE})
     add_custom_command(
       OUTPUT ${OUTPUT_FILE}
-      COMMAND ${THRIFT_COMPILER} ${JAVA_EXT_DS_ARGS} ${THRIFT_FILE} &&
+      COMMAND ${THRIFT_JAVA_COMPILER} ${JAVA_EXT_DS_ARGS} ${THRIFT_FILE} &&
               mkdir -p ${OUTPUT_DIR} && echo ${OUTPUT_FILE_MESSAGE} > ${OUTPUT_FILE}
       DEPENDS ${ABS_THRIFT_FILE}
       COMMENT "Running thrift compiler for ext-data-source on ${THRIFT_FILE}"
@@ -125,9 +125,15 @@ endfunction(THRIFT_GEN_DS)
 
 set(HIVE_THRIFT_SOURCE_DIR "hive-$ENV{IMPALA_HIVE_MAJOR_VERSION}-api")
 set(TCLI_SERVICE_THRIFT "${HIVE_THRIFT_SOURCE_DIR}/TCLIService.thrift")
-message("Using Thrift compiler: ${THRIFT_COMPILER}")
-set(THRIFT_INCLUDE_DIR_OPTION -I ${THRIFT_CONTRIB_DIR} -I $ENV{HIVE_METASTORE_THRIFT_DIR}
-  -I ${HIVE_THRIFT_SOURCE_DIR})
+message("Using Thrift CPP compiler: ${THRIFT_CPP_COMPILER}")
+message("Using Thrift JAVA compiler: ${THRIFT_JAVA_COMPILER}")
+message("Using Thrift PY compiler: ${THRIFT_PY_COMPILER}")
+set(THRIFT_CPP_INCLUDE_DIR_OPTION -I ${THRIFT_CPP_CONTRIB_DIR}
+  -I $ENV{HIVE_METASTORE_THRIFT_DIR} -I ${HIVE_THRIFT_SOURCE_DIR})
+set(THRIFT_JAVA_INCLUDE_DIR_OPTION -I ${THRIFT_JAVA_CONTRIB_DIR}
+  -I $ENV{HIVE_METASTORE_THRIFT_DIR} -I ${HIVE_THRIFT_SOURCE_DIR})
+set(THRIFT_PY_INCLUDE_DIR_OPTION -I ${THRIFT_PY_CONTRIB_DIR}
+  -I $ENV{HIVE_METASTORE_THRIFT_DIR} -I ${HIVE_THRIFT_SOURCE_DIR})
 set(BE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/be/generated-sources)
 set(FE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/fe/generated-sources)
 # TODO: avoid duplicating generated java classes
@@ -141,9 +147,9 @@ file(MAKE_DIRECTORY ${PYTHON_OUTPUT_DIR})
 file(MAKE_DIRECTORY ${HIVE_THRIFT_SOURCE_DIR})
 
 # Args passed to thrift for Java gen
-set(JAVA_FE_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen java -o ${FE_OUTPUT_DIR})
-set(JAVA_EXT_DS_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen java -o ${EXT_DS_OUTPUT_DIR})
-set(PYTHON_ARGS ${THRIFT_INCLUDE_DIR_OPTION} -r --gen py:no_utf8strings -o
+set(JAVA_FE_ARGS ${THRIFT_JAVA_INCLUDE_DIR_OPTION} --gen java -o ${FE_OUTPUT_DIR})
+set(JAVA_EXT_DS_ARGS ${THRIFT_JAVA_INCLUDE_DIR_OPTION} --gen java -o ${EXT_DS_OUTPUT_DIR})
+set(PYTHON_ARGS ${THRIFT_PY_INCLUDE_DIR_OPTION} -r --gen py:no_utf8strings -o
                 ${PYTHON_OUTPUT_DIR})
 
 set (EXT_DATA_SRC_FILES
