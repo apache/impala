@@ -497,7 +497,9 @@ create table ice_part_hadoop_tbl (
 ---- QUERY
 describe formatted ice_part_hadoop_tbl;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','NULL','NULL'
 '# Partition Transform Information','NULL','NULL'
+'# col_name            ','transform_type      ','NULL'
 'col_year','YEAR','NULL'
 'col_month','MONTH','NULL'
 'col_day','DAY','NULL'
@@ -535,7 +537,9 @@ create table ice_part_hadoop_catalog (
 ---- QUERY
 describe formatted ice_part_hadoop_catalog;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','NULL','NULL'
 '# Partition Transform Information','NULL','NULL'
+'# col_name            ','transform_type      ','NULL'
 'col_year','YEAR','NULL'
 'col_month','MONTH','NULL'
 'col_day','DAY','NULL'
@@ -570,7 +574,9 @@ create table ice_part_catalogs (
 ---- QUERY
 describe formatted ice_part_catalogs;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','NULL','NULL'
 '# Partition Transform Information','NULL','NULL'
+'# col_name            ','transform_type      ','NULL'
 'col_year','YEAR','NULL'
 'col_month','MONTH','NULL'
 'col_day','DAY','NULL'
@@ -590,6 +596,7 @@ create table ice_non_partition (i int, s string, ts timestamp, d date) stored as
 describe formatted ice_non_partition;
 ---- RESULTS: VERIFY_IS_NOT_IN
 '# Partition Transform Information','NULL','NULL'
+'# col_name            ','transform_type      ','NULL'
 ---- TYPES
 string, string, string
 ====

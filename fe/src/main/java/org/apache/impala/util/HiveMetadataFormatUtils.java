@@ -107,8 +107,9 @@ public class HiveMetadataFormatUtils {
   public static String getPartitionTransformInformation(List<FieldSchema> partCols) {
     StringBuilder info = new StringBuilder(DEFAULT_STRINGBUILDER_SIZE);
     if (partCols == null || partCols.isEmpty()) return info.toString();
-    info.append("# Partition Transform Information").append(LINE_DELIM);
-    formatColumnsHeader(info, null);
+    info.append(LINE_DELIM).append("# Partition Transform Information")
+        .append(LINE_DELIM);
+    formatPartitionTransformColumnsHeader(info);
     formatAllFields(info, partCols, false, null);
     return info.toString();
   }
@@ -117,6 +118,13 @@ public class HiveMetadataFormatUtils {
       List<ColumnStatisticsObj> colStats) {
     columnInformation.append("# "); // Easy for shell scripts to ignore
     formatOutput(getColumnsHeader(colStats), columnInformation, false, true);
+    columnInformation.append(LINE_DELIM);
+  }
+
+  private static void formatPartitionTransformColumnsHeader(
+      StringBuilder columnInformation) {
+    columnInformation.append("# "); // Easy for shell scripts to ignore
+    formatOutput(getPartitionTransformColumnsHeader(), columnInformation, false, true);
     columnInformation.append(LINE_DELIM);
   }
 
@@ -167,6 +175,8 @@ public class HiveMetadataFormatUtils {
   private static final String colStatsSchema = "col_name,data_type,min,max,num_nulls,"
       + "distinct_count,avg_col_len,max_col_len,num_trues,num_falses,comment"
       + "#string:string:string:string:string:string:string:string:string:string:string";
+  private static final String partitionTransformSchema =
+      "col_name,transform_type#string:string";
 
   public static String[] getColumnsHeader(List<ColumnStatisticsObj> colStats) {
     String colSchema = schema;
@@ -174,6 +184,10 @@ public class HiveMetadataFormatUtils {
       colSchema = colStatsSchema;
     }
     return colSchema.split("#")[0].split(",");
+  }
+
+  public static String[] getPartitionTransformColumnsHeader() {
+    return partitionTransformSchema.split("#")[0].split(",");
   }
 
   /**
