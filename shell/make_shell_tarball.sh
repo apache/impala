@@ -73,6 +73,7 @@ mkdir -p ${TARBALL_ROOT}/ext-py
 
 rm -f ${THRIFT_GEN_PY_DIR}/impala_build_version.py
 cat > ${THRIFT_GEN_PY_DIR}/impala_build_version.py <<EOF
+# -*- coding: utf-8 -*-
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
