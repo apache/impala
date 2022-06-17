@@ -698,3 +698,7 @@ class TestIcebergTable(ImpalaTestSuite):
   def test_plain_count_star_optimization(self, vector, unique_database):
       self.run_test_case('QueryTest/iceberg-plain-count-star-optimization', vector,
                          use_db=unique_database)
+
+  def test_create_table_like_table(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-create-table-like-table', vector,
+                       use_db=unique_database)

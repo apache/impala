@@ -1,0 +1,556 @@
+====
+---- QUERY
+create table ice_hadoop_tbl_no_part(
+  id INT comment "this is id",
+  col_bool BOOLEAN,
+  col_int INT,
+  col_bigint BIGINT,
+  col_float FLOAT,
+  col_double DOUBLE,
+  col_dc1 DECIMAL(9, 3),
+  col_dc2 DECIMAL(18, 3),
+  col_dc3 DECIMAL(38, 3),
+  col_date DATE,
+  col_timestamp TIMESTAMP,
+  col_string STRING,
+  col_struct STRUCT < f1: BIGINT,
+  f2: BIGINT >,
+  col_array ARRAY < STRING >,
+  col_map MAP < STRING,
+  array < STRING > >
+) stored as iceberg tblproperties('iceberg.catalog' = 'hadoop.tables');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+create table ice_hadoop_tbl_no_part_clone like ice_hadoop_tbl_no_part;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe formatted ice_hadoop_tbl_no_part_clone;
+---- RESULTS: VERIFY_IS_SUBSET
+'# col_name            ','data_type           ','comment             '
+'','NULL','NULL'
+'id','int','this is id'
+'col_bool','boolean','NULL'
+'col_int','int','NULL'
+'col_bigint','bigint','NULL'
+'col_float','float','NULL'
+'col_double','double','NULL'
+'col_dc1','decimal(9,3)','NULL'
+'col_dc2','decimal(18,3)','NULL'
+'col_dc3','decimal(38,3)','NULL'
+'col_date','date','NULL'
+'col_timestamp','timestamp','NULL'
+'col_string','string','NULL'
+'col_struct','struct<f1:bigint,f2:bigint>','NULL'
+'col_array','array<string>','NULL'
+'col_map','map<string,array<string>>','NULL'
+'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/ice_hadoop_tbl_no_part_clone','NULL'
+'','iceberg.catalog     ','hadoop.tables       '
+'','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
+'','write.format.default','parquet             '
+'SerDe Library:      ','org.apache.iceberg.mr.hive.HiveIcebergSerDe','NULL'
+'InputFormat:        ','org.apache.iceberg.mr.hive.HiveIcebergInputFormat','NULL'
+'OutputFormat:       ','org.apache.iceberg.mr.hive.HiveIcebergOutputFormat','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+create table ice_hadoop_tbl(
+  id INT comment "this is id",
+  col_bool BOOLEAN,
+  col_int INT,
+  col_bigint BIGINT,
+  col_float FLOAT,
+  col_double DOUBLE,
+  col_dc1 DECIMAL(9, 3),
+  col_dc2 DECIMAL(18, 3),
+  col_dc3 DECIMAL(38, 3),
+  col_date DATE,
+  col_timestamp TIMESTAMP,
+  col_string STRING,
+  col_struct STRUCT < f1: BIGINT,
+  f2: BIGINT >,
+  col_array ARRAY < STRING >,
+  col_map MAP < STRING,
+  array < STRING > >
+) partitioned by spec (bucket(3, id)) stored as iceberg tblproperties('iceberg.catalog' = 'hadoop.tables');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+create table ice_hadoop_tbl_clone like ice_hadoop_tbl;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe formatted ice_hadoop_tbl_clone;
+---- RESULTS: VERIFY_IS_SUBSET
+'# col_name            ','data_type           ','comment             '
+'','NULL','NULL'
+'id','int','this is id'
+'col_bool','boolean','NULL'
+'col_int','int','NULL'
+'col_bigint','bigint','NULL'
+'col_float','float','NULL'
+'col_double','double','NULL'
+'col_dc1','decimal(9,3)','NULL'
+'col_dc2','decimal(18,3)','NULL'
+'col_dc3','decimal(38,3)','NULL'
+'col_date','date','NULL'
+'col_timestamp','timestamp','NULL'
+'col_string','string','NULL'
+'col_struct','struct<f1:bigint,f2:bigint>','NULL'
+'col_array','array<string>','NULL'
+'col_map','map<string,array<string>>','NULL'
+'# Partition Transform Information','NULL','NULL'
+'# col_name            ','transform_type      ','NULL'
+'id','BUCKET[3]','NULL'
+'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/ice_hadoop_tbl_clone','NULL'
+'','iceberg.catalog     ','hadoop.tables       '
+'','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
+'','write.format.default','parquet             '
+'SerDe Library:      ','org.apache.iceberg.mr.hive.HiveIcebergSerDe','NULL'
+'InputFormat:        ','org.apache.iceberg.mr.hive.HiveIcebergInputFormat','NULL'
+'OutputFormat:       ','org.apache.iceberg.mr.hive.HiveIcebergOutputFormat','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+create table ice_hadoop_catalog_no_part(
+  id INT comment "this is id",
+  col_bool BOOLEAN,
+  col_int INT,
+  col_bigint BIGINT,
+  col_float FLOAT,
+  col_double DOUBLE,
+  col_dc1 DECIMAL(9, 3),
+  col_dc2 DECIMAL(18, 3),
+  col_dc3 DECIMAL(38, 3),
+  col_date DATE,
+  col_timestamp TIMESTAMP,
+  col_string STRING,
+  col_struct STRUCT < f1: BIGINT,
+  f2: BIGINT >,
+  col_array ARRAY < STRING >,
+  col_map MAP < STRING,
+  array < STRING > >
+) stored as iceberg tblproperties(
+  'iceberg.catalog' = 'hadoop.catalog',
+  'iceberg.catalog_location' = '/test-warehouse/$DATABASE.db/cat_loc',
+  'iceberg.table_identifier' = 'id_a.id_b.ice_hadoop_catalog_no_part'
+);
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+create table ice_hadoop_catalog_no_part_clone like ice_hadoop_catalog_no_part;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe formatted ice_hadoop_catalog_no_part_clone;
+---- RESULTS: VERIFY_IS_SUBSET
+'# col_name            ','data_type           ','comment             '
+'','NULL','NULL'
+'id','int','this is id'
+'col_bool','boolean','NULL'
+'col_int','int','NULL'
+'col_bigint','bigint','NULL'
+'col_float','float','NULL'
+'col_double','double','NULL'
+'col_dc1','decimal(9,3)','NULL'
+'col_dc2','decimal(18,3)','NULL'
+'col_dc3','decimal(38,3)','NULL'
+'col_date','date','NULL'
+'col_timestamp','timestamp','NULL'
+'col_string','string','NULL'
+'col_struct','struct<f1:bigint,f2:bigint>','NULL'
+'col_array','array<string>','NULL'
+'col_map','map<string,array<string>>','NULL'
+'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/cat_loc/$DATABASE/ice_hadoop_catalog_no_part_clone','NULL'
+'','iceberg.catalog     ','hadoop.catalog      '
+'','iceberg.catalog_location','/test-warehouse/$DATABASE.db/cat_loc'
+'','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
+'','write.format.default','parquet             '
+'SerDe Library:      ','org.apache.iceberg.mr.hive.HiveIcebergSerDe','NULL'
+'InputFormat:        ','org.apache.iceberg.mr.hive.HiveIcebergInputFormat','NULL'
+'OutputFormat:       ','org.apache.iceberg.mr.hive.HiveIcebergOutputFormat','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+create table ice_hadoop_catalog(
+  id INT comment "this is id",
+  col_bool BOOLEAN,
+  col_int INT,
+  col_bigint BIGINT,
+  col_float FLOAT,
+  col_double DOUBLE,
+  col_dc1 DECIMAL(9, 3),
+  col_dc2 DECIMAL(18, 3),
+  col_dc3 DECIMAL(38, 3),
+  col_date DATE,
+  col_timestamp TIMESTAMP,
+  col_string STRING,
+  col_struct STRUCT < f1: BIGINT,
+  f2: BIGINT >,
+  col_array ARRAY < STRING >,
+  col_map MAP < STRING,
+  array < STRING > >
+) partitioned by spec (bucket(3, id)) stored as iceberg tblproperties(
+  'iceberg.catalog' = 'hadoop.catalog',
+  'iceberg.catalog_location' = '/test-warehouse/$DATABASE.db/cat_loc',
+  'iceberg.table_identifier' = 'id_a.id_b.ice_hadoop_catalog'
+);
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+create table ice_hadoop_catalog_clone like ice_hadoop_catalog;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe formatted ice_hadoop_catalog_clone;
+---- RESULTS: VERIFY_IS_SUBSET
+'# col_name            ','data_type           ','comment             '
+'','NULL','NULL'
+'id','int','this is id'
+'col_bool','boolean','NULL'
+'col_int','int','NULL'
+'col_bigint','bigint','NULL'
+'col_float','float','NULL'
+'col_double','double','NULL'
+'col_dc1','decimal(9,3)','NULL'
+'col_dc2','decimal(18,3)','NULL'
+'col_dc3','decimal(38,3)','NULL'
+'col_date','date','NULL'
+'col_timestamp','timestamp','NULL'
+'col_string','string','NULL'
+'col_struct','struct<f1:bigint,f2:bigint>','NULL'
+'col_array','array<string>','NULL'
+'col_map','map<string,array<string>>','NULL'
+'# Partition Transform Information','NULL','NULL'
+'# col_name            ','transform_type      ','NULL'
+'id','BUCKET[3]','NULL'
+'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/cat_loc/$DATABASE/ice_hadoop_catalog_clone','NULL'
+'','iceberg.catalog     ','hadoop.catalog      '
+'','iceberg.catalog_location','/test-warehouse/$DATABASE.db/cat_loc'
+'','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
+'','write.format.default','parquet             '
+'SerDe Library:      ','org.apache.iceberg.mr.hive.HiveIcebergSerDe','NULL'
+'InputFormat:        ','org.apache.iceberg.mr.hive.HiveIcebergInputFormat','NULL'
+'OutputFormat:       ','org.apache.iceberg.mr.hive.HiveIcebergOutputFormat','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+create table ice_hive_catalog_no_part(
+  id INT comment "this is id",
+  col_bool BOOLEAN,
+  col_int INT,
+  col_bigint BIGINT,
+  col_float FLOAT,
+  col_double DOUBLE,
+  col_dc1 DECIMAL(9, 3),
+  col_dc2 DECIMAL(18, 3),
+  col_dc3 DECIMAL(38, 3),
+  col_date DATE,
+  col_timestamp TIMESTAMP,
+  col_string STRING,
+  col_struct STRUCT < f1: BIGINT,
+  f2: BIGINT >,
+  col_array ARRAY < STRING >,
+  col_map MAP < STRING,
+  array < STRING > >
+) stored as iceberg tblproperties(
+  'iceberg.catalog' = 'ice_hive_cat',
+  'iceberg.table_identifier' = '$DATABASE.ice_hive_catalog_no_part'
+);
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+create table ice_hive_catalog_no_part_clone like ice_hive_catalog_no_part;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe formatted ice_hive_catalog_no_part_clone;
+---- RESULTS: VERIFY_IS_SUBSET
+'# col_name            ','data_type           ','comment             '
+'','NULL','NULL'
+'id','int','this is id'
+'col_bool','boolean','NULL'
+'col_int','int','NULL'
+'col_bigint','bigint','NULL'
+'col_float','float','NULL'
+'col_double','double','NULL'
+'col_dc1','decimal(9,3)','NULL'
+'col_dc2','decimal(18,3)','NULL'
+'col_dc3','decimal(38,3)','NULL'
+'col_date','date','NULL'
+'col_timestamp','timestamp','NULL'
+'col_string','string','NULL'
+'col_struct','struct<f1:bigint,f2:bigint>','NULL'
+'col_array','array<string>','NULL'
+'col_map','map<string,array<string>>','NULL'
+'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/ice_hive_catalog_no_part_clone','NULL'
+'','iceberg.table_identifier','$DATABASE.ice_hive_catalog_no_part_clone'
+row_regex: '','metadata_location   ','$NAMENODE/test-warehouse/$DATABASE.db/ice_hive_catalog_no_part_clone/metadata/.*.metadata.json'
+'','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
+'','table_type          ','ICEBERG             '
+'','write.format.default','parquet             '
+'SerDe Library:      ','org.apache.iceberg.mr.hive.HiveIcebergSerDe','NULL'
+'InputFormat:        ','org.apache.iceberg.mr.hive.HiveIcebergInputFormat','NULL'
+'OutputFormat:       ','org.apache.iceberg.mr.hive.HiveIcebergOutputFormat','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+create table ice_hive_catalog(
+  id INT comment "this is id",
+  col_bool BOOLEAN,
+  col_int INT,
+  col_bigint BIGINT,
+  col_float FLOAT,
+  col_double DOUBLE,
+  col_dc1 DECIMAL(9, 3),
+  col_dc2 DECIMAL(18, 3),
+  col_dc3 DECIMAL(38, 3),
+  col_date DATE,
+  col_timestamp TIMESTAMP,
+  col_string STRING,
+  col_struct STRUCT < f1: BIGINT,
+  f2: BIGINT >,
+  col_array ARRAY < STRING >,
+  col_map MAP < STRING,
+  array < STRING > >
+) partitioned by spec (bucket(3, id)) stored as iceberg tblproperties(
+  'iceberg.catalog' = 'ice_hive_cat',
+  'iceberg.table_identifier' = '$DATABASE.ice_hive_catalog'
+);
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+create table ice_hive_catalog_clone like ice_hive_catalog;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe formatted ice_hive_catalog_clone;
+---- RESULTS: VERIFY_IS_SUBSET
+'# col_name            ','data_type           ','comment             '
+'','NULL','NULL'
+'id','int','this is id'
+'col_bool','boolean','NULL'
+'col_int','int','NULL'
+'col_bigint','bigint','NULL'
+'col_float','float','NULL'
+'col_double','double','NULL'
+'col_dc1','decimal(9,3)','NULL'
+'col_dc2','decimal(18,3)','NULL'
+'col_dc3','decimal(38,3)','NULL'
+'col_date','date','NULL'
+'col_timestamp','timestamp','NULL'
+'col_string','string','NULL'
+'col_struct','struct<f1:bigint,f2:bigint>','NULL'
+'col_array','array<string>','NULL'
+'col_map','map<string,array<string>>','NULL'
+'# Partition Transform Information','NULL','NULL'
+'# col_name            ','transform_type      ','NULL'
+'id','BUCKET[3]','NULL'
+'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/ice_hive_catalog_clone','NULL'
+'','iceberg.table_identifier','$DATABASE.ice_hive_catalog_clone'
+row_regex: '','metadata_location   ','$NAMENODE/test-warehouse/$DATABASE.db/ice_hive_catalog_clone/metadata/.*.metadata.json'
+'','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
+'','table_type          ','ICEBERG             '
+'','write.format.default','parquet             '
+'SerDe Library:      ','org.apache.iceberg.mr.hive.HiveIcebergSerDe','NULL'
+'InputFormat:        ','org.apache.iceberg.mr.hive.HiveIcebergInputFormat','NULL'
+'OutputFormat:       ','org.apache.iceberg.mr.hive.HiveIcebergOutputFormat','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+create table ice_hadoop_cat_no_part(
+  id INT comment "this is id",
+  col_bool BOOLEAN,
+  col_int INT,
+  col_bigint BIGINT,
+  col_float FLOAT,
+  col_double DOUBLE,
+  col_dc1 DECIMAL(9, 3),
+  col_dc2 DECIMAL(18, 3),
+  col_dc3 DECIMAL(38, 3),
+  col_date DATE,
+  col_timestamp TIMESTAMP,
+  col_string STRING,
+  col_struct STRUCT < f1: BIGINT,
+  f2: BIGINT >,
+  col_array ARRAY < STRING >,
+  col_map MAP < STRING,
+  array < STRING > >
+) stored as iceberg tblproperties(
+  'iceberg.catalog' = 'ice_hadoop_cat',
+  'iceberg.table_identifier' = 'id_a.id_b.ice_hadoop_cat_no_part'
+);
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+create table ice_hadoop_cat_no_part_clone like ice_hadoop_cat_no_part;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe formatted ice_hadoop_cat_no_part_clone;
+---- RESULTS: VERIFY_IS_SUBSET
+'# col_name            ','data_type           ','comment             '
+'','NULL','NULL'
+'id','int','this is id'
+'col_bool','boolean','NULL'
+'col_int','int','NULL'
+'col_bigint','bigint','NULL'
+'col_float','float','NULL'
+'col_double','double','NULL'
+'col_dc1','decimal(9,3)','NULL'
+'col_dc2','decimal(18,3)','NULL'
+'col_dc3','decimal(38,3)','NULL'
+'col_date','date','NULL'
+'col_timestamp','timestamp','NULL'
+'col_string','string','NULL'
+'col_struct','struct<f1:bigint,f2:bigint>','NULL'
+'col_array','array<string>','NULL'
+'col_map','map<string,array<string>>','NULL'
+'Location:           ','$NAMENODE/test-warehouse/ice_hadoop_cat/$DATABASE/ice_hadoop_cat_no_part_clone','NULL'
+'','iceberg.catalog     ','ice_hadoop_cat      '
+'','iceberg.table_identifier','$DATABASE.ice_hadoop_cat_no_part_clone'
+'','name                ','$DATABASE.ice_hadoop_cat_no_part_clone'
+'','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
+'','write.format.default','parquet             '
+'SerDe Library:      ','org.apache.iceberg.mr.hive.HiveIcebergSerDe','NULL'
+'InputFormat:        ','org.apache.iceberg.mr.hive.HiveIcebergInputFormat','NULL'
+'OutputFormat:       ','org.apache.iceberg.mr.hive.HiveIcebergOutputFormat','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+create table ice_hadoop_cat(
+  id INT comment "this is id",
+  col_bool BOOLEAN,
+  col_int INT,
+  col_bigint BIGINT,
+  col_float FLOAT,
+  col_double DOUBLE,
+  col_dc1 DECIMAL(9, 3),
+  col_dc2 DECIMAL(18, 3),
+  col_dc3 DECIMAL(38, 3),
+  col_date DATE,
+  col_timestamp TIMESTAMP,
+  col_string STRING,
+  col_struct STRUCT < f1: BIGINT,
+  f2: BIGINT >,
+  col_array ARRAY < STRING >,
+  col_map MAP < STRING,
+  array < STRING > >
+) partitioned by spec (bucket(3, id)) stored as iceberg tblproperties(
+  'iceberg.catalog' = 'ice_hadoop_cat',
+  'iceberg.table_identifier' = 'id_a.id_b.ice_hadoop_cat'
+);
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+create table ice_hadoop_cat_clone like ice_hadoop_cat;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe formatted ice_hadoop_cat_clone;
+---- RESULTS: VERIFY_IS_SUBSET
+'# col_name            ','data_type           ','comment             '
+'','NULL','NULL'
+'id','int','this is id'
+'col_bool','boolean','NULL'
+'col_int','int','NULL'
+'col_bigint','bigint','NULL'
+'col_float','float','NULL'
+'col_double','double','NULL'
+'col_dc1','decimal(9,3)','NULL'
+'col_dc2','decimal(18,3)','NULL'
+'col_dc3','decimal(38,3)','NULL'
+'col_date','date','NULL'
+'col_timestamp','timestamp','NULL'
+'col_string','string','NULL'
+'col_struct','struct<f1:bigint,f2:bigint>','NULL'
+'col_array','array<string>','NULL'
+'col_map','map<string,array<string>>','NULL'
+'# Partition Transform Information','NULL','NULL'
+'# col_name            ','transform_type      ','NULL'
+'id','BUCKET[3]','NULL'
+'Location:           ','$NAMENODE/test-warehouse/ice_hadoop_cat/$DATABASE/ice_hadoop_cat_clone','NULL'
+'','iceberg.catalog     ','ice_hadoop_cat      '
+'','iceberg.table_identifier','$DATABASE.ice_hadoop_cat_clone'
+'','name                ','$DATABASE.ice_hadoop_cat_clone'
+'','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
+'','write.format.default','parquet             '
+'SerDe Library:      ','org.apache.iceberg.mr.hive.HiveIcebergSerDe','NULL'
+'InputFormat:        ','org.apache.iceberg.mr.hive.HiveIcebergInputFormat','NULL'
+'OutputFormat:       ','org.apache.iceberg.mr.hive.HiveIcebergOutputFormat','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+create table ice_clone like functional_parquet.iceberg_non_partitioned stored as iceberg;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+set timezone='Europe/Budapest';
+insert
+  overwrite ice_clone
+select
+  *
+from
+  functional_parquet.iceberg_non_partitioned
+order by
+  id
+limit
+  5;
+select * from ice_clone order by id;
+---- RESULTS
+1,'Alex','view',2020-01-01 09:00:00
+2,'Lisa','download',2020-01-01 11:00:00
+3,'Alan','click',2020-01-01 10:00:00
+4,'Alex','view',2020-01-01 09:00:00
+5,'Lisa','download',2020-01-01 11:00:00
+---- TYPES
+int,string,string,timestamp
+====
+---- QUERY
+set timezone='Europe/Budapest';
+insert
+  overwrite ice_clone
+select
+  *
+from
+  functional_parquet.iceberg_non_partitioned
+order by
+  id desc
+limit
+  5;
+select * from ice_clone order by id;
+---- RESULTS
+16,'Lisa','download',2020-01-01 11:00:00
+17,'Alex','view',2020-01-01 09:00:00
+18,'Alan','click',2020-01-01 10:00:00
+19,'Alex','view',2020-01-01 09:00:00
+20,'Alex','view',2020-01-01 09:00:00
+---- TYPES
+int,string,string,timestamp
+====

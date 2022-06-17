@@ -158,7 +158,7 @@ public class IcebergUtil {
       name = msTable.getParameters().get(Catalogs.NAME);
     }
     if (name == null || name.isEmpty()) {
-      return TableIdentifier.of(msTable.getDbName(), msTable.getTableName());
+      return getIcebergTableIdentifier(msTable.getDbName(), msTable.getTableName());
     }
 
     // If database not been specified in property, use default
@@ -166,6 +166,11 @@ public class IcebergUtil {
       return TableIdentifier.of(Catalog.DEFAULT_DB, name);
     }
     return TableIdentifier.parse(name);
+  }
+
+  public static TableIdentifier getIcebergTableIdentifier(String dbName,
+      String tableName) {
+    return TableIdentifier.of(dbName, tableName);
   }
 
   /**
@@ -186,31 +191,35 @@ public class IcebergUtil {
     if (partSpec == null) return PartitionSpec.unpartitioned();
 
     List<TIcebergPartitionField> partitionFields = partSpec.getPartition_fields();
+    if (partitionFields == null || partitionFields.isEmpty()) {
+      return PartitionSpec.unpartitioned();
+    }
+
     PartitionSpec.Builder builder = PartitionSpec.builderFor(schema);
     for (TIcebergPartitionField partitionField : partitionFields) {
       TIcebergPartitionTransformType transformType =
           partitionField.getTransform().getTransform_type();
       if (transformType == TIcebergPartitionTransformType.IDENTITY) {
-        builder.identity(partitionField.getField_name());
+        builder.identity(partitionField.getOrig_field_name());
       } else if (transformType == TIcebergPartitionTransformType.HOUR) {
-        builder.hour(partitionField.getField_name());
+        builder.hour(partitionField.getOrig_field_name());
       } else if (transformType == TIcebergPartitionTransformType.DAY) {
-        builder.day(partitionField.getField_name());
+        builder.day(partitionField.getOrig_field_name());
       } else if (transformType == TIcebergPartitionTransformType.MONTH) {
-        builder.month(partitionField.getField_name());
+        builder.month(partitionField.getOrig_field_name());
       } else if (transformType == TIcebergPartitionTransformType.YEAR) {
-        builder.year(partitionField.getField_name());
+        builder.year(partitionField.getOrig_field_name());
       } else if (transformType == TIcebergPartitionTransformType.BUCKET) {
-        builder.bucket(partitionField.getField_name(),
+        builder.bucket(partitionField.getOrig_field_name(),
             partitionField.getTransform().getTransform_param());
       } else if (transformType == TIcebergPartitionTransformType.TRUNCATE) {
-        builder.truncate(partitionField.getField_name(),
+        builder.truncate(partitionField.getOrig_field_name(),
             partitionField.getTransform().getTransform_param());
       } else if (transformType == TIcebergPartitionTransformType.VOID) {
-        builder.alwaysNull(partitionField.getField_name());
+        builder.alwaysNull(partitionField.getOrig_field_name());
       } else {
         throw new ImpalaRuntimeException(String.format("Skip partition: %s, %s",
-            partitionField.getField_name(), transformType));
+            partitionField.getOrig_field_name(), transformType));
       }
     }
     return builder.build();

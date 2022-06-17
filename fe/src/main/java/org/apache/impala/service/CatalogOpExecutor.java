@@ -29,7 +29,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -82,6 +81,7 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.mr.Catalogs;
 import org.apache.impala.analysis.AlterTableSortByStmt;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.LiteralExpr;
@@ -208,6 +208,7 @@ import org.apache.impala.thrift.THdfsCachingOp;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TImpalaTableType;
+import org.apache.impala.thrift.TIcebergPartitionSpec;
 import org.apache.impala.thrift.TPartitionDef;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TPartitionStats;
@@ -3182,7 +3183,9 @@ public class CatalogOpExecutor {
     if (KuduTable.isKuduTable(tbl)) {
       return createKuduTable(tbl, params, wantMinimalResult, response);
     } else if (IcebergTable.isIcebergTable(tbl)) {
-      return createIcebergTable(tbl, params, wantMinimalResult, response);
+      return createIcebergTable(tbl, wantMinimalResult, response, params.if_not_exists,
+          params.getColumns(), params.getPartition_spec(), params.getTable_properties(),
+          params.getComment());
     }
     Preconditions.checkState(params.getColumns().size() > 0,
         "Empty column list given as argument to Catalog.createTable");
@@ -3510,8 +3513,9 @@ public class CatalogOpExecutor {
    * Creates a new Iceberg table.
    */
   private boolean createIcebergTable(org.apache.hadoop.hive.metastore.api.Table newTable,
-      TCreateTableParams params, boolean wantMinimalResult, TDdlExecResponse response)
-      throws ImpalaException {
+      boolean wantMinimalResult, TDdlExecResponse response, boolean ifNotExists,
+      List<TColumn> columns, TIcebergPartitionSpec partitionSpec,
+      Map<String, String> tableProperties, String tblComment) throws ImpalaException {
     Preconditions.checkState(IcebergTable.isIcebergTable(newTable));
 
     getMetastoreDdlLock().lock();
@@ -3544,8 +3548,8 @@ public class CatalogOpExecutor {
               }
             }
             String tableLoc = IcebergCatalogOpExecutor.createTable(catalog,
-                IcebergUtil.getIcebergTableIdentifier(newTable), location, params)
-                .location();
+                IcebergUtil.getIcebergTableIdentifier(newTable), location, columns,
+                partitionSpec, tableProperties).location();
             newTable.getSd().setLocation(tableLoc);
           } else {
             // If this is not a synchronized table, we assume that the table must be
@@ -3597,17 +3601,17 @@ public class CatalogOpExecutor {
         }
       }
       Pair<Long, org.apache.hadoop.hive.metastore.api.Table> eventTblPair
-          = getTableFromEvents(events, params.if_not_exists);
+          = getTableFromEvents(events, ifNotExists);
       long createEventId = eventTblPair == null ? -1 : eventTblPair.first;
       // Add the table to the catalog cache
       Table newTbl = catalog_.addIncompleteTable(newTable.getDbName(),
-          newTable.getTableName(), TImpalaTableType.TABLE, params.getComment(),
+          newTable.getTableName(), TImpalaTableType.TABLE, tblComment,
           createEventId);
       LOG.debug("Created a iceberg table {} in catalog with create event Id {} ",
           newTbl.getFullName(), createEventId);
       addTableToCatalogUpdate(newTbl, wantMinimalResult, response.result);
     } catch (Exception e) {
-      if (e instanceof AlreadyExistsException && params.if_not_exists) {
+      if (e instanceof AlreadyExistsException && ifNotExists) {
         addSummary(response, "Table already exists.");
         return false;
       }
@@ -3735,8 +3739,42 @@ public class CatalogOpExecutor {
     tbl.putToParameters(StatsSetupConst.ROW_COUNT, "-1");
     setDefaultTableCapabilities(tbl);
     LOG.trace(String.format("Creating table %s LIKE %s", tblName, srcTblName));
-    createTable(tbl, params.if_not_exists, null, params.server_name, null, null,
-        wantMinimalResult, response);
+
+    if (srcTable instanceof IcebergTable && IcebergTable.isIcebergTable(tbl)) {
+      IcebergTable srcIceTable = (IcebergTable) srcTable;
+      Map<String, String> tableProperties = Maps
+          .newHashMap(srcIceTable.getIcebergApiTable().properties());
+      tableProperties.remove(Catalogs.NAME);
+      tableProperties.remove(Catalogs.LOCATION);
+      tableProperties.remove(IcebergTable.ICEBERG_CATALOG);
+      tableProperties.remove(IcebergTable.ICEBERG_TABLE_IDENTIFIER);
+
+      // The table identifier of the new table will be 'database.table'
+      TableIdentifier identifier = IcebergUtil
+          .getIcebergTableIdentifier(tbl.getDbName(), tbl.getTableName());
+      if (tbl.getParameters().containsKey(Catalogs.NAME)) {
+        tbl.getParameters().put(Catalogs.NAME, identifier.toString());
+        tableProperties.put(Catalogs.NAME, identifier.toString());
+      }
+      if (tbl.getParameters().containsKey(IcebergTable.ICEBERG_CATALOG)) {
+        tableProperties.put(IcebergTable.ICEBERG_CATALOG,
+            tbl.getParameters().get(IcebergTable.ICEBERG_CATALOG));
+      }
+      if (tbl.getParameters().containsKey(IcebergTable.ICEBERG_TABLE_IDENTIFIER)) {
+        tbl.getParameters()
+            .put(IcebergTable.ICEBERG_TABLE_IDENTIFIER, identifier.toString());
+        tableProperties.put(IcebergTable.ICEBERG_TABLE_IDENTIFIER, identifier.toString());
+      }
+      List<TColumn> columns = new ArrayList<>();
+      for (Column col: srcIceTable.getColumns()) columns.add(col.toThrift());
+      TIcebergPartitionSpec partitionSpec = srcIceTable.getDefaultPartitionSpec()
+          .toThrift();
+      createIcebergTable(tbl, wantMinimalResult, response, params.if_not_exists, columns,
+          partitionSpec, tableProperties, params.getComment());
+    } else {
+      createTable(tbl, params.if_not_exists, null, params.server_name, null, null,
+          wantMinimalResult, response);
+    }
   }
 
   private static void setDefaultTableCapabilities(

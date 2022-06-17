@@ -51,7 +51,6 @@ import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.fb.FbIcebergColumnStats;
 import org.apache.impala.fb.FbIcebergDataFile;
 import org.apache.impala.thrift.TColumn;
-import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergOperationParam;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
@@ -73,14 +72,14 @@ public class IcebergCatalogOpExecutor {
    * Return value is table location from Iceberg
    */
   public static Table createTable(TIcebergCatalog catalog, TableIdentifier identifier,
-      String location, TCreateTableParams params) throws ImpalaRuntimeException {
+      String location, List<TColumn> columns, TIcebergPartitionSpec partitionSpec,
+      Map<String, String> tableProperties) throws ImpalaRuntimeException {
     // Each table id increase from zero
-    Schema schema = createIcebergSchema(params);
-    PartitionSpec spec = IcebergUtil.createIcebergPartition(schema,
-        params.getPartition_spec());
+    Schema schema = createIcebergSchema(columns);
+    PartitionSpec spec = IcebergUtil.createIcebergPartition(schema, partitionSpec);
     IcebergCatalog icebergCatalog = IcebergUtil.getIcebergCatalog(catalog, location);
     Table iceTable = icebergCatalog.createTable(identifier, schema, spec, location,
-        params.getTable_properties());
+        tableProperties);
     LOG.info("Create iceberg table successful.");
     return iceTable;
   }
@@ -220,9 +219,9 @@ public class IcebergCatalogOpExecutor {
   /**
    * Build iceberg schema by parameters.
    */
-  private static Schema createIcebergSchema(TCreateTableParams params)
+  private static Schema createIcebergSchema(List<TColumn> columns)
       throws ImpalaRuntimeException {
-    return IcebergSchemaConverter.genIcebergSchema(params.getColumns());
+    return IcebergSchemaConverter.genIcebergSchema(columns);
   }
 
   /**
