@@ -225,4 +225,6 @@ struct TBackendGflags {
   100: required bool enable_sync_to_latest_event_on_ddls
 
   101: required bool pull_table_types_and_comments
+
+  102: required bool use_hms_column_order_for_hbase_tables
 }

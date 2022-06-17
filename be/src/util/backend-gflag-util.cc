@@ -187,6 +187,10 @@ DEFINE_string(startup_filesystem_check_directories, "/",
     "specified to a subdirectory to avoid accesses to the root of the filesystem. "
     "To disable the startup check, specify the empty string.");
 
+DEFINE_bool(use_hms_column_order_for_hbase_tables, false,
+    "Use the column order in HMS for HBase tables instead of ordering the columns by "
+    "family/qualifier. Keeping the default as false for backward compatibility.");
+
 namespace impala {
 
 Status GetConfigFromCommand(const string& flag_cmd, string& result) {
@@ -324,6 +328,8 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_enable_sync_to_latest_event_on_ddls(
       FLAGS_enable_sync_to_latest_event_on_ddls);
   cfg.__set_pull_table_types_and_comments(FLAGS_pull_table_types_and_comments);
+  cfg.__set_use_hms_column_order_for_hbase_tables(
+      FLAGS_use_hms_column_order_for_hbase_tables);
   return Status::OK();
 }
 

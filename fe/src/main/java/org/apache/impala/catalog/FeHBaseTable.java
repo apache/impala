@@ -49,6 +49,7 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.THBaseTable;
 import org.apache.impala.thrift.TResultSet;
@@ -191,25 +192,36 @@ public interface FeHBaseTable extends FeTable {
         if (col.getColumnFamily().equals(ROW_KEY_COLUMN_FAMILY)) {
           // Store the row key column separately from the rest
           keyCol = col;
-        } else {
-          tmpCols.add(col);
         }
+        tmpCols.add(col);
       }
       Preconditions.checkState(keyCol != null);
-      // The backend assumes that the row key column is always first and
-      // that the remaining HBase columns are ordered by columnFamily,columnQualifier,
-      // so the final position depends on the other mapped HBase columns.
-      // Sort columns and update positions.
-      Collections.sort(tmpCols);
-      keyCol.setPosition(0);
       List<Column> cols = new ArrayList<>();
-      cols.add(keyCol);
-      // Update the positions of the remaining columns
-      for (int i = 0; i < tmpCols.size(); ++i) {
-        HBaseColumn col = tmpCols.get(i);
-        col.setPosition(i + 1);
-        cols.add(col);
+      // Till IMPALA-886 the backend assumed that the row key column is always first and
+      // that the remaining HBase columns are ordered by columnFamily,columnQualifier.
+      // If flag use_hms_column_order_for_hbase_tables is false, keep the old behavor,
+      // otherwise use the HMS order (similarly as Hive).
+      if (BackendConfig.INSTANCE.useHmsColumnOrderForHBaseTables()) {
+        for (int i = 0; i < tmpCols.size(); ++i) {
+          HBaseColumn col = tmpCols.get(i);
+          col.setPosition(i);
+          cols.add(col);
+        }
+      } else {
+        // Add key col as the first column.
+        tmpCols.remove(keyCol);
+        keyCol.setPosition(0);
+        cols.add(keyCol);
+        // Sort by columnFamily/columnQualifier.
+        Collections.sort(tmpCols);
+        // Update the positions of the remaining columns.
+        for (int i = 0; i < tmpCols.size(); ++i) {
+          HBaseColumn col = tmpCols.get(i);
+          col.setPosition(i + 1);
+          cols.add(col);
+        }
       }
+
       return cols;
     }
 

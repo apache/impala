@@ -38,6 +38,7 @@ import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HBaseColumn;
@@ -130,9 +131,11 @@ public class HBaseScanNode extends ScanNode {
   public void init(Analyzer analyzer) throws ImpalaException {
     FeTable table = desc_.getTable();
     // determine scan predicates for clustering cols
-    for (int i = 0; i < table.getNumClusteringCols(); ++i) {
-      SlotDescriptor slotDesc = analyzer.getColumnSlot(
-          desc_, table.getColumns().get(i));
+    List<Column> columns = table.getColumns();
+    for (int i = 0; i < columns.size(); ++i) {
+      HBaseColumn col = (HBaseColumn) columns.get(i);
+      if (!col.isKeyColumn()) continue;
+      SlotDescriptor slotDesc = analyzer.getColumnSlot(desc_, col);
       if (slotDesc == null || !slotDesc.getType().isStringType()) {
         // the hbase row key is mapped to a non-string type
         // (since it's stored in ASCII it will be lexicographically ordered,

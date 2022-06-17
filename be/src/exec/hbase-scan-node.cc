@@ -75,30 +75,37 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
     return Status("Failed to get tuple descriptor.");
   }
   // The data retrieved from HBase via result_.raw() is sorted by family/qualifier.
-  // The corresponding HBase columns in the Impala metadata are also sorted by
-  // family/qualifier.
   // Here, we re-order the slots from the query by family/qualifier, exploiting the
-  // know sort order of the columns retrieved from HBase, to avoid family/qualifier
+  // known sort order of the columns retrieved from HBase, to avoid family/qualifier
   // comparisons.
+  const HBaseTableDescriptor* hbase_table =
+      static_cast<const HBaseTableDescriptor*>(tuple_desc_->table_desc());
+  const vector<HBaseTableDescriptor::HBaseColumnDescriptor>& cols = hbase_table->cols();
   const vector<SlotDescriptor*>& slots = tuple_desc_->slots();
   sorted_non_key_slots_.reserve(slots.size());
   for (int i = 0; i < slots.size(); ++i) {
-    if (slots[i]->col_pos() == ROW_KEY) {
+    const HBaseTableDescriptor::HBaseColumnDescriptor& col = cols[slots[i]->col_pos()];
+    if (col.family == ":key") {
       row_key_slot_ = slots[i];
+      row_key_binary_encoded_ = col.binary_encoded;
     } else {
       sorted_non_key_slots_.push_back(slots[i]);
     }
   }
+  // This is not needed if flag use_hms_column_order_for_hbase_tables=false as the columns
+  // will be already ordered in the FE, but sort it anyway to avoid relying on this.
   sort(sorted_non_key_slots_.begin(), sorted_non_key_slots_.end(),
-      SlotDescriptor::ColPathLessThan);
+      [&](const SlotDescriptor* a, const SlotDescriptor* b) -> bool {
+        const HBaseTableDescriptor::HBaseColumnDescriptor& cola = cols[a->col_pos()];
+        const HBaseTableDescriptor::HBaseColumnDescriptor& colb = cols[b->col_pos()];
+        return cola.family == colb.family
+            ? cola.qualifier < colb.qualifier : cola.family < colb.family;
+      });
 
   // Create list of family/qualifier pointers in same sort order as sorted_non_key_slots_.
-  const HBaseTableDescriptor* hbase_table =
-      static_cast<const HBaseTableDescriptor*>(tuple_desc_->table_desc());
-  row_key_binary_encoded_ = hbase_table->cols()[ROW_KEY].binary_encoded;
   sorted_cols_.reserve(sorted_non_key_slots_.size());
   for (int i = 0; i < sorted_non_key_slots_.size(); ++i) {
-    sorted_cols_.push_back(&hbase_table->cols()[sorted_non_key_slots_[i]->col_pos()]);
+    sorted_cols_.push_back(&cols[sorted_non_key_slots_[i]->col_pos()]);
   }
 
   // TODO(marcel): add int tuple_idx_[] indexed by TupleId somewhere in runtime-state.h

@@ -1,0 +1,44 @@
+====
+---- QUERY
+# Test that * is expanded in the same order as for other file formats
+# if use_hms_column_order_for_hbase_tables=true
+select * from functional_hbase.alltypestiny where id = 1
+---- RESULTS
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+====
+---- QUERY
+# Test that DESCRIBE returns columns in the same order as for other file formats
+# if use_hms_column_order_for_hbase_tables=true
+describe functional_hbase.alltypestiny
+---- RESULTS:VERIFY_IS_EQUAL
+'id','int',''
+'bool_col','boolean',''
+'tinyint_col','tinyint',''
+'smallint_col','smallint',''
+'int_col','int',''
+'bigint_col','bigint',''
+'float_col','float',''
+'double_col','double',''
+'date_string_col','string',''
+'string_col','string',''
+'timestamp_col','timestamp',''
+'year','int',''
+'month','int',''
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Test a query with filter on string key that will be pushed down to HBase.
+select * from functional_hbase.stringids
+  where id = '5' and tinyint_col = 5;
+---- RESULTS
+'5',false,5,5,5,50,5.5,50.5,'01/01/10','5',2010-01-01 00:05:00.100000000,2010,1,1
+---- TYPES
+string, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int, int
+---- RUNTIME_PROFILE
+row_regex: .*key predicates: id = '5'.*
+row_regex: .*start key: 5.*
+row_regex: .*stop key: 5\\0.*
+====

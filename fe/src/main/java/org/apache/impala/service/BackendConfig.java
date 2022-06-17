@@ -359,4 +359,8 @@ public class BackendConfig {
   public boolean pullTableTypesAndComments() {
     return backendCfg_.pull_table_types_and_comments;
   }
+
+  public boolean useHmsColumnOrderForHBaseTables() {
+    return backendCfg_.use_hms_column_order_for_hbase_tables;
+  }
 }

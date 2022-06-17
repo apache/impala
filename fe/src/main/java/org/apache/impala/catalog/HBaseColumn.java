@@ -39,10 +39,14 @@ public class HBaseColumn extends Column implements Comparable<HBaseColumn> {
   public String getColumnFamily() { return columnFamily_; }
   public String getColumnQualifier() { return columnQualifier_; }
   public boolean isBinaryEncoded() { return binaryEncoded_; }
+  public boolean isKeyColumn() {
+    return columnFamily_.equals(FeHBaseTable.Util.ROW_KEY_COLUMN_FAMILY);
+  }
 
   @Override
-  // We order the HBase columns in the matadata based on columnFamily,columnQualifier,
-  // to more easily map slots from HBase's Result.raw() to target slots in the backend.
+  // We order the HBase columns based on columnFamily,columnQualifier.
+  // Till IMPALA-886 the backend relied on this, now it is only done for backward
+  // compatibility if flag use_hms_column_order_for_hbase_tables=false.
   public int compareTo(HBaseColumn o) {
     int familyCmp = columnFamily_.compareTo(o.columnFamily_);
     if (familyCmp != 0) {

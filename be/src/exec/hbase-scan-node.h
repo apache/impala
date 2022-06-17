@@ -66,8 +66,6 @@ class HBaseScanNode : public ScanNode {
 
  private:
   const static int SKIP_COLUMN = -1;
-  /// Column 0 in the Impala metadata refers to the HBasw row key.
-  const static int ROW_KEY = 0;
 
   /// Compare two slots based on their column position, to sort them ascending.
   static bool CmpColPos(const SlotDescriptor* a, const SlotDescriptor* b);
