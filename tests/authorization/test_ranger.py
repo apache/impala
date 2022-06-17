@@ -655,7 +655,7 @@ class TestRanger(CustomClusterTestSuite):
     return json.loads(r.content)["policies"]
 
   def _add_ranger_user(self, user):
-    data = {"name": user, "password": "password123", "userRoleList": ["ROLE_USER"]}
+    data = {"name": user, "password": "Password123", "userRoleList": ["ROLE_USER"]}
     r = requests.post("{0}/service/xusers/secure/users".format(RANGER_HOST),
                       auth=RANGER_AUTH,
                       json=data, headers=REST_HEADERS)
