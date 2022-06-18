@@ -1433,7 +1433,7 @@ public class Frontend {
     FeTable table = getCatalog().getTable(dbName, tableName);
     if (table instanceof FeFsTable) {
       if (table instanceof FeIcebergTable && op == TShowStatsOp.PARTITIONS) {
-        return FeIcebergTable.Utils.getPartitionSpecs((FeIcebergTable) table);
+        return FeIcebergTable.Utils.getPartitionStats((FeIcebergTable) table);
       }
       return ((FeFsTable) table).getTableStats();
     } else if (table instanceof FeHBaseTable) {

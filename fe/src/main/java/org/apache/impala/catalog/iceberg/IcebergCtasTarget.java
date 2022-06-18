@@ -63,6 +63,7 @@ import org.apache.impala.thrift.THdfsStorageDescriptor;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
+import org.apache.impala.thrift.TIcebergPartitionStats;
 import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
@@ -254,6 +255,11 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
   @Override
   public long snapshotId() {
     return -1;
+  }
+
+  @Override
+  public Map<String, TIcebergPartitionStats> getIcebergPartitionStats() {
+    return null;
   }
 
   @Override

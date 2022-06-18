@@ -22,10 +22,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
@@ -41,6 +43,7 @@ import org.apache.iceberg.Table;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Reference;
@@ -53,6 +56,7 @@ import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
+import org.apache.impala.thrift.TIcebergPartitionStats;
 import org.apache.impala.thrift.TIcebergTable;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TResultSet;
@@ -60,6 +64,7 @@ import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.TResultRowBuilder;
+import org.json.simple.JSONValue;
 
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Ints;
@@ -77,6 +82,7 @@ public interface FeIcebergTable extends FeFsTable {
    */
   Map<String, HdfsPartition.FileDescriptor> getPathHashToFileDescMap();
 
+  Map<String, TIcebergPartitionStats> getIcebergPartitionStats();
   /**
    * Return the hdfs table transformed from iceberg table
    */
@@ -294,33 +300,32 @@ public interface FeIcebergTable extends FeFsTable {
       return format == HdfsFileFormat.PARQUET || format == HdfsFileFormat.ORC;
     }
 
-    public static TResultSet getPartitionSpecs(FeIcebergTable table)
+    public static TResultSet getPartitionStats(FeIcebergTable table)
         throws TableLoadingException {
       TResultSet result = new TResultSet();
       TResultSetMetadata resultSchema = new TResultSetMetadata();
       result.setSchema(resultSchema);
+      result.setRows(new ArrayList<>());
 
-      resultSchema.addToColumns(new TColumn("Partition Id", Type.BIGINT.toThrift()));
-      resultSchema.addToColumns(new TColumn("Source Id", Type.BIGINT.toThrift()));
-      resultSchema.addToColumns(new TColumn("Field Id", Type.BIGINT.toThrift()));
-      resultSchema.addToColumns(new TColumn("Field Name", Type.STRING.toThrift()));
-      resultSchema.addToColumns(new TColumn("Field Partition Transform",
-          Type.STRING.toThrift()));
+      resultSchema.addToColumns(new TColumn("Partition", Type.STRING.toThrift()));
+      resultSchema.addToColumns(new TColumn("Number Of Rows", Type.BIGINT.toThrift()));
+      resultSchema.addToColumns(new TColumn("Number Of Files", Type.BIGINT.toThrift()));
 
-      if (!table.getIcebergApiTable().specs().isEmpty()) {
-        // Just show the current PartitionSpec from Iceberg table metadata
-        PartitionSpec latestSpec = table.getIcebergApiTable().spec();
-        HashMap<String, Integer> transformParams =
-            IcebergUtil.getPartitionTransformParams(latestSpec);
-        for(PartitionField field : latestSpec.fields()) {
-          TResultRowBuilder builder = new TResultRowBuilder();
-          builder.add(latestSpec.specId());
-          builder.add(field.sourceId());
-          builder.add(field.fieldId());
-          builder.add(field.name());
-          builder.add(IcebergUtil.getPartitionTransform(field, transformParams).toSql());
-          result.addToRows(builder.get());
-        }
+      Map<String, TIcebergPartitionStats> fieldNameToPartitionValue =
+          table.getIcebergPartitionStats()
+              .entrySet()
+              .stream()
+              .sorted(Map.Entry.comparingByKey())
+              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
+                  (oldValue, newValue) -> oldValue, LinkedHashMap::new));
+
+      for (Map.Entry<String, TIcebergPartitionStats> partitionInfo :
+          fieldNameToPartitionValue.entrySet()) {
+        TResultRowBuilder builder = new TResultRowBuilder();
+        builder.add(partitionInfo.getKey());
+        builder.add(partitionInfo.getValue().getNum_rows());
+        builder.add(partitionInfo.getValue().getNum_files());
+        result.addToRows(builder.get());
       }
       return result;
     }
@@ -453,6 +458,7 @@ public interface FeIcebergTable extends FeFsTable {
           icebergTable.getIcebergParquetPlainPageSize());
       tIcebergTable.setParquet_dict_page_size(
           icebergTable.getIcebergParquetDictPageSize());
+      tIcebergTable.setPartition_stats(icebergTable.getIcebergPartitionStats());
       return tIcebergTable;
     }
 
@@ -563,6 +569,53 @@ public interface FeIcebergTable extends FeFsTable {
           }
       }
       return fileDescMap;
+    }
+
+    /**
+     * Return the PartitionContent loaded by the internal HdfsTable. To avoid returning
+     * the metadata files the result set is limited to the files that are tracked by
+     * Iceberg. Both the number of rows and number of files show in partitionStats.
+     */
+    public static Map<String, TIcebergPartitionStats> loadPartitionStats(
+        IcebergTable table) throws TableLoadingException {
+      List<DataFile> dataFileList =
+          IcebergUtil
+              .getIcebergDataFiles(table, new ArrayList<>(), /*timeTravelSpecl=*/null)
+              .first;
+      Map<String, TIcebergPartitionStats> partitionStats = new HashMap<>();
+      for (DataFile dataFile : dataFileList) {
+        String partitionKey = getParitionKey(table, dataFile);
+        if (partitionStats.containsKey(partitionKey)) {
+          TIcebergPartitionStats info = partitionStats.get(partitionKey);
+          info.num_rows += dataFile.recordCount();
+          info.num_files += 1;
+          partitionStats.put(partitionKey, info);
+        } else {
+          TIcebergPartitionStats icebergPartitionStats =
+              new TIcebergPartitionStats();
+          icebergPartitionStats.num_rows = dataFile.recordCount();
+          icebergPartitionStats.num_files = 1;
+          partitionStats.put(partitionKey, icebergPartitionStats);
+        }
+      }
+      return partitionStats;
+    }
+
+    /**
+     * Get iceberg partition from a dataFile and wrapper to a json string
+     */
+    public static String getParitionKey(IcebergTable table, DataFile dataFile) {
+      PartitionSpec spec = table.getIcebergApiTable().specs().get(dataFile.specId());
+      Map<String, String> fieldNameToPartitionValue = new LinkedHashMap<>();
+      for (int i = 0; i < spec.fields().size(); ++i) {
+        Object partValue = dataFile.partition().get(i, Object.class);
+        String partValueString = null;
+        if (partValue != null) {
+          partValueString = partValue.toString();
+        }
+        fieldNameToPartitionValue.put(spec.fields().get(i).name(), partValueString);
+      }
+      return JSONValue.toJSONString(fieldNameToPartitionValue);
     }
 
     /**

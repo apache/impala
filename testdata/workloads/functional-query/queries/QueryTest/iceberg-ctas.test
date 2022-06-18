@@ -37,6 +37,13 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_ctas_part/data/d=2021-02-26
 STRING, STRING, STRING
 ====
 ---- QUERY
+SHOW PARTITIONS ice_ctas_part;
+---- RESULTS
+'{"d":"18684"}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====
+---- QUERY
 # INSERT an additional row to a different partition.
 INSERT INTO ice_ctas_part VALUES ('fox','2021-02-27 16:16:59','2021-02-27');
 SELECT * FROM ice_ctas_part;
@@ -53,6 +60,14 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_ctas_part/data/d=2021-02-26
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_ctas_part/data/d=2021-02-27/.*.0.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
+====
+---- QUERY
+SHOW PARTITIONS ice_ctas_part;
+---- RESULTS
+'{"d":"18684"}',1,1
+'{"d":"18685"}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
 ====
 ---- QUERY
 # Test CTAS in Iceberg HadoopTables catalog.
@@ -74,6 +89,41 @@ show files in ice_ctas_hadoop_tables_part;
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/loc_test/data/d_month=2021-02/.*.0.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
+====
+---- QUERY
+SHOW PARTITIONS ice_ctas_hadoop_tables_part;
+---- RESULTS
+'{"d_month":"613"}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====
+---- QUERY
+INSERT INTO ice_ctas_hadoop_tables_part VALUES
+('fox','2021-02-27 16:16:59','2021-02-27'),('fox','2021-02-27 16:16:59','2021-02-27'),('cow','2021-02-28 17:16:59','2021-02-28'),
+('fox','2021-03-27 16:16:59','2021-03-27'),('fox','2021-03-27 16:16:59','2021-03-27'),('cow','2021-03-28 17:16:59','2021-03-28'),
+('fox','2021-04-27 16:16:59','2021-04-27'),('fox','2021-04-27 16:16:59','2021-04-27');
+SELECT * FROM ice_ctas_hadoop_tables_part;
+---- RESULTS
+'cow',2021-02-28 17:16:59,2021-02-28
+'cow',2021-03-28 17:16:59,2021-03-28
+'impala',2021-02-26 16:16:59,2021-02-26
+'fox',2021-02-27 16:16:59,2021-02-27
+'fox',2021-02-27 16:16:59,2021-02-27
+'fox',2021-03-27 16:16:59,2021-03-27
+'fox',2021-03-27 16:16:59,2021-03-27
+'fox',2021-04-27 16:16:59,2021-04-27
+'fox',2021-04-27 16:16:59,2021-04-27
+---- TYPES
+STRING,TIMESTAMP,DATE
+====
+---- QUERY
+SHOW PARTITIONS ice_ctas_hadoop_tables_part;
+---- RESULTS
+'{"d_month":"613"}',4,2
+'{"d_month":"614"}',3,1
+'{"d_month":"615"}',2,1
+---- TYPES
+STRING,BIGINT,BIGINT
 ====
 ---- QUERY
 # Test CTAS in Iceberg HadoopCatalog catalog.
@@ -103,3 +153,12 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/cat_loc/ns1/ns2/ctas/data/s_tru
 ---- TYPES
 STRING, STRING, STRING
 ====
+---- QUERY
+SHOW PARTITIONS ice_ctas_hadoop_catalog_part;
+---- RESULTS
+'{"s_trunc":"imp"}',1,1
+'{"s_trunc":"lio"}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====
+

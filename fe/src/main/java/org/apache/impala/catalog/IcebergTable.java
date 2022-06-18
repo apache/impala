@@ -41,6 +41,7 @@ import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergPartitionField;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
+import org.apache.impala.thrift.TIcebergPartitionStats;
 import org.apache.impala.thrift.TIcebergTable;
 import org.apache.impala.thrift.TPartialPartitionInfo;
 import org.apache.impala.thrift.TTable;
@@ -163,6 +164,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
 
   // The snapshot id cached in the CatalogD, necessary to syncronize the caches.
   private long catalogSnapshotId_ = -1;
+
+  private Map<String, TIcebergPartitionStats> partitionStats_;
 
   protected IcebergTable(org.apache.hadoop.hive.metastore.api.Table msTable,
       Db db, String name, String owner) {
@@ -303,6 +306,11 @@ public class IcebergTable extends Table implements FeIcebergTable {
   }
 
   @Override
+  public Map<String, TIcebergPartitionStats> getIcebergPartitionStats() {
+    return partitionStats_;
+  }
+
+  @Override
   public TTable toThrift() {
     TTable table = super.toThrift();
     table.setTable_type(TTableType.ICEBERG_TABLE);
@@ -345,6 +353,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
         hdfsTable_
             .load(false, msClient, msTable_, true, true, false, null, null,null, reason);
         pathHashToFileDescMap_ = Utils.loadAllPartition(this);
+        partitionStats_ = Utils.loadPartitionStats(this);
         loadAllColumnStats(msClient);
       } catch (Exception e) {
         throw new IcebergTableLoadingException("Error loading metadata for Iceberg table "
@@ -429,6 +438,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
     pathHashToFileDescMap_ = FeIcebergTable.Utils.loadFileDescMapFromThrift(
         ticeberg.getPath_hash_to_file_descriptor(), null, null);
     hdfsTable_.loadFromThrift(thriftTable);
+    partitionStats_ = ticeberg.getPartition_stats();
   }
 
   private List<IcebergPartitionSpec> loadPartitionBySpecsFromThrift(

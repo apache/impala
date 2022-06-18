@@ -571,6 +571,11 @@ struct TIcebergPartitionSpec {
   2: optional list<TIcebergPartitionField> partition_fields
 }
 
+struct TIcebergPartitionStats {
+  1: required i64 num_files;
+  2: required i64 num_rows;
+}
+
 struct TIcebergTable {
   // Iceberg file system table location
   1: required string table_location
@@ -589,6 +594,7 @@ struct TIcebergTable {
   // properties
   8: optional i64 parquet_plain_page_size;
   9: optional i64 parquet_dict_page_size;
+  10: optional map<string, TIcebergPartitionStats> partition_stats;
 }
 
 // Represents a table or view.

@@ -116,10 +116,11 @@ int,string,string,timestamp
 # Test show partitions query for iceberg table
 SHOW PARTITIONS iceberg_partitioned
 ---- TYPES
-bigint,bigint,bigint,string,string
+string,bigint,bigint
 ---- RESULTS
-0,4,1000,'event_time_hour','HOUR'
-0,3,1001,'action','IDENTITY'
+'{"event_time_hour":"438296","action":"view"}',8,8
+'{"event_time_hour":"438297","action":"click"}',6,6
+'{"event_time_hour":"438298","action":"download"}',6,6
 ====
 ---- QUERY
 SHOW FILES in iceberg_partitioned
@@ -233,10 +234,11 @@ int,string,string,timestamp
 ---- QUERY
 SHOW PARTITIONS hadoop_catalog_test_external
 ---- TYPES
-bigint,bigint,bigint,string,string
+string,bigint,bigint
 ---- RESULTS
-0,4,1000,'event_time_hour','HOUR'
-0,3,1001,'action','IDENTITY'
+'{"event_time_hour":"438296","action":"view"}',8,8
+'{"event_time_hour":"438297","action":"click"}',6,6
+'{"event_time_hour":"438298","action":"download"}',6,6
 ====
 ---- QUERY
 SHOW FILES in hadoop_catalog_test_external
@@ -312,9 +314,11 @@ int,string,string
 ---- QUERY
 SHOW PARTITIONS iceberg_partitioned_orc_external
 ---- TYPES
-bigint,bigint,bigint,string,string
+string,bigint,bigint
 ---- RESULTS
-0,3,1000,'action','IDENTITY'
+'{"action":"click"}',6,6
+'{"action":"download"}',6,6
+'{"action":"view"}',8,8
 ====
 ---- QUERY
 SHOW FILES in iceberg_partitioned_orc_external

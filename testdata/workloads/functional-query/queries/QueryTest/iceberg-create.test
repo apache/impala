@@ -39,14 +39,8 @@ STRING,STRING,STRING,STRING
 ---- QUERY
 SHOW PARTITIONS iceberg_hadoop_tables;
 ---- RESULTS
-0,1,1000,'level','IDENTITY'
-0,1,1001,'level_trunc','TRUNCATE[10]'
-0,2,1002,'event_time','IDENTITY'
-0,2,1003,'event_time_hour','HOUR'
-0,2,1004,'event_time_bucket','BUCKET[1000]'
-0,3,1005,'register_time_day','DAY'
 ---- TYPES
-BIGINT,BIGINT,BIGINT,STRING,STRING
+STRING, BIGINT,BIGINT
 ====
 ---- QUERY
 DROP TABLE iceberg_hadoop_tables;
@@ -97,11 +91,8 @@ STRING,STRING,STRING,STRING
 ---- QUERY
 SHOW PARTITIONS iceberg_hadoop_tbls_external;
 ---- RESULTS
-0,1,1000,'level','IDENTITY'
-0,1,1001,'level_bucket','BUCKET[12345]'
-0,1,1002,'level_trunc','TRUNCATE[15]'
 ---- TYPES
-BIGINT,BIGINT,BIGINT,STRING,STRING
+STRING,BIGINT,BIGINT
 ====
 ---- QUERY
 CREATE EXTERNAL TABLE iceberg_hadoop_tbls_external_empty_col
@@ -117,15 +108,6 @@ DESCRIBE iceberg_hadoop_tbls_external_empty_col;
 'level','string','','true'
 ---- TYPES
 STRING,STRING,STRING,STRING
-====
----- QUERY
-SHOW PARTITIONS iceberg_hadoop_tbls_external_empty_col;
----- RESULTS
-0,1,1000,'level','IDENTITY'
-0,1,1001,'level_bucket','BUCKET[12345]'
-0,1,1002,'level_trunc','TRUNCATE[15]'
----- TYPES
-BIGINT,BIGINT,BIGINT,STRING,STRING
 ====
 ---- QUERY
 DROP TABLE iceberg_hadoop_tbls_with_loc;
@@ -173,18 +155,6 @@ DESCRIBE iceberg_hadoop_catalog;
 STRING,STRING,STRING,STRING
 ====
 ---- QUERY
-SHOW PARTITIONS iceberg_hadoop_catalog;
----- RESULTS
-0,1,1000,'level','IDENTITY'
-0,1,1001,'level_trunc','TRUNCATE[10]'
-0,2,1002,'event_time','IDENTITY'
-0,2,1003,'event_time_hour','HOUR'
-0,2,1004,'event_time_bucket','BUCKET[1000]'
-0,3,1005,'register_time_day','DAY'
----- TYPES
-BIGINT,BIGINT,BIGINT,STRING,STRING
-====
----- QUERY
 DROP TABLE iceberg_hadoop_catalog;
 ---- RESULTS
 'Table has been dropped.'
@@ -217,15 +187,6 @@ DESCRIBE iceberg_hadoop_cat_external;
 'level','string','','true'
 ---- TYPES
 STRING,STRING,STRING,STRING
-====
----- QUERY
-SHOW PARTITIONS iceberg_hadoop_cat_external;
----- RESULTS
-0,1,1000,'level','IDENTITY'
-0,1,1001,'level_bucket','BUCKET[12345]'
-0,1,1002,'level_trunc','TRUNCATE[10]'
----- TYPES
-BIGINT,BIGINT,BIGINT,STRING,STRING
 ====
 ---- QUERY
 DROP TABLE iceberg_hadoop_catalog;
@@ -345,16 +306,6 @@ DESCRIBE iceberg_hadoop_cat_with_orc;
 STRING,STRING,STRING,STRING
 ====
 ---- QUERY
-SHOW PARTITIONS iceberg_hadoop_cat_with_orc;
----- RESULTS
-0,1,1000,'level','IDENTITY'
-0,2,1001,'event_time','IDENTITY'
-0,2,1002,'event_time_hour','HOUR'
-0,3,1003,'register_time_day','DAY'
----- TYPES
-BIGINT,BIGINT,BIGINT,STRING,STRING
-====
----- QUERY
 DROP TABLE iceberg_hadoop_cat_with_orc;
 ---- RESULTS
 'Table has been dropped.'
@@ -464,14 +415,6 @@ DESCRIBE iceberg_old_style_partitions;
 'event_id','int','','true'
 ---- TYPES
 STRING,STRING,STRING,STRING
-====
----- QUERY
-SHOW PARTITIONS iceberg_old_style_partitions;
----- RESULTS
-0,6,1000,'level','IDENTITY'
-0,7,1001,'event_id','IDENTITY'
----- TYPES
-BIGINT,BIGINT,BIGINT,STRING,STRING
 ====
 ---- QUERY
 create table ice_part_hadoop_tbl (

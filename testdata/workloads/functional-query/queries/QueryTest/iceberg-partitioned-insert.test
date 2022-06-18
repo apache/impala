@@ -36,6 +36,17 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=__HIVE_DEF
 STRING, STRING, STRING
 ====
 ---- QUERY
+SHOW PARTITIONS ice_only_part;
+---- RESULTS
+'{"i":"1"}',1,1
+'{"i":"2"}',1,1
+'{"i":"3"}',1,1
+'{"i":"4"}',1,1
+'{"i":null}',1,1
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
 select * from ice_only_part
 where i = 1;
@@ -157,6 +168,20 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=7/bool_co
 STRING, STRING, STRING
 ====
 ---- QUERY
+SHOW PARTITIONS alltypes_part;
+---- RESULTS
+'{"id":"0","bool_col":"true","int_col":"0","bigint_col":"0","float_col":"0.0","double_col":"0.0","date_col":"14245","string_col":"0"}',1,1
+'{"id":"1","bool_col":"false","int_col":"1","bigint_col":"10","float_col":"1.1","double_col":"10.1","date_col":"14245","string_col":"1"}',1,1
+'{"id":"2","bool_col":"true","int_col":"0","bigint_col":"0","float_col":"0.0","double_col":"0.0","date_col":"14276","string_col":"0"}',1,1
+'{"id":"3","bool_col":"false","int_col":"1","bigint_col":"10","float_col":"1.1","double_col":"10.1","date_col":"14276","string_col":"1"}',1,1
+'{"id":"4","bool_col":"true","int_col":"0","bigint_col":"0","float_col":"0.0","double_col":"0.0","date_col":"14304","string_col":"0"}',1,1
+'{"id":"5","bool_col":"false","int_col":"1","bigint_col":"10","float_col":"1.1","double_col":"10.1","date_col":"14304","string_col":"1"}',1,1
+'{"id":"6","bool_col":"true","int_col":"0","bigint_col":"0","float_col":"0.0","double_col":"0.0","date_col":"14335","string_col":"0"}',1,1
+'{"id":"7","bool_col":"false","int_col":"1","bigint_col":"10","float_col":"1.1","double_col":"10.1","date_col":"14335","string_col":"1"}',1,1
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
 # INSERTs with wrong value orderings are rejected.
 insert into alltypes_part
 select bool_col, id, int_col, bigint_col, float_col, double_col,
@@ -269,6 +294,14 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_non_order/data/s=secon
 STRING, STRING, STRING
 ====
 ---- QUERY
+SHOW PARTITIONS ice_part_non_order;
+---- RESULTS
+'{"s":"first","d":"18603"}',1,1
+'{"s":"second","d":"18604"}',1,1
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
 # Test inserts with different partition specs.
 create table ice_alter_part (i int, d date, s string)
 stored as iceberg;
@@ -335,6 +368,17 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/d_year=2020
 STRING, STRING, STRING
 ====
 ---- QUERY
+SHOW PARTITIONS ice_alter_part;
+---- RESULTS
+'{"d_year":"50","i":"5","s_bucket":"2"}',1,1
+'{"d_year":"50","i":"6","s_bucket":"0"}',1,1
+'{"i":"3","d":"18605"}',1,1
+'{"i":"4","d":"18606"}',1,1
+'{}',2,1
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
 create table ice_void (i int, s string, d date)
 partitioned by spec (void(i), truncate(1, s), year(d))
 stored as iceberg;
@@ -363,6 +407,15 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=
 STRING, STRING, STRING
 ====
 ---- QUERY
+SHOW PARTITIONS ice_void;
+---- RESULTS
+'{"i_null":null,"s_trunc":"o","d_year":"31"}',2,1
+'{"i_null":null,"s_trunc":"t","d_year":"32"}',1,1
+'{"i_null":null,"s_trunc":"t","d_year":"33"}',1,1
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
 alter table ice_void set partition spec (i, void(s), year(d));
 insert into ice_void values (4, 'four', '2004-04-04');
 select * from ice_void;
@@ -386,6 +439,16 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=4/d_year=2004/.*.0.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
+====
+---- QUERY
+SHOW PARTITIONS ice_void;
+---- RESULTS
+'{"i":"4","s_null":null,"d_year":"34"}',1,1
+'{"i_null":null,"s_trunc":"o","d_year":"31"}',2,1
+'{"i_null":null,"s_trunc":"t","d_year":"32"}',1,1
+'{"i_null":null,"s_trunc":"t","d_year":"33"}',1,1
+---- TYPES
+STRING, BIGINT, BIGINT
 ====
 ---- QUERY
 alter table ice_void set partition spec (i, void(s), void(d));
@@ -414,6 +477,17 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=4/d_year=2004/.
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=5/[^=/]*.0.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
+====
+---- QUERY
+SHOW PARTITIONS ice_void;
+---- RESULTS
+'{"i":"4","s_null":null,"d_year":"34"}',1,1
+'{"i":"5","s_null":null,"d_null":null}',2,1
+'{"i_null":null,"s_trunc":"o","d_year":"31"}',2,1
+'{"i_null":null,"s_trunc":"t","d_year":"32"}',1,1
+'{"i_null":null,"s_trunc":"t","d_year":"33"}',1,1
+---- TYPES
+STRING, BIGINT, BIGINT
 ====
 ---- QUERY
 alter table ice_void set partition spec (void(i), void(s), void(d));
@@ -445,6 +519,18 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=5/[^=/]*.0.parq
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/[^=/]*.0.parq','.*',''
 ---- TYPES
 STRING, STRING, STRING
+====
+---- QUERY
+SHOW PARTITIONS ice_void;
+---- RESULTS
+'{"i":"4","s_null":null,"d_year":"34"}',1,1
+'{"i":"5","s_null":null,"d_null":null}',2,1
+'{"i_null":null,"s_null":null,"d_null":null}',2,1
+'{"i_null":null,"s_trunc":"o","d_year":"31"}',2,1
+'{"i_null":null,"s_trunc":"t","d_year":"32"}',1,1
+'{"i_null":null,"s_trunc":"t","d_year":"33"}',1,1
+---- TYPES
+STRING, BIGINT, BIGINT
 ====
 ---- QUERY
 create table store_sales partitioned by spec (ss_sold_date_sk) stored as iceberg

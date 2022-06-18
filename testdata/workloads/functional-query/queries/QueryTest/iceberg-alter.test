@@ -65,14 +65,8 @@ ALTER TABLE iceberg_hadoop_tables SET PARTITION SPEC (
   price);
 SHOW PARTITIONS iceberg_hadoop_tables;
 ---- RESULTS
-regex:.+,1,1000,'level','IDENTITY'
-regex:.+,1,1001,'level_trunc','TRUNCATE[5]'
-regex:.+,2,1002,'event_time_hour','HOUR'
-regex:.+,3,1003,'register_time_year','YEAR'
-regex:.+,4,1004,'message_bucket','BUCKET[15]'
-regex:.+,5,1005,'price','IDENTITY'
 ---- TYPES
-BIGINT, BIGINT, BIGINT, STRING, STRING
+STRING, BIGINT, BIGINT
 ====
 ---- QUERY
 CREATE TABLE iceberg_hadoop_catalog(
@@ -132,14 +126,8 @@ ALTER TABLE iceberg_hadoop_catalog SET PARTITION SPEC (
   price);
 SHOW PARTITIONS iceberg_hadoop_catalog;
 ---- RESULTS
-regex:.+,1,1000,'level','IDENTITY'
-regex:.+,1,1001,'level_trunc','TRUNCATE[5]'
-regex:.+,2,1002,'event_time_hour','HOUR'
-regex:.+,3,1003,'register_time_year','YEAR'
-regex:.+,4,1004,'message_bucket','BUCKET[15]'
-regex:.+,5,1005,'price','IDENTITY'
 ---- TYPES
-BIGINT, BIGINT, BIGINT, STRING, STRING
+STRING, BIGINT, BIGINT
 ====
 ---- QUERY
 CREATE TABLE iceberg_rename (i int)

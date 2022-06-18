@@ -40,6 +40,7 @@ import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
+import org.apache.impala.thrift.TIcebergPartitionStats;
 import org.apache.impala.thrift.TPartialTableInfo;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
@@ -72,6 +73,8 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
 
   // Cached Iceberg API table object.
   private org.apache.iceberg.Table icebergApiTable_;
+
+  private Map<String, TIcebergPartitionStats> partitionStats_;
 
   /**
    * Loads the Iceberg metadata from the CatalogD then initializes a LocalIcebergTable.
@@ -123,6 +126,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     icebergParquetRowGroupSize_ = Utils.getIcebergParquetRowGroupSize(msTable);
     icebergParquetPlainPageSize_ = Utils.getIcebergParquetPlainPageSize(msTable);
     icebergParquetDictPageSize_ = Utils.getIcebergParquetDictPageSize(msTable);
+    partitionStats_ = tableInfo.getIceberg_table().getPartition_stats();
     addVirtualColumns();
   }
 
@@ -211,6 +215,11 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   @Override
   public long snapshotId() {
     return catalogSnapshotId_;
+  }
+
+  @Override
+  public Map<String, TIcebergPartitionStats> getIcebergPartitionStats() {
+    return partitionStats_;
   }
 
   @Override
