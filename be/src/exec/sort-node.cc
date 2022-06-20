@@ -81,7 +81,8 @@ Status SortNode::Prepare(RuntimeState* state) {
   sorter_.reset(new Sorter(tuple_row_comparator_config_, sort_tuple_exprs_,
       &row_descriptor_, mem_tracker(), buffer_pool_client(),
       resource_profile_.spillable_buffer_size, runtime_profile(), state, label(), true,
-      pnode.codegend_sort_helper_fn_, ComputeInputSizeEstimate()));
+      pnode.codegend_sort_helper_fn_, pnode.codegend_heapify_helper_fn_,
+      ComputeInputSizeEstimate()));
   RETURN_IF_ERROR(sorter_->Prepare(pool_));
   DCHECK_GE(resource_profile_.min_reservation, sorter_->ComputeMinReservation());
   return Status::OK();
@@ -114,6 +115,10 @@ void SortPlanNode::Codegen(FragmentState* state) {
         Sorter::TupleSorter::Codegen(state, compare_fn,
             row_descriptor_->tuple_descriptors()[0]->byte_size(),
             &codegend_sort_helper_fn_);
+  }
+  if (codegen_status.ok()) {
+    codegen_status =
+        SortedRunMerger::Codegen(state, compare_fn, &codegend_heapify_helper_fn_);
   }
   AddCodegenStatus(codegen_status);
 }

@@ -449,7 +449,11 @@ class DataStreamTest : public testing::Test {
 
   void ReadStreamMerging(ReceiverInfo* info, RuntimeProfile* profile,
       TupleRowComparator* less_than_comparator) {
-    info->status = info->stream_recvr->CreateMerger(*less_than_comparator);
+    /// Note that codegend_heapify_helper_fn currently stores a nullptr.
+    /// The codegened case of this function is covered in end-to-end tests.
+    CodegenFnPtr<SortedRunMerger::HeapifyHelperFn> codegend_heapify_helper_fn;
+    info->status = info->stream_recvr->CreateMerger(
+        *less_than_comparator, codegend_heapify_helper_fn);
     if (info->status.IsCancelled()) return;
     RowBatch batch(row_desc_, 1024, &tracker_);
     VLOG_QUERY << "start reading merging";

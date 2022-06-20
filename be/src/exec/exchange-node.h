@@ -21,7 +21,7 @@
 
 #include <boost/scoped_ptr.hpp>
 #include "exec/exec-node.h"
-
+#include "runtime/sorted-run-merger.h"
 #include "runtime/bufferpool/buffer-pool.h"
 
 namespace impala {
@@ -46,6 +46,9 @@ class ExchangePlanNode : public PlanNode {
 
   /// Config used to create a TupleRowComparator instance. Non null for merging exchange.
   TupleRowComparatorConfig* row_comparator_config_ = nullptr;
+
+  /// Codegened version of SortedRunMerger::HeapifyHelper().
+  CodegenFnPtr<SortedRunMerger::HeapifyHelperFn> codegend_heapify_helper_fn_;
 };
 
 /// Receiver node for data streams. The data stream receiver is created in Prepare()

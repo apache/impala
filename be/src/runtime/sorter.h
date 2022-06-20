@@ -23,6 +23,7 @@
 #include "runtime/bufferpool/buffer-pool.h"
 #include "util/runtime-profile.h"
 #include "util/tuple-row-compare.h"
+#include "runtime/sorted-run-merger.h"
 
 namespace impala {
 
@@ -119,6 +120,8 @@ class Sorter {
       RuntimeProfile* profile, RuntimeState* state, const std::string& node_label,
       bool enable_spilling,
       const CodegenFnPtr<SortHelperFn>& codegend_sort_helper_fn,
+      const CodegenFnPtr<SortedRunMerger::HeapifyHelperFn>& codegend_heapify_helper_fn =
+            default_heapify_helper_fn_,
       int64_t estimated_input_size = -1);
   ~Sorter();
 
@@ -255,8 +258,17 @@ class Sorter {
   boost::scoped_ptr<TupleSorter> in_mem_tuple_sorter_;
 
   /// A reference to the codegened version of TupleSorter::SortHelper() that is stored
-  /// inside SortPlanNode and PartialSortPlanNode.
+  /// inside SortPlanNode, PartialSortPlanNode and TopNPlanNode.
   const CodegenFnPtr<SortHelperFn>& codegend_sort_helper_fn_;
+
+  /// A reference to the codegened version of SortedRunMerger::HeapifyHelper() that is
+  /// stored inside SortPlanNode and ExchangePlanNode.
+  const CodegenFnPtr<SortedRunMerger::HeapifyHelperFn>& codegend_heapify_helper_fn_;
+
+  /// A default codegened function pointer storing nullptr, which is used when the
+  /// merger is not needed. Used as a default value in constructor, when the CodegenFnPtr
+  /// is not provided.
+  static const CodegenFnPtr<SortedRunMerger::HeapifyHelperFn> default_heapify_helper_fn_;
 
   /// Client used to allocate pages from the buffer pool. Not owned.
   BufferPool::ClientHandle* const buffer_pool_client_;

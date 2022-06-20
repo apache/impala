@@ -19,118 +19,78 @@
 #include "runtime/tuple-row.h"
 #include "util/runtime-profile-counters.h"
 #include "util/tuple-row-compare.h"
+#include "runtime/fragment-state.h"
+#include "codegen/llvm-codegen.h"
 
 #include "common/names.h"
 
 namespace impala {
 
-/// SortedRunWrapper returns individual rows in a batch obtained from a sorted input run
-/// (a RunBatchSupplierFn). Used as the heap element in the min heap maintained by the
-/// merger.
-/// Advance() advances the row supplier to the next row in the input batch and retrieves
-/// the next batch from the input if the current input batch is exhausted. Transfers
-/// ownership from the current input batch to an output batch if requested.
-class SortedRunMerger::SortedRunWrapper {
- public:
-  /// Construct an instance from a sorted input run.
-  SortedRunWrapper(SortedRunMerger* parent, const RunBatchSupplierFn& sorted_run)
-    : sorted_run_(sorted_run),
-      input_row_batch_(NULL),
-      input_row_batch_index_(-1),
-      parent_(parent) {
-  }
+SortedRunMerger::SortedRunWrapper::SortedRunWrapper(SortedRunMerger* parent,
+    const RunBatchSupplierFn& sorted_run)
+  : sorted_run_(sorted_run),
+    input_row_batch_(nullptr),
+    input_row_batch_index_(-1),
+    parent_(parent) {
+}
 
-  /// Retrieves the first batch of sorted rows from the run.
-  Status Init(bool* eos) {
+Status SortedRunMerger::SortedRunWrapper::Init(bool* eos) {
+  *eos = false;
+  RETURN_IF_ERROR(sorted_run_(&input_row_batch_));
+  if (input_row_batch_ == nullptr) {
+    *eos = true;
+    return Status::OK();
+  }
+  RETURN_IF_ERROR(Advance(nullptr, eos));
+  return Status::OK();
+}
+
+Status SortedRunMerger::SortedRunWrapper::Advance(RowBatch* transfer_batch, bool* eos) {
+  DCHECK(input_row_batch_ != nullptr);
+  ++input_row_batch_index_;
+  if (input_row_batch_index_ < input_row_batch_->num_rows()) {
     *eos = false;
-    RETURN_IF_ERROR(sorted_run_(&input_row_batch_));
-    if (input_row_batch_ == NULL) {
-      *eos = true;
-      return Status::OK();
-    }
-    RETURN_IF_ERROR(Advance(NULL, eos));
     return Status::OK();
   }
 
-  /// Increment the current row index. If the current input batch is exhausted, fetch the
-  /// next one from the sorted run. Transfer ownership to transfer_batch if not NULL.
-  Status Advance(RowBatch* transfer_batch, bool* eos) {
-    DCHECK(input_row_batch_ != NULL);
-    ++input_row_batch_index_;
-    if (input_row_batch_index_ < input_row_batch_->num_rows()) {
-      *eos = false;
-      return Status::OK();
+  // Iterate until we hit eos or get a non-empty batch.
+  do {
+    // Make sure to transfer resources from every batch received from 'sorted_run_'.
+    if (transfer_batch != nullptr) {
+      DCHECK_ENUM_EQ(
+          RowBatch::FlushMode::NO_FLUSH_RESOURCES, input_row_batch_->flush_mode())
+          << "Run batch suppliers that flush resources must use a deep-copying merger";
+      input_row_batch_->TransferResourceOwnership(transfer_batch);
     }
 
-    // Iterate until we hit eos or get a non-empty batch.
-    do {
-      // Make sure to transfer resources from every batch received from 'sorted_run_'.
-      if (transfer_batch != NULL) {
-        DCHECK_ENUM_EQ(
-            RowBatch::FlushMode::NO_FLUSH_RESOURCES, input_row_batch_->flush_mode())
-            << "Run batch suppliers that flush resources must use a deep-copying merger";
-        input_row_batch_->TransferResourceOwnership(transfer_batch);
-      }
+    {
+      ScopedTimer<MonotonicStopWatch> timer(parent_->get_next_batch_timer_);
+      RETURN_IF_ERROR(sorted_run_(&input_row_batch_));
+    }
+  } while (input_row_batch_ != nullptr && input_row_batch_->num_rows() == 0);
 
-      {
-        ScopedTimer<MonotonicStopWatch> timer(parent_->get_next_batch_timer_);
-        RETURN_IF_ERROR(sorted_run_(&input_row_batch_));
-      }
-    } while (input_row_batch_ != NULL && input_row_batch_->num_rows() == 0);
-
-    *eos = input_row_batch_ == NULL;
-    input_row_batch_index_ = 0;
-    return Status::OK();
-  }
-
-  TupleRow* current_row() const {
-    return input_row_batch_->GetRow(input_row_batch_index_);
-  }
-
- private:
-  friend class SortedRunMerger;
-
-  /// The run from which this object supplies rows.
-  RunBatchSupplierFn sorted_run_;
-
-  /// The current input batch being processed.
-  RowBatch* input_row_batch_;
-
-  /// Index into input_row_batch_ of the current row being processed.
-  int input_row_batch_index_;
-
-  /// The parent merger instance.
-  SortedRunMerger* parent_;
-};
+  *eos = input_row_batch_ == nullptr;
+  input_row_batch_index_ = 0;
+  return Status::OK();
+}
 
 void SortedRunMerger::Heapify(int parent_index) {
-  int left_index = 2 * parent_index + 1;
-  int right_index = left_index + 1;
-  if (left_index >= min_heap_.size()) return;
-  int least_child;
-  // Find the least child of parent.
-  if (right_index >= min_heap_.size() ||
-      comparator_.Less(
-          min_heap_[left_index]->current_row(), min_heap_[right_index]->current_row())) {
-    least_child = left_index;
-  } else {
-    least_child = right_index;
-  }
+  const HeapifyHelperFn heapify_helper_fn = codegend_heapify_helper_fn_.load();
 
-  // If the parent is out of place, swap it with the least child and invoke
-  // Heapify recursively.
-  if (comparator_.Less(min_heap_[least_child]->current_row(),
-          min_heap_[parent_index]->current_row())) {
-    iter_swap(min_heap_.begin() + least_child, min_heap_.begin() + parent_index);
-    Heapify(least_child);
+  if (heapify_helper_fn != nullptr) {
+    heapify_helper_fn(this, parent_index);
+  } else {
+    HeapifyHelper(parent_index);
   }
 }
 
 SortedRunMerger::SortedRunMerger(const TupleRowComparator& comparator,
-    const RowDescriptor* row_desc, RuntimeProfile* profile, bool deep_copy_input)
+    const RowDescriptor* row_desc, RuntimeProfile* profile, bool deep_copy_input,
+    const CodegenFnPtr<HeapifyHelperFn>& codegend_heapify_helper_fn)
   : comparator_(comparator),
     input_row_desc_(row_desc),
-    deep_copy_input_(deep_copy_input) {
+    deep_copy_input_(deep_copy_input),
+    codegend_heapify_helper_fn_(codegend_heapify_helper_fn) {
   get_next_timer_ = ADD_TIMER(profile, "MergeGetNext");
   get_next_batch_timer_ = ADD_TIMER(profile, "MergeGetNextBatch");
 }
@@ -140,7 +100,7 @@ Status SortedRunMerger::Prepare(const vector<RunBatchSupplierFn>& input_runs) {
   min_heap_.reserve(input_runs.size());
   for (const RunBatchSupplierFn& input_run: input_runs) {
     SortedRunWrapper* new_elem = pool_.Add(new SortedRunWrapper(this, input_run));
-    DCHECK(new_elem != NULL);
+    DCHECK(new_elem != nullptr);
     bool empty;
     RETURN_IF_ERROR(new_elem->Init(&empty));
     if (!empty) min_heap_.push_back(new_elem);
@@ -182,14 +142,40 @@ Status SortedRunMerger::AdvanceMinRow(RowBatch* transfer_batch) {
   bool min_run_complete;
   // Advance to the next element in min. output_batch is supplied to transfer
   // resource ownership if the input batch in min is exhausted.
-  RETURN_IF_ERROR(min->Advance(deep_copy_input_ ? NULL : transfer_batch,
+  RETURN_IF_ERROR(min->Advance(deep_copy_input_ ? nullptr : transfer_batch,
       &min_run_complete));
   if (min_run_complete) {
     // Remove the element from the heap.
     iter_swap(min_heap_.begin(), min_heap_.end() - 1);
     min_heap_.pop_back();
   }
-  if (!min_heap_.empty()) Heapify(0);
+  if (!min_heap_.empty()) {
+    Heapify(0);
+  }
+  return Status::OK();
+}
+
+const char* SortedRunMerger::LLVM_CLASS_NAME = "class.impala::SortedRunMerger";
+
+Status SortedRunMerger::Codegen(FragmentState* state, llvm::Function* compare_fn,
+      CodegenFnPtr<HeapifyHelperFn>* codegend_fn) {
+  LlvmCodeGen* codegen = state->codegen();
+  DCHECK(codegen != nullptr);
+
+  llvm::Function* fn = codegen->GetFunction(
+      IRFunction::SORTED_RUN_MERGER_HEAPIFY_HELPER, true);
+  DCHECK(fn != nullptr);
+
+  int replaced =
+      codegen->ReplaceCallSites(fn, compare_fn, TupleRowComparator::COMPARE_SYMBOL);
+  DCHECK_REPLACE_COUNT(replaced, 2) << LlvmCodeGen::Print(fn);
+
+  fn = codegen->FinalizeFunction(fn);
+  if (fn == nullptr) {
+    return Status("SortedRunMerger::Codegen(): failed to finalize function");
+  }
+  codegen->AddFunctionToJit(fn, codegend_fn);
+
   return Status::OK();
 }
 

@@ -639,14 +639,16 @@ void KrpcDataStreamRecvr::SenderQueue::Close() {
   current_batch_.reset();
 }
 
-Status KrpcDataStreamRecvr::CreateMerger(const TupleRowComparator& less_than) {
+Status KrpcDataStreamRecvr::CreateMerger(const TupleRowComparator& less_than,
+    const CodegenFnPtr<SortedRunMerger::HeapifyHelperFn>& codegend_heapify_helper_fn) {
   DCHECK(is_merging_);
   DCHECK(TestInfo::is_test() || FragmentInstanceState::IsFragmentExecThread());
   vector<SortedRunMerger::RunBatchSupplierFn> input_batch_suppliers;
   input_batch_suppliers.reserve(sender_queues_.size());
 
   // Create the merger that will a single stream of sorted rows.
-  merger_.reset(new SortedRunMerger(less_than, row_desc_, profile_, false));
+  merger_.reset(new SortedRunMerger(less_than, row_desc_, profile_, false,
+      codegend_heapify_helper_fn));
 
   for (SenderQueue* queue: sender_queues_) {
     input_batch_suppliers.push_back(

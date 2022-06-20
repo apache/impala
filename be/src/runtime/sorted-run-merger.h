@@ -23,6 +23,9 @@
 #include "common/object-pool.h"
 #include "util/runtime-profile.h"
 
+#include "runtime/row-batch.h"
+#include "util/tuple-row-compare.h"
+
 namespace impala {
 
 class RowBatch;
@@ -53,9 +56,11 @@ class SortedRunMerger {
   /// batch being returned. The returned batch can have any number of rows (including
   /// zero).
   typedef boost::function<Status (RowBatch**)> RunBatchSupplierFn;
+  typedef void (*HeapifyHelperFn)(SortedRunMerger*, int);
 
   SortedRunMerger(const TupleRowComparator& comparator, const RowDescriptor* row_desc,
-      RuntimeProfile* profile, bool deep_copy_input);
+      RuntimeProfile* profile, bool deep_copy_input,
+      const CodegenFnPtr<HeapifyHelperFn>& codegend_heapify_helper_fn);
 
   /// Prepare this merger to merge and return rows from the sorted runs in 'input_runs'.
   /// Retrieves the first batch from each run and sets up the binary heap implementing
@@ -64,6 +69,18 @@ class SortedRunMerger {
 
   /// Return the next batch of sorted rows from this merger.
   Status GetNext(RowBatch* output_batch, bool* eos);
+
+  /// Makes an attempt to codegen for method HeapifyHelper(). Stores the resulting
+  /// function in codegend_fn and returns Status::OK() if codegen was successful.
+  /// Otherwise, a Status("SortedRunMergerer::Codegen(): failed to finalize function")
+  /// object is returned.
+  /// 'compare_fn' is the pointer to the codegen version of the compare method with
+  /// which to replace all non-codegen versions.
+  static Status Codegen(FragmentState* state, llvm::Function* compare_fn,
+      CodegenFnPtr<HeapifyHelperFn>* codegend_fn);
+
+  /// Class name in LLVM IR.
+  static const char* LLVM_CLASS_NAME;
 
  private:
   class SortedRunWrapper;
@@ -80,6 +97,8 @@ class SortedRunMerger {
   /// Assuming the element at parent_index is the only out of place element in the heap,
   /// restore the heap property (i.e. swap elements so parent <= children).
   void Heapify(int parent_index);
+
+  void HeapifyHelper(int parent_index);
 
   /// The binary min-heap used to merge rows from the sorted input runs. Since the heap is
   /// stored in a 0-indexed array, the 0-th element is the minimum element in the heap,
@@ -108,5 +127,48 @@ class SortedRunMerger {
 
   /// Times calls to get the next batch of rows from the input run.
   RuntimeProfile::Counter* get_next_batch_timer_;
+
+  /// A reference to the codegened version of SortedRunMerger::HeapifyHelper() that is
+  /// stored inside SortPlanNode and ExchangePlanNode.
+  const CodegenFnPtr<HeapifyHelperFn>& codegend_heapify_helper_fn_;
 };
+
+/// SortedRunWrapper returns individual rows in a batch obtained from a sorted input run
+/// (a RunBatchSupplierFn). Used as the heap element in the min heap maintained by the
+/// merger.
+/// Advance() advances the row supplier to the next row in the input batch and retrieves
+/// the next batch from the input if the current input batch is exhausted. Transfers
+/// ownership from the current input batch to an output batch if requested.
+class SortedRunMerger::SortedRunWrapper {
+ public:
+  /// Construct an instance from a sorted input run.
+  SortedRunWrapper(SortedRunMerger* parent, const RunBatchSupplierFn& sorted_run);
+
+  /// Retrieves the first batch of sorted rows from the run.
+  Status Init(bool* eos);
+
+  /// Increment the current row index. If the current input batch is exhausted, fetch the
+  /// next one from the sorted run. Transfer ownership to transfer_batch if not nullptr.
+  Status Advance(RowBatch* transfer_batch, bool* eos);
+
+  TupleRow* current_row() const {
+    return input_row_batch_->GetRow(input_row_batch_index_);
+  }
+
+ private:
+  friend class SortedRunMerger;
+
+  /// The run from which this object supplies rows.
+  RunBatchSupplierFn sorted_run_;
+
+  /// The current input batch being processed.
+  RowBatch* input_row_batch_;
+
+  /// Index into input_row_batch_ of the current row being processed.
+  int input_row_batch_index_;
+
+  /// The parent merger instance.
+  SortedRunMerger* parent_;
+};
+
 }
