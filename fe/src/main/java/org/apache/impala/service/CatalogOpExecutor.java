@@ -1287,6 +1287,7 @@ public class CatalogOpExecutor {
   private boolean altersIcebergTable(TAlterTableType type) {
     return type == TAlterTableType.ADD_COLUMNS
         || type == TAlterTableType.REPLACE_COLUMNS
+        || type == TAlterTableType.EXECUTE
         || type == TAlterTableType.DROP_COLUMN
         || type == TAlterTableType.ALTER_COLUMN
         || type == TAlterTableType.SET_PARTITION_SPEC
@@ -1321,6 +1322,12 @@ public class CatalogOpExecutor {
           IcebergCatalogOpExecutor.alterColumn(iceTxn, alterColParams.getCol_name(),
                alterColParams.getNew_col_def());
           addSummary(response, "Column has been altered.");
+          break;
+        case EXECUTE:
+          Preconditions.checkState(params.isSetSet_execute_params());
+          String summary = IcebergCatalogOpExecutor.alterTableExecute(tbl,
+              params.getSet_execute_params());
+          addSummary(response, summary);
           break;
         case SET_PARTITION_SPEC:
           // Set partition spec uses 'TableOperations', not transactions.

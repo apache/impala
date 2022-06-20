@@ -125,6 +125,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("escaped", SqlParserSymbols.KW_ESCAPED);
     keywordMap.put("except", SqlParserSymbols.KW_EXCEPT);
     keywordMap.put("exists", SqlParserSymbols.KW_EXISTS);
+    keywordMap.put("execute", SqlParserSymbols.KW_EXECUTE);
     keywordMap.put("explain", SqlParserSymbols.KW_EXPLAIN);
     keywordMap.put("extended", SqlParserSymbols.KW_EXTENDED);
     keywordMap.put("external", SqlParserSymbols.KW_EXTERNAL);

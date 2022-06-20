@@ -16,6 +16,7 @@
 # under the License.
 
 import datetime
+import logging
 import os
 import pytest
 import random
@@ -29,14 +30,18 @@ from avro.io import DatumReader
 import json
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.impala_test_suite import ImpalaTestSuite, LOG
+from tests.common.iceberg_test_suite import IcebergTestSuite
+
 from tests.common.skip import SkipIf
 
 from tests.util.filesystem_utils import get_fs_path, IS_HDFS
 from tests.util.get_parquet_metadata import get_parquet_metadata
 from tests.common.file_utils import create_iceberg_table_from_directory
 
-class TestIcebergTable(ImpalaTestSuite):
+LOG = logging.getLogger(__name__)
+
+
+class TestIcebergTable(IcebergTestSuite):
   """Tests related to Iceberg tables."""
 
   @classmethod
@@ -57,6 +62,61 @@ class TestIcebergTable(ImpalaTestSuite):
 
   def test_alter_iceberg_tables(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-alter', vector, use_db=unique_database)
+
+  def test_expire_snapshots(self, vector, unique_database):
+    tbl_name = unique_database + ".expire_snapshots"
+
+    # We are setting the TIMEZONE query option in this test, so let's create a local
+    # impala client.
+    with self.create_impala_client() as impalad_client:
+      # Iceberg doesn't create a snapshot entry for the initial empty table
+      impalad_client.execute("create table {0} (i int) stored as iceberg"
+          .format(tbl_name))
+      ts_0 = datetime.datetime.now()
+      insert_q = "insert into {0} values (1)".format(tbl_name)
+      ts_1 = self.execute_query_ts(impalad_client, insert_q)
+      time.sleep(5)
+      impalad_client.execute(insert_q)
+      time.sleep(5)
+      ts_2 = self.execute_query_ts(impalad_client, insert_q)
+      impalad_client.execute(insert_q)
+
+      # There should be 4 snapshots initially
+      self.expect_num_snapshots_from(impalad_client, tbl_name, ts_0, 4)
+      # Expire the oldest snapshot and test that the oldest one was expired
+      expire_q = "alter table {0} execute expire_snapshots({1})"
+      impalad_client.execute(expire_q.format(tbl_name, self.cast_ts(ts_1)))
+      self.expect_num_snapshots_from(impalad_client, tbl_name, ts_0, 3)
+      self.expect_num_snapshots_from(impalad_client, tbl_name, ts_1, 3)
+
+      # Expire with a timestamp in which the interval does not touch existing snapshot
+      impalad_client.execute(expire_q.format(tbl_name, self.cast_ts(ts_1)))
+      self.expect_num_snapshots_from(impalad_client, tbl_name, ts_0, 3)
+
+      # Expire all, but retain 1
+      impalad_client.execute(expire_q.format(tbl_name,
+          self.cast_ts(datetime.datetime.now())))
+      self.expect_num_snapshots_from(impalad_client, tbl_name, ts_2, 1)
+
+      # Change number of retained snapshots, then expire all
+      impalad_client.execute("""alter table {0} set tblproperties
+          ('history.expire.min-snapshots-to-keep' = '2')""".format(tbl_name))
+      impalad_client.execute(insert_q)
+      impalad_client.execute(insert_q)
+      impalad_client.execute(expire_q.format(tbl_name,
+          self.cast_ts(datetime.datetime.now())))
+      self.expect_num_snapshots_from(impalad_client, tbl_name, ts_0, 2)
+
+      # Check that timezone is interpreted in local timezone controlled by query option
+      # TIMEZONE.
+      impalad_client.execute("SET TIMEZONE='Asia/Tokyo'")
+      impalad_client.execute(insert_q)
+      ts_tokyo = self.impala_now(impalad_client)
+      impalad_client.execute("SET TIMEZONE='Europe/Budapest'")
+      impalad_client.execute(insert_q)
+      impalad_client.execute("SET TIMEZONE='Asia/Tokyo'")
+      impalad_client.execute(expire_q.format(tbl_name, self.cast_ts(ts_tokyo)))
+      self.expect_num_snapshots_from(impalad_client, tbl_name, ts_tokyo, 1)
 
   def test_truncate_iceberg_tables(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-truncate', vector, use_db=unique_database)
@@ -177,47 +237,14 @@ class TestIcebergTable(ImpalaTestSuite):
   def test_describe_history_params(self, vector, unique_database):
     tbl_name = unique_database + ".describe_history"
 
-    def execute_query_ts(query):
-      impalad_client.execute(query)
-      return datetime.datetime.now()
-
-    def expect_results_from(ts, expected_result_size):
-      query = "DESCRIBE HISTORY {0} FROM {1};".format(tbl_name, cast_ts(ts))
-      data = impalad_client.execute(query)
-      assert len(data.data) == expected_result_size
-      for i in range(len(data.data)):
-        result_ts_dt = parse_timestamp(data.data[i].split('\t')[0])
-        assert result_ts_dt >= ts
-
     def expect_results_between(ts_start, ts_end, expected_result_size):
       query = "DESCRIBE HISTORY {0} BETWEEN {1} AND {2};".format(
-        tbl_name, cast_ts(ts_start), cast_ts(ts_end))
+        tbl_name, self.cast_ts(ts_start), self.cast_ts(ts_end))
       data = impalad_client.execute(query)
       assert len(data.data) == expected_result_size
       for i in range(len(data.data)):
-        result_ts_dt = parse_timestamp(data.data[i].split('\t')[0])
+        result_ts_dt = self.parse_timestamp(data.data[i].split('\t')[0])
         assert result_ts_dt >= ts_start and result_ts_dt <= ts_end
-
-    def parse_timestamp(ts_string):
-      """The client can receive the timestamp in two formats, if the timestamp has
-      fractional seconds "yyyy-MM-dd HH:mm:ss.SSSSSSSSS" pattern is used, otherwise
-      "yyyy-MM-dd HH:mm:ss". Additionally, Python's datetime library cannot handle
-      nanoseconds, therefore in that case the timestamp has to be trimmed."""
-      if len(ts_string.split('.')) > 1:
-        return datetime.datetime.strptime(ts_string[:-3], '%Y-%m-%d %H:%M:%S.%f')
-      else:
-        return datetime.datetime.strptime(ts_string, '%Y-%m-%d %H:%M:%S')
-
-    def quote(s):
-      return "'{0}'".format(s)
-
-    def cast_ts(ts):
-      return "CAST({0} as timestamp)".format(quote(ts))
-
-    def impala_now():
-      now_data = impalad_client.execute("select now()")
-      now_data_ts_dt = parse_timestamp(now_data.data[0])
-      return now_data_ts_dt
 
     # We are setting the TIMEZONE query option in this test, so let's create a local
     # impala client.
@@ -225,19 +252,21 @@ class TestIcebergTable(ImpalaTestSuite):
       # Iceberg doesn't create a snapshot entry for the initial empty table
       impalad_client.execute("create table {0} (i int) stored as iceberg"
           .format(tbl_name))
-      ts_1 = execute_query_ts("insert into {0} values (1)".format(tbl_name))
+      insert_q = "insert into {0} values (1)".format(tbl_name)
+      ts_1 = self.execute_query_ts(impalad_client, insert_q)
       time.sleep(5)
-      ts_2 = execute_query_ts("insert into {0} values (2)".format(tbl_name))
+      ts_2 = self.execute_query_ts(impalad_client, insert_q)
       time.sleep(5)
-      ts_3 = execute_query_ts("insert into {0} values (3)".format(tbl_name))
+      ts_3 = self.execute_query_ts(impalad_client, insert_q)
       # Describe history without predicate
       data = impalad_client.execute("DESCRIBE HISTORY {0}".format(tbl_name))
       assert len(data.data) == 3
 
       # Describe history with FROM predicate
-      expect_results_from(ts_1 - datetime.timedelta(hours=1), 3)
-      expect_results_from(ts_1, 2)
-      expect_results_from(ts_3, 0)
+      self.expect_num_snapshots_from(impalad_client, tbl_name,
+          ts_1 - datetime.timedelta(hours=1), 3)
+      self.expect_num_snapshots_from(impalad_client, tbl_name, ts_1, 2)
+      self.expect_num_snapshots_from(impalad_client, tbl_name, ts_3, 0)
 
       # Describe history with BETWEEN <ts> AND <ts> predicate
       expect_results_between(ts_1, ts_2, 1)
@@ -248,25 +277,21 @@ class TestIcebergTable(ImpalaTestSuite):
       # Check that timezone is interpreted in local timezone controlled by query option
       # TIMEZONE. Persist the local times first and create a new snapshot.
       impalad_client.execute("SET TIMEZONE='Asia/Tokyo'")
-      now_tokyo = impala_now()
+      now_tokyo = self.impala_now(impalad_client)
       impalad_client.execute("SET TIMEZONE='Europe/Budapest'")
-      now_budapest = impala_now()
-      execute_query_ts("insert into {0} values (4)".format(tbl_name))
-      expect_results_from(now_budapest, 1)
+      now_budapest = self.impala_now(impalad_client)
+      self.execute_query_ts(impalad_client, "insert into {0} values (4)".format(tbl_name))
+      self.expect_num_snapshots_from(impalad_client, tbl_name, now_budapest, 1)
 
       # Let's switch to Tokyo time. Tokyo time is always greater than Budapest time.
       impalad_client.execute("SET TIMEZONE='Asia/Tokyo'")
-      expect_results_from(now_tokyo, 1)
+      self.expect_num_snapshots_from(impalad_client, tbl_name, now_tokyo, 1)
 
       # Interpreting Budapest time in Tokyo time points to the past.
-      expect_results_from(now_budapest, 4)
+      self.expect_num_snapshots_from(impalad_client, tbl_name, now_budapest, 4)
 
   def test_time_travel(self, vector, unique_database):
     tbl_name = unique_database + ".time_travel"
-
-    def execute_query_ts(query):
-      impalad_client.execute(query)
-      return str(datetime.datetime.now())
 
     def expect_results(query, expected_results):
       data = impalad_client.execute(query)
@@ -324,22 +349,26 @@ class TestIcebergTable(ImpalaTestSuite):
     # impala client.
     with self.create_impala_client() as impalad_client:
       # Iceberg doesn't create a snapshot entry for the initial empty table
-      impalad_client.execute("create table {0} (i int) stored as iceberg".format(tbl_name))
-      ts_1 = execute_query_ts("insert into {0} values (1)".format(tbl_name))
-      ts_2 = execute_query_ts("insert into {0} values (2)".format(tbl_name))
-      ts_3 = execute_query_ts("truncate table {0}".format(tbl_name))
+      impalad_client.execute("create table {0} (i int) stored as iceberg"
+          .format(tbl_name))
+      ts_1 = self.execute_query_ts(impalad_client, "insert into {0} values (1)"
+          .format(tbl_name))
+      ts_2 = self.execute_query_ts(impalad_client, "insert into {0} values (2)"
+          .format(tbl_name))
+      ts_3 = self.execute_query_ts(impalad_client, "truncate table {0}".format(tbl_name))
       time.sleep(5)
-      ts_4 = execute_query_ts("insert into {0} values (100)".format(tbl_name))
+      ts_4 = self.execute_query_ts(impalad_client, "insert into {0} values (100)"
+          .format(tbl_name))
       # Query table as of timestamps.
       expect_results_t("now()", ['100'])
-      expect_results_t(quote(ts_1), ['1'])
-      expect_results_t(quote(ts_2), ['1', '2'])
-      expect_results_t(quote(ts_3), [])
-      expect_results_t(cast_ts(ts_3) + " + interval 1 seconds", [])
-      expect_results_t(quote(ts_4), ['100'])
-      expect_results_t(cast_ts(ts_4) + " - interval 5 seconds", [])
+      expect_results_t(self.quote(ts_1), ['1'])
+      expect_results_t(self.quote(ts_2), ['1', '2'])
+      expect_results_t(self.quote(ts_3), [])
+      expect_results_t(self.cast_ts(ts_3) + " + interval 1 seconds", [])
+      expect_results_t(self.quote(ts_4), ['100'])
+      expect_results_t(self.cast_ts(ts_4) + " - interval 5 seconds", [])
       # Future queries return the current snapshot.
-      expect_results_t(cast_ts(ts_4) + " + interval 1 hours", ['100'])
+      expect_results_t(self.cast_ts(ts_4) + " + interval 1 hours", ['100'])
       # Query table as of snapshot IDs.
       snapshots = get_snapshots()
       expect_results_v(snapshots[0], ['1'])
@@ -406,16 +435,16 @@ class TestIcebergTable(ImpalaTestSuite):
       impalad_client.execute("insert into {0} values (1111)".format(tbl_name))
       impalad_client.execute("SET TIMEZONE='Europe/Budapest'")
       now_budapest = impala_now()
-      expect_results_t(quote(now_budapest), ['1111'])
+      expect_results_t(self.quote(now_budapest), ['1111'])
 
       # Let's switch to Tokyo time. Tokyo time is always greater than Budapest time.
       impalad_client.execute("SET TIMEZONE='Asia/Tokyo'")
       now_tokyo = impala_now()
-      expect_results_t(quote(now_tokyo), ['1111'])
+      expect_results_t(self.quote(now_tokyo), ['1111'])
       try:
         # Interpreting Budapest time in Tokyo time points to the past when the table
         # didn't exist.
-        expect_results_t(quote(now_budapest), [])
+        expect_results_t(self.quote(now_budapest), [])
         assert False
       except Exception as e:
         assert "Cannot find a snapshot older than" in str(e)

@@ -114,6 +114,7 @@ enum TAlterTableType {
   SET_OWNER = 16
   UNSET_TBL_PROPERTIES = 17
   SET_PARTITION_SPEC = 18
+  EXECUTE = 19
 }
 
 // Parameters of CREATE DATABASE commands
@@ -411,6 +412,12 @@ struct TAlterTableSetPartitionSpecParams {
   1: required CatalogObjects.TIcebergPartitionSpec partition_spec
 }
 
+// Parameters for ALTER TABLE EXECUTE operations.
+struct TAlterTableExecuteParams {
+  // The parameter of the ExpireSnapshot.expireOlderThan(timestampMillis) Iceberg call.
+  1: required i64 older_than_millis
+}
+
 // Parameters for all ALTER TABLE commands.
 struct TAlterTableParams {
   1: required TAlterTableType alter_type
@@ -468,6 +475,9 @@ struct TAlterTableParams {
 
   // Parameters for ALTER TABLE SET PARTITION SPEC
   19: optional TAlterTableSetPartitionSpecParams set_partition_spec_params
+
+  // Parameters for ALTER TABLE EXECUTE
+  20: optional TAlterTableExecuteParams set_execute_params
 }
 
 // Parameters of CREATE TABLE LIKE commands

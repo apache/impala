@@ -28,6 +28,7 @@ import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.DeleteFiles;
+import org.apache.iceberg.ExpireSnapshots;
 import org.apache.iceberg.Metrics;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.ReplacePartitions;
@@ -50,6 +51,7 @@ import org.apache.impala.catalog.iceberg.IcebergCatalog;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.fb.FbIcebergColumnStats;
 import org.apache.impala.fb.FbIcebergDataFile;
+import org.apache.impala.thrift.TAlterTableExecuteParams;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergOperationParam;
@@ -173,6 +175,14 @@ public class IcebergCatalogOpExecutor {
                    String.valueOf(catalogVersion));
     newMetadata = newMetadata.replaceProperties(properties);
     tableOp.commit(metadata, newMetadata);
+  }
+
+  public static String alterTableExecute(FeIcebergTable tbl,
+      TAlterTableExecuteParams params) {
+    ExpireSnapshots expireApi = tbl.getIcebergApiTable().expireSnapshots();
+    expireApi.expireOlderThan(params.older_than_millis);
+    expireApi.commit();
+    return "Snapshots have been expired.";
   }
 
   /**

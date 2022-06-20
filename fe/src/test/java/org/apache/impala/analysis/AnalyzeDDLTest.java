@@ -4138,6 +4138,32 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     }
   }
 
+  @Test
+  public void TestAlterExecuteExpireSnapshots() {
+    AnalyzesOk("alter table functional_parquet.iceberg_partitioned execute " +
+        "expire_snapshots(now() - interval 20 years);");
+    AnalyzesOk("alter table functional_parquet.iceberg_partitioned execute " +
+        "expire_snapshots('2022-01-04 10:00:00');");
+
+    // Negative tests
+    AnalysisError("alter table functional_parquet.iceberg_partitioned execute " +
+        "unsupported_operation(123456789);", "'unsupported_operation' is not supported " +
+        "by ALTER TABLE <table> EXECUTE. Supported operation is " +
+        "EXPIRE_SNAPSHOTS(<expression>)");
+    AnalysisError("alter table functional_parquet.iceberg_partitioned execute " +
+        "expire_snapshots(now(), 3);", "EXPIRE_SNAPSHOTS(<expression>) must have one " +
+        "parameter: expire_snapshots(now(), 3)");
+    AnalysisError("alter table functional_parquet.iceberg_partitioned execute " +
+        "expire_snapshots(id);", "EXPIRE_SNAPSHOTS(<expression>) must be a constant " +
+        "expression: expire_snapshots(id)");
+    AnalysisError("alter table functional_parquet.iceberg_partitioned execute " +
+        "expire_snapshots(42);", "EXPIRE_SNAPSHOTS(<expression>) must be a timestamp " +
+        "type but is 'TINYINT': 42");
+    AnalysisError("alter table functional_parquet.iceberg_partitioned execute " +
+        "expire_snapshots('2021-02-32 15:52:45');", "Invalid TIMESTAMP expression has" +
+        " been given to EXPIRE_SNAPSHOTS(<expression>)");
+  }
+
   private static String buildLongOwnerName() {
     StringBuilder comment = new StringBuilder();
     for (int i = 0; i < MetaStoreUtil.MAX_OWNER_LENGTH + 5; i++) {
