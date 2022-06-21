@@ -106,13 +106,39 @@ SHOW CREATE TABLE fake_iceberg_table_hadoop_catalog;
 row_regex:.*CAUSED BY: TableLoadingException: Table does not exist: fake_db.fake_table*
 ====
 ---- QUERY
-CREATE TABLE iceberg_overwrite_bucket (i int)
+CREATE TABLE iceberg_overwrite_bucket (i int, j int)
 PARTITIONED BY SPEC (bucket(3, i))
-STORED AS ICEBERG
-TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
-INSERT OVERWRITE iceberg_overwrite_bucket VALUES (1), (2), (3);
+STORED AS ICEBERG;
+INSERT OVERWRITE iceberg_overwrite_bucket values (1, 2);
 ---- CATCH
-AnalysisException: The Iceberg table has BUCKET partitioning.
+AnalysisException: The Iceberg table has BUCKET partitioning. The outcome of static partition overwrite is unforeseeable.
+====
+---- QUERY
+INSERT OVERWRITE iceberg_overwrite_bucket SELECT 1, j FROM iceberg_overwrite_bucket;
+---- CATCH
+AnalysisException: The Iceberg table has BUCKET partitioning. The outcome of dynamic partition overwrite is unforeseeable with the given select list, only '*' allowed.
+====
+---- QUERY
+INSERT OVERWRITE iceberg_overwrite_bucket SELECT * FROM iceberg_overwrite_bucket WHERE j = 1;
+---- CATCH
+AnalysisException: The Iceberg table has BUCKET partitioning. The outcome of dynamic partition overwrite is unforeseeable with the given select query with WHERE clause
+====
+---- QUERY
+CREATE TABLE iceberg_overwrite_bucket_other (i int, j int)
+PARTITIONED BY SPEC (bucket(3, i))
+STORED AS ICEBERG;
+INSERT OVERWRITE iceberg_overwrite_bucket SELECT * FROM iceberg_overwrite_bucket_other;
+---- CATCH
+AnalysisException: The Iceberg table has BUCKET partitioning and the source table does not match the target table.
+====
+---- QUERY
+ALTER TABLE iceberg_overwrite_bucket SET PARTITION SPEC (
+  bucket(3, i),
+  truncate(3, j)
+);
+INSERT OVERWRITE iceberg_overwrite_bucket SELECT * FROM iceberg_overwrite_bucket_other;
+---- CATCH
+AnalysisException: The Iceberg table has multiple partition specs.
 ====
 ---- QUERY
 CREATE TABLE iceberg_hive_cat_with_cat_locaction (i int)

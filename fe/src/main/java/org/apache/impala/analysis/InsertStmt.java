@@ -20,6 +20,7 @@ package org.apache.impala.analysis;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -602,8 +603,16 @@ public class InsertStmt extends StatementBase {
     }
 
     if (table_ instanceof FeIcebergTable) {
-      if (overwrite_) validateNoBucketTransform((FeIcebergTable)table_);
-      validateIcebergColumnsForInsert((FeIcebergTable)table_);
+      FeIcebergTable iceTable = (FeIcebergTable)table_;
+      if (overwrite_) {
+        if (iceTable.getPartitionSpecs().size() > 1) {
+          throw new AnalysisException("The Iceberg table has multiple partition specs. " +
+              "This means the outcome of dynamic partition overwrite is unforeseeable. " +
+              "Consider using TRUNCATE and INSERT INTO to overwrite your table.");
+        }
+        validateBucketTransformForOverwrite(iceTable);
+      }
+      validateIcebergColumnsForInsert(iceTable);
     }
 
     if (isHBaseTable && overwrite_) {
@@ -625,15 +634,46 @@ public class InsertStmt extends StatementBase {
     }
   }
 
-  private void validateNoBucketTransform(FeIcebergTable iceTable)
+  /**
+   * Validate if INSERT OVERWRITE could be allowed when the table has bucket partition
+   * transform. 'INSERT OVERWRITE tbl SELECT * FROM tbl' can be allowed because the source
+   * and target table is the same and the partitions are known.
+   */
+  private void validateBucketTransformForOverwrite(FeIcebergTable iceTable)
       throws AnalysisException {
+    Preconditions.checkState(overwrite_ == true);
     IcebergPartitionSpec spec = iceTable.getDefaultPartitionSpec();
     if (!spec.hasPartitionFields()) return;
     for (IcebergPartitionField field : spec.getIcebergPartitionFields()) {
-      if (field.getTransformType() == TIcebergPartitionTransformType.BUCKET) {
-          throw new AnalysisException("The Iceberg table has BUCKET partitioning. " +
-              "This means the outcome of dynamic partition overwrite is unforeseeable. " +
-              "Consider using TRUNCATE and INSERT INTO to overwrite your table.");
+      if (field.getTransformType() != TIcebergPartitionTransformType.BUCKET) continue;
+      if (queryStmt_ instanceof ValuesStmt) {
+        throw new AnalysisException("The Iceberg table has BUCKET partitioning. " +
+            "The outcome of static partition overwrite is unforeseeable. Consider " +
+            "using TRUNCATE and INSERT INTO to overwrite your table.");
+      }
+      List<TableRef> tblRefs = queryStmt_.collectTableRefs();
+      List<String> sourceTableAliases = tblRefs.size() <= 0 ? new ArrayList(0) :
+          Arrays.asList(tblRefs.get(0).getAliases());
+      String targetTableName = iceTable.getFullName();
+      if (!(tblRefs.size() == 1 && sourceTableAliases.contains(targetTableName))) {
+        throw new AnalysisException("The Iceberg table has BUCKET partitioning and " +
+            "the source table does not match the target table. This means the " +
+            "outcome of dynamic partition overwrite is unforeseeable. Consider using " +
+            "TRUNCATE and INSERT INTO to overwrite your table.");
+      }
+      SelectList selectList = ((SelectStmt)queryStmt_).selectList_;
+      if (selectList.getItems().size() != 1 && !selectList.getItems().get(0).isStar()) {
+        throw new AnalysisException("The Iceberg table has BUCKET partitioning. " +
+            "The outcome of dynamic partition overwrite is unforeseeable with the " +
+            "given select list, only '*' allowed. Otherwise consider using TRUNCATE " +
+            "and INSERT INTO to overwrite your table.");
+      }
+      if (((SelectStmt)queryStmt_).whereClause_ != null) {
+        throw new AnalysisException("The Iceberg table has BUCKET partitioning. " +
+            "The outcome of dynamic partition overwrite is unforeseeable with the " +
+            "given select query with WHERE clause, selective overwrite is not " +
+            "supported. Consider using TRUNCATE and INSERT INTO to overwrite your " +
+            "table.");
       }
     }
   }

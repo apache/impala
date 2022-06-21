@@ -166,3 +166,34 @@ select * from ice_trunc
 ---- TYPES
 DECIMAL
 ====
+---- QUERY
+create table iceberg_overwrite_bucket (i int)
+partitioned by spec (bucket(3, i))
+stored as iceberg;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into iceberg_overwrite_bucket values (1);
+insert into iceberg_overwrite_bucket values (1);
+insert into iceberg_overwrite_bucket values (1);
+select INPUT__FILE__NAME, count(*)
+  from iceberg_overwrite_bucket
+  group by INPUT__FILE__NAME;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_overwrite_bucket/data/.*.0.parq',1
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_overwrite_bucket/data/.*.0.parq',1
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_overwrite_bucket/data/.*.0.parq',1
+---- TYPES
+STRING, BIGINT
+====
+---- QUERY
+insert overwrite iceberg_overwrite_bucket select * from iceberg_overwrite_bucket;
+select INPUT__FILE__NAME, count(*)
+  from iceberg_overwrite_bucket
+  group by INPUT__FILE__NAME;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_overwrite_bucket/data/.*.0.parq',3
+---- TYPES
+STRING, BIGINT
+====

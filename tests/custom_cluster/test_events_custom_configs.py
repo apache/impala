@@ -359,6 +359,8 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
           CREATE TABLE {0} (i int) STORED AS ICEBERG
           TBLPROPERTIES ({1})""".format(tbl_name, catalog))
 
+      check_self_events("INSERT OVERWRITE {0} VALUES (1)".format(tbl_name),
+          skips_events=is_hive_catalog)
       check_self_events("ALTER TABLE {0} ADD COLUMN j INT".format(tbl_name))
       check_self_events("ALTER TABLE {0} DROP COLUMN i".format(tbl_name))
       check_self_events("ALTER TABLE {0} CHANGE COLUMN j j BIGINT".format(tbl_name))
@@ -370,9 +372,7 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
       check_self_events(
           "ALTER TABLE {0} SET TBLPROPERTIES('key'='value')".format(tbl_name))
       check_self_events("ALTER TABLE {0} UNSET TBLPROPERTIES('key')".format(tbl_name))
-      check_self_events("INSERT INTO {0} VALUES (1), (2), (3)".format(tbl_name),
-          skips_events=is_hive_catalog)
-      check_self_events("INSERT OVERWRITE {0} VALUES (4), (5), (6)".format(tbl_name),
+      check_self_events("INSERT INTO {0} VALUES (2), (3), (4)".format(tbl_name),
           skips_events=is_hive_catalog)
       ctas_tbl = unique_database + ".ice_ctas"
       check_self_events("""CREATE TABLE {0} STORED AS ICEBERG
