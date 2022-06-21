@@ -317,13 +317,21 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
         onDatabase("functional", TPrivilegeLevel.CREATE));
 
     authzError(events -> {
-      // Only log the first column event. We do not log the table access used for
-      // short-circuiting.
+      // Only log the table event.
       assertEquals(1, events.size());
-      assertEventEquals("@column", "select", "functional/alltypes/id", 0, events.get(0));
+      assertEventEquals("@table", "select", "functional/alltypes", 0, events.get(0));
       assertEquals("select id, string_col from functional.alltypes",
           events.get(0).getRequestData());
     }, "select id, string_col from functional.alltypes");
+
+    authzError(events -> {
+      // Log the table event even when the table does not exist.
+      assertEquals(1, events.size());
+      assertEventEquals("@table", "select", "functional/non_existing_tbl", 0,
+          events.get(0));
+      assertEquals("select * from functional.non_existing_tbl",
+          events.get(0).getRequestData());
+    }, "select * from functional.non_existing_tbl");
 
     authzError(events -> {
       // Show the actual view_metadata audit log.
@@ -496,15 +504,14 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       // When the requesting user is not granted the necessary privileges, the audit log
       // entries corresponding to column masking are not generated. Notice that in the
       // case when the requesting user is not granted the necessary privileges, only the
-      // event of the first column that failed the authorization will be logged, i.e.,
-      // 'id'. Refer to RangerAuthorizationChecker#authorizeTableAccess() for further
-      // details.
+      // event of the table that failed the authorization will be logged. Refer to
+      // RangerAuthorizationChecker#authorizeTableAccess() for further details.
       authzError(events -> {
         assertEquals(1, events.size());
         assertEquals("with iv as (select id, bool_col, string_col from " +
                 "functional.alltypestiny) select * from iv",
             events.get(0).getRequestData());
-        assertEventEquals("@column", "select", "functional/alltypestiny/id", 0,
+        assertEventEquals("@table", "select", "functional/alltypestiny", 0,
             events.get(0));
       },"with iv as (select id, bool_col, string_col from functional.alltypestiny) " +
           "select * from iv", onTable("functional", "alltypestiny"));
@@ -714,13 +721,13 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
           TPrivilegeLevel.SELECT));
 
       // When fails with not enough privileges, no audit logs for row filtering is
-      // generated. Only the event of the first column (i.e. id) that failed the
-      // authorization will be logged.
+      // generated. Only the event of the table that failed the authorization will be
+      // logged.
       authzError(events -> {
         assertEquals(1, events.size());
         assertEquals("select * from functional.alltypestiny",
             events.get(0).getRequestData());
-        assertEventEquals("@column", "select", "functional/alltypestiny/id", 0,
+        assertEventEquals("@table", "select", "functional/alltypestiny", 0,
             events.get(0));
       },"select * from functional.alltypestiny", onTable("functional", "alltypestiny"));
 

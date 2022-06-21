@@ -255,34 +255,49 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
       throws AuthorizationException, InternalException {
     RangerAuthorizationContext originalCtx = (RangerAuthorizationContext) authzCtx;
     RangerBufferAuditHandler originalAuditHandler = originalCtx.getAuditHandler();
-    // case 1: table (select) OK --> add the table event
+    // case 1: table (select) OK, columns (select) OK --> add the table event,
+    //                                                    add the column events
     // case 2: table (non-select) ERROR --> add the table event
     // case 3: table (select) ERROR, columns (select) OK -> only add the column events
-    // case 4: table (select) ERROR, columns (select) ERROR --> only add the first column
-    //                                                          event
+    // case 4: table (select) ERROR, columns (select) ERROR --> add the table event
+    // case 5: table (select) ERROR --> add the table event
+    //         This could happen when the select request for a non-existing table fails
+    //         the authorization.
+    // case 6: table (select) OK, columns (select) ERROR --> add the first column event
+    //         This could happen when the requesting user is granted the select privilege
+    //         on the table but is denied access to a column in the same table in Ranger.
     RangerAuthorizationContext tmpCtx = new RangerAuthorizationContext(
         originalCtx.getSessionState(), originalCtx.getTimeline());
     tmpCtx.setAuditHandler(new RangerBufferAuditHandler(originalAuditHandler));
+    AuthorizationException authorizationException = null;
     try {
       super.authorizeTableAccess(tmpCtx, analysisResult, catalog, requests);
     } catch (AuthorizationException e) {
+      authorizationException = e;
       tmpCtx.getAuditHandler().getAuthzEvents().stream()
           .filter(evt ->
               // case 2: get the first failing non-select table
               (!"select".equalsIgnoreCase(evt.getAccessType()) &&
                   "@table".equals(evt.getResourceType())) ||
-              // case 4: get the first failing column
-              ("@column".equals(evt.getResourceType()) && evt.getAccessResult() == 0))
+              // case 4 & 5 & 6: get the table or a column event
+              (("@table".equals(evt.getResourceType()) ||
+                  "@column".equals(evt.getResourceType())) &&
+                  evt.getAccessResult() == 0))
           .findFirst()
           .ifPresent(evt -> originalCtx.getAuditHandler().getAuthzEvents().add(evt));
       throw e;
     } finally {
-      // case 1 & 4: we only add the successful events. The first table-level access
-      // check is only for the short-circuit, we don't want to add an event for that.
-      List<AuthzAuditEvent> events = tmpCtx.getAuditHandler().getAuthzEvents().stream()
-          .filter(evt -> evt.getAccessResult() != 0)
-          .collect(Collectors.toList());
-      originalCtx.getAuditHandler().getAuthzEvents().addAll(events);
+      // We should not add successful events when there was an AuthorizationException.
+      // Specifically, we should not add the successful table event in case 6.
+      if (authorizationException == null) {
+        // case 1 & 3: we only add the successful events.
+        // TODO(IMPALA-11381): Consider whether we should keep the table-level event which
+        // corresponds to a check only for short-circuiting authorization.
+        List<AuthzAuditEvent> events = tmpCtx.getAuditHandler().getAuthzEvents().stream()
+            .filter(evt -> evt.getAccessResult() != 0)
+            .collect(Collectors.toList());
+        originalCtx.getAuditHandler().getAuthzEvents().addAll(events);
+      }
     }
   }
 
