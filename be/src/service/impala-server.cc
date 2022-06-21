@@ -63,6 +63,7 @@
 #include "gen-cpp/admission_control_service.proxy.h"
 #include "kudu/rpc/rpc_context.h"
 #include "kudu/rpc/rpc_controller.h"
+#include "kudu/security/security_flags.h"
 #include "kudu/util/random_util.h"
 #include "rpc/authentication.h"
 #include "rpc/rpc-mgr.h"
@@ -129,6 +130,7 @@ using boost::uuids::uuid;
 using google::protobuf::RepeatedPtrField;
 using kudu::GetRandomSeed32;
 using kudu::rpc::RpcContext;
+using kudu::security::SecurityDefaults;
 using namespace apache::hive::service::cli::thrift;
 using namespace apache::thrift;
 using namespace apache::thrift::transport;
@@ -232,10 +234,10 @@ DEFINE_string(ssl_private_key_password_cmd, "", "A Unix command whose output ret
     "will not be invoked. The output of the command will be truncated to 1024 bytes, and "
     "then all trailing whitespace will be trimmed before it is used to decrypt the "
     "private key");
-
-// TODO: For 3.0 (compatibility-breaking release), set this to a whitelist of ciphers,
-// e.g.  https://wiki.mozilla.org/Security/Server_Side_TLS
-DEFINE_string(ssl_cipher_list, "",
+// This defaults ssl_cipher_list to the same set of ciphers used by Kudu,
+// which is based on Mozilla's intermediate compatibility recommendations
+// from https://wiki.mozilla.org/Security/Server_Side_TLS
+DEFINE_string(ssl_cipher_list, SecurityDefaults::kDefaultTlsCiphers,
     "The cipher suite preferences to use for TLS-secured "
     "Thrift RPC connections. Uses the OpenSSL cipher preference list format. See man (1) "
     "ciphers for more information. If empty, the default cipher list for your platform "
