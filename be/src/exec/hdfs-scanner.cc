@@ -75,8 +75,23 @@ HdfsScanner::HdfsScanner()
 HdfsScanner::~HdfsScanner() {
 }
 
+Status HdfsScanner::ValidateSlotDescriptors() const {
+  if (file_format() != THdfsFileFormat::PARQUET) {
+    // Virtual column FILE__POSITION is only supported for PARQUET files.
+    for (SlotDescriptor* sd : scan_node_->virtual_column_slots()) {
+      if (sd->virtual_column_type() == TVirtualColumnType::FILE_POSITION) {
+        return Status(Substitute(
+            "Virtual column FILE__POSITION is not supported for $0 files.",
+            _THdfsFileFormat_VALUES_TO_NAMES.find(file_format())->second));
+      }
+    }
+  }
+  return Status::OK();
+}
+
 Status HdfsScanner::Open(ScannerContext* context) {
   context_ = context;
+  RETURN_IF_ERROR(ValidateSlotDescriptors());
   file_metadata_utils_.SetFile(state_, scan_node_->GetFileDesc(
       context->partition_descriptor()->id(), context->GetStream()->filename()));
   stream_ = context->GetStream();

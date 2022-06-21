@@ -181,6 +181,10 @@ abstract class LocalTable implements FeTable {
     this.tableStats_ = null;
   }
 
+  protected void addVirtualColumns(List<VirtualColumn> virtualColumns) {
+    for (VirtualColumn virtCol : virtualColumns) addVirtualColumn(virtCol);
+  }
+
   protected void addVirtualColumn(VirtualColumn col) {
     virtualCols_.add(col);
   }

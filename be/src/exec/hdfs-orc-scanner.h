@@ -181,6 +181,10 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   virtual Status ProcessSplit() override WARN_UNUSED_RESULT;
   virtual void Close(RowBatch* row_batch) override;
 
+  THdfsFileFormat::type file_format() const override {
+    return THdfsFileFormat::ORC;
+  }
+
  protected:
   virtual int64_t GetNumberOfRowsInFile() const override {
     return static_cast<int64_t>(reader_->getNumberOfRows());

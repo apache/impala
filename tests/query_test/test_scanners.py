@@ -117,6 +117,24 @@ class TestScannersAllTableFormats(ImpalaTestSuite):
     else:
       self.run_test_case('QueryTest/string-escaping', vector)
 
+
+class TestScannersVirtualColumns(ImpalaTestSuite):
+  BATCH_SIZES = [0, 1, 16]
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestScannersVirtualColumns, cls).add_test_dimensions()
+    if cls.exploration_strategy() == 'core':
+      # The purpose of this test is to get some base coverage of all the file formats.
+      # Even in 'core', we'll test each format by using the pairwise strategy.
+      cls.ImpalaTestMatrix.add_dimension(cls.create_table_info_dimension('pairwise'))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('batch_size', *TestScannersAllTableFormats.BATCH_SIZES))
+
   def test_virtual_column_input_file_name(self, vector, unique_database):
     file_format = vector.get_value('table_format').file_format
     if file_format in ['hbase', 'kudu']:
@@ -128,6 +146,24 @@ class TestScannersAllTableFormats(ImpalaTestSuite):
     if file_format == 'text':
       self.run_test_case('QueryTest/virtual-column-input-file-name-in-table', vector,
           use_db=unique_database)
+
+  def test_virtual_column_file_position_generic(self, vector):
+    # Generic tests about virtual column file position.
+    file_format = vector.get_value('table_format').file_format
+    # TODO: add support for other file formats, especially ORC
+    if file_format not in ['parquet']:
+      pytest.skip()
+    self.run_test_case('QueryTest/virtual-column-file-position-generic', vector)
+
+  def test_mixing_virtual_columns(self, vector, unique_database):
+    # Test queries with multiple virtual columns.
+    file_format = vector.get_value('table_format').file_format
+    # TODO: add support for other file formats, especially ORC
+    if file_format not in ['parquet']:
+      pytest.skip()
+    create_table_from_parquet(self.client, unique_database, 'alltypes_tiny_pages')
+    self.run_test_case('QueryTest/mixing-virtual-columns', vector, unique_database)
+
 
 # Test all the scanners with a simple limit clause. The limit clause triggers
 # cancellation in the scanner code paths.
@@ -385,6 +421,16 @@ class TestParquet(ImpalaTestSuite):
 
   def test_parquet(self, vector):
     self.run_test_case('QueryTest/parquet', vector)
+
+  def test_virtual_column_file_position_parquet(self, vector, unique_database):
+    # Parquet-specific tests for virtual column FILE__POSITION
+    create_table_from_parquet(self.client, unique_database, 'alltypes_tiny_pages')
+    new_vector = deepcopy(vector)
+    for late_mat in [-1, 1, 17]:
+      new_vector.get_value('exec_option')['parquet_late_materialization_threshold'] = \
+          late_mat
+      self.run_test_case('QueryTest/virtual-column-file-position-parquet', new_vector,
+          unique_database)
 
   def test_corrupt_files(self, vector):
     new_vector = deepcopy(vector)

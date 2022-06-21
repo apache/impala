@@ -739,6 +739,10 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
       // ensure that serialization of the GetPartialCatalogObjectResponse object
       // is done while we continue to hold the table lock.
       resp.table_info.setHms_table(getMetaStoreTable().deepCopy());
+      resp.table_info.setVirtual_columns(new ArrayList<>());
+      for (VirtualColumn vCol : getVirtualColumns()) {
+        resp.table_info.addToVirtual_columns(vCol.toThrift());
+      }
     }
     if (selector.want_stats_for_column_names != null ||
         selector.want_stats_for_all_columns) {

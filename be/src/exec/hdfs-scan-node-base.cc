@@ -1039,6 +1039,10 @@ bool HdfsScanPlanNode::HasVirtualColumnInTemplateTuple() const {
     DCHECK(sd->IsVirtual());
     if (sd->virtual_column_type() == TVirtualColumnType::INPUT_FILE_NAME) {
       return true;
+    } else if (sd->virtual_column_type() == TVirtualColumnType::FILE_POSITION) {
+      // We return false at the end of the function if there are no virtual
+      // columns in the template tuple.
+      continue;
     } else {
       // Adding DCHECK here so we don't forget to update this when adding new virtual
       // column.

@@ -1,0 +1,112 @@
+====
+---- QUERY
+select input__file__name, file__position, id from alltypes_tiny_pages
+where file__position = 7000;
+---- RESULTS
+'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_tiny_pages/alltypes_tiny_pages.parquet',7000,6285
+---- TYPES
+STRING, BIGINT, INT
+====
+---- QUERY
+select file__position, input__file__name, id from alltypes_tiny_pages
+where file__position = 7000;
+---- RESULTS
+7000,'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_tiny_pages/alltypes_tiny_pages.parquet',6285
+---- TYPES
+BIGINT, STRING, INT
+====
+---- QUERY
+select input__file__name, file__position, id from alltypes_tiny_pages
+where id = 6285;
+---- RESULTS
+'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_tiny_pages/alltypes_tiny_pages.parquet',7000,6285
+---- TYPES
+STRING, BIGINT, INT
+====
+---- QUERY
+select input__file__name, file__position, id from alltypes_tiny_pages
+where file__position = 1000;
+---- RESULTS
+'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_tiny_pages/alltypes_tiny_pages.parquet',1000,3623
+---- TYPES
+STRING, BIGINT, INT
+====
+---- QUERY
+select input__file__name, file__position from alltypes_tiny_pages
+where id = 2950;
+---- RESULTS
+'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_tiny_pages/alltypes_tiny_pages.parquet',587
+---- TYPES
+STRING, BIGINT
+====
+---- QUERY
+select input__file__name, max(file__position) from functional_parquet.lineitem_multiblock
+group by input__file__name;
+---- RESULTS
+'$NAMENODE/test-warehouse/lineitem_multiblock_parquet/000000_0',19999
+---- TYPES
+STRING, BIGINT
+====
+---- QUERY
+select input__file__name, file__position, l_orderkey from functional_parquet.lineitem_multiblock
+where file__position = 7000;
+---- RESULTS
+'$NAMENODE/test-warehouse/lineitem_multiblock_parquet/000000_0',7000,12996
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+select input__file__name, file__position, l_orderkey from functional_parquet.lineitem_multiblock
+where l_orderkey = 12996;
+---- RESULTS
+'$NAMENODE/test-warehouse/lineitem_multiblock_parquet/000000_0',6998,12996
+'$NAMENODE/test-warehouse/lineitem_multiblock_parquet/000000_0',6999,12996
+'$NAMENODE/test-warehouse/lineitem_multiblock_parquet/000000_0',7000,12996
+'$NAMENODE/test-warehouse/lineitem_multiblock_parquet/000000_0',7001,12996
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+select input__file__name, file__position, * from functional_parquet.lineitem_multiblock
+where file__position = 19993;
+---- RESULTS
+'$NAMENODE/test-warehouse/lineitem_multiblock_parquet/000000_0',19993,2,106170,1191,1,38.00,44694.46,0.00,0.05,'N','O','1997-01-28','1997-01-14','1997-02-02','TAKE BACK RETURN','RAIL','ven requests. deposits breach a'
+---- TYPES
+STRING, BIGINT, BIGINT, BIGINT, BIGINT, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select a.file__position, a.input__file__name, a.id
+from functional_parquet.alltypestiny a, functional_parquet.alltypestiny b
+where a.file__position = 0 and a.id > 3
+order by id;
+---- RESULTS
+0,regex:'$NAMENODE/test-warehouse/alltypestiny_parquet/year=2009/month=3/.*.parq',4
+0,regex:'$NAMENODE/test-warehouse/alltypestiny_parquet/year=2009/month=3/.*.parq',4
+0,regex:'$NAMENODE/test-warehouse/alltypestiny_parquet/year=2009/month=3/.*.parq',4
+0,regex:'$NAMENODE/test-warehouse/alltypestiny_parquet/year=2009/month=3/.*.parq',4
+0,regex:'$NAMENODE/test-warehouse/alltypestiny_parquet/year=2009/month=3/.*.parq',4
+0,regex:'$NAMENODE/test-warehouse/alltypestiny_parquet/year=2009/month=3/.*.parq',4
+0,regex:'$NAMENODE/test-warehouse/alltypestiny_parquet/year=2009/month=3/.*.parq',4
+0,regex:'$NAMENODE/test-warehouse/alltypestiny_parquet/year=2009/month=3/.*.parq',4
+0,regex:'$NAMENODE/test-warehouse/alltypestiny_parquet/year=2009/month=4/.*.parq',6
+0,regex:'$NAMENODE/test-warehouse/alltypestiny_parquet/year=2009/month=4/.*.parq',6
+0,regex:'$NAMENODE/test-warehouse/alltypestiny_parquet/year=2009/month=4/.*.parq',6
+0,regex:'$NAMENODE/test-warehouse/alltypestiny_parquet/year=2009/month=4/.*.parq',6
+0,regex:'$NAMENODE/test-warehouse/alltypestiny_parquet/year=2009/month=4/.*.parq',6
+0,regex:'$NAMENODE/test-warehouse/alltypestiny_parquet/year=2009/month=4/.*.parq',6
+0,regex:'$NAMENODE/test-warehouse/alltypestiny_parquet/year=2009/month=4/.*.parq',6
+0,regex:'$NAMENODE/test-warehouse/alltypestiny_parquet/year=2009/month=4/.*.parq',6
+---- TYPES
+BIGINT, STRING, INT
+====
+---- QUERY
+select input__file__name, input__file__name, file__position, file__position, l_orderkey from functional_parquet.lineitem_multiblock_variable_num_rows
+where l_orderkey = 12996;
+---- RESULTS
+'$NAMENODE/test-warehouse/lineitem_multiblock_variable_num_rows_parquet/lineitem_multiblock_variable_num_rows.parquet','$NAMENODE/test-warehouse/lineitem_multiblock_variable_num_rows_parquet/lineitem_multiblock_variable_num_rows.parquet',6998,6998,12996
+'$NAMENODE/test-warehouse/lineitem_multiblock_variable_num_rows_parquet/lineitem_multiblock_variable_num_rows.parquet','$NAMENODE/test-warehouse/lineitem_multiblock_variable_num_rows_parquet/lineitem_multiblock_variable_num_rows.parquet',6999,6999,12996
+'$NAMENODE/test-warehouse/lineitem_multiblock_variable_num_rows_parquet/lineitem_multiblock_variable_num_rows.parquet','$NAMENODE/test-warehouse/lineitem_multiblock_variable_num_rows_parquet/lineitem_multiblock_variable_num_rows.parquet',7000,7000,12996
+'$NAMENODE/test-warehouse/lineitem_multiblock_variable_num_rows_parquet/lineitem_multiblock_variable_num_rows.parquet','$NAMENODE/test-warehouse/lineitem_multiblock_variable_num_rows_parquet/lineitem_multiblock_variable_num_rows.parquet',7001,7001,12996
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT
+====

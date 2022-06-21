@@ -34,6 +34,7 @@ import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsPartitionLocationCompressor;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.SqlConstraints;
+import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.local.LocalIcebergTable.TableParams;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TBriefTableMeta;
@@ -148,6 +149,7 @@ public interface MetaProvider {
     List<String> getPartitionPrefixes();
     boolean isPartitioned();
     boolean isTransactional();
+    List<VirtualColumn> getVirtualColumns();
   }
 
   /**

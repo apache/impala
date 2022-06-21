@@ -80,8 +80,14 @@ class ParquetColumnReader {
   }
   const SlotDescriptor* pos_slot_desc() const { return pos_slot_desc_; }
   void set_pos_slot_desc(const SlotDescriptor* pos_slot_desc) {
-    DCHECK(pos_slot_desc_ == NULL);
+    DCHECK(pos_slot_desc_ == nullptr);
     pos_slot_desc_ = pos_slot_desc;
+  }
+
+  const SlotDescriptor* file_pos_slot_desc() const { return file_pos_slot_desc_; }
+  void set_file_pos_slot_desc(const SlotDescriptor* file_pos_slot_desc) {
+    DCHECK(file_pos_slot_desc_ == nullptr);
+    file_pos_slot_desc_ = file_pos_slot_desc;
   }
 
   /// Returns true if this reader materializes collections (i.e. CollectionValues).
@@ -162,7 +168,12 @@ class ParquetColumnReader {
   /// call when doing non-batched reading, i.e. NextLevels() must have been called
   /// before each call to this function to advance to the next element in the
   /// collection.
-  inline void ReadPositionNonBatched(int64_t* pos);
+  inline void ReadItemPositionNonBatched(int64_t* pos);
+
+  /// Writes file position based on the current row of the child scanners.
+  /// Only valid to call when doing non-batched reading, i.e. NextLevels() must have been
+  /// called before each call.
+  inline void ReadFilePositionNonBatched(int64_t* file_pos);
 
   /// Returns true if this column reader has reached the end of the row group.
   inline bool RowGroupAtEnd() {
@@ -198,14 +209,21 @@ class ParquetColumnReader {
     tuple->SetNull(DCHECK_NOTNULL(slot_desc_)->null_indicator_offset());
   }
 
+  /// Returns 'true' if there is a file position slot or position slot to be filled.
+  bool AnyPosSlotToBeFilled() const {
+    return pos_slot_desc_ != nullptr || file_pos_slot_desc_ != nullptr;
+  }
+
  protected:
   HdfsParquetScanner* parent_;
   const SchemaNode& node_;
   const SlotDescriptor* const slot_desc_;
 
-  /// The slot descriptor for the position field of the tuple, if there is one. NULL if
-  /// there's not. Only one column reader for a given tuple desc will have this set.
-  const SlotDescriptor* pos_slot_desc_;
+  /// The slot descriptors for the collection item position and file position fields of
+  /// the tuple, if there is one. NULL if there's not. If one is set, then the other must
+  /// be NULL. Only one column reader for a given tuple desc will have this set.
+  const SlotDescriptor* pos_slot_desc_ = nullptr;
+  const SlotDescriptor* file_pos_slot_desc_ = nullptr;
 
   /// The next value to write into the position slot, if there is one. 64-bit int because
   /// the pos slot is always a BIGINT Set to ParquetLevel::INVALID_POS when this column
@@ -240,7 +258,8 @@ class ParquetColumnReader {
     : parent_(parent),
       node_(node),
       slot_desc_(slot_desc),
-      pos_slot_desc_(NULL),
+      pos_slot_desc_(nullptr),
+      file_pos_slot_desc_(nullptr),
       pos_current_value_(ParquetLevel::INVALID_POS),
       rep_level_(ParquetLevel::INVALID_LEVEL),
       max_rep_level_(node_.max_rep_level),
@@ -298,7 +317,7 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// set_io_reservation() must be called to assign reservation to this
   /// column, followed by StartScan().
   Status Reset(const HdfsFileDesc& file_desc, const parquet::ColumnChunk& col_chunk,
-    int row_group_idx);
+    int row_group_idx, int64_t row_group_first_row);
 
   /// Starts the column scan range. The reader must be Reset() and have a
   /// reservation assigned via set_io_reservation(). This must be called
@@ -395,6 +414,11 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// Metadata for the column for the current row group.
   const parquet::ColumnMetaData* metadata_ = nullptr;
 
+  /// Index of the current top-level row. It is updated together with the rep/def levels.
+  /// When updated, and its value is N, it means that we already processed the Nth row
+  /// completely, hence the initial value is '-1', because '0' would mean that we already
+  /// processed the first (zeroeth) row.
+  int64_t current_row_ = -1;
 
   /////////////////////////////////////////
   /// BEGIN: Members used for page filtering
@@ -418,11 +442,6 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// are processing values in this range. When we leave this range, then we need to skip
   /// rows and increment this field.
   int current_row_range_ = 0;
-
-  /// Index of the current top-level row. It is updated together with the rep/def levels.
-  /// When updated, and its value is N, it means that we already processed the Nth row
-  /// completely.
-  int64_t current_row_ = -1;
 
   /// This flag is needed for the proper tracking of the last processed row.
   /// The batched and non-batched interfaces behave differently. E.g. when using the
@@ -649,7 +668,7 @@ class BaseScalarColumnReader : public ParquetColumnReader {
 };
 
 // Inline to allow inlining into collection and scalar column reader.
-inline void ParquetColumnReader::ReadPositionNonBatched(int64_t* pos) {
+inline void ParquetColumnReader::ReadItemPositionNonBatched(int64_t* pos) {
   // NextLevels() should have already been called
   DCHECK_GE(rep_level_, 0);
   DCHECK_GE(def_level_, 0);
@@ -657,6 +676,16 @@ inline void ParquetColumnReader::ReadPositionNonBatched(int64_t* pos) {
   DCHECK_GE(def_level_, def_level_of_immediate_repeated_ancestor()) <<
       "Caller should have called NextLevels() until we are ready to read a value";
   *pos = pos_current_value_++;
+}
+
+// Inline to allow inlining into collection and scalar column reader.
+inline void ParquetColumnReader::ReadFilePositionNonBatched(int64_t* file_pos) {
+  // NextLevels() should have already been called
+  DCHECK_GE(rep_level_, 0);
+  DCHECK_GE(def_level_, 0);
+  DCHECK_GE(def_level_, def_level_of_immediate_repeated_ancestor()) <<
+      "Caller should have called NextLevels() until we are ready to read a value";
+  *file_pos = LastProcessedRow() + 1;
 }
 
 // Change 'val_count' to zero to exercise IMPALA-5197. This verifies the error handling

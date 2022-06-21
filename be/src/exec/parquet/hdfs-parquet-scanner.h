@@ -351,6 +351,10 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   virtual Status ProcessSplit() override WARN_UNUSED_RESULT;
   virtual void Close(RowBatch* row_batch) override;
 
+  THdfsFileFormat::type file_format() const override {
+    return THdfsFileFormat::PARQUET;
+  }
+
   /// Helper function to create ColumnStatsReader object. 'col_order' might be NULL.
   ColumnStatsReader CreateColumnStatsReader(
       const parquet::ColumnChunk& col_chunk, const ColumnType& col_type,
@@ -812,8 +816,9 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
 
   /// Walks file_metadata_ and initiates reading the materialized columns.  This
   /// initializes 'scalar_readers_' and divides reservation between the columns but
-  /// does not start any scan ranges.
-  Status InitScalarColumns() WARN_UNUSED_RESULT;
+  /// does not start any scan ranges. 'row_group_first_row' is the index of the first
+  /// row in this row group, it is used to track the file position of the rows.
+  Status InitScalarColumns(int64_t row_group_first_row) WARN_UNUSED_RESULT;
 
   /// Initializes the column readers in complex_readers_.
   void InitComplexColumns();

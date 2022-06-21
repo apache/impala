@@ -111,9 +111,6 @@ class BaseSequenceScanner : public HdfsScanner {
   /// not at a sync marker or other metadata of the range. May set 'eos_'.
   virtual Status ProcessRange(RowBatch* row_batch) WARN_UNUSED_RESULT = 0;
 
-  /// Returns type of scanner: e.g. rcfile, seqfile
-  virtual THdfsFileFormat::type file_format() const = 0;
-
   BaseSequenceScanner(HdfsScanNodeBase*, RuntimeState*);
 
   /// Read sync marker from 'stream_' and validate against 'header_->sync'. Returns

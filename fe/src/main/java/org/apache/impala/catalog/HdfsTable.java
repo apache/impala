@@ -631,6 +631,7 @@ public class HdfsTable extends Table implements FeFsTable {
 
   private void addVirtualColumns() {
     addVirtualColumn(VirtualColumn.INPUT_FILE_NAME);
+    addVirtualColumn(VirtualColumn.FILE_POSITION);
   }
 
   /**

@@ -52,8 +52,12 @@ class HdfsTextScanner : public HdfsScanner {
   virtual ~HdfsTextScanner();
 
   /// Implementation of HdfsScanner interface.
-  virtual Status Open(ScannerContext* context) WARN_UNUSED_RESULT;
-  virtual void Close(RowBatch* row_batch);
+  virtual Status Open(ScannerContext* context) override WARN_UNUSED_RESULT;
+  virtual void Close(RowBatch* row_batch) override;
+
+  THdfsFileFormat::type file_format() const override {
+    return THdfsFileFormat::TEXT;
+  }
 
   /// Issue io manager byte ranges for 'files'.
   static Status IssueInitialRanges(HdfsScanNodeBase* scan_node,
@@ -87,7 +91,7 @@ class HdfsTextScanner : public HdfsScanner {
   static const char* LLVM_CLASS_NAME;
 
  protected:
-  virtual Status GetNextInternal(RowBatch* row_batch) WARN_UNUSED_RESULT;
+  virtual Status GetNextInternal(RowBatch* row_batch) override WARN_UNUSED_RESULT;
 
   /// Reset the scanner.  This clears any partial state that needs to
   /// be cleared when starting or when restarting after an error.
@@ -130,7 +134,7 @@ class HdfsTextScanner : public HdfsScanner {
 
   /// Initializes this scanner for this context.  The context maps to a single
   /// scan range. Advances the scan state to SCAN_RANGE_INITIALIZED.
-  virtual Status InitNewRange() WARN_UNUSED_RESULT;
+  virtual Status InitNewRange() override WARN_UNUSED_RESULT;
 
   /// Finds the start of the first tuple in this scan range and initializes
   /// 'byte_buffer_ptr_' to point to the start of first tuple. Advances the scan state

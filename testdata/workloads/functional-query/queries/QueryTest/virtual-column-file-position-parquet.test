@@ -1,0 +1,223 @@
+====
+---- QUERY
+select file__position, id from alltypes_tiny_pages
+where file__position = 7000;
+---- RESULTS
+7000,6285
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+select file__position, id from alltypes_tiny_pages
+where id = 6285;
+---- RESULTS
+7000,6285
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+select file__position, id from alltypes_tiny_pages
+where file__position = 1000;
+---- RESULTS
+1000,3623
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+select file__position, id from alltypes_tiny_pages
+where id = 2950;
+---- RESULTS
+587,2950
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+# The data files of the tpch_parquet.lineitem table are not deterministic,
+# so we cannot check the results here. We only check that the queries succeed.
+select file__position, l_orderkey from tpch_parquet.lineitem
+where file__position = 0
+order by l_orderkey;
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+select file__position, l_orderkey from tpch_parquet.lineitem
+where file__position = 700000
+order by l_orderkey;
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+select file__position, l_orderkey from tpch_parquet.lineitem
+where file__position = 2142542
+order by l_orderkey;
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+select file__position, l_orderkey from tpch_parquet.lineitem
+where l_orderkey in (3555011, 4625378, 5692993)
+order by l_orderkey;
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+select max(file__position) from functional_parquet.lineitem_multiblock;
+---- RESULTS
+19999
+---- TYPES
+BIGINT
+====
+---- QUERY
+select file__position, l_orderkey from functional_parquet.lineitem_multiblock
+where file__position = 7000;
+---- RESULTS
+7000,12996
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+select file__position, l_orderkey from functional_parquet.lineitem_multiblock
+where l_orderkey = 12996;
+---- RESULTS
+6998,12996
+6999,12996
+7000,12996
+7001,12996
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+select file__position, * from functional_parquet.lineitem_multiblock
+where file__position = 19993;
+---- RESULTS
+19993,2,106170,1191,1,38.00,44694.46,0.00,0.05,'N','O','1997-01-28','1997-01-14','1997-02-02','TAKE BACK RETURN','RAIL','ven requests. deposits breach a'
+---- TYPES
+BIGINT, BIGINT, BIGINT, BIGINT, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select file__position, * from functional_parquet.lineitem_multiblock
+where l_orderkey = 2;
+---- RESULTS
+19993,2,106170,1191,1,38.00,44694.46,0.00,0.05,'N','O','1997-01-28','1997-01-14','1997-02-02','TAKE BACK RETURN','RAIL','ven requests. deposits breach a'
+---- TYPES
+BIGINT, BIGINT, BIGINT, BIGINT, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select max(file__position) from functional_parquet.lineitem_multiblock_variable_num_rows;
+---- RESULTS
+19999
+---- TYPES
+BIGINT
+====
+---- QUERY
+select file__position, l_orderkey from functional_parquet.lineitem_multiblock_variable_num_rows
+where file__position = 7000;
+---- RESULTS
+7000,12996
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+select file__position, l_orderkey from functional_parquet.lineitem_multiblock_variable_num_rows
+where l_orderkey = 12996;
+---- RESULTS
+6998,12996
+6999,12996
+7000,12996
+7001,12996
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+select file__position, * from functional_parquet.lineitem_multiblock_variable_num_rows
+where file__position = 19993;
+---- RESULTS
+19993,2,106170,1191,1,38.00,44694.46,0.00,0.05,'N','O','1997-01-28','1997-01-14','1997-02-02','TAKE BACK RETURN','RAIL','ven requests. deposits breach a'
+---- TYPES
+BIGINT, BIGINT, BIGINT, BIGINT, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select file__position, * from functional_parquet.lineitem_multiblock_variable_num_rows
+where l_orderkey = 2;
+---- RESULTS
+19993,2,106170,1191,1,38.00,44694.46,0.00,0.05,'N','O','1997-01-28','1997-01-14','1997-02-02','TAKE BACK RETURN','RAIL','ven requests. deposits breach a'
+---- TYPES
+BIGINT, BIGINT, BIGINT, BIGINT, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select max(file__position) from tpcds_parquet.store_sales
+---- TYPES
+BIGINT
+====
+---- QUERY
+select file__position, id, float_col from functional_parquet.alltypes
+where float_col < 1 and year=2009 and month=6;
+---- TYPES
+BIGINT, INT, FLOAT
+====
+---- QUERY
+select a.file__position, b.file__position, id, l_orderkey
+from alltypes_tiny_pages a, functional_parquet.lineitem_multiblock_variable_num_rows b
+where a.file__position = b.file__position and
+      a.file__position > 6710 and a.file__position < 6720;
+---- RESULTS
+6713,6713,6021,13253
+6715,6715,6069,13253
+6718,6718,6066,13252
+6711,6711,6023,13253
+6712,6712,6022,13253
+6714,6714,6020,13253
+6716,6716,6068,13253
+6717,6717,6067,13253
+6719,6719,6065,13252
+---- TYPES
+BIGINT, BIGINT, INT, BIGINT
+====
+---- QUERY
+select a.file__position, b.file__position, id, l_orderkey
+from alltypes_tiny_pages a, functional_parquet.lineitem_multiblock_variable_num_rows b
+where id = l_orderkey and
+      id > 6000 and id < 6030;
+---- RESULTS
+6765,13971,6019,6019
+6767,13974,6017,6017
+6767,13975,6017,6017
+6767,13976,6017,6017
+6767,13977,6017,6017
+6767,13978,6017,6017
+6713,13958,6021,6021
+6713,13959,6021,6021
+6713,13960,6021,6021
+6713,13961,6021,6021
+6713,13962,6021,6021
+6713,13963,6021,6021
+6766,13972,6018,6018
+6766,13973,6018,6018
+6768,13979,6016,6016
+6768,13980,6016,6016
+6768,13981,6016,6016
+6711,13944,6023,6023
+6711,13945,6023,6023
+6711,13946,6023,6023
+6711,13947,6023,6023
+6711,13948,6023,6023
+6711,13949,6023,6023
+6711,13950,6023,6023
+6712,13951,6022,6022
+6712,13952,6022,6022
+6712,13953,6022,6022
+6712,13954,6022,6022
+6712,13955,6022,6022
+6712,13956,6022,6022
+6712,13957,6022,6022
+6714,13964,6020,6020
+6714,13965,6020,6020
+6714,13966,6020,6020
+6714,13967,6020,6020
+6714,13968,6020,6020
+6714,13969,6020,6020
+6714,13970,6020,6020
+---- TYPES
+BIGINT, BIGINT, INT, BIGINT
+====

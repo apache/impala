@@ -416,6 +416,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
 
   private void addVirtualColumns() {
     addVirtualColumn(VirtualColumn.INPUT_FILE_NAME);
+    addVirtualColumn(VirtualColumn.FILE_POSITION);
   }
 
   @Override

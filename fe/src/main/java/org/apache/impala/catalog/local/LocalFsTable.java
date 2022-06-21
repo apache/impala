@@ -183,11 +183,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
 
     avroSchema_ = explicitAvroSchema;
     isMarkedCached_ = (ref != null && ref.isMarkedCached());
-    addVirtualColumns();
-  }
-
-  private void addVirtualColumns() {
-    addVirtualColumn(VirtualColumn.INPUT_FILE_NAME);
+    if (ref != null) addVirtualColumns(ref.getVirtualColumns());
   }
 
   private static String loadAvroSchema(Table msTbl) throws AnalysisException {

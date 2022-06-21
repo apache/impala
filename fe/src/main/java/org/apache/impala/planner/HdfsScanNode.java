@@ -611,6 +611,7 @@ public class HdfsScanNode extends ScanNode {
     // LiteralExpr, but can also be an expr like "1 + 2".
     if (!constExpr.isConstant()) return;
     if (Expr.IS_NULL_VALUE.apply(constExpr)) return;
+    if (slotDesc.isVirtualColumn()) return;
     if (isUnsupportedStatsType(slotDesc.getType())) return;
     if (isUnsupportedStatsType(constExpr.getType())) return;
 
@@ -1009,6 +1010,9 @@ public class HdfsScanNode extends ScanNode {
     // Check to see if this slot is a collection type. Dictionary pruning is applicable
     // to scalar values nested in collection types, not enclosing collection types.
     if (firstSlotDesc.getType().isCollectionType()) return;
+
+    // Dictionary filtering is not applicable on virtual columns.
+    if (firstSlotDesc.isVirtualColumn()) return;
 
     // If any of the slot descriptors affected by 'conjunct' happens to be a scalar member
     // of a struct, where the struct is also given in the select list then skip dictionary

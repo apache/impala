@@ -43,8 +43,7 @@ Tuple* FileMetadataUtils::CreateTemplateTuple(int64_t partition_id, MemPool* mem
   // HdfsScanNodeBase.
   Tuple* template_tuple = scan_node_->GetTemplateTupleForPartitionId(partition_id);
   if (template_tuple != nullptr) {
-    template_tuple =
-        template_tuple->DeepCopy(*scan_node_->tuple_desc(), mem_pool);
+    template_tuple = template_tuple->DeepCopy(*scan_node_->tuple_desc(), mem_pool);
   }
   if (UNLIKELY(!scan_node_->virtual_column_slots().empty())) {
     AddFileLevelVirtualColumns(mem_pool, template_tuple);
@@ -57,7 +56,7 @@ Tuple* FileMetadataUtils::CreateTemplateTuple(int64_t partition_id, MemPool* mem
 
 void FileMetadataUtils::AddFileLevelVirtualColumns(MemPool* mem_pool,
     Tuple* template_tuple) {
-  DCHECK(template_tuple != nullptr);
+  if (template_tuple == nullptr) return;
   for (int i = 0; i < scan_node_->virtual_column_slots().size(); ++i) {
     const SlotDescriptor* slot_desc = scan_node_->virtual_column_slots()[i];
     if (slot_desc->virtual_column_type() != TVirtualColumnType::INPUT_FILE_NAME) {

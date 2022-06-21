@@ -584,7 +584,8 @@ class HdfsScanNodeBase : public ScanNode {
 
   /// Returns true if there are no materialized slots, such as a count(*) over the table.
   inline bool IsZeroSlotTableScan() const {
-    return materialized_slots().empty() && tuple_desc()->tuple_path().empty();
+    return materialized_slots().empty() && tuple_desc()->tuple_path().empty() &&
+        virtual_column_slots().empty();
   }
 
   /// Return true if scan over 'filename' require row validation.

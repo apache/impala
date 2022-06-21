@@ -127,11 +127,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     icebergParquetPlainPageSize_ = Utils.getIcebergParquetPlainPageSize(msTable);
     icebergParquetDictPageSize_ = Utils.getIcebergParquetDictPageSize(msTable);
     partitionStats_ = tableInfo.getIceberg_table().getPartition_stats();
-    addVirtualColumns();
-  }
-
-  private void addVirtualColumns() {
-    addVirtualColumn(VirtualColumn.INPUT_FILE_NAME);
+    addVirtualColumns(ref.getVirtualColumns());
   }
 
   static void validateColumns(List<Column> impalaCols, List<FieldSchema> hmsCols) {

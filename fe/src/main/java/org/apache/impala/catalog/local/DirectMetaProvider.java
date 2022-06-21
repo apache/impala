@@ -46,6 +46,7 @@ import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.SqlConstraints;
+import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.local.LocalIcebergTable.TableParams;
 import org.apache.impala.common.Pair;
 import org.apache.impala.compat.MetastoreShim;
@@ -510,6 +511,12 @@ class DirectMetaProvider implements MetaProvider {
     @Override
     public boolean isTransactional() {
       return AcidUtils.isTransactionalTable(msTable_.getParameters());
+    }
+
+    @Override
+    public List<VirtualColumn> getVirtualColumns() {
+      throw new UnsupportedOperationException("Virtual columns are not supported with " +
+          "DirectMetaProvider implementation");
     }
   }
 

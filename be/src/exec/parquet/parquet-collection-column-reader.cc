@@ -78,9 +78,12 @@ bool CollectionColumnReader::ReadValueBatch(MemPool* pool, int max_values,
       continue_execution = NextLevels();
       continue;
     }
-    // Fill in position slot if applicable
-    if (pos_slot_desc_ != nullptr) {
-      ReadPositionNonBatched(tuple->GetBigIntSlot(pos_slot_desc()->tuple_offset()));
+    // Fill in position slots if applicable
+    if (pos_slot_desc() != nullptr) {
+      ReadItemPositionNonBatched(tuple->GetBigIntSlot(pos_slot_desc()->tuple_offset()));
+    } else if (file_pos_slot_desc() != nullptr) {
+      ReadFilePositionNonBatched(
+          tuple->GetBigIntSlot(file_pos_slot_desc()->tuple_offset()));
     }
     continue_execution = ReadValue(pool, tuple);
     ++val_count;

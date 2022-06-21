@@ -849,6 +849,14 @@ Status HdfsParquetScanner::NextRowGroup() {
     // but some data in row groups.
     if (row_group.num_rows == 0 || file_metadata_.num_rows == 0) continue;
 
+    // Let's find the index of the first row in this row group. It's needed to track the
+    // file position of each row.
+    int64_t row_group_first_row = 0;
+    for (int i = 0; i < group_idx_; ++i) {
+      const parquet::RowGroup& row_group = file_metadata_.row_groups[i];
+      row_group_first_row += row_group.num_rows;
+    }
+
     RETURN_IF_ERROR(ParquetMetadataUtils::ValidateColumnOffsets(
         file_desc->filename, file_desc->file_length, row_group));
 
@@ -920,7 +928,7 @@ Status HdfsParquetScanner::NextRowGroup() {
     }
 
     InitComplexColumns();
-    RETURN_IF_ERROR(InitScalarColumns());
+    RETURN_IF_ERROR(InitScalarColumns(row_group_first_row));
 
     // Start scanning dictionary filtering column readers, so we can read the dictionary
     // pages in EvalDictionaryFilters().
@@ -2627,7 +2635,7 @@ inline bool HdfsParquetScanner::ReadCollectionItem(
       // Fill in position slot if applicable
       const SlotDescriptor* pos_slot_desc = col_reader->pos_slot_desc();
       if (pos_slot_desc != nullptr) {
-        col_reader->ReadPositionNonBatched(
+        col_reader->ReadItemPositionNonBatched(
             tuple->GetBigIntSlot(pos_slot_desc->tuple_offset()));
       }
       continue_execution = col_reader->ReadValue(pool, tuple);
@@ -2788,10 +2796,19 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
 
   // Each tuple can have at most one position slot. We'll process this slot desc last.
   SlotDescriptor* pos_slot_desc = nullptr;
+  SlotDescriptor* file_pos_slot_desc = nullptr;
 
   for (SlotDescriptor* slot_desc: tuple_desc.slots()) {
     // Skip partition columns
-    if (!file_metadata_utils_.NeedDataInFile(slot_desc)) continue;
+    if (!file_metadata_utils_.NeedDataInFile(slot_desc)) {
+      if (UNLIKELY(slot_desc->virtual_column_type() ==
+          TVirtualColumnType::FILE_POSITION)) {
+        DCHECK(file_pos_slot_desc == nullptr)
+            << "There should only be one position slot per tuple";
+        file_pos_slot_desc = slot_desc;
+      }
+      continue;
+    }
 
     SchemaNode* node = nullptr;
     bool pos_field;
@@ -2851,7 +2868,15 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
     column_readers->push_back(reader);
   }
 
-  if (pos_slot_desc != nullptr) {
+  // We either have a file position slot or a position slot in a tuple, but not both.
+  // Because file position is always at the table-level tuple, while position slot is
+  // at collection item-level.
+  DCHECK(file_pos_slot_desc == nullptr || pos_slot_desc == nullptr);
+  if (file_pos_slot_desc != nullptr) {
+    // 'tuple_desc' has a file position slot. Use an existing column reader to populate it
+    DCHECK(!column_readers->empty());
+    (*column_readers)[0]->set_file_pos_slot_desc(file_pos_slot_desc);
+  } else if (pos_slot_desc != nullptr) {
     // 'tuple_desc' has a position slot. Use an existing column reader to populate it.
     DCHECK(!column_readers->empty());
     (*column_readers)[0]->set_pos_slot_desc(pos_slot_desc);
@@ -2926,7 +2951,7 @@ void HdfsParquetScanner::InitComplexColumns() {
   }
 }
 
-Status HdfsParquetScanner::InitScalarColumns() {
+Status HdfsParquetScanner::InitScalarColumns(int64_t row_group_first_row) {
   int64_t partition_id = context_->partition_descriptor()->id();
   const HdfsFileDesc* file_desc = scan_node_->GetFileDesc(partition_id, filename());
   DCHECK(file_desc != nullptr);
@@ -2950,7 +2975,8 @@ Status HdfsParquetScanner::InitScalarColumns() {
       return Status(TErrorCode::PARQUET_NUM_COL_VALS_ERROR, scalar_reader->col_idx(),
           col_chunk.meta_data.num_values, num_values, filename());
     }
-    RETURN_IF_ERROR(scalar_reader->Reset(*file_desc, col_chunk, group_idx_));
+    RETURN_IF_ERROR(scalar_reader->Reset(*file_desc, col_chunk, group_idx_,
+        row_group_first_row));
   }
 
   ColumnRangeLengths col_range_lengths(scalar_readers_.size());

@@ -35,10 +35,15 @@ public class VirtualColumn extends Column {
 
   public static VirtualColumn INPUT_FILE_NAME = new VirtualColumn("INPUT__FILE__NAME",
       Type.STRING, TVirtualColumnType.INPUT_FILE_NAME);
+  public static VirtualColumn FILE_POSITION = new VirtualColumn("FILE__POSITION",
+      Type.BIGINT, TVirtualColumnType.FILE_POSITION);
 
   public static VirtualColumn getVirtualColumn(TVirtualColumnType virtColType) {
     if (virtColType == TVirtualColumnType.INPUT_FILE_NAME) {
       return INPUT_FILE_NAME;
+    }
+    if (virtColType == TVirtualColumnType.FILE_POSITION) {
+      return FILE_POSITION;
     }
     return null;
   }

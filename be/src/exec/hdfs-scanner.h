@@ -179,6 +179,9 @@ class HdfsScanner {
   /// Return the plan id of the scan node that this scanner is associated with.
   int GetScanNodeId() const { return scan_node_->id(); }
 
+  /// Returns type of scanner: e.g. rcfile, seqfile
+  virtual THdfsFileFormat::type file_format() const = 0;
+
   /// Not inlined in IR so it can be replaced with a constant.
   int IR_NO_INLINE tuple_byte_size() const { return tuple_byte_size_; }
   int IR_NO_INLINE tuple_byte_size(const TupleDescriptor& desc) const {
@@ -680,6 +683,10 @@ class HdfsScanner {
   /// WriteCompleteTuple() because it's easier than writing IR to access
   /// conjunct_evals_.
   ScalarExprEvaluator* GetConjunctEval(int idx) const;
+
+  /// Returns error if this scanner doesn't support a slot in the tuple, e.g. virtual
+  /// columns.
+  Status ValidateSlotDescriptors() const;
 
   /// Unit test constructor
   HdfsScanner();

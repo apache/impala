@@ -513,7 +513,8 @@ function custom-post-load-steps {
 
   hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_parquet \
     ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_sixblocks_parquet \
-    ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_one_row_group_parquet
+    ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_one_row_group_parquet \
+    ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_variable_num_rows_parquet
 
   #IMPALA-1881: data file produced by hive with multiple blocks.
   hadoop fs -Ddfs.block.size=1048576 -put -f \
@@ -529,6 +530,11 @@ function custom-post-load-steps {
   hadoop fs -Ddfs.block.size=1048576 -put -f \
     ${IMPALA_HOME}/testdata/LineItemMultiBlock/lineitem_one_row_group.parquet \
     ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_one_row_group_parquet
+
+  # IMPALA-11350: Add tests for row groups with variable num rows.
+  hadoop fs -Ddfs.block.size=1048576 -put -f \
+    ${IMPALA_HOME}/testdata/LineItemMultiBlock/lineitem_multiblock_variable_num_rows.parquet \
+    ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_variable_num_rows_parquet
 
   # IMPALA-3307: Upload test time-zone database
   hadoop fs -Ddfs.block.size=1048576 -put -f ${IMPALA_HOME}/testdata/tzdb \

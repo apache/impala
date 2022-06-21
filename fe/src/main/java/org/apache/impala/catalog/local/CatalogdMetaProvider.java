@@ -63,6 +63,7 @@ import org.apache.impala.catalog.ImpaladCatalog.ObjectUpdateSequencer;
 import org.apache.impala.catalog.Principal;
 import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.SqlConstraints;
+import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.local.LocalIcebergTable.TableParams;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
@@ -76,6 +77,7 @@ import org.apache.impala.thrift.TBriefTableMeta;
 import org.apache.impala.thrift.TCatalogInfoSelector;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDbInfoSelector;
 import org.apache.impala.thrift.TErrorCode;
@@ -737,7 +739,7 @@ public class CatalogdMetaProvider implements MetaProvider {
                 dbName, tableName, resp.table_info.hms_table, resp.object_version_number,
                 new SqlConstraints(primaryKeys, foreignKeys),
                 resp.table_info.valid_write_ids, resp.table_info.is_marked_cached,
-                resp.table_info.partition_prefixes);
+                resp.table_info.partition_prefixes, resp.table_info.virtual_columns);
            }
       });
     // The table list is populated based on tables in a given Db in catalogd. If a table
@@ -1711,6 +1713,11 @@ public class CatalogdMetaProvider implements MetaProvider {
     private final Table msTable_;
 
     /**
+     * List of virtual columns of this table.
+     */
+    List<VirtualColumn> virtualColumns_ = new ArrayList<>();
+
+    /**
      * The version of the table when we first loaded it. Subsequent requests about
      * the table are verified against this version.
      */
@@ -1732,7 +1739,7 @@ public class CatalogdMetaProvider implements MetaProvider {
     public TableMetaRefImpl(String dbName, String tableName,
         Table msTable, long catalogVersion, SqlConstraints sqlConstraints,
         TValidWriteIdList validWriteIds, boolean isMarkedCached,
-        List<String> locationPrefixes) {
+        List<String> locationPrefixes, List<TColumn> tvirtCols) {
       this.dbName_ = dbName;
       this.tableName_ = tableName;
       this.msTable_ = msTable;
@@ -1744,6 +1751,9 @@ public class CatalogdMetaProvider implements MetaProvider {
       this.partitionLocationCompressor_ = (locationPrefixes == null) ? null :
           new HdfsPartitionLocationCompressor(
               msTable.getPartitionKeysSize(), locationPrefixes);
+      for (TColumn tvCol : tvirtCols) {
+        virtualColumns_.add(VirtualColumn.fromThrift(tvCol));
+      }
     }
 
     @Override
@@ -1770,6 +1780,11 @@ public class CatalogdMetaProvider implements MetaProvider {
     @Override
     public boolean isTransactional() {
       return AcidUtils.isTransactionalTable(msTable_.getParameters());
+    }
+
+    @Override
+    public List<VirtualColumn> getVirtualColumns() {
+      return virtualColumns_;
     }
   }
 

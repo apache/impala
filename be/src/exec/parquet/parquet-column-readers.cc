@@ -149,6 +149,18 @@ class ScalarColumnReader : public BaseScalarColumnReader {
   /// Read 'num_to_read' position values into a batch of tuples starting at 'tuple_mem'.
   void ReadPositions(
       int64_t num_to_read, int tuple_size, uint8_t* RESTRICT tuple_mem) RESTRICT;
+  void ReadItemPositions(
+      int64_t num_to_read, int tuple_size, uint8_t* RESTRICT tuple_mem) RESTRICT;
+  void ReadFilePositions(
+      int64_t num_to_read, int tuple_size, uint8_t* RESTRICT tuple_mem) RESTRICT;
+
+  /// Reads file position into 'file_pos' based on 'rep_level'.
+  /// It updates 'current_row_' when 'rep_level' is 0.
+  inline ALWAYS_INLINE void ReadFilePositionBatched(int16_t rep_level, int64_t* file_pos);
+
+  /// Reads position into 'pos' and updates 'pos_current_value_' based on 'rep_level'.
+  /// It updates 'current_row_' when 'rep_level' is 0.
+  inline ALWAYS_INLINE void ReadItemPositionBatched(int16_t rep_level, int64_t* pos);
 
   virtual Status CreateDictionaryDecoder(
       uint8_t* values, int size, DictDecoderBase** decoder) override {
@@ -184,11 +196,6 @@ class ScalarColumnReader : public BaseScalarColumnReader {
   /// Force inlining - GCC does not always inline this into hot loops.
   template <Encoding::type ENCODING, bool NEEDS_CONVERSION>
   inline ALWAYS_INLINE bool ReadSlot(Tuple* tuple);
-
-  /// Reads position into 'pos' and updates 'pos_current_value_' based on 'rep_level'.
-  /// This helper is only used on the batched decoding path where we need to reset
-  /// 'pos_current_value_' to 0 based on 'rep_level'.
-  inline ALWAYS_INLINE void ReadPositionBatched(int16_t rep_level, int64_t* pos);
 
   /// Decode one value from *data into 'val' and advance *data. 'data_end' is one byte
   /// past the end of the buffer. Return false and set 'parse_error_' if there is an
@@ -460,7 +467,7 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ReadValueBatc
 
     // Not materializing anything - skip decoding any levels and rely on the value
     // count from page metadata to return the correct number of rows.
-    if (!MATERIALIZED && !IN_COLLECTION) {
+    if (!MATERIALIZED && !IN_COLLECTION && file_pos_slot_desc() == nullptr) {
       // We cannot filter pages in this context.
       DCHECK(!DoesPageFiltering());
       int vals_to_add = min(num_buffered_values_, max_values - val_count);
@@ -473,7 +480,7 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ReadValueBatc
     // nested collection into the top-level tuple returned by the scan, so we don't
     // care about the nesting structure unless the position slot is being populated,
     // or we filter out rows.
-    if (IN_COLLECTION && (pos_slot_desc_ != nullptr || DoesPageFiltering()) &&
+    if (IN_COLLECTION && (AnyPosSlotToBeFilled() || DoesPageFiltering()) &&
         !rep_levels_.CacheHasNext()) {
       parent_->parse_status_.MergeStatus(
             rep_levels_.CacheNextBatch(num_buffered_values_));
@@ -531,10 +538,10 @@ template <bool IN_COLLECTION, Encoding::type ENCODING, bool NEEDS_CONVERSION>
 bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::MaterializeValueBatch(
     int max_values, int tuple_size, uint8_t* RESTRICT tuple_mem,
     int* RESTRICT num_values) RESTRICT {
-  DCHECK(MATERIALIZED || IN_COLLECTION);
+  DCHECK(MATERIALIZED || IN_COLLECTION || file_pos_slot_desc() != nullptr);
   DCHECK_GT(num_buffered_values_, 0);
   DCHECK(def_levels_.CacheHasNext());
-  if (IN_COLLECTION && (pos_slot_desc_ != nullptr || DoesPageFiltering())) {
+  if (IN_COLLECTION && (AnyPosSlotToBeFilled() || DoesPageFiltering())) {
     DCHECK(rep_levels_.CacheHasNext());
   }
   int cache_start_idx = def_levels_.CacheCurrIdx();
@@ -559,10 +566,13 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::MaterializeVa
         // A containing repeated field is empty or NULL, skip the value.
         continue;
       }
-      if (pos_slot_desc_ != nullptr) {
-        ReadPositionBatched(rep_level,
+      if (pos_slot_desc()) {
+        ReadItemPositionBatched(rep_level,
             tuple->GetBigIntSlot(pos_slot_desc_->tuple_offset()));
       }
+    } else if (file_pos_slot_desc()) {
+      ReadFilePositionBatched(rep_level,
+          tuple->GetBigIntSlot(file_pos_slot_desc_->tuple_offset()));
     }
 
     if (MATERIALIZED) {
@@ -590,7 +600,7 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE,
     uint8_t* RESTRICT tuple_mem, int* RESTRICT num_values) RESTRICT {
   DCHECK_GT(num_buffered_values_, 0);
   if (max_rep_level_ > 0 &&
-      (pos_slot_desc_ != nullptr || DoesPageFiltering())) {
+      (AnyPosSlotToBeFilled() || DoesPageFiltering())) {
     DCHECK(rep_levels_.CacheHasNext());
   }
   int32_t def_level_repeats = def_levels_.NextRepeatedRunLength();
@@ -605,7 +615,7 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE,
     DCHECK_GT(max_rep_level_, 0) << "Only possible if in a collection.";
     // A containing repeated field is empty or NULL. We don't need to return any values
     // but need to advance any rep levels.
-    if (pos_slot_desc_ != nullptr) {
+    if (AnyPosSlotToBeFilled()) {
       num_def_levels_to_consume =
           min<uint32_t>(def_level_repeats, rep_levels_.CacheRemaining());
     } else {
@@ -615,7 +625,7 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE,
     // Cannot consume more levels than allowed by buffered input values and output space.
     num_def_levels_to_consume = min(min(
         num_buffered_values_, max_values), def_level_repeats);
-    if (pos_slot_desc_ != nullptr) {
+    if (max_rep_level_ > 0 && AnyPosSlotToBeFilled()) {
       num_def_levels_to_consume =
           min<uint32_t>(num_def_levels_to_consume, rep_levels_.CacheRemaining());
     }
@@ -625,7 +635,11 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE,
     int rows_remaining = RowsRemainingInCandidateRange();
     if (max_rep_level_ == 0) {
       num_def_levels_to_consume = min(num_def_levels_to_consume, rows_remaining);
-      current_row_ += num_def_levels_to_consume;
+      if (file_pos_slot_desc()) {
+        ReadFilePositions(num_def_levels_to_consume, tuple_size, tuple_mem);
+      } else {
+        current_row_ += num_def_levels_to_consume;
+      }
     } else {
       // We need to calculate how many 'primitive' values are there until the end
       // of the current candidate range. In the meantime we also fill the position
@@ -636,12 +650,12 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE,
   }
   // Now we have 'num_def_levels_to_consume' set, let's read the slots.
   if (def_level < def_level_of_immediate_repeated_ancestor()) {
-    if (pos_slot_desc_ != nullptr && !DoesPageFiltering()) {
+    if (AnyPosSlotToBeFilled() && !DoesPageFiltering()) {
       rep_levels_.CacheSkipLevels(num_def_levels_to_consume);
     }
     *num_values = 0;
   } else {
-    if (pos_slot_desc_ != nullptr && !DoesPageFiltering()) {
+    if (AnyPosSlotToBeFilled() && !DoesPageFiltering()) {
       ReadPositions(num_def_levels_to_consume, tuple_size, tuple_mem);
     }
     if (MATERIALIZED) {
@@ -887,8 +901,14 @@ bool ScalarColumnReader<bool, parquet::Type::BOOLEAN, true>::DecodeValues(
 }
 
 template <typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
-void ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ReadPositionBatched(
-    int16_t rep_level, int64_t* pos) {
+void ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::
+    ReadFilePositionBatched(int16_t rep_level, int64_t* file_pos) {
+  *file_pos = current_row_;
+}
+
+template <typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
+void ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::
+    ReadItemPositionBatched(int16_t rep_level, int64_t* pos) {
   // Reset position counter if we are at the start of a new parent collection.
   if (rep_level <= max_rep_level() - 1) pos_current_value_ = 0;
   *pos = pos_current_value_++;
@@ -897,11 +917,44 @@ void ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ReadPositionB
 template <typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
 void ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ReadPositions(
     int64_t num_to_read, int tuple_size, uint8_t* RESTRICT tuple_mem) RESTRICT {
-  const int pos_slot_offset = pos_slot_desc()->tuple_offset();
-  void* first_slot = reinterpret_cast<Tuple*>(tuple_mem)->GetSlot(pos_slot_offset);
-  StrideWriter<int64_t> out{reinterpret_cast<int64_t*>(first_slot), tuple_size};
+  DCHECK(file_pos_slot_desc() != nullptr || pos_slot_desc() != nullptr);
+  DCHECK(file_pos_slot_desc() == nullptr || pos_slot_desc() == nullptr);
+  if (file_pos_slot_desc()) {
+    ReadFilePositions(num_to_read, tuple_size, tuple_mem);
+  } else {
+    ReadItemPositions(num_to_read, tuple_size, tuple_mem);
+  }
+}
+
+template <typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
+void ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ReadFilePositions(
+    int64_t num_to_read, int tuple_size, uint8_t* RESTRICT tuple_mem) RESTRICT {
+  DCHECK(file_pos_slot_desc() != nullptr);
+  DCHECK(pos_slot_desc() == nullptr);
+  int64_t* file_pos_slot = reinterpret_cast<Tuple*>(tuple_mem)->GetBigIntSlot(
+      file_pos_slot_desc()->tuple_offset());
+  StrideWriter<int64_t> file_out{reinterpret_cast<int64_t*>(file_pos_slot), tuple_size};
   for (int64_t i = 0; i < num_to_read; ++i) {
-    ReadPositionBatched(rep_levels_.CacheGetNext(), out.Advance());
+    int64_t* file_pos = file_out.Advance();
+    uint8_t rep_level = max_rep_level() > 0 ? rep_levels_.CacheGetNext() : 0;
+    if (rep_level == 0) ++current_row_;
+    ReadFilePositionBatched(rep_level, file_pos);
+  }
+}
+
+template <typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
+void ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ReadItemPositions(
+    int64_t num_to_read, int tuple_size, uint8_t* RESTRICT tuple_mem) RESTRICT {
+  DCHECK(file_pos_slot_desc() == nullptr);
+  DCHECK(pos_slot_desc() != nullptr);
+  int64_t* pos_slot = reinterpret_cast<Tuple*>(tuple_mem)->GetBigIntSlot(
+      pos_slot_desc()->tuple_offset());
+  StrideWriter<int64_t> out{reinterpret_cast<int64_t*>(pos_slot), tuple_size};
+  for (int64_t i = 0; i < num_to_read; ++i) {
+    int64_t* pos = out.Advance();
+    uint8_t rep_level = max_rep_level() > 0 ? rep_levels_.CacheGetNext() : 0;
+    if (rep_level == 0) ++current_row_;
+    ReadItemPositionBatched(rep_level, pos);
   }
 }
 
@@ -999,7 +1052,8 @@ void BaseScalarColumnReader::CreateSubRanges(vector<ScanRange::SubRange>* sub_ra
 }
 
 Status BaseScalarColumnReader::Reset(const HdfsFileDesc& file_desc,
-    const parquet::ColumnChunk& col_chunk, int row_group_idx) {
+    const parquet::ColumnChunk& col_chunk, int row_group_idx,
+    int64_t row_group_first_row) {
   // Ensure metadata is valid before using it to initialize the reader.
   RETURN_IF_ERROR(ParquetMetadataUtils::ValidateRowGroupColumn(parent_->file_metadata_,
       parent_->filename(), row_group_idx, col_idx(), schema_element(),
@@ -1014,6 +1068,7 @@ Status BaseScalarColumnReader::Reset(const HdfsFileDesc& file_desc,
   // See ColumnReader constructor.
   rep_level_ = max_rep_level() == 0 ? 0 : ParquetLevel::INVALID_LEVEL;
   pos_current_value_ = ParquetLevel::INVALID_POS;
+  current_row_ = row_group_first_row - 1;
 
   vector<ScanRange::SubRange> sub_ranges;
   CreateSubRanges(&sub_ranges);
@@ -1393,18 +1448,30 @@ int BaseScalarColumnReader::FillPositionsInCandidateRange(int rows_remaining,
     pos_slot = reinterpret_cast<Tuple*>(tuple_mem)->GetBigIntSlot(pos_slot_offset);
   }
   StrideWriter<int64_t> pos_writer{pos_slot, tuple_size};
+
+  int64_t *file_pos_slot = nullptr;
+  if (file_pos_slot_desc_ != nullptr) {
+    const int file_pos_slot_offset = file_pos_slot_desc()->tuple_offset();
+    file_pos_slot = reinterpret_cast<Tuple*>(tuple_mem)->GetBigIntSlot(
+        file_pos_slot_offset);
+  }
+  StrideWriter<int64_t> file_pos_writer{file_pos_slot, tuple_size};
   while (rep_levels_.CacheRemaining() && row_count <= rows_remaining &&
          val_count < max_values) {
     if (row_count == rows_remaining && rep_levels_.CachePeekNext() == 0) break;
     int rep_level = rep_levels_.CacheGetNext();
-    if (rep_level == 0) ++row_count;
+    if (rep_level == 0) {
+      ++row_count;
+      ++current_row_;
+    }
     ++val_count;
-    if (pos_writer.IsValid()) {
+    if (file_pos_writer.IsValid()) {
+      *file_pos_writer.Advance() = current_row_;
+    } else if (pos_writer.IsValid()) {
       if (rep_level <= max_rep_level() - 1) pos_current_value_ = 0;
       *pos_writer.Advance() = pos_current_value_++;
     }
   }
-  current_row_ += row_count;
   return val_count;
 }
 

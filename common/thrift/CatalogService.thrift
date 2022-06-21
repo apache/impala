@@ -468,33 +468,35 @@ struct TPartialTableInfo {
 
   3: optional list<hive_metastore.ColumnStatisticsObj> column_stats
 
+  4: optional list<CatalogObjects.TColumn> virtual_columns
+
   // Set if this table needs storage access during metadata load.
   // Time used for storage loading in nanoseconds.
-  4: optional i64 storage_metadata_load_time_ns
+  5: optional i64 storage_metadata_load_time_ns
 
   // Each TNetworkAddress is a datanode which contains blocks of a file in the table.
   // Used so that each THdfsFileBlock can just reference an index in this list rather
   // than duplicate the list of network address, which helps reduce memory usage.
   // Only used when partition files are fetched.
-  7: optional list<Types.TNetworkAddress> network_addresses
+  8: optional list<Types.TNetworkAddress> network_addresses
 
   // SqlConstraints for the table, small enough that we can
   // return them wholesale.
-  8: optional SqlConstraints.TSqlConstraints sql_constraints
+  9: optional SqlConstraints.TSqlConstraints sql_constraints
 
   // Valid write id list of ACID table.
-  9: optional CatalogObjects.TValidWriteIdList valid_write_ids;
+  10: optional CatalogObjects.TValidWriteIdList valid_write_ids;
 
   // Set if this table is marked as cached by hdfs caching. Does not necessarily mean the
   // data is cached or that all/any partitions are cached. Only used in analyzing DDLs.
-  10: optional bool is_marked_cached
+  11: optional bool is_marked_cached
 
   // The prefixes of locations of partitions in this table. See THdfsPartitionLocation for
   // the description of how a prefix is computed.
-  11: optional list<string> partition_prefixes
+  12: optional list<string> partition_prefixes
 
   // Iceberg table information
-  12: optional CatalogObjects.TIcebergTable iceberg_table
+  13: optional CatalogObjects.TIcebergTable iceberg_table
 }
 
 // Table types in the user's perspective. Though we treat materialized view as table

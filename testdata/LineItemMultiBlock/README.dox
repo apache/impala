@@ -33,6 +33,12 @@ blocks.
 'lineitem_multiblock_one_row_group' was created similarly but with a much higher
 'parquet.block.size' so that everything fit in one row group.
 
+'lineitem_multiblock_variable_num_rows' was created similarly, but with
+'parquet.block.size'=80000 so we have a bit fewer row groups, but the real point is that
+the number of rows in the row groups are not the same. Also, the source table was
+lineitem_multiblock so the resulting table will have the same rows in the same order in
+the data file.
+
 ----
 
 The orc files are created by the following hive queries:

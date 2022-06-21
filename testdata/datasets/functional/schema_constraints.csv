@@ -58,6 +58,7 @@ table_name:bad_column_metadata, constraint:restrict_to, table_format:parquet/non
 table_name:lineitem_multiblock, constraint:restrict_to, table_format:parquet/none/none
 table_name:lineitem_sixblocks, constraint:restrict_to, table_format:parquet/none/none
 table_name:lineitem_multiblock_one_row_group, constraint:restrict_to, table_format:parquet/none/none
+table_name:lineitem_multiblock_variable_num_rows, constraint:restrict_to, table_format:parquet/none/none
 table_name:customer_multiblock, constraint:restrict_to, table_format:parquet/none/none
 table_name:hudi_partitioned, constraint:restrict_to, table_format:parquet/none/none
 table_name:hudi_non_partitioned, constraint:restrict_to, table_format:parquet/none/none
