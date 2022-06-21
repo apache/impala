@@ -213,6 +213,9 @@ struct TIcebergOperationParam {
 
   // Is overwrite operation
   3: required bool is_overwrite = false;
+
+  // The snapshot id when the operation was started
+  4: optional i64 initial_snapshot_id;
 }
 
 // Per-partion info needed by Catalog to handle an INSERT.

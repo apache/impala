@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.iceberg.AppendFiles;
+import org.apache.iceberg.BaseReplacePartitions;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
@@ -38,6 +39,7 @@ import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateProperties;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.catalog.FeIcebergTable;
@@ -250,8 +252,10 @@ public class IcebergCatalogOpExecutor {
 
   private static class DynamicOverwrite implements BatchWrite {
     final private ReplacePartitions replace;
-    public DynamicOverwrite(Transaction txn) {
+    final long initialSnapshotId;
+    public DynamicOverwrite(Transaction txn, long initialSnapshotId) {
       replace = txn.newReplacePartitions();
+      this.initialSnapshotId = initialSnapshotId;
     }
 
     @Override
@@ -261,6 +265,9 @@ public class IcebergCatalogOpExecutor {
 
     @Override
     public void commit() {
+      replace.validateFromSnapshot(initialSnapshotId);
+      replace.validateNoConflictingData();
+      replace.validateNoConflictingDeletes();
       replace.commit();
     }
   }
@@ -275,7 +282,7 @@ public class IcebergCatalogOpExecutor {
     List<ByteBuffer> dataFilesFb = icebergOp.getIceberg_data_files_fb();
     BatchWrite batchWrite;
     if (icebergOp.isIs_overwrite()) {
-      batchWrite = new DynamicOverwrite(txn);
+      batchWrite = new DynamicOverwrite(txn, icebergOp.getInitial_snapshot_id());
     } else {
       batchWrite = new Append(txn);
     }
@@ -297,7 +304,11 @@ public class IcebergCatalogOpExecutor {
       if (partitionData != null) builder.withPartition(partitionData);
       batchWrite.addFile(builder.build());
     }
-    batchWrite.commit();
+    try {
+      batchWrite.commit();
+    } catch (ValidationException e) {
+      throw new ImpalaRuntimeException(e.getMessage(), e);
+    }
   }
 
   private static Metrics buildDataFileMetrics(FbIcebergDataFile dataFile) {

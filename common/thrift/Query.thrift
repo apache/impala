@@ -816,6 +816,9 @@ struct TFinalizeParams {
 
   // Stores the Iceberg spec id of the partition spec used for this INSERT.
   9: optional i32 spec_id;
+
+  // Stores the Iceberg snapshot id of the target table for INSERTs.
+  10: optional i64 initial_snapshot_id;
 }
 
 // Result of call to ImpalaPlanService/JniFrontend.CreateQueryRequest()

@@ -28,6 +28,7 @@ from avro.datafile import DataFileReader
 from avro.io import DatumReader
 import json
 
+from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import SkipIf
 
@@ -71,7 +72,6 @@ class TestIcebergTable(ImpalaTestSuite):
     self.hdfs_client.delete_file_dir(cat_location, True)
     self.execute_query_expect_success(self.client, """drop table {0}""".format(tbl_name))
 
-  @SkipIf.not_hdfs
   def test_insert(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-insert', vector, use_db=unique_database)
 
@@ -79,9 +79,46 @@ class TestIcebergTable(ImpalaTestSuite):
     self.run_test_case('QueryTest/iceberg-partitioned-insert', vector,
         use_db=unique_database)
 
-  @SkipIf.not_hdfs
   def test_insert_overwrite(self, vector, unique_database):
+    """Run iceberg-overwrite tests, then test that INSERT INTO/OVERWRITE queries running
+    concurrently with a long running INSERT OVERWRITE are handled gracefully. query_a is
+    started before query_b/query_c, but query_b/query_c supposed to finish before query_a.
+    query_a should fail because the overwrite should not erase query_b/query_c's result.
+    """
+    # Run iceberg-overwrite.test
     self.run_test_case('QueryTest/iceberg-overwrite', vector, use_db=unique_database)
+
+    # Create test dataset for concurrency tests and warm-up the test table
+    tbl_name = unique_database + ".overwrite_tbl"
+    self.client.execute("""create table {0} (i int)
+        partitioned by spec (truncate(3, i))
+        stored as iceberg""".format(tbl_name))
+    self.client.execute("insert into {0} values (1), (2), (3);".format(tbl_name))
+
+    # Test queries: 'a' is the long running query while 'b' and 'c' are the short ones
+    query_a = """insert overwrite {0} select sleep(5000);""".format(tbl_name)
+    query_b = """insert overwrite {0} select * from {0};""".format(tbl_name)
+    query_c = """insert into {0} select * from {0};""".format(tbl_name)
+
+    # Test concurrent INSERT OVERWRITEs, the exception closes the query handle.
+    handle = self.client.execute_async(query_a)
+    time.sleep(1)
+    self.client.execute(query_b)
+    try:
+      self.client.wait_for_finished_timeout(handle, 30)
+      assert False
+    except ImpalaBeeswaxException as e:
+      assert "Found conflicting files" in str(e)
+
+    # Test INSERT INTO during INSERT OVERWRITE, the exception closes the query handle.
+    handle = self.client.execute_async(query_a)
+    time.sleep(1)
+    self.client.execute(query_c)
+    try:
+      self.client.wait_for_finished_timeout(handle, 30)
+      assert False
+    except ImpalaBeeswaxException as e:
+      assert "Found conflicting files" in str(e)
 
   def test_ctas(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-ctas', vector, use_db=unique_database)

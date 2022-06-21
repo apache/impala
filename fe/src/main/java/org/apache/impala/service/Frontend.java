@@ -2259,6 +2259,7 @@ public class Frontend {
       } else if (targetTable instanceof FeIcebergTable) {
         FeIcebergTable iceTable = (FeIcebergTable)targetTable;
         finalizeParams.setSpec_id(iceTable.getDefaultPartitionSpecId());
+        finalizeParams.setInitial_snapshot_id(iceTable.snapshotId());
       } else {
         // TODO: Currently this flag only controls the removal of the query-level staging
         // directory. HdfsTableSink (that creates the staging dir) calculates the path

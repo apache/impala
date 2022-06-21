@@ -1467,6 +1467,7 @@ Status ClientRequestState::UpdateCatalog() {
         ice_op.__set_iceberg_data_files_fb(
             dml_exec_state->CreateIcebergDataFilesVector());
         ice_op.__set_is_overwrite(finalize_params.is_overwrite);
+        ice_op.__set_initial_snapshot_id(finalize_params.initial_snapshot_id);
       }
 
       Status cnxn_status;
