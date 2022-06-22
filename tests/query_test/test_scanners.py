@@ -1746,6 +1746,66 @@ class TestOrc(ImpalaTestSuite):
 
     self.run_test_case('QueryTest/hive2-pre-gregorian-date-orc', vector, unique_database)
 
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
+  @SkipIfS3.hive
+  @SkipIfGCS.hive
+  @SkipIfCOS.hive
+  def test_missing_field_orc(self, unique_database):
+    # Test scanning orc files with missing fields in file meta.
+    orc_tbl_name = unique_database + ".missing_field_orc"
+    self.client.execute("create table %s (f0 int) stored as orc" % orc_tbl_name)
+    self.run_stmt_in_hive("insert into table %s select 1" % orc_tbl_name)
+    self.client.execute("refresh %s" % orc_tbl_name)
+
+    self.client.execute("alter table %s add columns(f1 int)" % orc_tbl_name)
+    result = self.client.execute("select f1 from %s " % orc_tbl_name)
+    assert result.data == ['NULL']
+
+    self.client.execute("alter table %s add columns(f2 STRUCT<s0:STRING, s1:STRING>)"
+                        % orc_tbl_name)
+    result = self.client.execute("select f2.s0 from %s " % orc_tbl_name)
+    assert result.data == ['NULL']
+
+    orc_tbl_name = unique_database + ".missing_field_full_txn_test"
+    self.client.execute("create table %s(f0 int) stored as orc "
+                        "tblproperties('transactional'='true')" % orc_tbl_name)
+    self.run_stmt_in_hive("insert into %s values(0)" % orc_tbl_name)
+    self.run_stmt_in_hive("alter table %s add columns(f1 int)" % orc_tbl_name)
+    self.run_stmt_in_hive("insert into %s values(1,1)" % orc_tbl_name)
+    self.client.execute("refresh %s" % orc_tbl_name)
+    result = self.client.execute("select f1 from %s" % orc_tbl_name)
+    assert len(result.data) == 2
+    assert '1' in result.data
+    assert 'NULL' in result.data
+
+    # TODO: add a test case for Iceberg tables once IMPALA-10542 is done.
+    # orc_tbl_name = unique_database + ".missing_field_iceberg_test"
+    # self.client.execute("create table %s (f0 int) stored as iceberg "
+    #                     "tblproperties('write.format.default' = 'orc')"
+    #                     % orc_tbl_name)
+    # self.run_stmt_in_hive("insert into %s values(0)" % orc_tbl_name)
+    # self.run_stmt_in_hive("alter table %s add columns(f1 int)" % orc_tbl_name)
+    # self.run_stmt_in_hive("insert into %s values(1,1)" % orc_tbl_name)
+    # self.client.execute("refresh %s" % orc_tbl_name)
+    # result = self.client.execute("select f1 from %s" % orc_tbl_name)
+    # assert len(result.data) == 2
+    # assert '1' in result.data
+    # assert 'NULL' in result.data
+
+    orc_tbl_name = unique_database + ".lineitem_orc_ext"
+    test_file = "/test-warehouse/tpch.lineitem_orc_def"
+    create_sql = "create external table %s like tpch_orc_def.lineitem " \
+                 "location '%s'" % (orc_tbl_name, test_file)
+    self.client.execute(create_sql)
+    self.client.execute("alter table %s add columns (new_col int)" % orc_tbl_name)
+    result = self.execute_query("select count(*) from %s where new_col is null"
+                                % orc_tbl_name)
+    assert len(result.data) == 1
+    assert '6001215' in result.data
+
 
 class TestScannerReservation(ImpalaTestSuite):
   @classmethod
