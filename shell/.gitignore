@@ -4,6 +4,8 @@ ext-py/bitarray-2.3.0/bitarray.egg-info/
 ext-py/bitarray-2.3.0/dist/
 ext-py/bitarray-2.3.0/build/
 ext-py/kerberos-1.3.1/dist/
+ext-py/kerberos-1.3.1/build/
+ext-py/kerberos-1.3.1/kerberos.egg-info/
 ext-py/prettytable-0.7.2/dist/
 ext-py/prettytable-0.7.2/build/
 ext-py/prettytable-0.7.2/prettytable.egg-info

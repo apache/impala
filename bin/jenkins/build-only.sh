@@ -27,3 +27,15 @@ cd "${IMPALA_HOME}"
 export IMPALA_MAVEN_OPTIONS="-U"
 
 bin/bootstrap_build.sh
+
+# Sanity check: bootstrap_build.sh should not have modified any of
+# the Impala files. This is important for the continued functioning of
+# bin/single_node_perf_run.py.
+NUM_MODIFIED_FILES=$(git status --porcelain --untracked-files=no | wc -l)
+if [[ "${NUM_MODIFIED_FILES}" -ne 0 ]]; then
+  echo "ERROR: Impala source files were modified during bin/bootstrap_build.sh"
+  echo "Dumping diff:"
+  git status --porcelain --untracked-files=no
+  git --no-pager diff
+  exit 1
+fi

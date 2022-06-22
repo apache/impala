@@ -337,6 +337,11 @@ def main():
 
   if sh.git("status", "--porcelain", "--untracked-files=no", _out=None).strip():
     sh.git("status", "--porcelain", "--untracked-files=no", _out=sys.stdout)
+    # Something went wrong, let's dump the actual diff to make it easier to
+    # track down
+    print("#### Working copy is dirty, dumping the diff #####")
+    sh.git("--no-pager", "diff", _out=sys.stdout)
+    print("#### End of diff #####")
     raise Exception("Working copy is dirty. Consider 'git stash' and try again.")
 
   # Save the current hash to be able to return to this place in the tree when done
