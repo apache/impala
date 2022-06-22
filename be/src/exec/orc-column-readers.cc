@@ -530,28 +530,7 @@ Status OrcStructReader::TopLevelReadValueBatch(ScratchTupleBatch* scratch_batch,
   }
   int num_rows_read = scratch_batch->num_tuples - scratch_batch_idx;
   if (children_.empty()) {
-    // We allow empty 'children_' for original files, because we might select the
-    // synthetic 'rowid' field which is not present in original files.
-    // We also allow empty 'children_' when we need to validate row batches of a zero slot
-    // scan. In that case 'children_' is empty and only 'row_validator_' owns an ORC
-    // vector batch (the write id batch).
-    bool valid_empty_children = scanner_->acid_original_file_ ||
-         (scanner_->row_batches_need_validation_ &&
-          scanner_->scan_node_->IsZeroSlotTableScan());
-    if (!valid_empty_children) {
-      bool only_partitions = true;
-      for (SlotDescriptor* slot : tuple_desc_->slots()) {
-        if (!scanner_->IsPartitionKeySlot(slot)) {
-          only_partitions = false;
-          break;
-        }
-      }
-      if (!only_partitions) {
-        return Status(Substitute("Parse error in possibly corrupt ORC file: '$0'. "
-            "No columns found for this scan.",
-            scanner_->filename()));
-      }
-    }
+    // We allow empty 'children_' in all cases.
     DCHECK_EQ(0, num_rows_read);
     num_rows_read = std::min(scratch_batch->capacity - scratch_batch->num_tuples,
                              NumElements() - row_idx_);
