@@ -176,7 +176,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_strict_dimension())
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('protocol') != 'beeswax' or not v.get_value('strict_hs2_protocol'))
-    # Test with python2, python3, and the raw tarball
+    # Test combination of Python versions and tarball/PyPI
     cls.ImpalaTestMatrix.add_dimension(create_impala_shell_executable_dimension())
 
   def _expect_with_cmd(self, proc, cmd, vector, expectations=(), db="default"):
@@ -1185,7 +1185,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     impala_shell_executable = get_impala_shell_executable(vector)
     shell_args = ["--protocol={0}".format(protocol),
                   "-i{0}:{1}".format(http_503_server.HOST, http_503_server.PORT)]
-    shell_proc = spawn_shell([impala_shell_executable] + shell_args)
+    shell_proc = spawn_shell(impala_shell_executable + shell_args)
     shell_proc.expect("HTTP code 503", timeout=10)
 
   def test_http_interactions_extra(self, vector, http_503_server_extra):
@@ -1201,7 +1201,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     shell_args = ["--protocol={0}".format(protocol),
                   "-i{0}:{1}".format(http_503_server_extra.HOST,
                                      http_503_server_extra.PORT)]
-    shell_proc = spawn_shell([impala_shell_executable] + shell_args)
+    shell_proc = spawn_shell(impala_shell_executable + shell_args)
     shell_proc.expect("HTTP code 503: Service Unavailable \[EXTRA\]", timeout=10)
 
 

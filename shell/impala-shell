@@ -26,10 +26,9 @@
 #
 # The required directories are:
 # gen-py/ -- containing the Python thrift stubs for connecting to Impalad
-# lib/ -- containing the Hive Beeswax libraries, and the Python thrift 0.11.0 libraries
-#           note that this directory exists only in the shell tarball, not in the
-#           Impala repository, see make_shell_tarball.sh for details
-# ext-py/ -- containing all the eggs for the modules packaged with the shell.
+# lib/ -- containing the Hive Beeswax libraries; note this directory exists only in the
+#         shell tarball, not the Impala repository, see make_shell_tarball.sh for details
+# ext-py${VERSION}/ -- containing all the eggs for the modules packaged with the shell.
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SHELL_HOME=${IMPALA_SHELL_HOME:-${SCRIPT_DIR}}
@@ -46,11 +45,19 @@ if [ ! -d ${PYTHON_EGG_CACHE} ]; then
   mkdir ${PYTHON_EGG_CACHE}
 fi
 
+# Select python version; prefer 2, use 3 if 2's absent. Allow override with envvar
+PYTHON_EXE="${IMPALA_PYTHON_EXECUTABLE:-python}"
+if ! command -v "${PYTHON_EXE}" > /dev/null; then
+  PYTHON_EXE=python3
+fi
+
 # External module eggs are located in /ext-py, append them to the PYTHONPATH
+# Loads eggs based on Python version
+PYTHON_VERSION=$("${PYTHON_EXE}" -c 'import sys; print(sys.version_info[0])')
 EGG_PATH=''
-for EGG in $(ls ${SHELL_HOME}/ext-py/*.egg); do
+for EGG in $(ls ${SHELL_HOME}/ext-py${PYTHON_VERSION}/*.egg); do
    EGG_PATH="${EGG}:${EGG_PATH}"
 done
 
 PYTHONPATH="${EGG_PATH}${SHELL_HOME}/gen-py:${SHELL_HOME}/lib:${PYTHONPATH}" \
-  PYTHONIOENCODING='utf-8' exec python ${SHELL_HOME}/impala_shell.py "$@"
+  PYTHONIOENCODING='utf-8' exec ${PYTHON_EXE} ${SHELL_HOME}/impala_shell.py "$@"

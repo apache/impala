@@ -63,12 +63,13 @@ TARBALL_ROOT=${BUILD_DIR}/impala-shell-${VERSION}
 
 THRIFT_GEN_PY_DIR="${SHELL_HOME}/gen-py"
 
-echo "Deleting all files in ${TARBALL_ROOT}/{gen-py,lib,ext-py}"
+echo "Deleting all files in ${TARBALL_ROOT}/{gen-py,lib,ext-py*}"
 rm -rf ${TARBALL_ROOT}/lib/* 2>&1 > /dev/null
 rm -rf ${TARBALL_ROOT}/gen-py/* 2>&1 > /dev/null
-rm -rf ${TARBALL_ROOT}/ext-py/* 2>&1 > /dev/null
+rm -rf ${TARBALL_ROOT}/ext-py*/* 2>&1 > /dev/null
 mkdir -p ${TARBALL_ROOT}/lib
-mkdir -p ${TARBALL_ROOT}/ext-py
+mkdir -p ${TARBALL_ROOT}/ext-py2
+mkdir -p ${TARBALL_ROOT}/ext-py3
 
 rm -f ${THRIFT_GEN_PY_DIR}/impala_build_version.py
 cat > ${THRIFT_GEN_PY_DIR}/impala_build_version.py <<EOF
@@ -125,22 +126,22 @@ for MODULE in ${SHELL_HOME}/ext-py/*; do
   else
     python setup.py -q bdist_egg clean
   fi
-  cp dist/*.egg ${TARBALL_ROOT}/ext-py
+  cp dist/*.egg ${TARBALL_ROOT}/ext-py2
+  if [ -z "${DISABLE_PYTHON3_TEST:-}" ]; then
+    rm -rf dist 2>&1 > /dev/null
+    rm -rf build 2>&1 > /dev/null
+    if [[ "$MODULE" == *"/bitarray"* ]]; then
+      # Need to use setuptools to build egg for bitarray module
+      python3 -c "import setuptools; exec(open('setup.py').read())" -q bdist_egg
+    else
+      python3 setup.py -q bdist_egg clean
+    fi
+    cp dist/*.egg ${TARBALL_ROOT}/ext-py3
+  fi
   popd 2>&1 > /dev/null
 done
 
 # Copy all the shell files into the build dir
-# The location of python libs for thrift is different in rhel/centos/sles
-
-THRIFT_PY_ROOT="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/thrift-${IMPALA_THRIFT_PY_VERSION}"
-
-if [ -d ${THRIFT_PY_ROOT}/python/lib/python*/site-packages/thrift ]; then
-  cp -r ${THRIFT_PY_ROOT}/python/lib/python*/site-packages/thrift\
-        ${TARBALL_ROOT}/lib
-else
-  cp -r ${THRIFT_PY_ROOT}/python/lib64/python*/site-packages/thrift\
-        ${TARBALL_ROOT}/lib
-fi
 
 cp -r ${THRIFT_GEN_PY_DIR} ${TARBALL_ROOT}
 cp ${SHELL_HOME}/option_parser.py ${TARBALL_ROOT}/lib

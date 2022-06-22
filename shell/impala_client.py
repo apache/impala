@@ -25,6 +25,7 @@ import base64
 import operator
 import re
 import sasl
+import socket
 import ssl
 import sys
 import time
@@ -1022,11 +1023,16 @@ class ImpalaHS2Client(ImpalaClient):
       try:
         return rpc()
       except TTransportException as e:
+        # Unwrap socket.error so we can handle it directly.
+        if isinstance(e.inner, socket.error):
+          e = e.inner
         # issue with the connection with the impalad
         print('Caught exception {0}, type={1} in {2}. {3}'
           .format(str(e), type(e), rpc.__name__, retry_msg), file=sys.stderr)
         if raise_error:
-          raise DisconnectedException("Error communicating with impalad: %s" % e)
+          if isinstance(e, TTransportException):
+            raise DisconnectedException("Error communicating with impalad: %s" % e)
+          raise e
       except TApplicationException as t:
         # Suppress the errors from cancelling a query that is in waiting_to_finish state
         if suppress_error_on_cancel and self.is_query_cancelled:
@@ -1197,6 +1203,9 @@ class ImpalaBeeswaxClient(ImpalaClient):
         raise MissingThriftMethodException(t.message)
       raise
     except TTransportException as e:
+      # Unwrap socket.error so we can handle it directly.
+      if isinstance(e.inner, socket.error):
+        raise e.inner
       raise DisconnectedException("Error communicating with impalad: %s" % e)
     self.webserver_address = resp.webserver_address
     return (resp.version, resp.webserver_address)
@@ -1354,6 +1363,9 @@ class ImpalaBeeswaxClient(ImpalaClient):
         raise QueryCancelledByShellException()
       raise RPCException(utf8_encode_if_needed("ERROR: %s") % b.message)
     except TTransportException as e:
+      # Unwrap socket.error so we can handle it directly.
+      if isinstance(e.inner, socket.error):
+        raise e.inner
       # issue with the connection with the impalad
       raise DisconnectedException("Error communicating with impalad: %s" % e)
     except TApplicationException as t:

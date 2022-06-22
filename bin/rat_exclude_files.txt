@@ -51,6 +51,7 @@ shell/ext-py/prettytable-0.7.2/*
 shell/ext-py/sasl-0.2.1/*
 shell/ext-py/six-1.14.0/*
 shell/ext-py/sqlparse-0.3.1/*
+shell/ext-py/thrift-0.14.2/*
 shell/ext-py/thrift_sasl-0.4.3/*
 www/d3.v3.min.js
 www/jquery/jquery-3.5.1.min.js

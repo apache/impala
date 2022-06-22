@@ -180,13 +180,13 @@ def get_shell_cmd(vector):
   impala_shell_executable = get_impala_shell_executable(vector)
   if vector.get_value_with_default("strict_hs2_protocol", False):
     protocol = vector.get_value("protocol")
-    return [impala_shell_executable,
+    return impala_shell_executable + [
             "--protocol={0}".format(protocol),
             "--strict_hs2_protocol",
             "--use_ldap_test_password",
             "-i{0}".format(get_impalad_host_port(vector))]
   else:
-    return [impala_shell_executable,
+    return impala_shell_executable + [
             "--protocol={0}".format(vector.get_value("protocol")),
             "-i{0}".format(get_impalad_host_port(vector))]
 
@@ -340,9 +340,12 @@ def create_impala_shell_executable_dimension():
     if 'DISABLE_PYTHON3_TEST' in os.environ:
       return ImpalaTestDimension('impala_shell', 'dev', 'python2')
     else:
-      return ImpalaTestDimension('impala_shell', 'dev', 'python2', 'python3')
+      return ImpalaTestDimension('impala_shell', 'dev', 'dev3', 'python2', 'python3')
   else:
-    return ImpalaTestDimension('impala_shell', 'dev')
+    if 'DISABLE_PYTHON3_TEST' in os.environ:
+      return ImpalaTestDimension('impala_shell', 'dev')
+    else:
+      return ImpalaTestDimension('impala_shell', 'dev', 'dev3')
 
 
 def get_impala_shell_executable(vector):
@@ -350,7 +353,8 @@ def get_impala_shell_executable(vector):
   # use 'dev' as the default.
   impala_shell_executable, _ = get_dev_impala_shell_executable()
   return {
-    'dev': impala_shell_executable,
-    'python2': os.path.join(IMPALA_HOME, 'shell/build/py2_venv/bin/impala-shell'),
-    'python3': os.path.join(IMPALA_HOME, 'shell/build/py3_venv/bin/impala-shell')
+    'dev': [impala_shell_executable],
+    'dev3': ['env', 'IMPALA_PYTHON_EXECUTABLE=python3', impala_shell_executable],
+    'python2': [os.path.join(IMPALA_HOME, 'shell/build/py2_venv/bin/impala-shell')],
+    'python3': [os.path.join(IMPALA_HOME, 'shell/build/py3_venv/bin/impala-shell')]
   }[vector.get_value_with_default('impala_shell', 'dev')]

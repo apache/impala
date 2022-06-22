@@ -145,7 +145,7 @@ class TestImpalaShell(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_strict_dimension())
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('protocol') != 'beeswax' or not v.get_value('strict_hs2_protocol'))
-    # Test with python2, python3, and the raw tarball
+    # Test combination of Python versions and tarball/PyPI
     cls.ImpalaTestMatrix.add_dimension(create_impala_shell_executable_dimension())
 
   def test_no_args(self, vector):
@@ -870,7 +870,7 @@ class TestImpalaShell(ImpalaTestSuite):
     # to customize the impala daemon socket.
     protocol = vector.get_value("protocol")
     impala_shell_executable = get_impala_shell_executable(vector)
-    shell_cmd = [impala_shell_executable, "--protocol={0}".format(protocol)]
+    shell_cmd = impala_shell_executable + ["--protocol={0}".format(protocol)]
     if protocol == 'beeswax':
       expected_output = "get_default_configuration"
     else:

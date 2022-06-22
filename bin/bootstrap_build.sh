@@ -32,7 +32,7 @@ set -euxo pipefail
 # Install non-java dependencies:
 sudo apt-get update
 sudo apt-get --yes install g++ gcc git libsasl2-dev libssl-dev make \
-    python-dev python-setuptools python3-dev libffi-dev libkrb5-dev
+    python-dev python-setuptools python3-dev python3-setuptools libffi-dev libkrb5-dev
 
 
 source /etc/lsb-release

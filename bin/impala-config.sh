@@ -176,7 +176,8 @@ unset IMPALA_CALLONCEHACK_URL
 # IMPALA_THRIFT_POM_VERSION is used to populate IMPALA_THRIFT_JAVA_VERSION and
 # thrift.version in java/pom.xml.
 # If upgrading IMPALA_THRIFT_PY_VERSION, remember to also upgrade thrift version in
-# shell/packaging/requirements.txt
+# shell/ext-py and shell/packaging/requirements.txt. IMPALA_THRIFT_PY_VERSION is used
+# with Impyla and for the thrift compiler.
 export IMPALA_THRIFT_CPP_VERSION=0.16.0-p3
 unset IMPALA_THRIFT_CPP_URL
 export IMPALA_THRIFT_POM_VERSION=0.11.0
