@@ -45,7 +45,7 @@
 #include <thrift/transport/TSocket.h>
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/concurrency/ThreadManager.h>
-#include <thrift/concurrency/PosixThreadFactory.h>
+#include <thrift/concurrency/ThreadFactory.h>
 #include <thrift/protocol/TCompactProtocol.h>
 #pragma clang diagnostic pop
 
@@ -66,7 +66,7 @@ using namespace apache::thrift::concurrency;
 static_assert(PACKAGE_VERSION[0] == '0', NEW_THRIFT_VERSION_MSG);
 static_assert(PACKAGE_VERSION[1] == '.', NEW_THRIFT_VERSION_MSG);
 static_assert(PACKAGE_VERSION[2] == '1', NEW_THRIFT_VERSION_MSG);
-static_assert(PACKAGE_VERSION[3] == '1', NEW_THRIFT_VERSION_MSG);
+static_assert(PACKAGE_VERSION[3] == '6', NEW_THRIFT_VERSION_MSG);
 static_assert(PACKAGE_VERSION[4] == '.', NEW_THRIFT_VERSION_MSG);
 static_assert(PACKAGE_VERSION[5] == '0', NEW_THRIFT_VERSION_MSG);
 static_assert(PACKAGE_VERSION[6] == '\0', NEW_THRIFT_VERSION_MSG);

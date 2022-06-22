@@ -19,6 +19,7 @@
 #define IMPALA_RPC_THRIFT_THREAD_H
 
 #include <thrift/concurrency/Thread.h>
+#include <thrift/concurrency/ThreadFactory.h>
 
 #include "common/logging.h"
 #include "util/thread.h"
@@ -62,7 +63,7 @@ class ThriftThreadFactory : public apache::thrift::concurrency::ThreadFactory {
 /// server threads are registered with the global ThreadManager.
 class ThriftThread : public apache::thrift::concurrency::Thread {
  public:
-  ThriftThread(const std::string& group, const std::string& name,
+  ThriftThread(const std::string& group, const std::string& name, bool detached,
       std::shared_ptr<apache::thrift::concurrency::Runnable> runnable);
 
   /// (From Thread) - starts execution of the runnable in a separate thread, returning once

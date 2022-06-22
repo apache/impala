@@ -22,7 +22,7 @@
 #include "rpc/TAcceptQueueServer.h"
 
 #include <gutil/walltime.h>
-#include <thrift/concurrency/PlatformThreadFactory.h>
+#include <thrift/concurrency/ThreadFactory.h>
 #include <thrift/transport/TSocket.h>
 
 #include "util/histogram-metric.h"
@@ -198,7 +198,7 @@ TAcceptQueueServer::TAcceptQueueServer(const shared_ptr<TProcessor>& processor,
 
 void TAcceptQueueServer::init() {
   if (!threadFactory_) {
-    threadFactory_.reset(new PlatformThreadFactory);
+    threadFactory_.reset(new ThreadFactory);
   }
 }
 

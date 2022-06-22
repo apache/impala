@@ -28,79 +28,53 @@ set(SRC_FILES
   CatalogService.cpp
   CatalogService_constants.cpp
   CatalogService_types.cpp
-  CatalogInternalService_constants.cpp
   CatalogInternalService_types.cpp
   ImpalaInternalService_constants.cpp
   ImpalaInternalService_types.cpp
   ImpalaService.cpp
-  ImpalaService_constants.cpp
   ImpalaService_types.cpp
   ImpalaHiveServer2Service.cpp
-  beeswax_constants.cpp
   beeswax_types.cpp
-  BackendGflags_constants.cpp
   BackendGflags_types.cpp
   BeeswaxService.cpp
   TCLIService.cpp
   TCLIService_constants.cpp
   TCLIService_types.cpp
-  Data_constants.cpp
   Data_types.cpp
-  DataSinks_constants.cpp
   DataSinks_types.cpp
-  Descriptors_constants.cpp
   Descriptors_types.cpp
   ErrorCodes_types.cpp
   ErrorCodes_constants.cpp
-  ExecStats_constants.cpp
   ExecStats_types.cpp
-  Exprs_constants.cpp
   Exprs_types.cpp
-  ExternalDataSource_constants.cpp
   ExternalDataSource_types.cpp
   Frontend_types.cpp
-  Frontend_constants.cpp
   hive_metastore_constants.cpp
   hive_metastore_types.cpp
   JniCatalog_constants.cpp
   JniCatalog_types.cpp
   Logging_types.cpp
   LineageGraph_types.cpp
-  LineageGraph_constants.cpp
-  Metrics_constants.cpp
   Metrics_types.cpp
   MetricDefs_constants.cpp
   MetricDefs_types.cpp
-  NetworkTest_constants.cpp
   NetworkTest_types.cpp
   NetworkTestService.cpp
-  PlanNodes_constants.cpp
   PlanNodes_types.cpp
-  Results_constants.cpp
   Results_types.cpp
-  Partitions_constants.cpp
   Partitions_types.cpp
-  Planner_constants.cpp
   Planner_types.cpp
-  parquet_constants.cpp
   parquet_types.cpp
   Query_constants.cpp
   Query_types.cpp
-  ResourceProfile_constants.cpp
   ResourceProfile_types.cpp
-  RuntimeProfile_constants.cpp
   RuntimeProfile_types.cpp
-  SqlConstraints_constants.cpp
   SqlConstraints_types.cpp
   StatestoreService.cpp
-  StatestoreService_constants.cpp
   StatestoreService_types.cpp
   StatestoreSubscriber.cpp
-  Status_constants.cpp
   Status_types.cpp
-  Types_constants.cpp
   Types_types.cpp
-  Zip_constants.cpp
   Zip_types.cpp
 )
 

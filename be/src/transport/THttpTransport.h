@@ -40,23 +40,23 @@ public:
 
   virtual ~THttpTransport();
 
-  void open() { transport_->open(); }
+  void open() override { transport_->open(); }
 
-  bool isOpen() { return transport_->isOpen(); }
+  bool isOpen() const override { return transport_->isOpen(); }
 
-  bool peek() { return transport_->peek(); }
+  bool peek() override { return transport_->peek(); }
 
-  void close() { transport_->close(); }
+  void close() override { transport_->close(); }
 
   uint32_t read(uint8_t* buf, uint32_t len);
 
-  uint32_t readEnd();
+  uint32_t readEnd() override;
 
   void write(const uint8_t* buf, uint32_t len);
 
-  virtual void flush() = 0;
+  virtual void flush() override = 0;
 
-  virtual const std::string getOrigin();
+  virtual const std::string getOrigin() const override;
 
   std::shared_ptr<TTransport> getUnderlyingTransport() { return transport_; }
 

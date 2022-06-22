@@ -77,7 +77,7 @@ export IMPALA_VERSION=4.2.0-SNAPSHOT
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=162-3b0a0d993a
+export IMPALA_TOOLCHAIN_BUILD_ID=179-9977806f06
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p5
@@ -177,7 +177,7 @@ unset IMPALA_CALLONCEHACK_URL
 # thrift.version in java/pom.xml.
 # If upgrading IMPALA_THRIFT_PY_VERSION, remember to also upgrade thrift version in
 # shell/packaging/requirements.txt
-export IMPALA_THRIFT_CPP_VERSION=0.11.0-p5
+export IMPALA_THRIFT_CPP_VERSION=0.16.0-p3
 unset IMPALA_THRIFT_CPP_URL
 export IMPALA_THRIFT_POM_VERSION=0.11.0
 export IMPALA_THRIFT_JAVA_VERSION=${IMPALA_THRIFT_POM_VERSION}-p5

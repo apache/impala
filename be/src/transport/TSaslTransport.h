@@ -78,7 +78,7 @@ class TSaslTransport : public TVirtualTransport<TSaslTransport> {
   /**
    * Whether this transport is open.
    */
-  virtual bool isOpen();
+  virtual bool isOpen() const;
 
   /**
    * Tests whether there is more data to read or if the remote side is

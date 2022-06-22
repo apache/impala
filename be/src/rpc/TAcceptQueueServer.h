@@ -23,7 +23,7 @@
 #define IMPALA_RPC_TACCEPTQUEUESERVER_H
 
 #include <thrift/concurrency/Monitor.h>
-#include <thrift/concurrency/Thread.h>
+#include <thrift/concurrency/ThreadFactory.h>
 #include <thrift/server/TServer.h>
 #include <thrift/transport/TServerTransport.h>
 

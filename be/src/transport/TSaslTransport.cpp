@@ -57,7 +57,7 @@ namespace apache { namespace thrift { namespace transport {
     delete memBuf_;
   }
 
-  bool TSaslTransport::isOpen() {
+  bool TSaslTransport::isOpen() const {
     return transport_->isOpen();
   }
 

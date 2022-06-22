@@ -879,7 +879,6 @@ Status ClientRequestState::ExecShutdownRequest() {
   UniqueIdPB backend_id;
   backend_id.set_hi(0);
   backend_id.set_lo(0);
-  string krpc_error;
   if (ExecEnv::GetInstance()->rpc_mgr()->IsKrpcUsingUDS()) {
     if (ExecEnv::GetInstance()->rpc_mgr()->GetUdsAddressUniqueId()
         == UdsAddressUniqueIdPB::BACKEND_ID) {
@@ -895,10 +894,8 @@ Status ClientRequestState::ExecShutdownRequest() {
         }
       }
     }
-    krpc_error = "RemoteShutdown() RPC failed: Network error";
-  } else {
-    krpc_error = "RemoteShutdown() RPC failed: Timed out: connection negotiation to";
   }
+  string krpc_error = "RemoteShutdown() RPC failed: Network error";
   NetworkAddressPB krpc_addr = MakeNetworkAddressPB(ip_address, port, backend_id,
       ExecEnv::GetInstance()->rpc_mgr()->GetUdsAddressUniqueId());
   std::unique_ptr<ControlServiceProxy> proxy;

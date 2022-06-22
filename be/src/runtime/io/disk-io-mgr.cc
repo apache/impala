@@ -60,7 +60,6 @@ using namespace strings;
 using boost::shared_mutex;
 using boost::filesystem::path;
 using boost::uuids::random_generator;
-using std::to_string;
 
 // Control the number of disks on the machine.  If 0, this comes from the system
 // settings.
@@ -501,11 +500,13 @@ Status DiskIoMgr::Init() {
     } else if (DiskInfo::is_rotational(i)) {
       num_threads_per_disk = num_io_threads_per_rotational_disk_;
       // During tests, i may not point to an existing disk.
-      device_name = i < DiskInfo::num_disks() ? DiskInfo::device_name(i) : to_string(i);
+      device_name =
+          i < DiskInfo::num_disks() ? DiskInfo::device_name(i) : std::to_string(i);
     } else {
       num_threads_per_disk = num_io_threads_per_solid_state_disk_;
       // During tests, i may not point to an existing disk.
-      device_name = i < DiskInfo::num_disks() ? DiskInfo::device_name(i) : to_string(i);
+      device_name =
+          i < DiskInfo::num_disks() ? DiskInfo::device_name(i) : std::to_string(i);
     }
     const string& i_string = Substitute("$0", i);
 
