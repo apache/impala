@@ -369,7 +369,6 @@ class ImpalaTestClusterProperties(object):
     """Checks whether we use local catalog."""
     try:
       key = "use_local_catalog"
-      # --use_local_catalog is hidden so does not appear in JSON if disabled.
       return key in self.runtime_flags and self.runtime_flags[key]["current"] == "true"
     except Exception:
       if self.is_remote_cluster():

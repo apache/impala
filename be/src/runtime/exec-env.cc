@@ -100,21 +100,22 @@ DEFINE_int32(admission_control_slots, 0,
     "that it needs. Defaults to number of cores / -num_cores for executors, and 8x that "
     "value for dedicated coordinators).");
 
-DEFINE_bool_hidden(use_local_catalog, false,
-    "Use experimental implementation of a local catalog. If this is set, "
-    "the catalog service is not used and does not need to be started.");
-DEFINE_int32_hidden(local_catalog_cache_mb, -1,
+DEFINE_bool(use_local_catalog, false,
+    "Use the on-demand metadata feature in coordinators. If this is set, coordinators "
+    "pull metadata as needed from catalogd and cache it locally. The cached metadata "
+    "gets evicted automatically under memory pressure or after an expiration time.");
+DEFINE_int32(local_catalog_cache_mb, -1,
     "If --use_local_catalog is enabled, configures the size of the catalog "
     "cache within each impalad. If this is set to -1, the cache is auto-"
     "configured to 60% of the configured Java heap size. Note that the Java "
     "heap size is distinct from and typically smaller than the overall "
     "Impala memory limit.");
-DEFINE_int32_hidden(local_catalog_cache_expiration_s, 60 * 60,
+DEFINE_int32(local_catalog_cache_expiration_s, 60 * 60,
     "If --use_local_catalog is enabled, configures the expiration time "
     "of the catalog cache within each impalad. Even if the configured "
     "cache capacity has not been reached, items are removed from the cache "
     "if they have not been accessed in this amount of time.");
-DEFINE_int32_hidden(local_catalog_max_fetch_retries, 40,
+DEFINE_int32(local_catalog_max_fetch_retries, 40,
     "If --use_local_catalog is enabled, configures the maximum number of times "
     "the frontend retries when fetching a metadata object from the impalad "
     "coordinator's local catalog cache.");
