@@ -240,7 +240,11 @@ def build_create_statement(table_template, table_name, db_name, db_suffix,
                            force_reload):
   create_stmt = ''
   if (force_reload):
-    create_stmt += 'DROP TABLE IF EXISTS %s%s.%s;\n' % (db_name, db_suffix, table_name)
+    tbl_type = 'TABLE'
+    if table_template.upper().strip().startswith('CREATE VIEW'):
+      tbl_type = 'VIEW'
+    create_stmt += 'DROP %s IF EXISTS %s%s.%s;\n' \
+                   % (tbl_type, db_name, db_suffix, table_name)
   # hbase / kudu tables are external, and not read from hdfs. We don't need an
   # hdfs_location.
   if file_format in ['hbase', 'kudu']:
