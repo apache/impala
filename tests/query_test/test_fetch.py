@@ -19,7 +19,6 @@ import re
 
 from time import sleep
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3
 from tests.common.test_dimensions import extend_exec_option_dimension
 from tests.util.parse_util import parse_duration_string_ms
 
@@ -69,7 +68,6 @@ class TestFetch(ImpalaTestSuite):
       self.client.close_query(handle)
 
 
-@SkipIfS3.variable_listing_times
 class TestFetchAndSpooling(ImpalaTestSuite):
   """Tests that apply when result spooling is enabled or disabled."""
 
@@ -80,7 +78,8 @@ class TestFetchAndSpooling(ImpalaTestSuite):
     # Parquet files.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'parquet')
-    extend_exec_option_dimension(cls, 'spool_query_results', 'true')
+    # spool_query_results is set as true by default.
+    extend_exec_option_dimension(cls, 'spool_query_results', 'false')
 
   @classmethod
   def get_workload(cls):
@@ -91,10 +90,10 @@ class TestFetchAndSpooling(ImpalaTestSuite):
     the PLAN_ROOT_SINK section of the runtime profile."""
     num_rows = 10
     if ('spool_query_results' in vector.get_value('exec_option') and
-          bool(vector.get_value('exec_option')['spool_query_results'])):
-      vector.get_value('exec_option')['debug_action'] = "BPRS_BEFORE_ADD_BATCH:SLEEP@1000"
-    else:
+          vector.get_value('exec_option')['spool_query_results'] == 'false'):
       vector.get_value('exec_option')['debug_action'] = "BPRS_BEFORE_ADD_ROWS:SLEEP@1000"
+    else:
+      vector.get_value('exec_option')['debug_action'] = "BPRS_BEFORE_ADD_BATCH:SLEEP@1000"
     result = self.execute_query("select id from functional.alltypes limit {0}"
         .format(num_rows), vector.get_value('exec_option'))
     assert "RowsSent: {0} ({0})".format(num_rows) in result.runtime_profile
