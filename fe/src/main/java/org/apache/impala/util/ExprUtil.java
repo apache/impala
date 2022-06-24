@@ -52,17 +52,54 @@ public class ExprUtil {
   }
 
   /**
+   * Converts a UTC timestamp to string value for a specified time zone.
+   */
+  public static String utcTimestampToSpecifiedTimeZoneTimestamp(Analyzer analyzer,
+      Expr timestampExpr) throws AnalysisException, InternalException {
+    Preconditions.checkArgument(timestampExpr.isAnalyzed());
+    Preconditions.checkArgument(timestampExpr.isConstant());
+    Preconditions.checkArgument(timestampExpr.getType() == Type.TIMESTAMP);
+    Expr fromUtcTimestampExpr = new FunctionCallExpr("from_utc_timestamp", Lists
+        .newArrayList(timestampExpr,
+            new StringLiteral(analyzer.getQueryCtx().getLocal_time_zone())));
+    fromUtcTimestampExpr.analyze(analyzer);
+    TColumnValue result = FeSupport
+        .EvalExprWithoutRow(fromUtcTimestampExpr, analyzer.getQueryCtx());
+    if (!result.isSetString_val()) {
+      throw new InternalException("Error converting timestamp expression: " +
+          timestampExpr.debugString());
+    }
+    return result.getString_val();
+  }
+
+  /**
    * Converts a timestamp in local timezone to UTC, then to UNIX microseconds.
    */
   public static long localTimestampToUnixTimeMicros(Analyzer analyzer, Expr timestampExpr)
       throws AnalysisException, InternalException {
+    return utcTimestampToUnixTimeMicros(analyzer,
+        toUtcTimestampExpr(analyzer, timestampExpr));
+  }
+
+
+  /**
+   * Converts a timestamp in local timezone to string value.
+   */
+  public static String localTimestampToString(Analyzer analyzer, Expr timestampExpr)
+      throws AnalysisException, InternalException {
+    return utcTimestampToSpecifiedTimeZoneTimestamp(analyzer,
+        toUtcTimestampExpr(analyzer, timestampExpr));
+  }
+
+  private static Expr toUtcTimestampExpr(Analyzer analyzer, Expr timestampExpr)
+      throws AnalysisException {
     Preconditions.checkArgument(timestampExpr.isAnalyzed());
     Preconditions.checkArgument(timestampExpr.isConstant());
     Preconditions.checkArgument(timestampExpr.getType() == Type.TIMESTAMP);
     Expr toUtcTimestamp = new FunctionCallExpr("to_utc_timestamp",
         Lists.newArrayList(timestampExpr,
-        new StringLiteral(analyzer.getQueryCtx().getLocal_time_zone())));
+            new StringLiteral(analyzer.getQueryCtx().getLocal_time_zone())));
     toUtcTimestamp.analyze(analyzer);
-    return utcTimestampToUnixTimeMicros(analyzer, toUtcTimestamp);
+    return toUtcTimestamp;
   }
 }

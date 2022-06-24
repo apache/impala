@@ -52,6 +52,9 @@ public class TimeTravelSpec extends StmtNode {
   // Iceberg uses millis, Kudu uses micros for time travel, so using micros here.
   private long asOfMicros_ = -1;
 
+  // A time string represents the asOfMicros_ for the query option TIMEZONE
+  private String timeString_;
+
   public Kind getKind() { return kind_; }
 
   public long getAsOfVersion() { return asOfVersion_; }
@@ -71,6 +74,7 @@ public class TimeTravelSpec extends StmtNode {
     asOfExpr_ = other.asOfExpr_.clone();
     asOfVersion_ = other.asOfVersion_;
     asOfMicros_ = other.asOfMicros_;
+    timeString_ = other.timeString_;
   }
 
   @Override
@@ -106,6 +110,15 @@ public class TimeTravelSpec extends StmtNode {
       throw new AnalysisException(
           "Invalid TIMESTAMP expression: " + ie.getMessage(), ie);
     }
+    try {
+      timeString_ = ExprUtil.localTimestampToString(analyzer, asOfExpr_);
+      LOG.debug("FOR SYSTEM_TIME AS OF time: {}, {}", timeString_,
+          analyzer.getQueryCtx().getLocal_time_zone());
+    } catch (InternalException ie) {
+      throw new AnalysisException(
+          "Invalid TIMESTAMP expression: " + ie.getMessage(), ie);
+    }
+
   }
 
   private void analyzeVersionBased(Analyzer analyzer) throws AnalysisException {
@@ -145,5 +158,10 @@ public class TimeTravelSpec extends StmtNode {
   @Override
   public final String toSql() {
     return toSql(DEFAULT);
+  }
+
+  public String toTimeString() {
+    Preconditions.checkState(Kind.TIME_AS_OF.equals(kind_));
+    return timeString_;
   }
 }

@@ -545,17 +545,29 @@ public class IcebergUtil {
   }
 
   private static TableScan createScanAsOf(FeIcebergTable table,
-      TimeTravelSpec timeTravelSpec) throws TableLoadingException {
+      TimeTravelSpec timeTravelSpec) {
     TableScan scan = table.getIcebergApiTable().newScan();
     if (timeTravelSpec == null) {
       scan = scan.useSnapshot(table.snapshotId());
     } else {
       if (timeTravelSpec.getKind() == Kind.TIME_AS_OF) {
-        scan = scan.asOfTime(timeTravelSpec.getAsOfMillis());
+        scan = createScanAsOfTime(timeTravelSpec, scan);
       } else {
         Preconditions.checkState(timeTravelSpec.getKind() == Kind.VERSION_AS_OF);
         scan = scan.useSnapshot(timeTravelSpec.getAsOfVersion());
       }
+    }
+    return scan;
+  }
+
+  private static TableScan createScanAsOfTime(TimeTravelSpec timeTravelSpec,
+      TableScan scan) {
+    Preconditions.checkState(timeTravelSpec.getKind() == Kind.TIME_AS_OF);
+    try {
+      scan = scan.asOfTime(timeTravelSpec.getAsOfMillis());
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          "Cannot find a snapshot older than " + timeTravelSpec.toTimeString());
     }
     return scan;
   }
