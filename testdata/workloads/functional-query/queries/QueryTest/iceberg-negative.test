@@ -629,3 +629,20 @@ CREATE TABLE clone_ice LIKE functional_parquet.alltypestiny STORED AS ICEBERG;
 ---- CATCH
 CREATE TABLE LIKE is not supported for Iceberg tables.
 ====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part for system_time as of '2000-01-01 01:02:03';
+---- CATCH
+IllegalArgumentException: Cannot find a snapshot older than 2000-01-01 01:02:03
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+select * from functional_parquet.iceberg_alltypes_part for system_time as of '2000-01-01 01:02:03';
+---- CATCH
+IllegalArgumentException: Cannot find a snapshot older than 2000-01-01 01:02:03
+====
+---- QUERY
+SET TIMEZONE='Asia/Shanghai';
+select * from functional_parquet.iceberg_alltypes_part for system_time as of '2000-01-01 01:02:03';
+---- CATCH
+IllegalArgumentException: Cannot find a snapshot older than 2000-01-01 01:02:03
+====
