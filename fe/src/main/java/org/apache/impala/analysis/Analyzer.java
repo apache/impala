@@ -3456,14 +3456,6 @@ public class Analyzer {
     // without registering privileges.
     FeTable table = getTableNoThrow(fqTableName.getDb(), fqTableName.getTbl());
     final String tableOwner = table == null ? null : table.getOwnerUser();
-    // Notice that in isViewCreatedWithoutAuthz() we assume that 'table' is not a view
-    // whose creation was not authorized if we cannot find it currently cached in the
-    // local Catalog, i.e., when 'table' is null.
-    // TODO(IMPALA-10122): Remove the need for computing 'isViewCreatedWithoutAuthz' once
-    // we can properly process a PrivilegeRequest for a view whose creation was not
-    // authorized.
-    boolean isViewCreatedWithoutAuthz =
-        PrivilegeRequestBuilder.isViewCreatedWithoutAuthz(table);
     for (Privilege priv : privilege) {
       if (priv == Privilege.ANY || addColumnPrivilege) {
         registerPrivReq(builder ->
@@ -3473,8 +3465,8 @@ public class Analyzer {
       } else {
         registerPrivReq(builder ->
             builder.allOf(priv)
-                .onTable(fqTableName.getDb(), fqTableName.getTbl(), tableOwner,
-                isViewCreatedWithoutAuthz).build());
+                .onTable(fqTableName.getDb(), fqTableName.getTbl(), tableOwner)
+                .build());
       }
     }
     // Propagate the AnalysisException if the table/db does not exist.

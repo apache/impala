@@ -255,18 +255,6 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
     boolean hasColumnSelectPriv = false;
     for (PrivilegeRequest request: requests) {
       if (request.getAuthorizable().getType() == Authorizable.Type.TABLE) {
-        // Recall that this method will still be called even if authorization is not
-        // enabled. In this regard, we only deny access to a view not authorized at
-        // the creation time when authorization is enabled, i.e.,
-        // when config_.isEnabled() is true.
-        // TODO(IMPALA-10122): Remove the following if-then statement once we can
-        // properly process a PrivilegeRequest for a view whose creation was not
-        // authorized.
-        if (config_.isEnabled() && ((AuthorizableTable) request.getAuthorizable())
-            .isViewCreatedWithoutAuthz()) {
-            hasTableSelectPriv = false;
-            break;
-        }
         try {
           authorizePrivilegeRequest(authzCtx, analysisResult, catalog, request);
         } catch (AuthorizationException e) {

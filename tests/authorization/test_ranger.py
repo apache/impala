@@ -782,6 +782,49 @@ class TestRanger(CustomClusterTestSuite):
     return json.loads(r.content)["id"]
 
   @staticmethod
+  def _add_deny_policy(policy_name, user, db, table, column):
+    """ Adds a deny policy and returns the policy id"""
+    data = {
+      "name": policy_name,
+      "policyType": 0,
+      "serviceType": "hive",
+      "service": "test_impala",
+      "resources": {
+        "database": {
+          "values": [db],
+          "isExcludes": False,
+          "isRecursive": False
+        },
+        "table": {
+          "values": [table],
+          "isExcludes": False,
+          "isRecursive": False
+        },
+        "column": {
+          "values": [column],
+          "isExcludes": False,
+          "isRecursive": False
+        }
+      },
+      "policyItems": [],
+      "denyPolicyItems": [
+        {
+          "accesses": [
+            {
+              "type": "select",
+              "isAllowed": True
+            }
+          ],
+          "users": [user],
+        }
+      ]
+    }
+    r = requests.post("{0}/service/public/v2/api/policy".format(RANGER_HOST),
+                      auth=RANGER_AUTH, json=data, headers=REST_HEADERS)
+    assert 300 > r.status_code >= 200, r.content
+    return json.loads(r.content)["id"]
+
+  @staticmethod
   def _remove_policy(policy_name):
     r = requests.delete(
         "{0}/service/public/v2/api/policy?servicename=test_impala&policyname={1}".format(
@@ -1527,6 +1570,110 @@ class TestRanger(CustomClusterTestSuite):
           # exist, the granted privilege is revoked. The same applies to the case when we
           # drop a role.
           pass
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_select_view_created_by_non_superuser_with_catalog_v1(self, unique_name):
+    self._test_select_view_created_by_non_superuser(unique_name)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=LOCAL_CATALOG_IMPALAD_ARGS,
+    catalogd_args=LOCAL_CATALOG_CATALOGD_ARGS)
+  def test_select_view_created_by_non_superuser_with_local_catalog(self, unique_name):
+    self._test_select_view_created_by_non_superuser(unique_name)
+
+  def _test_select_view_created_by_non_superuser(self, unique_name):
+    """Test that except for the necessary privileges on the view, the requesting user
+    has to be granted the necessary privileges on the underlying tables as well in order
+    to access a view with its table property of 'Authorized' set to false."""
+    admin_client = self.create_impala_client()
+    non_owner_client = self.create_impala_client()
+    unique_database = unique_name + "_db"
+    test_tbl_1 = unique_name + "_tbl_1"
+    test_tbl_2 = unique_name + "_tbl_2"
+    test_view = unique_name + "_view"
+    grantee_user = "non_owner"
+
+    try:
+      # Set up temp database, tables, and the view.
+      admin_client.execute("drop database if exists {0} cascade"
+          .format(unique_database), user=ADMIN)
+      admin_client.execute("create database {0}".format(unique_database), user=ADMIN)
+      admin_client.execute("create table {0}.{1} (id int, bigint_col bigint)"
+          .format(unique_database, test_tbl_1), user=ADMIN)
+      admin_client.execute("create table {0}.{1} (id int, string_col string)"
+          .format(unique_database, test_tbl_2), user=ADMIN)
+      admin_client.execute("create view {0}.{1} (abc, xyz) as "
+          "select count(a.bigint_col), b.string_col "
+          "from {0}.{2} a inner join {0}.{3} b on a.id = b.id "
+          "group by b.string_col having count(a.bigint_col) > 1"
+          .format(unique_database, test_view, test_tbl_1, test_tbl_2), user=ADMIN)
+      # Add this table property to simulate a view created by a non-superuser.
+      self.run_stmt_in_hive("alter view {0}.{1} "
+          "set tblproperties ('Authorized' = 'false')"
+          .format(unique_database, test_view))
+
+      admin_client.execute("grant select(abc) on table {0}.{1} to user {2}"
+          .format(unique_database, test_view, grantee_user), user=ADMIN)
+      admin_client.execute("grant select(xyz) on table {0}.{1} to user {2}"
+          .format(unique_database, test_view, grantee_user), user=ADMIN)
+      admin_client.execute("grant select on table {0}.{1} to user {2}"
+          .format(unique_database, test_tbl_2, grantee_user), user=ADMIN)
+      admin_client.execute("refresh authorization")
+
+      result = self.execute_query_expect_failure(non_owner_client,
+          "select * from {0}.{1}".format(unique_database, test_view), user=grantee_user)
+      assert "User '{0}' does not have privileges to execute 'SELECT' on: " \
+          "{1}.{2}".format(grantee_user, unique_database, test_tbl_1) in str(result)
+
+      admin_client.execute("grant select(id) on table {0}.{1} to user {2}"
+          .format(unique_database, test_tbl_1, grantee_user), user=ADMIN)
+      admin_client.execute("refresh authorization")
+      # The query is not authorized since the SELECT privilege on the column 'bigint_col'
+      # in the table 'test_tbl_1' is also required.
+      result = self.execute_query_expect_failure(non_owner_client,
+          "select * from {0}.{1}".format(unique_database, test_view), user=grantee_user)
+      assert "User '{0}' does not have privileges to execute 'SELECT' on: " \
+          "{1}.{2}".format(grantee_user, unique_database, test_tbl_1) in str(result)
+
+      admin_client.execute("grant select(bigint_col) on table {0}.{1} to user {2}"
+          .format(unique_database, test_tbl_1, grantee_user), user=ADMIN)
+      admin_client.execute("refresh authorization")
+
+      # The query is authorized successfully once sufficient privileges are granted.
+      self.execute_query_expect_success(non_owner_client,
+          "select * from {0}.{1}".format(unique_database, test_view), user=grantee_user)
+
+      # Add a deny policy to prevent 'grantee_user' from accessing the column 'id' in
+      # the table 'test_tbl_2', on which 'grantee_user' had been granted the SELECT
+      # privilege.
+      TestRanger._add_deny_policy(unique_name, grantee_user, unique_database, test_tbl_2,
+          "id")
+      admin_client.execute("refresh authorization")
+
+      # The query is not authorized since the SELECT privilege on the column 'id' in the
+      # table 'test_tbl_2' has been denied in the policy above.
+      result = self.execute_query_expect_failure(non_owner_client,
+          "select * from {0}.{1}".format(unique_database, test_view), user=grantee_user)
+      assert "User '{0}' does not have privileges to execute 'SELECT' on: " \
+          "{1}.{2}".format(grantee_user, unique_database, test_tbl_2) in str(result)
+    finally:
+      admin_client.execute("revoke select(abc) on table {0}.{1} from user {2}"
+          .format(unique_database, test_view, grantee_user), user=ADMIN)
+      admin_client.execute("revoke select(xyz) on table {0}.{1} from user {2}"
+          .format(unique_database, test_view, grantee_user), user=ADMIN)
+      admin_client.execute("revoke select(id) on table {0}.{1} from user {2}"
+           .format(unique_database, test_tbl_1, grantee_user), user=ADMIN)
+      admin_client.execute("revoke select(bigint_col) on table {0}.{1} from user {2}"
+           .format(unique_database, test_tbl_1, grantee_user), user=ADMIN)
+      admin_client.execute("revoke select on table {0}.{1} from user {2}"
+          .format(unique_database, test_tbl_2, grantee_user), user=ADMIN)
+      admin_client.execute("drop database if exists {0} cascade"
+          .format(unique_database), user=ADMIN)
+      TestRanger._remove_policy(unique_name)
+
 
 class TestRangerColumnMaskingTpchNested(CustomClusterTestSuite):
   """

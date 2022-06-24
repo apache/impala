@@ -80,11 +80,8 @@ import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.analysis.TruncateStmt;
 import org.apache.impala.authentication.saml.ImpalaSamlClient;
-import org.apache.impala.authorization.Authorizable;
-import org.apache.impala.authorization.AuthorizableTable;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
@@ -1538,18 +1535,6 @@ public class Frontend {
       PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder(
           authzFactory_.getAuthorizableFactory())
           .allOf(Privilege.VIEW_METADATA).onTable(table).build();
-      // TODO(IMPALA-10122): Remove the following if-then statement once we can
-      // properly process a PrivilegeRequest for a view whose creation was not
-      // authorized.
-      if (privilegeRequest.getAuthorizable().getType() == Authorizable.Type.TABLE) {
-        if (((AuthorizableTable) privilegeRequest.getAuthorizable())
-            .isViewCreatedWithoutAuthz()) {
-          throw new AuthorizationException(String.format("User '%s' does not have " +
-                  "privileges to execute '%s' on: %s", user.getName(),
-              privilegeRequest.getPrivilege().toString(),
-              privilegeRequest.getAuthorizable().getFullTableName()));
-        }
-      }
       if (!authzChecker_.get().hasAccess(user, privilegeRequest)) {
         // Filter out columns that the user is not authorized to see.
         filteredColumns = new ArrayList<Column>();

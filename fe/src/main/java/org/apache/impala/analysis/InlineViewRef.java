@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.impala.authorization.AuthorizationContext;
+import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.authorization.TableMask;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
@@ -214,18 +215,23 @@ public class InlineViewRef extends TableRef {
     // Catalog views refs require special analysis settings for authorization.
     if (isCatalogView()) {
       analyzer.registerAuthAndAuditEvent(view_, priv_, requireGrantOption_);
-      if (inlineViewAnalyzer_.isExplain()) {
-        // If the user does not have privileges on the view's definition
-        // then we report a masked authorization error so as not to reveal
-        // privileged information (e.g., the existence of a table).
-        inlineViewAnalyzer_.setMaskPrivChecks(
-            String.format("User '%s' does not have privileges to " +
-            "EXPLAIN this statement.", analyzer.getUser().getName()));
-      } else {
-        // If this is not an EXPLAIN statement, auth checks for the view
-        // definition are still performed in order to determine if the user has access
-        // to the runtime profile but don't trigger authorization errors.
-        inlineViewAnalyzer_.setMaskPrivChecks(null);
+      // For a view created by a non-superuser, i.e., a view with its table property of
+      // 'Authorized' set to false, we do not set 'maskPrivChecks_' to true so as to
+      // enforce the privilege checks for the underlying tables additionally.
+      if (!PrivilegeRequestBuilder.isViewCreatedByNonSuperuser(view_)) {
+        if (inlineViewAnalyzer_.isExplain()) {
+          // If the user does not have privileges on the view's definition
+          // then we report a masked authorization error so as not to reveal
+          // privileged information (e.g., the existence of a table).
+          inlineViewAnalyzer_.setMaskPrivChecks(
+              String.format("User '%s' does not have privileges to " +
+                  "EXPLAIN this statement.", analyzer.getUser().getName()));
+        } else {
+          // If this is not an EXPLAIN statement, auth checks for the view
+          // definition are still performed in order to determine if the user has access
+          // to the runtime profile but don't trigger authorization errors.
+          inlineViewAnalyzer_.setMaskPrivChecks(null);
+        }
       }
     }
 

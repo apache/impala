@@ -33,19 +33,14 @@ public class AuthorizableTable extends Authorizable {
   private final String tableName_;
   @Nullable // Is null if the owner is not set.
   private final String ownerUser_;
-  // TODO(IMPALA-10122): Remove the following field once we can properly process a
-  // PrivilegeRequest for a view whose creation was not authorized.
-  private final boolean viewCreatedWithoutAuthz_;
   private final List<String> columns_ = new ArrayList<>();
 
-  public AuthorizableTable(String dbName, String tableName, @Nullable String ownerUser,
-      boolean viewCreatedWithoutAuthz) {
+  public AuthorizableTable(String dbName, String tableName, @Nullable String ownerUser) {
     Preconditions.checkArgument(!Strings.isNullOrEmpty(dbName));
     Preconditions.checkArgument(!Strings.isNullOrEmpty(tableName));
     dbName_ = dbName;
     tableName_ = tableName;
     ownerUser_ = ownerUser;
-    viewCreatedWithoutAuthz_ = viewCreatedWithoutAuthz;
   }
 
   @Override
@@ -65,10 +60,6 @@ public class AuthorizableTable extends Authorizable {
 
   @Override
   public String getOwnerUser() { return ownerUser_; }
-
-  // TODO(IMPALA-10122): Remove the following method once we can properly process a
-  // PrivilegeRequest for a view whose creation was not authorized.
-  public boolean isViewCreatedWithoutAuthz() { return viewCreatedWithoutAuthz_; }
 
   public void setColumns(List<String> columns) {
     columns_.clear();

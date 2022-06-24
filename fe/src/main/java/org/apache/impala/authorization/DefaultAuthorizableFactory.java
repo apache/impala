@@ -37,11 +37,10 @@ public class DefaultAuthorizableFactory implements AuthorizableFactory {
   }
 
   @Override
-  public Authorizable newTable(String dbName, String tableName, String ownerUser,
-      boolean viewCreatedWithoutAuthz) {
+  public Authorizable newTable(String dbName, String tableName, String ownerUser) {
     Preconditions.checkNotNull(dbName);
     Preconditions.checkNotNull(tableName);
-    return new AuthorizableTable(dbName, tableName, ownerUser, viewCreatedWithoutAuthz);
+    return new AuthorizableTable(dbName, tableName, ownerUser);
   }
 
   @Override
