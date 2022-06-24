@@ -24,8 +24,9 @@ from time import sleep
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.kudu_test_suite import KuduTestSuite
-from tests.common.skip import SkipIfKudu, SkipIfHive3, SkipIfBuildType
+from tests.common.skip import SkipIfKudu, SkipIfBuildType
 from tests.common.test_dimensions import add_exec_option_dimension
+from tests.util.event_processor_utils import EventProcessorUtils
 
 KUDU_MASTER_HOSTS = pytest.config.option.kudu_master_hosts
 LOG = logging.getLogger(__name__)
@@ -291,12 +292,16 @@ class TestKuduHMSIntegration(CustomKuduTest):
     assert kudu_client.table_exists(kudu_tbl_name)
     kudu_client.delete_table(kudu_tbl_name)
     assert not kudu_client.table_exists(kudu_tbl_name)
+
+    # Wait for events to prevent race condition
+    EventProcessorUtils.wait_for_event_processing(self)
+
     try:
       cursor.execute("DROP TABLE %s" % kudu_tbl_name)
       assert False
     except Exception as e:
       LOG.info(str(e))
-      assert "Table %s no longer exists in the Hive MetaStore." % kudu_tbl_name in str(e)
+      "Table does not exist: %s" % kudu_tbl_name in str(e)
 
   @pytest.mark.execute_serially
   def test_drop_external_kudu_table(self, cursor, kudu_client, unique_database):
