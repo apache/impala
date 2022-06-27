@@ -236,7 +236,7 @@ add_custom_target(thrift-ext-data-src ALL DEPENDS ${THRIFT_DATA_SRC_FILES})
 add_dependencies(thrift-ext-data-src thrift-cpp)
 
 add_custom_target(thrift-cpp-manual-edit
-  COMMAND sed -i.bak "'s|\(dispatchCallTemplated.*\));|\1) override;|'"
+  COMMAND sed -i.bak "'s|\\(dispatchCallTemplated.*\\));|\\1) override;|'"
       ${BE_OUTPUT_DIR}/gen-cpp/ImpalaHiveServer2Service.h
       ${BE_OUTPUT_DIR}/gen-cpp/ImpalaService.h
       COMMENT "IMPALA-11384: Manual override on ImpalaHiveServer2Service.h and ImpalaService.h"
