@@ -138,6 +138,18 @@ under the License.
         <version>${gcs.version}</version>
     </dependency>
 
+    <!-- Dependency of gcs-connector, newer version addresses CVE -->
+    <dependency>
+      <groupId>com.google.oauth-client</groupId>
+      <artifactId>google-oauth-client</artifactId>
+      <version>${google.oauth-client.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.oauth-client</groupId>
+      <artifactId>google-oauth-client-java6</artifactId>
+      <version>${google.oauth-client.version}</version>
+    </dependency>
+
     <dependency>
       <groupId>com.qcloud.cos</groupId>
       <artifactId>hadoop-cos</artifactId>

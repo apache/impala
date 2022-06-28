@@ -46,6 +46,7 @@ under the License.
     <kite.version>${env.IMPALA_KITE_VERSION}</kite.version>
     <knox.version>${env.IMPALA_KNOX_VERSION}</knox.version>
     <gcs.version>${env.IMPALA_GCS_VERSION}</gcs.version>
+    <google.oauth-client.version>1.33.3</google.oauth-client.version>
     <cos.version>${env.IMPALA_COS_VERSION}</cos.version>
     <thrift.version>${env.IMPALA_THRIFT_POM_VERSION}</thrift.version>
     <impala.extdatasrc.api.version>${project.version}</impala.extdatasrc.api.version>
