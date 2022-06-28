@@ -129,8 +129,9 @@ unset IMPALA_LLVM_URL
 export IMPALA_LLVM_ASAN_VERSION=5.0.1-p5
 unset IMPALA_LLVM_ASAN_URL
 
-# Maximum memory available for mini-cluster and CDH cluster
-export IMPALA_CLUSTER_MAX_MEM_GB
+# To limit maximum memory available for the mini-cluster and CDH cluster, add the
+# following in $IMPALA_HOME/bin/impala-config-local.sh
+#   export IMPALA_CLUSTER_MAX_MEM_GB=<value>
 
 # LLVM stores some files in subdirectories that are named after what
 # version it thinks it is. We might think it is 5.0.1-p1, based on a
