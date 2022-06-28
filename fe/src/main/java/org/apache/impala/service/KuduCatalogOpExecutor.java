@@ -19,6 +19,7 @@ package org.apache.impala.service;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,6 +38,7 @@ import org.apache.impala.thrift.TAlterTableAddDropRangePartitionParams;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.TKuduPartitionParam;
+import org.apache.impala.thrift.TKuduPartitionByHashParam;
 import org.apache.impala.thrift.TRangePartition;
 import org.apache.impala.thrift.TRangePartitionOperationType;
 import org.apache.impala.util.KuduUtil;
@@ -49,6 +51,7 @@ import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduException;
 import org.apache.kudu.client.PartialRow;
 import org.apache.kudu.client.RangePartitionBound;
+import org.apache.kudu.client.RangePartitionWithCustomHashSchema;
 import org.apache.kudu.util.CharUtil;
 import org.apache.kudu.util.DecimalUtil;
 import org.apache.log4j.Logger;
@@ -221,8 +224,14 @@ public class KuduCatalogOpExecutor {
             Preconditions.checkState(rangeBounds.size() == 2);
             Pair<PartialRow, RangePartitionBound> lowerBound = rangeBounds.get(0);
             Pair<PartialRow, RangePartitionBound> upperBound = rangeBounds.get(1);
-            tableOpts.addRangePartition(lowerBound.first, upperBound.first,
-                lowerBound.second, upperBound.second);
+            if (rangePartition.isSetHash_specs()) {
+              RangePartitionWithCustomHashSchema rangePart =
+                  getRangePartitionWithCustomHashSchema(rangePartition, rangeBounds);
+              tableOpts.addRangePartition(rangePart);
+            } else {
+              tableOpts.addRangePartition(lowerBound.first, upperBound.first,
+                  lowerBound.second, upperBound.second);
+            }
           }
         }
       }
@@ -390,6 +399,27 @@ public class KuduCatalogOpExecutor {
     }
   }
 
+  private static RangePartitionWithCustomHashSchema getRangePartitionWithCustomHashSchema(
+      TRangePartition rangePartition,
+      List<Pair<PartialRow, RangePartitionBound>> rangeBounds) {
+    Pair<PartialRow, RangePartitionBound> lowerBound = rangeBounds.get(0);
+    Pair<PartialRow, RangePartitionBound> upperBound = rangeBounds.get(1);
+    RangePartitionWithCustomHashSchema rangePart =
+      new RangePartitionWithCustomHashSchema(
+          lowerBound.first,
+          upperBound.first,
+          lowerBound.second,
+          upperBound.second);
+    Iterator<TKuduPartitionParam> specIter = rangePartition.getHash_specsIterator();
+    while (specIter.hasNext()) {
+      TKuduPartitionParam param = specIter.next();
+      TKuduPartitionByHashParam hash = param.getBy_hash_param();
+      // Seed parameter is currently not supported at all in the Impala grammar
+      int seed = 0;
+      rangePart.addHashPartitions(hash.getColumns(), hash.getNum_partitions(), seed);
+    }
+    return rangePart;
+  }
   /**
    * Adds/drops a range partition.
    */
@@ -404,8 +434,14 @@ public class KuduCatalogOpExecutor {
     AlterTableOptions alterTableOptions = new AlterTableOptions();
     TRangePartitionOperationType type = params.getType();
     if (type == TRangePartitionOperationType.ADD) {
-      alterTableOptions.addRangePartition(lowerBound.first, upperBound.first,
-          lowerBound.second, upperBound.second);
+      if (rangePartition.isSetHash_specs()) {
+        RangePartitionWithCustomHashSchema rangePart =
+            getRangePartitionWithCustomHashSchema(rangePartition, rangeBounds);
+        alterTableOptions.addRangePartition(rangePart);
+      } else {
+        alterTableOptions.addRangePartition(lowerBound.first, upperBound.first,
+            lowerBound.second, upperBound.second);
+      }
     } else {
       alterTableOptions.dropRangePartition(lowerBound.first, upperBound.first,
           lowerBound.second, upperBound.second);

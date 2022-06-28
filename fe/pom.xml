@@ -645,6 +645,7 @@ under the License.
           <className>SqlParser</className>
           <symbolsName>SqlParserSymbols</symbolsName>
           <outputDirectory>${project.build.directory}/generated-sources/cup</outputDirectory>
+          <expectedConflicts>0</expectedConflicts>
         </configuration>
       </plugin>
 

@@ -267,3 +267,147 @@ create table range_multi_col_duplicate_parts (id int, name string, valf float,
 ---- CATCH
 NonRecoverableException: overlapping range partitions: first range partition: (10, "dimitris") <= VALUES < (10, "dimitris\000"), second range partition: (10, "dimitris") <= VALUES < (10, "dimitris\000")
 ====
+---- QUERY
+-- Test create custom hash partitioning overlapping hash colums
+create table custom_hash_range (id int, c2 int, primary key(id, c2))
+partition by hash(id) partitions 3, hash(c2) partitions 4,
+range (c2)
+(
+    partition 0 <= values < 10
+  , partition 10 <= values < 20 hash(id) partitions 2 hash(id) partitions 3
+)
+stored as kudu;
+---- CATCH
+NonRecoverableException: hash bucket schema components must not contain columns in common
+====
+---- QUERY
+-- Test create custom hash partitioning on non-pk column
+create table custom_hash_range (id int, c2 int, c3 int, primary key(id, c2))
+partition by hash(id) partitions 3,
+range (c2)
+(
+    partition 0 <= values < 10
+  , partition 10 <= values < 20 hash(c3) partitions 3
+)
+stored as kudu;
+---- CATCH
+AnalysisException: Column 'c3' in 'HASH (c3) PARTITIONS 3' is not a key column. Only key columns can be used in PARTITION BY.
+====
+---- QUERY
+-- Test create custom hash partitioning varying hash dimensions unsupported
+create table custom_hash_range (id int, c2 int, primary key(id, c2))
+partition by hash(id) partitions 3, hash(c2) partitions 4,
+range (c2)
+(
+    partition 0 <= values < 10
+  , partition 10 <= values < 20 hash partitions 2
+)
+stored as kudu;
+---- CATCH
+NonRecoverableException: varying number of hash dimensions per range is not yet supported
+====
+---- QUERY
+-- Test custom hash partitioning
+create table custom_hash_range (id int, c2 int, primary key(id, c2))
+partition by hash(id) partitions 3, hash(c2) partitions 4,
+range (c2)
+(
+    partition 0 <= values < 10
+  , partition 10 <= values < 20 hash(id) partitions 2 hash(c2) partitions 3
+)
+stored as kudu;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+-- Test alter custom hash partitioning varying hash dimensions unsupported
+alter table custom_hash_range add range partition 30 <= values < 40 hash partitions 10
+---- CATCH
+NonRecoverableException: varying number of hash dimensions per range is not yet supported
+====
+---- QUERY
+-- Test alter custom hash partitioning on non-pk column
+alter table custom_hash_range add range partition 30 <= values < 40 hash(c3) partitions 3
+---- CATCH
+AnalysisException: Column 'c3' in 'HASH (c3) PARTITIONS 3' is not a key column. Only key columns can be used in PARTITION BY.
+====
+---- QUERY
+-- Test alter add custom hash partitioning
+alter table custom_hash_range add range partition 30 <= values < 40 hash(c2) partitions 5 hash(id) partitions 3
+---- RESULTS
+'Range partition has been added.'
+====
+---- QUERY
+show hash schema custom_hash_range
+---- LABELS
+RANGE (c2) HASH SCHEMA
+---- RESULTS
+'0 <= VALUES < 10 HASH(id) PARTITIONS 3 HASH(c2) PARTITIONS 4'
+'10 <= VALUES < 20 HASH(id) PARTITIONS 2 HASH(c2) PARTITIONS 3'
+'30 <= VALUES < 40 HASH(c2) PARTITIONS 5 HASH(id) PARTITIONS 3'
+---- TYPES
+STRING
+====
+---- QUERY
+-- Test single-level custom hash partitioning
+create table custom_hash_range_single (id int, c2 int, primary key(id, c2))
+partition by hash(id) partitions 3,
+range (c2)
+(
+    partition 0 <= values < 10
+  , partition 10 <= values < 20 hash partitions 2
+  , partition 20 <= values < 30 hash(c2) partitions 3
+  , partition 30 <= values < 40 hash(id) partitions 4
+  , partition 40 <= values < 50 hash(id, c2) partitions 5
+)
+stored as kudu
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+-- Test single-level custom hash partitioning
+alter table custom_hash_range_single add range partition 50 <= values < 60 hash partitions 2
+---- RESULTS
+'Range partition has been added.'
+====
+---- QUERY
+-- Test single-level custom hash partitioning
+alter table custom_hash_range_single add range partition 60 <= values < 70 hash(c2) partitions 3
+---- RESULTS
+'Range partition has been added.'
+====
+---- QUERY
+-- Test single-level custom hash partitioning
+alter table custom_hash_range_single add range partition 70 <= values < 80 hash(id) partitions 4
+---- RESULTS
+'Range partition has been added.'
+====
+---- QUERY
+-- Test single-level custom hash partitioning
+alter table custom_hash_range_single add range partition 80 <= values < 90 hash(id,c2) partitions 5
+---- RESULTS
+'Range partition has been added.'
+====
+---- QUERY
+show hash schema custom_hash_range_single
+---- LABELS
+RANGE (c2) HASH SCHEMA
+---- RESULTS
+'0 <= VALUES < 10 HASH(id) PARTITIONS 3'
+'10 <= VALUES < 20 HASH(id,c2) PARTITIONS 2'
+'20 <= VALUES < 30 HASH(c2) PARTITIONS 3'
+'30 <= VALUES < 40 HASH(id) PARTITIONS 4'
+'40 <= VALUES < 50 HASH(id,c2) PARTITIONS 5'
+'50 <= VALUES < 60 HASH(id,c2) PARTITIONS 2'
+'60 <= VALUES < 70 HASH(c2) PARTITIONS 3'
+'70 <= VALUES < 80 HASH(id) PARTITIONS 4'
+'80 <= VALUES < 90 HASH(id,c2) PARTITIONS 5'
+---- TYPES
+STRING
+====
+---- QUERY
+-- Test invalid partition count
+alter table custom_hash_range_single add range partition 40 <= values < 50 hash partitions -1
+---- CATCH
+ParseException: Syntax error in line 2:...lues < 50 hash partitions -1
+====

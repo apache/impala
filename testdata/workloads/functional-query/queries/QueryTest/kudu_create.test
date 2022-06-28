@@ -178,7 +178,7 @@ partition by range (
   partition cast('2009-01-02 10:00:00' as timestamp) <= VALUES
 ) stored as kudu
 ---- CATCH
-NonRecoverableException: overlapping range partitions: first range partition: 2009-01-02T00:00:00.000000Z <= VALUES < 2009-01-03T00:00:00.000000Z, second range partition: VALUES >= 2009-01-02T10:00:00.000000Z
+NonRecoverableException: overlapping range partitions: first range partition: 2009-01-02T00:00:00.000000Z <= VALUES < 2009-01-03T00:00:00.000000Z, second range partition: 2009-01-02T10:00:00.000000Z <= VALUES
 ====
 ---- QUERY
 # Creates a range partitioned Kudu table with a timestamp PK. Note that nanoseconds

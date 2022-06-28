@@ -62,6 +62,8 @@ public class ShowStatsStmt extends StatementBase {
       return "SHOW PARTITIONS";
     } else if (op_ == TShowStatsOp.RANGE_PARTITIONS) {
       return "SHOW RANGE PARTITIONS";
+    } else if (op_ == TShowStatsOp.HASH_SCHEMA) {
+      return "SHOW HASH_SCHEMA";
     } else {
       Preconditions.checkState(false);
       return "";
@@ -105,19 +107,19 @@ public class ShowStatsStmt extends StatementBase {
       if (!partitioned) {
         throw new AnalysisException("Table is not partitioned: " + table_.getFullName());
       }
-      if (op_ == TShowStatsOp.RANGE_PARTITIONS) {
+      if (op_ == TShowStatsOp.RANGE_PARTITIONS || op_ == TShowStatsOp.HASH_SCHEMA) {
         throw new AnalysisException(getSqlPrefix() + " must target a Kudu table: " +
             table_.getFullName());
       }
     } else if (table_ instanceof FeKuduTable) {
       FeKuduTable kuduTable = (FeKuduTable) table_;
-      if (op_ == TShowStatsOp.RANGE_PARTITIONS &&
+      if ((op_ == TShowStatsOp.RANGE_PARTITIONS || op_ == TShowStatsOp.HASH_SCHEMA) &&
           FeKuduTable.Utils.getRangePartitioningColNames(kuduTable).isEmpty()) {
         throw new AnalysisException(getSqlPrefix() + " requested but table does not " +
             "have range partitions: " + table_.getFullName());
       }
     } else {
-      if (op_ == TShowStatsOp.RANGE_PARTITIONS) {
+      if (op_ == TShowStatsOp.RANGE_PARTITIONS || op_ == TShowStatsOp.HASH_SCHEMA) {
         throw new AnalysisException(getSqlPrefix() + " must target a Kudu table: " +
             table_.getFullName());
       } else if (op_ == TShowStatsOp.PARTITIONS) {

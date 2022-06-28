@@ -1439,7 +1439,9 @@ public class Frontend {
       return ((FeDataSourceTable) table).getTableStats();
     } else if (table instanceof FeKuduTable) {
       if (op == TShowStatsOp.RANGE_PARTITIONS) {
-        return FeKuduTable.Utils.getRangePartitions((FeKuduTable) table);
+        return FeKuduTable.Utils.getRangePartitions((FeKuduTable) table, false);
+      } else if (op == TShowStatsOp.HASH_SCHEMA) {
+        return FeKuduTable.Utils.getRangePartitions((FeKuduTable) table, true);
       } else if (op == TShowStatsOp.PARTITIONS) {
         return FeKuduTable.Utils.getPartitions((FeKuduTable) table);
       } else {

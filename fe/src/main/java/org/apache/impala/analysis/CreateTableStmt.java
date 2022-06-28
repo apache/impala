@@ -520,11 +520,6 @@ public class CreateTableStmt extends StatementBase {
     Map<String, ColumnDef> pkColDefsByName =
         ColumnDef.mapByColumnNames(getPrimaryKeyColumnDefs());
     for (KuduPartitionParam partitionParam: getKuduPartitionParams()) {
-      // If no column names were specified in this partitioning scheme, use all the
-      // primary key columns.
-      if (!partitionParam.hasColumnNames()) {
-        partitionParam.setColumnNames(pkColDefsByName.keySet());
-      }
       partitionParam.setPkColumnDefMap(pkColDefsByName);
       partitionParam.analyze(analyzer);
     }

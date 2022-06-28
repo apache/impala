@@ -119,9 +119,13 @@ public class KuduPartitionParam extends StmtNode {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    Preconditions.checkState(!colNames_.isEmpty());
     Preconditions.checkNotNull(pkColumnDefByName_);
     Preconditions.checkState(!pkColumnDefByName_.isEmpty());
+    // If no column names were specified in this partitioning scheme, use all the
+    // primary key columns.
+    if (!hasColumnNames()) {
+      setColumnNames(pkColumnDefByName_.keySet());
+    }
     // Validate that the columns specified in this partitioning are primary key columns.
     for (String colName: colNames_) {
       if (!pkColumnDefByName_.containsKey(colName)) {
@@ -208,6 +212,11 @@ public class KuduPartitionParam extends StmtNode {
 
   void setPkColumnDefMap(Map<String, ColumnDef> pkColumnDefByName) {
     pkColumnDefByName_ = pkColumnDefByName;
+    if (rangePartitions_ != null) {
+      for (RangePartition rangePartition: rangePartitions_) {
+        rangePartition.setPkColumnDefMap(pkColumnDefByName);
+      }
+    }
   }
 
   boolean hasColumnNames() { return !colNames_.isEmpty(); }

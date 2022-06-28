@@ -523,6 +523,7 @@ struct TRangePartition {
   2: optional bool is_lower_bound_inclusive
   3: optional list<Exprs.TExpr> upper_bound_values
   4: optional bool is_upper_bound_inclusive
+  5: optional list<TKuduPartitionParam> hash_specs
 }
 
 // A range partitioning is identified by a list of columns and a list of range partitions.

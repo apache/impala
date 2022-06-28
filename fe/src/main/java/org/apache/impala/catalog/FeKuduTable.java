@@ -206,7 +206,7 @@ public interface FeKuduTable extends FeTable {
       return result;
     }
 
-    public static TResultSet getRangePartitions(FeKuduTable table)
+    public static TResultSet getRangePartitions(FeKuduTable table, boolean showHashSchema)
         throws ImpalaRuntimeException {
       TResultSet result = new TResultSet();
       TResultSetMetadata resultSchema = new TResultSetMetadata();
@@ -215,6 +215,9 @@ public interface FeKuduTable extends FeTable {
       // Build column header
       String header = "RANGE (" + Joiner.on(',').join(
           Utils.getRangePartitioningColNames(table)) + ")";
+      if (showHashSchema) {
+        header += " HASH SCHEMA";
+      }
       resultSchema.addToColumns(new TColumn(header, Type.STRING.toThrift()));
       KuduClient client = KuduUtil.getKuduClient(table.getKuduMasterHosts());
       try {
@@ -222,8 +225,10 @@ public interface FeKuduTable extends FeTable {
         org.apache.kudu.client.KuduTable kuduTable =
             client.openTable(table.getKuduTableName());
         // The Kudu table API will return the partitions in sorted order by value.
-        List<String> partitions = kuduTable.getFormattedRangePartitions(
-            BackendConfig.INSTANCE.getKuduClientTimeoutMs());
+        long timeout = BackendConfig.INSTANCE.getKuduClientTimeoutMs();
+        List<String> partitions = showHashSchema ?
+            kuduTable.getFormattedRangePartitionsWithHashSchema(timeout) :
+            kuduTable.getFormattedRangePartitions(timeout);
         if (partitions.isEmpty()) {
           TResultRowBuilder builder = new TResultRowBuilder();
           result.addToRows(builder.add("").get());

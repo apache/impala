@@ -21,6 +21,7 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 
 import java.math.BigInteger;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -65,12 +66,14 @@ public class RangePartition extends StmtNode {
   private final boolean lowerBoundInclusive_;
   private final boolean upperBoundInclusive_;
   private final boolean isSingletonRange_;
+  private final List<KuduPartitionParam> hashSpec_;
 
   // Set true when this partition has been analyzed.
   private boolean isAnalyzed_ = false;
 
   private RangePartition(List<Expr> lowerBoundValues, boolean lowerBoundInclusive,
-      List<Expr> upperBoundValues, boolean upperBoundInclusive) {
+      List<Expr> upperBoundValues, boolean upperBoundInclusive,
+      List<KuduPartitionParam> hashSpec) {
     Preconditions.checkNotNull(lowerBoundValues);
     Preconditions.checkNotNull(upperBoundValues);
     Preconditions.checkState(!lowerBoundValues.isEmpty() || !upperBoundValues.isEmpty());
@@ -80,6 +83,7 @@ public class RangePartition extends StmtNode {
     upperBoundInclusive_ = upperBoundInclusive;
     isSingletonRange_ = (upperBoundInclusive && lowerBoundInclusive
         && lowerBoundValues == upperBoundValues);
+    hashSpec_ = hashSpec;
   }
 
   /**
@@ -92,7 +96,7 @@ public class RangePartition extends StmtNode {
    * values that indicate inclusive or exclusive bounds.
    */
   public static RangePartition createFromRange(Pair<List<Expr>, Boolean> lower,
-      Pair<List<Expr>, Boolean> upper) {
+      Pair<List<Expr>, Boolean> upper, List<KuduPartitionParam> hashSpec) {
     List<Expr> lowerBoundExprs = Lists.newArrayListWithCapacity(1);
     boolean lowerBoundInclusive = false;
     List<Expr> upperBoundExprs = Lists.newArrayListWithCapacity(1);
@@ -106,7 +110,7 @@ public class RangePartition extends StmtNode {
       upperBoundInclusive = upper.second;
     }
     return new RangePartition(lowerBoundExprs, lowerBoundInclusive, upperBoundExprs,
-        upperBoundInclusive);
+        upperBoundInclusive, hashSpec);
   }
 
   /**
@@ -115,13 +119,22 @@ public class RangePartition extends StmtNode {
    * 'PARTITION VALUE = (<expr>,...,<expr>)' clause. For both cases, the generated
    * range partition has the same lower and upper bounds.
    */
-  public static RangePartition createFromValues(List<Expr> values) {
-    return new RangePartition(values, true, values, true);
+  public static RangePartition createFromValues(List<Expr> values,
+      List<KuduPartitionParam> hashSpec) {
+    return new RangePartition(values, true, values, true, hashSpec);
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     throw new IllegalStateException("Not implemented");
+  }
+
+  void setPkColumnDefMap(Map<String, ColumnDef> pkColumnDefByName) {
+    if (hashSpec_ != null) {
+      for (KuduPartitionParam partitionParam: hashSpec_) {
+        partitionParam.setPkColumnDefMap(pkColumnDefByName);
+      }
+    }
   }
 
   public void analyze(Analyzer analyzer, List<ColumnDef> partColDefs)
@@ -133,6 +146,11 @@ public class RangePartition extends StmtNode {
     analyzeBoundaryValues(lowerBound_, partColDefs, analyzer);
     if (!isSingletonRange_) {
       analyzeBoundaryValues(upperBound_, partColDefs, analyzer);
+    }
+    if (hashSpec_ != null) {
+      for (KuduPartitionParam partitionParam: hashSpec_) {
+        partitionParam.analyze(analyzer);
+      }
     }
     isAnalyzed_ = true;
   }
@@ -250,6 +268,17 @@ public class RangePartition extends StmtNode {
         if (upperBound_.size() > 1) output.append(")");
       }
     }
+    if (hashSpec_ != null) {
+      boolean firstParam = true;
+      for (KuduPartitionParam partitionParam: hashSpec_) {
+        if (firstParam) {
+          firstParam = false;
+        } else {
+          output.append(" ");
+        }
+        partitionParam.toSql(options);
+      }
+    }
     return output.toString();
   }
 
@@ -269,6 +298,11 @@ public class RangePartition extends StmtNode {
     }
     Preconditions.checkState(tRangePartition.isSetLower_bound_values()
         || tRangePartition.isSetUpper_bound_values());
+    if (hashSpec_ != null) {
+      for (KuduPartitionParam partitionParam: hashSpec_) {
+        tRangePartition.addToHash_specs(partitionParam.toThrift());
+      }
+    }
     return tRangePartition;
   }
 }

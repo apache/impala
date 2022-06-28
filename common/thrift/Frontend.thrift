@@ -214,6 +214,7 @@ enum TShowStatsOp {
   COLUMN_STATS = 1
   PARTITIONS = 2
   RANGE_PARTITIONS = 3
+  HASH_SCHEMA = 4
 }
 
 // Parameters for SHOW TABLE/COLUMN STATS and SHOW PARTITIONS commands

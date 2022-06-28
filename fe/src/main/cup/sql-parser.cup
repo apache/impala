@@ -343,6 +343,7 @@ nonterminal String ident_or_default;
 // words cannot be used as identifiers but they are words and can be used in query
 // options, column attributes, etc.
 nonterminal String word;
+nonterminal String opt_comma;
 nonterminal StatementBase stmt;
 // Single select statement.
 nonterminal SelectStmt select_stmt;
@@ -364,7 +365,7 @@ nonterminal SetStmt unset_stmt;
 nonterminal ShowTablesStmt show_tables_stmt;
 nonterminal ShowDbsStmt show_dbs_stmt;
 nonterminal ShowStatsStmt show_stats_stmt, show_partitions_stmt,
-  show_range_partitions_stmt;
+  show_range_partitions_stmt, show_hash_schema_stmt;
 nonterminal String show_pattern;
 nonterminal ShowFilesStmt show_files_stmt;
 nonterminal StatementBase describe_stmt;
@@ -490,7 +491,7 @@ nonterminal List<RangePartition> range_params_list;
 nonterminal RangePartition range_param;
 nonterminal Pair<List<Expr>, Boolean> opt_lower_range_val,
    opt_upper_range_val;
-nonterminal List<KuduPartitionParam> hash_partition_param_list;
+nonterminal List<KuduPartitionParam> hash_partition_param_list, custom_hash_partition_param_list;
 nonterminal List<KuduPartitionParam> partition_param_list;
 nonterminal KuduPartitionParam range_partition_param;
 nonterminal ColumnDef column_def, view_column_def;
@@ -630,6 +631,7 @@ precedence left KW_OVERWRITE;
 precedence left KW_INTO;
 
 precedence left KW_OVER;
+precedence left KW_HASH;
 
 start with stmt;
 
@@ -654,6 +656,8 @@ stmt ::=
   {: RESULT = show_partitions; :}
   | show_range_partitions_stmt:show_range_partitions
   {: RESULT = show_range_partitions; :}
+  | show_hash_schema_stmt:show_hash_schema
+  {: RESULT = show_hash_schema; :}
   | show_stats_stmt:show_stats
   {: RESULT = show_stats; :}
   | show_functions_stmt:show_functions
@@ -1661,6 +1665,13 @@ partition_column_defs ::=
   {: RESULT = col_defs; :}
   ;
 
+opt_comma ::=
+  COMMA
+  {: :}
+  | /* empty */
+  {: :}
+  ;
+
 // The PARTITION BY clause contains any number of HASH() clauses followed by or following
 // exactly zero or one RANGE clauses
 partition_param_list ::=
@@ -1668,12 +1679,12 @@ partition_param_list ::=
   {: RESULT = list; :}
   | KW_PARTITION KW_BY range_partition_param:rng
   {: RESULT = Lists.newArrayList(rng); :}
-  | KW_PARTITION KW_BY hash_partition_param_list:list COMMA range_partition_param:rng
+  | KW_PARTITION KW_BY hash_partition_param_list:list opt_comma range_partition_param:rng
   {:
     list.add(rng);
     RESULT = list;
   :}
-  | KW_PARTITION KW_BY range_partition_param:rng COMMA hash_partition_param_list:list
+  | KW_PARTITION KW_BY range_partition_param:rng opt_comma hash_partition_param_list:list
   {:
     list.add(rng);
     RESULT = list;
@@ -1684,7 +1695,7 @@ partition_param_list ::=
 hash_partition_param_list ::=
   hash_partition_param:dc
   {: RESULT = Lists.newArrayList(dc); :}
-  | hash_partition_param_list:list COMMA hash_partition_param:d
+  | hash_partition_param_list:list opt_comma hash_partition_param:d
   {:
     list.add(d);
     RESULT = list;
@@ -1719,7 +1730,7 @@ range_params_list ::=
   {:
     RESULT = Lists.<RangePartition>newArrayList(param);
   :}
-  | range_params_list:list COMMA range_param:param
+  | range_params_list:list opt_comma range_param:param
   {:
     list.add(param);
     RESULT = list;
@@ -1727,22 +1738,34 @@ range_params_list ::=
   ;
 
 range_param ::=
-  KW_PARTITION opt_lower_range_val:lower_val KW_VALUES opt_upper_range_val:upper_val
-  {: RESULT = RangePartition.createFromRange(lower_val, upper_val); :}
+  KW_PARTITION opt_lower_range_val:lower_val KW_VALUES opt_upper_range_val:upper_val custom_hash_partition_param_list:hashspec
+  {: RESULT = RangePartition.createFromRange(lower_val, upper_val, hashspec); :}
   // Use dotted_path to avoid reduce/reduce conflicts with expr
-  | KW_PARTITION dotted_path:val EQUAL expr:l
+  | KW_PARTITION dotted_path:val EQUAL expr:l custom_hash_partition_param_list:hashspec
   {:
     if (!val.get(0).toUpperCase().equals("VALUE")) {
       parser.parseError("identifier", SqlParserSymbols.IDENT, "VALUE");
     }
-    RESULT = RangePartition.createFromValues(Lists.newArrayList(l)); :}
-  | KW_PARTITION dotted_path:val EQUAL LPAREN expr_list:l RPAREN
+    RESULT = RangePartition.createFromValues(Lists.newArrayList(l), hashspec); :}
+  | KW_PARTITION dotted_path:val EQUAL LPAREN expr_list:l RPAREN custom_hash_partition_param_list:hashspec
   {:
     if (!val.get(0).toUpperCase().equals("VALUE")) {
       parser.parseError("identifier", SqlParserSymbols.IDENT, "VALUE");
     }
-    RESULT = RangePartition.createFromValues(l);
+    RESULT = RangePartition.createFromValues(l, hashspec);
   :}
+  ;
+
+custom_hash_partition_param_list ::=
+  hash_partition_param:dc
+  {: RESULT = Lists.newArrayList(dc); :}
+  | custom_hash_partition_param_list:list opt_comma hash_partition_param:d
+  {:
+    list.add(d);
+    RESULT = list;
+  :} %prec KW_HASH
+  | /* empty */
+  {: RESULT = Lists.newArrayList(); :}
   ;
 
 opt_lower_range_val ::=
@@ -2787,6 +2810,11 @@ show_partitions_stmt ::=
 show_range_partitions_stmt ::=
   KW_SHOW KW_RANGE KW_PARTITIONS table_name:table
   {: RESULT = new ShowStatsStmt(table, TShowStatsOp.RANGE_PARTITIONS); :}
+  ;
+
+show_hash_schema_stmt ::=
+  KW_SHOW KW_HASH KW_SCHEMA table_name:table
+  {: RESULT = new ShowStatsStmt(table, TShowStatsOp.HASH_SCHEMA); :}
   ;
 
 show_functions_stmt ::=
