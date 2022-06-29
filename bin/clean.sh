@@ -39,7 +39,7 @@ popd
 # don't use git clean because we need to retain Eclipse conf files
 pushd "${IMPALA_FE_DIR}"
 rm -rf target
-rm -f src/test/resources/{core,hbase,hive}-site.xml
+rm -f src/test/resources/{core,hbase,hive,ozone}-site.xml
 rm -rf generated-sources/*
 [ -z "${IMPALA_LOGS_DIR}" ] || rm -rf "${IMPALA_LOGS_DIR}"/*
 mkdir -p ${IMPALA_ALL_LOGS_DIRS}

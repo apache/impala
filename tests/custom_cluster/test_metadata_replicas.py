@@ -21,6 +21,7 @@ from time import sleep
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import (
     SkipIfS3,
+    SkipIfOzone,
     SkipIfABFS,
     SkipIfADLS,
     SkipIfGCS,
@@ -30,6 +31,7 @@ from tests.common.skip import (
 from tests.util.hive_utils import HiveDbWrapper
 
 @SkipIfS3.hive
+@SkipIfOzone.hive
 @SkipIfGCS.hive
 @SkipIfCOS.hive
 @SkipIfABFS.hive

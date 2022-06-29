@@ -18,7 +18,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# This will create/control/destroy a local hdfs/yarn/kms/kudu cluster.
+# This will create/control/destroy a local hdfs/yarn/kms or ozone + kudu cluster.
 #
 # All roles run on 127.0.0.1, just like the standard mini cluster included with hadoop.
 # The difference is with this cluster, each role runs in its own process and has its own
@@ -56,6 +56,8 @@ export KILL_CLUSTER_MARKER=IBelongToTheMiniCluster
 if [[ "$TARGET_FILESYSTEM" == "hdfs" ]]; then
   # The check above indicates that the regular mini-cluster is in use.
   SUPPORTED_SERVICES=(hdfs kms yarn)
+elif [[ "$TARGET_FILESYSTEM" == "ozone" ]]; then
+  SUPPORTED_SERVICES=(ozone)
 else
   # Either a remote distributed file system or a local non-distributed file system is
   # in use. Currently the only service that is expected to work is Kudu, though in theory
@@ -86,6 +88,7 @@ export YARN_WEBUI_PORT=8088   # same as default
 export KMS_WEBUI_PORT=9600    # changed to make room for non-ephemeral HBase ports
                               # (HADOOP-12811)
 export KUDU_WEBUI_PORT=8051   # same as default
+export OZONE_WEBUI_PORT=9874  # same as default for OM WebUI
 
 # Empty dirs that should be included in the templates. Since git ignores empty dirs it is
 # easier to maintain them here.
@@ -216,7 +219,7 @@ function create_cluster {
     if [[ $NODE_IDX -gt 1 ]]; then
       # Remove master role scripts from slave nodes
       rm -f "$NODE_DIR/etc/init.d/"{hdfs-namenode,yarn-resourcemanager} \
-            "$NODE_DIR/etc/init.d/"{kms,kudu-master}
+            "$NODE_DIR/etc/init.d/"{kms,kudu-master,ozone-scm,ozone-manager}
       # Only run one YARN nodemanager (more memory-efficient to scale up a
       # single NM than run several)
       rm -f "$NODE_DIR/etc/init.d/yarn-nodemanager"
@@ -322,6 +325,12 @@ function start_cluster {
     sleep 10
     check_cluster_status
   fi
+
+  if [[ "${TARGET_FILESYSTEM}" = "ozone" ]]; then
+    ozone sh volume create /${OZONE_VOLUME} || true
+    ozone sh bucket create /${OZONE_VOLUME}/${OZONE_BUCKET} || true
+  fi
+
   return $?
 }
 
@@ -460,6 +469,7 @@ function delete_data {
   # Delete namenode, datanode and KMS data while preserving directory structure.
   rm -rf "$IMPALA_CLUSTER_NODES_DIR/$NODE_PREFIX"*/data/dfs/{nn,dn}/*
   rm -f "$IMPALA_CLUSTER_NODES_DIR/$NODE_PREFIX"*/data/kms.keystore
+  rm -rf "$IMPALA_CLUSTER_NODES_DIR/$NODE_PREFIX"*/data/ozone
   delete_kudu_data
 }
 

@@ -27,13 +27,14 @@ from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
                                SkipIfGCS, SkipIfCOS, SkipIfLocal, SkipIfEC,
-                               SkipIfDockerizedCluster, SkipIfCatalogV2)
+                               SkipIfDockerizedCluster, SkipIfOzone)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import get_fs_path
 from tests.util.shell_util import exec_process
 
 # End to end test that hdfs caching is working.
 @SkipIfS3.caching # S3: missing coverage: verify SET CACHED gives error
+@SkipIfOzone.caching
 @SkipIfGCS.caching
 @SkipIfCOS.caching
 @SkipIfABFS.caching
@@ -116,6 +117,7 @@ class TestHdfsCaching(ImpalaTestSuite):
 # run as a part of exhaustive tests which require the workload to be 'functional-query'.
 # TODO: Move this to TestHdfsCaching once we make exhaustive tests run for other workloads
 @SkipIfS3.caching
+@SkipIfOzone.caching
 @SkipIfGCS.caching
 @SkipIfCOS.caching
 @SkipIfABFS.caching
@@ -128,6 +130,7 @@ class TestHdfsCachingFallbackPath(ImpalaTestSuite):
     return 'functional-query'
 
   @SkipIfS3.hdfs_encryption
+  @SkipIfOzone.hdfs_encryption
   @SkipIfGCS.hdfs_encryption
   @SkipIfCOS.hdfs_encryption
   @SkipIfABFS.hdfs_encryption
@@ -182,6 +185,7 @@ class TestHdfsCachingFallbackPath(ImpalaTestSuite):
 
 
 @SkipIfS3.caching
+@SkipIfOzone.caching
 @SkipIfGCS.caching
 @SkipIfCOS.caching
 @SkipIfABFS.caching

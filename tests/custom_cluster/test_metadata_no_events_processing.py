@@ -17,10 +17,11 @@
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfGCS,
-                               SkipIfIsilon, SkipIfLocal)
+                               SkipIfIsilon, SkipIfLocal, SkipIfOzone)
 
 
 @SkipIfS3.hive
+@SkipIfOzone.hive
 @SkipIfGCS.hive
 @SkipIfABFS.hive
 @SkipIfADLS.hive

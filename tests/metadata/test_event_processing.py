@@ -17,11 +17,12 @@
 from tests.common.skip import SkipIfHive2, SkipIfCatalogV2
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfGCS, SkipIfLocal)
+                               SkipIfGCS, SkipIfLocal, SkipIfOzone)
 from tests.util.event_processor_utils import EventProcessorUtils
 
 
 @SkipIfS3.hive
+@SkipIfOzone.hive
 @SkipIfABFS.hive
 @SkipIfADLS.hive
 @SkipIfGCS.hive

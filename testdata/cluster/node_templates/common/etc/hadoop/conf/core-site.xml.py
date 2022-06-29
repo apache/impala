@@ -121,6 +121,9 @@ if target_filesystem == 's3':
       'fs.s3a.s3guard.ddb.region': '${S3GUARD_DYNAMODB_REGION}',
     })
 
+if target_filesystem == 'ozone':
+  CONFIG.update({'fs.AbstractFileSystem.o3fs.impl': 'org.apache.hadoop.fs.ozone.OzFs'})
+
 if kerberize:
   CONFIG.update({
     'hadoop.security.authentication': 'kerberos',

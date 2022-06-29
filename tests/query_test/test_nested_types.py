@@ -26,6 +26,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (
     SkipIfIsilon,
     SkipIfS3,
+    SkipIfOzone,
     SkipIfGCS,
     SkipIfCOS,
     SkipIfABFS,
@@ -318,6 +319,7 @@ class TestNestedTypesNoMtDop(ImpalaTestSuite):
 
   @SkipIfIsilon.hive
   @SkipIfS3.hive
+  @SkipIfOzone.hive
   @SkipIfGCS.hive
   @SkipIfCOS.hive
   @SkipIfABFS.hive
@@ -378,6 +380,7 @@ class TestNestedTypesNoMtDop(ImpalaTestSuite):
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
   @SkipIfS3.hive
+  @SkipIfOzone.hive
   @SkipIfGCS.hive
   @SkipIfCOS.hive
   @SkipIfHive2.acid
@@ -883,6 +886,7 @@ class TestMaxNestingDepth(ImpalaTestSuite):
 
   @SkipIfIsilon.hive
   @SkipIfS3.hive
+  @SkipIfOzone.hive
   @SkipIfGCS.hive
   @SkipIfCOS.hive
   @SkipIfABFS.hive

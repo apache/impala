@@ -28,7 +28,7 @@ from multiprocessing.pool import ThreadPool
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import (SkipIfHive2, SkipIfS3, SkipIfABFS, SkipIfGCS, SkipIfCOS,
-                               SkipIfADLS, SkipIfIsilon, SkipIfLocal)
+                               SkipIfADLS, SkipIfIsilon, SkipIfLocal, SkipIfOzone)
 from tests.util.filesystem_utils import WAREHOUSE
 
 RETRY_PROFILE_MSG = 'Retried query planning due to inconsistent metadata'
@@ -536,6 +536,7 @@ class TestFullAcid(CustomClusterTestSuite):
 
   @SkipIfHive2.acid
   @SkipIfS3.hive
+  @SkipIfOzone.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfGCS.hive

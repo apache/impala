@@ -63,6 +63,7 @@ from tests.performance.query_exec_functions import execute_using_jdbc
 from tests.performance.query_executor import JdbcQueryExecConfig
 from tests.util.filesystem_utils import (
     IS_S3,
+    IS_OZONE,
     IS_ABFS,
     IS_ADLS,
     IS_GCS,
@@ -269,6 +270,8 @@ class ImpalaTestSuite(BaseTestSuite):
     elif IS_COS:
       # COS is implemented via HDFS command line client
       cls.filesystem_client = HadoopFsCommandLineClient("COS")
+    elif IS_OZONE:
+      cls.filesystem_client = HadoopFsCommandLineClient("Ozone")
 
     # Override the shell history path so that commands run by any tests
     # don't write any history into the developer's file.
@@ -1057,7 +1060,7 @@ class ImpalaTestSuite(BaseTestSuite):
     # If 'skip_hbase' is specified or the filesystem is isilon, s3, GCS(gs), COS(cosn) or
     # local, we don't need the hbase dimension.
     if pytest.config.option.skip_hbase or TARGET_FILESYSTEM.lower() \
-        in ['s3', 'isilon', 'local', 'abfs', 'adls', 'gs', 'cosn']:
+        in ['s3', 'isilon', 'local', 'abfs', 'adls', 'gs', 'cosn', 'ozone']:
       for tf_dimension in tf_dimensions:
         if tf_dimension.value.file_format == "hbase":
           tf_dimensions.remove(tf_dimension)

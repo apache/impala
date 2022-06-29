@@ -38,6 +38,7 @@ from tests.util.filesystem_utils import (
     IS_ISILON,
     IS_LOCAL,
     IS_S3,
+    IS_OZONE,
     SECONDARY_FILESYSTEM)
 
 IMPALA_TEST_CLUSTER_PROPERTIES = ImpalaTestClusterProperties.get_instance()
@@ -65,6 +66,23 @@ class SkipIfS3:
       reason="Currently Iceberg is only supported on HDFS.")
   variable_listing_times = pytest.mark.skipif(IS_S3,
       reason="Flakiness due to unpredictable listing times on S3.")
+
+
+class SkipIfOzone:
+  # These are skipped due to product limitations.
+  caching = pytest.mark.skipif(IS_OZONE, reason="SET CACHED not implemented for Ozone")
+  hdfs_block_size = pytest.mark.skipif(IS_OZONE, reason="Ozone uses it's own block size")
+  hdfs_acls = pytest.mark.skipif(IS_OZONE, reason="HDFS acls are not supported on Ozone")
+  hdfs_encryption = pytest.mark.skipif(IS_OZONE,
+      reason="HDFS encryption is not supported with Ozone")
+  no_storage_ids = pytest.mark.skipif(IS_OZONE,
+        reason="Ozone does not return storage ids, IMPALA-10213")
+
+  # These need test infra work to re-enable.
+  hive = pytest.mark.skipif(IS_OZONE, reason="Hive not started with Ozone")
+  hbase = pytest.mark.skipif(IS_OZONE, reason="HBase not started with Ozone")
+  qualified_path = pytest.mark.skipif(IS_OZONE,
+      reason="Tests rely on HDFS qualified paths, IMPALA-1872")
 
 
 class SkipIfABFS:

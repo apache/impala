@@ -41,6 +41,8 @@ under the License.
     <hbase.version>${env.IMPALA_HBASE_VERSION}</hbase.version>
     <avro.version>${env.IMPALA_AVRO_JAVA_VERSION}</avro.version>
     <orc.version>${env.IMPALA_ORC_JAVA_VERSION}</orc.version>
+    <ozone.groupId>${env.IMPALA_OZONE_JAR_GROUP_ID}</ozone.groupId>
+    <ozone.artifactId>${env.IMPALA_OZONE_JAR_ARTIFACT_ID}</ozone.artifactId>
     <ozone.version>${env.IMPALA_OZONE_VERSION}</ozone.version>
     <parquet.version>${env.IMPALA_PARQUET_VERSION}</parquet.version>
     <kite.version>${env.IMPALA_KITE_VERSION}</kite.version>

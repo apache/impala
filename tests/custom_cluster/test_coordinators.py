@@ -24,7 +24,7 @@ import time
 from subprocess import check_call
 from tests.util.filesystem_utils import get_fs_path
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import (SkipIf, SkipIfS3, SkipIfABFS, SkipIfADLS,
+from tests.common.skip import (SkipIf, SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfOzone,
                                SkipIfIsilon, SkipIfGCS, SkipIfCOS, SkipIfLocal)
 
 LOG = logging.getLogger('test_coordinators')
@@ -321,6 +321,7 @@ class TestCoordinators(CustomClusterTestSuite):
     assert num_hosts in str(ret)
 
   @SkipIfS3.hbase
+  @SkipIfOzone.hbase
   @SkipIfGCS.hbase
   @SkipIfCOS.hbase
   @SkipIfABFS.hbase

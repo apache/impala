@@ -871,6 +871,7 @@ under the License.
                     <include>org.apache.avro:*:${avro.version}</include>
                     <include>org.apache.parquet:*:${parquet.version}</include>
                     <include>org.apache.orc:*:${orc.version}</include>
+                    <include>org.apache.ozone:*:${ozone.version}</include>
                   </includes>
                 </bannedDependencies>
               </rules>

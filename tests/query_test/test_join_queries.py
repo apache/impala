@@ -26,6 +26,7 @@ from tests.common.skip import (
     SkipIfIsilon,
     SkipIfLocal,
     SkipIfS3,
+    SkipIfOzone,
     SkipIfGCS,
     SkipIfCOS,
     SkipIfABFS,
@@ -81,6 +82,7 @@ class TestJoinQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/single-node-joins-with-limits-exhaustive', new_vector)
 
   @SkipIfS3.hbase
+  @SkipIfOzone.hbase
   @SkipIfGCS.hbase
   @SkipIfCOS.hbase
   @SkipIfABFS.hbase

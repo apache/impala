@@ -21,6 +21,8 @@ LOG_DIR="$NODE_DIR/var/log"
 
 export HADOOP_CONF_DIR="$NODE_DIR/etc/hadoop/conf"
 export HADOOP_PID_DIR=$NODE_DIR/var/run
+# Suppress Ozone deprecation warning
+export OZONE_CONF_DIR="$NODE_DIR/etc/hadoop/conf"
 
 # Mark each process so they can be killed if needed. This is a safety mechanism for
 # stopping the processes if the pid file has been removed for whatever reason.

@@ -22,7 +22,7 @@ import pytest
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.util.event_processor_utils import EventProcessorUtils
 from tests.common.environ import HIVE_MAJOR_VERSION
-from tests.common.skip import SkipIfS3, SkipIfGCS, SkipIfCOS
+from tests.common.skip import SkipIfS3, SkipIfGCS, SkipIfCOS, SkipIfOzone
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_result_verifier import verify_query_result_is_equal
 from tests.util.filesystem_utils import get_fs_path
@@ -53,6 +53,7 @@ class TestParquetInterop(CustomClusterTestSuite):
         lambda v: v.get_value('table_format').file_format == 'parquet')
 
   @SkipIfS3.hive
+  @SkipIfOzone.hive
   @SkipIfGCS.hive
   @SkipIfCOS.hive
   @pytest.mark.execute_serially

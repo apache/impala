@@ -38,4 +38,4 @@ rm -rf /tmp/hbase-*
 # HACK: Some jobs have seen the HBase master fail to initialize with mesages like:
 # "Master startup cannot progress, in holding-pattern until region onlined."
 # Anecdotally, removing the MasterProcWALs directory avoids the issue.
-hdfs dfs -rm /hbase/MasterProcWALs/* || true
+hdfs dfs -Dozone.client.failover.max.attempts=3 -rm /hbase/MasterProcWALs/* || true

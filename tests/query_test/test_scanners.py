@@ -35,6 +35,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import (
     SkipIf,
     SkipIfS3,
+    SkipIfOzone,
     SkipIfGCS,
     SkipIfCOS,
     SkipIfABFS,
@@ -486,6 +487,7 @@ class TestParquet(ImpalaTestSuite):
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
   @SkipIfS3.hive
+  @SkipIfOzone.hive
   @SkipIfGCS.hive
   @SkipIfCOS.hive
   def test_multi_compression_types(self, vector, unique_database):
@@ -615,6 +617,7 @@ class TestParquet(ImpalaTestSuite):
     assert "AAAAAAAACPKFFAAA" in result.data
 
   @SkipIfS3.hdfs_block_size
+  @SkipIfOzone.hdfs_block_size
   @SkipIfGCS.hdfs_block_size
   @SkipIfCOS.hdfs_block_size
   @SkipIfABFS.hdfs_block_size
@@ -674,6 +677,7 @@ class TestParquet(ImpalaTestSuite):
     assert total == num_scanners_with_no_reads
 
   @SkipIfS3.hdfs_block_size
+  @SkipIfOzone.hdfs_block_size
   @SkipIfGCS.hdfs_block_size
   @SkipIfCOS.hdfs_block_size
   @SkipIfABFS.hdfs_block_size
@@ -725,6 +729,7 @@ class TestParquet(ImpalaTestSuite):
       self.client.clear_configuration()
 
   @SkipIfS3.hdfs_block_size
+  @SkipIfOzone.hdfs_block_size
   @SkipIfGCS.hdfs_block_size
   @SkipIfCOS.hdfs_block_size
   @SkipIfABFS.hdfs_block_size
@@ -743,6 +748,7 @@ class TestParquet(ImpalaTestSuite):
     self._multiple_blocks_helper(table_name, 40000, ranges_per_node=2)
 
   @SkipIfS3.hdfs_block_size
+  @SkipIfOzone.hdfs_block_size
   @SkipIfGCS.hdfs_block_size
   @SkipIfCOS.hdfs_block_size
   @SkipIfABFS.hdfs_block_size
@@ -1406,6 +1412,7 @@ class TestTextScanRangeLengths(ImpalaTestSuite):
 
 # Missing Coverage: No coverage for truncated files errors or scans.
 @SkipIfS3.hive
+@SkipIfOzone.hive
 @SkipIfGCS.hive
 @SkipIfCOS.hive
 @SkipIfABFS.hive
@@ -1492,6 +1499,7 @@ class TestOrc(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('orc_schema_resolution', 0, 1))
 
   @SkipIfS3.hdfs_block_size
+  @SkipIfOzone.hdfs_block_size
   @SkipIfGCS.hdfs_block_size
   @SkipIfCOS.hdfs_block_size
   @SkipIfABFS.hdfs_block_size
@@ -1574,6 +1582,7 @@ class TestOrc(ImpalaTestSuite):
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
   @SkipIfS3.hive
+  @SkipIfOzone.hive
   @SkipIfGCS.hive
   @SkipIfCOS.hive
   @SkipIfHive3.non_acid
@@ -1625,6 +1634,7 @@ class TestOrc(ImpalaTestSuite):
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
   @SkipIfS3.hive
+  @SkipIfOzone.hive
   @SkipIfGCS.hive
   @SkipIfCOS.hive
   @SkipIfHive2.acid
@@ -1751,6 +1761,7 @@ class TestOrc(ImpalaTestSuite):
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
   @SkipIfS3.hive
+  @SkipIfOzone.hive
   @SkipIfGCS.hive
   @SkipIfCOS.hive
   def test_missing_field_orc(self, unique_database):

@@ -20,13 +20,14 @@ import pytest
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-  SkipIfGCS, SkipIfLocal)
+  SkipIfGCS, SkipIfLocal, SkipIfOzone)
 from tests.util.hive_utils import HiveDbWrapper
 from tests.util.event_processor_utils import EventProcessorUtils
 from tests.util.filesystem_utils import WAREHOUSE
 
 
 @SkipIfS3.hive
+@SkipIfOzone.hive
 @SkipIfABFS.hive
 @SkipIfADLS.hive
 @SkipIfGCS.hive

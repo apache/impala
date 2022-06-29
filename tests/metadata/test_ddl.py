@@ -31,7 +31,7 @@ from tests.common.impala_test_suite import LOG
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import (SkipIf, SkipIfABFS, SkipIfADLS, SkipIfKudu, SkipIfLocal,
                                SkipIfCatalogV2, SkipIfHive2, SkipIfS3, SkipIfGCS,
-                               SkipIfCOS)
+                               SkipIfCOS, SkipIfOzone)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_dimensions import (create_exec_option_dimension,
     create_client_protocol_dimension)
@@ -42,10 +42,14 @@ from tests.util.filesystem_utils import (
     IS_HDFS,
     IS_S3,
     IS_ADLS,
+    IS_OZONE,
     FILESYSTEM_NAME)
 from tests.common.impala_cluster import ImpalaCluster
 from tests.util.filesystem_utils import FILESYSTEM_PREFIX
 
+
+TRASH_PATH = ('.Trash/{0}/Current' if IS_OZONE else 'user/{0}/.Trash/Current').\
+  format(getpass.getuser())
 
 # Validates DDL statements (create, drop)
 class TestDdlStatements(TestDdlBase):
@@ -66,12 +70,10 @@ class TestDdlStatements(TestDdlBase):
         format(unique_database))
     assert not self.filesystem_client.exists("test-warehouse/{0}.db/t1/".\
         format(unique_database))
-    assert self.filesystem_client.exists(\
-        "user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/t1.txt".\
-        format(getpass.getuser(), unique_database))
-    assert self.filesystem_client.exists(\
-        "user/{0}/.Trash/Current/test-warehouse/{1}.db/t1".\
-        format(getpass.getuser(), unique_database))
+    assert self.filesystem_client.exists(
+      '{0}/test-warehouse/{1}.db/t1/t1.txt'.format(TRASH_PATH, unique_database))
+    assert self.filesystem_client.exists(
+      '{0}/test-warehouse/{1}.db/t1'.format(TRASH_PATH, unique_database))
     # Drop the table (with purge) and make sure it doesn't exist in trash
     self.client.execute("drop table {0}.t2 purge".format(unique_database))
     if not IS_S3 and not IS_ADLS:
@@ -85,12 +87,10 @@ class TestDdlStatements(TestDdlBase):
           format(unique_database))
       assert not self.filesystem_client.exists("test-warehouse/{0}.db/t2/t2.txt".\
           format(unique_database))
-    assert not self.filesystem_client.exists(\
-        "user/{0}/.Trash/Current/test-warehouse/{1}.db/t2/t2.txt".\
-        format(getpass.getuser(), unique_database))
-    assert not self.filesystem_client.exists(\
-        "user/{0}/.Trash/Current/test-warehouse/{1}.db/t2".\
-        format(getpass.getuser(), unique_database))
+    assert not self.filesystem_client.exists(
+      '{0}/test-warehouse/{1}.db/t2/t2.txt'.format(TRASH_PATH, unique_database))
+    assert not self.filesystem_client.exists(
+      '{0}/test-warehouse/{1}.db/t2'.format(TRASH_PATH, unique_database))
     # Create an external table t3 and run the same test as above. Make
     # sure the data is not deleted
     self.filesystem_client.make_dir(
@@ -306,6 +306,7 @@ class TestDdlStatements(TestDdlBase):
 
   @SkipIfHive2.orc
   @SkipIfS3.hive
+  @SkipIfOzone.hive
   @SkipIfGCS.hive
   @SkipIfCOS.hive
   @UniqueDatabase.parametrize(sync_ddl=True)
@@ -496,12 +497,10 @@ class TestDdlStatements(TestDdlBase):
         format(unique_database))
     assert not self.filesystem_client.exists("test-warehouse/{0}.db/t1/j=1".\
         format(unique_database))
-    assert self.filesystem_client.exists(\
-        "user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=1/j1.txt".\
-        format(getpass.getuser(), unique_database))
-    assert self.filesystem_client.exists(\
-        "user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=1".\
-        format(getpass.getuser(), unique_database))
+    assert self.filesystem_client.exists(
+      '{0}/test-warehouse/{1}.db/t1/j=1/j1.txt'.format(TRASH_PATH, unique_database))
+    assert self.filesystem_client.exists(
+      '{0}/test-warehouse/{1}.db/t1/j=1'.format(TRASH_PATH, unique_database))
     # Drop the partition (with purge) and make sure it doesn't exist in trash
     self.client.execute("alter table {0}.t1 drop partition(j=2) purge".\
         format(unique_database));
@@ -516,12 +515,10 @@ class TestDdlStatements(TestDdlBase):
           format(unique_database))
       assert not self.filesystem_client.exists("test-warehouse/{0}.db/t1/j=2".\
           format(unique_database))
-    assert not self.filesystem_client.exists(\
-        "user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=2".\
-        format(getpass.getuser(), unique_database))
     assert not self.filesystem_client.exists(
-        "user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=2/j2.txt".\
-        format(getpass.getuser(), unique_database))
+      '{0}/test-warehouse/{1}.db/t1/j=2/j2.txt'.format(TRASH_PATH, unique_database))
+    assert not self.filesystem_client.exists(
+      '{0}/test-warehouse/{1}.db/t1/j=2'.format(TRASH_PATH, unique_database))
 
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_views_ddl(self, vector, unique_database):

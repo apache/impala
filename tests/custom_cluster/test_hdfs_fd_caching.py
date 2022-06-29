@@ -23,7 +23,8 @@ from tests.util.filesystem_utils import (
     IS_ISILON,
     IS_ADLS,
     IS_GCS,
-    IS_COS)
+    IS_COS,
+    IS_OZONE)
 from time import sleep
 
 @SkipIfLocal.hdfs_fd_caching
@@ -132,7 +133,7 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
 
     # Caching applies to HDFS, S3, and ABFS files. If this is HDFS, S3, or ABFS, then
     # verify that caching works. Otherwise, verify that file handles are not cached.
-    if IS_ADLS or IS_ISILON or IS_GCS or IS_COS:
+    if IS_ADLS or IS_ISILON or IS_GCS or IS_COS or IS_OZONE:
       caching_expected = False
     else:
       caching_expected = True
@@ -148,7 +149,7 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
     handle_timeout = 5
 
     # Only test eviction on platforms where caching is enabled.
-    if IS_ADLS or IS_ISILON or IS_GCS or IS_COS:
+    if IS_ADLS or IS_ISILON or IS_GCS or IS_COS or IS_OZONE:
       return
     caching_expected = True
     self.run_fd_caching_test(vector, caching_expected, cache_capacity, handle_timeout)
@@ -176,7 +177,7 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
     eviction_timeout_secs = 5
 
     # Only test eviction on platforms where caching is enabled.
-    if IS_ADLS or IS_ISILON or IS_GCS or IS_COS:
+    if IS_ADLS or IS_ISILON or IS_GCS or IS_COS or IS_OZONE:
       return
 
     # Maximum number of file handles cached.

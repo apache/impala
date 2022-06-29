@@ -211,11 +211,11 @@ under the License.
     </dependency>
 
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-ozone-filesystem-hadoop3</artifactId>
+      <groupId>${ozone.groupId}</groupId>
+      <artifactId>${ozone.artifactId}</artifactId>
       <version>${ozone.version}</version>
       <!-- Remove all transitive dependencies from the Apache Ozone dependency.
-      hadoop-ozone-filesystem-hadoop3 is a shaded-jar, which already includes
+      ozone-filesystem-hadoop3 is a shaded-jar, which already includes
       all required transitive dependencies. For some reason, Ozone still pulls
       in some transitive dependencies even though they are not needed. -->
       <exclusions>

@@ -17,7 +17,7 @@
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfEC, SkipIfLocal, SkipIfS3, SkipIfABFS,
-                               SkipIfGCS, SkipIfCOS, SkipIfADLS)
+                               SkipIfGCS, SkipIfCOS, SkipIfADLS, SkipIfOzone)
 from tests.common.test_dimensions import create_parquet_dimension
 
 
@@ -46,6 +46,7 @@ class TestResourceLimits(ImpalaTestSuite):
     self.run_test_case('QueryTest/query-resource-limits', vector)
 
   @SkipIfS3.hbase
+  @SkipIfOzone.hbase
   @SkipIfGCS.hbase
   @SkipIfCOS.hbase
   @SkipIfADLS.hbase

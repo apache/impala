@@ -24,7 +24,7 @@ from multiprocessing import Value
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import (SkipIf, SkipIfHive2, SkipIfS3, SkipIfGCS, SkipIfCOS,
-                               SkipIfDockerizedCluster)
+                               SkipIfDockerizedCluster, SkipIfOzone)
 from tests.stress.stress_util import Task, run_tasks
 
 NUM_OVERWRITES = 2
@@ -161,6 +161,7 @@ class TestAcidInsertsBasic(TestAcidStress):
 
   @SkipIfHive2.acid
   @SkipIfS3.hive
+  @SkipIfOzone.hive
   @SkipIfGCS.hive
   @SkipIfCOS.hive
   @pytest.mark.execute_serially

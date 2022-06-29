@@ -218,6 +218,7 @@ export CDP_GCS_VERSION=2.1.2.7.2.16.0-77
 export APACHE_MIRROR
 export APACHE_HIVE_VERSION=3.1.2
 export APACHE_HIVE_STORAGE_API_VERSION=2.7.0
+export APACHE_OZONE_VERSION=1.2.1
 
 export ARCH_NAME=$(uname -p)
 
@@ -231,6 +232,7 @@ export IMPALA_COS_VERSION=3.1.0-5.9.3
 unset IMPALA_HADOOP_URL
 unset IMPALA_HBASE_URL
 unset IMPALA_HIVE_URL
+unset IMPALA_OZONE_URL
 unset IMPALA_KUDU_URL
 unset IMPALA_KUDU_VERSION
 
@@ -257,12 +259,14 @@ export CDP_HADOOP_URL=${CDP_HADOOP_URL-}
 export CDP_HBASE_URL=${CDP_HBASE_URL-}
 export CDP_HIVE_URL=${CDP_HIVE_URL-}
 export CDP_HIVE_SOURCE_URL=${CDP_HIVE_SOURCE_URL-}
+export CDP_OZONE_URL=${CDP_OZONE_URL-}
 export CDP_ICEBERG_URL=${CDP_ICEBERG_URL-}
 export CDP_RANGER_URL=${CDP_RANGER_URL-}
 export CDP_TEZ_URL=${CDP_TEZ_URL-}
 
 export APACHE_HIVE_URL=${APACHE_HIVE_URL-}
 export APACHE_HIVE_SOURCE_URL=${APACHE_HIVE_SOURCE_URL-}
+export APACHE_OZONE_URL=${APACHE_OZONE_URL-}
 
 export CDP_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdp_components-$CDP_BUILD_NUMBER"
 export CDH_MAJOR_VERSION=7
@@ -275,7 +279,6 @@ export IMPALA_HBASE_URL=${CDP_HBASE_URL-}
 export IMPALA_ICEBERG_VERSION=${CDP_ICEBERG_VERSION}
 export IMPALA_ICEBERG_URL=${CDP_ICEBERG_URL-}
 export IMPALA_KNOX_VERSION=${CDP_KNOX_VERSION}
-export IMPALA_OZONE_VERSION=${CDP_OZONE_VERSION}
 export IMPALA_PARQUET_VERSION=${CDP_PARQUET_VERSION}
 export IMPALA_RANGER_VERSION=${CDP_RANGER_VERSION}
 export IMPALA_RANGER_URL=${CDP_RANGER_URL-}
@@ -315,6 +318,28 @@ if [[ "${IMPALA_HIVE_MAJOR_VERSION}" == "1" ||
       "${IMPALA_HIVE_MAJOR_VERSION}" == "2" ]]; then
   echo "Hive 1 and 2 are no longer supported"
   return 1
+fi
+
+# Defaults to Apache because Ozone in newer CDP releases is currently unmaintained
+export USE_APACHE_OZONE=${USE_APACHE_OZONE-true}
+if $USE_APACHE_OZONE; then
+  export IMPALA_OZONE_DIST_TYPE="apache-ozone"
+  export IMPALA_OZONE_VERSION=${APACHE_OZONE_VERSION}
+  export IMPALA_OZONE_URL=${APACHE_OZONE_URL-}
+else
+  export IMPALA_OZONE_DIST_TYPE="ozone"
+  export IMPALA_OZONE_VERSION=${CDP_OZONE_VERSION}
+  export IMPALA_OZONE_URL=${CDP_OZONE_URL-}
+fi
+
+# Ozone changed jar groupId and artifactId in Ozone 1.2
+export IMPALA_OZONE_MINOR_VERSION=$(echo "$IMPALA_OZONE_VERSION" | cut -d . -f 2)
+if [[ ${IMPALA_OZONE_MINOR_VERSION} < 2 ]]; then
+  export IMPALA_OZONE_JAR_GROUP_ID="org.apache.hadoop"
+  export IMPALA_OZONE_JAR_ARTIFACT_ID="hadoop-ozone-filesystem-hadoop3"
+else
+  export IMPALA_OZONE_JAR_GROUP_ID="org.apache.ozone"
+  export IMPALA_OZONE_JAR_ARTIFACT_ID="ozone-filesystem-hadoop3"
 fi
 
 # It is important to have a coherent view of the JAVA_HOME and JAVA executable.
@@ -448,8 +473,13 @@ export HIVE_METASTORE_THRIFT_DIR=${HIVE_METASTORE_THRIFT_DIR_OVERRIDE:-\
 "$HIVE_SRC_DIR/standalone-metastore/src/main/thrift"}
 export TEZ_HOME="$CDP_COMPONENTS_HOME/tez-${IMPALA_TEZ_VERSION}-minimal"
 export HBASE_HOME="$CDP_COMPONENTS_HOME/hbase-${IMPALA_HBASE_VERSION}/"
+if $USE_APACHE_OZONE; then
+  export OZONE_HOME="$APACHE_COMPONENTS_HOME/ozone-${IMPALA_OZONE_VERSION}/"
+else
+  export OZONE_HOME="$CDP_COMPONENTS_HOME/ozone-${IMPALA_OZONE_VERSION}/"
+fi
 # Set the Hive binaries in the path
-export PATH="$HIVE_HOME/bin:$PATH"
+export PATH="$HIVE_HOME/bin:$HBASE_HOME/bin:$OZONE_HOME/bin:$PATH"
 
 RANGER_POLICY_DB=${RANGER_POLICY_DB-$(cut -c-63 <<< ranger$ESCAPED_IMPALA_HOME)}
 # The DB script in Ranger expects the database name to be in lower case.
@@ -628,9 +658,13 @@ elif [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
     export HDFS_ERASURECODE_POLICY="RS-3-2-1024k"
     export HDFS_ERASURECODE_PATH="/test-warehouse"
   fi
+elif [ "${TARGET_FILESYSTEM}" = "ozone" ]; then
+  export OZONE_VOLUME="impala"
+  export OZONE_BUCKET="base"
+  export DEFAULT_FS="o3fs://${OZONE_BUCKET}.${OZONE_VOLUME}.${INTERNAL_LISTEN_HOST}:9862"
 else
   echo "Unsupported filesystem '$TARGET_FILESYSTEM'"
-  echo "Valid values are: hdfs, isilon, s3, abfs, adls, gs, local"
+  echo "Valid values are: hdfs, isilon, s3, abfs, adls, gs, local, ozone"
   return 1
 fi
 
@@ -683,6 +717,11 @@ export HADOOP_LIB_DIR=${HADOOP_LIB_DIR_OVERRIDE:-"${HADOOP_HOME}/lib"}
 # Beware of adding entries from $HADOOP_HOME here, because they can change
 # the order of the classpath, leading to configuration not showing up first.
 export HADOOP_CLASSPATH="${HADOOP_CLASSPATH-}"
+# Add Ozone Hadoop filesystem implementation when using Ozone
+if [ "${TARGET_FILESYSTEM}" = "ozone" ]; then
+  OZONE_JAR="ozone-filesystem-hadoop3-${IMPALA_OZONE_VERSION}.jar"
+  HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:${OZONE_HOME}/share/ozone/lib/${OZONE_JAR}"
+fi
 # Add the path containing the hadoop-aws jar, which is required to access AWS from the
 # minicluster.
 # Please note that the * is inside quotes, thus it won't get expanded by bash but
@@ -721,8 +760,6 @@ export AUX_CLASSPATH=""
 ### Tell hive not to use jline
 export HADOOP_USER_CLASSPATH_FIRST=true
 
-export PATH="$HBASE_HOME/bin:$PATH"
-
 # Add the jars so hive can create hbase tables.
 export AUX_CLASSPATH="$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-common-${IMPALA_HBASE_VERSION}.jar"
 export AUX_CLASSPATH="$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-client-${IMPALA_HBASE_VERSION}.jar"
@@ -731,6 +768,8 @@ export AUX_CLASSPATH="$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-protocol-${IMPALA_HBA
 export AUX_CLASSPATH="$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-hadoop-compat-${IMPALA_HBASE_VERSION}.jar"
 
 export HBASE_CONF_DIR="$IMPALA_FE_DIR/src/test/resources"
+# Suppress Ozone deprecation warning
+export OZONE_CONF_DIR="$IMPALA_FE_DIR/src/test/resources"
 
 # To use a local build of Kudu, set KUDU_BUILD_DIR to the path Kudu was built in and
 # set KUDU_CLIENT_DIR to the path KUDU was installed in.
@@ -820,6 +859,8 @@ echo "HIVE_CONF_DIR           = $HIVE_CONF_DIR"
 echo "HIVE_SRC_DIR            = $HIVE_SRC_DIR"
 echo "HBASE_HOME              = $HBASE_HOME"
 echo "HBASE_CONF_DIR          = $HBASE_CONF_DIR"
+echo "OZONE_HOME              = $OZONE_HOME"
+echo "OZONE_CONF_DIR          = $OZONE_CONF_DIR"
 echo "RANGER_HOME             = $RANGER_HOME"
 echo "RANGER_CONF_DIR         = $RANGER_CONF_DIR "
 echo "THRIFT_CPP_HOME         = $THRIFT_CPP_HOME"
@@ -846,6 +887,7 @@ echo "IMPALA_AVRO_JAVA_VERSION= $IMPALA_AVRO_JAVA_VERSION"
 echo "IMPALA_PARQUET_VERSION  = $IMPALA_PARQUET_VERSION"
 echo "IMPALA_HIVE_VERSION     = $IMPALA_HIVE_VERSION"
 echo "IMPALA_HBASE_VERSION    = $IMPALA_HBASE_VERSION"
+echo "IMPALA_OZONE_VERSION    = $IMPALA_OZONE_VERSION"
 echo "IMPALA_HUDI_VERSION     = $IMPALA_HUDI_VERSION"
 echo "IMPALA_KUDU_VERSION     = $IMPALA_KUDU_VERSION"
 echo "IMPALA_RANGER_VERSION   = $IMPALA_RANGER_VERSION"

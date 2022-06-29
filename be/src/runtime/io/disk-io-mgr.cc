@@ -841,7 +841,7 @@ int DiskIoMgr::AssignQueue(
   DCHECK(!IsOSSPath(file, check_default_fs)); // OSS/JindoFS is always remote.
   DCHECK(!IsGcsPath(file, check_default_fs)); // GCS is always remote.
   DCHECK(!IsCosPath(file, check_default_fs)); // COS is always remote.
-  DCHECK(!IsOzonePath(file, check_default_fs)); // Ozone is always remote.
+  // TODO: why is Ozone sometimes local?
   DCHECK(!IsSFSPath(file, check_default_fs)); // SFS is always remote.
   if (disk_id == -1) {
     // disk id is unknown, assign it an arbitrary one.

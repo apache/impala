@@ -39,7 +39,7 @@
 #   other. The way to specify a single consistent set of components is via a build
 #   number. This determines the location in s3 to get the artifacts.
 # DOWNLOAD_CDH_COMPONENTS - When set to true, this script will also download and extract
-#   the CDP Hadoop components (i.e. Hadoop, Hive, HBase, Ranger, etc) into
+#   the CDP Hadoop components (i.e. Hadoop, Hive, HBase, Ranger, Ozone, etc) into
 #   CDP_COMPONENTS_HOME as appropriate.
 # IMPALA_<PACKAGE>_VERSION - The version expected for <PACKAGE>. This is typically
 #   configured in bin/impala-config.sh and must exist for every package. This is used
@@ -509,6 +509,14 @@ def get_hadoop_downloads():
   hadoop = CdpComponent("hadoop")
   hbase = CdpComponent("hbase", archive_basename_tmpl="hbase-${version}-bin",
                        unpack_directory_tmpl="hbase-${version}")
+
+  use_apache_ozone = os.environ["USE_APACHE_OZONE"] == "true"
+  if use_apache_ozone:
+    ozone = ApacheComponent("ozone", component_path_tmpl="ozone/${version}")
+  else:
+    ozone = CdpComponent("ozone", archive_basename_tmpl="hadoop-ozone-${version}",
+                        unpack_directory_tmpl="ozone-${version}")
+
   use_apache_hive = os.environ["USE_APACHE_HIVE"] == "true"
   if use_apache_hive:
     hive = ApacheComponent("hive", archive_basename_tmpl="apache-hive-${version}-bin")
@@ -516,22 +524,20 @@ def get_hadoop_downloads():
   else:
     hive = CdpComponent("hive", archive_basename_tmpl="apache-hive-${version}-bin")
     hive_src = CdpComponent("hive-source",
-                          explicit_version=os.environ.get("IMPALA_HIVE_VERSION"),
-                          archive_basename_tmpl="hive-${version}-source",
-                          unpack_directory_tmpl="hive-${version}")
-  tez = CdpComponent("tez", archive_basename_tmpl="tez-${version}-minimal",
-                     makedir=True)
+                            explicit_version=os.environ.get("IMPALA_HIVE_VERSION"),
+                            archive_basename_tmpl="hive-${version}-source",
+                            unpack_directory_tmpl="hive-${version}")
+
+  tez = CdpComponent("tez", archive_basename_tmpl="tez-${version}-minimal", makedir=True)
+  ranger = CdpComponent("ranger", archive_basename_tmpl="ranger-${version}-admin")
   use_override_hive = \
       "HIVE_VERSION_OVERRIDE" in os.environ and os.environ["HIVE_VERSION_OVERRIDE"] != ""
   # If we are using a locally built Hive we do not have a need to pull hive as a
   # dependency
-  if use_override_hive:
-    cluster_components.extend([hadoop, hbase, tez])
-  else:
-    cluster_components.extend([hadoop, hbase, hive, hive_src, tez])
-  # Ranger is always CDP
-  cluster_components.append(CdpComponent("ranger",
-                                         archive_basename_tmpl="ranger-${version}-admin"))
+  cluster_components.extend([hadoop, hbase, ozone])
+  if not use_override_hive:
+    cluster_components.extend([hive, hive_src])
+  cluster_components.extend([tez, ranger])
   return cluster_components
 
 

@@ -17,7 +17,7 @@
 
 import pytest
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfEC
+from tests.common.skip import SkipIfEC, SkipIfOzone
 
 
 class TestRuntimeProfile(CustomClusterTestSuite):
@@ -29,6 +29,8 @@ class TestRuntimeProfile(CustomClusterTestSuite):
 
   PERIODIC_COUNTER_UPDATE_FLAG = '--periodic_counter_update_period_ms=50'
 
+  # Test depends on block size < 256MiB so larger table is stored in at least 4 blocks.
+  @SkipIfOzone.hdfs_block_size
   @SkipIfEC.different_schedule
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args('--gen_experimental_profile=true ' +

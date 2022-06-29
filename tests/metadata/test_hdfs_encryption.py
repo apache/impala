@@ -20,7 +20,7 @@ import pytest
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfGCS, SkipIfCOS, SkipIfLocal)
+                               SkipIfGCS, SkipIfCOS, SkipIfLocal, SkipIfOzone)
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -35,6 +35,7 @@ TMP_DIR = '/%s' % (PYWEBHDFS_TMP_DIR)
 
 
 @SkipIfS3.hdfs_encryption
+@SkipIfOzone.hdfs_encryption
 @SkipIfGCS.hdfs_encryption
 @SkipIfCOS.hdfs_encryption
 @SkipIfABFS.hdfs_encryption
