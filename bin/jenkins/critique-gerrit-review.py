@@ -47,7 +47,7 @@ from subprocess import check_call, check_output, Popen, PIPE
 import sys
 import virtualenv
 
-FLAKE8_VERSION = "3.5.0"
+FLAKE8_VERSION = "3.9.2"
 FLAKE8_DIFF_VERSION = "0.2.2"
 
 VENV_PATH = "gerrit_critic_venv"
