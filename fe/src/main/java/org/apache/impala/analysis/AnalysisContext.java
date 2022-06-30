@@ -416,7 +416,8 @@ public class AnalysisContext {
     } catch (AnalysisException e) {
       analysisException = e;
     }
-    timeline_.markEvent("Analysis finished");
+    long durationMs = timeline_.markEvent("Analysis finished") / 1000000;
+    LOG.info("Analysis took {} ms", durationMs);
 
     // Authorize statement and record exception. Authorization relies on information
     // collected during analysis.
