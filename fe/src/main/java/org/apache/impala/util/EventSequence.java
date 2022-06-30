@@ -33,10 +33,12 @@ public class EventSequence {
 
   private final long startTime_;
   private final String name_;
+  private long lastTime_;
 
   public EventSequence(String name) {
     name_ = name;
     startTime_ = System.nanoTime();
+    lastTime_ = startTime_;
   }
 
   /**
@@ -45,8 +47,10 @@ public class EventSequence {
    */
   public long markEvent(String label) {
     // Timestamps should be in ns resolution
-    long durationNs = System.nanoTime() - startTime_;
-    timestamps_.add(durationNs);
+    long currentTime = System.nanoTime();
+    long durationNs = currentTime - lastTime_;
+    lastTime_ = currentTime;
+    timestamps_.add(currentTime - startTime_);
     labels_.add(label);
     return durationNs;
   }
