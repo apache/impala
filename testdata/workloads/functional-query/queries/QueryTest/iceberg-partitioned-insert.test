@@ -76,6 +76,56 @@ select * from ice_multi_part;
 INT, DATE, STRING
 ====
 ---- QUERY
+insert into
+  ice_multi_part (d, s)
+values
+  ('2022-07-26', 'third'),
+  ('2022-07-27', 'fourth'),
+  ('2022-07-28', 'fifth');
+select * from ice_multi_part order by d;
+---- RESULTS
+1,2020-12-07,'first'
+2,2020-12-08,'second'
+NULL,2022-07-26,'third'
+NULL,2022-07-27,'fourth'
+NULL,2022-07-28,'fifth'
+---- TYPES
+INT, DATE, STRING
+====
+---- QUERY
+insert into
+  ice_multi_part (i, s)
+values
+  (6, 'sixth'),
+  (7, 'seventh');
+select * from ice_multi_part order by d, i;
+---- RESULTS
+1,2020-12-07,'first'
+2,2020-12-08,'second'
+NULL,2022-07-26,'third'
+NULL,2022-07-27,'fourth'
+NULL,2022-07-28,'fifth'
+6,NULL,'sixth'
+7,NULL,'seventh'
+---- TYPES
+INT, DATE, STRING
+====
+---- QUERY
+show files in ice_multi_part;
+---- LABELS
+Path,Size,Partition
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=1/d=2020-12-07/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=2/d=2020-12-08/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=6/d=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=7/d=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=__HIVE_DEFAULT_PARTITION__/d=2022-07-26/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=__HIVE_DEFAULT_PARTITION__/d=2022-07-27/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=__HIVE_DEFAULT_PARTITION__/d=2022-07-28/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
 select * from ice_multi_part
 where d = '2020-12-08';
 ---- RESULTS
@@ -84,6 +134,24 @@ where d = '2020-12-08';
 INT, DATE, STRING
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 1
+====
+---- QUERY
+select
+  *
+from
+  ice_multi_part
+where
+  i is null
+order by
+  d;
+---- RESULTS
+NULL,2022-07-26,'third'
+NULL,2022-07-27,'fourth'
+NULL,2022-07-28,'fifth'
+---- TYPES
+INT, DATE, STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 3
 ====
 ---- QUERY
 # Test that Impala only writes one file per partitions.
@@ -261,6 +329,56 @@ where timestamp_col = now();
 BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
+====
+---- QUERY
+create table alltypes_part_2 like alltypes_part;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into
+  alltypes_part_2(
+    id,
+    int_col,
+    bigint_col,
+    float_col,
+    double_col,
+    date_col,
+    string_col,
+    timestamp_col
+  )
+select
+  id,
+  int_col,
+  bigint_col,
+  float_col,
+  double_col,
+  CAST(date_string_col as date FORMAT 'MM/DD/YY'),
+  string_col,
+  timestamp_col
+from
+  functional.alltypestiny;
+select count(*) from alltypes_part;
+---- RESULTS
+8
+---- TYPES
+BIGINT
+====
+---- QUERY
+show files in alltypes_part_2;
+---- LABELS
+Path,Size,Partition
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=0/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-01-01/string_col=0/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=1/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-01-01/string_col=1/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=2/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-02-01/string_col=0/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=3/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-02-01/string_col=1/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=4/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-03-01/string_col=0/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=5/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-03-01/string_col=1/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=6/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-04-01/string_col=0/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=7/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-04-01/string_col=1/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
 ====
 ---- QUERY
 # Iceberg partitions independent of column order

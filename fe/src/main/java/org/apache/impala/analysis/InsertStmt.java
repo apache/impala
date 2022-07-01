@@ -17,15 +17,23 @@
 
 package org.apache.impala.analysis;
 
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.iceberg.types.Types;
+
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Column;
@@ -54,12 +62,6 @@ import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.util.IcebergUtil;
-import org.apache.thrift.TBaseHelper;
-
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Sets;
 
 /**
  * Representation of a single insert or upsert statement, including the select statement
@@ -929,7 +931,9 @@ public class InsertStmt extends StatementBase {
           ++parts;
         }
       }
-      Preconditions.checkState(partitionKeyExprs_.size() == parts);
+      if (CollectionUtils.isEmpty(columnPermutation_)) {
+        Preconditions.checkState(partitionKeyExprs_.size() == parts);
+      }
     }
     else if (isKuduTable) {
       Preconditions.checkState(
@@ -972,7 +976,19 @@ public class InsertStmt extends StatementBase {
           } else {
             // Unmentioned non-clustering columns get NULL literals with the appropriate
             // target type because Parquet cannot handle NULL_TYPE (IMPALA-617).
-            resultExprs_.add(NullLiteral.create(tblColumn.getType()));
+            NullLiteral nullExpr = NullLiteral.create(tblColumn.getType());
+            resultExprs_.add(nullExpr);
+            // In the case of INSERT INTO iceberg_tbl (col_a, col_b, ...), if the
+            // partition columns are not in the columnPermutation_, we should fill it
+            // with NullLiteral to partitionKeyExprs_ (IMPALA-11408).
+            if (isIcebergTarget() && !CollectionUtils.isEmpty(columnPermutation_)
+                && icebergPartSpec != null) {
+              IcebergColumn targetColumn = (IcebergColumn) tblColumn;
+              if (IcebergUtil.isPartitionColumn(targetColumn, icebergPartSpec)) {
+                partitionKeyExprs_.add(nullExpr);
+                partitionColPos_.add(targetColumn.getPosition());
+              }
+            }
           }
         }
       }
@@ -982,6 +998,23 @@ public class InsertStmt extends StatementBase {
         if (kuduTable.getPrimaryKeyColumnNames().contains(tblColumn.getName())) {
           primaryKeyExprs_.add(Iterables.getLast(resultExprs_));
         }
+      }
+    }
+
+    // In the case of INSERT INTO iceberg_tbl (col_a, col_b, ...), to ensure that data is
+    // written to the correct partition, we need to make sure that the partitionKeyExprs_
+    // is in ascending order according to the column position of the Iceberg tables.
+    if (isIcebergTarget() && !CollectionUtils.isEmpty(columnPermutation_)) {
+      List<Pair<Integer, Expr>> exprPairs = Lists.newArrayList();
+      for (int i = 0; i < partitionColPos_.size(); i++) {
+        exprPairs.add(Pair.create(partitionColPos_.get(i), partitionKeyExprs_.get(i)));
+      }
+      exprPairs.sort(Comparator.comparingInt(p -> p.first));
+      partitionColPos_.clear();
+      partitionKeyExprs_.clear();
+      for (Pair<Integer, Expr> exprPair : exprPairs) {
+        partitionColPos_.add(exprPair.first);
+        partitionKeyExprs_.add(exprPair.second);
       }
     }
 

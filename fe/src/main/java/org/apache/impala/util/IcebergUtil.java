@@ -67,6 +67,7 @@ import org.apache.impala.analysis.TimeTravelSpec.Kind;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.iceberg.IcebergCatalog;
@@ -983,5 +984,15 @@ public class IcebergUtil {
         return new Pair<Byte, Integer>(FbIcebergTransformType.VOID, null);
       }
     });
+  }
+
+  public static boolean isPartitionColumn(IcebergColumn column,
+      IcebergPartitionSpec spec) {
+    for (IcebergPartitionField partField : spec.getIcebergPartitionFields()) {
+      if (partField.getTransformType() == TIcebergPartitionTransformType.VOID) continue;
+      if (column.getFieldId() != partField.getSourceId()) continue;
+      return true;
+    }
+    return false;
   }
 }

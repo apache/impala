@@ -1,5 +1,176 @@
 ====
 ---- QUERY
+create table ice_part_transform (col_i int, col_str string, col_ts timestamp)
+partitioned by spec (
+  bucket(3, col_i),
+  truncate(1, col_str),
+  day(col_ts)
+)
+stored as iceberg;
+====
+---- QUERY
+insert into
+  ice_part_transform
+values
+  (2, 'two', '2001-02-03 07:08:00'),
+  (1, 'one', '2001-01-03 07:08:00'),
+  (3, 'three', '2002-03-03 07:08:00'),
+  (5, 'five', '2003-05-03 07:08:00');
+select col_i,col_str,col_ts from ice_part_transform order by 1,2,3;
+---- RESULTS
+1,'one',2001-01-03 07:08:00
+2,'two',2001-02-03 07:08:00
+3,'three',2002-03-03 07:08:00
+5,'five',2003-05-03 07:08:00
+---- TYPES
+int,string,timestamp
+====
+---- QUERY
+insert into ice_part_transform(col_i) values (0), (4);
+select
+  col_i, col_str, col_ts
+from
+  ice_part_transform
+where
+  col_str is null
+  and col_ts is null
+order by
+  1, 2, 3;
+---- RESULTS
+0,'NULL',NULL
+4,'NULL',NULL
+---- TYPES
+int,string,timestamp
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+insert into ice_part_transform(col_str) values ('zero'), ('four');
+select
+  col_i, col_str, col_ts
+from
+  ice_part_transform
+where
+  col_i is null
+  and col_ts is null
+order by
+  1, 2, 3;
+---- RESULTS
+NULL,'four',NULL
+NULL,'zero',NULL
+---- TYPES
+int,string,timestamp
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+insert into ice_part_transform(col_ts) values ('2001-04-03 07:08:00'), ('2001-05-03 07:08:00');
+select
+  col_i, col_str, col_ts
+from
+  ice_part_transform
+where
+  col_i is null
+  and col_str is null
+order by
+  1, 2, 3;
+---- RESULTS
+NULL,'NULL',2001-04-03 07:08:00
+NULL,'NULL',2001-05-03 07:08:00
+---- TYPES
+int,string,timestamp
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+insert into ice_part_transform(col_i, col_str) values (2, 'two'), (1, 'one');
+select
+  col_i, col_str, col_ts
+from
+  ice_part_transform
+where
+  col_i is not null
+  and col_str is not null
+  and col_ts is null
+order by
+  1, 2, 3;
+---- RESULTS
+1,'one',NULL
+2,'two',NULL
+---- TYPES
+int,string,timestamp
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+insert into ice_part_transform(col_i, col_ts) values (2, '2001-02-03 07:08:00'), (1, '2001-01-03 07:08:00');
+select
+  col_i, col_str, col_ts
+from
+  ice_part_transform
+where
+  col_i is not null
+  and col_str is null
+  and col_ts is not null
+order by
+  1, 2, 3;
+---- RESULTS
+1,'NULL',2001-01-03 07:08:00
+2,'NULL',2001-02-03 07:08:00
+---- TYPES
+int,string,timestamp
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+insert into ice_part_transform(col_str, col_ts) values ('two', '2001-02-03 07:08:00'), ('one', '2001-01-03 07:08:00');
+select
+  col_i, col_str, col_ts
+from
+  ice_part_transform
+where
+  col_i is null
+  and col_str is not null
+  and col_ts is not null
+order by
+  1, 2, 3;
+---- RESULTS
+NULL,'one',2001-01-03 07:08:00
+NULL,'two',2001-02-03 07:08:00
+---- TYPES
+int,string,timestamp
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+show files in ice_part_transform;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=0/col_str_trunc=__HIVE_DEFAULT_PARTITION__/col_ts_day=2001-02-03/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=0/col_str_trunc=__HIVE_DEFAULT_PARTITION__/col_ts_day=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=0/col_str_trunc=t/col_ts_day=2001-02-03/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=0/col_str_trunc=t/col_ts_day=2002-03-03/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=0/col_str_trunc=t/col_ts_day=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=1/col_str_trunc=__HIVE_DEFAULT_PARTITION__/col_ts_day=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=2/col_str_trunc=__HIVE_DEFAULT_PARTITION__/col_ts_day=2001-01-03/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=2/col_str_trunc=f/col_ts_day=2003-05-03/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=2/col_str_trunc=o/col_ts_day=2001-01-03/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=2/col_str_trunc=o/col_ts_day=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=__HIVE_DEFAULT_PARTITION__/col_str_trunc=__HIVE_DEFAULT_PARTITION__/col_ts_day=2001-04-03/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=__HIVE_DEFAULT_PARTITION__/col_str_trunc=__HIVE_DEFAULT_PARTITION__/col_ts_day=2001-05-03/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=__HIVE_DEFAULT_PARTITION__/col_str_trunc=f/col_ts_day=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=__HIVE_DEFAULT_PARTITION__/col_str_trunc=o/col_ts_day=2001-01-03/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=__HIVE_DEFAULT_PARTITION__/col_str_trunc=t/col_ts_day=2001-02-03/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=__HIVE_DEFAULT_PARTITION__/col_str_trunc=z/col_ts_day=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*',''
+---- TYPES
+string, string, string
+====
+---- QUERY
 # Test partitioned INSERTs with single column that is also
 # the partitioned column. Partition transform is BUCKET.
 create table single_col_bucket (s string)
