@@ -55,7 +55,7 @@ class CodegenFnPtr : public CodegenFnPtrBase {
    }
 
    void store(FuncType value) {
-     CodegenFnPtrBase::store(value);
+     CodegenFnPtrBase::store(reinterpret_cast<void*>(value));
    }
 };
 
