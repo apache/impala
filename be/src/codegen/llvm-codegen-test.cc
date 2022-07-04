@@ -42,6 +42,26 @@ using std::unique_ptr;
 
 namespace impala {
 
+class CodegenFnPtrTest : public testing:: Test {
+ protected:
+   typedef int (*FnPtr)(int);
+   static int int_identity(int a) { return a; }
+   CodegenFnPtr<FnPtr> codegen_fn_ptr;
+};
+
+TEST_F(CodegenFnPtrTest, StoreVoidPtrAndLoad) {
+  void* fn_ptr = reinterpret_cast<void*>(int_identity);
+  codegen_fn_ptr.CodegenFnPtrBase::store(fn_ptr);
+  FnPtr loaded_fn_ptr = codegen_fn_ptr.load();
+  ASSERT_TRUE(loaded_fn_ptr == int_identity);
+}
+
+TEST_F(CodegenFnPtrTest, StoreNonVoidPtrAndLoad) {
+  codegen_fn_ptr.store(int_identity);
+  FnPtr loaded_fn_ptr = codegen_fn_ptr.load();
+  ASSERT_TRUE(loaded_fn_ptr == int_identity);
+}
+
 class LlvmCodeGenTest : public testing:: Test {
  protected:
   scoped_ptr<TestEnv> test_env_;
