@@ -64,7 +64,7 @@ class ScratchTupleBatchTest : public testing::Test {
       int last_true_idx = batch.start;
       for (int j = batch.start + 1; j < batch.end; j++) {
         if (selected_rows[j]) {
-          EXPECT_TRUE(j - last_true_idx + 1 <= gap);
+          EXPECT_LE(j - last_true_idx, gap);
           last_true_idx = j;
         }
       }

@@ -169,10 +169,11 @@ struct ScratchTupleBatch {
   /// Creates micro batches that needs to be scanned.
   /// Bits set in 'selected_rows' are the rows that needs to be scanned. Consecutive
   /// bits set are used to create micro batches. Micro batches that differ by less than
-  /// 'skip_length', are merged together. E.g., for micro batches 1-8, 11-20, 35-100
-  /// derived from 'selected_rows' and 'skip_length' as 10, first two micro batches would
-  /// be merged into 1-20 as they differ by 3 (11 - 8) which is less than 10
-  /// ('skip_length'). Precondition for the function is there is at least one micro batch
+  /// or equal to 'skip_length', are merged together.
+  /// E.g., for micro batches 1-8, 11-20, 35-100 derived from 'selected_rows' and
+  /// 'skip_length' as 10, first two micro batches would be merged into 1-20 as there is a
+  /// non-matching run of 2 rows (9, 10) which is <= 10 ('skip_length').
+  /// Precondition for the function is there is at least one micro batch
   /// present i.e., atleast one of the 'selected_rows' is true.
   int GetMicroBatches(int skip_length, ScratchMicroBatch* batches) {
     int batch_idx = 0;
@@ -185,7 +186,7 @@ struct ScratchTupleBatch {
           // start the first ever micro batch.
           start = i;
           last = i;
-        } else if (i - last < skip_length) {
+        } else if (i - last <= skip_length) {
           // continue the old micro batch as 'last' is within 'skip_length' of last
           // micro batch.
           last = i;

@@ -1,0 +1,15 @@
+# This tests pages skipped by parquet late materialization.
+====
+---- QUERY
+create table late_mat(i int, j int)
+stored as parquet;
+insert into late_mat values (1,1), (0,0), (1,1), (0,0), (0,0), (1,1);
+set PARQUET_LATE_MATERIALIZATION_THRESHOLD=1;
+select i, j from late_mat where j = 0;
+---- RESULTS
+0,0
+0,0
+0,0
+---- TYPES
+INT, INT
+====

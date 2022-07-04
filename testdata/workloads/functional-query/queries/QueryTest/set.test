@@ -284,3 +284,19 @@ set SCAN_NODE_CODEGEN_THRESHOLD = "foo";
 set max_io_buffers="foo";
 ---- RESULTS
 ====
+---- QUERY
+set PARQUET_LATE_MATERIALIZATION_THRESHOLD=-1;
+set PARQUET_LATE_MATERIALIZATION_THRESHOLD=1;
+set PARQUET_LATE_MATERIALIZATION_THRESHOLD=10000;
+---- RESULTS
+====
+---- QUERY
+set PARQUET_LATE_MATERIALIZATION_THRESHOLD=-2;
+---- CATCH
+Invalid parquet late materialization threshold: '-2'. Use -1 to disable the feature, and values > 0 to specify the minimum skip length.
+====
+---- QUERY
+set PARQUET_LATE_MATERIALIZATION_THRESHOLD=0;
+---- CATCH
+Invalid parquet late materialization threshold: '0'. Use -1 to disable the feature, and values > 0 to specify the minimum skip length.
+====
