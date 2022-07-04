@@ -660,6 +660,7 @@ if [[ $SKIP_METADATA_LOAD -eq 1 ]]; then
         load-data "functional-query" "core" "kudu/none/none" force
   run-step-backgroundable "Loading Kudu TPCH" load-kudu-tpch.log \
         load-data "tpch" "core" "kudu/none/none" force
+  run-step-wait-all
 fi
 run-step-backgroundable "Loading Hive UDFs" build-and-copy-hive-udfs.log \
     build-and-copy-hive-udfs
