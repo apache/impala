@@ -35,3 +35,7 @@ class TestParquetLateMaterialization(ImpalaTestSuite):
 
   def test_parquet_late_materialization(self, vector):
     self.run_test_case('QueryTest/parquet-late-materialization', vector)
+
+  def test_parquet_late_materialization_unique_db(self, vector, unique_database):
+    self.run_test_case('QueryTest/parquet-late-materialization-unique-db', vector,
+        unique_database)

@@ -1160,9 +1160,11 @@ Status impala::SetQueryOption(const string& key, const string& value,
         StringParser::ParseResult result;
         const int32_t threshold =
             StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
-        if (value == nullptr || result != StringParser::PARSE_SUCCESS || threshold < -1) {
+        if (value == nullptr || result != StringParser::PARSE_SUCCESS || threshold < -1 ||
+            threshold == 0) {
           return Status(Substitute("Invalid parquet late materialization threshold: "
-              "'$0'. Only integer value -1 and above is allowed.", value));
+              "'$0'. Use -1 to disable the feature, and values > 0 to specify the "
+              "minimum skip length.", value));
         }
         query_options->__set_parquet_late_materialization_threshold(threshold);
         break;
