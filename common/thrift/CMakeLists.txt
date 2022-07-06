@@ -50,8 +50,6 @@ function(THRIFT_GEN VAR)
     #   - Does not include java output files
     set(OUTPUT_BE_FILE "${BE_OUTPUT_DIR}/gen-cpp/${THRIFT_FILE_WE}_types.cpp")
     set(OUTPUT_BE_FILE ${OUTPUT_BE_FILE} "${BE_OUTPUT_DIR}/gen-cpp/${THRIFT_FILE_WE}_types.h")
-    set(OUTPUT_BE_FILE ${OUTPUT_BE_FILE} "${BE_OUTPUT_DIR}/gen-cpp/${THRIFT_FILE_WE}_constants.cpp")
-    set(OUTPUT_BE_FILE ${OUTPUT_BE_FILE} "${BE_OUTPUT_DIR}/gen-cpp/${THRIFT_FILE_WE}_constants.h")
     list(APPEND ${VAR} ${OUTPUT_BE_FILE})
 
     # BeeswaxService thrift generation
@@ -70,6 +68,23 @@ function(THRIFT_GEN VAR)
       add_custom_command(
         OUTPUT ${OUTPUT_BE_FILE}
         COMMAND ${THRIFT_CPP_COMPILER} ${CPP_ARGS} ${THRIFT_FILE}
+        COMMAND ${THRIFT_PY_COMPILER} ${PYTHON_ARGS} ${THRIFT_FILE}
+        DEPENDS ${ABS_THRIFT_FILE}
+        COMMENT "Running thrift compiler on ${THRIFT_FILE}"
+        VERBATIM
+      )
+    ELSEIF (THRIFT_FILE STREQUAL "ImpalaService.thrift")
+      add_custom_command(
+        OUTPUT ${OUTPUT_BE_FILE}
+        COMMAND ${THRIFT_CPP_COMPILER} ${CPP_ARGS} ${THRIFT_FILE}
+        # Because of some CMake bug we can't just use
+        #     sed -i.bak "'s|\\(dispatchCallTemplated.*\\));|\\1) override;|'"
+        # here because for some reason CMake doesn't remove the quotes and generates
+        # wrong Makefiles. Strange, because at global scope add_custom_command works fine.
+        COMMAND ${CMAKE_SOURCE_DIR}/bin/cmake_aux/add_override.sh
+            ${BE_OUTPUT_DIR}/gen-cpp/ImpalaHiveServer2Service.h
+            ${BE_OUTPUT_DIR}/gen-cpp/ImpalaService.h
+        COMMAND ${THRIFT_JAVA_COMPILER} ${JAVA_FE_ARGS} ${THRIFT_FILE}
         COMMAND ${THRIFT_PY_COMPILER} ${PYTHON_ARGS} ${THRIFT_FILE}
         DEPENDS ${ABS_THRIFT_FILE}
         COMMENT "Running thrift compiler on ${THRIFT_FILE}"
@@ -235,15 +250,6 @@ add_dependencies(thrift-cpp thrift-generated-files-metrics thrift-generated-file
 add_custom_target(thrift-ext-data-src ALL DEPENDS ${THRIFT_DATA_SRC_FILES})
 add_dependencies(thrift-ext-data-src thrift-cpp)
 
-add_custom_target(thrift-cpp-manual-edit
-  COMMAND sed -i.bak "'s|\\(dispatchCallTemplated.*\\));|\\1) override;|'"
-      ${BE_OUTPUT_DIR}/gen-cpp/ImpalaHiveServer2Service.h
-      ${BE_OUTPUT_DIR}/gen-cpp/ImpalaService.h
-      COMMENT "IMPALA-11384: Manual override on ImpalaHiveServer2Service.h and ImpalaService.h"
-  DEPENDS thrift-cpp
-)
-
 # Combined target for all thrift dependencies
 add_custom_target(thrift-deps ALL)
 add_dependencies(thrift-deps thrift-ext-data-src)
-add_dependencies(thrift-deps thrift-cpp-manual-edit)
