@@ -87,6 +87,10 @@ under the License.
         Time travel: enables reproducible queries that use exactly the same table
         snapshot, or lets users easily examine changes.
       </li>
+      <li>
+        Cloning Iceberg tables: create an empty Iceberg table based on the definition of
+        another Iceberg table.
+      </li>
     </ul>
   </conbody>
   </concept>
@@ -481,6 +485,24 @@ DESCRIBE HISTORY ice_t BETWEEN '2022-01-04 10:00:00' AND '2022-01-05 10:00:00';
         snapshot of the table which might have had a different schema in the past.
       </p>
 
+    </conbody>
+  </concept>
+
+  <concept id="iceberg_table_cloning">
+    <title>Cloning Iceberg tables (LIKE clause)</title>
+    <conbody>
+      <p>
+        Use <codeph>CREATE TABLE ... LIKE ...</codeph> to create an empty Iceberg table
+        based on the definition of another Iceberg table, including any column attributes in
+        the original table:
+        <codeblock>
+CREATE TABLE new_ice_tbl LIKE orig_ice_tbl;
+        </codeblock>
+      </p>
+      <p>
+        Because of the Data Types of Iceberg and Impala do not correspond one by one, Impala
+        can only clone between Iceberg tables.
+      </p>
     </conbody>
   </concept>
 
