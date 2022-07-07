@@ -471,6 +471,15 @@ public class AnalysisContext {
     } finally {
       authzChecker.postAnalyze(authzCtx);
     }
+    // A statement that returns at most one row does not need to spool query results.
+    if (analysisException == null && analysisResult_.stmt_ instanceof SelectStmt &&
+        ((SelectStmt)analysisResult_.stmt_).returnsAtMostOneRow()) {
+      clientRequest.query_options.setSpool_query_results(false);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Result spooling is disabled due to the statement returning at most "
+            + "one row.");
+      }
+    }
     long durationMs = timeline_.markEvent("Analysis finished") / 1000000;
     LOG.info("Analysis took {} ms", durationMs);
 

@@ -676,7 +676,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=5.02MB mem-reservation=5.00MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  output exprs: count(*)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
@@ -715,7 +715,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=3
 PLAN-ROOT SINK
 |  output exprs: count(*)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
@@ -754,7 +754,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=5.02MB mem-reservation=5.00MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  output exprs: count(*)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
@@ -794,7 +794,7 @@ F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(*)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
@@ -866,7 +866,7 @@ F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(*)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 07:AGGREGATE [FINALIZE]
 |  output: count:merge(*)

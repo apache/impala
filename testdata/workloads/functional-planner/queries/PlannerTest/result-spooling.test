@@ -138,3 +138,107 @@ Per-Instance Resources: mem-estimate=308.13MB mem-reservation=20.00MB thread-res
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
 ====
+# Select stmt returning one constant row does not need to spool query results.
+select 1, uuid()
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=0B Threads=1
+Per-Host Resource Estimates: Memory=10MB
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: 1, uuid()
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+00:UNION
+   constant-operands=1
+   mem-estimate=0B mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=13B cardinality=1
+   in pipelines: <none>
+====
+# Select from an inline view that returns one row does not need to spool query results
+select a, b from (select 1 a, uuid() b) t
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=0B Threads=1
+Per-Host Resource Estimates: Memory=10MB
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: a, b
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+00:UNION
+   constant-operands=1
+   mem-estimate=0B mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=13B cardinality=1
+   in pipelines: <none>
+====
+# Select stmt with a 'limit 1' clause does not need to spool query results
+select id from functional.dimtbl limit 1
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=8.00KB Threads=3
+Per-Host Resource Estimates: Memory=16MB
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: id
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+01:EXCHANGE [UNPARTITIONED]
+|  limit: 1
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=8B cardinality=1
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+Per-Host Resources: mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=2
+00:SCAN HDFS [functional.dimtbl, RANDOM]
+   HDFS partitions=1/1 files=1 size=171B
+   stored statistics:
+     table: rows=10 size=171B
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=10
+   limit: 1
+   mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=1
+   in pipelines: 00(GETNEXT)
+====
+# Select stmt with an aggregate function and no group by does not need to spool query results
+select count(*) from functional.dimtbl
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=8.00KB Threads=3
+Per-Host Resource Estimates: Memory=16MB
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: count(*)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=1
+|  in pipelines: 03(GETNEXT), 01(OPEN)
+|
+02:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=1
+|  in pipelines: 01(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+Per-Host Resources: mem-estimate=16.02MB mem-reservation=8.00KB thread-reservation=2
+01:AGGREGATE
+|  output: count(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=1
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [functional.dimtbl, RANDOM]
+   HDFS partitions=1/1 files=1 size=171B
+   stored statistics:
+     table: rows=10 size=171B
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=10
+   mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
+   tuple-ids=0 row-size=0B cardinality=10
+   in pipelines: 00(GETNEXT)
+====

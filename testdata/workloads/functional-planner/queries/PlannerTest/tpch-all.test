@@ -1173,8 +1173,8 @@ PLAN-ROOT SINK
    predicates: l_discount <= 0.07, l_discount >= 0.05, l_quantity < 24, l_shipdate < '1995-01-01', l_shipdate >= '1994-01-01'
    row-size=46B cardinality=600.12K
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=12.00MB Threads=3
-Per-Host Resource Estimates: Memory=268MB
+Max Per-Host Resource Reservation: Memory=8.00MB Threads=3
+Per-Host Resource Estimates: Memory=264MB
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
@@ -1192,8 +1192,8 @@ PLAN-ROOT SINK
    predicates: l_discount <= 0.07, l_discount >= 0.05, l_quantity < 24, l_shipdate < '1995-01-01', l_shipdate >= '1994-01-01'
    row-size=46B cardinality=600.12K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=20.00MB Threads=3
-Per-Host Resource Estimates: Memory=180MB
+Max Per-Host Resource Reservation: Memory=16.00MB Threads=3
+Per-Host Resource Estimates: Memory=176MB
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
@@ -3111,8 +3111,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> l_partkey
    row-size=46B cardinality=600.12K
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=30.50MB Threads=6
-Per-Host Resource Estimates: Memory=359MB
+Max Per-Host Resource Reservation: Memory=26.50MB Threads=6
+Per-Host Resource Estimates: Memory=355MB
 PLAN-ROOT SINK
 |
 07:AGGREGATE [FINALIZE]
@@ -3144,8 +3144,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> l_partkey
    row-size=46B cardinality=600.12K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=40.50MB Threads=8
-Per-Host Resource Estimates: Memory=258MB
+Max Per-Host Resource Reservation: Memory=36.50MB Threads=8
+Per-Host Resource Estimates: Memory=254MB
 PLAN-ROOT SINK
 |
 07:AGGREGATE [FINALIZE]
@@ -3677,8 +3677,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpch.lineitem.l_partkey
    row-size=16B cardinality=6.00M
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=46.75MB Threads=8
-Per-Host Resource Estimates: Memory=625MB
+Max Per-Host Resource Reservation: Memory=42.75MB Threads=8
+Per-Host Resource Estimates: Memory=621MB
 PLAN-ROOT SINK
 |
 12:AGGREGATE [FINALIZE]
@@ -3733,8 +3733,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpch.lineitem.l_partkey
    row-size=16B cardinality=6.00M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=78.62MB Threads=11
-Per-Host Resource Estimates: Memory=445MB
+Max Per-Host Resource Reservation: Memory=74.62MB Threads=11
+Per-Host Resource Estimates: Memory=441MB
 PLAN-ROOT SINK
 |
 12:AGGREGATE [FINALIZE]
@@ -4113,8 +4113,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> l_partkey
    row-size=72B cardinality=197.63K
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=22.94MB Threads=5
-Per-Host Resource Estimates: Memory=335MB
+Max Per-Host Resource Reservation: Memory=18.94MB Threads=5
+Per-Host Resource Estimates: Memory=331MB
 PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
@@ -4146,8 +4146,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> l_partkey
    row-size=72B cardinality=197.63K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=33.88MB Threads=5
-Per-Host Resource Estimates: Memory=218MB
+Max Per-Host Resource Reservation: Memory=29.88MB Threads=5
+Per-Host Resource Estimates: Memory=214MB
 PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]

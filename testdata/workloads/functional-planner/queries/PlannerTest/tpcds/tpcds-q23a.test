@@ -55,7 +55,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=633.30MB mem-reservation=84.56MB thread-reservation=11 runtime-filters-memory=10.00MB
 PLAN-ROOT SINK
 |  output exprs: sum(sales)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 49:AGGREGATE [FINALIZE]
 |  output: sum(sales)
@@ -507,13 +507,13 @@ PLAN-ROOT SINK
    tuple-ids=8 row-size=12B cardinality=2.88M
    in pipelines: 09(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=270.38MB Threads=50
+Max Per-Host Resource Reservation: Memory=266.38MB Threads=50
 Per-Host Resource Estimates: Memory=1.34GB
 F31:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: sum(sales)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 89:AGGREGATE [FINALIZE]
 |  output: sum:merge(sales)
@@ -1240,13 +1240,13 @@ Per-Host Resources: mem-estimate=65.14MB mem-reservation=12.75MB thread-reservat
    tuple-ids=8 row-size=12B cardinality=2.88M
    in pipelines: 09(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=501.12MB Threads=63
+Max Per-Host Resource Reservation: Memory=497.12MB Threads=63
 Per-Host Resource Estimates: Memory=1.11GB
 F31:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: sum(sales)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 89:AGGREGATE [FINALIZE]
 |  output: sum:merge(sales)

@@ -30,7 +30,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=570.31MB mem-reservation=45.06MB thread-reservation=7 runtime-filters-memory=4.00MB
 PLAN-ROOT SINK
 |  output exprs: count(cs_order_number), sum(cs_ext_ship_cost), sum(cs_net_profit)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 13:TOP-N [LIMIT=100]
 |  order by: count(cs_order_number) ASC
@@ -160,13 +160,13 @@ PLAN-ROOT SINK
    tuple-ids=4 row-size=12B cardinality=1.44M
    in pipelines: 04(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=45.77MB Threads=14
-Per-Host Resource Estimates: Memory=588MB
+Max Per-Host Resource Reservation: Memory=41.77MB Threads=14
+Per-Host Resource Estimates: Memory=584MB
 F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(cs_order_number), sum(cs_ext_ship_cost), sum(cs_net_profit)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 13:TOP-N [LIMIT=100]
 |  order by: count(cs_order_number) ASC
@@ -351,13 +351,13 @@ Per-Host Resources: mem-estimate=97.00MB mem-reservation=5.00MB thread-reservati
    tuple-ids=4 row-size=12B cardinality=1.44M
    in pipelines: 04(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=54.58MB Threads=13
-Per-Host Resource Estimates: Memory=216MB
+Max Per-Host Resource Reservation: Memory=50.58MB Threads=13
+Per-Host Resource Estimates: Memory=212MB
 F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(cs_order_number), sum(cs_ext_ship_cost), sum(cs_net_profit)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 13:TOP-N [LIMIT=100]
 |  order by: count(cs_order_number) ASC

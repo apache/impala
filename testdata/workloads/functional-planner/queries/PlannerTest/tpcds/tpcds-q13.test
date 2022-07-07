@@ -54,7 +54,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=316.75MB mem-reservation=26.70MB thread-reservation=7 runtime-filters-memory=5.00MB
 PLAN-ROOT SINK
 |  output exprs: avg(ss_quantity), avg(ss_ext_sales_price), avg(ss_ext_wholesale_cost), sum(ss_ext_wholesale_cost)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 11:AGGREGATE [FINALIZE]
 |  output: avg(CAST(ss_quantity AS BIGINT)), avg(ss_ext_sales_price), avg(ss_ext_wholesale_cost), sum(ss_ext_wholesale_cost)
@@ -180,13 +180,13 @@ PLAN-ROOT SINK
    tuple-ids=2 row-size=39B cardinality=181.75K
    in pipelines: 02(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=40.08MB Threads=14
-Per-Host Resource Estimates: Memory=339MB
+Max Per-Host Resource Reservation: Memory=36.08MB Threads=14
+Per-Host Resource Estimates: Memory=335MB
 F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: avg(ss_quantity), avg(ss_ext_sales_price), avg(ss_ext_wholesale_cost), sum(ss_ext_wholesale_cost)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 19:AGGREGATE [FINALIZE]
 |  output: avg:merge(ss_quantity), avg:merge(ss_ext_sales_price), avg:merge(ss_ext_wholesale_cost), sum:merge(ss_ext_wholesale_cost)
@@ -366,13 +366,13 @@ Per-Host Resources: mem-estimate=139.26MB mem-reservation=14.81MB thread-reserva
    tuple-ids=0 row-size=40B cardinality=288.04K
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=56.83MB Threads=16
-Per-Host Resource Estimates: Memory=167MB
+Max Per-Host Resource Reservation: Memory=52.83MB Threads=16
+Per-Host Resource Estimates: Memory=164MB
 F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: avg(ss_quantity), avg(ss_ext_sales_price), avg(ss_ext_wholesale_cost), sum(ss_ext_wholesale_cost)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 19:AGGREGATE [FINALIZE]
 |  output: avg:merge(ss_quantity), avg:merge(ss_ext_sales_price), avg:merge(ss_ext_wholesale_cost), sum:merge(ss_ext_wholesale_cost)

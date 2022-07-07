@@ -36,7 +36,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=618.94MB mem-reservation=186.94MB thread-reservation=10 runtime-filters-memory=6.00MB
 PLAN-ROOT SINK
 |  output exprs: count(*)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 20:AGGREGATE [FINALIZE]
 |  output: count(*)
@@ -225,13 +225,13 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=8B cardinality=2.88M
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=330.81MB Threads=22
-Per-Host Resource Estimates: Memory=893MB
+Max Per-Host Resource Reservation: Memory=326.81MB Threads=22
+Per-Host Resource Estimates: Memory=889MB
 F12:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(*)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 36:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
@@ -528,13 +528,13 @@ Per-Host Resources: mem-estimate=80.58MB mem-reservation=46.94MB thread-reservat
    tuple-ids=0 row-size=8B cardinality=2.88M
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=470.62MB Threads=25
-Per-Host Resource Estimates: Memory=755MB
+Max Per-Host Resource Reservation: Memory=466.62MB Threads=25
+Per-Host Resource Estimates: Memory=751MB
 F12:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(*)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 36:AGGREGATE [FINALIZE]
 |  output: count:merge(*)

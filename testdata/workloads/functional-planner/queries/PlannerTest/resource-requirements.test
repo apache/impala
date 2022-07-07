@@ -1867,16 +1867,16 @@ Per-Instance Resources: mem-estimate=120.06MB mem-reservation=38.00MB thread-res
 # Non-grouping aggregation with zero-slot parquet scan
 select count(*) from tpch_parquet.lineitem
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=4.00MB Threads=2
+Max Per-Host Resource Reservation: Memory=128.00KB Threads=2
 Per-Host Resource Estimates: Memory=10MB
 Codegen disabled by planner
 Analyzed query: SELECT count(*) FROM tpch_parquet.lineitem
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=1.02MB mem-reservation=128.00KB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: count(*)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum_init_zero(tpch_parquet.lineitem.stats: num_rows)
@@ -1894,16 +1894,16 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=8B cardinality=3
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=4.12MB Threads=3
+Max Per-Host Resource Reservation: Memory=128.00KB Threads=3
 Per-Host Resource Estimates: Memory=10MB
 Codegen disabled by planner
 Analyzed query: SELECT count(*) FROM tpch_parquet.lineitem
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(*)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
@@ -1934,16 +1934,16 @@ Per-Host Resources: mem-estimate=1.02MB mem-reservation=128.00KB thread-reservat
    tuple-ids=0 row-size=8B cardinality=3
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=4.12MB Threads=2
-Per-Host Resource Estimates: Memory=84MB
+Max Per-Host Resource Reservation: Memory=128.00KB Threads=2
+Per-Host Resource Estimates: Memory=80MB
 Codegen disabled by planner
 Analyzed query: SELECT count(*) FROM tpch_parquet.lineitem
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(*)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
@@ -5847,16 +5847,16 @@ PLAN-ROOT SINK
 # Kudu Scan count(*)
 select count(*) from functional_kudu.alltypes
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=4.00MB Threads=2
+Max Per-Host Resource Reservation: Memory=0B Threads=2
 Per-Host Resource Estimates: Memory=10MB
 Codegen disabled by planner
 Analyzed query: SELECT count(*) FROM functional_kudu.alltypes
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=400.00KB mem-reservation=0B thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: count(*)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum_init_zero(functional_kudu.alltypes.stats: num_rows)

@@ -806,8 +806,8 @@ PLAN-ROOT SINK
    predicates: l_discount <= 0.07, l_discount >= 0.05, l_quantity < 24, l_shipdate < '1995-01-01', l_shipdate >= '1994-01-01'
    row-size=36B cardinality=1.50M
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=20.00MB Threads=3
-Per-Host Resource Estimates: Memory=356MB
+Max Per-Host Resource Reservation: Memory=16.00MB Threads=3
+Per-Host Resource Estimates: Memory=352MB
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
@@ -2074,8 +2074,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> l_partkey
    row-size=36B cardinality=1.50M
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=40.00MB Threads=5
-Per-Host Resource Estimates: Memory=414MB
+Max Per-Host Resource Reservation: Memory=36.00MB Threads=5
+Per-Host Resource Estimates: Memory=410MB
 PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
@@ -2447,8 +2447,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> l.l_partkey, RF002 -> l_partkey
    row-size=24B cardinality=15.00M
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=158.94MB Threads=8
-Per-Host Resource Estimates: Memory=990MB
+Max Per-Host Resource Reservation: Memory=154.94MB Threads=8
+Per-Host Resource Estimates: Memory=986MB
 PLAN-ROOT SINK
 |
 12:AGGREGATE [FINALIZE]
@@ -2674,8 +2674,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> l_partkey
    row-size=56B cardinality=1.50M
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=32.94MB Threads=5
-Per-Host Resource Estimates: Memory=599MB
+Max Per-Host Resource Reservation: Memory=28.94MB Threads=5
+Per-Host Resource Estimates: Memory=595MB
 PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]

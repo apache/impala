@@ -180,7 +180,8 @@ class TestObservability(ImpalaTestSuite):
         "NUM_NODES=1,NUM_SCANNER_THREADS=1,"
         "RUNTIME_FILTER_MODE=OFF,MT_DOP=0,{erasure_coding}TIMEZONE={timezone},"
         "CLIENT_IDENTIFIER="
-        "query_test/test_observability.py::TestObservability::()::test_query_options"
+        "query_test/test_observability.py::TestObservability::()::test_query_options,"
+        "SPOOL_QUERY_RESULTS=0"
         "\n")
     expected_str = expected_str.format(
         erasure_coding="ALLOW_ERASURE_CODED_FILES=1," if IS_EC else "",

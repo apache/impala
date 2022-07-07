@@ -1821,13 +1821,15 @@ public class Frontend {
       }
       TExecutorGroupSet new_entry = new TExecutorGroupSet(e);
       if (poolService != null) {
-        // Find out the max_mem_limit from the pool service
+        // Find out the max_mem_limit from the pool service. Set to max_mem_limit when it
+        // is greater than 0, otherwise set to max possible threshold value.
         TPoolConfig poolConfig =
             poolService.getPoolConfig(e.getExec_group_name_prefix());
         Preconditions.checkNotNull(poolConfig);
-        new_entry.setMax_mem_limit(poolConfig.getMax_query_mem_limit());
+        new_entry.setMax_mem_limit(poolConfig.getMax_query_mem_limit() > 0 ?
+            poolConfig.getMax_query_mem_limit() : Long.MAX_VALUE);
       } else {
-        // Set to max possible thresold value when there is no pool service
+        // Set to max possible threshold value when there is no pool service
         new_entry.setMax_mem_limit(Long.MAX_VALUE);
       }
       result.add(new_entry);

@@ -437,7 +437,7 @@ where
   and l_discount between 0.05 and 0.07
   and l_quantity < 24
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=4.00MB Threads=2
+Max Per-Host Resource Reservation: Memory=0B Threads=2
 Per-Host Resource Estimates: Memory=10MB
 PLAN-ROOT SINK
 |
@@ -1412,7 +1412,7 @@ where
     )
   )
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=5.00MB Threads=3
+Max Per-Host Resource Reservation: Memory=2.94MB Threads=3
 Per-Host Resource Estimates: Memory=15MB
 PLAN-ROOT SINK
 |
