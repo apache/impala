@@ -63,7 +63,8 @@ static bool IndicateTimestampParseFailure(date* d, time_duration* t) {
 }
 
 bool TimestampParser::ParseSimpleDateFormat(const char* str, int len,
-    boost::gregorian::date* d, boost::posix_time::time_duration* t) {
+    boost::gregorian::date* d, boost::posix_time::time_duration* t,
+    bool accept_time_toks_only) {
   DCHECK(d != nullptr);
   DCHECK(t != nullptr);
   if (UNLIKELY(str == nullptr)) return IndicateTimestampParseFailure(d, t);
@@ -100,7 +101,8 @@ bool TimestampParser::ParseSimpleDateFormat(const char* str, int len,
       SimpleDateFormatTokenizer::DEFAULT_DATE_TIME_FMT_LEN);
   // Determine the default formatting context that's required for parsing.
   const DateTimeFormatContext* dt_ctx =
-      SimpleDateFormatTokenizer::GetDefaultFormatContext(str, default_fmt_len, true);
+      SimpleDateFormatTokenizer::GetDefaultFormatContext(
+          str, default_fmt_len, true, accept_time_toks_only);
   if (dt_ctx != nullptr) {
     return ParseSimpleDateFormat(str, default_fmt_len, *dt_ctx, d, t);
   }

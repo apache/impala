@@ -74,6 +74,8 @@ class SimpleDateFormatTokenizer {
 public:
   /// Constants to hold default format lengths.
   static const int DEFAULT_DATE_FMT_LEN;
+  static const int DEFAULT_TIME_FMT_LEN;
+  static const int DEFAULT_TIME_FRAC_FMT_LEN;
   static const int DEFAULT_SHORT_DATE_TIME_FMT_LEN;
   static const int DEFAULT_DATE_TIME_FMT_LEN;
   static const int FRACTIONAL_MAX_LEN;
@@ -85,7 +87,7 @@ public:
   /// cast_mode -- indicates if it is a 'datetime to string' or 'string to datetime' cast
   /// Return true if the parse was successful.
   static bool Tokenize(DateTimeFormatContext* dt_ctx, CastDirection cast_mode,
-      bool accept_time_toks = true);
+      bool accept_time_toks = true, bool accept_time_toks_only = false);
 
   /// Parse the date/time string to generate the DateTimeFormatToken required by
   /// DateTimeFormatContext. Similar to Tokenize() this function will take the string
@@ -106,10 +108,12 @@ public:
   /// len -- length of the string to parse (must be > 0)
   /// accept_time_toks -- if true, time tokens are accepted. Otherwise time tokens are
   /// rejected.
+  /// accept_time_toks_only -- if true, time tokens without date tokens are accepted.
+  /// Otherwise, they are rejected.
   /// Return the corresponding default format context if parsing succeeded, or nullptr
   /// otherwise.
   static const DateTimeFormatContext* GetDefaultFormatContext(const char* str, int len,
-      bool accept_time_toks);
+      bool accept_time_toks, bool accept_time_toks_only);
 
   /// Return default date/time format context for a timestamp parsing.
   /// If 'time' has a fractional seconds, context with pattern
@@ -134,8 +138,10 @@ private:
   static DateTimeFormatContext DEFAULT_SHORT_DATE_TIME_CTX;
   static DateTimeFormatContext DEFAULT_SHORT_ISO_DATE_TIME_CTX;
   static DateTimeFormatContext DEFAULT_DATE_CTX;
+  static DateTimeFormatContext DEFAULT_TIME_CTX;
   static DateTimeFormatContext DEFAULT_DATE_TIME_CTX[10];
   static DateTimeFormatContext DEFAULT_ISO_DATE_TIME_CTX[10];
+  static DateTimeFormatContext DEFAULT_TIME_FRAC_CTX[10];
 
   /// Checks if str_begin point to the beginning of a valid timezone offset.
   static bool IsValidTZOffset(const char* str_begin, const char* str_end);
