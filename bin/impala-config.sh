@@ -215,7 +215,7 @@ export CDP_TEZ_VERSION=0.9.1.7.2.16.0-164
 # Ref: https://infra.apache.org/release-download-pages.html#closer
 : ${APACHE_MIRROR:="https://www.apache.org/dyn/closer.cgi"}
 export APACHE_MIRROR
-export APACHE_HIVE_VERSION=3.1.2
+export APACHE_HIVE_VERSION=3.1.3
 export APACHE_HIVE_STORAGE_API_VERSION=2.7.0
 export APACHE_OZONE_VERSION=1.2.1
 
