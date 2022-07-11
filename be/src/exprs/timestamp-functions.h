@@ -168,9 +168,13 @@ class TimestampFunctions {
   static IntVal DayOfYear(FunctionContext* context, const TimestampVal& ts_val);
   static IntVal WeekOfYear(FunctionContext* context, const TimestampVal& ts_val);
   static IntVal Hour(FunctionContext* context, const TimestampVal& ts_val);
+  static IntVal Hour(FunctionContext* context, const StringVal& str_val);
   static IntVal Minute(FunctionContext* context, const TimestampVal& ts_val);
+  static IntVal Minute(FunctionContext* context, const StringVal& str_val);
   static IntVal Second(FunctionContext* context, const TimestampVal& ts_val);
+  static IntVal Second(FunctionContext* context, const StringVal& str_val);
   static IntVal Millisecond(FunctionContext* context, const TimestampVal& ts_val);
+  static IntVal Millisecond(FunctionContext* context, const StringVal& str_val);
 
   /// Date/time functions.
   static TimestampVal Now(FunctionContext* context);

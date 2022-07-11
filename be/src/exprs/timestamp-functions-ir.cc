@@ -276,6 +276,47 @@ IntVal TimestampFunctions::Millisecond(FunctionContext* context,
   return IntVal(time.total_milliseconds() - time.total_seconds() * 1000);
 }
 
+bool StringToTimeOfDay(
+    const StringVal& str_val, boost::posix_time::time_duration* time) {
+  if (str_val.is_null) return false;
+  boost::gregorian::date dummy_date;
+  return TimestampParser::ParseSimpleDateFormat(
+      reinterpret_cast<char*>(str_val.ptr), str_val.len, &dummy_date, time, true);
+}
+
+IntVal TimestampFunctions::Hour(FunctionContext* context, const StringVal& str_val) {
+  boost::posix_time::time_duration time;
+  if (!StringToTimeOfDay(str_val, &time)) {
+    return IntVal::null();
+  }
+  return IntVal(time.hours());
+}
+
+IntVal TimestampFunctions::Minute(FunctionContext* context, const StringVal& str_val) {
+  boost::posix_time::time_duration time;
+  if (!StringToTimeOfDay(str_val, &time)) {
+    return IntVal::null();
+  }
+  return IntVal(time.minutes());
+}
+
+IntVal TimestampFunctions::Second(FunctionContext* context, const StringVal& str_val) {
+  boost::posix_time::time_duration time;
+  if (!StringToTimeOfDay(str_val, &time)) {
+    return IntVal::null();
+  }
+  return IntVal(time.seconds());
+}
+
+IntVal TimestampFunctions::Millisecond(
+    FunctionContext* context, const StringVal& str_val) {
+  boost::posix_time::time_duration time;
+  if (!StringToTimeOfDay(str_val, &time)) {
+    return IntVal::null();
+  }
+  return IntVal(time.total_milliseconds() - time.total_seconds() * 1000);
+}
+
 TimestampVal TimestampFunctions::Now(FunctionContext* context) {
   const TimestampValue* now = context->impl()->state()->now();
   TimestampVal return_val;

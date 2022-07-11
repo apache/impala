@@ -39,13 +39,17 @@ class TimestampParser {
   /// date may be specified. All components are required in either the
   /// date or time except for the fractional seconds following the period. In the case
   /// of just a date, the time will be set to 00:00:00.
+  /// In case accept_time_toks_only=true, HH:mm:ss.SSSSSSSSS is also accepted and if
+  /// there is no data part in the string, the output date is set to invalid.
   /// str -- valid pointer to the string to parse
   /// len -- length of the string to parse (must be > 0)
   /// d -- the date value where the results of the parsing will be placed
   /// t -- the time value where the results of the parsing will be placed
+  /// accept_time_toks_only -- also accepts time of the day string without date part
   /// Returns true if the date/time was successfully parsed.
   static bool ParseSimpleDateFormat(const char* str, int len, boost::gregorian::date* d,
-      boost::posix_time::time_duration* t) WARN_UNUSED_RESULT;
+      boost::posix_time::time_duration* t,
+      bool accept_time_toks_only = false) WARN_UNUSED_RESULT;
 
   /// Parse a date/time string. The data must adhere to SimpleDateFormat, otherwise it
   /// will be rejected i.e. no missing tokens. In the case of just a date, the time will

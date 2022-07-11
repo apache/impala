@@ -6954,6 +6954,25 @@ TEST_P(ExprTest, TimestampFunctions) {
   TestStringValue(
       "to_date(cast('2011-12-22 09:10:11.12345678' as timestamp))", "2011-12-22");
 
+  // These expressions directly extract hour/minute/second/millis from STRING type
+  // to support these functions for timestamp strings without a date part (IMPALA-11355).
+  TestValue("hour('09:10:11.000000')", TYPE_INT, 9);
+  TestValue("minute('09:10:11.000000')", TYPE_INT, 10);
+  TestValue("second('09:10:11.000000')", TYPE_INT, 11);
+  TestValue("millisecond('09:10:11.123456')", TYPE_INT, 123);
+  TestValue("millisecond('09:10:11')", TYPE_INT, 0);
+  // Test the functions above with invalid inputs.
+  TestIsNull("hour('09:10:1')", TYPE_INT);
+  TestIsNull("hour('838:59:59')", TYPE_INT);
+  TestIsNull("minute('09-10-11')", TYPE_INT);
+  TestIsNull("second('09:aa:11.000000')", TYPE_INT);
+  TestIsNull("second('09:10:11pm')", TYPE_INT);
+  TestIsNull("millisecond('24:11:11.123')", TYPE_INT);
+  TestIsNull("millisecond('09:61:11.123')", TYPE_INT);
+  TestIsNull("millisecond('09:10:61.123')", TYPE_INT);
+  TestIsNull("millisecond('09:10:11.123aaa')", TYPE_INT);
+  TestIsNull("millisecond('')", TYPE_INT);
+
   // Check that timeofday() does not crash or return incorrect results
   TestIsNotNull("timeofday()", TYPE_STRING);
 
