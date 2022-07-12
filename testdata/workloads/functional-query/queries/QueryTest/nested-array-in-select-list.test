@@ -386,7 +386,7 @@ INT,INT,STRING
 ---- QUERY
 # Regression test for:
 #   IMPALA-11434: "More than 1 2d arrays in select list causes analysis error"
-select id, int_1d, int_2d, int_3d, string_1d, string_2d, string_3d from array_tbl;
+select id, arr_int_1d, arr_int_2d, arr_int_3d, arr_string_1d, arr_string_2d, arr_string_3d from collection_tbl;
 ---- RESULTS
 1,'[1,2,NULL]','[[1,2,NULL],[3]]','[[[1,2,NULL],[3]],[[4]]]','["1","2",NULL]','[["1","2",NULL],["3"]]','[[["1","2",NULL],["3"]],[["4"]]]'
 ---- TYPES

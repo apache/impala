@@ -1,0 +1,326 @@
+====
+---- QUERY
+select id, int_map from complextypestbl
+---- RESULTS
+1,'{"k1":1,"k2":100}'
+2,'{"k1":2,"k2":NULL}'
+3,'{}'
+4,'{}'
+5,'{}'
+6,'NULL'
+7,'{"k1":NULL,"k3":NULL}'
+8,'{"k1":-1}'
+---- TYPES
+bigint,string
+====
+---- QUERY
+select id, int_map from complextypestbl where id=1
+---- RESULTS
+1,'{"k1":1,"k2":100}'
+---- TYPES
+bigint,string
+====
+---- QUERY
+select id, int_map, int_map_array from complextypestbl
+---- RESULTS
+1,'{"k1":1,"k2":100}','[{"k1":1}]'
+2,'{"k1":2,"k2":NULL}','[{"k3":NULL,"k1":1},NULL,{}]'
+3,'{}','[NULL,NULL]'
+4,'{}','[]'
+5,'{}','NULL'
+6,'NULL','NULL'
+7,'{"k1":NULL,"k3":NULL}','NULL'
+8,'{"k1":-1}','[{},{"k1":1},{},{}]'
+---- TYPES
+bigint,string,string
+====
+---- QUERY
+# Sorting is not supported yet for collections: IMPALA-10939
+select id, int_map_array, int_map from complextypestbl order by id
+---- CATCH
+IllegalStateException: Sorting is not supported if the select list contains collection columns.
+====
+---- QUERY
+# Same collection used twice in a select list.
+select id, int_map, int_map from complextypestbl
+---- RESULTS
+1,'{"k1":1,"k2":100}','{"k1":1,"k2":100}'
+2,'{"k1":2,"k2":NULL}','{"k1":2,"k2":NULL}'
+3,'{}','{}'
+4,'{}','{}'
+5,'{}','{}'
+6,'NULL','NULL'
+7,'{"k1":NULL,"k3":NULL}','{"k1":NULL,"k3":NULL}'
+8,'{"k1":-1}','{"k1":-1}'
+---- TYPES
+bigint,string,string
+====
+---- QUERY
+# Same collection used from two versions of the same table/
+select t1.id, t1.int_map, t2.int_map
+ from complextypestbl t1 join complextypestbl t2
+ on t1.id = t2.id
+---- RESULTS
+1,'{"k1":1,"k2":100}','{"k1":1,"k2":100}'
+2,'{"k1":2,"k2":NULL}','{"k1":2,"k2":NULL}'
+3,'{}','{}'
+4,'{}','{}'
+5,'{}','{}'
+6,'NULL','NULL'
+7,'{"k1":NULL,"k3":NULL}','{"k1":NULL,"k3":NULL}'
+8,'{"k1":-1}','{"k1":-1}'
+---- TYPES
+bigint,string,string
+====
+---- QUERY
+select id, int_map from complextypestbl union all select id, int_map from complextypestbl
+---- RESULTS
+1,'{"k1":1,"k2":100}'
+2,'{"k1":2,"k2":NULL}'
+3,'{}'
+4,'{}'
+5,'{}'
+6,'NULL'
+7,'{"k1":NULL,"k3":NULL}'
+8,'{"k1":-1}'
+1,'{"k1":1,"k2":100}'
+2,'{"k1":2,"k2":NULL}'
+3,'{}'
+4,'{}'
+5,'{}'
+6,'NULL'
+7,'{"k1":NULL,"k3":NULL}'
+8,'{"k1":-1}'
+---- TYPES
+bigint,string
+====
+---- QUERY
+# TODO: only UNION ALL is supported. UNION needs several utility functions in the BE, so
+# for now we reject it in the FE.
+select id, int_map from complextypestbl union select id, int_map from complextypestbl;
+---- CATCH
+IllegalStateException: UNION, EXCEPT and INTERSECT are not supported for collection types
+====
+---- QUERY
+# Changing a column to a different type leads "non-pass-through" union that does a
+# deepcopy on the tuple, which is not yet implemented in BE for arrays. This case is
+# currently caught in the planner.
+select id, int_map from complextypestbl
+  union all select cast(id as tinyint), int_map from complextypestbl
+---- CATCH
+IllegalStateException: only pass-through UNION ALL is supported for array columns
+====
+---- QUERY
+# Constants in the select list of unions also lead to "non-pass-through" union.
+select 1, int_map from complextypestbl
+  union all select 2, int_map from complextypestbl;
+---- CATCH
+IllegalStateException: only pass-through UNION ALL is supported for array columns
+====
+---- QUERY
+select 1 from (select int_map from complextypestbl) s
+---- RESULTS
+1
+1
+1
+1
+1
+1
+1
+1
+---- TYPES
+tinyint
+====
+---- QUERY
+select id, int_map from (select id, int_map from complextypestbl) s;
+---- RESULTS
+1,'{"k1":1,"k2":100}'
+2,'{"k1":2,"k2":NULL}'
+3,'{}'
+4,'{}'
+5,'{}'
+6,'NULL'
+7,'{"k1":NULL,"k3":NULL}'
+8,'{"k1":-1}'
+---- TYPES
+bigint,string
+====
+---- QUERY
+with s as (select id, t.int_map from complextypestbl t)
+select id, int_map from s;
+---- RESULTS
+1,'{"k1":1,"k2":100}'
+2,'{"k1":2,"k2":NULL}'
+3,'{}'
+4,'{}'
+5,'{}'
+6,'NULL'
+7,'{"k1":NULL,"k3":NULL}'
+8,'{"k1":-1}'
+---- TYPES
+bigint,string
+====
+---- QUERY
+select id, int_map from complextypes_maps_view;
+---- RESULTS
+1,'{"k1":1,"k2":100}'
+2,'{"k1":2,"k2":NULL}'
+3,'{}'
+4,'{}'
+5,'{}'
+6,'NULL'
+7,'{"k1":NULL,"k3":NULL}'
+8,'{"k1":-1}'
+---- TYPES
+bigint,string
+====
+---- QUERY
+# Unnesting map returned by view.
+select id, m.key, m.value from complextypes_maps_view v, v.int_map m;
+---- RESULTS
+1,'k1',1
+1,'k2',100
+2,'k1',2
+2,'k2',NULL
+7,'k1',NULL
+7,'k3',NULL
+8,'k1',-1
+---- TYPES
+bigint,string,int
+====
+---- QUERY
+# Unnesting map returned from WITH clause and predicate in inner query.
+with v as (select id, int_map from complextypestbl where id=1)
+select v.id, a.key, a.value from v, v.int_map a;
+---- RESULTS
+1,'k1',1
+1,'k2',100
+---- TYPES
+bigint,string,int
+====
+---- QUERY
+# Unnesting map returned from WITH clause and predicate in outer query.
+with v as (select id, int_map from complextypestbl)
+select v.id, a.key, a.value from v, v.int_map a where id=1;
+---- RESULTS
+1,'k1',1
+1,'k2',100
+---- TYPES
+bigint,string,int
+====
+---- QUERY
+# Unnesting map returned from WITH clause on item.
+with v as (select id, int_map from complextypestbl)
+select v.id, a.key, a.value from v, v.int_map a where a.key='k1'
+---- RESULTS
+1,'k1',1
+2,'k1',2
+7,'k1',NULL
+8,'k1',-1
+---- TYPES
+bigint,string,int
+====
+---- QUERY
+# Unnesting map returned by view wrapped in inline view.
+select v.id, a.key, a.value from
+  (select id, int_map from complextypes_maps_view) v, v.int_map a;
+---- RESULTS
+1,'k1',1
+1,'k2',100
+2,'k1',2
+2,'k2',NULL
+7,'k1',NULL
+7,'k3',NULL
+8,'k1',-1
+---- TYPES
+bigint,string,int
+====
+---- QUERY
+# Unnesting map returned by view wrapped in inline view + WITH clause.
+with v2 as (select id, int_map from complextypes_maps_view)
+select v.id, a.key, a.value from (select id, int_map from v2) v, v.int_map a;
+---- RESULTS
+1,'k1',1
+1,'k2',100
+2,'k1',2
+2,'k2',NULL
+7,'k1',NULL
+7,'k3',NULL
+8,'k1',-1
+---- TYPES
+bigint,string,int
+====
+---- QUERY
+# Unnesting map returned by view wrapped in inline view + WITH clause.
+with v2 as (select id, int_map from complextypes_maps_view)
+select v.id, a.key, a.value from
+  (select id, int_map from v2 where id=1) v, v.int_map a
+  where a.key='k1';
+---- RESULTS
+1,'k1',1
+---- TYPES
+bigint,string,int
+====
+---- QUERY
+select item from unnest(complextypestbl.int_map_array)
+---- RESULTS
+'{"k1":1}'
+'{"k3":NULL,"k1":1}'
+'NULL'
+'{}'
+'NULL'
+'NULL'
+'{}'
+'{"k1":1}'
+'{}'
+'{}'
+---- TYPES
+string
+====
+---- QUERY
+select id, a.key, a.value from complextypes_maps_view t left join t.int_map a;
+---- RESULTS
+1,'k1',1
+1,'k2',100
+2,'k1',2
+2,'k2',NULL
+3,'NULL',NULL
+4,'NULL',NULL
+5,'NULL',NULL
+6,'NULL',NULL
+7,'k1',NULL
+7,'k3',NULL
+8,'k1',-1
+---- TYPES
+BIGINT,STRING,INT
+====
+---- QUERY
+select id, a2.key, a2.value from complextypes_maps_view v, v.int_map_array a1, a1.item a2;
+---- RESULTS
+1,'k1',1
+2,'k3',NULL
+2,'k1',1
+8,'k1',1
+---- TYPES
+BIGINT,STRING,INT
+====
+---- QUERY
+# Regression test for:
+#   IMPALA-11434: "More than 1 2d arrays in select list causes analysis error"
+select id, map_1d, map_2d, map_3d, arr_int_3d, map_map_array from collection_tbl;
+---- RESULTS
+1,'{1:"first",2:"second"}','{1:{10:"ten",20:"twenty"},2:{30:"thirty",40:"forty"}}','{1:{10:{100:"hundred",200:"two hundred"},20:{300:"three hundred",400:"four hundred"}},2:{30:{500:"five hundred",600:"six hundred"},40:{700:"seven hundred",800:"eight hundred"}}}','[[[1,2,NULL],[3]],[[4]]]','{1:{10:[100,200],20:[300,400]},2:{30:[500,600],40:[700,800]}}'
+---- TYPES
+INT,STRING,STRING,STRING,STRING,STRING
+=====
+---- QUERY
+select id, map_1d, map_2d, mma.value mma_value, ma.value ma_value
+from collection_tbl c, c.map_map_array mma, mma.value ma;
+---- RESULTS
+1,'{1:"first",2:"second"}','{1:{10:"ten",20:"twenty"},2:{30:"thirty",40:"forty"}}','{10:[100,200],20:[300,400]}','[100,200]'
+1,'{1:"first",2:"second"}','{1:{10:"ten",20:"twenty"},2:{30:"thirty",40:"forty"}}','{10:[100,200],20:[300,400]}','[300,400]'
+1,'{1:"first",2:"second"}','{1:{10:"ten",20:"twenty"},2:{30:"thirty",40:"forty"}}','{30:[500,600],40:[700,800]}','[500,600]'
+1,'{1:"first",2:"second"}','{1:{10:"ten",20:"twenty"},2:{30:"thirty",40:"forty"}}','{30:[500,600],40:[700,800]}','[700,800]'
+---- TYPES
+INT,STRING,STRING,STRING,STRING
+=====

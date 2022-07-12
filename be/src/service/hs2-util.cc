@@ -421,9 +421,10 @@ static void StructExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
   }
 }
 
-static void ArrayExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
+static void CollectionExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     const TColumnType& type, RowBatch* batch, int start_idx, int num_rows,
-    uint32_t output_row_idx, apache::hive::service::cli::thrift::TColumn* column) {
+    uint32_t output_row_idx, apache::hive::service::cli::thrift::TColumn* column,
+    bool is_map) {
   DCHECK(type.types.size() > 1);
   ReserveSpace(num_rows, output_row_idx, &column->stringVal);
   FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
@@ -439,7 +440,7 @@ static void ArrayExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
       CollectionValue value(coll_val);
       // TODO: use rapidjson as in for structs
       stringstream stream;
-      RawValue::PrintArrayValue(&value, item_tuple_desc, -1, &stream);
+      RawValue::PrintCollectionValue(&value, item_tuple_desc, -1, &stream, is_map);
       column->stringVal.values.emplace_back(stream.str());
     }
     SetNullBit(output_row_idx, coll_val.is_null, &column->stringVal.nulls);
@@ -461,8 +462,12 @@ void impala::ExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
           expr_eval, type, batch, start_idx, num_rows, output_row_idx, column);
       return;
     case TTypeNodeType::ARRAY:
-      ArrayExprValuesToHS2TColumn(
-          expr_eval, type, batch, start_idx, num_rows, output_row_idx, column);
+      CollectionExprValuesToHS2TColumn(
+          expr_eval, type, batch, start_idx, num_rows, output_row_idx, column, false);
+      return;
+    case TTypeNodeType::MAP:
+      CollectionExprValuesToHS2TColumn(
+          expr_eval, type, batch, start_idx, num_rows, output_row_idx, column, true);
       return;
     default:
       break;
@@ -939,6 +944,7 @@ thrift::TTypeEntry impala::ColumnToHs2Type(
     }
     case TYPE_STRUCT:
     case TYPE_ARRAY:
+    case TYPE_MAP:
       type_entry.__set_type(thrift::TTypeId::STRING_TYPE);
       break;
     case TYPE_BINARY:

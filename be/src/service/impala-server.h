@@ -886,8 +886,8 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Initializes the backend descriptor in 'be_desc' with the local backend information.
   void BuildLocalBackendDescriptorInternal(BackendDescriptorPB* be_desc);
 
-  /// Converts a type to a string. The only complex type supported is array which
-  /// is returned as string (see IMPALA-11041).
+  /// Converts a type to a string. The only complex types supported are array and map,
+  /// which are returned as strings (see IMPALA-11041).
   std::string ColumnTypeToBeeswaxTypeString(const TColumnType& type);
 
   /// Snapshot of a query's state, archived in the query log. Not mutated after

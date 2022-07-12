@@ -206,7 +206,8 @@ string ImpalaServer::ColumnTypeToBeeswaxTypeString(const TColumnType& type) {
     DCHECK_EQ(TTypeNodeType::SCALAR, type.types[0].type);
     DCHECK(type.types[0].__isset.scalar_type);
     return TypeToOdbcString(type);
-  } else if (type.types[0].type == TTypeNodeType::ARRAY) {
+  } else if (type.types[0].type == TTypeNodeType::ARRAY
+      || type.types[0].type == TTypeNodeType::MAP) {
     DCHECK_GT(type.types.size(), 1);
     // TODO (IMPALA-11041): consider returning the real type
     return "string";
@@ -220,7 +221,7 @@ string ImpalaServer::ColumnTypeToBeeswaxTypeString(const TColumnType& type) {
   }
 }
 
-// TODO: Handle complex types.
+// TODO: Handle struct types.
 void ImpalaServer::get_results_metadata(ResultsMetadata& results_metadata,
     const beeswax::QueryHandle& beeswax_handle) {
   ScopedSessionState session_handle(this);

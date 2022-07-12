@@ -197,11 +197,9 @@ Status AsciiQueryResultSet::AddRows(const vector<ScalarExprEvaluator*>& expr_eva
             &out_stream);
       } else if (metadata_.columns[i].columnType.types.size() > 1) {
         ColumnType col_type = ColumnType::FromThrift(metadata_.columns[i].columnType);
-        // TODO: Implement map (IMPALA-10918) type.
-        DCHECK(col_type.IsArrayType());
-        if (col_type.IsArrayType()) {
-          PrintArrayValue(expr_evals[i], it.Get(), scales[i], &out_stream);
-        }
+        DCHECK(col_type.IsArrayType() || col_type.IsMapType());
+        PrintCollectionValue(expr_evals[i], it.Get(), scales[i], &out_stream,
+            col_type.IsMapType());
       } else {
         DCHECK(false);
       }
@@ -212,8 +210,8 @@ Status AsciiQueryResultSet::AddRows(const vector<ScalarExprEvaluator*>& expr_eva
   return Status::OK();
 }
 
-void QueryResultSet::PrintArrayValue(ScalarExprEvaluator* expr_eval,
-    const TupleRow* row, int scale, stringstream *stream) {
+void QueryResultSet::PrintCollectionValue(ScalarExprEvaluator* expr_eval,
+    const TupleRow* row, int scale, stringstream *stream, bool is_map) {
   const ScalarExpr& scalar_expr = expr_eval->root();
   // Currently scalar_expr can be only a slot ref as no functions return arrays.
   DCHECK(scalar_expr.IsSlotRef());
@@ -222,7 +220,7 @@ void QueryResultSet::PrintArrayValue(ScalarExprEvaluator* expr_eval,
   const CollectionValue* array_val =
       static_cast<const CollectionValue*>(expr_eval->GetValue(row));
 
-  RawValue::PrintArrayValue(array_val, item_tuple_desc, scale, stream);
+  RawValue::PrintCollectionValue(array_val, item_tuple_desc, scale, stream, is_map);
 }
 
 Status AsciiQueryResultSet::AddOneRow(const TResultRow& row) {
@@ -447,8 +445,9 @@ void HS2ColumnarResultSet::InitColumns() {
     DCHECK(type_nodes.size() > 0);
     ThriftTColumn col_output;
     if (type_nodes[0].type == TTypeNodeType::STRUCT
-        || type_nodes[0].type == TTypeNodeType::ARRAY) {
-      // Return structs and arrays as string.
+        || type_nodes[0].type == TTypeNodeType::ARRAY
+        || type_nodes[0].type == TTypeNodeType::MAP) {
+      // Return structs, arrays and maps as string.
       col_output.__isset.stringVal = true;
     } else {
       DCHECK(type_nodes.size() == 1);

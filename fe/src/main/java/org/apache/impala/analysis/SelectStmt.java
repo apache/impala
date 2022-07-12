@@ -39,6 +39,7 @@ import org.apache.impala.catalog.FeIcebergTable.Utils;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
@@ -488,10 +489,12 @@ public class SelectStmt extends QueryStmt {
                 expr.getType().toSql() + "' in '" + expr.toSql() + "'.");
           }
         } else if (expr.getType().isMapType()) {
-          throw new AnalysisException(String.format(
-              "Expr '%s' in select list returns a map type '%s'.\n" +
-              "Map type is not allowed in the select list.",
-              expr.toSql(), expr.getType().toSql()));
+          MapType mapType = (MapType) expr.getType();
+          if (!mapType.getKeyType().isSupported()
+              || !mapType.getValueType().isSupported()) {
+            throw new AnalysisException("Unsupported type '" +
+                expr.getType().toSql() + "' in '" + expr.toSql() + "'.");
+          }
         } else if (expr.getType().isStructType()) {
           if (!analyzer_.getQueryCtx().client_request.query_options.disable_codegen) {
             throw new AnalysisException("Struct type in select list is not allowed " +

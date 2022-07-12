@@ -718,6 +718,40 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
         .error(selectError("functional.allcomplextypes"), onColumn("functional",
             "allcomplextypes", new String[]{"array_array_col"}, TPrivilegeLevel.SELECT));
 
+    // Select with map types in select list.
+    authorize("select int_map_col, array_map_col, map_map_col "
+        + "from functional.allcomplextypes")
+        .ok(onServer(TPrivilegeLevel.ALL))
+        .ok(onServer(TPrivilegeLevel.OWNER))
+        .ok(onServer(TPrivilegeLevel.SELECT))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALL))
+        .ok(onDatabase("functional", TPrivilegeLevel.OWNER))
+        .ok(onDatabase("functional", TPrivilegeLevel.SELECT))
+        .ok(onTable("functional", "allcomplextypes", TPrivilegeLevel.ALL))
+        .ok(onTable("functional", "allcomplextypes", TPrivilegeLevel.OWNER))
+        .ok(onTable("functional", "allcomplextypes", TPrivilegeLevel.SELECT))
+        .ok(onColumn("functional", "allcomplextypes",
+            new String[]{"int_map_col", "array_map_col", "map_map_col"},
+            TPrivilegeLevel.SELECT))
+        .error(selectError("functional.allcomplextypes"))
+        .error(selectError("functional.allcomplextypes"), onServer(allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.SELECT)))
+        .error(selectError("functional.allcomplextypes"), onDatabase(
+            "functional", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
+            TPrivilegeLevel.SELECT)))
+        .error(selectError("functional.allcomplextypes"), onTable("functional",
+            "allcomplextypes", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
+            TPrivilegeLevel.SELECT)))
+        .error(selectError("functional.allcomplextypes"), onColumn("functional",
+            "allcomplextypes", new String[]{"int_map_col"}, TPrivilegeLevel.SELECT))
+        .error(selectError("functional.allcomplextypes"), onColumn("functional",
+            "allcomplextypes", new String[]{"array_map_col"}, TPrivilegeLevel.SELECT))
+        .error(selectError("functional.allcomplextypes"), onColumn("functional",
+            "allcomplextypes", new String[]{"map_map_col"}, TPrivilegeLevel.SELECT))
+        .error(selectError("functional.allcomplextypes"), onColumn("functional",
+            "allcomplextypes", new String[]{"int_map_col", "map_map_col"},
+            TPrivilegeLevel.SELECT));
+
     for (AuthzTest authzTest: new AuthzTest[]{
         // Select with cross join.
         authorize("select * from functional.alltypes union all " +

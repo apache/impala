@@ -304,7 +304,7 @@ public class InlineViewRef extends TableRef {
       analyzer.createAuxEqPredicate(new SlotRef(slotDesc), colExpr.clone());
     }
 
-    if (colExpr.getType().isArrayType()) {
+    if (colExpr.getType().isCollectionType()) {
       // Calling registerSlotRef() above created a new SlotDescriptor + TupleDescriptor
       // hierarchy for Array types. Walk through this hiararchy and add all slot refs
       // to smap_ and baseTblSmap_.
@@ -322,22 +322,26 @@ public class InlineViewRef extends TableRef {
       if (itemTupleDesc != null) {
         Preconditions.checkState(srcItemTupleDesc != null);
         Preconditions.checkState(baseTableItemTupleDesc != null);
-        // Assume that there is only a single slot as struct in nested in
-        // arrays is not yet supported in select lists.
-        Preconditions.checkState(itemTupleDesc.getSlots().size() == 1);
-        Preconditions.checkState(srcItemTupleDesc.getSlots().size() == 1);
-        Preconditions.checkState(baseTableItemTupleDesc.getSlots().size() == 1);
-        SlotDescriptor itemSlotDesc = itemTupleDesc.getSlots().get(0);
-        SlotDescriptor srcItemSlotDesc = srcItemTupleDesc.getSlots().get(0);
-        SlotDescriptor baseTableItemSlotDesc = baseTableItemTupleDesc.getSlots().get(0);
-        SlotRef itemSlotRef = new SlotRef(itemSlotDesc);
-        SlotRef srcItemSlotRef = new SlotRef(srcItemSlotDesc);
-        SlotRef beseTableItemSlotRef = new SlotRef(baseTableItemSlotDesc);
-        smap_.put(itemSlotRef, srcItemSlotRef);
-        baseTblSmap_.put(itemSlotRef, beseTableItemSlotRef);
-        if (createAuxPredicate(colExpr)) {
-          analyzer.createAuxEqPredicate(
-              new SlotRef(itemSlotDesc), srcItemSlotRef.clone());
+
+        final int num_slots = itemTupleDesc.getSlots().size();
+        Preconditions.checkState(srcItemTupleDesc.getSlots().size() == num_slots);
+        Preconditions.checkState(baseTableItemTupleDesc.getSlots().size() == num_slots);
+
+        // There is one slot for arrays and two for maps. When we add support for structs
+        // in collections in the select list, there may be more slots.
+        for (int i = 0; i < num_slots; i++) {
+          SlotDescriptor itemSlotDesc = itemTupleDesc.getSlots().get(i);
+          SlotDescriptor srcItemSlotDesc = srcItemTupleDesc.getSlots().get(i);
+          SlotDescriptor baseTableItemSlotDesc = baseTableItemTupleDesc.getSlots().get(i);
+          SlotRef itemSlotRef = new SlotRef(itemSlotDesc);
+          SlotRef srcItemSlotRef = new SlotRef(srcItemSlotDesc);
+          SlotRef beseTableItemSlotRef = new SlotRef(baseTableItemSlotDesc);
+          smap_.put(itemSlotRef, srcItemSlotRef);
+          baseTblSmap_.put(itemSlotRef, beseTableItemSlotRef);
+          if (createAuxPredicate(colExpr)) {
+            analyzer.createAuxEqPredicate(
+                new SlotRef(itemSlotDesc), srcItemSlotRef.clone());
+          }
         }
       }
     }

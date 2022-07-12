@@ -47,3 +47,33 @@ NULL,'[NULL,[5,6]]'
 ---- TYPES
 bigint,string
 ====
+---- QUERY
+select id, int_map from functional_orc_def.complextypestbl
+---- RESULTS
+NULL,'{"k1":-1}'
+NULL,'{"k1":1,"k2":100}'
+NULL,'{"k1":2,"k2":NULL}'
+NULL,'{}'
+NULL,'{}'
+NULL,'{}'
+NULL,'NULL'
+NULL,'{"k1":NULL,"k3":NULL}'
+---- TYPES
+bigint,string
+====
+---- QUERY
+# There is a column mask added for int_map_array, but it is ignored.
+# It is not clear whether we should support this (RANGER-3525).
+select id, int_map_array from functional_orc_def.complextypestbl
+---- RESULTS
+NULL,'[{},{"k1":1},{},{}]'
+NULL,'[{"k1":1}]'
+NULL,'[{"k3":NULL,"k1":1},NULL,{}]'
+NULL,'[NULL,NULL]'
+NULL,'[]'
+NULL,'NULL'
+NULL,'NULL'
+NULL,'NULL'
+---- TYPES
+bigint,string
+====

@@ -632,3 +632,16 @@ select id, a.item from complextypes_arrays_only_view v, v.int_array a;
 ---- TYPES
 BIGINT,INT
 ====
+---- QUERY
+select id, a.key, a.value from complextypes_maps_view v, v.int_map a;
+---- RESULTS
+100,'k1',1
+100,'k2',100
+200,'k1',2
+200,'k2',NULL
+700,'k1',NULL
+700,'k3',NULL
+800,'k1',-1
+---- TYPES
+BIGINT,STRING,INT
+====

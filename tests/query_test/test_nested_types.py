@@ -152,7 +152,7 @@ class TestNestedStructsInSelectList(ImpalaTestSuite):
     self.run_test_case('QueryTest/nested-struct-in-select-list', new_vector)
 
 
-class TestNestedTArraysInSelectList(ImpalaTestSuite):
+class TestNestedCollectionsInSelectList(ImpalaTestSuite):
   """Functional tests for nested arrays provided in the select list."""
   @classmethod
   def get_workload(self):
@@ -160,7 +160,7 @@ class TestNestedTArraysInSelectList(ImpalaTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestNestedTArraysInSelectList, cls).add_test_dimensions()
+    super(TestNestedCollectionsInSelectList, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ['parquet', 'orc'])
     cls.ImpalaTestMatrix.add_dimension(
@@ -175,6 +175,10 @@ class TestNestedTArraysInSelectList(ImpalaTestSuite):
   def test_array_in_select_list(self, vector, unique_database):
     """Queries where an array column is in the select list"""
     self.run_test_case('QueryTest/nested-array-in-select-list', vector)
+
+  def test_map_in_select_list(self, vector, unique_database):
+    """Queries where a map column is in the select list"""
+    self.run_test_case('QueryTest/nested-map-in-select-list', vector)
 
 
 # Moved this to a separate test class from TestNestedTypesInSelectList because this needs

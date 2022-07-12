@@ -303,15 +303,12 @@ public class AnalyzerTest extends FrontendTestBase {
         "select binary_member_col from functional_parquet.binary_in_complex_types",
         "Struct containing a BINARY type is not allowed in the select list " +
         "(IMPALA-11491).");
-    // TODO: change error message once IMPALA-10918 is finished.
     AnalysisError(
         "select binary_key_col from functional_parquet.binary_in_complex_types",
-        "Expr 'binary_key_col' in select list returns a map type 'MAP<BINARY,INT>'." +
-        "\nMap type is not allowed in the select list.");
+        "Binary type inside collection types is not supported (IMPALA-11491).");
     AnalysisError(
         "select binary_value_col from functional_parquet.binary_in_complex_types",
-        "Expr 'binary_value_col' in select list returns a map type 'MAP<INT,BINARY>'." +
-        "\nMap type is not allowed in the select list.");
+        "Binary type inside collection types is not supported (IMPALA-11491).");
 
     for (ScalarType t: Type.getUnsupportedTypes()) {
       // Create/Alter table.

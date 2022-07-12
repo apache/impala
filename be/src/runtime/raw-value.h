@@ -67,10 +67,11 @@ class RawValue {
     return str;
   }
 
-  /// Similar to PrintValue() but works with array values.
-  /// Converts 'array_val' array into ascii and writes to 'stream'.
-  static void PrintArrayValue(const CollectionValue* array_val,
-      const TupleDescriptor* item_tuple_desc, int scale, std::stringstream *stream);
+  /// Similar to PrintValue() but works with collection values.
+  /// Converts 'coll_val' collection into ascii and writes to 'stream'.
+  static void PrintCollectionValue(const CollectionValue* coll_val,
+      const TupleDescriptor* item_tuple_desc, int scale, std::stringstream *stream,
+      bool is_map);
 
   /// Writes the byte representation of a value to a stringstream character-by-character
   static void PrintValueAsBytes(const void* value, const ColumnType& type,

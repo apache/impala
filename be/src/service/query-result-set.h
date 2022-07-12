@@ -78,10 +78,10 @@ class QueryResultSet {
       apache::hive::service::cli::thrift::TRowSet* rowset);
 
 protected:
-  /// Wrapper to call RawValue::PrintArrayValue for a given collection column.
+  /// Wrapper to call RawValue::PrintCollectionValue for a given collection column.
   /// expr_eval must be a SlotRef on a collection slot.
-  static void PrintArrayValue(ScalarExprEvaluator* expr_eval, const TupleRow* row,
-      int scale, std::stringstream *stream);
+  static void PrintCollectionValue(ScalarExprEvaluator* expr_eval, const TupleRow* row,
+      int scale, std::stringstream *stream, bool is_map);
 
 };
 }

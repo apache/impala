@@ -642,3 +642,9 @@ select nested_struct.c.d from complextypestbl;
 ---- CATCH
 AnalysisException: STRUCT type inside collection types is not supported.
 ====
+---- QUERY
+# Structs inside maps are not yet supported.
+select nested_struct.g from complextypestbl;
+---- CATCH
+AnalysisException: STRUCT type inside collection types is not supported.
+====

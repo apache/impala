@@ -627,7 +627,7 @@ public class SetOperationStmt extends QueryStmt {
       SlotDescriptor slotDesc = analyzer.addSlotDescriptor(tupleDesc);
       slotDesc.setLabel(getColLabels().get(i));
       slotDesc.setType(expr.getType());
-      if (expr.getType().isArrayType()) {
+      if (expr.getType().isCollectionType()) {
         slotDesc.setItemTupleDesc(((SlotRef)expr).getDesc().getItemTupleDesc());
       }
       slotDesc.setStats(columnStats.get(i));

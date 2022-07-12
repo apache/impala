@@ -1465,8 +1465,8 @@ public class Analyzer {
     SlotDescriptor existingSlotDesc = slotPathMap_.get(key);
     if (existingSlotDesc != null) return existingSlotDesc;
 
-    if (slotPath.destType().isArrayType()) {
-      SlotDescriptor result = registerArraySlotRef(slotPath);
+    if (slotPath.destType().isCollectionType()) {
+      SlotDescriptor result = registerCollectionSlotRef(slotPath);
       result.setPath(slotPath);
       slotPathMap_.put(slotPath.getFullyQualifiedRawPath(), result);
       registerColumnPrivReq(result);
@@ -1652,13 +1652,13 @@ public class Analyzer {
   }
 
   /**
-   * Registers an array and its descendants.
+   * Registers a collection and its descendants.
    * Creates a CollectionTableRef for all collections on the path.
    */
-  private SlotDescriptor registerArraySlotRef(Path slotPath)
+  private SlotDescriptor registerCollectionSlotRef(Path slotPath)
       throws AnalysisException {
     Preconditions.checkState(slotPath.isResolved());
-    Preconditions.checkState(slotPath.destType().isArrayType());
+    Preconditions.checkState(slotPath.destType().isCollectionType());
     List<String> rawPath = slotPath.getRawPath();
     List<String> collectionTableRawPath = new ArrayList<>();
     TupleDescriptor rootDesc = slotPath.getRootDesc();
@@ -1678,28 +1678,38 @@ public class Analyzer {
     SlotDescriptor desc = ((SlotRef) collTblRef.getCollectionExpr()).getDesc();
     desc.setIsMaterializedRecursively(true);
 
-    // Resolve path
-    List<String> rawPathToItem = new ArrayList<String>();
-    rawPathToItem.add(Path.ARRAY_ITEM_FIELD_NAME);
+    if (slotPath.destType().isArrayType()) {
+      // Resolve path
+      List<String> rawPathToItem = Arrays.asList(Path.ARRAY_ITEM_FIELD_NAME);
+      resolveAndRegisterDescendantPath(collTblRef, rawPathToItem);
+    } else {
+      Preconditions.checkState(slotPath.destType().isMapType());
 
-    Path resolvedPathToItem = new Path(collTblRef.getDesc(), rawPathToItem);
-    boolean isResolved = resolvedPathToItem.resolve();
+      List<String> rawPathToKey = Arrays.asList(Path.MAP_KEY_FIELD_NAME);
+      resolveAndRegisterDescendantPath(collTblRef, rawPathToKey);
+
+      List<String> rawPathToValue = Arrays.asList(Path.MAP_VALUE_FIELD_NAME);
+      resolveAndRegisterDescendantPath(collTblRef, rawPathToValue);
+    }
+
+    return desc;
+  }
+
+  private void resolveAndRegisterDescendantPath(CollectionTableRef collTblRef,
+      List<String> rawPath) throws AnalysisException {
+    Path resolvedPath = new Path(collTblRef.getDesc(), rawPath);
+    boolean isResolved = resolvedPath.resolve();
     Preconditions.checkState(isResolved);
 
-    if (resolvedPathToItem.destType().isStructType()) {
+    if (resolvedPath.destType().isStructType()) {
       throw new AnalysisException(
           "STRUCT type inside collection types is not supported.");
     }
-    if (resolvedPathToItem.destType().isMapType()) {
-      throw new AnalysisException(
-          "MAP type inside collection types is not supported.");
-    }
-    if (resolvedPathToItem.destType().isBinary()) {
+    if (resolvedPath.destType().isBinary()) {
       throw new AnalysisException(
           "Binary type inside collection types is not supported (IMPALA-11491).");
     }
-    registerSlotRef(resolvedPathToItem, false);
-    return desc;
+    registerSlotRef(resolvedPath, false);
   }
 
   /**

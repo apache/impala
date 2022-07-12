@@ -120,10 +120,5 @@ public class AnalyzeUpsertStmtTest extends AnalyzerTest {
         "'b.int_array_col' correlated with an outer block as well as an " +
         "uncorrelated one 'functional.alltypestiny':\n" +
         "SELECT item FROM b.int_array_col, functional.alltypestiny");
-    // Illegal map-typed expr
-    AnalysisError("upsert into functional_kudu.testtbl " +
-        "select int_map_col from functional.allcomplextypes",
-        "Expr 'int_map_col' in select list returns a map type 'MAP<STRING,INT>'.\n" +
-        "Map type is not allowed in the select list.");
   }
 }

@@ -3430,6 +3430,16 @@ AS SELECT id, int_array, int_array_array FROM {db_name}{db_suffix}.complextypest
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+complextypes_maps_view
+---- CREATE
+DROP VIEW IF EXISTS {db_name}{db_suffix}.{table_name};
+CREATE VIEW {db_name}{db_suffix}.{table_name}
+AS SELECT id, int_map, int_map_array FROM {db_name}{db_suffix}.complextypestbl;
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 iceberg_v2_delete_positional
 ---- CREATE
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
@@ -3636,26 +3646,40 @@ select count(*) as mv_count from {db_name}{db_suffix}.{table_name};
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
-array_tbl
+collection_tbl
 ---- COLUMNS
 id INT
-int_1d ARRAY<INT>
-int_2d ARRAY<ARRAY<INT>>
-int_3d ARRAY<ARRAY<ARRAY<INT>>>
-string_1d ARRAY<STRING>
-string_2d ARRAY<ARRAY<STRING>>
-string_3d ARRAY<ARRAY<ARRAY<STRING>>>
+arr_int_1d ARRAY<INT>
+arr_int_2d ARRAY<ARRAY<INT>>
+arr_int_3d ARRAY<ARRAY<ARRAY<INT>>>
+arr_string_1d ARRAY<STRING>
+arr_string_2d ARRAY<ARRAY<STRING>>
+arr_string_3d ARRAY<ARRAY<ARRAY<STRING>>>
+map_1d MAP<INT, STRING>
+map_2d MAP<INT,MAP<INT,STRING>>
+map_3d MAP<INT,MAP<INT,MAP<INT,STRING>>>
+map_map_array MAP<INT,MAP<INT,ARRAY<INT>>>
 ---- DEPENDENT_LOAD_HIVE
 -- It would be nice to insert NULLs, but I couldn't find a way in Hive.
 INSERT INTO {db_name}{db_suffix}.{table_name} VALUES
- (1,
-  array(1, 2, NULL),
-  array(array(1, 2, NULL), array(3)),
-  array(array(array(1, 2, NULL), array(3)), array(array(4))),
-  array("1", "2", NULL),
-  array(array("1", "2", NULL), array("3")),
-  array(array(array("1", "2", NULL), array("3")), array(array("4")))
- );
+  (1,
+   array(1, 2, NULL),
+   array(array(1, 2, NULL), array(3)),
+   array(array(array(1, 2, NULL), array(3)), array(array(4))),
+   array("1", "2", NULL),
+   array(array("1", "2", NULL), array("3")),
+   array(array(array("1", "2", NULL), array("3")), array(array("4"))),
+   map(1, "first", 2, "second"),
+   map(1, map(10, "ten", 20, "twenty"), 2, map(30, "thirty", 40, "forty")),
+   map(
+       1, map(10, map(100, "hundred", 200, "two hundred"), 20, map(300, "three hundred", 400, "four hundred")),
+       2, map(30, map(500, "five hundred", 600, "six hundred"), 40, map(700, "seven hundred", 800, "eight hundred"))
+   ),
+   map(
+       1, map(10, array(100, 200), 20, array(300, 400)),
+       2, map(30, array(500, 600), 40, array(700, 800))
+   )
+  );
 ---- LOAD
 ====
 ---- DATASET
