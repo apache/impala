@@ -166,21 +166,13 @@ public class CreateTableLikeStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(tableName_ != null && !tableName_.isEmpty());
     Preconditions.checkState(srcTableName_ != null && !srcTableName_.isEmpty());
-    // We currently don't support creating a Kudu table using a CREATE TABLE LIKE
-    // statement (see IMPALA-4052).
-    if (fileFormat_ == THdfsFileFormat.KUDU) {
-      throw new AnalysisException("CREATE TABLE LIKE is not supported for Kudu tables");
-    }
 
     // Make sure the source table exists and the user has permission to access it.
     FeTable srcTable = analyzer.getTable(srcTableName_, Privilege.VIEW_METADATA);
 
     analyzer.ensureTableNotBucketed(srcTable);
 
-    if (KuduTable.isKuduTable(srcTable.getMetaStoreTable())) {
-      throw new AnalysisException("Cloning a Kudu table using CREATE TABLE LIKE is " +
-          "not supported.");
-    }
+    validateCreateKuduTableParams(srcTable);
 
     // Only clone between Iceberg tables because the Data Types of Iceberg and Impala
     // do not correspond one by one, the transformation logic is in
@@ -213,6 +205,34 @@ public class CreateTableLikeStmt extends StatementBase {
 
     if (sortColumns_ != null) {
       TableDef.analyzeSortColumns(sortColumns_, srcTable, sortingOrder_);
+    }
+  }
+
+  private void validateCreateKuduTableParams(FeTable srcTable) throws AnalysisException {
+    // Only clone between Kudu tables because the table creation statements are different.
+    if ((fileFormat_ == THdfsFileFormat.KUDU
+            && !KuduTable.isKuduTable(srcTable.getMetaStoreTable()))
+        || (fileFormat_ != null && fileFormat_ != THdfsFileFormat.KUDU
+               && KuduTable.isKuduTable(srcTable.getMetaStoreTable()))) {
+      throw new AnalysisException(String.format(
+          "%s cannot be cloned into a %s table: CREATE TABLE LIKE is not supported "
+              + "between Kudu tables and non-Kudu tables.",
+          srcTable.getFullName(), fileFormat_.toString()));
+    }
+    if (sortColumns_ != null && KuduTable.isKuduTable(srcTable.getMetaStoreTable())) {
+      throw new AnalysisException(srcTable.getFullName()
+          + " cannot be cloned because SORT BY is not supported for Kudu tables.");
+    }
+    if (srcTable instanceof KuduTable) {
+      KuduTable kuduTable = (KuduTable) srcTable;
+      for (KuduPartitionParam kuduPartitionParam : kuduTable.getPartitionBy()) {
+        // TODO: IMPALA-11912: Add support for cloning a Kudu table with range partitions
+        if (kuduPartitionParam.getType() == KuduPartitionParam.Type.RANGE) {
+          throw new AnalysisException(
+              "CREATE TABLE LIKE is not supported for Kudu tables having range "
+              + "partitions.");
+        }
+      }
     }
   }
 }

@@ -336,6 +336,12 @@ class TestKuduHMSIntegration(CustomKuduTest):
   def test_kudu_alter_table(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_hms_alter', vector, use_db=unique_database)
 
+  @SkipIfKudu.no_hybrid_clock
+  def test_create_kudu_table_like(self, vector, unique_database):
+    self.run_test_case(
+      'QueryTest/kudu_create_table_like_table',
+      vector,
+      use_db=unique_database)
 
 class TestKuduTransactionBase(CustomClusterTestSuite):
   """

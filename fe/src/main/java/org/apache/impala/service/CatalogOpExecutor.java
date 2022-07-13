@@ -86,6 +86,7 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.mr.Catalogs;
 import org.apache.impala.analysis.AlterTableSortByStmt;
 import org.apache.impala.analysis.FunctionName;
+import org.apache.impala.analysis.KuduPartitionParam;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.AuthorizationConfig;
@@ -115,6 +116,7 @@ import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.HiveStorageDescriptorFactory;
 import org.apache.impala.catalog.IncompleteTable;
+import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.PartitionNotFoundException;
@@ -212,6 +214,7 @@ import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
+import org.apache.impala.thrift.TKuduPartitionParam;
 import org.apache.impala.thrift.TOwnerType;
 import org.apache.impala.thrift.TPartitionDef;
 import org.apache.impala.thrift.TPartitionKeyValue;
@@ -3772,7 +3775,6 @@ public class CatalogOpExecutor {
   private void createTableLike(TCreateTableLikeParams params, TDdlExecResponse response,
       boolean syncDdl, boolean wantMinimalResult) throws ImpalaException {
     Preconditions.checkNotNull(params);
-
     THdfsFileFormat fileFormat =
         params.isSetFile_format() ? params.getFile_format() : null;
     String comment = params.isSetComment() ? params.getComment() : null;
@@ -3819,8 +3821,6 @@ public class CatalogOpExecutor {
         "Load source for CREATE TABLE LIKE");
     org.apache.hadoop.hive.metastore.api.Table tbl =
         srcTable.getMetaStoreTable().deepCopy();
-    Preconditions.checkState(!KuduTable.isKuduTable(tbl),
-        "CREATE TABLE LIKE is not supported for Kudu tables.");
     tbl.setDbName(tblName.getDb());
     tbl.setTableName(tblName.getTbl());
     tbl.setOwner(params.getOwner());
@@ -3908,11 +3908,59 @@ public class CatalogOpExecutor {
           .toThrift();
       createIcebergTable(tbl, wantMinimalResult, response, params.if_not_exists, columns,
           partitionSpec, tableProperties, params.getComment());
+    } else if (srcTable instanceof KuduTable && KuduTable.isKuduTable(tbl)) {
+      TCreateTableParams createTableParams =
+          extractKuduCreateTableParams(params, tblName, (KuduTable) srcTable, tbl);
+      createKuduTable(tbl, createTableParams, wantMinimalResult, response);
     } else {
       MetastoreShim.setTableLocation(catalog_.getDb(tbl.getDbName()), tbl);
       createTable(tbl, params.if_not_exists, null, params.server_name, null, null,
           wantMinimalResult, response);
     }
+  }
+
+  /**
+   * Build TCreateTableParams by source
+   */
+  private TCreateTableParams extractKuduCreateTableParams(TCreateTableLikeParams params,
+      TableName tblName, KuduTable kuduTable,
+      org.apache.hadoop.hive.metastore.api.Table tbl) throws ImpalaRuntimeException {
+    TCreateTableParams createTableParams = new TCreateTableParams();
+    createTableParams.if_not_exists = params.if_not_exists;
+    createTableParams.setComment(params.getComment());
+    List<TColumn> columns = new ArrayList<>();
+    for (Column col : kuduTable.getColumns()) {
+      // Omit cloning auto-incrementing column of Kudu table since the column will be
+      // created by Kudu engine.
+      if (((KuduColumn) col).isAutoIncrementing()) continue;
+      columns.add(col.toThrift());
+    }
+    createTableParams.setColumns(columns);
+    // Omit auto-incrementing column as primary key.
+    List<String> primaryColumnNames =
+        new ArrayList<>(kuduTable.getPrimaryKeyColumnNames());
+    if (kuduTable.hasAutoIncrementingColumn()) {
+      primaryColumnNames.remove(KuduUtil.getAutoIncrementingColumnName());
+    }
+    createTableParams.setPrimary_key_column_names(primaryColumnNames);
+
+    List<TKuduPartitionParam> partitionParams = new ArrayList<>();
+    for (KuduPartitionParam kuduPartitionParam : kuduTable.getPartitionBy()) {
+      partitionParams.add(kuduPartitionParam.toThrift());
+    }
+    createTableParams.setPartition_by(partitionParams);
+
+    Map<String, String> tableProperties = tbl.getParameters();
+    tableProperties.remove(KuduTable.KEY_TABLE_NAME);
+    tableProperties.remove(KuduTable.KEY_TABLE_ID);
+
+    String kuduMasters = tbl.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
+    boolean isKuduHmsIntegrationEnabled = KuduTable.isHMSIntegrationEnabled(kuduMasters);
+    tableProperties.put(KuduTable.KEY_TABLE_NAME,
+        KuduUtil.getDefaultKuduTableName(
+            tblName.getDb(), tblName.getTbl(), isKuduHmsIntegrationEnabled));
+    tbl.setParameters(tableProperties);
+    return createTableParams;
   }
 
   private static void setDefaultTableCapabilities(

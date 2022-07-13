@@ -263,7 +263,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
   year INT,
   month INT
 )
-PARTITION BY HASH (id) PARTITIONS 3 STORED AS KUDU;
+PARTITION BY HASH (id) PARTITIONS 3 COMMENT 'Tiny table' STORED AS KUDU;
 ---- DEPENDENT_LOAD_KUDU
 INSERT INTO TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col,

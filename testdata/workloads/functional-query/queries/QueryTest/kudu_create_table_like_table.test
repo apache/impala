@@ -1,0 +1,115 @@
+====
+---- QUERY
+# CREATE TABLE LIKE on Kudu table
+create table kudu_alltypes_clone like functional_kudu.alltypes
+stored as kudu
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Make sure no data exists for this table
+select count(*) from kudu_alltypes_clone
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+describe formatted kudu_alltypes_clone
+---- RESULTS: VERIFY_IS_SUBSET
+'# col_name            ','data_type           ','comment             '
+'','NULL','NULL'
+'id','int','NULL'
+'bool_col','boolean','NULL'
+'tinyint_col','tinyint','NULL'
+'smallint_col','smallint','NULL'
+'int_col','int','NULL'
+'bigint_col','bigint','NULL'
+'float_col','float','NULL'
+'double_col','double','NULL'
+'date_string_col','string','NULL'
+'string_col','string','NULL'
+'timestamp_col','timestamp','NULL'
+'year','int','NULL'
+'month','int','NULL'
+'','NULL','NULL'
+'# Detailed Table Information','NULL','NULL'
+'OwnerType:          ','USER                ','NULL'
+'LastAccessTime:     ','UNKNOWN             ','NULL'
+'Retention:          ','0                   ','NULL'
+'Table Parameters:','NULL','NULL'
+'','storage_handler     ','org.apache.hadoop.hive.kudu.KuduStorageHandler'
+'','NULL','NULL'
+'# Storage Information','NULL','NULL'
+'Compressed:         ','No                  ','NULL'
+'Num Buckets:        ','0                   ','NULL'
+'Bucket Columns:     ','[]                  ','NULL'
+'Sort Columns:       ','[]                  ','NULL'
+'','NULL','NULL'
+'# Constraints','NULL','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Should be able to insert into this table
+insert into kudu_alltypes_clone
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+float_col, double_col, date_string_col, string_col, timestamp_col,
+year, month
+from functional.alltypes where year=2009 and month=4
+---- RESULTS
+: 300
+====
+---- QUERY
+# Make sure we can read the new data.
+select count(*) from kudu_alltypes_clone
+---- RESULTS
+300
+---- TYPES
+BIGINT
+====
+---- QUERY
+# create table like having comment.
+create table kudu_alltypestiny_clone like functional_kudu.alltypestiny comment 'Tiny clone table'
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe formatted kudu_alltypestiny_clone
+---- RESULTS: VERIFY_IS_SUBSET
+'# col_name            ','data_type           ','comment             '
+'','comment             ','Tiny clone table    '
+---- TYPES
+string, string, string
+====
+---- QUERY
+# No error is thrown when IF NOT EXISTS is specified and the table already exists.
+create table if not exists kudu_alltypes_clone like functional_kudu.alltypes
+---- RESULTS
+'Table already exists.'
+====
+---- QUERY
+# Create Kudu table with non unique primary key
+create table non_unique_key_create_tbl1 (id int non unique primary key, name string)
+partition by hash (id) partitions 3
+stored as kudu
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# create table like on Kudu table with non unique primary key
+create table non_unique_key_create_tbl1_clone like non_unique_key_create_tbl1
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe non_unique_key_create_tbl1_clone
+---- LABELS
+NAME,TYPE,COMMENT,PRIMARY_KEY,KEY_UNIQUE,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
+---- RESULTS
+'id','int','','true','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'auto_incrementing_id','bigint','','true','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'name','string','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+---- TYPES
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====

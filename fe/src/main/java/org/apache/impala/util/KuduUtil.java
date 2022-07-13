@@ -493,4 +493,9 @@ public class KuduUtil {
     sb.append("PRIMARY KEY");
     return sb.toString();
   }
+
+  // Get auto-incrementing column name of Kudu table
+  public static String getAutoIncrementingColumnName() {
+    return Schema.getAutoIncrementingColumnName();
+  }
 }

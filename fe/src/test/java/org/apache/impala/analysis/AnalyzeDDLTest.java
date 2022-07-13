@@ -2506,11 +2506,25 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table functional.baz like functional.alltypes location '  '",
         "URI path cannot be empty.");
 
-    // CREATE TABLE LIKE is not currently supported for Kudu tables (see IMPALA-4052)
+    // CREATE TABLE LIKE is only implements cloning between Kudu tables (see IMPALA-4052)
     AnalysisError("create table kudu_tbl like functional.alltypestiny stored as kudu",
-        "CREATE TABLE LIKE is not supported for Kudu tables");
-    AnalysisError("create table tbl like functional_kudu.dimtbl", "Cloning a Kudu " +
-        "table using CREATE TABLE LIKE is not supported.");
+        "functional.alltypestiny cannot be cloned into a KUDU table: " +
+        "CREATE TABLE LIKE is not supported between Kudu tables and non-Kudu tables.");
+    AnalysisError(
+        "create table kudu_to_parquet like functional_kudu.alltypes stored as parquet",
+        "functional_kudu.alltypes cannot be cloned into a PARQUET table: CREATE "
+            + "TABLE LIKE is not supported between Kudu tables and non-Kudu tables.");
+    AnalysisError("create table kudu_decimal_tbl_clone sort by (d1, d2) like "
+            + "functional_kudu.decimal_tbl",
+        "functional_kudu.decimal_tbl cannot be cloned "
+            + "because SORT BY is not supported for Kudu tables.");
+    AnalysisError(
+        "create table alltypestiny_clone sort by (d1, d2) like functional.alltypestiny " +
+        "stored as kudu", "functional.alltypestiny cannot be cloned into a KUDU table: " +
+        "CREATE TABLE LIKE is not supported between Kudu tables and non-Kudu tables.");
+    // Kudu tables with range partitions cannot be cloned
+    AnalysisError("create table kudu_jointbl_clone like functional_kudu.jointbl",
+        "CREATE TABLE LIKE is not supported for Kudu tables having range partitions.");
 
     // Test sort columns.
     AnalyzesOk("create table tbl sort by (int_col,id) like functional.alltypes");

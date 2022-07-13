@@ -85,6 +85,13 @@ class TestKuduBasicDML(KuduTestSuite):
   def test_kudu_delete(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_delete', vector, use_db=unique_database)
 
+  @SkipIfKudu.no_hybrid_clock
+  def test_kudu_create_table_like_table(self, vector, unique_database):
+    self.run_test_case(
+      'QueryTest/kudu_create_table_like_table',
+      vector,
+      use_db=unique_database)
+
 # TODO(IMPALA-8614): parameterize some tests to run with HMS integration enabled.
 class TestKuduOperations(KuduTestSuite):
   """
