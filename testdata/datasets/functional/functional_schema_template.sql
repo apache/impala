@@ -3473,3 +3473,28 @@ ALTER MATERIALIZED VIEW {db_name}{db_suffix}.{table_name} REBUILD;
 -- do a count to confirm if the rebuild populated rows in the MV
 select count(*) as mv_count from {db_name}{db_suffix}.{table_name};
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+array_tbl
+---- COLUMNS
+id INT
+int_1d ARRAY<INT>
+int_2d ARRAY<ARRAY<INT>>
+int_3d ARRAY<ARRAY<ARRAY<INT>>>
+string_1d ARRAY<STRING>
+string_2d ARRAY<ARRAY<STRING>>
+string_3d ARRAY<ARRAY<ARRAY<STRING>>>
+---- DEPENDENT_LOAD_HIVE
+-- It would be nice to insert NULLs, but I couldn't find a way in Hive.
+INSERT INTO {db_name}{db_suffix}.{table_name} VALUES
+ (1,
+  array(1, 2, NULL),
+  array(array(1, 2, NULL), array(3)),
+  array(array(array(1, 2, NULL), array(3)), array(array(4))),
+  array("1", "2", NULL),
+  array(array("1", "2", NULL), array("3")),
+  array(array(array("1", "2", NULL), array("3")), array(array("4")))
+ )
+---- LOAD
+====

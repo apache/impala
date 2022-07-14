@@ -383,3 +383,12 @@ where a.unnested_arr1 < 5;
 ---- TYPES
 INT,INT,STRING
 ====
+---- QUERY
+# Regression test for:
+#   IMPALA-11434: "More than 1 2d arrays in select list causes analysis error"
+select id, int_1d, int_2d, int_3d, string_1d, string_2d, string_3d from array_tbl;
+---- RESULTS
+1,'[1,2,NULL]','[[1,2,NULL],[3]]','[[[1,2,NULL],[3]],[[4]]]','["1","2",NULL]','[["1","2",NULL],["3"]]','[[["1","2",NULL],["3"]],[["4"]]]'
+---- TYPES
+INT,STRING,STRING,STRING,STRING,STRING,STRING
+=====

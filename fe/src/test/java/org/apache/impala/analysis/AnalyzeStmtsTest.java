@@ -78,6 +78,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         collectionField, collectionTable), tbl);
     TblsAnalyzeOk(String.format("select c.%s from $TBL a, a.int_array_col b, a.%s c",
         collectionField, collectionTable), tbl);
+    TblsAnalyzeOk(String.format(
+        "select 1 from $TBL, allcomplextypes.%s, functional.allcomplextypes.%s",
+        collectionTable, collectionTable), tbl);
 
     // Test join types. Parent/collection joins do not require an ON or USING clause.
     for (JoinOperator joinOp: JoinOperator.values()) {
@@ -118,15 +121,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         collectionField, collectionTable, collectionTable), tbl,
         "Duplicate table alias: 'b'");
     // Duplicate implicit alias.
-    String[] childTblPath = collectionTable.split("\\.");
-    String childTblAlias = childTblPath[childTblPath.length - 1];
     TblsAnalysisError(String.format("select %s from $TBL a, a.%s, a.%s",
         collectionField, collectionTable, collectionTable), tbl,
         String.format("Duplicate table alias: '%s'", "a." + collectionTable));
-    TblsAnalysisError(String.format(
-        "select 1 from $TBL, allcomplextypes.%s, functional.allcomplextypes.%s",
-        collectionTable, collectionTable), tbl,
-        String.format("Duplicate table alias: '%s'", childTblAlias));
     // Duplicate implicit/explicit alias.
     TblsAnalysisError(String.format(
         "select %s from $TBL, functional.allcomplextypes.%s allcomplextypes",
@@ -413,7 +410,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "TABLESAMPLE is only supported on HDFS tables: functional.alltypes_view");
     AnalysisError("select * from functional.allcomplextypes.int_array_col " +
         "tablesample system (10)",
-        "TABLESAMPLE is only supported on HDFS tables: int_array_col");
+        "TABLESAMPLE is only supported on HDFS tables: " +
+        "functional.allcomplextypes.int_array_col");
     AnalysisError("select * from functional.allcomplextypes a, a.int_array_col " +
         "tablesample system (10)",
         "TABLESAMPLE is only supported on HDFS tables: a.int_array_col");

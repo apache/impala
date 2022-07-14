@@ -176,9 +176,10 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
         // contrary to the intended semantics of reset(). We could address this issue by
         // changing the WITH-clause analysis to register local views that have
         // fully-qualified table refs, and then remove the full qualification here.
-        if (!(origTblRef instanceof CollectionTableRef
-            && ((CollectionTableRef)origTblRef).isRelative())) {
-          newTblRef.rawPath_ = origTblRef.getResolvedPath().getFullyQualifiedRawPath();
+        Path oldPath = origTblRef.getResolvedPath();
+        if (oldPath.getRootDesc() == null
+            || !oldPath.getRootDesc().getType().isCollectionStructType()) {
+          newTblRef.rawPath_ = oldPath.getFullyQualifiedRawPath();
         }
         set(i, newTblRef);
       }

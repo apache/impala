@@ -873,7 +873,7 @@ public class Analyzer {
           table instanceof FeDataSourceTable);
       return new BaseTableRef(tableRef, resolvedPath);
     } else {
-      return new CollectionTableRef(tableRef, resolvedPath);
+      return new CollectionTableRef(tableRef, resolvedPath, false);
     }
   }
 
@@ -1670,8 +1670,7 @@ public class Analyzer {
     collectionTableRawPath.addAll(rawPath);
 
     TableRef tblRef = new TableRef(collectionTableRawPath, null);
-    CollectionTableRef collTblRef = new CollectionTableRef(tblRef, slotPath);
-    collTblRef.setInSelectList(true);
+    CollectionTableRef collTblRef = new CollectionTableRef(tblRef, slotPath, true);
     collTblRef.analyze(this);
 
     Preconditions.checkState(collTblRef.getCollectionExpr() instanceof SlotRef);

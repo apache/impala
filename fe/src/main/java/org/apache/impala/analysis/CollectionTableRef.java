@@ -52,16 +52,15 @@ public class CollectionTableRef extends TableRef {
    * its resolved path. Sets table aliases and join-related attributes.
    * If inSelectList is true, then the collection won't be flattened during execution.
    */
-  public CollectionTableRef(TableRef tableRef, Path resolvedPath) {
+  public CollectionTableRef(TableRef tableRef, Path resolvedPath, boolean inSelectList) {
     super(tableRef);
     Preconditions.checkState(resolvedPath.isResolved());
     resolvedPath_ = resolvedPath;
+    inSelectList_ = inSelectList;
     // Use the last path element as an implicit alias if no explicit alias was given.
     if (hasExplicitAlias()) return;
-    boolean rootTableHasExplicitAlias = resolvedPath.getRootDesc() != null
-        && resolvedPath.getRootDesc().hasExplicitAlias();
     String implicitAlias = rawPath_.get(rawPath_.size() - 1).toLowerCase();
-    if (rootTableHasExplicitAlias) {
+    if (rawPath_.size() > 1) {
       // Use the full path from the root table alias to be able to distinguish
       // among collection columns with the same name.
       aliases_ =
@@ -204,7 +203,6 @@ public class CollectionTableRef extends TableRef {
 
   @Override
   public boolean isCollectionInSelectList() { return inSelectList_; }
-  public void setInSelectList(boolean value) { inSelectList_ = value; }
 
   @Override
   protected CollectionTableRef clone() { return new CollectionTableRef(this); }
