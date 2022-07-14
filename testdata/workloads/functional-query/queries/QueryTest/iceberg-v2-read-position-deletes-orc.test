@@ -1,0 +1,201 @@
+====
+---- QUERY
+SELECT count(*) from iceberg_v2_no_deletes_orc
+---- RESULTS
+3
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+SELECT count(*) from iceberg_v2_positional_delete_all_rows;
+---- RESULTS
+0
+---- TYPES
+bigint
+====
+---- QUERY
+SELECT count(*) from iceberg_v2_positional_not_all_data_files_have_delete_files_orc
+---- RESULTS
+6
+---- TYPES
+bigint
+====
+---- QUERY
+SELECT count(*) from iceberg_v2_partitioned_position_deletes_orc
+---- RESULTS
+10
+---- TYPES
+bigint
+====
+---- QUERY
+SELECT count(*) from iceberg_v2_no_deletes_orc where i = 2;
+---- RESULTS
+1
+---- TYPES
+bigint
+====
+---- QUERY
+SELECT count(*) from iceberg_v2_positional_delete_all_rows where i > 2;
+---- RESULTS
+0
+---- TYPES
+bigint
+====
+---- QUERY
+SELECT count(*) from iceberg_v2_positional_not_all_data_files_have_delete_files_orc
+where i < 4;
+---- RESULTS
+3
+---- TYPES
+bigint
+====
+---- QUERY
+SELECT count(*) from iceberg_v2_partitioned_position_deletes_orc
+where action = 'click';
+---- RESULTS
+3
+---- TYPES
+bigint
+====
+---- QUERY
+SELECT * from iceberg_v2_no_deletes_orc
+---- RESULTS
+1,'x'
+2,'y'
+3,'z'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+SELECT * from iceberg_v2_positional_delete_all_rows;
+---- RESULTS
+---- TYPES
+INT, STRING
+====
+---- QUERY
+SELECT * from iceberg_v2_positional_not_all_data_files_have_delete_files_orc
+---- RESULTS
+1,'a'
+2,'b'
+3,'c'
+5,'X'
+4,'d'
+6,'f'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+SELECT * from iceberg_v2_partitioned_position_deletes_orc
+---- RESULTS
+6,'Alex','view',2020-01-01 09:00:00
+20,'Alex','view',2020-01-01 09:00:00
+4,'Alex','view',2020-01-01 09:00:00
+18,'Alan','click',2020-01-01 10:00:00
+12,'Alan','click',2020-01-01 10:00:00
+10,'Alan','click',2020-01-01 10:00:00
+2,'Lisa','download',2020-01-01 11:00:00
+14,'Lisa','download',2020-01-01 11:00:00
+8,'Lisa','download',2020-01-01 11:00:00
+16,'Lisa','download',2020-01-01 11:00:00
+---- TYPES
+INT, STRING, STRING, TIMESTAMP
+====
+---- QUERY
+SELECT strright(upper(input__file__name),90), file__position + 1000, * from iceberg_v2_no_deletes_orc
+---- RESULTS
+'AGYZ_20220830153046_7C9AAA51-D601-4C5B-A51C-67C1E9E1FE29-JOB_16618645111570_0001-00001.ORC',1000,1,'x'
+'AGYZ_20220830153046_7C9AAA51-D601-4C5B-A51C-67C1E9E1FE29-JOB_16618645111570_0001-00001.ORC',1001,2,'y'
+'AGYZ_20220830153046_7C9AAA51-D601-4C5B-A51C-67C1E9E1FE29-JOB_16618645111570_0001-00001.ORC',1002,3,'z'
+---- TYPES
+STRING, BIGINT, INT, STRING
+====
+---- QUERY
+SELECT strright(upper(input__file__name),90), file__position + 1000, * from iceberg_v2_positional_delete_all_rows;
+---- RESULTS
+---- TYPES
+STRING, BIGINT, INT, STRING
+====
+---- QUERY
+SELECT strright(upper(input__file__name),90), file__position + 1000, * from iceberg_v2_positional_not_all_data_files_have_delete_files_orc
+---- RESULTS
+'AGYZ_20220830155337_FCBDA57D-F37D-48CD-AFE4-28D0BAD0A4C0-JOB_16618645111570_0004-00001.ORC',1000,5,'X'
+'AGYZ_20220830155232_F36B3F3E-183A-475A-A7D1-D16898FD4524-JOB_16618645111570_0003-00001.ORC',1000,1,'a'
+'AGYZ_20220830155232_F36B3F3E-183A-475A-A7D1-D16898FD4524-JOB_16618645111570_0003-00001.ORC',1001,2,'b'
+'AGYZ_20220830155232_F36B3F3E-183A-475A-A7D1-D16898FD4524-JOB_16618645111570_0003-00001.ORC',1002,3,'c'
+'AGYZ_20220830155307_610E0B78-1186-477B-A30B-9943CB4E90E9-JOB_16618645111570_0003-00001.ORC',1000,4,'d'
+'AGYZ_20220830155307_610E0B78-1186-477B-A30B-9943CB4E90E9-JOB_16618645111570_0003-00001.ORC',1002,6,'f'
+---- TYPES
+STRING, BIGINT, INT, STRING
+====
+---- QUERY
+SELECT strright(upper(input__file__name),90), file__position + 1000, * from iceberg_v2_partitioned_position_deletes_orc
+---- RESULTS
+'AGYZ_20220830173852_560D6F0E-8508-42D6-95A7-67BFA860A28C-JOB_16618645111571_0006-00001.ORC',1001,12,'Alan','click',2020-01-01 10:00:00
+'AGYZ_20220830173852_560D6F0E-8508-42D6-95A7-67BFA860A28C-JOB_16618645111571_0006-00001.ORC',1003,18,'Alan','click',2020-01-01 10:00:00
+'AGYZ_20220830173852_560D6F0E-8508-42D6-95A7-67BFA860A28C-JOB_16618645111571_0006-00001.ORC',1005,10,'Alan','click',2020-01-01 10:00:00
+'AGYZ_20220830173852_560D6F0E-8508-42D6-95A7-67BFA860A28C-JOB_16618645111571_0006-00002.ORC',1000,16,'Lisa','download',2020-01-01 11:00:00
+'AGYZ_20220830173852_560D6F0E-8508-42D6-95A7-67BFA860A28C-JOB_16618645111571_0006-00002.ORC',1002,2,'Lisa','download',2020-01-01 11:00:00
+'AGYZ_20220830173852_560D6F0E-8508-42D6-95A7-67BFA860A28C-JOB_16618645111571_0006-00002.ORC',1004,8,'Lisa','download',2020-01-01 11:00:00
+'AGYZ_20220830173852_560D6F0E-8508-42D6-95A7-67BFA860A28C-JOB_16618645111571_0006-00002.ORC',1005,14,'Lisa','download',2020-01-01 11:00:00
+'AGYZ_20220830173852_560D6F0E-8508-42D6-95A7-67BFA860A28C-JOB_16618645111571_0006-00003.ORC',1002,20,'Alex','view',2020-01-01 09:00:00
+'AGYZ_20220830173852_560D6F0E-8508-42D6-95A7-67BFA860A28C-JOB_16618645111571_0006-00003.ORC',1004,6,'Alex','view',2020-01-01 09:00:00
+'AGYZ_20220830173852_560D6F0E-8508-42D6-95A7-67BFA860A28C-JOB_16618645111571_0006-00003.ORC',1007,4,'Alex','view',2020-01-01 09:00:00
+---- TYPES
+STRING, BIGINT, INT, STRING, STRING, TIMESTAMP
+====
+---- QUERY
+SELECT * from iceberg_v2_no_deletes_orc where i = 2;
+---- RESULTS
+2,'y'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+SELECT * from iceberg_v2_positional_delete_all_rows where i > 2;
+---- RESULTS
+---- TYPES
+INT, STRING
+====
+---- QUERY
+SELECT * from iceberg_v2_positional_not_all_data_files_have_delete_files_orc
+where i < 4;
+---- RESULTS
+1,'a'
+2,'b'
+3,'c'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+SELECT * from iceberg_v2_partitioned_position_deletes_orc
+where action = 'click';
+---- RESULTS
+18,'Alan','click',2020-01-01 10:00:00
+12,'Alan','click',2020-01-01 10:00:00
+10,'Alan','click',2020-01-01 10:00:00
+---- TYPES
+INT, STRING, STRING, TIMESTAMP
+====
+---- QUERY
+SELECT action, count(*) from iceberg_v2_partitioned_position_deletes_orc
+group by action;
+---- RESULTS
+'click',3
+'download',4
+'view',3
+---- TYPES
+STRING, BIGINT
+====
+---- QUERY
+with v as (select i + 1000 as ii, upper(s) as ss from iceberg_v2_positional_not_all_data_files_have_delete_files_orc)
+select * from v where ii > 1003;
+---- RESULTS
+1005,'X'
+1004,'D'
+1006,'F'
+---- TYPES
+BIGINT, STRING
+====

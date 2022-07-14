@@ -348,9 +348,8 @@ abstract class LocalTable implements FeTable {
       // then all other columns.
       List<Column> cols;
       try {
+        cols = FeCatalogUtils.fieldSchemasToColumns(msTbl);
         boolean isFullAcidTable = AcidUtils.isFullAcidTable(msTbl.getParameters());
-        cols = FeCatalogUtils.fieldSchemasToColumns(msTbl.getPartitionKeys(),
-            msTbl.getSd().getCols(), msTbl.getTableName(), isFullAcidTable);
         return new ColumnMap(cols, numClusteringCols, fullName, isFullAcidTable);
       } catch (TableLoadingException e) {
         throw new LocalCatalogException(e);

@@ -31,7 +31,7 @@ import json
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.iceberg_test_suite import IcebergTestSuite
-from tests.common.skip import SkipIf
+from tests.common.skip import SkipIf, SkipIfDockerizedCluster
 from tests.common.file_utils import create_iceberg_table_from_directory
 from tests.shell.util import run_impala_shell_cmd
 from tests.util.filesystem_utils import get_fs_path, IS_HDFS
@@ -779,3 +779,30 @@ class TestIcebergTable(IcebergTestSuite):
 
     args = ['-q', 'DROP TABLE {0}.{1}'.format(db_name, tbl_name)]
     results = run_impala_shell_cmd(vector, args)
+
+
+class TestIcebergV2Table(IcebergTestSuite):
+  """Tests related to Iceberg V2 tables."""
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestIcebergV2Table, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  # The test uses pre-written Iceberg tables where the position delete files refer to
+  # the data files via full URI, i.e. they start with 'hdfs://localhost:2050/...'. In the
+  # dockerised environment the namenode is accessible on a different hostname/port.
+  @SkipIfDockerizedCluster.internal_hostname
+  @SkipIf.not_hdfs
+  def test_read_position_deletes(self, vector):
+    self.run_test_case('QueryTest/iceberg-v2-read-position-deletes', vector)
+
+  @SkipIfDockerizedCluster.internal_hostname
+  @SkipIf.not_hdfs
+  def test_read_position_deletes_orc(self, vector):
+    self.run_test_case('QueryTest/iceberg-v2-read-position-deletes-orc', vector)

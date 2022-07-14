@@ -1712,7 +1712,7 @@ public class SingleNodePlanner {
    * Adds a new slot ref with path 'rawPath' to its tuple descriptor. This is a no-op if
    * the tuple descriptor already has a slot ref with the given raw path.
    */
-  private static void addSlotRefToDesc(Analyzer analyzer, List<String> rawPath)
+  public static void addSlotRefToDesc(Analyzer analyzer, List<String> rawPath)
       throws AnalysisException {
     Path resolvedPath = null;
     try {
@@ -1773,7 +1773,7 @@ public class SingleNodePlanner {
         acidJoinConjuncts, /*otherJoinConjuncts=*/Collections.emptyList());
     acidJoin.setId(ctx_.getNextNodeId());
     acidJoin.init(analyzer);
-    acidJoin.setIsAcidJoin();
+    acidJoin.setIsDeleteRowsJoin();
     return acidJoin;
   }
 
@@ -1871,13 +1871,9 @@ public class SingleNodePlanner {
     FeTable table = tblRef.getTable();
     if (table instanceof FeFsTable) {
       if (table instanceof FeIcebergTable) {
-        FeFsTable feFsTable = ((FeIcebergTable) tblRef.getDesc().getTable()).
-            getFeFsTable();
-        analyzer.materializeSlots(conjuncts);
-        scanNode = new IcebergScanNode(ctx_.getNextNodeId(), tblRef.getDesc(), conjuncts,
-            tblRef, feFsTable, aggInfo);
-        scanNode.init(analyzer);
-        return scanNode;
+        IcebergScanPlanner icebergPlanner = new IcebergScanPlanner(analyzer, ctx_, tblRef,
+            conjuncts, aggInfo);
+        return icebergPlanner.createIcebergScanPlan();
       }
       return createHdfsScanPlan(tblRef, aggInfo, conjuncts, analyzer);
     } else if (table instanceof FeDataSourceTable) {

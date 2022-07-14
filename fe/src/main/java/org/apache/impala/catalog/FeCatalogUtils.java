@@ -98,18 +98,17 @@ public abstract class FeCatalogUtils {
    * @throws TableLoadingException if any type is invalid
    */
   public static ImmutableList<Column> fieldSchemasToColumns(
-      List<FieldSchema> partCols, List<FieldSchema> nonPartCols,
-      String tableName, boolean isFullAcidTable) throws TableLoadingException {
+      org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
+    boolean isFullAcidTable = AcidUtils.isFullAcidTable(msTbl.getParameters());
     int pos = 0;
     ImmutableList.Builder<Column> ret = ImmutableList.builder();
-    for (FieldSchema s : Iterables.concat(partCols, nonPartCols)) {
-      if (isFullAcidTable && pos == partCols.size()) {
-        ret.add(AcidUtils.getRowIdColumnType(pos));
-        ++pos;
+    for (FieldSchema s : Iterables.concat(msTbl.getPartitionKeys(),
+                                          msTbl.getSd().getCols())) {
+      if (isFullAcidTable && pos == msTbl.getPartitionKeys().size()) {
+        ret.add(AcidUtils.getRowIdColumnType(pos++));
       }
-      Type type = parseColumnType(s, tableName);
-      ret.add(new Column(s.getName(), type, s.getComment(), pos));
-      ++pos;
+      Type type = parseColumnType(s, msTbl.getTableName());
+      ret.add(new Column(s.getName(), type, s.getComment(), pos++));
     }
     return ret.build();
   }

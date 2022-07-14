@@ -641,11 +641,6 @@ ALTER TABLE iceberg_alter_part SET PARTITION SPEC (HOUR(d));
 ImpalaRuntimeException: Failed to ALTER table 'iceberg_alter_part': Cannot partition type date by hour
 ====
 ---- QUERY
-select * from functional_parquet.iceberg_v2_delete_positional;
----- CATCH
-row_regex:.*CAUSED BY: TableLoadingException: Unsupported Iceberg V2 feature, table .* contains delete files..*
-====
----- QUERY
 CREATE TABLE clone_ice LIKE functional_parquet.alltypestiny STORED AS ICEBERG;
 ---- CATCH
 functional_parquet.alltypestiny cannot be cloned into an Iceberg table because it is not an Iceberg table.

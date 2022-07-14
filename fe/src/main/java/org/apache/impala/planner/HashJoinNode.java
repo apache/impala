@@ -175,7 +175,8 @@ public class HashJoinNode extends JoinNode {
       }
     }
     if (detailLevel.ordinal() > TExplainLevel.MINIMAL.ordinal()) {
-      if (!isAcidJoin_ || detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+      if (!isDeleteRowsJoin_ ||
+          detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
         output.append(detailPrefix + "hash predicates: ");
         for (int i = 0; i < eqJoinConjuncts_.size(); ++i) {
           Expr eqConjunct = eqJoinConjuncts_.get(i);

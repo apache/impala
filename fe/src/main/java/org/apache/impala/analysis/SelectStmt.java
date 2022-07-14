@@ -29,14 +29,13 @@ import java.util.Set;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
-import org.apache.iceberg.SnapshotSummary;
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.DatabaseNotFoundException;
-import org.apache.impala.catalog.FeFsTable.Utils;
 import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.FeIcebergTable.Utils;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
@@ -1359,9 +1358,8 @@ public class SelectStmt extends QueryStmt {
     }
     if (!hasCountStarFunc) return;
 
-    long num = Utils.getSnapshotSummaryPropOfTypeLong(
-        ((FeIcebergTable) table).getIcebergApiTable(), tableRef.getTimeTravelSpec(),
-        SnapshotSummary.TOTAL_RECORDS_PROP);
+    long num = Utils.getRecordCount(
+        ((FeIcebergTable) table).getIcebergApiTable(), tableRef.getTimeTravelSpec());
     if (num <= 0) return;
     analyzer_.setTotalRecordsNum(num);
 

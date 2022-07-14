@@ -1231,6 +1231,16 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   /**
+   * Check that Iceberg V2 table scans work as expected.
+   */
+  @Test
+  public void testIcebergV2TableScans() {
+    runPlannerTestFile("iceberg-v2-tables", "functional_parquet",
+        ImmutableSet.of(
+            PlannerTestOption.DO_NOT_VALIDATE_ROWCOUNT_ESTIMATION_FOR_PARTITIONS));
+  }
+
+  /**
    * Test limit pushdown into analytic sort in isolation.
    */
   @Test

@@ -35,17 +35,25 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.iceberg.ContentFile;
 import org.apache.iceberg.DataFile;
+import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.SnapshotSummary;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.util.SnapshotUtil;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.PartitionKeyValue;
+import org.apache.impala.analysis.TimeTravelSpec;
+import org.apache.impala.analysis.TimeTravelSpec.Kind;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
 import org.apache.impala.compat.HdfsShim;
 import org.apache.impala.thrift.TColumn;
@@ -67,6 +75,8 @@ import org.apache.impala.util.TResultRowBuilder;
 import org.json.simple.JSONValue;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import com.google.common.collect.Iterables;
 import com.google.common.primitives.Ints;
 
 import org.slf4j.Logger;
@@ -546,26 +556,27 @@ public interface FeIcebergTable extends FeFsTable {
         }
       }
       Map<String, HdfsPartition.FileDescriptor> fileDescMap = new HashMap<>();
-      List<DataFile> dataFileList = IcebergUtil.getIcebergDataFiles(table,
-          new ArrayList<>(), /*timeTravelSpecl=*/null).first;
-      for (DataFile dataFile : dataFileList) {
-          Path path = new Path(dataFile.path().toString());
+      Pair<List<DataFile>, Set<DeleteFile>> allFiles = IcebergUtil.getIcebergFiles(
+          table, new ArrayList<>(), /*timeTravelSpecl=*/null);
+      for (ContentFile contentFile : Iterables.concat(allFiles.first,
+                                                      allFiles.second)) {
+          Path path = new Path(contentFile.path().toString());
           if (hdfsFileDescMap.containsKey(path.toUri().getPath())) {
-            String pathHash = IcebergUtil.getDataFilePathHash(dataFile);
+            String pathHash = IcebergUtil.getFilePathHash(contentFile);
             HdfsPartition.FileDescriptor fsFd = hdfsFileDescMap.get(
                 path.toUri().getPath());
             HdfsPartition.FileDescriptor iceFd = fsFd.cloneWithFileMetadata(
-                IcebergUtil.createIcebergMetadata(table, dataFile));
+                IcebergUtil.createIcebergMetadata(table, contentFile));
             fileDescMap.put(pathHash, iceFd);
           } else {
-            LOG.warn("Iceberg DataFile '{}' cannot be found in the HDFS recursive file "
+            LOG.warn("Iceberg file '{}' cannot be found in the HDFS recursive file "
                 + "listing results.", path.toString());
             HdfsPartition.FileDescriptor fileDesc = getFileDescriptor(
-                new Path(dataFile.path().toString()),
+                new Path(contentFile.path().toString()),
                 new Path(table.getIcebergTableLocation()), table.getHostIndex());
             HdfsPartition.FileDescriptor iceFd = fileDesc.cloneWithFileMetadata(
-                IcebergUtil.createIcebergMetadata(table, dataFile));
-            fileDescMap.put(IcebergUtil.getDataFilePathHash(dataFile), iceFd);
+                IcebergUtil.createIcebergMetadata(table, contentFile));
+            fileDescMap.put(IcebergUtil.getFilePathHash(contentFile), iceFd);
           }
       }
       return fileDescMap;
@@ -575,12 +586,13 @@ public interface FeIcebergTable extends FeFsTable {
      * Return the PartitionContent loaded by the internal HdfsTable. To avoid returning
      * the metadata files the result set is limited to the files that are tracked by
      * Iceberg. Both the number of rows and number of files show in partitionStats.
+     * TODO(IMPALA-11516): Return better partition stats for V2 tables.
      */
     public static Map<String, TIcebergPartitionStats> loadPartitionStats(
         IcebergTable table) throws TableLoadingException {
       List<DataFile> dataFileList =
           IcebergUtil
-              .getIcebergDataFiles(table, new ArrayList<>(), /*timeTravelSpecl=*/null)
+              .getIcebergFiles(table, new ArrayList<>(), /*timeTravelSpecl=*/null)
               .first;
       Map<String, TIcebergPartitionStats> partitionStats = new HashMap<>();
       for (DataFile dataFile : dataFileList) {
@@ -663,6 +675,73 @@ public interface FeIcebergTable extends FeFsTable {
         partition.getHdfs_storage_descriptor().setFileFormat(
             IcebergUtil.toTHdfsFileFormat(icebergTable.getIcebergFileFormat()));
       }
+    }
+
+    /**
+     * Get record count for a table with the given time travel spec. Returns -1 when
+     * the record count cannot be retrieved from the table summary.
+     * If 'travelSpec' is null then the current snapshot is being used.
+     */
+    public static long getRecordCount(Table icebergTable,
+        TimeTravelSpec travelSpec) {
+      Map<String, String> summary = getSnapshotSummary(icebergTable, travelSpec);
+      if (summary == null) return -1;
+
+      String totalRecordsStr = summary.get(SnapshotSummary.TOTAL_RECORDS_PROP);
+      if (Strings.isNullOrEmpty(totalRecordsStr)) return -1;
+
+      try {
+        // We cannot tell the record count from the summary if there are deleted rows.
+        String totalDeleteFilesStr = summary.get(SnapshotSummary.TOTAL_DELETE_FILES_PROP);
+        if (!Strings.isNullOrEmpty(totalDeleteFilesStr)) {
+          long totalDeleteFiles = Long.parseLong(totalDeleteFilesStr);
+          if (totalDeleteFiles > 0) return -1;
+        }
+
+        return Long.parseLong(totalRecordsStr);
+      } catch (NumberFormatException ex) {
+        LOG.warn("Failed to get {} from iceberg table summary. Table name: {}, " +
+                 "Table location: {}, Prop value: {}",
+            SnapshotSummary.TOTAL_RECORDS_PROP, icebergTable.name(),
+            icebergTable.location(), totalRecordsStr, ex);
+      }
+
+      return -1;
+    }
+
+    /**
+     * Get the snapshot summary from the Iceberg table.
+     */
+    private static Map<String, String> getSnapshotSummary(Table icebergTable,
+        TimeTravelSpec travelSpec) {
+      Snapshot snapshot = getIcebergSnapshot(icebergTable, travelSpec);
+      // There are no snapshots for the tables created for the first time.
+      if (snapshot == null) return null;
+      return snapshot.summary();
+    }
+
+    /**
+     * Get time-travel snapshot or current snapshot of the Iceberg table.
+     * Only current snapshot can return null.
+     */
+    private static Snapshot getIcebergSnapshot(Table icebergTable,
+        TimeTravelSpec travelSpec) {
+      if (travelSpec == null) return icebergTable.currentSnapshot();
+      Snapshot snapshot;
+      if (travelSpec.getKind().equals(Kind.VERSION_AS_OF)) {
+        long snapshotId = travelSpec.getAsOfVersion();
+        snapshot = icebergTable.snapshot(snapshotId);
+        Preconditions.checkArgument(snapshot != null, "Cannot find snapshot with ID %s",
+            snapshotId);
+      } else {
+        long timestampMillis = travelSpec.getAsOfMillis();
+        long snapshotId = SnapshotUtil.snapshotIdAsOfTime(icebergTable, timestampMillis);
+        snapshot = icebergTable.snapshot(snapshotId);
+        Preconditions.checkArgument(snapshot != null,
+            "Cannot find snapshot with ID %s, timestampMillis %s", snapshotId,
+            timestampMillis);
+      }
+      return snapshot;
     }
   }
 }

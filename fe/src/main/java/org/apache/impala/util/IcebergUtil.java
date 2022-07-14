@@ -40,7 +40,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.iceberg.ContentFile;
 import org.apache.iceberg.DataFile;
+import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.PartitionField;
@@ -525,33 +527,40 @@ public class IcebergUtil {
   }
 
   /**
-   * Returns a Pair, the first element is the DataFiles by file system table location and
-   * iceberg predicates, the second element is whether or not a DeleteFile exists for the
-   * DataFiles in the first element.
+   * Returns a list of Iceberg FileScanTask objects. These objects contain a data file
+   * to be scanned and the associated delete files need to be applied.
    */
-  public static Pair<List<DataFile>, Boolean> getIcebergDataFiles(FeIcebergTable table,
+  public static CloseableIterable<FileScanTask> planFiles(FeIcebergTable table,
       List<Expression> predicates, TimeTravelSpec timeTravelSpec)
         throws TableLoadingException {
-    if (table.snapshotId() == -1) return new Pair<>(Collections.emptyList(), false);
+    if (table.snapshotId() == -1) return CloseableIterable.empty();
 
     TableScan scan = createScanAsOf(table, timeTravelSpec);
     for (Expression predicate : predicates) {
       scan = scan.filter(predicate);
     }
 
-    List<DataFile> dataFileList = new ArrayList<>();
-    boolean hasDeleteFile = false;
-    try (CloseableIterable<FileScanTask> fileScanTasks = scan.planFiles()) {
-      for (FileScanTask task : fileScanTasks) {
-        if (!task.deletes().isEmpty()) {
-          hasDeleteFile = true;
-        }
-        dataFileList.add(task.file());
+    return scan.planFiles();
+  }
+
+  /**
+   * Returns lists of data and delete files in the Iceberg table.
+   */
+  public static Pair<List<DataFile>, Set<DeleteFile>> getIcebergFiles(
+      FeIcebergTable table, List<Expression> predicates, TimeTravelSpec timeTravelSpec)
+        throws TableLoadingException {
+    List<DataFile> dataFiles = new ArrayList<>();
+    Set<DeleteFile> deleteFiles = new HashSet<>();
+    try (CloseableIterable<FileScanTask> fileScanTasks = planFiles(
+        table, predicates, timeTravelSpec)) {
+      for (FileScanTask scanTask : fileScanTasks) {
+        dataFiles.add(scanTask.file());
+        deleteFiles.addAll(scanTask.deletes());
       }
     } catch (IOException e) {
-      throw new TableLoadingException("Data file list collection failed.", e);
+      throw new TableLoadingException("Error during reading Iceberg manifest files.", e);
     }
-    return new Pair<>(dataFileList, hasDeleteFile);
+    return new Pair<>(dataFiles, deleteFiles);
   }
 
   private static TableScan createScanAsOf(FeIcebergTable table,
@@ -583,11 +592,11 @@ public class IcebergUtil {
   }
 
   /**
-   * Use DataFile path to generate 128-bit Murmur3 hash as map key, cached in memory
+   * Use ContentFile path to generate 128-bit Murmur3 hash as map key, cached in memory
    */
-  public static String getDataFilePathHash(DataFile dataFile) {
+  public static String getFilePathHash(ContentFile contentFile) {
     Hasher hasher = Hashing.murmur3_128().newHasher();
-    hasher.putUnencodedChars(dataFile.path().toString());
+    hasher.putUnencodedChars(contentFile.path().toString());
     return hasher.hash().toString();
   }
 
@@ -868,9 +877,10 @@ public class IcebergUtil {
    * It creates a flatbuffer so it can be passed between machines and processes without
    * further de/serialization.
    */
-  public static FbFileMetadata createIcebergMetadata(FeIcebergTable feTbl, DataFile df) {
+  public static FbFileMetadata createIcebergMetadata(FeIcebergTable feTbl,
+      ContentFile cf) {
     FlatBufferBuilder fbb = new FlatBufferBuilder(1);
-    int iceOffset = createIcebergMetadata(feTbl, fbb, df);
+    int iceOffset = createIcebergMetadata(feTbl, fbb, cf);
     fbb.finish(FbFileMetadata.createFbFileMetadata(fbb, iceOffset));
     ByteBuffer bb = fbb.dataBuffer().slice();
     ByteBuffer compressedBb = ByteBuffer.allocate(bb.capacity());
@@ -879,17 +889,17 @@ public class IcebergUtil {
   }
 
   private static int createIcebergMetadata(FeIcebergTable feTbl, FlatBufferBuilder fbb,
-      DataFile df) {
+      ContentFile cf) {
     int partKeysOffset = -1;
-    PartitionSpec spec = feTbl.getIcebergApiTable().specs().get(df.specId());
+    PartitionSpec spec = feTbl.getIcebergApiTable().specs().get(cf.specId());
     if (spec != null && !spec.fields().isEmpty()) {
-      partKeysOffset = createPartitionKeys(feTbl, fbb, spec, df);
+      partKeysOffset = createPartitionKeys(feTbl, fbb, spec, cf);
     }
     FbIcebergMetadata.startFbIcebergMetadata(fbb);
     byte fileFormat = -1;
-    if (df.format() == FileFormat.PARQUET) fileFormat = FbIcebergDataFileFormat.PARQUET;
-    else if (df.format() == FileFormat.ORC) fileFormat = FbIcebergDataFileFormat.ORC;
-    else if (df.format() == FileFormat.AVRO) fileFormat = FbIcebergDataFileFormat.AVRO;
+    if (cf.format() == FileFormat.PARQUET) fileFormat = FbIcebergDataFileFormat.PARQUET;
+    else if (cf.format() == FileFormat.ORC) fileFormat = FbIcebergDataFileFormat.ORC;
+    else if (cf.format() == FileFormat.AVRO) fileFormat = FbIcebergDataFileFormat.AVRO;
     if (fileFormat != -1) {
       FbIcebergMetadata.addFileFormat(fbb, fileFormat);
     }
@@ -900,23 +910,23 @@ public class IcebergUtil {
   }
 
   private static int createPartitionKeys(FeIcebergTable feTbl, FlatBufferBuilder fbb,
-      PartitionSpec spec, DataFile df) {
-    Preconditions.checkState(spec.fields().size() == df.partition().size());
+      PartitionSpec spec, ContentFile cf) {
+    Preconditions.checkState(spec.fields().size() == cf.partition().size());
     int[] partitionKeyOffsets = new int[spec.fields().size()];
     for (int i = 0; i < spec.fields().size(); ++i) {
       partitionKeyOffsets[i] =
-          createPartitionTransformValue(feTbl, fbb, spec, df, i);
+          createPartitionTransformValue(feTbl, fbb, spec, cf, i);
     }
     return FbIcebergMetadata.createPartitionKeysVector(fbb, partitionKeyOffsets);
   }
 
   private static int createPartitionTransformValue(FeIcebergTable feTbl,
-      FlatBufferBuilder fbb, PartitionSpec spec, DataFile df, int fieldIndex) {
+      FlatBufferBuilder fbb, PartitionSpec spec, ContentFile cf, int fieldIndex) {
     PartitionField field = spec.fields().get(fieldIndex);
     Pair<Byte, Integer> transform = getFbTransform(spec.schema(), field);
     int valueOffset = -1;
     if (transform.first != FbIcebergTransformType.VOID) {
-      Object partValue = df.partition().get(fieldIndex, Object.class);
+      Object partValue = cf.partition().get(fieldIndex, Object.class);
       String partValueString;
       if (partValue != null) {
         partValueString = partValue.toString();

@@ -763,3 +763,106 @@ CREATE TABLE iceberg_migrated_complex_test_orc (struct_1_col struct<int_array_co
 insert into table iceberg_migrated_complex_test_orc values (named_struct("int_array_col", array(0), "string_col", "A", "bool_int_map_col", map(True, 1 )), map(2,CAST(3 as bigint)), named_struct("struct_3_col", named_struct("float_col", cast(0.5 as float), "string_double_map_col", map("B", cast(1.5 as double)), "bigint_array_col", array(cast(4 as bigint))), "int_int_map_col", map(5,6)));
 ALTER TABLE iceberg_migrated_complex_test_orc SET TBLPROPERTIES ('storage_handler'='org.apache.iceberg.mr.hive.HiveIcebergStorageHandler');
 Then extracted from hdfs and modified to be able to load as an external hadoop table
+
+iceberg_test/hadoop_catalog/ice/iceberg_v2_no_deletes:
+Created by Hive 3.1.3000.2022.0.10.0-49 r5cd8759d0df2ecbfb788b7f4ee0edce6022ee459
+create table iceberg_v2_no_deletes (i int, s string)
+stored by iceberg
+location '/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_no_deletes'
+tblproperties ('format-version'='2');
+insert into iceberg_v2_no_deletes values (1, 'x'), (2, 'y'), (3, 'z');
+(setting table location is important because it makes it easier the conversion later).
+Then saved the contents from HDFS to local  ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/ice
+And converted the HiveCatalog metadata to HadoopCatalog metadata via the following scripts:
+convert_to_iceberg.sh:
+#!/bin/bash
+
+i=0
+for f in *.json; do
+  i=$((i+1))
+  sed -i 's|hdfs://localhost:20500/test-warehouse/|/test-warehouse/|' $f
+  mv $f v${i}.metadata.json
+done
+echo ${i} > version-hint.txt
+
+for f in *.avro; do
+  avro_iceberg_convert.sh $f 'hdfs://localhost:20500/test-warehouse/'  '/test-warehouse/'
+  mv ${f}_mod $f
+done
+
+rm *.avro_json
+
+avro_iceberg_convert.sh:
+#!/bin/bash
+
+# Usage: avro_iceberg_convert.sh <source avro> <search string> <replace string>
+# Example:
+SOURCE_FILE=$1
+SEARCH_STR=$2
+REPLACE_STR=$3
+TMP_JSON=$1_json
+DST_AVRO=$1_mod
+AVRO_TOOLS="/path/to/avro-tools-1.11.0.jar"
+
+if [ ! -f "$AVRO_TOOLS" ]; then
+    echo "Can't find $AVRO_TOOLS."
+    exit
+fi
+if [ ! -f $SOURCE_FILE ]; then
+    echo "Can't find source file: $SOURCE_FILE!"
+    exit
+fi
+# Transform avro to json:
+java -jar $AVRO_TOOLS tojson --pretty $SOURCE_FILE  > $TMP_JSON
+# Replace search string with replace string
+sed --in-place "s|$SEARCH_STR|$REPLACE_STR|g" $TMP_JSON
+# Convert the file back to avro
+SCHEMA=`java -jar $AVRO_TOOLS getschema $SOURCE_FILE`
+java -jar $AVRO_TOOLS fromjson $TMP_JSON --schema "$SCHEMA" > $DST_AVRO
+
+iceberg_v2_partitioned_position_deletes:
+iceberg_v2_partitioned_position_deletes_orc:
+Created similarly to iceberg_v2_no_deletes.
+Hive> create table iceberg_v2_partitioned_position_deletes (
+  id int, `user` string, action string, event_time timestamp)
+partitioned by spec (action)
+STORED BY ICEBERG
+location '/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_partitioned_position_deletes'
+tblproperties ('format-version'='2', 'write.format.default'='parquet');
+Impala> insert into iceberg_v2_partitioned_position_deletes select * from functional_parquet.iceberg_partitioned;
+Hive> delete from iceberg_v2_partitioned_position_deletes where id % 2 = 1;
+ORC table is similarly created.
+
+
+iceberg_v2_positional_delete_all_rows:
+iceberg_v2_positional_delete_all_rows_orc:
+Created similarly to iceberg_v2_no_deletes.
+Hive> create table iceberg_v2_positional_delete_all_rows_orc (
+        i int, s string)
+      stored by iceberg
+      location '/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_positional_delete_all_rows_orc'
+      tblproperties ('format-version'='2', 'write.format.default'='orc');
+Hive> insert into iceberg_v2_positional_delete_all_rows_orc values (1, 'x'), (2, 'y'), (3, 'z');
+Hive> delete from iceberg_v2_positional_delete_all_rows_orc;
+
+iceberg_v2_positional_not_all_data_files_have_delete_files:
+iceberg_v2_positional_not_all_data_files_have_delete_files_orc:
+Created similarly to iceberg_v2_no_deletes.
+create table iceberg_v2_positional_not_all_data_files_have_delete_files_orc (i int, s string)
+stored by iceberg
+location '/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_positional_not_all_data_files_have_delete_files_orc'
+tblproperties ('format-version'='2', 'write.format.default'='orc');
+insert into iceberg_v2_positional_not_all_data_files_have_delete_files_orc values (1,'a'), (2,'b'), (3,'c');
+insert into iceberg_v2_positional_not_all_data_files_have_delete_files_orc values (4,'d'), (5,'e'), (6,'f');
+insert into iceberg_v2_positional_not_all_data_files_have_delete_files_orc values (7,'g'), (8,'h'), (9,'i');
+update iceberg_v2_positional_not_all_data_files_have_delete_files_orc set s='X' where i = 5;
+delete from iceberg_v2_positional_not_all_data_files_have_delete_files_orc where i > 6;
+
+iceberg_v2_positional_update_all_rows:
+Created similarly to iceberg_v2_no_deletes
+create table iceberg_v2_positional_update_all_rows (i int, s string)
+stored by iceberg
+location '/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_positional_update_all_rows'
+tblproperties ('format-version'='2');
+insert into iceberg_v2_positional_update_all_rows values (1,'a'), (2,'b'), (3,'c')
+update iceberg_v2_positional_update_all_rows set s = upper(s);

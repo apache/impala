@@ -125,6 +125,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
   public static final long MIN_PARQUET_PAGE_SIZE = 64 * 1024;
   public static final long MAX_PARQUET_PAGE_SIZE = 1024 * 1024 * 1024;
 
+  // Field IDs of the position delete files according to the Iceberg spec.
+  public static final int V2_FILE_PATH_FIELD_ID = 2147483546;
+  public static final int V2_POS_FIELD_ID = 2147483545;
+
   // Iceberg catalog type dependend on table properties
   private TIcebergCatalog icebergCatalog_;
 

@@ -84,10 +84,10 @@ public abstract class JoinNode extends PlanNode {
   protected JoinTableId joinTableId_ = JoinTableId.INVALID;
 
   // True if this join is used to do the join between insert and delete delta files.
-  protected boolean isAcidJoin_ = false;
+  protected boolean isDeleteRowsJoin_ = false;
 
-  public void setIsAcidJoin() {
-    isAcidJoin_ = true;
+  public void setIsDeleteRowsJoin() {
+    isDeleteRowsJoin_ = true;
     displayName_ = "DELETE EVENTS " + displayName_;
   }
 

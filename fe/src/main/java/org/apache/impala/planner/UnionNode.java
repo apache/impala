@@ -99,6 +99,8 @@ public class UnionNode extends PlanNode {
    */
   public boolean isConstantUnion() { return resultExprLists_.isEmpty(); }
 
+  public int getFirstNonPassthroughChildIndex() { return firstMaterializedChildIdx_; }
+
   /**
    * Add a child tree plus its corresponding unresolved resultExprs.
    */

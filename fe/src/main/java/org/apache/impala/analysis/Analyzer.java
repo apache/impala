@@ -63,6 +63,7 @@ import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.VirtualColumn;
+import org.apache.impala.catalog.VirtualTable;
 import org.apache.impala.catalog.local.LocalKuduTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.IdGenerator;
@@ -3376,6 +3377,14 @@ public class Analyzer {
       throw new TableLoadingException("Missing metadata for table: " + tableName, cause);
     }
     return table;
+  }
+
+  /**
+   * Adds auxiliary virtual table for a query.
+   */
+  public void addVirtualTable(VirtualTable virtTable) {
+    TableName tblName = virtTable.getTableName();
+    globalState_.stmtTableCache.tables.put(tblName, virtTable);
   }
 
   public org.apache.kudu.client.KuduTable getKuduTable(FeKuduTable feKuduTable)

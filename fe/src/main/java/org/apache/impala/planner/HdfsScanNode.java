@@ -201,6 +201,7 @@ public class HdfsScanNode extends ScanNode {
           .add(HdfsFileFormat.PARQUET)
           .add(HdfsFileFormat.HUDI_PARQUET)
           .add(HdfsFileFormat.ORC)
+          .add(HdfsFileFormat.ICEBERG)
           .build();
 
   //An estimate of the width of a row when the information is not available.
@@ -1185,28 +1186,11 @@ public class HdfsScanNode extends ScanNode {
         throw new ImpalaRuntimeException("Error determining partition fs type", e);
       }
       boolean fsHasBlocks = FileSystemUtil.supportsStorageIds(partitionFs);
-      List<FileDescriptor> fileDescs;
-      if (this instanceof IcebergScanNode) {
-        fileDescs = ((IcebergScanNode) this).getFileDescriptorByIcebergPredicates();
-      } else {
-        if (isSimpleLimit) {
-          fileDescs = new ArrayList<>();
-          for (FileDescriptor fd : partition.getFileDescriptors()) {
-            // skip empty files
-            if ((fsHasBlocks && fd.getNumFileBlocks() == 0)
-                || (!fsHasBlocks && fd.getFileLength() <= 0)) {
-              continue;
-            }
-            simpleLimitNumRows++;  // conservatively estimate 1 row per file
-            fileDescs.add(fd);
-            if (simpleLimitNumRows == analyzer.getSimpleLimitStatus().second) {
-              break;
-            }
-          }
-        } else {
-          fileDescs = partition.getFileDescriptors();
-        }
-      }
+      List<FileDescriptor> fileDescs = getFileDescriptorsWithLimit(partition, fsHasBlocks,
+          isSimpleLimit ? analyzer.getSimpleLimitStatus().second - simpleLimitNumRows
+                        : -1);
+      // conservatively estimate 1 row per file
+      simpleLimitNumRows += fileDescs.size();
 
       if (sampledFiles != null) {
         // If we are sampling, check whether this partition is included in the sample.
@@ -1295,6 +1279,30 @@ public class HdfsScanNode extends ScanNode {
             tableNumRows, sumValues(totalBytesPerFs_), largestScanRangeBytes_);
       }
     }
+  }
+
+  protected List<FileDescriptor> getFileDescriptorsWithLimit(
+      FeFsPartition partition, boolean fsHasBlocks, long limit) {
+    List<FileDescriptor> fileDescs;
+    if (limit != -1) {
+      int fileCount = 0;
+      fileDescs = new ArrayList<>();
+      for (FileDescriptor fd : partition.getFileDescriptors()) {
+        // skip empty files
+        if ((fsHasBlocks && fd.getNumFileBlocks() == 0)
+            || (!fsHasBlocks && fd.getFileLength() <= 0)) {
+          continue;
+        }
+        fileCount++;
+        fileDescs.add(fd);
+        if (fileCount == limit) {
+          break;
+        }
+      }
+    } else {
+      fileDescs = partition.getFileDescriptors();
+    }
+    return fileDescs;
   }
 
   /**
@@ -1652,7 +1660,7 @@ public class HdfsScanNode extends ScanNode {
               * ESTIMATED_COMPRESSION_FACTOR_LEGACY);
         } else {
          Preconditions.checkState(VALID_COLUMNAR_FORMATS.contains(format),
-             "Unknown HDFS compressed format: %s", this);
+             "Unknown HDFS compressed format: %s", format, this);
          estimatedPartitionSize += Math.round(p.getSize()
              * ESTIMATED_COMPRESSION_FACTOR_COLUMNAR);
         }

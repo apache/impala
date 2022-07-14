@@ -259,31 +259,33 @@ struct TColumn {
   // Ordinal position in the source table
   5: optional i32 position
   6: optional TVirtualColumnType virtual_column_type = TVirtualColumnType.NONE
+  // True for hidden columns
+  7: optional bool is_hidden
 
   // Indicates whether this is an HBase column. If true, implies
   // all following HBase-specific fields are set.
-  7: optional bool is_hbase_column
-  8: optional string column_family
-  9: optional string column_qualifier
-  10: optional bool is_binary
+  8: optional bool is_hbase_column
+  9: optional string column_family
+  10: optional string column_qualifier
+  11: optional bool is_binary
 
   // The followings are Kudu-specific column properties
-  11: optional bool is_kudu_column
-  12: optional bool is_key
-  13: optional bool is_nullable
-  14: optional TColumnEncoding encoding
-  15: optional THdfsCompression compression
-  16: optional Exprs.TExpr default_value
-  17: optional i32 block_size
+  12: optional bool is_kudu_column
+  13: optional bool is_key
+  14: optional bool is_nullable
+  15: optional TColumnEncoding encoding
+  16: optional THdfsCompression compression
+  17: optional Exprs.TExpr default_value
+  18: optional i32 block_size
   // The column name, in the case that it appears in Kudu.
-  18: optional string kudu_column_name
+  19: optional string kudu_column_name
 
   // Here come the Iceberg-specific fields.
-  19: optional bool is_iceberg_column
-  20: optional i32 iceberg_field_id
+  20: optional bool is_iceberg_column
+  21: optional i32 iceberg_field_id
   // Key and value field id for Iceberg column with Map type.
-  21: optional i32 iceberg_field_map_key_id
-  22: optional i32 iceberg_field_map_value_id
+  22: optional i32 iceberg_field_map_key_id
+  23: optional i32 iceberg_field_map_value_id
 }
 
 // Represents an HDFS file in a partition.

@@ -34,9 +34,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
-import org.apache.iceberg.Snapshot;
-import org.apache.iceberg.Table;
-import org.apache.iceberg.util.SnapshotUtil;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.PartitionKeyValue;
@@ -62,7 +59,6 @@ import org.apache.thrift.TException;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Joiner;
-import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -469,63 +465,6 @@ public interface FeFsTable extends FeTable {
         }
       }
       return result;
-    }
-
-    /**
-     * Get the snapshot summary property of type long from the Iceberg table.
-     */
-    public static long getSnapshotSummaryPropOfTypeLong(Table icebergTable,
-        TimeTravelSpec travelSpec, String propName) {
-      String propValue = getSnapshotSummaryProperty(icebergTable, travelSpec, propName);
-
-      if (Strings.isNullOrEmpty(propValue)) return -1;
-
-      try {
-        return Long.parseLong(propValue);
-      } catch (NumberFormatException ex) {
-        LOG.warn("Failed to get {} from iceberg table summary. Table name: {}, "
-                + "Table location: {}, Prop value: {}", propName, icebergTable.name(),
-            icebergTable.location(), propValue, ex);
-      }
-
-      return -1;
-    }
-
-    /**
-     * Get the snapshot summary property from the Iceberg table.
-     */
-    private static String getSnapshotSummaryProperty(Table icebergTable,
-        TimeTravelSpec travelSpec, String propName) {
-      Snapshot snapshot = getIcebergSnapshot(icebergTable, travelSpec);
-      // There are no snapshots for the tables created for the first time.
-      if (snapshot == null) { return null; }
-      return snapshot.summary().get(propName);
-    }
-
-    /**
-     * Get time-travel snapshot or current snapshot of the Iceberg table.
-     * Only current snapshot can return null.
-     */
-    private static Snapshot getIcebergSnapshot(Table icebergTable,
-        TimeTravelSpec travelSpec) {
-
-      if (travelSpec == null) return icebergTable.currentSnapshot();
-
-      Snapshot snapshot;
-      if (travelSpec.getKind().equals(Kind.VERSION_AS_OF)) {
-        long snapshotId = travelSpec.getAsOfVersion();
-        snapshot = icebergTable.snapshot(snapshotId);
-        Preconditions.checkArgument(snapshot != null, "Cannot find snapshot with ID %s",
-            snapshotId);
-      } else {
-        long timestampMillis = travelSpec.getAsOfMillis();
-        long snapshotId = SnapshotUtil.snapshotIdAsOfTime(icebergTable, timestampMillis);
-        snapshot = icebergTable.snapshot(snapshotId);
-        Preconditions.checkArgument(snapshot != null,
-            "Cannot find snapshot with ID %s, timestampMillis %s", snapshotId,
-            timestampMillis);
-      }
-      return snapshot;
     }
 
     /**
