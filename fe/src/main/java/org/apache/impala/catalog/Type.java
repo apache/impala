@@ -20,6 +20,7 @@ package org.apache.impala.catalog;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.impala.analysis.CollectionStructType;
 import org.apache.impala.analysis.CreateTableStmt;
 import org.apache.impala.analysis.Parser;
 import org.apache.impala.analysis.StatementBase;
@@ -234,6 +235,9 @@ public abstract class Type {
   public boolean isMapType() { return this instanceof MapType; }
   public boolean isArrayType() { return this instanceof ArrayType; }
   public boolean isStructType() { return this instanceof StructType; }
+  public boolean isCollectionStructType() {
+    return this instanceof CollectionStructType;
+  }
 
   /**
    * Returns true if Impala supports this type in the metdata. It does not mean we

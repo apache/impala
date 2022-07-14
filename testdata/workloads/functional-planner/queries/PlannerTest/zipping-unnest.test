@@ -73,7 +73,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.complextypes_arrays]
    HDFS partitions=1/1 files=1 size=1.06KB
    predicates: !empty(arr1)
-   predicates on arr1: UNNEST(arr1) < 5, arr1.item < 5
+    predicates on functional_parquet.complextypes_arrays.arr1: UNNEST(functional_parquet.complextypes_arrays.arr1) < 5, functional_parquet.complextypes_arrays.arr1.item < 5
    row-size=16B cardinality=1.35K
 ====
 # Similar as above but using the FROM clause syntax for zipping unnest.
@@ -99,7 +99,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.complextypes_arrays]
    HDFS partitions=1/1 files=1 size=1.06KB
    predicates: !empty(arr1)
-   predicates on arr1: arr1.item < 5
+   predicates on functional_parquet.complextypes_arrays.arr1: functional_parquet.complextypes_arrays.arr1.item < 5
    row-size=16B cardinality=1.35K
 ====
 # Check that for multiple unnests the predicate on the unnested items is pushed to the
@@ -172,7 +172,7 @@ PLAN-ROOT SINK
 |  |     row-size=16B cardinality=1
 |  |
 |  03:UNNEST [test_zipping_unnest_db.view_arrays.arr1, test_zipping_unnest_db.view_arrays.arr2]
-|     predicates: UNNEST(arr1) < 5
+|     predicates: UNNEST(functional_parquet.complextypes_arrays.arr1) < 5
 |     row-size=4B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.complextypes_arrays]
@@ -197,7 +197,7 @@ PLAN-ROOT SINK
 |  |     row-size=16B cardinality=1
 |  |
 |  03:UNNEST [a.arr1, a.arr2]
-|     predicates: arr1.item < 5
+|     predicates: functional_parquet.complextypes_arrays.arr1.item < 5
 |     row-size=4B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.complextypes_arrays]
