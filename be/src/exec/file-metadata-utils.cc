@@ -29,20 +29,19 @@
 
 namespace impala {
 
-void FileMetadataUtils::Open(ScannerContext* context) {
-  DCHECK(context != nullptr);
-  context_ = context;
-  file_desc_ = scan_node_->GetFileDesc(context->partition_descriptor()->id(),
-                                       context->GetStream()->filename());
+void FileMetadataUtils::SetFile(RuntimeState* state, const HdfsFileDesc* file_desc) {
+  DCHECK(state != nullptr);
+  DCHECK(file_desc != nullptr);
+  state_ = state;
+  file_desc_ = file_desc;
 }
 
-Tuple* FileMetadataUtils::CreateTemplateTuple(MemPool* mem_pool) {
-  DCHECK(context_ != nullptr);
+Tuple* FileMetadataUtils::CreateTemplateTuple(int64_t partition_id, MemPool* mem_pool,
+    std::map<const SlotId, const SlotDescriptor*>* slot_descs_written) {
   DCHECK(file_desc_ != nullptr);
   // Initialize the template tuple, it is copied from the template tuple map in the
   // HdfsScanNodeBase.
-  Tuple* template_tuple =
-      scan_node_->GetTemplateTupleForPartitionId(context_->partition_descriptor()->id());
+  Tuple* template_tuple = scan_node_->GetTemplateTupleForPartitionId(partition_id);
   if (template_tuple != nullptr) {
     template_tuple =
         template_tuple->DeepCopy(*scan_node_->tuple_desc(), mem_pool);
@@ -51,7 +50,7 @@ Tuple* FileMetadataUtils::CreateTemplateTuple(MemPool* mem_pool) {
     AddFileLevelVirtualColumns(mem_pool, template_tuple);
   }
   if (scan_node_->hdfs_table()->IsIcebergTable()) {
-    AddIcebergColumns(mem_pool, &template_tuple);
+    AddIcebergColumns(mem_pool, &template_tuple, slot_descs_written);
   }
   return template_tuple;
 }
@@ -65,7 +64,7 @@ void FileMetadataUtils::AddFileLevelVirtualColumns(MemPool* mem_pool,
       continue;
     }
     StringValue* slot = template_tuple->GetStringSlot(slot_desc->tuple_offset());
-    const char* filename = context_->GetStream()->filename();
+    const char* filename = file_desc_->filename.c_str();
     int len = strlen(filename);
     char* filename_copy = reinterpret_cast<char*>(mem_pool->Allocate(len));
     Ubsan::MemCpy(filename_copy, filename, len);
@@ -75,7 +74,8 @@ void FileMetadataUtils::AddFileLevelVirtualColumns(MemPool* mem_pool,
   }
 }
 
-void FileMetadataUtils::AddIcebergColumns(MemPool* mem_pool, Tuple** template_tuple) {
+void FileMetadataUtils::AddIcebergColumns(MemPool* mem_pool, Tuple** template_tuple,
+    std::map<const SlotId, const SlotDescriptor*>* slot_descs_written) {
   using namespace org::apache::impala::fb;
   TextConverter text_converter(/* escape_char = */ '\\',
       scan_node_->hdfs_table()->null_partition_key_value(),
@@ -125,19 +125,21 @@ void FileMetadataUtils::AddIcebergColumns(MemPool* mem_pool, Tuple** template_tu
               &parse_result);
           if (parse_result == StringParser::ParseResult::PARSE_SUCCESS) {
             (*template_tuple)->SetNotNull(slot_desc->null_indicator_offset());
+            slot_descs_written->insert({slot_desc->id(), slot_desc});
           } else {
             state_->LogError(error_msg);
           }
         } else {
           state_->LogError(error_msg);
         }
+      } else {
+        slot_descs_written->insert({slot_desc->id(), slot_desc});
       }
     }
   }
 }
 
 bool FileMetadataUtils::IsValuePartitionCol(const SlotDescriptor* slot_desc) {
-  DCHECK(context_ != nullptr);
   DCHECK(file_desc_ != nullptr);
   if (slot_desc->col_pos() < scan_node_->num_partition_keys() &&
       !slot_desc->IsVirtual()) {

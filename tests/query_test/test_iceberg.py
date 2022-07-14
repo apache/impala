@@ -83,9 +83,9 @@ class TestIcebergTable(ImpalaTestSuite):
   def test_insert_overwrite(self, vector, unique_database):
     """Run iceberg-overwrite tests, then test that INSERT INTO/OVERWRITE queries running
     concurrently with a long running INSERT OVERWRITE are handled gracefully. query_a is
-    started before query_b/query_c, but query_b/query_c supposed to finish before query_a.
-    query_a should fail because the overwrite should not erase query_b/query_c's result.
-    """
+    started before query_b/query_c, but query_b/query_c are supposed to finish before
+    query_a. query_a should fail because the overwrite should not erase query_b/query_c's
+    result."""
     # Run iceberg-overwrite.test
     self.run_test_case('QueryTest/iceberg-overwrite', vector, use_db=unique_database)
 
@@ -697,6 +697,7 @@ class TestIcebergTable(ImpalaTestSuite):
         assert ref_split_stats == split_stats
 
   def test_in_predicate_push_down(self, vector, unique_database):
+    self.execute_query("SET RUNTIME_FILTER_MODE=OFF")
     self.run_test_case('QueryTest/iceberg-in-predicate-push-down', vector,
                        use_db=unique_database)
 

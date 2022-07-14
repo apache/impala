@@ -31,6 +31,7 @@
 
 #include "codegen/codegen-fn-ptr.h"
 #include "exec/acid-metadata-utils.h"
+#include "exec/file-metadata-utils.h"
 #include "exec/filter-context.h"
 #include "exec/scan-node.h"
 #include "runtime/descriptors.h"
@@ -640,6 +641,18 @@ class HdfsScanNodeBase : public ScanNode {
   bool PartitionPassesFilters(int32_t partition_id, const std::string& stats_name,
       const std::vector<FilterContext>& filter_ctxs);
 
+  /// Returns true if Iceberg partition passes all the filter predicates in 'filter_ctxs'
+  /// and should not be filtered out. Iceberg partition information is in the 'file'
+  /// object. 'partition_id' is used to get the template tuple. 'stats_name' is the key of
+  /// one of the counter groups in FilterStats, and is used to update the correct
+  /// statistics. 'state' is used for logging.
+  ///
+  /// 'filter_ctxs' is either an empty list, in which case filtering is disabled and the
+  /// function returns true, or a set of filter contexts to evaluate.
+  bool IcebergPartitionPassesFilters(int64_t partition_id, const std::string& stats_name,
+      const std::vector<FilterContext>& filter_ctxs, HdfsFileDesc* file,
+      RuntimeState* state);
+
   /// Update book-keeping to skip the scan range if it has been issued but will not be
   /// processed by a scanner. E.g. used to cancel ranges that are filtered out by
   /// late-arriving filters that could not be applied in IssueInitialScanRanges()
@@ -796,6 +809,9 @@ class HdfsScanNodeBase : public ScanNode {
   /// e.g. partition key tuple and their string buffers
   boost::scoped_ptr<MemPool> scan_node_pool_;
 
+  /// Pool for allocating memory for Iceberg partition filtering.
+  boost::scoped_ptr<MemPool> iceberg_partition_filtering_pool_;
+
   /// Status of failed operations.  This is set in the ScannerThreads
   /// Returned in GetNext() if an error occurred.  An non-ok status triggers cleanup
   /// scanner threads.
@@ -821,6 +837,9 @@ class HdfsScanNodeBase : public ScanNode {
 
   /// Pointer to the scan range related state that is shared across all node instances.
   ScanRangeSharedState* shared_state_ = nullptr;
+
+  /// Utility class for handling file metadata.
+  FileMetadataUtils file_metadata_utils_;
 
   /// Performs dynamic partition pruning, i.e., applies runtime filters to files, and
   /// issues initial ranges for all file types. Waits for runtime filters if necessary.
@@ -867,10 +886,9 @@ class HdfsScanNodeBase : public ScanNode {
   void InitNullCollectionValues(RowBatch* row_batch) const;
 
   /// Returns false if, according to filters in 'filter_ctxs', 'file' should be filtered
-  /// and therefore not processed. 'file_type' is the the format of 'file', and is used
-  /// for bookkeeping. Returns true if all filters pass or are not present.
-  bool FilePassesFilterPredicates(const std::vector<FilterContext>& filter_ctxs,
-      const THdfsFileFormat::type& file_type, HdfsFileDesc* file);
+  /// and therefore not processed. Returns true if all filters pass or are not present.
+  bool FilePassesFilterPredicates(RuntimeState* state, HdfsFileDesc* file,
+      const std::vector<FilterContext>& filter_ctxs);
 
   /// Stops periodic counters and aggregates counter values for the entire scan node.
   /// This should be called as soon as the scan node is complete to get the most accurate

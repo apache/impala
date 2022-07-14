@@ -1,0 +1,156 @@
+====
+---- QUERY
+CREATE TABLE iceberg_multi_partition_runtime_filter (
+  col_1 INT,
+  col_2 INT,
+  col_3 STRING,
+  col_4 STRING
+)
+PARTITIONED BY SPEC (col_1, col_2, col_3)
+STORED AS ICEBERG;
+====
+---- QUERY
+# Create 3 files, one with two rows.
+INSERT INTO iceberg_multi_partition_runtime_filter VALUES (1, 1, "a", "a"),
+                                                          (1, 1, "a", "b"),
+                                                          (2, 2, "a", "a"),
+                                                          (2, 2, "b", "b"),
+                                                          (3, 3, "6", "c");
+====
+---- QUERY
+# Prune with 1 partition column, runtime filter is created for 'col_1'. One filter
+# iterates over 4 files, one file gets rejected.
+# Filter: col_1 = (1, 2)
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SELECT * FROM iceberg_multi_partition_runtime_filter a
+  JOIN iceberg_multi_partition_runtime_filter b
+  ON a.col_1 = b.col_1 AND b.col_4 = 'a';
+---- RUNTIME_PROFILE
+aggregation(SUM, Files processed): 4
+aggregation(SUM, Files rejected): 1
+====
+---- QUERY
+# Prune with 2 partition columns and mixed types, runtime filters are created for 'col_1'
+# and 'col_3'. Two filters iterate over 4 files, 2 filters are processed for 3 files and
+# 1 filter for 1 file, 2 files get rejected.
+# Filters: col_1 = (1, 2) and col_3 = ("a")
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SELECT * FROM iceberg_multi_partition_runtime_filter a
+  JOIN iceberg_multi_partition_runtime_filter b
+  ON a.col_1 = b.col_1 AND a.col_3 = b.col_3 AND b.col_4 = 'a';
+---- RUNTIME_PROFILE
+aggregation(SUM, Files processed): 7
+aggregation(SUM, Files rejected): 2
+====
+---- QUERY
+# Prune with a predicate that contains an expression with a literal. 2 files match the
+# expression where 'col_1' is '2'.
+# Filter: col_1 = (3)
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SELECT * FROM iceberg_multi_partition_runtime_filter a
+  JOIN iceberg_multi_partition_runtime_filter b
+  ON (a.col_1 + 1) = b.col_1 AND b.col_4 = 'c';
+---- RUNTIME_PROFILE
+aggregation(SUM, Files processed): 4
+aggregation(SUM, Files rejected): 2
+====
+---- QUERY
+# Prune with a predicate that contains 2 slots. Only 1 file matches the expression
+# where 'col_3' value is "6".
+# Filter: col_1 = ("6")
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SELECT * FROM iceberg_multi_partition_runtime_filter a
+  JOIN iceberg_multi_partition_runtime_filter b
+  ON CAST((a.col_1 + a.col_2) AS STRING) = b.col_3 AND b.col_4 = 'c';
+---- RUNTIME_PROFILE
+aggregation(SUM, Files processed): 4
+aggregation(SUM, Files rejected): 3
+====
+---- QUERY
+CREATE TABLE iceberg_truncate_partition_runtime_filter (col_1 decimal(10, 4), col_2 string)
+PARTITIONED BY SPEC (truncate(100, col_1))
+STORED AS ICEBERG;
+====
+---- QUERY
+INSERT INTO iceberg_truncate_partition_runtime_filter
+VALUES (1.1234, "a"), (10.5432, "b"), (200.786, "c"), (314.1592, "d"), (98765.4321, "e"),
+       (1.1235, "a"), (10.5433, "b"), (200.789, "c"), (314.1598, "d" ), (98765.43, "e"), (NULL, NULL);
+====
+---- QUERY
+# Truncated columns can not be evaluated during file runtime filtering. However, the row
+# runtime filters should reject the NULL value.
+# Filter: col_1 = (1.1234)
+SELECT * FROM iceberg_truncate_partition_runtime_filter a
+  JOIN iceberg_truncate_partition_runtime_filter b
+  ON a.col_1 = b.col_1 AND b.col_2 = 'a';
+---- RESULTS
+1.1234,'a',1.1234,'a'
+1.1235,'a',1.1235,'a'
+---- TYPES
+DECIMAL,STRING,DECIMAL,STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, Files processed): 0
+aggregation(SUM, Files rejected): 0
+aggregation(SUM, RowGroups processed): 5
+aggregation(SUM, RowGroups rejected): 0
+aggregation(SUM, Rows processed): 3
+aggregation(SUM, Rows rejected): 1
+aggregation(SUM, NumRowGroups): 7
+aggregation(SUM, NumDictFilteredRowGroups): 4
+====
+---- QUERY
+CREATE TABLE iceberg_bucket_partition_runtime_filter (col_1 int, col_2 int, col_3 string)
+PARTITIONED BY SPEC (bucket(3, col_1), col_2)
+STORED AS ICEBERG;
+====
+---- QUERY
+insert into iceberg_bucket_partition_runtime_filter
+values (1, 1, 'a'),
+       (1, 1, 'b'),
+       (3, 3, 'c'),
+       (4, 4, 'd');
+====
+---- QUERY
+# Bucketting columns can not be evaluated during file runtime filtering. Filter is created
+# but it can not be applied.
+# Filters: col_1 = (1)
+SELECT * FROM iceberg_bucket_partition_runtime_filter a
+  JOIN iceberg_bucket_partition_runtime_filter b
+  ON a.col_1 = b.col_1 AND b.col_3 = 'a';
+---- RESULTS
+1,1,'a',1,1,'a'
+1,1,'b',1,1,'a'
+---- TYPES
+INT,INT,STRING,INT,INT,STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, Files processed): 0
+aggregation(SUM, Files rejected): 0
+aggregation(SUM, RowGroups processed): 3
+aggregation(SUM, RowGroups rejected): 0
+aggregation(SUM, Rows processed): 2
+aggregation(SUM, Rows rejected): 0
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumDictFilteredRowGroups): 2
+====
+---- QUERY
+# Bucketting columns can not be evaluated during file runtime filtering. However, other
+# filters should be evaluated. Filter on 'col_2' is processed and rejects 2 files.
+# Filters: col_1 = (1) and col_2(1)
+SELECT * FROM iceberg_bucket_partition_runtime_filter a
+  JOIN iceberg_bucket_partition_runtime_filter b
+  ON a.col_1 = b.col_1 AND a.col_2 = b.col_2 AND b.col_3 = 'a';
+---- RESULTS
+1,1,'a',1,1,'a'
+1,1,'b',1,1,'a'
+---- TYPES
+INT,INT,STRING,INT,INT,STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, Files processed): 3
+aggregation(SUM, Files rejected): 2
+aggregation(SUM, RowGroups processed): 1
+aggregation(SUM, RowGroups rejected): 0
+aggregation(SUM, Rows processed): 4
+aggregation(SUM, Rows rejected): 0
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumDictFilteredRowGroups): 0
+====

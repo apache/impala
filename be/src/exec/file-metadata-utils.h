@@ -17,6 +17,12 @@
 
 #pragma once
 
+#include "common/global-types.h"
+
+#include <cstdint>
+#include <map>
+#include <memory>
+
 namespace impala {
 
 struct HdfsFileDesc;
@@ -31,17 +37,21 @@ class TupleDescriptor;
 /// Helper class for scanners dealing with different table/file formats.
 class FileMetadataUtils {
 public:
-  FileMetadataUtils(HdfsScanNodeBase* scan_node, RuntimeState* state) :
-      scan_node_(scan_node), state_(state) {}
+  FileMetadataUtils(HdfsScanNodeBase* scan_node) : scan_node_(scan_node) {}
 
-  void Open(ScannerContext* context);
+  /// Initialize the RuntimeState and HdfsFileDescriptor, this method can be called
+  /// multiple times during the object's lifecycle.
+  void SetFile(RuntimeState* state, const HdfsFileDesc* file_desc);
 
-  /// Returns the template tuple corresponding to this scanner context. I.e. it sets
-  /// partition columns and default values in the template tuple.
-  Tuple* CreateTemplateTuple(MemPool* mem_pool);
+  /// Returns the template tuple corresponding to the partition_id and file_desc_.
+  /// I.e. it sets partition columns and default values in the template tuple.
+  /// Updates the slot_descs_written map with the SlotDescriptors that were written into
+  /// the returned tuple.
+  Tuple* CreateTemplateTuple(int64_t partition_id, MemPool* mem_pool,
+      std::map<const SlotId, const SlotDescriptor*>* slot_descs_written);
 
   /// Returns true if 'slot_desc' refers to a value-based partition column. Returns false
-  /// for transform-based partition columns and non-partition columns.
+  /// for transform-based partition columns and non-partition colusmns.
   bool IsValuePartitionCol(const SlotDescriptor* slot_desc);
 
   /// Returns true if the file should contain the column described by 'slot_desc'.
@@ -51,13 +61,17 @@ public:
 
 private:
   void AddFileLevelVirtualColumns(MemPool* mem_pool, Tuple* template_tuple);
-  void AddIcebergColumns(MemPool* mem_pool, Tuple** template_tuple);
 
-  HdfsScanNodeBase* scan_node_;
-  RuntimeState* state_;
+  /// Writes the Iceberg columns from FbIcebergMetadata into template_tuple. Updates the
+  /// slot_descs_written map with the SlotDescriptors that were written into the
+  /// template_tuple.
+  void AddIcebergColumns(MemPool* mem_pool, Tuple** template_tuple,
+      std::map<const SlotId, const SlotDescriptor*>* slot_descs_written);
+
+  HdfsScanNodeBase* const scan_node_;
 
   // Members below are set in Open()
-  ScannerContext* context_ = nullptr;
+  RuntimeState* state_ = nullptr;
   const HdfsFileDesc* file_desc_ = nullptr;
 };
 

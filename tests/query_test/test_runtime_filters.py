@@ -209,6 +209,11 @@ class TestBloomFilters(ImpalaTestSuite):
     self.run_test_case('QueryTest/parquet-dictionary-runtime-filter', vector,
       unique_database, test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 
+  def test_iceberg_partition_runtime_filter(self, vector, unique_database):
+    self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=BLOOM")
+    self.run_test_case('QueryTest/iceberg-partition-runtime-filter', vector,
+      unique_database, test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
+
 @SkipIfLocal.multiple_impalad
 class TestMinMaxFilters(ImpalaTestSuite):
   @classmethod

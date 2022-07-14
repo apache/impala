@@ -428,7 +428,8 @@ HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const HdfsScanPlanNode& pno
     virtual_column_slots_(pnode.virtual_column_slots_),
     disks_accessed_bitmap_(TUnit::UNIT, 0),
     active_hdfs_read_thread_counter_(TUnit::UNIT, 0),
-    shared_state_(const_cast<ScanRangeSharedState*>(&(pnode.shared_state_))) {}
+    shared_state_(const_cast<ScanRangeSharedState*>(&(pnode.shared_state_))),
+    file_metadata_utils_(this) {}
 
 HdfsScanNodeBase::~HdfsScanNodeBase() {}
 
@@ -469,6 +470,7 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
 
   // One-time initialization of state that is constant across scan ranges
   scan_node_pool_.reset(new MemPool(mem_tracker()));
+  iceberg_partition_filtering_pool_.reset(new MemPool(mem_tracker()));
   runtime_profile()->AddInfoString("Table Name", hdfs_table_->fully_qualified_name());
 
   if (HasRowBatchQueue()) {
@@ -630,7 +632,10 @@ void HdfsScanNodeBase::Close(RuntimeState* state) {
   // There should be no active hdfs read threads.
   DCHECK_EQ(active_hdfs_read_thread_counter_.value(), 0);
 
-  if (scan_node_pool_.get() != NULL) scan_node_pool_->FreeAll();
+  if (scan_node_pool_.get() != nullptr) scan_node_pool_->FreeAll();
+  if (iceberg_partition_filtering_pool_.get() != nullptr) {
+    iceberg_partition_filtering_pool_->FreeAll();
+  }
 
   // Close collection conjuncts
   for (auto& tid_conjunct_eval : conjunct_evals_map_) {
@@ -665,7 +670,7 @@ Status HdfsScanNodeBase::IssueInitialScanRanges(RuntimeState* state) {
           runtime_state_->instance_ctx().fragment_instance_id);
   if (file_list == nullptr) return Status::OK();
   for (HdfsFileDesc* file : *file_list) {
-    if (FilePassesFilterPredicates(filter_ctxs_, file->file_format, file)) {
+    if (FilePassesFilterPredicates(state, file, filter_ctxs_)) {
       matching_per_type_files[file->file_format].push_back(file);
     } else {
       SkipFile(file->file_format, file);
@@ -708,9 +713,8 @@ Status HdfsScanNodeBase::IssueInitialScanRanges(RuntimeState* state) {
   return Status::OK();
 }
 
-bool HdfsScanNodeBase::FilePassesFilterPredicates(
-    const vector<FilterContext>& filter_ctxs, const THdfsFileFormat::type& format,
-    HdfsFileDesc* file) {
+bool HdfsScanNodeBase::FilePassesFilterPredicates(RuntimeState* state, HdfsFileDesc* file,
+    const vector<FilterContext>& filter_ctxs) {
 #ifndef NDEBUG
   if (FLAGS_skip_file_runtime_filtering) return true;
 #endif
@@ -718,7 +722,10 @@ bool HdfsScanNodeBase::FilePassesFilterPredicates(
   ScanRangeMetadata* metadata =
       static_cast<ScanRangeMetadata*>(file->splits[0]->meta_data());
   if (!PartitionPassesFilters(metadata->partition_id, FilterStats::FILES_KEY,
-          filter_ctxs)) {
+      filter_ctxs)) {
+    return false;
+  } else if (hdfs_table_->IsIcebergTable() && !IcebergPartitionPassesFilters(
+      metadata->partition_id, FilterStats::FILES_KEY, filter_ctxs, file, state)) {
     return false;
   }
   return true;
@@ -938,6 +945,42 @@ bool HdfsScanNodeBase::PartitionPassesFilters(int32_t partition_id,
     if (!passed_filter) return false;
   }
 
+  return true;
+}
+
+bool HdfsScanNodeBase::IcebergPartitionPassesFilters(int64_t partition_id,
+    const string& stats_name, const vector<FilterContext>& filter_ctxs,
+    HdfsFileDesc* file, RuntimeState* state) {
+  file_metadata_utils_.SetFile(state, file);
+  // Create the template tuple based on file metadata
+  std::map<const SlotId, const SlotDescriptor*> slot_descs_written;
+  Tuple* template_tuple = file_metadata_utils_.CreateTemplateTuple(partition_id,
+      iceberg_partition_filtering_pool_.get(), &slot_descs_written);
+  // Defensive - if template_tuple is NULL, there can be no filters on partition columns.
+  if (template_tuple == nullptr) return true;
+  // Try to evaluate all filter_ctxs on template_tuple
+  for (const FilterContext& ctx: filter_ctxs) {
+    bool skip_filter = false;
+    const auto& expr = ctx.expr_eval->root();
+    // Match written SlotDescriptors to SlotDescriptors available in this FilterContext
+    vector<SlotId> slot_ids;
+    expr.GetSlotIds(&slot_ids);
+    for (SlotId filter_slot_id : slot_ids) {
+      if (slot_descs_written.find(filter_slot_id) == slot_descs_written.end()) {
+        skip_filter = true;
+        break;
+      }
+    }
+    // Do not evaluate this filter when the slots are not present in the template_tuple
+    if (skip_filter) continue;
+    // Evaluate filter on template_tuple
+    TupleRow* row = reinterpret_cast<TupleRow*>(&template_tuple);
+    bool has_filter = ctx.filter->HasFilter();
+    bool passed_filter = !has_filter || ctx.Eval(row);
+    ctx.stats->IncrCounters(stats_name, 1, has_filter, !passed_filter);
+    if (!passed_filter) return false;
+  }
+  iceberg_partition_filtering_pool_->FreeAll();
   return true;
 }
 

@@ -51,7 +51,7 @@ const char* HdfsScanner::LLVM_CLASS_NAME = "class.impala::HdfsScanner";
 HdfsScanner::HdfsScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
     : scan_node_(scan_node),
       state_(state),
-      file_metadata_utils_(scan_node, state),
+      file_metadata_utils_(scan_node),
       expr_perm_pool_(new MemPool(scan_node->expr_mem_tracker())),
       template_tuple_pool_(new MemPool(scan_node->mem_tracker())),
       tuple_byte_size_(scan_node->tuple_desc()->byte_size()),
@@ -67,7 +67,7 @@ HdfsScanner::HdfsScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
 HdfsScanner::HdfsScanner()
     : scan_node_(nullptr),
       state_(nullptr),
-      file_metadata_utils_(nullptr, nullptr),
+      file_metadata_utils_(nullptr),
       tuple_byte_size_(0) {
   DCHECK(TestInfo::is_test());
 }
@@ -77,7 +77,8 @@ HdfsScanner::~HdfsScanner() {
 
 Status HdfsScanner::Open(ScannerContext* context) {
   context_ = context;
-  file_metadata_utils_.Open(context);
+  file_metadata_utils_.SetFile(state_, scan_node_->GetFileDesc(
+      context->partition_descriptor()->id(), context->GetStream()->filename()));
   stream_ = context->GetStream();
 
   // Clone the scan node's conjuncts map. The cloned evaluators must be closed by the
@@ -112,7 +113,10 @@ Status HdfsScanner::Open(ScannerContext* context) {
     }
   }
 
-  template_tuple_ = file_metadata_utils_.CreateTemplateTuple(template_tuple_pool_.get());
+  std::map<const SlotId, const SlotDescriptor*> slot_descs_written;
+  template_tuple_ = file_metadata_utils_.CreateTemplateTuple(
+      context_->partition_descriptor()->id(), template_tuple_pool_.get(),
+      &slot_descs_written);
   template_tuple_map_[scan_node_->tuple_desc()] = template_tuple_;
 
   decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");
