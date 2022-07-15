@@ -45,9 +45,10 @@ import org.apache.hadoop.hive.metastore.api.LongColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.Table;
-import org.apache.hadoop.hive.ql.metadata.PrimaryKeyInfo;
 import org.apache.hadoop.hive.ql.metadata.ForeignKeyInfo;
+import org.apache.hadoop.hive.ql.metadata.PrimaryKeyInfo;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
+import org.apache.impala.catalog.IcebergTable;
 
 /**
  * Most of the code in this class is copied from Hive 2.1.1. This is used so that
@@ -514,7 +515,7 @@ public class HiveMetadataFormatUtils {
 
     // Storage information.
     tableInfo.append(LINE_DELIM).append("# Storage Information").append(LINE_DELIM);
-    getStorageDescriptorInfo(tableInfo, table.getSd());
+    getStorageDescriptorInfo(tableInfo, table);
 
     if (TableType.VIRTUAL_VIEW.equals(TableType.valueOf(table.getTableType()))) {
       tableInfo.append(LINE_DELIM).append("# View Information").append(LINE_DELIM);
@@ -632,16 +633,18 @@ public class HiveMetadataFormatUtils {
     return "UNKNOWN";
   }
 
-  private static void getStorageDescriptorInfo(StringBuilder tableInfo,
-      StorageDescriptor storageDesc) {
-
+  private static void getStorageDescriptorInfo(StringBuilder tableInfo, Table table) {
+    StorageDescriptor storageDesc = table.getSd();
     formatOutput("SerDe Library:", storageDesc.getSerdeInfo().getSerializationLib(),
         tableInfo);
     formatOutput("InputFormat:", storageDesc.getInputFormat(), tableInfo);
     formatOutput("OutputFormat:", storageDesc.getOutputFormat(), tableInfo);
     formatOutput("Compressed:", storageDesc.isCompressed() ? "Yes" : "No", tableInfo);
-    formatOutput("Num Buckets:", String.valueOf(storageDesc.getNumBuckets()), tableInfo);
-    formatOutput("Bucket Columns:", storageDesc.getBucketCols().toString(), tableInfo);
+    if (!IcebergTable.isIcebergTable(table)) {
+      formatOutput("Num Buckets:", String.valueOf(storageDesc.getNumBuckets()),
+          tableInfo);
+      formatOutput("Bucket Columns:", storageDesc.getBucketCols().toString(), tableInfo);
+    }
     formatOutput("Sort Columns:", storageDesc.getSortCols().toString(), tableInfo);
     if (storageDesc.isStoredAsSubDirectories()) {// optional parameter
       formatOutput("Stored As SubDirectories:", "Yes", tableInfo);

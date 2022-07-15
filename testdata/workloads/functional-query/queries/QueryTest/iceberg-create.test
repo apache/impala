@@ -450,6 +450,9 @@ describe formatted ice_part_hadoop_tbl;
 'col_truncate','TRUNCATE[2]','NULL'
 'col_bucket','BUCKET[2]','NULL'
 'col_identity','IDENTITY','NULL'
+---- RESULTS: VERIFY_IS_NOT_IN
+'Num Buckets:        ','0                   ','NULL'
+'Bucket Columns:     ','[]                  ','NULL'
 ---- TYPES
 string, string, string
 ====
@@ -490,6 +493,9 @@ describe formatted ice_part_hadoop_catalog;
 'col_truncate','TRUNCATE[2]','NULL'
 'col_bucket','BUCKET[2]','NULL'
 'col_identity','IDENTITY','NULL'
+---- RESULTS: VERIFY_IS_NOT_IN
+'Num Buckets:        ','0                   ','NULL'
+'Bucket Columns:     ','[]                  ','NULL'
 ---- TYPES
 string, string, string
 ====
@@ -527,6 +533,9 @@ describe formatted ice_part_catalogs;
 'col_truncate','TRUNCATE[2]','NULL'
 'col_bucket','BUCKET[2]','NULL'
 'col_identity','IDENTITY','NULL'
+---- RESULTS: VERIFY_IS_NOT_IN
+'Num Buckets:        ','0                   ','NULL'
+'Bucket Columns:     ','[]                  ','NULL'
 ---- TYPES
 string, string, string
 ====
@@ -540,6 +549,8 @@ describe formatted ice_non_partition;
 ---- RESULTS: VERIFY_IS_NOT_IN
 '# Partition Transform Information','NULL','NULL'
 '# col_name            ','transform_type      ','NULL'
+'Num Buckets:        ','0                   ','NULL'
+'Bucket Columns:     ','[]                  ','NULL'
 ---- TYPES
 string, string, string
 ====
