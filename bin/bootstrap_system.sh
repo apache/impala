@@ -215,7 +215,7 @@ if [[ "$UBUNTU" == true ]]; then
   done
 fi
 ubuntu apt-get update
-ubuntu apt-get --yes install ccache curl gawk g++ gcc apt-utils git ant libffi-dev \
+ubuntu apt-get --yes install ccache curl gawk g++ gcc apt-utils git libffi-dev \
         libkrb5-dev krb5-admin-server krb5-kdc krb5-user libsasl2-dev \
         libsasl2-modules libsasl2-modules-gssapi-mit libssl-dev make ninja-build \
         python-dev python-setuptools python3-dev python3-setuptools postgresql \
@@ -310,13 +310,6 @@ redhat sudo yum install -y ccache
 
 # Clean up yum caches
 redhat sudo yum clean all
-
-# Download ant for centos
-redhat sudo wget -nv \
-  https://archive.apache.org/dist/ant/binaries/apache-ant-1.9.14-bin.tar.gz
-redhat sudo sha512sum -c - <<< '487dbd1d7f678a92924ba884a57e910ccb4fe565c554278795a8fdfc80c4e88d81ebc2ccecb5a8f353f0b2076572bb921499a2cadb064e0f44fc406a3c31da20  apache-ant-1.9.14-bin.tar.gz'
-redhat sudo tar -C /usr/local -xzf apache-ant-1.9.14-bin.tar.gz
-redhat sudo ln -sf /usr/local/apache-ant-1.9.14/bin/ant /usr/local/bin
 
 # Download maven for all OSes, since the OS-packaged version can be
 # pretty old.
