@@ -507,6 +507,11 @@ if [[ $ARCH_NAME == 'aarch64' ]]; then
 fi
 
 # Try to prepopulate the m2 directory to save time
-if ! bin/jenkins/populate_m2_directory.py ; then
-  echo "Failed to prepopulate the m2 directory. Continuing..."
+if [[ "${PREPOPULATE_M2_REPOSITORY:-true}" == true ]] ; then
+  echo ">>> Populating m2 directory..."
+  if ! bin/jenkins/populate_m2_directory.py ; then
+    echo "Failed to prepopulate the m2 directory. Continuing..."
+  fi
+else
+  echo ">>> Skip populating m2 directory"
 fi
