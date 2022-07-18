@@ -854,3 +854,40 @@ PLAN-ROOT SINK
    HDFS partitions=11/11 files=11 size=814.73KB
    row-size=14B cardinality=11.00K
 ====
+# Regression test for IMPALA-11443. Tests partitioned top-n with -1 cardinality.
+# Relies on functional.tinytable not having stats and running this test with
+# DISABLE_HDFS_NUM_ROWS_ESTIMATE=1
+select a, b, rn from (
+  select *, row_number() over (partition by a order by b) as rn
+  from functional.tinytable) v
+where rn <= 5
+order by a, rn;
+---- PLAN
+PLAN-ROOT SINK
+|
+04:SORT
+|  order by: a ASC, rn ASC
+|  row-size=32B cardinality=unavailable
+|
+03:SELECT
+|  predicates: row_number() <= 5
+|  row-size=32B cardinality=unavailable
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: a
+|  order by: b ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=32B cardinality=unavailable
+|
+01:TOP-N
+|  partition by: a
+|  order by: b ASC
+|  partition limit: 5
+|  source expr: row_number() <= CAST(5 AS BIGINT)
+|  row-size=24B cardinality=unavailable
+|
+00:SCAN HDFS [functional.tinytable]
+   HDFS partitions=1/1 files=1 size=38B
+   row-size=24B cardinality=unavailable
+====
