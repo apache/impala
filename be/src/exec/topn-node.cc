@@ -218,7 +218,8 @@ void TopNPlanNode::Codegen(FragmentState* state) {
   Status codegen_status = ordering_comparator_config_->Codegen(state, &compare_fn);
   if (codegen_status.ok() && is_partitioned()) {
     codegen_status =
-        Sorter::TupleSorter::Codegen(state, compare_fn, &codegend_sort_helper_fn_);
+        Sorter::TupleSorter::Codegen(state, compare_fn, output_tuple_desc_->byte_size(),
+            &codegend_sort_helper_fn_);
   }
   if (codegen_status.ok() && is_partitioned()) {
     // TODO: IMPALA-10228: replace comparisons in std::map.

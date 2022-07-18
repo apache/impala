@@ -111,7 +111,9 @@ void SortPlanNode::Codegen(FragmentState* state) {
   Status codegen_status = row_comparator_config_->Codegen(state, &compare_fn);
   if (codegen_status.ok()) {
     codegen_status =
-        Sorter::TupleSorter::Codegen(state, compare_fn, &codegend_sort_helper_fn_);
+        Sorter::TupleSorter::Codegen(state, compare_fn,
+            row_descriptor_->tuple_descriptors()[0]->byte_size(),
+            &codegend_sort_helper_fn_);
   }
   AddCodegenStatus(codegen_status);
 }

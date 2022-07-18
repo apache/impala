@@ -1211,7 +1211,7 @@ const char* Sorter::TupleSorter::LLVM_CLASS_NAME = "class.impala::Sorter::TupleS
 
 // A method to code-gen for TupleSorter::SortHelper().
 Status Sorter::TupleSorter::Codegen(FragmentState* state, llvm::Function* compare_fn,
-    CodegenFnPtr<SortHelperFn>* codegened_fn) {
+    int tuple_size, CodegenFnPtr<SortHelperFn>* codegened_fn) {
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != nullptr);
 
@@ -1227,6 +1227,10 @@ Status Sorter::TupleSorter::Codegen(FragmentState* state, llvm::Function* compar
   // There are 2 recursive calls within SorterHelper() to replace with.
   replaced = codegen->ReplaceCallSites(fn, fn, SORTER_HELPER_SYMBOL);
   DCHECK_REPLACE_COUNT(replaced, 2) << LlvmCodeGen::Print(fn);
+
+  replaced = codegen->ReplaceCallSitesWithValue(fn,
+      codegen->GetI32Constant(tuple_size), "get_tuple_size");
+  DCHECK_REPLACE_COUNT(replaced, 3) << LlvmCodeGen::Print(fn);
 
   fn = codegen->FinalizeFunction(fn);
   if (fn == nullptr) {

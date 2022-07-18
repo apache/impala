@@ -94,7 +94,9 @@ void PartialSortPlanNode::Codegen(FragmentState* state) {
   llvm::Function* compare_fn = nullptr;
   AddCodegenStatus(row_comparator_config_->Codegen(state, &compare_fn));
   AddCodegenStatus(
-      Sorter::TupleSorter::Codegen(state, compare_fn, &codegend_sort_helper_fn_));
+      Sorter::TupleSorter::Codegen(state, compare_fn,
+          row_descriptor_->tuple_descriptors()[0]->byte_size(),
+          &codegend_sort_helper_fn_));
 }
 
 Status PartialSortNode::Open(RuntimeState* state) {

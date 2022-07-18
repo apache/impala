@@ -90,7 +90,7 @@ Status IR_ALWAYS_INLINE Sorter::TupleSorter::Partition2way(TupleIterator begin,
     TupleIterator end, const Tuple* pivot, TupleIterator* cut) {
   // Hoist member variable lookups out of loop to avoid extra loads inside loop.
   Run* run = run_;
-  int tuple_size = tuple_size_;
+  const int tuple_size = get_tuple_size();
   Tuple* pivot_tuple = reinterpret_cast<Tuple*>(temp_tuple_buffer_);
   TupleRow* pivot_tuple_row = reinterpret_cast<TupleRow*>(&pivot_tuple);
   Tuple* swap_tuple = reinterpret_cast<Tuple*>(swap_buffer_);
@@ -136,7 +136,7 @@ Status IR_ALWAYS_INLINE Sorter::TupleSorter::Partition3way(TupleIterator begin,
     TupleIterator* cut_right) {
   // Hoist member variable lookups out of loop to avoid extra loads inside loop.
   Run* run = run_;
-  int tuple_size = tuple_size_;
+  const int tuple_size = get_tuple_size();
   Tuple* pivot_tuple = reinterpret_cast<Tuple*>(temp_tuple_buffer_);
   TupleRow* pivot_tuple_row = reinterpret_cast<TupleRow*>(&pivot_tuple);
   Tuple* swap_tuple = reinterpret_cast<Tuple*>(swap_buffer_);
@@ -215,7 +215,7 @@ Status IR_ALWAYS_INLINE Sorter::TupleSorter::InsertionSort(const TupleIterator& 
 
   // Hoist member variable lookups out of loop to avoid extra loads inside loop.
   Run* run = run_;
-  int tuple_size = tuple_size_;
+  const int tuple_size = get_tuple_size();
   uint8_t* temp_tuple_buffer = temp_tuple_buffer_;
 
   TupleIterator insert_iter = begin;

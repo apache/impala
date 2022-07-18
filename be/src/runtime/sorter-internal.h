@@ -444,7 +444,7 @@ class Sorter::TupleSorter {
   /// 'compare_fn' is the pointer to the code-gen version of the compare method with
   /// which to replace all non-code-gen versions.
   static Status Codegen(FragmentState* state, llvm::Function* compare_fn,
-      CodegenFnPtr<SortHelperFn>* codegend_fn);
+      int tuple_byte_size, CodegenFnPtr<SortHelperFn>* codegend_fn);
 
   /// Mangled name of SorterHelper().
   static const char* SORTER_HELPER_SYMBOL;
@@ -459,6 +459,9 @@ class Sorter::TupleSorter {
 
   /// Size of the tuples in memory.
   const int tuple_size_;
+
+  /// Getter for the size of the tuples in memory. Replaced by a constant during codegen
+  int IR_NO_INLINE get_tuple_size() const { return tuple_size_; }
 
   /// Tuple comparator with method Less() that returns true if lhs < rhs.
   const TupleRowComparator& comparator_;
