@@ -1248,7 +1248,9 @@ public class PlannerTest extends PlannerTestBase {
    */
   @Test
   public void testLimitPushdownPartitionedTopN() {
-    runPlannerTestFile("limit-pushdown-partitioned-top-n");
+    TQueryOptions options = defaultQueryOptions();
+    options.setDisable_hdfs_num_rows_estimate(true); // Needed to test IMPALA-11443.
+    runPlannerTestFile("limit-pushdown-partitioned-top-n", options);
   }
 
   /**

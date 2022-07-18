@@ -501,7 +501,7 @@ public class SortNode extends PlanNode {
           PARTIAL_SORT_MEM_LIMIT : (long) Math.ceil(fullInputSize / numInstances);
       perInstanceMinMemReservation = 3 * bufferSize * pageMultiplier;
 
-      if (type_ == TSortType.PARTITIONED_TOPN) {
+      if (type_ == TSortType.PARTITIONED_TOPN && cardinality_ >= 0) {
         // We may be able to estimate a lower memory requirement based on the size
         // of in-memory heaps.
         long totalHeapBytes = getSortInfo().estimateMaterializedSize(cardinality_);
