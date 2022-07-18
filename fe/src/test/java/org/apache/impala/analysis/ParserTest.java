@@ -2798,6 +2798,13 @@ public class ParserTest extends FrontendTestBase {
     ParserError("CREATE TABLE foo (PRIMARY KEY(a), a INT) STORED AS KUDU");
     ParserError("CREATE TABLE foo (i INT) PRIMARY KEY (i) STORED AS KUDU");
 
+    // Supported storage engines
+    ParsesOk("CREATE TABLE foo (i INT) STORED BY KUDU");
+    ParsesOk("CREATE TABLE foo (i INT) STORED BY ICEBERG");
+    ParserError("CREATE TABLE foo (i INT) STORED BY PARQUET");
+    ParserError("CREATE TABLE foo (i INT) STORED BY FOOBAR");
+    ParserError("CREATE TABLE foo (i INT) STORED BY");
+
     // Primary key and foreign key specification.
     ParsesOk("create table foo(id int, year int, primary key (id))");
     ParsesOk("create table foo(id int, year int, primary key (id, year))");

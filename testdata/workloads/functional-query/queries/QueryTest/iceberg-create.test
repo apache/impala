@@ -554,3 +554,16 @@ describe formatted ice_non_partition;
 ---- TYPES
 string, string, string
 ====
+---- QUERY
+# Create with keyword 'stored by'
+create table iceberg_stored_by (i int, s string, ts timestamp, d date) stored by iceberg;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe formatted iceberg_stored_by;
+---- RESULTS: VERIFY_IS_SUBSET
+'','table_type          ','ICEBERG             '
+---- TYPES
+string, string, string
+====

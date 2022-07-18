@@ -514,6 +514,7 @@ nonterminal Boolean external_val;
 nonterminal Boolean purge_val;
 nonterminal String opt_init_string_val;
 nonterminal THdfsFileFormat file_format_val;
+nonterminal THdfsFileFormat storage_engine_val;
 nonterminal THdfsFileFormat file_format_create_table_val;
 nonterminal Boolean if_exists_val;
 nonterminal Boolean if_not_exists_val;
@@ -2023,6 +2024,8 @@ terminator_val ::=
 file_format_create_table_val ::=
   KW_STORED KW_AS file_format_val:file_format
   {: RESULT = file_format; :}
+  | KW_STORED KW_BY storage_engine_val:storage_engine
+  {: RESULT = storage_engine; :}
   |
   {: RESULT = null; :}
   ;
@@ -2050,6 +2053,13 @@ file_format_val ::=
   {: RESULT = THdfsFileFormat.ICEBERG; :}
   | KW_JSONFILE
   {: RESULT = THdfsFileFormat.JSON; :}
+  ;
+
+storage_engine_val ::=
+  KW_KUDU
+  {: RESULT = THdfsFileFormat.KUDU; :}
+  | KW_ICEBERG
+  {: RESULT = THdfsFileFormat.ICEBERG; :}
   ;
 
 tbl_properties ::=

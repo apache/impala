@@ -2313,6 +2313,15 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Unable to infer the column type for column 'new_col'. Use cast() to " +
         "explicitly specify the column type for column 'new_col'.");
 
+    // IMPALA-11268: Allow STORED BY as well for storage engines
+    AnalyzesOk("create table t primary key (id) " +
+        " stored by kudu as select id, bool_col, tinyint_col, smallint_col, " +
+        "int_col, bigint_col, float_col, double_col, date_string_col, string_col " +
+        "from functional.alltypestiny");
+    AnalyzesOk("create table t primary key (id) stored by iceberg as select id, " +
+        "bool_col, int_col, float_col, double_col, date_string_col, string_col " +
+        "from functional.alltypestiny");
+
     // IMPALA-9822 Row Format Delimited is valid only for Text Files
     String[] fileFormats = {"PARQUET", "ICEBERG"};
     for (String format : fileFormats) {
