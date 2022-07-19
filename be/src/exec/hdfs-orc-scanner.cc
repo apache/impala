@@ -732,6 +732,13 @@ Status HdfsOrcScanner::TransferTuples(OrcComplexColumnReader* coll_reader,
       int num_tuples_transferred = TransferScratchTuples(dst_batch);
       row_id += num_tuples_transferred;
       num_to_commit += num_tuples_transferred;
+      // Commit rows before next iteration. otherwise, they will be overwritten.
+      // This happens when more than one iteration is needed, e.g. when the capacity of
+      // scratch_batch is small (due to reading wide rows).
+      VLOG_ROW << Substitute(
+          "Transfer $0 rows from scratch batch to dst_batch ($1 rows)",
+          num_to_commit, dst_batch->num_rows());
+      RETURN_IF_ERROR(CommitRows(num_tuples_transferred, dst_batch));
     } else {
       if (tuple_desc->byte_size() > 0) DCHECK_LT((void*)tuple, (void*)tuple_mem_end_);
       InitTuple(tuple_desc, template_tuple_, tuple);
@@ -746,9 +753,12 @@ Status HdfsOrcScanner::TransferTuples(OrcComplexColumnReader* coll_reader,
       }
     }
   }
-  VLOG_ROW << Substitute("Transfer $0 rows from scratch batch to dst_batch ($1 rows)",
-      num_to_commit, dst_batch->num_rows());
-  return CommitRows(num_to_commit, dst_batch);
+  if (!do_batch_read) {
+    VLOG_ROW << Substitute("Transfer $0 rows from scratch batch to dst_batch ($1 rows)",
+        num_to_commit, dst_batch->num_rows());
+    return CommitRows(num_to_commit, dst_batch);
+  }
+  return Status::OK();
 }
 
 Status HdfsOrcScanner::AllocateTupleMem(RowBatch* row_batch) {

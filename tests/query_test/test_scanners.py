@@ -68,6 +68,11 @@ DEBUG_ACTION_DIMS = [None,
 # Trigger injected soft limit failures when scanner threads check memory limit.
 DEBUG_ACTION_DIMS.append('HDFS_SCANNER_THREAD_CHECK_SOFT_MEM_LIMIT:FAIL@0.5')
 
+# Map from the test dimension file_format string to the SQL "STORED AS"
+# argument.
+STORED_AS_ARGS = {'text': 'textfile', 'parquet': 'parquet', 'avro': 'avro', 'orc': 'orc',
+    'seq': 'sequencefile', 'rc': 'rcfile'}
+
 class TestScannersAllTableFormats(ImpalaTestSuite):
   BATCH_SIZES = [0, 1, 16]
 
@@ -225,7 +230,6 @@ class TestUnmatchedSchema(ImpalaTestSuite):
     self._drop_test_table(vector)
 
 
-# Tests that scanners can read a single-column, single-row, 10MB table
 class TestWideRow(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):
@@ -240,7 +244,8 @@ class TestWideRow(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format != 'hbase')
 
-  def test_wide_row(self, vector):
+  def test_single_wide_row(self, vector):
+    """Tests that scanners can read a single-column, single-row, 10MB table"""
     if vector.get_value('table_format').file_format == 'kudu':
       pytest.xfail("KUDU-666: Kudu support for large values")
 
@@ -255,6 +260,42 @@ class TestWideRow(ImpalaTestSuite):
     # TODO: figure out exact breakdown of memory usage (IMPALA-681)
     new_vector.get_value('exec_option')['mem_limit'] = 100 * 1024 * 1024
     self.run_test_case('QueryTest/wide-row', new_vector)
+
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
+  @SkipIfS3.hive
+  def test_multi_wide_rows(self, vector, unique_database):
+    """Tests that scanners can read multi rows of a wide table"""
+    if vector.get_value('table_format').file_format == 'kudu':
+      pytest.xfail("Kudu table can have a maximum of 300 columns")
+    format = STORED_AS_ARGS[vector.get_value('table_format').file_format]
+
+    create_tbl_stmt = 'create table %s.wide_tbl(col0 bigint' % unique_database
+    for i in range(1, 2000):
+      create_tbl_stmt += ',col%d bigint' % i
+    create_tbl_stmt += ') stored as %s' % format
+    self.client.execute(create_tbl_stmt)
+
+    insert_stmt = 'insert into %s.wide_tbl ' % unique_database +\
+                  'select id' + (',id' * 1999) +\
+                  ' from functional.alltypes order by id limit 1000'
+    if format in ('textfile', 'parquet', 'kudu'):
+      self.client.execute(insert_stmt)
+    else:
+      self.run_stmt_in_hive(insert_stmt)
+      self.client.execute('refresh %s.wide_tbl' % unique_database)
+
+    result = self.client.execute(
+        "select * from %s.wide_tbl where col0 = 1" % unique_database)
+    assert len(result.data) == 1
+    assert type(result.data[0]) == str
+    cols = result.data[0].split('\t')
+    assert len(cols) == 2000
+    for i in range(2000):
+      assert cols[i] == '1'
+
 
 class TestWideTable(ImpalaTestSuite):
   # TODO: expand this to more rows when we have the capability
