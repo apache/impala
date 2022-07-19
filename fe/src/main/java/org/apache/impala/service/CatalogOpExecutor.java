@@ -6598,13 +6598,22 @@ public class CatalogOpExecutor {
     boolean isTransactional = AcidUtils
         .isTransactionalTable(tbl.getMetaStoreTable().getParameters());
     // in case of unpartitioned table, partVals will be empty
-    if (!partVals.isEmpty()) {
+    boolean isPartitioned = !partVals.isEmpty();
+    if (isPartitioned) {
       MetastoreShim.setPartitionVal(insertEventRequestData, partVals);
     }
-    FileSystem fs = tbl.getFileSystem();
+    // Get table file system with table location.
+    FileSystem tableFs = tbl.getFileSystem();
+    FileSystem fs;
     for (String file : newFiles) {
       try {
         Path filePath = new Path(file);
+        if (!isPartitioned) {
+          fs = tableFs;
+        } else {
+          // Partitions may be in different file systems.
+          fs = FeFsTable.getFileSystem(filePath);
+        }
         FileChecksum checkSum = fs.getFileChecksum(filePath);
         String checksumStr = checkSum == null ? ""
             : StringUtils.byteToHexString(checkSum.getBytes(), 0, checkSum.getLength());
