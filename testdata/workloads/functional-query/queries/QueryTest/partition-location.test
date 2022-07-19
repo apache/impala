@@ -1,0 +1,86 @@
+====
+---- QUERY
+# Create a table with location in HDFS as default.
+CREATE EXTERNAL TABLE hdfs_table_location_1 (name STRING, age INT, grade STRING)
+PARTITIONED BY (course STRING);
+====
+---- QUERY
+# Add partition with location in HDFS as default.
+ALTER TABLE hdfs_table_location_1 ADD PARTITION (course = "Sport");
+====
+---- QUERY
+INSERT INTO hdfs_table_location_1 PARTITION (course)
+VALUES ("Joe", 33, "A", "Sport");
+====
+---- QUERY
+select count(*) from hdfs_table_location_1;
+---- RESULTS
+1
+====
+---- QUERY
+# Create a table with location in HDFS as default.
+CREATE EXTERNAL TABLE hdfs_table_location_2 (name STRING, age INT, grade STRING)
+PARTITIONED BY (course STRING);
+====
+---- QUERY
+# Add partition with location in local file system.
+ALTER TABLE hdfs_table_location_2 ADD PARTITION (course = "Sport")
+LOCATION 'file:///tmp/$DATABASE.db/hdfs_table_location_2/course=Sport';
+====
+---- QUERY
+# Add partition with location in HDFS.
+ALTER TABLE hdfs_table_location_2 ADD PARTITION (course = "Math");
+====
+---- QUERY
+INSERT INTO hdfs_table_location_2 PARTITION (course)
+VALUES ("Joe", 33, "A", "Sport"), ("Melinda", 27, "B", "Math");
+====
+---- QUERY
+select count(*) from hdfs_table_location_2;
+---- RESULTS
+2
+====
+---- QUERY
+# Create a table with location in local file system.
+CREATE EXTERNAL TABLE local_fs_table_location_1 (name STRING, age INT, grade STRING)
+PARTITIONED BY (course STRING)
+LOCATION 'file:///tmp/$DATABASE.db/local_fs_table_location_1/';
+====
+---- QUERY
+# Add partition with location in local file system.
+ALTER TABLE local_fs_table_location_1 ADD PARTITION (course = "Sport");
+====
+---- QUERY
+INSERT INTO local_fs_table_location_1 PARTITION (course)
+VALUES ("Joe", 33, "A", "Sport");
+====
+---- QUERY
+select count(*) from local_fs_table_location_1;
+---- RESULTS
+1
+====
+---- QUERY
+# Create a table with location in local file system.
+CREATE EXTERNAL TABLE local_fs_table_location_2 (name STRING, age INT, grade STRING)
+PARTITIONED BY (course STRING)
+LOCATION 'file:///tmp/$DATABASE.db/local_fs_table_location_2/';
+====
+---- QUERY
+# Add partition with location in HDFS.
+ALTER TABLE local_fs_table_location_2 ADD PARTITION (course = "Sport")
+LOCATION
+'$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/local_fs_table_location_2/course=Sport';
+====
+---- QUERY
+# Add partition with location in local file system.
+ALTER TABLE local_fs_table_location_2 ADD PARTITION (course = "Math");
+====
+---- QUERY
+INSERT INTO local_fs_table_location_2 PARTITION (course)
+VALUES ("Joe", 33, "A", "Sport"), ("Melinda", 27, "B", "Math");
+====
+---- QUERY
+select count(*) from local_fs_table_location_2;
+---- RESULTS
+2
+====

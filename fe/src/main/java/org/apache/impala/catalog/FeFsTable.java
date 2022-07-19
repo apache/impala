@@ -209,6 +209,16 @@ public interface FeFsTable extends FeTable {
     return tableFs;
   }
 
+  public static FileSystem getFileSystem(Path filePath) throws CatalogException {
+    FileSystem tableFs;
+    try {
+      tableFs = filePath.getFileSystem(CONF);
+    } catch (IOException e) {
+      throw new CatalogException("Invalid path: " + filePath.toString(), e);
+    }
+    return tableFs;
+  }
+
   /**
    * @return  List of primary keys column names, useful for toSqlUtils. In local
    * catalog mode, this causes load of constraints.
