@@ -416,6 +416,32 @@ where
 aggregation(SUM, NumRowGroups): 0
 ====
 ---- QUERY
+# NOT_IN works when col_i is the partition column
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_i not in (0, 1);
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# NOT_IN does not work because col_dt is not the partition column
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_dt not in (DATE'1400-01-01', DATE'1500-01-01');
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
 # Test DECIMAL(9, 3)/DECIMAL(18, 3)/DECIMAL(38, 3) InPredicate push-down
 create table ice_pred_pd2 (
   p INT,

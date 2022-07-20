@@ -284,11 +284,6 @@ public class IcebergScanNode extends HdfsScanNode {
 
   private UnboundPredicate<Object> convertIcebergPredicate(Analyzer analyzer,
       InPredicate predicate) throws ImpalaException {
-    // TODO: convert NOT_IN predicate
-    if (predicate.isNotIn()) {
-      return null;
-    }
-
     // Do not convert if there is an implicit cast
     if (!(predicate.getChild(0) instanceof SlotRef)) {
       return null;
@@ -322,7 +317,14 @@ public class IcebergScanNode extends HdfsScanNode {
       values.add(value);
     }
 
-    return Expressions.in(col.getName(), values);
+    // According to the method:
+    // 'org.apache.iceberg.expressions.InclusiveMetricsEvaluator.MetricsEvalVisitor#notIn'
+    // Expressions.notIn only works when the push-down column is the partition column
+    if (predicate.isNotIn())
+      return Expressions.notIn(col.getName(), values);
+    else {
+      return Expressions.in(col.getName(), values);
+    }
   }
 
   private UnboundPredicate<Object> convertIcebergPredicate(IsNullPredicate predicate) {
