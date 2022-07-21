@@ -351,7 +351,13 @@ int HS2ColumnarResultSet::AddRows(
   for (int j = 0; j < metadata_.columns.size(); ++j) {
     ThriftTColumn* from = &o->result_set_->columns[j];
     ThriftTColumn* to = &result_set_->columns[j];
-    switch (metadata_.columns[j].columnType.types[0].scalar_type.type) {
+    const TColumnType& colType = metadata_.columns[j].columnType;
+    TPrimitiveType::type primitiveType = colType.types[0].scalar_type.type;
+    if (colType.types[0].type != TTypeNodeType::SCALAR) {
+      DCHECK(from->__isset.stringVal);
+      primitiveType = TPrimitiveType::STRING;
+    }
+    switch (primitiveType) {
       case TPrimitiveType::NULL_TYPE:
       case TPrimitiveType::BOOLEAN:
         StitchNulls(
