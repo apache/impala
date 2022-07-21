@@ -511,7 +511,7 @@ Status HdfsAvroScanner::ProcessRange(RowBatch* row_batch) {
       data_block_end_ = nullptr;
       int64_t num_records_in_block;
       RETURN_IF_FALSE(stream_->ReadZLong(&num_records_in_block, &parse_status_));
-      if (num_records_in_block_ < 0) {
+      if (num_records_in_block < 0) {
         return Status(TErrorCode::AVRO_INVALID_RECORD_COUNT, stream_->filename(),
             num_records_in_block_, stream_->file_offset());
       }
