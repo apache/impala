@@ -46,13 +46,14 @@ if os.path.isfile(IMPALA_LOCAL_VERSION_INFO):
   if IMPALA_LOCAL_BUILD_VERSION is None:
     raise Exception("Could not find VERSION in {0}".format(IMPALA_LOCAL_VERSION_INFO))
 
-# Check if it is Red Hat/CentOS Linux
+# Check if it is Red Hat/CentOS/Rocky/AlmaLinux Linux
 distribution = platform.linux_distribution()
 distname = distribution[0].lower()
 version = distribution[1]
 IS_REDHAT_6_DERIVATIVE = False
 IS_REDHAT_DERIVATIVE = False
-if distname.find('centos') or distname.find('red hat'):
+if distname.find('centos') or distname.find('rocky') or \
+   distname.find('almalinux') or distname.find('red hat'):
   IS_REDHAT_DERIVATIVE = True
   if len(re.findall('^6\.*', version)) > 0:
     IS_REDHAT_6_DERIVATIVE = True

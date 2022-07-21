@@ -77,6 +77,8 @@ OS_MAPPING = [
   OsMapping("centos6", "ec2-package-centos-6", "redhat6"),
   OsMapping("centos7", "ec2-package-centos-7", "redhat7"),
   OsMapping("centos8", "ec2-package-centos-8", "redhat8"),
+  OsMapping("rocky8", "ec2-package-centos-8", "redhat8"),
+  OsMapping("almalinux8", "ec2-package-centos-8", "redhat8"),
   OsMapping("redhatenterpriseserver5", "ec2-package-centos-5", None),
   OsMapping("redhatenterpriseserver6", "ec2-package-centos-6", "redhat6"),
   OsMapping("redhatenterpriseserver7", "ec2-package-centos-7", "redhat7"),
@@ -401,7 +403,8 @@ def get_platform_release_label(release=None):
       lsb_release = check_output(["lsb_release", "-irs"])
       release = "".join(map(lambda x: x.lower(), lsb_release.split()))
       # Only need to check against the major release if RHEL, CentOS or Suse
-      for distro in ['centos', 'redhatenterprise', 'redhatenterpriseserver', 'suse']:
+      for distro in ['centos', 'rocky', 'almalinux', 'redhatenterprise',
+                     'redhatenterpriseserver', 'suse']:
         if distro in release:
           release = release.split('.')[0]
           break
