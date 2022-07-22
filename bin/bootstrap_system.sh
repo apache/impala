@@ -219,7 +219,8 @@ ubuntu apt-get --yes install ccache curl gawk g++ gcc libffi-dev \
         libkrb5-dev krb5-admin-server krb5-kdc krb5-user libsasl2-dev \
         libsasl2-modules libsasl2-modules-gssapi-mit libssl-dev make ninja-build \
         python-dev python-setuptools postgresql ssh wget vim-common psmisc \
-        lsof openjdk-8-jdk openjdk-8-source openjdk-8-dbg apt-utils git ant
+        lsof openjdk-8-jdk openjdk-8-source openjdk-8-dbg apt-utils git ant \
+        language-pack-en
 # Required by Kudu in the minicluster
 ubuntu20 apt-get --yes install libtinfo5
 ARCH_NAME=$(uname -p)
@@ -266,7 +267,7 @@ redhat sudo yum install -y curl gawk gcc gcc-c++ git krb5-devel krb5-server \
         postgresql postgresql-server \
         wget vim-common nscd cmake fuse-devel zlib-devel \
         psmisc lsof openssh-server redhat-lsb java-1.8.0-openjdk-devel \
-        java-1.8.0-openjdk-src
+        java-1.8.0-openjdk-src langpacks-en
 
 # Enable the Powertools repo for snappy-devel on RedHat 8
 redhat8 sudo yum install -y dnf-plugins-core
