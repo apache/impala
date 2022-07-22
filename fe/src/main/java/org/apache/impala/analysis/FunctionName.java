@@ -161,4 +161,8 @@ public class FunctionName {
   public static FunctionName fromThrift(TFunctionName fnName) {
     return new FunctionName(fnName.getDb_name(), fnName.getFunction_name());
   }
+
+  public static String thriftToString(TFunctionName fnName) {
+    return fromThrift(fnName).toString();
+  }
 }

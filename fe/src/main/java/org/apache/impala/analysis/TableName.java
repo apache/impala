@@ -126,6 +126,10 @@ public class TableName {
     return new TableName(tableName.getDb_name(), tableName.getTable_name());
   }
 
+  public static String thriftToString(TTableName tableName) {
+    return fromThrift(tableName).toString();
+  }
+
   public TTableName toThrift() { return new TTableName(db_, tbl_); }
 
   /**
