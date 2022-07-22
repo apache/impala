@@ -232,6 +232,7 @@ import org.apache.impala.thrift.TUpdateCatalogResponse;
 import org.apache.impala.thrift.TUpdatedPartition;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.AcidUtils.TblTransaction;
+import org.apache.impala.util.CatalogOpUtil;
 import org.apache.impala.util.CompressionUtil;
 import org.apache.impala.util.DebugUtils;
 import org.apache.impala.util.HdfsCachingUtil;
@@ -239,6 +240,7 @@ import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.MetaStoreUtil.TableInsertEventInfo;
+import org.apache.impala.util.ThreadNameAnnotator;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -5506,7 +5508,10 @@ public class CatalogOpExecutor {
 
     // Add partitions to metastore.
     Map<String, Long> partitionToEventId = Maps.newHashMap();
-    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+    String annotation = String.format("Recovering %d partitions for %s",
+        hmsPartitions.size(), tbl.getFullName());
+    try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation);
+        MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       List<Partition> addedPartitions = addHmsPartitions(msClient, tbl, hmsPartitions,
           partitionToEventId, true);
       addHdfsPartitions(msClient, tbl, addedPartitions, partitionToEventId);
@@ -6045,9 +6050,7 @@ public class CatalogOpExecutor {
    */
   public TResetMetadataResponse execResetMetadata(TResetMetadataRequest req)
       throws CatalogException {
-    String cmdString = String.format("%s issued by %s",
-        req.is_refresh ? "REFRESH":"INVALIDATE",
-        req.header != null ? req.header.requesting_user : " unknown user");
+    String cmdString = CatalogOpUtil.getShortDescForReset(req);
     TResetMetadataResponse resp = new TResetMetadataResponse();
     resp.setResult(new TCatalogUpdateResult());
     resp.getResult().setCatalog_service_id(JniCatalog.getServiceId());

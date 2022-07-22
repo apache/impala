@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import com.google.common.base.Preconditions;
+import org.apache.impala.thrift.TColumnName;
 
 /**
  * Represents a column name that optionally includes its database name.
@@ -36,4 +37,9 @@ public class ColumnName {
   public TableName getTableName() { return tableName_; }
 
   public String getColumnName() { return columnName_; }
+
+  public static String thriftToString(TColumnName colName) {
+    return TableName.thriftToString(colName.getTable_name()) + "." +
+        colName.getColumn_name();
+  }
 }

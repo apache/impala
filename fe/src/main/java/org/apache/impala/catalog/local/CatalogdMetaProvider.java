@@ -97,6 +97,7 @@ import org.apache.impala.thrift.TValidWriteIdList;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.ListMap;
+import org.apache.impala.util.ThreadNameAnnotator;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
@@ -509,7 +510,8 @@ public class CatalogdMetaProvider implements MetaProvider {
     Stopwatch sw = Stopwatch.createStarted();
     boolean hit = false;
     boolean isPiggybacked = false;
-    try {
+    try (ThreadNameAnnotator tna = new ThreadNameAnnotator(
+        "LoadWithCaching for " + itemString)) {
       CompletableFuture<Object> f = new CompletableFuture<Object>();
       // NOTE: the Cache ensures that this is an atomic operation of either returning
       // an existing value or inserting our own. Only one thread can think it is the

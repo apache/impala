@@ -125,6 +125,11 @@ public class ResetMetadataStmt extends StatementBase {
   @VisibleForTesting
   protected Action getAction() { return action_; }
 
+  @VisibleForTesting
+  public void setRequestingUser(User user) {
+    requestingUser_ = user;
+  }
+
   @Override
   public void collectTableRefs(List<TableRef> tblRefs) {
     if (tableName_ != null && partitionSpec_ != null) {
