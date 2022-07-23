@@ -24,16 +24,16 @@
 # problem).
 
 if [[ -n "$KUDU_BUILD_DIR" ]]; then
-  KUDU_BIN_DIR="$KUDU_BUILD_DIR/bin"
+  KUDU_SBIN_DIR="$KUDU_BUILD_DIR/sbin"
   KUDU_WWW_DIR="$KUDU_HOME/www"
 else
-  KUDU_BIN_DIR="$IMPALA_KUDU_HOME"
+  KUDU_SBIN_DIR="$IMPALA_KUDU_HOME"
   if $USE_KUDU_DEBUG_BUILD; then
-    KUDU_BIN_DIR+=/debug/bin
+    KUDU_SBIN_DIR+=/debug/sbin
   else
-    KUDU_BIN_DIR+=/release/bin
+    KUDU_SBIN_DIR+=/release/sbin
   fi
-  KUDU_WWW_DIR="$KUDU_BIN_DIR/../lib/kudu/www"
+  KUDU_WWW_DIR="$KUDU_SBIN_DIR/../lib/kudu/www"
 fi
 
 KUDU_COMMON_ARGS=("-webserver_doc_root=$KUDU_WWW_DIR")
