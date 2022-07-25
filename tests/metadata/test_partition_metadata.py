@@ -17,11 +17,10 @@
 
 import pytest
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfGCS, SkipIfCOS, SkipIfLocal, SkipIfOzone)
+from tests.common.skip import SkipIfFS, SkipIfLocal
 from tests.common.test_dimensions import (create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
-from tests.util.filesystem_utils import get_fs_path, WAREHOUSE, FILESYSTEM_PREFIX
+from tests.util.filesystem_utils import WAREHOUSE, FILESYSTEM_PREFIX
 
 # Map from the test dimension file_format string to the SQL "STORED AS"
 # argument.
@@ -89,14 +88,7 @@ class TestPartitionMetadata(ImpalaTestSuite):
     data = self.execute_scalar("select sum(i), sum(j) from %s" % FQ_TBL_NAME)
     assert data.split('\t') == ['6', '9']
 
-  @SkipIfS3.hive
-  @SkipIfOzone.hive
-  @SkipIfGCS.hive
-  @SkipIfCOS.hive
-  @SkipIfABFS.hive
-  @SkipIfADLS.hive
-  @SkipIfIsilon.hive
-  @SkipIfLocal.hive
+  @SkipIfFS.hive
   def test_partition_metadata_compatibility(self, vector, unique_database):
     """Regression test for IMPALA-2048. For partitioned tables, test that when Impala
     updates the partition metadata (e.g. by doing a compute stats), the tables are

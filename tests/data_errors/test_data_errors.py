@@ -20,13 +20,11 @@
 # Tests Impala properly handles errors when reading and writing data.
 
 import pytest
-import random
 import subprocess
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import (SkipIf, SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfGCS,
-                               SkipIfCOS, SkipIfLocal, SkipIfOzone)
+from tests.common.skip import SkipIf, SkipIfFS
 from tests.common.test_dimensions import create_exec_option_dimension
 
 class TestDataErrors(ImpalaTestSuite):
@@ -106,12 +104,8 @@ class TestHdfsUnknownErrors(ImpalaTestSuite):
       assert error is "", "Couldn't turn Safe mode OFF. Error: %s" % (error)
       assert "Safe mode is OFF" in output
 
-@SkipIfS3.qualified_path
-@SkipIfOzone.qualified_path
-@SkipIfGCS.qualified_path
-@SkipIfCOS.qualified_path
-@SkipIfABFS.qualified_path
-@SkipIfADLS.qualified_path
+
+@SkipIfFS.qualified_path
 class TestHdfsScanNodeErrors(TestDataErrors):
   @classmethod
   def add_test_dimensions(cls):
@@ -128,13 +122,8 @@ class TestHdfsScanNodeErrors(TestDataErrors):
       pytest.xfail("Expected results differ across file formats")
     self.run_test_case('DataErrorsTest/hdfs-scan-node-errors', vector)
 
-@SkipIfS3.qualified_path
-@SkipIfOzone.qualified_path
-@SkipIfGCS.qualified_path
-@SkipIfCOS.qualified_path
-@SkipIfABFS.qualified_path
-@SkipIfADLS.qualified_path
-@SkipIfLocal.qualified_path
+
+@SkipIfFS.qualified_path
 class TestHdfsSeqScanNodeErrors(TestHdfsScanNodeErrors):
   @classmethod
   def add_test_dimensions(cls):
@@ -147,12 +136,7 @@ class TestHdfsSeqScanNodeErrors(TestHdfsScanNodeErrors):
     self.run_test_case('DataErrorsTest/hdfs-sequence-scan-errors', vector)
 
 
-@SkipIfS3.qualified_path
-@SkipIfOzone.qualified_path
-@SkipIfGCS.qualified_path
-@SkipIfCOS.qualified_path
-@SkipIfABFS.qualified_path
-@SkipIfADLS.qualified_path
+@SkipIfFS.qualified_path
 class TestHdfsRcFileScanNodeErrors(TestHdfsScanNodeErrors):
   @classmethod
   def add_test_dimensions(cls):

@@ -34,8 +34,8 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.errors import Timeout
-from tests.common.skip import SkipIfEC, SkipIfBuildType, SkipIfGCS, SkipIfCOS
-from tests.common.skip import SkipIfNotHdfsMinicluster
+from tests.common.skip import (SkipIfEC, SkipIfBuildType, SkipIfFS,
+    SkipIfNotHdfsMinicluster)
 
 # The BE krpc port of the impalad to simulate rpc or disk errors in tests.
 FAILED_KRPC_PORT = 27001
@@ -292,8 +292,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     self.__validate_web_ui_state()
     self.__validate_memz()
 
-  @SkipIfGCS.jira(reason="IMPALA-10562")
-  @SkipIfCOS.jira(reason="IMPALA-10562")
+  @SkipIfFS.shutdown_idle_fails
   @SkipIfBuildType.not_dev_build
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -359,8 +358,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     self.client.close_query(handle)
     self.__validate_web_ui_state()
 
-  @SkipIfGCS.jira(reason="IMPALA-10562")
-  @SkipIfCOS.jira(reason="IMPALA-10562")
+  @SkipIfFS.shutdown_idle_fails
   @SkipIfBuildType.not_dev_build
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

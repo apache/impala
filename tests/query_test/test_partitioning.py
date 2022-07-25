@@ -15,13 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import os
 import pytest
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfGCS, SkipIfCOS, SkipIfLocal, SkipIfOzone)
+from tests.common.skip import SkipIfFS, SkipIfLocal
 from tests.common.test_dimensions import create_single_exec_option_dimension
 
 # Tests to validate HDFS partitioning.
@@ -47,14 +45,7 @@ class TestPartitioning(ImpalaTestSuite):
 
   # Missing Coverage: Impala deals with boolean partitions created by Hive on a non-hdfs
   # filesystem.
-  @SkipIfS3.hive
-  @SkipIfOzone.hive
-  @SkipIfGCS.hive
-  @SkipIfCOS.hive
-  @SkipIfABFS.hive
-  @SkipIfADLS.hive
-  @SkipIfIsilon.hive
-  @SkipIfLocal.hive
+  @SkipIfFS.hive
   def test_boolean_partitions(self, vector, unique_database):
     # This test takes about a minute to complete due to the Hive commands that are
     # executed. To cut down on runtime, limit the test to exhaustive exploration

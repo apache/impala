@@ -19,7 +19,7 @@ from subprocess import check_call
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3, SkipIfGCS
+from tests.common.skip import SkipIfFS
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import get_fs_path
 
@@ -76,8 +76,7 @@ class TestRewrittenFile(ImpalaTestSuite):
     result = self.client.execute("select count(*) from %s.%s" % (db_name, table_name))
     assert result.data == [str(expected_new_count)]
 
-  @SkipIfS3.jira(reason="IMPALA-2512")
-  @SkipIfGCS.jira(reason="IMPALA-2512")
+  @SkipIfFS.read_past_eof
   def test_new_file_shorter(self, vector, unique_database):
     """Rewrites an existing file with a new shorter file."""
     # Full error is something like:

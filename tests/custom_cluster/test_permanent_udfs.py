@@ -20,12 +20,10 @@ import os
 import pytest
 import re
 import shutil
-import subprocess
 
 from tempfile import mkdtemp
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, SkipIfGCS,
-                               SkipIfCOS, SkipIfLocal, SkipIfOzone)
+from tests.common.skip import SkipIfFS
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.util.filesystem_utils import get_fs_path
 
@@ -161,14 +159,7 @@ class TestUdfPersistence(CustomClusterTestSuite):
     stmt = "RELOAD FUNCTION ; DESCRIBE FUNCTION {0}.{1}".format(db, udf)
     return self.run_stmt_in_hive(stmt)
 
-  @SkipIfIsilon.hive
-  @SkipIfS3.hive
-  @SkipIfOzone.hive
-  @SkipIfGCS.hive
-  @SkipIfCOS.hive
-  @SkipIfABFS.hive
-  @SkipIfADLS.hive
-  @SkipIfLocal.hive
+  @SkipIfFS.hive
   @pytest.mark.execute_serially
   def test_corrupt_java_udf(self):
     """ IMPALA-3820: This tests if the Catalog server can gracefully handle
@@ -185,15 +176,7 @@ class TestUdfPersistence(CustomClusterTestSuite):
     self.verify_function_count(
         "SHOW FUNCTIONS in {0}".format(self.JAVA_FN_TEST_DB), 0)
 
-
-  @SkipIfIsilon.hive
-  @SkipIfS3.hive
-  @SkipIfOzone.hive
-  @SkipIfGCS.hive
-  @SkipIfCOS.hive
-  @SkipIfABFS.hive
-  @SkipIfADLS.hive
-  @SkipIfLocal.hive
+  @SkipIfFS.hive
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
      catalogd_args= "--local_library_dir={0}".format(LOCAL_LIBRARY_DIR))
@@ -254,14 +237,7 @@ class TestUdfPersistence(CustomClusterTestSuite):
       # Make sure we deleted all the temporary jars we copied to the local fs
       assert len(glob.glob(self.LOCAL_LIBRARY_DIR + "/*.jar")) == 0
 
-  @SkipIfIsilon.hive
-  @SkipIfS3.hive
-  @SkipIfOzone.hive
-  @SkipIfGCS.hive
-  @SkipIfCOS.hive
-  @SkipIfABFS.hive
-  @SkipIfADLS.hive
-  @SkipIfLocal.hive
+  @SkipIfFS.hive
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
      catalogd_args= "--local_library_dir={0}".format(LOCAL_LIBRARY_DIR))
@@ -320,14 +296,7 @@ class TestUdfPersistence(CustomClusterTestSuite):
     # Make sure we deleted all the temporary jars we copied to the local fs
     assert len(glob.glob(self.LOCAL_LIBRARY_DIR + "/*.jar")) == 0
 
-  @SkipIfIsilon.hive
-  @SkipIfS3.hive
-  @SkipIfOzone.hive
-  @SkipIfGCS.hive
-  @SkipIfCOS.hive
-  @SkipIfABFS.hive
-  @SkipIfADLS.hive
-  @SkipIfLocal.hive
+  @SkipIfFS.hive
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
      catalogd_args= "--local_library_dir={0}".format(LOCAL_LIBRARY_DIR))

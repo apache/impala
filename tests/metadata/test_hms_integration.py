@@ -27,13 +27,10 @@
 import pytest
 import random
 import string
-from subprocess import call
 
 from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfHive2, SkipIfHive3,
-                               SkipIfIsilon, SkipIfGCS, SkipIfCOS, SkipIfLocal,
-                               SkipIfOzone)
+from tests.common.skip import SkipIfFS, SkipIfHive2, SkipIfHive3
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -41,14 +38,7 @@ from tests.util.event_processor_utils import EventProcessorUtils
 from tests.util.hive_utils import HiveDbWrapper, HiveTableWrapper
 
 
-@SkipIfS3.hive
-@SkipIfOzone.hive
-@SkipIfGCS.hive
-@SkipIfCOS.hive
-@SkipIfABFS.hive
-@SkipIfADLS.hive
-@SkipIfIsilon.hive
-@SkipIfLocal.hive
+@SkipIfFS.hive
 class TestHmsIntegrationSanity(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -153,14 +143,8 @@ class TestHmsIntegrationSanity(ImpalaTestSuite):
     else:
       assert False
 
-@SkipIfS3.hive
-@SkipIfOzone.hive
-@SkipIfGCS.hive
-@SkipIfCOS.hive
-@SkipIfABFS.hive
-@SkipIfADLS.hive
-@SkipIfIsilon.hive
-@SkipIfLocal.hive
+
+@SkipIfFS.hive
 class TestHmsIntegration(ImpalaTestSuite):
 
   @classmethod

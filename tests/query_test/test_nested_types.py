@@ -18,24 +18,10 @@
 import os
 from copy import deepcopy
 import pytest
-from subprocess import check_call
-from pytest import skip
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import (
-    SkipIfIsilon,
-    SkipIfS3,
-    SkipIfOzone,
-    SkipIfGCS,
-    SkipIfCOS,
-    SkipIfABFS,
-    SkipIfADLS,
-    SkipIfEC,
-    SkipIfHive2,
-    SkipIfLocal,
-    SkipIfNotHdfsMinicluster
-    )
+from tests.common.skip import SkipIfFS, SkipIfEC, SkipIfHive2, SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (create_exec_option_dimension,
     create_exec_option_dimension_from_dict, create_client_protocol_dimension,
     create_orc_dimension, orc_schema_resolution_constraint)
@@ -317,14 +303,7 @@ class TestNestedTypesNoMtDop(ImpalaTestSuite):
       pytest.skip('This test is specific to Parquet')
     self.run_test_case('QueryTest/nested-types-parquet-stats', vector)
 
-  @SkipIfIsilon.hive
-  @SkipIfS3.hive
-  @SkipIfOzone.hive
-  @SkipIfGCS.hive
-  @SkipIfCOS.hive
-  @SkipIfABFS.hive
-  @SkipIfADLS.hive
-  @SkipIfLocal.hive
+  @SkipIfFS.hive
   def test_upper_case_field_name(self, unique_database):
     """IMPALA-5994: Tests that a Hive-created table with a struct field name with upper
     case characters can be selected."""
@@ -375,14 +354,7 @@ class TestNestedTypesNoMtDop(ImpalaTestSuite):
 
   # Skip this test on non-HDFS filesystems, because the test contains Hive
   # queries that hang in some cases due to IMPALA-9365.
-  @SkipIfABFS.hive
-  @SkipIfADLS.hive
-  @SkipIfIsilon.hive
-  @SkipIfLocal.hive
-  @SkipIfS3.hive
-  @SkipIfOzone.hive
-  @SkipIfGCS.hive
-  @SkipIfCOS.hive
+  @SkipIfFS.hive
   @SkipIfHive2.acid
   def test_partitioned_table_acid(self, vector, unique_database):
     """IMPALA-6370: Test that a partitioned table with nested types can be scanned."""
@@ -801,7 +773,7 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
 
     # The Parquet resolution policy is manually set in the .test files.
     if vector.get_value('parquet_array_resolution') != "three_level":
-      skip("Test only run with three_level")
+      pytest.skip("Test only run with three_level")
 
     ambig_modern_tbl = "ambig_modern"
     self._create_test_table(unique_database, ambig_modern_tbl,
@@ -884,14 +856,7 @@ class TestMaxNestingDepth(ImpalaTestSuite):
       self.run_stmt_in_hive(insert_table)
       self.client.execute("INVALIDATE METADATA %s" % tbl_name)
 
-  @SkipIfIsilon.hive
-  @SkipIfS3.hive
-  @SkipIfOzone.hive
-  @SkipIfGCS.hive
-  @SkipIfCOS.hive
-  @SkipIfABFS.hive
-  @SkipIfADLS.hive
-  @SkipIfLocal.hive
+  @SkipIfFS.hive
   def test_load_hive_table(self, vector, unique_database):
     """Tests that Impala rejects Hive-created tables with complex types that exceed
     the maximum nesting depth."""

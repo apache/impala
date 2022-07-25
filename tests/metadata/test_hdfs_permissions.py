@@ -16,8 +16,7 @@
 # under the License.
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfLocal,
-                               SkipIfGCS, SkipIfCOS, SkipIfCatalogV2, SkipIfOzone)
+from tests.common.skip import SkipIfFS, SkipIfLocal, SkipIfCatalogV2
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -28,12 +27,7 @@ TEST_TBL = 'read_only_tbl'
 TBL_LOC = '%s/%s' % (WAREHOUSE, TEST_TBL)
 
 
-@SkipIfS3.hdfs_acls
-@SkipIfOzone.hdfs_acls
-@SkipIfGCS.hdfs_acls
-@SkipIfCOS.hdfs_acls
-@SkipIfABFS.hdfs_acls
-@SkipIfADLS.hdfs_acls
+@SkipIfFS.hdfs_acls
 @SkipIfLocal.hdfs_client
 class TestHdfsPermissions(ImpalaTestSuite):
   @classmethod

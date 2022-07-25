@@ -18,8 +18,7 @@
 import pytest
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfGCS, SkipIfCOS, SkipIfLocal, SkipIfOzone)
+from tests.common.skip import SkipIfFS
 
 # Number of tables to create per thread
 NUM_TBLS_PER_THREAD = 10
@@ -48,14 +47,7 @@ class TestDdlStress(ImpalaTestSuite):
         lambda v: (v.get_value('table_format').file_format == 'text' and
                    v.get_value('table_format').compression_codec == 'none'))
 
-  @SkipIfS3.caching
-  @SkipIfOzone.caching
-  @SkipIfGCS.caching
-  @SkipIfCOS.caching
-  @SkipIfABFS.caching
-  @SkipIfADLS.caching
-  @SkipIfIsilon.caching
-  @SkipIfLocal.caching
+  @SkipIfFS.hdfs_caching
   @pytest.mark.stress
   @pytest.mark.parametrize('test_index', TEST_INDICES)
   def test_create_cache_many_tables(self, vector, testid_checksum, test_index):

@@ -35,15 +35,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout, ImpalaTestClusterProperties
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.resource_pool_config import ResourcePoolConfig
-from tests.common.skip import (
-    SkipIfS3,
-    SkipIfGCS,
-    SkipIfCOS,
-    SkipIfABFS,
-    SkipIfADLS,
-    SkipIfEC,
-    SkipIfNotHdfsMinicluster,
-    SkipIfOS)
+from tests.common.skip import SkipIfFS, SkipIfEC, SkipIfNotHdfsMinicluster, SkipIfOS
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -444,11 +436,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       assert re.search("Rejected query from pool default-pool: request memory needed "
                        ".* is greater than pool max mem resources 10.00 MB", str(ex))
 
-  @SkipIfS3.hdfs_block_size
-  @SkipIfGCS.hdfs_block_size
-  @SkipIfCOS.hdfs_block_size
-  @SkipIfABFS.hdfs_block_size
-  @SkipIfADLS.hdfs_block_size
+  @SkipIfFS.hdfs_block_size
   @SkipIfEC.fix_later
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

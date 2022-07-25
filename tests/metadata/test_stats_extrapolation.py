@@ -17,11 +17,11 @@
 
 from os import path
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfEC, SkipIfOzone
+from tests.common.skip import SkipIfEC, SkipIfFS
 from tests.common.test_dimensions import (
-    create_exec_option_dimension,
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
+
 
 class TestStatsExtrapolation(ImpalaTestSuite):
   """Test stats extrapolation and compute stats tablesample. Stats extrapolation is
@@ -39,7 +39,7 @@ class TestStatsExtrapolation(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
 
-  @SkipIfOzone.no_storage_ids
+  @SkipIfFS.no_storage_ids
   @SkipIfEC.contain_full_explain
   def test_stats_extrapolation(self, vector, unique_database):
     vector.get_value('exec_option')['num_nodes'] = 1

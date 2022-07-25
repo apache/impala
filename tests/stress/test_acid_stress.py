@@ -23,8 +23,7 @@ from multiprocessing import Value
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import (SkipIf, SkipIfHive2, SkipIfS3, SkipIfGCS, SkipIfCOS,
-                               SkipIfDockerizedCluster, SkipIfOzone)
+from tests.common.skip import SkipIf, SkipIfHive2, SkipIfFS, SkipIfDockerizedCluster
 from tests.stress.stress_util import Task, run_tasks
 
 NUM_OVERWRITES = 2
@@ -160,10 +159,7 @@ class TestAcidInsertsBasic(TestAcidStress):
            sleep_seconds=0.1)])
 
   @SkipIfHive2.acid
-  @SkipIfS3.hive
-  @SkipIfOzone.hive
-  @SkipIfGCS.hive
-  @SkipIfCOS.hive
+  @SkipIfFS.hive
   @pytest.mark.execute_serially
   @pytest.mark.stress
   def test_read_hive_inserts(self, unique_database):
@@ -280,8 +276,7 @@ class TestConcurrentAcidInserts(TestAcidStress):
     finally:
       impalad_client.close()
 
-  @SkipIfGCS.jira(reason="IMPALA-10563")
-  @SkipIfCOS.jira(reason="IMPALA-10773")
+  @SkipIfFS.stress_insert_timeouts
   @SkipIfHive2.acid
   @SkipIfDockerizedCluster.jira(reason="IMPALA-11189")
   @pytest.mark.execute_serially
@@ -378,8 +373,7 @@ class TestFailingAcidInserts(TestAcidStress):
                 for i in xrange(0, num_checkers)]
     run_tasks(writers + checkers)
 
-  @SkipIfGCS.jira(reason="IMPALA-10563")
-  @SkipIfCOS.jira(reason="IMPALA-10773")
+  @SkipIfFS.stress_insert_timeouts
   @SkipIfDockerizedCluster.jira(reason="IMPALA-11191")
   @SkipIfHive2.acid
   @pytest.mark.execute_serially

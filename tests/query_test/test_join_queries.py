@@ -21,16 +21,7 @@ import pytest
 from copy import deepcopy
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import (
-    SkipIf,
-    SkipIfIsilon,
-    SkipIfLocal,
-    SkipIfS3,
-    SkipIfOzone,
-    SkipIfGCS,
-    SkipIfCOS,
-    SkipIfABFS,
-    SkipIfADLS)
+from tests.common.skip import SkipIf, SkipIfFS
 from tests.common.test_vector import ImpalaTestDimension
 
 class TestJoinQueries(ImpalaTestSuite):
@@ -81,15 +72,8 @@ class TestJoinQueries(ImpalaTestSuite):
     del new_vector.get_value('exec_option')['batch_size']  # .test file sets batch_size
     self.run_test_case('QueryTest/single-node-joins-with-limits-exhaustive', new_vector)
 
-  @SkipIfS3.hbase
-  @SkipIfOzone.hbase
-  @SkipIfGCS.hbase
-  @SkipIfCOS.hbase
-  @SkipIfABFS.hbase
-  @SkipIfADLS.hbase
-  @SkipIfIsilon.hbase
+  @SkipIfFS.hbase
   @SkipIf.skip_hbase
-  @SkipIfLocal.hbase
   def test_joins_against_hbase(self, vector):
     new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')

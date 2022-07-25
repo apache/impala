@@ -21,9 +21,7 @@ from subprocess import check_call
 from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfGCS, SkipIfCOS, SkipIfLocal, SkipIfCatalogV2,
-                               SkipIfOzone)
+from tests.common.skip import SkipIfFS, SkipIfLocal, SkipIfCatalogV2
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
     create_single_exec_option_dimension,
@@ -114,14 +112,7 @@ class TestComputeStats(ImpalaTestSuite):
                                           {"compression_codec": c})
         self.execute_query_expect_success(self.client, "drop stats {0}".format(table))
 
-  @SkipIfS3.hive
-  @SkipIfOzone.hive
-  @SkipIfGCS.hive
-  @SkipIfCOS.hive
-  @SkipIfABFS.hive
-  @SkipIfADLS.hive
-  @SkipIfIsilon.hive
-  @SkipIfLocal.hive
+  @SkipIfFS.hive
   def test_compute_stats_impala_2201(self, vector, unique_database):
     """IMPALA-2201: Tests that the results of compute incremental stats are properly
     persisted when the data was loaded from Hive with hive.stats.autogather=true.
@@ -196,14 +187,7 @@ class TestComputeStats(ImpalaTestSuite):
          assert(hdfs_physical_properties_template in explain_result.data[i + 1])
          assert("cardinality=0" not in explain_result.data[i + 2])
 
-  @SkipIfS3.hive
-  @SkipIfOzone.hive
-  @SkipIfGCS.hive
-  @SkipIfCOS.hive
-  @SkipIfABFS.hive
-  @SkipIfADLS.hive
-  @SkipIfIsilon.hive
-  @SkipIfLocal.hive
+  @SkipIfFS.hive
   def test_corrupted_stats_in_partitioned_hive_tables(self, vector, unique_database):
     """IMPALA-9744: Tests that the partition stats corruption in Hive tables
     (row count=0, partition size>0, persisted when the data was loaded with
@@ -246,14 +230,7 @@ class TestComputeStats(ImpalaTestSuite):
     self.create_load_test_corrupt_stats(self, unique_database, create_load_stmts,
             table_name, 2, 2)
 
-  @SkipIfS3.hive
-  @SkipIfOzone.hive
-  @SkipIfGCS.hive
-  @SkipIfCOS.hive
-  @SkipIfABFS.hive
-  @SkipIfADLS.hive
-  @SkipIfIsilon.hive
-  @SkipIfLocal.hive
+  @SkipIfFS.hive
   def test_corrupted_stats_in_unpartitioned_hive_tables(self, vector, unique_database):
     """IMPALA-9744: Tests that the stats corruption in unpartitioned Hive
     tables (row count=0, partition size>0, persisted when the data was loaded

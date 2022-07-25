@@ -19,7 +19,7 @@ import pytest
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_cluster import ImpalaCluster
-from tests.common.skip import SkipIfBuildType, SkipIfGCS, SkipIfCOS
+from tests.common.skip import SkipIfBuildType, SkipIfFS
 from tests.verifiers.metric_verifier import MetricVerifier
 
 # The BE krpc port of the impalad to simulate rpc errors in tests.
@@ -205,8 +205,7 @@ class TestRPCTimeout(CustomClusterTestSuite):
     self.execute_query_verify_metrics(self.SLOW_TEST_QUERY,
         expected_exception="cancelled due to unresponsive backend")
 
-  @SkipIfGCS.jira(reason="IMPALA-10562")
-  @SkipIfCOS.jira(reason="IMPALA-10562")
+  @SkipIfFS.shutdown_idle_fails
   @SkipIfBuildType.not_dev_build
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

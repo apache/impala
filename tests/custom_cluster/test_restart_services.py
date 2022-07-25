@@ -35,7 +35,7 @@ from TCLIService import TCLIService
 from beeswaxd.BeeswaxService import QueryState
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfGCS, SkipIfCOS
+from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfFS
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 
 LOG = logging.getLogger(__name__)
@@ -360,8 +360,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
   def get_workload(cls):
     return 'functional-query'
 
-  @SkipIfGCS.jira(reason="IMPALA-10562")
-  @SkipIfCOS.jira(reason="IMPALA-10562")
+  @SkipIfFS.shutdown_idle_fails
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--shutdown_grace_period_s={grace_period} \
@@ -426,8 +425,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     shutdown_duration = time.time() - start_time
     assert shutdown_duration <= self.IDLE_SHUTDOWN_GRACE_PERIOD_S + 10
 
-  @SkipIfGCS.jira(reason="IMPALA-10562")
-  @SkipIfCOS.jira(reason="IMPALA-10562")
+  @SkipIfFS.shutdown_idle_fails
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--shutdown_grace_period_s={grace_period} \

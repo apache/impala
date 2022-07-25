@@ -26,8 +26,7 @@ import tempfile
 import time
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import (SkipIfABFS, SkipIfADLS, SkipIfS3, SkipIfGCS, SkipIfCOS,
-  SkipIfOzone)
+from tests.common.skip import SkipIfFS
 
 LOG = logging.getLogger(__name__)
 
@@ -150,12 +149,7 @@ class TestLineage(CustomClusterTestSuite):
           lineage_json = json.load(log_file)
           assert lineage_json["queryId"] is not profile_query_id
 
-  @SkipIfABFS.hbase
-  @SkipIfADLS.hbase
-  @SkipIfS3.hbase
-  @SkipIfOzone.hbase
-  @SkipIfGCS.hbase
-  @SkipIfCOS.hbase
+  @SkipIfFS.hbase
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--lineage_event_log_dir={0}"
                                     .format(LINEAGE_TESTS_DIR))

@@ -20,7 +20,6 @@
 # annotate the class or test routine with the marker.
 #
 
-import os
 import pytest
 from functools import partial
 
@@ -43,130 +42,39 @@ from tests.util.filesystem_utils import (
 
 IMPALA_TEST_CLUSTER_PROPERTIES = ImpalaTestClusterProperties.get_instance()
 
-class SkipIfS3:
 
+class SkipIfFS:
   # These are skipped due to product limitations.
-  caching = pytest.mark.skipif(IS_S3, reason="SET CACHED not implemented for S3")
-  hive = pytest.mark.skipif(IS_S3, reason="Hive doesn't work with S3")
-  hdfs_block_size = pytest.mark.skipif(IS_S3, reason="S3 uses it's own block size")
-  hdfs_acls = pytest.mark.skipif(IS_S3, reason="HDFS acls are not supported on S3")
-  jira = partial(pytest.mark.skipif, IS_S3)
-  hdfs_encryption = pytest.mark.skipif(IS_S3,
-      reason="HDFS encryption is not supported with S3")
+  hdfs_caching = pytest.mark.skipif(not IS_HDFS, reason="SET CACHED not implemented")
+  hdfs_encryption = pytest.mark.skipif(not IS_HDFS,
+      reason="HDFS encryption is not supported")
+  hdfs_block_size = pytest.mark.skipif(not IS_HDFS, reason="uses it's own block size")
+  hdfs_acls = pytest.mark.skipif(not IS_HDFS, reason="HDFS acls are not supported")
+
+  # Special case product limitations.
   empty_directory = pytest.mark.skipif(IS_S3,
       reason="Empty directories are not supported on S3")
-
-  # These need test infra work to re-enable.
-  udfs = pytest.mark.skipif(IS_S3, reason="udas/udfs not copied to S3")
-  datasrc = pytest.mark.skipif(IS_S3, reason="data sources not copied to S3")
-  hbase = pytest.mark.skipif(IS_S3, reason="HBase not started with S3")
-  qualified_path = pytest.mark.skipif(IS_S3,
-      reason="Tests rely on HDFS qualified paths, IMPALA-1872")
-  iceberg = pytest.mark.skipif(IS_S3,
-      reason="Currently Iceberg is only supported on HDFS.")
-  variable_listing_times = pytest.mark.skipif(IS_S3,
-      reason="Flakiness due to unpredictable listing times on S3.")
-
-
-class SkipIfOzone:
-  # These are skipped due to product limitations.
-  caching = pytest.mark.skipif(IS_OZONE, reason="SET CACHED not implemented for Ozone")
-  hdfs_block_size = pytest.mark.skipif(IS_OZONE, reason="Ozone uses it's own block size")
-  hdfs_acls = pytest.mark.skipif(IS_OZONE, reason="HDFS acls are not supported on Ozone")
-  hdfs_encryption = pytest.mark.skipif(IS_OZONE,
-      reason="HDFS encryption is not supported with Ozone")
-  no_storage_ids = pytest.mark.skipif(IS_OZONE,
-        reason="Ozone does not return storage ids, IMPALA-10213")
-
-  # These need test infra work to re-enable.
-  hive = pytest.mark.skipif(IS_OZONE, reason="Hive not started with Ozone")
-  hbase = pytest.mark.skipif(IS_OZONE, reason="HBase not started with Ozone")
-  qualified_path = pytest.mark.skipif(IS_OZONE,
-      reason="Tests rely on HDFS qualified paths, IMPALA-1872")
-
-
-class SkipIfABFS:
-
-  # These are skipped due to product limitations.
-  caching = pytest.mark.skipif(IS_ABFS, reason="SET CACHED not implemented for ABFS")
-  hive = pytest.mark.skipif(IS_ABFS, reason="Hive doesn't work with ABFS")
-  hdfs_block_size = pytest.mark.skipif(IS_ABFS, reason="ABFS uses it's own block size")
-  hdfs_acls = pytest.mark.skipif(IS_ABFS, reason="HDFS acls are not supported on ABFS")
-  jira = partial(pytest.mark.skipif, IS_ABFS)
-  hdfs_encryption = pytest.mark.skipif(IS_ABFS,
-      reason="HDFS encryption is not supported with ABFS")
-  trash = pytest.mark.skipif(IS_ABFS,
-      reason="Drop/purge not working as expected on ABFS, IMPALA-7726")
   file_or_folder_name_ends_with_period = pytest.mark.skipif(IS_ABFS,
       reason="ABFS does not support file / directories that end with a period")
+  stress_insert_timeouts = pytest.mark.skipif(IS_COS or IS_GCS,
+      reason="IMPALA-10563, IMPALA-10773")
+  shutdown_idle_fails = pytest.mark.skipif(IS_COS or IS_GCS,
+      reason="IMPALA-10562")
+  late_filters = pytest.mark.skipif(IS_ISILON, reason="IMPALA-6998")
+  read_past_eof = pytest.mark.skipif(IS_S3 or IS_GCS, reason="IMPALA-2512")
+  no_storage_ids = pytest.mark.skipif(IS_OZONE,
+      reason="Ozone does not return storage ids, IMPALA-10213")
+  large_block_size = pytest.mark.skipif(IS_OZONE,
+      reason="block size is larger than 128MB")
 
   # These need test infra work to re-enable.
-  udfs = pytest.mark.skipif(IS_ABFS, reason="udas/udfs not copied to ABFS")
-  datasrc = pytest.mark.skipif(IS_ABFS, reason="data sources not copied to ABFS")
-  hbase = pytest.mark.skipif(IS_ABFS, reason="HBase not started with ABFS")
-  qualified_path = pytest.mark.skipif(IS_ABFS,
+  hive = pytest.mark.skipif(not IS_HDFS, reason="Hive doesn't work")
+  hbase = pytest.mark.skipif(not IS_HDFS, reason="HBase not started")
+  qualified_path = pytest.mark.skipif(not IS_HDFS,
       reason="Tests rely on HDFS qualified paths, IMPALA-1872")
-
-class SkipIfADLS:
-
-  # These are skipped due to product limitations.
-  caching = pytest.mark.skipif(IS_ADLS, reason="SET CACHED not implemented for ADLS")
-  hive = pytest.mark.skipif(IS_ADLS, reason="Hive doesn't work with ADLS")
-  hdfs_block_size = pytest.mark.skipif(IS_ADLS, reason="ADLS uses it's own block size")
-  hdfs_acls = pytest.mark.skipif(IS_ADLS, reason="HDFS acls are not supported on ADLS")
-  jira = partial(pytest.mark.skipif, IS_ADLS)
-  hdfs_encryption = pytest.mark.skipif(IS_ADLS,
-      reason="HDFS encryption is not supported with ADLS")
-
-  # These need test infra work to re-enable.
-  udfs = pytest.mark.skipif(IS_ADLS, reason="udas/udfs not copied to ADLS")
-  datasrc = pytest.mark.skipif(IS_ADLS, reason="data sources not copied to ADLS")
-  hbase = pytest.mark.skipif(IS_ADLS, reason="HBase not started with ADLS")
-  qualified_path = pytest.mark.skipif(IS_ADLS,
-      reason="Tests rely on HDFS qualified paths, IMPALA-1872")
-  eventually_consistent = pytest.mark.skipif(IS_ADLS,
-      reason="The client is slow to realize changes to file metadata")
-
-
-class SkipIfGCS:
-
-  # These are skipped due to product limitations.
-  caching = pytest.mark.skipif(IS_GCS, reason="SET CACHED not implemented for GCS")
-  hive = pytest.mark.skipif(IS_GCS, reason="Hive doesn't work with GCS")
-  hdfs_block_size = pytest.mark.skipif(IS_GCS, reason="GCS uses it's own block size")
-  hdfs_acls = pytest.mark.skipif(IS_GCS, reason="HDFS acls are not supported on GCS")
-  jira = partial(pytest.mark.skipif, IS_GCS)
-  hdfs_encryption = pytest.mark.skipif(IS_GCS,
-      reason="HDFS encryption is not supported with GCS")
-
-  # These need test infra work to re-enable.
-  hbase = pytest.mark.skipif(IS_GCS, reason="HBase not started with GCS")
-  qualified_path = pytest.mark.skipif(IS_GCS,
-      reason="Tests rely on HDFS qualified paths, IMPALA-1872")
-  variable_listing_times = pytest.mark.skipif(IS_GCS,
-      reason="Flakiness due to unpredictable listing times on GCS.")
-
-
-class SkipIfCOS:
-
-  # These are skipped due to product limitations.
-  caching = pytest.mark.skipif(IS_COS, reason="SET CACHED not implemented for COS")
-  hive = pytest.mark.skipif(IS_COS, reason="Hive doesn't work with COS")
-  hdfs_block_size = pytest.mark.skipif(IS_COS, reason="COS uses it's own block size")
-  hdfs_acls = pytest.mark.skipif(IS_COS, reason="HDFS acls are not supported on COS")
-  jira = partial(pytest.mark.skipif, IS_COS)
-  hdfs_encryption = pytest.mark.skipif(IS_COS,
-      reason="HDFS encryption is not supported with COS")
-
-  # These need test infra work to re-enable.
-  udfs = pytest.mark.skipif(IS_COS, reason="udas/udfs not copied to COS")
-  datasrc = pytest.mark.skipif(IS_COS, reason="data sources not copied to COS")
-  hbase = pytest.mark.skipif(IS_COS, reason="HBase not started with COS")
-  qualified_path = pytest.mark.skipif(IS_COS,
-      reason="Tests rely on HDFS qualified paths, IMPALA-1872")
-  variable_listing_times = pytest.mark.skipif(IS_COS,
-      reason="Flakiness due to unpredictable listing times on COS.")
-  eventually_consistent = pytest.mark.skipif(IS_COS,
+  variable_listing_times = pytest.mark.skipif(IS_S3 or IS_GCS or IS_COS,
+      reason="Flakiness due to unpredictable listing times on S3.")
+  eventually_consistent = pytest.mark.skipif(IS_ADLS or IS_COS,
       reason="The client is slow to realize changes to file metadata")
 
 class SkipIfKudu:
@@ -188,30 +96,10 @@ class SkipIf:
   is_buggy_el6_kernel = pytest.mark.skipif(
       IS_BUGGY_EL6_KERNEL, reason="Kernel is affected by KUDU-1508")
 
-
-class SkipIfIsilon:
-  caching = pytest.mark.skipif(IS_ISILON, reason="SET CACHED not implemented for Isilon")
-  hbase = pytest.mark.skipif(IS_ISILON, reason="HBase not tested with Isilon")
-  hive = pytest.mark.skipif(IS_ISILON, reason="Hive not tested with Isilon")
-  hdfs_acls = pytest.mark.skipif(IS_ISILON, reason="HDFS acls are not supported on Isilon")
-  hdfs_block_size = pytest.mark.skipif(IS_ISILON,
-      reason="Isilon uses its own block size")
-  hdfs_encryption = pytest.mark.skipif(IS_ISILON,
-      reason="HDFS encryption is not supported with Isilon")
-  untriaged = pytest.mark.skipif(IS_ISILON,
-      reason="This Isilon issue has yet to be triaged.")
-  jira = partial(pytest.mark.skipif, IS_ISILON)
-
 class SkipIfLocal:
   # These are skipped due to product limitations.
-  caching = pytest.mark.skipif(IS_LOCAL,
-      reason="HDFS caching not supported on local file system")
   hdfs_blocks = pytest.mark.skipif(IS_LOCAL,
       reason="Files on local filesystem are not split into blocks")
-  hdfs_encryption = pytest.mark.skipif(IS_LOCAL,
-      reason="HDFS encryption is not supported on local filesystem")
-  hive = pytest.mark.skipif(IS_LOCAL,
-      reason="Hive not started when using local file system")
   multiple_impalad = pytest.mark.skipif(IS_LOCAL,
       reason="Multiple impalads are not supported when using local file system")
   parquet_file_size = pytest.mark.skipif(IS_LOCAL,
@@ -220,12 +108,8 @@ class SkipIfLocal:
       reason="HDFS file handle caching not supported for local non-HDFS files")
 
   # These need test infra work to re-enable.
-  hbase = pytest.mark.skipif(IS_LOCAL,
-      reason="HBase not started when using local file system")
   hdfs_client = pytest.mark.skipif(IS_LOCAL,
       reason="HDFS not started when using local file system")
-  qualified_path = pytest.mark.skipif(IS_LOCAL,
-      reason="Tests rely on HDFS qualified paths")
   root_path = pytest.mark.skipif(IS_LOCAL,
       reason="Tests rely on the root directory")
 

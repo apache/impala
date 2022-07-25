@@ -19,9 +19,7 @@ from collections import defaultdict
 from datetime import datetime
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfGCS, SkipIfCOS, SkipIfLocal, SkipIfOzone,
-                               SkipIfNotHdfsMinicluster)
+from tests.common.skip import SkipIfFS, SkipIfLocal, SkipIfNotHdfsMinicluster
 from tests.util.filesystem_utils import IS_EC
 from time import sleep
 from RuntimeProfile.ttypes import TRuntimeProfileFormat
@@ -92,14 +90,7 @@ class TestObservability(ImpalaTestSuite):
     assert num_validated > 0
     self.hs2_client.close_query(handle)
 
-  @SkipIfS3.hbase
-  @SkipIfOzone.hbase
-  @SkipIfGCS.hbase
-  @SkipIfCOS.hbase
-  @SkipIfLocal.hbase
-  @SkipIfIsilon.hbase
-  @SkipIfABFS.hbase
-  @SkipIfADLS.hbase
+  @SkipIfFS.hbase
   def test_scan_summary(self):
     """IMPALA-4499: Checks that the exec summary for scans show the table name."""
     # HDFS table
@@ -676,14 +667,7 @@ class TestObservability(ImpalaTestSuite):
     self.__check_query_profile_storage_load_time(unique_database, table_name,
         cluster_properties)
 
-  @SkipIfS3.hbase
-  @SkipIfOzone.hbase
-  @SkipIfGCS.hbase
-  @SkipIfCOS.hbase
-  @SkipIfLocal.hbase
-  @SkipIfIsilon.hbase
-  @SkipIfABFS.hbase
-  @SkipIfADLS.hbase
+  @SkipIfFS.hbase
   @pytest.mark.execute_serially
   def test_query_profile_storage_load_time(self, cluster_properties):
     """Test that when a query needs load metadata for table(s), the

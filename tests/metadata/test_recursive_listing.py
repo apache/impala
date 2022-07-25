@@ -17,8 +17,7 @@ import time
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.test_dimensions import create_uncompressed_text_dimension
-from tests.common.skip import (SkipIfLocal, SkipIfS3, SkipIfGCS, SkipIfCOS,
-                               SkipIfADLS)
+from tests.common.skip import SkipIfLocal, SkipIfFS
 from tests.util.filesystem_utils import WAREHOUSE
 
 
@@ -142,10 +141,8 @@ class TestRecursiveListing(ImpalaTestSuite):
     assert len(self._show_files(fq_tbl_name)) == 1
     assert len(self._get_rows(fq_tbl_name)) == 1
 
-  @SkipIfS3.variable_listing_times
-  @SkipIfCOS.variable_listing_times
-  @SkipIfGCS.variable_listing_times
-  @SkipIfADLS.eventually_consistent
+  @SkipIfFS.variable_listing_times
+  @SkipIfFS.eventually_consistent
   @pytest.mark.execute_serially
   @pytest.mark.stress
   def test_large_staging_dirs(self, unique_database):
@@ -169,10 +166,8 @@ class TestRecursiveListing(ImpalaTestSuite):
                                  pause_ms_before_file_cleanup=300,
                                  refresh_should_fail=False)
 
-  @SkipIfS3.variable_listing_times
-  @SkipIfCOS.variable_listing_times
-  @SkipIfGCS.variable_listing_times
-  @SkipIfADLS.eventually_consistent
+  @SkipIfFS.variable_listing_times
+  @SkipIfFS.eventually_consistent
   @pytest.mark.execute_serially
   @pytest.mark.stress
   def test_partition_dir_removed_inflight(self, unique_database):

@@ -14,20 +14,12 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from tests.common.skip import SkipIfHive2, SkipIfCatalogV2
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfGCS, SkipIfLocal, SkipIfOzone)
+from tests.common.skip import SkipIfFS, SkipIfHive2, SkipIfCatalogV2
 from tests.util.event_processor_utils import EventProcessorUtils
 
 
-@SkipIfS3.hive
-@SkipIfOzone.hive
-@SkipIfABFS.hive
-@SkipIfADLS.hive
-@SkipIfGCS.hive
-@SkipIfIsilon.hive
-@SkipIfLocal.hive
+@SkipIfFS.hive
 @SkipIfCatalogV2.hms_event_polling_disabled()
 class TestEventProcessing(ImpalaTestSuite):
   """This class contains tests that exercise the event processing mechanism in the

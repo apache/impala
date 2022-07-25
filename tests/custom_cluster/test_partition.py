@@ -20,7 +20,7 @@ import pytest
 import shutil
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import (SkipIfIsilon, SkipIfLocal)
+from tests.common.skip import SkipIfFS
 from tests.common.test_dimensions import (
   create_single_exec_option_dimension,
   create_uncompressed_text_dimension)
@@ -43,8 +43,7 @@ class TestPartition(CustomClusterTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
       create_uncompressed_text_dimension(cls.get_workload()))
 
-  @SkipIfIsilon.hive
-  @SkipIfLocal.hive
+  @SkipIfFS.hive
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="--use_local_catalog=true",
@@ -61,8 +60,7 @@ class TestPartition(CustomClusterTestSuite):
       except OSError as e:
         LOG.info("Cannot remove directory %s, %s " % (local_file_dir, e.strerror))
 
-  @SkipIfIsilon.hive
-  @SkipIfLocal.hive
+  @SkipIfFS.hive
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="--use_local_catalog=false",

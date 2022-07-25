@@ -29,9 +29,8 @@ from tests.common.environ import (HIVE_MAJOR_VERSION)
 from tests.common.file_utils import create_table_from_orc
 from tests.common.impala_test_suite import LOG
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import (SkipIf, SkipIfABFS, SkipIfADLS, SkipIfKudu, SkipIfLocal,
-                               SkipIfCatalogV2, SkipIfHive2, SkipIfS3, SkipIfGCS,
-                               SkipIfCOS, SkipIfOzone)
+from tests.common.skip import (SkipIf, SkipIfFS, SkipIfKudu, SkipIfLocal,
+                               SkipIfCatalogV2, SkipIfHive2)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_dimensions import (create_exec_option_dimension,
     create_client_protocol_dimension)
@@ -105,7 +104,7 @@ class TestDdlStatements(TestDdlBase):
     self.filesystem_client.delete_file_dir(
         "test-warehouse/{0}.db/data_t3".format(unique_database), recursive=True)
 
-  @SkipIfADLS.eventually_consistent
+  @SkipIfFS.eventually_consistent
   @SkipIfLocal.hdfs_client
   def test_drop_cleans_hdfs_dirs(self, unique_database):
     self.client.execute('use default')
@@ -153,7 +152,7 @@ class TestDdlStatements(TestDdlBase):
     # Re-create database to make unique_database teardown succeed.
     self._create_db(unique_database)
 
-  @SkipIfADLS.eventually_consistent
+  @SkipIfFS.eventually_consistent
   @SkipIfLocal.hdfs_client
   def test_truncate_cleans_hdfs_files(self, unique_database):
     # Verify the db directory exists
@@ -305,10 +304,7 @@ class TestDdlStatements(TestDdlBase):
         use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
 
   @SkipIfHive2.orc
-  @SkipIfS3.hive
-  @SkipIfOzone.hive
-  @SkipIfGCS.hive
-  @SkipIfCOS.hive
+  @SkipIfFS.hive
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_create_table_like_file_orc(self, vector, unique_database):
     COMPLEXTYPETBL_PATH = 'test-warehouse/managed/functional_orc_def.db/' \

@@ -17,19 +17,11 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_dimensions import create_uncompressed_text_dimension
-from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfGCS, SkipIfCOS, SkipIfLocal, SkipIfOzone)
+from tests.common.skip import SkipIfFS
 from tests.util.filesystem_utils import get_fs_path
 
 
-@SkipIfS3.hive
-@SkipIfOzone.hive
-@SkipIfGCS.hive
-@SkipIfCOS.hive
-@SkipIfABFS.hive
-@SkipIfADLS.hive
-@SkipIfIsilon.hive
-@SkipIfLocal.hive
+@SkipIfFS.hive
 class TestRefreshPartition(ImpalaTestSuite):
   """
   This class tests the functionality to refresh a partition individually

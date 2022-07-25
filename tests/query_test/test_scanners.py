@@ -34,16 +34,10 @@ from testdata.common import widetable
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import (
     SkipIf,
-    SkipIfS3,
-    SkipIfOzone,
-    SkipIfGCS,
-    SkipIfCOS,
-    SkipIfABFS,
-    SkipIfADLS,
+    SkipIfFS,
     SkipIfEC,
     SkipIfHive2,
     SkipIfHive3,
-    SkipIfIsilon,
     SkipIfLocal,
     SkipIfNotHdfsMinicluster)
 from tests.common.test_dimensions import (
@@ -57,8 +51,7 @@ from tests.common.test_result_verifier import (
     QueryTestResult,
     parse_result_rows)
 from tests.common.test_vector import ImpalaTestDimension
-from tests.util.filesystem_utils import IS_HDFS, WAREHOUSE, get_fs_path
-from tests.util.hdfs_util import NAMENODE
+from tests.util.filesystem_utils import IS_HDFS, get_fs_path
 from tests.util.get_parquet_metadata import get_parquet_metadata
 from tests.util.parse_util import get_bytes_summary_stats_counter
 from tests.util.test_file_parser import QueryTestSectionReader
@@ -482,14 +475,7 @@ class TestParquet(ImpalaTestSuite):
     assert len(result.data) == 1
     assert "4294967294" in result.data
 
-  @SkipIfABFS.hive
-  @SkipIfADLS.hive
-  @SkipIfIsilon.hive
-  @SkipIfLocal.hive
-  @SkipIfS3.hive
-  @SkipIfOzone.hive
-  @SkipIfGCS.hive
-  @SkipIfCOS.hive
+  @SkipIfFS.hive
   def test_multi_compression_types(self, vector, unique_database):
     """IMPALA-5448: Tests that parquet splits with multi compression types are counted
     correctly. Cases tested:
@@ -616,13 +602,7 @@ class TestParquet(ImpalaTestSuite):
     assert len(result.data) == 1
     assert "AAAAAAAACPKFFAAA" in result.data
 
-  @SkipIfS3.hdfs_block_size
-  @SkipIfOzone.hdfs_block_size
-  @SkipIfGCS.hdfs_block_size
-  @SkipIfCOS.hdfs_block_size
-  @SkipIfABFS.hdfs_block_size
-  @SkipIfADLS.hdfs_block_size
-  @SkipIfIsilon.hdfs_block_size
+  @SkipIfFS.hdfs_block_size
   @SkipIfLocal.multiple_impalad
   @SkipIfEC.fix_later
   def test_misaligned_parquet_row_groups(self, vector):
@@ -676,13 +656,7 @@ class TestParquet(ImpalaTestSuite):
       total += int(n)
     assert total == num_scanners_with_no_reads
 
-  @SkipIfS3.hdfs_block_size
-  @SkipIfOzone.hdfs_block_size
-  @SkipIfGCS.hdfs_block_size
-  @SkipIfCOS.hdfs_block_size
-  @SkipIfABFS.hdfs_block_size
-  @SkipIfADLS.hdfs_block_size
-  @SkipIfIsilon.hdfs_block_size
+  @SkipIfFS.hdfs_block_size
   @SkipIfLocal.multiple_impalad
   @SkipIfEC.fix_later
   def test_multiple_blocks_mt_dop(self, vector):
@@ -728,13 +702,7 @@ class TestParquet(ImpalaTestSuite):
     finally:
       self.client.clear_configuration()
 
-  @SkipIfS3.hdfs_block_size
-  @SkipIfOzone.hdfs_block_size
-  @SkipIfGCS.hdfs_block_size
-  @SkipIfCOS.hdfs_block_size
-  @SkipIfABFS.hdfs_block_size
-  @SkipIfADLS.hdfs_block_size
-  @SkipIfIsilon.hdfs_block_size
+  @SkipIfFS.hdfs_block_size
   @SkipIfLocal.multiple_impalad
   @SkipIfEC.fix_later
   def test_multiple_blocks(self, vector):
@@ -747,13 +715,7 @@ class TestParquet(ImpalaTestSuite):
     # there are 6 blocks and 3 scan nodes.
     self._multiple_blocks_helper(table_name, 40000, ranges_per_node=2)
 
-  @SkipIfS3.hdfs_block_size
-  @SkipIfOzone.hdfs_block_size
-  @SkipIfGCS.hdfs_block_size
-  @SkipIfCOS.hdfs_block_size
-  @SkipIfABFS.hdfs_block_size
-  @SkipIfADLS.hdfs_block_size
-  @SkipIfIsilon.hdfs_block_size
+  @SkipIfFS.hdfs_block_size
   @SkipIfLocal.multiple_impalad
   @SkipIfEC.fix_later
   def test_multiple_blocks_one_row_group(self, vector):
@@ -1410,15 +1372,9 @@ class TestTextScanRangeLengths(ImpalaTestSuite):
     del new_vector.get_value('exec_option')['abort_on_error']
     self.run_test_case('QueryTest/dateless_timestamp_text', new_vector, unique_database)
 
+
 # Missing Coverage: No coverage for truncated files errors or scans.
-@SkipIfS3.hive
-@SkipIfOzone.hive
-@SkipIfGCS.hive
-@SkipIfCOS.hive
-@SkipIfABFS.hive
-@SkipIfADLS.hive
-@SkipIfIsilon.hive
-@SkipIfLocal.hive
+@SkipIfFS.hive
 class TestScanTruncatedFiles(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):
@@ -1498,14 +1454,8 @@ class TestOrc(ImpalaTestSuite):
       lambda v: v.get_value('table_format').file_format == 'orc')
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('orc_schema_resolution', 0, 1))
 
-  @SkipIfS3.hdfs_block_size
-  @SkipIfOzone.hdfs_block_size
-  @SkipIfGCS.hdfs_block_size
-  @SkipIfCOS.hdfs_block_size
-  @SkipIfABFS.hdfs_block_size
-  @SkipIfADLS.hdfs_block_size
+  @SkipIfFS.hdfs_block_size
   @SkipIfEC.fix_later
-  @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.multiple_impalad
   def test_misaligned_orc_stripes(self, vector, unique_database):
     self._build_lineitem_table_helper(unique_database, 'lineitem_threeblocks',
@@ -1577,14 +1527,7 @@ class TestOrc(ImpalaTestSuite):
   # queries that hang in some cases (IMPALA-9345). It would be possible to separate
   # the tests that use Hive and run most tests on S3, but I think that running these on
   # S3 doesn't add too much coverage.
-  @SkipIfABFS.hive
-  @SkipIfADLS.hive
-  @SkipIfIsilon.hive
-  @SkipIfLocal.hive
-  @SkipIfS3.hive
-  @SkipIfOzone.hive
-  @SkipIfGCS.hive
-  @SkipIfCOS.hive
+  @SkipIfFS.hive
   @SkipIfHive3.non_acid
   def test_type_conversions_hive2(self, vector, unique_database):
     # Create "illtypes" tables whose columns can't match the underlining ORC file's.
@@ -1629,14 +1572,7 @@ class TestOrc(ImpalaTestSuite):
   # queries that hang in some cases (IMPALA-9345). It would be possible to separate
   # the tests that use Hive and run most tests on S3, but I think that running these on
   # S3 doesn't add too much coverage.
-  @SkipIfABFS.hive
-  @SkipIfADLS.hive
-  @SkipIfIsilon.hive
-  @SkipIfLocal.hive
-  @SkipIfS3.hive
-  @SkipIfOzone.hive
-  @SkipIfGCS.hive
-  @SkipIfCOS.hive
+  @SkipIfFS.hive
   @SkipIfHive2.acid
   def test_type_conversions_hive3(self, vector, unique_database):
     # Create "illtypes" tables whose columns can't match the underlining ORC file's.
@@ -1756,14 +1692,7 @@ class TestOrc(ImpalaTestSuite):
 
     self.run_test_case('QueryTest/hive2-pre-gregorian-date-orc', vector, unique_database)
 
-  @SkipIfABFS.hive
-  @SkipIfADLS.hive
-  @SkipIfIsilon.hive
-  @SkipIfLocal.hive
-  @SkipIfS3.hive
-  @SkipIfOzone.hive
-  @SkipIfGCS.hive
-  @SkipIfCOS.hive
+  @SkipIfFS.hive
   def test_missing_field_orc(self, unique_database):
     # Test scanning orc files with missing fields in file meta.
     orc_tbl_name = unique_database + ".missing_field_orc"

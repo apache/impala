@@ -23,10 +23,10 @@ import re
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfGCS, SkipIfCOS, SkipIfLocal, SkipIfDockerizedCluster,
-                               SkipIfCatalogV2, SkipIfOzone)
+from tests.common.skip import (SkipIfFS, SkipIfLocal, SkipIfDockerizedCluster,
+    SkipIfCatalogV2)
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path, IS_S3
+
 
 @SkipIfLocal.hdfs_client
 class TestInsertBehaviour(ImpalaTestSuite):
@@ -48,7 +48,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     if method.__name__ == "test_insert_select_with_empty_resultset":
       self.cleanup_db(self.TEST_DB_NAME)
 
-  @SkipIfADLS.eventually_consistent
+  @SkipIfFS.eventually_consistent
   @pytest.mark.execute_serially
   def test_insert_removes_staging_files(self):
     TBL_NAME = "insert_overwrite_nopart"
@@ -133,13 +133,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     # a subdirectory)
     assert len(self.filesystem_client.ls(part_dir)) == 1
 
-  @SkipIfS3.hdfs_acls
-  @SkipIfOzone.hdfs_acls
-  @SkipIfGCS.hdfs_acls
-  @SkipIfCOS.hdfs_acls
-  @SkipIfABFS.hdfs_acls
-  @SkipIfADLS.hdfs_acls
-  @SkipIfIsilon.hdfs_acls
+  @SkipIfFS.hdfs_acls
   @pytest.mark.xfail(run=False, reason="Fails intermittently on test clusters")
   @pytest.mark.execute_serially
   def test_insert_inherit_acls(self):
@@ -198,13 +192,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
                                       "PARTITION(p1=1, p2=2, p3=30) VALUES(1)")
     check_has_acls("p1=1/p2=2/p3=30", "default:group:new_leaf_group:-w-")
 
-  @SkipIfS3.hdfs_acls
-  @SkipIfOzone.hdfs_acls
-  @SkipIfGCS.hdfs_acls
-  @SkipIfCOS.hdfs_acls
-  @SkipIfABFS.hdfs_acls
-  @SkipIfADLS.hdfs_acls
-  @SkipIfIsilon.hdfs_acls
+  @SkipIfFS.hdfs_acls
   @SkipIfCatalogV2.impala_7539()
   def test_insert_file_permissions(self, unique_database):
     """Test that INSERT correctly respects file permission (minimum ACLs)"""
@@ -254,13 +242,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     # Should be writable because 'other' ACLs allow writes
     self.execute_query_expect_success(self.client, insert_query)
 
-  @SkipIfS3.hdfs_acls
-  @SkipIfOzone.hdfs_acls
-  @SkipIfGCS.hdfs_acls
-  @SkipIfCOS.hdfs_acls
-  @SkipIfABFS.hdfs_acls
-  @SkipIfADLS.hdfs_acls
-  @SkipIfIsilon.hdfs_acls
+  @SkipIfFS.hdfs_acls
   @SkipIfCatalogV2.impala_7539()
   def test_mixed_partition_permissions(self, unique_database):
     """
@@ -339,13 +321,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     self.execute_query_expect_success(self.client, insert_query("added_part"))
     load_data(self.execute_query_expect_success, "added_part")
 
-  @SkipIfS3.hdfs_acls
-  @SkipIfOzone.hdfs_acls
-  @SkipIfGCS.hdfs_acls
-  @SkipIfCOS.hdfs_acls
-  @SkipIfABFS.hdfs_acls
-  @SkipIfADLS.hdfs_acls
-  @SkipIfIsilon.hdfs_acls
+  @SkipIfFS.hdfs_acls
   @SkipIfCatalogV2.impala_7539()
   def test_readonly_table_dir(self, unique_database):
     """
@@ -375,13 +351,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     err = self.execute_query_expect_failure(self.client, insert_query("some_new_part"))
     assert re.search(r'Impala does not have WRITE access.*' + table_path, str(err))
 
-  @SkipIfS3.hdfs_acls
-  @SkipIfOzone.hdfs_acls
-  @SkipIfGCS.hdfs_acls
-  @SkipIfCOS.hdfs_acls
-  @SkipIfABFS.hdfs_acls
-  @SkipIfADLS.hdfs_acls
-  @SkipIfIsilon.hdfs_acls
+  @SkipIfFS.hdfs_acls
   @SkipIfDockerizedCluster.insert_acls
   @SkipIfCatalogV2.impala_7539()
   def test_insert_acl_permissions(self, unique_database):
@@ -459,13 +429,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     # Should be writable because 'other' ACLs allow writes
     self.execute_query_expect_success(self.client, insert_query)
 
-  @SkipIfS3.hdfs_acls
-  @SkipIfOzone.hdfs_acls
-  @SkipIfGCS.hdfs_acls
-  @SkipIfCOS.hdfs_acls
-  @SkipIfABFS.hdfs_acls
-  @SkipIfADLS.hdfs_acls
-  @SkipIfIsilon.hdfs_acls
+  @SkipIfFS.hdfs_acls
   @SkipIfCatalogV2.impala_7539()
   def test_load_permissions(self, unique_database):
     # We rely on test_insert_acl_permissions() to exhaustively check that ACL semantics
@@ -518,8 +482,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     # We expect this to succeed, it's not an error if all files in the dir cannot be read
     self.execute_query_expect_success(self.client, load_dir_query)
 
-  @SkipIfADLS.eventually_consistent
-  @SkipIfCOS.eventually_consistent
+  @SkipIfFS.eventually_consistent
   @pytest.mark.execute_serially
   def test_insert_select_with_empty_resultset(self):
     """Test insert/select query won't trigger partition directory or zero size data file
@@ -589,13 +552,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     self.filesystem_client.delete_file_dir(target_table_path, recursive=True)
     self.execute_query_expect_failure(self.client, insert_query)
 
-  @SkipIfS3.hdfs_acls
-  @SkipIfOzone.hdfs_acls
-  @SkipIfGCS.hdfs_acls
-  @SkipIfCOS.hdfs_acls
-  @SkipIfABFS.hdfs_acls
-  @SkipIfADLS.hdfs_acls
-  @SkipIfIsilon.hdfs_acls
+  @SkipIfFS.hdfs_acls
   @SkipIfDockerizedCluster.insert_acls
   @SkipIfCatalogV2.impala_7539()
   def test_multiple_group_acls(self, unique_database):

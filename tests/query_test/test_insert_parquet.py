@@ -20,7 +20,7 @@
 import os
 
 from collections import namedtuple
-from datetime import (datetime, date)
+from datetime import datetime, date
 from decimal import Decimal
 from subprocess import check_call
 from parquet.ttypes import ColumnOrder, SortingColumn, TypeDefinedOrder, ConvertedType
@@ -28,8 +28,7 @@ from parquet.ttypes import ColumnOrder, SortingColumn, TypeDefinedOrder, Convert
 from tests.common.environ import impalad_basedir
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import (SkipIfEC, SkipIfIsilon, SkipIfLocal, SkipIfS3, SkipIfABFS,
-                               SkipIfADLS, SkipIfGCS, SkipIfCOS, SkipIfOzone)
+from tests.common.skip import SkipIfEC, SkipIfFS, SkipIfLocal
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_result_verifier import verify_query_result_is_equal
 from tests.common.test_vector import ImpalaTestDimension
@@ -200,7 +199,7 @@ class TestInsertParquetVerifySize(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension("compression_codec", *PARQUET_CODECS))
 
-  @SkipIfIsilon.hdfs_block_size
+  @SkipIfFS.hdfs_block_size
   @SkipIfLocal.hdfs_client
   def test_insert_parquet_verify_size(self, vector, unique_database):
     # Test to verify that the result file size is close to what we expect.
@@ -535,14 +534,7 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
   # by python to string. In both HS2 and beewax, it only handles float
   # precision uptil 16 decimal digits and test needs 17.
   # IMPALA-9365 describes why HS2 is not started on non-HDFS test env.
-  @SkipIfS3.hive
-  @SkipIfOzone.hive
-  @SkipIfGCS.hive
-  @SkipIfCOS.hive
-  @SkipIfABFS.hive
-  @SkipIfADLS.hive
-  @SkipIfIsilon.hive
-  @SkipIfLocal.hive
+  @SkipIfFS.hive
   def test_double_precision(self, vector, unique_database):
     # IMPALA-10654: Test inserting double into Parquet table retains the precision.
     src_tbl = "{0}.{1}".format(unique_database, "i10654_parquet")
@@ -556,14 +548,8 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
     result = self.run_stmt_in_hive(select_stmt)
     assert result.split('\n')[1] == '-0.43149576573887316'
 
-@SkipIfIsilon.hive
-@SkipIfLocal.hive
-@SkipIfS3.hive
-@SkipIfOzone.hive
-@SkipIfGCS.hive
-@SkipIfCOS.hive
-@SkipIfABFS.hive
-@SkipIfADLS.hive
+
+@SkipIfFS.hive
 # TODO: Should we move this to test_parquet_stats.py?
 class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
 

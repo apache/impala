@@ -16,17 +16,10 @@
 # under the License.
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfGCS,
-                               SkipIfIsilon, SkipIfLocal, SkipIfOzone)
+from tests.common.skip import SkipIfFS
 
 
-@SkipIfS3.hive
-@SkipIfOzone.hive
-@SkipIfGCS.hive
-@SkipIfABFS.hive
-@SkipIfADLS.hive
-@SkipIfIsilon.hive
-@SkipIfLocal.hive
+@SkipIfFS.hive
 class TestMetadataNoEventsProcessing(CustomClusterTestSuite):
 
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=0")

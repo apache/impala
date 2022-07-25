@@ -25,7 +25,7 @@ from tests.common.environ import ImpalaTestClusterProperties, build_flavor_timeo
 from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.kudu_test_suite import KuduTestSuite
-from tests.common.skip import SkipIfABFS, SkipIfEC, SkipIfNotHdfsMinicluster
+from tests.common.skip import SkipIfFS, SkipIfEC, SkipIfNotHdfsMinicluster
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import IS_HDFS
 
@@ -130,7 +130,7 @@ class TestMtDopParquet(ImpalaTestSuite):
     self.run_test_case('QueryTest/parquet-filtering', vector)
 
   @pytest.mark.execute_serially
-  @SkipIfABFS.file_or_folder_name_ends_with_period
+  @SkipIfFS.file_or_folder_name_ends_with_period
   def test_mt_dop_insert(self, vector, unique_database):
     """Basic tests for inserts with mt_dop > 0"""
     mt_dop = vector.get_value('mt_dop')

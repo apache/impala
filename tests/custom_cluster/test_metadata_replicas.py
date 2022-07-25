@@ -16,28 +16,12 @@
 # under the License.
 
 import pytest
-import re
-from time import sleep
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import (
-    SkipIfS3,
-    SkipIfOzone,
-    SkipIfABFS,
-    SkipIfADLS,
-    SkipIfGCS,
-    SkipIfCOS,
-    SkipIfIsilon,
-    SkipIfLocal)
+from tests.common.skip import SkipIfFS
 from tests.util.hive_utils import HiveDbWrapper
 
-@SkipIfS3.hive
-@SkipIfOzone.hive
-@SkipIfGCS.hive
-@SkipIfCOS.hive
-@SkipIfABFS.hive
-@SkipIfADLS.hive
-@SkipIfIsilon.hive
-@SkipIfLocal.hive
+
+@SkipIfFS.hive
 class TestMetadataReplicas(CustomClusterTestSuite):
   """ Validates metadata content across catalogd and impalad coordinators."""
 

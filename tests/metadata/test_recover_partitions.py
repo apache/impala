@@ -20,7 +20,7 @@
 import os
 from six.moves import urllib
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfLocal, SkipIfS3, SkipIfCatalogV2
+from tests.common.skip import SkipIfLocal, SkipIfFS, SkipIfCatalogV2
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.util.filesystem_utils import WAREHOUSE, IS_S3
@@ -378,7 +378,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
     self.verify_partitions(parts, result.data)
 
   @SkipIfLocal.hdfs_client
-  @SkipIfS3.empty_directory
+  @SkipIfFS.empty_directory
   def test_empty_directory(self, vector, unique_database):
     """Explicitly test how empty directories are handled when partitions are recovered."""
 

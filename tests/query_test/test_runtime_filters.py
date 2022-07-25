@@ -22,13 +22,10 @@ import pytest
 import re
 import time
 
-from beeswaxd.BeeswaxService import QueryState
-from tests.common.environ import build_flavor_timeout
-from tests.common.environ import ImpalaTestClusterProperties
+from tests.common.environ import build_flavor_timeout, ImpalaTestClusterProperties
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfEC
-from tests.common.skip import SkipIfLocal, SkipIfIsilon
+from tests.common.skip import SkipIfEC, SkipIfLocal, SkipIfFS
 from tests.common.test_dimensions import add_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.verifiers.metric_verifier import MetricVerifier
@@ -49,7 +46,7 @@ build_runs_slowly = ImpalaTestClusterProperties.get_instance().runs_slowly()
 # what tests to run for non-HDFS platforms
 @pytest.mark.execute_serially
 @SkipIfLocal.multiple_impalad
-@SkipIfIsilon.jira(reason="IMPALA-6998")
+@SkipIfFS.late_filters
 class TestRuntimeFilters(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):
