@@ -95,6 +95,27 @@ class TestParquetBloomFilter(ImpalaTestSuite):
     vector.get_value('exec_option')['parquet_bloom_filtering'] = False
     self.run_test_case('QueryTest/parquet-bloom-filter-disabled', vector, unique_database)
 
+  def test_parquet_bloom_filtering_schema_change(self, vector, unique_database):
+    """ Regression test for IMPALA-11345. Tests that the query does not fail when a new
+    column is added to the table schema but the old Parquet files do not contain it and
+    therefore no column is found for a conjunct while preparing Bloom filtering. """
+    vector.get_value('exec_option')['parquet_bloom_filtering'] = True
+
+    tbl_name = 'changed_schema'
+
+    stmts = [
+      'create table {db}.{tbl} (id INT) stored as parquet',
+      'insert into {db}.{tbl} values (1),(2),(3)',
+      'alter table {db}.{tbl} add columns (name STRING)',
+      'insert into {db}.{tbl} values (4, "James")',
+      'select * from {db}.{tbl} where name in ("Lily")'
+    ]
+
+    for stmt in stmts:
+      self.execute_query_expect_success(self.client,
+          stmt.format(db=str(unique_database), tbl=tbl_name),
+          vector.get_value('exec_option'))
+
   def test_write_parquet_bloom_filter(self, vector, unique_database, tmpdir):
     # Get Bloom filters from the first row group of file PARQUET_TEST_FILE.
     reference_col_to_bloom_filter = self._get_first_row_group_bloom_filters(
