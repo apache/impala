@@ -1925,13 +1925,39 @@ Status HdfsParquetScanner::ReadToBuffer(uint64_t offset, uint8_t* buffer, uint64
   return Status::OK();
 }
 
+void LogMissingFields(google::LogSeverity log_level, const std::string& text_before,
+    const std::string& text_after, const std::unordered_set<std::string>& paths) {
+  stringstream s;
+  s << text_before;
+  s << "[";
+  size_t i = 0;
+  for (const std::string& path : paths) {
+    s << path;
+    if (i + 1 < paths.size()) {
+      s << ", ";
+    }
+    i++;
+  }
+
+  s << "]. ";
+  s << text_after;
+  VLOG(log_level) << s.str();
+}
+
 // Create a map from column index to EQ conjuncts for Bloom filtering.
 Status HdfsParquetScanner::CreateColIdx2EqConjunctMap() {
   // EQ conjuncts are represented as a LE and a GE conjunct with the same
   // value. This map is used to pair them to form EQ conjuncts.
-  // The value is a vector because there may be multiple GE or LE conjuncts on a column.
+  // The value is a set because there may be multiple GE or LE conjuncts on a column.
   unordered_map<int, std::unordered_set<std::pair<std::string, const Literal*>>>
       conjunct_halves;
+
+  // Slot paths for which no data is found in the file. It is expected for example if it
+  // is a partition column and unexpected for example if the column was added to the table
+  // schema after the current file was written and therefore the current file does
+  // not have the column.
+  std::unordered_set<std::string> unexpected_missing_fields;
+  std::unordered_set<std::string> expected_missing_fields;
 
   for (ScalarExprEvaluator* eval : stats_conjunct_evals_) {
     const ScalarExpr& expr = eval->root();
@@ -1984,12 +2010,23 @@ Status HdfsParquetScanner::CreateColIdx2EqConjunctMap() {
       }
 
       if (missing_field) {
-        if (!file_metadata_utils_.NeedDataInFile(slot_desc)) continue;
-
-        return Status(Substitute(
-            "Unable to find SchemaNode for path '$0' in the schema of file '$1'.",
-            PrintPath(*scan_node_->hdfs_table(), slot_desc->col_path()), filename()));
+        if (file_metadata_utils_.NeedDataInFile(slot_desc)) {
+          // If a column is added to the schema of an existing table, the schemas of the
+          // old parquet data files do not contain the new column: see IMPALA-11345. This
+          // is not an error, we simply disregard this column in Bloom filtering in this
+          // scanner.
+          unexpected_missing_fields.emplace(
+              PrintPath(*scan_node_->hdfs_table(), slot_desc->col_path()));
+        } else {
+          // If the data is not expected to be in the file, we disregard the conjuncts for
+          // the purposes of Bloom filtering.
+          expected_missing_fields.emplace(
+              PrintPath(*scan_node_->hdfs_table(), slot_desc->col_path()));
+        }
+        continue;
       }
+
+      DCHECK(node != nullptr);
 
       if (!IsParquetBloomFilterSupported(node->element->type, child_slot_ref->type())) {
         continue;
@@ -2028,6 +2065,29 @@ Status HdfsParquetScanner::CreateColIdx2EqConjunctMap() {
         conjunct_halves[col_idx].emplace(function_name, child_literal);
       }
     }
+  }
+
+  // Log expected and unexpected missing fields.
+  if (!unexpected_missing_fields.empty()) {
+    LogMissingFields(google::WARNING,
+        Substitute(
+          "Unable to find SchemaNode for the following paths in the schema of "
+          "file '$0': ",
+          filename()),
+        "This may be because the column may have been added to the table schema after "
+        "writing this file. Disregarding conjuncts on this path for the purpose of "
+        "Parquet Bloom filtering in this file.",
+        unexpected_missing_fields);
+  }
+
+  if (!expected_missing_fields.empty()) {
+    LogMissingFields(google::INFO,
+        Substitute(
+          "Data for the following paths is not expected to be present in file '$0': ",
+          filename()),
+        "Disregarding conjuncts on this path for the purpose of Parquet Bloom filtering "
+        "in this file.",
+        expected_missing_fields);
   }
 
   return Status::OK();
