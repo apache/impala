@@ -52,8 +52,8 @@ table FbFileBlock {
   replica_host_idxs: [ushort] (id: 2);
 
   // The list of disk ids for the file block. May not be set if disk ids are not
-  // supported.
-  disk_ids: [ushort] (id: 3);
+  // supported. Set to -1 for unknown disk id.
+  disk_ids: [short] (id: 3);
 }
 
 table FbFileDesc {
