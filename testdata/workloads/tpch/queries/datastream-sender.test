@@ -1,0 +1,48 @@
+====
+---- QUERY: SHUFFLES
+# Shuffling around 1 GB of rows
+SET mem_limit="1gb";
+WITH cte1
+    AS (SELECT  c1,
+                c2,
+                orderkey
+         FROM   (SELECT Repeat(Group_concat(o_comment, o_comment), 20) AS c1,
+                        Repeat(Group_concat(o_comment, o_comment), 20) AS c2,
+                        o_orderkey % 700                               AS
+                        orderkey
+                FROM   orders
+                WHERE  o_orderkey < 800000000
+                GROUP  BY orderkey
+                UNION ALL
+                SELECT  Repeat(Group_concat(o_comment, o_comment), 20) AS c1,
+                        Repeat(Group_concat(o_comment, o_comment), 20) AS c2,
+                        o_orderkey % 700                               AS
+                        orderkey
+                FROM    orders
+                WHERE   o_orderkey = 1
+                GROUP   BY orderkey) a),
+    cte2
+    AS (SELECT o_orderkey % 700 AS orderkey
+        FROM    orders
+        WHERE   o_orderkey < 800000000
+        GROUP   BY orderkey
+        UNION   ALL
+        SELECT  o_orderkey % 700 AS orderkey
+        FROM    orders
+        WHERE   o_orderkey = 1
+        GROUP   BY orderkey)
+SELECT /* +straight_join */ Count(*),
+                            Max(Length(t1.c1)),
+                            Max(Length(t1.c2)),
+                            Max(Length(Substr(t1.c1, 1, 30))),
+                            Max(Length(Substr(t1.c2, 1, 30)))
+FROM   cte1 t1
+       JOIN /* +shuffle */ cte2 t2
+         ON t1.orderkey = t2.orderkey
+---- RESULTS
+703,4251520,4251520,30,30
+---- TYPES
+BIGINT, INT, INT, INT, INT
+---- RUNTIME_PROFILE
+row_regex:.*:EXCHANGE SENDER.*[0-9\.]+ MB.*
+=====

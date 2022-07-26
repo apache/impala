@@ -181,7 +181,7 @@ Per-Host Resources: mem-estimate=95.05MB mem-reservation=85.00MB thread-reservat
 |  |  in pipelines: 04(GETNEXT)
 |  |
 |  F03:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=164.00MB mem-reservation=23.94MB thread-reservation=2 runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=164.12MB mem-reservation=23.94MB thread-reservation=2 runtime-filters-memory=1.00MB
 |  07:AGGREGATE [STREAMING]
 |  |  group by: cs_bill_customer_sk, cs_item_sk
 |  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
@@ -202,7 +202,7 @@ Per-Host Resources: mem-estimate=95.05MB mem-reservation=85.00MB thread-reservat
 |  |  |  in pipelines: 05(GETNEXT)
 |  |  |
 |  |  F04:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=32.05MB mem-reservation=512.00KB thread-reservation=2
 |  |  05:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.15MB
 |  |     predicates: d_month_seq <= CAST(1211 AS INT), d_month_seq >= CAST(1200 AS INT)
@@ -239,7 +239,7 @@ Per-Host Resources: mem-estimate=95.05MB mem-reservation=85.00MB thread-reservat
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=69.00MB mem-reservation=37.94MB thread-reservation=2 runtime-filters-memory=1.00MB
+Per-Host Resources: mem-estimate=69.12MB mem-reservation=37.94MB thread-reservation=2 runtime-filters-memory=1.00MB
 03:AGGREGATE [STREAMING]
 |  group by: ss_customer_sk, ss_item_sk
 |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
@@ -260,7 +260,7 @@ Per-Host Resources: mem-estimate=69.00MB mem-reservation=37.94MB thread-reservat
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=2
+|  Per-Host Resources: mem-estimate=32.05MB mem-reservation=512.00KB thread-reservation=2
 |  01:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.15MB
 |     predicates: d_month_seq <= CAST(1211 AS INT), d_month_seq >= CAST(1200 AS INT)
@@ -287,7 +287,7 @@ Per-Host Resources: mem-estimate=69.00MB mem-reservation=37.94MB thread-reservat
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=154.75MB Threads=12
-Per-Host Resource Estimates: Memory=283MB
+Per-Host Resource Estimates: Memory=284MB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
@@ -342,7 +342,7 @@ Per-Instance Resources: mem-estimate=27.09MB mem-reservation=17.00MB thread-rese
 |  |
 |  F03:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-|  Per-Instance Resources: mem-estimate=65.00MB mem-reservation=21.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=65.38MB mem-reservation=21.00MB thread-reservation=1
 |  07:AGGREGATE [STREAMING]
 |  |  group by: cs_bill_customer_sk, cs_item_sk
 |  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
@@ -371,7 +371,7 @@ Per-Instance Resources: mem-estimate=27.09MB mem-reservation=17.00MB thread-rese
 |  |  |  in pipelines: 05(GETNEXT)
 |  |  |
 |  |  F04:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=512.00KB thread-reservation=1
 |  |  05:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.15MB
 |  |     predicates: d_month_seq <= CAST(1211 AS INT), d_month_seq >= CAST(1200 AS INT)
@@ -409,7 +409,7 @@ Per-Instance Resources: mem-estimate=27.09MB mem-reservation=17.00MB thread-rese
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-Per-Instance Resources: mem-estimate=33.00MB mem-reservation=18.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=33.38MB mem-reservation=18.00MB thread-reservation=1
 03:AGGREGATE [STREAMING]
 |  group by: ss_customer_sk, ss_item_sk
 |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
@@ -438,7 +438,7 @@ Per-Instance Resources: mem-estimate=33.00MB mem-reservation=18.00MB thread-rese
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=512.00KB thread-reservation=1
 |  01:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.15MB
 |     predicates: d_month_seq <= CAST(1211 AS INT), d_month_seq >= CAST(1200 AS INT)

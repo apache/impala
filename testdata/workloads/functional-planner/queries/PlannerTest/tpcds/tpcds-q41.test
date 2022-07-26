@@ -161,7 +161,7 @@ Per-Host Resources: mem-estimate=10.08MB mem-reservation=1.94MB thread-reservati
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-Per-Host Resources: mem-estimate=59.95MB mem-reservation=4.44MB thread-reservation=2
+Per-Host Resources: mem-estimate=60.07MB mem-reservation=4.44MB thread-reservation=2
 04:AGGREGATE [STREAMING]
 |  group by: (i_product_name)
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
@@ -182,7 +182,7 @@ Per-Host Resources: mem-estimate=59.95MB mem-reservation=4.44MB thread-reservati
 |  |  in pipelines: 07(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [HASH(i_manufact)] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=10.14MB mem-reservation=1.94MB thread-reservation=1
 |  07:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  group by: i_manufact
@@ -197,7 +197,7 @@ Per-Host Resources: mem-estimate=59.95MB mem-reservation=4.44MB thread-reservati
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=90.00MB mem-reservation=2.12MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=90.14MB mem-reservation=2.12MB thread-reservation=2
 |  02:AGGREGATE [STREAMING]
 |  |  output: count(*)
 |  |  group by: i_manufact
@@ -264,7 +264,7 @@ Per-Instance Resources: mem-estimate=10.08MB mem-reservation=1.94MB thread-reser
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-Per-Instance Resources: mem-estimate=26.00MB mem-reservation=2.50MB thread-reservation=1
+Per-Instance Resources: mem-estimate=26.13MB mem-reservation=2.50MB thread-reservation=1
 04:AGGREGATE [STREAMING]
 |  group by: (i_product_name)
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
@@ -293,7 +293,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=2.50MB thread-reser
 |  |  in pipelines: 07(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [HASH(i_manufact)] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=10.14MB mem-reservation=1.94MB thread-reservation=1
 |  07:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  group by: i_manufact
@@ -308,7 +308,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=2.50MB thread-reser
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=26.00MB mem-reservation=2.12MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=26.14MB mem-reservation=2.12MB thread-reservation=1
 |  02:AGGREGATE [STREAMING]
 |  |  output: count(*)
 |  |  group by: i_manufact

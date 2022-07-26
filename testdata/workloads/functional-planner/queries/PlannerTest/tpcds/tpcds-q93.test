@@ -149,7 +149,7 @@ Per-Host Resources: mem-estimate=116.56MB mem-reservation=25.94MB thread-reserva
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=2
+|  Per-Host Resources: mem-estimate=32.14MB mem-reservation=16.00KB thread-reservation=2
 |  02:SCAN HDFS [tpcds_parquet.reason, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.92KB
 |     predicates: r_reason_desc = 'reason 28'
@@ -176,7 +176,7 @@ Per-Host Resources: mem-estimate=116.56MB mem-reservation=25.94MB thread-reserva
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=97.00MB mem-reservation=5.00MB thread-reservation=2 runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=97.11MB mem-reservation=5.00MB thread-reservation=2 runtime-filters-memory=1.00MB
 |  01:SCAN HDFS [tpcds_parquet.store_returns, RANDOM]
 |     HDFS partitions=1/1 files=1 size=15.43MB
 |     runtime filters: RF001[min_max] -> sr_reason_sk, RF000[bloom] -> sr_reason_sk
@@ -200,7 +200,7 @@ Per-Host Resources: mem-estimate=116.56MB mem-reservation=25.94MB thread-reserva
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=63.77MB Threads=9
-Per-Host Resource Estimates: Memory=164MB
+Per-Host Resource Estimates: Memory=165MB
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -235,7 +235,7 @@ Per-Instance Resources: mem-estimate=10.66MB mem-reservation=1.94MB thread-reser
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
-Per-Instance Resources: mem-estimate=26.00MB mem-reservation=6.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=26.56MB mem-reservation=6.00MB thread-reservation=1
 05:AGGREGATE [STREAMING]
 |  output: sum(CASE WHEN sr_return_quantity IS NOT NULL THEN CAST((CAST(ss_quantity AS BIGINT) - CAST(sr_return_quantity AS BIGINT)) AS DECIMAL(19,0)) * ss_sales_price ELSE CAST((CAST(ss_quantity AS DECIMAL(10,0)) * ss_sales_price) AS DECIMAL(27,2)) END)
 |  group by: ss_customer_sk
@@ -265,7 +265,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=6.00MB thread-reser
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=16.14MB mem-reservation=16.00KB thread-reservation=1
 |  02:SCAN HDFS [tpcds_parquet.reason, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.92KB
 |     predicates: r_reason_desc = 'reason 28'
@@ -301,7 +301,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=6.00MB thread-reser
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-|  Per-Instance Resources: mem-estimate=24.00MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=24.11MB mem-reservation=4.00MB thread-reservation=1
 |  01:SCAN HDFS [tpcds_parquet.store_returns, RANDOM]
 |     HDFS partitions=1/1 files=1 size=15.43MB
 |     runtime filters: RF001[min_max] -> sr_reason_sk, RF000[bloom] -> sr_reason_sk

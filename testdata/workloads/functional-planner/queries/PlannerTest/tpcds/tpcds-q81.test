@@ -242,7 +242,7 @@ PLAN-ROOT SINK
    in pipelines: 02(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=52.62MB Threads=20
-Per-Host Resource Estimates: Memory=637MB
+Per-Host Resource Estimates: Memory=639MB
 F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.06MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -278,7 +278,7 @@ Per-Host Resources: mem-estimate=17.68MB mem-reservation=8.75MB thread-reservati
 |  |  in pipelines: 30(GETNEXT)
 |  |
 |  F10:PLAN FRAGMENT [HASH(ctr2.ctr_state)] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=10.13MB mem-reservation=1.94MB thread-reservation=1
 |  30:AGGREGATE [FINALIZE]
 |  |  output: avg:merge(ctr_total_return)
 |  |  group by: ctr2.ctr_state
@@ -335,7 +335,7 @@ Per-Host Resources: mem-estimate=17.68MB mem-reservation=8.75MB thread-reservati
 |  |  |  in pipelines: 08(GETNEXT)
 |  |  |
 |  |  F07:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=98.95MB mem-reservation=4.94MB thread-reservation=2 runtime-filters-memory=1.00MB
+|  |  Per-Host Resources: mem-estimate=99.06MB mem-reservation=4.94MB thread-reservation=2 runtime-filters-memory=1.00MB
 |  |  11:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  |  hash predicates: cr_returned_date_sk = d_date_sk
 |  |  |  fk/pk conjuncts: cr_returned_date_sk = d_date_sk
@@ -350,7 +350,7 @@ Per-Host Resources: mem-estimate=17.68MB mem-reservation=8.75MB thread-reservati
 |  |  |  |  in pipelines: 09(GETNEXT)
 |  |  |  |
 |  |  |  F08:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  |  Per-Host Resources: mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=2
+|  |  |  Per-Host Resources: mem-estimate=32.05MB mem-reservation=512.00KB thread-reservation=2
 |  |  |  09:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.15MB
 |  |  |     predicates: d_year = CAST(2000 AS INT)
@@ -400,7 +400,7 @@ Per-Host Resources: mem-estimate=17.68MB mem-reservation=8.75MB thread-reservati
 |  |  in pipelines: 07(GETNEXT)
 |  |
 |  F04:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=99.31MB mem-reservation=6.94MB thread-reservation=2 runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=100.10MB mem-reservation=6.94MB thread-reservation=2 runtime-filters-memory=1.00MB
 |  15:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: c_current_addr_sk = ca_address_sk
 |  |  fk/pk conjuncts: c_current_addr_sk = ca_address_sk
@@ -415,7 +415,7 @@ Per-Host Resources: mem-estimate=17.68MB mem-reservation=8.75MB thread-reservati
 |  |  |  in pipelines: 06(GETNEXT)
 |  |  |
 |  |  F05:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=128.00MB mem-reservation=1.00MB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=128.81MB mem-reservation=1.00MB thread-reservation=2
 |  |  06:SCAN HDFS [tpcds_parquet.customer_address, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.16MB
 |  |     predicates: ca_state = 'GA'
@@ -475,7 +475,7 @@ Per-Host Resources: mem-estimate=47.51MB mem-reservation=7.12MB thread-reservati
 |  |  in pipelines: 00(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=99.95MB mem-reservation=5.94MB thread-reservation=2 runtime-filters-memory=2.00MB
+|  Per-Host Resources: mem-estimate=100.06MB mem-reservation=5.94MB thread-reservation=2 runtime-filters-memory=2.00MB
 |  03:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: cr_returned_date_sk = d_date_sk
 |  |  fk/pk conjuncts: cr_returned_date_sk = d_date_sk
@@ -490,7 +490,7 @@ Per-Host Resources: mem-estimate=47.51MB mem-reservation=7.12MB thread-reservati
 |  |  |  in pipelines: 01(GETNEXT)
 |  |  |
 |  |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=32.05MB mem-reservation=512.00KB thread-reservation=2
 |  |  01:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.15MB
 |  |     predicates: d_year = CAST(2000 AS INT)
@@ -527,7 +527,7 @@ Per-Host Resources: mem-estimate=47.51MB mem-reservation=7.12MB thread-reservati
    in pipelines: 02(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=73.06MB Threads=19
-Per-Host Resource Estimates: Memory=257MB
+Per-Host Resource Estimates: Memory=260MB
 F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.06MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -571,7 +571,7 @@ Per-Instance Resources: mem-estimate=10.89MB mem-reservation=2.88MB thread-reser
 |  |  in pipelines: 30(GETNEXT)
 |  |
 |  F10:PLAN FRAGMENT [HASH(ctr2.ctr_state)] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=10.13MB mem-reservation=1.94MB thread-reservation=1
 |  30:AGGREGATE [FINALIZE]
 |  |  output: avg:merge(ctr_total_return)
 |  |  group by: ctr2.ctr_state
@@ -607,7 +607,7 @@ Per-Instance Resources: mem-estimate=10.89MB mem-reservation=2.88MB thread-reser
 |  |
 |  F06:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-|  Per-Instance Resources: mem-estimate=26.00MB mem-reservation=2.25MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=26.15MB mem-reservation=2.25MB thread-reservation=1
 |  13:AGGREGATE [STREAMING]
 |  |  output: sum(cr_return_amt_inc_tax)
 |  |  group by: cr_returning_customer_sk, ca_state
@@ -638,7 +638,7 @@ Per-Instance Resources: mem-estimate=10.89MB mem-reservation=2.88MB thread-reser
 |  |  |
 |  |  F07:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-|  |  Per-Instance Resources: mem-estimate=24.00MB mem-reservation=2.00MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=24.12MB mem-reservation=2.00MB thread-reservation=1
 |  |  11:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  |  hash-table-id=02
 |  |  |  hash predicates: cr_returned_date_sk = d_date_sk
@@ -661,7 +661,7 @@ Per-Instance Resources: mem-estimate=10.89MB mem-reservation=2.88MB thread-reser
 |  |  |  |  in pipelines: 09(GETNEXT)
 |  |  |  |
 |  |  |  F08:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
+|  |  |  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=512.00KB thread-reservation=1
 |  |  |  09:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.15MB
 |  |  |     predicates: d_year = CAST(2000 AS INT)
@@ -720,7 +720,7 @@ Per-Instance Resources: mem-estimate=10.89MB mem-reservation=2.88MB thread-reser
 |  |
 |  F04:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=17.17MB mem-reservation=4.00MB thread-reservation=1
 |  15:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash-table-id=04
 |  |  hash predicates: c_current_addr_sk = ca_address_sk
@@ -743,7 +743,7 @@ Per-Instance Resources: mem-estimate=10.89MB mem-reservation=2.88MB thread-reser
 |  |  |  in pipelines: 06(GETNEXT)
 |  |  |
 |  |  F05:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.81MB mem-reservation=1.00MB thread-reservation=1
 |  |  06:SCAN HDFS [tpcds_parquet.customer_address, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.16MB
 |  |     predicates: ca_state = 'GA'
@@ -782,7 +782,7 @@ Per-Instance Resources: mem-estimate=10.89MB mem-reservation=2.88MB thread-reser
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
-Per-Instance Resources: mem-estimate=26.00MB mem-reservation=2.25MB thread-reservation=1
+Per-Instance Resources: mem-estimate=26.15MB mem-reservation=2.25MB thread-reservation=1
 05:AGGREGATE [STREAMING]
 |  output: sum(cr_return_amt_inc_tax)
 |  group by: cr_returning_customer_sk, ca_state
@@ -813,7 +813,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=2.25MB thread-reser
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
-|  Per-Instance Resources: mem-estimate=24.00MB mem-reservation=2.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=24.12MB mem-reservation=2.00MB thread-reservation=1
 |  03:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash-table-id=06
 |  |  hash predicates: cr_returned_date_sk = d_date_sk
@@ -836,7 +836,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=2.25MB thread-reser
 |  |  |  in pipelines: 01(GETNEXT)
 |  |  |
 |  |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=512.00KB thread-reservation=1
 |  |  01:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.15MB
 |  |     predicates: d_year = CAST(2000 AS INT)

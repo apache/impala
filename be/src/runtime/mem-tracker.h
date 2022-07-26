@@ -570,4 +570,53 @@ class PoolMemTrackerRegistry {
   /// automatically destroy itself as part of process teardown, which could cause races.
   SpinLock pool_to_mem_trackers_lock_;
 };
+
+// An std::allocator that manipulates a MemTracker during allocation
+// and deallocation.
+// This is copied from src/kudu/util/mem_tracker.h
+template <typename T, typename Alloc = std::allocator<T>>
+class MemTrackerAllocator : public Alloc {
+ public:
+  typedef typename Alloc::pointer pointer;
+  typedef typename Alloc::const_pointer const_pointer;
+  typedef typename Alloc::size_type size_type;
+
+  explicit MemTrackerAllocator(std::shared_ptr<MemTracker> mem_tracker)
+    : mem_tracker_(std::move(mem_tracker)) {}
+
+  // This constructor is used for rebinding.
+  template <typename U>
+  MemTrackerAllocator(const MemTrackerAllocator<U>& allocator)
+    : Alloc(allocator), mem_tracker_(allocator.mem_tracker()) {}
+
+  ~MemTrackerAllocator() {}
+
+  pointer allocate(size_type n, const_pointer hint = 0) {
+    // Ideally we'd use TryConsume() here to enforce the tracker's limit.
+    // However, that means throwing bad_alloc if the limit is exceeded, and
+    // it's not clear that the rest of Kudu can handle that.
+    mem_tracker_->Consume(n * sizeof(T));
+    return Alloc::allocate(n, hint);
+  }
+
+  void deallocate(pointer p, size_type n) {
+    Alloc::deallocate(p, n);
+    mem_tracker_->Release(n * sizeof(T));
+  }
+
+  // This allows an allocator<T> to be used for a different type.
+  template <class U>
+  struct rebind {
+    typedef MemTrackerAllocator<U, typename Alloc::template rebind<U>::other> other;
+  };
+
+  const std::shared_ptr<MemTracker>& mem_tracker() const { return mem_tracker_; }
+
+ private:
+  std::shared_ptr<MemTracker> mem_tracker_;
+};
+
+typedef MemTrackerAllocator<char> CharMemTrackerAllocator;
+typedef std::basic_string<char, std::char_traits<char>, CharMemTrackerAllocator>
+    TrackedString;
 }

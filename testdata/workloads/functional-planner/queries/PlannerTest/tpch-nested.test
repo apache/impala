@@ -41,7 +41,7 @@ PLAN-ROOT SINK
    row-size=68B cardinality=1.50M
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=116.00MB Threads=4
-Per-Host Resource Estimates: Memory=1.03GB
+Per-Host Resource Estimates: Memory=1.04GB
 PLAN-ROOT SINK
 |
 05:MERGING-EXCHANGE [UNPARTITIONED]
@@ -415,7 +415,7 @@ PLAN-ROOT SINK
    row-size=33B cardinality=30.00K
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=104.00MB Threads=4
-Per-Host Resource Estimates: Memory=886MB
+Per-Host Resource Estimates: Memory=887MB
 PLAN-ROOT SINK
 |
 13:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1548,7 +1548,7 @@ PLAN-ROOT SINK
    row-size=209B cardinality=150.00K
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=66.89MB Threads=6
-Per-Host Resource Estimates: Memory=892MB
+Per-Host Resource Estimates: Memory=894MB
 PLAN-ROOT SINK
 |
 16:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1726,7 +1726,7 @@ PLAN-ROOT SINK
    row-size=14B cardinality=10.00K
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=115.91MB Threads=11
-Per-Host Resource Estimates: Memory=730MB
+Per-Host Resource Estimates: Memory=731MB
 PLAN-ROOT SINK
 |
 25:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2185,7 +2185,7 @@ PLAN-ROOT SINK
    row-size=36B cardinality=1.50M
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=190.88MB Threads=10
-Per-Host Resource Estimates: Memory=1.60GB
+Per-Host Resource Estimates: Memory=1.61GB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2448,7 +2448,7 @@ PLAN-ROOT SINK
    row-size=24B cardinality=15.00M
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=154.94MB Threads=8
-Per-Host Resource Estimates: Memory=986MB
+Per-Host Resource Estimates: Memory=987MB
 PLAN-ROOT SINK
 |
 12:AGGREGATE [FINALIZE]
@@ -3200,7 +3200,7 @@ PLAN-ROOT SINK
    row-size=47B cardinality=15.00K
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=31.94MB Threads=8
-Per-Host Resource Estimates: Memory=652MB
+Per-Host Resource Estimates: Memory=653MB
 PLAN-ROOT SINK
 |
 15:MERGING-EXCHANGE [UNPARTITIONED]

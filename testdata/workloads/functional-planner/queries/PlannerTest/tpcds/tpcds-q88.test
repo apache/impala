@@ -766,7 +766,7 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=73.12MB Threads=72
-Per-Host Resource Estimates: Memory=1.43GB
+Per-Host Resource Estimates: Memory=1.44GB
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.13MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -784,7 +784,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 116(GETNEXT)
 |  |
 |  F39:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=64.00KB mem-reservation=0B thread-reservation=1
 |  116:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -818,7 +818,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 59(GETNEXT)
 |  |  |
 |  |  F38:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=32.09MB mem-reservation=16.00KB thread-reservation=2
 |  |  59:SCAN HDFS [tpcds_parquet.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=9.93KB
 |  |     predicates: store.s_store_name = 'ese'
@@ -846,7 +846,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 57(GETNEXT)
 |  |  |
 |  |  F37:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=64.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=48.06MB mem-reservation=64.00KB thread-reservation=2
 |  |  57:SCAN HDFS [tpcds_parquet.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)))
@@ -872,7 +872,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 58(GETNEXT)
 |  |  |
 |  |  F36:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=512.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=48.06MB mem-reservation=512.00KB thread-reservation=2
 |  |  58:SCAN HDFS [tpcds_parquet.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     predicates: time_dim.t_hour = CAST(12 AS INT), time_dim.t_minute < CAST(30 AS INT)
@@ -909,7 +909,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 110(GETNEXT)
 |  |
 |  F34:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=64.00KB mem-reservation=0B thread-reservation=1
 |  110:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -943,7 +943,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 51(GETNEXT)
 |  |  |
 |  |  F33:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=32.09MB mem-reservation=16.00KB thread-reservation=2
 |  |  51:SCAN HDFS [tpcds_parquet.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=9.93KB
 |  |     predicates: store.s_store_name = 'ese'
@@ -971,7 +971,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 49(GETNEXT)
 |  |  |
 |  |  F32:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=64.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=48.06MB mem-reservation=64.00KB thread-reservation=2
 |  |  49:SCAN HDFS [tpcds_parquet.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)))
@@ -997,7 +997,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 50(GETNEXT)
 |  |  |
 |  |  F31:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=512.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=48.06MB mem-reservation=512.00KB thread-reservation=2
 |  |  50:SCAN HDFS [tpcds_parquet.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     predicates: time_dim.t_hour = CAST(11 AS INT), time_dim.t_minute >= CAST(30 AS INT)
@@ -1034,7 +1034,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 104(GETNEXT)
 |  |
 |  F29:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=64.00KB mem-reservation=0B thread-reservation=1
 |  104:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1068,7 +1068,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 43(GETNEXT)
 |  |  |
 |  |  F28:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=32.09MB mem-reservation=16.00KB thread-reservation=2
 |  |  43:SCAN HDFS [tpcds_parquet.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=9.93KB
 |  |     predicates: store.s_store_name = 'ese'
@@ -1096,7 +1096,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 41(GETNEXT)
 |  |  |
 |  |  F27:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=64.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=48.06MB mem-reservation=64.00KB thread-reservation=2
 |  |  41:SCAN HDFS [tpcds_parquet.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)))
@@ -1122,7 +1122,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 42(GETNEXT)
 |  |  |
 |  |  F26:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=512.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=48.06MB mem-reservation=512.00KB thread-reservation=2
 |  |  42:SCAN HDFS [tpcds_parquet.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     predicates: time_dim.t_hour = CAST(11 AS INT), time_dim.t_minute < CAST(30 AS INT)
@@ -1159,7 +1159,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 98(GETNEXT)
 |  |
 |  F24:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=64.00KB mem-reservation=0B thread-reservation=1
 |  98:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1193,7 +1193,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 35(GETNEXT)
 |  |  |
 |  |  F23:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=32.09MB mem-reservation=16.00KB thread-reservation=2
 |  |  35:SCAN HDFS [tpcds_parquet.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=9.93KB
 |  |     predicates: store.s_store_name = 'ese'
@@ -1221,7 +1221,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 33(GETNEXT)
 |  |  |
 |  |  F22:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=64.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=48.06MB mem-reservation=64.00KB thread-reservation=2
 |  |  33:SCAN HDFS [tpcds_parquet.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)))
@@ -1247,7 +1247,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 34(GETNEXT)
 |  |  |
 |  |  F21:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=512.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=48.06MB mem-reservation=512.00KB thread-reservation=2
 |  |  34:SCAN HDFS [tpcds_parquet.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     predicates: time_dim.t_hour = CAST(10 AS INT), time_dim.t_minute >= CAST(30 AS INT)
@@ -1284,7 +1284,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 92(GETNEXT)
 |  |
 |  F19:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=64.00KB mem-reservation=0B thread-reservation=1
 |  92:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1318,7 +1318,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 27(GETNEXT)
 |  |  |
 |  |  F18:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=32.09MB mem-reservation=16.00KB thread-reservation=2
 |  |  27:SCAN HDFS [tpcds_parquet.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=9.93KB
 |  |     predicates: store.s_store_name = 'ese'
@@ -1346,7 +1346,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 25(GETNEXT)
 |  |  |
 |  |  F17:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=64.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=48.06MB mem-reservation=64.00KB thread-reservation=2
 |  |  25:SCAN HDFS [tpcds_parquet.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)))
@@ -1372,7 +1372,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 26(GETNEXT)
 |  |  |
 |  |  F16:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=512.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=48.06MB mem-reservation=512.00KB thread-reservation=2
 |  |  26:SCAN HDFS [tpcds_parquet.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     predicates: time_dim.t_hour = CAST(10 AS INT), time_dim.t_minute < CAST(30 AS INT)
@@ -1409,7 +1409,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 86(GETNEXT)
 |  |
 |  F14:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=64.00KB mem-reservation=0B thread-reservation=1
 |  86:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1443,7 +1443,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 19(GETNEXT)
 |  |  |
 |  |  F13:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=32.09MB mem-reservation=16.00KB thread-reservation=2
 |  |  19:SCAN HDFS [tpcds_parquet.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=9.93KB
 |  |     predicates: store.s_store_name = 'ese'
@@ -1471,7 +1471,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 17(GETNEXT)
 |  |  |
 |  |  F12:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=64.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=48.06MB mem-reservation=64.00KB thread-reservation=2
 |  |  17:SCAN HDFS [tpcds_parquet.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)))
@@ -1497,7 +1497,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 18(GETNEXT)
 |  |  |
 |  |  F11:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=512.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=48.06MB mem-reservation=512.00KB thread-reservation=2
 |  |  18:SCAN HDFS [tpcds_parquet.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     predicates: time_dim.t_hour = CAST(9 AS INT), time_dim.t_minute >= CAST(30 AS INT)
@@ -1534,7 +1534,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 80(GETNEXT)
 |  |
 |  F09:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=64.00KB mem-reservation=0B thread-reservation=1
 |  80:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1568,7 +1568,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 11(GETNEXT)
 |  |  |
 |  |  F08:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=32.09MB mem-reservation=16.00KB thread-reservation=2
 |  |  11:SCAN HDFS [tpcds_parquet.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=9.93KB
 |  |     predicates: store.s_store_name = 'ese'
@@ -1596,7 +1596,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 09(GETNEXT)
 |  |  |
 |  |  F07:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=64.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=48.06MB mem-reservation=64.00KB thread-reservation=2
 |  |  09:SCAN HDFS [tpcds_parquet.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)))
@@ -1622,7 +1622,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 10(GETNEXT)
 |  |  |
 |  |  F06:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=512.00KB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=48.06MB mem-reservation=512.00KB thread-reservation=2
 |  |  10:SCAN HDFS [tpcds_parquet.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     predicates: time_dim.t_hour = CAST(9 AS INT), time_dim.t_minute < CAST(30 AS INT)
@@ -1681,7 +1681,7 @@ Per-Host Resources: mem-estimate=55.88MB mem-reservation=8.81MB thread-reservati
 |  |  in pipelines: 03(GETNEXT)
 |  |
 |  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=2
+|  Per-Host Resources: mem-estimate=32.09MB mem-reservation=16.00KB thread-reservation=2
 |  03:SCAN HDFS [tpcds_parquet.store, RANDOM]
 |     HDFS partitions=1/1 files=1 size=9.93KB
 |     predicates: store.s_store_name = 'ese'
@@ -1709,7 +1709,7 @@ Per-Host Resources: mem-estimate=55.88MB mem-reservation=8.81MB thread-reservati
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=48.00MB mem-reservation=64.00KB thread-reservation=2
+|  Per-Host Resources: mem-estimate=48.06MB mem-reservation=64.00KB thread-reservation=2
 |  01:SCAN HDFS [tpcds_parquet.household_demographics, RANDOM]
 |     HDFS partitions=1/1 files=1 size=41.69KB
 |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)))
@@ -1735,7 +1735,7 @@ Per-Host Resources: mem-estimate=55.88MB mem-reservation=8.81MB thread-reservati
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=48.00MB mem-reservation=512.00KB thread-reservation=2
+|  Per-Host Resources: mem-estimate=48.06MB mem-reservation=512.00KB thread-reservation=2
 |  02:SCAN HDFS [tpcds_parquet.time_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.31MB
 |     predicates: time_dim.t_hour = CAST(8 AS INT), time_dim.t_minute >= CAST(30 AS INT)
@@ -1762,7 +1762,7 @@ Per-Host Resources: mem-estimate=55.88MB mem-reservation=8.81MB thread-reservati
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=137.62MB Threads=79
-Per-Host Resource Estimates: Memory=758MB
+Per-Host Resource Estimates: Memory=760MB
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -1787,7 +1787,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 116(GETNEXT)
 |  |
 |  F39:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=64.00KB mem-reservation=0B thread-reservation=1
 |  116:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1830,7 +1830,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 59(GETNEXT)
 |  |  |
 |  |  F38:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.09MB mem-reservation=16.00KB thread-reservation=1
 |  |  59:SCAN HDFS [tpcds_parquet.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=9.93KB
 |  |     predicates: store.s_store_name = 'ese'
@@ -1866,7 +1866,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 57(GETNEXT)
 |  |  |
 |  |  F37:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=64.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=64.00KB thread-reservation=1
 |  |  57:SCAN HDFS [tpcds_parquet.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)))
@@ -1900,7 +1900,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 58(GETNEXT)
 |  |  |
 |  |  F36:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=512.00KB thread-reservation=1
 |  |  58:SCAN HDFS [tpcds_parquet.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     predicates: time_dim.t_hour = CAST(12 AS INT), time_dim.t_minute < CAST(30 AS INT)
@@ -1944,7 +1944,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 110(GETNEXT)
 |  |
 |  F34:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=64.00KB mem-reservation=0B thread-reservation=1
 |  110:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1987,7 +1987,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 51(GETNEXT)
 |  |  |
 |  |  F33:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.09MB mem-reservation=16.00KB thread-reservation=1
 |  |  51:SCAN HDFS [tpcds_parquet.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=9.93KB
 |  |     predicates: store.s_store_name = 'ese'
@@ -2023,7 +2023,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 49(GETNEXT)
 |  |  |
 |  |  F32:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=64.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=64.00KB thread-reservation=1
 |  |  49:SCAN HDFS [tpcds_parquet.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)))
@@ -2057,7 +2057,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 50(GETNEXT)
 |  |  |
 |  |  F31:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=512.00KB thread-reservation=1
 |  |  50:SCAN HDFS [tpcds_parquet.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     predicates: time_dim.t_hour = CAST(11 AS INT), time_dim.t_minute >= CAST(30 AS INT)
@@ -2101,7 +2101,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 104(GETNEXT)
 |  |
 |  F29:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=64.00KB mem-reservation=0B thread-reservation=1
 |  104:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -2144,7 +2144,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 43(GETNEXT)
 |  |  |
 |  |  F28:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.09MB mem-reservation=16.00KB thread-reservation=1
 |  |  43:SCAN HDFS [tpcds_parquet.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=9.93KB
 |  |     predicates: store.s_store_name = 'ese'
@@ -2180,7 +2180,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 41(GETNEXT)
 |  |  |
 |  |  F27:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=64.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=64.00KB thread-reservation=1
 |  |  41:SCAN HDFS [tpcds_parquet.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)))
@@ -2214,7 +2214,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 42(GETNEXT)
 |  |  |
 |  |  F26:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=512.00KB thread-reservation=1
 |  |  42:SCAN HDFS [tpcds_parquet.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     predicates: time_dim.t_hour = CAST(11 AS INT), time_dim.t_minute < CAST(30 AS INT)
@@ -2258,7 +2258,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 98(GETNEXT)
 |  |
 |  F24:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=64.00KB mem-reservation=0B thread-reservation=1
 |  98:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -2301,7 +2301,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 35(GETNEXT)
 |  |  |
 |  |  F23:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.09MB mem-reservation=16.00KB thread-reservation=1
 |  |  35:SCAN HDFS [tpcds_parquet.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=9.93KB
 |  |     predicates: store.s_store_name = 'ese'
@@ -2337,7 +2337,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 33(GETNEXT)
 |  |  |
 |  |  F22:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=64.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=64.00KB thread-reservation=1
 |  |  33:SCAN HDFS [tpcds_parquet.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)))
@@ -2371,7 +2371,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 34(GETNEXT)
 |  |  |
 |  |  F21:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=512.00KB thread-reservation=1
 |  |  34:SCAN HDFS [tpcds_parquet.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     predicates: time_dim.t_hour = CAST(10 AS INT), time_dim.t_minute >= CAST(30 AS INT)
@@ -2415,7 +2415,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 92(GETNEXT)
 |  |
 |  F19:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=64.00KB mem-reservation=0B thread-reservation=1
 |  92:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -2458,7 +2458,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 27(GETNEXT)
 |  |  |
 |  |  F18:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.09MB mem-reservation=16.00KB thread-reservation=1
 |  |  27:SCAN HDFS [tpcds_parquet.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=9.93KB
 |  |     predicates: store.s_store_name = 'ese'
@@ -2494,7 +2494,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 25(GETNEXT)
 |  |  |
 |  |  F17:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=64.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=64.00KB thread-reservation=1
 |  |  25:SCAN HDFS [tpcds_parquet.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)))
@@ -2528,7 +2528,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 26(GETNEXT)
 |  |  |
 |  |  F16:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=512.00KB thread-reservation=1
 |  |  26:SCAN HDFS [tpcds_parquet.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     predicates: time_dim.t_hour = CAST(10 AS INT), time_dim.t_minute < CAST(30 AS INT)
@@ -2572,7 +2572,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 86(GETNEXT)
 |  |
 |  F14:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=64.00KB mem-reservation=0B thread-reservation=1
 |  86:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -2615,7 +2615,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 19(GETNEXT)
 |  |  |
 |  |  F13:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.09MB mem-reservation=16.00KB thread-reservation=1
 |  |  19:SCAN HDFS [tpcds_parquet.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=9.93KB
 |  |     predicates: store.s_store_name = 'ese'
@@ -2651,7 +2651,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 17(GETNEXT)
 |  |  |
 |  |  F12:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=64.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=64.00KB thread-reservation=1
 |  |  17:SCAN HDFS [tpcds_parquet.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)))
@@ -2685,7 +2685,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 18(GETNEXT)
 |  |  |
 |  |  F11:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=512.00KB thread-reservation=1
 |  |  18:SCAN HDFS [tpcds_parquet.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     predicates: time_dim.t_hour = CAST(9 AS INT), time_dim.t_minute >= CAST(30 AS INT)
@@ -2729,7 +2729,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 80(GETNEXT)
 |  |
 |  F09:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=64.00KB mem-reservation=0B thread-reservation=1
 |  80:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -2772,7 +2772,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 11(GETNEXT)
 |  |  |
 |  |  F08:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.09MB mem-reservation=16.00KB thread-reservation=1
 |  |  11:SCAN HDFS [tpcds_parquet.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=9.93KB
 |  |     predicates: store.s_store_name = 'ese'
@@ -2808,7 +2808,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 09(GETNEXT)
 |  |  |
 |  |  F07:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=64.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=64.00KB thread-reservation=1
 |  |  09:SCAN HDFS [tpcds_parquet.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)))
@@ -2842,7 +2842,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 10(GETNEXT)
 |  |  |
 |  |  F06:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=512.00KB thread-reservation=1
 |  |  10:SCAN HDFS [tpcds_parquet.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     predicates: time_dim.t_hour = CAST(9 AS INT), time_dim.t_minute < CAST(30 AS INT)
@@ -2910,7 +2910,7 @@ Per-Instance Resources: mem-estimate=16.02MB mem-reservation=1.00MB thread-reser
 |  |  in pipelines: 03(GETNEXT)
 |  |
 |  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=16.09MB mem-reservation=16.00KB thread-reservation=1
 |  03:SCAN HDFS [tpcds_parquet.store, RANDOM]
 |     HDFS partitions=1/1 files=1 size=9.93KB
 |     predicates: store.s_store_name = 'ese'
@@ -2946,7 +2946,7 @@ Per-Instance Resources: mem-estimate=16.02MB mem-reservation=1.00MB thread-reser
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=64.00KB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=64.00KB thread-reservation=1
 |  01:SCAN HDFS [tpcds_parquet.household_demographics, RANDOM]
 |     HDFS partitions=1/1 files=1 size=41.69KB
 |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)))
@@ -2980,7 +2980,7 @@ Per-Instance Resources: mem-estimate=16.02MB mem-reservation=1.00MB thread-reser
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=512.00KB thread-reservation=1
 |  02:SCAN HDFS [tpcds_parquet.time_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.31MB
 |     predicates: time_dim.t_hour = CAST(8 AS INT), time_dim.t_minute >= CAST(30 AS INT)

@@ -61,20 +61,15 @@ RowBatch::RowBatch(const RowDescriptor* row_desc, int capacity, MemTracker* mem_
   DCHECK(tuple_ptrs_ != NULL);
 }
 
-// TODO: we want our input_batch's tuple_data to come from our (not yet implemented)
-// global runtime memory segment; how do we get thrift to allocate it from there?
-// maybe change line (in Data_types.cc generated from Data.thrift)
-//              xfer += iprot->readString(this->tuple_data[_i9]);
-// to allocated string data in special mempool
-// (change via python script that runs over Data_types.cc)
-RowBatch::RowBatch(
-    const RowDescriptor* row_desc, const TRowBatch& input_batch, MemTracker* mem_tracker)
-  : num_rows_(input_batch.num_rows),
-    capacity_(input_batch.num_rows),
+RowBatch::RowBatch(const RowDescriptor* row_desc, const OutboundRowBatch& input_batch,
+    MemTracker* mem_tracker)
+  : num_rows_(input_batch.header()->num_rows()),
+    capacity_(input_batch.header()->num_rows()),
     flush_mode_(FlushMode::NO_FLUSH_RESOURCES),
     needs_deep_copy_(false),
-    num_tuples_per_row_(input_batch.row_tuples.size()),
-    tuple_ptrs_size_(capacity_ * num_tuples_per_row_ * sizeof(Tuple*)),
+    num_tuples_per_row_(input_batch.header()->num_tuples_per_row()),
+    tuple_ptrs_size_(
+        input_batch.header()->num_rows() * num_tuples_per_row_ * sizeof(Tuple*)),
     attached_buffer_bytes_(0),
     tuple_data_pool_(mem_tracker),
     row_desc_(row_desc),
@@ -82,26 +77,21 @@ RowBatch::RowBatch(
   DCHECK(mem_tracker_ != nullptr);
   DCHECK_EQ(num_tuples_per_row_, row_desc_->tuple_descriptors().size());
   DCHECK_GT(tuple_ptrs_size_, 0);
-  kudu::Slice input_tuple_data =
-      kudu::Slice(input_batch.tuple_data.c_str(), input_batch.tuple_data.size());
-  kudu::Slice input_tuple_offsets = kudu::Slice(
-      reinterpret_cast<const char*>(input_batch.tuple_offsets.data()),
-      input_batch.tuple_offsets.size() * sizeof(int32_t));
-  const THdfsCompression::type& compression_type = input_batch.compression_type;
-  DCHECK(compression_type == THdfsCompression::NONE ||
-      compression_type == THdfsCompression::LZ4)
-      << "Unexpected compression type: " << input_batch.compression_type;
+  const CompressionTypePB& compression_type = input_batch.header()->compression_type();
+  DCHECK(compression_type == CompressionTypePB::NONE
+      || compression_type == CompressionTypePB::LZ4)
+      << "Unexpected compression type: " << input_batch.header()->compression_type();
 
   mem_tracker_->Consume(tuple_ptrs_size_);
   tuple_ptrs_ = reinterpret_cast<Tuple**>(malloc(tuple_ptrs_size_));
   DCHECK(tuple_ptrs_ != nullptr) << "Failed to allocate tuple pointers";
 
-  const uint64_t uncompressed_size = input_batch.uncompressed_size;
+  const uint64_t uncompressed_size = input_batch.header()->uncompressed_size();
   uint8_t* tuple_data = tuple_data_pool_.Allocate(uncompressed_size);
   DCHECK(tuple_data != nullptr) << "Failed to allocate tuple data";
 
-  Deserialize(input_tuple_offsets, input_tuple_data, uncompressed_size,
-      compression_type == THdfsCompression::LZ4, tuple_data);
+  Deserialize(input_batch.TupleOffsetsAsSlice(), input_batch.TupleDataAsSlice(),
+      uncompressed_size, compression_type == CompressionTypePB::LZ4, tuple_data);
 }
 
 RowBatch::RowBatch(const RowDescriptor* row_desc, const RowBatchHeaderPB& header,
@@ -229,67 +219,58 @@ RowBatch::~RowBatch() {
   tuple_ptrs_ = nullptr;
 }
 
-Status RowBatch::Serialize(TRowBatch* output_batch) {
+Status RowBatch::Serialize(OutboundRowBatch* output_batch) {
   return Serialize(output_batch, UseFullDedup());
 }
 
-Status RowBatch::Serialize(TRowBatch* output_batch, bool full_dedup) {
-  // why does Thrift not generate a Clear() function?
-  output_batch->row_tuples.clear();
-  output_batch->tuple_offsets.clear();
-  int64_t uncompressed_size;
-  bool is_compressed;
-  RETURN_IF_ERROR(Serialize(full_dedup, &output_batch->tuple_offsets,
-      &output_batch->tuple_data, &uncompressed_size, &is_compressed));
-  // TODO: max_size() is much larger than the amount of memory we could feasibly
-  // allocate. Need better way to detect problem.
-  DCHECK_LE(uncompressed_size, output_batch->tuple_data.max_size());
-  output_batch->__set_num_rows(num_rows_);
-  output_batch->__set_uncompressed_size(uncompressed_size);
-  output_batch->__set_compression_type(
-      is_compressed ? THdfsCompression::LZ4 : THdfsCompression::NONE);
-  row_desc_->ToThrift(&output_batch->row_tuples);
-  return Status::OK();
-}
-
-Status RowBatch::Serialize(OutboundRowBatch* output_batch) {
-  int64_t uncompressed_size;
+Status RowBatch::Serialize(OutboundRowBatch* output_batch, bool full_dedup) {
   bool is_compressed;
   output_batch->tuple_offsets_.clear();
-  RETURN_IF_ERROR(Serialize(UseFullDedup(), &output_batch->tuple_offsets_,
-      &output_batch->tuple_data_, &uncompressed_size, &is_compressed));
+
+  DedupMap distinct_tuples;
+  int64_t size;
+
+  // As part of the serialization process we deduplicate tuples to avoid serializing a
+  // Tuple multiple times for the RowBatch. By default we only detect duplicate tuples
+  // in adjacent rows only. If full deduplication is enabled, we will build a
+  // map to detect non-adjacent duplicates. Building this map comes with significant
+  // overhead, so is only worthwhile in the uncommon case of many non-adjacent duplicates.
+  if (full_dedup) {
+    RETURN_IF_ERROR(distinct_tuples.Init(num_rows_ * num_tuples_per_row_ * 2, 0));
+    size = TotalByteSize(&distinct_tuples);
+    distinct_tuples.Clear(); // Reuse allocated hash table.
+  } else {
+    size = TotalByteSize(nullptr);
+  }
+
+  // The maximum uncompressed RowBatch size that can be serialized is INT_MAX. This
+  // is because the tuple offsets are int32s and will overflow for a larger size.
+  if (size > numeric_limits<int32_t>::max()) {
+    return Status(TErrorCode::ROW_BATCH_TOO_LARGE, size, numeric_limits<int32_t>::max());
+  }
+  output_batch->tuple_data_.resize(size);
+
+  RETURN_IF_ERROR(Serialize(
+      full_dedup ? &distinct_tuples : nullptr, output_batch, &is_compressed, size));
 
   // Initialize the RowBatchHeaderPB
   RowBatchHeaderPB* header = &output_batch->header_;
   header->Clear();
   header->set_num_rows(num_rows_);
   header->set_num_tuples_per_row(row_desc_->tuple_descriptors().size());
-  header->set_uncompressed_size(uncompressed_size);
+  header->set_uncompressed_size(size);
   header->set_compression_type(
       is_compressed ? CompressionTypePB::LZ4 : CompressionTypePB::NONE);
   return Status::OK();
 }
 
-Status RowBatch::Serialize(bool full_dedup, vector<int32_t>* tuple_offsets,
-    string* tuple_data, int64_t* uncompressed_size, bool* is_compressed) {
-  // As part of the serialization process we deduplicate tuples to avoid serializing a
-  // Tuple multiple times for the RowBatch. By default we only detect duplicate tuples
-  // in adjacent rows only. If full deduplication is enabled, we will build a
-  // map to detect non-adjacent duplicates. Building this map comes with significant
-  // overhead, so is only worthwhile in the uncommon case of many non-adjacent duplicates.
-  int64_t size;
-  if (full_dedup) {
-    // Maps from tuple to offset of its serialized data in output_batch->tuple_data.
-    DedupMap distinct_tuples;
-    RETURN_IF_ERROR(distinct_tuples.Init(num_rows_ * num_tuples_per_row_ * 2, 0));
-    size = TotalByteSize(&distinct_tuples);
-    distinct_tuples.Clear(); // Reuse allocated hash table.
-    RETURN_IF_ERROR(SerializeInternal(size, &distinct_tuples, tuple_offsets, tuple_data));
-  } else {
-    size = TotalByteSize(nullptr);
-    RETURN_IF_ERROR(SerializeInternal(size, nullptr, tuple_offsets, tuple_data));
-  }
-  *uncompressed_size = size;
+Status RowBatch::Serialize(DedupMap* distinct_tuples, OutboundRowBatch* output_batch,
+    bool* is_compressed, int64_t size) {
+  char* tuple_data = const_cast<char*>(output_batch->tuple_data_.data());
+  std::vector<int32_t>* tuple_offsets = &output_batch->tuple_offsets_;
+
+  RETURN_IF_ERROR(SerializeInternal(size, distinct_tuples, tuple_offsets, tuple_data));
+
   *is_compressed = false;
 
   if (size > 0) {
@@ -306,18 +287,18 @@ Status RowBatch::Serialize(bool full_dedup, vector<int32_t>* tuple_offsets,
       return Status(TErrorCode::LZ4_COMPRESSION_INPUT_TOO_LARGE, size);
     }
     DCHECK_GT(compressed_size, 0);
-    if (compression_scratch_.size() < compressed_size) {
-      compression_scratch_.resize(compressed_size);
+    if (output_batch->compression_scratch_.size() < compressed_size) {
+      output_batch->compression_scratch_.resize(compressed_size);
     }
-    uint8_t* input =
-        const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(tuple_data->c_str()));
+
+    uint8_t* input = reinterpret_cast<uint8_t*>(tuple_data);
     uint8_t* compressed_output = const_cast<uint8_t*>(
-        reinterpret_cast<const uint8_t*>(compression_scratch_.c_str()));
+        reinterpret_cast<const uint8_t*>(output_batch->compression_scratch_.data()));
     RETURN_IF_ERROR(
         compressor.ProcessBlock(true, size, input, &compressed_size, &compressed_output));
     if (LIKELY(compressed_size < size)) {
-      compression_scratch_.resize(compressed_size);
-      tuple_data->swap(compression_scratch_);
+      output_batch->compression_scratch_.resize(compressed_size);
+      output_batch->tuple_data_.swap(output_batch->compression_scratch_);
       *is_compressed = true;
     }
     VLOG_ROW << "uncompressed size: " << size << ", compressed size: " << compressed_size;
@@ -340,24 +321,14 @@ bool RowBatch::UseFullDedup() {
 }
 
 Status RowBatch::SerializeInternal(int64_t size, DedupMap* distinct_tuples,
-    vector<int32_t>* tuple_offsets, string* tuple_data_str) {
+    vector<int32_t>* tuple_offsets, char* tuple_data) {
   DCHECK(distinct_tuples == nullptr || distinct_tuples->size() == 0);
 
-  // The maximum uncompressed RowBatch size that can be serialized is INT_MAX. This
-  // is because the tuple offsets are int32s and will overflow for a larger size.
-  if (size > numeric_limits<int32_t>::max()) {
-    return Status(TErrorCode::ROW_BATCH_TOO_LARGE, size, numeric_limits<int32_t>::max());
-  }
-
-  // TODO: track memory usage
-  // TODO: detect if serialized size is too large to allocate and return proper error.
-  tuple_data_str->resize(size);
   tuple_offsets->reserve(num_rows_ * num_tuples_per_row_);
 
   // Copy tuple data of unique tuples, including strings, into output_batch (converting
   // string pointers into offsets in the process).
   int offset = 0; // current offset into output_batch->tuple_data
-  char* tuple_data = const_cast<char*>(tuple_data_str->c_str());
 
   for (int i = 0; i < num_rows_; ++i) {
     vector<TupleDescriptor*>::const_iterator desc =
@@ -458,17 +429,6 @@ void RowBatch::SetMemTracker(MemTracker* new_tracker) {
   tuple_data_pool_.SetMemTracker(new_tracker);
   mem_tracker_->TransferTo(new_tracker, tuple_ptrs_size_);
   mem_tracker_ = new_tracker;
-}
-
-int64_t RowBatch::GetDeserializedSize(const TRowBatch& batch) {
-  return batch.uncompressed_size + batch.tuple_offsets.size() * sizeof(Tuple*);
-}
-
-int64_t RowBatch::GetSerializedSize(const TRowBatch& batch) {
-  int64_t result = batch.tuple_data.size();
-  result += batch.row_tuples.size() * sizeof(TTupleId);
-  result += batch.tuple_offsets.size() * sizeof(int32_t);
-  return result;
 }
 
 int64_t RowBatch::GetDeserializedSize(const RowBatchHeaderPB& header,
@@ -580,4 +540,4 @@ void RowBatch::VLogRows(const string& context) {
   }
 }
 
-}
+} // namespace impala

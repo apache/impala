@@ -161,7 +161,7 @@ Per-Host Resources: mem-estimate=11.39MB mem-reservation=2.88MB thread-reservati
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-Per-Host Resources: mem-estimate=147.15MB mem-reservation=29.81MB thread-reservation=2 runtime-filters-memory=3.00MB
+Per-Host Resources: mem-estimate=147.42MB mem-reservation=29.81MB thread-reservation=2 runtime-filters-memory=3.00MB
 07:AGGREGATE [STREAMING]
 |  output: sum(CAST(CASE WHEN (CAST(d_date AS DATE) < DATE '2000-03-11') THEN inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(d_date AS DATE) >= DATE '2000-03-11') THEN inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT))
 |  group by: w_warehouse_name, i_item_id
@@ -183,7 +183,7 @@ Per-Host Resources: mem-estimate=147.15MB mem-reservation=29.81MB thread-reserva
 |  |  in pipelines: 03(GETNEXT)
 |  |
 |  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=32.12MB mem-reservation=1.00MB thread-reservation=2
 |  03:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.15MB
 |     predicates: CAST(d_date AS DATE) <= DATE '2000-04-10', CAST(d_date AS DATE) >= DATE '2000-02-10'
@@ -211,7 +211,7 @@ Per-Host Resources: mem-estimate=147.15MB mem-reservation=29.81MB thread-reserva
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=2
+|  Per-Host Resources: mem-estimate=32.15MB mem-reservation=16.00KB thread-reservation=2
 |  01:SCAN HDFS [tpcds_parquet.warehouse, RANDOM]
 |     HDFS partitions=1/1 files=1 size=4.38KB
 |     stored statistics:
@@ -236,7 +236,7 @@ Per-Host Resources: mem-estimate=147.15MB mem-reservation=29.81MB thread-reserva
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=48.00MB mem-reservation=512.00KB thread-reservation=2
+|  Per-Host Resources: mem-estimate=48.17MB mem-reservation=512.00KB thread-reservation=2
 |  02:SCAN HDFS [tpcds_parquet.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.73MB
 |     predicates: i_current_price <= CAST(1.49 AS DECIMAL(3,2)), i_current_price >= CAST(0.99 AS DECIMAL(2,2))
@@ -262,7 +262,7 @@ Per-Host Resources: mem-estimate=147.15MB mem-reservation=29.81MB thread-reserva
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=47.02MB Threads=9
-Per-Host Resource Estimates: Memory=123MB
+Per-Host Resource Estimates: Memory=124MB
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -299,7 +299,7 @@ Per-Instance Resources: mem-estimate=11.39MB mem-reservation=2.88MB thread-reser
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
 Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
-Per-Instance Resources: mem-estimate=42.00MB mem-reservation=21.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=42.61MB mem-reservation=21.00MB thread-reservation=1
 07:AGGREGATE [STREAMING]
 |  output: sum(CAST(CASE WHEN (CAST(d_date AS DATE) < DATE '2000-03-11') THEN inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(d_date AS DATE) >= DATE '2000-03-11') THEN inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT))
 |  group by: w_warehouse_name, i_item_id
@@ -329,7 +329,7 @@ Per-Instance Resources: mem-estimate=42.00MB mem-reservation=21.00MB thread-rese
 |  |  in pipelines: 03(GETNEXT)
 |  |
 |  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=16.12MB mem-reservation=1.00MB thread-reservation=1
 |  03:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.15MB
 |     predicates: CAST(d_date AS DATE) <= DATE '2000-04-10', CAST(d_date AS DATE) >= DATE '2000-02-10'
@@ -365,7 +365,7 @@ Per-Instance Resources: mem-estimate=42.00MB mem-reservation=21.00MB thread-rese
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=16.15MB mem-reservation=16.00KB thread-reservation=1
 |  01:SCAN HDFS [tpcds_parquet.warehouse, RANDOM]
 |     HDFS partitions=1/1 files=1 size=4.38KB
 |     stored statistics:
@@ -398,7 +398,7 @@ Per-Instance Resources: mem-estimate=42.00MB mem-reservation=21.00MB thread-rese
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=16.17MB mem-reservation=512.00KB thread-reservation=1
 |  02:SCAN HDFS [tpcds_parquet.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.73MB
 |     predicates: i_current_price <= CAST(1.49 AS DECIMAL(3,2)), i_current_price >= CAST(0.99 AS DECIMAL(2,2))

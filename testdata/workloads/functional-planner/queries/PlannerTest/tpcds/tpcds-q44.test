@@ -261,7 +261,7 @@ PLAN-ROOT SINK
    in pipelines: 19(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=36.44MB Threads=20
-Per-Host Resource Estimates: Memory=354MB
+Per-Host Resource Estimates: Memory=355MB
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=13.11MB mem-reservation=11.69MB thread-reservation=1
 PLAN-ROOT SINK
@@ -287,7 +287,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 19(GETNEXT)
 |  |
 |  F13:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=2
+|  Per-Host Resources: mem-estimate=32.16MB mem-reservation=512.00KB thread-reservation=2
 |  19:SCAN HDFS [tpcds_parquet.item i2, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.73MB
 |     stored statistics:
@@ -311,7 +311,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 40(GETNEXT)
 |  |
 |  F12:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.17MB mem-reservation=4.00MB thread-reservation=1
 |  17:SELECT
 |  |  predicates: rank() < CAST(11 AS BIGINT)
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -360,7 +360,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 13(GETNEXT)
 |  |  |
 |  |  F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  |  Per-Host Resources: mem-estimate=64.00KB mem-reservation=0B thread-reservation=1
 |  |  13:CARDINALITY CHECK
 |  |  |  limit: 1
 |  |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -374,7 +374,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 36(GETNEXT)
 |  |  |
 |  |  F10:PLAN FRAGMENT [HASH(ss_store_sk)] hosts=3 instances=3
-|  |  Per-Host Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservation=1
+|  |  Per-Host Resources: mem-estimate=10.06MB mem-reservation=1.94MB thread-reservation=1
 |  |  36:AGGREGATE [FINALIZE]
 |  |  |  output: avg:merge(ss_net_profit)
 |  |  |  group by: ss_store_sk
@@ -389,7 +389,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 11(GETNEXT)
 |  |  |
 |  |  F09:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  |  Per-Host Resources: mem-estimate=58.00MB mem-reservation=3.00MB thread-reservation=2
+|  |  Per-Host Resources: mem-estimate=58.19MB mem-reservation=3.00MB thread-reservation=2
 |  |  12:AGGREGATE [STREAMING]
 |  |  |  output: avg(ss_net_profit)
 |  |  |  group by: ss_store_sk
@@ -424,7 +424,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 09(GETNEXT)
 |  |
 |  F07:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=58.00MB mem-reservation=3.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=58.23MB mem-reservation=3.00MB thread-reservation=2
 |  10:AGGREGATE [STREAMING]
 |  |  output: avg(ss_net_profit)
 |  |  group by: ss_item_sk
@@ -459,7 +459,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 18(GETNEXT)
 |  |
 |  F06:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=2
+|  Per-Host Resources: mem-estimate=32.16MB mem-reservation=512.00KB thread-reservation=2
 |  18:SCAN HDFS [tpcds_parquet.item i1, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.73MB
 |     stored statistics:
@@ -518,7 +518,7 @@ Per-Host Resources: mem-estimate=10.17MB mem-reservation=1.94MB thread-reservati
 |  |  in pipelines: 04(GETNEXT)
 |  |
 |  F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=64.00KB mem-reservation=0B thread-reservation=1
 |  04:CARDINALITY CHECK
 |  |  limit: 1
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -532,7 +532,7 @@ Per-Host Resources: mem-estimate=10.17MB mem-reservation=1.94MB thread-reservati
 |  |  in pipelines: 27(GETNEXT)
 |  |
 |  F03:PLAN FRAGMENT [HASH(ss_store_sk)] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=10.06MB mem-reservation=1.94MB thread-reservation=1
 |  27:AGGREGATE [FINALIZE]
 |  |  output: avg:merge(ss_net_profit)
 |  |  group by: ss_store_sk
@@ -547,7 +547,7 @@ Per-Host Resources: mem-estimate=10.17MB mem-reservation=1.94MB thread-reservati
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=58.00MB mem-reservation=3.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=58.19MB mem-reservation=3.00MB thread-reservation=2
 |  03:AGGREGATE [STREAMING]
 |  |  output: avg(ss_net_profit)
 |  |  group by: ss_store_sk
@@ -582,7 +582,7 @@ Per-Host Resources: mem-estimate=10.17MB mem-reservation=1.94MB thread-reservati
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=58.00MB mem-reservation=3.00MB thread-reservation=2
+Per-Host Resources: mem-estimate=58.23MB mem-reservation=3.00MB thread-reservation=2
 01:AGGREGATE [STREAMING]
 |  output: avg(ss_net_profit)
 |  group by: ss_item_sk
@@ -605,7 +605,7 @@ Per-Host Resources: mem-estimate=58.00MB mem-reservation=3.00MB thread-reservati
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=63.88MB Threads=27
-Per-Host Resource Estimates: Memory=346MB
+Per-Host Resource Estimates: Memory=350MB
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -639,7 +639,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 19(GETNEXT)
 |  |
 |  F13:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=16.16MB mem-reservation=512.00KB thread-reservation=1
 |  19:SCAN HDFS [tpcds_parquet.item i2, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.73MB
 |     stored statistics:
@@ -671,7 +671,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 40(GETNEXT)
 |  |
 |  F12:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.17MB mem-reservation=4.00MB thread-reservation=1
 |  17:SELECT
 |  |  predicates: rank() < CAST(11 AS BIGINT)
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -727,7 +727,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 13(GETNEXT)
 |  |  |
 |  |  F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=64.00KB mem-reservation=0B thread-reservation=1
 |  |  13:CARDINALITY CHECK
 |  |  |  limit: 1
 |  |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -741,7 +741,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 36(GETNEXT)
 |  |  |
 |  |  F10:PLAN FRAGMENT [HASH(ss_store_sk)] hosts=3 instances=6
-|  |  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=10.06MB mem-reservation=1.94MB thread-reservation=1
 |  |  36:AGGREGATE [FINALIZE]
 |  |  |  output: avg:merge(ss_net_profit)
 |  |  |  group by: ss_store_sk
@@ -756,7 +756,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 11(GETNEXT)
 |  |  |
 |  |  F09:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
-|  |  Per-Instance Resources: mem-estimate=26.00MB mem-reservation=3.00MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=26.38MB mem-reservation=3.00MB thread-reservation=1
 |  |  12:AGGREGATE [STREAMING]
 |  |  |  output: avg(ss_net_profit)
 |  |  |  group by: ss_store_sk
@@ -791,7 +791,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 09(GETNEXT)
 |  |
 |  F07:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
-|  Per-Instance Resources: mem-estimate=26.00MB mem-reservation=3.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=26.47MB mem-reservation=3.00MB thread-reservation=1
 |  10:AGGREGATE [STREAMING]
 |  |  output: avg(ss_net_profit)
 |  |  group by: ss_item_sk
@@ -834,7 +834,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 18(GETNEXT)
 |  |
 |  F06:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=16.16MB mem-reservation=512.00KB thread-reservation=1
 |  18:SCAN HDFS [tpcds_parquet.item i1, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.73MB
 |     stored statistics:
@@ -900,7 +900,7 @@ Per-Instance Resources: mem-estimate=10.21MB mem-reservation=1.94MB thread-reser
 |  |  in pipelines: 04(GETNEXT)
 |  |
 |  F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=64.00KB mem-reservation=0B thread-reservation=1
 |  04:CARDINALITY CHECK
 |  |  limit: 1
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -914,7 +914,7 @@ Per-Instance Resources: mem-estimate=10.21MB mem-reservation=1.94MB thread-reser
 |  |  in pipelines: 27(GETNEXT)
 |  |
 |  F03:PLAN FRAGMENT [HASH(ss_store_sk)] hosts=3 instances=6
-|  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=10.06MB mem-reservation=1.94MB thread-reservation=1
 |  27:AGGREGATE [FINALIZE]
 |  |  output: avg:merge(ss_net_profit)
 |  |  group by: ss_store_sk
@@ -929,7 +929,7 @@ Per-Instance Resources: mem-estimate=10.21MB mem-reservation=1.94MB thread-reser
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
-|  Per-Instance Resources: mem-estimate=26.00MB mem-reservation=3.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=26.38MB mem-reservation=3.00MB thread-reservation=1
 |  03:AGGREGATE [STREAMING]
 |  |  output: avg(ss_net_profit)
 |  |  group by: ss_store_sk
@@ -964,7 +964,7 @@ Per-Instance Resources: mem-estimate=10.21MB mem-reservation=1.94MB thread-reser
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
-Per-Instance Resources: mem-estimate=26.00MB mem-reservation=3.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=26.47MB mem-reservation=3.00MB thread-reservation=1
 01:AGGREGATE [STREAMING]
 |  output: avg(ss_net_profit)
 |  group by: ss_item_sk

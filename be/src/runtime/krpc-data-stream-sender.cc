@@ -161,7 +161,7 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
 
   // Initializes the channel.
   // Returns OK if successful, error indication otherwise.
-  Status Init(RuntimeState* state);
+  Status Init(RuntimeState* state, std::shared_ptr<CharMemTrackerAllocator> allocator);
 
   // Serializes the given row batch and send it to the destination. If the preceding
   // RPC is in progress, this function may block until the previous RPC finishes.
@@ -233,7 +233,7 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   // TODO: rethink whether to keep per-channel buffers vs having all buffers in the
   // datastream sender and sharing them across all channels. These buffers are not used in
   // "UNPARTITIONED" scheme.
-  OutboundRowBatch outbound_batches_[NUM_OUTBOUND_BATCHES];
+  std::vector<OutboundRowBatch> outbound_batches_;
 
   // Index into 'outbound_batches_' for the next available OutboundRowBatch to serialize
   // into. This is read and written by the main execution thread.
@@ -366,7 +366,8 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
       const char* rpc_name, int64_t total_time_ns, const kudu::Status& err);
 };
 
-Status KrpcDataStreamSender::Channel::Init(RuntimeState* state) {
+Status KrpcDataStreamSender::Channel::Init(
+    RuntimeState* state, std::shared_ptr<CharMemTrackerAllocator> allocator) {
   // TODO: take into account of var-len data at runtime.
   int capacity =
       max(1, parent_->per_channel_buffer_size_ / max(row_desc_->GetRowSize(), 1));
@@ -374,6 +375,11 @@ Status KrpcDataStreamSender::Channel::Init(RuntimeState* state) {
 
   // Create a DataStreamService proxy to the destination.
   RETURN_IF_ERROR(DataStreamService::GetProxy(address_, hostname_, &proxy_));
+
+  // Init outbound_batches_.
+  for (int i = 0; i < NUM_OUTBOUND_BATCHES; ++i) {
+    outbound_batches_.emplace_back(allocator);
+  }
   return Status::OK();
 }
 
@@ -709,6 +715,7 @@ void KrpcDataStreamSender::Channel::Teardown(RuntimeState* state) {
     while (rpc_in_flight_) rpc_done_cv_.wait(l);
   }
   batch_.reset();
+  outbound_batches_.clear();
 }
 
 KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
@@ -755,9 +762,8 @@ Status KrpcDataStreamSender::Prepare(
   RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
   state_ = state;
   SCOPED_TIMER(profile_->total_time_counter());
-  RETURN_IF_ERROR(ScalarExprEvaluator::Create(partition_exprs_, state,
-      state->obj_pool(), expr_perm_pool_.get(), expr_results_pool_.get(),
-      &partition_expr_evals_));
+  RETURN_IF_ERROR(ScalarExprEvaluator::Create(partition_exprs_, state, state->obj_pool(),
+      expr_perm_pool_.get(), expr_results_pool_.get(), &partition_expr_evals_));
   serialize_batch_timer_ = ADD_TIMER(profile(), "SerializeBatchTime");
   rpc_retry_counter_ = ADD_COUNTER(profile(), "RpcRetry", TUnit::UNIT);
   rpc_failure_counter_ = ADD_COUNTER(profile(), "RpcFailure", TUnit::UNIT);
@@ -774,9 +780,19 @@ Status KrpcDataStreamSender::Prepare(
   eos_sent_counter_ = ADD_COUNTER(profile(), "EosSent", TUnit::UNIT);
   uncompressed_bytes_counter_ =
       ADD_COUNTER(profile(), "UncompressedRowBatchSize", TUnit::BYTES);
-  total_sent_rows_counter_= ADD_COUNTER(profile(), "RowsSent", TUnit::UNIT);
+  total_sent_rows_counter_ = ADD_COUNTER(profile(), "RowsSent", TUnit::UNIT);
+
+  outbound_rb_mem_tracker_.reset(
+      new MemTracker(-1, "RowBatchSerialization", mem_tracker_.get()));
+  char_mem_tracker_allocator_.reset(
+      new CharMemTrackerAllocator(outbound_rb_mem_tracker_));
+
+  for (int i = 0; i < NUM_OUTBOUND_BATCHES; ++i) {
+    outbound_batches_.emplace_back(char_mem_tracker_allocator_);
+  }
+
   for (int i = 0; i < channels_.size(); ++i) {
-    RETURN_IF_ERROR(channels_[i]->Init(state));
+    RETURN_IF_ERROR(channels_[i]->Init(state, char_mem_tracker_allocator_));
   }
   return Status::OK();
 }
@@ -1079,6 +1095,12 @@ void KrpcDataStreamSender::Close(RuntimeState* state) {
   for (int i = 0; i < channels_.size(); ++i) {
     channels_[i]->Teardown(state);
   }
+
+  outbound_batches_.clear();
+  if (outbound_rb_mem_tracker_.get() != nullptr) {
+    outbound_rb_mem_tracker_->Close();
+  }
+
   ScalarExprEvaluator::Close(partition_expr_evals_, state);
   profile()->StopPeriodicCounters();
   DataSink::Close(state);
@@ -1101,4 +1123,3 @@ int64_t KrpcDataStreamSender::GetNumDataBytesSent() const {
 }
 
 } // namespace impala
-

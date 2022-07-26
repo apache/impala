@@ -4,7 +4,7 @@ from tpch_parquet.customer
     inner join tpch_parquet.nation on c_nationkey = n_nationkey
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=22.97MB Threads=5
-Per-Host Resource Estimates: Memory=100MB
+Per-Host Resource Estimates: Memory=102MB
 Analyzed query: SELECT /* +straight_join */ * FROM tpch_parquet.customer INNER
 JOIN tpch_parquet.nation ON c_nationkey = n_nationkey
 
@@ -20,7 +20,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-Per-Host Resources: mem-estimate=26.95MB mem-reservation=18.94MB thread-reservation=2 runtime-filters-memory=1.00MB
+Per-Host Resources: mem-estimate=28.25MB mem-reservation=18.94MB thread-reservation=2 runtime-filters-memory=1.00MB
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c_nationkey = n_nationkey
 |  fk/pk conjuncts: c_nationkey = n_nationkey
@@ -35,7 +35,7 @@ Per-Host Resources: mem-estimate=26.95MB mem-reservation=18.94MB thread-reservat
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=2
+|  Per-Host Resources: mem-estimate=16.44MB mem-reservation=32.00KB thread-reservation=2
 |  01:SCAN HDFS [tpch_parquet.nation, RANDOM]
 |     HDFS partitions=1/1 files=1 size=3.04KB
 |     stored statistics:
@@ -58,7 +58,7 @@ Per-Host Resources: mem-estimate=26.95MB mem-reservation=18.94MB thread-reservat
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=25.91MB Threads=4
-Per-Host Resource Estimates: Memory=103MB
+Per-Host Resource Estimates: Memory=105MB
 Analyzed query: SELECT /* +straight_join */ * FROM tpch_parquet.customer INNER
 JOIN tpch_parquet.nation ON c_nationkey = n_nationkey
 
@@ -75,7 +75,7 @@ PLAN-ROOT SINK
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-Per-Instance Resources: mem-estimate=24.00MB mem-reservation=16.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=25.31MB mem-reservation=16.00MB thread-reservation=1
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash-table-id=00
 |  hash predicates: c_nationkey = n_nationkey
@@ -98,7 +98,7 @@ Per-Instance Resources: mem-estimate=24.00MB mem-reservation=16.00MB thread-rese
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=16.44MB mem-reservation=32.00KB thread-reservation=1
 |  01:SCAN HDFS [tpch_parquet.nation, RANDOM]
 |     HDFS partitions=1/1 files=1 size=3.04KB
 |     stored statistics:
@@ -126,7 +126,7 @@ from tpch_parquet.lineitem
     left join tpch_parquet.orders on l_orderkey = o_orderkey
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=102.00MB Threads=5
-Per-Host Resource Estimates: Memory=534MB
+Per-Host Resource Estimates: Memory=535MB
 Analyzed query: SELECT /* +straight_join */ * FROM tpch_parquet.lineitem LEFT
 OUTER JOIN tpch_parquet.orders ON l_orderkey = o_orderkey
 
@@ -156,7 +156,7 @@ Per-Host Resources: mem-estimate=382.84MB mem-reservation=74.00MB thread-reserva
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-|  Per-Host Resources: mem-estimate=40.00MB mem-reservation=24.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=40.68MB mem-reservation=24.00MB thread-reservation=2
 |  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
 |     HDFS partitions=1/1 files=2 size=54.21MB
 |     stored statistics:
@@ -178,7 +178,7 @@ Per-Host Resources: mem-estimate=382.84MB mem-reservation=74.00MB thread-reserva
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=136.00MB Threads=4
-Per-Host Resource Estimates: Memory=534MB
+Per-Host Resource Estimates: Memory=536MB
 Analyzed query: SELECT /* +straight_join */ * FROM tpch_parquet.lineitem LEFT
 OUTER JOIN tpch_parquet.orders ON l_orderkey = o_orderkey
 
@@ -194,7 +194,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Instance Resources: mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=81.60MB mem-reservation=40.00MB thread-reservation=1
 02:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
 |  hash-table-id=00
 |  hash predicates: l_orderkey = o_orderkey
@@ -216,7 +216,7 @@ Per-Instance Resources: mem-estimate=80.00MB mem-reservation=40.00MB thread-rese
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-|  Per-Instance Resources: mem-estimate=40.00MB mem-reservation=24.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=40.68MB mem-reservation=24.00MB thread-reservation=1
 |  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
 |     HDFS partitions=1/1 files=2 size=54.21MB
 |     stored statistics:
@@ -243,7 +243,7 @@ from tpch_parquet.orders
     join /*+shuffle*/ tpch_parquet.customer on o_custkey = c_custkey
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=80.00MB Threads=6
-Per-Host Resource Estimates: Memory=231MB
+Per-Host Resource Estimates: Memory=234MB
 Analyzed query: SELECT /* +straight_join */ * FROM tpch_parquet.orders INNER
 JOIN /* +shuffle */ tpch_parquet.customer ON o_custkey = c_custkey
 
@@ -274,7 +274,7 @@ Per-Host Resources: mem-estimate=55.56MB mem-reservation=35.00MB thread-reservat
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=24.00MB mem-reservation=16.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=25.73MB mem-reservation=16.00MB thread-reservation=2
 |  01:SCAN HDFS [tpch_parquet.customer, RANDOM]
 |     HDFS partitions=1/1 files=1 size=12.34MB
 |     stored statistics:
@@ -291,7 +291,7 @@ Per-Host Resources: mem-estimate=55.56MB mem-reservation=35.00MB thread-reservat
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-Per-Host Resources: mem-estimate=41.00MB mem-reservation=25.00MB thread-reservation=2 runtime-filters-memory=1.00MB
+Per-Host Resources: mem-estimate=42.37MB mem-reservation=25.00MB thread-reservation=2 runtime-filters-memory=1.00MB
 00:SCAN HDFS [tpch_parquet.orders, RANDOM]
    HDFS partitions=1/1 files=2 size=54.21MB
    runtime filters: RF000[bloom] -> o_custkey
@@ -304,7 +304,7 @@ Per-Host Resources: mem-estimate=41.00MB mem-reservation=25.00MB thread-reservat
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=80.00MB Threads=5
-Per-Host Resource Estimates: Memory=231MB
+Per-Host Resource Estimates: Memory=236MB
 Analyzed query: SELECT /* +straight_join */ * FROM tpch_parquet.orders INNER
 JOIN /* +shuffle */ tpch_parquet.customer ON o_custkey = c_custkey
 
@@ -320,7 +320,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(o_custkey)] hosts=2 instances=2
-Per-Instance Resources: mem-estimate=10.34MB mem-reservation=0B thread-reservation=1
+Per-Instance Resources: mem-estimate=11.89MB mem-reservation=0B thread-reservation=1
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash-table-id=00
 |  hash predicates: o_custkey = c_custkey
@@ -343,7 +343,7 @@ Per-Instance Resources: mem-estimate=10.34MB mem-reservation=0B thread-reservati
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=24.00MB mem-reservation=16.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=25.73MB mem-reservation=16.00MB thread-reservation=1
 |  01:SCAN HDFS [tpch_parquet.customer, RANDOM]
 |     HDFS partitions=1/1 files=1 size=12.34MB
 |     stored statistics:
@@ -361,7 +361,7 @@ Per-Instance Resources: mem-estimate=10.34MB mem-reservation=0B thread-reservati
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
 Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-Per-Instance Resources: mem-estimate=40.00MB mem-reservation=24.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=41.37MB mem-reservation=24.00MB thread-reservation=1
 00:SCAN HDFS [tpch_parquet.orders, RANDOM]
    HDFS partitions=1/1 files=2 size=54.21MB
    runtime filters: RF000[bloom] -> o_custkey
@@ -379,7 +379,7 @@ from tpch_parquet.orders
     join /*+broadcast*/ tpch_parquet.customer on o_custkey = c_custkey
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=79.00MB Threads=5
-Per-Host Resource Estimates: Memory=220MB
+Per-Host Resource Estimates: Memory=221MB
 Analyzed query: SELECT /* +straight_join */ * FROM tpch_parquet.orders INNER
 JOIN /* +broadcast */ tpch_parquet.customer ON o_custkey = c_custkey
 
@@ -410,7 +410,7 @@ Per-Host Resources: mem-estimate=85.34MB mem-reservation=59.00MB thread-reservat
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=24.00MB mem-reservation=16.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=24.87MB mem-reservation=16.00MB thread-reservation=2
 |  01:SCAN HDFS [tpch_parquet.customer, RANDOM]
 |     HDFS partitions=1/1 files=1 size=12.34MB
 |     stored statistics:
@@ -433,7 +433,7 @@ Per-Host Resources: mem-estimate=85.34MB mem-reservation=59.00MB thread-reservat
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=114.00MB Threads=4
-Per-Host Resource Estimates: Memory=255MB
+Per-Host Resource Estimates: Memory=257MB
 Analyzed query: SELECT /* +straight_join */ * FROM tpch_parquet.orders INNER
 JOIN /* +broadcast */ tpch_parquet.customer ON o_custkey = c_custkey
 
@@ -450,7 +450,7 @@ PLAN-ROOT SINK
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
 Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-Per-Instance Resources: mem-estimate=40.00MB mem-reservation=24.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=41.55MB mem-reservation=24.00MB thread-reservation=1
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash-table-id=00
 |  hash predicates: o_custkey = c_custkey
@@ -473,7 +473,7 @@ Per-Instance Resources: mem-estimate=40.00MB mem-reservation=24.00MB thread-rese
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=24.00MB mem-reservation=16.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=24.87MB mem-reservation=16.00MB thread-reservation=1
 |  01:SCAN HDFS [tpch_parquet.customer, RANDOM]
 |     HDFS partitions=1/1 files=1 size=12.34MB
 |     stored statistics:
@@ -533,7 +533,7 @@ Per-Host Resources: mem-estimate=2.02GB mem-reservation=34.09MB thread-reservati
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=2
+|  Per-Host Resources: mem-estimate=16.33MB mem-reservation=88.00KB thread-reservation=2
 |  01:SCAN HDFS [functional_parquet.alltypestiny, RANDOM]
 |     HDFS partitions=4/4 files=4 size=11.92KB
 |     stored statistics:
@@ -557,7 +557,7 @@ Per-Host Resources: mem-estimate=2.02GB mem-reservation=34.09MB thread-reservati
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=72.34MB Threads=6
-Per-Host Resource Estimates: Memory=2.07GB
+Per-Host Resource Estimates: Memory=2.08GB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional_parquet.alltypestiny
 Analyzed query: SELECT /* +straight_join */ * FROM functional_parquet.alltypes
@@ -575,7 +575,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
-Per-Instance Resources: mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=1
+Per-Instance Resources: mem-estimate=16.66MB mem-reservation=88.00KB thread-reservation=1
 02:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
 |  hash-table-id=00
 |  hash predicates: alltypes.id = alltypestiny.id
@@ -597,7 +597,7 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=88.00KB thread-rese
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=4
-|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=16.33MB mem-reservation=88.00KB thread-reservation=1
 |  01:SCAN HDFS [functional_parquet.alltypestiny, RANDOM]
 |     HDFS partitions=4/4 files=4 size=11.92KB
 |     stored statistics:
@@ -642,7 +642,7 @@ PLAN-ROOT SINK
 |  in pipelines: 03(GETNEXT)
 |
 F01:PLAN FRAGMENT [HASH(c_nationkey)] hosts=1 instances=1
-Per-Host Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservation=1
+Per-Host Resources: mem-estimate=10.05MB mem-reservation=1.94MB thread-reservation=1
 03:AGGREGATE [FINALIZE]
 |  output: avg:merge(c_acctbal)
 |  group by: c_nationkey
@@ -656,7 +656,7 @@ Per-Host Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservati
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-Per-Host Resources: mem-estimate=34.00MB mem-reservation=4.00MB thread-reservation=2
+Per-Host Resources: mem-estimate=34.05MB mem-reservation=4.00MB thread-reservation=2
 01:AGGREGATE [STREAMING]
 |  output: avg(c_acctbal)
 |  group by: c_nationkey
@@ -691,7 +691,7 @@ PLAN-ROOT SINK
 |  in pipelines: 03(GETNEXT)
 |
 F01:PLAN FRAGMENT [HASH(c_nationkey)] hosts=1 instances=1
-Per-Instance Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservation=1
+Per-Instance Resources: mem-estimate=10.05MB mem-reservation=1.94MB thread-reservation=1
 03:AGGREGATE [FINALIZE]
 |  output: avg:merge(c_acctbal)
 |  group by: c_nationkey
@@ -705,7 +705,7 @@ Per-Instance Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reser
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-Per-Instance Resources: mem-estimate=34.00MB mem-reservation=4.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=34.05MB mem-reservation=4.00MB thread-reservation=1
 01:AGGREGATE [STREAMING]
 |  output: avg(c_acctbal)
 |  group by: c_nationkey
@@ -786,7 +786,7 @@ Per-Host Resources: mem-estimate=111.37MB mem-reservation=69.00MB thread-reserva
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-|  Per-Host Resources: mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=40.29MB mem-reservation=8.00MB thread-reservation=2
 |  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
 |     HDFS partitions=1/1 files=2 size=54.21MB
 |     stored statistics:
@@ -803,7 +803,7 @@ Per-Host Resources: mem-estimate=111.37MB mem-reservation=69.00MB thread-reserva
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=81.00MB mem-reservation=5.00MB thread-reservation=2 runtime-filters-memory=1.00MB
+Per-Host Resources: mem-estimate=81.14MB mem-reservation=5.00MB thread-reservation=2 runtime-filters-memory=1.00MB
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    HDFS partitions=1/1 files=3 size=193.98MB
    runtime filters: RF000[bloom] -> l_orderkey
@@ -816,7 +816,7 @@ Per-Host Resources: mem-estimate=81.00MB mem-reservation=5.00MB thread-reservati
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=120.00MB Threads=6
-Per-Host Resource Estimates: Memory=414MB
+Per-Host Resource Estimates: Memory=415MB
 Analyzed query: SELECT /* +straight_join */ l_orderkey, o_orderstatus, count(*)
 FROM tpch_parquet.lineitem INNER JOIN tpch_parquet.orders ON o_orderkey =
 l_orderkey GROUP BY l_orderkey, o_orderstatus HAVING count(*) = CAST(1 AS
@@ -849,7 +849,7 @@ Per-Instance Resources: mem-estimate=71.23MB mem-reservation=34.00MB thread-rese
 |  in pipelines: 00(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
-Per-Instance Resources: mem-estimate=66.32MB mem-reservation=34.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=66.70MB mem-reservation=34.00MB thread-reservation=1
 03:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: l_orderkey, o_orderstatus
@@ -879,7 +879,7 @@ Per-Instance Resources: mem-estimate=66.32MB mem-reservation=34.00MB thread-rese
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-|  Per-Instance Resources: mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=40.29MB mem-reservation=8.00MB thread-reservation=1
 |  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
 |     HDFS partitions=1/1 files=2 size=54.21MB
 |     stored statistics:
@@ -897,7 +897,7 @@ Per-Instance Resources: mem-estimate=66.32MB mem-reservation=34.00MB thread-rese
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-Per-Instance Resources: mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=80.14MB mem-reservation=4.00MB thread-reservation=1
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    HDFS partitions=1/1 files=3 size=193.98MB
    runtime filters: RF000[bloom] -> l_orderkey
@@ -914,7 +914,7 @@ select distinct *
 from tpch_parquet.lineitem
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=112.00MB Threads=4
-Per-Host Resource Estimates: Memory=1012MB
+Per-Host Resource Estimates: Memory=1015MB
 Analyzed query: SELECT DISTINCT * FROM tpch_parquet.lineitem
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -942,7 +942,7 @@ Per-Host Resources: mem-estimate=473.84MB mem-reservation=34.00MB thread-reserva
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=427.37MB mem-reservation=74.00MB thread-reservation=2
+Per-Host Resources: mem-estimate=430.12MB mem-reservation=74.00MB thread-reservation=2
 01:AGGREGATE [STREAMING]
 |  group by: tpch_parquet.lineitem.l_orderkey, tpch_parquet.lineitem.l_partkey, tpch_parquet.lineitem.l_suppkey, tpch_parquet.lineitem.l_linenumber, tpch_parquet.lineitem.l_quantity, tpch_parquet.lineitem.l_extendedprice, tpch_parquet.lineitem.l_discount, tpch_parquet.lineitem.l_tax, tpch_parquet.lineitem.l_returnflag, tpch_parquet.lineitem.l_linestatus, tpch_parquet.lineitem.l_shipdate, tpch_parquet.lineitem.l_commitdate, tpch_parquet.lineitem.l_receiptdate, tpch_parquet.lineitem.l_shipinstruct, tpch_parquet.lineitem.l_shipmode, tpch_parquet.lineitem.l_comment
 |  mem-estimate=347.37MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
@@ -960,7 +960,7 @@ Per-Host Resources: mem-estimate=427.37MB mem-reservation=74.00MB thread-reserva
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=112.00MB Threads=3
-Per-Host Resource Estimates: Memory=1012MB
+Per-Host Resource Estimates: Memory=1015MB
 Analyzed query: SELECT DISTINCT * FROM tpch_parquet.lineitem
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -988,7 +988,7 @@ Per-Instance Resources: mem-estimate=473.84MB mem-reservation=34.00MB thread-res
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Instance Resources: mem-estimate=427.37MB mem-reservation=74.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=430.12MB mem-reservation=74.00MB thread-reservation=1
 01:AGGREGATE [STREAMING]
 |  group by: tpch_parquet.lineitem.l_orderkey, tpch_parquet.lineitem.l_partkey, tpch_parquet.lineitem.l_suppkey, tpch_parquet.lineitem.l_linenumber, tpch_parquet.lineitem.l_quantity, tpch_parquet.lineitem.l_extendedprice, tpch_parquet.lineitem.l_discount, tpch_parquet.lineitem.l_tax, tpch_parquet.lineitem.l_returnflag, tpch_parquet.lineitem.l_linestatus, tpch_parquet.lineitem.l_shipdate, tpch_parquet.lineitem.l_commitdate, tpch_parquet.lineitem.l_receiptdate, tpch_parquet.lineitem.l_shipinstruct, tpch_parquet.lineitem.l_shipmode, tpch_parquet.lineitem.l_comment
 |  mem-estimate=347.37MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
@@ -1029,7 +1029,7 @@ PLAN-ROOT SINK
 |  in pipelines: 03(GETNEXT)
 |
 F01:PLAN FRAGMENT [HASH(string_col)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=128.07MB mem-reservation=34.00MB thread-reservation=1
+Per-Host Resources: mem-estimate=128.09MB mem-reservation=34.00MB thread-reservation=1
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
 |  group by: string_col
@@ -1043,7 +1043,7 @@ Per-Host Resources: mem-estimate=128.07MB mem-reservation=34.00MB thread-reserva
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=144.00MB mem-reservation=34.01MB thread-reservation=2
+Per-Host Resources: mem-estimate=144.28MB mem-reservation=34.01MB thread-reservation=2
 01:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: string_col
@@ -1063,7 +1063,7 @@ Per-Host Resources: mem-estimate=144.00MB mem-reservation=34.01MB thread-reserva
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=140.02MB Threads=5
-Per-Host Resource Estimates: Memory=554MB
+Per-Host Resource Estimates: Memory=555MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional_parquet.alltypestiny
 Analyzed query: SELECT string_col, count(*) FROM functional_parquet.alltypestiny
@@ -1095,7 +1095,7 @@ Per-Instance Resources: mem-estimate=128.09MB mem-reservation=34.00MB thread-res
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=4
-Per-Instance Resources: mem-estimate=144.00MB mem-reservation=34.01MB thread-reservation=1
+Per-Instance Resources: mem-estimate=144.38MB mem-reservation=34.01MB thread-reservation=1
 01:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: string_col

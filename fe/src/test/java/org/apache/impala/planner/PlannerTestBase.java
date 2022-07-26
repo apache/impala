@@ -555,8 +555,8 @@ public class PlannerTestBase extends FrontendTestBase {
       String planDiff = TestUtils.compareOutput(
           Lists.newArrayList(explainStr.split("\n")), expectedPlan, true, resultFilters);
       if (!planDiff.isEmpty()) {
-        errorLog.append(String.format(
-            "\nSection %s of query:\n%s\n\n%s", section, query, planDiff));
+        errorLog.append(String.format("\nSection %s of query at line %d:\n%s\n\n%s",
+            section, testCase.getStartingLineNum(), query, planDiff));
         // Append the VERBOSE explain plan because it contains details about
         // tuples/sizes/cardinality for easier debugging.
         String verbosePlan = getVerboseExplainPlan(queryCtx);

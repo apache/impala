@@ -21,6 +21,7 @@ Row of size 9.54 MB could not be materialized by AGGREGATION_NODE
 ====
 ---- QUERY
 # Agg should be able to process the large strings if we increase the row size.
+set mem_limit="1gb";
 set max_row_size=10m;
 select id, count(distinct bigstr)
 from bigstrs
@@ -152,7 +153,7 @@ Row of size 9.54 MB could not be materialized by SORT_NODE (id=1). Increase the 
 ---- QUERY
 # Sort and analytic should be able to process the large strings if we increase the row
 # size.
-set mem_limit="1gb";
+set mem_limit="1.4gb";
 set max_row_size=10m;
 SELECT id, int_col, substring(bigstr, 1, 10), substring(bigstr, 9999999, 1), rank
 FROM (

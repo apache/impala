@@ -118,7 +118,7 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=98.81MB Threads=8
-Per-Host Resource Estimates: Memory=332MB
+Per-Host Resource Estimates: Memory=334MB
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.69MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -166,7 +166,7 @@ Per-Host Resources: mem-estimate=116.13MB mem-reservation=50.00MB thread-reserva
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=83.48MB mem-reservation=41.81MB thread-reservation=2 runtime-filters-memory=2.00MB
+Per-Host Resources: mem-estimate=84.47MB mem-reservation=41.81MB thread-reservation=2 runtime-filters-memory=2.00MB
 05:AGGREGATE [STREAMING]
 |  output: sum(ss_ext_sales_price)
 |  group by: i_item_id, i_item_desc, i_category, i_class, i_current_price
@@ -188,7 +188,7 @@ Per-Host Resources: mem-estimate=83.48MB mem-reservation=41.81MB thread-reservat
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=32.12MB mem-reservation=1.00MB thread-reservation=2
 |  02:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.15MB
 |     predicates: CAST(d_date AS TIMESTAMP) <= TIMESTAMP '1999-03-24 00:00:00', CAST(d_date AS TIMESTAMP) >= TIMESTAMP '1999-02-22 00:00:00'
@@ -215,7 +215,7 @@ Per-Host Resources: mem-estimate=83.48MB mem-reservation=41.81MB thread-reservat
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=96.00MB mem-reservation=2.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=96.76MB mem-reservation=2.00MB thread-reservation=2
 |  01:SCAN HDFS [tpcds_parquet.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.73MB
 |     predicates: i_category IN ('Jewelry', 'Sports', 'Books')
@@ -242,7 +242,7 @@ Per-Host Resources: mem-estimate=83.48MB mem-reservation=41.81MB thread-reservat
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=190.62MB Threads=9
-Per-Host Resource Estimates: Memory=283MB
+Per-Host Resource Estimates: Memory=293MB
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=5.32MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -291,7 +291,7 @@ Per-Instance Resources: mem-estimate=65.21MB mem-reservation=50.00MB thread-rese
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
-Per-Instance Resources: mem-estimate=50.00MB mem-reservation=35.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=54.74MB mem-reservation=35.00MB thread-reservation=1
 05:AGGREGATE [STREAMING]
 |  output: sum(ss_ext_sales_price)
 |  group by: i_item_id, i_item_desc, i_category, i_class, i_current_price
@@ -321,7 +321,7 @@ Per-Instance Resources: mem-estimate=50.00MB mem-reservation=35.00MB thread-rese
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=16.12MB mem-reservation=1.00MB thread-reservation=1
 |  02:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.15MB
 |     predicates: CAST(d_date AS TIMESTAMP) <= TIMESTAMP '1999-03-24 00:00:00', CAST(d_date AS TIMESTAMP) >= TIMESTAMP '1999-02-22 00:00:00'
@@ -356,7 +356,7 @@ Per-Instance Resources: mem-estimate=50.00MB mem-reservation=35.00MB thread-rese
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=2.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=16.76MB mem-reservation=2.00MB thread-reservation=1
 |  01:SCAN HDFS [tpcds_parquet.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.73MB
 |     predicates: i_category IN ('Jewelry', 'Sports', 'Books')

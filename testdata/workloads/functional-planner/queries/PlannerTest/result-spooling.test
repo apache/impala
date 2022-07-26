@@ -190,7 +190,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-Per-Host Resources: mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=2
+Per-Host Resources: mem-estimate=16.05MB mem-reservation=8.00KB thread-reservation=2
 00:SCAN HDFS [functional.dimtbl, RANDOM]
    HDFS partitions=1/1 files=1 size=171B
    stored statistics:

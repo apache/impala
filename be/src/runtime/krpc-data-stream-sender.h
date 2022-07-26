@@ -19,15 +19,16 @@
 #ifndef IMPALA_RUNTIME_KRPC_DATA_STREAM_SENDER_H
 #define IMPALA_RUNTIME_KRPC_DATA_STREAM_SENDER_H
 
-#include <vector>
 #include <string>
+#include <vector>
 
-#include "exec/data-sink.h"
 #include "codegen/impala-ir.h"
 #include "common/global-types.h"
 #include "common/object-pool.h"
 #include "common/status.h"
+#include "exec/data-sink.h"
 #include "exprs/scalar-expr.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "util/runtime-profile.h"
 
@@ -206,7 +207,7 @@ class KrpcDataStreamSender : public DataSink {
   /// a RowBatchHeaderPB and buffers for the serialized tuple offsets and data. Used only
   /// when the partitioning strategy is UNPARTITIONED.
   static const int NUM_OUTBOUND_BATCHES = 2;
-  OutboundRowBatch outbound_batches_[NUM_OUTBOUND_BATCHES];
+  std::vector<OutboundRowBatch> outbound_batches_;
 
   /// If true, this sender has called FlushFinal() successfully.
   /// Not valid to call Send() anymore.
@@ -260,6 +261,11 @@ class KrpcDataStreamSender : public DataSink {
 
   /// Identifier of the destination plan node.
   PlanNodeId dest_node_id_;
+
+  /// Memory tracker from Parent Memory Tracker for tracking memory of OutBoundRowBatch
+  /// serialization
+  std::shared_ptr<MemTracker> outbound_rb_mem_tracker_;
+  std::shared_ptr<CharMemTrackerAllocator> char_mem_tracker_allocator_;
 
   /// Used for Kudu partitioning to round-robin rows that don't correspond to a partition
   /// or when errors are encountered.

@@ -39,9 +39,9 @@ row_regex: .*Cluster Memory Admitted: 169.47 MB.*
 # SELECT with non-merging exchange.
 select * from functional.alltypes;
 ---- RUNTIME_PROFILE
-row_regex: .*Per-Host Resource Estimates: Memory=20MB.*
+row_regex: .*Per-Host Resource Estimates: Memory=21MB.*
 row_regex: .*Dedicated Coordinator Resource Estimate: Memory=104MB.*
-row_regex: .*Cluster Memory Admitted: 145.47 MB.*
+row_regex: .*Cluster Memory Admitted: 146.20 MB.*
 ====
 ---- QUERY
 # SELECT with a non-grouping aggregate in the coordinator fragment.

@@ -67,7 +67,7 @@ from functional_avro.alltypes t1
   left outer join functional_avro.alltypes t3 on (t2.id = t3.id)
 where t1.month = 1 and t2.year = 2009 and t3.bool_col = false
 ---- RESULTS: VERIFY_IS_SUBSET
-'Per-Host Resource Estimates: Memory=54MB'
+'Per-Host Resource Estimates: Memory=55MB'
 'WARNING: The following tables are missing relevant table and/or column statistics.'
 'functional_avro.alltypes, functional_parquet.alltypessmall'
 ====
@@ -91,6 +91,6 @@ explain select year, month from functional.alltypes
   intersect
 select year, month from functional.alltypes where year=2009;
 ---- RESULTS: VERIFY_IS_SUBSET
-'Per-Host Resources: mem-estimate=13.97MB mem-reservation=5.88MB thread-reservation=1 runtime-filters-memory=2.00MB'
+'Per-Host Resources: mem-estimate=13.98MB mem-reservation=5.88MB thread-reservation=1 runtime-filters-memory=2.00MB'
 '04:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]'
 ====
