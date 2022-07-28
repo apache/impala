@@ -393,6 +393,9 @@ class ScanRange : public RequestRange {
   /// buffer reader.
   ReadOutcome DoReadInternal(DiskQueue* queue, int disk_id, bool use_local_buffer);
 
+  /// Whether to use file handle caching for the current file.
+  bool FileHandleCacheEnabled();
+
   /// Same as Cancel() except it doesn't remove the scan range from
   /// reader_->active_scan_ranges_ or call WaitForInFlightRead(). This allows for
   /// custom handling of in flight reads or active scan ranges. For example, this is

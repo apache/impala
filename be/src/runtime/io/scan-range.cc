@@ -34,6 +34,7 @@ using std::unique_lock;
 DECLARE_bool(cache_remote_file_handles);
 DECLARE_bool(cache_s3_file_handles);
 DECLARE_bool(cache_abfs_file_handles);
+DECLARE_bool(cache_ozone_file_handles);
 
 // Implementation of the ScanRange functionality. Each ScanRange contains a queue
 // of ready buffers. For each ScanRange, there is only a single producer and
@@ -122,6 +123,31 @@ void ScanRange::AddUnusedBuffers(vector<unique_ptr<BufferDescriptor>>&& buffers,
   if (unblocked) ScheduleScanRange();
 }
 
+bool ScanRange::FileHandleCacheEnabled() {
+  // Global flag for all file handle caching
+  if (!is_file_handle_caching_enabled()) return false;
+
+  if (expected_local_ && IsHdfsPath(file())) return true;
+  if (FLAGS_cache_remote_file_handles) {
+    if (disk_id_ == io_mgr_->RemoteDfsDiskId()) return true;
+  }
+
+  if (FLAGS_cache_ozone_file_handles) {
+    if (expected_local_ && IsOzonePath(file())) return true;
+    if (disk_id_ == io_mgr_->RemoteOzoneDiskId()) return true;
+  }
+
+  if (FLAGS_cache_s3_file_handles) {
+    if (disk_id_ == io_mgr_->RemoteS3DiskId()) return true;
+  }
+
+  if (FLAGS_cache_abfs_file_handles) {
+    if (disk_id_ == io_mgr_->RemoteAbfsDiskId()) return true;
+  }
+
+  return false;
+}
+
 ReadOutcome ScanRange::DoReadInternal(
     DiskQueue* queue, int disk_id, bool use_local_buff) {
   int64_t bytes_remaining = bytes_to_read_ - bytes_read_;
@@ -165,16 +191,11 @@ ReadOutcome ScanRange::DoReadInternal(
   // lock across the read call.
   // To use the file handle cache:
   // 1. It must be enabled at the daemon level.
-  // 2. The file is a local HDFS file (expected_local_) OR it is a remote HDFS file and
-  //    'cache_remote_file_handles' is true
-  bool use_file_handle_cache = false;
-  if (is_file_handle_caching_enabled() &&
-      (expected_local_ ||
-       (FLAGS_cache_remote_file_handles && disk_id_ == io_mgr_->RemoteDfsDiskId()) ||
-       (FLAGS_cache_s3_file_handles && disk_id_ == io_mgr_->RemoteS3DiskId()) ||
-       (FLAGS_cache_abfs_file_handles && disk_id_ == io_mgr_->RemoteAbfsDiskId()))) {
-    use_file_handle_cache = true;
-  }
+  // 2. It must be enabled for the particular filesystem.
+  bool use_file_handle_cache = FileHandleCacheEnabled();
+  VLOG_FILE << (use_file_handle_cache ? "Using" : "Skipping")
+            << " file handle cache for " << (expected_local_ ? "local" : "remote")
+            << " file " << file();
   Status read_status = file_reader->Open(use_file_handle_cache);
   bool eof = false;
   if (read_status.ok()) {

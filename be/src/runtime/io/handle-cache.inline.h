@@ -102,6 +102,7 @@ void FileHandleCache::Accessor::Destroy() {
 
 FileHandleCache::Accessor::~Accessor() {
   if (cache_accessor_.Get()) {
+    VLOG_FILE << "hdfsUnbufferFile() fid=" << Get()->file();
     if (hdfsUnbufferFile(Get()->file()) != 0) {
       VLOG_FILE << "FS does not support file handle unbuffering, closing file="
                 << cache_accessor_.GetKey()->first;
