@@ -76,7 +76,7 @@ EXCLUDE_FILE_PATTERNS = [
 
 def setup_virtualenv():
   """Set up virtualenv with flake8-diff."""
-  virtualenv.create_environment(VENV_PATH)
+  virtualenv.cli_run([VENV_PATH])
   check_call([PIP_PATH, "install",
               "flake8=={0}".format(FLAKE8_VERSION),
               "flake8-diff=={0}".format(FLAKE8_DIFF_VERSION)])
