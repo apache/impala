@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "common/names.h"
+#include "kudu/util/random.h"
 #include "testutil/gtest-util.h"
 #include "util/parquet-bloom-filter.h"
 
@@ -148,23 +149,32 @@ TEST(ParquetBloomFilter, CumulativeFind) {
 // The empirical false positives we find when looking for random items is with a constant
 // factor of the false positive probability the Bloom filter was constructed for.
 TEST(ParquetBloomFilter, FindInvalid) {
-  srand(0);
-  static const int find_limit = 1 << 20;
+  // We use a deterministic pseudorandom number generator with a set seed. The reason is
+  // that with a run-dependent seed, there will always be inputs that can fail. That's a
+  // potential argument for this to be a benchmark rather than a test, although the
+  // measured quantity would be not time but deviation from predicted fpp.
+  kudu::Random rgen(867 + 5309);
+  static const int find_limit = 1 << 22;
   std::unordered_set<uint64_t> to_find;
   while (to_find.size() < find_limit) {
-    to_find.insert(MakeRand());
+    to_find.insert(rgen.Next64());
   }
   static const int max_log_ndv = 19;
   std::unordered_set<uint64_t> to_insert;
   while (to_insert.size() < (1ull << max_log_ndv)) {
-    const uint64_t candidate = MakeRand();
+    const uint64_t candidate = rgen.Next64();
     if (to_find.find(candidate) == to_find.end()) {
       to_insert.insert(candidate);
     }
   }
+  // NOTE: Even though this was generated with a deterministic pseudorandom number
+  // generator, the order of items in the vector is dependent on the implementation
+  // of unordered_set, which can change with different libstdc++ versions. Since
+  // the tests below use the first X entries, changes in the order also change the
+  // test.
   vector<uint64_t> shuffled_insert(to_insert.begin(), to_insert.end());
   for (int log_ndv = 12; log_ndv < max_log_ndv; ++log_ndv) {
-    for (int log_fpp = 4; log_fpp < 15; ++log_fpp) {
+    for (int log_fpp = 4; log_fpp < 12; ++log_fpp) {
       double fpp = 1.0 / (1 << log_fpp);
       const size_t ndv = 1 << log_ndv;
       BloomWrapper wrapper = CreateBloomFilter(ndv, fpp);
@@ -182,18 +192,21 @@ TEST(ParquetBloomFilter, FindInvalid) {
       }
       EXPECT_LE(found, find_limit * fpp * 2)
           << "Too many false positives with -log2(fpp) = " << log_fpp
-          << ", ndv = " << ndv;
+          << " and ndv = " << ndv;
 
       // Because the space is rounded up to a power of 2, we might actually get a lower
       // fpp than the one passed to MinLogSpace().
       const int log_space = log2(wrapper.storage->size());
       const double expected_fpp =
           ParquetBloomFilter::FalsePositiveProb(ndv, log_space);
-      EXPECT_GE(found, find_limit * expected_fpp)
-          << "Too few false positives with -log2(fpp) = " << log_fpp << ", ndv = " << ndv;
-      EXPECT_LE(found, find_limit * expected_fpp * 8)
+      // Fudge factors are present because filter characteristics are true in the limit,
+      // and will deviate for small samples.
+      EXPECT_GE(found, find_limit * expected_fpp * 0.75)
+          << "Too few false positives with -log2(fpp) = " << log_fpp
+          << " expected_fpp = " << expected_fpp;
+      EXPECT_LE(found, find_limit * expected_fpp * 1.25)
           << "Too many false positives with -log2(fpp) = " << log_fpp
-          << ", ndv = " << ndv;
+          << " expected_fpp = " << expected_fpp;
     }
   }
 }
