@@ -518,6 +518,11 @@ under the License.
       <version>3.2.0-m3</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-server</artifactId>
+      <version>9.4.31.v20200723</version>
+    </dependency>
 
     <!-- https://mvnrepository.com/artifact/org.pac4j/pac4j-saml -->
     <dependency>
@@ -859,6 +864,8 @@ under the License.
                     <include>org.eclipse.jetty:jetty-client</include>
                     <include>org.eclipse.jetty:jetty-http</include>
                     <include>org.eclipse.jetty:jetty-io</include>
+                    <!-- jetty-server is required when HiveMetaStoreClient is instantiated after HIVE-21456. -->
+                    <include>org.eclipse.jetty:jetty-server</include>
                     <!-- hadoop-yarn-common depends on some Jetty utilities. -->
                     <include>org.eclipse.jetty:jetty-util</include>
                     <!-- Include the allowed versions specifically -->
