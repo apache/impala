@@ -108,6 +108,8 @@ class DelegatingHdfsClient(BaseFilesystem):
   def getacl(self, path):
     return self.webhdfs_client.getacl(path)
 
+  def touch(self, paths):
+    return self.hdfs_filesystem_client.touch(paths)
 
 class PyWebHdfsClientWithChmod(PyWebHdfsClient):
   def chmod(self, path, permission):
@@ -309,6 +311,16 @@ class HadoopFsCommandLineClient(BaseFilesystem):
     missing."""
     return path if path.startswith('/') else '/' + path
 
+  def touch(self, paths):
+    """Updates the access and modification times of the files specified by 'paths' to
+    the current time. If the files don't exist, zero length files will be created with
+    current time as the timestamp of them."""
+    if isinstance(paths, list):
+      cmd = ['-touch'] + paths
+    else:
+      cmd = ['-touch', paths]
+    (status, stdout, stderr) = self._hadoop_fs_shell(cmd)
+    return status == 0
 
 def get_webhdfs_client_from_conf(conf):
   """Returns a new HTTP client for an HDFS cluster using an HdfsConfig object"""
