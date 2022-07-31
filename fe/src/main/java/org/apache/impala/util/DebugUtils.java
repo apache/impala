@@ -40,6 +40,10 @@ public class DebugUtils {
   public static final String REFRESH_HDFS_LISTING_DELAY
       = "catalogd_refresh_hdfs_listing_delay";
 
+  // debug action label for introducing pauses after creating HDFS RemoteIterators.
+  public static final String REFRESH_PAUSE_AFTER_HDFS_REMOTE_ITERATOR_CREATION
+      = "catalogd_pause_after_hdfs_remote_iterator_creation";
+
   // debug action label for introducing delay in alter table recover partitions command.
   public static final String RECOVER_PARTITIONS_DELAY = "catalogd_table_recover_delay";
 

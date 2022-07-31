@@ -729,7 +729,7 @@ public class FileSystemUtil {
           return listFiles(fs, p, true, debugAction);
         }
         DebugUtils.executeDebugAction(debugAction, DebugUtils.REFRESH_HDFS_LISTING_DELAY);
-        return new FilterIterator(p, new RecursingIterator<>(fs, p,
+        return new FilterIterator(p, new RecursingIterator<>(fs, p, debugAction,
             FileSystemUtil::listStatusIterator));
       }
       DebugUtils.executeDebugAction(debugAction, DebugUtils.REFRESH_HDFS_LISTING_DELAY);
@@ -753,7 +753,7 @@ public class FileSystemUtil {
       if (hasRecursiveListFiles(fs)) {
         baseIterator = fs.listFiles(p, recursive);
       } else {
-        baseIterator = new RecursingIterator<>(fs, p,
+        baseIterator = new RecursingIterator<>(fs, p, debugAction,
             FileSystemUtil::listLocatedStatusIterator);
       }
       return new FilterIterator(p, baseIterator);
@@ -943,17 +943,22 @@ public class FileSystemUtil {
     private final BiFunctionWithException<FileSystem, Path, RemoteIterator<T>>
         newIterFunc_;
     private final FileSystem fs_;
+    private final String debugAction_;
     private final Stack<RemoteIterator<T>> iters_ = new Stack<>();
     private RemoteIterator<T> curIter_;
     private T curFile_;
 
-    private RecursingIterator(FileSystem fs, Path startPath,
+    private RecursingIterator(FileSystem fs, Path startPath, String debugAction,
         BiFunctionWithException<FileSystem, Path, RemoteIterator<T>> newIterFunc)
         throws IOException {
       this.fs_ = Preconditions.checkNotNull(fs);
+      this.debugAction_ = debugAction;
       this.newIterFunc_ = Preconditions.checkNotNull(newIterFunc);
       Preconditions.checkNotNull(startPath);
       curIter_ = newIterFunc.apply(fs, startPath);
+      LOG.trace("listed start path: {}", startPath);
+      DebugUtils.executeDebugAction(debugAction,
+          DebugUtils.REFRESH_PAUSE_AFTER_HDFS_REMOTE_ITERATOR_CREATION);
     }
 
     @Override
@@ -995,6 +1000,13 @@ public class FileSystemUtil {
      * @throws IOException if any IO error occurs
      */
     private void handleFileStat(T fileStatus) throws IOException {
+      LOG.trace("handleFileStat: {}", fileStatus.getPath());
+      if (isIgnoredDir(fileStatus.getPath())) {
+        LOG.debug("Ignoring {} since it is either a hidden directory or a temporary "
+            + "staging directory", fileStatus.getPath());
+        curFile_ = null;
+        return;
+      }
       if (fileStatus.isFile()) {
         curFile_ = fileStatus;
         return;
@@ -1004,6 +1016,9 @@ public class FileSystemUtil {
       iters_.push(curIter_);
       curIter_ = subIter;
       curFile_ = fileStatus;
+      LOG.trace("listed sub dir: {}", fileStatus.getPath());
+      DebugUtils.executeDebugAction(debugAction_,
+          DebugUtils.REFRESH_PAUSE_AFTER_HDFS_REMOTE_ITERATOR_CREATION);
     }
 
     @Override

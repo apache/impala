@@ -9,9 +9,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from tests.common.impala_test_suite import ImpalaTestSuite
+
+import pytest
+import requests
+import time
+
+from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.test_dimensions import create_uncompressed_text_dimension
-from tests.common.skip import SkipIfLocal
+from tests.common.skip import (SkipIfLocal, SkipIfS3, SkipIfGCS, SkipIfCOS,
+                               SkipIfADLS)
 from tests.util.filesystem_utils import WAREHOUSE
 
 
@@ -21,6 +28,10 @@ class TestRecursiveListing(ImpalaTestSuite):
   This class tests that files are recursively listed within directories
   and partitions, and that REFRESH picks up changes within them.
   """
+  enable_fs_tracing_url = "http://localhost:25020/set_java_loglevel?" \
+                          "class=org.apache.impala.common.FileSystemUtil&level=trace"
+  reset_log_level_url = "http://localhost:25020/reset_java_loglevel"
+
   @classmethod
   def get_workload(self):
     return 'functional-query'
@@ -44,13 +55,13 @@ class TestRecursiveListing(ImpalaTestSuite):
     result = self.client.execute("select * from {0}".format(table))
     return result.data
 
-  def test_unpartitioned(self, vector, unique_database):
-    self._do_test(vector, unique_database, partitioned=False)
+  def test_unpartitioned(self, unique_database):
+    self._do_test(unique_database, partitioned=False)
 
-  def test_partitioned(self, vector, unique_database):
-    self._do_test(vector, unique_database, partitioned=True)
+  def test_partitioned(self, unique_database):
+    self._do_test(unique_database, partitioned=True)
 
-  def _do_test(self, vector, unique_database, partitioned):
+  def _init_test_table(self, unique_database, partitioned):
     tbl_name = "t"
     fq_tbl_name = unique_database + "." + tbl_name
     tbl_path = '%s/%s.db/%s' % (WAREHOUSE, unique_database, tbl_name)
@@ -69,6 +80,11 @@ class TestRecursiveListing(ImpalaTestSuite):
       part_path = tbl_path + "/p=1"
     else:
       part_path = tbl_path
+
+    return fq_tbl_name, part_path
+
+  def _do_test(self, unique_database, partitioned):
+    fq_tbl_name, part_path = self._init_test_table(unique_database, partitioned)
 
     # Add a file inside a nested directory and refresh.
     self.filesystem_client.make_dir("{0}/dir1".format(part_path[1:]))
@@ -125,3 +141,89 @@ class TestRecursiveListing(ImpalaTestSuite):
     self.execute_query_expect_success(self.client, "refresh {0}".format(fq_tbl_name))
     assert len(self._show_files(fq_tbl_name)) == 1
     assert len(self._get_rows(fq_tbl_name)) == 1
+
+  @SkipIfS3.variable_listing_times
+  @SkipIfCOS.variable_listing_times
+  @SkipIfGCS.variable_listing_times
+  @SkipIfADLS.eventually_consistent
+  @pytest.mark.execute_serially
+  @pytest.mark.stress
+  def test_large_staging_dirs(self, unique_database):
+    """Regression test for IMPALA-11464:
+    Test REFRESH survives with concurrent add/remove ops on large staging/tmp dirs
+    which contain more than 1000 files. Execute this serially since the sleep intervals
+    might not work with concurrent workloads. Test this only on HDFS since other FS might
+    not have partial listing (configured by dfs.ls.limit)."""
+    fq_tbl_name, part_path = self._init_test_table(unique_database, partitioned=True)
+    staging_dir = "{0}/.hive-staging".format(part_path)
+    # Expected timeline (before the fix of IMPALA-11464):
+    # 0ms:   catalogd list the partition dir and wait 200ms.
+    # 200ms: catalogd get the staging dir and list it partially, then wait 200ms.
+    # 300ms: remove the staging dir.
+    # 400ms: catalogd consume the partial list (1000 items). Start listing the remaining
+    #        items and get FileNotFoundException due to the dir is removed.
+    # After the fix of IMPALA-11464, catalogd won't list the staging dir, so avoids
+    # hitting the exception.
+    self._test_listing_large_dir(fq_tbl_name, large_dir=staging_dir,
+                                 pause_ms_after_remote_iterator_creation=200,
+                                 pause_ms_before_file_cleanup=300,
+                                 refresh_should_fail=False)
+
+  @SkipIfS3.variable_listing_times
+  @SkipIfCOS.variable_listing_times
+  @SkipIfGCS.variable_listing_times
+  @SkipIfADLS.eventually_consistent
+  @pytest.mark.execute_serially
+  @pytest.mark.stress
+  def test_partition_dir_removed_inflight(self, unique_database):
+    """Test REFRESH with concurrent add/remove ops on large partition dirs
+    which contain more than 1000 files. Execute this serially since the sleep
+    intervals might not work with concurrent workloads. Test this only on HDFS
+    since other FS might not have partial listing (configured by dfs.ls.limit)"""
+    fq_tbl_name, part_path = self._init_test_table(unique_database, partitioned=True)
+    # Expected timeline:
+    # 0ms:   catalogd start listing the partition dir. Get 1000 items in the first
+    #        partial listing. Then wait for 300ms.
+    # 200ms: The partition dir is removed.
+    # 300ms: catalogd processed the 1000 items and start listing the remaining items.
+    #        Then get FileNotFoundException since the partition dir disappears.
+    self._test_listing_large_dir(fq_tbl_name, large_dir=part_path + '/',
+                                 pause_ms_after_remote_iterator_creation=300,
+                                 pause_ms_before_file_cleanup=200,
+                                 refresh_should_fail=True)
+
+  def _test_listing_large_dir(self, fq_tbl_name, large_dir,
+                              pause_ms_after_remote_iterator_creation,
+                              pause_ms_before_file_cleanup,
+                              refresh_should_fail):
+    # We need data files more than 1000 (default of dfs.ls.limit) so the initial
+    # file listing can't list all of them.
+    files = [large_dir + '/' + str(i) for i in range(1024)]
+    refresh_stmt = "refresh " + fq_tbl_name
+    self.client.set_configuration({
+      "debug_action": "catalogd_pause_after_hdfs_remote_iterator_creation:SLEEP@"
+                      + str(pause_ms_after_remote_iterator_creation)
+    })
+    # Enable TRACE logging in FileSystemUtil for better debugging
+    response = requests.get(self.enable_fs_tracing_url)
+    assert response.status_code == requests.codes.ok
+    try:
+      # self.filesystem_client is a DelegatingHdfsClient. It delegates delete_file_dir()
+      # and make_dir() to the underlying PyWebHdfsClient which expects the HDFS path
+      # without a leading '/'. So we use large_dir[1:] to remove the leading '/'.
+      self.filesystem_client.delete_file_dir(large_dir[1:], recursive=True)
+      self.filesystem_client.make_dir(large_dir[1:])
+      self.filesystem_client.touch(files)
+      LOG.info("created staging files under " + large_dir)
+      handle = self.execute_query_async(refresh_stmt)
+      # Wait a moment to let REFRESH finish expected partial listing on the dir.
+      time.sleep(pause_ms_before_file_cleanup / 1000.0)
+      self.filesystem_client.delete_file_dir(large_dir[1:], recursive=True)
+      LOG.info("removed staging dir " + large_dir)
+      try:
+        self.client.fetch(refresh_stmt, handle)
+        assert not refresh_should_fail, "REFRESH should fail"
+      except ImpalaBeeswaxException as e:
+        assert refresh_should_fail, "unexpected exception " + str(e)
+    finally:
+      requests.get(self.reset_log_level_url)

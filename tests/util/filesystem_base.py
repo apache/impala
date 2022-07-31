@@ -69,3 +69,10 @@ class BaseFilesystem(object):
     """Returns a list of integers which are all the file sizes of files found under
     'path'."""
     pass
+
+  @abstractmethod
+  def touch(self, paths):
+    """Updates the access and modification times of the files specified by 'paths' to
+    the current time. If the files don't exist, zero length files will be created with
+    current time as the timestamp of them."""
+    pass
