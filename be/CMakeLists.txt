@@ -51,6 +51,12 @@ SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFI
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_SYSTEM_NO_DEPRECATED")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_BIND_GLOBAL_PLACEHOLDERS")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_ALLOW_DEPRECATED_HEADERS")
+#  -DBOOST_UUID_RANDOM_PROVIDER_FORCE_POSIX
+#      For higher portability of the built binaries, switch to /dev/[u]random
+#      even if getrandom(2) is available. This is to allow for running binaries
+#      built at OS where getrandom(2) is available at OSes where getrandom(2)
+#      isn't supported (e.g., that might happen in containerized deployments).
+SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_UUID_RANDOM_PROVIDER_FORCE_POSIX")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -B $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/binutils-$ENV{IMPALA_BINUTILS_VERSION}/bin/")
 IF($ENV{USE_GOLD_LINKER} STREQUAL "true")
   SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fuse-ld=gold")
