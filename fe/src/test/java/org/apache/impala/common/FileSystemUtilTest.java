@@ -17,7 +17,6 @@
 
 package org.apache.impala.common;
 
-import static org.apache.impala.common.FileSystemUtil.HIVE_TEMP_FILE_PREFIX;
 import static org.apache.impala.common.FileSystemUtil.isIgnoredDir;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -26,6 +25,9 @@ import static org.junit.Assert.assertEquals;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TBackendGflags;
+import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -38,9 +40,18 @@ import java.util.List;
  * Tests for the various util methods in FileSystemUtil class
  */
 public class FileSystemUtilTest {
-
+  private static final String HIVE_TEMP_FILE_PREFIX = "_tmp.";
+  private static final String SPARK_TEMP_FILE_PREFIX = "_spark_metadata";
   private static final Path TEST_TABLE_PATH = new Path("/test-warehouse/foo"
       + ".db/filesystem-util-test");
+
+  @Before
+  public void setUp()  {
+    // Make sure BackendConfig is initialized.
+    if (BackendConfig.INSTANCE == null) {
+      BackendConfig.create(new TBackendGflags());
+    }
+  }
 
   @Test
   public void testIsInIgnoredDirectory() {
@@ -59,6 +70,10 @@ public class FileSystemUtilTest {
     assertTrue("Files in hive temporary directories should be ignored",
         testIsInIgnoredDirectory(new Path(TEST_TABLE_PATH,
             HIVE_TEMP_FILE_PREFIX + "delta_000000_2/test.manifest")));
+
+    assertTrue("Files in spark temporary directories should be ignored",
+        testIsInIgnoredDirectory(new Path(TEST_TABLE_PATH,
+            SPARK_TEMP_FILE_PREFIX + "/0")));
 
     //multiple nested levels
     assertTrue(testIsInIgnoredDirectory(new Path(TEST_TABLE_PATH,

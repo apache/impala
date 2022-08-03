@@ -36,6 +36,7 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.client.HdfsAdmin;
 import org.apache.hadoop.hdfs.protocol.EncryptionZone;
 import org.apache.impala.catalog.HdfsCompression;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.util.DebugUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,6 +45,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -846,12 +849,19 @@ public class FileSystemUtil {
   }
 
   /**
-   * Prefix string used by hive to write certain temporary or "non-data" files in the
-   * table location
+   * Prefix string used by tools like hive/spark/flink to write certain temporary or
+   * "non-data" files in the table location
    */
-  public static final String HIVE_TEMP_FILE_PREFIX = "_tmp.";
-
-  public static final String DOT = ".";
+  private static final List<String> TMP_DIR_PREFIX_LIST = new ArrayList<>();
+  static {
+    String s = BackendConfig.INSTANCE.getIgnoredDirPrefixList();
+    for (String prefix : s.split(",")) {
+      if (!prefix.isEmpty()) {
+        TMP_DIR_PREFIX_LIST.add(prefix);
+      }
+    }
+    LOG.info("Prefix list of ignored dirs: " + TMP_DIR_PREFIX_LIST);
+  }
 
   /**
    * Util method used to filter out hidden and temporary staging directories
@@ -861,7 +871,12 @@ public class FileSystemUtil {
   @VisibleForTesting
   static boolean isIgnoredDir(Path path) {
     String filename = path.getName();
-    return filename.startsWith(DOT) || filename.startsWith(HIVE_TEMP_FILE_PREFIX);
+    for (String prefix : TMP_DIR_PREFIX_LIST) {
+      if (filename.startsWith(prefix)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

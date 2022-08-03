@@ -363,4 +363,8 @@ public class BackendConfig {
   public boolean useHmsColumnOrderForHBaseTables() {
     return backendCfg_.use_hms_column_order_for_hbase_tables;
   }
+
+  public String getIgnoredDirPrefixList() {
+    return backendCfg_.ignored_dir_prefix_list;
+  }
 }

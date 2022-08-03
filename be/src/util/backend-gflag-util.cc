@@ -191,6 +191,10 @@ DEFINE_bool(use_hms_column_order_for_hbase_tables, false,
     "Use the column order in HMS for HBase tables instead of ordering the columns by "
     "family/qualifier. Keeping the default as false for backward compatibility.");
 
+DEFINE_string(ignored_dir_prefix_list, ".,_tmp.,_spark_metadata",
+    "Comma separated list to specify the prefix for tmp/staging dirs that catalogd should"
+    " skip in loading file metadata.");
+
 namespace impala {
 
 Status GetConfigFromCommand(const string& flag_cmd, string& result) {
@@ -330,6 +334,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_pull_table_types_and_comments(FLAGS_pull_table_types_and_comments);
   cfg.__set_use_hms_column_order_for_hbase_tables(
       FLAGS_use_hms_column_order_for_hbase_tables);
+  cfg.__set_ignored_dir_prefix_list(FLAGS_ignored_dir_prefix_list);
   return Status::OK();
 }
 
