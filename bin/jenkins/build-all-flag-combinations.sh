@@ -90,6 +90,10 @@ for CONFIG in "${CONFIGS[@]}"; do
   fi
   ccache -s
   bin/jenkins/get_maven_statistics.sh logs/mvn/mvn.log
+  # Dump the current disk usage and check the usage for
+  # several heavy users of disk space.
+  df
+  du -s ~/.m2 ./be ./toolchain
 
   # Keep each maven log from each round of the build
   cp logs/mvn/mvn.log "${TMP_DIR}/mvn.$(date +%s.%N).log"
@@ -131,12 +135,20 @@ else
 
   ccache -s
   bin/jenkins/get_maven_statistics.sh logs/mvn/mvn.log
+  # Dump the current disk usage and check the usage for
+  # several heavy users of disk space.
+  df
+  du -s ~/.m2 ./be ./toolchain
 
   # Keep each maven log from each round of the build
   cp logs/mvn/mvn.log "${TMP_DIR}/mvn.$(date +%s.%N).log"
   # Append the maven log to the accumulated maven log
   cat logs/mvn/mvn.log >> "${TMP_DIR}/mvn_accumulated.log"
 fi
+
+# To avoid diskspace issues, clean up the Impala build directory
+# before creating the archive.
+rm -rf be/build
 
 # Restore the maven logs (these don't interfere with existing mvn.log)
 # These files may not exist if this is doing a dryrun.
@@ -152,6 +164,11 @@ then
 fi
 
 if [[ "$GENERATE_M2_ARCHIVE" == true ]]; then
+  echo "Generating m2 archive."
+
+  # Print current diskspace
+  df
+
   # Make a tarball of the .m2 directory
   bin/jenkins/archive_m2_directory.sh logs/mvn/mvn_accumulated.log logs/m2_archive.tar.gz
 fi
