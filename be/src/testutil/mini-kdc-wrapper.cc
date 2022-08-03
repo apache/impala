@@ -20,7 +20,7 @@
 #include <string>
 
 #include "common/names.h"
-#include "exec/kudu-util.h"
+#include "exec/kudu/kudu-util.h"
 #include "gutil/strings/substitute.h"
 #include "kudu/util/env.h"
 #include "rpc/auth-provider.h"

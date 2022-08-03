@@ -21,7 +21,7 @@
 #include <mutex>
 #include <queue>
 
-#include "exec/kudu-util.h"
+#include "exec/kudu/kudu-util.h"
 #include "kudu/rpc/rpc_context.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/trace.h"

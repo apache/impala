@@ -26,7 +26,7 @@
 #include "catalog/catalog-service-client-wrapper.h"
 #include "common/logging.h"
 #include "common/object-pool.h"
-#include "exec/kudu-util.h"
+#include "exec/kudu/kudu-util.h"
 #include "kudu/rpc/service_if.h"
 #include "rpc/rpc-mgr.h"
 #include "runtime/bufferpool/buffer-pool.h"

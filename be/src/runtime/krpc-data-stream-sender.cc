@@ -27,7 +27,7 @@
 #include "common/logging.h"
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
-#include "exec/kudu-util.h"
+#include "exec/kudu/kudu-util.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "gutil/strings/substitute.h"

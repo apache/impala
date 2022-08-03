@@ -24,7 +24,7 @@
 #include "common/global-flags.h"
 #include "common/logging.h"
 #include "common/status.h"
-#include "exec/kudu-util.h"
+#include "exec/kudu/kudu-util.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/string-functions.h"
 #include "exprs/timezone_db.h"

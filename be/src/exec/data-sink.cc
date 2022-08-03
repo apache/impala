@@ -22,10 +22,10 @@
 
 #include "common/logging.h"
 #include "exec/exec-node.h"
-#include "exec/hbase-table-sink.h"
+#include "exec/hbase/hbase-table-sink.h"
 #include "exec/hdfs-table-sink.h"
-#include "exec/kudu-table-sink.h"
-#include "exec/kudu-util.h"
+#include "exec/kudu/kudu-table-sink.h"
+#include "exec/kudu/kudu-util.h"
 #include "exec/blocking-plan-root-sink.h"
 #include "exec/buffered-plan-root-sink.h"
 #include "exec/nested-loop-join-builder.h"

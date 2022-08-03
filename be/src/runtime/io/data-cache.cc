@@ -27,7 +27,7 @@
 #include <glog/logging.h>
 
 #include "common/compiler-util.h"
-#include "exec/kudu-util.h"
+#include "exec/kudu/kudu-util.h"
 #include "kudu/util/env.h"
 #include "kudu/util/locks.h"
 #include "kudu/util/path_util.h"

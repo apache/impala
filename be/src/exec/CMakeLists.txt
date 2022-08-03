@@ -15,7 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
+add_subdirectory(avro)
+add_subdirectory(hbase)
+add_subdirectory(kudu)
+add_subdirectory(orc)
 add_subdirectory(parquet)
+add_subdirectory(rcfile)
+add_subdirectory(sequence)
+add_subdirectory(text)
 
 # where to put generated libraries
 set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec")
@@ -48,8 +55,6 @@ add_library(Exec
   grouping-aggregator-ir.cc
   grouping-aggregator-partition.cc
   hash-table.cc
-  hbase-table-sink.cc
-  hbase-table-writer.cc
   hdfs-columnar-scanner.cc
   hdfs-columnar-scanner-ir.cc
   hdfs-scan-node.cc
@@ -59,37 +64,19 @@ add_library(Exec
   hdfs-scanner-ir.cc
   hdfs-table-sink.cc
   hdfs-table-writer.cc
-  hdfs-rcfile-scanner.cc
-  hdfs-sequence-scanner.cc
-  hdfs-avro-scanner.cc
-  hdfs-avro-scanner-ir.cc
-  hdfs-plugin-text-scanner.cc
-  hdfs-text-scanner.cc
   hdfs-text-table-writer.cc
-  hdfs-orc-scanner.cc
-  hbase-scan-node.cc
-  hbase-table-scanner.cc
   incr-stats-util.cc
   join-builder.cc
   nested-loop-join-builder.cc
   nested-loop-join-node.cc
   non-grouping-aggregator.cc
   non-grouping-aggregator-ir.cc
-  orc-column-readers.cc
-  orc-metadata-utils.cc
   partial-sort-node.cc
   partitioned-hash-join-builder.cc
   partitioned-hash-join-builder-ir.cc
   partitioned-hash-join-node.cc
   partitioned-hash-join-node-ir.cc
   plan-root-sink.cc
-  kudu-scanner.cc
-  kudu-scan-node.cc
-  kudu-scan-node-base.cc
-  kudu-scan-node-mt.cc
-  kudu-table-sink.cc
-  kudu-util.cc
-  kudu-util-ir.cc
   read-write-util.cc
   scan-node.cc
   scanner-context.cc
@@ -113,7 +100,6 @@ add_library(ExecTests STATIC
   acid-metadata-utils-test.cc
   delimited-text-parser-test.cc
   hash-table-test.cc
-  hdfs-avro-scanner-test.cc
   incr-stats-util-test.cc
   read-write-util-test.cc
   zigzag-test.cc
@@ -129,4 +115,3 @@ ADD_UNIFIED_BE_LSAN_TEST(read-write-util-test ReadWriteUtil.*)
 ADD_BE_LSAN_TEST(row-batch-list-test)
 ADD_BE_LSAN_TEST(scratch-tuple-batch-test)
 ADD_UNIFIED_BE_LSAN_TEST(incr-stats-util-test IncrStatsUtilTest.*)
-ADD_UNIFIED_BE_LSAN_TEST(hdfs-avro-scanner-test HdfsAvroScannerTest.*)

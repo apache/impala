@@ -18,16 +18,17 @@
 #include "exec/hdfs-scan-node-base.h"
 
 #include "exec/base-sequence-scanner.h"
-#include "exec/hdfs-avro-scanner.h"
 #include "exec/hdfs-columnar-scanner.h"
-#include "exec/hdfs-orc-scanner.h"
-#include "exec/hdfs-plugin-text-scanner.h"
-#include "exec/hdfs-rcfile-scanner.h"
 #include "exec/hdfs-scan-node-mt.h"
 #include "exec/hdfs-scan-node.h"
-#include "exec/hdfs-sequence-scanner.h"
-#include "exec/hdfs-text-scanner.h"
+#include "exec/avro/hdfs-avro-scanner.h"
+#include "exec/orc/hdfs-orc-scanner.h"
 #include "exec/parquet/hdfs-parquet-scanner.h"
+#include "exec/rcfile/hdfs-rcfile-scanner.h"
+#include "exec/sequence/hdfs-sequence-scanner.h"
+#include "exec/text/hdfs-text-scanner.h"
+#include "exec/text/hdfs-plugin-text-scanner.h"
+
 
 #include <avro/errors.h>
 #include <avro/schema.h>

@@ -25,7 +25,7 @@
 #include "kudu/util/net/sockaddr.h"
 #include "kudu/util/trace.h"
 
-#include "exec/kudu-util.h"
+#include "exec/kudu/kudu-util.h"
 #include "runtime/exec-env.h"
 #include "runtime/krpc-data-stream-recvr.h"
 #include "runtime/mem-tracker.h"

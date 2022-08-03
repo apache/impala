@@ -23,7 +23,7 @@
 #include <vector>
 #include <glog/logging.h>
 
-#include "exec/kudu-util.h"
+#include "exec/kudu/kudu-util.h"
 #include "gutil/strings/numbers.h"
 #include "kudu/gutil/gscoped_ptr.h"
 #include "kudu/gutil/ref_counted.h"

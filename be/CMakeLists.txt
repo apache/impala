@@ -432,7 +432,14 @@ set (IMPALA_LIBS
   Catalog
   CodeGen
   Common
+  Avro
+  HBase
+  Kudu
+  Orc
   Parquet
+  Rcfile
+  Sequence
+  Text
   Exec
   Exprs
   GlobalFlags
@@ -486,6 +493,7 @@ set (UNIFIED_TEST_LIBS
   CodeGenTests
   CommonTests
   ExecTests
+  AvroTests
   ExprsTests
   GUtilTests
   IoTests
@@ -514,7 +522,14 @@ if (BUILD_SHARED_LIBS)
     BufferPool
     Io
     Runtime
+    Avro
+    HBase
+    Kudu
+    Orc
     Parquet
+    Rcfile
+    Sequence
+    Text
     Exec
     CodeGen
     Exprs

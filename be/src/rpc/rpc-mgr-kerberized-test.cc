@@ -19,7 +19,7 @@
 
 #include <boost/filesystem/operations.hpp>
 
-#include "exec/kudu-util.h"
+#include "exec/kudu/kudu-util.h"
 #include "rpc/auth-provider.h"
 #include "service/fe-support.h"
 #include "testutil/mini-kdc-wrapper.h"

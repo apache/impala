@@ -19,7 +19,7 @@
 #define IMPALA_RPC_RPC_MGR_TEST_H
 
 #include "common/init.h"
-#include "exec/kudu-util.h"
+#include "exec/kudu/kudu-util.h"
 #include "kudu/rpc/remote_user.h"
 #include "kudu/rpc/rpc_context.h"
 #include "kudu/rpc/rpc_controller.h"

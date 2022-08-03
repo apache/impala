@@ -21,7 +21,7 @@
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/message.h>
 
-#include "exec/kudu-util.h"
+#include "exec/kudu/kudu-util.h"
 #include "kudu/rpc/acceptor_pool.h"
 #include "kudu/rpc/remote_user.h"
 #include "kudu/rpc/rpc_context.h"

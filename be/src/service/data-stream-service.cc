@@ -21,7 +21,7 @@
 
 #include "common/constant-strings.h"
 #include "common/status.h"
-#include "exec/kudu-util.h"
+#include "exec/kudu/kudu-util.h"
 #include "kudu/rpc/rpc_context.h"
 #include "kudu/util/monotime.h"
 #include "rpc/rpc-mgr.h"

@@ -21,7 +21,7 @@
 
 #include "common/object-pool.h"
 #include "exec/exec-node.h"
-#include "exec/kudu-util.h"
+#include "exec/kudu/kudu-util.h"
 #include "exec/scan-node.h"
 #include "gen-cpp/data_stream_service.proxy.h"
 #include "kudu/rpc/rpc_controller.h"

@@ -41,7 +41,7 @@
 
 #include <ldap.h>
 
-#include "exec/kudu-util.h"
+#include "exec/kudu/kudu-util.h"
 #include "kudu/rpc/sasl_common.h"
 #include "kudu/security/gssapi.h"
 #include "kudu/security/init.h"

@@ -19,7 +19,7 @@
 
 #include "common/constant-strings.h"
 #include "common/thread-debug-info.h"
-#include "exec/kudu-util.h"
+#include "exec/kudu/kudu-util.h"
 #include "kudu/rpc/rpc_context.h"
 #include "kudu/rpc/rpc_controller.h"
 #include "rpc/rpc-mgr.h"

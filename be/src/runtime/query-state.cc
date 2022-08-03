@@ -21,7 +21,7 @@
 
 #include "codegen/llvm-codegen.h"
 #include "common/thread-debug-info.h"
-#include "exec/kudu-util.h"
+#include "exec/kudu/kudu-util.h"
 #include "exprs/expr.h"
 #include "kudu/rpc/rpc_context.h"
 #include "kudu/rpc/rpc_controller.h"

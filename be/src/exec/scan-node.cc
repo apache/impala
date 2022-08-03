@@ -21,9 +21,9 @@
 #include <boost/bind.hpp>
 
 #include "exec/data-source-scan-node.h"
-#include "exec/hbase-scan-node.h"
-#include "exec/kudu-scan-node-mt.h"
-#include "exec/kudu-scan-node.h"
+#include "exec/hbase/hbase-scan-node.h"
+#include "exec/kudu/kudu-scan-node-mt.h"
+#include "exec/kudu/kudu-scan-node.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "runtime/blocking-row-batch-queue.h"
