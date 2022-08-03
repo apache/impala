@@ -538,7 +538,15 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
           IncompleteTable.createUninitializedTable(parentDb, thriftTable.getTbl_name(),
               tblType, MetadataOp.getTableComment(thriftTable.getMetastore_table()));
     }
-    newTable.loadFromThrift(thriftTable);
+    try {
+      newTable.loadFromThrift(thriftTable);
+    } catch (IcebergTableLoadingException e) {
+      LOG.warn(String.format("The table %s in database %s could not be loaded.",
+                   thriftTable.getTbl_name(), parentDb.getName()),
+          e);
+      newTable = IncompleteTable.createFailedMetadataLoadTable(
+          parentDb, thriftTable.getTbl_name(), e);
+    }
     newTable.validate();
     return newTable;
   }

@@ -29,6 +29,7 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.hadoop.HadoopCatalog;
 import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.IcebergTableLoadingException;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.TIcebergCatalog;
@@ -77,7 +78,7 @@ public class IcebergHadoopCatalog implements IcebergCatalog {
 
   @Override
   public Table loadTable(TableIdentifier tableId, String tableLocation,
-      Map<String, String> properties) throws TableLoadingException {
+      Map<String, String> properties) throws IcebergTableLoadingException {
     Preconditions.checkState(tableId != null);
     final int MAX_ATTEMPTS = 5;
     final int SLEEP_MS = 500;
@@ -86,11 +87,11 @@ public class IcebergHadoopCatalog implements IcebergCatalog {
       try {
         return hadoopCatalog.loadTable(tableId);
       } catch (NoSuchTableException e) {
-        throw new TableLoadingException(e.getMessage());
+        throw new IcebergTableLoadingException(e.getMessage());
       } catch (NullPointerException | UncheckedIOException e) {
         if (attempt == MAX_ATTEMPTS - 1) {
           // Throw exception on last attempt.
-          throw new TableLoadingException(String.format(
+          throw new IcebergTableLoadingException(String.format(
               "Could not load Iceberg table %s", tableId), (Exception)e);
         }
         LOG.warn("Caught Exception during Iceberg table loading: {}: {}", tableId, e);
@@ -103,7 +104,7 @@ public class IcebergHadoopCatalog implements IcebergCatalog {
       }
     }
     // We shouldn't really get there, but to make the compiler happy:
-    throw new TableLoadingException(
+    throw new IcebergTableLoadingException(
         String.format("Failed to load Iceberg table with id: %s", tableId));
   }
 

@@ -23,6 +23,7 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.IcebergTableLoadingException;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.ImpalaRuntimeException;
 
@@ -57,7 +58,7 @@ public interface IcebergCatalog {
    *     is being used.
    */
    Table loadTable(TableIdentifier tableId, String tableLocation,
-      Map<String, String> properties) throws TableLoadingException;
+      Map<String, String> properties) throws IcebergTableLoadingException;
 
   /**
    * Drops the table from this catalog.

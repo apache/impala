@@ -43,8 +43,6 @@ import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.ContentFile;
-import org.apache.iceberg.DataFile;
-import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.PartitionField;
@@ -75,6 +73,7 @@ import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.IcebergTable;
+import org.apache.impala.catalog.IcebergTableLoadingException;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.catalog.iceberg.IcebergCatalog;
@@ -134,7 +133,8 @@ public class IcebergUtil {
   /**
    * Helper method to load native Iceberg table for 'feTable'.
    */
-  public static Table loadTable(FeIcebergTable feTable) throws TableLoadingException {
+  public static Table loadTable(FeIcebergTable feTable)
+      throws IcebergTableLoadingException {
     return loadTable(feTable.getIcebergCatalog(), getIcebergTableIdentifier(feTable),
         feTable.getIcebergCatalogLocation(), feTable.getMetaStoreTable().getParameters());
   }
@@ -143,12 +143,13 @@ public class IcebergUtil {
    * Helper method to load native Iceberg table.
    */
   public static Table loadTable(TIcebergCatalog catalog, TableIdentifier tableId,
-      String location, Map<String, String> tableProps) throws TableLoadingException {
+      String location, Map<String, String> tableProps)
+      throws IcebergTableLoadingException {
     try {
       IcebergCatalog cat = getIcebergCatalog(catalog, location);
       return cat.loadTable(tableId, location, tableProps);
     } catch (ImpalaRuntimeException e) {
-      throw new TableLoadingException(String.format(
+      throw new IcebergTableLoadingException(String.format(
           "Failed to load Iceberg table: %s at location: %s",
           tableId, location), e);
     }

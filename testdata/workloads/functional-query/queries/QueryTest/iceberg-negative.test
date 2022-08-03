@@ -103,7 +103,7 @@ TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
     'iceberg.table_identifier'='fake_db.fake_table');
 SHOW CREATE TABLE fake_iceberg_table_hadoop_catalog;
 ---- CATCH
-row_regex:.*CAUSED BY: TableLoadingException: Table does not exist: fake_db.fake_table*
+row_regex:.*CAUSED BY: IcebergTableLoadingException: Table does not exist: fake_db.fake_table*
 ====
 ---- QUERY
 CREATE TABLE iceberg_overwrite_bucket (i int, j int)

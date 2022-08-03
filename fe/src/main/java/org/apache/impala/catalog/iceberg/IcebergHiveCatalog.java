@@ -21,7 +21,7 @@ import static org.apache.impala.catalog.Table.TBL_PROP_EXTERNAL_TABLE_PURGE;
 import static org.apache.impala.catalog.Table.TBL_PROP_EXTERNAL_TABLE_PURGE_DEFAULT;
 
 import java.util.Map;
-import java.util.HashMap;
+
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -30,6 +30,7 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.hadoop.ConfigProperties;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.IcebergTableLoadingException;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.util.IcebergUtil;
@@ -83,12 +84,12 @@ public class IcebergHiveCatalog implements IcebergCatalog {
 
   @Override
   public Table loadTable(TableIdentifier tableId, String tableLocation,
-      Map<String, String> properties) throws TableLoadingException {
+      Map<String, String> properties) throws IcebergTableLoadingException {
     Preconditions.checkState(tableId != null);
     try {
       return hiveCatalog_.loadTable(tableId);
     } catch (Exception e) {
-      throw new TableLoadingException(String.format(
+      throw new IcebergTableLoadingException(String.format(
           "Failed to load Iceberg table with id: %s", tableId), e);
     }
   }

@@ -2822,18 +2822,35 @@ public class CatalogOpExecutor {
       boolean isSynchronizedIcebergTable = msTbl != null &&
           IcebergTable.isIcebergTable(msTbl) &&
           IcebergTable.isSynchronizedTable(msTbl);
-      if (!(existingTbl instanceof IncompleteTable) && isSynchronizedIcebergTable) {
-        Preconditions.checkState(existingTbl instanceof IcebergTable);
-        IcebergCatalogOpExecutor.dropTable((IcebergTable)existingTbl, params.if_exists);
-      }
-
       // When HMS integration is automatic, the table is dropped automatically. In all
       // other cases, we need to drop the HMS table entry ourselves.
       boolean isSynchronizedTable = isSynchronizedKuduTable || isSynchronizedIcebergTable;
       boolean needsHmsDropTable =
           (existingTbl instanceof IncompleteTable && isSynchronizedIcebergTable) ||
-          !isSynchronizedTable ||
-          !isHmsIntegrationAutomatic(msTbl);
+              !isSynchronizedTable ||
+              !isHmsIntegrationAutomatic(msTbl);
+
+      if (!(existingTbl instanceof IncompleteTable) && isSynchronizedIcebergTable) {
+        Preconditions.checkState(existingTbl instanceof IcebergTable);
+        try {
+          IcebergCatalogOpExecutor.dropTable((IcebergTable)existingTbl, params.if_exists);
+        } catch (TableNotFoundException e) {
+          // This is unusual as normally this would have already shown up as
+          // (existingTbl instanceof IncompleteTable), but this can happen if
+          // for example the Iceberg metadata is removed.
+          if (!needsHmsDropTable) {
+            // There is no more work to be done, so throw exception.
+            throw e;
+          }
+          // Although dropTable() failed in Iceberg we need to also drop the table in
+          // HMS, so we continue here.
+          LOG.warn(String.format("Could not drop Iceberg table %s.%s " +
+                  "proceeding to drop table in HMS", tableName.getDb(),
+              tableName.getTbl()), e);
+        }
+      }
+
+
       if (needsHmsDropTable) {
         try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
           msClient.getHiveClient().dropTable(

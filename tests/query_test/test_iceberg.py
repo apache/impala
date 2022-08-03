@@ -130,16 +130,10 @@ class TestIcebergTable(IcebergTestSuite):
   def test_truncate_iceberg_tables(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-truncate', vector, use_db=unique_database)
 
-  # With IMPALA-11429 there is an extra "ALTER TABLE SET OWNER" right after executing
-  # "CREATE TABLE". As a result dropping the table location right after CREATE TABLE will
-  # trigger a known bug: IMPALA-11509. Hence, turning this test off until there is a fix
-  # for this issue. Note, we could add a sleep right after table creation that could
-  # workaround the above mentioned bug but then we would hit another issue: IMPALA-11502.
   @SkipIf.not_dfs
   def test_drop_incomplete_table(self, vector, unique_database):
     """Test DROP TABLE when the underlying directory is deleted. In that case table
     loading fails, but we should be still able to drop the table from Impala."""
-    pytest.skip("Gets into a metadata update loop")
     tbl_name = unique_database + ".synchronized_iceberg_tbl"
     cat_location = get_fs_path("/test-warehouse/" + unique_database)
     self.client.execute("""create table {0} (i int) stored as iceberg
@@ -147,6 +141,42 @@ class TestIcebergTable(IcebergTestSuite):
                       'iceberg.catalog_location'='{1}')""".format(tbl_name, cat_location))
     self.filesystem_client.delete_file_dir(cat_location, True)
     self.execute_query_expect_success(self.client, """drop table {0}""".format(tbl_name))
+
+  @SkipIf.not_dfs(reason="Dfs required as test to directly delete files.")
+  def test_drop_corrupt_table(self, unique_database):
+    self._do_test_drop_corrupt_table(unique_database, do_invalidate=False)
+
+  @SkipIf.not_dfs(reason="Dfs required as test to directly delete files.")
+  def test_drop_corrupt_table_with_invalidate(self, unique_database):
+    self._do_test_drop_corrupt_table(unique_database, do_invalidate=True)
+
+  def _do_test_drop_corrupt_table(self, unique_database, do_invalidate):
+    """Test that if the underlying iceberg metadata directory is deleted, then a query
+      fails with a reasonable error message, and the table can be dropped successfully."""
+    table = "corrupt_iceberg_tbl"
+    full_table_name = unique_database + "." + table
+    self.client.execute("""create table {0} (i int) stored as iceberg""".
+                        format(full_table_name))
+    metadata_location = get_fs_path("""/test-warehouse/{0}.db/{1}/metadata""".format(
+      unique_database, table))
+    assert self.filesystem_client.exists(metadata_location)
+    status = self.filesystem_client.delete_file_dir(metadata_location, True)
+    assert status, "Delete failed with {0}".format(status)
+    assert not self.hdfs_client.exists(metadata_location)
+
+    if do_invalidate:
+      # Invalidate so that table loading problems will happen in the catalog.
+      self.client.execute("invalidate metadata {0}".format(full_table_name))
+
+    # Query should now fail.
+    err = self.execute_query_expect_failure(self.client, """select * from {0}""".
+                                            format(full_table_name))
+    result = str(err)
+    assert "AnalysisException: Failed to load metadata for table" in result
+    assert ("Failed to load metadata for table" in result  # local catalog
+            or "Error loading metadata for Iceberg table" in result)  # default catalog
+    self.execute_query_expect_success(self.client, """drop table {0}""".
+                                      format(full_table_name))
 
   def test_insert(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-insert', vector, use_db=unique_database)

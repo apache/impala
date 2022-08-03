@@ -37,6 +37,7 @@ import org.apache.iceberg.mr.Catalogs;
 import org.apache.iceberg.mr.InputFormatConfig;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.IcebergTable;
+import org.apache.impala.catalog.IcebergTableLoadingException;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TIcebergCatalog;
@@ -116,7 +117,7 @@ public class IcebergCatalogs implements IcebergCatalog {
 
   @Override
   public Table loadTable(TableIdentifier tableId, String tableLocation,
-      Map<String, String> tableProps) throws TableLoadingException {
+      Map<String, String> tableProps) throws IcebergTableLoadingException {
     setContextClassLoader();
     Properties properties = createPropsForCatalogs(tableId, tableLocation, tableProps);
     return Catalogs.loadTable(configuration_, properties);
