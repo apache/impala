@@ -211,7 +211,6 @@ export CDP_OZONE_VERSION=1.1.0.7.2.16.0-127
 export CDP_PARQUET_VERSION=1.10.99.7.2.16.0-127
 export CDP_RANGER_VERSION=2.3.0.7.2.16.0-127
 export CDP_TEZ_VERSION=0.9.1.7.2.16.0-127
-export CDP_GCS_VERSION=2.1.2.7.2.16.0-127
 
 # Ref: https://infra.apache.org/release-download-pages.html#closer
 : ${APACHE_MIRROR:="https://www.apache.org/dyn/closer.cgi"}
@@ -284,7 +283,6 @@ export IMPALA_RANGER_VERSION=${CDP_RANGER_VERSION}
 export IMPALA_RANGER_URL=${CDP_RANGER_URL-}
 export IMPALA_TEZ_VERSION=${CDP_TEZ_VERSION}
 export IMPALA_TEZ_URL=${CDP_TEZ_URL-}
-export IMPALA_GCS_VERSION=${CDP_GCS_VERSION}
 
 export APACHE_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/apache_components"
 export USE_APACHE_HIVE=${USE_APACHE_HIVE-false}
@@ -892,7 +890,6 @@ echo "IMPALA_HUDI_VERSION     = $IMPALA_HUDI_VERSION"
 echo "IMPALA_KUDU_VERSION     = $IMPALA_KUDU_VERSION"
 echo "IMPALA_RANGER_VERSION   = $IMPALA_RANGER_VERSION"
 echo "IMPALA_ICEBERG_VERSION  = $IMPALA_ICEBERG_VERSION"
-echo "IMPALA_GCS_VERSION      = $IMPALA_GCS_VERSION"
 echo "IMPALA_COS_VERSION      = $IMPALA_COS_VERSION"
 
 # Kerberos things.  If the cluster exists and is kerberized, source

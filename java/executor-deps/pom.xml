@@ -88,9 +88,15 @@ under the License.
       </exclusions>
     </dependency>
 
+    <!--
+       hadoop-cloud-storage includes several dependencies that Impala needs:
+       Hadoop's AWS support, Azure support, GCS connector, Knox support, etc.
+       hadoop-cloud-storage has been carefully tuned to include the right shaded
+       dependencies.
+    -->
     <dependency>
       <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-aws</artifactId>
+      <artifactId>hadoop-cloud-storage</artifactId>
       <version>${hadoop.version}</version>
       <!-- Exclude the aws-java-sdk-bundle dependency because the Impala minimal
            version of this dependency is used instead. -->
@@ -98,6 +104,10 @@ under the License.
         <exclusion>
           <groupId>com.amazonaws</groupId>
           <artifactId>aws-java-sdk-bundle</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>*</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -112,42 +122,6 @@ under the License.
           <artifactId>*</artifactId>
         </exclusion>
       </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-azure</artifactId>
-      <version>${hadoop.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-azure-datalake</artifactId>
-      <version>${hadoop.version}</version>
-    </dependency>
-
-    <dependency>
-        <groupId>com.google.cloud.bigdataoss</groupId>
-        <artifactId>gcs-connector</artifactId>
-        <version>${gcs.version}</version>
-    </dependency>
-
-    <!-- Dependency of gcs-connector, newer version addresses CVE -->
-    <dependency>
-      <groupId>com.google.oauth-client</groupId>
-      <artifactId>google-oauth-client</artifactId>
-      <version>${google.oauth-client.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>com.google.oauth-client</groupId>
-      <artifactId>google-oauth-client-java6</artifactId>
-      <version>${google.oauth-client.version}</version>
     </dependency>
 
     <dependency>
@@ -191,20 +165,6 @@ under the License.
       <exclusions>
         <exclusion>
           <groupId>*</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <!-- IMPALA-8766: Include Knox jars on the classpath -->
-    <dependency>
-      <groupId>org.apache.knox</groupId>
-      <artifactId>gateway-cloud-bindings</artifactId>
-      <version>${knox.version}</version>
-      <exclusions>
-        <!-- Impala currently doesn't support GCS, so exclude those jars -->
-        <exclusion>
-          <groupId>com.google.cloud.bigdataoss</groupId>
           <artifactId>*</artifactId>
         </exclusion>
       </exclusions>
