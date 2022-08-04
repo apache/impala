@@ -77,7 +77,7 @@ export IMPALA_VERSION=4.2.0-SNAPSHOT
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=189-8936b89482
+export IMPALA_TOOLCHAIN_BUILD_ID=198-9ebe744de2
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p5
@@ -139,7 +139,7 @@ export IMPALA_LLVM_DEBUG_VERSION=5.0.1-asserts-p4
 unset IMPALA_LLVM_DEBUG_URL
 export IMPALA_LZ4_VERSION=1.9.3
 unset IMPALA_LZ4_URL
-export IMPALA_ZSTD_VERSION=1.4.9
+export IMPALA_ZSTD_VERSION=1.5.2
 unset IMPALA_ZSTD_URL
 export IMPALA_OPENLDAP_VERSION=2.4.47
 unset IMPALA_OPENLDAP_URL
@@ -168,7 +168,7 @@ export IMPALA_TPC_DS_VERSION=2.1.0
 unset IMPALA_TPC_DS_URL
 export IMPALA_TPC_H_VERSION=2.17.0
 unset IMPALA_TPC_H_URL
-export IMPALA_ZLIB_VERSION=1.2.11
+export IMPALA_ZLIB_VERSION=1.2.12
 unset IMPALA_ZLIB_URL
 export IMPALA_CALLONCEHACK_VERSION=1.0.0
 unset IMPALA_CALLONCEHACK_URL
