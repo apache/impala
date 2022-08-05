@@ -323,7 +323,7 @@ under the License.
 
           <dd>
             <p>
-              A comma separated list of user names. If specified, users must be
+              A comma separated list of usernames. If specified, users must be
               on this list for authentication to succeed
             </p>
           </dd>
@@ -459,7 +459,7 @@ under the License.
           <p>
             LDAP filter that will be used during LDAP search, it can contain
             <codeph>{0}</codeph> pattern which will be replaced with the
-            user name. The default value is <codeph>
+            username. The default value is <codeph>
             (&amp;(objectClass=user)(sAMAccountName={0}))</codeph>.
           </p>
         </dd>
@@ -475,11 +475,17 @@ under the License.
         <dd>
           <p>
             LDAP filter that will be used during LDAP group search, it can
-            contain <codeph>{0}</codeph> pattern which will be replaced with
-            the user name and/or <codeph>{1}</codeph> which will be replaced
+            contain <codeph>{1}</codeph> pattern which will be replaced with
+            the username and/or <codeph>{0}</codeph> which will be replaced
             with the user DN. The default value is <codeph>
-            (&amp;(objectClass=group)(member={1})</codeph>.
+            (&amp;(objectClass=group)(member={0})</codeph>.
           </p>
+          <note>
+            The behaviour of this flag has been changed between Impala 4.1 and Impala 4.2
+            to comply with Spring LDAP. Previously <codeph>{0}</codeph> was for username
+            and <codeph>{1}</codeph> for user dn, these paramters were swapped, now
+            <codeph>{0}</codeph> is for user dn and <codeph>{1}</codeph> is for username.
+          </note>
         </dd>
 
       </dlentry>
@@ -617,7 +623,7 @@ under the License.
               Sets the user. Per Active Directory, the user is the short username, not the full
               LDAP distinguished name. If your LDAP settings include a search base, use the
               <codeph>--ldap_bind_pattern</codeph> on the <cmdname>impalad</cmdname> daemon to
-              translate the short user name from <cmdname>impala-shell</cmdname> automatically
+              translate the short username from <cmdname>impala-shell</cmdname> automatically
               to the fully qualified name.
             </p>
           </dd>

@@ -71,7 +71,7 @@ public class LdapSearchBindImpalaShellTest extends LdapImpalaShellTest {
     setUp(String.format("--ldap_user_search_basedn=dc=myorg,dc=com "
             + "--ldap_group_search_basedn=ou=Groups,dc=myorg,dc=com "
             + "--ldap_user_filter=(&(objectClass=person)(cn={0})(!(cn=%s))) "
-            + "--ldap_group_filter=(uniqueMember={1})",
+            + "--ldap_group_filter=(uniqueMember={0})",
         TEST_USER_2));
     testLdapFiltersImpl();
   }
@@ -89,7 +89,7 @@ public class LdapSearchBindImpalaShellTest extends LdapImpalaShellTest {
     setUp(String.format("--ldap_user_search_basedn=dc=myorg,dc=com "
             + "--ldap_group_search_basedn=ou=Groups,dc=myorg,dc=com "
             + "--ldap_user_filter=(&(objectClass=person)(cn={0})(!(cn=%s))) "
-            + "--ldap_group_filter=(&(cn=%s)(uniqueMember={1}))",
+            + "--ldap_group_filter=(&(cn=%s)(uniqueMember={0}))",
         TEST_USER_2, TEST_USER_GROUP));
     testLdapFiltersImpl();
   }
@@ -107,7 +107,7 @@ public class LdapSearchBindImpalaShellTest extends LdapImpalaShellTest {
     setUp(String.format("--ldap_user_search_basedn=dc=myorg,dc=com "
             + "--ldap_group_search_basedn=ou=Groups,dc=myorg,dc=com "
             + "--ldap_user_filter=(&(objectClass=person)(cn={0})(!(cn=Test2Ldap))) "
-            + "--ldap_group_filter=(&(cn=group1)(uniqueMember={1})) "
+            + "--ldap_group_filter=(&(cn=group1)(uniqueMember={0})) "
             + "--authorized_proxy_user_config=%s=* ",
         TEST_USER_4));
     testLdapFiltersWithProxyImpl();
@@ -145,7 +145,7 @@ public class LdapSearchBindImpalaShellTest extends LdapImpalaShellTest {
     setUp("--ldap_user_search_basedn=dc=myorg,dc=com "
         + "--ldap_group_search_basedn=ou=Groups,dc=myorg,dc=com "
         + "--ldap_user_filter=(cn={0}) "
-        + "--ldap_group_filter=(uniqueMember={1}) ");
+        + "--ldap_group_filter=(uniqueMember={0}) ");
     String query = "select logged_in_user()";
 
     // Authentications should succeed with user who has escaped character in its DN

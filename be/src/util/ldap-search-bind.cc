@@ -42,11 +42,12 @@ using std::string;
 namespace impala {
 
 // Permitted patterns in the user/group filter
-const string USER_NAME_PATTERN = "{0}";
-const string USER_DN_PATTERN = "{1}";
+const string USER_SEARCH_LOGIN_NAME_PATTERN = "{0}";
+const string GROUP_SEARCH_LOGIN_NAME_PATTERN = "{1}";
+const string GROUP_SEARCH_USER_DN_PATTERN = "{0}";
 // Default ldap filters
 const string DEFAULT_USER_FILTER = "(&(objectClass=user)(sAMAccountName={0}))";
-const string DEFAULT_GROUP_FILTER = "(&(objectClass=group)(member={1})";
+const string DEFAULT_GROUP_FILTER = "(&(objectClass=group)(member={0})";
 
 Status LdapSearchBind::ValidateFlags() {
   RETURN_IF_ERROR(ImpalaLdap::ValidateFlags());
@@ -92,10 +93,10 @@ bool LdapSearchBind::LdapCheckPass(const char* user, const char* pass, unsigned 
   if (!success) return false;
   VLOG(2) << "LDAP bind successful";
 
-  // Escape special characters and replace the USER_NAME_PATTERN in the filter.
+  // Escape special characters and replace the USER_SEARCH_LOGIN_NAME_PATTERN.
   string filter = string(user_filter_);
   string escaped_user = EscapeFilterProperty(user);
-  replace_all(filter, USER_NAME_PATTERN, escaped_user);
+  replace_all(filter, USER_SEARCH_LOGIN_NAME_PATTERN, escaped_user);
 
   // Execute the LDAP search and try to retrieve the user dn
   VLOG(1) << "Trying LDAP user search for: " << user;
@@ -134,15 +135,15 @@ bool LdapSearchBind::LdapCheckFilters(string username) {
   if (!success) return false;
   VLOG(2) << "LDAP bind successful";
 
-  // Substitute the USER_NAME_PATTERN and USER_DN_PATTERN patterns for the group search.
-  // USER_DN_PATTERN requires to determine the user dn and therefore an additional LDAP
-  // search.
+  // Substitute the USER_SEARCH_LOGIN_NAME_PATTERN and GROUP_SEARCH_USER_DN_PATTERN
+  // patterns for the group search. This needs an additional LDAP search to determine
+  // the GROUP_SEARCH_USER_DN_PATTERN.
   string group_filter = group_filter_;
   string escaped_username = EscapeFilterProperty(username);
-  replace_all(group_filter, USER_NAME_PATTERN, escaped_username);
-  if (group_filter.find(USER_DN_PATTERN) != string::npos) {
+  replace_all(group_filter, GROUP_SEARCH_LOGIN_NAME_PATTERN, escaped_username);
+  if (group_filter.find(GROUP_SEARCH_USER_DN_PATTERN) != string::npos) {
     string user_filter = user_filter_;
-    replace_all(user_filter, USER_NAME_PATTERN, escaped_username);
+    replace_all(user_filter, USER_SEARCH_LOGIN_NAME_PATTERN, escaped_username);
     vector<string> user_dns =
         LdapSearchObject(ld, FLAGS_ldap_user_search_basedn.c_str(), user_filter.c_str());
     if (user_dns.size() != 1) {
@@ -153,9 +154,9 @@ bool LdapSearchBind::LdapCheckFilters(string username) {
       ldap_unbind_ext(ld, nullptr, nullptr);
       return false;
     }
-    // Escape the characters in the the DN then replace the USER_DN_PATTERN.
+    // Escape the characters in the the DN then replace the GROUP_SEARCH_DN_PATTERN.
     string escaped_user_dn = EscapeFilterProperty(user_dns[0]);
-    replace_all(group_filter, USER_DN_PATTERN, escaped_user_dn);
+    replace_all(group_filter, GROUP_SEARCH_USER_DN_PATTERN, escaped_user_dn);
   }
 
   // Execute LDAP search for the group
