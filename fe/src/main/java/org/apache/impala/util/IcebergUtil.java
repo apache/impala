@@ -99,10 +99,13 @@ import org.apache.impala.thrift.TIcebergPartitionField;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
 
+@SuppressWarnings("UnstableApiUsage")
 public class IcebergUtil {
   private static final int ICEBERG_EPOCH_YEAR = 1970;
   private static final int ICEBERG_EPOCH_MONTH = 1;
+  @SuppressWarnings("unused")
   private static final int ICEBERG_EPOCH_DAY = 1;
+  @SuppressWarnings("unused")
   private static final int ICEBERG_EPOCH_HOUR = 0;
 
   /**
@@ -124,8 +127,7 @@ public class IcebergUtil {
       case HIVE_CATALOG: return IcebergHiveCatalog.getInstance();
       case HADOOP_CATALOG: return new IcebergHadoopCatalog(location);
       case CATALOGS: return IcebergCatalogs.getInstance();
-      default: throw new ImpalaRuntimeException (
-          "Unexpected catalog type: " + catalog.toString());
+      default: throw new ImpalaRuntimeException("Unexpected catalog type: " + catalog);
     }
   }
 
@@ -186,8 +188,7 @@ public class IcebergUtil {
    * Get Iceberg Transaction for 'feTable', usually use Transaction to update Iceberg
    * table schema.
    */
-  public static Transaction getIcebergTransaction(FeIcebergTable feTable)
-      throws TableLoadingException, ImpalaRuntimeException {
+  public static Transaction getIcebergTransaction(FeIcebergTable feTable) {
     return feTable.getIcebergApiTable().newTransaction();
   }
 
@@ -317,7 +318,7 @@ public class IcebergUtil {
    */
   public static TIcebergFileFormat getIcebergFileFormat(
       org.apache.hadoop.hive.metastore.api.Table msTable) {
-    TIcebergFileFormat fileFormat = null;
+    TIcebergFileFormat fileFormat;
     Map<String, String> params = msTable.getParameters();
     if (params.containsKey(IcebergTable.ICEBERG_FILE_FORMAT)) {
       fileFormat = IcebergUtil.getIcebergFileFormat(
@@ -389,7 +390,7 @@ public class IcebergUtil {
       PartitionField field, HashMap<String, Integer> transformParams)
       throws TableLoadingException {
     String type = field.transform().toString();
-    String transformMappingKey = getPartitonTransformMappingKey(field.sourceId(),
+    String transformMappingKey = getPartitionTransformMappingKey(field.sourceId(),
         getPartitionTransformType(type));
     return getPartitionTransform(type, transformParams.get(transformMappingKey));
   }
@@ -405,15 +406,15 @@ public class IcebergUtil {
     return getPartitionTransform(transformType, null);
   }
 
-  public static TIcebergPartitionTransformType getPartitionTransformType(
+  private static TIcebergPartitionTransformType getPartitionTransformType(
       String transformType) throws TableLoadingException {
     Preconditions.checkNotNull(transformType);
     transformType = transformType.toUpperCase();
     if ("IDENTITY".equals(transformType)) {
       return TIcebergPartitionTransformType.IDENTITY;
-    } else if (transformType != null && transformType.startsWith("BUCKET")) {
+    } else if (transformType.startsWith("BUCKET")) {
       return TIcebergPartitionTransformType.BUCKET;
-    } else if (transformType != null && transformType.startsWith("TRUNCATE")) {
+    } else if (transformType.startsWith("TRUNCATE")) {
       return TIcebergPartitionTransformType.TRUNCATE;
     }
     switch (transformType) {
@@ -428,8 +429,8 @@ public class IcebergUtil {
     }
   }
 
-  private static String getPartitonTransformMappingKey(int sourceId,
-      TIcebergPartitionTransformType transformType) {
+  private static String getPartitionTransformMappingKey(
+      int sourceId, TIcebergPartitionTransformType transformType) {
     return sourceId + "_" + transformType.toString();
   }
 
@@ -438,10 +439,10 @@ public class IcebergUtil {
    * PartitionSpec and its transform's parameter. Only Bucket and Truncate transforms
    * have a parameter, for other transforms this mapping will have a null.
    * source ID and the transform type are needed together to uniquely identify a specific
-   * field in the PartitionSpec. (Unfortunaltely, fieldId is not available in the Visitor
+   * field in the PartitionSpec. (Unfortunately, fieldId is not available in the Visitor
    * class below.)
    * The reason for implementing the PartitionSpecVisitor below was that Iceberg doesn't
-   * expose the interface of the transform types outside of their package and the only
+   * expose the interface of the transform types outside their package and the only
    * way to get the transform's parameter is implementing this visitor class.
    */
   public static HashMap<String, Integer> getPartitionTransformParams(PartitionSpec spec) {
@@ -449,61 +450,61 @@ public class IcebergUtil {
         spec, new PartitionSpecVisitor<Pair<String, Integer>>() {
           @Override
           public Pair<String, Integer> identity(String sourceName, int sourceId) {
-            String mappingKey = getPartitonTransformMappingKey(sourceId,
+            String mappingKey = getPartitionTransformMappingKey(sourceId,
                 TIcebergPartitionTransformType.IDENTITY);
-            return new Pair<String, Integer>(mappingKey, null);
+            return new Pair<>(mappingKey, null);
           }
 
           @Override
           public Pair<String, Integer> bucket(String sourceName, int sourceId,
               int numBuckets) {
-            String mappingKey = getPartitonTransformMappingKey(sourceId,
+            String mappingKey = getPartitionTransformMappingKey(sourceId,
                 TIcebergPartitionTransformType.BUCKET);
-            return new Pair<String, Integer>(mappingKey, numBuckets);
+            return new Pair<>(mappingKey, numBuckets);
           }
 
           @Override
           public Pair<String, Integer> truncate(String sourceName, int sourceId,
               int width) {
-            String mappingKey = getPartitonTransformMappingKey(sourceId,
+            String mappingKey = getPartitionTransformMappingKey(sourceId,
                 TIcebergPartitionTransformType.TRUNCATE);
-            return new Pair<String, Integer>(mappingKey, width);
+            return new Pair<>(mappingKey, width);
           }
 
           @Override
           public Pair<String, Integer> year(String sourceName, int sourceId) {
-            String mappingKey = getPartitonTransformMappingKey(sourceId,
+            String mappingKey = getPartitionTransformMappingKey(sourceId,
                 TIcebergPartitionTransformType.YEAR);
-            return new Pair<String, Integer>(mappingKey, null);
+            return new Pair<>(mappingKey, null);
           }
 
           @Override
           public Pair<String, Integer> month(String sourceName, int sourceId) {
-            String mappingKey = getPartitonTransformMappingKey(sourceId,
+            String mappingKey = getPartitionTransformMappingKey(sourceId,
                 TIcebergPartitionTransformType.MONTH);
-            return new Pair<String, Integer>(mappingKey, null);
+            return new Pair<>(mappingKey, null);
           }
 
           @Override
           public Pair<String, Integer> day(String sourceName, int sourceId) {
-            String mappingKey = getPartitonTransformMappingKey(sourceId,
+            String mappingKey = getPartitionTransformMappingKey(sourceId,
                 TIcebergPartitionTransformType.DAY);
-            return new Pair<String, Integer>(mappingKey, null);
+            return new Pair<>(mappingKey, null);
           }
 
           @Override
           public Pair<String, Integer> hour(String sourceName, int sourceId) {
-            String mappingKey = getPartitonTransformMappingKey(sourceId,
+            String mappingKey = getPartitionTransformMappingKey(sourceId,
                 TIcebergPartitionTransformType.HOUR);
-            return new Pair<String, Integer>(mappingKey, null);
+            return new Pair<>(mappingKey, null);
           }
 
           @Override
           public Pair<String, Integer> alwaysNull(int fieldId, String sourceName,
               int sourceId) {
-            String mappingKey = getPartitonTransformMappingKey(sourceId,
+            String mappingKey = getPartitionTransformMappingKey(sourceId,
                 TIcebergPartitionTransformType.VOID);
-            return new Pair<String, Integer>(mappingKey, null);
+            return new Pair<>(mappingKey, null);
           }
         });
     // Move the content of the List into a HashMap for faster querying in the future.
@@ -539,8 +540,14 @@ public class IcebergUtil {
   /**
    * Transform TIcebergFileFormat to HdfsFileFormat
    */
+  @SuppressWarnings("unused")
   public static HdfsFileFormat toHdfsFileFormat(String format) {
-    return HdfsFileFormat.fromThrift(toTHdfsFileFormat(getIcebergFileFormat(format)));
+    TIcebergFileFormat icebergFileFormat = getIcebergFileFormat(format);
+    if (icebergFileFormat == null) {
+      // Can't pass null to toTHdfsFileFormat(), so throw.
+      throw new IllegalArgumentException("unknown table format " + format);
+    }
+    return HdfsFileFormat.fromThrift(toTHdfsFileFormat(icebergFileFormat));
   }
 
   /**
@@ -645,7 +652,6 @@ public class IcebergUtil {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public <T> T get(int pos, Class<T> javaClass) {
       return javaClass.cast(values[pos]);
     }
@@ -741,7 +747,7 @@ public class IcebergUtil {
    * return value should be 14.
    */
   private static Integer parseYearToTransformYear(String yearStr) {
-    Integer year = Integer.valueOf(yearStr);
+    int year = Integer.parseInt(yearStr);
     return year - ICEBERG_EPOCH_YEAR;
   }
 
@@ -749,12 +755,11 @@ public class IcebergUtil {
    * In the partition path months are represented as <year>-<month>, e.g. 2021-01. We
    * need to convert it to a single integer which represents the months from '1970-01'.
    */
-  private static Integer parseMonthToTransformMonth(String monthStr)
-      throws ImpalaRuntimeException {
+  private static Integer parseMonthToTransformMonth(String monthStr) {
     String[] parts = monthStr.split("-", -1);
     Preconditions.checkState(parts.length == 2);
-    Integer year = Integer.valueOf(parts[0]);
-    Integer month = Integer.valueOf(parts[1]);
+    int year = Integer.parseInt(parts[0]);
+    int month = Integer.parseInt(parts[1]);
     int years = year - ICEBERG_EPOCH_YEAR;
     int months = month - ICEBERG_EPOCH_MONTH;
     return years * 12 + months;
@@ -769,10 +774,10 @@ public class IcebergUtil {
     final OffsetDateTime EPOCH = Instant.ofEpochSecond(0).atOffset(ZoneOffset.UTC);
     String[] parts = hourStr.split("-", -1);
     Preconditions.checkState(parts.length == 4);
-    Integer year = Integer.valueOf(parts[0]);
-    Integer month = Integer.valueOf(parts[1]);
-    Integer day = Integer.valueOf(parts[2]);
-    Integer hour = Integer.valueOf(parts[3]);
+    int year = Integer.parseInt(parts[0]);
+    int month = Integer.parseInt(parts[1]);
+    int day = Integer.parseInt(parts[2]);
+    int hour = Integer.parseInt(parts[3]);
     OffsetDateTime datetime = OffsetDateTime.of(
         LocalDateTime.of(year, month, day, hour, /*minute=*/0),
         ZoneOffset.UTC);
@@ -812,9 +817,9 @@ public class IcebergUtil {
           clevel > IcebergTable.MAX_PARQUET_COMPRESSION_LEVEL) {
         errMsg.append("Parquet compression level for Iceberg table should fall in " +
             "the range of [")
-            .append(String.valueOf(IcebergTable.MIN_PARQUET_COMPRESSION_LEVEL))
+            .append(IcebergTable.MIN_PARQUET_COMPRESSION_LEVEL)
             .append("..")
-            .append(String.valueOf(IcebergTable.MAX_PARQUET_COMPRESSION_LEVEL))
+            .append(IcebergTable.MAX_PARQUET_COMPRESSION_LEVEL)
             .append("]");
         return null;
       }
@@ -836,9 +841,9 @@ public class IcebergUtil {
           rowGroupSize > IcebergTable.MAX_PARQUET_ROW_GROUP_SIZE) {
         errMsg.append("Parquet row group size for Iceberg table should ")
             .append("fall in the range of [")
-            .append(String.valueOf(IcebergTable.MIN_PARQUET_ROW_GROUP_SIZE))
+            .append(IcebergTable.MIN_PARQUET_ROW_GROUP_SIZE)
             .append("..")
-            .append(String.valueOf(IcebergTable.MAX_PARQUET_ROW_GROUP_SIZE))
+            .append(IcebergTable.MAX_PARQUET_ROW_GROUP_SIZE)
             .append("]");
         return null;
       }
@@ -873,9 +878,9 @@ public class IcebergUtil {
         errMsg.append("Parquet ")
             .append(descr)
             .append(" for Iceberg table should fall in the range of [")
-            .append(String.valueOf(IcebergTable.MIN_PARQUET_PAGE_SIZE))
+            .append(IcebergTable.MIN_PARQUET_PAGE_SIZE)
             .append("..")
-            .append(String.valueOf(IcebergTable.MAX_PARQUET_PAGE_SIZE))
+            .append(IcebergTable.MAX_PARQUET_PAGE_SIZE)
             .append("]");
         return null;
       }
@@ -979,45 +984,45 @@ public class IcebergUtil {
       schema, field, new PartitionSpecVisitor<Pair<Byte, Integer>>() {
       @Override
       public Pair<Byte, Integer> identity(String sourceName, int sourceId) {
-        return new Pair<Byte, Integer>(FbIcebergTransformType.IDENTITY, null);
+        return new Pair<>(FbIcebergTransformType.IDENTITY, null);
       }
 
       @Override
       public Pair<Byte, Integer> bucket(String sourceName, int sourceId,
           int numBuckets) {
-        return new Pair<Byte, Integer>(FbIcebergTransformType.BUCKET, numBuckets);
+        return new Pair<>(FbIcebergTransformType.BUCKET, numBuckets);
       }
 
       @Override
       public Pair<Byte, Integer> truncate(String sourceName, int sourceId,
           int width) {
-        return new Pair<Byte, Integer>(FbIcebergTransformType.TRUNCATE, width);
+        return new Pair<>(FbIcebergTransformType.TRUNCATE, width);
       }
 
       @Override
       public Pair<Byte, Integer> year(String sourceName, int sourceId) {
-        return new Pair<Byte, Integer>(FbIcebergTransformType.YEAR, null);
+        return new Pair<>(FbIcebergTransformType.YEAR, null);
       }
 
       @Override
       public Pair<Byte, Integer> month(String sourceName, int sourceId) {
-        return new Pair<Byte, Integer>(FbIcebergTransformType.MONTH, null);
+        return new Pair<>(FbIcebergTransformType.MONTH, null);
       }
 
       @Override
       public Pair<Byte, Integer> day(String sourceName, int sourceId) {
-        return new Pair<Byte, Integer>(FbIcebergTransformType.DAY, null);
+        return new Pair<>(FbIcebergTransformType.DAY, null);
       }
 
       @Override
       public Pair<Byte, Integer> hour(String sourceName, int sourceId) {
-        return new Pair<Byte, Integer>(FbIcebergTransformType.HOUR, null);
+        return new Pair<>(FbIcebergTransformType.HOUR, null);
       }
 
       @Override
       public Pair<Byte, Integer> alwaysNull(int fieldId, String sourceName,
           int sourceId) {
-        return new Pair<Byte, Integer>(FbIcebergTransformType.VOID, null);
+        return new Pair<>(FbIcebergTransformType.VOID, null);
       }
     });
   }

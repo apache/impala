@@ -37,7 +37,6 @@ import org.apache.impala.thrift.TQueryCtx;
 import org.apache.log4j.Logger;
 
 import com.google.common.base.Preconditions;
-import com.sun.tools.javac.code.Attribute.Array;
 
 /**
  * Object of this class creates a daemon thread that periodically heartbeats the

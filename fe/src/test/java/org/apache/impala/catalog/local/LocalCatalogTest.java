@@ -272,7 +272,7 @@ public class LocalCatalogTest {
   }
 
   /**
-   * This test verifies that the network adresses used by the LocalIcebergTable are
+   * This test verifies that the network addresses used by the LocalIcebergTable are
    * the same used by CatalogD.
    */
   @Test
