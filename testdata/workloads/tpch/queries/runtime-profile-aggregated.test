@@ -2,10 +2,12 @@
 ---- QUERY
 # Sanity check aggregated runtime profile. Pick a query that runs for long enough for
 # time series counters, etc to collect some data.
-select STRAIGHT_JOIN count(distinct l_partkey)
+select STRAIGHT_JOIN count(distinct l_partkey), count(distinct l_comment)
 from lineitem join [BROADCAST] supplier on l_suppkey = s_suppkey
+---- TYPES
+BIGINT,BIGINT
 ---- RESULTS
-200000
+200000,4580667
 ---- RUNTIME_PROFILE
 # Top-level counter (not aggregated)
 row_regex: .*NumBackends: 4 .*
