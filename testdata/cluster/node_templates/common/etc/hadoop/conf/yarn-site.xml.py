@@ -54,6 +54,10 @@ CONFIG = {
   'yarn.nodemanager.local-dirs': '${NODE_DIR}/var/lib/hadoop-yarn/cache/${USER}/nm-local-dir',
   'yarn.nodemanager.log-dirs': '${NODE_DIR}/var/log/hadoop-yarn/containers',
 
+  # Set it to a large enough value so that the logs of all the containers ever created in
+  # a Jenkins run will be retained.
+  'yarn.nodemanager.log.retain-seconds': 86400,
+
   # Enable the MR shuffle service, which is also used by Tez.
   'yarn.nodemanager.aux-services': 'mapreduce_shuffle',
   'yarn.nodemanager.aux-services.mapreduce_shuffle.class': 'org.apache.hadoop.mapred.ShuffleHandler',
