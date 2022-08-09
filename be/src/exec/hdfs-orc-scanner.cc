@@ -250,7 +250,7 @@ Status HdfsOrcScanner::StartColumnReading(const orc::StripeInformation& stripe) 
     // Determine if the column is completely contained within a local split.
     bool col_range_local = split_range->ExpectedLocalRead(range.offset_, range.length_);
 
-    int file_length = scan_node_->GetFileDesc(partition_id, filename())->file_length;
+    int64_t file_length = scan_node_->GetFileDesc(partition_id, filename())->file_length;
     if (range.offset_ + range.length_ > file_length) {
       string msg = Substitute("Invalid read len.");
       return Status(msg);
