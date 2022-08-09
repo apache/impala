@@ -25,9 +25,9 @@ import static org.junit.Assert.assertEquals;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TBackendGflags;
-import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -39,19 +39,11 @@ import java.util.List;
 /**
  * Tests for the various util methods in FileSystemUtil class
  */
-public class FileSystemUtilTest {
+public class FileSystemUtilTest extends FrontendTestBase {
   private static final String HIVE_TEMP_FILE_PREFIX = "_tmp.";
   private static final String SPARK_TEMP_FILE_PREFIX = "_spark_metadata";
   private static final Path TEST_TABLE_PATH = new Path("/test-warehouse/foo"
       + ".db/filesystem-util-test");
-
-  @Before
-  public void setUp()  {
-    // Make sure BackendConfig is initialized.
-    if (BackendConfig.INSTANCE == null) {
-      BackendConfig.create(new TBackendGflags());
-    }
-  }
 
   @Test
   public void testIsInIgnoredDirectory() {

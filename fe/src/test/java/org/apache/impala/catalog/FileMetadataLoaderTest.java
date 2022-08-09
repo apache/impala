@@ -32,6 +32,7 @@ import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.compat.MetastoreShim;
+import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.ListMap;
 import org.junit.Test;
@@ -39,7 +40,7 @@ import org.junit.Test;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableList;
 
-public class FileMetadataLoaderTest {
+public class FileMetadataLoaderTest extends FrontendTestBase {
 
   @Test
   public void testRecursiveLoading() throws IOException, CatalogException {
