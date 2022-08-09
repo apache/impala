@@ -31,15 +31,13 @@ import json
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.iceberg_test_suite import IcebergTestSuite
-
 from tests.common.skip import SkipIf
-
+from tests.common.file_utils import create_iceberg_table_from_directory
+from tests.shell.util import run_impala_shell_cmd
 from tests.util.filesystem_utils import get_fs_path, IS_HDFS
 from tests.util.get_parquet_metadata import get_parquet_metadata
-from tests.common.file_utils import create_iceberg_table_from_directory
 
 LOG = logging.getLogger(__name__)
-
 
 class TestIcebergTable(IcebergTestSuite):
   """Tests related to Iceberg tables."""
@@ -121,10 +119,16 @@ class TestIcebergTable(IcebergTestSuite):
   def test_truncate_iceberg_tables(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-truncate', vector, use_db=unique_database)
 
+  # With IMPALA-11429 there is an extra "ALTER TABLE SET OWNER" right after executing
+  # "CREATE TABLE". As a result dropping the table location right after CREATE TABLE will
+  # trigger a known bug: IMPALA-11509. Hence, turning this test off until there is a fix
+  # for this issue. Note, we could add a sleep righ after table creation that could
+  # workaround the above mentioned bug but then we would hit another issue: IMPALA-11502.
   @SkipIf.not_hdfs
   def test_drop_incomplete_table(self, vector, unique_database):
     """Test DROP TABLE when the underlying directory is deleted. In that case table
     loading fails, but we should be still able to drop the table from Impala."""
+    pytest.skip()
     tbl_name = unique_database + ".synchronized_iceberg_tbl"
     cat_location = "/test-warehouse/" + unique_database
     self.client.execute("""create table {0} (i int) stored as iceberg
@@ -745,3 +749,33 @@ class TestIcebergTable(IcebergTestSuite):
   def test_create_table_like_table(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-create-table-like-table', vector,
                        use_db=unique_database)
+
+  def test_table_owner(self, vector, unique_database):
+    self.run_table_owner_test(vector, unique_database, "some_random_user")
+    self.run_table_owner_test(vector, unique_database, "another_random_user")
+
+  def run_table_owner_test(self, vector, db_name, user_name):
+    # Create Iceberg table with a given user running the query.
+    tbl_name = "iceberg_table_owner"
+    sql_stmt = 'CREATE TABLE {0}.{1} (i int) STORED AS ICEBERG'.format(
+      db_name, tbl_name)
+    args = ['-u', user_name, '-q', sql_stmt]
+    run_impala_shell_cmd(vector, args)
+
+    # Run DESCRIBE FORMATTED to get the owner of the table.
+    args = ['-q', 'DESCRIBE FORMATTED {0}.{1}'.format(db_name, tbl_name)]
+    results = run_impala_shell_cmd(vector, args)
+    result_rows = results.stdout.strip().split('\n')
+
+    # Find the output row with the owner.
+    owner_row = ""
+    for row in result_rows:
+      if "Owner:" in row:
+        owner_row = row
+    assert owner_row != "", "DESCRIBE output doesn't contain owner" + results.stdout
+    # Verify that the user running the query is the owner of the table.
+    assert user_name in owner_row, "Unexpected owner of Iceberg table. " + \
+      "Expected user name: {0}. Actual output row: {1}".format(user_name, owner_row)
+
+    args = ['-q', 'DROP TABLE {0}.{1}'.format(db_name, tbl_name)]
+    results = run_impala_shell_cmd(vector, args)
