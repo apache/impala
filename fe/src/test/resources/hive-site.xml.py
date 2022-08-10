@@ -118,6 +118,7 @@ if hive_major_version >= 3:
    # We run YARN with Tez on the classpath directly
    'tez.ignore.lib.uris': 'true',
    'tez.use.cluster.hadoop-libs': 'true',
+   'tez.am.tez-ui.webservice.port-range': '32000-32100',
 
    # Some of the tests change the columns in a incompatible manner
    # (eg. string to timestamp) this is disallowed by default in Hive-3 which causes
