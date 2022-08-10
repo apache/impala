@@ -1,0 +1,43 @@
+# Without table stats, set 'TABLE_NUM_ROWS' hint value and the hint will be taken
+SELECT * FROM functional_parquet.alltypes /* +TABLE_NUM_ROWS(10000) */
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   HDFS partitions=24/24 files=24 size=188.17KB
+   row-size=80B cardinality=10.00K
+====
+# Without table stats, set 'TABLE_NUM_ROWS' hint value and the hint will be taken
+SELECT * FROM functional_parquet.alltypes /* +TABLE_NUM_ROWS(0) */
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   HDFS partitions=24/24 files=24 size=188.17KB
+   row-size=80B cardinality=0
+====
+# With stats for hdfs table, the hint value will be ignored
+SELECT * FROM functional.alltypes /* +TABLE_NUM_ROWS(10000) */
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=188.37KB
+   row-size=89B cardinality=7.30K
+====
+# With stats for kudu table, the hint value will be ignored
+SELECT * FROM functional_kudu.alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN KUDU [functional_kudu.alltypes]
+   row-size=97B cardinality=7.30K
+====
+# With stats for kudu table, the hint value will be ignored
+SELECT * FROM functional_kudu.alltypes /* +TABLE_NUM_ROWS(10000) */
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN KUDU [functional_kudu.alltypes]
+   row-size=97B cardinality=7.30K
+====

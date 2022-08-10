@@ -2001,7 +2001,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         // Table hints not supported for HBase tables
         AnalyzesOk(String.format("select * from functional_hbase.alltypes %s " +
               "%sschedule_random_replica%s", alias, prefix, suffix),
-            "Table hints only supported for Hdfs tables");
+            "Table hints only supported for Hdfs/Kudu tables");
         // Table hints not supported for catalog views
         AnalyzesOk(String.format("select * from functional.alltypes_view %s " +
               "%sschedule_random_replica%s", alias, prefix, suffix),
@@ -4689,7 +4689,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     testNumberOfMembers(ValuesStmt.class, 0);
 
     // Also check TableRefs.
-    testNumberOfMembers(TableRef.class, 28);
+    testNumberOfMembers(TableRef.class, 30);
     testNumberOfMembers(BaseTableRef.class, 0);
     testNumberOfMembers(InlineViewRef.class, 10);
   }
@@ -5112,5 +5112,36 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
             "/* +ILLEGAL_HINT_TEST1,ILLEGAL_HINT_TEST2,ILLEGAL_HINT_TEST3 */ " +
             "l_shipdate <= (select '1998-09-02')",
         "Predicate hint not recognized: ILLEGAL_HINT_TEST3");
+  }
+
+  @Test
+  public void testTableCardinalityHintNegative() {
+    // Cannot set cardinality hint with non long type parameter
+    AnalysisError("select * from functional.alltypes /* +TABLE_NUM_ROWS(aa) */",
+        "For input string: \"aa\"");
+    AnalysisError("select * from functional.alltypes /* +TABLE_NUM_ROWS(-1) */",
+        "Syntax error in line 1");
+    AnalysisError("select * from functional.alltypes /* +TABLE_NUM_ROWS(1.0) */",
+        "Syntax error in line 1");
+    // Cannot set cardinality hint with multiple parameters
+    AnalysisError("select * from functional.alltypes /* +TABLE_NUM_ROWS(10, 20) */",
+        "Syntax error in line 1");
+  }
+
+  @Test
+  public void testTableCardinalityHintPositive() {
+    // Cannot set cardinality hint without parameter
+    AnalyzesOk("select * from functional.alltypes /* +TABLE_NUM_ROWS */",
+        "Table hint not recognized for table functional.alltypes: TABLE_NUM_ROWS");
+    // 'TABLE_NUM_ROWS' is only valid for hdfs and kudu table now
+    AnalyzesOk("select * from functional.alltypes /* +TABLE_NUM_ROWS(100) */");
+    AnalyzesOk("select * from functional_kudu.alltypes /* +TABLE_NUM_ROWS(100) */");
+    // Kudu table only support 'TABLE_NUM_ROWS' hint
+    AnalyzesOk("select * from functional_kudu.alltypes /* +SCHEDULE_CACHE_LOCAL */",
+        "Kudu table only support 'TABLE_NUM_ROWS' hint.");
+    // Only hdfs and kudu tables can use this hint
+    AnalyzesOk("select * from functional_hbase.alltypes /* +TABLE_NUM_ROWS(100) */",
+        "Table hint not recognized for table " +
+            "functional_hbase.alltypes: TABLE_NUM_ROWS(100)");
   }
 }

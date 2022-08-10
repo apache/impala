@@ -78,6 +78,9 @@ abstract public class ScanNode extends PlanNode {
   // propagated outside the query block.
   protected ExprSubstitutionMap optimizedAggSmap_;
 
+  // Refer to the comment of 'TableRef.tableNumRowsHint_'
+  protected long tableNumRowsHint_ = -1;
+
   public ScanNode(PlanNodeId id, TupleDescriptor desc, String displayName) {
     super(id, desc.getId().asList(), displayName);
     desc_ = desc;

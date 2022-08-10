@@ -1889,7 +1889,7 @@ public class SingleNodePlanner {
       return scanNode;
     } else if (tblRef.getTable() instanceof FeKuduTable) {
       scanNode = new KuduScanNode(ctx_.getNextNodeId(), tblRef.getDesc(), conjuncts,
-          aggInfo);
+          aggInfo, tblRef);
       scanNode.init(analyzer);
       return scanNode;
     } else {

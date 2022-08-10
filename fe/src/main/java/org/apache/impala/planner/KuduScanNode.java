@@ -39,6 +39,7 @@ import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.StringLiteral;
+import org.apache.impala.analysis.TableRef;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.KuduColumn;
@@ -128,11 +129,12 @@ public class KuduScanNode extends ScanNode {
   boolean isPointLookupQuery_ = false;
 
   public KuduScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts,
-      MultiAggregateInfo aggInfo) {
+      MultiAggregateInfo aggInfo, TableRef kuduTblRef) {
     super(id, desc, "SCAN KUDU");
     kuduTable_ = (FeKuduTable) desc_.getTable();
     conjuncts_ = conjuncts;
     aggInfo_ = aggInfo;
+    tableNumRowsHint_ = kuduTblRef.getTableNumRowsHint();
   }
 
   @Override
@@ -374,8 +376,9 @@ public class KuduScanNode extends ScanNode {
     super.computeStats(analyzer);
     computeNumNodes(analyzer);
 
-    // Update the cardinality
-    inputCardinality_ = cardinality_ = kuduTable_.getNumRows();
+    // Update the cardinality, hint value will be used when table has no stats.
+    inputCardinality_ = cardinality_ =
+        kuduTable_.getNumRows() == -1 ? tableNumRowsHint_ : kuduTable_.getNumRows();
     if (isPointLookupQuery_) {
       // Adjust input and output cardinality for point lookup.
       // Planner don't create KuduScanNode for query with closure "limit 0" so

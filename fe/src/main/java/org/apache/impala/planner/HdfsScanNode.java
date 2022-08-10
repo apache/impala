@@ -354,6 +354,7 @@ public class HdfsScanNode extends ScanNode {
     sampleParams_ = hdfsTblRef.getSampleParams();
     replicaPreference_ = hdfsTblRef.getReplicaPreference();
     randomReplica_ = hdfsTblRef.getRandomReplica();
+    tableNumRowsHint_ = hdfsTblRef.getTableNumRowsHint();
     FeFsTable hdfsTable = (FeFsTable)hdfsTblRef.getTable();
     Preconditions.checkState(tbl_ == hdfsTable);
     isFullAcidTable_ =
@@ -1574,6 +1575,10 @@ public class HdfsScanNode extends ScanNode {
    *
    * Sets these members:
    * numPartitionsWithNumRows_, partitionNumRows_, hasCorruptTableStats_.
+   *
+   * Currently, we provide a table hint 'TABLE_NUM_ROWS' to set table rows manually if
+   * table has no stats or has corrupt stats. If the table has valid stats, this hint
+   * will be ignored.
    */
   private long getStatsNumRows(TQueryOptions queryOptions) {
     numPartitionsWithNumRows_ = 0;
@@ -1611,7 +1616,7 @@ public class HdfsScanNode extends ScanNode {
     // size of each column of scalar type, and then generate the estimate using
     // sumValues(totalBytesPerFs_), the size of the hdfs table.
     if (!queryOptions.disable_hdfs_num_rows_estimate
-        && (numRows == -1L || hasCorruptTableStats_)) {
+        && (numRows == -1L || hasCorruptTableStats_) && tableNumRowsHint_ == -1L) {
       // Compute the estimated table size from those partitions with missing or corrupt
       // row count, when taking compression into consideration
       long estimatedTableSize =
@@ -1648,7 +1653,8 @@ public class HdfsScanNode extends ScanNode {
       hasCorruptTableStats_ = true;
     }
 
-    return numRows;
+    // Use hint value if table no stats or stats is corrupt
+    return numRows >= 0 && !hasCorruptTableStats_ ? numRows :tableNumRowsHint_;
   }
 
   /**

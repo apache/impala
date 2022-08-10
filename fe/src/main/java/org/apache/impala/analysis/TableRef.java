@@ -33,6 +33,7 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
@@ -169,6 +170,13 @@ public class TableRef extends StmtNode {
   // true if this table ref is hidden, because e.g. it was generated during statement
   // rewrite.
   private boolean isHidden_ = false;
+
+  // Value of query hint 'TABLE_NUM_ROWS' on this table. Used in constructing ScanNode if
+  // the table does not have stats, or has corrupt stats. -1 indicates no hint. Currently,
+  // this hint is valid for hdfs and kudu table.
+  private long tableNumRowsHint_ = -1;
+  // Table row hint name used in sql.
+  private static final String TABLE_ROW_HINT = "TABLE_NUM_ROWS";
 
   /**
    * Returns a new, resolved, and analyzed table ref.
@@ -307,6 +315,10 @@ public class TableRef extends StmtNode {
   }
   public int getConvertLimitToSampleHintPercent() {
     return convertLimitToSampleHintPercent_;
+  }
+
+  public long getTableNumRowsHint() {
+    return tableNumRowsHint_;
   }
 
   /**
@@ -499,9 +511,10 @@ public class TableRef extends StmtNode {
     }
     // BaseTableRef will always have their path resolved at this point.
     Preconditions.checkState(getResolvedPath() != null);
+    boolean isTableHintSupported = true;
     if (getResolvedPath().destTable() != null &&
-        !(getResolvedPath().destTable() instanceof FeFsTable)) {
-      analyzer.addWarning("Table hints only supported for Hdfs tables");
+        !supportTableHint(getResolvedPath().destTable(), analyzer)) {
+      isTableHintSupported = false;
     }
     for (PlanHint hint: tableHints_) {
       if (hint.is("SCHEDULE_CACHE_LOCAL")) {
@@ -534,10 +547,38 @@ public class TableRef extends StmtNode {
             addHintWarning(hint, analyzer);
           }
         }
+      } else if (hint.is(TABLE_ROW_HINT)) {
+        List<String> args = hint.getArgs();
+        if (args == null || args.size() != 1 || !isTableHintSupported) {
+          addHintWarning(hint, analyzer);
+          return;
+        }
+        analyzer.setHasPlanHints();
+        tableNumRowsHint_ = Long.parseLong(args.get(0));
       } else {
         addHintWarning(hint, analyzer);
       }
     }
+  }
+
+  /**
+   * Returns whether the table supports hint. Currently, hdfs table support table hint
+   * usage, kudu table only support {@link this#TABLE_ROW_HINT} hint.
+   *
+   * TODO: Add other table hints for kudu table.
+   */
+  private boolean supportTableHint(FeTable table, Analyzer analyzer) {
+    if (table instanceof FeKuduTable) {
+      if (!(tableHints_.size() == 1 && tableHints_.get(0).is(TABLE_ROW_HINT))) {
+        analyzer.addWarning(String.format("Kudu table only support '%s' hint.",
+            TABLE_ROW_HINT));
+        return false;
+      }
+    } else if (!(table instanceof FeFsTable)) {
+      analyzer.addWarning("Table hints only supported for Hdfs/Kudu tables.");
+      return false;
+    }
+    return true;
   }
 
   private void addHintWarning(PlanHint hint, Analyzer analyzer) {

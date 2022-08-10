@@ -1340,4 +1340,13 @@ public class PlannerTest extends PlannerTestBase {
   public void testOrcStatsAgg() {
     runPlannerTestFile("orc-stats-agg");
   }
+
+  /**
+   * Test new hint of 'TABLE_NUM_ROWS'
+   */
+  @Test
+  public void testTableCardinalityHint() {
+    runPlannerTestFile("table-cardinality-hint",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
 }
