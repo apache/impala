@@ -1367,6 +1367,7 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkArgument(fileDesc.getNumFileBlocks() > 0);
     boolean fileDescMissingDiskIds = false;
     long fileMaxScanRangeBytes = 0;
+    FileSystemUtil.FsType fsType = partition.getFsType();
     for (int i = 0; i < fileDesc.getNumFileBlocks(); ++i) {
       FbFileBlock block = fileDesc.getFbFileBlock(i);
       int replicaHostCount = FileBlock.getNumReplicaHosts(block);
@@ -1388,7 +1389,10 @@ public class HdfsScanNode extends ScanNode {
         Integer globalHostIdx = analyzer.getHostIndex().getOrAddIndex(networkAddress);
         location.setHost_idx(globalHostIdx);
         if (fsHasBlocks && !fileDesc.getIsEc() && FileBlock.getDiskId(block, j) == -1) {
-          ++numScanRangesNoDiskIds_;
+          // Skip Ozone; it returns NULL storageIds and users can't do anything about it.
+          if (fsType != FileSystemUtil.FsType.OZONE) {
+            ++numScanRangesNoDiskIds_;
+          }
           fileDescMissingDiskIds = true;
         }
         location.setVolume_id(FileBlock.getDiskId(block, j));

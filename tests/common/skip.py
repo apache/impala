@@ -62,8 +62,6 @@ class SkipIfFS:
       reason="IMPALA-10562")
   late_filters = pytest.mark.skipif(IS_ISILON, reason="IMPALA-6998")
   read_past_eof = pytest.mark.skipif(IS_S3 or IS_GCS, reason="IMPALA-2512")
-  no_storage_ids = pytest.mark.skipif(IS_OZONE,
-      reason="Ozone does not return storage ids, IMPALA-10213")
   large_block_size = pytest.mark.skipif(IS_OZONE,
       reason="block size is larger than 128MB")
 

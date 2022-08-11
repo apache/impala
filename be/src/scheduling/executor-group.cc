@@ -96,6 +96,12 @@ void ExecutorGroup::AddExecutor(const BackendDescriptorPB& be_desc) {
   }
   be_descs.push_back(be_desc);
   executor_ip_map_[be_desc.address().hostname()] = be_desc.ip_address();
+  if (be_desc.ip_address() == "127.0.0.1") {
+    // Include localhost as an alias for filesystems that don't translate it.
+    LOG(INFO) << "Adding executor localhost alias for "
+              << be_desc.address().hostname() << " -> " << be_desc.ip_address();
+    executor_ip_map_["localhost"] = be_desc.ip_address();
+  }
 }
 
 void ExecutorGroup::RemoveExecutor(const BackendDescriptorPB& be_desc) {
