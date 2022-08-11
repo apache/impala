@@ -23,6 +23,7 @@
 #include <gutil/strings/substitute.h>
 #include <openssl/crypto.h>
 #include <openssl/ssl.h>
+#include <regex>
 
 #include "common/init.h"
 #include "testutil/gtest-util.h"
@@ -394,10 +395,27 @@ TEST(Webserver, TestWithSpnego) {
   // TODO(todd) IMPALA-8987: import curl into native-toolchain and test this with
   // authentication.
   string curl_output;
-  if (RunShellProcess("curl --version", &curl_output)
-      && curl_output.find("GSS-API") != string::npos
+  RunShellProcess("curl --version", &curl_output);
+
+  // Detect curl version. We only care about the major and minor.
+  std::regex curl_version_regex = std::regex("curl ([0-9]+)\\.([0-9]+)\\.[0-9]+");
+  std::smatch match_result;
+  ASSERT_TRUE(std::regex_search(curl_output, match_result, curl_version_regex));
+  ASSERT_EQ(match_result.size(), 3);
+
+  int curl_major_version = std::stoi(match_result[1]);
+  int curl_minor_version = std::stoi(match_result[2]);
+  bool curl_7_64_or_above = true;
+  if (curl_major_version < 7 ||
+      (curl_major_version == 7 && curl_minor_version < 64)) {
+    curl_7_64_or_above = false;
+  }
+  LOG(INFO) << "Detected curl version " << std::to_string(curl_major_version) << "."
+            << std::to_string(curl_minor_version) << " "
+            << (curl_7_64_or_above ? "is at least 7.64" : "is below 7.64");
+
+  if (curl_output.find("GSS-API") != string::npos
       && curl_output.find("SPNEGO") != string::npos) {
-    //if (system("curl --version") == 0) {
     // Test that OPTIONS works with and without having kinit-ed.
     string options_cmd =
         Substitute("curl -X OPTIONS -v --negotiate -u : 'http://127.0.0.1:$0'",
@@ -417,18 +435,21 @@ TEST(Webserver, TestWithSpnego) {
     // Run the command twice, the first time we should authenticate with SPNEGO, the
     // second time with a cookie.
     system(Substitute("$0 && $0", curl_cmd).c_str());
-    // There should be one more failed auth attempt, when curl first tries to connect
-    // without authentication, then one successful attempt, then a successful cookie auth.
-    CheckAuthMetrics(&metrics, 1, 2, 1, 0);
+    // curl behavior changed in 7.64.0. Before 7.64.0, there would be one more failed
+    // auth attempt, when curl first tries to connect without authentication, then
+    // one successful attempt, then a successful cookie auth. Starting with 7.64,
+    // curl does not do the initial attempt without authentication, so there is no
+    // additional failed auth attempt.
+    CheckAuthMetrics(&metrics, 1, (curl_7_64_or_above ? 1 : 2), 1, 0);
 
     webserver.Stop();
     MetricGroup metrics2("webserver-test");
     Webserver webserver2("", FLAGS_webserver_port, &metrics2);
     ASSERT_OK(webserver2.Start());
     // Run the command again. We should get a failed cookie attempt because the new
-    // webserver uses a different HMAC key.
+    // webserver uses a different HMAC key. See above note about curl 7.64.0 or above.
     system(curl_cmd.c_str());
-    CheckAuthMetrics(&metrics2, 1, 1, 0, 1);
+    CheckAuthMetrics(&metrics2, 1, (curl_7_64_or_above ? 0 : 1), 0, 1);
 
     filesystem::remove_all(cookie_dir);
   } else {
