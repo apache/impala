@@ -892,16 +892,16 @@ public class Analyzer {
         }
         return builder.build();
       });
+    } else {
+      registerPrivReq(builder -> {
+        builder.onTableUnknownOwner(
+            getDefaultDb(), tableRawPath.get(0)).allOf(tableRef.getPrivilege());
+        if (tableRef.requireGrantOption()) {
+          builder.grantOption();
+        }
+        return builder.build();
+      });
     }
-
-    registerPrivReq(builder -> {
-      builder.onTableUnknownOwner(
-          getDefaultDb(), tableRawPath.get(0)).allOf(tableRef.getPrivilege());
-      if (tableRef.requireGrantOption()) {
-        builder.grantOption();
-      }
-      return builder.build();
-    });
   }
 
   /**

@@ -487,7 +487,8 @@ public class AnalysisContext {
       } catch (AuthorizationException e) {
         authException = e;
       } finally {
-        authzChecker.postAuthorize(authzCtx, authException == null);
+        authzChecker.postAuthorize(authzCtx, authException == null,
+            analysisException == null);
       }
     }
 

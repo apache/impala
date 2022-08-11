@@ -70,7 +70,7 @@ public interface AuthorizationChecker {
   /**
    * This method is to be executed after an authorization check has occurred.
    */
-  void postAuthorize(AuthorizationContext authzCtx, boolean authzOk)
+  void postAuthorize(AuthorizationContext authzCtx, boolean authzOk, boolean analysisOk)
       throws AuthorizationException, InternalException;
 
   /**

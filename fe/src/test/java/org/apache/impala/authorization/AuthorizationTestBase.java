@@ -30,6 +30,7 @@ import org.apache.impala.authorization.ranger.RangerImpalaResourceBuilder;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.service.Frontend;
@@ -319,13 +320,22 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
      */
     public AuthzTest ok(TPrivilege[]... privileges)
         throws ImpalaException {
+      ok(/* expectAnalysisOk */ true, privileges);
+      return this;
+    }
+
+    /**
+     * This method runs with the specified privileges.
+     */
+    public AuthzTest ok(boolean expectAnalysisOk, TPrivilege[]... privileges)
+        throws ImpalaException {
       for (WithPrincipal withPrincipal: buildWithPrincipals()) {
         try {
           withPrincipal.init(privileges);
           if (context_ != null) {
-            authzOk(context_, stmt_, withPrincipal);
+            authzOk(context_, stmt_, withPrincipal, expectAnalysisOk);
           } else {
-            authzOk(stmt_, withPrincipal);
+            authzOk(stmt_, withPrincipal, expectAnalysisOk);
           }
         } finally {
           withPrincipal.cleanUp();
@@ -482,11 +492,21 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
   }
 
   private void authzOk(String stmt, WithPrincipal withPrincipal) throws ImpalaException {
-    authzOk(authzCtx_, stmt, withPrincipal);
+    authzOk(authzCtx_, stmt, withPrincipal, /* expectAnalysisOk */ true);
+  }
+
+  private void authzOk(String stmt, WithPrincipal withPrincipal,
+      boolean expectAnalysisOk) throws ImpalaException {
+    authzOk(authzCtx_, stmt, withPrincipal, expectAnalysisOk);
   }
 
   private void authzOk(AnalysisContext context, String stmt, WithPrincipal withPrincipal)
       throws ImpalaException {
+    authzOk(context, stmt, withPrincipal, /* expectAnalysisOk */ true);
+  }
+
+  private void authzOk(AnalysisContext context, String stmt, WithPrincipal withPrincipal,
+      boolean expectAnalysisOk) throws ImpalaException {
     try {
       LOG.info("Testing authzOk for {}", stmt);
       parseAndAnalyze(stmt, context, authzFrontend_);
@@ -496,6 +516,13 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
       throw new AuthorizationException(String.format(
           "\nPrincipal: %s\nStatement: %s\nError: %s", withPrincipal.getName(),
           stmt, e.getMessage(), e));
+    } catch (AnalysisException e) {
+      // We throw an AnalysisException only if we did not expect query analysis to fail.
+      if (expectAnalysisOk) {
+        throw new AnalysisException(String.format(
+            "\nPrincipal: %s\nStatement: %s\nError: %s", withPrincipal.getName(),
+            stmt, e.getMessage(), e));
+      }
     }
   }
 

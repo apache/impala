@@ -177,9 +177,10 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   }
 
   @Override
-  public void postAuthorize(AuthorizationContext authzCtx, boolean authzOk) {
+  public void postAuthorize(AuthorizationContext authzCtx, boolean authzOk,
+      boolean analysisOk) {
     Preconditions.checkArgument(authzCtx instanceof RangerAuthorizationContext);
-    super.postAuthorize(authzCtx, authzOk);
+    super.postAuthorize(authzCtx, authzOk, analysisOk);
     // Consolidate the audit log entries and apply the deduplicated column masking events
     // to update the List of all AuthzAuditEvent's only if the authorization is
     // successful.
@@ -194,7 +195,18 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     }
     RangerBufferAuditHandler auditHandler =
         ((RangerAuthorizationContext) authzCtx).getAuditHandler();
-    auditHandler.flush();
+    if (authzOk && !analysisOk) {
+      // When the query was authorized, we do not send any audit log entry to the Ranger
+      // server if there was an AnalysisException during query analysis.
+      // We still have to call clear() to remove audit log entries in this case because
+      // the current test framework checks the contents in auditHandler.getAuthzEvents()
+      // to determine whether the correct audit events are collected.
+      auditHandler.getAuthzEvents().clear();
+    } else {
+      // We send audit log entries to the Ranger server only if authorization failed or
+      // analysis succeeded.
+      auditHandler.flush();
+    }
   }
 
   @Override

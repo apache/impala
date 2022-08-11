@@ -104,7 +104,8 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
    * Override this method to add custom post-authorization check.
    */
   @Override
-  public void postAuthorize(AuthorizationContext authzCtx, boolean authzOk) {
+  public void postAuthorize(AuthorizationContext authzCtx, boolean authzOk,
+      boolean analysisOk) {
     if (authzCtx.getTimeline().isPresent()) {
       EventSequence timeline = authzCtx.getTimeline().get();
       long durationMs = timeline.markEvent(String.format("Authorization finished (%s)",

@@ -53,8 +53,9 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
     }
 
     @Override
-    public void postAuthorize(AuthorizationContext authzCtx, boolean authzOk) {
-      super.postAuthorize(authzCtx, authzOk);
+    public void postAuthorize(AuthorizationContext authzCtx, boolean authzOk,
+        boolean analysisOk) {
+      super.postAuthorize(authzCtx, authzOk, analysisOk);
       authzCtx_ = authzCtx;
     }
   }
@@ -278,6 +279,13 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
     }, "select min(id) from functional.alltypes union all " +
         "select max(id) from functional.alltypes",
         onTable("functional", "alltypes", TPrivilegeLevel.SELECT));
+
+    // No audit log entry should be produced for an authorized query against a
+    // non-existing table.
+    authzOk(events -> {
+      assertEquals(0, events.size());
+    }, "select * from functional.non_existing_tbl",
+        /* expectAnalysisOk */ false, onDatabase("functional", TPrivilegeLevel.SELECT));
   }
 
   @Test
@@ -802,7 +810,12 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
 
   private void authzOk(Consumer<List<AuthzAuditEvent>> resultChecker, String stmt,
       TPrivilege[]... privileges) throws ImpalaException {
-    authorize(stmt).ok(privileges);
+    authzOk(resultChecker, stmt, /* expectAnalysisOk */ true, privileges);
+  }
+
+  private void authzOk(Consumer<List<AuthzAuditEvent>> resultChecker, String stmt,
+      boolean expectAnalysisOk, TPrivilege[]... privileges) throws ImpalaException {
+      authorize(stmt).ok(expectAnalysisOk, privileges);
     RangerAuthorizationContext rangerCtx =
         (RangerAuthorizationContext) authzChecker_.authzCtx_;
     Preconditions.checkNotNull(rangerCtx);
