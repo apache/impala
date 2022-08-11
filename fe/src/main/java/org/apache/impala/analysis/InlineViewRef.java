@@ -455,7 +455,9 @@ public class InlineViewRef extends TableRef {
     int numColLabels = getColLabels().size();
     Preconditions.checkState(numColLabels > 0);
     Set<String> uniqueColAliases = Sets.newHashSetWithExpectedSize(numColLabels);
-    List<StructField> fields = Lists.newArrayListWithCapacity(numColLabels);
+    // Using linked set to preserve order and uniqueness of fields. If using a
+    // list, star-expanded complex columns would be enumerated multiple times.
+    Set<StructField> fields = Sets.newLinkedHashSetWithExpectedSize(numColLabels);
     for (int i = 0; i < numColLabels; ++i) {
       // inline view select statement has been analyzed. Col label should be filled.
       Expr selectItemExpr = queryStmt_.getResultExprs().get(i);
@@ -512,7 +514,7 @@ public class InlineViewRef extends TableRef {
         result.setMaskedTable(baseTbl);
       }
     }
-    result.setType(new StructType(fields));
+    result.setType(new StructType(Lists.newArrayList(fields)));
     return result;
   }
 

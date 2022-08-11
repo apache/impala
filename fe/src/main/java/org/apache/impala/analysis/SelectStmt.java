@@ -793,24 +793,27 @@ public class SelectStmt extends QueryStmt {
     /**
      * Helper function used during star expansion to add a single result expr
      * based on a given raw path to be resolved relative to an existing path.
-     * Ignores paths with a complex-typed destination because they are currently
-     * illegal in any select list (even for inline views, etc.)
      */
     private void addStarResultExpr(Path resolvedPath,
         String... relRawPath) throws AnalysisException {
       Path p = Path.createRelPath(resolvedPath, relRawPath);
       Preconditions.checkState(p.resolve());
-      if (p.destType().isComplexType()) return;
-      SlotDescriptor slotDesc = analyzer_.registerSlotRef(p);
+      if (p.destType().isComplexType() &&
+          !analyzer_.getQueryCtx().client_request.query_options.expand_complex_types) {
+        return;
+      }
+      SlotDescriptor slotDesc = analyzer_.registerSlotRef(p, false);
       SlotRef slotRef = new SlotRef(slotDesc);
       Preconditions.checkState(slotRef.isAnalyzed(),
           "Analysis should be done in constructor");
+
+      if(slotRef.getType().isStructType()){
+        slotRef.reExpandStruct(analyzer_);
+      }
       // Empty matched types means this is expanded from star of a catalog table.
       // For star of complex types, e.g. my_struct.*, my_array.*, my_map.*, the matched
       // types will have the complex type so it's not empty.
       if (resolvedPath.getMatchedTypes().isEmpty()) {
-        Preconditions.checkState(!slotDesc.getType().isComplexType(),
-            "Star expansion should only introduce scalar columns");
         analyzer_.registerColumnForMasking(slotDesc);
       }
       resultExprs_.add(slotRef);

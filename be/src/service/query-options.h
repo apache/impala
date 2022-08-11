@@ -50,7 +50,7 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
 // time we add or remove a query option to/from the enum TImpalaQueryOptions.
 #define QUERY_OPTS_TABLE                                                                 \
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),                                 \
-      TImpalaQueryOptions::ORC_SCHEMA_RESOLUTION + 1);                                   \
+      TImpalaQueryOptions::EXPAND_COMPLEX_TYPES + 1);                                    \
   REMOVED_QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED) \
   QUERY_OPT_FN(abort_on_error, ABORT_ON_ERROR, TQueryOptionLevel::REGULAR)               \
   REMOVED_QUERY_OPT_FN(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS)             \
@@ -274,7 +274,8 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
   QUERY_OPT_FN(enable_replan, ENABLE_REPLAN, TQueryOptionLevel::ADVANCED)                \
   QUERY_OPT_FN(test_replan, TEST_REPLAN, TQueryOptionLevel::ADVANCED)                    \
   QUERY_OPT_FN(lock_max_wait_time_s, LOCK_MAX_WAIT_TIME_S, TQueryOptionLevel::REGULAR)   \
-  QUERY_OPT_FN(orc_schema_resolution, ORC_SCHEMA_RESOLUTION, TQueryOptionLevel::REGULAR);
+  QUERY_OPT_FN(orc_schema_resolution, ORC_SCHEMA_RESOLUTION, TQueryOptionLevel::REGULAR) \
+  QUERY_OPT_FN(expand_complex_types, EXPAND_COMPLEX_TYPES, TQueryOptionLevel::REGULAR);
 
 /// Enforce practical limits on some query options to avoid undesired query state.
 static const int64_t SPILLABLE_BUFFER_LIMIT = 1LL << 40; // 1 TB

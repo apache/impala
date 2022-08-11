@@ -877,3 +877,34 @@ class TestMaxNestingDepth(ImpalaTestSuite):
       assert False, "Expected table loading to fail."
     except ImpalaBeeswaxException, e:
       assert "Type exceeds the maximum nesting depth" in str(e)
+
+
+class TestNestedTypesStarExpansion(ImpalaTestSuite):
+  """Functional tests for nested types when star expansion query
+  option (EXPAND_COMPLEX_TYPES) is enabled/disabled, run for all file formats that
+  support nested types."""
+
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestNestedTypesStarExpansion, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format in ['parquet', 'orc'])
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('protocol') == 'hs2')
+    cls.ImpalaTestMatrix.add_dimension(
+        create_exec_option_dimension_from_dict({
+            'disable_codegen': ['True']}))
+    cls.ImpalaTestMatrix.add_mandatory_exec_option(
+            'convert_legacy_hive_parquet_utc_timestamps', 'true')
+    cls.ImpalaTestMatrix.add_mandatory_exec_option('TIMEZONE', '"Europe/Budapest"')
+
+  def test_star_expansion(self, vector):
+    # Queries with star (*) expression on tables with array, map
+    # and struct complex type, through views, with query option
+    # EXPAND_COMPLEX_TYPES enabled and disabled.
+    self.run_test_case('QueryTest/nested-types-star-expansion', vector)

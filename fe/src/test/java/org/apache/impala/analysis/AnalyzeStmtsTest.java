@@ -1071,6 +1071,33 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "Unable to INSERT into target table (default.new_tbl) because the column " +
             "'tiny_struct' has a complex type 'STRUCT<b:BOOLEAN>' and Impala doesn't " +
             "support inserting into tables containing complex type columns");
+
+    //Make complex types available in star queries
+    ctx.getQueryOptions().setExpand_complex_types(true);
+    //TODO: Once IMPALA-10851 is resolved it can be removed
+    ctx.getQueryOptions().setDisable_codegen(true);
+
+    AnalyzesOk("select * from functional_parquet.complextypes_structs",ctx);
+    AnalyzesOk("select * from functional_parquet.complextypes_nested_structs",ctx);
+    AnalyzesOk("select * from functional_parquet.complextypes_maps_view",ctx);
+
+    AnalyzesOk("select outer_struct.str, outer_struct.* from " +
+            "functional_parquet.complextypes_nested_structs",ctx);
+    AnalyzesOk("select * from (select * from " +
+            "functional_parquet.complextypes_nested_structs) v",ctx);
+    AnalyzesOk("select * from (select int_map, int_map_array from " +
+            "functional_parquet.complextypestbl) v",ctx);
+
+    ctx.getQueryOptions().setDisable_codegen(false);
+
+    AnalyzesOk("select * from functional_parquet.complextypes_arrays",ctx);
+    AnalyzesOk("select * from " +
+            "functional_parquet.complextypes_arrays_only_view",ctx);
+    AnalyzesOk("select v.id, v.* from " +
+            "(select * from functional_parquet.complextypes_arrays) v",ctx);
+
+    AnalysisError("select * from functional.allcomplextypes",
+            ctx,"STRUCT type inside collection types is not supported.");
   }
 
   @Test
@@ -4634,7 +4661,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     testNumberOfMembers(BaseTableRef.class, 0);
     testNumberOfMembers(InlineViewRef.class, 10);
   }
-
   @SuppressWarnings("rawtypes")
   private void testNumberOfMembers(Class cl, int expectedNumMembers) {
     int actualNumMembers = 0;

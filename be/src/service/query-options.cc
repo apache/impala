@@ -1229,6 +1229,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_orc_schema_resolution(enum_type);
         break;
       }
+      case TImpalaQueryOptions::EXPAND_COMPLEX_TYPES: {
+        query_options->__set_expand_complex_types(IsTrue(value));
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

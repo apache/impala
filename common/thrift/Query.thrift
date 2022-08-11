@@ -594,6 +594,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   147: optional TSchemaResolutionStrategy orc_schema_resolution = 0;
+
+  // See comment in ImpalaService.thrift
+  148: optional bool expand_complex_types = false;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

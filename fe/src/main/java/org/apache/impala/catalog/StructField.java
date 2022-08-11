@@ -23,6 +23,8 @@ import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TStructField;
 import org.apache.impala.thrift.TTypeNode;
 
+import java.util.Objects;
+
 /**
  * TODO: Support comments for struct fields. The Metastore does not properly store
  * comments of struct fields. We set comment_ to null to avoid compatibility issues.
@@ -98,5 +100,9 @@ public class StructField {
     if (!(other instanceof StructField)) return false;
     StructField otherStructField = (StructField) other;
     return otherStructField.name_.equals(name_) && otherStructField.type_.equals(type_);
+  }
+  @Override
+  public int hashCode() {
+    return Objects.hash(name_, type_);
   }
 }

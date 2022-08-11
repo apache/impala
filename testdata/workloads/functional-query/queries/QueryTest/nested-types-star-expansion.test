@@ -1,0 +1,164 @@
+====
+---- QUERY
+# Expanding star on table with array type
+set EXPAND_COMPLEX_TYPES=true;
+select * from complextypes_arrays where id = 1
+---- RESULTS
+1,'[1,2,3,4,5]','["one","two","three","four","five"]'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+# Expanding star on table with array type, and an additional scalar field, without EXPAND_COMPLEX_TYPES
+select id, * from complextypes_arrays where id = 2
+---- RESULTS
+2,2
+---- TYPES
+INT, INT
+====
+---- QUERY
+# Expanding star on table with array type, and an additional scalar field
+set EXPAND_COMPLEX_TYPES=true;
+select id, * from complextypes_arrays where id = 3
+---- RESULTS
+3,3,'[10,9,8]','["ten"]'
+---- TYPES
+INT, INT, STRING, STRING
+====
+---- QUERY
+# Expanding star on view with array type, and an additional scalar field
+set EXPAND_COMPLEX_TYPES=true;
+select id, * from complextypes_arrays_only_view where id = 4
+---- RESULTS
+4,4,'NULL','[]'
+---- TYPES
+BIGINT, BIGINT, STRING, STRING
+====
+---- QUERY
+# Expanding star on view with map type, and an additional scalar field
+set EXPAND_COMPLEX_TYPES=true;
+select id, * from complextypes_maps_view where id = 5
+---- RESULTS
+5,5,'{}','NULL'
+---- TYPES
+BIGINT, BIGINT, STRING, STRING
+====
+---- QUERY
+# Expanding star on views with array type, and an additional scalar field
+set EXPAND_COMPLEX_TYPES=true;
+select v1.id, * from complextypes_arrays_only_view v1, complextypes_arrays_only_view v2
+where v1.id = v2.id and v1.id = 6
+---- RESULTS
+6,6,'NULL','NULL',6,'NULL','NULL'
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, BIGINT, STRING, STRING
+====
+---- QUERY
+# Expanding star on views with array type, and an additional scalar field, without EXPAND_COMPLEX_TYPES
+select v1.id, *
+from complextypes_arrays_only_view v1, complextypes_arrays_only_view v2
+where v1.id = v2.id and v1.id = 7
+---- RESULTS
+7,7,7
+---- TYPES
+BIGINT, BIGINT, BIGINT
+====
+---- QUERY
+# Expanding stars on view aliases with array type
+set EXPAND_COMPLEX_TYPES=true;
+select v1.*, v2.* from complextypes_arrays_only_view v1, complextypes_arrays_only_view v2
+where v1.id = v2.id and v1.id = 1
+---- RESULTS
+1,'[1,2,3]','[[1,2],[3,4]]',1,'[1,2,3]','[[1,2],[3,4]]'
+---- TYPES
+BIGINT, STRING, STRING, BIGINT, STRING, STRING
+====
+---- QUERY
+# Expanding star on table with struct type
+set EXPAND_COMPLEX_TYPES=true;
+select * from complextypes_structs where id = 2
+---- RESULTS
+2,'second item','{"ti":123,"si":4567,"i":1562322212,"bi":334333345342,"b":false,"f":NaN,"do":23233423.099,"da":null,"ts":"2020-06-11 12:10:04","s1":null,"s2":"NULL","c1":"a","c2":"ab ","vc":"varchar","de1":11223,"de2":null}','{"b":false}','{"i":19191,"s":"small_struct_str"}'
+---- TYPES
+INT, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Expanding star on table with struct type, and an additional scalar field
+set EXPAND_COMPLEX_TYPES=true;
+select id, * from complextypes_structs where id = 3
+---- RESULTS
+3,3,'third item','{"ti":null,"si":null,"i":null,"bi":null,"b":null,"f":null,"do":null,"da":null,"ts":null,"s1":null,"s2":null,"c1":null,"c2":null,"vc":null,"de1":null,"de2":null}','{"b":true}','{"i":98765,"s":null}'
+---- TYPES
+INT, INT, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Expanding star on tables with struct type, and an additional scalar field
+set EXPAND_COMPLEX_TYPES=true;
+select t1.id, *
+from complextypes_structs t1, complextypes_structs t2
+where t1.id = t2.id and t1.id = 4
+---- RESULTS
+4,4,'fourth item','{"ti":90,"si":30482,"i":1664336,"bi":23567459873,"b":true,"f":0.5600000023841858,"do":NaN,"da":"2000-12-31","ts":"2024-01-01 00:00:00.123400000","s1":"random string","s2":"","c1":"c","c2":"d  ","vc":"addsdrr","de1":33357,"de2":null}','{"b":null}','{"i":null,"s":"str"}',4,'fourth item','{"ti":90,"si":30482,"i":1664336,"bi":23567459873,"b":true,"f":0.5600000023841858,"do":NaN,"da":"2000-12-31","ts":"2024-01-01 00:00:00.123400000","s1":"random string","s2":"","c1":"c","c2":"d  ","vc":"addsdrr","de1":33357,"de2":null}','{"b":null}','{"i":null,"s":"str"}'
+---- TYPES
+INT, INT, STRING, STRING, STRING, STRING, INT, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Expanding inner struct
+set EXPAND_COMPLEX_TYPES=true;
+select alltypes.* from complextypes_structs where alltypes.ti = 100
+---- RESULTS
+100,12348,156789012,163234345342,True,1234.56005859375,65323423.33,2021-05-30,2021-06-01 10:19:04,'some string','another str','x','xyz','somevarcha',12345,NULL
+---- TYPES
+TINYINT, SMALLINT, INT, BIGINT, BOOLEAN, FLOAT, DOUBLE, DATE, TIMESTAMP, STRING, STRING, CHAR, CHAR, VARCHAR, DECIMAL, DECIMAL
+====
+---- QUERY
+# Expanding struct and array
+set EXPAND_COMPLEX_TYPES=true;
+select * from complextypes_structs s, complextypes_arrays a
+where s.id = a.id and s.id = 5
+---- RESULTS
+5,'fifth item','NULL','{"b":false}','{"i":98765,"s":"abcde f"}',5,'[10,NULL,12]','["ten","eleven","twelve","thirteen"]'
+---- TYPES
+INT, STRING, STRING, STRING, STRING, INT, STRING, STRING
+====
+---- QUERY
+# Expanding star on tables with array and struct type, without EXPAND_COMPLEX_TYPES
+select a.*, s.*
+from complextypes_arrays a, complextypes_structs s
+where a.id = s.id and a.id = 6
+---- RESULTS
+6,6,'sixth item'
+---- TYPES
+INT, INT, STRING
+====
+---- QUERY
+# Expanding struct and array as separate aliases
+set EXPAND_COMPLEX_TYPES=true;
+select s.*, a.* from complextypes_structs s, complextypes_arrays a
+where s.id = a.id and s.id = 1
+---- RESULTS
+1,'first item','{"ti":100,"si":12348,"i":156789012,"bi":163234345342,"b":true,"f":1234.56005859375,"do":65323423.33,"da":"2021-05-30","ts":"2021-06-01 10:19:04","s1":"some string","s2":"another str","c1":"x","c2":"xyz","vc":"somevarcha","de1":12345,"de2":null}','{"b":true}','NULL',1,'[1,2,3,4,5]','["one","two","three","four","five"]'
+---- TYPES
+INT, STRING, STRING, STRING, STRING, INT, STRING, STRING
+====
+---- QUERY
+# Expanding struct, map and array as separate aliases
+set EXPAND_COMPLEX_TYPES=true;
+select s.*, a.*, m.*
+from complextypes_structs s, complextypes_arrays a, complextypes_maps_view m
+where s.id = a.id and s.id = m.id and s.id = 2
+---- RESULTS
+2,'second item','{"ti":123,"si":4567,"i":1562322212,"bi":334333345342,"b":false,"f":NaN,"do":23233423.099,"da":null,"ts":"2020-06-11 12:10:04","s1":null,"s2":"NULL","c1":"a","c2":"ab ","vc":"varchar","de1":11223,"de2":null}','{"b":false}','{"i":19191,"s":"small_struct_str"}',2,'[1,NULL,3,4,5]','["one","two","three",NULL,"five"]',2,'{"k1":2,"k2":NULL}','[{"k3":NULL,"k1":1},NULL,{}]'
+---- TYPES
+INT, STRING, STRING, STRING, STRING, INT, STRING, STRING, BIGINT, STRING, STRING
+====
+---- QUERY
+# Expanding struct, map and array as separate aliases, without EXPAND_COMPLEX_TYPES
+select s.*, a.*, m.*
+from complextypes_structs s, complextypes_arrays a, complextypes_maps_view m
+where s.id = a.id and s.id = m.id and s.id = 3
+---- RESULTS
+3,'third item',3,3
+---- TYPES
+INT, STRING, INT, BIGINT
+====

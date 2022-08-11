@@ -736,6 +736,10 @@ enum TImpalaQueryOptions {
 
   // Determines how to resolve ORC files' schemas. Valid values are "position" and "name".
   ORC_SCHEMA_RESOLUTION = 146;
+
+  // Expands complex types in star queries
+  EXPAND_COMPLEX_TYPES = 147
+
 }
 
 // The summary of a DML statement.
