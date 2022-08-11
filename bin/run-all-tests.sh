@@ -204,7 +204,7 @@ do
   # there are custom-cluster tests which will leave the cluster running with specifit
   # flags.
   if [[ "$BE_TEST" == true || "$FE_TEST" == true || "$EE_TEST" == true
-      || "$JDBC_TEST" == true ]]; then
+      || "$JDBC_TEST" == true || "$CLUSTER_TEST" == true ]]; then
     if [[ $i == 1 || "$CLUSTER_TEST" == true ]]; then
       start_impala_cluster
     fi
