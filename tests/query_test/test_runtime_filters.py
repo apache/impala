@@ -190,19 +190,12 @@ class TestBloomFilters(ImpalaTestSuite):
 
   def test_iceberg_dictionary_runtime_filter(self, vector, unique_database):
     self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=BLOOM")
-    self.execute_query("SET PARQUET_READ_STATISTICS=false;")
-    self.execute_query("SET MINMAX_FILTER_THRESHOLD = 0.0;")
-    self.execute_query("SET MINMAX_FILTER_SORTED_COLUMNS=FALSE;")
-    self.execute_query("SET MINMAX_FILTER_PARTITION_COLUMNS=FALSE;")
     self.run_test_case('QueryTest/iceberg-dictionary-runtime-filter', vector,
       unique_database, test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 
   def test_parquet_dictionary_runtime_filter(self, vector, unique_database):
     self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=BLOOM")
     self.execute_query("SET PARQUET_READ_STATISTICS=false;")
-    self.execute_query("SET MINMAX_FILTER_THRESHOLD = 0.0;")
-    self.execute_query("SET MINMAX_FILTER_SORTED_COLUMNS=FALSE;")
-    self.execute_query("SET MINMAX_FILTER_PARTITION_COLUMNS=FALSE;")
     self.run_test_case('QueryTest/parquet-dictionary-runtime-filter', vector,
       unique_database, test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 
