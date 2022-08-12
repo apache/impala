@@ -334,9 +334,9 @@ def get_dev_impala_shell_executable():
         "impala-shell-" + IMPALA_LOCAL_BUILD_VERSION, "impala-shell"), True
 
 
-def create_impala_shell_executable_dimension():
+def create_impala_shell_executable_dimension(dev_only=False):
   _, include_pypi = get_dev_impala_shell_executable()
-  if include_pypi:
+  if include_pypi and not dev_only:
     if 'DISABLE_PYTHON3_TEST' in os.environ:
       return ImpalaTestDimension('impala_shell', 'dev', 'python2')
     else:

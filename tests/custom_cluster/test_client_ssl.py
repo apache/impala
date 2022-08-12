@@ -141,8 +141,14 @@ class TestClientSsl(CustomClusterTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestClientSsl, cls).add_test_dimensions()
+    # Limit the test dimensions to avoid long run times. This runs hs2 and hs2-http
+    # with only the dev shells (python2 and python3) for a total of up to 4
+    # dimensions.
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
-    cls.ImpalaTestMatrix.add_dimension(create_impala_shell_executable_dimension())
+    cls.ImpalaTestMatrix.add_dimension(
+        create_impala_shell_executable_dimension(dev_only=True))
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('protocol') != 'beeswax')
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args=WEBSERVER_SSL_ARGS,
