@@ -31,12 +31,22 @@
   </ul>
   </li>
   <li>Support ALTER TABLE UNSET TBLPROPERTIES/SERDEPROPERTIES (<a href="https://issues.apache.org/jira/browse/IMPALA-5569">IMPALA-5569</a>).</li>
-  <li>Support reading/writing Parquet Bloom filters for the most common types (<a href="https://issues.apache.org/jira/browse/IMPALA-10640">IMPALA-10640</a>, <a href="https://issues.apache.org/jira/browse/IMPALA-10642">IMPALA-10642</a>).</li>
+  <li>Support reading decimals from Parquet files with different precision/scale (<a href="https://issues.apache.org/jira/browse/IMPALA-7087">IMPALA-7087</a>, <a href="https://issues.apache.org/jira/browse/IMPALA-8131">IMPALA-8131</a>)</li>
+  <li>Support table definition over a single file (<a href="https://issues.apache.org/jira/browse/IMPALA-10934">IMPALA-10934</a>, <a href="https://issues.apache.org/jira/browse/HIVE-25569">HIVE-25569</a>)</li>
+  <li>impala-shell can connect directly to HiveServer2 (<a href="https://issues.apache.org/jira/browse/IMPALA-10778">IMPALA-10778</a>)</li>
+  <li>Support spilling to HDFS (<a href="https://issues.apache.org/jira/browse/IMPALA-10429">IMPALA-10429</a>)</li>
 </ul>
 
 <h2>Improvements</h2>
 <ul>
-  <li>Several improvements in scanning ORC tables:
+  <li>Several improvements in Parquet support:
+    <ul>
+      <li>Late materialization: avoid materialization of columns for filtered out rows in Parquet tables (<a href="https://issues.apache.org/jira/browse/IMPALA-9873">IMPALA-9873</a>).</li>
+      <li>Support reading/writing Parquet Bloom filters for the most common types (<a href="https://issues.apache.org/jira/browse/IMPALA-10640">IMPALA-10640</a>, <a href="https://issues.apache.org/jira/browse/IMPALA-10642">IMPALA-10642</a>).</li>
+      <li>Apply runtime filter on small dictionaries (<a href="https://issues.apache.org/jira/browse/IMPALA-10910">IMPALA-10910</a>, <a href="https://issues.apache.org/jira/browse/IMPALA-5509">IMPALA-5509</a>).</li>
+    </ul>
+  </li>
+  <li>Several improvements in ORC support:
     <ul>
       <li>Async IO in ORC scanner (<a href="https://issues.apache.org/jira/browse/IMPALA-6636">IMPALA-6636</a>).</li>
       <li>Predicate pushdown into the ORC lib (<a href="https://issues.apache.org/jira/browse/IMPALA-6505">IMPALA-6505</a>, <a href="https://issues.apache.org/jira/browse/IMPALA-10873">IMPALA-10873</a>).</li>
@@ -45,14 +55,27 @@
     </ul>
     See more in the Epic <a href="https://issues.apache.org/jira/browse/IMPALA-9040">IMPALA-9040</a> (login to see all jiras linked to it).
   </li>
-  <li>​​Reducing HashTable size by packing its buckets efficiently (<a href="https://issues.apache.org/jira/browse/IMPALA-7635">IMPALA-7635</a>).</li>
-  <li>​​Avoid materialization of columns for filtered out rows in Parquet tables (<a href="https://issues.apache.org/jira/browse/IMPALA-9873">IMPALA-9873</a>).</li>
-  <li>​​Improve TimestampValue to String casting (<a href="https://issues.apache.org/jira/browse/IMPALA-10984">IMPALA-10984</a>).</li>
-  <li>​​ACID lock timeouts are now configurable (<a href="https://issues.apache.org/jira/browse/IMPALA-11153">IMPALA-11153</a>).</li>
+  <li>Catalog improvements:
+    <ul>
+      <li>Batching of consecutive partition events (<a href="https://issues.apache.org/jira/browse/IMPALA-9857">IMPALA-9857</a>)</li>
+      <li>Fine grained table refreshing in catalogd at partition level for transactional tables (<a href="https://issues.apache.org/jira/browse/IMPALA-10923">IMPALA-10923</a>).</li>
+      <li>Improve metadata consistency and self events detection in catalogd (<a href="https://issues.apache.org/jira/browse/IMPALA-10926">IMPALA-10926</a>).</li>
+      <li>Skip file metadata reloading in processing AlterPartition events in EventProcessor in catalogd (<a href="https://issues.apache.org/jira/browse/IMPALA-11050">IMPALA-11050</a>).</li>
+    </ul>
+  </li>
+  <li>Planner improvements:
+    <ul>
+      <li>Improve inner join cardinality estimates (<a href="https://issues.apache.org/jira/browse/IMPALA-10681">IMPALA-10681</a>)</li>
+      <li>Set selectivity of Not-equal (<a href="https://issues.apache.org/jira/browse/IMPALA-7560">IMPALA-7560</a>)</li>
+      <li>Better selectivity for =,not distinct (<a href="https://issues.apache.org/jira/browse/IMPALA-10766">IMPALA-10766</a>)</li>
+      <li>Improve analysis with inline views and thousands of columns (<a href="https://issues.apache.org/jira/browse/IMPALA-10799">IMPALA-10799</a>)</li>
+      <li>Improve SingleNodePlan creation when hundreds of inline views are joined (<a href="https://issues.apache.org/jira/browse/IMPALA-10806">IMPALA-10806</a>)</li>
+    </ul>
+  </li>
+  <li>Reducing HashTable size by packing its buckets efficiently (<a href="https://issues.apache.org/jira/browse/IMPALA-7635">IMPALA-7635</a>).</li>
+  <li>Improve TimestampValue to String casting (<a href="https://issues.apache.org/jira/browse/IMPALA-10984">IMPALA-10984</a>).</li>
+  <li>ACID lock timeouts are now configurable (<a href="https://issues.apache.org/jira/browse/IMPALA-11153">IMPALA-11153</a>).</li>
   <li>Implementing adaptive 3-way quicksort in sorter. Improves quicksort performance when there is a large number of duplicates (<a href="https://issues.apache.org/jira/browse/IMPALA-10961">IMPALA-10961</a>).</li>
-  <li>Fine grained table refreshing in catalogd at partition level for transactional tables (<a href="https://issues.apache.org/jira/browse/IMPALA-10923">IMPALA-10923</a>).</li>
-  <li>Improve metadata consistency and self events detection in catalogd (<a href="https://issues.apache.org/jira/browse/IMPALA-10925">IMPALA-10925</a>).</li>
-  <li>Skip file metadata reloading in processing AlterPartition events in EventProcessor in catalogd (<a href="https://issues.apache.org/jira/browse/IMPALA-11050">IMPALA-11050</a>).</li>
 </ul>
 
 <h2>Fixed Issues</h2>
