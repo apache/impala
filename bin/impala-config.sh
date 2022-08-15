@@ -717,7 +717,7 @@ export HADOOP_LIB_DIR=${HADOOP_LIB_DIR_OVERRIDE:-"${HADOOP_HOME}/lib"}
 export HADOOP_CLASSPATH="${HADOOP_CLASSPATH-}"
 # Add Ozone Hadoop filesystem implementation when using Ozone
 if [ "${TARGET_FILESYSTEM}" = "ozone" ]; then
-  OZONE_JAR="ozone-filesystem-hadoop3-${IMPALA_OZONE_VERSION}.jar"
+  OZONE_JAR="${IMPALA_OZONE_JAR_ARTIFACT_ID}-${IMPALA_OZONE_VERSION}.jar"
   HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:${OZONE_HOME}/share/ozone/lib/${OZONE_JAR}"
 fi
 # Add the path containing the hadoop-aws jar, which is required to access AWS from the
