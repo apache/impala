@@ -1,0 +1,32 @@
+====
+---- QUERY
+# Test for IMPALA-11500
+# Impalad crashed in the ParquetBoolDecoder::SkipValues when num_values is 0
+create table parq_tbl (
+  s string,
+  i int,
+  b boolean
+) stored as parquet;
+====
+---- QUERY
+insert into
+  parq_tbl
+values
+  ( "abc", 3, true),
+  ( "def", NULL, false),
+  ( "ghi", 1, NULL),
+  (NULL, 0, NULL),
+  (NULL, NULL, NULL);
+select * from parq_tbl where s is not null order by s
+---- RESULTS
+'abc',3,true
+'def',NULL,false
+'ghi',1,NULL
+---- TYPES
+STRING,INT,BOOLEAN
+---- RUNTIME_PROFILE
+aggregation(SUM, NumColumns): 3
+aggregation(SUM, NumPages): 3
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, RowsRead): 5
+====

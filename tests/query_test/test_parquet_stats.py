@@ -105,3 +105,5 @@ class TestParquetStats(ImpalaTestSuite):
       new_vector.get_value('exec_option')['batch_size'] = batch_size
       self.run_test_case('QueryTest/parquet-page-index-large', new_vector,
                          unique_database)
+    # Test for the bugfix
+    self.run_test_case('QueryTest/parquet-page-index-bugfix', vector, unique_database)

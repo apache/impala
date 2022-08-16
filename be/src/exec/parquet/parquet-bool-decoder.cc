@@ -67,7 +67,7 @@ bool ParquetBoolDecoder::DecodeValues(
 }
 
 bool ParquetBoolDecoder::SkipValues(int num_values) {
-  DCHECK_GT(num_values, 0);
+  DCHECK_GE(num_values, 0);
   int skip_cached = min(num_unpacked_values_ - unpacked_value_idx_, num_values);
   unpacked_value_idx_ += skip_cached;
   if (skip_cached == num_values) return true;
