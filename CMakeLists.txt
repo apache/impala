@@ -401,7 +401,7 @@ IMPALA_ADD_THIRDPARTY_LIB(krb5 ${KERBEROS_INCLUDE_DIR} "" ${KERBEROS_LIBRARY})
 
 # We require certain binaries from the kerberos project for our automated kerberos
 # testing.
-find_package(KerberosPrograms REQUIRED)
+find_package(KerberosPrograms)
 
 # find curl headers and libs
 find_package(Curl REQUIRED)
