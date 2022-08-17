@@ -1004,5 +1004,24 @@ TEST(DecimalTest, PrecisionScaleValidation) {
   EXPECT_FALSE(ColumnType::ValidateDecimalParams(15, 16));
 }
 
+template <typename T>
+static void TestGetScaleMultiplier(int scale_upper_bound, T overflow_val) {
+  T expect = 1;
+  for (int scale = 0; scale < scale_upper_bound; scale++) {
+    EXPECT_EQ(expect, DecimalUtil::GetScaleMultiplier<T>(scale));
+    expect *= 10;
+  }
+  // test overflow
+  EXPECT_EQ(overflow_val, DecimalUtil::GetScaleMultiplier<T>(scale_upper_bound));
+}
+
+TEST(DecimalTest, GetScaleMultiplier) {
+  TestGetScaleMultiplier<int32_t>(DecimalUtil::INT32_SCALE_UPPER_BOUND, -1);
+  TestGetScaleMultiplier<int64_t>(DecimalUtil::INT64_SCALE_UPPER_BOUND, -1);
+  TestGetScaleMultiplier<int128_t>(DecimalUtil::INT128_SCALE_UPPER_BOUND, -1);
+  TestGetScaleMultiplier<int256_t>(DecimalUtil::INT256_SCALE_UPPER_BOUND, -1);
+  TestGetScaleMultiplier<double>(DecimalUtil::INT64_SCALE_UPPER_BOUND, 1E19);
+}
+
 }
 

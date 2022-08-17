@@ -34,6 +34,15 @@ namespace impala {
 
 class DecimalUtil {
  public:
+  // The scale's exclusive upper bound for GetScaleMultiplier<int32_t>()
+  static constexpr int INT32_SCALE_UPPER_BOUND = ColumnType::MAX_DECIMAL4_PRECISION + 1;
+  // The scale's exclusive upper bound for GetScaleMultiplier<int64_t>()
+  static constexpr int INT64_SCALE_UPPER_BOUND = ColumnType::MAX_DECIMAL8_PRECISION + 1;
+  // The scale's exclusive upper bound for GetScaleMultiplier<int128_t>()
+  static constexpr int INT128_SCALE_UPPER_BOUND = ColumnType::MAX_PRECISION + 1;
+  // The scale's exclusive upper bound for GetScaleMultiplier<int256_t>()
+  static constexpr int INT256_SCALE_UPPER_BOUND = 77;
+
   // Helper function that checks for multiplication overflow. We only check for overflow
   // if may_overflow is false.
   template <typename T>
@@ -166,7 +175,7 @@ class DecimalUtil {
 template <>
 inline int32_t DecimalUtil::GetScaleMultiplier<int32_t>(int scale) {
   DCHECK_GE(scale, 0);
-  static const int32_t values[] = {
+  static constexpr int32_t values[INT32_SCALE_UPPER_BOUND] = {
       1,
       10,
       100,
@@ -177,15 +186,14 @@ inline int32_t DecimalUtil::GetScaleMultiplier<int32_t>(int scale) {
       10000000,
       100000000,
       1000000000};
-  DCHECK_GE(sizeof(values) / sizeof(int32_t), ColumnType::MAX_DECIMAL4_PRECISION);
-  if (LIKELY(scale < 10)) return values[scale];
+  if (LIKELY(scale < INT32_SCALE_UPPER_BOUND)) return values[scale];
   return -1;  // Overflow
 }
 
 template <>
 inline int64_t DecimalUtil::GetScaleMultiplier<int64_t>(int scale) {
   DCHECK_GE(scale, 0);
-  static const int64_t values[] = {
+  static constexpr int64_t values[INT64_SCALE_UPPER_BOUND] = {
       1ll,
       10ll,
       100ll,
@@ -205,15 +213,15 @@ inline int64_t DecimalUtil::GetScaleMultiplier<int64_t>(int scale) {
       10000000000000000ll,
       100000000000000000ll,
       1000000000000000000ll};
-  DCHECK_GE(sizeof(values) / sizeof(int64_t), ColumnType::MAX_DECIMAL8_PRECISION);
-  if (LIKELY(scale < 19)) return values[scale];
+  if (LIKELY(scale < INT64_SCALE_UPPER_BOUND)) return values[scale];
   return -1;  // Overflow
 }
 
 template <>
 inline int128_t DecimalUtil::GetScaleMultiplier<int128_t>(int scale) {
   DCHECK_GE(scale, 0);
-  static const int128_t values[] = {
+  static constexpr int128_t i10e18{1000000000000000000ll};
+  static constexpr int128_t values[INT128_SCALE_UPPER_BOUND] = {
       static_cast<int128_t>(1ll),
       static_cast<int128_t>(10ll),
       static_cast<int128_t>(100ll),
@@ -232,29 +240,114 @@ inline int128_t DecimalUtil::GetScaleMultiplier<int128_t>(int scale) {
       static_cast<int128_t>(1000000000000000ll),
       static_cast<int128_t>(10000000000000000ll),
       static_cast<int128_t>(100000000000000000ll),
-      static_cast<int128_t>(1000000000000000000ll),
-      static_cast<int128_t>(1000000000000000000ll) * 10ll,
-      static_cast<int128_t>(1000000000000000000ll) * 100ll,
-      static_cast<int128_t>(1000000000000000000ll) * 1000ll,
-      static_cast<int128_t>(1000000000000000000ll) * 10000ll,
-      static_cast<int128_t>(1000000000000000000ll) * 100000ll,
-      static_cast<int128_t>(1000000000000000000ll) * 1000000ll,
-      static_cast<int128_t>(1000000000000000000ll) * 10000000ll,
-      static_cast<int128_t>(1000000000000000000ll) * 100000000ll,
-      static_cast<int128_t>(1000000000000000000ll) * 1000000000ll,
-      static_cast<int128_t>(1000000000000000000ll) * 10000000000ll,
-      static_cast<int128_t>(1000000000000000000ll) * 100000000000ll,
-      static_cast<int128_t>(1000000000000000000ll) * 1000000000000ll,
-      static_cast<int128_t>(1000000000000000000ll) * 10000000000000ll,
-      static_cast<int128_t>(1000000000000000000ll) * 100000000000000ll,
-      static_cast<int128_t>(1000000000000000000ll) * 1000000000000000ll,
-      static_cast<int128_t>(1000000000000000000ll) * 10000000000000000ll,
-      static_cast<int128_t>(1000000000000000000ll) * 100000000000000000ll,
-      static_cast<int128_t>(1000000000000000000ll) * 100000000000000000ll * 10ll,
-      static_cast<int128_t>(1000000000000000000ll) * 100000000000000000ll * 100ll,
-      static_cast<int128_t>(1000000000000000000ll) * 100000000000000000ll * 1000ll};
-  DCHECK_GE(sizeof(values) / sizeof(int128_t), ColumnType::MAX_PRECISION);
-  if (LIKELY(scale < 39)) return values[scale];
+      i10e18,
+      i10e18 * 10ll,
+      i10e18 * 100ll,
+      i10e18 * 1000ll,
+      i10e18 * 10000ll,
+      i10e18 * 100000ll,
+      i10e18 * 1000000ll,
+      i10e18 * 10000000ll,
+      i10e18 * 100000000ll,
+      i10e18 * 1000000000ll,
+      i10e18 * 10000000000ll,
+      i10e18 * 100000000000ll,
+      i10e18 * 1000000000000ll,
+      i10e18 * 10000000000000ll,
+      i10e18 * 100000000000000ll,
+      i10e18 * 1000000000000000ll,
+      i10e18 * 10000000000000000ll,
+      i10e18 * 100000000000000000ll,
+      i10e18 * i10e18,
+      i10e18 * i10e18 * 10ll,
+      i10e18 * i10e18 * 100ll};
+  if (LIKELY(scale < INT128_SCALE_UPPER_BOUND)) return values[scale];
+  return -1;  // Overflow
+}
+
+template <>
+inline int256_t DecimalUtil::GetScaleMultiplier<int256_t>(int scale) {
+  DCHECK_GE(scale, 0);
+  static constexpr int256_t i10e18{1000000000000000000ll};
+  static constexpr int256_t values[INT256_SCALE_UPPER_BOUND] = {
+      static_cast<int256_t>(1ll),
+      static_cast<int256_t>(10ll),
+      static_cast<int256_t>(100ll),
+      static_cast<int256_t>(1000ll),
+      static_cast<int256_t>(10000ll),
+      static_cast<int256_t>(100000ll),
+      static_cast<int256_t>(1000000ll),
+      static_cast<int256_t>(10000000ll),
+      static_cast<int256_t>(100000000ll),
+      static_cast<int256_t>(1000000000ll),
+      static_cast<int256_t>(10000000000ll),
+      static_cast<int256_t>(100000000000ll),
+      static_cast<int256_t>(1000000000000ll),
+      static_cast<int256_t>(10000000000000ll),
+      static_cast<int256_t>(100000000000000ll),
+      static_cast<int256_t>(1000000000000000ll),
+      static_cast<int256_t>(10000000000000000ll),
+      static_cast<int256_t>(100000000000000000ll),
+      i10e18,
+      i10e18 * 10ll,
+      i10e18 * 100ll,
+      i10e18 * 1000ll,
+      i10e18 * 10000ll,
+      i10e18 * 100000ll,
+      i10e18 * 1000000ll,
+      i10e18 * 10000000ll,
+      i10e18 * 100000000ll,
+      i10e18 * 1000000000ll,
+      i10e18 * 10000000000ll,
+      i10e18 * 100000000000ll,
+      i10e18 * 1000000000000ll,
+      i10e18 * 10000000000000ll,
+      i10e18 * 100000000000000ll,
+      i10e18 * 1000000000000000ll,
+      i10e18 * 10000000000000000ll,
+      i10e18 * 100000000000000000ll,
+      i10e18 * i10e18,
+      i10e18 * i10e18 * 10ll,
+      i10e18 * i10e18 * 100ll,
+      i10e18 * i10e18 * 1000ll,
+      i10e18 * i10e18 * 10000ll,
+      i10e18 * i10e18 * 100000ll,
+      i10e18 * i10e18 * 1000000ll,
+      i10e18 * i10e18 * 10000000ll,
+      i10e18 * i10e18 * 100000000ll,
+      i10e18 * i10e18 * 1000000000ll,
+      i10e18 * i10e18 * 10000000000ll,
+      i10e18 * i10e18 * 100000000000ll,
+      i10e18 * i10e18 * 1000000000000ll,
+      i10e18 * i10e18 * 10000000000000ll,
+      i10e18 * i10e18 * 100000000000000ll,
+      i10e18 * i10e18 * 1000000000000000ll,
+      i10e18 * i10e18 * 10000000000000000ll,
+      i10e18 * i10e18 * 100000000000000000ll,
+      i10e18 * i10e18 * i10e18,
+      i10e18 * i10e18 * i10e18 * 10ll,
+      i10e18 * i10e18 * i10e18 * 100ll,
+      i10e18 * i10e18 * i10e18 * 1000ll,
+      i10e18 * i10e18 * i10e18 * 10000ll,
+      i10e18 * i10e18 * i10e18 * 100000ll,
+      i10e18 * i10e18 * i10e18 * 1000000ll,
+      i10e18 * i10e18 * i10e18 * 10000000ll,
+      i10e18 * i10e18 * i10e18 * 100000000ll,
+      i10e18 * i10e18 * i10e18 * 1000000000ll,
+      i10e18 * i10e18 * i10e18 * 10000000000ll,
+      i10e18 * i10e18 * i10e18 * 100000000000ll,
+      i10e18 * i10e18 * i10e18 * 1000000000000ll,
+      i10e18 * i10e18 * i10e18 * 10000000000000ll,
+      i10e18 * i10e18 * i10e18 * 100000000000000ll,
+      i10e18 * i10e18 * i10e18 * 1000000000000000ll,
+      i10e18 * i10e18 * i10e18 * 10000000000000000ll,
+      i10e18 * i10e18 * i10e18 * 100000000000000000ll,
+      i10e18 * i10e18 * i10e18 * i10e18,
+      i10e18 * i10e18 * i10e18 * i10e18 * 10ll,
+      i10e18 * i10e18 * i10e18 * i10e18 * 100ll,
+      i10e18 * i10e18 * i10e18 * i10e18 * 1000ll,
+      i10e18 * i10e18 * i10e18 * i10e18 * 10000ll};
+  if (LIKELY(scale < INT256_SCALE_UPPER_BOUND)) return values[scale];
   return -1;  // Overflow
 }
 }
