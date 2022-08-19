@@ -112,6 +112,9 @@ CONFIG = {
 
 if target_filesystem == 's3':
   CONFIG.update({'fs.s3a.connection.maximum': 1500})
+  # As a workaround for HADOOP-18410, set the async drain threshold to an absurdly large
+  # value to turn off the async drain codepath.
+  CONFIG.update({'fs.s3a.input.async.drain.threshold': '512G'})
   s3guard_enabled = os.environ.get("S3GUARD_ENABLED") == 'true'
   if s3guard_enabled:
     CONFIG.update({
