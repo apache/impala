@@ -712,3 +712,71 @@ PLAN-ROOT SINK
    kudu predicates: l_orderkey = 1, l_partkey = 1, l_suppkey = 1
    row-size=0B cardinality=1
 ====
+# DATE predicate.
+select * from functional_kudu.date_tbl where date_col = DATE "1970-01-01";
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN KUDU [functional_kudu.date_tbl]
+   kudu predicates: date_col = DATE '1970-01-01'
+   row-size=12B cardinality=1
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN KUDU [functional_kudu.date_tbl]
+   kudu predicates: date_col = DATE '1970-01-01'
+   row-size=12B cardinality=1
+====
+# BIGINT predicate.
+select * from functional_kudu.alltypes where bigint_col = 1;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN KUDU [functional_kudu.alltypes]
+   kudu predicates: bigint_col = 1
+   row-size=97B cardinality=730
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN KUDU [functional_kudu.alltypes]
+   kudu predicates: bigint_col = 1
+   row-size=97B cardinality=730
+====
+# FLOAT predicate.
+select * from functional_kudu.alltypes where float_col = 1.0;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN KUDU [functional_kudu.alltypes]
+   kudu predicates: float_col = 1.0
+   row-size=97B cardinality=730
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN KUDU [functional_kudu.alltypes]
+   kudu predicates: float_col = 1.0
+   row-size=97B cardinality=730
+====
+# DOUBLE predicate.
+select * from functional_kudu.alltypes where double_col = 1.0;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN KUDU [functional_kudu.alltypes]
+   kudu predicates: double_col = 1.0
+   row-size=97B cardinality=730
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN KUDU [functional_kudu.alltypes]
+   kudu predicates: double_col = 1.0
+   row-size=97B cardinality=730
+====

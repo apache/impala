@@ -29,8 +29,8 @@ import java.util.Set;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BoolLiteral;
+import org.apache.impala.analysis.DateLiteral;
 import org.apache.impala.analysis.Expr;
-import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.LiteralExpr;
@@ -567,14 +567,20 @@ public class KuduScanNode extends ScanNode {
         }
         break;
       }
+      case DATE:
+        kuduPredicate = KuduPredicate.newComparisonPredicate(column, op,
+            ((DateLiteral)literal).getValue());
+        break;
       case DECIMAL: {
         kuduPredicate = KuduPredicate.newComparisonPredicate(column, op,
             ((NumericLiteral)literal).getValue());
         break;
       }
-      default: break;
+      default:
+        //All supported types are covered, should not reach default case
+        Preconditions.checkState(false);
     }
-    if (kuduPredicate == null) return false;
+    Preconditions.checkState(kuduPredicate != null);
 
     kuduConjuncts_.add(predicate);
     kuduPredicates_.add(kuduPredicate);
