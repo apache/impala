@@ -271,8 +271,10 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   /// Non-ACID file in full ACID table.
   bool acid_original_file_ = false;
 
-  /// Slot descriptor of synthetic rowid of original files.
-  const SlotDescriptor* acid_synthetic_rowid_ = nullptr;
+  /// Slot descriptor for file position (a.k.a. row ID) for two different purposes: It can
+  /// be used for the synthetic rowid column in original files of a full ACID table, or
+  /// for the FILE__POSITION virtual column.
+  const SlotDescriptor* file_position_ = nullptr;
 
   /// True if we need to validate the row batches against the valid write id list. This
   /// only needs to be done for Hive Streaming Ingestion. The 'write id' will be the same

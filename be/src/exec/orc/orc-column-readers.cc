@@ -537,20 +537,20 @@ Status OrcStructReader::TopLevelReadValueBatch(ScratchTupleBatch* scratch_batch,
                              NumElements() - row_idx_);
     scratch_batch->num_tuples += num_rows_read;
   }
-  if (scanner_->acid_synthetic_rowid_ != nullptr) {
-    FillSyntheticRowId(scratch_batch, scratch_batch_idx, num_rows_read);
+  if (scanner_->file_position_ != nullptr) {
+    FillVirtualRowIdColumn(scratch_batch, scratch_batch_idx, num_rows_read);
   }
   row_idx_ += num_rows_read;
   return Status::OK();
 }
 
-void OrcStructReader::FillSyntheticRowId(ScratchTupleBatch* scratch_batch,
+void OrcStructReader::FillVirtualRowIdColumn(ScratchTupleBatch* scratch_batch,
     int scratch_batch_idx, int num_rows) {
-    DCHECK(scanner_->acid_synthetic_rowid_ != nullptr);
+    DCHECK(scanner_->file_position_ != nullptr);
     int tuple_size = OrcColumnReader::scanner_->tuple_byte_size();
     uint8_t* first_tuple = scratch_batch->tuple_mem + scratch_batch_idx * tuple_size;
     int64_t* first_slot = reinterpret_cast<Tuple*>(first_tuple)->GetBigIntSlot(
-        scanner_->acid_synthetic_rowid_->tuple_offset());
+        scanner_->file_position_->tuple_offset());
     StrideWriter<int64_t> out{first_slot, tuple_size};
     for (int i = 0; i < num_rows; ++i) {
       *out.Advance() = file_row_idx_++;

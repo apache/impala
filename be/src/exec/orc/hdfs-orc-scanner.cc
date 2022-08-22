@@ -599,7 +599,14 @@ Status HdfsOrcScanner::ResolveColumns(const TupleDescriptor& tuple_desc,
   SlotDescriptor* pos_slot_desc = nullptr;
   for (SlotDescriptor* slot_desc : tuple_desc.slots()) {
     // Skip columns not (necessarily) stored in the data files.
-    if (!file_metadata_utils_.NeedDataInFile(slot_desc)) continue;
+    if (!file_metadata_utils_.NeedDataInFile(slot_desc)) {
+      if (slot_desc->virtual_column_type() == TVirtualColumnType::FILE_POSITION) {
+        DCHECK(pos_slot_desc == nullptr)
+            << "There should only be one position slot per tuple";
+        file_position_ = slot_desc;
+      }
+      continue;
+    }
 
     node = nullptr;
     pos_field = false;
@@ -676,7 +683,7 @@ void HdfsOrcScanner::SetSyntheticAcidFieldForOriginalFile(const SlotDescriptor* 
           ValidWriteIdList::GetBucketProperty(filename());
       break;
     case ACID_FIELD_ROWID_INDEX:
-      acid_synthetic_rowid_ = slot_desc;
+      file_position_ = slot_desc;
     default:
       break;
   }
@@ -934,7 +941,7 @@ Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
       try {
         end_of_stripe_ |= !row_reader_->next(*orc_root_batch_);
         RETURN_IF_ERROR(orc_root_reader_->UpdateInputBatch(orc_root_batch_.get()));
-        if (acid_synthetic_rowid_ != nullptr) {
+        if (file_position_ != nullptr) {
           // Set the first row index of the batch. The ORC reader guarantees that rows
           // are consecutive in the returned batch.
           orc_root_reader_->SetFileRowIndex(row_reader_->getRowNumber());

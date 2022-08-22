@@ -150,8 +150,8 @@ class TestScannersVirtualColumns(ImpalaTestSuite):
   def test_virtual_column_file_position_generic(self, vector):
     # Generic tests about virtual column file position.
     file_format = vector.get_value('table_format').file_format
-    # TODO: add support for other file formats, especially ORC
-    if file_format not in ['parquet']:
+    # TODO: add support for other file format
+    if file_format not in ['parquet', 'orc']:
       pytest.skip()
     self.run_test_case('QueryTest/virtual-column-file-position-generic', vector)
 

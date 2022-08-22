@@ -76,7 +76,8 @@ HdfsScanner::~HdfsScanner() {
 }
 
 Status HdfsScanner::ValidateSlotDescriptors() const {
-  if (file_format() != THdfsFileFormat::PARQUET) {
+  if (file_format() != THdfsFileFormat::PARQUET &&
+      file_format() != THdfsFileFormat::ORC) {
     // Virtual column FILE__POSITION is only supported for PARQUET files.
     for (SlotDescriptor* sd : scan_node_->virtual_column_slots()) {
       if (sd->virtual_column_type() == TVirtualColumnType::FILE_POSITION) {

@@ -630,7 +630,7 @@ class OrcStructReader : public OrcComplexColumnReader {
   void SetFileRowIndex(int64_t file_row_idx) { file_row_idx_ = file_row_idx; }
 
  private:
-  void FillSyntheticRowId(ScratchTupleBatch* scratch_batch, int scratch_batch_idx,
+  void FillVirtualRowIdColumn(ScratchTupleBatch* scratch_batch, int scratch_batch_idx,
       int num_rows);
 
   orc::StructVectorBatch* batch_ = nullptr;

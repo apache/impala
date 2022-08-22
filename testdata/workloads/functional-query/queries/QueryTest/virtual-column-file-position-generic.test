@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-select file__position, * from functional_parquet.alltypestiny order by id;
+select file__position, * from alltypestiny order by id;
 ---- RESULTS
 0,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
 1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
@@ -14,7 +14,7 @@ select file__position, * from functional_parquet.alltypestiny order by id;
 BIGINT, INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
 ====
 ---- QUERY
-select file__position, * from functional_parquet.alltypestiny
+select file__position, * from alltypestiny
 where file__position = 1
 order by id;
 ---- RESULTS
@@ -26,7 +26,7 @@ order by id;
 BIGINT, INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
 ====
 ---- QUERY
-select file__position, count(*) from functional_parquet.alltypestiny
+select file__position, count(*) from alltypestiny
 group by file__position;
 ---- RESULTS
 1,4
@@ -35,7 +35,7 @@ group by file__position;
 BIGINT, BIGINT
 ====
 ---- QUERY
-select file__position, id from functional_parquet.alltypestiny
+select file__position, id from alltypestiny
 order by id;
 ---- RESULTS
 0,0
@@ -50,7 +50,7 @@ order by id;
 BIGINT, INT
 ====
 ---- QUERY
-select file__position from functional_parquet.alltypestiny;
+select file__position from alltypestiny;
 ---- RESULTS
 0
 1
@@ -64,14 +64,14 @@ select file__position from functional_parquet.alltypestiny;
 BIGINT
 ====
 ---- QUERY
-select max(file__position) from functional_parquet.alltypestiny;
+select max(file__position) from alltypestiny;
 ---- RESULTS
 1
 ---- TYPES
 BIGINT
 ====
 ---- QUERY
-select file__position, id from functional_parquet.complextypestbl
+select file__position, id from complextypestbl
 order by id;
 ---- RESULTS
 0,1
@@ -86,7 +86,7 @@ order by id;
 BIGINT, BIGINT
 ====
 ---- QUERY
-select file__position, id, int_array from functional_parquet.complextypestbl;
+select file__position, id, int_array from complextypestbl;
 ---- RESULTS
 0,1,'[1,2,3]'
 1,2,'[NULL,1,2,NULL,3,NULL]'
@@ -100,7 +100,7 @@ select file__position, id, int_array from functional_parquet.complextypestbl;
 BIGINT, BIGINT, STRING
 ====
 ---- QUERY
-select file__position, id, item from functional_parquet.complextypestbl c, c.int_array
+select file__position, id, item from complextypestbl c, c.int_array
 order by id;
 ---- RESULTS
 0,1,1
@@ -117,7 +117,7 @@ order by id;
 BIGINT, BIGINT, INT
 ====
 ---- QUERY
-select file__position, id, item from functional_parquet.complextypestbl c, c.int_array_array;
+select file__position, id, item from complextypestbl c, c.int_array_array;
 ---- RESULTS
 0,1,'[1,2]'
 0,1,'[3,4]'
@@ -134,7 +134,7 @@ select file__position, id, item from functional_parquet.complextypestbl c, c.int
 BIGINT, BIGINT, STRING
 ====
 ---- QUERY
-select file__position, id, i.item from functional_parquet.complextypestbl c, c.int_array_array a, a.item i
+select file__position, id, i.item from complextypestbl c, c.int_array_array a, a.item i
 order by id;
 ---- RESULTS
 0,1,1
