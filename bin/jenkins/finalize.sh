@@ -59,6 +59,25 @@ if [[ $(find $LOGS_DIR -path "*minidumps*" -name "*dmp") ]]; then
   rm -rf $SYM_DIR
 fi
 
+# Do a second pass over the minidumps with the resolve_minidump.py script.
+# This means that we now generate two JUnitXMLs per minidump. This should
+# be temporary.
+# TODO: Once we verify everything works, we can remove the first loop.
+if [[ $(find $LOGS_DIR -path "*minidumps*" -name "*dmp") ]]; then
+  for minidump in $(find $LOGS_DIR -path "*minidumps*" -name "*dmp"); do
+    # Since this is experimental, use it inside an if so that any error code doesn't
+    # abort this script.
+    if ! bin/resolve_minidumps.py --minidump_file ${minidump} \
+        --output_file ${minidump}_dumpedv2 ; then
+      echo "bin/resolve_minidumps.py failed!"
+    else
+      "${IMPALA_HOME}"/bin/generate_junitxml.py --phase finalize --step minidumpsv2 \
+          --error "Minidump generated: $minidump" \
+          --stderr "resolve_minidumps.py output:\n$(head -n 100 ${minidump}_dumpedv2)"
+    fi
+  done
+fi
+
 function check_for_asan_error {
   ERROR_LOG=${1}
   if grep -q "ERROR: AddressSanitizer:" ${ERROR_LOG} ; then
