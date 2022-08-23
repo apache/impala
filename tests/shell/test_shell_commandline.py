@@ -1237,14 +1237,23 @@ class TestImpalaShell(ImpalaTestSuite):
     args = ['--quiet', '-B', '--query', 'select 0;']
     result = run_impala_shell_cmd(vector, args + ['--http_socket_timeout_s=0'],
                                   expect_success=False)
-    expected_err_py2 = (
-      "Caught exception [Errno 115] Operation now in progress, "
-      "type=<class 'socket.error'> in OpenSession. Num remaining tries: 3")
-    expected_err_py3 = (
-      "Caught exception [Errno 115] Operation now in progress, "
-      "type=<class 'BlockingIOError'> in OpenSession. Num remaining tries: 3")
+
+    # Outside the docker-based tests, Python 2 and Python 3 produce "Operating
+    # now in progress" with slightly different error classes. When running with
+    # docker-based tests, it results in a different error code and "Cannot
+    # assign requested address" for both Python 2 and Python 3.
+    # Tolerate all three of these variants.
+    error_template = (
+      "Caught exception [Errno {0}] {1}, type=<class '{2}'> in OpenSession. "
+      "Num remaining tries: 3")
+    expected_err_py2 = \
+        error_template.format(115, "Operation now in progress", "socket.error")
+    expected_err_py3 = \
+        error_template.format(115, "Operation now in progress", "BlockingIOError")
+    expected_err_docker = \
+        error_template.format(99, "Cannot assign requested address", "OSError")
     actual_err = result.stderr.splitlines()[0]
-    assert actual_err == expected_err_py2 or actual_err == expected_err_py3
+    assert actual_err in [expected_err_py2, expected_err_py3, expected_err_docker]
 
     # Test http_socket_timeout_s=-1, expect errors
     result = run_impala_shell_cmd(vector, args + ['--http_socket_timeout_s=-1'],
