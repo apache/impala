@@ -136,7 +136,7 @@ BIGINT, BIGINT
 ====
 ---- QUERY
 select bb1.id, bb2.id, bb1.binary_col_with_nulls, bb2.binary_col_with_nulls
-  from binary_tbl_big bb1 left join functional_hbase.binary_tbl_big bb2
+  from binary_tbl_big bb1 left join binary_tbl_big bb2
   on bb1.binary_col_with_nulls = bb2.binary_col_with_nulls
   where bb1.id < 3 and bb2.id < 3;
 ---- TYPES
