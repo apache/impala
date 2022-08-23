@@ -77,7 +77,7 @@ export IMPALA_VERSION=4.2.0-SNAPSHOT
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=198-9ebe744de2
+export IMPALA_TOOLCHAIN_BUILD_ID=207-21f1a0057a
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p5
