@@ -183,6 +183,7 @@ class TestQueries(ImpalaTestSuite):
       pytest.xfail("TODO: Enable with clause tests for hbase")
     self.run_test_case('QueryTest/with-clause', vector)
 
+  # TODO: Although it is not specified this test only runs in exhaustive.
   def test_misc(self, vector):
     table_format = vector.get_value('table_format')
     if table_format.file_format in ['hbase', 'rc', 'parquet', 'kudu']:

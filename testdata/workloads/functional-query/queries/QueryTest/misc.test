@@ -118,18 +118,6 @@ SELECT 1 as "``"
 tinyint
 ====
 ---- QUERY
-#  Select from table that contains unsupported primitive types
-SELECT int_col, str_col, bigint_col from functional.unsupported_types
----- RESULTS
-0,'aaaa',0
-1,'bbbb',10
-2,'cccc',20
-NULL,'NULL',NULL
-4,'eeee',40
----- TYPES
-int, string, bigint
-====
----- QUERY
 # where clause is a SlotRef
 SELECT count(*) from alltypes where bool_col
 ---- RESULTS
