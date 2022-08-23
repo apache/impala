@@ -134,6 +134,9 @@ Status Scheduler::GenerateScanRanges(const vector<TFileSplitGeneratorSpec>& spec
       hdfs_scan_range.__set_offset(scan_range_offset);
       hdfs_scan_range.__set_partition_id(spec.partition_id);
       hdfs_scan_range.__set_partition_path_hash(spec.partition_path_hash);
+      if (fb_desc->absolute_path() != nullptr) {
+        hdfs_scan_range.__set_absolute_path(fb_desc->absolute_path()->str());
+      }
       TScanRange scan_range;
       scan_range.__set_hdfs_file_split(hdfs_scan_range);
       if (spec.file_desc.__isset.file_metadata) {
@@ -1120,6 +1123,10 @@ void TScanRangeToScanRangePB(const TScanRange& tscan_range, ScanRangePB* scan_ra
     hdfs_file_split->set_mtime(tscan_range.hdfs_file_split.mtime);
     hdfs_file_split->set_partition_path_hash(
         tscan_range.hdfs_file_split.partition_path_hash);
+    if (tscan_range.hdfs_file_split.__isset.absolute_path) {
+      hdfs_file_split->set_absolute_path(
+          tscan_range.hdfs_file_split.absolute_path);
+    }
   }
   if (tscan_range.__isset.hbase_key_range) {
     HBaseKeyRangePB* hbase_key_range = scan_range_pb->mutable_hbase_key_range();

@@ -278,8 +278,14 @@ Status HdfsScanPlanNode::ProcessScanRangesAndInitSharedState(FragmentState* stat
                       " Try rerunning the query.");
       }
 
-      filesystem::path file_path(partition_desc->location());
-      file_path.append(split.relative_path(), filesystem::path::codecvt());
+      filesystem::path file_path;
+      if (hdfs_table_->IsIcebergTable() && split.relative_path().empty()) {
+        file_path.append(split.absolute_path(), filesystem::path::codecvt());
+      } else {
+        file_path.append(partition_desc->location(), filesystem::path::codecvt())
+            .append(split.relative_path(), filesystem::path::codecvt());
+      }
+
       const string& native_file_path = file_path.native();
 
       auto file_desc_map_key = make_pair(partition_desc->id(), native_file_path);

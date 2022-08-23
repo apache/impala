@@ -79,6 +79,10 @@ table FbFileDesc {
 
   // Whether this file is erasure-coded
   is_ec: bool = false (id: 5);
+
+  // The absolute path of the file, it`s used only when data files are outside of
+  // the Iceberg table location (IMPALA-11507).
+  absolute_path: string (id: 6);
 }
 
 // Additional file-related metadata

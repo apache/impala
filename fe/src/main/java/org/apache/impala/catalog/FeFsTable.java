@@ -16,6 +16,10 @@
 // under the License.
 package org.apache.impala.catalog;
 
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -37,8 +41,6 @@ import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.PartitionKeyValue;
-import org.apache.impala.analysis.TimeTravelSpec;
-import org.apache.impala.analysis.TimeTravelSpec.Kind;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
@@ -57,9 +59,6 @@ import org.apache.impala.util.TAccessLevelUtil;
 import org.apache.impala.util.TResultRowBuilder;
 import org.apache.thrift.TException;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Joiner;
-import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -458,7 +457,7 @@ public interface FeFsTable extends FeTable {
         Collections.sort(orderedFds);
         for (FileDescriptor fd: orderedFds) {
           TResultRowBuilder rowBuilder = new TResultRowBuilder();
-          rowBuilder.add(p.getLocation() + "/" + fd.getRelativePath());
+          rowBuilder.add(fd.getAbsolutePath(p.getLocation()));
           rowBuilder.add(PrintUtils.printBytes(fd.getFileLength()));
           rowBuilder.add(p.getPartitionName());
           result.addToRows(rowBuilder.get());
@@ -477,7 +476,7 @@ public interface FeFsTable extends FeTable {
       Collections.sort(orderedFds);
       for (FileDescriptor fd : orderedFds) {
         TResultRowBuilder rowBuilder = new TResultRowBuilder();
-        rowBuilder.add(table.getLocation() + "/" + fd.getRelativePath());
+        rowBuilder.add(fd.getAbsolutePath(table.getLocation()));
         rowBuilder.add(PrintUtils.printBytes(fd.getFileLength()));
         rowBuilder.add("");
         result.addToRows(rowBuilder.get());

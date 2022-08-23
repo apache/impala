@@ -351,7 +351,7 @@ public class IcebergScanPlanner {
         fileDesc = FeIcebergTable.Utils.getFileDescriptor(
             new Path(cf.path().toString()),
             new Path(getIceTable().getIcebergTableLocation()),
-            getIceTable().getHostIndex());
+            getIceTable());
       } catch (IOException ex) {
         throw new ImpalaRuntimeException(
             "Cannot load file descriptor for " + cf.path(), ex);

@@ -97,7 +97,7 @@ public class FileMetadataLoader {
     partDir_ = Preconditions.checkNotNull(partDir);
     recursive_ = recursive;
     hostIndex_ = Preconditions.checkNotNull(hostIndex);
-    oldFdsByRelPath_ = Maps.uniqueIndex(oldFds, FileDescriptor::getRelativePath);
+    oldFdsByRelPath_ = Maps.uniqueIndex(oldFds, FileDescriptor::getPath);
     writeIds_ = writeIds;
     validTxnList_ = validTxnList;
     fileFormat_ = fileFormat;
@@ -278,9 +278,9 @@ public class FileMetadataLoader {
   public boolean hasFilesChangedCompareTo(List<FileDescriptor> oldFds) {
     if (oldFds.size() != loadedFds_.size()) return true;
     ImmutableMap<String, FileDescriptor> oldFdsByRelPath =
-        Maps.uniqueIndex(oldFds, FileDescriptor::getRelativePath);
+        Maps.uniqueIndex(oldFds, FileDescriptor::getPath);
     for (FileDescriptor fd : loadedFds_) {
-      FileDescriptor oldFd = oldFdsByRelPath.get(fd.getRelativePath());
+      FileDescriptor oldFd = oldFdsByRelPath.get(fd.getPath());
       if (fd.isChanged(oldFd)) return true;
     }
     return false;

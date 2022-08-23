@@ -91,6 +91,7 @@ table_name:iceberg_v2_positional_not_all_data_files_have_delete_files, constrain
 table_name:iceberg_v2_positional_not_all_data_files_have_delete_files_orc, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_v2_partitioned_position_deletes, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_v2_partitioned_position_deletes_orc, constraint:restrict_to, table_format:parquet/none/none
+table_name:iceberg_multiple_storage_locations, constraint:restrict_to, table_format:parquet/none/none
 
 # TODO: Support Avro. Data loading currently fails for Avro because complex types
 # cannot be converted to the corresponding Avro types yet.

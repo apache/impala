@@ -1,0 +1,75 @@
+====
+---- QUERY
+select
+  *
+from
+  functional_parquet.iceberg_multiple_storage_locations
+order by
+  col_int,
+  col_bigint;
+---- RESULTS
+0,12345678900,3.1400001049,2.7182,'a',1970-01-01 00:00:00,1974-02-09
+0,12345678901,3.1400001049,2.71821,'b',1970-01-01 00:00:00,1974-02-09
+0,12345678902,3.1400001049,2.71822,'c',1970-01-01 00:00:00,1974-02-09
+1,12345678900,3.1400001049,2.7182,'a',1970-01-01 00:00:00,1974-02-09
+1,12345678901,3.1400001049,2.71821,'b',1970-01-01 00:00:00,1974-02-09
+1,12345678902,3.1400001049,2.71822,'c',1970-01-01 00:00:00,1974-02-09
+2,12345678900,3.1400001049,2.7182,'a',1970-01-01 00:00:00,1974-02-09
+2,12345678901,3.1400001049,2.71821,'b',1970-01-01 00:00:00,1974-02-09
+2,12345678902,3.1400001049,2.71822,'c',1970-01-01 00:00:00,1974-02-09
+---- TYPES
+INT,BIGINT,FLOAT,DOUBLE,STRING,TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 6
+aggregation(SUM, RowsRead): 9
+====
+---- QUERY
+show files in functional_parquet.iceberg_multiple_storage_locations;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations_data/col_int=0/.*1.parquet','.*',''
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations_data/col_int=1/.*2.parquet','.*',''
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations_data01/col_int=1/.*1.parquet','.*',''
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations_data01/col_int=2/.*2.parquet','.*',''
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations_data02/col_int=0/.*2.parquet','.*',''
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations_data02/col_int=2/.*1.parquet','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+select
+  *
+from
+  functional_parquet.iceberg_multiple_storage_locations
+where
+  col_int = 2
+order by
+  col_bigint;
+---- RESULTS
+2,12345678900,3.1400001049,2.7182,'a',1970-01-01 00:00:00,1974-02-09
+2,12345678901,3.1400001049,2.71821,'b',1970-01-01 00:00:00,1974-02-09
+2,12345678902,3.1400001049,2.71822,'c',1970-01-01 00:00:00,1974-02-09
+---- TYPES
+INT,BIGINT,FLOAT,DOUBLE,STRING,TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 3
+====
+---- QUERY
+select
+  *
+from
+  functional_parquet.iceberg_multiple_storage_locations
+where
+  col_string = "a"
+order by
+  col_int;
+---- RESULTS
+0,12345678900,3.1400001049,2.7182,'a',1970-01-01 00:00:00,1974-02-09
+1,12345678900,3.1400001049,2.7182,'a',1970-01-01 00:00:00,1974-02-09
+2,12345678900,3.1400001049,2.7182,'a',1970-01-01 00:00:00,1974-02-09
+---- TYPES
+INT,BIGINT,FLOAT,DOUBLE,STRING,TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, RowsRead): 6
+====

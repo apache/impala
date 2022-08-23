@@ -78,7 +78,7 @@ public class BlockIdGenerator {
             for (FeFsPartition partition : parts) {
               List<FileDescriptor> fileDescriptors = partition.getFileDescriptors();
               for (FileDescriptor fd : fileDescriptors) {
-                Path p = new Path(partition.getLocation(), fd.getRelativePath());
+                Path p = new Path(fd.getAbsolutePath(partition.getLocation()));
 
                 // Use a deprecated API to get block ids
                 DistributedFileSystem dfs =

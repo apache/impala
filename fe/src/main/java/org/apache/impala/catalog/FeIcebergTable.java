@@ -17,8 +17,14 @@
 
 package org.apache.impala.catalog;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.primitives.Ints;
+
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -29,6 +35,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -44,11 +51,12 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.SnapshotSummary;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableProperties;
+import org.apache.iceberg.util.PropertyUtil;
 import org.apache.iceberg.util.SnapshotUtil;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.LiteralExpr;
-import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.analysis.TimeTravelSpec;
 import org.apache.impala.analysis.TimeTravelSpec.Kind;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
@@ -60,8 +68,8 @@ import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.THdfsCompression;
 import org.apache.impala.thrift.THdfsFileDesc;
-import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.THdfsPartition;
+import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergPartitionStats;
@@ -72,13 +80,8 @@ import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.TResultRowBuilder;
+
 import org.json.simple.JSONValue;
-
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
-import com.google.common.collect.Iterables;
-import com.google.common.primitives.Ints;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,7 +109,7 @@ public interface FeIcebergTable extends FeFsTable {
   /**
    * Returns the cached Iceberg Table object that stores the metadata loaded by Iceberg.
    */
-  org.apache.iceberg.Table getIcebergApiTable();
+  Table getIcebergApiTable();
 
   /**
    * Return Iceberg catalog location, we use this location to load metadata from Iceberg
@@ -510,20 +513,34 @@ public interface FeIcebergTable extends FeFsTable {
      * Get FileDescriptor by data file location
      */
     public static HdfsPartition.FileDescriptor getFileDescriptor(Path fileLoc,
-        Path tableLoc, ListMap<TNetworkAddress> hostIndex) throws IOException {
+        Path tableLoc, FeIcebergTable table) throws IOException {
       FileSystem fs = FileSystemUtil.getFileSystemForPath(tableLoc);
       FileStatus fileStatus = fs.getFileStatus(fileLoc);
-      return getFileDescriptor(fs, tableLoc, fileStatus, hostIndex);
+      return getFileDescriptor(fs, tableLoc, fileStatus, table);
     }
 
     private static HdfsPartition.FileDescriptor getFileDescriptor(FileSystem fs,
-        Path tableLoc, FileStatus fileStatus, ListMap<TNetworkAddress> hostIndex)
+        Path tableLoc, FileStatus fileStatus, FeIcebergTable table)
         throws IOException {
-      Reference<Long> numUnknownDiskIds = new Reference<Long>(Long.valueOf(0));
-      String relPath = FileSystemUtil.relativizePath(fileStatus.getPath(), tableLoc);
+      Reference<Long> numUnknownDiskIds = new Reference<>(0L);
+
+      String relPath = null;
+      String absPath = null;
+      URI relUri = tableLoc.toUri().relativize(fileStatus.getPath().toUri());
+      if (relUri.isAbsolute() || relUri.getPath().startsWith(Path.SEPARATOR)) {
+        if (Utils.requiresDataFilesInTableLocation(table)) {
+          throw new RuntimeException(fileStatus.getPath()
+              + " is outside of the Iceberg table location " + tableLoc);
+        }
+        absPath = fileStatus.getPath().toString();
+      } else {
+        relPath = relUri.getPath();
+      }
+
 
       if (!FileSystemUtil.supportsStorageIds(fs)) {
-        return HdfsPartition.FileDescriptor.createWithNoBlocks(fileStatus, relPath);
+        return HdfsPartition.FileDescriptor.createWithNoBlocks(fileStatus,
+            StringUtils.isNotEmpty(relPath) ? relPath : absPath);
       }
 
       BlockLocation[] locations;
@@ -534,7 +551,8 @@ public interface FeIcebergTable extends FeFsTable {
       }
 
       return HdfsPartition.FileDescriptor.create(fileStatus, relPath, locations,
-          hostIndex, HdfsShim.isErasureCoded(fileStatus), numUnknownDiskIds);
+          table.getHostIndex(), HdfsShim.isErasureCoded(fileStatus), numUnknownDiskIds,
+          absPath);
     }
 
     /**
@@ -550,8 +568,7 @@ public interface FeIcebergTable extends FeFsTable {
           ((HdfsTable)table.getFeFsTable()).partitionMap_.values();
       for (HdfsPartition partition : partitions) {
         for (FileDescriptor fileDesc : partition.getFileDescriptors()) {
-            Path path = new Path(table.getHdfsBaseDir() + Path.SEPARATOR +
-                fileDesc.getRelativePath());
+            Path path = new Path(fileDesc.getAbsolutePath(table.getHdfsBaseDir()));
             hdfsFileDescMap.put(path.toUri().getPath(), fileDesc);
         }
       }
@@ -569,11 +586,13 @@ public interface FeIcebergTable extends FeFsTable {
                 IcebergUtil.createIcebergMetadata(table, contentFile));
             fileDescMap.put(pathHash, iceFd);
           } else {
-            LOG.warn("Iceberg file '{}' cannot be found in the HDFS recursive file "
-                + "listing results.", path.toString());
+            if (Utils.requiresDataFilesInTableLocation(table)) {
+              LOG.warn("Iceberg file '{}' cannot be found in the HDFS recursive"
+               + "file listing results.", path.toString());
+            }
             HdfsPartition.FileDescriptor fileDesc = getFileDescriptor(
                 new Path(contentFile.path().toString()),
-                new Path(table.getIcebergTableLocation()), table.getHostIndex());
+                new Path(table.getIcebergTableLocation()), table);
             HdfsPartition.FileDescriptor iceFd = fileDesc.cloneWithFileMetadata(
                 IcebergUtil.createIcebergMetadata(table, contentFile));
             fileDescMap.put(IcebergUtil.getFilePathHash(contentFile), iceFd);
@@ -742,6 +761,19 @@ public interface FeIcebergTable extends FeFsTable {
             timestampMillis);
       }
       return snapshot;
+    }
+
+    public static boolean requiresDataFilesInTableLocation(FeIcebergTable icebergTable) {
+      Map<String, String> properties = icebergTable.getIcebergApiTable().properties();
+      return !(PropertyUtil.propertyAsBoolean(properties,
+          TableProperties.OBJECT_STORE_ENABLED,
+          TableProperties.OBJECT_STORE_ENABLED_DEFAULT)
+          || StringUtils.isNotEmpty(properties.get(TableProperties.WRITE_DATA_LOCATION))
+          || StringUtils
+          .isNotEmpty(properties.get(TableProperties.WRITE_LOCATION_PROVIDER_IMPL))
+          || StringUtils.isNotEmpty(properties.get(TableProperties.OBJECT_STORE_PATH))
+          || StringUtils
+          .isNotEmpty(properties.get(TableProperties.WRITE_FOLDER_STORAGE_LOCATION)));
     }
   }
 }

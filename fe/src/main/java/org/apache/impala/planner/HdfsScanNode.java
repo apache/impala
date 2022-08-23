@@ -1230,9 +1230,9 @@ public class HdfsScanNode extends ScanNode {
       for (FileDescriptor fileDesc: fileDescs) {
         if (!analyzer.getQueryOptions().isAllow_erasure_coded_files() &&
             fileDesc.getIsEc()) {
-          throw new ImpalaRuntimeException(String.format(
-              "Scanning of HDFS erasure-coded file (%s/%s) is not supported",
-              partition.getLocation(), fileDesc.getRelativePath()));
+          throw new ImpalaRuntimeException(String
+              .format("Scanning of HDFS erasure-coded file (%s) is not supported",
+                  fileDesc.getAbsolutePath(partition.getLocation())));
         }
 
         // Accumulate on the number of EC files and the total size of such files.
@@ -1338,7 +1338,7 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkArgument(maxBlockSize > 0);
     if (fileDesc.getFileLength() <= 0) return;
     boolean splittable = partition.getFileFormat().isSplittable(
-        HdfsCompression.fromFileName(fileDesc.getRelativePath()));
+        HdfsCompression.fromFileName(fileDesc.getPath()));
     TFileSplitGeneratorSpec splitSpec = new TFileSplitGeneratorSpec(
         fileDesc.toThrift(), maxBlockSize, splittable, partition.getId(),
         partition.getLocation().hashCode());
@@ -1404,10 +1404,12 @@ public class HdfsScanNode extends ScanNode {
           currentLength = scanRangeBytesLimit;
         }
         TScanRange scanRange = new TScanRange();
-        scanRange.setHdfs_file_split(new THdfsFileSplit(fileDesc.getRelativePath(),
+        THdfsFileSplit hdfsFileSplit = new THdfsFileSplit(fileDesc.getRelativePath(),
             currentOffset, currentLength, partition.getId(), fileDesc.getFileLength(),
             fileDesc.getFileCompression().toThrift(), fileDesc.getModificationTime(),
-            partition.getLocation().hashCode()));
+            partition.getLocation().hashCode());
+        hdfsFileSplit.setAbsolute_path(fileDesc.getAbsolutePath());
+        scanRange.setHdfs_file_split(hdfsFileSplit);
         if (fileDesc.getFbFileMetadata() != null) {
           scanRange.setFile_metadata(fileDesc.getFbFileMetadata().getByteBuffer());
         }
@@ -1642,8 +1644,7 @@ public class HdfsScanNode extends ScanNode {
       long estimatedPartitionSize = 0;
       if (format == HdfsFileFormat.TEXT || format == HdfsFileFormat.JSON) {
         for (FileDescriptor desc : p.getFileDescriptors()) {
-          HdfsCompression compression
-            = HdfsCompression.fromFileName(desc.getRelativePath().toString());
+          HdfsCompression compression = HdfsCompression.fromFileName(desc.getPath());
           if (HdfsCompression.SUFFIX_MAP.containsValue(compression)) {
             estimatedPartitionSize += Math.round(desc.getFileLength()
                 * ESTIMATED_COMPRESSION_FACTOR_LEGACY);

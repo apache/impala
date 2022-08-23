@@ -17,6 +17,21 @@
 
 package org.apache.impala.catalog;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
+import com.google.common.base.Joiner;
+import com.google.common.base.MoreObjects;
+import com.google.common.base.MoreObjects.ToStringHelper;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
+import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+import com.google.flatbuffers.FlatBufferBuilder;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -29,10 +44,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
-
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
@@ -68,20 +83,6 @@ import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.ListMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
-import com.google.common.base.Joiner;
-import com.google.common.base.MoreObjects;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
-import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import com.google.flatbuffers.FlatBufferBuilder;
 
 /**
  * Query-relevant information for one table partition. Partitions are comparable
@@ -191,7 +192,7 @@ public class HdfsPartition extends CatalogObjectImpl
      */
     public static FileDescriptor create(FileStatus fileStatus, String relPath,
         BlockLocation[] blockLocations, ListMap<TNetworkAddress> hostIndex, boolean isEc,
-        Reference<Long> numUnknownDiskIds) throws IOException {
+        Reference<Long> numUnknownDiskIds, String absPath) throws IOException {
       FlatBufferBuilder fbb = new FlatBufferBuilder(1);
       int[] fbFileBlockOffsets = new int[blockLocations.length];
       int blockIdx = 0;
@@ -206,7 +207,14 @@ public class HdfsPartition extends CatalogObjectImpl
         }
       }
       return new FileDescriptor(createFbFileDesc(fbb, fileStatus, relPath,
-          fbFileBlockOffsets, isEc));
+          fbFileBlockOffsets, isEc, absPath));
+    }
+
+    public static FileDescriptor create(FileStatus fileStatus, String relPath,
+        BlockLocation[] blockLocations, ListMap<TNetworkAddress> hostIndex, boolean isEc,
+        Reference<Long> numUnknownDiskIds) throws IOException {
+      return create(fileStatus, relPath, blockLocations, hostIndex, isEc,
+          numUnknownDiskIds, null);
     }
 
     /**
@@ -216,7 +224,8 @@ public class HdfsPartition extends CatalogObjectImpl
     public static FileDescriptor createWithNoBlocks(FileStatus fileStatus,
         String relPath) {
       FlatBufferBuilder fbb = new FlatBufferBuilder(1);
-      return new FileDescriptor(createFbFileDesc(fbb, fileStatus, relPath, null, false));
+      return new FileDescriptor(createFbFileDesc(fbb, fileStatus, relPath, null, false,
+          null));
     }
 
     /**
@@ -226,13 +235,16 @@ public class HdfsPartition extends CatalogObjectImpl
      * in the underlying buffer. Can be null if there are no blocks.
      */
     private static FbFileDesc createFbFileDesc(FlatBufferBuilder fbb,
-        FileStatus fileStatus, String relPath, int[] fbFileBlockOffets, boolean isEc) {
-      int relPathOffset = fbb.createString(relPath);
+        FileStatus fileStatus, String relPath, int[] fbFileBlockOffets, boolean isEc,
+        String absPath) {
+      int relPathOffset = fbb.createString(relPath == null ? StringUtils.EMPTY : relPath);
       // A negative block vector offset is used when no block offsets are specified.
       int blockVectorOffset = -1;
       if (fbFileBlockOffets != null) {
         blockVectorOffset = FbFileDesc.createFileBlocksVector(fbb, fbFileBlockOffets);
       }
+      int absPathOffset = -1;
+      if (StringUtils.isNotEmpty(absPath)) absPathOffset = fbb.createString(absPath);
       FbFileDesc.startFbFileDesc(fbb);
       // TODO(todd) rename to RelativePathin the FBS
       FbFileDesc.addRelativePath(fbb, relPathOffset);
@@ -242,6 +254,7 @@ public class HdfsPartition extends CatalogObjectImpl
       HdfsCompression comp = HdfsCompression.fromFileName(fileStatus.getPath().getName());
       FbFileDesc.addCompression(fbb, comp.toFb());
       if (blockVectorOffset >= 0) FbFileDesc.addFileBlocks(fbb, blockVectorOffset);
+      if (absPathOffset >= 0) FbFileDesc.addAbsolutePath(fbb, absPathOffset);
       fbb.finish(FbFileDesc.endFbFileDesc(fbb));
       // To eliminate memory fragmentation, copy the contents of the FlatBuffer to the
       // smallest possible ByteBuffer.
@@ -252,6 +265,20 @@ public class HdfsPartition extends CatalogObjectImpl
     }
 
     public String getRelativePath() { return fbFileDescriptor_.relativePath(); }
+
+    public String getAbsolutePath() { return fbFileDescriptor_.absolutePath(); }
+
+    public String getAbsolutePath(String rootPath) {
+      return StringUtils.isNotEmpty(fbFileDescriptor_.relativePath())
+          ? rootPath + Path.SEPARATOR + fbFileDescriptor_.relativePath()
+          : fbFileDescriptor_.absolutePath();
+    }
+
+    public String getPath() {
+      return StringUtils.isNotEmpty(fbFileDescriptor_.relativePath())
+          ? fbFileDescriptor_.relativePath() : fbFileDescriptor_.absolutePath();
+    }
+
     public long getFileLength() { return fbFileDescriptor_.length(); }
 
     /** Compute the total length of files in fileDescs */
@@ -296,17 +323,21 @@ public class HdfsPartition extends CatalogObjectImpl
       for (int i = 0; i < numFileBlocks; ++i) {
         blocks.add(FileBlock.debugString(getFbFileBlock(i)));
       }
-      return MoreObjects.toStringHelper(this)
+      ToStringHelper stringHelper = MoreObjects.toStringHelper(this)
           .add("RelativePath", getRelativePath())
           .add("Length", getFileLength())
           .add("Compression", getFileCompression())
           .add("ModificationTime", getModificationTime())
-          .add("Blocks", Joiner.on(", ").join(blocks)).toString();
+          .add("Blocks", Joiner.on(", ").join(blocks));
+      if (StringUtils.isNotEmpty(getAbsolutePath())) {
+        stringHelper.add("AbsolutePath", getAbsolutePath());
+      }
+      return stringHelper.toString();
     }
 
     @Override
     public int compareTo(FileDescriptor otherFd) {
-      return getRelativePath().compareTo(otherFd.getRelativePath());
+      return getPath().compareTo(otherFd.getPath());
     }
 
     /**
@@ -980,9 +1011,8 @@ public class HdfsPartition extends CatalogObjectImpl
     List<FileDescriptor> fdList = getFileDescriptors();
     Set<String> fileNames = new HashSet<>(fdList.size());
     // Fully qualified file names.
-    String location = getLocation();
     for (FileDescriptor fd : fdList) {
-      fileNames.add(location + Path.SEPARATOR + fd.getRelativePath());
+      fileNames.add(fd.getAbsolutePath(getLocation()));
     }
     return fileNames;
   }

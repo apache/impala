@@ -780,6 +780,10 @@ class TestIcebergTable(IcebergTestSuite):
     args = ['-q', 'DROP TABLE {0}.{1}'.format(db_name, tbl_name)]
     results = run_impala_shell_cmd(vector, args)
 
+  def test_multiple_storage_locations(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-multiple-storage-locations-table',
+                       vector, unique_database)
+
 
 class TestIcebergV2Table(IcebergTestSuite):
   """Tests related to Iceberg V2 tables."""
