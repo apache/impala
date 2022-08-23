@@ -48,8 +48,17 @@ under the License.
     query option can be set globally, or at per session level. Only queries with UTF8_MODE=true will
     have UTF-8 aware behaviors.</p>
    <p>
-    <note>If the query option UTF8_MODE is turned on globally, existing queries that depend on the
-     original binary behavior need to explicitly set UTF8_MODE=false.</note></p>
+    <note>
+          <ul id="ul_vs2_qrx_p5b">
+            <li>If the query option UTF8_MODE is turned on globally, existing queries that depend on
+              the original binary behavior need to explicitly set UTF8_MODE=false.</li>
+            <li>Impala Daemons should be deployed on nodes using the same Glibc version since
+              different Glibc version supports different Unicode standard version and also ensure
+              that the en_US.UTF-8 locale is installed in the nodes. Not using the same Glibc
+              version might result in inconsistent UTF-8 behavior when UTF8_MODE is set to
+              true.</li>
+          </ul>
+        </note></p>
   </conbody>
  </concept>
  <concept id="list_string_functions">

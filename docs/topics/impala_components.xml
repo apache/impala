@@ -47,46 +47,47 @@ under the License.
 
     <conbody>
 
-      <p> The core Impala component is the Impala daemon, physically represented
-        by the <codeph>impalad</codeph> process. A few of the key functions that
-        an Impala daemon performs are:<ul>
+      <p> The core Impala component is the Impala daemon, physically represented by the
+          <codeph>impalad</codeph> process. A few of the key functions that an Impala daemon
+        performs are:<ul>
           <li>Reads and writes to data files.</li>
-          <li>Accepts queries transmitted from the <codeph>impala-shell</codeph>
-            command, Hue, JDBC, or ODBC.</li>
-          <li>Parallelizes the queries and distributes work across the
-            cluster.</li>
-          <li>Transmits intermediate query results back to the central
-            coordinator. </li>
+          <li>Accepts queries transmitted from the <codeph>impala-shell</codeph> command, Hue, JDBC,
+            or ODBC.</li>
+          <li>Parallelizes the queries and distributes work across the cluster.</li>
+          <li>Transmits intermediate query results back to the central coordinator. </li>
         </ul></p>
       <p>Impala daemons can be deployed in one of the following ways:<ul>
-          <li>HDFS and Impala are co-located, and each Impala daemon runs on the
-            same host as a DataNode.</li>
-          <li>Impala is deployed separately in a compute cluster and reads
-            remotely from HDFS, S3, ADLS, etc.</li>
+          <li>HDFS and Impala are co-located, and each Impala daemon runs on the same host as a
+            DataNode.</li>
+          <li>Impala is deployed separately in a compute cluster and reads remotely from HDFS, S3,
+            ADLS, etc.</li>
         </ul></p>
 
-      <p> The Impala daemons are in constant communication with StateStore, to
-        confirm which daemons are healthy and can accept new work. </p>
+      <p> The Impala daemons are in constant communication with StateStore, to confirm which daemons
+        are healthy and can accept new work. </p>
 
-      <p rev="1.2"> They also receive broadcast messages from the
-          <cmdname>catalogd</cmdname> daemon (introduced in Impala 1.2) whenever
-        any Impala daemon in the cluster creates, alters, or drops any type of
-        object, or when an <codeph>INSERT</codeph> or <codeph>LOAD DATA</codeph>
-        statement is processed through Impala. This background communication
-        minimizes the need for <codeph>REFRESH</codeph> or <codeph>INVALIDATE
-          METADATA</codeph> statements that were needed to coordinate metadata
-        across Impala daemons prior to Impala 1.2. </p>
+      <p rev="1.2"> They also receive broadcast messages from the <cmdname>catalogd</cmdname> daemon
+        (introduced in Impala 1.2) whenever any Impala daemon in the cluster creates, alters, or
+        drops any type of object, or when an <codeph>INSERT</codeph> or <codeph>LOAD DATA</codeph>
+        statement is processed through Impala. This background communication minimizes the need for
+          <codeph>REFRESH</codeph> or <codeph>INVALIDATE METADATA</codeph> statements that were
+        needed to coordinate metadata across Impala daemons prior to Impala 1.2. </p>
 
-      <p rev="2.9.0 IMPALA-3807 IMPALA-5147 IMPALA-5503">
-        In <keyword keyref="impala29_full"/> and higher, you can control which hosts act as query coordinators
-        and which act as query executors, to improve scalability for highly concurrent workloads on large clusters.
-        See <xref keyref="scalability_coordinator"/> for details.
-      </p>
+      <p rev="2.9.0 IMPALA-3807 IMPALA-5147 IMPALA-5503"> In <keyword keyref="impala29_full"/> and
+        higher, you can control which hosts act as query coordinators and which act as query
+        executors, to improve scalability for highly concurrent workloads on large clusters. See
+          <xref keyref="scalability_coordinator"/> for details. </p>
+
+      <note>Impala daemons should be deployed on nodes using the same Glibc version since different
+        Glibc version supports different Unicode standard version and also ensure that the
+        en_US.UTF-8 locale is installed in the nodes. Not using the same Glibc version might result
+        in inconsistent UTF-8 behavior when UTF8_MODE is set to true.</note>
 
       <p>
-        <b>Related information:</b> <xref href="impala_config_options.xml#config_options"/>,
-        <xref href="impala_processes.xml#processes"/>, <xref href="impala_timeouts.xml#impalad_timeout"/>,
-        <xref href="impala_ports.xml#ports"/>, <xref href="impala_proxy.xml#proxy"/>
+        <b>Related information:</b>
+        <xref href="impala_config_options.xml#config_options"/>, <xref
+          href="impala_processes.xml#processes"/>, <xref href="impala_timeouts.xml#impalad_timeout"
+        />, <xref href="impala_ports.xml#ports"/>, <xref href="impala_proxy.xml#proxy"/>
       </p>
     </conbody>
   </concept>
