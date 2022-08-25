@@ -570,15 +570,17 @@ class TestKuduTransactionBase(CustomClusterTestSuite):
     table_name = "%s.test_kudu_txn_abort_partition_lock" % unique_database
     self.execute_query(self._create_kudu_table_query.format(table_name))
 
-    # Enable Kudu transactions and run "insert" query with injected sleeping time for
-    # 3 seconds. The query is started asynchronously.
+    # Enable Kudu transactions and run "insert" query with debug action to skip calling
+    # Commit for Kudu transaction so that partition locking is not released. The Kudu
+    # transaction object is held by KuduTransactionManager and the transaction is not
+    # cleaned up after this test. But the Impala daemon will be restarted after this
+    # class of custom cluster test so that the transaction will be cleaned up on Kudu
+    # server after Impala daemon is restarted since there is no heart beat for the
+    # uncommitted transaction.
     self.execute_query("set ENABLE_KUDU_TRANSACTION=true")
-    query_options = {'debug_action': 'FIS_KUDU_TABLE_SINK_WRITE_BATCH:SLEEP@3000'}
+    query_options = {'debug_action': 'CRS_NOT_COMMIT_KUDU_TXN:FAIL'}
     query = "insert into %s values (0, 'a')" % table_name
-    handle = self.execute_query_async(query, query_options)
-    # Wait for it to start running. Kudu lock the partition for more than 3 seconds.
-    self.wait_for_state(handle, self.client.QUERY_STATES['RUNNING'], 60)
-    sleep(1)
+    self.execute_query(query, query_options)
     # Launch the same query again. The query should fail with error message "aborted
     # since it tries to acquire the partition lock that is held by another transaction".
     try:
@@ -587,8 +589,6 @@ class TestKuduTransactionBase(CustomClusterTestSuite):
     except ImpalaBeeswaxException as e:
       assert "aborted since it tries to acquire the partition lock that is held by " \
           "another transaction" in str(e)
-    # Close the first query.
-    self.client.close_query(handle)
 
 
 class TestKuduTransaction(TestKuduTransactionBase):

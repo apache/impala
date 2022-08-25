@@ -1812,7 +1812,17 @@ void ClientRequestState::AbortKuduTransaction() {
 
 Status ClientRequestState::CommitKuduTransaction() {
   DCHECK(InKuduTransaction());
-  Status status = frontend_->CommitKuduTransaction(query_ctx_.query_id);
+  // Skip calling Commit() for Kudu Transaction with a debug action so that test code
+  // could explicitly control over calling Commit().
+  Status status = DebugAction(exec_request_->query_options, "CRS_NOT_COMMIT_KUDU_TXN");
+  if (UNLIKELY(!status.ok())) {
+    VLOG(1) << Substitute("Skip to commit Kudu transaction with query-id: $0",
+        PrintId(query_ctx_.query_id));
+    transaction_closed_ = true;
+    return Status::OK();
+  }
+
+  status = frontend_->CommitKuduTransaction(query_ctx_.query_id);
   if (status.ok()) {
     query_events_->MarkEvent("Kudu transaction committed");
     transaction_closed_ = true;
