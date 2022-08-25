@@ -85,7 +85,7 @@ add_custom_command(
           ${CLANG_INCLUDE_FLAGS} ${IR_INPUT_FILES} -o ${IR_TMP_OUTPUT_FILE}
   COMMAND ${LLVM_OPT_EXECUTABLE} ${LLVM_OPT_IR_FLAGS} < ${IR_TMP_OUTPUT_FILE} > ${IR_OUTPUT_FILE}
   COMMAND rm ${IR_TMP_OUTPUT_FILE}
-  DEPENDS Exec Exprs Runtime Udf Util ${IR_INPUT_FILES}
+  DEPENDS Exec ExecAvro ExecKudu Exprs Runtime Udf Util ${IR_INPUT_FILES}
 )
 
 add_custom_command(
@@ -95,7 +95,7 @@ add_custom_command(
   COMMAND ${LLVM_OPT_EXECUTABLE} ${LLVM_OPT_IR_FLAGS} < ${LEGACY_AVX_IR_TMP_OUTPUT_FILE}
           > ${LEGACY_AVX_IR_OUTPUT_FILE}
   COMMAND rm ${LEGACY_AVX_IR_TMP_OUTPUT_FILE}
-  DEPENDS Exec Exprs Runtime Udf Util ${IR_INPUT_FILES}
+  DEPENDS Exec ExecAvro ExecKudu Exprs Runtime Udf Util ${IR_INPUT_FILES}
 )
 
 add_custom_target(compile_to_ir DEPENDS ${IR_OUTPUT_FILE})

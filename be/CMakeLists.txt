@@ -438,15 +438,15 @@ set (IMPALA_LIBS
   Catalog
   CodeGen
   Common
-  Avro
-  HBase
-  Kudu
-  Orc
-  Parquet
-  Rcfile
-  Sequence
-  Text
   Exec
+  ExecAvro
+  ExecHBase
+  ExecKudu
+  ExecOrc
+  ExecParquet
+  ExecRcfile
+  ExecSequence
+  ExecText
   Exprs
   GlobalFlags
   histogram_proto
@@ -499,11 +499,11 @@ set (UNIFIED_TEST_LIBS
   CodeGenTests
   CommonTests
   ExecTests
-  AvroTests
+  ExecAvroTests
+  ExecParquetTests
   ExprsTests
   GUtilTests
   IoTests
-  ParquetTests
   RpcTests
   RuntimeTests
   SchedulingTests
@@ -528,15 +528,15 @@ if (BUILD_SHARED_LIBS)
     BufferPool
     Io
     Runtime
-    Avro
-    HBase
-    Kudu
-    Orc
-    Parquet
-    Rcfile
-    Sequence
-    Text
     Exec
+    ExecAvro
+    ExecHBase
+    ExecKudu
+    ExecOrc
+    ExecParquet
+    ExecRcfile
+    ExecSequence
+    ExecText
     CodeGen
     Exprs
     Rpc

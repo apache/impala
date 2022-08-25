@@ -15,17 +15,15 @@
 # specific language governing permissions and limitations
 # under the License.
 
-cmake_minimum_required(VERSION 2.6)
-
 # where to put generated libraries
 set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/text")
 
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/text")
 
-add_library(Text
+add_library(ExecText
   hdfs-text-scanner.cc
   hdfs-plugin-text-scanner.cc
 )
 
-add_dependencies(Text gen-deps)
+add_dependencies(ExecText gen-deps)

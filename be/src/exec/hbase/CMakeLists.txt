@@ -15,19 +15,17 @@
 # specific language governing permissions and limitations
 # under the License.
 
-cmake_minimum_required(VERSION 2.6)
-
 # where to put generated libraries
 set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/hbase")
 
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/hbase")
 
-add_library(HBase
+add_library(ExecHBase
   hbase-scan-node.cc
   hbase-table-scanner.cc
   hbase-table-sink.cc
   hbase-table-writer.cc
 )
 
-add_dependencies(HBase gen-deps)
+add_dependencies(ExecHBase gen-deps)

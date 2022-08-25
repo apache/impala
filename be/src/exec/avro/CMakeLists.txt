@@ -15,24 +15,22 @@
 # specific language governing permissions and limitations
 # under the License.
 
-cmake_minimum_required(VERSION 2.6)
-
 # where to put generated libraries
 set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/avro")
 
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/avro")
 
-add_library(Avro
+add_library(ExecAvro
   hdfs-avro-scanner.cc
   hdfs-avro-scanner-ir.cc
 )
 
-add_dependencies(Avro gen-deps)
+add_dependencies(ExecAvro gen-deps)
 
-add_library(AvroTests STATIC
+add_library(ExecAvroTests STATIC
   hdfs-avro-scanner-test.cc
 )
-add_dependencies(AvroTests gen-deps)
+add_dependencies(ExecAvroTests gen-deps)
 
 ADD_UNIFIED_BE_LSAN_TEST(hdfs-avro-scanner-test HdfsAvroScannerTest.*)

@@ -21,7 +21,7 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/parquet")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/parquet")
 
-add_library(Parquet
+add_library(ExecParquet
   hdfs-parquet-scanner.cc
   hdfs-parquet-table-writer.cc
   parquet-bloom-filter-util.cc
@@ -39,9 +39,9 @@ add_library(Parquet
   parquet-struct-column-reader.cc
 )
 
-add_dependencies(Parquet gen-deps)
+add_dependencies(ExecParquet gen-deps)
 
-add_library(ParquetTests STATIC
+add_library(ExecParquetTests STATIC
   hdfs-parquet-scanner-test.cc
   parquet-bool-decoder-test.cc
   parquet-common-test.cc
@@ -50,7 +50,7 @@ add_library(ParquetTests STATIC
   parquet-version-test.cc
   serialize-single-value-test.cc
 )
-add_dependencies(ParquetTests gen-deps)
+add_dependencies(ExecParquetTests gen-deps)
 
 ADD_UNIFIED_BE_LSAN_TEST(parquet-bool-decoder-test ParquetBoolDecoder.*)
 ADD_UNIFIED_BE_LSAN_TEST(parquet-common-test ParquetCommon.*)

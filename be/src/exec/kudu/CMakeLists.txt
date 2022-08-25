@@ -15,15 +15,13 @@
 # specific language governing permissions and limitations
 # under the License.
 
-cmake_minimum_required(VERSION 2.6)
-
 # where to put generated libraries
 set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/kudu")
 
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/kudu")
 
-add_library(Kudu
+add_library(ExecKudu
   kudu-scanner.cc
   kudu-scan-node.cc
   kudu-scan-node-base.cc
@@ -33,4 +31,4 @@ add_library(Kudu
   kudu-util-ir.cc
 )
 
-add_dependencies(Kudu gen-deps)
+add_dependencies(ExecKudu gen-deps)
