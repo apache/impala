@@ -494,7 +494,7 @@ if [[ $ARCH_NAME == 'aarch64' ]]; then
   echo -e "\n$SET_TOOLCHAIN_HOME" >> "${IMPALA_HOME}/bin/impala-config-local.sh"
   eval "$SET_TOOLCHAIN_HOME"
   if ! [[ -d "$NATIVE_TOOLCHAIN_HOME" ]]; then
-    time -p git clone https://github.com/cloudera/native-toolchain/ \
+    time -p git clone -b asf-impala-4.1 https://github.com/cloudera/native-toolchain/ \
       "$NATIVE_TOOLCHAIN_HOME"
   fi
   cd "$NATIVE_TOOLCHAIN_HOME"
