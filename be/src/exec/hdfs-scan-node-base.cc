@@ -337,6 +337,7 @@ Status HdfsScanPlanNode::ProcessScanRangesAndInitSharedState(FragmentState* stat
   shared_state_.progress().Init(
       Substitute("Splits complete (node=$0)", tnode_->node_id), total_splits);
   shared_state_.use_mt_scan_node_ = tnode_->hdfs_scan_node.use_mt_scan_node;
+  shared_state_.scan_range_queue_.Reserve(total_splits);
 
   // Distribute the work evenly for issuing initial scan ranges.
   DCHECK(shared_state_.use_mt_scan_node_ || instance_ctx_pbs.size() == 1)
@@ -1279,19 +1280,7 @@ void ScanRangeSharedState::UpdateRemainingScanRangeSubmissions(int32_t delta) {
 void ScanRangeSharedState::EnqueueScanRange(
     const vector<ScanRange*>& ranges, bool at_front) {
   DCHECK(use_mt_scan_node_) << "Should only be called by MT scan nodes";
-  if (!at_front) {
-    for (ScanRange* scan_range : ranges) {
-      if(scan_range->UseHdfsCache()){
-        scan_range_queue_.PushFront(scan_range);
-        continue;
-      }
-      scan_range_queue_.Enqueue(scan_range);
-    }
-  } else {
-    for (ScanRange* scan_range : ranges) {
-      scan_range_queue_.PushFront(scan_range);
-    }
-  }
+  scan_range_queue_.EnqueueRanges(ranges, at_front);
 }
 
 Status ScanRangeSharedState::GetNextScanRange(
@@ -1302,13 +1291,13 @@ Status ScanRangeSharedState::GetNextScanRange(
     if (*scan_range != nullptr) return Status::OK();
     {
       unique_lock<mutex> l(scan_range_submission_lock_);
-      while (scan_range_queue_.empty() && remaining_scan_range_submissions_.Load() > 0
+      while (scan_range_queue_.Empty() && remaining_scan_range_submissions_.Load() > 0
           && !state->is_cancelled()) {
         range_submission_cv_.Wait(l);
       }
     }
     // No more work to do.
-    if (scan_range_queue_.empty() && remaining_scan_range_submissions_.Load() == 0) {
+    if (scan_range_queue_.Empty() && remaining_scan_range_submissions_.Load() == 0) {
       break;
     }
     if (state->is_cancelled()) return Status::CANCELLED;

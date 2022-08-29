@@ -34,6 +34,7 @@
 #include "exec/file-metadata-utils.h"
 #include "exec/filter-context.h"
 #include "exec/scan-node.h"
+#include "exec/scan-range-queue-mt.h"
 #include "runtime/descriptors.h"
 #include "runtime/io/request-context.h"
 #include "runtime/io/request-ranges.h"
@@ -254,7 +255,7 @@ class ScanRangeSharedState {
 
   /// Queue of all scan ranges that need to be read. Shared by all instances of this
   /// fragment. Only used for MT scans.
-  InternalQueue<io::ScanRange> scan_range_queue_;
+  ScanRangeQueueMt scan_range_queue_;
 
   /// END: Members that are used only by MT scan nodes(use_mt_scan_node_ is true).
   /////////////////////////////////////////////////////////////////////
