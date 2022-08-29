@@ -87,9 +87,7 @@ class TAcceptQueueServer : public TServer {
   void SetupConnection(std::shared_ptr<TAcceptQueueEntry> entry);
 
   // Helper function to close a client connection in case of server side errors.
-  void CleanupAndClose(const std::string& error,
-      std::shared_ptr<TTransport> input,
-      std::shared_ptr<TTransport> output,
+  void CleanupAndClose(const std::string& error, std::shared_ptr<TTransport> io_transport,
       std::shared_ptr<TTransport> client);
 
   std::shared_ptr<ThreadFactory> threadFactory_;

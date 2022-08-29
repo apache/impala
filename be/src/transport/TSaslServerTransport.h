@@ -184,14 +184,6 @@ class TSaslServerTransport : public TSaslTransport {
    private:
     /* Map for holding and returning server definitions. */
     std::map<std::string, TSaslServerDefinition*> serverDefinitionMap_;
-
-    /* Map from a transport to its Sasl Transport (wrapped by a TBufferedTransport). */
-    typedef std::map<std::shared_ptr<TTransport>,
-                     std::shared_ptr<TBufferedTransport>> TransportMap;
-    TransportMap transportMap_;
-
-    /* Lock to synchronize the transport map. */
-    std::mutex transportMap_mutex_;
   };
 
 };

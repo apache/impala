@@ -203,13 +203,9 @@ void TAcceptQueueServer::init() {
 }
 
 void TAcceptQueueServer::CleanupAndClose(const string& error,
-    shared_ptr<TTransport> input, shared_ptr<TTransport> output,
-    shared_ptr<TTransport> client) {
-  if (input != nullptr) {
-    input->close();
-  }
-  if (output != nullptr) {
-    output->close();
+    shared_ptr<TTransport> io_transport, shared_ptr<TTransport> client) {
+  if (io_transport != nullptr) {
+    io_transport->close();
   }
   if (client != nullptr) {
     client->close();
@@ -220,8 +216,7 @@ void TAcceptQueueServer::CleanupAndClose(const string& error,
 // New.
 void TAcceptQueueServer::SetupConnection(shared_ptr<TAcceptQueueEntry> entry) {
   if (metrics_enabled_) queue_size_metric_->Increment(-1);
-  shared_ptr<TTransport> inputTransport;
-  shared_ptr<TTransport> outputTransport;
+  shared_ptr<TTransport> io_transport;
   shared_ptr<TTransport> client = entry->client_;
   const string& socket_info = reinterpret_cast<TSocket*>(client.get())->getSocketInfo();
   VLOG(2) << Substitute("TAcceptQueueServer: $0 started connection setup for client $1",
@@ -230,12 +225,25 @@ void TAcceptQueueServer::SetupConnection(shared_ptr<TAcceptQueueEntry> entry) {
     MonotonicStopWatch timer;
     // Start timing for connection setup.
     timer.Start();
-    inputTransport = inputTransportFactory_->getTransport(client);
-    outputTransport = outputTransportFactory_->getTransport(client);
+
+    // Since THRIFT-5237, it is necessary for Impala to have the same TTransport object
+    // for both input and output transport. The detailed reasoning on why this TTransport
+    // object sharing requirement is as follow:
+    // - Thrift decrements the max message size counter as messages arrive.
+    // - Thrift resets the max message size counter with a flush.
+    // - If the input and output transport are distinct, the decrement is happening on
+    //   one object while the reset is happening on a different object, so it eventually
+    //   throws an error.
+    // Using same transport fixes the counter logic. This also helps with simplifying
+    // Impala's custom TSaslTransport since its caching algorithm in
+    // TSaslServerTransport::Factory is not required anymore.
+    DCHECK(inputTransportFactory_ == outputTransportFactory_);
+    io_transport = inputTransportFactory_->getTransport(client);
+
     shared_ptr<TProtocol> inputProtocol =
-        inputProtocolFactory_->getProtocol(inputTransport);
+        inputProtocolFactory_->getProtocol(io_transport);
     shared_ptr<TProtocol> outputProtocol =
-        outputProtocolFactory_->getProtocol(outputTransport);
+        outputProtocolFactory_->getProtocol(io_transport);
     shared_ptr<TProcessor> processor =
         getProcessor(inputProtocol, outputProtocol, client);
 
@@ -278,7 +286,7 @@ void TAcceptQueueServer::SetupConnection(shared_ptr<TAcceptQueueEntry> entry) {
           }
           LOG(INFO) << name_ << ": Server busy. Timing out connection request.";
           string errStr = "TAcceptQueueServer: " + name_ + " server busy";
-          CleanupAndClose(errStr, inputTransport, outputTransport, client);
+          CleanupAndClose(errStr, io_transport, client);
           return;
         }
       }
@@ -293,11 +301,11 @@ void TAcceptQueueServer::SetupConnection(shared_ptr<TAcceptQueueEntry> entry) {
   } catch (const TException& tx) {
     string errStr = Substitute("TAcceptQueueServer: $0 connection setup failed for "
         "client $1. Caught TException: $2", name_, socket_info, string(tx.what()));
-    CleanupAndClose(errStr, inputTransport, outputTransport, client);
+    CleanupAndClose(errStr, io_transport, client);
   } catch (const string& s) {
     string errStr = Substitute("TAcceptQueueServer: $0 connection setup failed for "
         "client $1. Unknown exception: $2", name_, socket_info, s);
-    CleanupAndClose(errStr, inputTransport, outputTransport, client);
+    CleanupAndClose(errStr, io_transport, client);
   }
 }
 

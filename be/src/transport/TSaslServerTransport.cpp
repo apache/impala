@@ -132,35 +132,9 @@ std::shared_ptr<TTransport> TSaslServerTransport::Factory::getTransport(
   // Thrift servers use both an input and an output transport to communicate with
   // clients. In principal, these can be different, but for SASL clients we require them
   // to be the same so that the authentication state is identical for communication in
-  // both directions. In order to do this, we cache the transport that we return in a map
-  // keyed by the transport argument to this method. Then if there are two successive
-  // calls to getTransport() with the same transport, we are sure to return the same
-  // wrapped transport both times.
-  //
-  // However, the cache map would retain references to all the transports it ever
-  // created. Instead, we remove an entry in the map after it has been found for the first
-  // time, that is, after the second call to getTransport() with the same argument. That
-  // matches the calling pattern in TAcceptQueueServer which calls getTransport() twice in
-  // succession when a connection is established, and then never again. This is obviously
-  // brittle (what if for some reason getTransport() is called a third time?) but for our
-  // usage of Thrift it's a tolerable band-aid.
-  //
-  // An alternative approach is to use the 'custom deleter' feature of shared_ptr to
-  // ensure that when ret_transport is eventually deleted, its corresponding map entry is
-  // removed. That is likely to be error prone given the locking involved; for now we go
-  // with the simple solution.
+  // both directions. In order to do this, we share the same TTransport object for both
+  // input and output set in TAcceptQueueServer::SetupConnection.
   std::shared_ptr<TBufferedTransport> ret_transport;
-  {
-    lock_guard<mutex> l(transportMap_mutex_);
-    TransportMap::iterator trans_map = transportMap_.find(trans);
-    if (trans_map != transportMap_.end()) {
-      ret_transport = trans_map->second;
-      transportMap_.erase(trans_map);
-      return ret_transport;
-    }
-    // This method should never be called concurrently with the same 'trans' object.
-    // Therefore, it is safe to drop the transportMap_mutex_ here.
-  }
   std::shared_ptr<TTransport> wrapped(
       new TSaslServerTransport(serverDefinitionMap_, trans));
   // Set socket timeouts to prevent TSaslServerTransport->open from blocking the server
@@ -174,11 +148,6 @@ std::shared_ptr<TTransport> TSaslServerTransport::Factory::getTransport(
   // Reset socket timeout back to zero, so idle clients do not timeout
   socket->setRecvTimeout(0);
   socket->setSendTimeout(0);
-  {
-    lock_guard<mutex> l(transportMap_mutex_);
-    DCHECK(transportMap_.find(trans) == transportMap_.end());
-    transportMap_[trans] = ret_transport;
-  }
   return ret_transport;
 }
 
