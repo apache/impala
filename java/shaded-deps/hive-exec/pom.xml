@@ -100,6 +100,7 @@ the same dependencies
                 <include>org/apache/hadoop/hive/ql/parse/SemanticException.class</include>
                 <!-- Needed to support Hive udfs -->
                 <include>org/apache/hadoop/hive/ql/exec/*UDF*</include>
+                <include>org/apache/hadoop/hive/ql/exec/UDAF.class</include>
                 <include>org/apache/hadoop/hive/ql/exec/MapredContext.class</include>
                 <include>org/apache/hadoop/hive/ql/exec/FunctionUtils*</include>
                 <include>org/apache/hadoop/hive/ql/parse/GenericHiveLexer*</include>

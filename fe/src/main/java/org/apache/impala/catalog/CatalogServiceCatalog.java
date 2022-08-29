@@ -1764,7 +1764,7 @@ public class CatalogServiceCatalog extends Catalog {
           db.addFunction(fn);
           fn.setCatalogVersion(incrementAndGetCatalogVersion());
         }
-      } catch (Exception e) {
+      } catch (Exception | LinkageError e) {
         LOG.error("Skipping function load: " + function.getFunctionName(), e);
       }
     }

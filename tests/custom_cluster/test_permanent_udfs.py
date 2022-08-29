@@ -178,6 +178,34 @@ class TestUdfPersistence(CustomClusterTestSuite):
 
   @SkipIfFS.hive
   @pytest.mark.execute_serially
+  def test_corrupt_java_bad_function(self):
+    if self.exploration_strategy() != 'exhaustive': pytest.skip()
+    """ IMPALA-11528: This tests if a corrupt function exists inside of Hive
+    which does not derive from UDF. The way we do this here is to create a valid
+    function in Hive which does derive from UDF, but switch the underlying jar to
+    one that does not derive from the UDF class. """
+
+    CORRUPT_JAR = "test-warehouse/test_corrupt.jar"
+    self.filesystem_client.delete_file_dir(CORRUPT_JAR)
+    # impala-hive-udfs.jar contains the class CorruptUdf which derives from UDF
+    # which is a valid function.
+    self.filesystem_client.copy("/test-warehouse/impala-hive-udfs.jar",
+        "/" + CORRUPT_JAR)
+    self.run_stmt_in_hive("create function %s.corrupt_bad_function_udf as \
+        'org.apache.impala.CorruptUdf' using jar '%s/%s'"
+        % (self.JAVA_FN_TEST_DB, os.getenv('DEFAULT_FS'), CORRUPT_JAR))
+    # Now copy the CorruptUdf class from the impala-corrupt-hive-udfs.jar file which
+    # does not derive from UDF, making it an invalid UDF.
+    self.filesystem_client.delete_file_dir(CORRUPT_JAR)
+    self.filesystem_client.copy("/test-warehouse/impala-corrupt-hive-udfs.jar",
+        "/" + CORRUPT_JAR)
+    self.__restart_cluster()
+    # Make sure the function count is 0
+    self.verify_function_count(
+        "SHOW FUNCTIONS in {0}".format(self.JAVA_FN_TEST_DB), 0)
+
+  @SkipIfFS.hive
+  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
      catalogd_args= "--local_library_dir={0}".format(LOCAL_LIBRARY_DIR))
   def test_java_udfs_hive_integration(self):

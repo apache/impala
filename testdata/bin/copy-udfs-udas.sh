@@ -51,6 +51,10 @@ then
   pushd "${IMPALA_HOME}"
   "${MAKE_CMD:-make}" ${IMPALA_MAKE_FLAGS} "-j${IMPALA_BUILD_THREADS:-4}" \
       TestUdas TestUdfs test-udfs-ir udfsample udasample udf-sample-ir uda-sample-ir
+  cd "${IMPALA_HOME}/java/test-corrupt-hive-udfs"
+  "${IMPALA_HOME}/bin/mvn-quiet.sh" package
+  cp target/test-corrupt-hive-udfs-1.0.jar \
+      "${IMPALA_HOME}/testdata/udfs/impala-corrupt-hive-udfs.jar"
   cd "${IMPALA_HOME}/java/test-hive-udfs"
   "${IMPALA_HOME}/bin/mvn-quiet.sh" package
   cp target/test-hive-udfs-1.0.jar "${IMPALA_HOME}/testdata/udfs/impala-hive-udfs.jar"
@@ -97,6 +101,8 @@ ln -s "${IMPALA_HOME}/be/build/latest/testutil/libTestUdfs.so" "${UDF_TMP_DIR}/u
 ln -s "${HIVE_HOME}/lib/hive-exec-"*.jar "${UDF_TMP_DIR}/hive-exec.jar"
 ln -s "${IMPALA_HOME}/testdata/udfs/impala-hive-udfs.jar" \
   "${UDF_TMP_DIR}/impala-hive-udfs.jar"
+ln -s "${IMPALA_HOME}/testdata/udfs/impala-corrupt-hive-udfs.jar" \
+  "${UDF_TMP_DIR}/impala-corrupt-hive-udfs.jar"
 ln -s "${IMPALA_HOME}/be/build/latest/testutil/test-udfs.ll" "${UDF_TMP_DIR}"
 ln -s "${IMPALA_HOME}/be/build/latest/udf_samples/libudfsample.so" "${UDF_TMP_DIR}"
 ln -s "${IMPALA_HOME}/be/build/latest/udf_samples/udf-sample.ll" "${UDF_TMP_DIR}"

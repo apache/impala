@@ -261,6 +261,7 @@ under the License.
     <module>shaded-deps/s3a-aws-sdk</module>
     <module>TableFlattener</module>
     <module>test-hive-udfs</module>
+    <module>test-corrupt-hive-udfs</module>
     <module>yarn-extras</module>
   </modules>
 
