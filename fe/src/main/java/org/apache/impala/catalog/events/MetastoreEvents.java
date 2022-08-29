@@ -64,6 +64,7 @@ import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.TableNotLoadedException;
 import org.apache.impala.catalog.TableWriteId;
 import org.apache.impala.common.Metrics;
+import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.Reference;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.hive.common.MutableValidWriteIdList;
@@ -639,6 +640,17 @@ public class MetastoreEvents {
           new StringBuilder(LOG_FORMAT_EVENT_ID_TYPE).append(logFormattedStr).toString();
       Object[] formatArgs = getLogFormatArgs(args);
       LOG.trace(formatString, formatArgs);
+    }
+
+    /**
+     * Similar to infoLog excepts logs at warn level
+     */
+    protected void warnLog(String logFormattedStr, Object... args) {
+      if (!LOG.isWarnEnabled()) return;
+      String formatString =
+          new StringBuilder(LOG_FORMAT_EVENT_ID_TYPE).append(logFormattedStr).toString();
+      Object[] formatArgs = getLogFormatArgs(args);
+      LOG.warn(formatString, formatArgs);
     }
 
     /**
@@ -1432,6 +1444,7 @@ public class MetastoreEvents {
       // refresh  eg. this could be due to as simple as adding a new parameter or a
       // full blown adding or changing column type
       // rename is already handled above
+      long startNs = System.nanoTime();
       if (!reloadTableFromCatalog("ALTER_TABLE", false)) {
         if (wasEventSyncTurnedOn()) {
           // we received this alter table event on a non-existing table. We also
@@ -1447,6 +1460,13 @@ public class MetastoreEvents {
                   + "continued further. Issue a invalidate metadata command to reset "
                   + "the event processing state", getFullyQualifiedTblName()));
         }
+      }
+      long durationNs = System.nanoTime() - startNs;
+      // Log event details for those triggered slow reload.
+      if (durationNs > HdfsTable.LOADING_WARNING_TIME_NS) {
+        warnLog("Slow event processing. Duration: {}. TableBefore: {}. " +
+            "TableAfter: {}", PrintUtils.printTimeNs(durationNs),
+            tableBefore_.toString(), tableAfter_.toString());
       }
     }
 
