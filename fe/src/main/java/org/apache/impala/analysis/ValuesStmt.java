@@ -89,4 +89,10 @@ public class ValuesStmt extends UnionStmt {
    */
   @Override
   public void rewriteExprs(ExprRewriter rewriter) {}
+
+  @Override
+  protected boolean shouldAvoidLossyCharPadding(Analyzer analyzer) {
+    return analyzer.getQueryCtx().client_request
+        .query_options.values_stmt_avoid_lossy_char_padding;
+  }
 }

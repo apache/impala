@@ -1,0 +1,173 @@
+====
+---- QUERY
+create table test_char_values_string_col_tmp (s string);
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert overwrite test_char_values_string_col_tmp values
+(cast("1" as char(1))),
+(cast("12" as char(2))),
+(cast("123" as char(3)));
+---- RESULTS
+: 3
+====
+---- QUERY
+select length(s) from test_char_values_string_col_tmp;
+---- TYPES
+int
+---- RESULTS
+1
+2
+3
+====
+---- QUERY
+create table test_char_values_varchar_col_tmp (v varchar(5));
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert overwrite test_char_values_varchar_col_tmp values
+(cast("1" as char(1))),
+(cast("12" as char(2)));
+---- RESULTS
+: 2
+====
+---- QUERY
+select v from test_char_values_varchar_col_tmp;
+---- TYPES
+string
+---- RESULTS
+'1'
+'12'
+====
+---- QUERY
+# A CHAR(10) value can't be inserted into a VARCHAR(5) field.
+insert overwrite test_char_values_varchar_col_tmp values
+(cast("1" as char(1))),
+(cast("0123456789" as char(10)));
+---- CATCH
+AnalysisException: Possible loss of precision for target table
+====
+---- QUERY
+create table test_char_values_char_col_tmp (c char(5));
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert overwrite test_char_values_char_col_tmp values
+(cast("1" as char(1))),
+(cast("12" as char(2)));
+---- RESULTS
+: 2
+====
+---- QUERY
+select c from test_char_values_char_col_tmp;
+---- TYPES
+char
+---- RESULTS
+'1    '
+'12   '
+====
+---- QUERY
+create table test_char_values_mixed_cols_tmp (c char(5), s string, v varchar(8));
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert overwrite test_char_values_mixed_cols_tmp values
+(cast("1" as char(1)), cast("str" as char(3)), cast("vchar" as char(5))),
+(cast("10" as char(4)), cast("str_2" as char(5)), cast("vchar_2" as char(7)))
+---- RESULTS
+: 2
+====
+---- QUERY
+select c, s, v from test_char_values_mixed_cols_tmp;
+---- TYPES
+char,string,string
+---- RESULTS
+'1    ','str','vchar'
+'10   ','str_2','vchar_2'
+====
+---- QUERY
+create table test_char_values_mixed_cols_different_order_tmp (s string, c char(5), v varchar(8));
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert overwrite test_char_values_mixed_cols_different_order_tmp values
+(cast("str" as char(3)), cast("1" as char(1)), cast("vchar" as char(5))),
+(cast("str_2" as char(5)), cast("10" as char(4)), cast("vchar_2" as char(7)))
+---- RESULTS
+: 2
+====
+---- QUERY
+select s, c, v from test_char_values_mixed_cols_different_order_tmp;
+---- TYPES
+string,char,string
+---- RESULTS
+'str','1    ','vchar'
+'str_2','10   ','vchar_2'
+====
+---- QUERY
+# In the first column we have CHARs with the same length, but in the third we don't. The
+# third column should not be padded.
+insert overwrite test_char_values_mixed_cols_different_order_tmp values
+(cast("str" as char(3)), cast("1" as char(1)), cast("vchar" as char(5))),
+(cast("str" as char(3)), cast("10" as char(4)), cast("vchar_2" as char(7)))
+---- RESULTS
+: 2
+====
+---- QUERY
+select s, c, v from test_char_values_mixed_cols_different_order_tmp;
+---- TYPES
+string,char,string
+---- RESULTS
+'str','1    ','vchar'
+'str','10   ','vchar_2'
+====
+---- QUERY
+# In the first column we don't only insert CHARs, but in the third we do. The third column
+# should not be padded.
+insert overwrite test_char_values_mixed_cols_different_order_tmp values
+(cast("str" as char(3)), cast("1" as char(1)), cast("vchar" as char(5))),
+(cast("str_1" as char(5)), cast("1" as char(1)), cast("vchar" as char(5))),
+("str_2", cast("10" as char(4)), cast("vchar_2" as char(7)))
+---- RESULTS
+: 3
+====
+---- QUERY
+select s, c, v from test_char_values_mixed_cols_different_order_tmp;
+---- TYPES
+string,char,string
+---- RESULTS
+'str','1    ','vchar'
+'str_1','1    ','vchar'
+'str_2','10   ','vchar_2'
+====
+---- QUERY
+# In the first column we don't only have CHARs, so the values there should not be cast.
+# In the second column we have only chars so the values should be cast to VARCHAR.
+select typeof(mixed), typeof(chars) from (values
+(cast("str" as char(3)) mixed,   cast("1" as char(1)) chars),
+(cast("str_1" as char(5)),       cast("1" as char(1))),
+("str_2",                        cast("10" as char(4)))
+) vals;
+---- TYPES
+string,string
+---- RESULTS
+'STRING','VARCHAR(4)'
+'STRING','VARCHAR(4)'
+'STRING','VARCHAR(4)'
+====
+
+---- QUERY
+# Setting ALLOW_UNSAFE_CASTS together with VALUES_STMT_AVOID_LOSSY_CHAR_PADDING is not
+# allowed if the query contains set operation(s).
+set ALLOW_UNSAFE_CASTS=1;
+insert overwrite test_char_values_varchar_col_tmp values
+(cast("1" as char(1))),
+(cast("12" as char(2)));
+---- CATCH
+AnalysisException: Query options ALLOW_UNSAFE_CASTS and VALUES_STMT_AVOID_LOSSY_CHAR_PADDING are not allowed to be set at the same time if the query contains set operation(s).
+====

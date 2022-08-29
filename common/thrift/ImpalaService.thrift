@@ -806,6 +806,12 @@ enum TImpalaQueryOptions {
 
   // Turns off optimized Iceberg V2 reads, falls back to Hash Join
   DISABLE_OPTIMIZED_ICEBERG_V2_READ = 160;
+
+  // In VALUES clauses, if all values in a column are CHARs but they have different
+  // lengths, choose the VARCHAR type of the longest length instead of the corresponding
+  // CHAR type as the common type. This avoids padding and thereby loss of information.
+  // See IMPALA-10753.
+  VALUES_STMT_AVOID_LOSSY_CHAR_PADDING = 161;
 }
 
 // The summary of a DML statement.

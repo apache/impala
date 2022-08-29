@@ -315,6 +315,15 @@ public class SetOperationStmt extends QueryStmt {
     if (isAnalyzed()) return;
     super.analyze(analyzer);
 
+    final org.apache.impala.thrift.TQueryOptions query_options =
+        analyzer.getQueryCtx().client_request.query_options;
+    if (query_options.values_stmt_avoid_lossy_char_padding
+        && query_options.allow_unsafe_casts) {
+      throw new AnalysisException("Query options ALLOW_UNSAFE_CASTS and " +
+          "VALUES_STMT_AVOID_LOSSY_CHAR_PADDING are not allowed to be set at the same " +
+          "time if the query contains set operation(s).");
+    }
+
     // Propagates DISTINCT from right to left.
     propagateDistinct();
 
@@ -343,7 +352,8 @@ public class SetOperationStmt extends QueryStmt {
     for (SetOperand op : operands_) {
       resultExprLists.add(op.getQueryStmt().getResultExprs());
     }
-    widestExprs_ = analyzer.castToSetOpCompatibleTypes(resultExprLists);
+    widestExprs_ = analyzer.castToSetOpCompatibleTypes(resultExprLists,
+        shouldAvoidLossyCharPadding(analyzer));
     // TODO (IMPALA-11018): Currently only UNION ALL is supported for collection types
     //       due to missing handling in BE.
     if (!hasOnlyUnionAllOps()) {
@@ -352,7 +362,6 @@ public class SetOperationStmt extends QueryStmt {
             "UNION, EXCEPT and INTERSECT are not supported for collection types");
       }
     }
-
 
     // Create tuple descriptor materialized by this UnionStmt, its resultExprs, and
     // its sortInfo if necessary.
@@ -379,6 +388,18 @@ public class SetOperationStmt extends QueryStmt {
     setOperationResultExprs_ = Expr.cloneList(resultExprs_);
     if (evaluateOrderBy_) createSortTupleInfo(analyzer);
     baseTblResultExprs_ = resultExprs_;
+  }
+
+  /**
+   * If all values in a column are CHARs but they have different lengths, the common type
+   * will normally be the CHAR type of the greatest length, in which case other CHAR
+   * values are padded; this function decides whether this should be avoided by using
+   * VARCHAR as the common type. See IMPALA-10753.
+   *
+   * The default behaviour is returning false, subclasses can override it.
+   */
+  protected boolean shouldAvoidLossyCharPadding(Analyzer analyzer) {
+    return false;
   }
 
   /**

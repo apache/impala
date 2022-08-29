@@ -1,0 +1,33 @@
+====
+---- QUERY
+insert overwrite test_char_values_string_col_tmp values
+(cast("1" as char(1))),
+(cast("12" as char(2))),
+(cast("123" as char(3)));
+---- RESULTS
+: 3
+====
+---- QUERY
+select length(s) from test_char_values_string_col_tmp;
+---- TYPES
+int
+---- RESULTS
+3
+3
+3
+====
+---- QUERY
+insert overwrite test_char_values_mixed_cols_tmp values
+(cast("1" as char(1)), cast("str" as char(3)), cast("vchar" as char(5))),
+(cast("10" as char(4)), cast("str_2" as char(5)), cast("vchar_2" as char(7)))
+---- RESULTS
+: 2
+====
+---- QUERY
+select c, s, v from test_char_values_mixed_cols_tmp;
+---- TYPES
+char,string,string
+---- RESULTS
+'1    ','str  ','vchar  '
+'10   ','str_2','vchar_2'
+====

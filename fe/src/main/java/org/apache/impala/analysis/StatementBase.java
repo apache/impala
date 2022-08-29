@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Optional;
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.common.AnalysisException;
@@ -196,13 +197,38 @@ public abstract class StatementBase extends StmtNode {
    * message.
    *
    * 'widestTypeSrcExpr' is the first widest type expression of the source expressions.
-   * This is only used when constructing an AnalysisException message to make sure the
-   * right expression is blamed in the error message.
    *
    * If compatibility is unsafe and the source expression is not constant, compatibility
    * ignores the unsafe option.
    */
   public static Expr checkTypeCompatibility(String dstTableName, Column dstCol,
+      Expr srcExpr, Analyzer analyzer, Expr widestTypeSrcExpr) throws AnalysisException {
+    // In 'ValueStmt', if all values in a column are CHARs but they have different
+    // lengths, they are implicitly cast to VARCHAR to avoid padding (see IMPALA-10753 and
+    // ValuesStmt.java). Since VARCHAR cannot normally be cast to CHAR because of possible
+    // loss of precision, if the destination column is CHAR, we have to manually cast the
+    // values back to CHAR. There is no danger of loss of precision here because we cast
+    // the values to the CHAR type of the same length as the VARCHAR type. If that is
+    // still not compatible with the destination column, we throw an AnalysisException.
+    if (widestTypeSrcExpr != null &&  widestTypeSrcExpr.isImplicitCast()) {
+      // TODO: Can we avoid casting CHAR -> VARCHAR -> CHAR for CHAR dst columns?
+      Expr exprWithoutImplicitCast = widestTypeSrcExpr.ignoreImplicitCast();
+      if (srcExpr.getType().isVarchar() && exprWithoutImplicitCast.getType().isChar()) {
+        ScalarType varcharType = (ScalarType) srcExpr.getType();
+        ScalarType charType = (ScalarType) exprWithoutImplicitCast.getType();
+        Preconditions.checkState(varcharType.getLength() >= charType.getLength());
+        Type newCharType = ScalarType.createCharType(varcharType.getLength());
+        Expr newCharExpr = new CastExpr(newCharType, srcExpr);
+        return checkTypeCompatibilityHelper(dstTableName, dstCol, newCharExpr,
+            analyzer, null);
+      }
+    }
+
+    return checkTypeCompatibilityHelper(dstTableName, dstCol, srcExpr, analyzer,
+        widestTypeSrcExpr);
+  }
+
+  private static Expr checkTypeCompatibilityHelper(String dstTableName, Column dstCol,
       Expr srcExpr, Analyzer analyzer, Expr widestTypeSrcExpr) throws AnalysisException {
     Type dstColType = dstCol.getType();
     Type srcExprType = srcExpr.getType();

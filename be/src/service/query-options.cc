@@ -1106,6 +1106,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
         RETURN_IF_ERROR(
             QueryOptionValidator<int32_t>::NotEquals(option, int32_t_val, 1));
         query_options->__set_max_sort_run_size(int32_t_val);
+        break;
       }
       case TImpalaQueryOptions::ALLOW_UNSAFE_CASTS: {
         query_options->__set_allow_unsafe_casts(IsTrue(value));
@@ -1120,6 +1121,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
       }
       case TImpalaQueryOptions::DISABLE_OPTIMIZED_ICEBERG_V2_READ: {
         query_options->__set_disable_optimized_iceberg_v2_read(IsTrue(value));
+        break;
+      }
+      case TImpalaQueryOptions::VALUES_STMT_AVOID_LOSSY_CHAR_PADDING: {
+        query_options->__set_values_stmt_avoid_lossy_char_padding(IsTrue(value));
         break;
       }
       default:

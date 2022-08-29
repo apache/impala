@@ -362,7 +362,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
 
       // Cast partition exprs of all hash-partitioning senders to their compatible types.
       try {
-        analyzer.castToSetOpCompatibleTypes(senderPartitionExprs);
+        analyzer.castToSetOpCompatibleTypes(senderPartitionExprs, false);
       } catch (AnalysisException e) {
         // Should never happen. Analysis should have ensured type compatibility already.
         throw new IllegalStateException(e);

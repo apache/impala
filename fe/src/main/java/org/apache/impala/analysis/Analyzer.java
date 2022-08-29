@@ -63,6 +63,7 @@ import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.IcebergTimeTravelTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.MaterializedViewHdfsTable;
+import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
@@ -3374,9 +3375,13 @@ public class Analyzer {
    * widest compatible expression encountered among all i-th exprs in the expr lists.
    * Returns null if an empty expression list or null is passed to it.
    * Throw an AnalysisException if the types are incompatible.
+   *
+   * If 'avoidLossyCharPadding' is true, then if a column contains only CHAR values but
+   * the lengths are different, they are cast to VARCHAR so the common type will not be a
+   * CHAR type, which would cause padding. See IMPALA-10753.
    */
-  public List<Expr> castToSetOpCompatibleTypes(List<List<Expr>> exprLists)
-      throws AnalysisException {
+  public List<Expr> castToSetOpCompatibleTypes(List<List<Expr>> exprLists,
+      boolean avoidLossyCharPadding) throws AnalysisException {
     if (exprLists == null || exprLists.size() == 0) return null;
     if (exprLists.size() == 1) return exprLists.get(0);
 
@@ -3418,7 +3423,24 @@ public class Analyzer {
         }
 
         // compatibleType will be updated if a new wider type is encountered
-        if (preType != compatibleType) widestExprs.set(i, expr);
+        if (preType != compatibleType) {
+          if (avoidLossyCharPadding && differentLenCharTypes(preType, compatibleType)) {
+            // ALLOW_UNSAFE_CASTS and VALUES_STMT_AVOID_LOSSY_CHAR_PADDING don't work well
+            // together now. With ALLOW_UNSAFE_CASTS it is possible that 'compatibleType'
+            // alternates between integer and CHAR types, so we don't detect that we
+            // should change to VARCHAR (when VALUES_STMT_AVOID_LOSSY_CHAR_PADDING is
+            // true). Having these two query options at the same time is disabled in
+            // 'SetOperationStmt.analyze()'.
+            Preconditions.checkState(!compatibilityLevel.isUnsafe());
+
+            Preconditions.checkState(compatibleType.isChar());
+            int length = ((ScalarType) compatibleType).getLength();
+            compatibleType = ScalarType.createVarcharType(length);
+            expr = expr.castTo(compatibleType, compatibilityLevel);
+          }
+
+          widestExprs.set(i, expr);
+        }
       }
       // Now that we've found a compatible type, add implicit casts if necessary.
       for (int j = 0; j < exprLists.size(); ++j) {
@@ -4411,5 +4433,12 @@ public class Analyzer {
       }
     }
     return hasNullRejectingTid;
+  }
+
+  private static boolean differentLenCharTypes(Type t1, Type t2) {
+    if (!t1.isChar() || !t2.isChar()) return false;
+    ScalarType t1Scalar = (ScalarType) t1;
+    ScalarType t2Scalar = (ScalarType) t2;
+    return t1Scalar.getLength() != t2Scalar.getLength();
   }
 }
