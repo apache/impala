@@ -279,6 +279,8 @@ Status JniUtil::GetJniExceptionMsg(JNIEnv* env, bool log_stack, const string& pr
       env->ExceptionClear();
       string oom_msg = Substitute(oom_msg_template, "throwableToStackTrace");
       LOG(ERROR) << oom_msg;
+      DCHECK(msg_str_guard.get() != nullptr);
+      LOG(ERROR) << msg_str_guard.get();
       return Status(oom_msg);
     }
     JniUtfCharGuard c_stack_guard;
