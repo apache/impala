@@ -81,7 +81,6 @@ else
   #   - We don't yet have a good way to start YARN using a different defaultFS. Moreoever
   #     we currently don't run hive queries against Isilon for testing.
   #   - LLAMA is avoided because we cannot start YARN.
-  #   - KMS is used for encryption testing, which is not available on remote storage.
   #   - Hive needs YARN, and we don't run Hive queries.
   # Impala can also run on a local file system without additional services.
   # TODO: Figure out how to start YARN, LLAMA and Hive with a different defaultFs.

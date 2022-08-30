@@ -57,7 +57,7 @@ if [[ "$TARGET_FILESYSTEM" == "hdfs" ]]; then
   # The check above indicates that the regular mini-cluster is in use.
   SUPPORTED_SERVICES=(hdfs kms yarn)
 elif [[ "$TARGET_FILESYSTEM" == "ozone" ]]; then
-  SUPPORTED_SERVICES=(ozone)
+  SUPPORTED_SERVICES=(kms ozone)
 else
   # Either a remote distributed file system or a local non-distributed file system is
   # in use. Currently the only service that is expected to work is Kudu, though in theory
@@ -327,8 +327,17 @@ function start_cluster {
   fi
 
   if [[ "${TARGET_FILESYSTEM}" = "ozone" ]]; then
-    ozone sh volume create /${OZONE_VOLUME} || true
-    ozone sh bucket create /${OZONE_VOLUME}/${OZONE_BUCKET} || true
+    local bucketkey=''
+    if $USE_OZONE_ENCRYPTION; then
+      echo "Ozone encryption enabled for ${OZONE_VOLUME}/${OZONE_BUCKET}"
+
+      # Encryption is done at the bucket level, so ensure the keys are available first.
+      ${IMPALA_HOME}/testdata/bin/setup-dfs-keys.sh testkey
+      bucketkey='--bucketkey testkey'
+    fi
+
+    ozone sh volume create ${OZONE_VOLUME} || true
+    ozone sh bucket create ${bucketkey} ${OZONE_VOLUME}/${OZONE_BUCKET} || true
   fi
 
   return $?

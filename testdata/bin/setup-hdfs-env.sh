@@ -46,15 +46,8 @@ fi
 # against a remote cluster, rather than the local mini-cluster (i.e., when REMOTE_LOAD
 # is true. See: IMPALA-4344)
 
-if [[ $TARGET_FILESYSTEM == hdfs && -z "$REMOTE_LOAD" ]]; then  # Otherwise assume KMS isn't setup.
-  # Create encryption keys for HDFS encryption tests. Keys are stored by the KMS.
-  EXISTING_KEYS=$(hadoop key list)
-  for KEY in testkey{1,2}; do
-    if grep $KEY <<< $EXISTING_KEYS &>/dev/null; then
-      hadoop key delete $KEY -f
-    fi
-    hadoop key create $KEY
-  done
+if [[ -z "$REMOTE_LOAD" ]]; then  # Otherwise assume KMS isn't setup.
+  ${IMPALA_HOME}/testdata/bin/setup-dfs-keys.sh testkey{1,2}
 fi
 
 if [[ -n "${REMOTE_LOAD:-}" ]]; then

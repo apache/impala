@@ -657,6 +657,7 @@ elif [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
     export HDFS_ERASURECODE_PATH="/test-warehouse"
   fi
 elif [ "${TARGET_FILESYSTEM}" = "ozone" ]; then
+  export USE_OZONE_ENCRYPTION=${USE_OZONE_ENCRYPTION-true}
   export OZONE_VOLUME="impala"
   export OZONE_BUCKET="base"
   export DEFAULT_FS="o3fs://${OZONE_BUCKET}.${OZONE_VOLUME}.${INTERNAL_LISTEN_HOST}:9862"
