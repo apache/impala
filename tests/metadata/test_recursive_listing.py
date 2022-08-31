@@ -141,8 +141,7 @@ class TestRecursiveListing(ImpalaTestSuite):
     assert len(self._show_files(fq_tbl_name)) == 1
     assert len(self._get_rows(fq_tbl_name)) == 1
 
-  @SkipIfFS.variable_listing_times
-  @SkipIfFS.eventually_consistent
+  @SkipIfFS.no_partial_listing
   @pytest.mark.execute_serially
   @pytest.mark.stress
   def test_large_staging_dirs(self, unique_database):
@@ -166,8 +165,7 @@ class TestRecursiveListing(ImpalaTestSuite):
                                  pause_ms_before_file_cleanup=300,
                                  refresh_should_fail=False)
 
-  @SkipIfFS.variable_listing_times
-  @SkipIfFS.eventually_consistent
+  @SkipIfFS.no_partial_listing
   @pytest.mark.execute_serially
   @pytest.mark.stress
   def test_partition_dir_removed_inflight(self, unique_database):
@@ -213,6 +211,7 @@ class TestRecursiveListing(ImpalaTestSuite):
       handle = self.execute_query_async(refresh_stmt)
       # Wait a moment to let REFRESH finish expected partial listing on the dir.
       time.sleep(pause_ms_before_file_cleanup / 1000.0)
+      LOG.info("removing staging dir " + large_dir)
       self.filesystem_client.delete_file_dir(large_dir[1:], recursive=True)
       LOG.info("removed staging dir " + large_dir)
       try:

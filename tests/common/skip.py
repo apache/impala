@@ -72,6 +72,8 @@ class SkipIfFS:
   hbase = pytest.mark.skipif(not IS_HDFS, reason="HBase not started")
   qualified_path = pytest.mark.skipif(not IS_HDFS,
       reason="Tests rely on HDFS qualified paths, IMPALA-1872")
+  no_partial_listing = pytest.mark.skipif(not IS_HDFS,
+      reason="Tests rely on HDFS partial listing.")
   variable_listing_times = pytest.mark.skipif(IS_S3 or IS_GCS or IS_COS,
       reason="Flakiness due to unpredictable listing times on S3.")
   eventually_consistent = pytest.mark.skipif(IS_ADLS or IS_COS,
