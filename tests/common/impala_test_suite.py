@@ -33,6 +33,7 @@ import time
 import string
 from functools import wraps
 from getpass import getuser
+from impala.hiveserver2 import HiveServer2Cursor
 from random import choice
 from subprocess import check_call
 from tests.common.base_test_suite import BaseTestSuite
@@ -1114,9 +1115,10 @@ class ImpalaTestSuite(BaseTestSuite):
       actual_state = client.get_state(handle)
       time.sleep(0.5)
     if actual_state not in expected_states:
-      raise Timeout("query {0} did not reach one of the expected states {1}, "
-                    "last known state {2}".format(handle.get_handle().id, expected_states,
-                    actual_state))
+      timeout_msg = "query '{0}' did not reach one of the expected states {1}, last " \
+          "known state {2}".format(self.__get_id_or_query_from_handle(handle),
+          expected_states, actual_state)
+      raise Timeout(timeout_msg)
     return actual_state
 
   def wait_for_progress(self, handle, expected_progress, timeout, client=None):
@@ -1130,15 +1132,27 @@ class ImpalaTestSuite(BaseTestSuite):
       time.sleep(0.5)
     actual_progress = self.__get_query_progress_rate(summary.progress)
     if actual_progress <= expected_progress:
-      raise Timeout("query {0} did not reach the expected progress {1}, "
-                    "current progress {2}".format(handle.get_handle().id,
-                    expected_progress, actual_progress))
+      timeout_msg = "query '{0}' did not reach the expected progress {1}, current " \
+          "progress {2}".format(self.__get_id_or_query_from_handle(handle),
+          expected_progress, actual_progress)
+      raise Timeout(timeout_msg)
     return actual_progress
 
   def __get_query_progress_rate(self, progress):
     if progress is None:
       return 0
     return float(progress.num_completed_scan_ranges) / progress.total_scan_ranges
+
+  def __get_id_or_query_from_handle(self, handle):
+    """Returns a query identifier, for QueryHandlers it returns the query id. However,
+    Impyla handle is a HiveServer2Cursor that does not have query id, returns the query
+    string instead."""
+    if isinstance(handle.get_handle(), HiveServer2Cursor):
+      return handle.get_handle().query_string
+    elif hasattr(handle.get_handle(), 'id'):
+      return handle.get_handle().id
+    else:
+      return "UNIDENTIFIED"
 
   def wait_for_db_to_appear(self, db_name, timeout_s):
     """Wait until the database with 'db_name' is present in the impalad's local catalog.
