@@ -784,6 +784,11 @@ class TestIcebergTable(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-multiple-storage-locations-table',
                        vector, unique_database)
 
+  def test_mixed_file_format(self, vector, unique_database):
+    create_iceberg_table_from_directory(self.client, unique_database,
+                                        "iceberg_mixed_file_format_test", "parquet")
+    self.run_test_case('QueryTest/iceberg-mixed-file-format', vector,
+                      unique_database)
 
 class TestIcebergV2Table(IcebergTestSuite):
   """Tests related to Iceberg V2 tables."""

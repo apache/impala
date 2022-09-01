@@ -28,7 +28,11 @@ import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.fb.FbIcebergDataFileFormat;
 
 import com.google.common.base.Preconditions;
 
@@ -40,13 +44,35 @@ public class IcebergScanNode extends HdfsScanNode {
   private List<FileDescriptor> fileDescs_;
 
   public IcebergScanNode(PlanNodeId id, TableRef tblRef, List<Expr> conjuncts,
-      MultiAggregateInfo aggInfo, List<FileDescriptor> fileDescs) {
+      MultiAggregateInfo aggInfo, List<FileDescriptor> fileDescs)
+      throws ImpalaRuntimeException {
     super(id, tblRef.getDesc(), conjuncts,
         getIcebergPartition(((FeIcebergTable)tblRef.getTable()).getFeFsTable()), tblRef,
         aggInfo, null, false);
     // Hdfs table transformed from iceberg table only has one partition
     Preconditions.checkState(partitions_.size() == 1);
+
     fileDescs_ = fileDescs;
+
+    boolean hasParquet = false;
+    boolean hasOrc = false;
+    boolean hasAvro = false;
+    for (FileDescriptor fileDesc : fileDescs_) {
+      byte fileFormat = fileDesc.getFbFileMetadata().icebergMetadata().fileFormat();
+      if (fileFormat == FbIcebergDataFileFormat.PARQUET) {
+        hasParquet = true;
+      } else if (fileFormat == FbIcebergDataFileFormat.ORC) {
+        hasOrc = true;
+      } else if (fileFormat == FbIcebergDataFileFormat.AVRO) {
+        hasAvro = true;
+      } else {
+        throw new ImpalaRuntimeException(String.format(
+            "Invalid Iceberg file format of file: %s", fileDesc.getAbsolutePath()));
+      }
+    }
+    if (hasParquet) fileFormats_.add(HdfsFileFormat.PARQUET);
+    if (hasOrc) fileFormats_.add(HdfsFileFormat.ORC);
+    if (hasAvro) fileFormats_.add(HdfsFileFormat.AVRO);
   }
 
   /**

@@ -1,0 +1,11 @@
+====
+---- QUERY
+select * from iceberg_mixed_file_format_test;
+---- RESULTS
+2,'B',1.5
+3,'C',2.5
+4,'D',3.5
+1,'A',0.5
+---- TYPES
+INT, STRING, DOUBLE
+====

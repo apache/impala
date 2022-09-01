@@ -232,7 +232,7 @@ public class HdfsScanNode extends ScanNode {
   private Map<FileSystemUtil.FsType, Long> totalBytesPerFsEC_ = new TreeMap<>();
 
   // File formats scanned. Set in computeScanRangeLocations().
-  private Set<HdfsFileFormat> fileFormats_;
+  protected Set<HdfsFileFormat> fileFormats_;
 
   // Whether all formats scanned are Parquet. Set in computeScanRangeLocations().
   private boolean allParquet_ = false;
@@ -363,6 +363,7 @@ public class HdfsScanNode extends ScanNode {
       throw new IllegalStateException(error.toString());
     }
     isPartitionKeyScan_ = isPartitionKeyScan;
+    fileFormats_ = new HashSet<>();
   }
 
   /**
@@ -1168,7 +1169,6 @@ public class HdfsScanNode extends ScanNode {
     totalBytesPerFsEC_ = new TreeMap<>();
     largestScanRangeBytes_ = 0;
     maxScanRangeNumRows_ = -1;
-    fileFormats_ = new HashSet<>();
     boolean allParquet = (partitions_.size() > 0) ? true : false;
     long simpleLimitNumRows = 0; // only used for the simple limit case
     boolean isSimpleLimit = sampleParams_ == null &&

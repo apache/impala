@@ -856,43 +856,66 @@ const CodegenFnPtrBase* HdfsScanNodeBase::GetCodegenFn(THdfsFileFormat::type typ
 
 Status HdfsScanNodeBase::CreateAndOpenScannerHelper(HdfsPartitionDescriptor* partition,
     ScannerContext* context, scoped_ptr<HdfsScanner>* scanner) {
+  using namespace org::apache::impala::fb;
   DCHECK(context != nullptr);
   DCHECK(scanner->get() == nullptr);
-  THdfsCompression::type compression =
-      context->GetStream()->file_desc()->file_compression;
 
-  // Create a new scanner for this file format and compression.
-  switch (partition->file_format()) {
-    case THdfsFileFormat::TEXT:
-      if (HdfsTextScanner::HasBuiltinSupport(compression)) {
-        scanner->reset(new HdfsTextScanner(this, runtime_state_));
-      } else {
-        // No builtin support - we must have loaded the plugin in IssueInitialRanges().
-        auto it = _THdfsCompression_VALUES_TO_NAMES.find(compression);
-        DCHECK(it != _THdfsCompression_VALUES_TO_NAMES.end())
-            << "Already issued ranges for this compression type.";
-        scanner->reset(HdfsPluginTextScanner::GetHdfsPluginTextScanner(
-            this, runtime_state_, it->second));
-      }
-      break;
-    case THdfsFileFormat::SEQUENCE_FILE:
-      scanner->reset(new HdfsSequenceScanner(this, runtime_state_));
-      break;
-    case THdfsFileFormat::RC_FILE:
-      scanner->reset(new HdfsRCFileScanner(this, runtime_state_));
-      break;
-    case THdfsFileFormat::AVRO:
-      scanner->reset(new HdfsAvroScanner(this, runtime_state_));
-      break;
-    case THdfsFileFormat::PARQUET:
-      scanner->reset(new HdfsParquetScanner(this, runtime_state_));
-      break;
-    case THdfsFileFormat::ORC:
-      scanner->reset(new HdfsOrcScanner(this, runtime_state_));
-      break;
-    default:
-      return Status(Substitute("Unknown Hdfs file format type: $0",
-          partition->file_format()));
+  const FbFileMetadata* file_metadata = context->GetStream(0)->file_desc()->file_metadata;
+  if (file_metadata) {
+    // Iceberg tables can have different file format for each data file:
+    const FbIcebergMetadata* ice_metadata = file_metadata->iceberg_metadata();
+    DCHECK(ice_metadata != nullptr);
+    switch (ice_metadata->file_format()) {
+      case FbIcebergDataFileFormat::FbIcebergDataFileFormat_PARQUET:
+        scanner->reset(new HdfsParquetScanner(this, runtime_state_));
+        break;
+      case FbIcebergDataFileFormat::FbIcebergDataFileFormat_ORC:
+        scanner->reset(new HdfsOrcScanner(this, runtime_state_));
+        break;
+      case FbIcebergDataFileFormat::FbIcebergDataFileFormat_AVRO:
+        scanner->reset(new HdfsAvroScanner(this, runtime_state_));
+        break;
+      default:
+        return Status(Substitute(
+            "Unknown Iceberg file format type: $0", ice_metadata->file_format()));
+    }
+  } else {
+    THdfsCompression::type compression =
+        context->GetStream()->file_desc()->file_compression;
+
+    // Create a new scanner for this file format and compression.
+    switch (partition->file_format()) {
+      case THdfsFileFormat::TEXT:
+        if (HdfsTextScanner::HasBuiltinSupport(compression)) {
+          scanner->reset(new HdfsTextScanner(this, runtime_state_));
+        } else {
+          // No builtin support - we must have loaded the plugin in IssueInitialRanges().
+          auto it = _THdfsCompression_VALUES_TO_NAMES.find(compression);
+          DCHECK(it != _THdfsCompression_VALUES_TO_NAMES.end())
+              << "Already issued ranges for this compression type.";
+          scanner->reset(HdfsPluginTextScanner::GetHdfsPluginTextScanner(
+              this, runtime_state_, it->second));
+        }
+        break;
+      case THdfsFileFormat::SEQUENCE_FILE:
+        scanner->reset(new HdfsSequenceScanner(this, runtime_state_));
+        break;
+      case THdfsFileFormat::RC_FILE:
+        scanner->reset(new HdfsRCFileScanner(this, runtime_state_));
+        break;
+      case THdfsFileFormat::AVRO:
+        scanner->reset(new HdfsAvroScanner(this, runtime_state_));
+        break;
+      case THdfsFileFormat::PARQUET:
+        scanner->reset(new HdfsParquetScanner(this, runtime_state_));
+        break;
+      case THdfsFileFormat::ORC:
+        scanner->reset(new HdfsOrcScanner(this, runtime_state_));
+        break;
+      default:
+        return Status(
+            Substitute("Unknown Hdfs file format type: $0", partition->file_format()));
+    }
   }
   DCHECK(scanner->get() != nullptr);
   RETURN_IF_ERROR(scanner->get()->Open(context));
