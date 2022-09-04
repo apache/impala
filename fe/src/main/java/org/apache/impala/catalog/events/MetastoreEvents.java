@@ -470,6 +470,8 @@ public class MetastoreEvents {
 
     public long getEventId() { return eventId_; }
 
+    public long getEventTime() { return event_.getEventTime(); }
+
     public MetastoreEventType getEventType() { return eventType_; }
 
     /**

@@ -868,26 +868,47 @@ struct TEventProcessorMetrics {
   // Total number of events skipped so far
   3: optional i64 events_skipped
 
-  // Mean time in sec for the fetching metastore events
+  // Time in sec for the fetching metastore events
   4: optional double events_fetch_duration_mean
+  5: optional double events_fetch_duration_p75
+  6: optional double events_fetch_duration_p95
+  7: optional double events_fetch_duration_p99
 
-  // Mean time in sec for processing a given batch of events
-  5: optional double events_process_duration_mean
+  // Duration in sec for fetching the last event batch
+  8: optional double last_events_fetch_duration
+
+  // Time in sec for processing a given batch of events
+  9: optional double events_process_duration_mean
+  10: optional double events_process_duration_p75
+  11: optional double events_process_duration_p95
+  12: optional double events_process_duration_p99
+
+  // Duration in sec for processing the last event batch
+  13: optional double last_events_process_duration
 
   // Average number of events received in 1 min
-  6: optional double events_received_1min_rate
+  14: optional double events_received_1min_rate
 
-  // Average number of events received in 1 min
-  7: optional double events_received_5min_rate
+  // Average number of events received in 5 min
+  15: optional double events_received_5min_rate
 
-  // Average number of events received in 1 min
-  8: optional double events_received_15min_rate
+  // Average number of events received in 15 min
+  16: optional double events_received_15min_rate
 
   // Average number events skipped in a polling interval
-  9: optional double events_skipped_per_poll_mean
+  17: optional double events_skipped_per_poll_mean
 
   // Last metastore event id that the catalog server synced to
-  10: optional i64 last_synced_event_id
+  18: optional i64 last_synced_event_id
+
+  // Event time of the last synced event
+  19: optional i64 last_synced_event_time
+
+  // Latest metastore event id
+  20: optional i64 latest_event_id
+
+  // Event time of the latest metastore event
+  21: optional i64 latest_event_time
 }
 
 struct TCatalogHmsCacheApiMetrics {

@@ -2690,7 +2690,47 @@
     "label": "Average duration to fetch metastore events",
     "units": "TIME_S",
     "kind": "GAUGE",
-    "key": "events-processor.avg-events-fetch-duration"
+    "key": "events-processor.events-fetch-duration-avg"
+  },
+  {
+    "description": "75th percentile of the time taken to fetch a batch of metastore events",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "P75 duration to fetch metastore events",
+    "units": "TIME_S",
+    "kind": "GAUGE",
+    "key": "events-processor.events-fetch-duration-p75"
+  },
+  {
+    "description": "95th percentile of the time taken to fetch a batch of metastore events",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "P95 duration to fetch metastore events",
+    "units": "TIME_S",
+    "kind": "GAUGE",
+    "key": "events-processor.events-fetch-duration-p95"
+  },
+  {
+    "description": "99th percentile of the time taken to fetch a batch of metastore events",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "P99 duration to fetch metastore events",
+    "units": "TIME_S",
+    "kind": "GAUGE",
+    "key": "events-processor.events-fetch-duration-p99"
+  },
+  {
+    "description": "Last time taken to fetch a batch of metastore events",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Last duration to fetch a batch of metastore events",
+    "units": "TIME_S",
+    "kind": "GAUGE",
+    "key": "events-processor.events-fetch-duration-latest"
   },
   {
     "description": "Average time taken to process a batch of events received from metastore",
@@ -2700,7 +2740,47 @@
     "label": "Average duration to process a batch of metastore events",
     "units": "TIME_S",
     "kind": "GAUGE",
-    "key": "events-processor.avg-events-process-duration"
+    "key": "events-processor.events-process-duration-avg"
+  },
+  {
+    "description": "75th percentile of the time taken to process a batch of events received from metastore",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "P75 duration to process a batch of metastore events",
+    "units": "TIME_S",
+    "kind": "GAUGE",
+    "key": "events-processor.events-process-duration-p75"
+  },
+  {
+    "description": "95th percentile of the time taken to process a batch of events received from metastore",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "P95 duration to process a batch of metastore events",
+    "units": "TIME_S",
+    "kind": "GAUGE",
+    "key": "events-processor.events-process-duration-p95"
+  },
+  {
+    "description": "99th percentile of the time taken to process a batch of events received from metastore",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "P99 duration to process a batch of metastore events",
+    "units": "TIME_S",
+    "kind": "GAUGE",
+    "key": "events-processor.events-process-duration-p99"
+  },
+  {
+    "description": "Last time taken to process a batch of events received from metastore",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Last duration to process a batch of metastore events",
+    "units": "TIME_S",
+    "kind": "GAUGE",
+    "key": "events-processor.events-process-duration-latest"
   },
   {
     "description": "Exponentially weighted moving average (EWMA) of number of events received in last 1 min",
@@ -2741,6 +2821,36 @@
     "units": "NONE",
     "kind" : "COUNTER",
     "key" : "events-processor.last-synced-event-id"
+  },
+  {
+    "description": "Last metastore event time that the catalog server processed and synced to",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Last Synced Event Time",
+    "units": "NONE",
+    "kind" : "COUNTER",
+    "key" : "events-processor.last-synced-event-time"
+  },
+  {
+    "description": "Latest event id in Hive metastore",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Latest Event Id",
+    "units": "NONE",
+    "kind" : "COUNTER",
+    "key" : "events-processor.latest-event-id"
+  },
+  {
+    "description": "Event time of the latest event in Hive metastore",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Latest Event Time",
+    "units": "NONE",
+    "kind" : "COUNTER",
+    "key" : "events-processor.latest-event-time"
   },
   {
     "description": "Total number of executor groups that have at least one executor",

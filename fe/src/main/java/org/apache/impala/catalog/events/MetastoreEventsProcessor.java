@@ -18,6 +18,7 @@
 package org.apache.impala.catalog.events;
 
 import com.codahale.metrics.Gauge;
+import com.codahale.metrics.Snapshot;
 import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -49,6 +50,7 @@ import org.apache.impala.catalog.events.MetastoreEvents.DropDatabaseEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.common.Metrics;
+import org.apache.impala.common.PrintUtils;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.TEventProcessorMetrics;
@@ -249,6 +251,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   public static final String DELETE_EVENT_LOG_SIZE = "delete-event-log-size";
   // number of batch events generated
   public static final String NUMBER_OF_BATCH_EVENTS = "batch-events-created";
+
+  private static final long SECOND_IN_NANOS = 1000 * 1000 * 1000L;
 
   /**
    * Wrapper around {@link
@@ -489,6 +493,15 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
 
   // keeps track of the last event id which we have synced to
   private final AtomicLong lastSyncedEventId_ = new AtomicLong(-1);
+  private final AtomicLong lastSyncedEventTimeMs_ = new AtomicLong(0);
+
+  // The event id and eventTime of the latest event in HMS. Only used in metrics to show
+  // how far we are lagging behind.
+  private final AtomicLong latestEventId_ = new AtomicLong(-1);
+  private final AtomicLong latestEventTimeMs_ = new AtomicLong(0);
+
+  // The duration in nanoseconds of the processing of the last event batch.
+  private final AtomicLong lastEventProcessDurationNs_ = new AtomicLong(0);
 
   // polling interval in seconds. Note this is a time we wait AFTER each fetch call
   private final long pollingFrequencyInSec_;
@@ -644,6 +657,10 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     LOG.info(String.format("Starting metastore event polling with interval %d seconds.",
         pollingFrequencyInSec_));
     scheduler_.scheduleWithFixedDelay(this::processEvents, pollingFrequencyInSec_,
+        pollingFrequencyInSec_, TimeUnit.SECONDS);
+    // Update latestEventId in another thread in case that the processEvents() thread is
+    // blocked by slow metadata reloading or waiting for table locks.
+    scheduler_.scheduleWithFixedDelay(this::updateLatestEventId, pollingFrequencyInSec_,
         pollingFrequencyInSec_, TimeUnit.SECONDS);
   }
 
@@ -850,6 +867,40 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   }
 
   /**
+   * Update the latest event id regularly so we know how far we are lagging behind.
+   */
+  private void updateLatestEventId() {
+    EventProcessorStatus currentStatus = eventProcessorStatus_;
+    if (currentStatus != EventProcessorStatus.ACTIVE) {
+      return;
+    }
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+      CurrentNotificationEventId currentNotificationEventId =
+          msClient.getHiveClient().getCurrentNotificationEventId();
+      long currentEventId = currentNotificationEventId.getEventId();
+      // no new events since we last polled
+      if (currentEventId <= latestEventId_.get()) {
+        return;
+      }
+      // Fetch the last event to get its eventTime.
+      NotificationEventRequest eventRequest = new NotificationEventRequest();
+      eventRequest.setLastEvent(currentEventId - 1);
+      eventRequest.setMaxEvents(1);
+      NotificationEventResponse response = MetastoreShim
+          .getNextNotification(msClient.getHiveClient(), eventRequest);
+      NotificationEvent event = response.getEventsIterator().next();
+      Preconditions.checkState(event.getEventId() == currentEventId);
+      LOG.info("Latest event in HMS: id={}, time={}", currentEventId,
+          event.getEventTime());
+      latestEventId_.set(currentEventId);
+      latestEventTimeMs_.set(event.getEventTime());
+    } catch (Exception e) {
+      LOG.error("Unable to update current notification event id. Last value: {}",
+          latestEventId_, e);
+    }
+  }
+
+  /**
    * Gets the current event processor metrics along with its status. If the status is
    * not active the metrics are skipped. Only the status is sent
    */
@@ -860,25 +911,48 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     eventProcessorMetrics.setStatus(currentStatus.toString());
     eventProcessorMetrics.setLast_synced_event_id(getLastSyncedEventId());
     if (currentStatus != EventProcessorStatus.ACTIVE) return eventProcessorMetrics;
+    // The following counters are only updated when event-processor is active.
+    eventProcessorMetrics.setLast_synced_event_time(lastSyncedEventTimeMs_.get());
+    eventProcessorMetrics.setLatest_event_id(latestEventId_.get());
+    eventProcessorMetrics.setLatest_event_time(latestEventTimeMs_.get());
 
     long eventsReceived = metrics_.getMeter(EVENTS_RECEIVED_METRIC).getCount();
     long eventsSkipped = metrics_.getCounter(EVENTS_SKIPPED_METRIC).getCount();
-    double avgFetchDuration =
-        metrics_.getTimer(EVENTS_FETCH_DURATION_METRIC).getMeanRate();
-    double avgProcessDuration =
-        metrics_.getTimer(EVENTS_PROCESS_DURATION_METRIC).getMeanRate();
+    eventProcessorMetrics.setEvents_received(eventsReceived);
+    eventProcessorMetrics.setEvents_skipped(eventsSkipped);
+
+    Snapshot fetchDuration =
+        metrics_.getTimer(EVENTS_FETCH_DURATION_METRIC).getSnapshot();
+    double avgFetchDuration = fetchDuration.getMean() / SECOND_IN_NANOS;
+    double p75FetchDuration = fetchDuration.get75thPercentile() / SECOND_IN_NANOS;
+    double p95FetchDuration = fetchDuration.get95thPercentile() / SECOND_IN_NANOS;
+    double p99FetchDuration = fetchDuration.get99thPercentile() / SECOND_IN_NANOS;
+    eventProcessorMetrics.setEvents_fetch_duration_mean(avgFetchDuration);
+    eventProcessorMetrics.setEvents_fetch_duration_p75(p75FetchDuration);
+    eventProcessorMetrics.setEvents_fetch_duration_p95(p95FetchDuration);
+    eventProcessorMetrics.setEvents_fetch_duration_p99(p99FetchDuration);
+
+    Snapshot processDuration =
+        metrics_.getTimer(EVENTS_PROCESS_DURATION_METRIC).getSnapshot();
+    double avgProcessDuration = processDuration.getMean() / SECOND_IN_NANOS;
+    double p75ProcessDuration = processDuration.get75thPercentile() / SECOND_IN_NANOS;
+    double p95ProcessDuration = processDuration.get95thPercentile() / SECOND_IN_NANOS;
+    double p99ProcessDuration = processDuration.get99thPercentile() / SECOND_IN_NANOS;
+    eventProcessorMetrics.setEvents_process_duration_mean(avgProcessDuration);
+    eventProcessorMetrics.setEvents_process_duration_p75(p75ProcessDuration);
+    eventProcessorMetrics.setEvents_process_duration_p95(p95ProcessDuration);
+    eventProcessorMetrics.setEvents_process_duration_p99(p99ProcessDuration);
+
+    double lastProcessDuration = lastEventProcessDurationNs_.get() /
+        (double) SECOND_IN_NANOS;
+    eventProcessorMetrics.setLast_events_process_duration(lastProcessDuration);
+
     double avgNumberOfEventsReceived1Min =
         metrics_.getMeter(EVENTS_RECEIVED_METRIC).getOneMinuteRate();
     double avgNumberOfEventsReceived5Min =
         metrics_.getMeter(EVENTS_RECEIVED_METRIC).getFiveMinuteRate();
     double avgNumberOfEventsReceived15Min =
         metrics_.getMeter(EVENTS_RECEIVED_METRIC).getFifteenMinuteRate();
-
-
-    eventProcessorMetrics.setEvents_received(eventsReceived);
-    eventProcessorMetrics.setEvents_skipped(eventsSkipped);
-    eventProcessorMetrics.setEvents_fetch_duration_mean(avgFetchDuration);
-    eventProcessorMetrics.setEvents_process_duration_mean(avgProcessDuration);
     eventProcessorMetrics.setEvents_received_1min_rate(avgNumberOfEventsReceived1Min);
     eventProcessorMetrics.setEvents_received_5min_rate(avgNumberOfEventsReceived5Min);
     eventProcessorMetrics.setEvents_received_15min_rate(avgNumberOfEventsReceived15Min);
@@ -935,6 +1009,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
           event.processIfEnabled();
           deleteEventLog_.garbageCollect(event.getEventId());
           lastSyncedEventId_.set(event.getEventId());
+          lastSyncedEventTimeMs_.set(event.getEventTime());
         }
       }
     } catch (CatalogException e) {
@@ -942,7 +1017,10 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
           "Unable to process event %d of type %s. Event processing will be stopped.",
           lastProcessedEvent.getEventId(), lastProcessedEvent.getEventType()), e);
     } finally {
-      context.stop();
+      long elapsed_ns = context.stop();
+      lastEventProcessDurationNs_.set(elapsed_ns);
+      LOG.info("Time elapsed in processing event batch: {}",
+          PrintUtils.printTimeNs(elapsed_ns));
     }
   }
 
