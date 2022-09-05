@@ -212,3 +212,6 @@ docs/images/howto_show_histogram.png
 docs/images/howto_static_server_pools_config.png
 docs/images/impala_arch.jpeg
 docs/images/support_send_diagnostic_data.png
+
+# Files of deployment configuration
+package/conf/*

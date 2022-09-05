@@ -228,7 +228,7 @@ fi
 redhat sudo yum install -y curl gcc gcc-c++ git krb5-devel krb5-server krb5-workstation \
         libevent-devel libffi-devel make ntp ntpdate ntp-perl openssl-devel cyrus-sasl \
         cyrus-sasl-gssapi cyrus-sasl-devel cyrus-sasl-plain \
-        python-devel python-setuptools postgresql postgresql-server \
+        python-devel python-setuptools postgresql postgresql-server rpm-build \
         wget vim-common nscd cmake lzo-devel fuse-devel snappy-devel zlib-devel \
         psmisc lsof openssh-server redhat-lsb java-1.8.0-openjdk-devel \
         java-1.8.0-openjdk-src python-argparse

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<configuration>
+  <property>
+    <name>dfs.namenode.servicerpc-address</name>
+    <value>localhost:8022</value>
+  </property>
+  <property>
+    <name>dfs.namenode.http-address</name>
+    <value>localhost:20101</value>
+  </property>
+  <property>
+    <name>dfs.replication</name>
+    <value>3</value>
+  </property>
+  <property>
+    <name>dfs.blocksize</name>
+    <value>134217728</value>
+  </property>
+  <property>
+    <name>dfs.domain.socket.path</name>
+    <value>/var/run/hdfs-sockets/dn</value>
+  </property>
+  <property>
+    <name>dfs.client.read.shortcircuit</name>
+    <value>true</value>
+  </property>
+  <property>
+    <name>dfs.client.read.shortcircuit.streams.cache.size</name>
+    <value>4096</value>
+  </property>
+  <property>
+    <name>dfs.client.read.shortcircuit.skip.checksum</name>
+    <value>false</value>
+  </property>
+  <property>
+    <name>dfs.client.file-block-storage-locations.timeout.millis</name>
+    <value>10000</value>
+  </property>
+</configuration>

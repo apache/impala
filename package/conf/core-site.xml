@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<configuration>
+  <property>
+    <name>fs.defaultFS</name>
+    <value>hdfs://localhost:8020</value>
+  </property>
+  <property>
+    <name>ipc.client.connection.maxidletime</name>
+    <value>30000</value>
+  </property>
+  <property>
+    <name>ipc.client.connect.max.retries</name>
+    <value>50</value>
+  </property>
+  <property>
+    <name>fs.trash.interval</name>
+    <value>1</value>
+  </property>
+</configuration>

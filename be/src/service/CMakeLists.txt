@@ -110,6 +110,10 @@ target_link_libraries(unifiedbetests
   ${JAVA_JSIG_LIBRARY} ${UNIFIED_TEST_LINK_LIBS})
 ADD_DEPENDENCIES(unified-be-test-executable unifiedbetests)
 
+install(FILES ${STATESTORED_SYMLINK} DESTINATION ${IMPALA_INSTALLDIR}/bin)
+install(FILES ${CATALOGD_SYMLINK} DESTINATION ${IMPALA_INSTALLDIR}/bin)
+install(TARGETS impalad DESTINATION ${IMPALA_INSTALLDIR}/bin)
+
 # Exception to unified be tests: Custom main() due to leak
 ADD_BE_TEST(session-expiry-test session-expiry-test.cc) # TODO: this leaks thrift server
 ADD_UNIFIED_BE_LSAN_TEST(hs2-util-test "StitchNullsTest.*:PrintTColumnValueTest.*")

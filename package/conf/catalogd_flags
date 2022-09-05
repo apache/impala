@@ -1,0 +1,13 @@
+-hostname=localhost
+-state_store_host=localhost
+#-kudu_master_hosts=localhost
+
+-log_dir=/var/log/catalogd
+-log_filename=catalogd
+-state_store_port=24000
+-minidump_path=/var/log/impala-minidumps
+-webserver_doc_root=/opt/impala
+-catalog_topic_mode=minimal
+-hms_event_polling_interval_s=0
+-v=1
+-max_log_size=200
