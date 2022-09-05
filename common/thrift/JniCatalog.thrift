@@ -115,6 +115,8 @@ enum TAlterTableType {
   UNSET_TBL_PROPERTIES = 17
   SET_PARTITION_SPEC = 18
   EXECUTE = 19
+  SET_VIEW_PROPERTIES = 20
+  UNSET_VIEW_PROPERTIES = 21
 }
 
 // Parameters of CREATE DATABASE commands
@@ -617,6 +619,9 @@ struct TCreateOrAlterViewParams {
   // The server name for security privileges when authorization is enabled.
   // TODO: Need to cleanup:IMPALA-7553
   8: optional string server_name
+
+  // Tblproperties of the view
+  9: optional map<string, string> tblproperties
 }
 
 // Parameters of a COMPUTE STATS command

@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.util.List;
+import java.util.Map;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.common.AnalysisException;
@@ -33,8 +34,9 @@ import com.google.common.base.Preconditions;
  */
 public class CreateViewStmt extends CreateOrAlterViewStmtBase {
   public CreateViewStmt(boolean ifNotExists, TableName tableName,
-      List<ColumnDef> columnDefs, String comment, QueryStmt viewDefStmt) {
-    super(ifNotExists, tableName, columnDefs, comment, viewDefStmt);
+      List<ColumnDef> columnDefs, String comment, Map<String, String> tblpropertiesMap,
+      QueryStmt viewDefStmt) {
+    super(ifNotExists, tableName, columnDefs, comment, tblpropertiesMap, viewDefStmt);
   }
 
   @Override
@@ -56,7 +58,7 @@ public class CreateViewStmt extends CreateOrAlterViewStmtBase {
 
     if (analyzer.dbContainsTable(dbName_, tableName_.getTbl(), Privilege.CREATE) &&
         !ifNotExists_) {
-      throw new AnalysisException(Analyzer.TBL_ALREADY_EXISTS_ERROR_MSG +
+      throw new AnalysisException(Analyzer.VIEW_ALREADY_EXISTS_ERROR_MSG +
           String.format("%s.%s", dbName_, tableName_.getTbl()));
     }
     analyzer.addAccessEvent(new TAccessEvent(dbName_ + "." + tableName_.getTbl(),
@@ -76,6 +78,9 @@ public class CreateViewStmt extends CreateOrAlterViewStmtBase {
     if (tableName_.getDb() != null) sb.append(tableName_.getDb() + ".");
     sb.append(tableName_.getTbl());
     if (columnDefs_ != null) sb.append("(" + getColumnNames() + ")");
+    if (tblPropertyMap_ != null && !tblPropertyMap_.isEmpty()) {
+      sb.append(" TBLPROPERTIES " + getTblProperties());
+    }
     sb.append(" AS ");
     sb.append(viewDefStmt_.toSql(options));
     return sb.toString();

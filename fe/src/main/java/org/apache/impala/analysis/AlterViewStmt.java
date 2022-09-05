@@ -38,7 +38,7 @@ import com.google.common.base.Preconditions;
 public class AlterViewStmt extends CreateOrAlterViewStmtBase {
   public AlterViewStmt(
       TableName tableName, List<ColumnDef> columnDefs, QueryStmt viewDefStmt) {
-    super(false, tableName, columnDefs, null, viewDefStmt);
+    super(false, tableName, columnDefs, null, null, viewDefStmt);
   }
 
   @Override

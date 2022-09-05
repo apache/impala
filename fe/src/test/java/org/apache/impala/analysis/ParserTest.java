@@ -3135,6 +3135,16 @@ public class ParserTest extends FrontendTestBase {
     // Mismatched number of columns in column definition and view definition parses ok.
     ParsesOk("CREATE VIEW Bar (x, y) AS SELECT 1, 2, 3");
 
+    ParsesOk("CREATE VIEW Bar (x, y, z) TBLPROPERTIES ('a' = 'b') AS SELECT 1, 2, 3");
+    ParsesOk("CREATE VIEW Bar (x, y, z) TBLPROPERTIES ('a' = 'b', 'c' = 'd')" +
+        " AS SELECT 1, 2, 3");
+    ParsesOk("CREATE VIEW Bar TBLPROPERTIES ('a' = 'b') AS VALUES(1, 2, 3)");
+    ParsesOk("CREATE VIEW Bar TBLPROPERTIES ('a' = 'b') AS SELECT 1, 2, 3");
+    ParsesOk("CREATE VIEW Bar TBLPROPERTIES ('a' = 'b', 'c' = 'd')" +
+        " AS SELECT 1, 2, 3");
+    ParsesOk("CREATE VIEW Foo.Bar COMMENT 'test' TBLPROPERTIES ('a' = 'b')" +
+        " AS SELECT a, b, c from t");
+
     // No view name.
     ParserError("CREATE VIEW AS SELECT c FROM t");
     // Missing AS keyword
@@ -3155,6 +3165,9 @@ public class ParserTest extends FrontendTestBase {
     ParserError("CREATE VIEW Foo.Bar (x) AS ALTER TABLE Foo COLUMNS (i int, s string)");
     ParserError("CREATE VIEW Foo.Bar (x) AS CREATE VIEW Foo.Bar AS SELECT 1");
     ParserError("CREATE VIEW Foo.Bar (x) AS ALTER VIEW Foo.Bar AS SELECT 1");
+
+    ParserError("CREATE VIEW Bar (x, y, z) TBLPROPERTIES () AS SELECT 1, 2, 3");
+    ParserError("CREATE VIEW Bar (x, y, z) TBLPROPERTIES (i int) AS SELECT 1, 2, 3");
   }
 
   @Test
@@ -3176,6 +3189,9 @@ public class ParserTest extends FrontendTestBase {
 
     // Mismatched number of columns in column definition and view definition parses ok.
     ParsesOk("ALTER VIEW Bar (x, y) AS SELECT 1, 2, 3");
+
+    ParsesOk("ALTER VIEW Foo.Bar SET TBLPROPERTIES ('pro1' = '1', 'pro2' = '2')");
+    ParsesOk("ALTER VIEW Foo.Bar UNSET TBLPROPERTIES ('pro1', 'pro2')");
 
     // Must be ALTER VIEW not ALTER TABLE.
     ParserError("ALTER TABLE Foo.Bar AS SELECT 1, 2, 3");
@@ -3200,6 +3216,11 @@ public class ParserTest extends FrontendTestBase {
     ParserError("ALTER VIEW Foo.Bar AS ALTER TABLE Foo COLUMNS (i int, s string)");
     ParserError("ALTER VIEW Foo.Bar AS CREATE VIEW Foo.Bar AS SELECT 1, 2, 3");
     ParserError("ALTER VIEW Foo.Bar AS ALTER VIEW Foo.Bar AS SELECT 1, 2, 3");
+
+    ParserError("ALTER VIEW Foo.Bar SET TBLPROPERTIES ()");
+    ParserError("ALTER VIEW Foo.Bar SET TBLPROPERTIES (int COMMENT 'x')");
+    ParserError("ALTER VIEW Foo.Bar UNSET TBLPROPERTIES ()");
+    ParserError("ALTER VIEW Foo.Bar UNSET TBLPROPERTIES (int COMMENT 'x')");
   }
 
   @Test

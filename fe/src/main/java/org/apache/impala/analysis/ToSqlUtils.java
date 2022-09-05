@@ -618,7 +618,7 @@ public class ToSqlUtils {
     return sb.toString();
   }
 
-  private static String propertyMapToSql(Map<String, String> propertyMap) {
+  public static String propertyMapToSql(Map<String, String> propertyMap) {
     // Sort entries on the key to ensure output is deterministic for tests (IMPALA-5757).
     List<Entry<String, String>> mapEntries = Lists.newArrayList(propertyMap.entrySet());
     Collections.sort(mapEntries, new Comparator<Entry<String, String>>() {

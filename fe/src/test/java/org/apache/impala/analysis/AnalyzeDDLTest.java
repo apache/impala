@@ -1497,6 +1497,34 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestAlterViewSetTblProperties() throws AnalysisException {
+    AnalyzesOk("ALTER VIEW functional.alltypes_view SET TBLPROPERTIES " +
+        " ('pro1' = 'test1', 'pro2' = 'test2')");
+    AnalyzesOk("ALTER VIEW functional.alltypes_view UNSET TBLPROPERTIES " +
+        " ('pro1', 'pro2')");
+
+    AnalysisError("ALTER VIEW Foo.Bar SET TBLPROPERTIES " +
+        " ('pro1' = 'test1', 'pro2' = 'test2')",
+        "Database does not exist: Foo");
+    AnalysisError("ALTER VIEW Foo.Bar UNSET TBLPROPERTIES ('pro1', 'pro2')",
+        "Database does not exist: Foo");
+    AnalysisError("alter view functional_orc_def.mv1_alltypes_jointbl " +
+        "set TBLPROPERTIES('a' = 'a')",
+        "ALTER VIEW not allowed on a materialized view: " +
+        "functional_orc_def.mv1_alltypes_jointbl");
+    AnalysisError("alter view functional.alltypes " +
+        "set TBLPROPERTIES('a' = 'a')",
+        "ALTER VIEW not allowed on a table: functional.alltypes");
+    AnalysisError("alter view functional_orc_def.mv1_alltypes_jointbl " +
+        "unset TBLPROPERTIES('a')",
+        "ALTER VIEW not allowed on a materialized view: " +
+        "functional_orc_def.mv1_alltypes_jointbl");
+    AnalysisError("alter view functional.alltypes " +
+        "unset TBLPROPERTIES('a')",
+        "ALTER VIEW not allowed on a table: functional.alltypes");
+  }
+
+  @Test
   public void TestAlterViewRename() throws AnalysisException {
     AnalyzesOk("alter view functional.alltypes_view rename to new_view");
     AnalyzesOk("alter view functional.alltypes_view rename to functional.new_view");
@@ -3068,7 +3096,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Table/view already exists.
     AnalysisError("create view functional.alltypes as " +
         "select * from functional.alltypessmall ",
-        "Table already exists: functional.alltypes");
+        "View already exists: functional.alltypes");
     // Target database does not exist.
     AnalysisError("create view wrongdb.test as " +
         "select * from functional.alltypessmall ",
@@ -3109,6 +3137,14 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create view v as select null as new_col",
         "Unable to infer the column type for column 'new_col'. Use cast() to " +
             "explicitly specify the column type for column 'new_col'.");
+
+    AnalyzesOk("create view v_tblproperties TBLPROPERTIES ('a' = 'a')" +
+        "as select cast(null as int) as new_col");
+    AnalyzesOk("create view v_tblproperties TBLPROPERTIES ('a' = 'a', 'b' = 'b')" +
+        "as select cast(null as int) as new_col");
+    AnalysisError("create view functional.view_view TBLPROPERTIES ('a' = 'a')" +
+        "as select cast(null as int) as new_col",
+        "View already exists: functional.view_view");
   }
 
   @Test

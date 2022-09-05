@@ -48,6 +48,14 @@ select * from $DATABASE.complex_view
 'View has been created.'
 ====
 ---- QUERY
+# Create a view with tblproperties
+create view $DATABASE.view_properties
+tblproperties ('a'='aa', 'b'='bb') as
+select * from functional.alltypes
+---- RESULTS
+'View has been created.'
+====
+---- QUERY
 # Test that the views are displayed by 'show tables'
 show tables in $DATABASE
 ---- RESULTS
@@ -55,6 +63,7 @@ show tables in $DATABASE
 'parquet_view'
 'simple_view'
 'simple_view_sub'
+'view_properties'
 'view_view'
 ====
 ---- QUERY
@@ -122,6 +131,25 @@ describe $DATABASE.view_view
 string,string,string
 ====
 ---- QUERY
+describe $DATABASE.view_properties
+---- RESULTS
+'id','int',''
+'bool_col','boolean',''
+'tinyint_col','tinyint',''
+'smallint_col','smallint',''
+'int_col','int',''
+'bigint_col','bigint',''
+'float_col','float',''
+'double_col','double',''
+'date_string_col','string',''
+'string_col','string',''
+'timestamp_col','timestamp',''
+'year','int',''
+'month','int',''
+---- TYPES
+string,string,string
+====
+---- QUERY
 # Test that the views can be queried.
 select count(*) from $DATABASE.simple_view
 ---- RESULTS
@@ -158,6 +186,13 @@ select count(*) from $DATABASE.view_view
 bigint
 ====
 ---- QUERY
+select count(*) from $DATABASE.view_properties
+---- RESULTS
+7300
+---- TYPES
+bigint
+====
+---- QUERY
 # Test dropping a view
 drop view $DATABASE.simple_view_sub
 ---- RESULTS
@@ -170,6 +205,7 @@ show tables in $DATABASE
 'complex_view'
 'parquet_view'
 'simple_view'
+'view_properties'
 'view_view'
 ====
 ---- QUERY
@@ -205,6 +241,7 @@ show tables in $DATABASE
 'complex_view'
 'parquet_view'
 'simple_view'
+'view_properties'
 'view_view'
 ====
 ---- QUERY
@@ -218,6 +255,37 @@ alter view $DATABASE.view_view rename to $DATABASE.view_on_view
 alter view $DATABASE.parquet_view rename to $DATABASE.new_parquet_view
 ---- RESULTS
 'Renaming was successful.'
+====
+---- QUERY
+# Test set tblproperties for view
+alter view $DATABASE.view_properties set tblproperties ('c'='cc', 'd'='dd')
+---- RESULTS
+'Updated view.'
+====
+---- QUERY
+# Test unset tblproperties for view
+alter view $DATABASE.view_properties unset tblproperties ('c')
+---- RESULTS
+'Updated view.'
+====
+---- QUERY
+# Test DESCRIBE FORMATTED for view with tblproperties
+alter view $DATABASE.view_properties set tblproperties ('e'='ee', 'f'='ff');
+alter view $DATABASE.view_properties unset tblproperties ('e');
+DESCRIBE FORMATTED $DATABASE.view_properties;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','a                  ','aa                  '
+'','b                  ','bb                  '
+'','d                  ','dd                  '
+'','f                  ','ff                  '
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Test dropping a view with tblproperties
+drop view $DATABASE.view_properties
+---- RESULTS
+'View has been dropped.'
 ====
 ---- QUERY
 # Test that the view was renamed

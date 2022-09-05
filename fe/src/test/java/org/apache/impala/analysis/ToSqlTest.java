@@ -503,6 +503,12 @@ public class ToSqlTest extends FrontendTestBase {
         "CREATE VIEW test_view_with_subquery AS " +
         "SELECT * FROM functional.alltypestiny t WHERE EXISTS " +
         "(SELECT * FROM functional.alltypessmall s WHERE s.id = t.id)");
+    testToSql(
+      "create view test_properties tblproperties ('a'='aa', 'b'='bb') as " +
+      "select int_col, string_col from functional.alltypes",
+      "default",
+      "CREATE VIEW test_properties TBLPROPERTIES ('a'='aa', 'b'='bb') AS " +
+      "SELECT int_col, string_col FROM functional.alltypes");
   }
 
   @Test
@@ -534,6 +540,12 @@ public class ToSqlTest extends FrontendTestBase {
         "default", "ALTER VIEW functional.alltypes_view(cnt) AS "+
         "SELECT count(DISTINCT x.int_col) FROM functional.alltypessmall x " +
         "INNER JOIN functional.alltypessmall y ON (x.id = y.id) GROUP BY x.bigint_col");
+    testToSql("alter view functional.alltypes_view set tblproperties ('a'='b')",
+        "functional",
+        "ALTER VIEW functional.alltypes_view SET TBLPROPERTIES ('a'='b')");
+    testToSql("alter view functional.alltypes_view unset tblproperties ('a', 'c')",
+        "functional",
+        "ALTER VIEW functional.alltypes_view UNSET TBLPROPERTIES ('a', 'c')");
   }
 
   @Test

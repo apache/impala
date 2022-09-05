@@ -2197,9 +2197,12 @@ block_size_val ::=
 
 create_view_stmt ::=
   KW_CREATE KW_VIEW if_not_exists_val:if_not_exists table_name:view_name
-  view_column_defs:col_defs opt_comment_val:comment KW_AS query_stmt:view_def
+  view_column_defs:col_defs opt_comment_val:comment
+  tbl_properties:tbl_props
+  KW_AS query_stmt:view_def
   {:
-    RESULT = new CreateViewStmt(if_not_exists, view_name, col_defs, comment, view_def);
+    RESULT = new CreateViewStmt(if_not_exists, view_name, col_defs, comment, tbl_props,
+         view_def);
   :}
   ;
 
@@ -2339,6 +2342,16 @@ alter_view_stmt ::=
   {:
     parser.checkIdentKeyword("OWNER", owner_id);
     RESULT = new AlterViewSetOwnerStmt(table, new Owner(TOwnerType.ROLE, role));
+  :}
+  | KW_ALTER KW_VIEW table_name:table KW_SET
+    tbl_properties:tbl_props
+  {:
+    RESULT = new AlterViewSetTblProperties(table, tbl_props);
+  :}
+  | KW_ALTER KW_VIEW table_name:table KW_UNSET
+    KW_TBLPROPERTIES if_exists_val:if_exists LPAREN properties_key_list:property_keys RPAREN
+  {:
+    RESULT = new AlterViewUnSetTblProperties(table, if_exists, property_keys);
   :}
   ;
 

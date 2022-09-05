@@ -336,6 +336,10 @@ public class CatalogOpExecutor {
       "Please use the following syntax if not sure whether the property existed" +
       " or not:\nALTER TABLE tableName UNSET (TBLPROPERTIES|SERDEPROPERTIES) IF EXISTS" +
       " (key1, key2, ...)\n";
+  private final static String ALTER_VIEW_UNSET_NON_EXIST_PROPERTY =
+      "Please use the following syntax if not sure whether the property existed" +
+      " or not:\nALTER VIEW viewName UNSET TBLPROPERTIES IF EXISTS" +
+      " (key1, key2, ...)\n";
 
   // Table default capabilities
   private static final String ACIDINSERTONLY_CAPABILITIES =
@@ -1158,6 +1162,16 @@ public class CatalogOpExecutor {
           } else {
             responseSummaryMsg = "Updated table.";
           }
+          break;
+        case SET_VIEW_PROPERTIES:
+          alterViewSetTblProperties(tbl, params.getSet_tbl_properties_params());
+          reloadTableSchema = true;
+          responseSummaryMsg = "Updated view.";
+          break;
+        case UNSET_VIEW_PROPERTIES:
+          alterViewUnSetTblProperties(tbl, params.getUnset_tbl_properties_params());
+          reloadTableSchema = true;
+          responseSummaryMsg = "Updated view.";
           break;
         case UPDATE_STATS:
           Preconditions.checkState(params.isSetUpdate_stats_params());
@@ -3902,6 +3916,9 @@ public class CatalogOpExecutor {
     if (params.isSetComment() && params.getComment() != null) {
       view.getParameters().put("comment", params.getComment());
     }
+    if (params.getTblproperties() != null && params.getTblpropertiesSize() != 0) {
+      view.getParameters().putAll(params.getTblproperties());
+    }
     StorageDescriptor sd = new StorageDescriptor();
     // Add all the columns to a new storage descriptor.
     sd.setCols(buildFieldSchemaList(params.getColumns()));
@@ -3920,6 +3937,9 @@ public class CatalogOpExecutor {
     view.setViewExpandedText(params.getExpanded_view_def());
     if (params.isSetComment() && params.getComment() != null) {
       view.getParameters().put("comment", params.getComment());
+    }
+    if (params.getTblproperties() != null && params.getTblpropertiesSize() != 0) {
+      view.getParameters().putAll(params.getTblproperties());
     }
     // Add all the columns to a new storage descriptor.
     view.getSd().setCols(buildFieldSchemaList(params.getColumns()));
@@ -5305,8 +5325,8 @@ public class CatalogOpExecutor {
             throw new UnsupportedOperationException(
                 "Unknown target TTablePropertyType: " + params.getTarget());
         }
-        removeKeys(removeProperties, ifExists, keys,
-            "partition " + partition.getPartitionName());
+        removeKeys(removeProperties, ifExists, keys, "partition " +
+            partition.getPartitionName(), ALTER_TBL_UNSET_NON_EXIST_PROPERTY);
         modifiedParts.add(partBuilder);
       }
       try {
@@ -5332,7 +5352,8 @@ public class CatalogOpExecutor {
           throw new UnsupportedOperationException(
               "Unknown target TTablePropertyType: " + params.getTarget());
       }
-      removeKeys(removeProperties, ifExists, keys, "table " + tbl.getFullName());
+      removeKeys(removeProperties, ifExists, keys,
+          "table " + tbl.getFullName(), ALTER_TBL_UNSET_NON_EXIST_PROPERTY);
       // Validate that the new table properties are valid and that
       // the Kudu table is accessible.
       if (KuduTable.isKuduTable(msTbl)) {
@@ -5342,8 +5363,40 @@ public class CatalogOpExecutor {
     }
   }
 
+  /**
+   * Appends to the view property metadata for the given view, replacing
+   * the values of any keys that already exist.
+   */
+  private void alterViewSetTblProperties(Table tbl,
+      TAlterTableSetTblPropertiesParams params) throws ImpalaException {
+    Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
+    Map<String, String> properties = params.getProperties();
+    Preconditions.checkNotNull(properties);
+
+    // Alter view params.
+    org.apache.hadoop.hive.metastore.api.Table msTbl =
+        tbl.getMetaStoreTable().deepCopy();
+    msTbl.getParameters().putAll(properties);
+    applyAlterTable(msTbl);
+  }
+
+  private void alterViewUnSetTblProperties(Table tbl,
+      TAlterTableUnSetTblPropertiesParams params) throws ImpalaException {
+    Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
+    List<String> removeProperties = params.getProperty_keys();
+    boolean ifExists = params.isIf_exists();
+    Preconditions.checkNotNull(removeProperties);
+    // Alter view params.
+    org.apache.hadoop.hive.metastore.api.Table msTbl =
+            tbl.getMetaStoreTable().deepCopy();
+    Set<String> keys = msTbl.getParameters().keySet();
+    removeKeys(removeProperties, ifExists, keys,
+        "view " + tbl.getFullName(), ALTER_VIEW_UNSET_NON_EXIST_PROPERTY);
+    applyAlterTable(msTbl);
+  }
+
   private void removeKeys(List<String> removeProperties, boolean ifExists,
-      Set<String> keys, String fullName) throws CatalogException {
+      Set<String> keys, String fullName, String excepInfo) throws CatalogException {
     if (ifExists || keys.containsAll(removeProperties)) {
       keys.removeAll(removeProperties);
     } else {
@@ -5353,7 +5406,7 @@ public class CatalogOpExecutor {
           String.format("These properties do not exist for %s: %s.\n%s",
               fullName,
               String.join(",", removeCopy),
-              ALTER_TBL_UNSET_NON_EXIST_PROPERTY));
+              excepInfo));
     }
   }
 

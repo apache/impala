@@ -18,8 +18,10 @@
 package org.apache.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.impala.analysis.ColumnLineageGraph.ColumnLabel;
@@ -45,6 +47,7 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
   protected final List<ColumnDef> columnDefs_;
   protected final String comment_;
   protected final QueryStmt viewDefStmt_;
+  protected Map<String, String> tblPropertyMap_;
 
   // Set during analysis
   protected String dbName_;
@@ -75,13 +78,15 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
   protected List<ColumnDef> finalColDefs_;
 
   public CreateOrAlterViewStmtBase(boolean ifNotExists, TableName tableName,
-      List<ColumnDef> columnDefs, String comment, QueryStmt viewDefStmt) {
+      List<ColumnDef> columnDefs, String comment, Map<String, String> tblPropertyMap,
+      QueryStmt viewDefStmt) {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(viewDefStmt);
     this.ifNotExists_ = ifNotExists;
     this.tableName_ = tableName;
     this.columnDefs_ = columnDefs;
     this.comment_ = comment;
+    this.tblPropertyMap_ = tblPropertyMap;
     this.viewDefStmt_ = viewDefStmt;
   }
 
@@ -197,6 +202,7 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
     params.setExpanded_view_def(inlineViewDef_);
     params.setServer_name(serverName_);
     params.setComment(comment_);
+    params.setTblproperties(getTblPropertyMap());
     return params;
   }
 
@@ -228,6 +234,20 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
       columnNames.add(colDef.getColName());
     }
     return Joiner.on(", ").join(columnNames);
+  }
+
+  protected Map<String, String> getTblPropertyMap() {
+    if (tblPropertyMap_ == null || tblPropertyMap_.size() == 0) {
+      return Collections.emptyMap();
+    }
+    return tblPropertyMap_;
+  }
+
+  protected String getTblProperties() {
+    if (tblPropertyMap_ == null) {
+      return null;
+    }
+    return ToSqlUtils.propertyMapToSql(tblPropertyMap_);
   }
 
   public boolean getIfNotExists() { return ifNotExists_; }
