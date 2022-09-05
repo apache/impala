@@ -25,11 +25,36 @@ set -euo pipefail
 
 INSTALL_DEBUG_TOOLS=false
 JAVA_VERSION=8
+DRY_RUN=false
+PKG_LIST=""
+NON_PKG_NAMES=(apt-get yum install update)
 
 function print_usage {
     echo "install_os_packages.sh - Helper script to install OS dependencies"
     echo "[--install-debug-tools] : Also install debug tools like curl, iproute, etc"
     echo "[--java <version>] : Use specified Java version rather than the default Java 8."
+    echo "[--dry-run] : Print the list of packages to install."
+}
+
+# Wraps the passed in command to either execute it (DRY_RUN=false) or just use it
+# to update PKG_LIST.
+function wrap {
+  if $DRY_RUN; then
+    for arg in $@; do
+      if [[ "${NON_PKG_NAMES[@]}"  =~ "$arg" ]]; then
+        continue
+      elif [[ "$arg" == "-"* ]]; then
+        # Ignores command options
+        continue
+      elif [[ "$PKG_LIST" != "" ]]; then
+        PKG_LIST="$PKG_LIST,$arg"
+      else
+        PKG_LIST="$arg"
+      fi
+    done
+  else
+    "$@"
+  fi
 }
 
 while [ -n "$*" ]
@@ -42,6 +67,9 @@ do
       JAVA_VERSION="${2-}"
       shift;
       ;;
+    --dry-run)
+      DRY_RUN=true
+      ;;
     --help|*)
       print_usage
       exit 1
@@ -52,6 +80,7 @@ done
 
 echo "INSTALL_DEBUG_TOOLS=${INSTALL_DEBUG_TOOLS}"
 echo "JAVA_VERSION=${JAVA_VERSION}"
+echo "DRY_RUN=${DRY_RUN}"
 
 # This can get more detailed if there are specific steps
 # for specific versions, but at the moment the distribution
@@ -85,8 +114,8 @@ fi
 # Optionally install extra debug tools.
 if [[ $DISTRIBUTION == Ubuntu ]]; then
   export DEBIAN_FRONTEND=noninteractive
-  apt-get update
-  apt-get install -y \
+  wrap apt-get update
+  wrap apt-get install -y \
       hostname \
       krb5-user \
       language-pack-en \
@@ -97,7 +126,7 @@ if [[ $DISTRIBUTION == Ubuntu ]]; then
       tzdata
   if $INSTALL_DEBUG_TOOLS ; then
     echo "Installing extra debug tools"
-    apt-get install -y \
+    wrap apt-get install -y \
         curl \
         dnsutils \
         iproute2 \
@@ -111,7 +140,7 @@ elif [[ $DISTRIBUTION == Redhat ]]; then
   if [[ $JAVA_VERSION == 8 ]]; then
     JAVA_VERSION=1.8.0
   fi
-  yum install -y --disableplugin=subscription-manager \
+  wrap yum install -y --disableplugin=subscription-manager \
       cyrus-sasl-gssapi \
       cyrus-sasl-plain \
       hostname \
@@ -125,14 +154,14 @@ elif [[ $DISTRIBUTION == Redhat ]]; then
   # Install the appropriate language packs. Redhat/Centos 7 come
   # with en_US.utf8, so there is no need to install anything.
   if ! grep 'release 7\.' /etc/redhat-release; then
-      yum install -y --disableplugin=subscription-manager \
+      wrap yum install -y --disableplugin=subscription-manager \
           glibc-langpack-en \
           langpacks-en
   fi
 
   if $INSTALL_DEBUG_TOOLS ; then
     echo "Installing extra debug tools"
-    yum install -y --disableplugin=subscription-manager \
+    wrap yum install -y --disableplugin=subscription-manager \
         bind-utils \
         curl \
         iproute \
@@ -143,6 +172,12 @@ elif [[ $DISTRIBUTION == Redhat ]]; then
         vim \
         which
   fi
+fi
+
+if $DRY_RUN; then
+  echo "The following packages would be installed:"
+  echo "$PKG_LIST"
+  exit 0
 fi
 
 # Verify en_US.utf8 is present

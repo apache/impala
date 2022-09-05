@@ -69,6 +69,7 @@ BUILD_ASAN=0
 BUILD_FE_ONLY=0
 BUILD_TESTS=1
 GEN_CMAKE_ONLY=0
+GEN_PACKAGE=0
 BUILD_RELEASE_AND_DEBUG=0
 BUILD_TIDY=0
 BUILD_UBSAN=0
@@ -204,6 +205,9 @@ do
     -cmake_only)
       GEN_CMAKE_ONLY=1
       ;;
+    -package)
+      GEN_PACKAGE=1
+      ;;
     -help|*)
       echo "buildall.sh - Builds Impala and runs all tests."
       echo "[-noclean] : Omits cleaning all packages before building. Will not kill"\
@@ -258,6 +262,7 @@ do
       echo "[-fe_only] : Build just the frontend"
       echo "[-ninja] : Use ninja instead of make"
       echo "[-cmake_only] : Generate makefiles only, instead of doing a full build"
+      echo "[-package] : Generate a package for deployment."
       echo "-----------------------------------------------------------------------------
 Examples of common tasks:
 
@@ -537,6 +542,9 @@ generate_cmake_files() {
     echo "CACHELINESIZE_AARCH64:$CACHELINESIZE_AARCH64"
     CMAKE_ARGS+=(-DCACHELINESIZE_AARCH64=$CACHELINESIZE_AARCH64)
   fi
+  if [[ "$GEN_PACKAGE" -eq 1 ]]; then
+    CMAKE_ARGS+=(-DBUILD_PACKAGES=ON)
+  fi
 
   cmake . ${CMAKE_ARGS[@]}
 }
@@ -658,6 +666,10 @@ if [[ "$BUILD_RELEASE_AND_DEBUG" -eq 1 ]]; then
   build_all_components ${CMAKE_BUILD_TYPE} 0
 else
   build_all_components $CMAKE_BUILD_TYPE 1
+fi
+
+if [[ "$GEN_PACKAGE" -eq 1 ]]; then
+  ${MAKE_CMD} -j${IMPALA_BUILD_THREADS:-4} package
 fi
 
 if [[ $NEED_MINICLUSTER -eq 1 ]]; then

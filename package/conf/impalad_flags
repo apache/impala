@@ -1,0 +1,16 @@
+-hostname=localhost
+-state_store_host=localhost
+-catalog_service_host=localhost
+#-kudu_master_hosts=localhost
+
+-mem_limit=80%
+-use_local_catalog=true
+-log_dir=/var/log/impalad
+-log_filename=impalad
+-minidump_path=/var/log/impala-minidumps
+-local_library_dir=/var/lib/impala/udfs
+-fair_scheduler_allocation_path=/opt/impala/conf/fair-scheduler.xml
+-llama_site_path=/opt/impala/conf/llama-site.xml
+-webserver_doc_root=/opt/impala
+-v=1
+-max_log_size=200
