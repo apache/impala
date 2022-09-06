@@ -41,7 +41,10 @@ class TestShowCreateTable(ImpalaTestSuite):
                            "bucketing_version", "OBJCAPABILITIES",
                            "TRANSLATED_TO_EXTERNAL", "previous_metadata_location",
                            "impala.events.catalogServiceId",
-                           "impala.events.catalogVersion", "uuid"]
+                           "impala.events.catalogVersion", "uuid",
+                           "current-schema", "snapshot-count", "default-partition-spec",
+                           "current-snapshot-id", "current-snapshot-summary",
+                           "current-snapshot-timestamp-ms"]
 
   @classmethod
   def get_workload(self):
