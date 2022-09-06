@@ -282,9 +282,9 @@ class TestCoordinators(CustomClusterTestSuite):
               "where id NOT IN (0,1,2) and string_col IN ('aaaa', 'bbbb', 'cccc', NULL) "
               "and mod(int_col,50) IN (0,1) and id IN (int_col);").data
       assert 'F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2' in result
-      # Single partition table
-      result = client.execute("explain select * from tpch.lineitem "
-              "union all select * from tpch.lineitem").data
+      # Single partition table with 3 blocks
+      result = client.execute("explain select * from tpch_parquet.lineitem "
+              "union all select * from tpch_parquet.lineitem").data
       assert 'F02:PLAN FRAGMENT [RANDOM] hosts=2 instances=2' in result
     finally:
       assert client is not None

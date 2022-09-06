@@ -728,6 +728,7 @@ elif [ "${TARGET_FILESYSTEM}" = "local" ]; then
 elif [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
   if [[ "${ERASURE_CODING}" = true ]]; then
     export HDFS_ERASURECODE_POLICY="RS-3-2-1024k"
+    export ERASURECODE_POLICY="$HDFS_ERASURECODE_POLICY"
     export HDFS_ERASURECODE_PATH="/test-warehouse"
   fi
 elif [ "${TARGET_FILESYSTEM}" = "ozone" ]; then
@@ -736,6 +737,11 @@ elif [ "${TARGET_FILESYSTEM}" = "ozone" ]; then
   export DEFAULT_FS="ofs://${INTERNAL_LISTEN_HOST}:9862"
   export FILESYSTEM_PREFIX="${DEFAULT_FS}/${OZONE_VOLUME}"
   export WAREHOUSE_LOCATION_PREFIX="/${OZONE_VOLUME}"
+  if [[ "${ERASURE_CODING}" = true ]]; then
+    export OZONE_ERASURECODE_POLICY="RS-3-2-1024k"
+    # Ozone normalizes the policy for internal storage. Use this string for tests.
+    export ERASURECODE_POLICY="rs-3-2-1048576"
+  fi
 else
   echo "Unsupported filesystem '$TARGET_FILESYSTEM'"
   echo "Valid values are: hdfs, isilon, s3, abfs, adls, gs, local, ozone"

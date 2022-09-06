@@ -47,11 +47,10 @@ class TestIOMetrics(ImpalaTestSuite):
     def append_metric(metric, expect_nonzero):
       (expect_nonzero_metrics if expect_nonzero else expect_zero_metrics).append(metric)
 
-    append_metric("impala-server.io-mgr.erasure-coded-bytes-read", IS_EC)
+    # IMPALA-11697: these come from getReadStatistics, which is only implemented for HDFS
+    append_metric("impala-server.io-mgr.erasure-coded-bytes-read", IS_HDFS and IS_EC)
     append_metric("impala-server.io-mgr.short-circuit-bytes-read",
         IS_HDFS and not IS_DOCKERIZED_TEST_CLUSTER)
-    # TODO: this should be updated for Ozone, but the code that updates it is guarded by
-    #       IsHdfsPath and adding Ozone causes a crash. Plan to debug in IMPALA-11697.
     append_metric("impala-server.io-mgr.local-bytes-read",
         IS_HDFS and not IS_DOCKERIZED_TEST_CLUSTER)
 

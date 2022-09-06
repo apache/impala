@@ -41,7 +41,7 @@ shift $(($OPTIND-1))
 
 DIR=$(dirname $0)
 NODE_COUNT=3
-if [[ "$TARGET_FILESYSTEM" == "hdfs" && "$ERASURE_CODING" = true ]]; then
+if [[ "$ERASURE_CODING" = true ]]; then
   NODE_COUNT=5
 fi
 NODE_PREFIX=node-
@@ -327,6 +327,13 @@ function start_cluster {
   fi
 
   if [[ "${TARGET_FILESYSTEM}" = "ozone" ]]; then
+    local replication=''
+    echo "Creating Ozone volume/bucket"
+    if [ -n "${OZONE_ERASURECODE_POLICY}" ]; then
+      replication="--type EC --replication ${OZONE_ERASURECODE_POLICY}"
+      echo "with erasure coding ${OZONE_ERASURECODE_POLICY}"
+    fi
+
     local bucketkey=''
     if $USE_OZONE_ENCRYPTION; then
       echo "Ozone encryption enabled for ${OZONE_VOLUME}/test-warehouse"
@@ -337,7 +344,8 @@ function start_cluster {
     fi
 
     ozone sh volume create ${OZONE_VOLUME} || true
-    ozone sh bucket create ${bucketkey} ${OZONE_VOLUME}/test-warehouse || true
+    ozone sh bucket create ${bucketkey} ${replication} \
+        ${OZONE_VOLUME}/test-warehouse || true
   fi
 
   return $?

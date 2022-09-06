@@ -32,11 +32,17 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.adl.AdlFileSystem;
 import org.apache.hadoop.fs.azurebfs.AzureBlobFileSystem;
 import org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem;
+import org.apache.hadoop.fs.ozone.BasicRootedOzoneClientAdapterImpl;
+import org.apache.hadoop.fs.ozone.BasicRootedOzoneFileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.client.HdfsAdmin;
 import org.apache.hadoop.hdfs.protocol.EncryptionZone;
 import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.impala.catalog.HdfsCompression;
+import org.apache.impala.common.Pair;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.util.DebugUtils;
 import org.slf4j.Logger;
@@ -52,7 +58,10 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.Stack;
+import java.util.StringTokenizer;
 import java.util.UUID;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 /**
  * Common utility functions for operating on FileSystem objects.
@@ -195,14 +204,55 @@ public class FileSystemUtil {
   }
 
   /**
+   * Returns a string representation of the Ozone replication type for a given path.
+   */
+  private static String getOzoneReplication(ObjectStore os, Path p) throws IOException {
+    String path = Path.getPathWithoutSchemeAndAuthority(p).toString();
+    StringTokenizer tokens = new StringTokenizer(path, OZONE_URI_DELIMITER);
+
+    if (!tokens.hasMoreTokens()) return null;
+
+    OzoneVolume volume = os.getVolume(tokens.nextToken());
+    if (!tokens.hasMoreTokens()) return null;
+    OzoneBucket bucket = volume.getBucket(tokens.nextToken());
+    if (!tokens.hasMoreTokens()) {
+      return bucket.getReplicationConfig().getReplication();
+    }
+
+    // Get all remaining text except the leading slash
+    String keyName = tokens.nextToken("").substring(1);
+    return bucket.getKey(keyName).getReplicationConfig().getReplication();
+  }
+
+  /**
    * Returns the erasure coding policy for the path, or NONE if not set.
    */
   public static String getErasureCodingPolicy(Path p) {
     if (isDistributedFileSystem(p)) {
       try {
-        ErasureCodingPolicy policy = getDistributedFileSystem().getErasureCodingPolicy(p);
+        DistributedFileSystem dfs = (DistributedFileSystem) p.getFileSystem(CONF);
+        ErasureCodingPolicy policy = dfs.getErasureCodingPolicy(p);
         if (policy != null) {
           return policy.getName();
+        }
+      } catch (IOException e) {
+        LOG.warn("Unable to retrieve erasure coding policy for {}", p, e);
+      }
+    } else if (isOzoneFileSystem(p)) {
+      try {
+        FileSystem fs = p.getFileSystem(CONF);
+        if (fs instanceof BasicRootedOzoneFileSystem) {
+          BasicRootedOzoneFileSystem ofs = (BasicRootedOzoneFileSystem) fs;
+          Preconditions.checkState(
+              ofs.getAdapter() instanceof BasicRootedOzoneClientAdapterImpl);
+          BasicRootedOzoneClientAdapterImpl adapter =
+              (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
+          String replication = getOzoneReplication(adapter.getObjectStore(), p);
+          if (replication != null) {
+            return replication;
+          }
+        } else {
+          LOG.debug("Retrieving erasure code policy not supported for {}", p);
         }
       } catch (IOException e) {
         LOG.warn("Unable to retrieve erasure coding policy for {}", p, e);
@@ -268,14 +318,17 @@ public class FileSystemUtil {
   }
 
   // Returns the first two elements (volume, bucket) of the unqualified path.
-  public static String volumeBucketSubstring(Path p) {
+  public static Pair<String, String> volumeBucketPair(Path p) {
     String path = Path.getPathWithoutSchemeAndAuthority(p).toString();
-    if (path.startsWith("/")) path = path.substring(1);
-    int afterVolume = path.indexOf('/');
-    if (afterVolume == -1) return path;
-    int afterBucket = path.indexOf('/', afterVolume + 1);
-    if (afterBucket == -1) return path;
-    return path.substring(0, afterBucket);
+    StringTokenizer tokens = new StringTokenizer(path, OZONE_URI_DELIMITER);
+    String volume = "", bucket = "";
+    if (tokens.hasMoreTokens()) {
+      volume = tokens.nextToken();
+      if (tokens.hasMoreTokens()) {
+        bucket = tokens.nextToken();
+      }
+    }
+    return Pair.create(volume, bucket);
   }
 
   /*
@@ -290,7 +343,7 @@ public class FileSystemUtil {
     if (!hasScheme(source, SCHEME_OFS)) return true;
 
     // Compare (volume, bucket) for source and dest.
-    return volumeBucketSubstring(source).equals(volumeBucketSubstring(dest));
+    return volumeBucketPair(source).equals(volumeBucketPair(dest));
   }
 
   /**

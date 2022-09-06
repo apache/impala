@@ -214,19 +214,20 @@ public class FileSystemUtilTest {
   }
 
   @Test
-  public void testVolumeBucketSubstring() throws IOException {
-    List<Pair<String, String>> cases = Arrays.asList(
-      Pair.create(mockLocation(FileSystemUtil.SCHEME_OFS), "volume1/bucket2"),
-      Pair.create("ofs://svc1:9876/volume/bucket/file", "volume/bucket"),
-      Pair.create("ofs://svc1:9876/volume/bucket/", "volume/bucket"),
-      Pair.create("ofs://svc1:9876/volume/bucket", "volume/bucket"),
-      Pair.create("ofs://svc1:9876/volume/", "volume"),
-      Pair.create("ofs://svc1:9876/volume", "volume"),
-      Pair.create("ofs://svc1:9876/", "")
+  public void testVolumeBucketPair() throws IOException {
+    List<Pair<String, Pair<String, String>>> cases = Arrays.asList(
+      Pair.create(mockLocation(FileSystemUtil.SCHEME_OFS),
+          Pair.create("volume1", "bucket2")),
+      Pair.create("ofs://svc1:9876/volume/bucket/file", Pair.create("volume", "bucket")),
+      Pair.create("ofs://svc1:9876/volume/bucket/", Pair.create("volume", "bucket")),
+      Pair.create("ofs://svc1:9876/volume/bucket", Pair.create("volume", "bucket")),
+      Pair.create("ofs://svc1:9876/volume/", Pair.create("volume", "")),
+      Pair.create("ofs://svc1:9876/volume", Pair.create("volume", "")),
+      Pair.create("ofs://svc1:9876/", Pair.create("", ""))
     );
-    for (Pair<String, String> c : cases) {
+    for (Pair<String, Pair<String, String>> c : cases) {
       Path p = new Path(c.first);
-      assertEquals(c.second, FileSystemUtil.volumeBucketSubstring(p));
+      assertEquals(c.second, FileSystemUtil.volumeBucketPair(p));
     }
   }
 

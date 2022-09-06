@@ -66,7 +66,8 @@ class SkipIfFS:
   shutdown_idle_fails = pytest.mark.skipif(IS_COS or IS_GCS or IS_OSS,
       reason="IMPALA-10562")
   late_filters = pytest.mark.skipif(IS_ISILON, reason="IMPALA-6998")
-  read_past_eof = pytest.mark.skipif(IS_S3 or IS_GCS, reason="IMPALA-2512")
+  read_past_eof = pytest.mark.skipif(IS_S3 or IS_GCS or (IS_OZONE and IS_EC),
+      reason="IMPALA-2512")
   large_block_size = pytest.mark.skipif(IS_OZONE or IS_EC,
       reason="block size is larger than 128MB")
   read_speed_dependent = pytest.mark.skipif(not IS_HDFS or IS_EC,
@@ -110,6 +111,8 @@ class SkipIf:
       reason="Secondary filesystem needed")
   is_buggy_el6_kernel = pytest.mark.skipif(
       IS_BUGGY_EL6_KERNEL, reason="Kernel is affected by KUDU-1508")
+
+  ozone_ec_incomplete = pytest.mark.skipif(IS_OZONE and IS_EC, reason="HDDS-7603")
 
 class SkipIfLocal:
   # These are skipped due to product limitations.

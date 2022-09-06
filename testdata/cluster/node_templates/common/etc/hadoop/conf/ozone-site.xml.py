@@ -18,7 +18,6 @@
 # under the License.
 
 import os
-import sys
 
 CONFIG = {
   # Host/port configs
@@ -41,3 +40,9 @@ CONFIG = {
   'ozone.om.ratis.storage.dir': '${NODE_DIR}/data/ozone/om-ratis',
   'dfs.container.ratis.datanode.storage.dir': '${NODE_DIR}/data/ozone/ratis',
 }
+
+if os.environ.get('OZONE_ERASURECODE_POLICY'):
+  CONFIG.update({
+    'ozone.server.default.replication.type': 'EC',
+    'ozone.server.default.replication': os.environ['OZONE_ERASURECODE_POLICY'],
+  })

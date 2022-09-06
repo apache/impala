@@ -1892,6 +1892,7 @@ class TestErasureCoding(ImpalaTestSuite):
   def get_workload(cls):
     return 'functional-query'
 
+  @SkipIf.ozone_ec_incomplete
   @SkipIf.not_ec
   def test_erasure_coding(self, vector):
     self.run_test_case('QueryTest/hdfs-erasure-coding', vector)
