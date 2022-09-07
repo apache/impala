@@ -1102,6 +1102,10 @@ class TestIcebergTable(IcebergTestSuite):
   def test_avro_file_format(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-avro', vector, unique_database)
 
+  def test_convert_table(self, vector, unique_database):
+      self.run_test_case('QueryTest/iceberg-migrate-from-external-hdfs-tables',
+                         vector, unique_database)
+
 
 class TestIcebergV2Table(IcebergTestSuite):
   """Tests related to Iceberg V2 tables."""

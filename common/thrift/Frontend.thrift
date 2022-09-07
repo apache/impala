@@ -587,6 +587,22 @@ struct TAccessEvent {
   3: required string privilege
 }
 
+// Request for "ALTER TABLE ... CONVERT TO" statements
+struct TConvertTableRequest {
+  1: required CatalogObjects.TTableName table_name
+  2: required CatalogObjects.TTableName hdfs_table_name
+  3: required CatalogObjects.THdfsFileFormat file_format
+  4: optional map<string, string> properties
+  5: optional string set_hdfs_table_properties_query
+  6: optional string rename_hdfs_table_to_temporary_query
+  7: optional string refresh_temporary_hdfs_table_query
+  8: optional string reset_table_name_query
+  9: optional string create_iceberg_table_query
+  10: optional string invalidate_metadata_query
+  11: optional string post_create_alter_table_query
+  12: optional string drop_temporary_hdfs_table_query
+}
+
 // Result of call to createExecRequest()
 struct TExecRequest {
   1: required Types.TStmtType stmt_type
@@ -647,6 +663,9 @@ struct TExecRequest {
   // True if request pool is set by Frontend rather than user specifically setting it via
   // REQUEST_POOL query option.
   18: optional bool request_pool_set_by_frontend = false
+
+  // Request for "ALTER TABLE ... CONVERT TO" statements.
+  19: optional TConvertTableRequest convert_table_request
 }
 
 // Parameters to FeSupport.cacheJar().

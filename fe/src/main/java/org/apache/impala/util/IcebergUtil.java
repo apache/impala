@@ -101,12 +101,14 @@ import org.apache.impala.thrift.TIcebergPartitionTransformType;
 
 @SuppressWarnings("UnstableApiUsage")
 public class IcebergUtil {
+
   private static final int ICEBERG_EPOCH_YEAR = 1970;
   private static final int ICEBERG_EPOCH_MONTH = 1;
   @SuppressWarnings("unused")
   private static final int ICEBERG_EPOCH_DAY = 1;
   @SuppressWarnings("unused")
   private static final int ICEBERG_EPOCH_HOUR = 0;
+  public static final String HIVE_CATALOG = "hive.catalog";
 
   /**
    * Returns the corresponding catalog implementation for 'feTable'.
@@ -277,7 +279,7 @@ public class IcebergUtil {
       return TIcebergCatalog.HADOOP_TABLES;
     } else if ("hadoop.catalog".equalsIgnoreCase(catalog)) {
       return TIcebergCatalog.HADOOP_CATALOG;
-    } else if ("hive.catalog".equalsIgnoreCase(catalog) ||
+    } else if (HIVE_CATALOG.equalsIgnoreCase(catalog) ||
                catalog == null) {
       return TIcebergCatalog.HIVE_CATALOG;
     }

@@ -17,12 +17,13 @@
 
 package org.apache.impala.catalog.iceberg;
 
+
 import static org.apache.impala.catalog.Table.TBL_PROP_EXTERNAL_TABLE_PURGE;
 import static org.apache.impala.catalog.Table.TBL_PROP_EXTERNAL_TABLE_PURGE_DEFAULT;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Properties;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.iceberg.CatalogUtil;
@@ -42,8 +43,6 @@ import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.util.IcebergUtil;
-
-import com.google.common.base.Preconditions;
 
 /**
  * Implementation of IcebergCatalog for tables handled by Iceberg's Catalogs API.
@@ -135,6 +134,12 @@ public class IcebergCatalogs implements IcebergCatalog {
   }
 
   @Override
+  public boolean dropTable(String dbName, String tblName, boolean purge) {
+    throw new UnsupportedOperationException(
+        "'Catalogs' doesn't support dropping table by name");
+  }
+
+  @Override
   public void renameTable(FeIcebergTable feTable, TableIdentifier newTableId) {
     // Iceberg's Catalogs class has no renameTable() method
     throw new UnsupportedOperationException(
@@ -150,8 +155,8 @@ public class IcebergCatalogs implements IcebergCatalog {
     return configuration_.get(propKey);
   }
 
-  private Properties createPropsForCatalogs(TableIdentifier tableId, String location,
-      Map<String, String> tableProps) {
+  public static Properties createPropsForCatalogs(TableIdentifier tableId,
+      String location, Map<String, String> tableProps) {
     Properties properties = new Properties();
     properties.putAll(tableProps);
     if (tableId != null) {
@@ -160,7 +165,7 @@ public class IcebergCatalogs implements IcebergCatalog {
       properties.setProperty(Catalogs.LOCATION, location);
     }
     properties.setProperty(IcebergTable.ICEBERG_CATALOG,
-                           tableProps.get(IcebergTable.ICEBERG_CATALOG));
+        tableProps.get(IcebergTable.ICEBERG_CATALOG));
     return properties;
   }
 }

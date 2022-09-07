@@ -2051,7 +2051,7 @@ public class MetastoreEvents {
         }
       } catch (CatalogException e) {
         throw new MetastoreNotificationNeedsInvalidateException(debugString("Failed to "
-                + "refresh newly added partitions of table {}. Event processing cannot "
+                + "refresh newly added partitions of table '%s'. Event processing cannot "
                 + "continue. Issue an invalidate metadata command to reset event "
                 + "processor.", getFullyQualifiedTblName()), e);
       }

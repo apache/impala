@@ -642,6 +642,8 @@ struct TQueryOptions {
   // See comment in ImpalaService.thrift
   159: optional bool allow_unsafe_casts = false;
 
+  // See comment in ImpalaService.thrift
+  160: optional i32 num_threads_for_table_migration = 1;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

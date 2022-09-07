@@ -1111,6 +1111,13 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_allow_unsafe_casts(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::NUM_THREADS_FOR_TABLE_MIGRATION: {
+        int32_t int32_t_val = 0;
+        RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckInclusiveRange<int32_t>(
+            option, value, 0, 1024, &int32_t_val));
+        query_options->__set_num_threads_for_table_migration(int32_t_val);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

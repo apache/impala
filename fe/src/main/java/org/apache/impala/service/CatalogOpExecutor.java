@@ -4304,6 +4304,11 @@ public class CatalogOpExecutor {
           table.getFullName());
       return 0;
     }
+    if (table instanceof IcebergTable) {
+      LOG.info("EventId: {} Table {} is an Iceberg table. Partitioning is handled by " +
+          "Iceberg. Skipping add partitions", eventId, table.getFullName());
+      return 0;
+    }
     if(!(table instanceof HdfsTable)) {
       throw new CatalogException(
           "Partition event " + eventId + " received on a non-hdfs table");

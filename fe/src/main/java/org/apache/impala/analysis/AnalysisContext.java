@@ -212,6 +212,10 @@ public class AnalysisContext {
           || isShowTablesStmt() || isAlterTableStmt() || isShowFunctionsStmt();
     }
 
+    public boolean isConvertTableToIcebergStmt() {
+      return stmt_ instanceof ConvertTableToIcebergStmt;
+    }
+
     public AlterTableStmt getAlterTableStmt() {
       Preconditions.checkState(isAlterTableStmt());
       return (AlterTableStmt) stmt_;
@@ -379,6 +383,11 @@ public class AnalysisContext {
     public AdminFnStmt getAdminFnStmt() {
       Preconditions.checkState(isAdminFnStmt());
       return (AdminFnStmt) stmt_;
+    }
+
+    public ConvertTableToIcebergStmt getConvertTableToIcebergStmt() {
+      Preconditions.checkState(isConvertTableToIcebergStmt());
+      return (ConvertTableToIcebergStmt) stmt_;
     }
 
     public StatementBase getStmt() { return stmt_; }

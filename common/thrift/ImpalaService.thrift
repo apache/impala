@@ -799,6 +799,10 @@ enum TImpalaQueryOptions {
   // implicit casts between numeric and string types in set operations and insert
   // statements.
   ALLOW_UNSAFE_CASTS = 158;
+
+  // The maximum number of threads Impala can use for migrating a table to a different
+  // type. E.g. from Hive table to Iceberg table.
+  NUM_THREADS_FOR_TABLE_MIGRATION = 159;
 }
 
 // The summary of a DML statement.

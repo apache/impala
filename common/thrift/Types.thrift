@@ -109,6 +109,7 @@ enum TStmtType {
   SET = 5
   ADMIN_FN = 6
   TESTCASE = 7
+  CONVERT = 8
 }
 
 enum TIcebergOperation {

@@ -305,7 +305,7 @@ terminal
   KW_ARRAY, KW_AS, KW_ASC, KW_AUTHORIZATION, KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BINARY,
   KW_BLOCKSIZE, KW_BOOLEAN, KW_BY, KW_CACHED, KW_CASCADE, KW_CASE, KW_CAST, KW_CHANGE,
   KW_CHAR, KW_CLASS, KW_CLOSE_FN, KW_COLUMN, KW_COLUMNS, KW_COMMENT, KW_COMPRESSION,
-  KW_COMPUTE, KW_CONSTRAINT, KW_COPY, KW_CREATE, KW_CROSS, KW_CUBE, KW_CURRENT, KW_DATA,
+  KW_COMPUTE, KW_CONSTRAINT, KW_CONVERT, KW_COPY, KW_CREATE, KW_CROSS, KW_CUBE, KW_CURRENT, KW_DATA,
   KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DEFAULT, KW_DELETE,
   KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISABLE, KW_DISTINCT, KW_DIV, KW_DOUBLE,
   KW_DROP, KW_ELSE, KW_ENABLE, KW_ENCODING, KW_END, KW_ESCAPED, KW_EXCEPT, KW_EXECUTE,
@@ -617,6 +617,9 @@ nonterminal CopyTestCaseStmt copy_testcase_stmt;
 // Admin statements.
 nonterminal AdminFnStmt admin_fn_stmt;
 
+// For "ALTER TABLE ... CONVERT TO" statements
+nonterminal ConvertTableToIcebergStmt convert_tbl_stmt;
+
 precedence left KW_LOGICAL_OR;
 precedence left KW_OR;
 precedence left KW_AND;
@@ -764,6 +767,8 @@ stmt ::=
   {: RESULT = shutdown; :}
   | stmt:s SEMICOLON
   {: RESULT = s; :}
+  | convert_tbl_stmt: convert
+  {: RESULT = convert; :}
   ;
 
 load_stmt ::=
@@ -1367,6 +1372,14 @@ alter_tbl_stmt ::=
   {:
     RESULT = AlterTableExecuteStmt.createExecuteStmt(table, expr);
   :}
+  ;
+
+convert_tbl_stmt ::=
+  KW_ALTER KW_TABLE table_name:table KW_CONVERT KW_TO KW_ICEBERG
+  {: RESULT = new ConvertTableToIcebergStmt(table); :}
+  | KW_ALTER KW_TABLE table_name:table KW_CONVERT KW_TO KW_ICEBERG
+    KW_TBLPROPERTIES LPAREN properties_map:props RPAREN
+  {: RESULT =  new ConvertTableToIcebergStmt(table, props); :}
   ;
 
 table_property_type ::=
@@ -4210,6 +4223,8 @@ word ::=
   | KW_COMPUTE:r
   {: RESULT = r.toString(); :}
   | KW_CONSTRAINT:r
+  {: RESULT = r.toString(); :}
+  | KW_CONVERT:r
   {: RESULT = r.toString(); :}
   | KW_COPY:r
   {: RESULT = r.toString(); :}

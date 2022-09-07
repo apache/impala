@@ -80,6 +80,7 @@ import org.apache.impala.thrift.TLoadDataReq;
 import org.apache.impala.thrift.TLoadDataResp;
 import org.apache.impala.thrift.TLogLevel;
 import org.apache.impala.thrift.TMetadataOpRequest;
+import org.apache.impala.thrift.TConvertTableRequest;
 import org.apache.impala.thrift.TQueryCompleteContext;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TResultSet;
@@ -214,6 +215,15 @@ public class JniFrontend {
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }
+  }
+
+  /**
+   * Jni wrapper for Frontend#convertTable(TConvertRequest).
+   */
+  public void convertTable(byte[] params) throws ImpalaException {
+    TExecRequest execRequest = new TExecRequest();
+    JniUtil.deserializeThrift(protocolFactory_, execRequest, params);
+    frontend_.convertTable(execRequest);
   }
 
   /**

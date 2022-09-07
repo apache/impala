@@ -17,33 +17,53 @@
 
 package org.apache.impala.analysis;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.UUID;
 
 /**
- * This class standardizes the query string building process. At this point only used for
- * child query creation for Iceberg LOAD DATA INPATH queries. Each inner class is
- * responsible for a specific query type, while the outer class can be used to instantiate
- * the inner classes. The methods of the inner classes are supposed to be chainable.
+ * This class standardizes the query string building process. Each inner class is
+ * responsible for a specific query type, while the outer class can be used to
+ * instantiate the inner classes. The methods of the inner classes are supposed to be
+ * chainable.
  */
 public class QueryStringBuilder {
 
+  public static String createTmpTableName(String dbName, String tableName) {
+    return dbName + "." + tableName + "_tmp_" + UUID.randomUUID().toString()
+        .substring(0, 8);
+  }
+
+  private static String appendProps(StringBuilder builder, Map<String, String> props_) {
+    builder.append(" TBLPROPERTIES (");
+    for (Entry<String, String> prop : props_.entrySet()) {
+      builder.append("'").append(prop.getKey()).append("'='").append(prop.getValue())
+          .append("',");
+    }
+    builder.deleteCharAt(builder.length() - 1);
+    builder.append(")");
+    return builder.toString();
+  }
+
   public static class Create {
     private String tableName_;
-    private Boolean external_;
-    private Boolean like_;
+    private boolean external_;
+    private boolean like_;
     private String likeFileFormat_;
     private String likeLocation_;
     private String storedAsFileFormat_;
     private String tableLocation_;
-    private List<String> tableProperties_;
+    private final Map<String, String> props_= Maps.newHashMap();
 
-    public Create() {
-      tableProperties_ = new ArrayList<String>();
+    public Create() {}
+
+    public static Create builder() {
+      return new Create();
     }
 
-    public Create table(String tableName, Boolean external) {
+    public Create table(String tableName, boolean external) {
       tableName_ = tableName;
       external_ = external;
       return this;
@@ -66,8 +86,8 @@ public class QueryStringBuilder {
       return this;
     }
 
-    public Create addTableProperty(String key, String value) {
-      tableProperties_.add("'" + key + "'='" + value + "'");
+    public Create property(String k, String v) {
+      props_.put(k, v);
       return this;
     }
 
@@ -84,32 +104,28 @@ public class QueryStringBuilder {
       }
       builder.append("STORED AS " + storedAsFileFormat_ + " ");
       builder.append("LOCATION '" + tableLocation_ + "'");
-      if (!tableProperties_.isEmpty()) {
-        builder.append(" TBLPROPERTIES (");
-        Iterator<String> it = tableProperties_.iterator();
-        while(it.hasNext()) {
-          builder.append(it.next());
-          if(it.hasNext()) builder.append(", ");
-        }
-        builder.append(")");
+      if (props_.isEmpty()) {
+        return builder.toString();
       }
-      return builder.toString();
+      return appendProps(builder, props_);
     }
   }
 
   public static class Insert {
     private String tableName_;
-    private Boolean overwrite_;
+    private boolean overwrite_;
     private Select select_;
 
-    public Insert() {}
+    public static Insert builder() {
+      return new Insert();
+    }
 
     public Insert table(String tableName) {
       tableName_ = tableName + " ";
       return this;
     }
 
-    public Insert overwrite(Boolean overwrite) {
+    public Insert overwrite(boolean overwrite) {
       overwrite_ = overwrite;
       return this;
     }
@@ -136,7 +152,9 @@ public class QueryStringBuilder {
     private String selectList_;
     private String tableName_;
 
-    public Select() {}
+    public static Select builder() {
+      return new Select();
+    }
 
     public Select selectList(String selectList) {
       selectList_ = selectList;
@@ -159,7 +177,9 @@ public class QueryStringBuilder {
   public static class Drop {
     private String tableName_;
 
-    public Drop() {}
+    public static Drop builder() {
+      return new Drop();
+    }
 
     public Drop table(String tableName) {
       tableName_ = tableName;
@@ -171,6 +191,95 @@ public class QueryStringBuilder {
       builder.append("DROP TABLE ");
       builder.append(tableName_);
       return builder.toString();
+    }
+  }
+
+  public static class SetTblProps {
+    private String tableName_;
+    private final Map<String, String> props_ = Maps.newHashMap();;
+
+    public static SetTblProps builder() {
+      return new SetTblProps();
+    }
+
+    public SetTblProps table(String tableName) {
+      tableName_ = tableName;
+      return this;
+    }
+
+    public SetTblProps property(String k, String v) {
+      props_.put(k, v);
+      return this;
+    }
+
+    public String build() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("ALTER TABLE ");
+      builder.append(tableName_);
+      builder.append(" SET");
+      Preconditions.checkState(props_.size() >= 1);
+      return appendProps(builder, props_);
+    }
+  }
+
+  public static class Rename {
+
+    private String sourceTableName_;
+    private String targetTableName_;
+
+    public static Rename builder() {
+      return new Rename();
+    }
+
+    public Rename source(String tableName) {
+      sourceTableName_ = tableName;
+      return this;
+    }
+
+    public Rename target(String tableName) {
+      targetTableName_ = tableName;
+      return this;
+    }
+
+    public String build() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("ALTER TABLE ");
+      builder.append(sourceTableName_);
+      builder.append(" RENAME TO ");
+      builder.append(targetTableName_);
+      return builder.toString();
+    }
+  }
+
+  public static class Refresh {
+    private String tableName_;
+
+    public static Refresh builder() {
+      return new Refresh();
+    }
+
+    public Refresh table(String tableName) {
+      tableName_ = tableName;
+      return this;
+    }
+
+    public String build() {
+      return "REFRESH " + tableName_;
+    }
+  }
+
+  public static class Invalidate {
+    private String tableName_;
+
+    public static Invalidate builder() { return new Invalidate(); }
+
+    public Invalidate table(String tableName) {
+      tableName_ = tableName;
+      return this;
+    }
+
+    public String build() {
+      return "INVALIDATE METADATA " + tableName_;
     }
   }
 }

@@ -25,11 +25,9 @@
 #include <rapidjson/rapidjson.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
-#include <rapidjson/error/en.h>
 
 #include "catalog/catalog-service-client-wrapper.h"
 #include "common/status.h"
-#include "exec/kudu/kudu-util.h"
 #include "exprs/timezone_db.h"
 #include "kudu/rpc/rpc_controller.h"
 #include "rpc/rpc-mgr.inline.h"
@@ -52,15 +50,12 @@
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
 #include "util/lineage-util.h"
-#include "util/metrics.h"
 #include "util/pretty-printer.h"
-#include "util/promise.h"
 #include "util/redactor.h"
 #include "util/runtime-profile-counters.h"
 #include "util/time.h"
 #include "util/uid-util.h"
 
-#include "gen-cpp/CatalogService.h"
 #include "gen-cpp/CatalogService_types.h"
 #include "gen-cpp/control_service.pb.h"
 #include "gen-cpp/control_service.proxy.h"
@@ -312,6 +307,10 @@ Status ClientRequestState::Exec() {
     case TStmtType::ADMIN_FN:
       DCHECK(exec_request_->admin_request.type == TAdminRequestType::SHUTDOWN);
       RETURN_IF_ERROR(ExecShutdownRequest());
+      break;
+    case TStmtType::CONVERT:
+      DCHECK(exec_request_->__isset.convert_table_request);
+      LOG_AND_RETURN_IF_ERROR(ExecMigrateRequest());
       break;
     default:
       stringstream errmsg;
@@ -2217,6 +2216,119 @@ void ClientRequestState::CopyRPCs(ClientRequestState& from_request) {
     rpc_context->Register();
     pending_rpcs_.insert(rpc_context);
   }
+}
+
+Status ClientRequestState::ExecMigrateRequest() {
+  ExecMigrateRequestImpl();
+  SetResultSet({"Table has been migrated."});
+  return query_status_;
+}
+
+void ClientRequestState::ExecMigrateRequestImpl() {
+  // A convert table request holds the query strings for the sub-queries. These are
+  // populated by ConvertTableToIcebergStmt in the Frontend during analysis.
+  TConvertTableRequest& params = exec_request_->convert_table_request;
+  {
+    RuntimeProfile* child_profile =
+        RuntimeProfile::Create(&profile_pool_, "Child Queries 1");
+    profile_->AddChild(child_profile);
+    vector<ChildQuery> child_queries;
+
+    // Prepare: SET some table properties for the original table.
+    RuntimeProfile* set_hdfs_table_profile = RuntimeProfile::Create(
+        &profile_pool_, "Set properties for HDFS table query");
+    child_profile->AddChild(set_hdfs_table_profile);
+    child_queries.emplace_back(params.set_hdfs_table_properties_query, this,
+        parent_server_, set_hdfs_table_profile, &profile_pool_);
+
+    // Prepare: RENAME the HDFS table to a temporary HDFS table.
+    RuntimeProfile* rename_hdfs_table_profile = RuntimeProfile::Create(
+        &profile_pool_, "Rename HDFS table query");
+    child_profile->AddChild(rename_hdfs_table_profile);
+    child_queries.emplace_back(params.rename_hdfs_table_to_temporary_query,
+        this, parent_server_, rename_hdfs_table_profile, &profile_pool_);
+
+    // Prepare: REFRESH the temporary HDFS table.
+    RuntimeProfile* refresh_hdfs_table_profile = RuntimeProfile::Create(
+        &profile_pool_, "Refresh temporary HDFS table query");
+    child_profile->AddChild(refresh_hdfs_table_profile);
+    child_queries.emplace_back(params.refresh_temporary_hdfs_table_query, this,
+        parent_server_, refresh_hdfs_table_profile, &profile_pool_);
+
+    // Execute child queries
+    unique_ptr<ChildQueryExecutor> query_executor(new ChildQueryExecutor());
+    RETURN_VOID_IF_ERROR(query_executor->ExecAsync(move(child_queries)));
+    vector<ChildQuery*>* completed_queries = new vector<ChildQuery*>();
+    Status query_status = query_executor->WaitForAll(completed_queries);
+    if (!query_status.ok()) AddTableResetHints(params, &query_status);
+    {
+      lock_guard<mutex> l(lock_);
+      RETURN_VOID_IF_ERROR(UpdateQueryStatus(query_status));
+    }
+  }
+  // Create an external Iceberg table using the data of the HDFS table.
+  Status status = frontend_->Convert(*exec_request_);
+  if (!status.ok()) AddTableResetHints(params, &status);
+  {
+    lock_guard<mutex> l(lock_);
+    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
+  }
+  {
+    RuntimeProfile* child_profile =
+        RuntimeProfile::Create(&profile_pool_, "Child Queries 2");
+    profile_->AddChild(child_profile);
+    vector<ChildQuery> child_queries;
+
+    if (params.__isset.create_iceberg_table_query) {
+      // Prepare: CREATE the Iceberg table that inherits HDFS table location.
+      RuntimeProfile* create_iceberg_table_profile = RuntimeProfile::Create(
+          &profile_pool_, "Create Iceberg table query");
+      child_profile->AddChild(create_iceberg_table_profile);
+      child_queries.emplace_back(params.create_iceberg_table_query, this,
+          parent_server_, create_iceberg_table_profile, &profile_pool_);
+    } else {
+      // Prepare: Invalidate metadata for tables in Hive catalog to guarantee that it is
+      // propagated instantly to all coordinators.
+      RuntimeProfile* invalidate_metadata_profile = RuntimeProfile::Create(
+          &profile_pool_, "Invalidate metadata Iceberg table query");
+      child_profile->AddChild(invalidate_metadata_profile);
+      child_queries.emplace_back(params.invalidate_metadata_query, this,
+          parent_server_, invalidate_metadata_profile, &profile_pool_);
+    }
+
+    if (params.__isset.post_create_alter_table_query) {
+      // Prepare: ALTER TABLE query after creating the Iceberg table.
+      RuntimeProfile* post_create_alter_table_profile = RuntimeProfile::Create(
+          &profile_pool_, "ALTER TABLE after create Iceberg table query");
+      child_profile->AddChild(post_create_alter_table_profile);
+      child_queries.emplace_back(params.post_create_alter_table_query, this,
+          parent_server_, post_create_alter_table_profile, &profile_pool_);
+    }
+
+    // Prepare: DROP the temporary HDFS table.
+    RuntimeProfile* drop_tmp_hdfs_table_profile = RuntimeProfile::Create(
+        &profile_pool_, "Drop temporary HDFS table query");
+    child_profile->AddChild(drop_tmp_hdfs_table_profile);
+    child_queries.emplace_back(params.drop_temporary_hdfs_table_query, this,
+        parent_server_, drop_tmp_hdfs_table_profile, &profile_pool_);
+
+    // Execute queries
+    unique_ptr<ChildQueryExecutor> query_executor(new ChildQueryExecutor());
+    RETURN_VOID_IF_ERROR(query_executor->ExecAsync(move(child_queries)));
+    vector<ChildQuery*>* completed_queries = new vector<ChildQuery*>();
+    Status query_status = query_executor->WaitForAll(completed_queries);
+    {
+      lock_guard<mutex> l(lock_);
+      RETURN_VOID_IF_ERROR(UpdateQueryStatus(query_status));
+    }
+  }
+}
+
+void ClientRequestState::AddTableResetHints(const TConvertTableRequest& params,
+      Status* status) const {
+  string table_reset_hint("Your table might have been renamed. To reset the name "
+      "try running:\n" + params.reset_table_name_query + ";");
+  status->MergeStatus(Status(table_reset_hint));
 }
 
 }

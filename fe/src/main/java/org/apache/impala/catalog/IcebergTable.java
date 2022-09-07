@@ -134,6 +134,9 @@ public class IcebergTable extends Table implements FeIcebergTable {
   public static final int V2_FILE_PATH_FIELD_ID = 2147483546;
   public static final int V2_POS_FIELD_ID = 2147483545;
 
+  // The name of the folder where Iceberg metadata lives.
+  public static final String METADATA_FOLDER_NAME = "metadata";
+
   // Iceberg catalog type dependent on table properties
   private TIcebergCatalog icebergCatalog_;
 

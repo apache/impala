@@ -1,0 +1,355 @@
+====
+---- QUERY
+create table alltypes (
+    id int,
+    bool_col boolean,
+    tinyint_col int,
+    smallint_col int,
+    int_col int,
+    bigint_col bigint,
+    float_col float,
+    double_col double,
+    string_col string,
+    timestamp_col timestamp)
+partitioned by (year int, month int, date_col date, date_string_col string)
+stored as parquet;
+insert into alltypes partition (year, month, date_col, date_string_col)
+    select
+        id,
+        bool_col,
+        cast(tinyint_col as int) as tinyint_col,
+        cast(smallint_col as int) as smallint_col,
+        int_col,
+        bigint_col,
+        float_col,
+        double_col,
+        string_col,
+        timestamp_col,
+        year,
+        month,
+        cast(date_string_col as date format 'MM/DD/YY') as date_col,
+        # removing '/' until Iceberg issue #7612 is fixed
+        replace(date_string_col, "/", "")
+    from functional.alltypes t;
+insert into alltypes partition (year, month, date_col, date_string_col)
+values (10000, true, 1, 2, 3, 4, 5.1, 6.2, "str", "2023-05-01 01:02:03", 2023, 5,
+    cast("2023-05-02" as date) as date_col, null as date_string_col);
+describe alltypes;
+---- RESULTS
+'id','int',regex:'.*'
+'bool_col','boolean',regex:'.*'
+'tinyint_col','int',regex:'.*'
+'smallint_col','int',regex:'.*'
+'int_col','int',regex:'.*'
+'bigint_col','bigint',regex:'.*'
+'float_col','float',regex:'.*'
+'double_col','double',regex:'.*'
+'string_col','string',regex:'.*'
+'timestamp_col','timestamp',regex:'.*'
+'year','int',regex:'.*'
+'month','int',regex:'.*'
+'date_col','date',regex:'.*'
+'date_string_col','string',regex:'.*'
+---- TYPES
+string,string,string
+====
+---- QUERY
+create table parquet_partitioned like alltypes stored as parquet;
+insert into parquet_partitioned partition(year, month, date_col, date_string_col)
+    select * from alltypes;
+select count(*) from parquet_partitioned;
+---- RESULTS
+7301
+---- TYPES
+bigint
+====
+---- QUERY
+describe formatted parquet_partitioned;
+---- RESULTS: VERIFY_IS_SUBSET
+'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/parquet_partitioned','NULL'
+'SerDe Library:      ','org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe','NULL'
+'InputFormat:        ','org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat','NULL'
+'OutputFormat:       ','org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+alter table parquet_partitioned convert to iceberg tblproperties('iceberg.catalog' = 'hadoop.tables');
+---- RESULTS
+'Table has been migrated.'
+====
+---- QUERY
+select count(*) from parquet_partitioned;
+---- RESULTS
+7301
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+====
+---- QUERY
+describe formatted parquet_partitioned;
+---- RESULTS: VERIFY_IS_SUBSET
+'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/parquet_partitioned','NULL'
+'','iceberg.catalog     ','hadoop.tables       '
+'','external.table.purge','true                '
+'','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
+'','write.format.default','parquet             '
+'SerDe Library:      ','org.apache.iceberg.mr.hive.HiveIcebergSerDe','NULL'
+'InputFormat:        ','org.apache.iceberg.mr.hive.HiveIcebergInputFormat','NULL'
+'OutputFormat:       ','org.apache.iceberg.mr.hive.HiveIcebergOutputFormat','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+create table alltypesnopart like functional.alltypesnopart stored as parquet;
+alter table alltypesnopart change column smallint_col smallint_col int comment 'changed to int col';
+alter table alltypesnopart change column tinyint_col tinyint_col int comment 'changed to int col';
+describe alltypesnopart;
+---- RESULTS
+'id','int',regex:'.*'
+'bool_col','boolean',regex:'.*'
+'tinyint_col','int',regex:'.*'
+'smallint_col','int',regex:'.*'
+'int_col','int',regex:'.*'
+'bigint_col','bigint',regex:'.*'
+'float_col','float',regex:'.*'
+'double_col','double',regex:'.*'
+'date_string_col','string',regex:'.*'
+'string_col','string',regex:'.*'
+'timestamp_col','timestamp',regex:'.*'
+---- TYPES
+string,string,string
+====
+---- QUERY
+create table parquet_nopartitioned like alltypesnopart stored as parquet;
+insert into parquet_nopartitioned
+select id,
+       bool_col,
+       tinyint_col,
+       smallint_col,
+       int_col,
+       bigint_col,
+       float_col,
+       double_col,
+       date_string_col,
+       string_col,
+       timestamp_col
+from alltypes;
+select count(*) from parquet_nopartitioned;
+---- RESULTS
+7301
+---- TYPES
+bigint
+====
+---- QUERY
+describe formatted parquet_nopartitioned;
+---- RESULTS: VERIFY_IS_SUBSET
+'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/parquet_nopartitioned','NULL'
+'SerDe Library:      ','org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe','NULL'
+'InputFormat:        ','org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat','NULL'
+'OutputFormat:       ','org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+alter table parquet_nopartitioned convert to iceberg tblproperties('iceberg.catalog' = 'hadoop.catalog');
+---- CATCH
+AnalysisException: The Hadoop Catalog is not supported because the location may change
+====
+---- QUERY
+alter table parquet_nopartitioned convert to iceberg;
+---- RESULTS
+'Table has been migrated.'
+====
+---- QUERY
+select count(*) from parquet_nopartitioned;
+---- RESULTS
+7301
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+====
+---- QUERY
+describe formatted parquet_nopartitioned;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','iceberg.catalog     ','hadoop.tables       '
+---- RESULTS: VERIFY_IS_SUBSET
+'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/parquet_nopartitioned','NULL'
+row_regex: '','metadata_location   ','$NAMENODE/test-warehouse/$DATABASE.db/parquet_nopartitioned/metadata/.*.metadata.json'
+'','external.table.purge','true                '
+'','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
+'','write.format.default','parquet             '
+'SerDe Library:      ','org.apache.iceberg.mr.hive.HiveIcebergSerDe','NULL'
+'InputFormat:        ','org.apache.iceberg.mr.hive.HiveIcebergInputFormat','NULL'
+'OutputFormat:       ','org.apache.iceberg.mr.hive.HiveIcebergOutputFormat','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+create table hdfs_table (col int);
+alter table hdfs_table set tblproperties ('EXTERNAL'='FALSE');
+alter table hdfs_table convert to iceberg;
+---- CATCH
+AnalysisException: CONVERT TO ICEBERG is not supported for managed tables
+====
+---- QUERY
+alter table hdfs_table set tblproperties ('EXTERNAL'='TRUE', 'transactional'='true', 'transactional_properties'='insert_only');
+alter table hdfs_table convert to iceberg;
+---- CATCH
+AnalysisException: CONVERT TO ICEBERG is not supported for transactional tables
+====
+---- QUERY
+# Check that we get an error when converting a table that has column type(s) that is invalid in Iceberg.
+create table hdfs_table2 (col tinyint) stored as parquet;
+alter table hdfs_table2 convert to iceberg;
+---- CATCH
+Unsupported Hive type: BYTE, use integer instead
+====
+---- QUERY
+# Test table migration for decimal partitioned table.
+create table decimal_tbl (
+    d2 decimal(10,0),
+    d3 decimal(20,10),
+    d4 decimal(38,38),
+    d5 decimal(10,5),
+    d6 decimal(9,0))
+partitioned by (d1 decimal(9,0))
+stored as parquet;
+insert into decimal_tbl partition (d1)
+    select d2, d3, d4, d5, d6, d1 from functional_parquet.decimal_tbl;
+describe formatted decimal_tbl;
+---- RESULTS: VERIFY_IS_SUBSET
+'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/decimal_tbl','NULL'
+'SerDe Library:      ','org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe','NULL'
+'InputFormat:        ','org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat','NULL'
+'OutputFormat:       ','org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat','NULL'
+---- TYPES
+string,string,string
+====
+---- QUERY
+alter table decimal_tbl convert to iceberg;
+---- RESULTS
+'Table has been migrated.'
+====
+---- QUERY
+describe formatted decimal_tbl;
+---- RESULTS: VERIFY_IS_SUBSET
+'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/decimal_tbl','NULL'
+row_regex: '','metadata_location   ','$NAMENODE/test-warehouse/$DATABASE.db/decimal_tbl/metadata/.*.metadata.json'
+'','external.table.purge','true                '
+'','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
+'','write.format.default','parquet             '
+'SerDe Library:      ','org.apache.iceberg.mr.hive.HiveIcebergSerDe','NULL'
+'InputFormat:        ','org.apache.iceberg.mr.hive.HiveIcebergInputFormat','NULL'
+'OutputFormat:       ','org.apache.iceberg.mr.hive.HiveIcebergOutputFormat','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Test table migration when table is at a different location than what the table name
+# would imply.
+create table table_at_random_location (i int, s string)
+    stored as parquet
+    location '$NAMENODE/test-warehouse/$DATABASE.db/random_location/';
+insert into table_at_random_location values (1, "str1"), (2, "str2"), (3, "str3");
+select * from table_at_random_location
+---- RESULTS
+1,'str1'
+2,'str2'
+3,'str3'
+---- TYPES
+int, string
+====
+---- QUERY
+describe formatted table_at_random_location;
+---- RESULTS: VERIFY_IS_SUBSET
+'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/random_location','NULL'
+'SerDe Library:      ','org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe','NULL'
+'InputFormat:        ','org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat','NULL'
+'OutputFormat:       ','org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+alter table table_at_random_location convert to iceberg;
+---- RESULTS
+'Table has been migrated.'
+====
+---- QUERY
+describe formatted table_at_random_location;
+---- RESULTS: VERIFY_IS_SUBSET
+'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/random_location','NULL'
+row_regex: '','metadata_location   ','$NAMENODE/test-warehouse/$DATABASE.db/random_location/metadata/.*.metadata.json'
+'','external.table.purge','true                '
+'','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
+'','write.format.default','parquet             '
+'SerDe Library:      ','org.apache.iceberg.mr.hive.HiveIcebergSerDe','NULL'
+'InputFormat:        ','org.apache.iceberg.mr.hive.HiveIcebergInputFormat','NULL'
+'OutputFormat:       ','org.apache.iceberg.mr.hive.HiveIcebergOutputFormat','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+select * from table_at_random_location;
+---- RESULTS
+1,'str1'
+2,'str2'
+3,'str3'
+---- TYPES
+int, string
+====
+---- QUERY
+# Currently not feasible to convert directly into a V2 Iceberg table.
+create table converted_into_v2 (i int) partitioned by (s string) stored as parquet;
+alter table converted_into_v2 convert to iceberg tblproperties ('format-version'='2');
+---- CATCH
+AnalysisException: CONVERT TO ICEBERG only accepts 'iceberg.catalog' as TBLPROPERTY.
+====
+---- QUERY
+create table simple_tbl (i int) stored as parquet;
+set debug_action="CONVERT_TABLE_FAIL_ICEBERG_CALL";
+alter table simple_tbl convert to iceberg;
+---- CATCH
+ImpalaRuntimeException: Unable load data files for location:
+====
+---- QUERY
+create table special_chars (i int) partitioned by (s string) stored as parquet;
+insert into special_chars partition (s='11 22-33&44%55"') values (1);
+insert into special_chars partition (s='aa - bb') values (2);
+insert into special_chars partition (s=null) values (3);
+alter table special_chars convert to iceberg;
+---- RESULTS
+'Table has been migrated.'
+====
+---- QUERY
+select * from special_chars;
+---- RESULTS
+1,'11 22-33&44%55"'
+2,'aa - bb'
+3,'NULL'
+---- TYPES
+int, string
+====
+---- QUERY
+select * from special_chars where s='aa - bb';
+---- RESULTS
+2,'aa - bb'
+---- TYPES
+int, string
+====
+---- QUERY
+select * from special_chars where s is null;
+---- RESULTS
+3,'NULL'
+---- TYPES
+int, string
+====
+---- QUERY
+create table special_chars_with_slash (i int) partitioned by (s1 string, s2 string) stored as parquet;
+insert into special_chars_with_slash partition (s1='abcde', s2='11/22/33') values (1);
+alter table special_chars_with_slash convert to iceberg;
+---- CATCH
+AnalysisException: Can't migrate table with '/' in the partition values until Iceberg #7612 is fixed. '11/22/33'
+====

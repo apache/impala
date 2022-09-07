@@ -20,9 +20,17 @@ package org.apache.impala.util;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.hive.HiveSchemaUtil;
+import org.apache.iceberg.relocated.com.google.common.collect.Lists;
 import org.apache.iceberg.types.Types;
+import org.apache.impala.analysis.IcebergPartitionField;
+import org.apache.impala.analysis.IcebergPartitionSpec;
+import org.apache.impala.analysis.IcebergPartitionTransform;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.IcebergColumn;
@@ -35,6 +43,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnType;
+import org.apache.impala.thrift.TIcebergPartitionTransformType;
 
 /**
  * Utility class for converting between Iceberg and Impala schemas and types.
@@ -140,6 +149,21 @@ public class IcebergSchemaConverter {
           column.fieldId(), keyId, valueId, column.isOptional()));
     }
     return ret;
+  }
+
+  public static Schema convertToIcebergSchema(Table table) {
+    List<FieldSchema> columns = Lists.newArrayList(table.getSd().getCols());
+    columns.addAll(table.getPartitionKeys());
+    return HiveSchemaUtil.convert(columns, false);
+  }
+
+  public static PartitionSpec createIcebergPartitionSpec(Table table,
+      Schema schema) {
+    PartitionSpec.Builder specBuilder = PartitionSpec.builderFor(schema);
+    for (FieldSchema partitionKey : table.getPartitionKeys()) {
+      specBuilder.identity(partitionKey.getName());
+    }
+    return specBuilder.build();
   }
 
   /**

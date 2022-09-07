@@ -17,10 +17,11 @@
 
 package org.apache.impala.analysis;
 
+import com.google.common.base.Preconditions;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.List;
-import java.util.UUID;
 
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -38,8 +39,6 @@ import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.FsPermissionChecker;
 import org.apache.orc.OrcFile;
 import org.apache.parquet.hadoop.ParquetFileWriter;
-
-import com.google.common.base.Preconditions;
 
 /**
  * Represents a LOAD DATA statement for moving data into an existing table:
@@ -241,10 +240,10 @@ public class LoadDataStmt extends StatementBase {
    */
   private void analyzeLoadIntoIcebergTable() throws AnalysisException {
     Path sourcePath = sourceDataPath_.getPath();
-    String tmpTableName = dbName_ + "." + tableName_ + "_tmp" +
-        UUID.randomUUID().toString().substring(0, 8);
+    String tmpTableName = QueryStringBuilder.createTmpTableName(dbName_,
+        tableName_.getTbl());
     QueryStringBuilder.Create createTableQueryBuilder =
-        new QueryStringBuilder.Create().table(tmpTableName, true);
+        QueryStringBuilder.Create.builder().table(tmpTableName, true);
     try {
       FileSystem fs = sourcePath.getFileSystem(FileSystemUtil.getConfiguration());
       Path filePathForLike = sourcePath;
@@ -272,20 +271,20 @@ public class LoadDataStmt extends StatementBase {
             + "format, file '%s' has '%s' magic string.", filePathForLike, magicString));
       }
       createTableQueryBuilder.tableLocation("%s");
-      createTableQueryBuilder.addTableProperty("TEMPORARY", "true");
+      createTableQueryBuilder.property("TEMPORARY", "true");
     } catch (IOException e) {
       throw new AnalysisException("Failed to generate CREATE TABLE subquery "
           + "statement. ", e);
     }
     createTmpTblQuery_ = createTableQueryBuilder.build();
-    QueryStringBuilder.Insert insertTblQueryBuilder =
-        new QueryStringBuilder.Insert().overwrite(overwrite_)
+    QueryStringBuilder.Insert insertTblQueryBuilder = QueryStringBuilder.Insert.builder()
+        .overwrite(overwrite_)
         .table(tableName_.toString());
     QueryStringBuilder.Select insertSelectTblQueryBuilder =
-        new QueryStringBuilder.Select().selectList("*").from(tmpTableName);
+        QueryStringBuilder.Select.builder().selectList("*").from(tmpTableName);
     insertTblQueryBuilder.select(insertSelectTblQueryBuilder);
     insertTblQuery_ = insertTblQueryBuilder.build();
-    dropTmpTblQuery_ = new QueryStringBuilder.Drop().table(tmpTableName).build();
+    dropTmpTblQuery_ = QueryStringBuilder.Drop.builder().table(tmpTableName).build();
   }
 
   public TLoadDataReq toThrift() {

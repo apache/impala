@@ -876,6 +876,16 @@ class ClientRequestState {
 
   /// Helper function to get common header
   TCatalogServiceRequestHeader GetCatalogServiceRequestHeader();
-};
 
+  /// The logic of executing a MIGRATE TABLE statement.
+  Status ExecMigrateRequest() WARN_UNUSED_RESULT;
+
+  /// Core logic of executing a MIGRATE TABLE statement.
+  void ExecMigrateRequestImpl();
+
+  /// Used when running into an error during table migration to extend 'status' with some
+  /// hints about how to reset the original table name. 'params' holds the SQL query
+  /// string the user should run.
+  void AddTableResetHints(const TConvertTableRequest& params, Status* status) const;
+};
 }

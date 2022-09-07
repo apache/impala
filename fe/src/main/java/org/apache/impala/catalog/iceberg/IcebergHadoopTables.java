@@ -125,6 +125,12 @@ public class IcebergHadoopTables implements IcebergCatalog {
   }
 
   @Override
+  public boolean dropTable(String dbName, String tblName, boolean purge) {
+    throw new UnsupportedOperationException(
+        "Hadoop Tables doesn't support dropping table by name");
+  }
+
+  @Override
   public void renameTable(FeIcebergTable feTable, TableIdentifier newTableId) {
     // HadoopTables no renameTable method in Iceberg
     throw new UnsupportedOperationException(

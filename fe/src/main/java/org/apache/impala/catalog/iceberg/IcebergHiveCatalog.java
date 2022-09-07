@@ -103,6 +103,11 @@ public class IcebergHiveCatalog implements IcebergCatalog {
   }
 
   @Override
+  public boolean dropTable(String dbName, String tblName, boolean purge) {
+    return hiveCatalog_.dropTable(TableIdentifier.of(dbName, tblName), purge);
+  }
+
+  @Override
   public void renameTable(FeIcebergTable feTable, TableIdentifier newTableId) {
     TableIdentifier oldTableId = IcebergUtil.getIcebergTableIdentifier(feTable);
     hiveCatalog_.renameTable(oldTableId, newTableId);

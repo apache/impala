@@ -1933,6 +1933,100 @@ class TestRanger(CustomClusterTestSuite):
                            user=ADMIN)
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_convert_table_to_iceberg(self, unique_name):
+    """Test that autorization is taken into account when performing a table migration to
+    Iceberg."""
+    user = getuser()
+    admin_client = self.create_impala_client()
+    non_admin_client = self.create_impala_client()
+    unique_database = unique_name + "_db"
+    tbl_name = unique_database + "." + "hive_tbl_to_convert"
+
+    try:
+      admin_client.execute("drop database if exists {0} cascade"
+                           .format(unique_database), user=ADMIN)
+      admin_client.execute("create database {0}".format(unique_database), user=ADMIN)
+
+      # create table using admin user.
+      admin_client.execute("create table {0} (a int, b string) stored as parquet".format(
+          tbl_name), user=ADMIN)
+      admin_client.execute("insert into {0} values (1, 'one')".format(tbl_name),
+                           user=ADMIN)
+
+      try:
+        # non-admin user can't convert table by default.
+        result = self.execute_query_expect_failure(
+            non_admin_client, "alter table {0} convert to iceberg".format(tbl_name),
+            user=user)
+        assert "User '{0}' does not have privileges to access: {1}".format(
+            user, unique_database) in str(result)
+
+        # Grant ALL privileges on the table for non-admin user. Even with this the query
+        # should fail as we expect DB level ALL privileges for table migration. Once
+        # https://issues.apache.org/jira/browse/IMPALA-12190 is fixed, this should also
+        # pass with table-level ALL privileges.
+        admin_client.execute("grant all on table {0} to user {1}".format(tbl_name, user),
+            user=ADMIN)
+        result = self.execute_query_expect_failure(
+            non_admin_client, "alter table {0} convert to iceberg".format(tbl_name),
+            user=user)
+        assert "User '{0}' does not have privileges to access: {1}".format(
+            user, unique_database) in str(result)
+
+        # After granting ALL privileges on the DB, the table migration should succeed.
+        admin_client.execute("grant all on database {0} to user {1}"
+            .format(unique_database, user), user=ADMIN)
+        self.execute_query_expect_success(
+            non_admin_client, "alter table {0} convert to iceberg".format(tbl_name),
+            user=user)
+
+        result = non_admin_client.execute("describe formatted {0}".format(tbl_name),
+            user=user)
+        assert "org.apache.iceberg.mr.hive.HiveIcebergSerDe" in str(result)
+        assert "org.apache.iceberg.mr.hive.HiveIcebergInputFormat" in str(result)
+        assert "org.apache.iceberg.mr.hive.HiveIcebergOutputFormat" in str(result)
+      finally:
+        # Revoke privileges
+        admin_client.execute("revoke all on table {0} from user {1}"
+                            .format(tbl_name, user), user=ADMIN)
+        admin_client.execute("revoke all on database {0} from user {1}"
+                            .format(unique_database, user), user=ADMIN)
+
+      tbl_name2 = unique_database + "." + "hive_tbl_to_convert2"
+      # create table using admin user.
+      admin_client.execute("create table {0} (a int, b string) stored as parquet".format(
+          tbl_name2), user=ADMIN)
+      admin_client.execute("insert into {0} values (1, 'one')".format(tbl_name2),
+                           user=ADMIN)
+
+      try:
+        admin_client.execute("grant all on table {0} to user {1}"
+                             .format(tbl_name2, user), user=ADMIN)
+        result = self.execute_query_expect_success(
+            non_admin_client, "select count(*) from {0}".format(tbl_name2), user=user)
+        assert result.get_data() == "1"
+
+        # Migrates the table by admin and checks if the non-admin usert still has
+        # privileges.
+        self.execute_query_expect_success(
+            admin_client, "alter table {0} convert to iceberg".format(tbl_name2),
+            user=ADMIN)
+
+        result = self.execute_query_expect_success(
+            non_admin_client, "select count(*) from {0}".format(tbl_name2), user=user)
+        assert result.get_data() == "1"
+      finally:
+        # Revoke privileges
+        admin_client.execute("revoke all on table {0} from user {1}"
+                            .format(tbl_name2, user), user=ADMIN)
+
+    finally:
+      admin_client.execute("drop database if exists {0} cascade".format(unique_database),
+                           user=ADMIN)
+
+  @pytest.mark.execute_serially
   @SkipIfFS.hive
   @SkipIfHive2.ranger_auth
   @CustomClusterTestSuite.with_args()

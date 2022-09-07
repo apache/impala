@@ -48,7 +48,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -133,6 +132,7 @@ import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.KuduTransactionManager;
 import org.apache.impala.common.NotImplementedException;
@@ -183,6 +183,7 @@ import org.apache.impala.thrift.TLineageGraph;
 import org.apache.impala.thrift.TLoadDataReq;
 import org.apache.impala.thrift.TLoadDataResp;
 import org.apache.impala.thrift.TMetadataOpRequest;
+import org.apache.impala.thrift.TConvertTableRequest;
 import org.apache.impala.thrift.TPlanExecInfo;
 import org.apache.impala.thrift.TPlanFragment;
 import org.apache.impala.thrift.TPoolConfig;
@@ -208,6 +209,7 @@ import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.KuduUtil;
+import org.apache.impala.util.MigrateTableUtil;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.RequestPoolService;
 import org.apache.impala.util.TResultRowBuilder;
@@ -910,6 +912,25 @@ public class Frontend {
       } catch(InconsistentMetadataFetchException e) {
         retries.handleRetryOrThrow(e);
       }
+    }
+  }
+
+  /**
+   * Migrate external Hdfs tables to Iceberg tables.
+   */
+  public void convertTable(TExecRequest execRequest)
+      throws DatabaseNotFoundException, ImpalaRuntimeException, InternalException {
+    Preconditions.checkState(execRequest.isSetConvert_table_request());
+    TQueryOptions queryOptions = execRequest.query_options;
+    TConvertTableRequest convertTableRequest = execRequest.convert_table_request;
+    TTableName tableName = convertTableRequest.getHdfs_table_name();
+    FeTable table = getCatalog().getTable(tableName.getDb_name(),
+        tableName.getTable_name());
+    Preconditions.checkNotNull(table);
+    Preconditions.checkState(table instanceof FeFsTable);
+    try (MetaStoreClient client = metaStoreClientPool_.getClient()) {
+      MigrateTableUtil.migrateToIcebergTable(client.getHiveClient(), convertTableRequest,
+          (FeFsTable) table, queryOptions);
     }
   }
 
@@ -2393,6 +2414,13 @@ public class Frontend {
         result.setResult_set_metadata(new TResultSetMetadata(Arrays.asList(
             new TColumn("summary", Type.STRING.toThrift()))));
         result.setAdmin_request(analysisResult.getAdminFnStmt().toThrift());
+        return result;
+      } else if (analysisResult.isConvertTableToIcebergStmt()) {
+        result.stmt_type = TStmtType.CONVERT;
+        result.setResult_set_metadata(new TResultSetMetadata(
+            Collections.singletonList(new TColumn("summary", Type.STRING.toThrift()))));
+        result.setConvert_table_request(
+            analysisResult.getConvertTableToIcebergStmt().toThrift());
         return result;
       } else if (analysisResult.isTestCaseStmt()) {
         CopyTestCaseStmt testCaseStmt = ((CopyTestCaseStmt) stmt);

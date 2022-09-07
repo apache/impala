@@ -113,6 +113,7 @@ Frontend::Frontend() {
     {"setCatalogIsReady", "()V", &set_catalog_is_ready_id_},
     {"waitForCatalog", "()V", &wait_for_catalog_id_},
     {"loadTableData", "([B)[B", &load_table_data_id_},
+    {"convertTable", "([B)V", &convertTable},
     {"getTableFiles", "([B)[B", &get_table_files_id_},
     {"showCreateFunction", "([B)Ljava/lang/String;", &show_create_function_id_},
     {"buildTestDescriptorTable", "([B)[B", &build_test_descriptor_table_id_},
@@ -359,4 +360,8 @@ Status Frontend::AbortKuduTransaction(const TUniqueId& query_id) {
 
 Status Frontend::CommitKuduTransaction(const TUniqueId& query_id) {
   return JniUtil::CallJniMethod(fe_, commit_kudu_txn_, query_id);
+}
+
+Status Frontend::Convert(const TExecRequest& request) {
+  return JniUtil::CallJniMethod(fe_, convertTable, request);
 }

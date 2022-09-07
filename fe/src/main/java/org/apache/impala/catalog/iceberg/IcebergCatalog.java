@@ -68,6 +68,15 @@ public interface IcebergCatalog {
   boolean dropTable(FeIcebergTable feTable, boolean purge);
 
   /**
+   * Drops the table from this catalog using database name and table name.
+   * @param dbName the database name
+   * @param tblName the table name
+   * @param purge whether to drop data/metadata files or not
+   * @return true if table was dropped, false if the table did not exist
+   */
+  boolean dropTable(String dbName, String tblName, boolean purge);
+
+  /**
    * Renames Iceberg table.
    * For HadoopTables, Iceberg does not supported 'renameTable' method
    * For HadoopCatalog, Iceberg implement 'renameTable' method with Exception threw

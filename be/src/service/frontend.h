@@ -222,6 +222,9 @@ class Frontend {
   /// Commits Kudu transaction with the given query id.
   Status CommitKuduTransaction(const TUniqueId& query_id);
 
+  /// Convert external Hdfs tables to Iceberg tables
+  Status Convert(const TExecRequest& request);
+
  private:
   jobject fe_;  // instance of org.apache.impala.service.JniFrontend
   jmethodID create_exec_request_id_;  // JniFrontend.createExecRequest()
@@ -260,6 +263,7 @@ class Frontend {
   jmethodID validate_saml2_bearer_id_; // JniFrontend.validateSaml2Bearer()
   jmethodID abort_kudu_txn_; // JniFrontend.abortKuduTransaction()
   jmethodID commit_kudu_txn_; // JniFrontend.commitKuduTransaction()
+  jmethodID convertTable; // JniFrontend.convertTable
 
   // Only used for testing.
   jmethodID build_test_descriptor_table_id_; // JniFrontend.buildTestDescriptorTable()
