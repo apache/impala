@@ -60,7 +60,12 @@ then
   trap "kill -i $KILLER_PID" EXIT
 fi
 
-source bin/bootstrap_development.sh
+RET_CODE=0
+if ! bin/bootstrap_development.sh; then
+  RET_CODE=1
+fi
+
+source bin/impala-config.sh
 
 # Sanity check: bootstrap_development.sh should not have modified any of
 # the Impala files. This is important for the continued functioning of
@@ -71,16 +76,17 @@ if [[ "${NUM_MODIFIED_FILES}" -ne 0 ]]; then
   echo "Dumping diff:"
   git status --porcelain --untracked-files=no
   git --no-pager diff
-  exit 1
-fi
-
-RET_CODE=0
-if ! bin/run-all-tests.sh; then
   RET_CODE=1
 fi
 
-# Shutdown minicluster at the end
-testdata/bin/kill-all.sh
+# Skip tests if build/dataload failed
+if [[ $RET_CODE -eq 0 ]]; then
+  if ! bin/run-all-tests.sh; then
+    RET_CODE=1
+  fi
+fi
 
+# Always shutdown minicluster at the end and run finalize.sh
+testdata/bin/kill-all.sh
 bin/jenkins/finalize.sh
 exit $RET_CODE
