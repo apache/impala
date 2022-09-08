@@ -222,7 +222,7 @@ struct TAlterTableOrViewRenameParams {
 // Parameters for ALTER TABLE ADD COLUMNS commands.
 struct TAlterTableAddColsParams {
   // List of columns to add to the table
-  1: required list<CatalogObjects.TColumn> columns
+  1: optional list<CatalogObjects.TColumn> columns
 
   // If true, no error is raised when a column already exists.
   2: required bool if_not_exists

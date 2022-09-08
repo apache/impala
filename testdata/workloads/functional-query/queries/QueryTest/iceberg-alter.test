@@ -436,3 +436,60 @@ DESCRIBE FORMATTED iceberg_upgrade_v2_merge_mode;
 ---- TYPES
 string, string, string
 ====
+---- QUERY
+# Add a column that already exists and a new column that does not exist with
+# "if not exists" clause.
+ALTER TABLE ice_alter_cols ADD IF NOT EXISTS COLUMNS (a bigint, d bigint)
+---- RESULTS
+'Column(s) have been added.'
+---- TYPES
+string
+====
+---- QUERY
+describe ice_alter_cols;
+---- RESULTS
+'d','decimal(22,3)','','true'
+'a','bigint','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Add column for the same name, but of a different type
+ALTER TABLE ice_alter_cols ADD IF NOT EXISTS COLUMNS (a string, d string)
+---- RESULTS
+'No new column(s) have been added to the table.'
+---- TYPES
+string
+====
+---- QUERY
+# Add a column that already exists and a new column that does not exist with
+# "if not exists" clause.
+ALTER TABLE ice_alter_cols ADD IF NOT EXISTS COLUMNS (a bigint, b bigint)
+---- RESULTS
+'Column(s) have been added.'
+---- TYPES
+string
+====
+---- QUERY
+DESCRIBE ice_alter_cols
+---- RESULTS
+'d','decimal(22,3)','','true'
+'a','bigint','','true'
+'b','bigint','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+ALTER TABLE ice_alter_cols ADD IF NOT EXISTS COLUMNS (c bigint, c string)
+---- CATCH
+AnalysisException: Duplicate column name: c
+====
+---- QUERY
+ALTER TABLE ice_alter_cols DROP COLUMN a;
+ALTER TABLE ice_alter_cols DROP COLUMN b;
+DESCRIBE ice_alter_cols;
+---- RESULTS
+'d','decimal(22,3)','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====

@@ -1035,10 +1035,16 @@ public class CatalogOpExecutor {
       }
       switch (params.getAlter_type()) {
         case ADD_COLUMNS:
-          TAlterTableAddColsParams addColParams = params.getAdd_cols_params();
-          boolean added = alterTableAddCols(tbl, addColParams.getColumns(),
-              addColParams.isIf_not_exists());
-          reloadTableSchema = true;
+          boolean added = false;
+          // Columns could be ignored/cleared in AlterTableAddColsStmt,
+          // that may cause columns to be empty.
+          if (params.getAdd_cols_params() != null
+              && params.getAdd_cols_params().getColumnsSize() != 0) {
+            TAlterTableAddColsParams addColParams = params.getAdd_cols_params();
+            added = alterTableAddCols(tbl, addColParams.getColumns(),
+                addColParams.isIf_not_exists());
+            reloadTableSchema = true;
+          }
           if (added) {
             responseSummaryMsg = "New column(s) have been added to the table.";
           } else {
@@ -1267,9 +1273,14 @@ public class CatalogOpExecutor {
     Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
     switch (params.getAlter_type()) {
       case ADD_COLUMNS:
-        TAlterTableAddColsParams addColParams = params.getAdd_cols_params();
-        KuduCatalogOpExecutor.addColumn(tbl, addColParams.getColumns());
-        addSummary(response, "Column(s) have been added.");
+        if (params.getAdd_cols_params() != null
+            && params.getAdd_cols_params().getColumnsSize() != 0) {
+          TAlterTableAddColsParams addColParams = params.getAdd_cols_params();
+          KuduCatalogOpExecutor.addColumn(tbl, addColParams.getColumns());
+          addSummary(response, "Column(s) have been added.");
+        } else {
+          addSummary(response, "No new column(s) have been added to the table.");
+        }
         break;
       case REPLACE_COLUMNS:
         TAlterTableReplaceColsParams replaceColParams = params.getReplace_cols_params();
@@ -1334,9 +1345,14 @@ public class CatalogOpExecutor {
       org.apache.iceberg.Transaction iceTxn = IcebergUtil.getIcebergTransaction(tbl);
       switch (params.getAlter_type()) {
         case ADD_COLUMNS:
-          TAlterTableAddColsParams addColParams = params.getAdd_cols_params();
-          IcebergCatalogOpExecutor.addColumns(iceTxn, addColParams.getColumns());
-          addSummary(response, "Column(s) have been added.");
+          if (params.getAdd_cols_params() != null
+              && params.getAdd_cols_params().getColumnsSize() != 0) {
+            TAlterTableAddColsParams addColParams = params.getAdd_cols_params();
+            IcebergCatalogOpExecutor.addColumns(iceTxn, addColParams.getColumns());
+            addSummary(response, "Column(s) have been added.");
+          } else {
+            addSummary(response, "No new column(s) have been added to the table.");
+          }
           break;
         case DROP_COLUMN:
           TAlterTableDropColParams dropColParams = params.getDrop_col_params();

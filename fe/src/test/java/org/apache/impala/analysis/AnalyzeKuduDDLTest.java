@@ -729,6 +729,11 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
     AnalyzesOk("alter table functional_kudu.testtbl add columns (a int encoding rle)");
     AnalyzesOk("alter table functional_kudu.testtbl add columns (a int compression lz4)");
     AnalyzesOk("alter table functional_kudu.testtbl add columns (a int block_size 10)");
+    // Test 'if not exists'
+    AnalyzesOk("alter table functional_kudu.testtbl add if not exists columns " +
+        "(name string null)");
+    AnalyzesOk("alter table functional_kudu.testtbl add if not exists columns " +
+        "(a string null, b int, c string null)");
 
     // REPLACE columns is not supported for Kudu tables
     AnalysisError("alter table functional_kudu.testtbl replace columns (a int null)",

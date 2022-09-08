@@ -347,6 +347,98 @@ alter table tbl_to_alter add columns (invalid_col int not null)
 A new non-null column must have a default value
 ====
 ---- QUERY
+# Add a column that already exists and a new column that does not exist.
+alter table tbl_to_alter add columns (new_col4 string, new_col5 int)
+---- CATCH
+AnalysisException: Column already exists: new_col4
+====
+---- QUERY
+describe tbl_to_alter;
+---- LABELS
+ID, NAME, VALI, NEW_COL1, NEW_COL2, NEW_COL3, NEW_COL4
+---- TYPES
+INT,STRING,BIGINT,INT,BIGINT,STRING,INT
+====
+---- QUERY
+# Add a column that already exists and a new column that does not exist with
+# "if not exists" clause.
+alter table tbl_to_alter add if not exists columns (new_col4 int, new_col5 int)
+---- RESULTS
+'Column(s) have been added.'
+---- TYPES
+string
+====
+---- QUERY
+describe tbl_to_alter;
+---- LABELS
+ID, NAME, VALI, NEW_COL1, NEW_COL2, NEW_COL3, NEW_COL4, NEW_COL5
+---- TYPES
+INT,STRING,BIGINT,INT,BIGINT,STRING,INT,INT
+====
+---- QUERY
+# Add a column that already exists and a new column that does not exist with
+# "if not exists" clause.
+alter table tbl_to_alter add if not exists columns (new_col4 string, new_col6 int)
+---- RESULTS
+'Column(s) have been added.'
+---- TYPES
+string
+====
+---- QUERY
+describe tbl_to_alter;
+---- LABELS
+ID, NAME, VALI, NEW_COL1, NEW_COL2, NEW_COL3, NEW_COL4, NEW_COL5, NEW_COL6
+---- TYPES
+INT,STRING,BIGINT,INT,BIGINT,STRING,INT,INT,INT
+====
+---- QUERY
+# All new columns are existing columns.
+alter table tbl_to_alter add if not exists columns (new_col3 string, new_col4 int);
+---- RESULTS
+'No new column(s) have been added to the table.'
+---- TYPES
+string
+====
+---- QUERY
+# Test for duplicated columns.
+alter table tbl_to_alter add if not exists columns (new_col7 string, new_col7 int);
+---- CATCH
+AnalysisException: Duplicate column name: new_col7
+====
+---- QUERY
+describe tbl_to_alter;
+---- LABELS
+ID, NAME, VALI, NEW_COL1, NEW_COL2, NEW_COL3, NEW_COL4, NEW_COL5, NEW_COL6
+---- TYPES
+INT,STRING,BIGINT,INT,BIGINT,STRING,INT,INT,INT
+====
+---- QUERY
+# Recover status after add 'new_col5' column
+alter table tbl_to_alter drop column new_col5
+---- RESULTS
+'Column has been dropped.'
+====
+---- QUERY
+describe tbl_to_alter;
+---- LABELS
+ID, NAME, VALI, NEW_COL1, NEW_COL2, NEW_COL3, NEW_COL4, NEW_COL6
+---- TYPES
+INT,STRING,BIGINT,INT,BIGINT,STRING,INT,INT
+====
+---- QUERY
+# Recover status after add 'new_col6' column
+alter table tbl_to_alter drop column new_col6
+---- RESULTS
+'Column has been dropped.'
+====
+---- QUERY
+describe tbl_to_alter;
+---- LABELS
+ID, NAME, VALI, NEW_COL1, NEW_COL2, NEW_COL3, NEW_COL4
+---- TYPES
+INT,STRING,BIGINT,INT,BIGINT,STRING,INT
+====
+---- QUERY
 # Add a column with name reserved by Kudu engine
 alter table tbl_to_alter add columns (auto_incrementing_id bigint)
 ---- CATCH

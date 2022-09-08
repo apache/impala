@@ -32,6 +32,7 @@ import org.apache.impala.thrift.TAlterTableType;
 import org.apache.impala.util.KuduUtil;
 
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -74,7 +75,9 @@ public class AlterTableAddColsStmt extends AlterTableStmt {
     // are all valid and unique, and that none of the columns conflict with
     // partition columns.
     Set<String> colNames = new HashSet<>();
-    for (ColumnDef c: columnDefs_) {
+    Iterator<ColumnDef> iterator = columnDefs_.iterator();
+    while (iterator.hasNext()){
+      ColumnDef c = iterator.next();
       c.analyze(analyzer);
       String colName = c.getColName().toLowerCase();
       if (existingPartitionKeys.contains(colName)) {
@@ -83,9 +86,15 @@ public class AlterTableAddColsStmt extends AlterTableStmt {
       }
 
       Column col = t.getColumn(colName);
-      if (col != null && !ifNotExists_) {
-        throw new AnalysisException("Column already exists: " + colName);
-      } else if (!colNames.add(colName)) {
+      if (col != null) {
+        if (!ifNotExists_) {
+          throw new AnalysisException("Column already exists: " + colName);
+        }
+        // remove the existing column
+        iterator.remove();
+        continue;
+      }
+      if (!colNames.add(colName)) {
         throw new AnalysisException("Duplicate column name: " + colName);
       }
 
