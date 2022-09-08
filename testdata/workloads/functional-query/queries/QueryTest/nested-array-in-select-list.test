@@ -391,4 +391,18 @@ select id, arr_int_1d, arr_int_2d, arr_int_3d, arr_string_1d, arr_string_2d, arr
 1,'[1,2,NULL]','[[1,2,NULL],[3]]','[[[1,2,NULL],[3]],[[4]]]','["1","2",NULL]','[["1","2",NULL],["3"]]','[[["1","2",NULL],["3"]],[["4"]]]'
 ---- TYPES
 INT,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Regression test for:
+#   IMPALA-11567: "Error in left outer join if the right side is a subquery with complex types"
+select a.id, b.arr_int_1d, b.arr_int_2d
+from alltypestiny a left outer join
+  (select id, arr_int_1d, arr_int_2d from collection_tbl) b
+on a.id = b.id where a.id < 3;
+---- RESULTS
+0,'NULL','NULL'
+1,'[1,2,NULL]','[[1,2,NULL],[3]]'
+2,'NULL','NULL'
+---- TYPES
+INT,STRING,STRING
 =====

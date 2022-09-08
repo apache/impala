@@ -162,8 +162,14 @@ public class TupleIsNullPredicate extends Predicate {
   public static boolean requiresNullWrapping(Expr expr, Analyzer analyzer)
       throws InternalException {
     Preconditions.checkNotNull(expr);
-    Preconditions.checkState(!expr.getType().isComplexType(),
-        "Should not evaluate on complex type: " + expr.debugString());
+
+    if (expr.getType().isComplexType()) {
+      // Currently the only Expr supported for complex types is SlotRef, which does not
+      // need NULL wrapping.
+      Preconditions.checkState(expr instanceof SlotRef);
+      return false;
+    }
+
     // If the expr is already wrapped in an IF(TupleIsNull(), NULL, expr)
     // then it must definitely be wrapped again at this level.
     // Do not try to execute expr because a TupleIsNullPredicate is not constant.
