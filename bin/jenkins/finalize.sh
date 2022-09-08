@@ -32,12 +32,16 @@ fi
 
 rm -rf "${IMPALA_HOME}"/logs_system
 mkdir -p "${IMPALA_HOME}"/logs_system
-dmesg > "${IMPALA_HOME}"/logs_system/dmesg
+# Tolerate dmesg failures. dmesg can fail if there are insufficient permissions.
+if dmesg > "${IMPALA_HOME}"/logs_system/dmesg ; then
 
-# Check dmesg for OOMs and generate a symptom if present.
-if [[ $(grep "Out of memory" "${IMPALA_HOME}"/logs_system/dmesg) ]]; then
-  "${IMPALA_HOME}"/bin/generate_junitxml.py --phase finalize --step dmesg \
-      --stdout "${IMPALA_HOME}"/logs_system/dmesg --error "Process was OOM killed."
+  # Check dmesg for OOMs and generate a symptom if present.
+  if [[ $(grep "Out of memory" "${IMPALA_HOME}"/logs_system/dmesg) ]]; then
+    "${IMPALA_HOME}"/bin/generate_junitxml.py --phase finalize --step dmesg \
+        --stdout "${IMPALA_HOME}"/logs_system/dmesg --error "Process was OOM killed."
+  fi
+else
+  echo "Failed to run dmesg, not checking for OOMs"
 fi
 
 # Check for any minidumps and symbolize and dump them.
