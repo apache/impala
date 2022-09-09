@@ -109,6 +109,6 @@ class BlockingRowBatchQueue {
   std::list<std::unique_ptr<RowBatch>> cleanup_queue_;
 
   /// BlockingQueue that stores the RowBatches
-  BlockingQueue<std::unique_ptr<RowBatch>, RowBatchBytesFn>* batch_queue_;
+  std::unique_ptr<BlockingQueue<std::unique_ptr<RowBatch>, RowBatchBytesFn>> batch_queue_;
 };
 }
