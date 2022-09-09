@@ -231,7 +231,8 @@ public class Frontend {
 
   // Maximum number of times to retry a query if it fails due to inconsistent metadata.
   private static final int INCONSISTENT_METADATA_NUM_RETRIES =
-      BackendConfig.INSTANCE.getLocalCatalogMaxFetchRetries();
+      (BackendConfig.INSTANCE != null) ?
+      BackendConfig.INSTANCE.getLocalCatalogMaxFetchRetries() : 0;
 
   // Maximum number of threads used to check authorization for the user when executing
   // show tables/databases.
@@ -1762,7 +1763,7 @@ public class Frontend {
    *
    * Also imposes the artificial two-executor groups for testing when needed.
    */
-  private List<TExecutorGroupSet> setupThresholdsForExecutorGroupSets(
+  public static List<TExecutorGroupSet> setupThresholdsForExecutorGroupSets(
       List<TExecutorGroupSet> executorGroupSets, String request_pool,
       boolean default_executor_group, boolean test_replan) throws ImpalaException {
     RequestPoolService poolService = RequestPoolService.getInstance();
@@ -1854,7 +1855,7 @@ public class Frontend {
   // Only the following types of statements are considered auto scalable since each
   // can be planned by the distributed planner utilizing the number of executors in
   // an executor group as input.
-  private boolean canStmtBeAutoScaled(TStmtType type) {
+  public static boolean canStmtBeAutoScaled(TStmtType type) {
     return type == TStmtType.EXPLAIN || type == TStmtType.QUERY || type == TStmtType.DML;
   }
 
@@ -1879,11 +1880,11 @@ public class Frontend {
       default_executor_group = e.getExec_group_name_prefix() == null
           || e.getExec_group_name_prefix().isEmpty();
     }
-
-    List<TExecutorGroupSet> executorGroupSetsToUse = setupThresholdsForExecutorGroupSets(
-        originalExecutorGroupSets, queryOptions.getRequest_pool(), default_executor_group,
-        enable_replan
-            && (RuntimeEnv.INSTANCE.isTestEnv() || queryOptions.isTest_replan()));
+    List<TExecutorGroupSet> executorGroupSetsToUse =
+        Frontend.setupThresholdsForExecutorGroupSets(originalExecutorGroupSets,
+            queryOptions.getRequest_pool(), default_executor_group,
+            enable_replan
+                && (RuntimeEnv.INSTANCE.isTestEnv() || queryOptions.isTest_replan()));
 
     int num_executor_group_sets = executorGroupSetsToUse.size();
     if (num_executor_group_sets == 0) {
@@ -1938,7 +1939,7 @@ public class Frontend {
       } else if (!enable_replan) {
         reason = "query option 'enable_replan' is false";
         break;
-      } else if (!canStmtBeAutoScaled(req.stmt_type)) {
+      } else if (!Frontend.canStmtBeAutoScaled(req.stmt_type)) {
         reason = "query is not auto-scalable";
         break;
       }
