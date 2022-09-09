@@ -49,6 +49,8 @@ from subprocess import call
 from shell_exceptions import (RPCException, DisconnectedException, QueryStateException,
     QueryCancelledByShellException, MissingThriftMethodException)
 
+from value_converter import HS2ValueConverter
+
 
 VERSION_FORMAT = "Impala Shell v%(version)s (%(git_hash)s) built on %(build_date)s"
 VERSION_STRING = "impala shell build version not available"
@@ -589,6 +591,13 @@ class ImpalaShell(cmd.Cmd, object):
 
   def _new_impala_client(self):
     protocol = options.protocol.lower()
+
+    value_converter = None
+    if protocol == 'hs2' or protocol == 'hs2-http':
+      value_converter = HS2ValueConverter()
+      if options.hs2_fp_format:
+        value_converter.override_floating_point_converter(options.hs2_fp_format)
+
     if options.strict_hs2_protocol:
       assert protocol == 'hs2' or protocol == 'hs2-http'
       if protocol == 'hs2':
@@ -597,21 +606,22 @@ class ImpalaShell(cmd.Cmd, object):
                           self.ca_cert, self.user, self.ldap_password, True,
                           self.client_connect_timeout_ms, self.verbose,
                           use_http_base_transport=False, http_path=self.http_path,
-                          http_cookie_names=None)
+                          http_cookie_names=None, value_converter=value_converter)
       elif protocol == 'hs2-http':
         return StrictHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
                           self.ca_cert, self.user, self.ldap_password, self.use_ldap,
                           self.client_connect_timeout_ms, self.verbose,
                           use_http_base_transport=True, http_path=self.http_path,
-                          http_cookie_names=self.http_cookie_names)
+                          http_cookie_names=self.http_cookie_names,
+                          value_converter=value_converter)
     if protocol == 'hs2':
       return ImpalaHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
                           self.ca_cert, self.user, self.ldap_password, self.use_ldap,
                           self.client_connect_timeout_ms, self.verbose,
                           use_http_base_transport=False, http_path=self.http_path,
-                          http_cookie_names=None)
+                          http_cookie_names=None, value_converter=value_converter)
     elif protocol == 'hs2-http':
       return ImpalaHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
@@ -619,7 +629,8 @@ class ImpalaShell(cmd.Cmd, object):
                           self.client_connect_timeout_ms, self.verbose,
                           use_http_base_transport=True, http_path=self.http_path,
                           http_cookie_names=self.http_cookie_names,
-                          http_socket_timeout_s=self.http_socket_timeout_s)
+                          http_socket_timeout_s=self.http_socket_timeout_s,
+                          value_converter=value_converter)
     elif protocol == 'beeswax':
       return ImpalaBeeswaxClient(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
@@ -1916,8 +1927,22 @@ def get_intro(options):
   if options.protocol == 'beeswax':
     intro += ("\n\nWARNING: The beeswax protocol is deprecated and will be removed in a "
               "future version of Impala.")
+    if options.hs2_fp_format:
+      intro += ("\n\nWARNING: Formatting floating-point values is "
+                "not supported with Beeswax protocol")
 
   return intro
+
+
+def _validate_hs2_fp_format_specification(format_specification):
+  try:
+    format_str = "{:%s}" % format_specification
+    format_str.format(float())
+  except UnicodeDecodeError as e:
+    raise e
+  except (ValueError, TypeError) as e:
+    raise FatalShellException(e)
+
 
 
 def impala_shell_main():
@@ -2021,6 +2046,18 @@ def impala_shell_main():
     print("Option --ldap_password_cmd requires using LDAP authentication " +
           "mechanism (-l)", file=sys.stderr)
     raise FatalShellException()
+
+  if options.hs2_fp_format:
+    try:
+      _validate_hs2_fp_format_specification(options.hs2_fp_format)
+    except FatalShellException as e:
+      print("Invalid floating point format specification: %s" %
+            options.hs2_fp_format, file=sys.stderr)
+      raise e
+    except UnicodeDecodeError as e:
+      print("Unicode character in format specification is not supported",
+            file=sys.stderr)
+      raise FatalShellException(e)
 
   start_msg = "Starting Impala Shell"
 

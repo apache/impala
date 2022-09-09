@@ -321,7 +321,12 @@ def get_option_parser(defaults):
                     "returned in an http response by the server or an intermediate proxy "
                     "then it will be included in each subsequent request for the same "
                     "connection.")
-
+  parser.add_option("--hs2_fp_format", type="str",
+                    dest="hs2_fp_format", default=None,
+                    help="Sets the printing format specification for floating point "
+                    "values when using HS2 protocol. The default behaviour makes the  "
+                    "values handled by Python's str() built-in method. Use '%16G' to "
+                    "match Beeswax protocol's floating-point output format")
 
   # add default values to the help text
   for option in parser.option_list:

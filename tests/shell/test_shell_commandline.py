@@ -1305,3 +1305,81 @@ class TestImpalaShell(ImpalaTestSuite):
       assert len(lines) >= 2
       assert "1\n" in lines[len(lines) - 2]
       assert "Fetched 1 row(s)" in lines[len(lines) - 1]
+
+  def skip_if_protocol_is_beeswax(self, vector):
+    """Helper to skip Beeswax protocol on formatting tests"""
+    if vector.get_value("protocol") == "beeswax":
+      pytest.skip("Floating-point value formatting is not supported "
+                  "with Beeswax")
+
+  def validate_fp_format(self, vector, column_type, format, value, expected_values):
+    args = ['--hs2_fp_format', format, '-q',
+           'select cast("%s" as %s) as fp_value' % (value, column_type)]
+    result = run_impala_shell_cmd(vector, args)
+
+    assert(any(expected_value in result.stdout for expected_value in expected_values))
+
+  def test_hs2_fp_format_types(self, vector):
+    """Tests formatting with double and float value"""
+    self.skip_if_protocol_is_beeswax(vector)
+    self.validate_fp_format(vector, column_type='double', format='.16f',
+                            value='0.1234567891011121314',
+                            expected_values='0.1234567891011121')
+
+    expected_values_float = ['0.12345679104328156', '0.12345679000000000']
+    self.validate_fp_format(vector, column_type='float', format='.17f',
+                            value='0.1234567891011121314',
+                            expected_values=expected_values_float)
+
+  def test_hs2_fp_format_modifiers(self, vector):
+    """Test formatting with various modifiers, like mode, grouping, sign"""
+    self.skip_if_protocol_is_beeswax(vector)
+    self.validate_fp_format(vector, column_type='double', format='+f',
+                            value='123456789123456789',
+                            expected_values='+123456789123456784.000000')
+
+    self.validate_fp_format(vector, column_type='double', format='+.16f',
+                            value='-12.3456789123456789',
+                            expected_values='-12.3456789123456794')
+
+    expected_grouped_value = '+123,456,788,999,999,994,034,486,658,482,569,216.000000'
+    self.validate_fp_format(vector, column_type='double', format='+,f',
+                            value='1.23456789e+35',
+                            expected_values=expected_grouped_value)
+
+    self.validate_fp_format(vector, column_type='double', format='+E',
+                            value='12345678912345',
+                            expected_values='+1.234568E+13')
+
+  def test_hs2_fp_format_nan_inf_null(self, vector):
+    """Test NaN, inf, null value formatting"""
+    self.skip_if_protocol_is_beeswax(vector)
+    self.validate_fp_format(vector, column_type='double', format='F',
+                            value='NaN',
+                            expected_values='NAN')
+
+    self.validate_fp_format(vector, column_type='double', format='F',
+                            value='-inf',
+                            expected_values=['-INF', 'NULL'])
+
+    self.validate_fp_format(vector, column_type='double', format='F',
+                            value='NULL',
+                            expected_values='NULL')
+
+  def test_hs2_fp_format_invalid(self, vector):
+    """Test invalid format specification"""
+    self.skip_if_protocol_is_beeswax(vector)
+    error_message = 'Invalid floating point format specification: invalid'
+    args = ['--hs2_fp_format', 'invalid']
+    result = run_impala_shell_cmd(vector, args, expect_success=False)
+
+    assert error_message in result.stderr
+
+  def test_fp_default(self, vector):
+    """Test default floating point value formatting"""
+    expected_py2 = '0.123456789101'
+    expected_py3 = '0.1234567891011121'
+    args = ['-q', 'select cast("0.1234567891011121314" as double) as fp_value', '-B']
+    result = run_impala_shell_cmd(vector, args)
+
+    assert expected_py2 in result.stdout or expected_py3 in result.stdout

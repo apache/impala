@@ -51,35 +51,32 @@ from thrift.Thrift import TApplicationException, TException
 from shell_exceptions import (RPCException, QueryStateException, DisconnectedException,
     QueryCancelledByShellException, MissingThriftMethodException, HttpError)
 
+from value_converter import HS2ValueConverter
 
-# Helpers to extract and convert HS2's representation of values to the display version.
+# Getters to extract HS2's representation of values to the display version.
 # An entry must be added to this map for each supported type. HS2's TColumn has many
-# different typed field, each of which has a 'values' and a 'nulls' field. The first
-# element of each tuple is a "getter" function that extracts the appropriate member from
-# TColumn for the given TTypeId. The second element is a "stringifier" function that
-# converts a single value to its display representation. If the value is already a
-# string and does not need conversion for display, the stringifier can be None.
-HS2_VALUE_CONVERTERS = {
-    TTypeId.BOOLEAN_TYPE: (operator.attrgetter('boolVal'),
-     lambda b: 'true' if b else 'false'),
-    TTypeId.TINYINT_TYPE: (operator.attrgetter('byteVal'), str),
-    TTypeId.SMALLINT_TYPE: (operator.attrgetter('i16Val'), str),
-    TTypeId.INT_TYPE: (operator.attrgetter('i32Val'), str),
-    TTypeId.BIGINT_TYPE: (operator.attrgetter('i64Val'), str),
-    TTypeId.TIMESTAMP_TYPE: (operator.attrgetter('stringVal'), None),
-    TTypeId.FLOAT_TYPE: (operator.attrgetter('doubleVal'), str),
-    TTypeId.DOUBLE_TYPE: (operator.attrgetter('doubleVal'), str),
-    TTypeId.STRING_TYPE: (operator.attrgetter('stringVal'), None),
-    TTypeId.DECIMAL_TYPE: (operator.attrgetter('stringVal'), None),
-    TTypeId.BINARY_TYPE: (operator.attrgetter('binaryVal'), str),
-    TTypeId.VARCHAR_TYPE: (operator.attrgetter('stringVal'), None),
-    TTypeId.CHAR_TYPE: (operator.attrgetter('stringVal'), None),
-    TTypeId.MAP_TYPE: (operator.attrgetter('stringVal'), None),
-    TTypeId.ARRAY_TYPE: (operator.attrgetter('stringVal'), None),
-    TTypeId.STRUCT_TYPE: (operator.attrgetter('stringVal'), None),
-    TTypeId.UNION_TYPE: (operator.attrgetter('stringVal'), None),
-    TTypeId.NULL_TYPE: (operator.attrgetter('stringVal'), None),
-    TTypeId.DATE_TYPE: (operator.attrgetter('stringVal'), None)
+# different typed field, each of which has a 'values' and a 'nulls' field. These getters
+# extract the appropriate member from TColumn for the given TTypeId.
+HS2_VALUE_GETTERS = {
+    TTypeId.BOOLEAN_TYPE: operator.attrgetter('boolVal'),
+    TTypeId.TINYINT_TYPE: operator.attrgetter('byteVal'),
+    TTypeId.SMALLINT_TYPE: operator.attrgetter('i16Val'),
+    TTypeId.INT_TYPE: operator.attrgetter('i32Val'),
+    TTypeId.BIGINT_TYPE: operator.attrgetter('i64Val'),
+    TTypeId.TIMESTAMP_TYPE: operator.attrgetter('stringVal'),
+    TTypeId.FLOAT_TYPE: operator.attrgetter('doubleVal'),
+    TTypeId.DOUBLE_TYPE: operator.attrgetter('doubleVal'),
+    TTypeId.STRING_TYPE: operator.attrgetter('stringVal'),
+    TTypeId.DECIMAL_TYPE: operator.attrgetter('stringVal'),
+    TTypeId.BINARY_TYPE: operator.attrgetter('binaryVal'),
+    TTypeId.VARCHAR_TYPE: operator.attrgetter('stringVal'),
+    TTypeId.CHAR_TYPE: operator.attrgetter('stringVal'),
+    TTypeId.MAP_TYPE: operator.attrgetter('stringVal'),
+    TTypeId.ARRAY_TYPE: operator.attrgetter('stringVal'),
+    TTypeId.STRUCT_TYPE: operator.attrgetter('stringVal'),
+    TTypeId.UNION_TYPE: operator.attrgetter('stringVal'),
+    TTypeId.NULL_TYPE: operator.attrgetter('stringVal'),
+    TTypeId.DATE_TYPE: operator.attrgetter('stringVal')
 }
 
 
@@ -133,7 +130,7 @@ class ImpalaClient(object):
                kerberos_service_name="impala", use_ssl=False, ca_cert=None, user=None,
                ldap_password=None, use_ldap=False, client_connect_timeout_ms=60000,
                verbose=True, use_http_base_transport=False, http_path=None,
-               http_cookie_names=None, http_socket_timeout_s=None):
+               http_cookie_names=None, http_socket_timeout_s=None, value_converter=None):
     self.connected = False
     self.impalad_host = impalad[0]
     self.impalad_port = int(impalad[1])
@@ -162,6 +159,7 @@ class ImpalaClient(object):
     # This is set in connect(). It's used in constructing the retried query link after
     # we parse the retried query id.
     self.webserver_address = None
+    self.value_converter = value_converter
 
   def connect(self):
     """Creates a connection to an Impalad instance. Returns a tuple with the impala
@@ -660,6 +658,11 @@ class ImpalaHS2Client(ImpalaClient):
     # Minimum sleep interval between retry attempts.
     self.min_sleep_interval = 1
 
+    # In case of direct instantiation of the client where the converter is
+    # not set, there should be a default value converter assigned
+    if self.value_converter is None:
+      self.value_converter = HS2ValueConverter()
+
   def _get_thrift_client(self, protocol):
     return ImpalaHiveServer2Service.Client(protocol)
 
@@ -826,7 +829,9 @@ class ImpalaHS2Client(ImpalaClient):
     assert query_handle.hasResultSet
     prim_types = [column.typeDesc.types[0].primitiveEntry.type
                   for column in query_handle.schema.columns]
-    col_value_converters = [HS2_VALUE_CONVERTERS[prim_type]
+    column_value_getters = [HS2_VALUE_GETTERS[prim_type]
+                        for prim_type in prim_types]
+    column_value_converters = [self.value_converter.get_converter(prim_type)
                         for prim_type in prim_types]
     while True:
       req = TFetchResultsReq(query_handle, TFetchOrientation.FETCH_NEXT,
@@ -842,26 +847,27 @@ class ImpalaHS2Client(ImpalaClient):
       # Transpose the columns into a row-based format for more convenient processing
       # for the display code. This is somewhat inefficient, but performance is comparable
       # to the old Beeswax code.
-      yield self._transpose(col_value_converters, resp.results.columns)
-      if not self._hasMoreRows(resp, col_value_converters):
+      yield self._transpose(column_value_getters, column_value_converters,
+                            resp.results.columns)
+      if not self._hasMoreRows(resp, column_value_getters):
         return
 
-  def _hasMoreRows(self, resp, col_value_converters):
+  def _hasMoreRows(self, resp, column_value_getters):
     return resp.hasMoreRows
 
-  def _transpose(self, col_value_converters, columns):
+  def _transpose(self, column_value_getters, column_value_converters, columns):
     """Transpose the columns from a TFetchResultsResp into the row format returned
     by fetch() with all the values converted into their string representations for
-    display. Uses the getters and stringifiers provided in col_value_converters[i]
-    for column i."""
-    tcols = [col_value_converters[i][0](col) for i, col in enumerate(columns)]
+    display. Uses the getters and convertes provided in column_value_getters[i] and
+    column_value_converters[i] for column i."""
+    tcols = [column_value_getters[i](col) for i, col in enumerate(columns)]
     num_rows = len(tcols[0].values)
     # Preallocate rows for efficiency.
     rows = [[None] * len(tcols) for i in xrange(num_rows)]
     for col_idx, tcol in enumerate(tcols):
       is_null = bitarray(endian='little')
       is_null.frombytes(tcol.nulls)
-      stringifier = col_value_converters[col_idx][1]
+      stringifier = column_value_converters[col_idx]
       # Skip stringification if not needed. This makes large extracts of tpch.orders
       # ~8% faster according to benchmarks.
       if stringifier is None:
@@ -1140,8 +1146,8 @@ class StrictHS2Client(ImpalaHS2Client):
   def _populate_query_options(self):
     return
 
-  def _hasMoreRows(self, resp, col_value_converters):
-    tcol = col_value_converters[0][0](resp.results.columns[0])
+  def _hasMoreRows(self, resp, column_value_getters):
+    tcol = column_value_getters[0](resp.results.columns[0])
     return len(tcol.values)
 
 
