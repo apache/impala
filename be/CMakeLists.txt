@@ -221,6 +221,33 @@ SET(CMAKE_CXX_FLAGS "${CXX_COMMON_FLAGS} ${CMAKE_CXX_FLAGS}")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fverbose-asm")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LLVM_CFLAGS}")
 
+# The IMPALA_MINIMAL_DEBUG_INFO option saves diskspace by reducing the debug info
+# in binaries to the minimal level that can do backtraces. The "-g1" option
+# keeps line number tables, but it does not keep variable information. This
+# can reduce the size of binaries by >%60. This is appended to the end of arguments
+# so that it overrides other "-g" arguments.
+if ($ENV{IMPALA_MINIMAL_DEBUG_INFO} STREQUAL "true")
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g1")
+  # The choice of CMAKE_BUILD_TYPE specifies a set of flags that are added
+  # after the flags in CMAKE_CXX_FLAGS. CMAKE_BUILD_TYPE=Debug adds "-g", which
+  # overrides our "-g1" because it is later in the argument list. To fix this,
+  # this overrides CMake's flags for CMAKE_BUILD_TYPE=Debug to use "-g1" rather
+  # than "-g". CMAKE_BUILD_TYPE=Release and other CMAKE_BUILD_TYPEs that we use
+  # don't include a "-g" flag, so they don't need similar treatment.
+  SET(CMAKE_CXX_FLAGS_DEBUG "-g1")
+endif()
+
+# The IMPALA_COMPRESSED_DEBUG_INFO option saves diskspace by compressing the
+# debug info in the executable. This can reduce the size of binaries by >50%
+# without changing the amount of debug information. gdb is known to work
+# with compressed debug info, but other tools may not know how to use it.
+# TODO: The current version of Clang does not handles this flag correctly and
+# simply produces binaries with uncompressed debug info. This needs further
+# debugging.
+if ($ENV{IMPALA_COMPRESSED_DEBUG_INFO} STREQUAL "true")
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gz")
+endif()
+
 # Use ccache when found and not explicitly disabled by setting the DISABLE_CCACHE envvar.
 find_program(CCACHE ccache)
 set(RULE_LAUNCH_PREFIX)

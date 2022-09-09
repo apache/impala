@@ -97,6 +97,27 @@ def find_dump_syms_binary():
   return ''
 
 
+def find_objcopy_binary():
+  """Locate the 'objcopy' binary from Binutils.
+
+  We try to locate the package in the Impala toolchain folder.
+  TODO: Fall back to finding objcopy in the system path.
+  """
+  toolchain_packages_home = os.environ.get('IMPALA_TOOLCHAIN_PACKAGES_HOME')
+  if toolchain_packages_home:
+    if not os.path.isdir(toolchain_packages_home):
+      die('Could not find toolchain packages directory')
+    binutils_version = os.environ.get('IMPALA_BINUTILS_VERSION')
+    if not binutils_version:
+      die('Could not determine binutils version from toolchain')
+    binutils_dir = 'binutils-%s' % binutils_version
+    objcopy = os.path.join(toolchain_packages_home, binutils_dir, 'bin', 'objcopy')
+    if not os.path.isfile(objcopy):
+      die('Could not find objcopy executable at %s' % objcopy)
+    return objcopy
+  return ''
+
+
 def parse_args():
   """Parse command line arguments and perform sanity checks."""
   parser = ArgumentParser()
@@ -114,6 +135,7 @@ def parse_args():
       to process, use with -s""")
   parser.add_argument('-s', '--symbol_pkg', '--debuginfo_rpm', help="""RPM/DEB file
       containing the debug symbols matching the binaries in -r""")
+  parser.add_argument('--objcopy', help='Path to the objcopy binary from Binutils')
   args = parser.parse_args()
 
   # Post processing checks
@@ -237,7 +259,7 @@ def enumerate_binaries(args):
   die('No input method provided')
 
 
-def process_binary(dump_syms, binary, out_dir):
+def process_binary(dump_syms, objcopy, binary, out_dir):
   """Dump symbols of a single binary file and move the result.
 
   Symbols will be extracted to a temporary file and moved into place afterwards. Required
@@ -249,14 +271,40 @@ def process_binary(dump_syms, binary, out_dir):
   # destroyed.
   tmp_fd, tmp_file = tempfile.mkstemp(dir=out_dir, suffix='.sym')
   try:
-    # Run dump_syms on the binary.
-    args = [dump_syms, binary.path]
+    # Create a temporary directory used for decompressing debug info
+    tempdir = tempfile.mkdtemp()
+
+    # Binaries can contain compressed debug symbols. Breakpad currently
+    # does not support dumping symbols for binaries with compressed debug
+    # symbols.
+    #
+    # As a workaround, this uses objcopy to create a copy of the binary with
+    # the debug symbols decompressed. If the debug symbols are not compressed
+    # in the original binary, objcopy simply makes a copy of the binary.
+    # Breakpad is able to read symbols from the decompressed binary, and
+    # those symbols work correctly in resolving a minidump from the original
+    # compressed binary.
+    # TODO: In theory, this could work with the binary.debug_path.
+    binary_basename = os.path.basename(binary.path)
+    decompressed_binary = os.path.join(tempdir, binary_basename)
+    objcopy_retcode = subprocess.call([objcopy, "--decompress-debug-sections",
+                                       binary.path, decompressed_binary])
+
+    # Run dump_syms on the binary
+    # If objcopy failed for some reason, fall back to running dump_syms
+    # directly on the original binary. This is unlikely to work, but it is a way of
+    # guaranteeing that objcopy is not the problem.
+    args = [dump_syms, decompressed_binary]
+    if objcopy_retcode != 0:
+      sys.stderr.write('objcopy failed. Trying to run dump_sym directly.\n')
+      args = [dump_syms, binary.path]
+
     if binary.debug_path:
       args.append(binary.debug_path)
     proc = subprocess.Popen(args, stdout=os.fdopen(tmp_fd, 'wb'), stderr=subprocess.PIPE)
     _, stderr = proc.communicate()
     if proc.returncode != 0:
-      sys.stderr.write('Failed to dump symbols from %s, return code %s\n' %
+      sys.stderr.write('dump_syms: Failed to dump symbols from %s, return code %s\n' %
           (binary.path, proc.returncode))
       sys.stderr.write(stderr)
       os.remove(tmp_file)
@@ -277,6 +325,9 @@ def process_binary(dump_syms, binary, out_dir):
     except EnvironmentError:
       pass
     raise e
+  finally:
+    # Cleanup temporary directory
+    shutil.rmtree(tempdir)
   return True
 
 
@@ -285,10 +336,12 @@ def main():
   args = parse_args()
   dump_syms = args.dump_syms or find_dump_syms_binary()
   assert dump_syms
+  objcopy = args.objcopy or find_objcopy_binary()
+  assert objcopy
   status = 0
   ensure_dir_exists(args.dest_dir)
   for binary in enumerate_binaries(args):
-    if not process_binary(dump_syms, binary, args.dest_dir):
+    if not process_binary(dump_syms, objcopy, binary, args.dest_dir):
       status = 1
   sys.exit(status)
 

@@ -408,6 +408,29 @@ export IMPALA_MAVEN_OPTIONS=${IMPALA_MAVEN_OPTIONS-}
 # If enabled, debug symbols are added to cross-compiled IR.
 export ENABLE_IMPALA_IR_DEBUG_INFO=${ENABLE_IMPALA_IR_DEBUG_INFO-false}
 
+# Impala has dozens of binaries that link in all the Impala libraries.
+# Each binary is hundreds of megabytes, and they end up taking 10s of GBs
+# disk space for a developer environment. A large amount of the binary
+# size is due to debug information.
+#
+# These are two options for reducing the binary size and disk space
+# usage.
+# - IMPALA_MINIMAL_DEBUG_INFO=true changes the build to produce only
+#   minimal debuginfo (i.e. -g1). This has line tables and can do backtraces,
+#   but it doesn't include variable information and limits further
+#   debuggability. This option reduces the size of binaries by 60+%.
+# - IMPALA_COMPRESSED_DEBUG_INFO=true changes the build to compress the
+#   debug info with gzip. This significantly reduces the size of the
+#   binary without changing the quantity of debug information. The catch
+#   is that tools need to support it. gdb is known to support it and
+#   the Breakpad scripts have been modified to handle it, but there may
+#   be other tools that do not know how to use it. This reduces the size
+#   of binaries by 50+%.
+# Both of these are disabled by default.
+# TODO: Explore enabling IMPALA_COMPRESSED_DEBUG_INFO by default.
+export IMPALA_MINIMAL_DEBUG_INFO=${IMPALA_MINIMAL_DEBUG_INFO-false}
+export IMPALA_COMPRESSED_DEBUG_INFO=${IMPALA_COMPRESSED_DEBUG_INFO-false}
+
 # Download and use the CDH components from S3. It can be useful to set this to false if
 # building against a custom local build using HIVE_SRC_DIR_OVERRIDE,
 # HADOOP_INCLUDE_DIR_OVERRIDE, and HADOOP_LIB_DIR_OVERRIDE.
