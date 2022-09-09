@@ -180,6 +180,7 @@ string TimezoneDatabase::LocalZoneName() {
     string result;
     while (timezone_file) {
       getline(timezone_file, result);
+      if (result.rfind("#", 0) == 0) continue;
       auto p = result.find("ZONE=\"");
       if (p != string::npos) {
         result.erase(p, p + 6);
