@@ -72,10 +72,6 @@ fi
 # mvn versions:set -DnewVersion=YOUR_NEW_VERSION
 export IMPALA_VERSION=4.5.0-SNAPSHOT
 
-# Whether to build on Apache Hive (or CDP Hive). Versions of some toolchain dependencies
-# (e.g. thrift) will also depend on this.
-export USE_APACHE_HIVE=${USE_APACHE_HIVE-false}
-
 # Whether to build the backend on Avro C++ library or C.
 # This is added temporarily to help transitioning from Avro C to C++ library.
 export USE_AVRO_CPP=${USE_AVRO_CPP:=false}
@@ -213,29 +209,6 @@ unset IMPALA_MOLD_URL
 # Impala JDBC driver for testing.
 export IMPALA_SIMBA_JDBC_DRIVER_VERSION=42-2.6.32.1041
 
-# Thrift related environment variables.
-# IMPALA_THRIFT_POM_VERSION is used to populate IMPALA_THRIFT_JAVA_VERSION and
-# thrift.version in java/pom.xml.
-# IMPALA_THRIFT_PY_VERSION is used to find the thrift compiler to produce
-# the generated Python code. The code that uses the generated Python code gets
-# the corresponding Thrift runtime library by pip installing thrift (and does not
-# respect this version). If upgrading IMPALA_THRIFT_PY_VERSION, also upgrade the
-# thrift version in shell/ext-py, shell/packaging/requirements.txt, and
-# infra/python/deps/requirements.txt.
-export IMPALA_THRIFT_CPP_VERSION=0.16.0-p7
-unset IMPALA_THRIFT_CPP_URL
-if $USE_APACHE_HIVE; then
-  # Apache Hive 3 clients can't run on thrift versions >= 0.14 (IMPALA-11801)
-  export IMPALA_THRIFT_POM_VERSION=0.11.0
-  export IMPALA_THRIFT_JAVA_VERSION=${IMPALA_THRIFT_POM_VERSION}-p5
-else
-  export IMPALA_THRIFT_POM_VERSION=0.16.0
-  export IMPALA_THRIFT_JAVA_VERSION=${IMPALA_THRIFT_POM_VERSION}-p7
-fi
-unset IMPALA_THRIFT_JAVA_URL
-export IMPALA_THRIFT_PY_VERSION=0.16.0-p7
-unset IMPALA_THRIFT_PY_URL
-
 # Find system python versions for testing
 export IMPALA_SYSTEM_PYTHON2="${IMPALA_SYSTEM_PYTHON2_OVERRIDE-$(command -v python2)}"
 export IMPALA_SYSTEM_PYTHON3="${IMPALA_SYSTEM_PYTHON3_OVERRIDE-$(command -v python3)}"
@@ -272,13 +245,22 @@ export CDP_TEZ_VERSION=0.9.1.7.3.0.0-128
 # Ref: https://infra.apache.org/release-download-pages.html#closer
 : ${APACHE_MIRROR:="https://www.apache.org/dyn/closer.cgi"}
 export APACHE_MIRROR
+export APACHE_AVRO_JAVA_VERSION=1.8.2
+export APACHE_HADOOP_VERSION=3.3.6
+export APACHE_HBASE_VERSION=2.6.0
+export APACHE_ICEBERG_VERSION=1.4.3
+export APACHE_KNOX_VERSION=1.6.1
+export APACHE_PARQUET_VERSION=1.12.3
+export APACHE_RANGER_VERSION=2.4.0
+export APACHE_TEZ_VERSION=0.10.3
 export APACHE_HIVE_VERSION=3.1.3
 export APACHE_HIVE_STORAGE_API_VERSION=2.7.0
-export APACHE_OZONE_VERSION=1.3.0
+export APACHE_OZONE_VERSION=1.4.0
 
 # Java dependencies that are not also runtime components. Declaring versions here allows
 # other branches to override them in impala-config-branch.sh for cleaner patches.
 export IMPALA_BOUNCY_CASTLE_VERSION=1.78
+export IMPALA_COMMONS_IO_VERSION=2.6
 export IMPALA_COS_VERSION=3.1.0-8.0.8
 export IMPALA_DERBY_VERSION=10.14.2.0
 export IMPALA_GUAVA_VERSION=32.0.1-jre
@@ -375,22 +357,53 @@ export APACHE_OZONE_URL=${APACHE_OZONE_URL-}
 
 export CDP_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdp_components-$CDP_BUILD_NUMBER"
 export CDH_MAJOR_VERSION=7
-export IMPALA_AVRO_JAVA_VERSION=${CDP_AVRO_JAVA_VERSION}
-export IMPALA_HADOOP_VERSION=${CDP_HADOOP_VERSION}
-export IMPALA_HADOOP_URL=${CDP_HADOOP_URL-}
-export HADOOP_HOME="$CDP_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/"
-export IMPALA_HBASE_VERSION=${CDP_HBASE_VERSION}
-export IMPALA_HBASE_URL=${CDP_HBASE_URL-}
-export IMPALA_ICEBERG_VERSION=${CDP_ICEBERG_VERSION}
-export IMPALA_ICEBERG_URL=${CDP_ICEBERG_URL-}
-export IMPALA_KNOX_VERSION=${CDP_KNOX_VERSION}
-export IMPALA_PARQUET_VERSION=${CDP_PARQUET_VERSION}
-export IMPALA_RANGER_VERSION=${RANGER_VERSION_OVERRIDE:-"$CDP_RANGER_VERSION"}
-export IMPALA_RANGER_URL=${CDP_RANGER_URL-}
-export IMPALA_TEZ_VERSION=${CDP_TEZ_VERSION}
-export IMPALA_TEZ_URL=${CDP_TEZ_URL-}
+if ${USE_APACHE_COMPONENTS:=false}; then
+  export IMPALA_AVRO_JAVA_VERSION=${APACHE_AVRO_JAVA_VERSION}
+  export IMPALA_HADOOP_VERSION=${APACHE_HADOOP_VERSION}
+  export IMPALA_HBASE_VERSION=${APACHE_HBASE_VERSION}
+  export IMPALA_ICEBERG_VERSION=${APACHE_ICEBERG_VERSION}
+  export IMPALA_KNOX_VERSION=${APACHE_KNOX_VERSION}
+  export IMPALA_OZONE_VERSION=${APACHE_OZONE_VERSION}
+  export IMPALA_PARQUET_VERSION=${APACHE_PARQUET_VERSION}
+  export IMPALA_RANGER_VERSION=${RANGER_VERSION_OVERRIDE:-"$APACHE_RANGER_VERSION"}
+  export IMPALA_TEZ_VERSION=${APACHE_TEZ_VERSION}
+  export USE_APACHE_HADOOP=${USE_APACHE_HADOOP:=true}
+  export USE_APACHE_HBASE=${USE_APACHE_HBASE:=true}
+  export USE_APACHE_HIVE=${USE_APACHE_HIVE:=true}
+  export USE_APACHE_TEZ=${USE_APACHE_TEZ:=true}
+  export USE_APACHE_RANGER=${USE_APACHE_RANGER:=true}
+  export USE_APACHE_OZONE=${USE_APACHE_OZONE:=true}
+else
+  export IMPALA_AVRO_JAVA_VERSION=${CDP_AVRO_JAVA_VERSION}
+  export IMPALA_HADOOP_VERSION=${CDP_HADOOP_VERSION}
+  export IMPALA_HADOOP_URL=${CDP_HADOOP_URL-}
+  export IMPALA_HBASE_VERSION=${CDP_HBASE_VERSION}
+  export IMPALA_HBASE_URL=${CDP_HBASE_URL-}
+  export IMPALA_ICEBERG_VERSION=${CDP_ICEBERG_VERSION}
+  export IMPALA_ICEBERG_URL=${CDP_ICEBERG_URL-}
+  export IMPALA_KNOX_VERSION=${CDP_KNOX_VERSION}
+  export IMPALA_OZONE_VERSION=${CDP_OZONE_VERSION}
+  export IMPALA_PARQUET_VERSION=${CDP_PARQUET_VERSION}
+  export IMPALA_RANGER_VERSION=${RANGER_VERSION_OVERRIDE:-"$CDP_RANGER_VERSION"}
+  export IMPALA_RANGER_URL=${CDP_RANGER_URL-}
+  export IMPALA_TEZ_VERSION=${CDP_TEZ_VERSION}
+  export IMPALA_TEZ_URL=${CDP_TEZ_URL-}
+  export USE_APACHE_HADOOP=${USE_APACHE_HADOOP:=false}
+  export USE_APACHE_HBASE=${USE_APACHE_HBASE:=false}
+  export USE_APACHE_HIVE=${USE_APACHE_HIVE:=false}
+  export USE_APACHE_TEZ=${USE_APACHE_TEZ:=false}
+  export USE_APACHE_RANGER=${USE_APACHE_RANGER:=false}
+  export USE_APACHE_OZONE=${USE_APACHE_OZONE:=false}
+fi
 
 export APACHE_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/apache_components"
+
+if $USE_APACHE_HADOOP; then
+  export HADOOP_HOME="$APACHE_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}"
+else
+  export HADOOP_HOME="$CDP_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}"
+fi
+
 if $USE_APACHE_HIVE; then
   # When USE_APACHE_HIVE is set we use the apache hive version to build as well as deploy
   # in the minicluster
@@ -409,6 +422,28 @@ else
   export IMPALA_HIVE_STORAGE_API_VERSION=${HIVE_STORAGE_API_VERSION_OVERRIDE:-\
 "2.3.0.$IMPALA_HIVE_VERSION"}
 fi
+# Thrift related environment variables.
+# IMPALA_THRIFT_POM_VERSION is used to populate IMPALA_THRIFT_JAVA_VERSION and
+# thrift.version in java/pom.xml.
+# IMPALA_THRIFT_PY_VERSION is used to find the thrift compiler to produce
+# the generated Python code. The code that uses the generated Python code gets
+# the corresponding Thrift runtime library by pip installing thrift (and does not
+# respect this version). If upgrading IMPALA_THRIFT_PY_VERSION, also upgrade the
+# thrift version in shell/ext-py, shell/packaging/requirements.txt, and
+# infra/python/deps/requirements.txt.
+export IMPALA_THRIFT_CPP_VERSION=0.16.0-p7
+unset IMPALA_THRIFT_CPP_URL
+if $USE_APACHE_HIVE; then
+  # Apache Hive 3 clients can't run on thrift versions >= 0.14 (IMPALA-11801)
+  export IMPALA_THRIFT_POM_VERSION=0.11.0
+  export IMPALA_THRIFT_JAVA_VERSION=${IMPALA_THRIFT_POM_VERSION}-p5
+else
+  export IMPALA_THRIFT_POM_VERSION=0.16.0
+  export IMPALA_THRIFT_JAVA_VERSION=${IMPALA_THRIFT_POM_VERSION}-p7
+fi
+unset IMPALA_THRIFT_JAVA_URL
+export IMPALA_THRIFT_PY_VERSION=0.16.0-p7
+unset IMPALA_THRIFT_PY_URL
 
 # Extract the first component of the hive version.
 # Allow overriding of Hive source location in case we want to build Impala without
@@ -423,7 +458,6 @@ if [[ "${IMPALA_HIVE_MAJOR_VERSION}" == "1" ||
   return 1
 fi
 
-export USE_APACHE_OZONE=${USE_APACHE_OZONE-false}
 if $USE_APACHE_OZONE; then
   export IMPALA_OZONE_VERSION=${APACHE_OZONE_VERSION}
   export IMPALA_OZONE_URL=${APACHE_OZONE_URL-}
@@ -582,6 +616,7 @@ export IMPALA_COMPRESSED_DEBUG_INFO=${IMPALA_COMPRESSED_DEBUG_INFO-true}
 # building against a custom local build using HIVE_SRC_DIR_OVERRIDE,
 # HADOOP_INCLUDE_DIR_OVERRIDE, and HADOOP_LIB_DIR_OVERRIDE.
 export DOWNLOAD_CDH_COMPONENTS=${DOWNLOAD_CDH_COMPONENTS-true}
+export DOWNLOAD_APACHE_COMPONENTS=${DOWNLOAD_APACHE_COMPONENTS-true}
 
 export IS_OSX="$(if [[ "$OSTYPE" == "darwin"* ]]; then echo true; else echo false; fi)"
 
@@ -653,8 +688,17 @@ fi
 # Set the path to the hive_metastore.thrift which is used to build thrift code
 export HIVE_METASTORE_THRIFT_DIR=${HIVE_METASTORE_THRIFT_DIR_OVERRIDE:-\
 "$HIVE_SRC_DIR/standalone-metastore/src/main/thrift"}
-export TEZ_HOME="$CDP_COMPONENTS_HOME/tez-${IMPALA_TEZ_VERSION}-minimal"
-export HBASE_HOME="$CDP_COMPONENTS_HOME/hbase-${IMPALA_HBASE_VERSION}/"
+if $USE_APACHE_TEZ; then
+  export TEZ_HOME="$APACHE_COMPONENTS_HOME/tez-${IMPALA_TEZ_VERSION}"
+else
+  export TEZ_HOME="$CDP_COMPONENTS_HOME/tez-${IMPALA_TEZ_VERSION}-minimal"
+fi
+
+if $USE_APACHE_HBASE; then
+  export HBASE_HOME="$APACHE_COMPONENTS_HOME/hbase-${IMPALA_HBASE_VERSION}-hadoop3/"
+else
+  export HBASE_HOME="$CDP_COMPONENTS_HOME/hbase-${IMPALA_HBASE_VERSION}/"
+fi
 if $USE_APACHE_OZONE; then
   export OZONE_HOME="$APACHE_COMPONENTS_HOME/ozone-${IMPALA_OZONE_VERSION}/"
 else
@@ -949,8 +993,13 @@ HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:${HADOOP_HOME}/share/hadoop/tools/lib/*"
 
 export PATH="$HADOOP_HOME/bin:$PATH"
 
-export RANGER_HOME=\
+if $USE_APACHE_RANGER; then
+  export RANGER_HOME=${RANGER_HOME_OVERRIDE:-\
+"${APACHE_COMPONENTS_HOME}/ranger-${IMPALA_RANGER_VERSION}-admin"}
+else
+  export RANGER_HOME=\
 ${RANGER_HOME_OVERRIDE:-"${CDP_COMPONENTS_HOME}/ranger-${IMPALA_RANGER_VERSION}-admin"}
+fi
 export RANGER_CONF_DIR="$IMPALA_HOME/fe/src/test/resources"
 
 # To configure Hive logging, there's a hive-log4j2.properties[.template]
@@ -1096,7 +1145,7 @@ echo "IMPALA_MAVEN_OPTIONS    = $IMPALA_MAVEN_OPTIONS"
 echo "IMPALA_TOOLCHAIN_HOST   = $IMPALA_TOOLCHAIN_HOST"
 echo "CDP_BUILD_NUMBER        = $CDP_BUILD_NUMBER"
 echo "CDP_COMPONENTS_HOME     = $CDP_COMPONENTS_HOME"
-if $USE_APACHE_HIVE; then
+if $USE_APACHE_COMPONENTS; then
   echo "APACHE_MIRROR           = $APACHE_MIRROR"
   echo "APACHE_COMPONENTS_HOME  = $APACHE_COMPONENTS_HOME"
 fi

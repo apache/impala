@@ -434,8 +434,9 @@ bootstrap_dependencies() {
     else
       echo "SKIP_TOOLCHAIN_BOOTSTRAP is true, skipping toolchain bootstrap."
     fi
-    if [[ "${DOWNLOAD_CDH_COMPONENTS}" = true ]]; then
-      echo ">>> Downloading and extracting cdh components."
+    if [[ "${DOWNLOAD_CDH_COMPONENTS}" = true ]] || \
+      [[ "${DOWNLOAD_APACHE_COMPONENTS}" = true ]]; then
+      echo ">>> Downloading and extracting cdh or apache components."
       "$IMPALA_HOME/bin/bootstrap_toolchain.py"
     fi
   else
