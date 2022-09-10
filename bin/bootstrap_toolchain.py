@@ -509,30 +509,46 @@ def get_toolchain_downloads():
 
 def get_hadoop_downloads():
   cluster_components = []
-  hadoop = CdpComponent("hadoop")
-  hbase = CdpComponent("hbase", archive_basename_tmpl="hbase-${version}-bin",
+  use_apache_hadoop = os.environ["USE_APACHE_HADOOP"] == "true"
+  use_apache_hbase = os.environ["USE_APACHE_HBASE"] == "true"
+  use_apache_hive = os.environ["USE_APACHE_HIVE"] == "true"
+  use_apache_tez = os.environ["USE_APACHE_TEZ"] == "true"
+  use_apache_ranger = os.environ["USE_APACHE_RANGER"] == "true"
+  use_apache_ozone = os.environ["USE_APACHE_OZONE"] == "true"
+  if use_apache_hadoop:
+    hadoop = ApacheComponent("hadoop", component_path_tmpl="${name}/common/${name}-${version}/", archive_basename_tmpl="${name}-${version}")
+  else:
+    hadoop = CdpComponent("hadoop")
+
+  if use_apache_hbase:
+    hbase = ApacheComponent("hbase", component_path_tmpl="${name}/${version}/", archive_basename_tmpl="${name}-${version}-bin", unpack_directory_tmpl="${name}-${version}")
+  else:
+    hbase = CdpComponent("hbase", archive_basename_tmpl="hbase-${version}-bin",
                        unpack_directory_tmpl="hbase-${version}")
 
-  use_apache_ozone = os.environ["USE_APACHE_OZONE"] == "true"
-  if use_apache_ozone:
-    ozone = ApacheComponent("ozone", component_path_tmpl="ozone/${version}")
-  else:
-    ozone = CdpComponent("ozone", archive_basename_tmpl="hadoop-ozone-${version}",
-                        unpack_directory_tmpl="ozone-${version}")
-
-  use_apache_hive = os.environ["USE_APACHE_HIVE"] == "true"
   if use_apache_hive:
     hive = ApacheComponent("hive", archive_basename_tmpl="apache-hive-${version}-bin")
     hive_src = ApacheComponent("hive", archive_basename_tmpl="apache-hive-${version}-src")
   else:
     hive = CdpComponent("hive", archive_basename_tmpl="apache-hive-${version}-bin")
     hive_src = CdpComponent("hive-source",
-                            explicit_version=os.environ.get("IMPALA_HIVE_VERSION"),
-                            archive_basename_tmpl="hive-${version}-source",
-                            unpack_directory_tmpl="hive-${version}")
-
-  tez = CdpComponent("tez", archive_basename_tmpl="tez-${version}-minimal", makedir=True)
-  ranger = CdpComponent("ranger", archive_basename_tmpl="ranger-${version}-admin")
+                          explicit_version=os.environ.get("IMPALA_HIVE_VERSION"),
+                          archive_basename_tmpl="hive-${version}-source",
+                          unpack_directory_tmpl="hive-${version}")
+  if use_apache_tez:
+    tez = ApacheComponent("tez", component_path_tmpl="${name}/${version}/", archive_basename_tmpl="apache-${name}-${version}-bin")
+  else:
+    tez = CdpComponent("tez", archive_basename_tmpl="tez-${version}-minimal",
+                     makedir=True)
+  if use_apache_ranger:
+    ranger = ApacheComponent("ranger", component_path_tmpl="${name}/${version}/", archive_basename_tmpl="apache-${name}-${version}")
+  else:
+    ranger = CdpComponent("ranger", archive_basename_tmpl="ranger-${version}-admin")
+  if use_apache_ozone:
+    ozone = ApacheComponent("ozone", component_path_tmpl="ozone/${version}")
+  else:
+    ozone = CdpComponent("ozone", archive_basename_tmpl="hadoop-ozone-${version}",
+                      unpack_directory_tmpl="ozone-${version}")
   use_override_hive = \
       "HIVE_VERSION_OVERRIDE" in os.environ and os.environ["HIVE_VERSION_OVERRIDE"] != ""
   # If we are using a locally built Hive we do not have a need to pull hive as a
@@ -584,7 +600,9 @@ def main():
   kudu_download = None
   if os.getenv("DOWNLOAD_CDH_COMPONENTS", "false") == "true":
     create_directory_from_env_var("CDP_COMPONENTS_HOME")
+  if os.getenv("DOWNLOAD_APACHE_COMPONENTS", "false") == "true":
     create_directory_from_env_var("APACHE_COMPONENTS_HOME")
+  if os.getenv("DOWNLOAD_CDH_COMPONENTS", "false") == "true" or os.getenv("DOWNLOAD_APACHE_COMPONENTS", "false") == "true":
     if platform.processor() != "aarch64":
       downloads += get_kudu_downloads()
     downloads += get_hadoop_downloads()

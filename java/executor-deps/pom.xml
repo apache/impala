@@ -187,7 +187,31 @@ under the License.
     </dependency>
 
   </dependencies>
-
+  <profiles>
+    <profile>
+      <activation>
+        <property>
+          <name>${env.USE_APACHE}</name>
+          <value>false</value>
+        </property>
+      </activation>
+      <dependencies>
+        <!-- IMPALA-8766: Include Knox jars on the classpath -->
+        <dependency>
+          <groupId>org.apache.knox</groupId>
+          <artifactId>gateway-cloud-bindings</artifactId>
+          <version>${knox.version}</version>
+          <exclusions>
+            <!-- Impala currently doesn't support GCS, so exclude those jars -->
+            <exclusion>
+              <groupId>com.google.cloud.bigdataoss</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+      </dependencies>
+    </profile>
+  </profiles>
   <build>
     <plugins>
       <plugin>

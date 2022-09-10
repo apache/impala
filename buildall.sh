@@ -412,8 +412,8 @@ bootstrap_dependencies() {
   # Populate necessary thirdparty components unless it's set to be skipped.
   if [[ "${SKIP_TOOLCHAIN_BOOTSTRAP}" = true ]]; then
     echo "SKIP_TOOLCHAIN_BOOTSTRAP is true, skipping toolchain bootstrap."
-    if [[ "${DOWNLOAD_CDH_COMPONENTS}" = true ]]; then
-      echo ">>> Downloading and extracting cdh components."
+    if [[ "${DOWNLOAD_CDH_COMPONENTS}" = true ]] || [[ "${DOWNLOAD_APACHE_COMPONENTS}" = true ]]; then
+      echo ">>> Downloading and extracting cdh or apache components."
       "$IMPALA_HOME/bin/bootstrap_toolchain.py"
     fi
     # Create soft link to locally builded native-toolchain on aarch64

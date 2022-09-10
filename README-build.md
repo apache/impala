@@ -36,6 +36,14 @@ can do so through the environment variables and scripts listed below.
 | JAVA | "${JAVA_HOME}/bin/java" | Java binary location. |
 | CLASSPATH | | See bin/set-classpath.sh for details. |
 | PYTHONPATH |  Will be changed to include: "${IMPALA_HOME}/shell/gen-py" "${IMPALA_HOME}/testdata" "${THRIFT_PY_HOME}/python/lib/python2.7/site-packages" "${HIVE_HOME}/lib/py" |
+| USE_APACHE | false | Use Apache components for Hadoop, HBase, Hive, Tez, Ranger. It will set USE_APACHE_{HADOOP,HBASE,HIVE,TEZ,RANGER} variable as true if not set. |
+| USE_APACHE_HADOOP | false | Use Apache Hadoop |
+| USE_APACHE_HBASE | false | Use Apache HBase |
+| USE_APACHE_HIVE | false | Use Apache Hive |
+| USE_APACHE_TEZ | false | Use Apache Tez |
+| USE_APACHE_RANGER | false | Use Apache Ranger |
+| DOWNLOAD_CDH_COMPONENTS | true | Download CDH components |
+| DOWNLOAD_APACHE_COMPONENTS | true | Download Apache components |
 
 ## Source Directories for Impala
 

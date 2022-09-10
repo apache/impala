@@ -485,8 +485,11 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
         .table(tableName)
         .column(columnName)
         .build();
-    RangerAccessRequest req = new RangerAccessRequestImpl(resource,
-        SELECT_ACCESS_TYPE, user.getShortName(), getUserGroups(user));
+    RangerAccessRequestImpl req = new RangerAccessRequestImpl();
+    req.setResource(resource);
+    req.setAccessType(SELECT_ACCESS_TYPE);
+    req.setUser(user.getShortName());
+    req.setUserGroups(getUserGroups(user));
     // The method evalDataMaskPolicies() only checks whether there is a corresponding
     // column masking policy on the Ranger server and thus does not check whether the
     // requesting user/group is granted the necessary privilege on the specified
@@ -506,8 +509,11 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
         .database(dbName)
         .table(tableName)
         .build();
-    RangerAccessRequest req = new RangerAccessRequestImpl(resource,
-        SELECT_ACCESS_TYPE, user.getShortName(), getUserGroups(user));
+    RangerAccessRequestImpl req = new RangerAccessRequestImpl();
+    req.setResource(resource);
+    req.setAccessType(SELECT_ACCESS_TYPE);
+    req.setUser(user.getShortName());
+    req.setUserGroups(getUserGroups(user));
     return plugin_.evalRowFilterPolicies(req, auditHandler);
   }
 
@@ -641,8 +647,11 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     } else {
       accessType = privilege.name().toLowerCase();
     }
-    RangerAccessRequestImpl request = new RangerAccessRequestImpl(resource,
-        accessType, user.getShortName(), getUserGroups(user));
+    RangerAccessRequestImpl request = new RangerAccessRequestImpl();
+    request.setResource(resource);
+    request.setAccessType(SELECT_ACCESS_TYPE);
+    request.setUser(user.getShortName());
+    request.setUserGroups(getUserGroups(user));
     request.setClusterName(plugin_.getClusterName());
     if (authzCtx.getSessionState() != null) {
       request.setClientIPAddress(
