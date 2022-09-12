@@ -32,7 +32,9 @@ import json
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.iceberg_test_suite import IcebergTestSuite
 from tests.common.skip import SkipIf, SkipIfDockerizedCluster
-from tests.common.file_utils import create_iceberg_table_from_directory
+from tests.common.file_utils import (
+  create_iceberg_table_from_directory,
+  create_table_from_parquet)
 from tests.shell.util import run_impala_shell_cmd
 from tests.util.filesystem_utils import get_fs_path, IS_HDFS
 from tests.util.get_parquet_metadata import get_parquet_metadata
@@ -789,6 +791,59 @@ class TestIcebergTable(IcebergTestSuite):
                                         "iceberg_mixed_file_format_test", "parquet")
     self.run_test_case('QueryTest/iceberg-mixed-file-format', vector,
                       unique_database)
+
+  def _create_table_like_parquet_helper(self, vector, unique_database, tbl_name,
+                                        expect_success):
+    create_table_from_parquet(self.client, unique_database, tbl_name)
+    args = ['-q', "show files in {0}.{1}".format(unique_database, tbl_name)]
+    results = run_impala_shell_cmd(vector, args)
+    result_rows = results.stdout.strip().split('\n')
+    hdfs_file = None
+    for row in result_rows:
+      if "hdfs://" in row:
+        hdfs_file = row.split('|')[1].lstrip()
+        break
+    assert hdfs_file
+
+    iceberg_tbl_name = "iceberg_{0}".format(tbl_name)
+    sql_stmt = "create table {0}.{1} like parquet '{2}' stored as iceberg".format(
+      unique_database, iceberg_tbl_name, hdfs_file
+    )
+    args = ['-q', sql_stmt]
+
+    return run_impala_shell_cmd(vector, args, expect_success=expect_success)
+
+  def test_create_table_like_parquet(self, vector, unique_database):
+    tbl_name = 'alltypes_tiny_pages'
+    # Not all types are supported by iceberg
+    self._create_table_like_parquet_helper(vector, unique_database, tbl_name, False)
+
+    tbl_name = "create_table_like_parquet_test"
+    results = self._create_table_like_parquet_helper(vector, unique_database, tbl_name,
+                                                     True)
+    result_rows = results.stdout.strip().split('\n')
+    assert result_rows[3].split('|')[1] == ' Table has been created. '
+
+    sql_stmt = "describe {0}.{1}".format(unique_database, tbl_name)
+    args = ['-q', sql_stmt]
+    parquet_results = run_impala_shell_cmd(vector, args)
+    parquet_result_rows = parquet_results.stdout.strip().split('\n')
+
+    parquet_column_name_type_list = []
+    for row in parquet_result_rows[1:-2]:
+      parquet_column_name_type_list.append(row.split('|')[1:3])
+
+    sql_stmt = "describe {0}.iceberg_{1}".format(unique_database, tbl_name)
+    args = ['-q', sql_stmt]
+    iceberg_results = run_impala_shell_cmd(vector, args)
+    iceberg_result_rows = iceberg_results.stdout.strip().split('\n')
+
+    iceberg_column_name_type_list = []
+    for row in iceberg_result_rows[1:-2]:
+      iceberg_column_name_type_list.append(row.split('|')[1:3])
+
+    assert parquet_column_name_type_list == iceberg_column_name_type_list
+
 
 class TestIcebergV2Table(IcebergTestSuite):
   """Tests related to Iceberg V2 tables."""
