@@ -50,6 +50,10 @@ class SkipIfFS:
       reason="HDFS encryption is not supported")
   hdfs_block_size = pytest.mark.skipif(not IS_HDFS, reason="uses it's own block size")
   hdfs_acls = pytest.mark.skipif(not IS_HDFS, reason="HDFS acls are not supported")
+  # TODO: IMPALA-11584: see if this can be collapsed into SkipIfNotHdfsMinicluster
+  always_remote = pytest.mark.skipif(IS_EC or not (IS_HDFS or IS_OZONE)
+      or IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),
+      reason="Only HDFS and Ozone tests are run co-located")
 
   # Special case product limitations.
   empty_directory = pytest.mark.skipif(IS_S3,
