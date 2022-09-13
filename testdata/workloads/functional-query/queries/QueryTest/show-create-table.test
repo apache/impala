@@ -652,7 +652,7 @@ TBLPROPERTIES('write.format.default'='parquet',
     'write.parquet.page-size-bytes'='65536',
     'write.parquet.dict-size-bytes'='131072',
     'iceberg.catalog'='hadoop.catalog',
-    'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
+    'iceberg.catalog_location'='$$warehouse$$/hadoop_catalog_test')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test2 (
   level STRING NULL
@@ -667,7 +667,7 @@ TBLPROPERTIES ('external.table.purge'='TRUE',
     'write.parquet.dict-size-bytes'='131072',
     'engine.hive.enabled'='true',
     'iceberg.catalog'='hadoop.catalog',
-    'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
+    'iceberg.catalog_location'='$$warehouse$$/hadoop_catalog_test')
 ====
 ---- CREATE_TABLE
 CREATE TABLE iceberg_test3 (
@@ -681,7 +681,7 @@ TBLPROPERTIES('write.format.default'='parquet',
     'write.parquet.page-size-bytes'='65536',
     'write.parquet.dict-size-bytes'='131072',
     'iceberg.catalog'='hadoop.catalog',
-    'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test',
+    'iceberg.catalog_location'='$$warehouse$$/hadoop_catalog_test',
     'iceberg.table_identifier'='org.my_db.my_table')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test3 (
@@ -697,7 +697,7 @@ TBLPROPERTIES ('external.table.purge'='TRUE',
     'write.parquet.dict-size-bytes'='131072',
     'engine.hive.enabled'='true',
     'iceberg.catalog'='hadoop.catalog',
-    'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test',
+    'iceberg.catalog_location'='$$warehouse$$/hadoop_catalog_test',
     'iceberg.table_identifier'='org.my_db.my_table')
 ====
 ---- CREATE_TABLE
@@ -725,7 +725,7 @@ TBLPROPERTIES('write.format.default'='parquet',
     'write.parquet.page-size-bytes'='65536',
     'write.parquet.dict-size-bytes'='131072',
     'iceberg.catalog'='hadoop.catalog',
-    'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
+    'iceberg.catalog_location'='$$warehouse$$/hadoop_catalog_test')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test1_partitioned (
   level STRING NULL,
@@ -753,7 +753,7 @@ TBLPROPERTIES ('external.table.purge'='TRUE',
     'write.parquet.dict-size-bytes'='131072',
     'engine.hive.enabled'='true',
     'iceberg.catalog'='hadoop.catalog',
-    'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
+    'iceberg.catalog_location'='$$warehouse$$/hadoop_catalog_test')
 ====
 ---- CREATE_TABLE
 CREATE TABLE iceberg_test_orc (

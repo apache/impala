@@ -120,14 +120,14 @@ INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIM
 # Note: intentionally not using $SECONDARY_FILESYSTEM so that the partition points
 # to the default filesystem.
 alter table alltypes add partition(year=2010, month=3)
-location '/test-warehouse/alltypes_parquet/year=2010/month=3'
+location '$WAREHOUSE_LOCATION_PREFIX/test-warehouse/alltypes_parquet/year=2010/month=3'
 ---- RESULTS
 ====
 ---- QUERY
 # Note: intentionally not using $SECONDARY_FILESYSTEM so that the partition points
 # to the default filesystem.
 alter table alltypes add partition(year=2010, month=4)
-location '/test-warehouse/alltypes_parquet/year=2010/month=4'
+location '$WAREHOUSE_LOCATION_PREFIX/test-warehouse/alltypes_parquet/year=2010/month=4'
 ---- RESULTS
 ====
 ---- QUERY
@@ -187,7 +187,7 @@ INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIM
 # Note: intentionally not using $SECONDARY_FILESYSTEM so that the partition points
 # to the default filesystem.
 alter table alltypes add partition(year=2009, month=5)
-location '/test-warehouse/alltypes_parquet/year=2009/month=5'
+location '$WAREHOUSE_LOCATION_PREFIX/test-warehouse/alltypes_parquet/year=2009/month=5'
 ---- RESULTS
 ====
 ---- QUERY
@@ -199,7 +199,7 @@ location '$SECONDARY_FILESYSTEM/multi_fs_tests/$DATABASE.db/alltypes_parquet/yea
 # Note: intentionally not using $SECONDARY_FILESYSTEM so that the partition points
 # to the default filesystem.
 alter table alltypes add partition(year=2010, month=5)
-location '/test-warehouse/alltypes_parquet/year=2010/month=5'
+location '$WAREHOUSE_LOCATION_PREFIX/test-warehouse/alltypes_parquet/year=2010/month=5'
 ---- RESULTS
 ====
 ---- QUERY
@@ -306,7 +306,7 @@ year=2009/month=1: 310
 # ADD PARTITION on the default filesystem.
 # Point to unique database so we don't overwrite someone else's data.
 alter table alltypes_multipart_insert add partition(year=2009, month=2)
-location '/test-warehouse/$DATABASE.db/alltypes_multipart_insert/year=2009/month=2'
+location '$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE.db/alltypes_multipart_insert/year=2009/month=2'
 ---- RESULTS
 ====
 ---- QUERY

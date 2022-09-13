@@ -55,7 +55,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
         create_uncompressed_text_dimension(cls.get_workload()))
 
   def __get_fs_location(self, db_name, table_name):
-    return 'test-warehouse/%s.db/%s/' % (db_name, table_name)
+    return '%s/%s.db/%s/' % (WAREHOUSE, db_name, table_name)
 
   @SkipIfLocal.hdfs_client
   def test_recover_partitions(self, vector, unique_database):

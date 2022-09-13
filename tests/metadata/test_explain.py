@@ -210,8 +210,8 @@ class TestExplainEmptyPartition(ImpalaTestSuite):
       "ALTER TABLE %s.empty_partition ADD PARTITION (p=NULL)" % self.TEST_DB_NAME)
     # Put an empty file in the partition so we have > 0 files, but 0 rows
     self.filesystem_client.create_file(
-        "test-warehouse/%s.db/empty_partition/p=__HIVE_DEFAULT_PARTITION__/empty" %
-        self.TEST_DB_NAME, "")
+        "{1}/{0}.db/empty_partition/p=__HIVE_DEFAULT_PARTITION__/empty".
+        format(self.TEST_DB_NAME, WAREHOUSE), "")
     self.client.execute("REFRESH %s.empty_partition" % self.TEST_DB_NAME)
     self.client.execute("COMPUTE STATS %s.empty_partition" % self.TEST_DB_NAME)
     assert "NULL\t0\t1" in str(
@@ -224,8 +224,8 @@ class TestExplainEmptyPartition(ImpalaTestSuite):
     # that its lack of stats is correctly identified
     self.client.execute(
       "ALTER TABLE %s.empty_partition ADD PARTITION (p=1)" % self.TEST_DB_NAME)
-    self.filesystem_client.create_file("test-warehouse/%s.db/empty_partition/p=1/rows" %
-                                 self.TEST_DB_NAME, "1")
+    self.filesystem_client.create_file(
+        "{1}/{0}.db/empty_partition/p=1/rows".format(self.TEST_DB_NAME, WAREHOUSE), "1")
     self.client.execute("REFRESH %s.empty_partition" % self.TEST_DB_NAME)
     explain_result = str(
       self.client.execute("EXPLAIN SELECT * FROM %s.empty_partition" % self.TEST_DB_NAME))

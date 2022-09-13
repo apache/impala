@@ -20,7 +20,7 @@ from datetime import datetime
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS, SkipIfLocal, SkipIfNotHdfsMinicluster
-from tests.util.filesystem_utils import IS_EC
+from tests.util.filesystem_utils import IS_EC, WAREHOUSE
 from time import sleep
 from RuntimeProfile.ttypes import TRuntimeProfileFormat
 import pytest
@@ -424,7 +424,7 @@ class TestObservability(ImpalaTestSuite):
   def test_query_profile_contains_all_events(self, unique_database):
     """Test that the expected events show up in a query profile for various queries"""
     # make a data file to load data from
-    path = "test-warehouse/{0}.db/data_file".format(unique_database)
+    path = "{1}/{0}.db/data_file".format(unique_database, WAREHOUSE)
     self.filesystem_client.create_file(path, "1")
     use_query = "use {0}".format(unique_database)
     self.execute_query(use_query)
@@ -441,7 +441,7 @@ class TestObservability(ImpalaTestSuite):
       'explain select * from impala_6568',
       'describe impala_6568',
       'alter table impala_6568 set tblproperties(\'numRows\'=\'10\')',
-      "load data inpath '/{0}' into table impala_6568".format(path)
+      "load data inpath '{0}' into table impala_6568".format(path)
     ]
     # run each query...
     for query in queries:

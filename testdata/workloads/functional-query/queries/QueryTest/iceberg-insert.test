@@ -102,7 +102,7 @@ select * from ts_iceberg;
 create table iceberg_hadoop_cat (i int)
 stored as iceberg
 tblproperties('iceberg.catalog'='hadoop.catalog',
-  'iceberg.catalog_location'='/test-warehouse/$DATABASE.db/hadoop_catalog_test');
+  'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE.db/hadoop_catalog_test');
 insert into iceberg_hadoop_cat values (1), (2), (3);
 ---- RESULTS
 : 3
@@ -128,7 +128,7 @@ STRING, STRING, STRING
 create table iceberg_hadoop_cat_ti (i int)
 stored as iceberg
 tblproperties('iceberg.catalog'='hadoop.catalog',
-  'iceberg.catalog_location'='/test-warehouse/$DATABASE.db/hadoop_catalog_test',
+  'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE.db/hadoop_catalog_test',
   'iceberg.table_identifier'='test.custom_db.int_table');
 insert into iceberg_hadoop_cat_ti values (1), (2), (3);
 ---- RESULTS
@@ -170,7 +170,7 @@ INT
 # Query external Iceberg table
 create external table iceberg_hive_cat_ext (i int)
 stored as iceberg
-location '/test-warehouse/$DATABASE.db/iceberg_hive_cat'
+location '$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE.db/iceberg_hive_cat'
 tblproperties('iceberg.catalog'='hive.catalog',
     'iceberg.table_identifier'='$DATABASE.iceberg_hive_cat');
 ---- RESULTS
@@ -223,7 +223,7 @@ INT
 # Create another external Iceberg table
 create external table iceberg_hive_cat_ext_2 (i int)
 stored as iceberg
-location '/test-warehouse/$DATABASE.db/iceberg_hive_cat'
+location '$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE.db/iceberg_hive_cat'
 tblproperties('iceberg.catalog'='hive.catalog',
     'iceberg.table_identifier'='$DATABASE.iceberg_hive_cat');
 select * from iceberg_hive_cat_ext_2
@@ -248,7 +248,7 @@ Table does not exist
 # Insert into hive catalog with custom location.
 create table iceberg_hive_cat_custom_loc (i int)
 stored as iceberg
-location '/test-warehouse/$DATABASE.db/custom_hive_cat'
+location '$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE.db/custom_hive_cat'
 tblproperties('iceberg.catalog'='hive.catalog');
 insert into iceberg_hive_cat_custom_loc values (1), (2), (3);
 ---- RESULTS

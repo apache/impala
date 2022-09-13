@@ -370,7 +370,7 @@ string, string, string
 describe formatted hadoop_catalog_test_external;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test','NULL'
-'','iceberg.catalog_location','/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test'
+'','iceberg.catalog_location','$WAREHOUSE_LOCATION_PREFIX/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test'
 '','iceberg.table_identifier','functional_parquet.hadoop_catalog_test'
 '','write.format.default','parquet             '
 '','iceberg.catalog     ','hadoop.catalog      '
@@ -381,7 +381,7 @@ string, string, string
 describe formatted iceberg_partitioned_orc_external;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc','NULL'
-'','iceberg.catalog_location','/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc'
+'','iceberg.catalog_location','$WAREHOUSE_LOCATION_PREFIX/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc'
 '','iceberg.table_identifier','functional_parquet.iceberg_partitioned_orc'
 '','write.format.default','orc                 '
 '','iceberg.catalog     ','hadoop.catalog      '
@@ -451,7 +451,7 @@ bigint,bigint
 describe formatted iceberg_resolution_test_external;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test','NULL'
-'','iceberg.catalog_location','/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test'
+'','iceberg.catalog_location','$WAREHOUSE_LOCATION_PREFIX/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test'
 '','iceberg.table_identifier','functional_parquet.iceberg_resolution_test'
 '','write.format.default','parquet             '
 '','iceberg.catalog     ','hadoop.catalog      '

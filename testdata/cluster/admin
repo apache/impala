@@ -329,7 +329,7 @@ function start_cluster {
   if [[ "${TARGET_FILESYSTEM}" = "ozone" ]]; then
     local bucketkey=''
     if $USE_OZONE_ENCRYPTION; then
-      echo "Ozone encryption enabled for ${OZONE_VOLUME}/${OZONE_BUCKET}"
+      echo "Ozone encryption enabled for ${OZONE_VOLUME}/test-warehouse"
 
       # Encryption is done at the bucket level, so ensure the keys are available first.
       ${IMPALA_HOME}/testdata/bin/setup-dfs-keys.sh testkey
@@ -337,7 +337,7 @@ function start_cluster {
     fi
 
     ozone sh volume create ${OZONE_VOLUME} || true
-    ozone sh bucket create ${bucketkey} ${OZONE_VOLUME}/${OZONE_BUCKET} || true
+    ozone sh bucket create ${bucketkey} ${OZONE_VOLUME}/test-warehouse || true
   fi
 
   return $?

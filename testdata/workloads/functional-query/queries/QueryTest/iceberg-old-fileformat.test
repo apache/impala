@@ -5,7 +5,7 @@ STORED AS ICEBERG
 TBLPROPERTIES(
   'iceberg.file_format'='orc',
   'iceberg.catalog'='hadoop.catalog',
-  'iceberg.catalog_location'='/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc',
+  'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc',
   'iceberg.table_identifier'='functional_parquet.iceberg_partitioned_orc'
 );
 ALTER TABLE iceberg_partitioned_orc_external_old_fileformat
@@ -13,7 +13,7 @@ UNSET TBLPROPERTIES IF EXISTS ('write.format.default');
 DESCRIBE FORMATTED iceberg_partitioned_orc_external_old_fileformat;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc','NULL'
-'','iceberg.catalog_location','/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc'
+'','iceberg.catalog_location','$WAREHOUSE_LOCATION_PREFIX/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc'
 '','iceberg.table_identifier','functional_parquet.iceberg_partitioned_orc'
 '','iceberg.file_format','orc                 '
 '','iceberg.catalog     ','hadoop.catalog      '

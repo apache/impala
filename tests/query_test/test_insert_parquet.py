@@ -32,7 +32,7 @@ from tests.common.skip import SkipIfEC, SkipIfFS, SkipIfLocal
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_result_verifier import verify_query_result_is_equal
 from tests.common.test_vector import ImpalaTestDimension
-from tests.util.filesystem_utils import get_fs_path
+from tests.util.filesystem_utils import get_fs_path, WAREHOUSE
 from tests.util.get_parquet_metadata import (decode_stats_value,
     get_parquet_metadata_from_hdfs_folder)
 
@@ -328,8 +328,8 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
     to have columns with different signed integer logical types. The test verifies
     that parquet file written by the hdfs parquet table writer using the generated
     file has the same column type metadata as the generated one."""
-    hdfs_path = (os.environ['DEFAULT_FS'] + "/test-warehouse/{0}.db/"
-                 "signed_integer_logical_types.parquet").format(unique_database)
+    hdfs_path = "{1}/{0}.db/signed_integer_logical_types.parquet".\
+        format(unique_database, WAREHOUSE)
     self.filesystem_client.copy_from_local(os.environ['IMPALA_HOME'] +
         '/testdata/data/signed_integer_logical_types.parquet', hdfs_path)
     # Create table with signed integer logical types

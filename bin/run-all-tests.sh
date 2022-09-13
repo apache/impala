@@ -197,7 +197,8 @@ do
   TEST_RET_CODE=0
 
   # Store a list of the files at the beginning of each iteration.
-  hdfs dfs -ls -R /test-warehouse > ${IMPALA_LOGS_DIR}/file-list-begin-${i}.log 2>&1
+  hdfs dfs -ls -R ${FILESYSTEM_PREFIX}/test-warehouse \
+      > ${IMPALA_LOGS_DIR}/file-list-begin-${i}.log 2>&1
 
   # Try not restarting the cluster to save time. BE, FE, JDBC and EE tests require
   # running on a cluster with default flags. We just need to restart the cluster when
@@ -334,7 +335,8 @@ do
   # to the file-list-begin*.log from the beginning of the iteration to see if files
   # are not being cleaned up. This is most useful on the first iteration, when
   # the list of files is from dataload.
-  hdfs dfs -ls -R /test-warehouse > ${IMPALA_LOGS_DIR}/file-list-end-${i}.log 2>&1
+  hdfs dfs -ls -R ${FILESYSTEM_PREFIX}/test-warehouse \
+      > ${IMPALA_LOGS_DIR}/file-list-end-${i}.log 2>&1
 
   if [[ $TEST_RET_CODE == 1 ]]; then
     break

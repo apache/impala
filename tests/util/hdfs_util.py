@@ -67,9 +67,11 @@ class DelegatingHdfsClient(BaseFilesystem):
     super(DelegatingHdfsClient, self).__init__()
 
   def create_file(self, path, file_data, overwrite=True):
+    path = self._normalize_path(path)
     return self.webhdfs_client.create_file(path, file_data, overwrite=overwrite)
 
   def make_dir(self, path, permission=None):
+    path = self._normalize_path(path)
     if permission:
       return self.webhdfs_client.make_dir(path, permission=permission)
     else:
@@ -82,18 +84,23 @@ class DelegatingHdfsClient(BaseFilesystem):
     self.hdfs_filesystem_client.copy_from_local(src, dst)
 
   def ls(self, path):
+    path = self._normalize_path(path)
     return self.webhdfs_client.ls(path)
 
   def exists(self, path):
+    path = self._normalize_path(path)
     return self.webhdfs_client.exists(path)
 
   def delete_file_dir(self, path, recursive=False):
+    path = self._normalize_path(path)
     return self.webhdfs_client.delete_file_dir(path, recursive=recursive)
 
   def get_file_dir_status(self, path):
+    path = self._normalize_path(path)
     return self.webhdfs_client.get_file_dir_status(path)
 
   def get_all_file_sizes(self, path):
+    path = self._normalize_path(path)
     return self.webhdfs_client.get_all_file_sizes(path)
 
   def chmod(self, path, permission):
@@ -110,6 +117,11 @@ class DelegatingHdfsClient(BaseFilesystem):
 
   def touch(self, paths):
     return self.hdfs_filesystem_client.touch(paths)
+
+  def _normalize_path(self, path):
+    """Paths passed in may include a leading slash. Remove it as the underlying
+    PyWebHdfsClient expects the HDFS path without a leading '/'."""
+    return path[1:] if path.startswith('/') else path
 
 class PyWebHdfsClientWithChmod(PyWebHdfsClient):
   def chmod(self, path, permission):
@@ -212,20 +224,18 @@ class HadoopFsCommandLineClient(BaseFilesystem):
   def create_file(self, path, file_data, overwrite=True):
     """Creates a temporary file with the specified file_data on the local filesystem,
     then puts it into the specified path."""
-    fixed_path = self._normalize_path(path)
-    if not overwrite and self.exists(fixed_path): return False
+    if not overwrite and self.exists(path): return False
     with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
       tmp_file.write(file_data)
     put_cmd_params = ['-put', '-d']
     if overwrite: put_cmd_params.append('-f')
-    put_cmd_params.extend([tmp_file.name, fixed_path])
+    put_cmd_params.extend([tmp_file.name, path])
     (status, stdout, stderr) = self._hadoop_fs_shell(put_cmd_params)
     return status == 0
 
   def make_dir(self, path, permission=None):
     """Create a directory at the specified path. Permissions are not supported."""
-    fixed_path = self._normalize_path(path)
-    (status, stdout, stderr) = self._hadoop_fs_shell(['-mkdir', '-p', fixed_path])
+    (status, stdout, stderr) = self._hadoop_fs_shell(['-mkdir', '-p', path])
     return status == 0
 
   def copy(self, src, dst, overwrite=False):
@@ -233,11 +243,9 @@ class HadoopFsCommandLineClient(BaseFilesystem):
     'Skip[s] creation of temporary file with the suffix ._COPYING_.' to avoid extraneous
     copies on S3. If overwrite is true, the destination file is overwritten, set to false
     by default for backwards compatibility."""
-    fixed_src = self._normalize_path(src)
-    fixed_dst = self._normalize_path(dst)
     cp_cmd_params = ['-cp', '-d']
     if overwrite: cp_cmd_params.append('-f')
-    cp_cmd_params.extend([fixed_src, fixed_dst])
+    cp_cmd_params.extend([src, dst])
     (status, stdout, stderr) = self._hadoop_fs_shell(cp_cmd_params)
     assert status == 0, \
         '{0} copy failed: '.format(self.filesystem_type) + stderr + "; " + stdout
@@ -259,8 +267,7 @@ class HadoopFsCommandLineClient(BaseFilesystem):
 
   def _inner_ls(self, path):
     """List names, lengths, and mode for files/directories under the specified path."""
-    fixed_path = self._normalize_path(path)
-    (status, stdout, stderr) = self._hadoop_fs_shell(['-ls', fixed_path])
+    (status, stdout, stderr) = self._hadoop_fs_shell(['-ls', path])
     # Trim the "Found X items" line and trailing new-line
     entries = stdout.split("\n")[1:-1]
     files = []
@@ -275,9 +282,8 @@ class HadoopFsCommandLineClient(BaseFilesystem):
 
   def ls(self, path):
     """Returns a list of all file and directory names in 'path'"""
-    fixed_path = self._normalize_path(path)
     files = []
-    for f in self._inner_ls(fixed_path):
+    for f in self._inner_ls(path):
       fname = os.path.basename(f['name'])
       if not fname == '':
         files += [fname]
@@ -285,31 +291,23 @@ class HadoopFsCommandLineClient(BaseFilesystem):
 
   def exists(self, path):
     """Checks if a particular path exists"""
-    fixed_path = self._normalize_path(path)
-    (status, stdout, stderr) = self._hadoop_fs_shell(['-test', '-e', fixed_path])
+    (status, stdout, stderr) = self._hadoop_fs_shell(['-test', '-e', path])
     return status == 0
 
   def delete_file_dir(self, path, recursive=False):
     """Delete the file or directory given by the specified path. Recursive must be true
     for directories."""
-    fixed_path = self._normalize_path(path)
-    rm_command = ['-rm', fixed_path]
+    rm_command = ['-rm', path]
     if recursive:
-      rm_command = ['-rm', '-r', fixed_path]
+      rm_command = ['-rm', '-r', path]
     (status, stdout, stderr) = self._hadoop_fs_shell(rm_command)
     return status == 0
 
   def get_all_file_sizes(self, path):
     """Returns a list of integers which are all the file sizes of files found
     under 'path'."""
-    fixed_path = self._normalize_path(path)
     return [f['length'] for f in
-        self._inner_ls(fixed_path) if f['mode'][0] == "-"]
-
-  def _normalize_path(self, path):
-    """Paths passed in may lack a leading slash. This adds a leading slash if it is
-    missing."""
-    return path if path.startswith('/') else '/' + path
+        self._inner_ls(path) if f['mode'][0] == "-"]
 
   def touch(self, paths):
     """Updates the access and modification times of the files specified by 'paths' to

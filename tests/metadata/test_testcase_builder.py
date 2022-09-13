@@ -40,7 +40,7 @@ class TestTestcaseBuilder(ImpalaTestSuite):
     tmp_path = get_fs_path("/tmp")
     # Make sure /tmp dir exists
     if not self.filesystem_client.exists(tmp_path):
-      self.filesystem_client.make_dir('tmp')
+      self.filesystem_client.make_dir(tmp_path)
     # Generate Testcase Data for query without table reference
     testcase_generate_query = """COPY TESTCASE TO '%s' SELECT 5 * 20""" % tmp_path
     result = self.execute_query_expect_success(self.client, testcase_generate_query)
@@ -48,7 +48,7 @@ class TestTestcaseBuilder(ImpalaTestSuite):
 
     # Check file exists
     testcase_path = str(result.data)[1: -1]
-    index = testcase_path.index('/tmp')
+    index = testcase_path.index(tmp_path)
     hdfs_path = testcase_path[index:-1]
     assert self.filesystem_client.exists(hdfs_path), \
         "File not generated {0}".format(hdfs_path)

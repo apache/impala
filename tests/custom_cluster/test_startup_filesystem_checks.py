@@ -25,6 +25,7 @@ import tempfile
 from impala_py_lib.helpers import find_all_files, is_core_dump
 from tests.common.file_utils import assert_file_in_dir_contains
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.util.filesystem_utils import get_fs_path
 
 LOG = logging.getLogger('test_startup_filesystem_checks')
 
@@ -38,12 +39,19 @@ class TestStartupFilesystemChecks(CustomClusterTestSuite):
   setup_method().
   """
 
-  NONEXISTENT_PATH = "/nonexistent_path"
-  NONDIRECTORY_PATH = "/test-warehouse/alltypes/year=2009/month=1/090101.txt"
-  VALID_SUBDIRECTORY = "/test-warehouse"
+  # Use get_fs_path because testdata in Ozone requires a volume prefix and does not
+  # accept underscore as a bucket name (the first element after volume prefix).
+  NONEXISTENT_PATH = get_fs_path("/nonexistent-path")
+  NONDIRECTORY_PATH = \
+      get_fs_path("/test-warehouse/alltypes/year=2009/month=1/090101.txt")
+  VALID_SUBDIRECTORY = get_fs_path("/test-warehouse")
   # Test multiple valid directories along with an empty entry
-  MULTIPLE_VALID_DIRECTORIES = \
-      "/,/test-warehouse/zipcode_incomes,,/test-warehouse/alltypes"
+  MULTIPLE_VALID_DIRECTORIES = ",".join([
+    "/",
+    get_fs_path("/test-warehouse/zipcode_incomes"),
+    "",
+    get_fs_path("/test-warehouse/alltypes")]
+  )
   LOG_DIR = tempfile.mkdtemp(prefix="test_startup_filesystem_checks_",
                              dir=os.getenv("LOG_DIR"))
   MINIDUMP_PATH = tempfile.mkdtemp()

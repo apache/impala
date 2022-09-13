@@ -82,3 +82,4 @@ def get_secondary_fs_path(path):
 
 WAREHOUSE = get_fs_path('/test-warehouse')
 FILESYSTEM_NAME = get_fs_name(FILESYSTEM)
+WAREHOUSE_PREFIX = os.getenv("WAREHOUSE_LOCATION_PREFIX")

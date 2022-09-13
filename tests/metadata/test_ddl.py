@@ -38,6 +38,7 @@ from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import (
     get_fs_path,
     WAREHOUSE,
+    WAREHOUSE_PREFIX,
     IS_HDFS,
     IS_S3,
     IS_ADLS,
@@ -47,8 +48,11 @@ from tests.common.impala_cluster import ImpalaCluster
 from tests.util.filesystem_utils import FILESYSTEM_PREFIX
 
 
-TRASH_PATH = ('.Trash/{0}/Current' if IS_OZONE else 'user/{0}/.Trash/Current').\
-  format(getpass.getuser())
+def get_trash_path(bucket, path):
+  if IS_OZONE:
+    return get_fs_path('/{0}/.Trash/{1}/Current{2}/{0}/{3}'.format(bucket,
+        getpass.getuser(), WAREHOUSE_PREFIX, path))
+  return '/user/{0}/.Trash/Current/{1}/{2}'.format(getpass.getuser(), bucket, path)
 
 # Validates DDL statements (create, drop)
 class TestDdlStatements(TestDdlBase):
@@ -59,20 +63,16 @@ class TestDdlStatements(TestDdlBase):
     self.client.execute("create table {0}.t1(i int)".format(unique_database))
     self.client.execute("create table {0}.t2(i int)".format(unique_database))
     # Create sample test data files under the table directories
-    self.filesystem_client.create_file("test-warehouse/{0}.db/t1/t1.txt".\
-        format(unique_database), file_data='t1')
-    self.filesystem_client.create_file("test-warehouse/{0}.db/t2/t2.txt".\
-        format(unique_database), file_data='t2')
+    dbpath = "{0}/{1}.db".format(WAREHOUSE, unique_database)
+    self.filesystem_client.create_file("{}/t1/t1.txt".format(dbpath), file_data='t1')
+    self.filesystem_client.create_file("{}/t2/t2.txt".format(dbpath), file_data='t2')
     # Drop the table (without purge) and make sure it exists in trash
     self.client.execute("drop table {0}.t1".format(unique_database))
-    assert not self.filesystem_client.exists("test-warehouse/{0}.db/t1/t1.txt".\
-        format(unique_database))
-    assert not self.filesystem_client.exists("test-warehouse/{0}.db/t1/".\
-        format(unique_database))
-    assert self.filesystem_client.exists(
-      '{0}/test-warehouse/{1}.db/t1/t1.txt'.format(TRASH_PATH, unique_database))
-    assert self.filesystem_client.exists(
-      '{0}/test-warehouse/{1}.db/t1'.format(TRASH_PATH, unique_database))
+    assert not self.filesystem_client.exists("{}/t1/t1.txt".format(dbpath))
+    assert not self.filesystem_client.exists("{}/t1/".format(dbpath))
+    trash = get_trash_path("test-warehouse", unique_database + ".db")
+    assert self.filesystem_client.exists("{}/t1/t1.txt".format(trash))
+    assert self.filesystem_client.exists("{}/t1".format(trash))
     # Drop the table (with purge) and make sure it doesn't exist in trash
     self.client.execute("drop table {0}.t2 purge".format(unique_database))
     if not IS_S3 and not IS_ADLS:
@@ -82,27 +82,20 @@ class TestDdlStatements(TestDdlBase):
       # consistent.
       # The ADLS Python client is not strongly consistent, so these files may still be
       # visible after a DROP. (Remove after IMPALA-5335 is resolved)
-      assert not self.filesystem_client.exists("test-warehouse/{0}.db/t2/".\
-          format(unique_database))
-      assert not self.filesystem_client.exists("test-warehouse/{0}.db/t2/t2.txt".\
-          format(unique_database))
-    assert not self.filesystem_client.exists(
-      '{0}/test-warehouse/{1}.db/t2/t2.txt'.format(TRASH_PATH, unique_database))
-    assert not self.filesystem_client.exists(
-      '{0}/test-warehouse/{1}.db/t2'.format(TRASH_PATH, unique_database))
+      assert not self.filesystem_client.exists("{}/t2/".format(dbpath))
+      assert not self.filesystem_client.exists("{}/t2/t2.txt".format(dbpath))
+    assert not self.filesystem_client.exists("{}/t2/t2.txt".format(trash))
+    assert not self.filesystem_client.exists("{}/t2".format(trash))
     # Create an external table t3 and run the same test as above. Make
     # sure the data is not deleted
-    self.filesystem_client.make_dir(
-        "test-warehouse/{0}.db/data_t3/".format(unique_database), permission=777)
+    self.filesystem_client.make_dir("{}/data_t3/".format(dbpath), permission=777)
     self.filesystem_client.create_file(
-        "test-warehouse/{0}.db/data_t3/data.txt".format(unique_database), file_data='100')
+        "{}/data_t3/data.txt".format(dbpath), file_data='100')
     self.client.execute("create external table {0}.t3(i int) stored as "
-      "textfile location \'/test-warehouse/{0}.db/data_t3\'" .format(unique_database))
+        "textfile location \'{1}/data_t3\'".format(unique_database, dbpath))
     self.client.execute("drop table {0}.t3 purge".format(unique_database))
-    assert self.filesystem_client.exists(
-        "test-warehouse/{0}.db/data_t3/data.txt".format(unique_database))
-    self.filesystem_client.delete_file_dir(
-        "test-warehouse/{0}.db/data_t3".format(unique_database), recursive=True)
+    assert self.filesystem_client.exists("{}/data_t3/data.txt".format(dbpath))
+    self.filesystem_client.delete_file_dir("{}/data_t3".format(dbpath), recursive=True)
 
   @SkipIfFS.eventually_consistent
   @SkipIfLocal.hdfs_client
@@ -110,24 +103,24 @@ class TestDdlStatements(TestDdlBase):
     self.client.execute('use default')
     # Verify the db directory exists
     assert self.filesystem_client.exists(
-        "test-warehouse/{0}.db/".format(unique_database))
+        "{1}/{0}.db/".format(unique_database, WAREHOUSE))
 
     self.client.execute("create table {0}.t1(i int)".format(unique_database))
     # Verify the table directory exists
     assert self.filesystem_client.exists(
-        "test-warehouse/{0}.db/t1/".format(unique_database))
+        "{1}/{0}.db/t1/".format(unique_database, WAREHOUSE))
 
     # Dropping the table removes the table's directory and preserves the db's directory
     self.client.execute("drop table {0}.t1".format(unique_database))
     assert not self.filesystem_client.exists(
-        "test-warehouse/{0}.db/t1/".format(unique_database))
+        "{1}/{0}.db/t1/".format(unique_database, WAREHOUSE))
     assert self.filesystem_client.exists(
-        "test-warehouse/{0}.db/".format(unique_database))
+        "{1}/{0}.db/".format(unique_database, WAREHOUSE))
 
     # Dropping the db removes the db's directory
     self.client.execute("drop database {0}".format(unique_database))
     assert not self.filesystem_client.exists(
-        "test-warehouse/{0}.db/".format(unique_database))
+        "{1}/{0}.db/".format(unique_database, WAREHOUSE))
 
     # Dropping the db using "cascade" removes all tables' and db's directories
     # but keeps the external tables' directory
@@ -138,17 +131,17 @@ class TestDdlStatements(TestDdlBase):
         "location '{1}/{0}/t3/'".format(unique_database, WAREHOUSE))
     self.client.execute("drop database {0} cascade".format(unique_database))
     assert not self.filesystem_client.exists(
-        "test-warehouse/{0}.db/".format(unique_database))
+        "{1}/{0}.db/".format(unique_database, WAREHOUSE))
     assert not self.filesystem_client.exists(
-        "test-warehouse/{0}.db/t1/".format(unique_database))
+        "{1}/{0}.db/t1/".format(unique_database, WAREHOUSE))
     assert not self.filesystem_client.exists(
-        "test-warehouse/{0}.db/t2/".format(unique_database))
+        "{1}/{0}.db/t2/".format(unique_database, WAREHOUSE))
     assert self.filesystem_client.exists(
-        "test-warehouse/{0}/t3/".format(unique_database))
+        "{1}/{0}/t3/".format(unique_database, WAREHOUSE))
     self.filesystem_client.delete_file_dir(
-        "test-warehouse/{0}/t3/".format(unique_database), recursive=True)
+        "{1}/{0}/t3/".format(unique_database, WAREHOUSE), recursive=True)
     assert not self.filesystem_client.exists(
-        "test-warehouse/{0}/t3/".format(unique_database))
+        "{1}/{0}/t3/".format(unique_database, WAREHOUSE))
     # Re-create database to make unique_database teardown succeed.
     self._create_db(unique_database)
 
@@ -157,12 +150,12 @@ class TestDdlStatements(TestDdlBase):
   def test_truncate_cleans_hdfs_files(self, unique_database):
     # Verify the db directory exists
     assert self.filesystem_client.exists(
-        "test-warehouse/{0}.db/".format(unique_database))
+        "{1}/{0}.db/".format(unique_database, WAREHOUSE))
 
     self.client.execute("create table {0}.t1(i int)".format(unique_database))
     # Verify the table directory exists
     assert self.filesystem_client.exists(
-        "test-warehouse/{0}.db/t1/".format(unique_database))
+        "{1}/{0}.db/t1/".format(unique_database, WAREHOUSE))
 
     try:
       # If we're testing S3, we want the staging directory to be created.
@@ -170,31 +163,31 @@ class TestDdlStatements(TestDdlBase):
       # Should have created one file in the table's dir
       self.client.execute("insert into {0}.t1 values (1)".format(unique_database))
       assert len(self.filesystem_client.ls(
-          "test-warehouse/{0}.db/t1/".format(unique_database))) == 2
+          "{1}/{0}.db/t1/".format(unique_database, WAREHOUSE))) == 2
 
       # Truncating the table removes the data files and preserves the table's directory
       self.client.execute("truncate table {0}.t1".format(unique_database))
       assert len(self.filesystem_client.ls(
-          "test-warehouse/{0}.db/t1/".format(unique_database))) == 1
+          "{1}/{0}.db/t1/".format(unique_database, WAREHOUSE))) == 1
 
       self.client.execute(
           "create table {0}.t2(i int) partitioned by (p int)".format(unique_database))
       # Verify the table directory exists
       assert self.filesystem_client.exists(
-          "test-warehouse/{0}.db/t2/".format(unique_database))
+          "{1}/{0}.db/t2/".format(unique_database, WAREHOUSE))
 
       # Should have created the partition dir, which should contain exactly one file
       self.client.execute(
           "insert into {0}.t2 partition(p=1) values (1)".format(unique_database))
       assert len(self.filesystem_client.ls(
-          "test-warehouse/{0}.db/t2/p=1".format(unique_database))) == 1
+          "{1}/{0}.db/t2/p=1".format(unique_database, WAREHOUSE))) == 1
 
       # Truncating the table removes the data files and preserves the partition's directory
       self.client.execute("truncate table {0}.t2".format(unique_database))
       assert self.filesystem_client.exists(
-          "test-warehouse/{0}.db/t2/p=1".format(unique_database))
+          "{1}/{0}.db/t2/p=1".format(unique_database, WAREHOUSE))
       assert len(self.filesystem_client.ls(
-          "test-warehouse/{0}.db/t2/p=1".format(unique_database))) == 0
+          "{1}/{0}.db/t2/p=1".format(unique_database, WAREHOUSE))) == 0
     finally:
       # Reset to its default value.
       self.client.execute("set s3_skip_insert_staging=true")
@@ -455,11 +448,10 @@ class TestDdlStatements(TestDdlBase):
     # use the (key=value) format. The directory is automatically cleanup up
     # by the unique_database fixture.
     self.client.execute("create table {0}.part_data (i int)".format(unique_database))
-    assert self.filesystem_client.exists(
-        "test-warehouse/{0}.db/part_data".format(unique_database))
+    dbpath = "{1}/{0}.db".format(unique_database, WAREHOUSE)
+    assert self.filesystem_client.exists("{}/part_data".format(dbpath))
     self.filesystem_client.create_file(
-        "test-warehouse/{0}.db/part_data/data.txt".format(unique_database),
-        file_data='1984')
+        "{}/part_data/data.txt".format(dbpath), file_data='1984')
     self.run_test_case('QueryTest/alter-table', vector, use_db=unique_database,
         multiple_impalad=self._use_multiple_impalad(vector))
 
@@ -483,20 +475,16 @@ class TestDdlStatements(TestDdlBase):
     # Add two partitions (j=1) and (j=2) to table t1
     self.client.execute("alter table {0}.t1 add partition(j=1)".format(unique_database))
     self.client.execute("alter table {0}.t1 add partition(j=2)".format(unique_database))
-    self.filesystem_client.create_file(\
-        "test-warehouse/{0}.db/t1/j=1/j1.txt".format(unique_database), file_data='j1')
-    self.filesystem_client.create_file(\
-        "test-warehouse/{0}.db/t1/j=2/j2.txt".format(unique_database), file_data='j2')
+    dbpath = "{1}/{0}.db".format(unique_database, WAREHOUSE)
+    self.filesystem_client.create_file("{}/t1/j=1/j1.txt".format(dbpath), file_data='j1')
+    self.filesystem_client.create_file("{}/t1/j=2/j2.txt".format(dbpath), file_data='j2')
     # Drop the partition (j=1) without purge and make sure it exists in trash
     self.client.execute("alter table {0}.t1 drop partition(j=1)".format(unique_database))
-    assert not self.filesystem_client.exists("test-warehouse/{0}.db/t1/j=1/j1.txt".\
-        format(unique_database))
-    assert not self.filesystem_client.exists("test-warehouse/{0}.db/t1/j=1".\
-        format(unique_database))
-    assert self.filesystem_client.exists(
-      '{0}/test-warehouse/{1}.db/t1/j=1/j1.txt'.format(TRASH_PATH, unique_database))
-    assert self.filesystem_client.exists(
-      '{0}/test-warehouse/{1}.db/t1/j=1'.format(TRASH_PATH, unique_database))
+    assert not self.filesystem_client.exists("{}/t1/j=1/j1.txt".format(dbpath))
+    assert not self.filesystem_client.exists("{}/t1/j=1".format(dbpath))
+    trash = get_trash_path("test-warehouse", unique_database + ".db")
+    assert self.filesystem_client.exists('{}/t1/j=1/j1.txt'.format(trash))
+    assert self.filesystem_client.exists('{}/t1/j=1'.format(trash))
     # Drop the partition (with purge) and make sure it doesn't exist in trash
     self.client.execute("alter table {0}.t1 drop partition(j=2) purge".\
         format(unique_database));
@@ -507,14 +495,10 @@ class TestDdlStatements(TestDdlBase):
       # consistent.
       # The ADLS Python client is not strongly consistent, so these files may still be
       # visible after a DROP. (Remove after IMPALA-5335 is resolved)
-      assert not self.filesystem_client.exists("test-warehouse/{0}.db/t1/j=2/j2.txt".\
-          format(unique_database))
-      assert not self.filesystem_client.exists("test-warehouse/{0}.db/t1/j=2".\
-          format(unique_database))
-    assert not self.filesystem_client.exists(
-      '{0}/test-warehouse/{1}.db/t1/j=2/j2.txt'.format(TRASH_PATH, unique_database))
-    assert not self.filesystem_client.exists(
-      '{0}/test-warehouse/{1}.db/t1/j=2'.format(TRASH_PATH, unique_database))
+      assert not self.filesystem_client.exists("{}/t1/j=2/j2.txt".format(dbpath))
+      assert not self.filesystem_client.exists("{}/t1/j=2".format(dbpath))
+    assert not self.filesystem_client.exists('{}/t1/j=2/j2.txt'.format(trash))
+    assert not self.filesystem_client.exists('{}/t1/j=2'.format(trash))
 
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_views_ddl(self, vector, unique_database):
@@ -751,8 +735,8 @@ class TestDdlStatements(TestDdlBase):
     tbl_name = "test_tbl"
     self.execute_query_expect_success(self.client, "create table {0}.{1} (c1 string)"
                                       .format(unique_database, tbl_name))
-    self.filesystem_client.create_file("test-warehouse/{0}.db/{1}/f".
-                                       format(unique_database, tbl_name),
+    self.filesystem_client.create_file("{2}/{0}.db/{1}/f".
+                                       format(unique_database, tbl_name, WAREHOUSE),
                                        file_data="\nfoo\n")
     self.execute_query_expect_success(self.client,
                                       "alter table {0}.{1} set tblproperties"

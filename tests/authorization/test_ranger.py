@@ -32,6 +32,7 @@ from tests.common.test_dimensions import (create_client_protocol_dimension,
     create_exec_option_dimension, create_orc_dimension)
 from tests.util.hdfs_util import NAMENODE
 from tests.util.calculation_util import get_random_id
+from tests.util.filesystem_utils import WAREHOUSE_PREFIX
 
 ADMIN = "admin"
 RANGER_AUTH = ("admin", "admin")
@@ -285,7 +286,7 @@ class TestRanger(CustomClusterTestSuite):
         admin_client.execute("revoke {0} on server from user {1}".format(privilege, user))
 
   def _test_show_grant_basic(self, admin_client, kw, id, unique_database, unique_table):
-    uri = '/tmp'
+    uri = WAREHOUSE_PREFIX + '/tmp'
     try:
       # Grant server privileges and verify
       admin_client.execute("grant all on server to {0} {1}".format(kw, id), user=ADMIN)
@@ -306,7 +307,7 @@ class TestRanger(CustomClusterTestSuite):
       result = self.client.execute("show grant {0} {1} on uri '{2}'"
                                    .format(kw, id, uri))
       TestRanger._check_privileges(result, [
-          [kw, id, "", "", "", "{0}{1}".format(NAMENODE, uri), "", "all", "false"]])
+          [kw, id, "", "", "", "{0}{1}".format(NAMENODE, '/tmp'), "", "all", "false"]])
 
       # Revoke uri privileges and verify
       admin_client.execute("revoke all on uri '{0}' from {1} {2}"

@@ -682,8 +682,9 @@ elif [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
 elif [ "${TARGET_FILESYSTEM}" = "ozone" ]; then
   export USE_OZONE_ENCRYPTION=${USE_OZONE_ENCRYPTION-true}
   export OZONE_VOLUME="impala"
-  export OZONE_BUCKET="base"
-  export DEFAULT_FS="o3fs://${OZONE_BUCKET}.${OZONE_VOLUME}.${INTERNAL_LISTEN_HOST}:9862"
+  export DEFAULT_FS="ofs://${INTERNAL_LISTEN_HOST}:9862"
+  export FILESYSTEM_PREFIX="${DEFAULT_FS}/${OZONE_VOLUME}"
+  export WAREHOUSE_LOCATION_PREFIX="/${OZONE_VOLUME}"
 else
   echo "Unsupported filesystem '$TARGET_FILESYSTEM'"
   echo "Valid values are: hdfs, isilon, s3, abfs, adls, gs, local, ozone"

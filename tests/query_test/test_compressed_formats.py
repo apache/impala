@@ -27,7 +27,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_result_verifier import verify_query_result_is_equal
 from tests.common.test_vector import ImpalaTestDimension
-from tests.util.filesystem_utils import get_fs_path
+from tests.util.filesystem_utils import get_fs_path, WAREHOUSE
 
 
 # (file extension, table suffix) pairs
@@ -65,14 +65,14 @@ class TestCompressedFormatsBase(ImpalaTestSuite):
     new table. Unless expected_error is set, it expects the query to run successfully.
     """
     # Calculate locations for the source table
-    base_dir = '/test-warehouse'
+    base_dir = WAREHOUSE
     src_table = "functional{0}.{1}".format(db_suffix, table_name)
     src_table_dir = join(base_dir, table_name + db_suffix)
     file_basename = self.filesystem_client.ls(src_table_dir)[0]
     src_file = join(src_table_dir, file_basename)
 
     # Calculate locations for the destination table
-    dest_table_dir = "/test-warehouse/{0}.db/{1}".format(unique_database, table_name)
+    dest_table_dir = "{2}/{0}.db/{1}".format(unique_database, table_name, WAREHOUSE)
     dest_table = "{0}.{1}".format(unique_database, table_name)
     dest_file = join(dest_table_dir, file_basename + dest_extension)
 
@@ -240,7 +240,7 @@ class TestLargeCompressedFile(ImpalaTestSuite):
     # is generated from a string of 50176 bytes.
     payload_size = 50176
     hdfs_cat = subprocess.Popen(["hadoop", "fs", "-cat",
-        "/test-warehouse/compressed_payload.snap"], stdout=subprocess.PIPE)
+        "%s/compressed_payload.snap" % WAREHOUSE], stdout=subprocess.PIPE)
     compressed_payload = hdfs_cat.stdout.read()
     compressed_size = len(compressed_payload)
     hdfs_cat.stdout.close()

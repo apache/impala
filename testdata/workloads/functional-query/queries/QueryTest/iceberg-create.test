@@ -70,13 +70,13 @@ PARTITIONED BY SPEC
   TRUNCATE(15, level)
 )
 STORED AS ICEBERG
-LOCATION '/$DATABASE.iceberg_test_with_location'
+LOCATION '$WAREHOUSE_LOCATION_PREFIX/other/$DATABASE.iceberg_test_with_location'
 TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
 CREATE EXTERNAL TABLE iceberg_hadoop_tbls_external(
   level STRING
 )
 STORED AS ICEBERG
-LOCATION '/$DATABASE.iceberg_test_with_location'
+LOCATION '$WAREHOUSE_LOCATION_PREFIX/other/$DATABASE.iceberg_test_with_location'
 TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
 ---- RESULTS
 'Table has been created.'
@@ -97,7 +97,7 @@ STRING,BIGINT,BIGINT
 ---- QUERY
 CREATE EXTERNAL TABLE iceberg_hadoop_tbls_external_empty_col
 STORED AS ICEBERG
-LOCATION '/$DATABASE.iceberg_test_with_location'
+LOCATION '$WAREHOUSE_LOCATION_PREFIX/other/$DATABASE.iceberg_test_with_location'
 TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
 ---- RESULTS
 'Table has been created.'
@@ -137,7 +137,7 @@ PARTITIONED BY SPEC
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
-'iceberg.catalog_location'='/$DATABASE/hadoop_catalog_test');
+'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/other/$DATABASE/hadoop_catalog_test');
 ---- RESULTS
 'Table has been created.'
 ====
@@ -171,13 +171,13 @@ PARTITIONED BY SPEC
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
-'iceberg.catalog_location'='/$DATABASE/hadoop_catalog_test');
+'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/other/$DATABASE/hadoop_catalog_test');
 CREATE EXTERNAL TABLE iceberg_hadoop_cat_external(
   level STRING
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
-'iceberg.catalog_location'='/$DATABASE/hadoop_catalog_test', 'iceberg.table_identifier'='$DATABASE.iceberg_hadoop_catalog');
+'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/other/$DATABASE/hadoop_catalog_test', 'iceberg.table_identifier'='$DATABASE.iceberg_hadoop_catalog');
 ---- RESULTS
 'Table has been created.'
 ====
@@ -200,13 +200,13 @@ CREATE TABLE iceberg_hadoop_cat_drop(
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
-'iceberg.catalog_location'='/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test');
+'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test');
 CREATE TABLE iceberg_hadoop_cat_query(
   level STRING
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
-'iceberg.catalog_location'='/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test');
+'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test');
 DROP TABLE iceberg_hadoop_cat_drop;
 SELECT * FROM iceberg_hadoop_cat_query;
 ---- TYPES
@@ -217,7 +217,7 @@ string
 DESCRIBE FORMATTED iceberg_hadoop_cat_query;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test/$DATABASE/iceberg_hadoop_cat_query','NULL'
-'','iceberg.catalog_location','/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
+'','iceberg.catalog_location','$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
 '','write.format.default','parquet             '
 '','iceberg.catalog     ','hadoop.catalog      '
 ---- TYPES
@@ -229,12 +229,12 @@ CREATE TABLE iceberg_hadoop_cat_with_ident(
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
-'iceberg.catalog_location'='/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test',
+'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test',
 'iceberg.table_identifier'='org.db.tbl');
 DESCRIBE FORMATTED iceberg_hadoop_cat_with_ident;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test/org/db/tbl','NULL'
-'','iceberg.catalog_location','/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
+'','iceberg.catalog_location','$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
 '','write.format.default','parquet             '
 '','iceberg.catalog     ','hadoop.catalog      '
 ---- TYPES
@@ -247,7 +247,7 @@ INSERT INTO iceberg_hadoop_cat_with_ident values ("ice");
 CREATE EXTERNAL TABLE iceberg_hadoop_cat_with_ident_ext
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
-'iceberg.catalog_location'='/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test',
+'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test',
 'iceberg.table_identifier'='org.db.tbl');
 ---- RESULTS
 'Table has been created.'
@@ -256,7 +256,7 @@ TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
 DESCRIBE FORMATTED iceberg_hadoop_cat_with_ident_ext;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test/org/db/tbl','NULL'
-'','iceberg.catalog_location','/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
+'','iceberg.catalog_location','$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
 '','write.format.default','parquet             '
 '','iceberg.catalog     ','hadoop.catalog      '
 ---- TYPES
@@ -288,7 +288,7 @@ PARTITIONED BY SPEC
 )
 STORED AS ICEBERG
 TBLPROPERTIES('write.format.default'='orc','iceberg.catalog'='hadoop.catalog',
-'iceberg.catalog_location'='/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test');
+'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test');
 ---- RESULTS
 'Table has been created.'
 ====
@@ -475,7 +475,7 @@ create table ice_part_hadoop_catalog (
   col_identity
 ) stored as iceberg TBLPROPERTIES(
   'iceberg.catalog' = 'hadoop.catalog',
-  'iceberg.catalog_location' = '/$DATABASE/hadoop_catalog_test'
+  'iceberg.catalog_location' = '$WAREHOUSE_LOCATION_PREFIX/other/$DATABASE/hadoop_catalog_test'
 );
 ---- RESULTS
 'Table has been created.'

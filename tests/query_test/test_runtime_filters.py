@@ -29,6 +29,7 @@ from tests.common.skip import SkipIfEC, SkipIfLocal, SkipIfFS
 from tests.common.test_dimensions import add_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.verifiers.metric_verifier import MetricVerifier
+from tests.util.filesystem_utils import WAREHOUSE
 
 # slow_build_timeout is set to 200000 to avoid failures like IMPALA-8064 where the
 # runtime filters don't arrive in time.
@@ -320,12 +321,10 @@ class TestOverlapMinMaxFilters(ImpalaTestSuite):
     tbl_name = "part_col_in_data_file"
     self.execute_query("CREATE TABLE {0}.{1} (i INT) PARTITIONED BY (d DATE) "
                        "STORED AS PARQUET".format(unique_database, tbl_name))
-    tbl_loc = self._get_table_location("{0}.{1}".format(unique_database, tbl_name),
-        vector)
-    self.filesystem_client.make_dir(tbl_loc[tbl_loc.find('test-warehouse'):] +
-        '/d=2022-02-22/')
+    tbl_loc = "%s/%s/%s/d=2022-02-22/" % (WAREHOUSE, unique_database, tbl_name)
+    self.filesystem_client.make_dir(tbl_loc)
     self.filesystem_client.copy_from_local(os.environ['IMPALA_HOME'] +
-        '/testdata/data/partition_col_in_parquet.parquet', tbl_loc + '/d=2022-02-22/')
+        '/testdata/data/partition_col_in_parquet.parquet', tbl_loc)
     self.execute_query("ALTER TABLE {0}.{1} RECOVER PARTITIONS".format(
         unique_database, tbl_name))
     self.execute_query("SET PARQUET_FALLBACK_SCHEMA_RESOLUTION=NAME")

@@ -28,13 +28,13 @@ from tests.common.test_dimensions import (
     create_uncompressed_text_dimension)
 from tests.common.skip import SkipIfLocal
 from tests.common.test_vector import ImpalaTestDimension
-from tests.util.filesystem_utils import (WAREHOUSE)
+from tests.util.filesystem_utils import WAREHOUSE
 
 TEST_TBL_PART = "test_load"
 TEST_TBL_NOPART = "test_load_nopart"
-STAGING_PATH = 'test-warehouse/test_load_staging'
-ALLTYPES_PATH = "test-warehouse/alltypes/year=2010/month=1/100101.txt"
-MULTIAGG_PATH = 'test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1'
+STAGING_PATH = '%s/test_load_staging' % WAREHOUSE
+ALLTYPES_PATH = "%s/alltypes/year=2010/month=1/100101.txt" % WAREHOUSE
+MULTIAGG_PATH = '%s/alltypesaggmultifiles/year=2010/month=1/day=1' % WAREHOUSE
 HIDDEN_FILES = ["{0}/3/.100101.txt".format(STAGING_PATH),
                 "{0}/3/_100101.txt".format(STAGING_PATH)]
 
@@ -155,7 +155,7 @@ class TestAsyncLoadData(ImpalaTestSuite):
 
     # Create a table with the staging path
     self.client.execute("create table {0} like functional.alltypesnopart \
-        location \'/{1}\'".format(qualified_table_name, staging_path))
+        location \'{1}\'".format(qualified_table_name, staging_path))
 
     try:
 
@@ -171,7 +171,7 @@ class TestAsyncLoadData(ImpalaTestSuite):
            enable_async_load_data
       delay = "CRS_DELAY_BEFORE_LOAD_DATA:SLEEP@3000"
       new_vector.get_value('exec_option')['debug_action'] = "{0}".format(delay)
-      load_stmt = "load data inpath \'/{1}\' \
+      load_stmt = "load data inpath \'{1}\' \
           into table {0}".format(qualified_table_name, staging_path)
       exec_start = time.time()
       handle = self.execute_query_async_using_client(client, load_stmt, new_vector)

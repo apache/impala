@@ -17,6 +17,7 @@
 
 import getpass
 import grp
+import os
 import pwd
 import pytest
 import re
@@ -25,7 +26,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import (SkipIfFS, SkipIfLocal, SkipIfDockerizedCluster,
     SkipIfCatalogV2)
-from tests.util.filesystem_utils import WAREHOUSE, get_fs_path, IS_S3
+from tests.util.filesystem_utils import WAREHOUSE, IS_S3
 
 
 @SkipIfLocal.hdfs_client
@@ -52,8 +53,8 @@ class TestInsertBehaviour(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_insert_removes_staging_files(self):
     TBL_NAME = "insert_overwrite_nopart"
-    insert_staging_dir = ("test-warehouse/functional.db/%s/"
-        "_impala_insert_staging" % TBL_NAME)
+    insert_staging_dir = ("%s/functional.db/%s/"
+        "_impala_insert_staging" % (WAREHOUSE, TBL_NAME))
     self.filesystem_client.delete_file_dir(insert_staging_dir, recursive=True)
     self.client.execute("INSERT OVERWRITE functional.%s "
                         "SELECT int_col FROM functional.tinyinttable" % TBL_NAME)
@@ -64,7 +65,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
   def test_insert_preserves_hidden_files(self):
     """Test that INSERT OVERWRITE preserves hidden files in the root table directory"""
     TBL_NAME = "insert_overwrite_nopart"
-    table_dir = "test-warehouse/functional.db/%s/" % TBL_NAME
+    table_dir = "%s/functional.db/%s/" % (WAREHOUSE, TBL_NAME)
     hidden_file_locations = [".hidden", "_hidden"]
     dir_locations = ["dir", ".hidden_dir"]
 
@@ -103,8 +104,10 @@ class TestInsertBehaviour(ImpalaTestSuite):
   def test_insert_alter_partition_location(self, unique_database):
     """Test that inserts after changing the location of a partition work correctly,
     including the creation of a non-existant partition dir"""
-    part_dir = "tmp/{0}".format(unique_database)
-    qualified_part_dir = get_fs_path('/' + part_dir)
+    # Moved to WAREHOUSE for Ozone because it does not allow rename between buckets.
+    work_dir = "%s/tmp" % WAREHOUSE
+    self.filesystem_client.make_dir(work_dir)
+    part_dir = os.path.join(work_dir, unique_database)
     table_name = "`{0}`.`insert_alter_partition_location`".format(unique_database)
 
     self.execute_query_expect_success(self.client, "DROP TABLE IF EXISTS %s" % table_name)
@@ -119,7 +122,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     self.execute_query_expect_success(
         self.client,
         "ALTER TABLE %s PARTITION(p=1) SET LOCATION '%s'" % (table_name,
-                                                             qualified_part_dir))
+                                                             part_dir))
     self.execute_query_expect_success(
         self.client,
         "INSERT OVERWRITE %s PARTITION(p=1) VALUES(1)" % table_name)
@@ -492,7 +495,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
           "should {1}exist but does {2}exist.".format(
               path, '' if should_exist else 'not ', 'not ' if should_exist else '')
 
-    db_path = "test-warehouse/%s.db/" % self.TEST_DB_NAME
+    db_path = "%s/%s.db/" % (WAREHOUSE, self.TEST_DB_NAME)
     table_path = db_path + "test_insert_empty_result"
     partition_path = "{0}/year=2009/month=1".format(table_path)
     check_path_exists(table_path, False)
@@ -600,14 +603,13 @@ class TestInsertBehaviour(ImpalaTestSuite):
     if self.exploration_strategy() != 'exhaustive' and IS_S3:
       pytest.skip("only runs in exhaustive")
     table = "{0}.insert_clustered".format(unique_database)
-    table_path = "test-warehouse/{0}.db/insert_clustered".format(unique_database)
-    table_location = get_fs_path("/" + table_path)
+    table_path = "{1}/{0}.db/insert_clustered".format(unique_database, WAREHOUSE)
 
     create_stmt = """create table {0} like functional.alltypes""".format(table)
     self.execute_query_expect_success(self.client, create_stmt)
 
     set_location_stmt = """alter table {0} set location '{1}'""".format(
-        table, table_location)
+        table, table_path)
     self.execute_query_expect_success(self.client, set_location_stmt)
 
     # Setting a lower batch size will result in multiple row batches being written.
@@ -635,8 +637,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip("only runs in exhaustive")
     table = "{0}.insert_clustered".format(unique_database)
-    table_path = "test-warehouse/{0}.db/insert_clustered".format(unique_database)
-    table_location = get_fs_path("/" + table_path)
+    table_path = "{1}/{0}.db/insert_clustered".format(unique_database, WAREHOUSE)
 
     create_stmt = """create table {0} (
                      l_orderkey BIGINT,
@@ -659,7 +660,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     self.execute_query_expect_success(self.client, create_stmt)
 
     set_location_stmt = """alter table {0} set location '{1}'""".format(
-        table, table_location)
+        table, table_path)
     self.execute_query_expect_success(self.client, set_location_stmt)
 
     # Setting a lower parquet file size will result in multiple files being written.

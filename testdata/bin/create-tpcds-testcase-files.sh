@@ -31,7 +31,7 @@ IMPALAD=${IMPALAD:-localhost}
 
 TPCDS_QUERY_HOME=$IMPALA_HOME/testdata/workloads/tpcds/queries/raw
 # Target directory containing the testcase data.
-TESTCASE_DATA_DIR=/test-warehouse/tpcds-testcase-data
+TESTCASE_DATA_DIR=${FILESYSTEM_PREFIX}/test-warehouse/tpcds-testcase-data
 
 COPY_TEST_CASE_PREFIX="COPY TESTCASE TO '$TESTCASE_DATA_DIR'"
 

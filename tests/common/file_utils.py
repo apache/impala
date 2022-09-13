@@ -21,9 +21,10 @@
 
 import os
 import re
+import tempfile
 from subprocess import check_call
 
-from tests.util.filesystem_utils import get_fs_path
+from tests.util.filesystem_utils import get_fs_path, WAREHOUSE_PREFIX
 
 
 def create_iceberg_table_from_directory(impala_client, unique_database, table_name,
@@ -38,6 +39,15 @@ def create_iceberg_table_from_directory(impala_client, unique_database, table_na
     os.environ['IMPALA_HOME'], 'testdata/data/iceberg_test/{0}'.format(table_name))
   assert os.path.isdir(local_dir)
 
+  # If using a prefix, rewrite iceberg metadata to use the prefix
+  if WAREHOUSE_PREFIX:
+    tmp_dir = tempfile.mktemp(table_name)
+    check_call(['cp', '-r', local_dir, tmp_dir])
+    rewrite = os.path.join(
+        os.environ['IMPALA_HOME'], 'testdata/bin/rewrite-iceberg-metadata.py')
+    check_call([rewrite, WAREHOUSE_PREFIX, os.path.join(tmp_dir, 'metadata')])
+    local_dir = tmp_dir
+
   # Put the directory in the database's directory (not the table directory)
   hdfs_parent_dir = get_fs_path("/test-warehouse")
 
@@ -47,7 +57,7 @@ def create_iceberg_table_from_directory(impala_client, unique_database, table_na
   check_call(['hdfs', 'dfs', '-rm', '-f', '-r', hdfs_dir])
 
   # Note: -d skips a staging copy
-  check_call(['hdfs', 'dfs', '-put', '-d', local_dir, hdfs_parent_dir])
+  check_call(['hdfs', 'dfs', '-put', '-d', local_dir, hdfs_dir])
 
   # Create external table
   qualified_table_name = '{0}.{1}'.format(unique_database, table_name)

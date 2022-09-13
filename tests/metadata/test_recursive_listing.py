@@ -86,36 +86,33 @@ class TestRecursiveListing(ImpalaTestSuite):
     fq_tbl_name, part_path = self._init_test_table(unique_database, partitioned)
 
     # Add a file inside a nested directory and refresh.
-    self.filesystem_client.make_dir("{0}/dir1".format(part_path[1:]))
-    self.filesystem_client.create_file("{0}/dir1/file1.txt".format(part_path[1:]),
-        "file1")
+    self.filesystem_client.make_dir("{0}/dir1".format(part_path))
+    self.filesystem_client.create_file("{0}/dir1/file1.txt".format(part_path), "file1")
     self.execute_query_expect_success(self.client, "refresh {0}".format(fq_tbl_name))
     assert len(self._show_files(fq_tbl_name)) == 1
     assert len(self._get_rows(fq_tbl_name)) == 1
 
     # Add another file inside the same directory, make sure it shows up.
-    self.filesystem_client.create_file("{0}/dir1/file2.txt".format(part_path[1:]),
-        "file2")
+    self.filesystem_client.create_file("{0}/dir1/file2.txt".format(part_path), "file2")
     self.execute_query_expect_success(self.client, "refresh {0}".format(fq_tbl_name))
     assert len(self._show_files(fq_tbl_name)) == 2
     assert len(self._get_rows(fq_tbl_name)) == 2
 
     # Add a file at the top level, make sure it shows up.
-    self.filesystem_client.create_file("{0}/file3.txt".format(part_path[1:]),
-        "file3")
+    self.filesystem_client.create_file("{0}/file3.txt".format(part_path), "file3")
     self.execute_query_expect_success(self.client, "refresh {0}".format(fq_tbl_name))
     assert len(self._show_files(fq_tbl_name)) == 3
     assert len(self._get_rows(fq_tbl_name)) == 3
 
     # Create files in the nested hidden directories and refresh. Make sure it does not
     # show up
-    self.filesystem_client.make_dir("{0}/.hive-staging".format(part_path[1:]))
+    self.filesystem_client.make_dir("{0}/.hive-staging".format(part_path))
     self.filesystem_client.create_file(
-        "{0}/.hive-staging/file3.txt".format(part_path[1:]),
+        "{0}/.hive-staging/file3.txt".format(part_path),
         "data-should-be-ignored-by-impala")
-    self.filesystem_client.make_dir("{0}/_tmp.base_000000_1".format(part_path[1:]))
+    self.filesystem_client.make_dir("{0}/_tmp.base_000000_1".format(part_path))
     self.filesystem_client.create_file(
-        "{0}/_tmp.base_000000_1/000000_0.manifest".format(part_path[1:]),
+        "{0}/_tmp.base_000000_1/000000_0.manifest".format(part_path),
         "manifest-file_contents")
     self.execute_query_expect_success(self.client, "refresh {0}".format(fq_tbl_name))
     assert len(self._show_files(fq_tbl_name)) == 3
@@ -135,8 +132,7 @@ class TestRecursiveListing(ImpalaTestSuite):
     assert len(self._get_rows(fq_tbl_name)) == 3
 
     # Remove the dir with two files. One should remain.
-    self.filesystem_client.delete_file_dir("{0}/dir1".format(part_path[1:]),
-        recursive=True)
+    self.filesystem_client.delete_file_dir("{0}/dir1".format(part_path), recursive=True)
     self.execute_query_expect_success(self.client, "refresh {0}".format(fq_tbl_name))
     assert len(self._show_files(fq_tbl_name)) == 1
     assert len(self._get_rows(fq_tbl_name)) == 1
@@ -201,18 +197,15 @@ class TestRecursiveListing(ImpalaTestSuite):
     response = requests.get(self.enable_fs_tracing_url)
     assert response.status_code == requests.codes.ok
     try:
-      # self.filesystem_client is a DelegatingHdfsClient. It delegates delete_file_dir()
-      # and make_dir() to the underlying PyWebHdfsClient which expects the HDFS path
-      # without a leading '/'. So we use large_dir[1:] to remove the leading '/'.
-      self.filesystem_client.delete_file_dir(large_dir[1:], recursive=True)
-      self.filesystem_client.make_dir(large_dir[1:])
+      self.filesystem_client.delete_file_dir(large_dir, recursive=True)
+      self.filesystem_client.make_dir(large_dir)
       self.filesystem_client.touch(files)
       LOG.info("created staging files under " + large_dir)
       handle = self.execute_query_async(refresh_stmt)
       # Wait a moment to let REFRESH finish expected partial listing on the dir.
       time.sleep(pause_ms_before_file_cleanup / 1000.0)
       LOG.info("removing staging dir " + large_dir)
-      self.filesystem_client.delete_file_dir(large_dir[1:], recursive=True)
+      self.filesystem_client.delete_file_dir(large_dir, recursive=True)
       LOG.info("removed staging dir " + large_dir)
       try:
         self.client.fetch(refresh_stmt, handle)

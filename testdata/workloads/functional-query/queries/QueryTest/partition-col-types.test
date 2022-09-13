@@ -12,7 +12,7 @@ PARTITIONED BY (
   float_col FLOAT,
   double_col DOUBLE,
   string_col STRING
-) LOCATION '/test-warehouse/$DATABASE.db/all_insert_partition_col_types'
+) LOCATION '$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE.db/all_insert_partition_col_types'
 ====
 ---- QUERY
 DESCRIBE all_insert_partition_col_types
@@ -193,13 +193,13 @@ STRING, STRING, STRING
 ALTER TABLE all_partition_col_types
 ADD PARTITION (bool_col=FALSE, tinyint_col=1, smallint_col=1, int_col=1,
 bigint_col=10, float_col=0, double_col=1.1, string_col='1')
-LOCATION '/test-warehouse/$DATABASE.db/all_insert_partition_col_types/tinyint_col=1/smallint_col=1/int_col=1/bigint_col=10/float_col=0/double_col=1.1/string_col=1/'
+LOCATION '$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE.db/all_insert_partition_col_types/tinyint_col=1/smallint_col=1/int_col=1/bigint_col=10/float_col=0/double_col=1.1/string_col=1/'
 ====
 ---- QUERY
 ALTER TABLE all_partition_col_types
 ADD PARTITION (bool_col=TRUE, tinyint_col=2, smallint_col=2, int_col=2,
 bigint_col=20, float_col=0, double_col=1.1, string_col='2')
-LOCATION '/test-warehouse/$DATABASE.db/all_insert_partition_col_types/tinyint_col=2/smallint_col=2/int_col=2/bigint_col=20/float_col=0/double_col=1.1/string_col=2/'
+LOCATION '$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE.db/all_insert_partition_col_types/tinyint_col=2/smallint_col=2/int_col=2/bigint_col=20/float_col=0/double_col=1.1/string_col=2/'
 ====
 ---- QUERY
 EXPLAIN

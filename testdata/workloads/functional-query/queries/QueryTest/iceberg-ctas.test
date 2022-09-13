@@ -75,7 +75,7 @@ STRING,BIGINT,BIGINT
 # Use PARTITIONED BY SPEC
 CREATE TABLE ice_ctas_hadoop_tables_part PARTITIONED BY SPEC (month(d))
 STORED AS ICEBERG
-LOCATION '/test-warehouse/$DATABASE.db/loc_test'
+LOCATION '$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE.db/loc_test'
 TBLPROPERTIES ('iceberg.catalog'='hadoop.tables') AS SELECT s, ts, d FROM value_tbl;
 SELECT * FROM ice_ctas_hadoop_tables_part where d='2021-02-26';
 ---- RESULTS
@@ -134,7 +134,7 @@ STRING,BIGINT,BIGINT
 CREATE TABLE ice_ctas_hadoop_catalog_part PARTITIONED BY SPEC (truncate(3, s))
 STORED AS ICEBERG
 TBLPROPERTIES ('iceberg.catalog'='hadoop.catalog',
-               'iceberg.catalog_location'='/test-warehouse/$DATABASE.db/cat_loc',
+               'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE.db/cat_loc',
                'iceberg.table_identifier'='ns1.ns2.ctas')
 AS SELECT cast(t as INT), s, d FROM value_tbl;
 INSERT INTO ice_ctas_hadoop_catalog_part VALUES (1, 'lion', '2021-02-27');

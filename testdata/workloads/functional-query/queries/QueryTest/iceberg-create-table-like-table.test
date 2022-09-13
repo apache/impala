@@ -139,7 +139,7 @@ create table ice_hadoop_catalog_no_part(
   array < STRING > >
 ) stored as iceberg tblproperties(
   'iceberg.catalog' = 'hadoop.catalog',
-  'iceberg.catalog_location' = '/test-warehouse/$DATABASE.db/cat_loc',
+  'iceberg.catalog_location' = '$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE.db/cat_loc',
   'iceberg.table_identifier' = 'id_a.id_b.ice_hadoop_catalog_no_part'
 );
 ---- RESULTS
@@ -172,7 +172,7 @@ describe formatted ice_hadoop_catalog_no_part_clone;
 'col_map','map<string,array<string>>','NULL'
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/cat_loc/$DATABASE/ice_hadoop_catalog_no_part_clone','NULL'
 '','iceberg.catalog     ','hadoop.catalog      '
-'','iceberg.catalog_location','/test-warehouse/$DATABASE.db/cat_loc'
+'','iceberg.catalog_location','$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE.db/cat_loc'
 '','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
 '','write.format.default','parquet             '
 'SerDe Library:      ','org.apache.iceberg.mr.hive.HiveIcebergSerDe','NULL'
@@ -202,7 +202,7 @@ create table ice_hadoop_catalog(
   array < STRING > >
 ) partitioned by spec (bucket(3, id)) stored as iceberg tblproperties(
   'iceberg.catalog' = 'hadoop.catalog',
-  'iceberg.catalog_location' = '/test-warehouse/$DATABASE.db/cat_loc',
+  'iceberg.catalog_location' = '$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE.db/cat_loc',
   'iceberg.table_identifier' = 'id_a.id_b.ice_hadoop_catalog'
 );
 ---- RESULTS
@@ -238,7 +238,7 @@ describe formatted ice_hadoop_catalog_clone;
 'id','BUCKET[3]','NULL'
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/cat_loc/$DATABASE/ice_hadoop_catalog_clone','NULL'
 '','iceberg.catalog     ','hadoop.catalog      '
-'','iceberg.catalog_location','/test-warehouse/$DATABASE.db/cat_loc'
+'','iceberg.catalog_location','$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE.db/cat_loc'
 '','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
 '','write.format.default','parquet             '
 'SerDe Library:      ','org.apache.iceberg.mr.hive.HiveIcebergSerDe','NULL'

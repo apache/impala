@@ -37,7 +37,7 @@ AnalysisException: Table is not partitioned: functional_parquet.iceberg_non_part
 CREATE TABLE iceberg_table_hadoop_tables_cat_loc(i INT)
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.tables',
-              'iceberg.catalog_location'='/test-warehouse/cat_loc')
+              'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/cat_loc')
 ---- CATCH
 iceberg.catalog_location cannot be set for Iceberg table stored in hadoop.tables
 ====
@@ -46,7 +46,7 @@ CREATE TABLE iceberg_table_hadoop_catalog(
   level STRING
 )
 STORED AS ICEBERG
-LOCATION '/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
+LOCATION '$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog');
 ---- CATCH
 AnalysisException: Location cannot be set for Iceberg table with 'hadoop.catalog'.
@@ -63,9 +63,9 @@ AnalysisException: Table property 'iceberg.catalog_location' is necessary for Ic
 ---- QUERY
 CREATE EXTERNAL TABLE iceberg_external_table_hadoop_catalog
 STORED AS ICEBERG
-LOCATION '/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
+LOCATION '$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
-    'iceberg.catalog_location'='/test-warehouse/fake_table',
+    'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/fake_table',
     'iceberg.table_identifier'='fake_db.fake_table');
 ---- CATCH
 AnalysisException: Location cannot be set for Iceberg table with 'hadoop.catalog'.
@@ -99,7 +99,7 @@ Table property 'iceberg.table_identifier' is necessary for external Iceberg tabl
 CREATE EXTERNAL TABLE fake_iceberg_table_hadoop_catalog
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
-    'iceberg.catalog_location'='/test-warehouse/fake_table',
+    'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/fake_table',
     'iceberg.table_identifier'='fake_db.fake_table');
 SHOW CREATE TABLE fake_iceberg_table_hadoop_catalog;
 ---- CATCH
@@ -144,7 +144,7 @@ AnalysisException: The Iceberg table has multiple partition specs.
 CREATE TABLE iceberg_hive_cat_with_cat_locaction (i int)
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hive.catalog',
-    'iceberg.catalog_location'='/test-warehouse/catalog_loc')
+    'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/catalog_loc')
 ---- CATCH
 iceberg.catalog_location cannot be set for Iceberg table stored in hive.catalog
 ====
@@ -152,7 +152,7 @@ iceberg.catalog_location cannot be set for Iceberg table stored in hive.catalog
 CREATE TABLE iceberg_hadoop_tables_with_metdata_locaction (i int)
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.tables',
-    'metadata_location'='/test-warehouse/catalog/metadata_loc')
+    'metadata_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/catalog/metadata_loc')
 ---- CATCH
 metadata_location cannot be set for Iceberg tables
 ====
@@ -160,8 +160,8 @@ metadata_location cannot be set for Iceberg tables
 CREATE TABLE iceberg_hadoop_cat_with_metadata_locaction (i int)
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
-    'iceberg.catalog_location'='/test-warehouse/catalog',
-    'metadata_location'='/test-warehouse/catalog/metadata_loc')
+    'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/catalog',
+    'metadata_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/catalog/metadata_loc')
 ---- CATCH
 metadata_location cannot be set for Iceberg tables
 ====
@@ -169,7 +169,7 @@ metadata_location cannot be set for Iceberg tables
 CREATE TABLE iceberg_hive_cat_with_metadata_locaction (i int)
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hive.catalog',
-    'metadata_location'='/test-warehouse/catalog/metadata_loc')
+    'metadata_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/catalog/metadata_loc')
 ---- CATCH
 metadata_location cannot be set for Iceberg tables
 ====
@@ -218,7 +218,7 @@ CREATE TABLE iceberg_table_hadoop_catalog(
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
-'iceberg.catalog_location'='/$DATABASE/hadoop_catalog_test');
+'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/other/$DATABASE/hadoop_catalog_test');
 ALTER TABLE iceberg_table_hadoop_catalog RENAME TO iceberg_table_hadoop_catalog_new;
 ---- CATCH
 UnsupportedOperationException: Cannot rename Iceberg tables that use 'hadoop.catalog' as catalog.
@@ -254,7 +254,7 @@ ALTER TABLE iceberg_table_hadoop_catalog unset TBLPROPERTIES('iceberg.table_iden
 AnalysisException: Unsetting the 'iceberg.table_identifier' table property is not supported for Iceberg table.
 ====
 ---- QUERY
-ALTER TABLE iceberg_table_hadoop_catalog set TBLPROPERTIES('metadata_location'='/test-warehouse/metadata_loc');
+ALTER TABLE iceberg_table_hadoop_catalog set TBLPROPERTIES('metadata_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/metadata_loc');
 ---- CATCH
 AnalysisException: Changing the 'metadata_location' table property is not supported for Iceberg table.
 ====
@@ -264,7 +264,7 @@ ALTER TABLE iceberg_table_hadoop_catalog unset TBLPROPERTIES('metadata_location'
 AnalysisException: Unsetting the 'metadata_location' table property is not supported for Iceberg table.
 ====
 ---- QUERY
-ALTER TABLE iceberg_table_hive_catalog set TBLPROPERTIES('metadata_location'='/test-warehouse/metadata_loc');
+ALTER TABLE iceberg_table_hive_catalog set TBLPROPERTIES('metadata_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/metadata_loc');
 ---- CATCH
 AnalysisException: Changing the 'metadata_location' table property is not supported for Iceberg table.
 ====
@@ -314,7 +314,7 @@ Iceberg tables cannot have Hive ACID table properties.
 CREATE TABLE iceberg_insert_only(i int)
 STORED AS ICEBERG
 tblproperties('iceberg.catalog'='hadoop.catalog',
-'iceberg.catalog_location'='/$EXTERNAL_WAREHOUSE_DIR/specified_location',
+'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/$EXTERNAL_WAREHOUSE_DIR/specified_location',
 'transactional'='true', 'transactional_properties'='insert_only');
 ---- CATCH
 Iceberg tables cannot have Hive ACID table properties.

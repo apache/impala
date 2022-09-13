@@ -32,6 +32,8 @@ if [[ $# -ne 1 ]]; then
   exit 1
 fi
 
+: ${TEST_WAREHOUSE_DIR=/test-warehouse}
+
 SNAPSHOT_FILE=$1
 if [ ! -f ${SNAPSHOT_FILE} ]; then
   echo "Metastore Snapshot file '${SNAPSHOT_FILE}' not found"
@@ -67,6 +69,13 @@ if [[ "${FILESYSTEM_PREFIX}" != "" ]]; then
 elif [[ "${DEFAULT_FS}" != "hdfs://localhost:20500" ]]; then
   echo "Changing table metadata to point to ${DEFAULT_FS}"
   sed -i "s|hdfs://localhost:20500|${DEFAULT_FS}|g" ${TMP_SNAPSHOT_FILE}
+fi
+
+if [[ "${WAREHOUSE_LOCATION_PREFIX}" != "" ]]; then
+  echo "Adding prefix ${WAREHOUSE_LOCATION_PREFIX} to iceberg.catalog_location"
+  cloc='iceberg\.catalog_location\t'
+  sed -i "s|\(${cloc}\)\(${TEST_WAREHOUSE_DIR}\)|\1${WAREHOUSE_LOCATION_PREFIX}\2|g" \
+      ${TMP_SNAPSHOT_FILE}
 fi
 
 # Drop and re-create the hive metastore database
