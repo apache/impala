@@ -1248,6 +1248,10 @@ public class HdfsPartition extends CatalogObjectImpl
       this(partition.table_);
       oldInstance_ = partition;
       prevId_ = oldInstance_.id_;
+      copyFromPartition(partition);
+    }
+
+    public Builder copyFromPartition(HdfsPartition partition) {
       partitionKeyValues_ = partition.partitionKeyValues_;
       fileFormatDescriptor_ = partition.fileFormatDescriptor_;
       setFileDescriptors(partition);
@@ -1266,6 +1270,7 @@ public class HdfsPartition extends CatalogObjectImpl
       // Take over the in-flight events
       inFlightEvents_ = partition.inFlightEvents_;
       lastCompactionId_ = partition.lastCompactionId_;
+      return this;
     }
 
     public HdfsPartition build() {
