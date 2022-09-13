@@ -494,8 +494,12 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
         for (PrunablePartition part : ((HdfsTable) existingTable).getPartitions()) {
           numExistingParts++;
           if (tHdfsTable.partitions.containsKey(part.getId())) {
-            Preconditions.checkState(
-                newHdfsTable.addPartitionNoThrow((HdfsPartition) part));
+            // Create a new partition instance under the new table object and copy all
+            // the fields of the existing partition.
+            HdfsPartition newPart = new HdfsPartition.Builder(newHdfsTable, part.getId())
+                .copyFromPartition((HdfsPartition) part)
+                .build();
+            Preconditions.checkState(newHdfsTable.addPartitionNoThrow(newPart));
           } else {
             numDeletedParts++;
           }
