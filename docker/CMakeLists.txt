@@ -37,10 +37,13 @@ execute_process(COMMAND ${LSB_RELEASE_EXEC} -rs
 
 if(${LSB_RELEASE_ID} STREQUAL "Ubuntu" AND ${LSB_RELEASE_VERSION} STREQUAL "16.04")
   set(DISTRO_BASE_IMAGE "ubuntu:16.04")
+  set(PIP "python-pip")
 elseif(${LSB_RELEASE_ID} STREQUAL "Ubuntu" AND ${LSB_RELEASE_VERSION} STREQUAL "18.04")
   set(DISTRO_BASE_IMAGE "ubuntu:18.04")
+  set(PIP "python-pip")
 elseif(${LSB_RELEASE_ID} STREQUAL "Ubuntu" AND ${LSB_RELEASE_VERSION} STREQUAL "20.04")
   set(DISTRO_BASE_IMAGE "ubuntu:20.04")
+  set(PIP "python3-pip")
 else()
   set(DISTRO_BASE_IMAGE "UNSUPPORTED")
 endif()
@@ -158,7 +161,7 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
     # Supply the appropriate base image as an argument for the Dockerfile.
     # Use tar with -h flag to assemble a tarball including all the symlinked files and
     # directories in the build context.
-    COMMAND tar cvh . -C ${quickstart_client_build_dir} . | ${DOCKER_BUILD} ${COMMON_DOCKER_BUILD_ARGS} --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE} -t ${QUICKSTART_CLIENT_IMAGE} -
+    COMMAND tar cvh . -C ${quickstart_client_build_dir} . | ${DOCKER_BUILD} ${COMMON_DOCKER_BUILD_ARGS} --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE} --build-arg PIP=${PIP}  -t ${QUICKSTART_CLIENT_IMAGE} -
     DEPENDS ${quickstart_client_build_dir}/Dockerfile ${quickstart_client_build_dir}/data-load-entrypoint.sh
     COMMENT "Building quickstart client docker image."
     VERBATIM

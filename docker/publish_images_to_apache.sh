@@ -20,8 +20,7 @@
 set -euo pipefail
 
 usage() {
-  echo "publish_container_to_apache.sh -v <version string> [-d] [-r <repo>"
-  echo "  -d: if specified, upload debug images instead of release images"
+  echo "publish_container_to_apache.sh -v <version string> [-r <repo>]"
   echo "  -r: docker repository to upload to (defaults to apache/impala)"
   echo "  -v: version string to tag upload with, e.g. git hash or release version"
 }

@@ -27,6 +27,7 @@ ARG VCS_REF
 ARG VCS_TYPE
 ARG VCS_URL
 ARG VERSION
+ARG PIP=python-pip
 
 # Install useful utilities. Set to non-interactive to avoid issues when installing tzdata.
 ENV DEBIAN_FRONTEND=noninteractive
@@ -34,7 +35,7 @@ RUN apt-get update && \
   apt-get install -y \
   sudo netcat-openbsd less curl iproute2 vim iputils-ping \
   libsasl2-dev libsasl2-2 libsasl2-modules libsasl2-modules-gssapi-mit \
-  tzdata krb5-user python-pip && \
+  tzdata krb5-user ${PIP} && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/*
 
