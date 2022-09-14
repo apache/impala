@@ -1,0 +1,27 @@
+====
+---- QUERY
+# EXECUTE ROLLBACK with an invalid snapshot id on a partitioned Iceberg table.
+ALTER TABLE functional_parquet.iceberg_partitioned EXECUTE ROLLBACK(1)
+---- CATCH
+Cannot roll back to unknown snapshot id: 1
+====
+---- QUERY
+# EXECUTE ROLLBACK to a too old date on a partitioned Iceberg table.
+set timezone=CET;
+ALTER TABLE functional_parquet.iceberg_partitioned EXECUTE ROLLBACK('2020-08-31 07:58:00')
+---- CATCH
+Cannot roll back, no valid snapshot older than: 1598853480000
+====
+---- QUERY
+# EXECUTE ROLLBACK to an Invalid timestamp expression on a partitioned Iceberg table.
+set timezone=CET;
+ALTER TABLE functional_parquet.iceberg_partitioned EXECUTE ROLLBACK('1111');
+---- CATCH
+An invalid TIMESTAMP expression has been given to EXECUTE ROLLBACK(<expression>): the expression '1111' cannot be converted to a TIMESTAMP
+====
+---- QUERY
+# EXECUTE ROLLBACK fails on a non-Iceberg table.
+ALTER TABLE functional_parquet.alltypestiny EXECUTE ROLLBACK(1111111)
+---- CATCH
+ALTER TABLE EXECUTE ROLLBACK is only supported for Iceberg tables
+====

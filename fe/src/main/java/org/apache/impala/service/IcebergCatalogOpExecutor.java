@@ -23,16 +23,17 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.iceberg.AppendFiles;
-import org.apache.iceberg.BaseReplacePartitions;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.DeleteFiles;
 import org.apache.iceberg.ExpireSnapshots;
+import org.apache.iceberg.ManageSnapshots;
 import org.apache.iceberg.Metrics;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.ReplacePartitions;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.SnapshotManager;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableOperations;
@@ -42,32 +43,36 @@ import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.iceberg.expressions.Expressions;
-import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.TableNotFoundException;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.catalog.iceberg.IcebergCatalog;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.fb.FbIcebergColumnStats;
 import org.apache.impala.fb.FbIcebergDataFile;
-import org.apache.impala.thrift.TAlterTableExecuteParams;
+import org.apache.impala.thrift.TAlterTableExecuteExpireSnapshotsParams;
+import org.apache.impala.thrift.TAlterTableExecuteRollbackParams;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergOperationParam;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
+import org.apache.impala.thrift.TRollbackType;
 import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.util.IcebergUtil;
-import org.apache.log4j.Logger;
 
 import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This is a helper for the CatalogOpExecutor to provide Iceberg related DDL functionality
  * such as creating and dropping tables from Iceberg.
  */
 public class IcebergCatalogOpExecutor {
-  public static final Logger LOG = Logger.getLogger(IcebergCatalogOpExecutor.class);
+  public static final Logger LOG =
+      LoggerFactory.getLogger(IcebergCatalogOpExecutor.class);
 
   /**
    * Create Iceberg table by Iceberg api
@@ -177,12 +182,47 @@ public class IcebergCatalogOpExecutor {
     tableOp.commit(metadata, newMetadata);
   }
 
-  public static String alterTableExecute(Transaction txn,
-      TAlterTableExecuteParams params) {
+  /**
+   * Use the ExpireSnapshot API to expire snapshots by calling the
+   * ExpireSnapshot.expireOlderThan(timestampMillis) method.
+   * TableProperties.MIN_SNAPSHOTS_TO_KEEP table property manages how many snapshots
+   * should be retained even when all snapshots are selected by expireOlderThan().
+   */
+  public static String alterTableExecuteExpireSnapshots(
+      Transaction txn, TAlterTableExecuteExpireSnapshotsParams params) {
     ExpireSnapshots expireApi = txn.expireSnapshots();
+    Preconditions.checkState(params.isSetOlder_than_millis());
     expireApi.expireOlderThan(params.older_than_millis);
     expireApi.commit();
     return "Snapshots have been expired.";
+  }
+
+  /**
+   * Executes an ALTER TABLE EXECUTE ROLLBACK.
+   */
+  public static String alterTableExecuteRollback(
+      Transaction iceTxn, FeIcebergTable tbl, TAlterTableExecuteRollbackParams params) {
+    TRollbackType kind = params.getKind();
+    ManageSnapshots manageSnapshots = iceTxn.manageSnapshots();
+    switch (kind) {
+      case TIME_ID:
+        Preconditions.checkState(params.isSetTimestamp_millis());
+        long timestampMillis = params.getTimestamp_millis();
+        LOG.info("Rollback iceberg table to snapshot before timestamp {}",
+            timestampMillis);
+        manageSnapshots.rollbackToTime(timestampMillis);
+        break;
+      case VERSION_ID:
+        Preconditions.checkState(params.isSetSnapshot_id());
+        long snapshotId = params.getSnapshot_id();
+        LOG.info("Rollback iceberg table to snapshot id {}", snapshotId);
+        manageSnapshots.rollbackTo(snapshotId);
+        break;
+      default: throw new IllegalStateException("Bad kind of execute rollback " + kind);
+    }
+    // Commit the update.
+    manageSnapshots.commit();
+    return "Rollback executed.";
   }
 
   /**

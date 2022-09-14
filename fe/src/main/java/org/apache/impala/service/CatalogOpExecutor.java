@@ -165,6 +165,7 @@ import org.apache.impala.thrift.TAlterTableAddPartitionParams;
 import org.apache.impala.thrift.TAlterTableAlterColParams;
 import org.apache.impala.thrift.TAlterTableDropColParams;
 import org.apache.impala.thrift.TAlterTableDropPartitionParams;
+import org.apache.impala.thrift.TAlterTableExecuteParams;
 import org.apache.impala.thrift.TAlterTableOrViewSetOwnerParams;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableReplaceColsParams;
@@ -1367,9 +1368,23 @@ public class CatalogOpExecutor {
           break;
         case EXECUTE:
           Preconditions.checkState(params.isSetSet_execute_params());
-          String summary = IcebergCatalogOpExecutor.alterTableExecute(iceTxn,
-              params.getSet_execute_params());
-          addSummary(response, summary);
+          // All the EXECUTE functions operate only on Iceberg data.
+          needsToUpdateHms = false;
+          TAlterTableExecuteParams setExecuteParams = params.getSet_execute_params();
+          if (setExecuteParams.isSetExecute_rollback_params()) {
+            String rollbackSummary = IcebergCatalogOpExecutor.alterTableExecuteRollback(
+                iceTxn, tbl, setExecuteParams.getExecute_rollback_params());
+            addSummary(response, rollbackSummary);
+          } else if (setExecuteParams.isSetExpire_snapshots_params()) {
+            String expireSummary =
+                IcebergCatalogOpExecutor.alterTableExecuteExpireSnapshots(
+                    iceTxn, setExecuteParams.getExpire_snapshots_params());
+            addSummary(response, expireSummary);
+          } else {
+            // Cannot happen, but throw just in case.
+            throw new IllegalStateException(
+                "Alter table execute statement is not implemented.");
+          }
           break;
         case SET_PARTITION_SPEC:
           // Set partition spec uses 'TableOperations', not transactions.
@@ -1393,7 +1408,7 @@ public class CatalogOpExecutor {
           break;
         case REPLACE_COLUMNS:
           // It doesn't make sense to replace all the columns of an Iceberg table as it
-          // would basically make all existing data unaccessible.
+          // would basically make all existing data inaccessible.
         default:
           throw new UnsupportedOperationException(
               "Unsupported ALTER TABLE operation for Iceberg tables: " +
@@ -1414,7 +1429,7 @@ public class CatalogOpExecutor {
 
     if (!needsToUpdateHms) {
       // We don't need to update HMS because either it is already done by Iceberg's
-      // HiveCatalog, or we modified the PARTITION SPEC which is not stored in HMS.
+      // HiveCatalog, or we modified the Iceberg data which is not stored in HMS.
       loadTableMetadata(tbl, newCatalogVersion, true, true, null, "ALTER Iceberg TABLE " +
           params.getAlter_type().name());
       catalog_.addVersionsForInflightEvents(false, tbl, newCatalogVersion);

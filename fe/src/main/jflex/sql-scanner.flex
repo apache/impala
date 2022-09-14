@@ -408,7 +408,8 @@ import org.apache.impala.thrift.TReservedWordsVersion;
         "year", "month", "day", "hour", "minute", "second",
         "begin", "call", "check", "classifier", "close", "identity", "language",
         "localtime", "member", "module", "new", "nullif", "old", "open", "parameter",
-        "period", "result", "return", "sql", "start", "system", "time", "user", "value"
+        "period", "result", "return", "rollback", "sql", "start", "system", "time",
+        "user", "value"
     }));
   }
 

@@ -178,7 +178,7 @@ public interface FeFsTable extends FeTable {
   Map<Long, ? extends PrunablePartition> getPartitionMap();
 
   /**
-   * @param the index of the target partitioning column
+   * @param col the index of the target partitioning column
    * @return a map from value to a set of partitions for which column 'col'
    * has that value.
    */

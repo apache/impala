@@ -414,10 +414,36 @@ struct TAlterTableSetPartitionSpecParams {
   1: required CatalogObjects.TIcebergPartitionSpec partition_spec
 }
 
-// Parameters for ALTER TABLE EXECUTE operations.
-struct TAlterTableExecuteParams {
-  // The parameter of the ExpireSnapshot.expireOlderThan(timestampMillis) Iceberg call.
+// Parameters for ALTER TABLE EXECUTE EXPIRE_SNAPSHOTS operations.
+struct TAlterTableExecuteExpireSnapshotsParams {
   1: required i64 older_than_millis
+}
+
+// ALTER TABLE EXECUTE ROLLBACK can be to a date or snapshot id.
+enum TRollbackType {
+  TIME_ID = 0
+  VERSION_ID = 1
+}
+
+// Parameters for ALTER TABLE EXECUTE ROLLBACK operations.
+struct TAlterTableExecuteRollbackParams {
+  // Is rollback to a date or snapshot id.
+  1: required TRollbackType kind
+
+  // If kind is TIME_ID this is the date to rollback to.
+  2: optional i64 timestamp_millis
+
+  // If kind is VERSION_ID this is the id to rollback to.
+  3: optional i64 snapshot_id
+}
+
+// Parameters for ALTER TABLE EXECUTE ... operations.
+struct TAlterTableExecuteParams {
+  // Parameters for ALTER TABLE EXECUTE EXPIRE_SNAPSHOTS
+  1: optional TAlterTableExecuteExpireSnapshotsParams expire_snapshots_params
+
+  // Parameters for ALTER TABLE EXECUTE ROLLBACK
+  2: optional TAlterTableExecuteRollbackParams execute_rollback_params
 }
 
 // Parameters for all ALTER TABLE commands.
@@ -478,7 +504,7 @@ struct TAlterTableParams {
   // Parameters for ALTER TABLE SET PARTITION SPEC
   19: optional TAlterTableSetPartitionSpecParams set_partition_spec_params
 
-  // Parameters for ALTER TABLE EXECUTE
+  // Parameters for ALTER TABLE EXECUTE operations
   20: optional TAlterTableExecuteParams set_execute_params
 }
 

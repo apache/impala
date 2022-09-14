@@ -106,3 +106,34 @@ def get_snapshots(impalad_client, tbl_name, ts_start=None, ts_end=None,
   for snapshot_str in rows.data:
     results.append(Snapshot(snapshot_str))
   return results
+
+
+class IcebergCatalogs:
+  """Utility class to generate TBLPROPERTIES corresponding to various iceberg catalogs."""
+
+  def __init__(self, database):
+    """Create a IcebergCatalogs object parameterized by database name."""
+    self.database = database
+
+  hive_catalog = "'iceberg.catalog'='hive.catalog'"
+  hive_catalogs = "'iceberg.catalog'='ice_hive_cat'"
+  hadoop_tables = "'iceberg.catalog'='hadoop.tables'"
+  hadoop_catalogs = "'iceberg.catalog'='ice_hadoop_cat'"
+
+  def get_iceberg_catalog_properties(self):
+    """Return a list containing TBLPROPERTIES corresponding to various iceberg catalogs.
+     The TBLPROPERTIES can be used to create tables."""
+    hadoop_catalog = ("'iceberg.catalog'='hadoop.catalog', "
+        + "'iceberg.catalog_location'='/test-warehouse/{0}/hadoop_catalog_test/'".format(
+          self.database))
+    return [
+      self.hadoop_tables,
+      self.hive_catalog,
+      self.hive_catalogs,
+      self.hadoop_catalogs,
+      hadoop_catalog
+    ]
+
+  def is_a_hive_catalog(self, catalog):
+    """Return true if the catalog property is for a Hive catalog."""
+    return catalog == self.hive_catalog or catalog == self.hive_catalogs

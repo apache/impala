@@ -28,6 +28,7 @@ from tests.common.skip import SkipIfFS
 from tests.util.hive_utils import HiveDbWrapper
 from tests.util.event_processor_utils import EventProcessorUtils
 from tests.util.filesystem_utils import WAREHOUSE
+from tests.util.iceberg_util import IcebergCatalogs
 
 
 @SkipIfFS.hive
@@ -482,6 +483,7 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
   def test_iceberg_self_events(self, unique_database):
     """This test checks that Impala doesn't refresh Iceberg tables on self events."""
     tbl_name = unique_database + ".test_iceberg_events"
+    iceberg_catalogs = IcebergCatalogs(unique_database)
 
     def check_self_events(query, skips_events=True):
       tbls_refreshed_before, partitions_refreshed_before, \
@@ -495,19 +497,8 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
       if skips_events:
         assert events_skipped_after > events_skipped_before
 
-    hadoop_tables = "'iceberg.catalog'='hadoop.tables'"
-    hadoop_catalog = ("'iceberg.catalog'='hadoop.catalog', " +
-        "'iceberg.catalog_location'='/test-warehouse/{0}/hadoop_catalog_test/'".format(
-            unique_database))
-    hive_catalog = "'iceberg.catalog'='hive.catalog'"
-    hive_catalogs = "'iceberg.catalog'='ice_hive_cat'"
-    hadoop_catalogs = "'iceberg.catalog'='ice_hadoop_cat'"
-
-    all_catalogs = [hadoop_tables, hadoop_catalog, hive_catalog, hive_catalogs,
-        hadoop_catalogs]
-
-    for catalog in all_catalogs:
-      is_hive_catalog = catalog == hive_catalog or catalog == hive_catalogs
+    for catalog in iceberg_catalogs.get_iceberg_catalog_properties():
+      is_hive_catalog = iceberg_catalogs.is_a_hive_catalog(catalog)
       self.client.execute("""
           CREATE TABLE {0} (i int) STORED AS ICEBERG
           TBLPROPERTIES ({1})""".format(tbl_name, catalog))
