@@ -1,0 +1,43 @@
+====
+---- QUERY
+set TIMEZONE='Europe/Budapest';
+select * from iceberg_non_partitioned tablesample system(10) repeatable(1234)
+---- RESULTS
+20,'Alex','view',2020-01-01 09:00:00
+9,'Alan','click',2020-01-01 10:00:00
+6,'Alex','view',2020-01-01 09:00:00
+---- TYPES
+INT, STRING, STRING, TIMESTAMP
+====
+---- QUERY
+select count(*) from iceberg_non_partitioned tablesample system(10) repeatable(1234)
+---- RESULTS
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+set TIMEZONE='Europe/Budapest';
+select * from iceberg_partitioned tablesample system(10) repeatable(1234)
+---- RESULTS
+16,'Lisa','download',2020-01-01 11:00:00
+3,'Alan','click',2020-01-01 10:00:00
+---- TYPES
+INT, STRING, STRING, TIMESTAMP
+====
+---- QUERY
+select count(*) from iceberg_partitioned tablesample system(10) repeatable(1234)
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+set TIMEZONE='Europe/Budapest';
+select * from iceberg_partitioned tablesample system(10) repeatable(1234)
+where action = 'click';
+---- RESULTS
+10,'Alan','click',2020-01-01 10:00:00
+---- TYPES
+INT, STRING, STRING, TIMESTAMP
+====

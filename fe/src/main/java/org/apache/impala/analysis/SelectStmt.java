@@ -1320,6 +1320,7 @@ public class SelectStmt extends QueryStmt {
    *  - stmt does not have GROUP BY clause
    *  - stmt does not have HAVING clause
    *  - tableRefs contains only one BaseTableRef
+   *  - tableRef doesn't have sampling param
    *  - table is the Iceberg table
    *  - SelectList must contains 'count(*)' or 'count(constant)'
    *  - SelectList can contain other agg functions, e.g. min, sum, etc
@@ -1336,6 +1337,7 @@ public class SelectStmt extends QueryStmt {
     if (tables.size() != 1) return;
     TableRef tableRef = tables.get(0);
     if (!(tableRef instanceof BaseTableRef)) return;
+    if (tableRef.getSampleParams() != null) return;
 
     TableName tableName = tableRef.getDesc().getTableName();
     FeTable table;

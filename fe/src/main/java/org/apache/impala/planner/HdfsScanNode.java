@@ -1147,8 +1147,7 @@ public class HdfsScanNode extends ScanNode {
       // Pass a minimum sample size of 0 because users cannot set a minimum sample size
       // for scans directly. For compute stats, a minimum sample size can be set, and
       // the sampling percent is adjusted to reflect it.
-      sampledFiles = FeFsTable.Utils.getFilesSample(tbl_, partitions_, percentBytes, 0,
-          randomSeed);
+      sampledFiles = getFilesSample(percentBytes, 0, randomSeed);
     }
 
     long scanRangeBytesLimit = analyzer.getQueryCtx().client_request.getQuery_options()
@@ -1303,6 +1302,18 @@ public class HdfsScanNode extends ScanNode {
       fileDescs = partition.getFileDescriptors();
     }
     return fileDescs;
+  }
+
+  /**
+   * Returns a sample of file descriptors associated to this scan node.
+   * @param percentBytes must be between 0 and 100.
+   * @param minSampleBytes minimum number of bytes to read.
+   * @param randomSeed used for random number generation.
+   */
+  protected Map<SampledPartitionMetadata, List<FileDescriptor>> getFilesSample(
+      long percentBytes, long minSampleBytes, long randomSeed) {
+    return FeFsTable.Utils.getFilesSample(tbl_, partitions_, percentBytes, minSampleBytes,
+        randomSeed);
   }
 
   /**

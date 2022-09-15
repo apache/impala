@@ -792,6 +792,10 @@ class TestIcebergTable(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-mixed-file-format', vector,
                       unique_database)
 
+  def test_table_sampling(self, vector):
+    self.run_test_case('QueryTest/iceberg-tablesample', vector,
+        use_db="functional_parquet")
+
   def _create_table_like_parquet_helper(self, vector, unique_database, tbl_name,
                                         expect_success):
     create_table_from_parquet(self.client, unique_database, tbl_name)
@@ -873,3 +877,9 @@ class TestIcebergV2Table(IcebergTestSuite):
   @SkipIf.not_hdfs
   def test_read_position_deletes_orc(self, vector):
     self.run_test_case('QueryTest/iceberg-v2-read-position-deletes-orc', vector)
+
+  @SkipIfDockerizedCluster.internal_hostname
+  @SkipIf.not_hdfs
+  def test_table_sampling_v2(self, vector):
+    self.run_test_case('QueryTest/iceberg-tablesample-v2', vector,
+        use_db="functional_parquet")
