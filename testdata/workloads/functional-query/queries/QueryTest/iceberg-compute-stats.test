@@ -1,0 +1,392 @@
+====
+---- QUERY
+create table ice_alltypes stored as iceberg
+as select * from functional_parquet.iceberg_alltypes_part;
+show column stats ice_alltypes;
+---- RESULTS
+'i','INT',-1,-1,4,4,-1,-1
+'p_bool','BOOLEAN',-1,-1,1,1,-1,-1
+'p_int','INT',-1,-1,4,4,-1,-1
+'p_bigint','BIGINT',-1,-1,8,8,-1,-1
+'p_float','FLOAT',-1,-1,4,4,-1,-1
+'p_double','DOUBLE',-1,-1,8,8,-1,-1
+'p_decimal','DECIMAL(6,3)',-1,-1,4,4,-1,-1
+'p_date','DATE',-1,-1,4,4,-1,-1
+'p_string','STRING',-1,-1,-1,-1,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+# Table-level stats are automatically updated.
+# 'impala.lastComputeStatsTime' is not set yet.
+describe formatted ice_alltypes;
+---- RESULTS: VERIFY_IS_SUBSET
+'','numFiles            ','1                   '
+'','numRows             ','2                   '
+row_regex:'','totalSize           ','\d+\s+'
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:'','impala.lastComputeStatsTime','\d+\s+'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+compute stats ice_alltypes;
+show column stats ice_alltypes;
+---- RESULTS
+'i','INT',2,0,4,4,-1,-1
+'p_bool','BOOLEAN',2,0,1,1,2,0
+'p_int','INT',1,0,4,4,-1,-1
+'p_bigint','BIGINT',1,0,8,8,-1,-1
+'p_float','FLOAT',1,0,4,4,-1,-1
+'p_double','DOUBLE',1,0,8,8,-1,-1
+'p_decimal','DECIMAL(6,3)',1,0,4,4,-1,-1
+'p_date','DATE',1,0,4,4,-1,-1
+'p_string','STRING',1,0,6,6,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+describe formatted ice_alltypes;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'','impala.lastComputeStatsTime','\d+\s+'
+'','numFiles            ','1                   '
+'','numRows             ','2                   '
+row_regex:'','totalSize           ','\d+\s+'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+drop stats ice_alltypes;
+---- RESULTS
+'Stats have been dropped.'
+---- TYPES
+STRING
+====
+---- QUERY
+alter table ice_alltypes unset tblproperties('impala.lastComputeStatsTime');
+---- RESULTS
+'Updated table.'
+---- TYPES
+STRING
+====
+---- QUERY
+# Table-level stats are not affected by DROP STATS.
+describe formatted ice_alltypes;
+---- RESULTS: VERIFY_IS_SUBSET
+'','numFiles            ','1                   '
+'','numRows             ','2                   '
+row_regex:'','totalSize           ','\d+\s+'
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:'','impala.lastComputeStatsTime','\d+\s+'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Column stats have been dropped.
+show column stats ice_alltypes;
+---- RESULTS
+'i','INT',-1,-1,4,4,-1,-1
+'p_bool','BOOLEAN',-1,-1,1,1,-1,-1
+'p_int','INT',-1,-1,4,4,-1,-1
+'p_bigint','BIGINT',-1,-1,8,8,-1,-1
+'p_float','FLOAT',-1,-1,4,4,-1,-1
+'p_double','DOUBLE',-1,-1,8,8,-1,-1
+'p_decimal','DECIMAL(6,3)',-1,-1,4,4,-1,-1
+'p_date','DATE',-1,-1,4,4,-1,-1
+'p_string','STRING',-1,-1,-1,-1,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+compute incremental stats ice_alltypes;
+show column stats ice_alltypes;
+---- RESULTS
+'i','INT',2,0,4,4,-1,-1
+'p_bool','BOOLEAN',2,0,1,1,2,0
+'p_int','INT',1,0,4,4,-1,-1
+'p_bigint','BIGINT',1,0,8,8,-1,-1
+'p_float','FLOAT',1,0,4,4,-1,-1
+'p_double','DOUBLE',1,0,8,8,-1,-1
+'p_decimal','DECIMAL(6,3)',1,0,4,4,-1,-1
+'p_date','DATE',1,0,4,4,-1,-1
+'p_string','STRING',1,0,6,6,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+describe formatted ice_alltypes;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'','impala.lastComputeStatsTime','\d+\s+'
+'','numFiles            ','1                   '
+'','numRows             ','2                   '
+row_regex:'','totalSize           ','\d+\s+'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Setting 'numRows' doesn't have effect on Iceberg tables.
+ALTER TABLE ice_alltypes
+SET TBLPROPERTIES('numRows'='1000', 'STATS_GENERATED_VIA_STATS_TASK'='true');
+describe formatted ice_alltypes;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'','impala.lastComputeStatsTime','\d+\s+'
+'','numRows             ','2                   '
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Users can still set column stats manually as they are managed outside of Iceberg.
+ALTER TABLE ice_alltypes SET COLUMN STATS i ('numDVs'='100');
+show column stats ice_alltypes;
+---- RESULTS
+'i','INT',100,0,4,4,-1,-1
+'p_bool','BOOLEAN',2,0,1,1,2,0
+'p_int','INT',1,0,4,4,-1,-1
+'p_bigint','BIGINT',1,0,8,8,-1,-1
+'p_float','FLOAT',1,0,4,4,-1,-1
+'p_double','DOUBLE',1,0,8,8,-1,-1
+'p_decimal','DECIMAL(6,3)',1,0,4,4,-1,-1
+'p_date','DATE',1,0,4,4,-1,-1
+'p_string','STRING',1,0,6,6,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+drop stats ice_alltypes;
+---- RESULTS
+'Stats have been dropped.'
+---- TYPES
+STRING
+====
+---- QUERY
+# Table-level stats are not affected by DROP STATS.
+describe formatted ice_alltypes;
+---- RESULTS: VERIFY_IS_SUBSET
+'','numFiles            ','1                   '
+'','numRows             ','2                   '
+row_regex:'','totalSize           ','\d+\s+'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Column stats have been dropped.
+show column stats ice_alltypes;
+---- RESULTS
+'i','INT',-1,-1,4,4,-1,-1
+'p_bool','BOOLEAN',-1,-1,1,1,-1,-1
+'p_int','INT',-1,-1,4,4,-1,-1
+'p_bigint','BIGINT',-1,-1,8,8,-1,-1
+'p_float','FLOAT',-1,-1,4,4,-1,-1
+'p_double','DOUBLE',-1,-1,8,8,-1,-1
+'p_decimal','DECIMAL(6,3)',-1,-1,4,4,-1,-1
+'p_date','DATE',-1,-1,4,4,-1,-1
+'p_string','STRING',-1,-1,-1,-1,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+create table ice_alltypes_ht stored as iceberg
+tblproperties ('iceberg.catalog'='hadoop.tables')
+as select * from functional_parquet.iceberg_alltypes_part;
+show column stats ice_alltypes_ht;
+---- RESULTS
+'i','INT',-1,-1,4,4,-1,-1
+'p_bool','BOOLEAN',-1,-1,1,1,-1,-1
+'p_int','INT',-1,-1,4,4,-1,-1
+'p_bigint','BIGINT',-1,-1,8,8,-1,-1
+'p_float','FLOAT',-1,-1,4,4,-1,-1
+'p_double','DOUBLE',-1,-1,8,8,-1,-1
+'p_decimal','DECIMAL(6,3)',-1,-1,4,4,-1,-1
+'p_date','DATE',-1,-1,4,4,-1,-1
+'p_string','STRING',-1,-1,-1,-1,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+# Table-level stats are not automatically updated for non-HMS integrated
+# Iceberg tables.
+# 'impala.lastComputeStatsTime' is not set yet.
+describe formatted ice_alltypes_ht;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','numFiles            ','1                   '
+'','numRows             ','2                   '
+row_regex:'','totalSize           ','\d+\s+'
+row_regex:'','impala.lastComputeStatsTime','\d+\s+'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+compute stats ice_alltypes_ht;
+show column stats ice_alltypes_ht;
+---- RESULTS
+'i','INT',2,0,4,4,-1,-1
+'p_bool','BOOLEAN',2,0,1,1,2,0
+'p_int','INT',1,0,4,4,-1,-1
+'p_bigint','BIGINT',1,0,8,8,-1,-1
+'p_float','FLOAT',1,0,4,4,-1,-1
+'p_double','DOUBLE',1,0,8,8,-1,-1
+'p_decimal','DECIMAL(6,3)',1,0,4,4,-1,-1
+'p_date','DATE',1,0,4,4,-1,-1
+'p_string','STRING',1,0,6,6,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+describe formatted ice_alltypes_ht;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'','impala.lastComputeStatsTime','\d+\s+'
+'','numRows             ','2                   '
+row_regex:'','totalSize           ','\d+\s+'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+drop stats ice_alltypes_ht;
+---- RESULTS
+'Stats have been dropped.'
+---- TYPES
+STRING
+====
+---- QUERY
+alter table ice_alltypes_ht unset tblproperties('impala.lastComputeStatsTime');
+---- RESULTS
+'Updated table.'
+---- TYPES
+STRING
+====
+---- QUERY
+# Table-level stats are dropped for non-HMS integrated Iceberg tables.
+describe formatted ice_alltypes_ht;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','numRows             ','2                   '
+row_regex:'','impala.lastComputeStatsTime','\d+\s+'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Column stats have been dropped.
+show column stats ice_alltypes_ht;
+---- RESULTS
+'i','INT',-1,-1,4,4,-1,-1
+'p_bool','BOOLEAN',-1,-1,1,1,-1,-1
+'p_int','INT',-1,-1,4,4,-1,-1
+'p_bigint','BIGINT',-1,-1,8,8,-1,-1
+'p_float','FLOAT',-1,-1,4,4,-1,-1
+'p_double','DOUBLE',-1,-1,8,8,-1,-1
+'p_decimal','DECIMAL(6,3)',-1,-1,4,4,-1,-1
+'p_date','DATE',-1,-1,4,4,-1,-1
+'p_string','STRING',-1,-1,-1,-1,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+compute incremental stats ice_alltypes_ht;
+show column stats ice_alltypes_ht;
+---- RESULTS
+'i','INT',2,0,4,4,-1,-1
+'p_bool','BOOLEAN',2,0,1,1,2,0
+'p_int','INT',1,0,4,4,-1,-1
+'p_bigint','BIGINT',1,0,8,8,-1,-1
+'p_float','FLOAT',1,0,4,4,-1,-1
+'p_double','DOUBLE',1,0,8,8,-1,-1
+'p_decimal','DECIMAL(6,3)',1,0,4,4,-1,-1
+'p_date','DATE',1,0,4,4,-1,-1
+'p_string','STRING',1,0,6,6,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+describe formatted ice_alltypes_ht;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'','impala.lastComputeStatsTime','\d+\s+'
+'','numRows             ','2                   '
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Users can set 'numRows' for non-HMS integrated Iceberfg tables.
+ALTER TABLE ice_alltypes_ht
+SET TBLPROPERTIES('numRows'='1000', 'STATS_GENERATED_VIA_STATS_TASK'='true');
+describe formatted ice_alltypes_ht;
+---- RESULTS: VERIFY_IS_SUBSET
+'','numRows             ','1000                '
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Users can set column stats manually.
+ALTER TABLE ice_alltypes_ht SET COLUMN STATS i ('numDVs'='100');
+show column stats ice_alltypes_ht;
+---- RESULTS
+'i','INT',100,0,4,4,-1,-1
+'p_bool','BOOLEAN',2,0,1,1,2,0
+'p_int','INT',1,0,4,4,-1,-1
+'p_bigint','BIGINT',1,0,8,8,-1,-1
+'p_float','FLOAT',1,0,4,4,-1,-1
+'p_double','DOUBLE',1,0,8,8,-1,-1
+'p_decimal','DECIMAL(6,3)',1,0,4,4,-1,-1
+'p_date','DATE',1,0,4,4,-1,-1
+'p_string','STRING',1,0,6,6,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+drop stats ice_alltypes_ht;
+---- RESULTS
+'Stats have been dropped.'
+---- TYPES
+STRING
+====
+---- QUERY
+# Table-level stats are dropped for non-HMS integrated Iceberg tables.
+describe formatted ice_alltypes_ht;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','numFiles            ','1                   '
+'','numRows             ','2                   '
+row_regex:'','totalSize           ','\d+\s+'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Column stats have been dropped.
+show column stats ice_alltypes_ht;
+---- RESULTS
+'i','INT',-1,-1,4,4,-1,-1
+'p_bool','BOOLEAN',-1,-1,1,1,-1,-1
+'p_int','INT',-1,-1,4,4,-1,-1
+'p_bigint','BIGINT',-1,-1,8,8,-1,-1
+'p_float','FLOAT',-1,-1,4,4,-1,-1
+'p_double','DOUBLE',-1,-1,8,8,-1,-1
+'p_decimal','DECIMAL(6,3)',-1,-1,4,4,-1,-1
+'p_date','DATE',-1,-1,4,4,-1,-1
+'p_string','STRING',-1,-1,-1,-1,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+# COMPUTE INCREMENTAL STATS without partition clause fall back to original
+# COMPUTE STATS
+create table ice_alltypes_part
+partitioned by spec (i)
+stored as iceberg
+as select * from functional_parquet.iceberg_alltypes_part;
+COMPUTE INCREMENTAL STATS ice_alltypes_part;
+show column stats ice_alltypes_part;
+---- RESULTS
+'i','INT',2,0,4,4,-1,-1
+'p_bool','BOOLEAN',2,0,1,1,2,0
+'p_int','INT',1,0,4,4,-1,-1
+'p_bigint','BIGINT',1,0,8,8,-1,-1
+'p_float','FLOAT',1,0,4,4,-1,-1
+'p_double','DOUBLE',1,0,8,8,-1,-1
+'p_decimal','DECIMAL(6,3)',1,0,4,4,-1,-1
+'p_date','DATE',1,0,4,4,-1,-1
+'p_string','STRING',1,0,6,6,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+COMPUTE INCREMENTAL STATS ice_alltypes_part PARTITION (i=1);
+---- CATCH
+COMPUTE INCREMENTAL ... PARTITION not supported for Iceberg table
+====

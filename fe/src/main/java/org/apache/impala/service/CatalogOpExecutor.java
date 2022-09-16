@@ -1663,9 +1663,13 @@ public class CatalogOpExecutor {
       Table.updateTimestampProperty(msTbl, HdfsTable.TBL_PROP_LAST_COMPUTE_STATS_TIME);
     }
 
-    // Apply property changes like numRows.
-    msTbl.getParameters().remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
-    applyAlterTable(msTbl, false, tblTxn);
+    if (IcebergTable.isIcebergTable(msTbl) && isIcebergHmsIntegrationEnabled(msTbl)) {
+      updateTableStatsViaIceberg((IcebergTable)table, msTbl);
+    } else {
+      // Apply property changes like numRows.
+      msTbl.getParameters().remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
+      applyAlterTable(msTbl, false, tblTxn);
+    }
     numUpdatedPartitions.setRef(0L);
     if (modifiedParts != null) {
       numUpdatedPartitions.setRef((long) modifiedParts.size());
@@ -1673,6 +1677,37 @@ public class CatalogOpExecutor {
       numUpdatedPartitions.setRef(1L);
     }
   }
+
+  /**
+   * For Iceberg tables using HiveCatalog we must avoid updating the HMS table directly to
+   * avoid overriding concurrent modifications to the table. See IMPALA-11583.
+   * Table-level stats (numRows, totalSize) should not be set as Iceberg keeps them
+   * up-to-date.
+   * 'impala.lastComputeStatsTime' still needs to be set, so we'll know when we executed
+   * COMPUTE STATS the last time.
+   * We need to set catalog service id and catalog version to detect self-events.
+   */
+  private void updateTableStatsViaIceberg(IcebergTable iceTbl,
+      org.apache.hadoop.hive.metastore.api.Table msTbl) throws ImpalaException {
+    String CATALOG_SERVICE_ID = MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey();
+    String CATALOG_VERSION    = MetastoreEventPropertyKey.CATALOG_VERSION.getKey();
+    String COMPUTE_STATS_TIME = HdfsTable.TBL_PROP_LAST_COMPUTE_STATS_TIME;
+
+    Preconditions.checkState(msTbl.getParameters().containsKey(CATALOG_SERVICE_ID));
+    Preconditions.checkState(msTbl.getParameters().containsKey(CATALOG_VERSION));
+
+    Map<String, String> props = new HashMap<>();
+    props.put(CATALOG_SERVICE_ID, msTbl.getParameters().get(CATALOG_SERVICE_ID));
+    props.put(CATALOG_VERSION,    msTbl.getParameters().get(CATALOG_VERSION));
+    if (msTbl.getParameters().containsKey(COMPUTE_STATS_TIME)) {
+      props.put(COMPUTE_STATS_TIME, msTbl.getParameters().get(COMPUTE_STATS_TIME));
+    }
+
+    org.apache.iceberg.Transaction iceTxn = IcebergUtil.getIcebergTransaction(iceTbl);
+    IcebergCatalogOpExecutor.setTblProperties(iceTxn, props);
+    iceTxn.commitTransaction();
+  }
+
 
   /**
    * Updates the row counts and incremental column stats of the partitions in the given
@@ -2342,6 +2377,13 @@ public class CatalogOpExecutor {
     Preconditions.checkState(table.isWriteLockedByCurrentThread());
     // Delete the ROW_COUNT from the table (if it was set).
     org.apache.hadoop.hive.metastore.api.Table msTbl = table.getMetaStoreTable();
+    boolean isIntegratedIcebergTbl =
+        IcebergTable.isIcebergTable(msTbl) && isIcebergHmsIntegrationEnabled(msTbl);
+    if (isIntegratedIcebergTbl) {
+      // We shouldn't modify table-level stats of HMS-integrated Iceberg tables as these
+      // stats are managed by Iceberg.
+      return 0;
+    }
     int numTargetedPartitions = 0;
     boolean droppedRowCount =
         msTbl.getParameters().remove(StatsSetupConst.ROW_COUNT) != null;

@@ -844,6 +844,9 @@ class TestIcebergTable(IcebergTestSuite):
 
     assert parquet_column_name_type_list == iceberg_column_name_type_list
 
+  def test_compute_stats(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-compute-stats', vector, unique_database)
+
 
 class TestIcebergV2Table(IcebergTestSuite):
   """Tests related to Iceberg V2 tables."""

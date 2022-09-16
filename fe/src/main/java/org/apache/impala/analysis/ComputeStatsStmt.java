@@ -413,6 +413,14 @@ public class ComputeStatsStmt extends StatementBase {
       isIncremental_ = false;
     }
 
+    if (table_ instanceof FeIcebergTable) {
+      if (partitionSet_ != null) {
+        throw new AnalysisException("COMPUTE INCREMENTAL ... PARTITION not supported " +
+            "for Iceberg table " + tableName_);
+      }
+      isIncremental_ = false;
+    }
+
     if (columnWhitelist_ != null) {
       validatedColumnWhitelist_ = new HashSet<>();
       for (String colName : columnWhitelist_) {
