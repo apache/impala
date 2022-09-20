@@ -4453,6 +4453,11 @@ public class CatalogOpExecutor {
     if (!(table instanceof HdfsTable)) {
       throw new CatalogException("Partition event received on a non-hdfs table");
     }
+    if (eventId > 0 && eventId <= table.getCreateEventId()) {
+      LOG.debug("Not reloading partitions of table {}.{} for event {} since it is " +
+          "recreated at event {}.", dbName, tblName, eventId, table.getCreateEventId());
+      return 0;
+    }
     try {
       tryWriteLock(table, reason);
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
