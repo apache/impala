@@ -32,6 +32,7 @@ import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.IcebergContentFileStore;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.thrift.TCompressionCodec;
@@ -64,7 +65,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   private long icebergParquetDictPageSize_;
   private List<IcebergPartitionSpec> partitionSpecs_;
   private int defaultPartitionSpecId_;
-  private Map<String, FileDescriptor> pathHashToFileDescMap_;
+  private IcebergContentFileStore fileStore_;
   private LocalFsTable localFsTable_;
 
   // The snapshot id of the current snapshot stored in the CatalogD.
@@ -112,8 +113,8 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     Preconditions.checkNotNull(tableInfo);
     localFsTable_ = LocalFsTable.load(db, msTable, ref);
     tableParams_ = tableParams;
-    pathHashToFileDescMap_ = FeIcebergTable.Utils.loadFileDescMapFromThrift(
-        tableInfo.getIceberg_table().getPath_hash_to_file_descriptor(),
+    fileStore_ = IcebergContentFileStore.fromThrift(
+        tableInfo.getIceberg_table().getContent_files(),
         tableInfo.getNetwork_addresses(),
         getHostIndex());
     icebergApiTable_ = icebergApiTable;
@@ -195,11 +196,6 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   @Override
   public IcebergPartitionSpec getDefaultPartitionSpec() {
     return Utils.getDefaultPartitionSpec(this);
-  }
-
-  @Override
-  public Map<String, FileDescriptor> getPathHashToFileDescMap() {
-    return pathHashToFileDescMap_;
   }
 
   @Override
@@ -285,5 +281,10 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     public String getIcebergCatalogLocation() {
       return icebergCatalogLocation_;
     }
+  }
+
+  @Override
+  public IcebergContentFileStore getContentFileStore() {
+    return fileStore_;
   }
 }

@@ -34,7 +34,7 @@ STRING, STRING, STRING
 ---- QUERY
 # Lower/upper bounds metrics eliminate all row groups
 select count(*) from ice_types1
-where s >= 'z';
+where s >= 'z' and p >= 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -44,7 +44,7 @@ aggregation(SUM, RowsRead): 0
 ---- QUERY
 # Where condition matches one row group's metrics
 select count(*) from ice_types1
-where s >= 'b' and s <= 'cz';
+where s >= 'b' and s <= 'cz' and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE
@@ -54,7 +54,7 @@ aggregation(SUM, RowsRead): 3
 ---- QUERY
 # Where condition spans over 2 row groups
 select count(*) from ice_types1
-where s >= 'b' and s <= 'dz';
+where s >= 'b' and s <= 'dz' and p >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -64,7 +64,7 @@ aggregation(SUM, RowsRead): 6
 ---- QUERY
 # 'fermium' is the upper bound of one row group and the lower bound of another
 select count(*) from ice_types1
-where s = 'fermium';
+where s = 'fermium' and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE
@@ -74,7 +74,7 @@ aggregation(SUM, RowsRead): 6
 ---- QUERY
 # Lower/upper bounds metrics eliminate all row groups
 select count(*) from ice_types1
-where i >= 10;
+where i >= 10 and p >= 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -84,7 +84,7 @@ aggregation(SUM, RowsRead): 0
 ---- QUERY
 # Where condition matches one row group's metrics
 select count(*) from ice_types1
-where i >= 2 and i <= 3;
+where i >= 2 and i <= 3 and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE
@@ -94,7 +94,7 @@ aggregation(SUM, RowsRead): 3
 ---- QUERY
 # Where condition spans over 2 row groups
 select count(*) from ice_types1
-where i >= 2 and i <= 4;
+where i >= 2 and i <= 4 and p >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -104,7 +104,7 @@ aggregation(SUM, RowsRead): 6
 ---- QUERY
 # 6 is the upper bound of one row group and the lower bound of another
 select count(*) from ice_types1
-where i = 6;
+where i = 6 and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE
@@ -114,7 +114,7 @@ aggregation(SUM, RowsRead): 6
 ---- QUERY
 # Lower/upper bounds metrics eliminate all row groups
 select count(*) from ice_types1
-where bi >= 10;
+where bi >= 10 and p >= 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -124,7 +124,7 @@ aggregation(SUM, RowsRead): 0
 ---- QUERY
 # Where condition matches one row group's metrics
 select count(*) from ice_types1
-where bi >= 2 and bi <= 3;
+where bi >= 2 and bi <= 3 and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE
@@ -134,7 +134,7 @@ aggregation(SUM, RowsRead): 3
 ---- QUERY
 # Where condition spans over 2 row groups
 select count(*) from ice_types1
-where bi >= 2 and bi <= 4;
+where bi >= 2 and bi <= 4 and p >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -144,7 +144,7 @@ aggregation(SUM, RowsRead): 6
 ---- QUERY
 # 6 is the upper bound of one row group and the lower bound of another
 select count(*) from ice_types1
-where bi = 6;
+where bi = 6 and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE
@@ -154,7 +154,7 @@ aggregation(SUM, RowsRead): 6
 ---- QUERY
 # Lower/upper bounds metrics eliminate all row groups
 select count(*) from ice_types1
-where f >= 5.0;
+where f >= 5.0 and p >= 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -164,7 +164,7 @@ aggregation(SUM, RowsRead): 0
 ---- QUERY
 # Where condition matches one row group's metrics
 select count(*) from ice_types1
-where f >= 0.13 and f <= 3.451;
+where f >= 0.13 and f <= 3.451 and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE
@@ -174,7 +174,7 @@ aggregation(SUM, RowsRead): 3
 ---- QUERY
 # Where condition spans over 2 row groups
 select count(*) from ice_types1
-where f >= 0.13 and f <= 3.57;
+where f >= 0.13 and f <= 3.57 and p >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -184,7 +184,7 @@ aggregation(SUM, RowsRead): 6
 ---- QUERY
 # 4.01 is the upper bound of one row group and the lower bound of another
 select count(*) from ice_types1
-where f = 4.01;
+where f = 4.01 and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE
@@ -194,7 +194,7 @@ aggregation(SUM, RowsRead): 6
 ---- QUERY
 # Lower/upper bounds metrics eliminate all row groups
 select count(*) from ice_types1
-where db >= 5.0;
+where db >= 5.0 and p >= 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -204,7 +204,7 @@ aggregation(SUM, RowsRead): 0
 ---- QUERY
 # Where condition matches one row group's metrics
 select count(*) from ice_types1
-where db >= 0.13 and db <= 3.451;
+where db >= 0.13 and db <= 3.451 and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE
@@ -214,7 +214,7 @@ aggregation(SUM, RowsRead): 3
 ---- QUERY
 # Where condition spans over 2 row groups
 select count(*) from ice_types1
-where db >= 0.13 and db <= 3.57;
+where db >= 0.13 and db <= 3.57 and p >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -224,7 +224,7 @@ aggregation(SUM, RowsRead): 6
 ---- QUERY
 # 4.01 is the upper bound of one row group and the lower bound of another
 select count(*) from ice_types1
-where db = 4.01;
+where db = 4.01 and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE
@@ -266,7 +266,7 @@ STRING, STRING, STRING
 ---- QUERY
 # Lower/upper bounds metrics eliminate all row groups
 select count(*) from ice_types2
-where dt >= DATE'9999-12-31';
+where dt >= DATE'9999-12-31' and p >= 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -276,7 +276,7 @@ aggregation(SUM, RowsRead): 0
 ---- QUERY
 # Where condition matches one row group's metrics
 select count(*) from ice_types2
-where dt >= DATE'1969-12-31' and dt <= DATE'1970-01-01';
+where dt >= DATE'1969-12-31' and dt <= DATE'1970-01-01' and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE
@@ -286,7 +286,7 @@ aggregation(SUM, RowsRead): 3
 ---- QUERY
 # Where condition spans over 2 row groups
 select count(*) from ice_types2
-where dt >= DATE'1969-12-31' and dt <= DATE'1970-01-02';
+where dt >= DATE'1969-12-31' and dt <= DATE'1970-01-02' and p >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -296,7 +296,7 @@ aggregation(SUM, RowsRead): 6
 ---- QUERY
 # 1999-12-31 is the upper bound of one row group and the lower bound of another
 select count(*) from ice_types2
-where dt = DATE'1999-12-31';
+where dt = DATE'1999-12-31' and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE
@@ -306,7 +306,7 @@ aggregation(SUM, RowsRead): 6
 ---- QUERY
 # Lower/upper bounds metrics eliminate all row groups
 select count(*) from ice_types2
-where ts >= '9999-12-31 03:04:06';
+where ts >= '9999-12-31 03:04:06' and p >= 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -316,7 +316,7 @@ aggregation(SUM, RowsRead): 0
 ---- QUERY
 # Where condition matches one row group's metrics
 select count(*) from ice_types2
-where dt >= '1969-12-31 12:34:59' and ts <= '1969-12-31 12:35:00';
+where dt >= '1969-12-31 12:34:59' and ts <= '1969-12-31 12:35:00' and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE
@@ -326,7 +326,7 @@ aggregation(SUM, RowsRead): 3
 ---- QUERY
 # Where condition spans over 2 row groups
 select count(*) from ice_types2
-where ts >= '1969-12-31 12:34:59' and ts <= '1969-12-31 12:35:01';
+where ts >= '1969-12-31 12:34:59' and ts <= '1969-12-31 12:35:01' and p >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -336,7 +336,7 @@ aggregation(SUM, RowsRead): 6
 ---- QUERY
 # '1999-12-31 23:59:59' is the upper bound of one row group and the lower bound of another
 select count(*) from ice_types2
-where ts = '1999-12-31 23:59:59';
+where ts = '1999-12-31 23:59:59' and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE
@@ -384,7 +384,7 @@ STRING, STRING, STRING
 ---- QUERY
 # Lower/upper bounds metrics eliminate all row groups
 select count(*) from ice_types3
-where d1 >= 123456.791;
+where d1 >= 123456.791 and p >= 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -394,7 +394,7 @@ aggregation(SUM, RowsRead): 0
 ---- QUERY
 # Where condition matches one row group's metrics
 select count(*) from ice_types3
-where d1 >= 123.457 and d1 <= 123.458;
+where d1 >= 123.457 and d1 <= 123.458 and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE
@@ -404,7 +404,7 @@ aggregation(SUM, RowsRead): 3
 ---- QUERY
 # Where condition spans over 2 row groups
 select count(*) from ice_types3
-where d1 >= 123.457 and d1 <= 123.459;
+where d1 >= 123.457 and d1 <= 123.459 and p >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -414,7 +414,7 @@ aggregation(SUM, RowsRead): 6
 ---- QUERY
 # 341.234 is the upper bound of one row group and the lower bound of another
 select count(*) from ice_types3
-where d1 = 341.234;
+where d1 = 341.234 and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE
@@ -424,7 +424,7 @@ aggregation(SUM, RowsRead): 6
 ---- QUERY
 # Lower/upper bounds metrics eliminate all row groups
 select count(*) from ice_types3
-where d2 >= 123456789012345.680;
+where d2 >= 123456789012345.680 and p >= 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -434,7 +434,7 @@ aggregation(SUM, RowsRead): 0
 ---- QUERY
 # Where condition matches one row group's metrics
 select count(*) from ice_types3
-where d2 >= 1234567890.124 and d2 <= 1234567890.125;
+where d2 >= 1234567890.124 and d2 <= 1234567890.125 and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE
@@ -444,7 +444,7 @@ aggregation(SUM, RowsRead): 3
 ---- QUERY
 # Where condition spans over 2 row groups
 select count(*) from ice_types3
-where d2 >= 1234567890.124 and d2 <= 1234567890.126;
+where d2 >= 1234567890.124 and d2 <= 1234567890.126 and p >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -454,7 +454,7 @@ aggregation(SUM, RowsRead): 6
 ---- QUERY
 # 3412345678.901 is the upper bound of one row group and the lower bound of another
 select count(*) from ice_types3
-where d2 = 3412345678.901;
+where d2 = 3412345678.901 and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE
@@ -464,7 +464,7 @@ aggregation(SUM, RowsRead): 6
 ---- QUERY
 # Lower/upper bounds metrics eliminate all row groups
 select count(*) from ice_types3
-where d3 >= 12345678901234567890123456789012345.681;
+where d3 >= 12345678901234567890123456789012345.681 and p >= 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -474,7 +474,7 @@ aggregation(SUM, RowsRead): 0
 ---- QUERY
 # Where condition matches one row group's metrics
 select count(*) from ice_types3
-where d3 >= 1234567890123456789.013 and d3 <= 1234567890123456789.014;
+where d3 >= 1234567890123456789.013 and d3 <= 1234567890123456789.014 and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE
@@ -484,7 +484,7 @@ aggregation(SUM, RowsRead): 3
 ---- QUERY
 # Where condition spans over 2 row groups
 select count(*) from ice_types3
-where d3 >= 1234567890123456789.013 and d3 <= 1234567890123456789.015;
+where d3 >= 1234567890123456789.013 and d3 <= 1234567890123456789.015 and p >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -494,7 +494,7 @@ aggregation(SUM, RowsRead): 6
 ---- QUERY
 # 3412345678901234567.89 is the upper bound of one row group and the lower bound of another
 select count(*) from ice_types3
-where d3 = 3412345678901234567.89;
+where d3 = 3412345678901234567.89 and p >= 0;
 ---- RESULTS
 2
 ---- RUNTIME_PROFILE

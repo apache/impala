@@ -17,33 +17,21 @@
 
 package org.apache.impala.catalog;
 
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.hadoop.hive.common.ValidWriteIdList;
+import org.apache.commons.lang.NotImplementedException;
 import org.apache.iceberg.Table;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.analysis.IcebergPartitionSpec;
-import org.apache.impala.analysis.TableName;
-import org.apache.impala.thrift.CatalogObjectsConstants;
-import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumnStats;
 import org.apache.impala.thrift.TCompressionCodec;
-import org.apache.impala.thrift.THdfsPartition;
-import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergPartitionStats;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableStats;
-import org.apache.impala.thrift.TTableType;
-import org.apache.impala.util.AcidUtils;
-import org.apache.impala.util.IcebergUtil;
-
-import com.google.common.base.Preconditions;
 
 /**
  * Iceberg position delete table is created on the fly during planning. It belongs to an
@@ -115,8 +103,8 @@ public class IcebergPositionDeleteTable extends VirtualTable implements FeIceber
   }
 
   @Override
-  public Map<String, FileDescriptor> getPathHashToFileDescMap() {
-    return baseTable_.getPathHashToFileDescMap();
+  public IcebergContentFileStore getContentFileStore() {
+    throw new NotImplementedException("This should never be called.");
   }
 
   @Override

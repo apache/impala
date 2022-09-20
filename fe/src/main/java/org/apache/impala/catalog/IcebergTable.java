@@ -163,8 +163,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
   // last item of the list is the latest.
   private int defaultPartitionSpecId_;
 
-  // Key is the DataFile path hash, value is FileDescriptor transformed from DataFile
-  private Map<String, FileDescriptor> pathHashToFileDescMap_;
+  // File descriptor store of all data and delete files.
+  private IcebergContentFileStore fileStore_;
 
   // Treat iceberg table as a non-partitioned hdfs table in backend
   private HdfsTable hdfsTable_;
@@ -306,11 +306,6 @@ public class IcebergTable extends Table implements FeIcebergTable {
   }
 
   @Override
-  public Map<String, FileDescriptor> getPathHashToFileDescMap() {
-    return pathHashToFileDescMap_;
-  }
-
-  @Override
   public long snapshotId() {
     return catalogSnapshotId_;
   }
@@ -362,7 +357,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
         icebergParquetDictPageSize_ = Utils.getIcebergParquetDictPageSize(msTbl);
         hdfsTable_
             .load(false, msClient, msTable_, true, true, false, null, null,null, reason);
-        pathHashToFileDescMap_ = Utils.loadAllPartition(this);
+        fileStore_ = Utils.loadAllPartition(this);
         partitionStats_ = Utils.loadPartitionStats(this);
         loadAllColumnStats(msClient);
       } catch (Exception e) {
@@ -446,8 +441,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
     // The Iceberg API table needs to be available and cached even when loaded through
     // thrift.
     icebergApiTable_ = IcebergUtil.loadTable(this);
-    pathHashToFileDescMap_ = FeIcebergTable.Utils.loadFileDescMapFromThrift(
-        ticeberg.getPath_hash_to_file_descriptor(), null, null);
+    fileStore_ = IcebergContentFileStore.fromThrift(
+        ticeberg.getContent_files(), null, null);
     hdfsTable_.loadFromThrift(thriftTable);
     partitionStats_ = ticeberg.getPartition_stats();
   }
@@ -514,5 +509,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
       resp.table_info.iceberg_table.setCatalog_snapshot_id(catalogSnapshotId_);
     }
     return resp;
+  }
+
+  @Override
+  public IcebergContentFileStore getContentFileStore() {
+    return fileStore_;
   }
 }

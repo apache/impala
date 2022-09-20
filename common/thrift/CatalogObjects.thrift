@@ -581,13 +581,19 @@ struct TIcebergPartitionStats {
   3: required i64 file_size_in_bytes;
 }
 
+// Contains maps from 128-bit Murmur3 hash of file path to its file descriptor
+struct TIcebergContentFileStore {
+  1: optional map<string, THdfsFileDesc> path_hash_to_data_file
+  2: optional map<string, THdfsFileDesc> path_hash_to_delete_file
+}
+
 struct TIcebergTable {
   // Iceberg file system table location
   1: required string table_location
   2: required list<TIcebergPartitionSpec> partition_spec
   3: required i32 default_partition_spec_id
-  // Map from 128-bit Murmur3 hash of data file path to its file descriptor
-  4: optional map<string, THdfsFileDesc> path_hash_to_file_descriptor
+  // Iceberg data and delete files
+  4: optional TIcebergContentFileStore content_files
   // Snapshot id of the org.apache.iceberg.Table object cached in the CatalogD
   5: optional i64 catalog_snapshot_id;
   // Iceberg 'write.parquet.compression-codec' and 'write.parquet.compression-level' table

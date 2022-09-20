@@ -97,9 +97,9 @@ import org.slf4j.LoggerFactory;
 public interface FeIcebergTable extends FeFsTable {
   final static Logger LOG = LoggerFactory.getLogger(FeIcebergTable.class);
   /**
-   * FileDescriptor map
+   * Return content file store.
    */
-  Map<String, HdfsPartition.FileDescriptor> getPathHashToFileDescMap();
+  IcebergContentFileStore getContentFileStore();
 
   /**
    * Return the partition stats from iceberg table
@@ -324,12 +324,12 @@ public interface FeIcebergTable extends FeFsTable {
     }
 
     /**
-     * Get files info for the given fe iceberg table.
+     * Get file info for the given fe iceberg table.
      */
     public static TResultSet getIcebergTableFiles(FeIcebergTable table,
         TResultSet result) {
-      List<FileDescriptor> orderedFds = Lists
-          .newArrayList(table.getPathHashToFileDescMap().values());
+      List<FileDescriptor> orderedFds = Lists.newArrayList(
+          table.getContentFileStore().getAllFiles());
       Collections.sort(orderedFds);
       for (FileDescriptor fd : orderedFds) {
         TResultRowBuilder rowBuilder = new TResultRowBuilder();
@@ -413,7 +413,7 @@ public interface FeIcebergTable extends FeFsTable {
         rowBuilder.add("NOT CACHED");
       } else {
         long cachedBytes = 0L;
-        for (FileDescriptor fd: table.getPathHashToFileDescMap().values()) {
+        for (FileDescriptor fd: table.getContentFileStore().getAllFiles()) {
           int numBlocks = fd.getNumFileBlocks();
           for (int i = 0; i < numBlocks; ++i) {
             FbFileBlock block = fd.getFbFileBlock(i);
@@ -552,8 +552,7 @@ public interface FeIcebergTable extends FeFsTable {
       tIcebergTable.setDefault_partition_spec_id(
           icebergTable.getDefaultPartitionSpecId());
 
-      tIcebergTable.setPath_hash_to_file_descriptor(
-          convertPathHashToFileDescMap(icebergTable));
+      tIcebergTable.setContent_files(icebergTable.getContentFileStore().toThrift());
 
       tIcebergTable.setCatalog_snapshot_id(icebergTable.snapshotId());
       tIcebergTable.setParquet_compression_codec(
@@ -566,16 +565,6 @@ public interface FeIcebergTable extends FeFsTable {
           icebergTable.getIcebergParquetDictPageSize());
       tIcebergTable.setPartition_stats(icebergTable.getIcebergPartitionStats());
       return tIcebergTable;
-    }
-
-    public static Map<String, THdfsFileDesc> convertPathHashToFileDescMap(
-        FeIcebergTable icebergTable) {
-      Map<String, THdfsFileDesc> ret = new HashMap<>();
-      for (Map.Entry<String, HdfsPartition.FileDescriptor> entry :
-          icebergTable.getPathHashToFileDescMap().entrySet()) {
-        ret.put(entry.getKey(), entry.getValue().toThrift());
-      }
-      return ret;
     }
 
     /**
@@ -653,7 +642,7 @@ public interface FeIcebergTable extends FeFsTable {
      * Iceberg. Both the HdfsBaseDir and the DataFile path can contain the scheme in their
      * path, using org.apache.hadoop.fs.Path to normalize the paths.
      */
-    public static Map<String, HdfsPartition.FileDescriptor> loadAllPartition(
+    public static IcebergContentFileStore loadAllPartition(
         IcebergTable table) throws IOException, TableLoadingException {
       Map<String, HdfsPartition.FileDescriptor> hdfsFileDescMap = new HashMap<>();
       Collection<HdfsPartition> partitions =
@@ -664,33 +653,54 @@ public interface FeIcebergTable extends FeFsTable {
             hdfsFileDescMap.put(path.toUri().getPath(), fileDesc);
         }
       }
-      Map<String, HdfsPartition.FileDescriptor> fileDescMap = new HashMap<>();
+      IcebergContentFileStore fileStore = new IcebergContentFileStore();
       Pair<List<DataFile>, Set<DeleteFile>> allFiles = IcebergUtil.getIcebergFiles(
           table, new ArrayList<>(), /*timeTravelSpecl=*/null);
-      for (ContentFile contentFile : Iterables.concat(allFiles.first,
-                                                      allFiles.second)) {
-          Path path = new Path(contentFile.path().toString());
-          if (hdfsFileDescMap.containsKey(path.toUri().getPath())) {
-            String pathHash = IcebergUtil.getFilePathHash(contentFile);
-            HdfsPartition.FileDescriptor fsFd = hdfsFileDescMap.get(
-                path.toUri().getPath());
-            HdfsPartition.FileDescriptor iceFd = fsFd.cloneWithFileMetadata(
-                IcebergUtil.createIcebergMetadata(table, contentFile));
-            fileDescMap.put(pathHash, iceFd);
-          } else {
-            if (Utils.requiresDataFilesInTableLocation(table)) {
-              LOG.warn("Iceberg file '{}' cannot be found in the HDFS recursive"
-               + "file listing results.", path.toString());
-            }
-            HdfsPartition.FileDescriptor fileDesc = getFileDescriptor(
-                new Path(contentFile.path().toString()),
-                new Path(table.getIcebergTableLocation()), table);
-            HdfsPartition.FileDescriptor iceFd = fileDesc.cloneWithFileMetadata(
-                IcebergUtil.createIcebergMetadata(table, contentFile));
-            fileDescMap.put(IcebergUtil.getFilePathHash(contentFile), iceFd);
-          }
+      for (ContentFile contentFile : Iterables.concat(allFiles.first, allFiles.second)) {
+        addContentFileToFileStore(contentFile, fileStore, table, hdfsFileDescMap);
       }
-      return fileDescMap;
+      return fileStore;
+    }
+
+    private static void addContentFileToFileStore(ContentFile contentFile,
+        IcebergContentFileStore fileStore, IcebergTable table,
+        Map<String, HdfsPartition.FileDescriptor> hdfsFileDescMap) throws IOException {
+      String pathHash = IcebergUtil.getFilePathHash(contentFile);
+      HdfsPartition.FileDescriptor fd = getOrCreateIcebergFd(
+          table, hdfsFileDescMap, contentFile);
+      if (contentFile.content().equals(FileContent.DATA)) {
+        fileStore.addDataFileDescriptor(pathHash, fd);
+      } else {
+        Preconditions.checkState(
+            contentFile.content().equals(FileContent.EQUALITY_DELETES) ||
+            contentFile.content().equals(FileContent.POSITION_DELETES));
+        fileStore.addDeleteFileDescriptor(pathHash, fd);
+      }
+    }
+
+    private static FileDescriptor getOrCreateIcebergFd(IcebergTable table,
+        Map<String, HdfsPartition.FileDescriptor> hdfsFileDescMap,
+        ContentFile contentFile) throws IllegalArgumentException, IOException {
+      Path path = new Path(contentFile.path().toString());
+      HdfsPartition.FileDescriptor iceFd = null;
+      if (hdfsFileDescMap.containsKey(path.toUri().getPath())) {
+        HdfsPartition.FileDescriptor fsFd = hdfsFileDescMap.get(
+            path.toUri().getPath());
+        iceFd = fsFd.cloneWithFileMetadata(
+            IcebergUtil.createIcebergMetadata(table, contentFile));
+        return iceFd;
+      } else {
+        if (Utils.requiresDataFilesInTableLocation(table)) {
+          LOG.warn("Iceberg file '{}' cannot be found in the HDFS recursive"
+           + "file listing results.", path.toString());
+        }
+        HdfsPartition.FileDescriptor fileDesc = getFileDescriptor(
+            new Path(contentFile.path().toString()),
+            new Path(table.getIcebergTableLocation()), table);
+        iceFd = fileDesc.cloneWithFileMetadata(
+            IcebergUtil.createIcebergMetadata(table, contentFile));
+        return iceFd;
+      }
     }
 
     /**

@@ -22,10 +22,11 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.apache.curator.shaded.com.google.common.collect.Lists;
@@ -50,21 +51,22 @@ import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.catalog.Column;
-import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.DateLiteral;
 import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TableRef;
 import org.apache.impala.analysis.TimeTravelSpec;
 import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.BinaryPredicate.Operator;
 import org.apache.impala.catalog.FeIcebergTable;
-import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.IcebergColumn;
+import org.apache.impala.catalog.IcebergContentFileStore;
 import org.apache.impala.catalog.IcebergPositionDeleteTable;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
@@ -87,6 +89,12 @@ import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Scanning Iceberg tables is not as simple as scanning legacy Hive tables. The
+ * complexity comes from handling delete files and time travel. We also want to push
+ * down Impala conjuncts to Iceberg to filter out partitions and data files. This
+ * class deals with such complexities.
+ */
 public class IcebergScanPlanner {
   private final static Logger LOG = LoggerFactory.getLogger(IcebergScanPlanner.class);
 
@@ -122,8 +130,12 @@ public class IcebergScanPlanner {
   }
 
   public PlanNode createIcebergScanPlan() throws ImpalaException {
-    FeIcebergTable iceTbl = getIceTable();
     analyzer_.materializeSlots(conjuncts_);
+
+    if (!needIcebergForPlanning()) {
+      return planWithoutIceberg();
+    }
+
     filterFileDescriptors();
 
     PlanNode ret;
@@ -137,6 +149,31 @@ public class IcebergScanPlanner {
       // Let's create a bit more complex plan in the presence of delete files.
       ret = createComplexIcebergScanPlan();
     }
+    return ret;
+  }
+
+  /**
+   * We can avoid calling Iceberg's expensive planFiles() API when the followings are
+   * true:
+   *  - we don't push down predicates
+   *  - no time travel
+   *  - no delete files
+   * TODO: we should still avoid calling planFiles() if there are delete files. To do that
+   * we either need to track which delete files have corresponding data files so we
+   * can create the UNION ALL node. Or, if we have an optimized, Iceberg-specific
+   * ANTI-JOIN operator, then it wouldn't hurt too much to transfer all rows through it.
+   */
+  private boolean needIcebergForPlanning() {
+    return
+        !icebergPredicates_.isEmpty() ||
+        tblRef_.getTimeTravelSpec() != null ||
+        !getIceTable().getContentFileStore().getDeleteFiles().isEmpty();
+  }
+
+  private PlanNode planWithoutIceberg() throws ImpalaException {
+    PlanNode ret = new IcebergScanNode(ctx_.getNextNodeId(), tblRef_, conjuncts_,
+        aggInfo_, getIceTable().getContentFileStore().getDataFiles());
+    ret.init(analyzer_);
     return ret;
   }
 
@@ -338,13 +375,22 @@ public class IcebergScanPlanner {
   private Pair<FileDescriptor, Boolean> getFileDescriptor(ContentFile cf)
       throws ImpalaRuntimeException {
     boolean cachehit = true;
-    FileDescriptor fileDesc = getIceTable().getPathHashToFileDescMap().get(
-        IcebergUtil.getFilePathHash(cf));
+    String pathHash = IcebergUtil.getFilePathHash(cf);
+    IcebergContentFileStore fileStore = getIceTable().getContentFileStore();
+    FileDescriptor fileDesc = cf.content() == FileContent.DATA ?
+        fileStore.getDataFileDescriptor(pathHash) :
+        fileStore.getDeleteFileDescriptor(pathHash);
+
     if (fileDesc == null) {
       if (tblRef_.getTimeTravelSpec() == null) {
         // We should always find the data files in the cache when not doing time travel.
         throw new ImpalaRuntimeException("Cannot find file in cache: " + cf.path()
             + " with snapshot id: " + String.valueOf(getIceTable().snapshotId()));
+      }
+      // We can still find the file descriptor among the old file descriptors.
+      fileDesc = fileStore.getOldFileDescriptor(pathHash);
+      if (fileDesc != null) {
+        return new Pair<>(fileDesc, true);
       }
       cachehit = false;
       try {
@@ -363,8 +409,7 @@ public class IcebergScanPlanner {
       // Add file descriptor to the cache.
       fileDesc = fileDesc.cloneWithFileMetadata(
           IcebergUtil.createIcebergMetadata(getIceTable(), cf));
-      getIceTable().getPathHashToFileDescMap().put(
-          IcebergUtil.getFilePathHash(cf), fileDesc);
+      fileStore.addOldFileDescriptor(pathHash, fileDesc);
     }
     return new Pair<>(fileDesc, cachehit);
   }
@@ -373,7 +418,10 @@ public class IcebergScanPlanner {
    * Extracts predicates from conjuncts_ that can be pushed down to Iceberg.
    *
    * Since Iceberg will filter data files by metadata instead of scan data files,
-   * we pushdown all predicates to Iceberg to get the minimum data files to scan.
+   * if any of the predicates refer to an Iceberg partitioning column
+   * we pushdown all predicates to Iceberg to get the minimum data files to scan. If none
+   * of the predicates refer to a partition column then we don't pushdown predicates
+   * since this way we avoid calling the expensive 'planFiles()' API call.
    * Here are three cases for predicate pushdown:
    * 1.The column is not part of any Iceberg partition expression
    * 2.The column is part of all partition keys without any transformation (i.e. IDENTITY)
@@ -384,9 +432,48 @@ public class IcebergScanPlanner {
    * please refer: https://iceberg.apache.org/spec/#scan-planning
    */
   private void extractIcebergConjuncts() throws ImpalaException {
+    boolean isPartitionColumnIncluded = false;
+    Map<SlotId, SlotDescriptor> idToSlotDesc = new HashMap<>();
+    for (SlotDescriptor slotDesc : tblRef_.getDesc().getSlots()) {
+      idToSlotDesc.put(slotDesc.getId(), slotDesc);
+    }
+    for (Expr expr : conjuncts_) {
+      if (isPartitionColumnIncluded(expr, idToSlotDesc)) {
+        isPartitionColumnIncluded = true;
+        break;
+      }
+    }
+    if (!isPartitionColumnIncluded) {
+      return;
+    }
     for (Expr expr : conjuncts_) {
       tryConvertIcebergPredicate(expr);
     }
+  }
+
+  private boolean isPartitionColumnIncluded(Expr expr,
+      Map<SlotId, SlotDescriptor> idToSlotDesc) {
+    List<TupleId> tupleIds = Lists.newArrayList();
+    List<SlotId> slotIds = Lists.newArrayList();
+    expr.getIds(tupleIds, slotIds);
+
+    if (tupleIds.size() > 1) return false;
+    if (!tupleIds.get(0).equals(tblRef_.getDesc().getId())) return false;
+
+    for (SlotId sId : slotIds) {
+      SlotDescriptor slotDesc = idToSlotDesc.get(sId);
+      if (slotDesc == null) continue;
+      Column col = slotDesc.getColumn();
+      if (col == null) continue;
+      Preconditions.checkState(col instanceof IcebergColumn);
+      IcebergColumn iceCol = (IcebergColumn)col;
+      if (IcebergUtil.isPartitionColumn(iceCol,
+          getIceTable().getDefaultPartitionSpec())) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**

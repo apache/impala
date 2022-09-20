@@ -183,7 +183,7 @@ select
 from
   ice_pred_pd1
 where
-  col_bi in (12345678900, 12345678903, 12345678906);
+  col_bi in (12345678900, 12345678903, 12345678906) and col_i >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -196,7 +196,7 @@ select
 from
   ice_pred_pd1
 where
-  col_bi in (12345678900);
+  col_bi in (12345678900) and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -209,7 +209,7 @@ select
 from
   ice_pred_pd1
 where
-  col_bi in (12345678909);
+  col_bi in (12345678909) and col_i >= 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -223,7 +223,7 @@ select
 from
   ice_pred_pd1
 where
-  col_f in (3.140, 3.143, 3.146);
+  col_f in (3.140, 3.143, 3.146) and col_i >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -236,7 +236,7 @@ select
 from
   ice_pred_pd1
 where
-  col_f in (3.140);
+  col_f in (3.140) and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -249,7 +249,7 @@ select
 from
   ice_pred_pd1
 where
-  col_f in (3.149);
+  col_f in (3.149) and col_i >= 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -263,7 +263,7 @@ select
 from
   ice_pred_pd1
 where
-  col_db in (2.71820, 2.71823, 2.71826);
+  col_db in (2.71820, 2.71823, 2.71826) and col_i >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -276,7 +276,7 @@ select
 from
   ice_pred_pd1
 where
-  col_db in (2.71820);
+  col_db in (2.71820) and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -289,7 +289,7 @@ select
 from
   ice_pred_pd1
 where
-  col_db in (2.71829);
+  col_db in (2.71829) and col_i >= 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -303,7 +303,7 @@ select
 from
   ice_pred_pd1
 where
-  col_str in ('Leonhard_A', 'Leonhard_D', 'Leonhard_G');
+  col_str in ('Leonhard_A', 'Leonhard_D', 'Leonhard_G') and col_i >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -316,7 +316,7 @@ select
 from
   ice_pred_pd1
 where
-  col_str in ('Leonhard_A');
+  col_str in ('Leonhard_A') and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -329,7 +329,7 @@ select
 from
   ice_pred_pd1
 where
-  col_str in ('Leonhard_J');
+  col_str in ('Leonhard_J') and col_i >= 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -343,7 +343,7 @@ select
 from
   ice_pred_pd1
 where
-  col_ts in ('1400-01-01 00:00:00', '1500-01-01 00:00:00', '1600-01-01 00:00:00');
+  col_ts in ('1400-01-01 00:00:00', '1500-01-01 00:00:00', '1600-01-01 00:00:00') and col_i >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -356,7 +356,7 @@ select
 from
   ice_pred_pd1
 where
-  col_ts in ('1400-01-01 00:00:00');
+  col_ts in ('1400-01-01 00:00:00') and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -369,7 +369,7 @@ select
 from
   ice_pred_pd1
 where
-  col_ts in ('1700-01-01 00:00:00');
+  col_ts in ('1700-01-01 00:00:00') and col_i >= 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -383,7 +383,7 @@ select
 from
   ice_pred_pd1
 where
-  col_dt in (DATE'1400-01-01', DATE'1500-01-01', DATE'1600-01-01');
+  col_dt in (DATE'1400-01-01', DATE'1500-01-01', DATE'1600-01-01') and col_i >= 0;
 ---- RESULTS
 9
 ---- RUNTIME_PROFILE
@@ -396,7 +396,7 @@ select
 from
   ice_pred_pd1
 where
-  col_dt in (DATE'1400-01-01');
+  col_dt in (DATE'1400-01-01') and col_i >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -409,7 +409,7 @@ select
 from
   ice_pred_pd1
 where
-  col_dt in (DATE'1700-01-01');
+  col_dt in (DATE'1700-01-01') and col_i >= 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -422,7 +422,7 @@ select
 from
   ice_pred_pd1
 where
-  col_i not in (0, 1);
+  col_i not in (0, 1) and col_i >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -435,7 +435,7 @@ select
 from
   ice_pred_pd1
 where
-  col_dt not in (DATE'1400-01-01', DATE'1500-01-01');
+  col_dt not in (DATE'1400-01-01', DATE'1500-01-01') and col_i >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -536,7 +536,7 @@ select
 from
   ice_pred_pd2
 where
-  d1 in (123.450, 123.453, 123.456);
+  d1 in (123.450, 123.453, 123.456) and p >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -549,7 +549,7 @@ select
 from
   ice_pred_pd2
 where
-  d1 in (123.450, 123.451, 123.452);
+  d1 in (123.450, 123.451, 123.452) and p >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -562,7 +562,7 @@ select
 from
   ice_pred_pd2
 where
-  d1 in (123.459);
+  d1 in (123.459) and p >= 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -576,7 +576,7 @@ select
 from
   ice_pred_pd2
 where
-  d2 in (1234567890.120, 1234567890.123, 1234567890.126);
+  d2 in (1234567890.120, 1234567890.123, 1234567890.126) and p >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -589,7 +589,7 @@ select
 from
   ice_pred_pd2
 where
-  d2 in (1234567890.120, 1234567890.121, 1234567890.122);
+  d2 in (1234567890.120, 1234567890.121, 1234567890.122) and p >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -602,7 +602,7 @@ select
 from
   ice_pred_pd2
 where
-  d2 in (1234567890.129);
+  d2 in (1234567890.129) and p >= 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -616,7 +616,7 @@ select
 from
   ice_pred_pd2
 where
-  d3 in (1234567890123456789.010, 1234567890123456789.013, 1234567890123456789.016);
+  d3 in (1234567890123456789.010, 1234567890123456789.013, 1234567890123456789.016) and p >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -629,7 +629,7 @@ select
 from
   ice_pred_pd2
 where
-  d3 in (1234567890123456789.010, 1234567890123456789.011, 1234567890123456789.012);
+  d3 in (1234567890123456789.010, 1234567890123456789.011, 1234567890123456789.012) and p >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -642,7 +642,7 @@ select
 from
   ice_pred_pd2
 where
-  d3 in (1234567890123456789.019);
+  d3 in (1234567890123456789.019) and p >= 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE

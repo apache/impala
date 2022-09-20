@@ -20,7 +20,6 @@ package org.apache.impala.catalog.local;
 import static org.junit.Assert.*;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
@@ -36,9 +35,9 @@ import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
-import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.IcebergContentFileStore;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.fb.FbFileBlock;
@@ -52,6 +51,7 @@ import org.apache.impala.thrift.TMetadataOpcode;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartialTableInfo;
 import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.PatternMatcher;
@@ -278,18 +278,20 @@ public class LocalCatalogTest {
   public void testLoadIcebergFileDescriptors() throws Exception {
     LocalIcebergTable t = (LocalIcebergTable)catalog_.getTable(
         "functional_parquet", "iceberg_partitioned");
-    Map<String, FileDescriptor> localTblFdMap = t.getPathHashToFileDescMap();
+    IcebergContentFileStore fileStore = t.getContentFileStore();
     TPartialTableInfo tblInfo = provider_.loadIcebergTable(t.ref_);
     ListMap<TNetworkAddress> catalogdHostIndexes = new ListMap<>();
     catalogdHostIndexes.populate(tblInfo.getNetwork_addresses());
-    Map<String, FileDescriptor> catalogFdMap =
-        FeIcebergTable.Utils.loadFileDescMapFromThrift(
-            tblInfo.getIceberg_table().getPath_hash_to_file_descriptor(),
+    IcebergContentFileStore catalogFileStore = IcebergContentFileStore.fromThrift(
+            tblInfo.getIceberg_table().getContent_files(),
             null, null);
-    for (Map.Entry<String, FileDescriptor> entry : localTblFdMap.entrySet()) {
-      String path = entry.getKey();
-      FileDescriptor localFd = entry.getValue();
-      FileDescriptor catalogFd = catalogFdMap.get(path);
+    for (FileDescriptor localFd : fileStore.getDataFiles()) {
+      String path = localFd.getAbsolutePath(t.getLocation());
+      // For this test table the manifest files contain data paths without FS-scheme, so
+      // they are loaded to the file content store without them.
+      path = path.substring(path.indexOf("/test-warehouse"));
+      String pathHash = IcebergUtil.getFilePathHash(path);
+      FileDescriptor catalogFd = catalogFileStore.getDataFileDescriptor(pathHash);
       assertEquals(localFd.getNumFileBlocks(), 1);
       FbFileBlock localBlock = localFd.getFbFileBlock(0);
       FbFileBlock catalogBlock = catalogFd.getFbFileBlock(0);

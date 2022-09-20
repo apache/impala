@@ -72,7 +72,7 @@ where
   and (
     col_ts in ('1500-01-01 00:00:00')
     or col_db = 2.71823
-  );
+  ) and col_i >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -91,7 +91,7 @@ where
     col_db = 2.71823
     or col_ts in ('1500-01-01 00:00:00')
   )
-  and col_str in ('1700-01-01 00:00:00');
+  and col_str in ('1700-01-01 00:00:00') and col_i >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -113,7 +113,7 @@ where
   and (
     col_ts is not null
     or col_db = 2.71823
-  );
+  ) and col_i >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -134,7 +134,7 @@ where
   and (
     col_db = 2.71823
     or col_ts in ('1500-01-01 00:00:00')
-  );
+  ) and col_i >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -152,7 +152,7 @@ where
   and (
     col_ts in ('1500-01-01 00:00:00')
     or cast(col_db as double) = 2.71823
-  );
+  ) and col_i >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -169,7 +169,7 @@ where
   and (
     cast(col_db as bigint) = 2.71823
     or col_ts in ('1500-01-01 00:00:00')
-  );
+  ) and col_i >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -183,8 +183,8 @@ select
 from
   ice_compound_pred_pd
 where
-  col_bi = 12345678902
-  or col_db in (2.71823);
+  (col_bi = 12345678902
+  or col_db in (2.71823)) and col_i >= 0;
 ---- RESULTS
 6
 ---- RUNTIME_PROFILE
@@ -198,11 +198,11 @@ select
 from
   ice_compound_pred_pd
 where
-  col_bi in (12345678902)
+  (col_bi in (12345678902)
   or (
     col_ts in ('1500-01-01 00:00:00')
     and col_db = 2.71823
-  );
+  )) and col_i >= 0;
 ---- RESULTS
 6
 ---- RUNTIME_PROFILE
@@ -216,11 +216,11 @@ select
 from
   ice_compound_pred_pd
 where
-  (
+  ((
     col_db = 2.71823
     and col_ts in ('1500-01-01 00:00:00')
   )
-  or col_bi in (12345678902);
+  or col_bi in (12345678902)) and col_i >= 0;
 ---- RESULTS
 6
 ---- RUNTIME_PROFILE
@@ -237,6 +237,7 @@ where
   (
     col_db = 1.71823 + 1
     and col_ts in ('1500-01-01 00:00:00')
+    and col_i >= 0
   )
   or (
     col_bi in (12345678902)
@@ -257,6 +258,7 @@ where
   (
     col_db = 2.71823
     and cast(col_ts as string) in ('1500-01-01 00:00:00')
+    and col_i >= 0
   )
   or (
     col_bi in (12345678902)
@@ -281,6 +283,7 @@ where
   or (
     col_bi in (12345678902)
     and col_str is not null
+    and col_i >= 0
   );
 ---- RESULTS
 0
@@ -295,7 +298,7 @@ select
 from
   ice_compound_pred_pd
 where
-  not col_bi is not null;
+  not col_bi is not null and col_i >= 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -310,7 +313,8 @@ from
   ice_compound_pred_pd
 where
   not col_bi is not null
-  or col_bi = 12345678908;
+  or col_bi = 12345678908
+  or col_i = -1;
 ---- RESULTS
 6
 ---- RUNTIME_PROFILE
@@ -324,7 +328,7 @@ select
 from
   ice_compound_pred_pd
 where
-  not (col_bi != 12345678901);
+  not (col_bi != 12345678901) or col_i = -1;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -341,6 +345,7 @@ where
   not (
     col_bi != 123
     or col_db = 2.71822
+    or col_i = -1
   );
 ---- RESULTS
 0
@@ -357,6 +362,7 @@ where
   not (
     col_bi + 1 != 123
     or col_db = 2.71822
+    or col_i = -1
   );
 ---- RESULTS
 0
@@ -373,7 +379,8 @@ from
 where
   col_bi is null
   or col_bi between 12345678901
-  and 12345678902;
+  and 12345678902
+  and col_i >= 0;
 ---- RESULTS
 9
 ---- RUNTIME_PROFILE
@@ -446,6 +453,7 @@ where
   or not(
     col_bi_2 < 22
     or col_bi_2 > 22
+    or col_i = -1
   )
   or col_bi_3 is null
   or col_bi_4 = 44

@@ -596,8 +596,12 @@ public class IcebergUtil {
    * Use ContentFile path to generate 128-bit Murmur3 hash as map key, cached in memory
    */
   public static String getFilePathHash(ContentFile contentFile) {
+    return getFilePathHash(contentFile.path().toString());
+  }
+
+  public static String getFilePathHash(String path) {
     Hasher hasher = Hashing.murmur3_128().newHasher();
-    hasher.putUnencodedChars(contentFile.path().toString());
+    hasher.putUnencodedChars(path);
     return hasher.hash().toString();
   }
 
@@ -1009,6 +1013,7 @@ public class IcebergUtil {
 
   public static boolean isPartitionColumn(IcebergColumn column,
       IcebergPartitionSpec spec) {
+    if (!spec.hasPartitionFields()) return false;
     for (IcebergPartitionField partField : spec.getIcebergPartitionFields()) {
       if (partField.getTransformType() == TIcebergPartitionTransformType.VOID) continue;
       if (column.getFieldId() != partField.getSourceId()) continue;

@@ -60,7 +60,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  col_bi is null;
+  col_bi is null and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -73,7 +73,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  cast(col_bi as double) is null;
+  cast(col_bi as double) is null and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -86,7 +86,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  cast(col_bi as TIMESTAMP) is null;
+  cast(col_bi as TIMESTAMP) is null and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -99,7 +99,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  col_bi + 1 is null;
+  col_bi + 1 is null and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -112,7 +112,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  col_bi is not null;
+  col_bi is not null and col_i >= 0;
 ---- RESULTS
 8
 ---- RUNTIME_PROFILE
@@ -126,7 +126,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  col_db is null;
+  col_db is null and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -139,7 +139,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  cast(col_db as decimal(6,5)) is null;
+  cast(col_db as decimal(6,5)) is null and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -152,7 +152,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  col_db is not null;
+  col_db is not null and col_i >= 0;
 ---- RESULTS
 8
 ---- RUNTIME_PROFILE
@@ -166,7 +166,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  col_str is null;
+  col_str is null and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -179,7 +179,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  cast(col_str as TIMESTAMP) is null
+  cast(col_str as TIMESTAMP) is null and col_i >= 0
 order by 1;
 ---- RESULTS
 0
@@ -195,7 +195,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  col_str is not null;
+  col_str is not null and col_i >= 0;
 ---- RESULTS
 8
 ---- RUNTIME_PROFILE
@@ -209,7 +209,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  col_ts is null;
+  col_ts is null and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -222,7 +222,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  cast(col_ts as string) is null;
+  cast(col_ts as string) is null and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -235,7 +235,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  col_ts is not null;
+  col_ts is not null and col_i >= 0;
 ---- RESULTS
 8
 ---- RUNTIME_PROFILE
@@ -249,7 +249,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  col_dt is null;
+  col_dt is null and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -262,7 +262,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  cast(col_dt as string) is null;
+  cast(col_dt as string) is null and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -275,7 +275,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  col_dt is not null;
+  col_dt is not null and col_i >= 0;
 ---- RESULTS
 8
 ---- RUNTIME_PROFILE
@@ -289,7 +289,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  col_dc1 is null;
+  col_dc1 is null and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -302,7 +302,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  cast(col_dc1 as double) is null;
+  cast(col_dc1 as double) is null and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -315,7 +315,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  col_dc1 is not null;
+  col_dc1 is not null and col_i >= 0;
 ---- RESULTS
 8
 ---- RUNTIME_PROFILE
@@ -329,7 +329,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  col_dc2 is null;
+  col_dc2 is null and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -342,7 +342,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  cast(col_dc2 as double) is null;
+  cast(col_dc2 as double) is null and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -355,7 +355,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  col_dc2 is not null;
+  col_dc2 is not null and col_i >= 0;
 ---- RESULTS
 8
 ---- RUNTIME_PROFILE
@@ -369,7 +369,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  col_dc3 is null;
+  col_dc3 is null and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -382,7 +382,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  cast(col_dc3 as string) is null;
+  cast(col_dc3 as string) is null and col_i >= 0;
 ---- RESULTS
 1
 ---- RUNTIME_PROFILE
@@ -395,7 +395,7 @@ select
 from
   ice_is_null_pred_pd
 where
-  col_dc3 is not null;
+  col_dc3 is not null and col_i >= 0;
 ---- RESULTS
 8
 ---- RUNTIME_PROFILE

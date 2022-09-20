@@ -46,6 +46,7 @@ import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.IcebergColumn;
+import org.apache.impala.catalog.IcebergContentFileStore;
 import org.apache.impala.catalog.IcebergStructField;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
@@ -183,8 +184,8 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
   }
 
   @Override
-  public Map<String, FileDescriptor> getPathHashToFileDescMap() {
-    return Collections.<String, FileDescriptor>emptyMap();
+  public IcebergContentFileStore getContentFileStore() {
+    return new IcebergContentFileStore();
   }
 
   @Override

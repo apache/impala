@@ -95,7 +95,7 @@ aggregation(SUM, RowGroups processed): 5
 aggregation(SUM, RowGroups rejected): 0
 aggregation(SUM, Rows processed): 3
 aggregation(SUM, Rows rejected): 1
-aggregation(SUM, NumRowGroups): 7
+aggregation(SUM, NumRowGroups): 12
 aggregation(SUM, NumDictFilteredRowGroups): 4
 ====
 ---- QUERY
@@ -129,7 +129,7 @@ aggregation(SUM, RowGroups processed): 3
 aggregation(SUM, RowGroups rejected): 0
 aggregation(SUM, Rows processed): 2
 aggregation(SUM, Rows rejected): 0
-aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumRowGroups): 6
 aggregation(SUM, NumDictFilteredRowGroups): 2
 ====
 ---- QUERY
@@ -151,6 +151,6 @@ aggregation(SUM, RowGroups processed): 1
 aggregation(SUM, RowGroups rejected): 0
 aggregation(SUM, Rows processed): 4
 aggregation(SUM, Rows rejected): 0
-aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumRowGroups): 4
 aggregation(SUM, NumDictFilteredRowGroups): 0
 ====

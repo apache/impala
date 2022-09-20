@@ -60,7 +60,7 @@ select
 from
   functional_parquet.iceberg_multiple_storage_locations
 where
-  col_string = "a"
+  col_string = "a" and col_int >= 0
 order by
   col_int;
 ---- RESULTS

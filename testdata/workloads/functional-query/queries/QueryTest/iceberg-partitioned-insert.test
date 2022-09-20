@@ -319,7 +319,7 @@ BIGINT
 aggregation(SUM, NumRowGroups): 4
 ====
 ---- QUERY
-# 'timestamp_col' is not a partitioning column, but min/max stats will be used to
+# 'timestamp_col' is not a partitioning column, so min/max stats will not be used to
 # eliminate row groups
 select count(*) from alltypes_part
 where timestamp_col = now();
@@ -328,7 +328,7 @@ where timestamp_col = now();
 ---- TYPES
 BIGINT
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumRowGroups): 8
 ====
 ---- QUERY
 create table alltypes_part_2 like alltypes_part;
