@@ -1747,9 +1747,8 @@ public class HdfsTable extends Table implements FeFsTable {
   }
 
   /**
-   * Sets avroSchema_ if the table or any of the partitions in the table are stored
-   * as Avro. Additionally, this method also reconciles the schema if the column
-   * definitions from the metastore differ from the Avro schema.
+   * Checks if the table or any of the partitions in the table are stored as Avro.
+   * If so, calls setAvroSchemaInternal to set avroSchema_.
    */
   protected void setAvroSchema(IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws Exception {
@@ -1758,47 +1757,56 @@ public class HdfsTable extends Table implements FeFsTable {
     String serDeLib = msTbl.getSd().getSerdeInfo().getSerializationLib();
     if (HdfsFileFormat.fromJavaClassName(inputFormat, serDeLib) == HdfsFileFormat.AVRO
         || hasAvroData_) {
-      // Look for Avro schema in TBLPROPERTIES and in SERDEPROPERTIES, with the latter
-      // taking precedence.
-      List<Map<String, String>> schemaSearchLocations = new ArrayList<>();
-      schemaSearchLocations.add(
-          getMetaStoreTable().getSd().getSerdeInfo().getParameters());
-      schemaSearchLocations.add(getMetaStoreTable().getParameters());
+      setAvroSchemaInternal(client, msTable_);
+    }
+  }
 
-      avroSchema_ = AvroSchemaUtils.getAvroSchema(schemaSearchLocations);
+  /**
+   * Sets avroSchema_. Additionally, this method also reconciles the schema if the column
+   * definitions from the metastore differ from the Avro schema.
+   */
+  protected void setAvroSchemaInternal(IMetaStoreClient client,
+      org.apache.hadoop.hive.metastore.api.Table msTbl) throws Exception {
+    // Look for Avro schema in TBLPROPERTIES and in SERDEPROPERTIES, with the latter
+    // taking precedence.
+    List<Map<String, String>> schemaSearchLocations = new ArrayList<>();
+    schemaSearchLocations.add(
+        getMetaStoreTable().getSd().getSerdeInfo().getParameters());
+    schemaSearchLocations.add(getMetaStoreTable().getParameters());
 
-      if (avroSchema_ == null) {
-        // No Avro schema was explicitly set in the table metadata, so infer the Avro
-        // schema from the column definitions.
-        Schema inferredSchema = AvroSchemaConverter.convertFieldSchemas(
-            msTbl.getSd().getCols(), getFullName());
-        avroSchema_ = inferredSchema.toString();
-        // NOTE: below we reconcile this inferred schema back into the table
-        // schema in the case of Avro-formatted tables. This has the side effect
-        // of promoting types like TINYINT to INT.
-      }
-      String serdeLib = msTbl.getSd().getSerdeInfo().getSerializationLib();
-      if (serdeLib == null ||
-          serdeLib.equals("org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe")) {
-        // If the SerDe library is null or set to LazySimpleSerDe or is null, it
-        // indicates there is an issue with the table metadata since Avro table need a
-        // non-native serde. Instead of failing to load the table, fall back to
-        // using the fields from the storage descriptor (same as Hive).
-        return;
-      } else {
-        List<FieldSchema> reconciledFieldSchemas = AvroSchemaUtils.reconcileAvroSchema(
-            msTbl, avroSchema_);
+    avroSchema_ = AvroSchemaUtils.getAvroSchema(schemaSearchLocations);
 
-        // Reset and update nonPartFieldSchemas_ to the reconciled colDefs.
-        nonPartFieldSchemas_.clear();
-        nonPartFieldSchemas_.addAll(reconciledFieldSchemas);
-        // Update the columns as per the reconciled colDefs and re-load stats.
-        clearColumns();
-        addColumnsFromFieldSchemas(msTbl.getPartitionKeys());
-        addColumnsFromFieldSchemas(nonPartFieldSchemas_);
-        addVirtualColumns();
-        loadAllColumnStats(client);
-      }
+    if (avroSchema_ == null) {
+      // No Avro schema was explicitly set in the table metadata, so infer the Avro
+      // schema from the column definitions.
+      Schema inferredSchema = AvroSchemaConverter.convertFieldSchemas(
+          msTbl.getSd().getCols(), getFullName());
+      avroSchema_ = inferredSchema.toString();
+      // NOTE: below we reconcile this inferred schema back into the table
+      // schema in the case of Avro-formatted tables. This has the side effect
+      // of promoting types like TINYINT to INT.
+    }
+    String serdeLib = msTbl.getSd().getSerdeInfo().getSerializationLib();
+    if (serdeLib == null ||
+        serdeLib.equals("org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe")) {
+      // If the SerDe library is null or set to LazySimpleSerDe or is null, it
+      // indicates there is an issue with the table metadata since Avro table need a
+      // non-native serde. Instead of failing to load the table, fall back to
+      // using the fields from the storage descriptor (same as Hive).
+      return;
+    } else {
+      List<FieldSchema> reconciledFieldSchemas = AvroSchemaUtils.reconcileAvroSchema(
+          msTbl, avroSchema_);
+
+      // Reset and update nonPartFieldSchemas_ to the reconciled colDefs.
+      nonPartFieldSchemas_.clear();
+      nonPartFieldSchemas_.addAll(reconciledFieldSchemas);
+      // Update the columns as per the reconciled colDefs and re-load stats.
+      clearColumns();
+      addColumnsFromFieldSchemas(msTbl.getPartitionKeys());
+      addColumnsFromFieldSchemas(nonPartFieldSchemas_);
+      addVirtualColumns();
+      loadAllColumnStats(client);
     }
   }
 

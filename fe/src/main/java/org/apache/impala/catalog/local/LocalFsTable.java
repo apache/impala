@@ -122,7 +122,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
    * as a table property. Such a schema is used when querying Avro partitions
    * of non-Avro tables.
    */
-  private final String avroSchema_;
+  private String avroSchema_;
 
   /**
    * True if this table is marked as cached by hdfs caching. Does not necessarily mean
@@ -371,6 +371,20 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
       if (p.getFileFormat() == HdfsFileFormat.AVRO) return true;
     }
     return false;
+  }
+
+  protected void setAvroSchema(Table msTbl) {
+    if (avroSchema_ == null) {
+      // No Avro schema was explicitly set in the table metadata, so infer the Avro
+      // schema from the column definitions.
+      Schema inferredSchema = AvroSchemaConverter.convertFieldSchemas(
+          msTbl.getSd().getCols(), msTbl.getDbName() + "." + msTbl.getTableName());
+      avroSchema_ = inferredSchema.toString();
+    }
+  }
+
+  protected String getAvroSchema() {
+    return avroSchema_;
   }
 
   public LocalFsPartition createPrototypePartition() {

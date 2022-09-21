@@ -1,0 +1,10 @@
+====
+---- QUERY
+select * from functional_parquet.iceberg_avro_only;
+---- RESULTS
+1,'A',0.5
+2,'B',1.5
+3,'C',2.5
+---- TYPES
+INT, STRING, DOUBLE
+====

@@ -98,10 +98,11 @@ enum THdfsCompression {
   LZ4_BLOCKED = 12
 }
 
-// Iceberg table file format identitied by table property 'write.format.default'
+// Iceberg table file format identified by table property 'write.format.default'
 enum TIcebergFileFormat {
   PARQUET = 0
   ORC = 1
+  AVRO = 2
 }
 
 // Iceberg table catalog type identified by table property 'iceberg.catalog'
@@ -604,6 +605,9 @@ struct TIcebergPartitionStats {
 struct TIcebergContentFileStore {
   1: optional map<string, THdfsFileDesc> path_hash_to_data_file
   2: optional map<string, THdfsFileDesc> path_hash_to_delete_file
+  3: optional bool has_avro
+  4: optional bool has_orc
+  5: optional bool has_parquet
 }
 
 struct TIcebergTable {

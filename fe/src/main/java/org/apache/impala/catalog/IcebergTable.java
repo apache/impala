@@ -359,6 +359,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
         partitionStats_ = Utils.loadPartitionStats(this);
         setIcebergTableStats();
         loadAllColumnStats(msClient);
+        setAvroSchema(msClient, msTbl, fileStore_);
       } catch (Exception e) {
         throw new IcebergTableLoadingException("Error loading metadata for Iceberg table "
             + icebergTableLocation_, e);
@@ -404,6 +405,17 @@ public class IcebergTable extends Table implements FeIcebergTable {
         getIcebergSchema()));
     for (Column col : IcebergSchemaConverter.convertToImpalaSchema(getIcebergSchema())) {
       addColumn(col);
+    }
+  }
+
+  /**
+   * Loads the AVRO schema if the table contains AVRO files.
+   */
+  private void setAvroSchema(IMetaStoreClient msClient,
+      org.apache.hadoop.hive.metastore.api.Table msTbl,
+      IcebergContentFileStore fileStore) throws Exception {
+    if (fileStore.hasAvro()) {
+      hdfsTable_.setAvroSchemaInternal(msClient, msTbl);
     }
   }
 

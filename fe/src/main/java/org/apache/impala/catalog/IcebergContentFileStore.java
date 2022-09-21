@@ -28,6 +28,7 @@ import java.util.concurrent.ConcurrentMap;
 
 import org.apache.curator.shaded.com.google.common.base.Preconditions;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.fb.FbIcebergDataFileFormat;
 import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.TIcebergContentFileStore;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -53,17 +54,24 @@ public class IcebergContentFileStore {
   private final ConcurrentMap<String, FileDescriptor> oldFileDescMap_ =
       new ConcurrentHashMap<>();
 
+  // Flags to indicate file formats used in the table.
+  private boolean hasAvro_ = false;
+  private boolean hasOrc_ = false;
+  private boolean hasParquet_ = false;
+
   public IcebergContentFileStore() {}
 
   public void addDataFileDescriptor(String pathHash, FileDescriptor desc) {
     if (dataFileDescMap_.put(pathHash, desc) == null) {
       dataFiles_.add(desc);
+      updateFileFormats(desc);
     }
   }
 
   public void addDeleteFileDescriptor(String pathHash, FileDescriptor desc) {
     if (deleteFileDescMap_.put(pathHash, desc) == null) {
       deleteFiles_.add(desc);
+      updateFileFormats(desc);
     }
   }
 
@@ -103,10 +111,28 @@ public class IcebergContentFileStore {
     return Iterables.concat(dataFiles_, deleteFiles_);
   }
 
+  public boolean hasAvro() { return hasAvro_; }
+  public boolean hasOrc() { return hasOrc_; }
+  public boolean hasParquet() { return hasParquet_; }
+
+  private void updateFileFormats(FileDescriptor desc) {
+    byte fileFormat = desc.getFbFileMetadata().icebergMetadata().fileFormat();
+    if (fileFormat == FbIcebergDataFileFormat.PARQUET) {
+      hasParquet_ = true;
+    } else if (fileFormat == FbIcebergDataFileFormat.ORC) {
+      hasOrc_ = true;
+    } else if (fileFormat == FbIcebergDataFileFormat.AVRO) {
+      hasAvro_ = true;
+    }
+  }
+
   public TIcebergContentFileStore toThrift() {
     TIcebergContentFileStore ret = new TIcebergContentFileStore();
     ret.setPath_hash_to_data_file(convertFileMapToThrift(dataFileDescMap_));
     ret.setPath_hash_to_delete_file(convertFileMapToThrift(deleteFileDescMap_));
+    ret.setHas_avro(hasAvro_);
+    ret.setHas_orc(hasOrc_);
+    ret.setHas_parquet(hasParquet_);
     return ret;
   }
 
@@ -122,6 +148,9 @@ public class IcebergContentFileStore {
       convertFileMapFromThrift(tFileStore.getPath_hash_to_delete_file(),
           ret.deleteFileDescMap_, ret.deleteFiles_, networkAddresses, hostIndex);
     }
+    ret.hasAvro_ = tFileStore.isSetHas_avro() ? tFileStore.isHas_avro() : false;
+    ret.hasOrc_ = tFileStore.isSetHas_orc() ? tFileStore.isHas_orc() : false;
+    ret.hasParquet_ = tFileStore.isSetHas_parquet() ? tFileStore.isHas_parquet() : false;
     return ret;
   }
 

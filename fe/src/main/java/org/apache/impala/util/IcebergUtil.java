@@ -326,6 +326,8 @@ public class IcebergUtil {
       return TIcebergFileFormat.PARQUET;
     } else if ("ORC".equalsIgnoreCase(format)) {
       return TIcebergFileFormat.ORC;
+    } else if ("AVRO".equalsIgnoreCase(format)) {
+      return TIcebergFileFormat.AVRO;
     }
     return null;
   }
@@ -507,6 +509,8 @@ public class IcebergUtil {
     switch (format) {
       case ORC:
         return THdfsFileFormat.ORC;
+      case AVRO:
+        return THdfsFileFormat.AVRO;
       case PARQUET:
       default:
         return THdfsFileFormat.PARQUET;

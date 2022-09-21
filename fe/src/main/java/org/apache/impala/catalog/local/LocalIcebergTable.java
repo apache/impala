@@ -147,6 +147,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
         tableInfo.getIceberg_table().getContent_files(),
         tableInfo.getNetwork_addresses(),
         getHostIndex());
+    if (fileStore_.hasAvro()) localFsTable_.setAvroSchema(msTable);
     icebergApiTable_ = icebergApiTable;
     catalogSnapshotId_ = tableInfo.getIceberg_table().getCatalog_snapshot_id();
     partitionSpecs_ = Utils.loadPartitionSpecByIceberg(this);
@@ -273,6 +274,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     THdfsTable hdfsTable = new THdfsTable(localFsTable_.getHdfsBaseDir(),
         getColumnNames(), localFsTable_.getNullPartitionKeyValue(),
         FeFsTable.DEFAULT_NULL_COLUMN_VALUE, idToPartition, tPrototypePartition);
+    hdfsTable.setAvroSchema(localFsTable_.getAvroSchema());
     Utils.updateIcebergPartitionFileFormat(this, hdfsTable);
     hdfsTable.setPartition_prefixes(localFsTable_.getPartitionPrefixes());
     return hdfsTable;
