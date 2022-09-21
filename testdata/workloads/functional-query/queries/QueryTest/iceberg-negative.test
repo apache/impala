@@ -662,8 +662,3 @@ select * from functional_parquet.iceberg_alltypes_part for system_time as of '20
 ---- CATCH
 IllegalArgumentException: Cannot find a snapshot older than 2000-01-01 01:02:03
 ====
----- QUERY
-select * from functional_parquet.iceberg_avro_mixed;
----- CATCH
-ImpalaRuntimeException: Iceberg tables containing multiple file formats are only supported if they do not contain AVRO files.
-====

@@ -89,16 +89,7 @@ public class IcebergScanNode extends HdfsScanNode {
     }
     if (hasParquet) fileFormats_.add(HdfsFileFormat.PARQUET);
     if (hasOrc) fileFormats_.add(HdfsFileFormat.ORC);
-
-    //TODO IMPALA-11708: Currently mixed file format Iceberg tables containing AVRO files
-    // cannot be read.
-    if (hasAvro) {
-      fileFormats_.add(HdfsFileFormat.AVRO);
-      if (hasOrc || hasParquet) {
-        throw new ImpalaRuntimeException("Iceberg tables containing multiple file "
-            + "formats are only supported if they do not contain AVRO files.");
-      }
-    }
+    if (hasAvro) fileFormats_.add(HdfsFileFormat.AVRO);
   }
 
   /**

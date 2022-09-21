@@ -241,6 +241,7 @@ Status HdfsScanPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
 
 Status HdfsScanPlanNode::ProcessScanRangesAndInitSharedState(FragmentState* state) {
   // Initialize the template tuple pool.
+  using namespace org::apache::impala::fb;
   shared_state_.template_pool_.reset(new MemPool(state->query_mem_tracker()));
   auto& template_tuple_map_ = shared_state_.partition_template_tuple_map_;
   ObjectPool* obj_pool = shared_state_.obj_pool();
@@ -301,8 +302,27 @@ Status HdfsScanPlanNode::ProcessScanRangesAndInitSharedState(FragmentState* stat
         file_desc->mtime = split.mtime();
         file_desc->file_compression = CompressionTypePBToThrift(split.file_compression());
         file_desc->is_erasure_coded = split.is_erasure_coded();
-        file_desc->file_format = partition_desc->file_format();
         file_desc->file_metadata = file_metadata;
+        if (file_metadata) {
+          DCHECK(file_metadata->iceberg_metadata() != nullptr);
+          switch (file_metadata->iceberg_metadata()->file_format()) {
+            case FbIcebergDataFileFormat::FbIcebergDataFileFormat_PARQUET:
+              file_desc->file_format = THdfsFileFormat::PARQUET;
+              break;
+            case FbIcebergDataFileFormat::FbIcebergDataFileFormat_ORC:
+              file_desc->file_format = THdfsFileFormat::ORC;
+              break;
+            case FbIcebergDataFileFormat::FbIcebergDataFileFormat_AVRO:
+              file_desc->file_format = THdfsFileFormat::AVRO;
+              break;
+            default:
+              return Status(Substitute(
+                  "Unknown Iceberg file format type: $0",
+                  file_metadata->iceberg_metadata()->file_format()));
+          }
+        } else {
+          file_desc->file_format = partition_desc->file_format();
+        }
         RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
             native_file_path, &file_desc->fs, &fs_cache));
         shared_state_.per_type_files_[partition_desc->file_format()].push_back(file_desc);

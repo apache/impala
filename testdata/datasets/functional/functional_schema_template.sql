@@ -3608,42 +3608,39 @@ hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/ice/i
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
-iceberg_avro_only
----- CREATE
-CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
-  int_col int,
-  string_col string,
-  double_col double
-)
-STORED AS ICEBERG
-TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
-              'iceberg.catalog_location'='/test-warehouse/iceberg_test/hadoop_catalog',
-              'iceberg.table_identifier'='ice.iceberg_avro_only',
-              'write.format.default'='avro');
----- DEPENDENT_LOAD
-`hadoop fs -mkdir -p /test-warehouse/iceberg_test/hadoop_catalog/ice && \
-hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/ice/iceberg_avro_only /test-warehouse/iceberg_test/hadoop_catalog/ice
-
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
-iceberg_avro_mixed
----- CREATE
+iceberg_avro_format
+---- CREATE_HIVE
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   int_col int,
   string_col string,
   double_col double,
   bool_col boolean
 )
-STORED AS ICEBERG
-TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
-              'iceberg.catalog_location'='/test-warehouse/iceberg_test/hadoop_catalog',
-              'iceberg.table_identifier'='ice.iceberg_avro_mixed',
-              'write.format.default'='avro');
----- DEPENDENT_LOAD
-`hadoop fs -mkdir -p /test-warehouse/iceberg_test/hadoop_catalog/ice && \
-hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/ice/iceberg_avro_mixed /test-warehouse/iceberg_test/hadoop_catalog/ice
+STORED BY ICEBERG STORED AS AVRO;
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} values(1, 'A', 0.5, true),(2, 'B', 1.5, true),(3, 'C', 2.5, false);
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+iceberg_mixed_file_format
+---- CREATE_HIVE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  int_col int,
+  string_col string,
+  double_col double,
+  bool_col boolean
+)
+STORED BY ICEBERG
+TBLPROPERTIES('write.format.default'='avro');
+---- DEPENDENT_LOAD_HIVE
+-- This INSERT must run in Hive, because Impala doesn't support inserting into tables
+-- with avro and orc file formats.
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} values(1, 'avro', 0.5, true);
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET TBLPROPERTIES('write.format.default'='orc');
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} values(2, 'orc', 1.5, false);
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET TBLPROPERTIES('write.format.default'='parquet');
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} values(3, 'parquet', 2.5, false);
+
 ====
 ---- DATASET
 functional
