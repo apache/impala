@@ -26,7 +26,9 @@ import java.util.Set;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.planner.PlanNode;
+import org.apache.impala.planner.ProcessingCost;
 import org.apache.impala.thrift.TSortingOrder;
+import org.apache.impala.util.ExprUtil;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
@@ -312,5 +314,11 @@ public class SortInfo {
       }
     }
     return result;
+  }
+
+  public ProcessingCost computeProcessingCost(String label, long inputCardinality) {
+    float weight = ExprUtil.computeExprsTotalCost(getSortExprs());
+
+    return ProcessingCost.basicCost(label, inputCardinality, weight);
   }
 }

@@ -141,9 +141,17 @@ public class JoinBuildSink extends DataSink {
                                        joinNode_.getFragment().getNumInstances();
   }
 
+  public boolean isShared() { return joinNode_.canShareBuild(); }
+
   @Override
   protected String getLabel() {
     return "JOIN BUILD";
+  }
+
+  @Override
+  public void computeProcessingCost(TQueryOptions queryOptions) {
+    // The processing cost to export rows.
+    processingCost_ = joinNode_.computeJoinProcessingCost().second;
   }
 
   @Override

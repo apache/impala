@@ -60,6 +60,11 @@ public class EmptySetNode extends PlanNode {
   }
 
   @Override
+  public void computeProcessingCost(TQueryOptions queryOptions) {
+    processingCost_ = ProcessingCost.zero();
+  }
+
+  @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     // TODO: add an estimate
     nodeResourceProfile_ = ResourceProfile.noReservation(0);
@@ -78,4 +83,9 @@ public class EmptySetNode extends PlanNode {
 
   @Override
   protected boolean displayCardinality(TExplainLevel detailLevel) { return false; }
+
+  @Override
+  protected boolean isLeafNode() {
+    return true;
+  }
 }

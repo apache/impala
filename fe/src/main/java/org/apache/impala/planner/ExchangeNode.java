@@ -29,6 +29,7 @@ import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSortInfo;
+import org.apache.impala.util.ExprUtil;
 
 import com.google.common.base.Preconditions;
 
@@ -66,7 +67,7 @@ public class ExchangeNode extends PlanNode {
     return mergeInfo_ != null;
   }
 
-  private boolean isBroadcastExchange() {
+  protected boolean isBroadcastExchange() {
     // If the output of the sink is not partitioned but the target fragment is
     // partitioned, then the data exchange is broadcast.
     Preconditions.checkState(!children_.isEmpty());
@@ -178,6 +179,39 @@ public class ExchangeNode extends PlanNode {
         (exchInput.getTupleIds().size() * PER_TUPLE_SERIALIZATION_OVERHEAD);
   }
 
+  // Return the number of sending instances of this exchange.
+  public int getNumSenders() {
+    Preconditions.checkState(!children_.isEmpty());
+    Preconditions.checkNotNull(children_.get(0).getFragment());
+    return children_.get(0).getFragment().getNumInstances();
+  }
+
+  // Return the number of receiving instances of this exchange.
+  public int getNumReceivers() {
+    DataSink sink = fragment_.getSink();
+    if (sink == null) return 1;
+    return sink.getFragment().getNumInstances();
+  }
+
+  @Override
+  public void computeProcessingCost(TQueryOptions queryOptions) {
+    // The computation for the processing cost for exchange splits into two parts:
+    //   1. The sending processing cost which is computed in the DataStreamSink of the
+    //      bottom sending fragment;
+    //   2. The receiving processing cost in the top receiving fragment which is computed
+    //      here.
+    // Assume serialization and deserialization costs per row are equal.
+    float conjunctsCost = ExprUtil.computeExprsTotalCost(conjuncts_);
+    float materializationCost = estimateSerializationCostPerRow();
+    processingCost_ = ProcessingCost.basicCost(getDisplayLabel() + "(receiving)",
+        getChild(0).getCardinality(), conjunctsCost, materializationCost);
+
+    if (isBroadcastExchange()) {
+      processingCost_ = ProcessingCost.broadcastCost(processingCost_,
+          () -> getNumReceivers());
+    }
+  }
+
   @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     // For non-merging exchanges, one row batch queue is maintained for row
@@ -193,9 +227,7 @@ public class ExchangeNode extends PlanNode {
     // the system load. This makes it difficult to accurately estimate the
     // memory usage at runtime. The following estimates assume that memory usage will
     // lean towards the soft limits.
-    Preconditions.checkState(!children_.isEmpty());
-    Preconditions.checkNotNull(children_.get(0).getFragment());
-    int numSenders = children_.get(0).getFragment().getNumInstances();
+    int numSenders = getNumSenders();
     long estimatedTotalQueueByteSize = estimateTotalQueueByteSize(numSenders);
     long estimatedDeferredRPCQueueSize = estimateDeferredRPCQueueSize(queryOptions,
         numSenders);
@@ -205,12 +237,18 @@ public class ExchangeNode extends PlanNode {
     nodeResourceProfile_ = ResourceProfile.noReservation(estimatedMem);
   }
 
+  /**
+   * Estimate per-row serialization/deserialization cost as 1 per 1KB.
+   */
+  protected float estimateSerializationCostPerRow() {
+    return (float) getAvgSerializedRowSize(this) / 1024;
+  }
+
   // Returns the estimated size of the deferred batch queue (in bytes) by
   // assuming that at least one row batch rpc payload per sender is queued.
   private long estimateDeferredRPCQueueSize(TQueryOptions queryOptions,
       int numSenders) {
-    long rowBatchSize = queryOptions.isSetBatch_size() && queryOptions.batch_size > 0
-        ? queryOptions.batch_size : DEFAULT_ROWBATCH_SIZE;
+    long rowBatchSize = getRowBatchSize(queryOptions);
     // Set an upper limit based on estimated cardinality.
     if (getCardinality() > 0) rowBatchSize = Math.min(rowBatchSize, getCardinality());
     long avgRowBatchByteSize = Math.min(
@@ -251,6 +289,10 @@ public class ExchangeNode extends PlanNode {
 
   @Override
   protected void toThrift(TPlanNode msg) {
+    if (processingCost_.isValid() && processingCost_ instanceof BroadcastProcessingCost) {
+      Preconditions.checkState(
+          getNumReceivers() == processingCost_.getNumInstancesExpected());
+    }
     msg.node_type = TPlanNodeType.EXCHANGE_NODE;
     msg.exchange_node = new TExchangeNode();
     for (TupleId tid: tupleIds_) {

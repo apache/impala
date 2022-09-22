@@ -17,7 +17,6 @@
 
 package org.apache.impala.planner;
 
-import java.nio.ByteBuffer;
 import java.util.List;
 
 import org.apache.impala.analysis.Expr;
@@ -28,6 +27,7 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TSinkAction;
 import org.apache.impala.thrift.TSortingOrder;
+import org.apache.impala.util.ExprUtil;
 
 import com.google.common.base.Preconditions;
 
@@ -159,5 +159,11 @@ public abstract class TableSink extends DataSink {
       throw new UnsupportedOperationException(
           "Cannot create data sink into table of type: " + table.getClass().getName());
     }
+  }
+
+  protected ProcessingCost computeDefaultProcessingCost() {
+    // TODO: consider including materialization cost into the returned cost.
+    return ProcessingCost.basicCost(getLabel(), fragment_.getPlanRoot().getCardinality(),
+        ExprUtil.computeExprsTotalCost(outputExprs_));
   }
 }

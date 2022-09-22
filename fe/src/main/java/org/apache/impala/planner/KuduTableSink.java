@@ -18,7 +18,6 @@
 
 package org.apache.impala.planner;
 
-import java.nio.ByteBuffer;
 import java.util.List;
 
 import org.apache.impala.analysis.DescriptorTable;
@@ -92,6 +91,12 @@ public class KuduTableSink extends TableSink {
   @Override
   protected String getLabel() {
     return "KUDU WRITER";
+  }
+
+  @Override
+  public void computeProcessingCost(TQueryOptions queryOptions) {
+    // The processing cost to export rows.
+    processingCost_ = computeDefaultProcessingCost();
   }
 
   @Override

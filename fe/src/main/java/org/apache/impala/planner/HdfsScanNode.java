@@ -2109,6 +2109,11 @@ public class HdfsScanNode extends ScanNode {
   }
 
   @Override
+  public void computeProcessingCost(TQueryOptions queryOptions) {
+    processingCost_ = computeScanProcessingCost(queryOptions);
+  }
+
+  @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     // Update 'useMtScanNode_' before any return cases. It's used in BE.
     useMtScanNode_ = queryOptions.mt_dop > 0;

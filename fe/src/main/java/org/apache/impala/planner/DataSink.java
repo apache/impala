@@ -45,6 +45,10 @@ public abstract class DataSink {
   // set in computeResourceProfile()
   protected ResourceProfile resourceProfile_ = ResourceProfile.invalid();
 
+  // A total processing cost across all instances of this plan node.
+  // Set in computeProcessingCost() for a meaningful value.
+  protected ProcessingCost processingCost_ = ProcessingCost.invalid();
+
   /**
    * Return an explain string for the DataSink. Each line of the explain will be prefixed
    * by "prefix".
@@ -56,6 +60,19 @@ public abstract class DataSink {
     if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
       output.append(detailPrefix);
       output.append(resourceProfile_.getExplainString());
+      if (ProcessingCost.isComputeCost(queryOptions)) {
+        // Show processing cost total.
+        output.append(" cost=");
+        if (processingCost_.isValid()) {
+          output.append(processingCost_.getTotalCost());
+          if (explainLevel.ordinal() >= TExplainLevel.VERBOSE.ordinal()) {
+            output.append("\n");
+            output.append(processingCost_.getExplainString(detailPrefix, false));
+          }
+        } else {
+          output.append("<invalid>");
+        }
+      }
       output.append("\n");
     }
     return output.toString();
@@ -107,6 +124,9 @@ public abstract class DataSink {
   public void setFragment(PlanFragment fragment) { fragment_ = fragment; }
   public PlanFragment getFragment() { return fragment_; }
   public ResourceProfile getResourceProfile() { return resourceProfile_; }
+  public ProcessingCost getProcessingCost() { return processingCost_; }
+
+  public abstract void computeProcessingCost(TQueryOptions queryOptions);
 
   /**
    * Compute the resource profile for an instance of this DataSink.
@@ -114,8 +134,19 @@ public abstract class DataSink {
   public abstract void computeResourceProfile(TQueryOptions queryOptions);
 
   /**
+   * Set number of rows consumed and produced data fields in processing cost.
+   */
+  public void computeRowConsumptionAndProductionToCost() {
+    Preconditions.checkState(processingCost_.isValid(),
+        "Processing cost of DataSink " + fragment_.getId() + ":" + getLabel()
+            + " is invalid!");
+    long inputOutputCardinality = fragment_.getPlanRoot().getCardinality();
+    processingCost_.setNumRowToConsume(inputOutputCardinality);
+    processingCost_.setNumRowToProduce(inputOutputCardinality);
+  }
+
+  /**
    * Collect all expressions evaluated by this data sink.
    */
   public abstract void collectExprs(List<Expr> exprs);
-
 }

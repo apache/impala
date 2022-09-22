@@ -118,6 +118,11 @@ public class SelectNode extends PlanNode {
   public void setSelectivity(double value) { selectivity_ = value; }
 
   @Override
+  public void computeProcessingCost(TQueryOptions queryOptions) {
+    processingCost_ = computeDefaultProcessingCost();
+  }
+
+  @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     // The select node initializes a single row-batch which it recycles on every
     // GetNext() call made to its child node. The memory attached to that

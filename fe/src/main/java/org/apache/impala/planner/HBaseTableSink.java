@@ -55,6 +55,12 @@ public class HBaseTableSink extends TableSink {
   }
 
   @Override
+  public void computeProcessingCost(TQueryOptions queryOptions) {
+    // The processing cost to export rows.
+    processingCost_ = computeDefaultProcessingCost();
+  }
+
+  @Override
   public void computeResourceProfile(TQueryOptions queryOptions) {
     resourceProfile_ = ResourceProfile.noReservation(0);
   }

@@ -17,7 +17,6 @@
 
 package org.apache.impala.planner;
 
-import java.util.Comparator;
 import java.util.List;
 
 import org.apache.impala.analysis.Analyzer;
@@ -94,6 +93,12 @@ public class UnnestNode extends PlanNode {
     numNodes_ = containingSubplanNode_.getChild(0).getNumNodes();
     numInstances_ = containingSubplanNode_.getChild(0).getNumInstances();
     cardinality_ = capCardinalityAtLimit(cardinality_);
+  }
+
+  @Override
+  public void computeProcessingCost(TQueryOptions queryOptions) {
+    processingCost_ = ProcessingCost.basicCost(
+        getDisplayLabel(), containingSubplanNode_.getChild(0).getCardinality(), 0);
   }
 
   @Override

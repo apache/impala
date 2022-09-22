@@ -454,6 +454,12 @@ public class SortNode extends PlanNode {
   }
 
   @Override
+  public void computeProcessingCost(TQueryOptions queryOptions) {
+    processingCost_ =
+        getSortInfo().computeProcessingCost(getDisplayLabel(), getCardinality());
+  }
+
+  @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     Preconditions.checkState(hasValidStats());
     if (type_ == TSortType.TOPN) {

@@ -333,6 +333,11 @@ public class DataSourceScanNode extends ScanNode {
   }
 
   @Override
+  public void computeProcessingCost(TQueryOptions queryOptions) {
+    processingCost_ = computeDefaultProcessingCost();
+  }
+
+  @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     // This node fetches a thrift representation of the rows from the data
     // source. The memory used by it is unfortunately allocated on the heap and

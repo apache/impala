@@ -37,6 +37,7 @@ import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.BitUtil;
+import org.apache.impala.util.ExprUtil;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
@@ -313,5 +314,31 @@ public class HashJoinNode extends JoinNode {
         .setSpillableBufferBytes(bufferSize)
         .setMaxRowBufferBytes(maxRowBufferSize).build();
     return Pair.create(probeProfile, buildProfile);
+  }
+
+  @Override
+  public Pair<ProcessingCost, ProcessingCost> computeJoinProcessingCost() {
+    // TODO: The cost should consider conjuncts_ as well.
+    // Assume 'eqJoinConjuncts_' will be applied to all rows from lhs and rhs side,
+    // and 'otherJoinConjuncts_' to the resultant rows.
+    float eqJoinPredicateEvalCost = ExprUtil.computeExprsTotalCost(eqJoinConjuncts_);
+    float otherJoinPredicateEvalCost =
+        ExprUtil.computeExprsTotalCost(otherJoinConjuncts_);
+
+    // Compute the processing cost for lhs.
+    ProcessingCost probeProcessingCost =
+        ProcessingCost.basicCost(getDisplayLabel() + " Probe side (eqJoinConjuncts_)",
+            getChild(0).getCardinality(), eqJoinPredicateEvalCost);
+    if (otherJoinPredicateEvalCost > 0) {
+      probeProcessingCost = ProcessingCost.sumCost(probeProcessingCost,
+          ProcessingCost.basicCost(getDisplayLabel() + " Probe side(otherJoinConjuncts_)",
+              getCardinality(), otherJoinPredicateEvalCost));
+    }
+
+    // Compute the processing cost for rhs.
+    ProcessingCost buildProcessingCost =
+        ProcessingCost.basicCost(getDisplayLabel() + " Build side",
+            getChild(1).getCardinality(), eqJoinPredicateEvalCost);
+    return Pair.create(probeProcessingCost, buildProcessingCost);
   }
 }

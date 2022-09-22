@@ -27,8 +27,11 @@ import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TColumnValue;
+
+import java.util.List;
 
 public class ExprUtil {
   /**
@@ -101,5 +104,21 @@ public class ExprUtil {
             new StringLiteral(analyzer.getQueryCtx().getLocal_time_zone())));
     toUtcTimestamp.analyze(analyzer);
     return toUtcTimestamp;
+  }
+
+  // Compute total cost for a list of expressions. Return 0 for a null list.
+  public static float computeExprsTotalCost(List<? extends Expr> exprs) {
+    // TODO: Implement the cost for conjunts once the implemetation for
+    // 'Expr' is in place.
+    if (exprs == null) return 0;
+    return exprs.size();
+  }
+
+  public static float computeExprCost(Expr e) {
+    if (e == null) return 0;
+    return 1;
+    // TODO Implement a function that can take into consideration of data types,
+    // expressions and potentially LLVM translation in BE. The function must also
+    // run fast.
   }
 }

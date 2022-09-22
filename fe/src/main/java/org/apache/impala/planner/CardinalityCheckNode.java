@@ -79,6 +79,11 @@ public class CardinalityCheckNode extends PlanNode {
   }
 
   @Override
+  public void computeProcessingCost(TQueryOptions queryOptions) {
+    processingCost_ = computeDefaultProcessingCost();
+  }
+
+  @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     nodeResourceProfile_ = ResourceProfile.noReservation(0);
   }

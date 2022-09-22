@@ -97,6 +97,11 @@ public class SubplanNode extends PlanNode {
   }
 
   @Override
+  public void computeProcessingCost(TQueryOptions queryOptions) {
+    processingCost_ = ProcessingCost.basicCost(getDisplayLabel(), getCardinality(), 0);
+  }
+
+  @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     // TODO: add an estimate
     nodeResourceProfile_ = ResourceProfile.noReservation(0);

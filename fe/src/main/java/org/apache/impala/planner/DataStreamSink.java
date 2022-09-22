@@ -71,9 +71,7 @@ public class DataStreamSink extends DataSink {
   private long estimateOutboundRowBatchBuffers(TQueryOptions queryOptions) {
     int numChannels =
         outputPartition_.isPartitioned() ? exchNode_.getFragment().getNumInstances() : 1;
-    long rowBatchSize = queryOptions.isSetBatch_size() && queryOptions.batch_size > 0 ?
-        queryOptions.batch_size :
-        PlanNode.DEFAULT_ROWBATCH_SIZE;
+    long rowBatchSize = PlanNode.getRowBatchSize(queryOptions);
     long avgOutboundRowBatchSize = Math.min(
         (long) Math.ceil(rowBatchSize * exchNode_.getAvgSerializedRowSize(exchNode_)),
         PlanNode.ROWBATCH_MAX_MEM_USAGE);
@@ -84,6 +82,14 @@ public class DataStreamSink extends DataSink {
     long bufferSize = numChannels * outboundBatchesPerChannel * bufferPerOutboundBatch
         * avgOutboundRowBatchSize;
     return bufferSize;
+  }
+
+  @Override
+  public void computeProcessingCost(TQueryOptions queryOptions) {
+    // The sending part of the processing cost for the exchange node.
+    processingCost_ =
+        ProcessingCost.basicCost(getLabel() + "(" + exchNode_.getDisplayLabel() + ")",
+            exchNode_.getCardinality(), 0, exchNode_.estimateSerializationCostPerRow());
   }
 
   @Override

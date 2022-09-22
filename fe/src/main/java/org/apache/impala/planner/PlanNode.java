@@ -28,7 +28,6 @@ import java.util.Set;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
-import org.apache.impala.analysis.CollectionTableRef;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprId;
 import org.apache.impala.analysis.ExprSubstitutionMap;
@@ -49,6 +48,7 @@ import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.util.BitUtil;
+import org.apache.impala.util.ExprUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -154,6 +154,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // Runtime filters assigned to this node.
   protected List<RuntimeFilter> runtimeFilters_ = new ArrayList<>();
 
+  // A total processing cost across all instances of this plan node.
+  // Gets set correctly in computeProcessingCost().
+  protected ProcessingCost processingCost_ = ProcessingCost.invalid();
+
   protected PlanNode(PlanNodeId id, List<TupleId> tupleIds, String displayName) {
     this(id, displayName);
     tupleIds_.addAll(tupleIds);
@@ -235,6 +239,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public void setAssignedConjuncts(Set<ExprId> conjuncts) {
     assignedConjuncts_ = conjuncts;
   }
+  public ProcessingCost getProcessingCost() { return processingCost_; }
 
   /**
    * Set the limit_ to the given limit_ only if the limit_ hasn't been set, or the new limit_
@@ -342,6 +347,13 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       expBuilder.append(nodeResourceProfile_.getExplainString());
       expBuilder.append("\n");
 
+      if (ProcessingCost.isComputeCost(queryOptions) && processingCost_.isValid()
+          && detailLevel.ordinal() >= TExplainLevel.VERBOSE.ordinal()) {
+        // Print processing cost.
+        expBuilder.append(processingCost_.getExplainString(detailPrefix, false));
+        expBuilder.append("\n");
+      }
+
       // Print tuple ids, row size and cardinality.
       expBuilder.append(detailPrefix + "tuple-ids=");
       for (int i = 0; i < tupleIds_.size(); ++i) {
@@ -358,10 +370,19 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     if (displayCardinality) {
       if (detailLevel == TExplainLevel.STANDARD) expBuilder.append(detailPrefix);
       expBuilder.append("row-size=")
-        .append(PrintUtils.printBytes(Math.round(avgRowSize_)))
-        .append(" cardinality=")
-        .append(PrintUtils.printEstCardinality(cardinality_))
-        .append("\n");
+          .append(PrintUtils.printBytes(Math.round(avgRowSize_)))
+          .append(" cardinality=")
+          .append(PrintUtils.printEstCardinality(cardinality_));
+      if (ProcessingCost.isComputeCost(queryOptions)) {
+        // Show processing cost total.
+        expBuilder.append(" cost=");
+        if (processingCost_.isValid()) {
+          expBuilder.append(processingCost_.getTotalCost());
+        } else {
+          expBuilder.append("<invalid>");
+        }
+      }
+      expBuilder.append("\n");
     }
 
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
@@ -653,6 +674,13 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     return cardinality;
   }
 
+  // Default implementation of computing the total data processed in bytes.
+  protected ProcessingCost computeDefaultProcessingCost() {
+    Preconditions.checkState(hasValidStats());
+    return ProcessingCost.basicCost(getDisplayLabel(), getInputCardinality(),
+        ExprUtil.computeExprsTotalCost(getConjuncts()));
+  }
+
   public static long capCardinalityAtLimit(long cardinality, long limit) {
     return cardinality == -1 ? limit : Math.min(cardinality, limit);
   }
@@ -882,13 +910,40 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     }
   }
 
+  public abstract void computeProcessingCost(TQueryOptions queryOptions);
+
   /**
    * Compute peak resources consumed when executing this PlanNode, initializing
-   * 'nodeResourceProfile_'. May only be called after this PlanNode has been placed in
-   * a PlanFragment because the cost computation is dependent on the enclosing fragment's
-   * data partition.
+   * 'nodeResourceProfile_' and 'processingCost_'. May only be called after this PlanNode
+   * has been placed in a PlanFragment because the cost computation is dependent on the
+   * enclosing fragment's data partition.
    */
   public abstract void computeNodeResourceProfile(TQueryOptions queryOptions);
+
+  /**
+   * Determine whether a PlanNode is a leaf node within the plan tree.
+   * @return true if a PlanNode is a leaf node within the plan tree.
+   */
+  protected boolean isLeafNode() { return false; }
+
+  /**
+   * Set number of rows consumed and produced data fields in processing cost.
+   */
+  public void computeRowConsumptionAndProductionToCost() {
+    Preconditions.checkState(processingCost_.isValid(),
+        "Processing cost of PlanNode " + getDisplayLabel() + " is invalid!");
+    processingCost_.setNumRowToConsume(getInputCardinality());
+    processingCost_.setNumRowToProduce(getCardinality());
+  }
+
+  /**
+   * Get row batch size after considering 'batch_size' query option.
+   */
+  protected static long getRowBatchSize(TQueryOptions queryOptions) {
+    return (queryOptions.isSetBatch_size() && queryOptions.batch_size > 0) ?
+        queryOptions.batch_size :
+        PlanNode.DEFAULT_ROWBATCH_SIZE;
+  }
 
   /**
    * Wrapper class to represent resource profiles during different phases of execution.

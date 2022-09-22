@@ -910,6 +910,19 @@ public abstract class JoinNode extends PlanNode {
   }
 
   @Override
+  public void computeProcessingCost(TQueryOptions queryOptions) {
+    Pair<ProcessingCost, ProcessingCost> probeBuildCost = computeJoinProcessingCost();
+    if (hasSeparateBuild()) {
+      // All build resource consumption is accounted for in the separate builder.
+      processingCost_ = probeBuildCost.first;
+    } else {
+      // Both build and profile resources are accounted for in the node.
+      processingCost_ =
+          ProcessingCost.sumCost(probeBuildCost.first, probeBuildCost.second);
+    }
+  }
+
+  @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     Pair<ResourceProfile, ResourceProfile> profiles =
         computeJoinResourceProfile(queryOptions);
@@ -930,6 +943,14 @@ public abstract class JoinNode extends PlanNode {
    */
   public abstract Pair<ResourceProfile, ResourceProfile> computeJoinResourceProfile(
       TQueryOptions queryOptions);
+
+  /**
+   * Helper method to compute the processing cost for the join that can be
+   * called from the builder or the join node. Returns a pair of the probe
+   * processing cost and the build processing cost.
+   * Does not modify the state of this node.
+   */
+  public abstract Pair<ProcessingCost, ProcessingCost> computeJoinProcessingCost();
 
   /* Helper to return all predicates as a string. */
   public String getAllPredicatesAsString(TExplainLevel level) {

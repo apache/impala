@@ -33,6 +33,7 @@ import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TUnionNode;
+import org.apache.impala.util.ExprUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -146,6 +147,19 @@ public class UnionNode extends PlanNode {
     if (LOG.isTraceEnabled()) {
       LOG.trace("stats Union: cardinality=" + Long.toString(cardinality_));
     }
+  }
+
+  @Override
+  public void computeProcessingCost(TQueryOptions queryOptions) {
+    // Compute the cost for materializing child rows and use that to figure out
+    // the total data processed. Assume the costs of processing pass-through rows are 0.
+    float totalMaterializeCost = 0;
+    for (int i = firstMaterializedChildIdx_; i < resultExprLists_.size(); i++) {
+      totalMaterializeCost += ExprUtil.computeExprsTotalCost(resultExprLists_.get(i));
+    }
+
+    processingCost_ =
+        ProcessingCost.basicCost(getDisplayLabel(), cardinality_, totalMaterializeCost);
   }
 
   @Override
@@ -374,5 +388,12 @@ public class UnionNode extends PlanNode {
         }
       }
     }
+  }
+
+  @Override
+  protected boolean isLeafNode() {
+    // Union node is being scheduled the same as scan node.
+    // See Scheduler::CreateCollocatedAndScanInstances() in scheduler.cc.
+    return true;
   }
 }

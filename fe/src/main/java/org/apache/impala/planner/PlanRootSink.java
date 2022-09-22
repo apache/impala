@@ -26,6 +26,7 @@ import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanRootSink;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.util.ExprUtil;
 import org.apache.log4j.Logger;
 
 import com.google.common.base.Preconditions;
@@ -65,6 +66,19 @@ public class PlanRootSink extends DataSink {
   @Override
   protected String getLabel() {
     return "ROOT";
+  }
+
+  @Override
+  public void computeProcessingCost(TQueryOptions queryOptions) {
+    if (queryOptions.isSpool_query_results() && queryOptions.getScratch_limit() != 0
+        && !BackendConfig.INSTANCE.getScratchDirs().isEmpty()) {
+      // The processing cost to buffer these many rows in root.
+      processingCost_ =
+          ProcessingCost.basicCost(getLabel(), fragment_.getPlanRoot().getCardinality(),
+              ExprUtil.computeExprsTotalCost(outputExprs_));
+    } else {
+      processingCost_ = ProcessingCost.zero();
+    }
   }
 
   /**

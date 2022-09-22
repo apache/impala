@@ -41,10 +41,8 @@ import org.apache.impala.thrift.TTableSinkType;
 import org.apache.impala.util.BitUtil;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -140,6 +138,12 @@ public class HdfsTableSink extends TableSink {
 
   public void setExternalOutputPartitionDepth(int partitionDepth) {
     externalOutputPartitionDepth_ = partitionDepth;
+  }
+
+  @Override
+  public void computeProcessingCost(TQueryOptions queryOptions) {
+    // The processing cost to export rows.
+    processingCost_ = computeDefaultProcessingCost();
   }
 
   @Override

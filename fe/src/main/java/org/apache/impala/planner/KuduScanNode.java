@@ -396,6 +396,11 @@ public class KuduScanNode extends ScanNode {
   }
 
   @Override
+  public void computeProcessingCost(TQueryOptions queryOptions) {
+    processingCost_ = computeScanProcessingCost(queryOptions);
+  }
+
+  @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     // The bulk of memory used by Kudu scan node is generally utilized by the
     // RowbatchQueue plus the row batches filled in by the scanner threads and

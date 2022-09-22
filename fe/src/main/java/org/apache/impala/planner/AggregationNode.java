@@ -77,6 +77,7 @@ public class AggregationNode extends PlanNode {
   private boolean useStreamingPreagg_ = false;
 
   // Resource profiles for each aggregation class.
+  // Set in computeNodeResourceProfile().
   private List<ResourceProfile> resourceProfiles_;
 
   // Conservative minimum size of hash table for low-cardinality aggregations.
@@ -503,6 +504,16 @@ public class AggregationNode extends PlanNode {
           .append("\n");
     }
     return output;
+  }
+
+  @Override
+  public void computeProcessingCost(TQueryOptions queryOptions) {
+    processingCost_ = ProcessingCost.zero();
+    for (AggregateInfo aggInfo : aggInfos_) {
+      ProcessingCost aggCost =
+          aggInfo.computeProcessingCost(getDisplayLabel(), getChild(0).getCardinality());
+      processingCost_ = ProcessingCost.sumCost(processingCost_, aggCost);
+    }
   }
 
   @Override

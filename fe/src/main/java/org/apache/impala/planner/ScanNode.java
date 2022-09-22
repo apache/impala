@@ -40,6 +40,7 @@ import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TScanRangeSpec;
 import org.apache.impala.thrift.TTableStats;
+import org.apache.impala.util.ExprUtil;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
@@ -343,6 +344,24 @@ abstract public class ScanNode extends PlanNode {
     }
     return maxScannerThreads;
   }
+
+  protected ProcessingCost computeScanProcessingCost(TQueryOptions queryOptions) {
+    return ProcessingCost.basicCost(getDisplayLabel(), getInputCardinality(),
+        ExprUtil.computeExprsTotalCost(conjuncts_), rowMaterializationCost());
+  }
+
+  /**
+   * Estimate per-row cost as 1 per 1KB row size.
+   * <p>
+   * This reflect deserialization/copy cost per row.
+   */
+  private float rowMaterializationCost() { return getAvgRowSize() / 1024; }
+
+  @Override
+  protected boolean isLeafNode() {
+    return true;
+  }
+
   /**
    * Returns true if this node has conjuncts to be evaluated by Impala against the scan
    * tuple.
