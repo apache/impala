@@ -29,6 +29,27 @@
 
 namespace impala {
 
+struct MemSpec {
+  int64_t value = {};
+  // MemSpec parsing can't distinguish 0 and infinity/unspecified (-1 parsed as 0)
+  // values, for printing ranges we have to make 0 available
+  bool could_be_inf_or_unspecified = false;
+
+  bool operator<(const MemSpec& other) const { return this->value < other.value; }
+  bool operator<=(const MemSpec& other) const { return this->value <= other.value; }
+  bool operator>(const MemSpec& other) const { return this->value > other.value; }
+  bool operator>=(const MemSpec& other) const { return this->value >= other.value; }
+
+  friend std::ostream& operator<<(std::ostream& os, const MemSpec& mem_spec) {
+    if (mem_spec.could_be_inf_or_unspecified && mem_spec.value == 0) {
+      os << "Inf/Not specified";
+    } else {
+      os << mem_spec.value;
+    }
+    return os;
+  }
+};
+
 /// Utility class for parsing information from strings.
 class ParseUtil {
  public:

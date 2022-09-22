@@ -477,6 +477,8 @@ error_codes = (
   ("JWT_VERIFY_FAILED", 154, "Error verifying JWT Token: $0."),
 
   ("PARQUET_ROWS_SKIPPING", 155, "Couldn't skip rows in column '$0' in file '$1'."),
+
+  ("QUERY_OPTION_PARSE_FAILED", 156, "Failed to parse query option '$0': $1")
 )
 
 import sys

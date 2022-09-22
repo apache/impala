@@ -87,7 +87,7 @@ STRING, STRING, STRING
 ---- QUERY
 set parquet_file_size='2g'
 ---- CATCH
-The PARQUET_FILE_SIZE query option must be less than 2GB.
+Invalid value for query option PARQUET_FILE_SIZE: 2147483648 is not in range [0, 2147483647]
 ====
 ---- QUERY
 set foo=bar
@@ -266,12 +266,12 @@ explain select count(distinct double_col) from functional.alltypesagg;
 ---- QUERY
 set max_row_size=-1;
 ---- CATCH
-Invalid max row size of -1. Valid sizes are in [1, 1099511627776]
+Invalid value for query option MAX_ROW_SIZE: Inf/Not specified is not in range [1, 1099511627776]
 ====
 ---- QUERY
 set max_row_size=0;
 ---- CATCH
-Invalid max row size of 0. Valid sizes are in [1, 1099511627776]
+Invalid value for query option MAX_ROW_SIZE: Inf/Not specified is not in range [1, 1099511627776]
 ====
 ---- QUERY
 # Setting some removed query options should be a no-op.
@@ -293,10 +293,10 @@ set PARQUET_LATE_MATERIALIZATION_THRESHOLD=10000;
 ---- QUERY
 set PARQUET_LATE_MATERIALIZATION_THRESHOLD=-2;
 ---- CATCH
-Invalid parquet late materialization threshold: '-2'. Use -1 to disable the feature, and values > 0 to specify the minimum skip length.
+Invalid value for query option PARQUET_LATE_MATERIALIZATION_THRESHOLD: Value must be greater than or equal to -1, actual value: -2
 ====
 ---- QUERY
 set PARQUET_LATE_MATERIALIZATION_THRESHOLD=0;
 ---- CATCH
-Invalid parquet late materialization threshold: '0'. Use -1 to disable the feature, and values > 0 to specify the minimum skip length.
+Invalid value for query option PARQUET_LATE_MATERIALIZATION_THRESHOLD: Value can't be 0
 ====
