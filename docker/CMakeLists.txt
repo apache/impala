@@ -88,6 +88,9 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
     if (${build_type} STREQUAL "debug")
       set(INSTALL_OS_PACKAGES_ARGS "--install-debug-tools")
     endif()
+    if ($ENV{IMPALA_DOCKER_USE_JAVA11} STREQUAL "true")
+      set(INSTALL_OS_PACKAGES_ARGS "${INSTALL_OS_PACKAGES_ARGS} --use-java11")
+    endif()
     # Target for the base Impala image.
     add_custom_target(impala_base_image_${build_type}
       # Run docker build inside the build context directory so that all dependencies are

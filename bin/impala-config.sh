@@ -236,6 +236,12 @@ export IMPALA_COS_VERSION=3.1.0-5.9.3
 export IMPALA_REDHAT7_DOCKER_BASE=${IMPALA_REDHAT7_DOCKER_BASE:-"centos:centos7.9.2009"}
 export IMPALA_REDHAT8_DOCKER_BASE=${IMPALA_REDHAT8_DOCKER_BASE:-"rockylinux:8.5"}
 
+# When set to true, this modifies the Docker image build logic to install Java 11
+# rather than the default of Java 8. This is strictly about what is shipped in the
+# Docker image, and it has no impact on what version of Java is used to compile
+# Impala's Java code.
+export IMPALA_DOCKER_USE_JAVA11=${IMPALA_DOCKER_USE_JAVA11:-"false"}
+
 # When IMPALA_(CDP_COMPONENT)_URL are overridden, they may contain '$(platform_label)'
 # which will be substituted for the CDP platform label in bootstrap_toolchain.py
 unset IMPALA_HADOOP_URL

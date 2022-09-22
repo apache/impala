@@ -24,10 +24,12 @@
 set -euo pipefail
 
 INSTALL_DEBUG_TOOLS=false
+USE_JAVA11=false
 
 function print_usage {
     echo "install_os_packages.sh - Helper script to install OS dependencies"
     echo "[--install-debug-tools] : Also install debug tools like curl, iproute, etc"
+    echo "[--use-java11] : Use Java 11 rather than the default Java 8."
 }
 
 while [ -n "$*" ]
@@ -35,6 +37,9 @@ do
   case "$1" in
     --install-debug-tools)
       INSTALL_DEBUG_TOOLS=true
+      ;;
+    --use-java11)
+      USE_JAVA11=true
       ;;
     --help|*)
       print_usage
@@ -45,6 +50,7 @@ do
 done
 
 echo "INSTALL_DEBUG_TOOLS=${INSTALL_DEBUG_TOOLS}"
+echo "USE_JAVA11=${USE_JAVA11}"
 
 # This can get more detailed if there are specific steps
 # for specific versions, but at the moment the distribution
@@ -58,6 +64,13 @@ else
   if [[ $DISTRIB_ID == Ubuntu ]]; then
     echo "Identified Ubuntu system."
     DISTRIBUTION=Ubuntu
+
+    # Ubuntu 16.04 does not have Java 11 in its package repository,
+    # so exit with an error.
+    if [[ $DISTRIB_RELEASE == 16.04 ]] && $USE_JAVA11 ; then
+      echo "ERROR: Java 11 is not supported on Ubuntu 16.04"
+      exit 1
+    fi
   fi
 fi
 
@@ -72,12 +85,16 @@ fi
 if [[ $DISTRIBUTION == Ubuntu ]]; then
   export DEBIAN_FRONTEND=noninteractive
   apt-get update
+  if $USE_JAVA11 ; then
+    apt-get install -y openjdk-11-jre-headless
+  else
+    apt-get install -y openjdk-8-jre-headless
+  fi
   apt-get install -y \
       krb5-user \
       libsasl2-2 \
       libsasl2-modules \
       libsasl2-modules-gssapi-mit \
-      openjdk-8-jre-headless \
       tzdata
   if $INSTALL_DEBUG_TOOLS ; then
     echo "Installing extra debug tools"
@@ -92,10 +109,16 @@ if [[ $DISTRIBUTION == Ubuntu ]]; then
         vim
   fi
 elif [[ $DISTRIBUTION == Redhat ]]; then
+  if $USE_JAVA11 ; then
+    yum install -y --disableplugin=subscription-manager \
+        java-11-openjdk-headless
+  else
+    yum install -y --disableplugin=subscription-manager \
+        java-1.8.0-openjdk-headless
+  fi
   yum install -y --disableplugin=subscription-manager \
       cyrus-sasl-gssapi \
       cyrus-sasl-plain \
-      java-1.8.0-openjdk-headless \
       krb5-workstation \
       openldap-devel \
       tzdata
