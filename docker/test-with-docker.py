@@ -255,7 +255,7 @@ def _compute_defaults():
     memlimit_gb = 11
     parallel_test_concurrency = min(cpus, 12)
   elif total_memory_gb >= 95:
-    suite_concurrency = 4
+    suite_concurrency = 5
     memlimit_gb = 11
     parallel_test_concurrency = min(cpus, 12)
   elif total_memory_gb >= 65:
@@ -350,10 +350,10 @@ cluster_test_exhaustive = cluster_test.exhaustive()
 # Default supported suites. These are organized slowest-to-fastest, so that,
 # when parallelism is limited, the total time is least impacted.
 DEFAULT_SUITES = [
-    ee_test_serial,
-    ee_test_parallel,
     cluster_test,
     Suite("FE_TEST"),
+    ee_test_parallel,
+    ee_test_serial,
     Suite("BE_TEST"),
     Suite("JDBC_TEST")
 ]
