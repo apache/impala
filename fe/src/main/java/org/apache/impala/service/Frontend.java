@@ -97,6 +97,7 @@ import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDataSource;
 import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeIcebergTable;
@@ -880,10 +881,13 @@ public class Frontend {
     // Get the destination for the load. If the load is targeting a partition,
     // this the partition location. Otherwise this is the table location.
     String destPathString = null;
+    String partitionName = null;
     FeCatalog catalog = getCatalog();
     if (request.isSetPartition_spec()) {
-      destPathString = catalog.getHdfsPartition(tableName.getDb(),
-          tableName.getTbl(), request.getPartition_spec()).getLocation();
+      FeFsPartition partition = catalog.getHdfsPartition(tableName.getDb(),
+          tableName.getTbl(), request.getPartition_spec());
+      destPathString = partition.getLocation();
+      partitionName = partition.getPartitionName();
     } else {
       destPathString = catalog.getTable(tableName.getDb(), tableName.getTbl())
           .getMetaStoreTable().getSd().getLocation();
@@ -898,12 +902,12 @@ public class Frontend {
     // file move.
     Path tmpDestPath = FileSystemUtil.makeTmpSubdirectory(destPath);
 
-    int filesLoaded = 0;
+    int numFilesLoaded = 0;
     if (sourceFs.isDirectory(sourcePath)) {
-      filesLoaded = FileSystemUtil.relocateAllVisibleFiles(sourcePath, tmpDestPath);
+      numFilesLoaded = FileSystemUtil.relocateAllVisibleFiles(sourcePath, tmpDestPath);
     } else {
       FileSystemUtil.relocateFile(sourcePath, tmpDestPath, true);
-      filesLoaded = 1;
+      numFilesLoaded = 1;
     }
 
     // If this is an OVERWRITE, delete all files in the destination.
@@ -911,17 +915,23 @@ public class Frontend {
       FileSystemUtil.deleteAllVisibleFiles(destPath);
     }
 
+    List<Path> filesLoaded = new ArrayList<>();
     // Move the files from the temporary location to the final destination.
-    FileSystemUtil.relocateAllVisibleFiles(tmpDestPath, destPath);
+    FileSystemUtil.relocateAllVisibleFiles(tmpDestPath, destPath, filesLoaded);
     // Cleanup the tmp directory.
     destFs.delete(tmpDestPath, true);
     TLoadDataResp response = new TLoadDataResp();
     TColumnValue col = new TColumnValue();
     String loadMsg = String.format(
         "Loaded %d file(s). Total files in destination location: %d",
-        filesLoaded, FileSystemUtil.getTotalNumVisibleFiles(destPath));
+        numFilesLoaded, FileSystemUtil.getTotalNumVisibleFiles(destPath));
     col.setString_val(loadMsg);
     response.setLoad_summary(new TResultRow(Lists.newArrayList(col)));
+    response.setLoaded_files(filesLoaded.stream().map(Path::toString)
+        .collect(Collectors.toList()));
+    if (partitionName != null && !partitionName.isEmpty()) {
+      response.setPartition_name(partitionName);
+    }
     return response;
   }
 

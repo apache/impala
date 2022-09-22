@@ -14,6 +14,9 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from subprocess import check_call
+import pytest
+
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS, SkipIfHive2, SkipIfCatalogV2
 from tests.util.event_processor_utils import EventProcessorUtils
@@ -374,6 +377,59 @@ class TestEventProcessing(ImpalaTestSuite):
     EventProcessorUtils.wait_for_event_processing(self)
     assert ('2019') not in self.get_impala_partition_info(test_tbl, 'year')
     assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+
+  @pytest.mark.execute_serially
+  def test_load_data_from_impala(self, unique_database):
+    tbl_nopart = "tbl_nopart"
+    tbl_part = "tbl_part"
+    staging_dir = "/tmp/{0}".format(unique_database)
+    check_call(["hdfs", "dfs", "-mkdir", staging_dir])
+    try:
+      self.execute_query(
+        "drop table if exists {0}.{1} purge".format(unique_database, tbl_nopart))
+      self.execute_query(
+        "drop table if exists {0}.{1} purge".format(unique_database, tbl_part))
+
+      self.execute_query(
+        "create table {0}.{1} like functional_parquet.tinytable stored as parquet"
+        .format(unique_database, tbl_nopart))
+      self.execute_query(
+        "create table {0}.{1} like functional_parquet.alltypessmall stored as \
+        parquet".format(unique_database, tbl_part))
+      EventProcessorUtils.wait_for_event_processing(self)
+
+      check_call([
+        "hdfs", "dfs", "-cp", "/test-warehouse/tinytable_parquet", staging_dir])
+      last_event_id = EventProcessorUtils.get_current_notification_id(self.hive_client)
+      self.execute_query("load data inpath '{0}/tinytable_parquet' \
+        into table {1}.{2}".format(staging_dir, unique_database, tbl_nopart))
+      # Check if there is an insert event fired after load data statement.
+      events = EventProcessorUtils.get_next_notification(self.hive_client, last_event_id)
+      assert len(events) == 1
+      last_event = events[0]
+      assert last_event.dbName == unique_database
+      assert last_event.tableName == tbl_nopart
+      assert last_event.eventType == "INSERT"
+
+      check_call(["hdfs", "dfs", "-cp", "/test-warehouse/alltypessmall_parquet",
+        staging_dir])
+      self.execute_query(
+        "alter table {0}.{1} add partition (year=2009,month=1)".format(
+          unique_database, tbl_part))
+      last_event_id = EventProcessorUtils.get_current_notification_id(self.hive_client)
+      self.execute_query(
+        "load data inpath '{0}/alltypessmall_parquet/year=2009/month=1' \
+        into table {1}.{2} partition (year=2009,month=1)".format(
+          staging_dir, unique_database, tbl_part))
+      # Check if there is an insert event fired after load data statement.
+      events = EventProcessorUtils.get_next_notification(self.hive_client, last_event_id)
+      assert len(events) == 1
+      last_event = events[0]
+      assert last_event.dbName == unique_database
+      assert last_event.tableName == tbl_part
+      assert last_event.eventType == "INSERT"
+    finally:
+      check_call(["hdfs", "dfs", "-rm", "-r", "-skipTrash", staging_dir])
 
   def __get_transactional_tblproperties(self, is_transactional):
     """

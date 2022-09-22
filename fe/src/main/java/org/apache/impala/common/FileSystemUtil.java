@@ -198,6 +198,15 @@ public class FileSystemUtil {
    */
   public static int relocateAllVisibleFiles(Path sourceDir, Path destDir)
       throws IOException {
+    return relocateAllVisibleFiles(sourceDir, destDir, null);
+  }
+
+  /**
+   * This method does the same as #relocateAllVisibleFiles(Path, Path) but it also adds
+   * loaded files into #loadedFiles.
+   */
+  public static int relocateAllVisibleFiles(Path sourceDir, Path destDir,
+        List<Path> loadedFiles) throws IOException {
     FileSystem destFs = destDir.getFileSystem(CONF);
     FileSystem sourceFs = sourceDir.getFileSystem(CONF);
     Preconditions.checkState(destFs.isDirectory(destDir));
@@ -226,6 +235,9 @@ public class FileSystemUtil {
             appendToBaseFileName(destFile.getName(), uuid.toString()));
       }
       FileSystemUtil.relocateFile(fStatus.getPath(), destFile, false);
+      if (loadedFiles != null) {
+        loadedFiles.add(destFile);
+      }
       ++numFilesMoved;
     }
     return numFilesMoved;

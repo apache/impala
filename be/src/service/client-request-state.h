@@ -809,6 +809,9 @@ class ClientRequestState {
   /// Logs audit and column lineage events. Expects that Wait() has already finished.
   /// Grabs lock_ for polling the query_status(). Hence do not call it under lock_.
   void LogQueryEvents();
+
+  /// Helper function to get common header
+  TCatalogServiceRequestHeader GetCatalogServiceRequestHeader();
 };
 
 }

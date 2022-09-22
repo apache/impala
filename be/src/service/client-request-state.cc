@@ -797,34 +797,40 @@ void ClientRequestState::ExecLoadDataRequestImpl(bool exec_in_worker_thread) {
   request_result_set_.reset(new vector<TResultRow>);
   request_result_set_->push_back(response.load_summary);
 
-  // Now refresh the table metadata.
-  TCatalogOpRequest reset_req;
-  reset_req.__set_sync_ddl(exec_request_->query_options.sync_ddl);
-  reset_req.__set_op_type(TCatalogOpType::RESET_METADATA);
-  reset_req.__set_reset_metadata_params(TResetMetadataRequest());
-  reset_req.reset_metadata_params.__set_header(TCatalogServiceRequestHeader());
-  reset_req.reset_metadata_params.header.__set_want_minimal_response(
-      FLAGS_use_local_catalog);
-  reset_req.reset_metadata_params.__set_is_refresh(true);
-  reset_req.reset_metadata_params.__set_table_name(
-      exec_request_->load_data_request.table_name);
-  if (exec_request_->load_data_request.__isset.partition_spec) {
-    reset_req.reset_metadata_params.__set_partition_spec(
-        exec_request_->load_data_request.partition_spec);
-  }
-  reset_req.reset_metadata_params.__set_sync_ddl(
-      exec_request_->query_options.sync_ddl);
-  catalog_op_executor_.reset(
-      new CatalogOpExecutor(ExecEnv::GetInstance(), frontend_, server_profile_));
+  // We use TUpdateCatalogRequest to refresh the table metadata so that it will
+  // fire an insert event just like an insert statement.
+  TUpdatedPartition updatedPartition;
+  updatedPartition.files.insert(updatedPartition.files.end(),
+    response.loaded_files.begin(), response.loaded_files.end());
+  TUpdateCatalogRequest catalog_update;
+  // The partition_name is an empty string for unpartitioned tables.
+  catalog_update.updated_partitions[response.partition_name] = updatedPartition;
 
-  status = catalog_op_executor_->Exec(reset_req);
+  catalog_update.__set_sync_ddl(exec_request_->query_options.sync_ddl);
+  catalog_update.__set_header(GetCatalogServiceRequestHeader());
+  catalog_update.target_table = exec_request_->load_data_request.table_name.table_name;
+  catalog_update.db_name = exec_request_->load_data_request.table_name.db_name;
+  catalog_update.is_overwrite = exec_request_->load_data_request.overwrite;
+
+  const TNetworkAddress& address =
+      MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);
+  CatalogServiceConnection client(
+      ExecEnv::GetInstance()->catalogd_client_cache(), address, &status);
+  {
+    lock_guard<mutex> l(lock_);
+    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
+  }
+
+  TUpdateCatalogResponse resp;
+  status = client.DoRpc(
+      &CatalogServiceClientWrapper::UpdateCatalog, catalog_update, &resp);
   {
     lock_guard<mutex> l(lock_);
     RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
   }
 
   status = parent_server_->ProcessCatalogUpdateResult(
-      *catalog_op_executor_->update_catalog_result(),
+      resp.result,
       exec_request_->query_options.sync_ddl);
   {
     lock_guard<mutex> l(lock_);
@@ -1429,13 +1435,7 @@ Status ClientRequestState::UpdateCatalog() {
     const TFinalizeParams& finalize_params = query_exec_request.finalize_params;
     TUpdateCatalogRequest catalog_update;
     catalog_update.__set_sync_ddl(exec_request_->query_options.sync_ddl);
-    catalog_update.__set_header(TCatalogServiceRequestHeader());
-    catalog_update.header.__set_requesting_user(effective_user());
-    catalog_update.header.__set_client_ip(session()->network_address.hostname);
-    catalog_update.header.__set_want_minimal_response(FLAGS_use_local_catalog);
-    catalog_update.header.__set_redacted_sql_stmt(
-        query_ctx_.client_request.__isset.redacted_stmt ?
-            query_ctx_.client_request.redacted_stmt : query_ctx_.client_request.stmt);
+    catalog_update.__set_header(GetCatalogServiceRequestHeader());
     DmlExecState* dml_exec_state = GetCoordinator()->dml_exec_state();
     if (!dml_exec_state->PrepareCatalogUpdate(&catalog_update)) {
       VLOG_QUERY << "No partitions altered, not updating metastore (query id: "
@@ -2041,5 +2041,16 @@ string ClientRequestState::RetryStateToString(RetryState state) {
           {ClientRequestState::RetryState::RETRYING, "RETRYING"},
           {ClientRequestState::RetryState::RETRIED, "RETRIED"}};
   return retry_state_strings.at(state);
+}
+
+TCatalogServiceRequestHeader ClientRequestState::GetCatalogServiceRequestHeader() {
+  TCatalogServiceRequestHeader header = TCatalogServiceRequestHeader();
+  header.__set_requesting_user(effective_user());
+  header.__set_client_ip(session()->network_address.hostname);
+  header.__set_want_minimal_response(FLAGS_use_local_catalog);
+  header.__set_redacted_sql_stmt(
+      query_ctx_.client_request.__isset.redacted_stmt ?
+          query_ctx_.client_request.redacted_stmt : query_ctx_.client_request.stmt);
+  return header;
 }
 }

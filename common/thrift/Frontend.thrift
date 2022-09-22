@@ -379,6 +379,12 @@ struct TLoadDataResp {
   // A result row that contains information on the result of the LOAD operation. This
   // includes details like the number of files moved as part of the request.
   1: required Data.TResultRow load_summary
+
+  // The loaded file paths
+  2: required list<string> loaded_files
+
+  // This is needed to issue TUpdateCatalogRequest
+  3: string partition_name = ""
 }
 
 enum TCatalogOpType {
