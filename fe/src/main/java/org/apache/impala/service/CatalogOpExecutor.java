@@ -1326,7 +1326,7 @@ public class CatalogOpExecutor {
           break;
         case EXECUTE:
           Preconditions.checkState(params.isSetSet_execute_params());
-          String summary = IcebergCatalogOpExecutor.alterTableExecute(tbl,
+          String summary = IcebergCatalogOpExecutor.alterTableExecute(iceTxn,
               params.getSet_execute_params());
           addSummary(response, summary);
           break;

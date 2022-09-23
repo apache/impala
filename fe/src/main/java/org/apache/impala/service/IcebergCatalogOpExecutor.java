@@ -177,9 +177,9 @@ public class IcebergCatalogOpExecutor {
     tableOp.commit(metadata, newMetadata);
   }
 
-  public static String alterTableExecute(FeIcebergTable tbl,
+  public static String alterTableExecute(Transaction txn,
       TAlterTableExecuteParams params) {
-    ExpireSnapshots expireApi = tbl.getIcebergApiTable().expireSnapshots();
+    ExpireSnapshots expireApi = txn.expireSnapshots();
     expireApi.expireOlderThan(params.older_than_millis);
     expireApi.commit();
     return "Snapshots have been expired.";
