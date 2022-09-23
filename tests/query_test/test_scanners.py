@@ -379,6 +379,7 @@ class TestHdfsScannerSkew(ImpalaTestSuite):
         v.get_value('table_format').compression_codec == 'none')
 
   @SkipIfLocal.multiple_impalad
+  @pytest.mark.execute_serially
   def test_mt_dop_skew_lpt(self, vector, unique_database):
     """IMPALA-11539: Sanity check for MT scan nodes to make sure that the intra-node
        skew is mitigated. For intra-node scan range assignment we are using dynamic
@@ -410,6 +411,7 @@ class TestHdfsScannerSkew(ImpalaTestSuite):
         print "Intra-node bytes read ratio:", ratio
         if ratio < SKEW_THRESHOLD:
           count_skew += 1
+          print "Profile of skewed execution: ", profile
       return count_skew
 
     tbl_name = unique_database + ".lineitem_skew"
