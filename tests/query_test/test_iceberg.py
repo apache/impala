@@ -804,7 +804,7 @@ class TestIcebergTable(IcebergTestSuite):
     result_rows = results.stdout.strip().split('\n')
     hdfs_file = None
     for row in result_rows:
-      if "hdfs://" in row:
+      if "://" in row:
         hdfs_file = row.split('|')[1].lstrip()
         break
     assert hdfs_file
