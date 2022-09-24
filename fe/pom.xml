@@ -1007,11 +1007,11 @@ under the License.
       <id>thrift-home-defined</id>
       <activation>
         <file>
-          <exists>${env.THRIFT_HOME}/bin/thrift</exists>
+          <exists>${env.THRIFT_JAVA_HOME}/bin/thrift</exists>
           </file>
       </activation>
       <properties>
-        <thrift.executable>${env.THRIFT_HOME}/bin/thrift</thrift.executable>
+        <thrift.executable>${env.THRIFT_JAVA_HOME}/bin/thrift</thrift.executable>
       </properties>
     </profile>
     <profile>
