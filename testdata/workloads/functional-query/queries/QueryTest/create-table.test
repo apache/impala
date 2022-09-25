@@ -309,3 +309,54 @@ describe formatted zsortbytest;
 ---- TYPES
 STRING,STRING,STRING
 ====
+---- QUERY
+# Create bucketed table
+create table bucketed_test (a int, b string) CLUSTERED BY (a) into 24 buckets;
+describe formatted bucketed_test;
+---- RESULTS: VERIFY_IS_NOT_IN
+'Num Buckets:        ','24                   ','NULL'
+'Bucket Columns:     ','[a]                  ','NULL'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+select a, b from bucketed_test t;
+---- RESULTS
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# Create bucketed table
+create table bucketed_test2 (a int, b string) partitioned by(day string)
+CLUSTERED BY (a) into 24 buckets;
+describe formatted bucketed_test2;
+---- RESULTS: VERIFY_IS_NOT_IN
+'Num Buckets:        ','24                   ','NULL'
+'Bucket Columns:     ','[a]                  ','NULL'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+select a, b from bucketed_test2 t where day = '2022-09-29';
+---- RESULTS
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# Create bucketed table
+create table bucketed_test3 (a int, b string) CLUSTERED BY (a) sort by (b) into 24 buckets;
+describe formatted bucketed_test3;
+---- RESULTS: VERIFY_IS_SUBSET
+'','bucketing_version   ','2                   '
+'','sort.columns        ','b                   '
+'Num Buckets:        ','24                  ','NULL'
+'Bucket Columns:     ','[a]                 ','NULL'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+select a, b from bucketed_test3 t;
+---- RESULTS
+---- TYPES
+INT, STRING
+====

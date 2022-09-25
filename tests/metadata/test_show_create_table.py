@@ -45,7 +45,7 @@ class TestShowCreateTable(ImpalaTestSuite):
                            "impala.events.catalogVersion", "uuid",
                            "current-schema", "snapshot-count", "default-partition-spec",
                            "current-snapshot-id", "current-snapshot-summary",
-                           "current-snapshot-timestamp-ms"]
+                           "current-snapshot-timestamp-ms", "sort.columns", "sort.order"]
 
   @classmethod
   def get_workload(self):

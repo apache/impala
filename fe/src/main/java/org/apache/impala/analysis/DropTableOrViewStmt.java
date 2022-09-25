@@ -28,6 +28,7 @@ import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDropTableOrViewParams;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.util.MetaStoreUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -135,7 +136,9 @@ public class DropTableOrViewStmt extends StatementBase {
         throw new AnalysisException(String.format(
             "DROP VIEW not allowed on a table: %s.%s", dbName_, getTbl()));
       }
-      if (dropTable_) {
+      // It currently supports create bucketed tables,
+      // but it should also support drop bucketed tables.
+      if (dropTable_ && !MetaStoreUtil.isBucketedTable(table.getMetaStoreTable())) {
         // To drop a view needs not write capabilities, only checks for tables.
         analyzer.checkTableCapability(table, Analyzer.OperationType.WRITE);
       }

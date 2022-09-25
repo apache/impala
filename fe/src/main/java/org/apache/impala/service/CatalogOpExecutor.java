@@ -174,6 +174,8 @@ import org.apache.impala.thrift.TAlterTableSetTblPropertiesParams;
 import org.apache.impala.thrift.TAlterTableType;
 import org.apache.impala.thrift.TAlterTableUnSetTblPropertiesParams;
 import org.apache.impala.thrift.TAlterTableUpdateStatsParams;
+import org.apache.impala.thrift.TBucketInfo;
+import org.apache.impala.thrift.TBucketType;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
@@ -3330,6 +3332,11 @@ public class CatalogOpExecutor {
       tbl.setTableType(TableType.MANAGED_TABLE.toString());
     }
 
+    // Set bucketing_version to table parameter
+    if (params.getBucket_info() != null
+        && params.getBucket_info().getBucket_type() != TBucketType.NONE) {
+      tbl.getParameters().put("bucketing_version", "2");
+    }
     tbl.setSd(createSd(params));
     if (params.getPartition_columns() != null) {
       // Add in any partition keys that were specified
@@ -3354,6 +3361,13 @@ public class CatalogOpExecutor {
     }
 
     if (params.getLocation() != null) sd.setLocation(params.getLocation());
+
+    // Add bucket desc
+    if (params.getBucket_info() != null
+        && params.getBucket_info().getBucket_type() != TBucketType.NONE) {
+      sd.setBucketCols(params.getBucket_info().getBucket_columns());
+      sd.setNumBuckets(params.getBucket_info().getNum_bucket());
+    }
 
     // Add in all the columns
     sd.setCols(buildFieldSchemaList(params.getColumns()));

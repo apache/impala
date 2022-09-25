@@ -36,6 +36,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TBucketInfo;
 import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.THdfsCompression;
@@ -142,6 +143,7 @@ public class CreateTableStmt extends StatementBase {
   public Map<String, String> getGeneratedKuduProperties() {
     return tableDef_.getGeneratedProperties();
   }
+  public TBucketInfo geTBucketInfo() { return tableDef_.geTBucketInfo(); }
 
   // Only exposed for ToSqlUtils. Returns the list of primary keys declared by the user
   // at the table level. Note that primary keys may also be declared in column
@@ -215,6 +217,7 @@ public class CreateTableStmt extends StatementBase {
     if (getRowFormat() != null) params.setRow_format(getRowFormat().toThrift());
     params.setFile_format(getFileFormat());
     params.setIf_not_exists(getIfNotExists());
+    if (geTBucketInfo() != null) params.setBucket_info(geTBucketInfo());
     params.setSort_columns(getSortColumns());
     params.setSorting_order(getSortingOrder());
     params.setTable_properties(Maps.newHashMap(getTblProperties()));

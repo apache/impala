@@ -50,6 +50,8 @@ import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.common.Pair;
+import org.apache.impala.thrift.TBucketInfo;
+import org.apache.impala.thrift.TBucketType;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TFunctionCategory;
@@ -334,6 +336,7 @@ terminal BigDecimal DECIMAL_LITERAL;
 terminal String STRING_LITERAL;
 terminal String UNMATCHED_STRING_LITERAL;
 terminal String UNEXPECTED_CHAR;
+terminal KW_CLUSTERED, KW_BUCKETS;
 
 // IMPALA-3726 introduced the DEFAULT keyword which could break existing applications
 // that use the identifier "KEYWORD" as database, column or table names. To avoid that,
@@ -387,6 +390,7 @@ nonterminal List<Expr> expr_list;
 nonterminal String alias_clause;
 nonterminal List<String> ident_list, primary_keys;
 nonterminal List<String> opt_ident_list;
+nonterminal Pair<TBucketInfo, Pair<List<String>, TSortingOrder>> opt_clustered;
 nonterminal Pair<List<String>, TSortingOrder> opt_sort_cols;
 nonterminal TableName table_name;
 nonterminal ColumnName column_name;
@@ -1628,16 +1632,35 @@ enable_spec ::=
   ;
 
 tbl_options ::=
-  opt_sort_cols:sort_cols opt_comment_val:comment opt_row_format_val:row_format
-  serde_properties:serde_props file_format_create_table_val:file_format
-  location_val:location opt_cache_op_val:cache_op
+  opt_clustered:clustered
+  opt_comment_val:comment
+  opt_row_format_val:row_format
+  serde_properties:serde_props
+  file_format_create_table_val:file_format
+  location_val:location
+  opt_cache_op_val:cache_op
   tbl_properties:tbl_props
   {:
     CreateTableStmt.unescapeProperties(serde_props);
     CreateTableStmt.unescapeProperties(tbl_props);
 
-    RESULT = new TableDef.Options(sort_cols, comment, row_format, serde_props,
-        file_format, location, cache_op, tbl_props, parser.getQueryOptions());
+    RESULT = new TableDef.Options(clustered.first, clustered.second, comment, row_format,
+        serde_props, file_format, location, cache_op, tbl_props, parser.getQueryOptions());
+  :}
+  ;
+
+opt_clustered ::=
+  opt_sort_cols:sort_cols
+  {:
+    TBucketInfo bucket_info = new TBucketInfo(TBucketType.NONE, 0);
+    RESULT = new Pair<TBucketInfo, Pair<List<String>, TSortingOrder>>(bucket_info, sort_cols);
+  :}
+  | KW_CLUSTERED KW_BY LPAREN opt_ident_list:col_names RPAREN opt_sort_cols:sort_cols
+        KW_INTO INTEGER_LITERAL:numBuckets KW_BUCKETS
+  {:
+    TBucketInfo bucket_info = new TBucketInfo(TBucketType.HASH, numBuckets.intValue());
+    bucket_info.setBucket_columns(col_names);
+    RESULT = new Pair<TBucketInfo, Pair<List<String>, TSortingOrder>>(bucket_info, sort_cols);
   :}
   ;
 
@@ -3284,6 +3307,8 @@ plan_hints ::=
 plan_hint ::=
   KW_STRAIGHT_JOIN
   {: RESULT = new PlanHint("straight_join"); :}
+  | KW_CLUSTERED
+  {: RESULT = new PlanHint("clustered"); :}
   | IDENT:name
   {: RESULT = new PlanHint(name); :}
   | IDENT:name LPAREN ident_list:args RPAREN
@@ -4087,6 +4112,8 @@ word ::=
   {: RESULT = r.toString(); :}
   | KW_BOOLEAN:r
   {: RESULT = r.toString(); :}
+  | KW_BUCKETS:r
+  {: RESULT = r.toString(); :}
   | KW_BY:r
   {: RESULT = r.toString(); :}
   | KW_CACHED:r
@@ -4104,6 +4131,8 @@ word ::=
   | KW_CLASS:r
   {: RESULT = r.toString(); :}
   | KW_CLOSE_FN:r
+  {: RESULT = r.toString(); :}
+  | KW_CLUSTERED:r
   {: RESULT = r.toString(); :}
   | KW_COLUMN:r
   {: RESULT = r.toString(); :}

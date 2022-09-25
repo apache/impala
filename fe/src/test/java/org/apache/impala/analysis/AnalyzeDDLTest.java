@@ -1347,6 +1347,25 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestAlterBucketedTable() throws AnalysisException {
+    AnalyzesOk("alter table functional.bucketed_table rename to bucketed_table_test");
+    AnalyzesOk("drop table functional.bucketed_table");
+
+    AnalysisError("alter table functional.bucketed_table add columns (a int)",
+        "functional.bucketed_table is a bucketed table. " +
+        "Only read operations are supported on such tables.");
+    AnalysisError("alter table functional.bucketed_table change col1 default bigint",
+        "functional.bucketed_table is a bucketed table. " +
+        "Only read operations are supported on such tables.");
+    AnalysisError("alter table functional.bucketed_table replace columns (a int)",
+        "functional.bucketed_table is a bucketed table. " +
+        "Only read operations are supported on such tables.");
+    AnalysisError("alter table functional.bucketed_table drop col1",
+        "functional.bucketed_table is a bucketed table. " +
+        "Only read operations are supported on such tables.");
+  }
+
+  @Test
   public void TestAlterView() {
     // View-definition references a table.
     AnalyzesOk("alter view functional.alltypes_view as " +
@@ -2821,6 +2840,38 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table functional.new_table (i int) PARTITIONED BY (d decimal)" +
         "sort by zorder (i, d)", "SORT BY column list must not contain partition " +
         "column: 'd'");
+  }
+
+  @Test
+  public void TestCreateBucketedTable() throws AnalysisException {
+    AnalyzesOk("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
+        "CLUSTERED BY(i) INTO 24 BUCKETS");
+    AnalyzesOk("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
+        "CLUSTERED BY(i) SORT BY (s) INTO 24 BUCKETS");
+
+    // Bucketed table not supported for Kudu and ICEBERG table
+    AnalysisError("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
+        "CLUSTERED BY (i) INTO 24 BUCKETS STORED BY KUDU", "CLUSTERED BY not " +
+        "support fileformat: 'KUDU'");
+    AnalysisError("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
+        "CLUSTERED BY (i) INTO 24 BUCKETS STORED BY ICEBERG",
+        "CLUSTERED BY not support fileformat: 'ICEBERG'");
+    // Bucketed columns must not contain partition column and don't duplicate
+    AnalysisError("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
+        "PARTITIONED BY(dt string) CLUSTERED BY (dt) INTO 24 BUCKETS",
+        "CLUSTERED BY column list must not contain partition column: 'dt'");
+    AnalysisError("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
+        "CLUSTERED BY (i, i) INTO 24 BUCKETS",
+        "Duplicate column in CLUSTERED BY list: i");
+    AnalysisError("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
+        "CLUSTERED BY (a) INTO 24 BUCKETS",
+        "Could not find CLUSTERED BY column 'a' in table.");
+    AnalysisError("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
+        "CLUSTERED BY (i) INTO 0 BUCKETS",
+        "Bucket's number must be greater than 0.");
+    AnalysisError("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
+        "CLUSTERED BY () INTO 12 BUCKETS",
+        "Bucket columns must be not null.");
   }
 
   @Test

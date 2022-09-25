@@ -591,6 +591,9 @@ struct TCreateTableParams {
 
   // Just one PartitionSpec when create iceberg table
   21: optional CatalogObjects.TIcebergPartitionSpec partition_spec
+
+  // Bucket desc for created bucketed table
+  22: optional CatalogObjects.TBucketInfo bucket_info
 }
 
 // Parameters of a CREATE VIEW or ALTER VIEW AS SELECT command

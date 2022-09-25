@@ -3060,6 +3060,32 @@ public class ParserTest extends FrontendTestBase {
     ParserError("CREATE TABLE Foo(a int PRIMARY KEY, b int BLOCK_SIZE 1+1) " +
         "STORED AS KUDU");
     ParserError("CREATE TABLE Foo(a int PRIMARY KEY BLOCK_SIZE -1) STORED AS KUDU");
+
+    // Supported bucketed table
+    ParsesOk("CREATE TABLE bucketed_test (i int COMMENT 'hello', s string) " +
+        "CLUSTERED BY (i) INTO 24 BUCKETS");
+    ParsesOk("CREATE TABLE bucketed_test (i int COMMENT 'hello', a int, s string) " +
+        "CLUSTERED BY (i, a) INTO 24 BUCKETS");
+
+    ParsesOk("CREATE TABLE bucketed_test (i int COMMENT 'hello', s string) " +
+        "PARTITIONED BY(dt string) CLUSTERED BY (i) INTO 24 BUCKETS");
+    ParsesOk("CREATE TABLE bucketed_test (i int COMMENT 'hello', s string) " +
+        "CLUSTERED BY (i) SORT BY(s) INTO 24 BUCKETS");
+    ParsesOk("CREATE TABLE bucketed_test (i int COMMENT 'hello', s string) " +
+        "PARTITIONED BY(dt string) CLUSTERED BY (i) SORT BY (s) " +
+        "INTO 24 BUCKETS");
+
+    ParserError("CREATE TABLE bucketed_test (i int COMMENT 'hello', s string) " +
+        "CLUSTERED BY (i)");
+    ParserError("CREATE TABLE bucketed_test (i int COMMENT 'hello', s string) " +
+        "CLUSTERED INTO 24 BUCKETS ");
+    ParserError("CREATE TABLE (i int, s string) CLUSTERED INTO 24 BUCKETS");
+    ParserError("CREATE TABLE bucketed_test (i int COMMENT 'hello', s string) " +
+        "CLUSTERED BY (i) INTO BUCKETS");
+    ParserError("CREATE TABLE bucketed_test (i int COMMENT 'hello', s string) " +
+        "PARTITIONED BY(dt string) CLUSTERED BY (i) INTO BUCKETS");
+    ParserError("CREATE TABLE bucketed_test (i int COMMENT 'hello', s string) " +
+        "CLUSTERED BY (i) INTO 12 BUCKETS SORT BY (s)");
   }
 
   @Test
@@ -4361,11 +4387,5 @@ public class ParserTest extends FrontendTestBase {
 
     ParsesOk("--test\nSELECT 1\n");
     ParsesOk("--test\nSELECT 1\n  ");
-  }
-
-  @Test
-  public void TestCreateBucketedTable() {
-    ParserError("Create table bucketed_tbl(order_id int, order_name string)"
-            + "clustered by (order_id) into 5 buckets", "Syntax error");
   }
 }

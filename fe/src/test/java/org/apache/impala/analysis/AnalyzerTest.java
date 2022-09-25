@@ -932,6 +932,7 @@ public class AnalyzerTest extends FrontendTestBase {
     AnalyzesOk("show column stats functional.bucketed_table");
     AnalyzesOk("create table test as select * from functional.bucketed_table");
     AnalyzesOk("compute stats functional.bucketed_table");
+    AnalyzesOk("drop table functional.bucketed_table");
 
     String errorMsgBucketed = "functional.bucketed_table " +
         "is a bucketed table. Only read operations are supported on such tables.";
@@ -959,7 +960,6 @@ public class AnalyzerTest extends FrontendTestBase {
     AnalysisError("insert into functional.bucketed_table select * from " +
        "functional.bucketed_table", errorMsgBucketed);
     AnalysisError("create table test like functional.bucketed_table", errorMsgBucketed);
-    AnalysisError("drop table functional.bucketed_table", errorMsgBucketed);
     AnalysisError("truncate table functional.bucketed_table", errorMsgBucketed);
     AnalysisError("alter table functional.bucketed_table add columns(col3 int)",
         errorMsgBucketed);

@@ -42,6 +42,8 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TAccessEvent;
+import org.apache.impala.thrift.TBucketInfo;
+import org.apache.impala.thrift.TBucketType;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TQueryOptions;
@@ -150,8 +152,11 @@ class TableDef {
     // Sorting order for SORT BY queries.
     final TSortingOrder sortingOrder;
 
-    Options(Pair<List<String>, TSortingOrder> sortProperties, String comment,
-        RowFormat rowFormat, Map<String, String> serdeProperties,
+    // Bucket desc for CLUSTERED BY
+    final TBucketInfo bucketInfo;
+
+    Options(TBucketInfo bucketInfo, Pair<List<String>, TSortingOrder> sortProperties,
+        String comment, RowFormat rowFormat, Map<String, String> serdeProperties,
         THdfsFileFormat fileFormat, HdfsUri location, HdfsCachingOp cachingOp,
         Map<String, String> tblProperties, TQueryOptions queryOptions) {
       this.sortCols = sortProperties.first;
@@ -168,12 +173,13 @@ class TableDef {
       this.cachingOp = cachingOp;
       Preconditions.checkNotNull(tblProperties);
       this.tblProperties = tblProperties;
+      this.bucketInfo = bucketInfo;
     }
 
     public Options(String comment, TQueryOptions queryOptions) {
       // Passing null to file format so that it uses the file format from the query option
       // if specified, otherwise it will use the default file format, which is TEXT.
-      this(new Pair<>(ImmutableList.of(), TSortingOrder.LEXICAL), comment,
+      this(null, new Pair<>(ImmutableList.of(), TSortingOrder.LEXICAL), comment,
           RowFormat.DEFAULT_ROW_FORMAT, new HashMap<>(), /* file format */null, null,
           null, new HashMap<>(), queryOptions);
     }
@@ -393,6 +399,13 @@ class TableDef {
   RowFormat getRowFormat() { return options_.rowFormat; }
   TSortingOrder getSortingOrder() { return options_.sortingOrder; }
   List<ForeignKey> getForeignKeysList() { return foreignKeysList_; }
+  TBucketInfo geTBucketInfo() { return options_.bucketInfo; }
+
+  boolean isBucketableFormat() {
+    return options_.fileFormat != THdfsFileFormat.KUDU
+        && options_.fileFormat != THdfsFileFormat.ICEBERG
+        && options_.fileFormat != THdfsFileFormat.HUDI_PARQUET;
+  }
 
   /**
    * Analyzes the parameters of a CREATE TABLE statement.
@@ -739,6 +752,10 @@ class TableDef {
           options_.sortingOrder.toString()));
     }
 
+    // analyze bucket columns
+    analyzeBucketColumns(options_.bucketInfo, getColumnNames(),
+        getPartitionColumnNames());
+
     // Analyze sort columns.
     if (options_.sortCols == null) return;
     if (isKuduTable()) {
@@ -748,6 +765,55 @@ class TableDef {
 
     analyzeSortColumns(options_.sortCols, getColumnNames(), getPartitionColumnNames(),
         getColumnTypes(), options_.sortingOrder);
+  }
+
+  private void analyzeBucketColumns(TBucketInfo bucketInfo, List<String> tableCols,
+      List<String> partitionCols) throws AnalysisException {
+    if (bucketInfo == null || bucketInfo.getBucket_type() == TBucketType.NONE) {
+      return;
+    }
+    // Bucketed Table only support hdfs fileformat
+    if (!isBucketableFormat()) {
+      throw new AnalysisException(String.format("CLUSTERED BY not support fileformat: " +
+          "'%s'", options_.fileFormat));
+    }
+    if (bucketInfo.getNum_bucket() <= 0) {
+      throw new AnalysisException(String.format(
+          "Bucket's number must be greater than 0."));
+    }
+    if (bucketInfo.getBucket_columns() == null
+        || bucketInfo.getBucket_columns().size() == 0) {
+      throw new AnalysisException(String.format(
+          "Bucket columns must be not null."));
+    }
+
+    // The index of each bucket column in the list of table columns.
+    Set<Integer> colIdxs = new LinkedHashSet<>();
+    for (String bucketCol : bucketInfo.getBucket_columns()) {
+      // Make sure it's not a partition column.
+      if (partitionCols.contains(bucketCol)) {
+        throw new AnalysisException(String.format("CLUSTERED BY column list must not " +
+            "contain partition column: '%s'", bucketCol));
+      }
+
+      // Determine the index of each bucket column in the list of table columns.
+      boolean foundColumn = false;
+      for (int j = 0; j < tableCols.size(); ++j) {
+        if (tableCols.get(j).equalsIgnoreCase(bucketCol)) {
+          if (colIdxs.contains(j)) {
+            throw new AnalysisException(String.format("Duplicate column in CLUSTERED " +
+                "BY list: %s", bucketCol));
+          }
+          colIdxs.add(j);
+          foundColumn = true;
+          break;
+        }
+      }
+      if (!foundColumn) {
+        throw new AnalysisException(String.format("Could not find CLUSTERED BY column " +
+            "'%s' in table.", bucketCol));
+      }
+    }
   }
 
   private void analyzeRowFormat(Analyzer analyzer) throws AnalysisException {

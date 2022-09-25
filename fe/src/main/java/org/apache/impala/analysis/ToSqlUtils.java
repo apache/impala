@@ -50,9 +50,12 @@ import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.Pair;
+import org.apache.impala.thrift.TBucketInfo;
+import org.apache.impala.thrift.TBucketType;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.util.AcidUtils;
+import org.apache.impala.util.BucketUtils;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.KuduUtil;
 import org.slf4j.Logger;
@@ -291,7 +294,8 @@ public class ToSqlUtils {
         kuduParamsSql, new Pair<>(stmt.getSortColumns(), stmt.getSortingOrder()),
         properties, stmt.getSerdeProperties(), stmt.isExternal(), stmt.getIfNotExists(),
         stmt.getRowFormat(), HdfsFileFormat.fromThrift(stmt.getFileFormat()),
-        HdfsCompression.NONE, null, stmt.getLocation(), icebergPartitionSpecs);
+        HdfsCompression.NONE, null, stmt.getLocation(),
+        icebergPartitionSpecs, stmt.geTBucketInfo());
   }
 
   /**
@@ -328,7 +332,7 @@ public class ToSqlUtils {
         innerStmt.getSortingOrder()), properties, innerStmt.getSerdeProperties(),
         innerStmt.isExternal(), innerStmt.getIfNotExists(), innerStmt.getRowFormat(),
         HdfsFileFormat.fromThrift(innerStmt.getFileFormat()), HdfsCompression.NONE, null,
-        innerStmt.getLocation(), icebergPartitionSpecs);
+        innerStmt.getLocation(), icebergPartitionSpecs, innerStmt.geTBucketInfo());
     return createTableSql + " AS " + stmt.getQueryStmt().toSql(options);
   }
 
@@ -372,6 +376,7 @@ public class ToSqlUtils {
     HdfsCompression compression = null;
     String location = isHbaseTable ? null : msTable.getSd().getLocation();
     Map<String, String> serdeParameters = msTable.getSd().getSerdeInfo().getParameters();
+    TBucketInfo bucketInfo = BucketUtils.fromStorageDescriptor(msTable.getSd());
 
     String storageHandlerClassName = table.getStorageHandlerClassName();
     List<String> primaryKeySql = new ArrayList<>();
@@ -447,7 +452,7 @@ public class ToSqlUtils {
         partitionColsSql, primaryKeySql, foreignKeySql, kuduPartitionByParams,
         new Pair<>(sortColsSql, sortingOrder), properties, serdeParameters,
         isExternal, false, rowFormat, format, compression,
-        storageHandlerClassName, tableLocation, icebergPartitions);
+        storageHandlerClassName, tableLocation, icebergPartitions, bucketInfo);
   }
 
   /**
@@ -462,7 +467,8 @@ public class ToSqlUtils {
       Map<String, String> tblProperties, Map<String, String> serdeParameters,
       boolean isExternal, boolean ifNotExists, RowFormat rowFormat,
       HdfsFileFormat fileFormat, HdfsCompression compression,
-      String storageHandlerClass, HdfsUri location, String icebergPartitions) {
+      String storageHandlerClass, HdfsUri location, String icebergPartitions,
+      TBucketInfo bucketInfo) {
     Preconditions.checkNotNull(tableName);
     StringBuilder sb = new StringBuilder("CREATE ");
     if (isExternal) sb.append("EXTERNAL ");
@@ -499,7 +505,16 @@ public class ToSqlUtils {
     if (kuduPartitionByParams != null && !kuduPartitionByParams.equals("")) {
       sb.append("PARTITION BY " + kuduPartitionByParams + "\n");
     }
-    if (sortProperties.first != null) {
+    if (bucketInfo != null && bucketInfo.getBucket_type() != TBucketType.NONE) {
+      sb.append(String.format("CLUSTERED BY (\n %s\n)\n",
+          Joiner.on(", \n  ").join(bucketInfo.getBucket_columns())));
+      if (sortProperties.first != null) {
+        sb.append(String.format("SORT BY %s (\n  %s\n)\n",
+            sortProperties.second.toString(),
+            Joiner.on(", \n  ").join(sortProperties.first)));
+      }
+      sb.append(String.format("INTO %s BUCKETS\n", bucketInfo.getNum_bucket()));
+    } else if (sortProperties.first != null) {
       sb.append(String.format("SORT BY %s (\n  %s\n)\n", sortProperties.second.toString(),
           Joiner.on(", \n  ").join(sortProperties.first)));
     }

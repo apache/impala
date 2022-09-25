@@ -152,6 +152,15 @@ enum TIcebergPartitionTransformType {
   VOID = 7
 }
 
+// Data distribution method of bucketed table.
+// (Easy to add more types later.)
+enum TBucketType {
+  // Non-Bucketed
+  NONE = 0
+  // For hive compatibility, the hash function used in Hive's bucketed tables
+  HASH = 1
+}
+
 struct TCompressionCodec {
   // Compression codec
   1: required THdfsCompression codec
@@ -183,6 +192,13 @@ struct TTableStats {
 
   // Sum of file sizes in the table. Only set for tables of type HDFS_TABLE.
   2: optional i64 total_file_bytes
+}
+
+// Represents the bucket spec of a table.
+struct TBucketInfo {
+  1: required TBucketType bucket_type
+  2: optional list<string> bucket_columns
+  3: required i32 num_bucket
 }
 
 // Column stats data that Impala uses.
@@ -479,6 +495,9 @@ struct THdfsTable {
 
   // Set iff this is an acid table. The valid write ids list.
   13: optional TValidWriteIdList valid_write_ids
+
+  // Bucket information for HDFS tables
+  16: optional TBucketInfo bucket_info
 }
 
 struct THBaseTable {

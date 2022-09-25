@@ -472,6 +472,24 @@ public class ToSqlTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestCreateBucketTable() throws AnalysisException {
+    testToSql("create table bucketed_table ( a int ) " +
+        "CLUSTERED BY ( a ) into 24 buckets", "default",
+        "CREATE TABLE default.bucketed_table ( a INT ) " +
+        "CLUSTERED BY ( a ) INTO 24 BUCKETS STORED AS TEXTFILE", true);
+    testToSql("create table bucketed_table1 ( a int ) " +
+        "partitioned by ( dt string ) CLUSTERED BY ( a ) into 24 buckets", "default",
+        "CREATE TABLE default.bucketed_table1 ( a INT ) " +
+        "PARTITIONED BY ( dt STRING ) CLUSTERED BY ( a ) INTO 24 BUCKETS " +
+        "STORED AS TEXTFILE", true);
+    testToSql("create table bucketed_table2 ( a int, s string ) partitioned " +
+        "by ( dt string ) CLUSTERED BY ( a ) sort by (s) into 24 buckets",
+        "default", "CREATE TABLE default.bucketed_table2 " +
+        "( a INT, s STRING ) PARTITIONED BY ( dt STRING ) CLUSTERED BY ( a ) SORT BY " +
+        "LEXICAL ( s ) INTO 24 BUCKETS STORED AS TEXTFILE", true);
+  }
+
+  @Test
   public void TestCreateView() throws AnalysisException {
     testToSql(
       "create view foo_new as select int_col, string_col from functional.alltypes",
