@@ -87,16 +87,14 @@ public class KuduUtil {
    * fetching tablet metadata.
    */
   public static KuduClient getKuduClient(String kuduMasters) {
-    KuduClient client = kuduClients_.get(kuduMasters);
-    if (client == null) {
+    KuduClient client = kuduClients_.computeIfAbsent(kuduMasters, k -> {
       KuduClientBuilder b = new KuduClient.KuduClientBuilder(kuduMasters);
       b.defaultAdminOperationTimeoutMs(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
       b.defaultOperationTimeoutMs(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
       b.workerCount(KUDU_CLIENT_WORKER_THREAD_COUNT);
       b.saslProtocolName(BackendConfig.INSTANCE.getKuduSaslProtocolName());
-      client = b.build();
-      kuduClients_.put(kuduMasters, client);
-    }
+      return b.build();
+    });
     return client;
   }
 
@@ -478,5 +476,10 @@ public class KuduUtil {
         insertStmt.getPartitionColPos());
     kuduPartitionExpr.analyze(analyzer);
     return kuduPartitionExpr;
+  }
+
+  // Used for test assertions
+  public static int getkuduClientsSize() {
+    return kuduClients_.size();
   }
 }
