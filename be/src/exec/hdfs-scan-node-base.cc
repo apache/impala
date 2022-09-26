@@ -309,7 +309,14 @@ Status HdfsScanPlanNode::ProcessScanRangesAndInitSharedState(FragmentState* stat
       }
 
       bool expected_local = params.has_is_remote() && !params.is_remote();
-      if (expected_local && params.volume_id() == -1) ++num_ranges_missing_volume_id;
+      if (expected_local && params.volume_id() == -1) {
+        // IMPALA-11541 TODO: Ozone returns a list of null volume IDs. So we know the
+        // number of volumes, but ID will be -1. Skip this metric for Ozone paths because
+        // it doesn't convey useful feedback.
+        if (!IsOzonePath(partition_desc->location().c_str())) {
+          ++num_ranges_missing_volume_id;
+        }
+      }
 
       int cache_options = BufferOpts::NO_CACHING;
       if (params.has_try_hdfs_cache() && params.try_hdfs_cache()) {
