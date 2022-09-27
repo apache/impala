@@ -1398,7 +1398,9 @@ public class SelectStmt extends QueryStmt {
     }
     if (orderByElements_ != null) {
       for (OrderByElement orderByElem: orderByElements_) {
-        orderByElem.setExpr(rewriteCheckOrdinalResult(rewriter, orderByElem.getExpr()));
+        Expr orderByExpr = resolveReferenceExpr(orderByElem.getExpr(), "ORDER BY",
+                analyzer_, true);
+        orderByElem.setExpr(rewriteCheckOrdinalResult(rewriter, orderByExpr));
       }
     }
   }

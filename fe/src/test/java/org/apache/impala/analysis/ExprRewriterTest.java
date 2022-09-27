@@ -384,6 +384,23 @@ public class ExprRewriterTest extends AnalyzerTest {
             + "FROM functional.alltypes WHERE "
             + "bool_col OR id = 2 OR concat(string_col, 'test') = 'testtest'");
 
+    assertToSql(ctx,
+        "select (case when (1 = 1 and `t1`.`dt` = '2022-05-13') then '2022-05-13' end) d0\n"
+            + "from `jhk_test`.`p1` `t1`\n"
+            + "group by (case when (1 = 1 and `t1`.`dt` = '2022-05-13') then '2022-05-13' end)\n"
+            + "order by (case when (1 = 1 and `t1`.`dt` = '2022-05-13') then '2022-05-13' end)\n"
+            + "limit 10",
+        "SELECT (CASE WHEN (1 = 1 AND `t1`.`dt` = '2022-05-13') THEN '2022-05-13' END) d0\n"
+            + "FROM `jhk_test`.`p1` `t1`\n"
+            + "GROUP BY (CASE WHEN (1 = 1 AND `t1`.`dt` = '2022-05-13') THEN '2022-05-13' END)\n"
+            + "ORDER BY (CASE WHEN (1 = 1 AND `t1`.`dt` = '2022-05-13') THEN '2022-05-13' END)\n"
+            + "LIMIT 10",
+            "SELECT (CASE WHEN (`t1`.`dt` = '2022-05-13') THEN '2022-05-13' END) d0\n"
+            + "FROM `jhk_test`.`p1` `t1`\n"
+            + "GROUP BY (CASE WHEN (`t1`.`dt` = '2022-05-13') THEN '2022-05-13' END)\n"
+            + "ORDER BY (CASE WHEN (`t1`.`dt` = '2022-05-13') THEN '2022-05-13' END)\n"
+            + "LIMIT 10");
+    
     // We don't do any rewrite for WITH clause.
     StatementBase stmt = (StatementBase) AnalyzesOk("with t as (select 1 + 1) " +
         "select id from functional.alltypes union select id from functional.alltypesagg",
