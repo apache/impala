@@ -5978,7 +5978,7 @@ insert into functional_kudu.tinyinttable values(1);
 Max Per-Host Resource Reservation: Memory=0B Threads=1
 Per-Host Resource Estimates: Memory=20MB
 Codegen disabled by planner
-Analyzed query: SELECT CAST(1 AS TINYINT) UNION SELECT CAST(1 AS TINYINT)
+Analyzed query: SELECT CAST(1 AS TINYINT)
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=20.00MB mem-reservation=0B thread-reservation=1
@@ -5995,7 +5995,7 @@ INSERT INTO KUDU [functional_kudu.tinyinttable]
 Max Per-Host Resource Reservation: Memory=2.00MB Threads=2
 Per-Host Resource Estimates: Memory=22MB
 Codegen disabled by planner
-Analyzed query: SELECT CAST(1 AS TINYINT) UNION SELECT CAST(1 AS TINYINT)
+Analyzed query: SELECT CAST(1 AS TINYINT)
 
 F01:PLAN FRAGMENT [KUDU(KuduPartition(1))] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=22.02MB mem-reservation=2.00MB thread-reservation=1

@@ -3507,6 +3507,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "partition (year, month) " +
         "values(1, true, 1, 1, 1, 1, cast(1.0 as float), cast(1.0 as double), " +
         "'a', 'a', cast(0 as timestamp), 2009, 10)");
+
+    assertEquals("SELECT 1", AnalyzesOk("values (1)").toSql(ToSqlOptions.REWRITTEN));
+
     // Values stmt with multiple rows.
     AnalyzesOk("values((1, 2, 3), (4, 5, 6))");
     AnalyzesOk("select * from (values('a', 'b', 'c')) as t");
@@ -3530,6 +3533,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "'b', 'b', cast(0 as timestamp), 2009, 2)," +
         "(3, true, 3, 3, 3, 3, cast(3.0 as float), cast(3.0 as double), " +
         "'c', 'c', cast(0 as timestamp), 2009, 3))");
+
+    assertEquals("SELECT 1 UNION ALL SELECT 2",
+        AnalyzesOk("values (1), (2)").toSql(ToSqlOptions.REWRITTEN));
 
     // Test multiple aliases. Values() is like union, the column labels are 'x' and 'y'.
     AnalyzesOk("values((1 as x, 'a' as y), (2 as k, 'b' as j))");

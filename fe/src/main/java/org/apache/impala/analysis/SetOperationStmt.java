@@ -510,7 +510,29 @@ public class SetOperationStmt extends QueryStmt {
       strBuilder.append(" ");
     }
 
+    operandsToSql(options, strBuilder);
+
+    // Order By clause
+    if (hasOrderByClause()) {
+      strBuilder.append(" ORDER BY ");
+      for (int i = 0; i < orderByElements_.size(); ++i) {
+        strBuilder.append(orderByElements_.get(i).toSql(options));
+        strBuilder.append((i + 1 != orderByElements_.size()) ? ", " : "");
+      }
+    }
+    // Limit clause.
+    strBuilder.append(limitElement_.toSql(options));
+    return strBuilder.toString();
+  }
+
+  private void operandsToSql(ToSqlOptions options, StringBuilder strBuilder) {
     strBuilder.append(operands_.get(0).getQueryStmt().toSql(options));
+
+    // If there is only one operand we simply print it without any mention of a set
+    // operator. It is only possible in a 'ValuesStmt' - otherwise it is syntactically
+    // impossible in SQL.
+    if (operands_.size() == 1) return;
+
     for (int i = 1; i < operands_.size() - 1; ++i) {
       String opName = operands_.get(i).getSetOperator() != null ?
           operands_.get(i).getSetOperator().name() :
@@ -525,6 +547,7 @@ public class SetOperationStmt extends QueryStmt {
         strBuilder.append(")");
       }
     }
+
     // Determine whether we need parentheses around the last union operand.
     SetOperand lastOperand = operands_.get(operands_.size() - 1);
     QueryStmt lastQueryStmt = lastOperand.getQueryStmt();
@@ -539,17 +562,6 @@ public class SetOperationStmt extends QueryStmt {
     } else {
       strBuilder.append(lastQueryStmt.toSql(options));
     }
-    // Order By clause
-    if (hasOrderByClause()) {
-      strBuilder.append(" ORDER BY ");
-      for (int i = 0; i < orderByElements_.size(); ++i) {
-        strBuilder.append(orderByElements_.get(i).toSql(options));
-        strBuilder.append((i + 1 != orderByElements_.size()) ? ", " : "");
-      }
-    }
-    // Limit clause.
-    strBuilder.append(limitElement_.toSql(options));
-    return strBuilder.toString();
   }
 
   @Override

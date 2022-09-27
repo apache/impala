@@ -493,8 +493,6 @@ public class ExprRewriterTest extends AnalyzerTest {
         + "values(" + data + ")";
     String expectedToSql = "INSERT INTO TABLE "
         + "functional.alltypesnopart(" + columnName + ") "
-        + "SELECT CAST(" + data + " AS " + castColumn + ")"
-        + " UNION "
         + "SELECT CAST(" + data + " AS " + castColumn + ")";
     assertToSqlWithImplicitCasts(ctx, query, expectedToSql);
   }
