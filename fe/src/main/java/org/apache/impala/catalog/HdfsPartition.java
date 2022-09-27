@@ -221,11 +221,11 @@ public class HdfsPartition extends CatalogObjectImpl
      * Creates the file descriptor of a file represented by 'fileStatus' that
      * resides in a filesystem that doesn't support the BlockLocation API (e.g. S3).
      */
-    public static FileDescriptor createWithNoBlocks(FileStatus fileStatus,
-        String relPath) {
+    public static FileDescriptor createWithNoBlocks(
+        FileStatus fileStatus, String relPath, String absPath) {
       FlatBufferBuilder fbb = new FlatBufferBuilder(1);
-      return new FileDescriptor(createFbFileDesc(fbb, fileStatus, relPath, null, false,
-          null));
+      return new FileDescriptor(
+          createFbFileDesc(fbb, fileStatus, relPath, null, false, absPath));
     }
 
     /**

@@ -537,10 +537,9 @@ public interface FeIcebergTable extends FeFsTable {
         relPath = relUri.getPath();
       }
 
-
       if (!FileSystemUtil.supportsStorageIds(fs)) {
-        return HdfsPartition.FileDescriptor.createWithNoBlocks(fileStatus,
-            StringUtils.isNotEmpty(relPath) ? relPath : absPath);
+        return HdfsPartition.FileDescriptor.createWithNoBlocks(
+            fileStatus, relPath, absPath);
       }
 
       BlockLocation[] locations;

@@ -259,7 +259,7 @@ public class FileMetadataLoader {
   private FileDescriptor createFd(FileSystem fs, FileStatus fileStatus,
       String relPath, Reference<Long> numUnknownDiskIds) throws IOException {
     if (!FileSystemUtil.supportsStorageIds(fs)) {
-      return FileDescriptor.createWithNoBlocks(fileStatus, relPath);
+      return FileDescriptor.createWithNoBlocks(fileStatus, relPath, null);
     }
     BlockLocation[] locations;
     if (fileStatus instanceof LocatedFileStatus) {
