@@ -47,6 +47,11 @@ done
 if [[ $KILL_HIVESERVER -eq 1 ]]; then
   echo Stopping Hive server.
   "$DIR"/kill-java-service.sh -c HiveServer
+  # The kill-java-service.sh command would fail if it did not succeed in
+  # stopping HiveServer2. Remove the pid file so that a reuse of the pid cannot
+  # interfere with starting HiveServer2. By default, the pid is written to
+  # $HIVE_CONF_DIR.
+  rm -f "$HIVE_CONF_DIR"/hiveserver2.pid
 fi
 if [[ $KILL_METASTORE -eq 1 ]]; then
   echo Stopping Hive metastore.
