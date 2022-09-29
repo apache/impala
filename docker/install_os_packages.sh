@@ -92,6 +92,7 @@ if [[ $DISTRIBUTION == Ubuntu ]]; then
   fi
   apt-get install -y \
       krb5-user \
+      language-pack-en \
       libsasl2-2 \
       libsasl2-modules \
       libsasl2-modules-gssapi-mit \
@@ -122,6 +123,16 @@ elif [[ $DISTRIBUTION == Redhat ]]; then
       krb5-workstation \
       openldap-devel \
       tzdata
+
+  # UTF-8 masking functions require the presence of en_US.utf8.
+  # Install the appropriate language packs. Redhat/Centos 7 come
+  # with en_US.utf8, so there is no need to install anything.
+  if ! grep 'release 7\.' /etc/redhat-release; then
+      yum install -y --disableplugin=subscription-manager \
+          glibc-langpack-en \
+          langpacks-en
+  fi
+
   if $INSTALL_DEBUG_TOOLS ; then
     echo "Installing extra debug tools"
     yum install -y --disableplugin=subscription-manager \
@@ -135,6 +146,12 @@ elif [[ $DISTRIBUTION == Redhat ]]; then
         vim \
         which
   fi
+fi
+
+# Verify en_US.utf8 is present
+if ! locale -a | grep en_US.utf8 ; then
+  echo "ERROR: en_US.utf8 locale is not present."
+  exit 1
 fi
 
 # To minimize the size for the Docker image, clean up any unnecessary files.

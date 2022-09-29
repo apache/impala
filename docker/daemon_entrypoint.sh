@@ -176,7 +176,26 @@ fi
 # Set ulimit core file size 0.
 ulimit -c 0
 
+# The UTF-8 masking functions rely on the presence of en_US.utf8. Make sure
+# it is present.
+if locale -a | grep en_US.utf8 ; then
+  echo "en_US.utf8 is present"
+else
+  echo "ERROR: en_US.utf8 locale is not present."
+  exit 1
+fi
+
 # Set a UTF-8 locale to enable upper/lower/initcap functions with UTF-8 mode.
-export LC_ALL=C.UTF-8
+# Use C.UTF-8 (aka C.utf8) if it is available, and fall back to en_US.utf8 if not
+#
+# Distributions can show either C.UTF-8 or C.utf8 in "locale -a", match either one
+if locale -a | grep -e "^C.UTF-8" -e "^C.utf8" ; then
+  # C.UTF-8 and C.utf8 are interchangeable as a setting for LC_ALL.
+  export LC_ALL=C.UTF-8
+else
+  # Presence of en_US.utf8 was verified above
+  export LC_ALL=en_US.utf8
+fi
+echo "LC_ALL: ${LC_ALL}"
 
 exec "$@"

@@ -268,7 +268,7 @@ redhat sudo yum install -y curl gawk gcc gcc-c++ git krb5-devel krb5-server \
         wget vim-common nscd cmake fuse-devel zlib-devel \
         psmisc lsof openssh-server redhat-lsb java-1.8.0-openjdk-devel \
         java-1.8.0-openjdk-src python3-devel python3-setuptools net-tools \
-        langpacks-en
+        langpacks-en glibc-langpack-en
 
 # Enable the Powertools repo for snappy-devel on RedHat 8
 redhat8 sudo yum install -y dnf-plugins-core

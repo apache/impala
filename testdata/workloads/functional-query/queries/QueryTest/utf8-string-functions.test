@@ -181,6 +181,86 @@ select mask('SQL引擎', 'x', 'x', 'x', 'x'),
 STRING,STRING,STRING,STRING,STRING
 ====
 ---- QUERY
+set utf8_mode=true;
+select mask('abcd áäèü ABCD ÁÄÈÜ');
+---- RESULTS: RAW_STRING
+'xxxx xxxx XXXX XXXX'
+---- TYPES
+STRING
+====
+---- QUERY
+set utf8_mode=true;
+select mask('Ich möchte ein Bier. Tschüss');
+---- RESULTS: RAW_STRING
+'Xxx xxxxxx xxx Xxxx. Xxxxxxx'
+---- TYPES
+STRING
+====
+---- QUERY
+set utf8_mode=true;
+select mask('Hungarian áéíöóőüúű ÁÉÍÖÓŐÜÚŰ');
+---- RESULTS: RAW_STRING
+'Xxxxxxxxx xxxxxxxxx XXXXXXXXX'
+---- TYPES
+STRING
+====
+---- QUERY
+set utf8_mode=true;
+select mask('German äöüß ÄÖÜẞ');
+---- RESULTS: RAW_STRING
+'Xxxxxx xxxx XXXX'
+---- TYPES
+STRING
+====
+---- QUERY
+set utf8_mode=true;
+select mask('French àâæçéèêëïîôœùûüÿ ÀÂÆÇÉÈÊËÏÎÔŒÙÛÜŸ');
+---- RESULTS: RAW_STRING
+'Xxxxxx xxxxxxxxxxxxxxxx XXXXXXXXXXXXXXXX'
+---- TYPES
+STRING
+====
+---- QUERY
+set utf8_mode=true;
+select mask('Greek αβξδ άέήώ ΑΒΞΔ ΆΈΉΏ 1234');
+---- RESULTS: RAW_STRING
+'Xxxxx xxxx xxxx XXXX XXXX nnnn'
+---- TYPES
+STRING
+====
+---- QUERY
+set utf8_mode=true;
+select mask_first_n('áéíöóőüúű');
+---- RESULTS: RAW_STRING
+'xxxxóőüúű'
+---- TYPES
+STRING
+====
+---- QUERY
+set utf8_mode=true;
+select mask_show_first_n('áéíöóőüúű');
+---- RESULTS: RAW_STRING
+'áéíöxxxxx'
+---- TYPES
+STRING
+====
+---- QUERY
+set utf8_mode=true;
+select mask_last_n('áéíöóőüúű');
+---- RESULTS: RAW_STRING
+'áéíöóxxxx'
+---- TYPES
+STRING
+====
+---- QUERY
+set utf8_mode=true;
+select mask_show_last_n('áéíöóőüúű')
+---- RESULTS: RAW_STRING
+'xxxxxőüúű'
+---- TYPES
+STRING
+====
+---- QUERY
 set utf8_mode=false;
 select upper('abcd áäèü'), lower('ABCD ÁÄÈÜ'), initcap('abcd áäèü ABCD ÁÄÈÜ');
 ---- RESULTS: RAW_STRING
