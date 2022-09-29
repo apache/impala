@@ -70,17 +70,20 @@ if [[ "$REPLY" =~ ^[Yy]$ ]]; then
   else
     # Either isilon or hdfs, no change in procedure.
     if hadoop fs -test -d ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}; then
-      echo "Removing existing ${TEST_WAREHOUSE_DIR} directory"
+      echo "Removing existing ${TEST_WAREHOUSE_DIR} directory contents"
       # For filesystems that don't allow 'rm' without 'x', chmod to 777 for the
       # subsequent 'rm -r'.
       if [ "${TARGET_FILESYSTEM}" = "isilon" ] || \
           [ "${TARGET_FILESYSTEM}" = "local" ]; then
         hadoop fs -chmod -R 777 ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
       fi
-      hadoop fs -rm -r -skipTrash ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
+      hadoop fs -rm -f -r -skipTrash "${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}/*"
+    else
+      # Only create the directory if it doesn't exist. Some filesystems - such as Ozone -
+      # are created with extra properties.
+      echo "Creating ${TEST_WAREHOUSE_DIR} directory"
+      hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
     fi
-    echo "Creating ${TEST_WAREHOUSE_DIR} directory"
-    hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
     if [[ -n "${HDFS_ERASURECODE_POLICY:-}" ]]; then
       hdfs ec -enablePolicy -policy "${HDFS_ERASURECODE_POLICY}"
       hdfs ec -setPolicy -policy "${HDFS_ERASURECODE_POLICY}" \

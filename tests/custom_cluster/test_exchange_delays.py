@@ -19,7 +19,7 @@ import pytest
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
 from tests.common.skip import SkipIfBuildType
-from tests.util.filesystem_utils import IS_S3, IS_ADLS, IS_ISILON
+from tests.util.filesystem_utils import IS_S3, IS_ADLS, IS_ISILON, IS_OZONE, IS_ENCRYPTED
 
 # IMPALA-6100: add additional margin for error for slow build types.
 SLOW_BUILD_TIMEOUT=20000
@@ -67,8 +67,9 @@ class TestExchangeDelays(CustomClusterTestSuite):
   # can't time out). Use a longer delay for platforms that have slow scans:
   # IMPALA-6811: S3/ADLS have slow scans.
   # IMPALA-6866: Isilon has slow scans (and is counted as a slow build above).
+  # Scans with Ozone encryption are also slower.
   SLOW_SCAN_EXTRA_DELAY_MS = 10000
-  if IS_S3 or IS_ADLS or IS_ISILON:
+  if IS_S3 or IS_ADLS or IS_ISILON or (IS_OZONE and IS_ENCRYPTED):
     DELAY_MS += SLOW_SCAN_EXTRA_DELAY_MS
 
   @pytest.mark.execute_serially

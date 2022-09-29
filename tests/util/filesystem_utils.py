@@ -35,6 +35,7 @@ IS_GCS = FILESYSTEM == "gs"
 IS_COS = FILESYSTEM == "cosn"
 IS_OZONE = FILESYSTEM == "ozone"
 IS_EC = os.getenv("ERASURE_CODING") == "true"
+IS_ENCRYPTED = os.getenv("USE_OZONE_ENCRYPTION") == "true"
 # This condition satisfies both the states where one can assume a default fs
 #   - The environment variable is set to an empty string.
 #   - Tne environment variables is unset ( None )
