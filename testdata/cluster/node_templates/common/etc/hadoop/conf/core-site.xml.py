@@ -125,7 +125,7 @@ if target_filesystem == 's3':
     })
 
 if target_filesystem == 'ozone':
-  CONFIG.update({'fs.AbstractFileSystem.o3fs.impl': 'org.apache.hadoop.fs.ozone.OzFs'})
+  CONFIG.update({'fs.ofs.impl': 'org.apache.hadoop.fs.ozone.RootedOzoneFileSystem'})
 
 if kerberize:
   CONFIG.update({
