@@ -2571,7 +2571,10 @@ void AdmissionController::UpdateExecGroupMetricMap(
 void AdmissionController::UpdateExecGroupMetric(
     const string& grp_name, int64_t delta) {
   auto entry = exec_group_query_load_map_.find(grp_name);
-  if (entry != exec_group_query_load_map_.end()) entry->second->Increment(delta);
+  if (entry != exec_group_query_load_map_.end()) {
+    DCHECK_GE(entry->second->GetValue() + delta, 0);
+    entry->second->Increment(delta);
+  }
 }
 
 } // namespace impala
