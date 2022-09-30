@@ -518,7 +518,8 @@ void TopNNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (heap_ != nullptr) heap_->Close();
   for (auto& entry : partition_heaps_) {
-    entry.second->Close();
+    DCHECK(entry.second != nullptr);
+    if (entry.second != nullptr) entry.second->Close();
   }
   if (tuple_pool_.get() != nullptr) tuple_pool_->FreeAll();
   if (order_cmp_.get() != nullptr) order_cmp_->Close(state);
@@ -690,6 +691,13 @@ Status TopNNode::ReclaimTuplePool(RuntimeState* state) {
     for (auto& entry : partition_heaps_) {
       RETURN_IF_ERROR(entry.second->RematerializeTuples(this, state, temp_pool.get()));
       DCHECK(entry.second->DCheckConsistency());
+    }
+    // The second loop is needed for IMPALA-11631. We only move heaps from partition_heap_
+    // to rematerialized_heaps once all have been rematerialized. Otherwise, in case of
+    // an error, we may call Close() on a nullptr or leak the memory by not explicitly
+    // calling Close() on the heap pointer. Maybe better to add Close() in the Heap
+    // destructor later.
+    for (auto& entry : partition_heaps_) {
       // The key references memory in 'tuple_pool_'. Replace it with a rematerialized
       // tuple.
       rematerialized_heaps.push_back(move(entry.second));
