@@ -27,6 +27,13 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/util")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/util")
 
+add_library(UtilIr
+  bloom-filter-ir.cc
+  in-list-filter-ir.cc
+  min-max-filter-ir.cc
+)
+add_dependencies(UtilIr gen-deps)
+
 set(UTIL_SRCS
   auth-util.cc
   avro-util.cc
@@ -36,7 +43,6 @@ set(UTIL_SRCS
   bit-packing.cc
   bit-util.cc
   bloom-filter.cc
-  bloom-filter-ir.cc
   cgroup-util.cc
   coding-util.cc
   codec.cc
@@ -62,7 +68,6 @@ set(UTIL_SRCS
   impalad-metrics.cc
   impala-bloom-filter-buffer-allocator.cc
   in-list-filter.cc
-  in-list-filter-ir.cc
   jni-util.cc
   json-util.cc
   jwt-util.cc
@@ -75,7 +80,6 @@ set(UTIL_SRCS
   memusage-path-handlers.cc
   metrics.cc
   min-max-filter.cc
-  min-max-filter-ir.cc
   minidump.cc
   mpfit-util.cc
   network-util.cc
@@ -139,7 +143,7 @@ else()
 endif()
 
 add_library(Util ${UTIL_SRCS})
-add_dependencies(Util gen-deps gen_ir_descriptions)
+add_dependencies(Util gen-deps)
 
 add_library(UtilTests STATIC
   benchmark-test.cc
@@ -191,7 +195,7 @@ add_library(UtilTests STATIC
   uid-util-test.cc
   zip-util-test.cc
 )
-add_dependencies(UtilTests gen-deps gen_ir_descriptions)
+add_dependencies(UtilTests gen-deps)
 
 # Squeasel requires C99 compatibility to build.
 SET_SOURCE_FILES_PROPERTIES(${SQUEASEL_SRC_DIR}/squeasel.c

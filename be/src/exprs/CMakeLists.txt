@@ -24,61 +24,65 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exprs")
 
 set(MURMURHASH_SRC_DIR "${CMAKE_SOURCE_DIR}/be/src/thirdparty/murmurhash")
 
-add_library(Exprs
-  agg-fn.cc
-  agg-fn-evaluator.cc
+add_library(ExprsIr
   agg-fn-evaluator-ir.cc
   aggregate-functions-ir.cc
-  anyval-util.cc
   bit-byte-functions-ir.cc
-  case-expr.cc
-  cast-format-expr.cc
   cast-functions-ir.cc
-  compound-predicates.cc
   compound-predicates-ir.cc
-  conditional-functions.cc
   conditional-functions-ir.cc
-  datasketches-common.cc
   datasketches-functions-ir.cc
   date-functions-ir.cc
   decimal-functions-ir.cc
   decimal-operators-ir.cc
-  expr.cc
-  hive-udf-call.cc
   hive-udf-call-ir.cc
   iceberg-functions-ir.cc
   in-predicate-ir.cc
-  is-not-empty-predicate.cc
   is-null-predicate-ir.cc
-  kudu-partition-expr.cc
   kudu-partition-expr-ir.cc
-  like-predicate.cc
   like-predicate-ir.cc
-  literal.cc
   mask-functions-ir.cc
   math-functions-ir.cc
+  operators-ir.cc
+  scalar-expr-ir.cc
+  string-functions-ir.cc
+  timestamp-functions-ir.cc
+  tuple-is-null-predicate-ir.cc
+  udf-builtins-ir.cc
+  utility-functions-ir.cc
+)
+add_dependencies(ExprsIr gen-deps)
+
+add_library(Exprs
+  agg-fn.cc
+  agg-fn-evaluator.cc
+  anyval-util.cc
+  case-expr.cc
+  cast-format-expr.cc
+  compound-predicates.cc
+  conditional-functions.cc
+  datasketches-common.cc
+  expr.cc
+  hive-udf-call.cc
+  is-not-empty-predicate.cc
+  kudu-partition-expr.cc
+  like-predicate.cc
+  literal.cc
   ${MURMURHASH_SRC_DIR}/MurmurHash3.cpp
   null-literal.cc
-  operators-ir.cc
   scalar-expr.cc
   scalar-expr-evaluator.cc
-  scalar-expr-ir.cc
   slot-ref.cc
   string-functions.cc
-  string-functions-ir.cc
   timestamp-functions.cc
-  timestamp-functions-ir.cc
   timezone_db.cc
   tuple-is-null-predicate.cc
-  tuple-is-null-predicate-ir.cc
   scalar-fn-call.cc
   udf-builtins.cc
-  udf-builtins-ir.cc
   utility-functions.cc
-  utility-functions-ir.cc
   valid-tuple-id.cc
 )
-add_dependencies(Exprs gen-deps gen_ir_descriptions)
+add_dependencies(Exprs gen-deps)
 
 add_library(ExprsTests STATIC
   datasketches-test.cc

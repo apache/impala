@@ -21,6 +21,12 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/kudu")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/kudu")
 
+add_library(ExecKuduIr
+  kudu-util-ir.cc
+)
+
+add_dependencies(ExecKuduIr gen-deps)
+
 add_library(ExecKudu
   kudu-scanner.cc
   kudu-scan-node.cc
@@ -28,7 +34,6 @@ add_library(ExecKudu
   kudu-scan-node-mt.cc
   kudu-table-sink.cc
   kudu-util.cc
-  kudu-util-ir.cc
 )
 
 add_dependencies(ExecKudu gen-deps)

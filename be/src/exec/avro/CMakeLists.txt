@@ -21,9 +21,14 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/avro")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/avro")
 
+add_library(ExecAvroIr
+  hdfs-avro-scanner-ir.cc
+)
+
+add_dependencies(ExecAvroIr gen-deps)
+
 add_library(ExecAvro
   hdfs-avro-scanner.cc
-  hdfs-avro-scanner-ir.cc
 )
 
 add_dependencies(ExecAvro gen-deps)

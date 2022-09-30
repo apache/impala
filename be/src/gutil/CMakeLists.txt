@@ -80,5 +80,5 @@ add_kudu_test(strings/string_util-test)
 add_library(GUtilTests STATIC
   sysinfo-test.cc
 )
-add_dependencies(GUtilTests gen-deps gen_ir_descriptions)
+add_dependencies(GUtilTests gen-deps)
 ADD_UNIFIED_BE_LSAN_TEST(sysinfo-test "SysInfoTest.*")

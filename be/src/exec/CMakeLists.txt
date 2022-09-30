@@ -30,6 +30,20 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec")
 
+add_library(ExecIr
+  grouping-aggregator-ir.cc
+  hdfs-columnar-scanner-ir.cc
+  hdfs-scanner-ir.cc
+  non-grouping-aggregator-ir.cc
+  partitioned-hash-join-builder-ir.cc
+  partitioned-hash-join-node-ir.cc
+  select-node-ir.cc
+  topn-node-ir.cc
+  union-node-ir.cc
+)
+
+add_dependencies(ExecIr gen-deps)
+
 add_library(Exec
   acid-metadata-utils.cc
   aggregation-node.cc
@@ -52,16 +66,13 @@ add_library(Exec
   file-metadata-utils.cc
   filter-context.cc
   grouping-aggregator.cc
-  grouping-aggregator-ir.cc
   grouping-aggregator-partition.cc
   hash-table.cc
   hdfs-columnar-scanner.cc
-  hdfs-columnar-scanner-ir.cc
   hdfs-scan-node.cc
   hdfs-scan-node-base.cc
   hdfs-scan-node-mt.cc
   hdfs-scanner.cc
-  hdfs-scanner-ir.cc
   hdfs-table-sink.cc
   hdfs-table-writer.cc
   hdfs-text-table-writer.cc
@@ -70,27 +81,21 @@ add_library(Exec
   nested-loop-join-builder.cc
   nested-loop-join-node.cc
   non-grouping-aggregator.cc
-  non-grouping-aggregator-ir.cc
   partial-sort-node.cc
   partitioned-hash-join-builder.cc
-  partitioned-hash-join-builder-ir.cc
   partitioned-hash-join-node.cc
-  partitioned-hash-join-node-ir.cc
   plan-root-sink.cc
   read-write-util.cc
   scan-node.cc
   scanner-context.cc
   select-node.cc
-  select-node-ir.cc
   singular-row-src-node.cc
   sort-node.cc
   streaming-aggregation-node.cc
   subplan-node.cc
   text-converter.cc
   topn-node.cc
-  topn-node-ir.cc
   union-node.cc
-  union-node-ir.cc
   unnest-node.cc
 )
 

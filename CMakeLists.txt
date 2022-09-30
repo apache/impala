@@ -502,7 +502,7 @@ add_subdirectory(shell)
 
 # Build target for all generated files which most backend code depends on
 add_custom_target(gen-deps ALL DEPENDS thrift-deps proto-deps fb-deps
-  kudu-util-proto-deps kudu-rpc-proto-deps kudu-security-proto-deps)
+  kudu-util-proto-deps kudu-rpc-proto-deps kudu-security-proto-deps gen_ir_descriptions)
 
 add_custom_target(tarballs ALL DEPENDS shell_tarball)
 

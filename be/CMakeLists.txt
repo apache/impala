@@ -482,15 +482,19 @@ set (IMPALA_LIBS
   CodeGen
   Common
   Exec
+  ExecIr
   ExecAvro
+  ExecAvroIr
   ExecHBase
   ExecKudu
+  ExecKuduIr
   ExecOrc
   ExecParquet
   ExecRcfile
   ExecSequence
   ExecText
   Exprs
+  ExprsIr
   GlobalFlags
   histogram_proto
   ImpalaThrift
@@ -503,6 +507,7 @@ set (IMPALA_LIBS
   rpc_introspection_proto
   pb_util_proto
   Runtime
+  RuntimeIr
   Scheduling
   security
   Service
@@ -511,7 +516,9 @@ set (IMPALA_LIBS
   ThriftSaslTransport
   token_proto
   Udf
+  UdfIr
   Util
+  UtilIr
   UtilCache
 )
 
