@@ -203,6 +203,7 @@ FILE_FORMAT_MAP = {
   'avro': 'AVRO',
   'hbase': "'org.apache.hadoop.hive.hbase.HBaseStorageHandler'",
   'kudu': "KUDU",
+  'iceberg': "ICEBERG",
   }
 
 HIVE_TO_AVRO_TYPE_MAP = {
@@ -309,7 +310,8 @@ def build_table_template(file_format, columns, partition_columns, row_format, tb
 
   tblproperties_clause = "TBLPROPERTIES (\n{0}\n)"
 
-  external = "" if is_transactional(tblproperties) else "EXTERNAL"
+  external = "" if is_transactional(tblproperties) or is_iceberg_table(file_format) \
+              else "EXTERNAL"
 
   if file_format == 'avro':
     # TODO Is this flag ever used?
@@ -319,7 +321,8 @@ def build_table_template(file_format, columns, partition_columns, row_format, tb
     else:
       tblproperties["avro.schema.url"] = "hdfs://%s/%s/%s/{table_name}.json" \
         % (options.hdfs_namenode, options.hive_warehouse_dir, avro_schema_dir)
-  elif file_format in ['parquet', 'orc']:  # columnar formats don't need row format
+  # columnar formats don't need row format
+  elif file_format in ['parquet', 'orc', 'iceberg']:
     row_format_stmt = str()
   elif file_format == 'kudu':
     # Use partitioned_by to set a trivial hash distribution
@@ -341,6 +344,22 @@ def build_table_template(file_format, columns, partition_columns, row_format, tb
   else:
     tblproperties_clause = tblproperties_clause.format(",\n".join(all_tblproperties))
 
+  columns_str = ""
+  if is_iceberg_table(file_format):
+    for col in columns.split("\n"):
+      # The primary keys and foreign keys of the Iceberg tables should be omitted
+      if col.lower().startswith(("primary key", "foreign key")):
+        continue
+      # Omit PRIMARY KEY declaration e.g 'col_i INT PRIMARY KEY,'
+      col = re.sub(r"(?i)\s*primary\s*key\s*", " ", col)
+      # Iceberg tables do not support TINYINT and SMALLINT
+      col = re.sub(r"(?i)\s*tinyint\s*", " INT", col)
+      col = re.sub(r"(?i)\s*smallint\s*", " INT", col)
+      columns_str = columns_str + col + ",\n"
+    columns_str = columns_str.strip().strip(",")
+  else:
+    columns_str = ",\n".join(columns.split("\n"))
+
   # Note: columns are ignored but allowed if a custom serde is specified
   # (e.g. Avro)
   stmt = """
@@ -357,13 +376,12 @@ LOCATION '{{hdfs_location}}'
     external=external,
     table_comment=table_comment_stmt,
     row_format=row_format_stmt,
-    columns=',\n'.join(columns.split('\n')),
+    columns=columns_str,
     primary_keys=primary_keys_clause,
     partitioned_by=partitioned_by,
     tblproperties=tblproperties_clause,
     file_format_string=file_format_string
     ).strip()
-
   # Remove empty lines from the stmt string.  There is an empty line for
   # each of the sections that didn't have anything (e.g. partitioned_by)
   stmt = os.linesep.join([s for s in stmt.splitlines() if s])
@@ -454,8 +472,9 @@ def build_impala_parquet_codec_statement(codec):
 
 def build_insert_into_statement(insert, db_name, db_suffix, table_name, file_format,
                                 hdfs_path, for_impala=False):
-  insert_hint = "/* +shuffle, clustered */" \
-    if for_impala and file_format == 'parquet' else ""
+  insert_hint = ""
+  if for_impala and (file_format == 'parquet' or is_iceberg_table(file_format)):
+    insert_hint = "/* +shuffle, clustered */"
   insert_statement = insert.format(db_name=db_name,
                                    db_suffix=db_suffix,
                                    table_name=table_name,
@@ -509,7 +528,7 @@ def build_insert(insert, db_name, db_suffix, file_format,
     output += build_codec_enabled_statement(codec) + "\n"
     output += build_compression_codec_statement(codec, compression_type,
                                                 file_format) + "\n"
-  elif file_format == 'parquet':
+  elif file_format == 'parquet' or is_iceberg_table(file_format):
     # This is for Impala parquet, add the appropriate codec statement
     output += build_impala_parquet_codec_statement(codec) + "\n"
   output += build_insert_into_statement(insert, db_name, db_suffix,
@@ -807,7 +826,7 @@ def generate_statements(output_name, test_vectors, sections,
                                                               db_suffix, table_name))
           else:
             print 'Empty base table load for %s. Skipping load generation' % table_name
-        elif file_format in ['kudu', 'parquet']:
+        elif file_format in ['kudu', 'parquet', 'iceberg']:
           if insert_hive:
             hive_output.load.append(build_insert(insert_hive, db_name, db_suffix,
                 file_format, codec, compression_type, table_name, data_path))
@@ -843,6 +862,10 @@ def generate_statements(output_name, test_vectors, sections,
 
 def is_transactional(table_properties):
   return table_properties.get('transactional', "").lower() == 'true'
+
+
+def is_iceberg_table(file_format):
+  return file_format == 'iceberg'
 
 
 def parse_schema_template_file(file_name):
