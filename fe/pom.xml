@@ -126,6 +126,13 @@ under the License.
           <groupId>org.apache.ranger</groupId>
           <artifactId>ranger-plugins-audit</artifactId>
         </exclusion>
+        <!-- After RANGER-3498, Ranger's ranger-plugins-common starts pulling in
+        log4j-1.2-api, which is banned by Impala's frontend. Thus we exclude the
+        dependency here.-->
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-1.2-api</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
 
@@ -140,6 +147,13 @@ under the License.
         <exclusion>
           <groupId>org.apache.kafka</groupId>
           <artifactId>*</artifactId>
+        </exclusion>
+        <!-- After RANGER-3498, Ranger's ranger-plugins-audit starts pulling in
+        log4j-1.2-api, which is banned by Impala's frontend. Thus we exclude the
+        dependency here.-->
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-1.2-api</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.apache.shiro</groupId>
