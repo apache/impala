@@ -74,7 +74,7 @@ under the License.
          but bcprov-jdk15on matches the versions from pac4j 4.5.5. -->
     <xmlsec.version>2.2.3</xmlsec.version>
     <bcprov-jdk15on.version>1.68</bcprov-jdk15on.version>
-    <springframework.version>5.3.18</springframework.version>
+    <springframework.version>5.3.20</springframework.version>
     <json-smart.version>2.4.7</json-smart.version>
   </properties>
 
