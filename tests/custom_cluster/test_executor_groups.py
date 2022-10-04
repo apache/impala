@@ -563,9 +563,9 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # Create fresh clients
     second_coord_client = self.create_client_for_nth_impalad(1)
     self.create_impala_clients()
-    # Add an exec group with a 4gb mem_limit.
+    # Add an exec group with a 4.001gb mem_limit, adding spare room for cancellation
     self._add_executor_group("group1", 2, admission_control_slots=2,
-                             extra_args="-mem_limit=4g")
+                             extra_args="-mem_limit=4.001g")
     assert self._get_num_executor_groups(only_healthy=True) == 1
     second_coord_client.set_configuration({'mt_dop': '2'})
     handle_for_second = second_coord_client.execute_async(QUERY)
