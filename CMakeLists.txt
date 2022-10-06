@@ -148,7 +148,13 @@ set_dep_root(CALLONCEHACK)
 # don't accidentally use it if it can be found.
 set(Boost_NO_BOOST_CMAKE ON)
 
-set(Boost_USE_STATIC_LIBS NOT ${BUILD_SHARED_LIBS})
+# Make Boost follow the preference of shared libraries vs static libraries.
+if(BUILD_SHARED_LIBS)
+  set(Boost_USE_STATIC_LIBS OFF)
+else()
+  set(Boost_USE_STATIC_LIBS ON)
+endif()
+# Always use the static Boost runtime
 set(Boost_USE_STATIC_RUNTIME ON)
 
 # Newer versions of boost (including the version in toolchain) don't build separate
@@ -195,7 +201,7 @@ find_package(Boost REQUIRED COMPONENTS thread regex filesystem system date_time 
 # Mark Boost as a system header to avoid compile warnings.
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 message(STATUS "Boost include dir: " ${Boost_INCLUDE_DIRS})
-message(STATUS "Boost libraries: " ${Boost_LIBRARIES})
+message(STATUS "Boost libraries: ${Boost_LIBRARIES}")
 
 # If at all possible, try to link with system OpenSSL in an attempt to match what the
 # platform that this build might ultimately be deployed on. If no suitable OpenSSL is

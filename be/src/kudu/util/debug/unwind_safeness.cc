@@ -32,8 +32,16 @@
 
 #include <glog/logging.h>
 
+// DCHECK's meaning on release builds is not compatible with the comma
+// operator, so don't include the DCHECK on release builds.
+#if defined(NDEBUG)
 #define CALL_ORIG(func_name, ...) \
   ((decltype(&func_name))g_orig_ ## func_name)(__VA_ARGS__)
+#else
+#define CALL_ORIG(func_name, ...) \
+  DCHECK(g_orig_ ## func_name != nullptr), \
+  ((decltype(&func_name))g_orig_ ## func_name)(__VA_ARGS__)
+#endif
 
 // Don't hook dl_iterate_phdr in TSAN builds since TSAN already instruments this
 // function and blocks signals while calling it. And skip it for macOS; it
@@ -69,13 +77,19 @@ struct ScopedBumpDepth {
   }
 };
 
+#ifndef IMPALA_SHARED_LIBRARY
 void *dlsym_or_die(const char *sym) {
   dlerror();
   void* ret = dlsym(RTLD_NEXT, sym);
   char* error = dlerror();
   CHECK(!error) << "failed to find symbol " << sym << ": " << error;
+  // On older glibc, the error may not be reported even when the symbol
+  // was not found. As a safeguard, this also checks that the return value
+  // is non-null.
+  CHECK(ret != nullptr) << "failed to find symbol " << sym << ", but no error was set.";
   return ret;
 }
+#endif
 
 // Initialize the global variables which store the original references. This is
 // set up as a constructor so that we're guaranteed to call this before main()
@@ -97,8 +111,22 @@ void InitIfNecessary() {
   // need for any synchronization here.
   if (g_initted) return;
 
+#ifdef IMPALA_SHARED_LIBRARY
+  // When Impala is built with shared libraries, it suffers a more extensive
+  // version of the issue with "dl_iterate_phdr" below. Both dlopen and
+  // dlclose cannot be found due to the linking order in the Impala build.
+  // Since Impala does not ship with shared libraries, tolerate these missing
+  // symbols. As noted below, any actual usage will result in dereferencing
+  // a null pointer, so this will be very noticeable.
+  g_orig_dlopen = dlsym(RTLD_NEXT, "dlopen");
+  g_orig_dlclose = dlsym(RTLD_NEXT, "dlclose");
+#else
+  // Leave the original logic in place for static binaries, as there has never
+  // been an issue with these checks.
   g_orig_dlopen = dlsym_or_die("dlopen");
   g_orig_dlclose = dlsym_or_die("dlclose");
+#endif
+
 #ifdef HOOK_DL_ITERATE_PHDR
   // Failing to hook dl_iterate_phdr is non-fatal.
   //

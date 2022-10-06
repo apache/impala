@@ -62,6 +62,12 @@ IF($ENV{USE_GOLD_LINKER} STREQUAL "true")
   SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fuse-ld=gold")
 ENDIF()
 
+if(BUILD_SHARED_LIBS)
+  # There is some logic in be/src/kudu/util/debug/unwind_safeness.cc that needs to adapt
+  # when using shared libraries. See IMPALA-11640.
+  SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DIMPALA_SHARED_LIBRARY")
+endif()
+
 # On Apple we build with clang and need libstdc++ instead of libc++
 if (APPLE)
   SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -stdlib=libstdc++")
