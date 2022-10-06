@@ -655,6 +655,29 @@ class TestDdlStatements(TestDdlBase):
         "insert into table {0} partition(j=1, s='1') select 1".format(fq_tbl_name))
     assert '1' == self.execute_scalar("select count(*) from {0}".format(fq_tbl_name))
 
+  @SkipIfLocal.hdfs_client
+  def test_alter_table_set_fileformat(self, vector, unique_database):
+    # Tests that SET FILEFORMAT clause is set for ALTER TABLE ADD PARTITION statement
+    fq_tbl_name = unique_database + ".p_fileformat"
+    self.client.execute(
+        "create table {0}(i int) partitioned by (p int)".format(fq_tbl_name))
+
+    # Add a partition with Parquet fileformat
+    self.execute_query_expect_success(self.client,
+        "alter table {0} add partition(p=1) set fileformat parquet"
+        .format(fq_tbl_name))
+
+    # Add two partitions with ORC fileformat
+    self.execute_query_expect_success(self.client,
+        "alter table {0} add partition(p=2) partition(p=3) set fileformat orc"
+        .format(fq_tbl_name))
+
+    result = self.execute_query_expect_success(self.client,
+        "SHOW PARTITIONS %s" % fq_tbl_name)
+
+    assert 1 == len(filter(lambda line: line.find("PARQUET") != -1, result.data))
+    assert 2 == len(filter(lambda line: line.find("ORC") != -1, result.data))
+
   def test_alter_table_create_many_partitions(self, vector, unique_database):
     """
     Checks that creating more partitions than the MAX_PARTITION_UPDATES_PER_RPC

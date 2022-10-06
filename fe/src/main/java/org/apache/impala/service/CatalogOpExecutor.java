@@ -1049,7 +1049,12 @@ public class CatalogOpExecutor {
           // Create and add HdfsPartition objects to the corresponding HdfsTable and load
           // their block metadata. Get the new table object with an updated catalog
           // version.
-          refreshedTable = alterTableAddPartitions(tbl, params.getAdd_partition_params());
+          THdfsFileFormat format = null;
+          if(params.isSetSet_file_format_params()) {
+            format = params.getSet_file_format_params().file_format;
+          }
+          refreshedTable = alterTableAddPartitions(tbl, params.getAdd_partition_params(),
+              format);
           if (refreshedTable != null) {
             refreshedTable.setCatalogVersion(newCatalogVersion);
             // the alter table event is only generated when we add the partition. For
@@ -4046,7 +4051,8 @@ public class CatalogOpExecutor {
    * catalog cache and the HMS.
    */
   private Table alterTableAddPartitions(Table tbl,
-      TAlterTableAddPartitionParams addPartParams) throws ImpalaException {
+      TAlterTableAddPartitionParams addPartParams, THdfsFileFormat fileFormat)
+      throws ImpalaException {
     Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
 
     TableName tableName = tbl.getTableName();
@@ -4071,6 +4077,10 @@ public class CatalogOpExecutor {
       Partition hmsPartition =
           createHmsPartition(partitionSpec, msTbl, tableName, partParams.getLocation());
       allHmsPartitionsToAdd.add(hmsPartition);
+
+      if (fileFormat != null) {
+        setStorageDescriptorFileFormat(hmsPartition.getSd(), fileFormat);
+      }
 
       THdfsCachingOp cacheOp = partParams.getCache_op();
       if (cacheOp != null) partitionCachingOpMap.put(hmsPartition.getValues(), cacheOp);
