@@ -69,6 +69,14 @@ under the License.
           <groupId>net.minidev</groupId>
           <artifactId>json-smart</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-log4j12</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>log4j</groupId>
+          <artifactId>log4j</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
 
@@ -133,6 +141,10 @@ under the License.
           <groupId>org.apache.logging.log4j</groupId>
           <artifactId>log4j-1.2-api</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>log4j</groupId>
+          <artifactId>log4j</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
 
@@ -154,6 +166,10 @@ under the License.
         <exclusion>
           <groupId>org.apache.logging.log4j</groupId>
           <artifactId>log4j-1.2-api</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>log4j</groupId>
+          <artifactId>log4j</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.apache.shiro</groupId>
@@ -315,7 +331,7 @@ under the License.
 
     <dependency>
       <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-log4j12</artifactId>
+      <artifactId>slf4j-reload4j</artifactId>
       <version>${slf4j.version}</version>
     </dependency>
 
@@ -431,6 +447,10 @@ under the License.
         <exclusion>
           <groupId>org.apache.logging.log4j</groupId>
           <artifactId>log4j-1.2-api</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>log4j</groupId>
+          <artifactId>log4j</artifactId>
         </exclusion>
         <!-- We should exclude hive-serde since it brings along a
            different version of flatbuffers causing problems for loading tables -->
@@ -843,8 +863,11 @@ under the License.
                     <exclude>ant-contrib:*</exclude>
                     <exclude>org.apache.ant:*</exclude>
                     <exclude>org.eclipse.jetty:*</exclude>
+                    <!-- We use reload4j, avoid all log4j 1.x implementations -->
                     <exclude>org.apache.logging.log4j:log4j-slf4j-impl</exclude>
                     <exclude>org.apache.logging.log4j:log4j-1.2-api</exclude>
+                    <exclude>log4j:log4j</exclude>
+                    <exclude>org.slf4j:slf4j-log4j12</exclude>
                     <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
                     <exclude>org.fusesource.leveldbjni:*</exclude>
                     <!-- IMPALA-9647 (re: CVE-2014-3577, CVE-2015-5262) -->
