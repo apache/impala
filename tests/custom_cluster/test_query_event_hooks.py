@@ -79,6 +79,7 @@ class TestHooksStartupFail(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
+      expect_cores=True,
       cluster_size=1,
       impalad_timeout_s=5,
       impala_log_dir=LOG_DIR1,
@@ -99,6 +100,7 @@ class TestHooksStartupFail(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
+      expect_cores=True,
       cluster_size=1,
       impalad_timeout_s=5,
       impala_log_dir=LOG_DIR2,
@@ -115,21 +117,3 @@ class TestHooksStartupFail(CustomClusterTestSuite):
     self.assert_impalad_log_contains("INFO",
                                      "Unable to instantiate query event hook class {0}"
                                      .format(self.NONEXIST_HOOK), expected_count=-1)
-
-  def setup_method(self, method):
-    # Explicitly override CustomClusterTestSuite.setup_method() to
-    # allow it to exception, since this test suite is for cases where
-    # startup fails
-    try:
-      super(TestHooksStartupFail, self).setup_method(method)
-    except Exception:
-      self._stop_impala_cluster()
-
-  def teardown_method(self, method):
-    # Explicitly override CustomClusterTestSuite.teardown_method() to
-    # allow it to exception, since it relies on setup_method() having
-    # completed successfully
-    try:
-      super(TestHooksStartupFail, self).teardown_method(method)
-    except Exception:
-      self._stop_impala_cluster()
