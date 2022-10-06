@@ -143,32 +143,62 @@ public class JniUtil {
     }
   }
 
-  /**
-   * Warn if the result size or the response time exceeds thresholds.
-   */
-  public static void logResponse(long resultSize, long startTime, TBase<?, ?> thriftReq,
-      String methodName) {
-    long duration = System.currentTimeMillis() - startTime;
-    boolean tooLarge = (resultSize > BackendConfig.INSTANCE.getWarnCatalogResponseSize());
-    boolean tooSlow =
-        (duration > BackendConfig.INSTANCE.getWarnCatalogResponseDurationMs());
-    if (tooLarge || tooSlow) {
-      String header = (tooLarge && tooSlow) ? "Response too large and too slow" :
-          (tooLarge ? "Response too large" : "Response too slow");
-      String request = (thriftReq == null) ? "" :
-          ", request: " + StringUtils.abbreviate(thriftReq.toString(), 1000);
-      LOG.warn("{}: size={} ({}), duration={}ms ({}), method: {}{}",
-          header, resultSize, PrintUtils.printBytes(resultSize),
-          duration, PrintUtils.printTimeMs(duration), methodName, request);
+  public static class OperationLog {
+    private final long startTime;
+    private final String methodName;
+    private final String shortDescription;
+
+    public OperationLog(String methodName, String shortDescription) {
+      this.startTime = System.currentTimeMillis();
+      this.methodName = methodName;
+      this.shortDescription = shortDescription;
+    }
+
+    public void logStart() { LOG.info("{} request: {}", methodName, shortDescription); }
+
+    public void logFinish() {
+      long duration = getDurationFromStart();
+      LOG.info("Finished {} request: {}. Time spent: {}", methodName, shortDescription,
+          PrintUtils.printTimeMs(duration));
+    }
+
+    public void logError() {
+      long duration = getDurationFromStart();
+      LOG.error("Error in {}. Time spent: {}", shortDescription,
+          PrintUtils.printTimeMs(duration));
+    }
+
+    /**
+     * Warn if the result size or the response time exceeds thresholds.
+     */
+    public void logResponse(long resultSize, TBase<?, ?> thriftReq) {
+      long duration = getDurationFromStart();
+      boolean tooLarge =
+          (resultSize > BackendConfig.INSTANCE.getWarnCatalogResponseSize());
+      boolean tooSlow =
+          (duration > BackendConfig.INSTANCE.getWarnCatalogResponseDurationMs());
+      if (tooLarge || tooSlow) {
+        String header = (tooLarge && tooSlow) ?
+            "Response too large and too slow" :
+            (tooLarge ? "Response too large" : "Response too slow");
+        String request = (thriftReq == null) ?
+            "" :
+            ", request: " + StringUtils.abbreviate(thriftReq.toString(), 1000);
+        LOG.warn("{}: size={} ({}), duration={}ms ({}), method: {}{}", header, resultSize,
+            PrintUtils.printBytes(resultSize), duration, PrintUtils.printTimeMs(duration),
+            methodName, request);
+      }
+    }
+
+    private long getDurationFromStart() {
+      return System.currentTimeMillis() - this.startTime;
     }
   }
 
-  public static void logResponse(long startTime, TBase<?, ?> thriftReq, String method) {
-    logResponse(0, startTime, thriftReq, method);
-  }
-
-  public static void logResponse(long startTime, String method) {
-    logResponse(startTime, null, method);
+  public static OperationLog logOperation(String methodName, String shortDescription) {
+    OperationLog operationLog = new OperationLog(methodName, shortDescription);
+    operationLog.logStart();
+    return operationLog;
   }
 
   /**
