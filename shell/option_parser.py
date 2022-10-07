@@ -279,6 +279,10 @@ def get_option_parser(defaults):
                     help="Timeout in seconds after which the socket will time out"
                     " if the associated operation cannot be completed. Set to None to"
                     " disable any timeout. Only supported for hs2-http mode.")
+  parser.add_option("--connect_max_tries", type="int",
+                    dest="connect_max_tries", default=4,
+                    help="Maximum number of times that an idempotent RPC connection to "
+                         "the Impala coordinator will be retried in hs2-http mode.")
   parser.add_option("--protocol", dest="protocol", default="hs2",
                     help="Protocol to use for client/server connection. Valid inputs are "
                          "['hs2', 'hs2-http', 'beeswax']. 'hs2-http' uses HTTP transport "

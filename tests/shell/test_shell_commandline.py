@@ -1272,6 +1272,31 @@ class TestImpalaShell(ImpalaTestSuite):
     assert result.stderr == ""
     assert result.stdout == "0\n"
 
+  def test_connect_max_tries(self, vector):
+    """Test setting different connect_max_tries values."""
+    if (vector.get_value('strict_hs2_protocol')
+        or vector.get_value('protocol') != 'hs2-http'):
+      pytest.skip("connect_max_tries not supported in strict hs2 mode."
+                  " Only supported with hs2-http protocol.")
+
+    # Test connect_max_tries=-1, expect errors
+    args = ['--quiet', '-B', '--query', 'select 0;']
+    result = run_impala_shell_cmd(vector, args + ['--connect_max_tries=-1'],
+                                  expect_success=False)
+    expected_err = ("connect_max_tries must be greater than or equal to 1")
+    assert result.stderr.splitlines()[0] == expected_err
+
+    # Test connect_max_tries=0, expect errors
+    result = run_impala_shell_cmd(vector, args + ['--connect_max_tries=0'],
+                                  expect_success=False)
+    expected_err = ("connect_max_tries must be greater than or equal to 1")
+    assert result.stderr.splitlines()[0] == expected_err
+
+    # Test connect_max_tries>0, expect success
+    result = run_impala_shell_cmd(vector, args + ['--connect_max_tries=2'])
+    assert result.stderr == ""
+    assert result.stdout == "0\n"
+
   def test_trailing_whitespace(self, vector):
     """Test CSV output with trailing whitespace"""
 

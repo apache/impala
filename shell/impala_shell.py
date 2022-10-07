@@ -202,6 +202,7 @@ class ImpalaShell(cmd.Cmd, object):
     if (options.http_socket_timeout_s != 'None' and
           options.http_socket_timeout_s is not None):
         self.http_socket_timeout_s = float(options.http_socket_timeout_s)
+    self.connect_max_tries = options.connect_max_tries
     self.verbose = options.verbose
     self.prompt = ImpalaShell.DISCONNECTED_PROMPT
     self.server_version = ImpalaShell.UNKNOWN_SERVER_VERSION
@@ -630,7 +631,8 @@ class ImpalaShell(cmd.Cmd, object):
                           use_http_base_transport=True, http_path=self.http_path,
                           http_cookie_names=self.http_cookie_names,
                           http_socket_timeout_s=self.http_socket_timeout_s,
-                          value_converter=value_converter)
+                          value_converter=value_converter,
+                          connect_max_tries=self.connect_max_tries)
     elif protocol == 'beeswax':
       return ImpalaBeeswaxClient(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
@@ -2126,6 +2128,10 @@ def impala_shell_main():
         print("http_socket_timeout_s must be a nonnegative floating point number"
               " expressing seconds, or None", file=sys.stderr)
         raise FatalShellException()
+
+  if options.connect_max_tries < 1:
+    print("connect_max_tries must be greater than or equal to 1", file=sys.stderr)
+    raise FatalShellException()
 
   options.variables = parse_variables(options.keyval)
 

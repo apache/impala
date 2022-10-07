@@ -130,7 +130,8 @@ class ImpalaClient(object):
                kerberos_service_name="impala", use_ssl=False, ca_cert=None, user=None,
                ldap_password=None, use_ldap=False, client_connect_timeout_ms=60000,
                verbose=True, use_http_base_transport=False, http_path=None,
-               http_cookie_names=None, http_socket_timeout_s=None, value_converter=None):
+               http_cookie_names=None, http_socket_timeout_s=None, value_converter=None,
+               connect_max_tries=4):
     self.connected = False
     self.impalad_host = impalad[0]
     self.impalad_port = int(impalad[1])
@@ -145,6 +146,7 @@ class ImpalaClient(object):
     self.use_ldap = use_ldap
     self.client_connect_timeout_ms = int(client_connect_timeout_ms)
     self.http_socket_timeout_s = http_socket_timeout_s
+    self.connect_max_tries = connect_max_tries
     self.default_query_options = {}
     self.query_option_levels = {}
     self.fetch_size = fetch_size
@@ -652,7 +654,7 @@ class ImpalaHS2Client(ImpalaClient):
     # Enable retries only for hs2-http protocol.
     if self.use_http_base_transport:
       # Maximum number of tries for idempotent rpcs.
-      self.max_tries = 4
+      self.max_tries = self.connect_max_tries
     else:
       self.max_tries = 1
     # Minimum sleep interval between retry attempts.
