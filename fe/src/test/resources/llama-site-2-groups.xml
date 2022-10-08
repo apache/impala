@@ -24,6 +24,14 @@
     <value>0</value>
   </property>
   <property>
+    <name>impala.admission-control.max-query-cpu-core-per-node-limit.root.small</name>
+    <value>8</value>
+  </property>
+  <property>
+    <name>impala.admission-control.max-query-cpu-core-coordinator-limit.root.small</name>
+    <value>8</value>
+  </property>
+  <property>
     <name>impala.admission-control.max-query-mem-limit.root.large</name>
    <!-- 8 PB -->
     <value>9007199254740992</value>
@@ -32,5 +40,13 @@
     <name>impala.admission-control.min-query-mem-limit.root.large</name>
    <!-- 64MB+1 -->
     <value>67108865</value>
+  </property>
+  <property>
+    <name>impala.admission-control.max-query-cpu-core-per-node-limit.root.large</name>
+    <value>64</value>
+  </property>
+  <property>
+    <name>impala.admission-control.max-query-cpu-core-coordinator-limit.root.large</name>
+    <value>64</value>
   </property>
 </configuration>

@@ -19,6 +19,20 @@
     <name>impala.admission-control.clamp-mem-limit-query-option.root.default</name>
     <value>false</value>
   </property>
+  <property>
+    <!-- Max cpu core per node given to queries by default. This will allow
+         running one large query and multiple small queries on a typical
+         minicluster where each impalad has ~7gb of memory. -->
+    <name>impala.admission-control.max-query-cpu-core-per-node-limit.root.default</name>
+    <value>16</value>
+  </property>
+  <property>
+    <!-- Max cpu core on coordinator given to queries by default. This will allow
+         running one large query and multiple small queries on a typical
+         minicluster where each impalad has ~7gb of memory. -->
+    <name>impala.admission-control.max-query-cpu-core-coordinator-limit.root.default</name>
+    <value>16</value>
+  </property>
   <!-- We need to increase the pool queue timeout to avoid flakiness from queries
        getting stuck behind queries from other tests and timed out. Set to a
        very high value to avoid failures unless queries are genuinely stuck. -->

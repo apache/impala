@@ -772,6 +772,19 @@ struct TExecutorGroupSet {
   // the frontend computes the per host estimated-memory after a compilation with a
   // number of executor nodes from this group set and compares it with this variable.
   4: optional i64 max_mem_limit
+
+  // The optional num_cores_per_executor is used to determine which executor group set to
+  // run for a query. The num_cores_per_executor value is set to
+  // max_query_cpu_core_per_node_limit attribute of the group set with name prefix
+  // 'exec_group_name_prefix' from the pool service.
+  // The total number of CPU cores among all executors in this executor group equals
+  // num_cores_per_executor * curr_num_executors if curr_num_executors is greater than 0,
+  // otherwise it equals num_cores_per_executor * expected_num_executors.
+  // For each query, the frontend computes the estimated total CPU core count required
+  // for a query to run efficiently after a compilation with a number of executor nodes
+  // from this group set and compare it with the total number of CPU cores in this
+  // executor group.
+  5: optional i32 num_cores_per_executor
 }
 
 // Sent from the impalad BE to FE with the latest membership snapshot of the

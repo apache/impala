@@ -143,6 +143,10 @@ const string POOL_MIN_QUERY_MEM_LIMIT_METRIC_KEY_FORMAT =
   "admission-controller.pool-min-query-mem-limit.$0";
 const string POOL_CLAMP_MEM_LIMIT_QUERY_OPTION_METRIC_KEY_FORMAT =
   "admission-controller.pool-clamp-mem-limit-query-option.$0";
+const string POOL_MAX_QUERY_CPU_CORE_PER_NODE_LIMIT_METRIC_KEY_FORMAT =
+  "admission-controller.pool-max-query-cpu-core-per-node-limit.$0";
+const string POOL_MAX_QUERY_CPU_CORE_COORDINATOR_LIMIT_METRIC_KEY_FORMAT =
+  "admission-controller.pool-max-query-cpu-core-coordinator-limit.$0";
 
 // Profile info strings
 const string AdmissionController::PROFILE_INFO_KEY_ADMISSION_RESULT = "Admission result";
@@ -1186,6 +1190,10 @@ void AdmissionController::PoolStats::UpdateConfigMetrics(const TPoolConfig& pool
   metrics_.max_query_mem_limit->SetValue(pool_cfg.max_query_mem_limit);
   metrics_.min_query_mem_limit->SetValue(pool_cfg.min_query_mem_limit);
   metrics_.clamp_mem_limit_query_option->SetValue(pool_cfg.clamp_mem_limit_query_option);
+  metrics_.max_query_cpu_core_per_node_limit->SetValue(
+      pool_cfg.max_query_cpu_core_per_node_limit);
+  metrics_.max_query_cpu_core_coordinator_limit->SetValue(
+      pool_cfg.max_query_cpu_core_coordinator_limit);
 }
 
 Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
@@ -2390,6 +2398,11 @@ void AdmissionController::PoolStats::ToJson(
       document->GetAllocator());
   pool->AddMember("clamp_mem_limit_query_option",
       metrics_.clamp_mem_limit_query_option->GetValue(), document->GetAllocator());
+  pool->AddMember("max_query_cpu_core_per_node_limit",
+      metrics_.max_query_cpu_core_per_node_limit->GetValue(), document->GetAllocator());
+  pool->AddMember("max_query_cpu_core_coordinator_limit",
+      metrics_.max_query_cpu_core_coordinator_limit->GetValue(),
+      document->GetAllocator());
   pool->AddMember("wait_time_ms_ema", wait_time_ms_ema_, document->GetAllocator());
   Value histogram(kArrayType);
   for (int bucket = 0; bucket < peak_mem_histogram_.size(); bucket++) {
@@ -2474,6 +2487,10 @@ void AdmissionController::PoolStats::InitMetrics() {
       POOL_MIN_QUERY_MEM_LIMIT_METRIC_KEY_FORMAT, 0, name_);
   metrics_.clamp_mem_limit_query_option = parent_->metrics_group_->AddProperty<bool>(
       POOL_CLAMP_MEM_LIMIT_QUERY_OPTION_METRIC_KEY_FORMAT, false, name_);
+  metrics_.max_query_cpu_core_per_node_limit = parent_->metrics_group_->AddGauge(
+      POOL_MAX_QUERY_CPU_CORE_PER_NODE_LIMIT_METRIC_KEY_FORMAT, 0, name_);
+  metrics_.max_query_cpu_core_coordinator_limit = parent_->metrics_group_->AddGauge(
+      POOL_MAX_QUERY_CPU_CORE_COORDINATOR_LIMIT_METRIC_KEY_FORMAT, 0, name_);
 }
 
 void AdmissionController::PopulatePerHostMemReservedAndAdmitted(

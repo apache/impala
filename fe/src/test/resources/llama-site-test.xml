@@ -55,4 +55,12 @@
     <name>impala.admission-control.clamp-mem-limit-query-option.root.queueC</name>
     <value>false</value>
   </property>
+  <property>
+    <name>impala.admission-control.max-query-cpu-core-per-node-limit.root.queueC</name>
+    <value>8</value>
+  </property>
+  <property>
+    <name>impala.admission-control.max-query-cpu-core-coordinator-limit.root.queueC</name>
+    <value>8</value>
+  </property>
 </configuration>

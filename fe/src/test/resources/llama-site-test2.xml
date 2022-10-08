@@ -66,6 +66,14 @@
     <value>10</value>
   </property>
   <property>
+    <name>impala.admission-control.max-query-cpu-core-per-node-limit.root.queueD</name>
+    <value>8</value>
+  </property>
+  <property>
+    <name>impala.admission-control.max-query-cpu-core-coordinator-limit.root.queueD</name>
+    <value>8</value>
+  </property>
+  <property>
     <name>llama.am.throttling.maximum.placed.reservations.root.queueD</name>
     <value>6</value>
   </property>

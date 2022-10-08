@@ -1828,6 +1828,7 @@ public class Frontend {
         result.add(new TExecutorGroupSet(e));
         result.get(0).setCurr_num_executors(e.getExpected_num_executors());
         result.get(0).setMax_mem_limit(Long.MAX_VALUE);
+        result.get(0).setNum_cores_per_executor(Integer.MAX_VALUE);
       } else if (test_replan) {
         ExecutorMembershipSnapshot cluster = ExecutorMembershipSnapshot.getCluster();
         int num_nodes = cluster.numExecutors();
@@ -1837,6 +1838,7 @@ public class Frontend {
         TExecutorGroupSet s = new TExecutorGroupSet(e);
         s.setExec_group_name_prefix("small");
         s.setMax_mem_limit(64*MEGABYTE);
+        s.setNum_cores_per_executor(8);
         result.add(s);
         TExecutorGroupSet l = new TExecutorGroupSet(e);
         String newName = "large";
@@ -1846,11 +1848,13 @@ public class Frontend {
         }
         l.setExec_group_name_prefix(newName);
         l.setMax_mem_limit(Long.MAX_VALUE);
+        l.setNum_cores_per_executor(Integer.MAX_VALUE);
         result.add(l);
       } else {
         // Copy and augment the group with the maximally allowed max_mem_limit value.
         result.add(new TExecutorGroupSet(e));
         result.get(0).setMax_mem_limit(Long.MAX_VALUE);
+        result.get(0).setNum_cores_per_executor(Integer.MAX_VALUE);
       }
       return result;
     }
@@ -1859,6 +1863,7 @@ public class Frontend {
     if (executorGroupSets.size() == 0) {
       result.add(new TExecutorGroupSet(1, 20, DEFAULT_POOL_NAME));
       result.get(0).setMax_mem_limit(Long.MAX_VALUE);
+      result.get(0).setNum_cores_per_executor(Integer.MAX_VALUE);
       return result;
     }
 
@@ -1879,9 +1884,13 @@ public class Frontend {
         Preconditions.checkNotNull(poolConfig);
         new_entry.setMax_mem_limit(poolConfig.getMax_query_mem_limit() > 0 ?
             poolConfig.getMax_query_mem_limit() : Long.MAX_VALUE);
+        new_entry.setNum_cores_per_executor(
+            poolConfig.getMax_query_cpu_core_per_node_limit() > 0 ?
+            (int)poolConfig.getMax_query_cpu_core_per_node_limit() : Integer.MAX_VALUE);
       } else {
         // Set to max possible threshold value when there is no pool service
         new_entry.setMax_mem_limit(Long.MAX_VALUE);
+        new_entry.setNum_cores_per_executor(Integer.MAX_VALUE);
       }
       result.add(new_entry);
     }

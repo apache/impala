@@ -195,6 +195,18 @@ struct TPoolConfig {
   // maximum, the mt_dop setting is reduced to the maximum. If the max_mt_dop is
   // negative, no limit is enforced.
   9: required i64 max_mt_dop = -1;
+
+  // Maximum CPU cores per node for processing a query.
+  // Typically it should be set with the value less than or equal to the number of cores
+  // of the executor nodes.
+  // 0 indicates no limit. Default value is set as 0.
+  10: required i64 max_query_cpu_core_per_node_limit = 0;
+
+  // Maximum CPU cores on coordinator for processing a query.
+  // Typically it should be set with the value less than or equal to the number of cores
+  // of the coordinators.
+  // 0 indicates no limit. Default value is set as 0.
+  11: required i64 max_query_cpu_core_coordinator_limit = 0;
 }
 
 struct TParseDateStringResult {

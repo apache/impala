@@ -150,6 +150,26 @@
     "key": "admission-controller.pool-clamp-mem-limit-query-option.$0"
   },
   {
+    "description": "Resource Pool $0 Max Query CPU Core Per Node Limit",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Max Query CPU Core Per Node Limit",
+    "units": "UNIT",
+    "kind": "GAUGE",
+    "key": "admission-controller.pool-max-query-cpu-core-per-node-limit.$0"
+  },
+  {
+    "description": "Resource Pool $0 Max Query CPU Core Coordinator Limit",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Max Query CPU Core Coordinator Limit",
+    "units": "UNIT",
+    "kind": "GAUGE",
+    "key": "admission-controller.pool-max-query-cpu-core-coordinator-limit.$0"
+  },
+  {
     "description": "Resource Pool $0 Aggregate Queue Size",
     "contexts": [
       "RESOURCE_POOL"

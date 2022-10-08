@@ -544,6 +544,8 @@ class AdmissionController {
       IntGauge* max_query_mem_limit;
       IntGauge* min_query_mem_limit;
       BooleanProperty* clamp_mem_limit_query_option;
+      IntGauge* max_query_cpu_core_per_node_limit;
+      IntGauge* max_query_cpu_core_coordinator_limit;
     };
 
     PoolStats(AdmissionController* parent, const std::string& name)

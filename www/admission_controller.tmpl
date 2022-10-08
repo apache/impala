@@ -36,6 +36,8 @@ Example of json received from the impala server
             "max_query_mem_limit": 0,
             "min_query_mem_limit": 0,
             "clamp_mem_limit_query_option": true,
+            "max_query_cpu_core_per_node_limit": 8,
+            "max_query_cpu_core_coordinator_limit": 8,
             "wait_time_ms_EMA": 0.0,
             "histogram": [
                 [
@@ -260,6 +262,14 @@ Time since last statestore update containing admission control topic state (ms):
     <tr>
       <td>Clamp MEM_LIMIT query option</td>
       <td>{{clamp_mem_limit_query_option}}</td>
+    </tr>
+    <tr>
+      <td>Query CPU core per node</td>
+      <td>{{max_query_cpu_core_per_node_limit}}</td>
+    </tr>
+    <tr>
+      <td>Query CPU core on coordinator</td>
+      <td>{{max_query_cpu_core_coordinator_limit}}</td>
     </tr>
   </table>
 
