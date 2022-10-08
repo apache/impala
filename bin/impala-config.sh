@@ -224,7 +224,7 @@ export ARCH_NAME=$(uname -p)
 export IMPALA_HUDI_VERSION=0.5.0-incubating
 export IMPALA_KITE_VERSION=1.1.0
 export IMPALA_ORC_JAVA_VERSION=1.7.6
-export IMPALA_COS_VERSION=3.1.0-5.9.3
+export IMPALA_COS_VERSION=3.1.0-8.0.8
 
 # When Impala is building docker images on Redhat-based distributions,
 # it is useful to be able to customize the base image. Some users will
