@@ -205,4 +205,41 @@ under the License.
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <!--
+        This profile aims to include huawei OBS dependencies.
+        This profile is disabled by default.
+        To active this profile, set environment variable 'ENABLE_OBS_FILESYSTEM' to 'true',
+        or use 'mvn package -Pobs-filesystem'.
+      -->
+      <id>obs-filesystem</id>
+      <activation>
+        <property>
+          <name>env.ENABLE_OBS_FILESYSTEM</name>
+          <value>true</value>
+        </property>
+      </activation>
+      <dependencies>
+        <!-- HuaweiCloud SDK. -->
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-huaweicloud</artifactId>
+            <version>${obs.version}</version>
+        </dependency>
+      </dependencies>
+      <repositories>
+        <!-- HuaweiCloud SDK repository. -->
+        <repository>
+          <id>huaweicloud.repo</id>
+          <url>https://repo.huaweicloud.com/repository/maven/huaweicloudsdk</url>
+          <name>HuaweiCloud SDK Repository</name>
+          <snapshots>
+            <enabled>false</enabled>
+          </snapshots>
+        </repository>
+      </repositories>
+    </profile>
+  </profiles>
 </project>

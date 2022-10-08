@@ -52,6 +52,7 @@ under the License.
     <knox.version>${env.IMPALA_KNOX_VERSION}</knox.version>
     <cos.version>${env.IMPALA_COS_VERSION}</cos.version>
     <oss.version>${env.IMPALA_OSS_VERSION}</oss.version>
+    <obs.version>${env.IMPALA_OBS_VERSION}</obs.version>
     <thrift.version>${env.IMPALA_THRIFT_POM_VERSION}</thrift.version>
     <impala.extdatasrc.api.version>${project.version}</impala.extdatasrc.api.version>
     <impala.query.event.hook.api.version>${project.version}</impala.query.event.hook.api.version>

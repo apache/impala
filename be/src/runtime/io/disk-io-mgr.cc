@@ -144,6 +144,9 @@ DEFINE_int32(num_ozone_io_threads, 16, "Number of Ozone I/O threads");
 // The maximum number of SFS I/O threads.
 DEFINE_int32(num_sfs_io_threads, 16, "Number of SFS I/O threads");
 
+// The maximum number of OBS I/O threads.
+DEFINE_int32(num_obs_io_threads, 16, "Number of OBS I/O threads");
+
 // The number of cached file handles defines how much memory can be used per backend for
 // caching frequently used file handles. Measurements indicate that a single file handle
 // uses about 6kB of memory. 20k file handles will thus reserve ~120MB of memory.
@@ -575,6 +578,9 @@ Status DiskIoMgr::Init() {
     } else if (i == RemoteSFSDiskId()) {
       num_threads_per_disk = FLAGS_num_sfs_io_threads;
       device_name = "SFS remote";
+    } else if (i == RemoteOBSDiskId()) {
+      num_threads_per_disk = FLAGS_num_obs_io_threads;
+      device_name = "OBS remote";
     } else if (DiskInfo::is_rotational(i)) {
       num_threads_per_disk = num_io_threads_per_rotational_disk_;
       // During tests, i may not point to an existing disk.
@@ -917,6 +923,7 @@ int DiskIoMgr::AssignQueue(
     if (IsCosPath(file, check_default_fs)) return RemoteCosDiskId();
     if (IsOzonePath(file, check_default_fs)) return RemoteOzoneDiskId();
     if (IsSFSPath(file, check_default_fs)) return RemoteSFSDiskId();
+    if (IsOBSPath(file, check_default_fs)) return RemoteOBSDiskId();
   }
   // Assign to a local disk queue.
   DCHECK(!IsS3APath(file, check_default_fs)); // S3 is always remote.
@@ -926,6 +933,7 @@ int DiskIoMgr::AssignQueue(
   DCHECK(!IsGcsPath(file, check_default_fs)); // GCS is always remote.
   DCHECK(!IsCosPath(file, check_default_fs)); // COS is always remote.
   DCHECK(!IsSFSPath(file, check_default_fs)); // SFS is always remote.
+  DCHECK(!IsOBSPath(file, check_default_fs)); // OBS is always remote.
   if (disk_id == -1) {
     // disk id is unknown, assign it an arbitrary one.
     disk_id = next_disk_id_.Add(1);

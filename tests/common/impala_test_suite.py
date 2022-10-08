@@ -70,6 +70,7 @@ from tests.util.filesystem_utils import (
     IS_GCS,
     IS_COS,
     IS_OSS,
+    IS_OBS,
     IS_HDFS,
     S3_BUCKET_NAME,
     S3GUARD_ENABLED,
@@ -275,6 +276,9 @@ class ImpalaTestSuite(BaseTestSuite):
     elif IS_OSS:
       # OSS is implemented via HDFS command line client
       cls.filesystem_client = HadoopFsCommandLineClient("OSS")
+    elif IS_OBS:
+      # OBS is implemented via HDFS command line client
+      cls.filesystem_client = HadoopFsCommandLineClient("OBS")
     elif IS_OZONE:
       cls.filesystem_client = HadoopFsCommandLineClient("Ozone")
 
@@ -1067,7 +1071,7 @@ class ImpalaTestSuite(BaseTestSuite):
     # If 'skip_hbase' is specified or the filesystem is isilon, s3, GCS(gs), COS(cosn) or
     # local, we don't need the hbase dimension.
     if pytest.config.option.skip_hbase or TARGET_FILESYSTEM.lower() \
-        in ['s3', 'isilon', 'local', 'abfs', 'adls', 'gs', 'cosn', 'ozone']:
+        in ['s3', 'isilon', 'local', 'abfs', 'adls', 'gs', 'cosn', 'ozone', 'obs']:
       for tf_dimension in tf_dimensions:
         if tf_dimension.value.file_format == "hbase":
           tf_dimensions.remove(tf_dimension)

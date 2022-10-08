@@ -41,6 +41,7 @@ const char* FILESYS_PREFIX_OFS = "ofs://";
 const char* FILESYS_PREFIX_SFS = "sfs+";
 const char* FILESYS_PREFIX_OSS = "oss://";
 const char* FILESYS_PREFIX_JINDOFS = "jfs://";
+const char* FILESYS_PREFIX_OBS = "obs://";
 
 string GetHdfsErrorMsg(const string& prefix, const string& file) {
   string error_msg = GetStrErrMsg();
@@ -136,6 +137,10 @@ bool IsOzonePath(const char* path, bool check_default_fs) {
 
 bool IsSFSPath(const char* path, bool check_default_fs) {
   return IsSpecificPath(path, FILESYS_PREFIX_SFS, check_default_fs);
+}
+
+bool IsOBSPath(const char* path, bool check_default_fs) {
+  return IsSpecificPath(path, FILESYS_PREFIX_OBS, check_default_fs);
 }
 
 // Returns the length of the filesystem name in 'path' which is the length of the

@@ -138,6 +138,15 @@ if target_filesystem == 's3':
       'fs.s3a.s3guard.ddb.region': '${S3GUARD_DYNAMODB_REGION}',
     })
 
+if target_filesystem == 'obs':
+  CONFIG.update({
+    'fs.obs.impl': 'org.apache.hadoop.fs.obs.OBSFileSystem',
+    'fs.AbstractFileSystem.obs.impl': 'org.apache.hadoop.fs.obs.OBS',
+    'fs.obs.access.key': '${OBS_ACCESS_KEY}',
+    'fs.obs.secret.key': '${OBS_SECRET_KEY}',
+    'fs.obs.endpoint': '${OBS_ENDPOINT}',
+    })
+
 if target_filesystem == 'ozone':
   CONFIG.update({'fs.ofs.impl': 'org.apache.hadoop.fs.ozone.RootedOzoneFileSystem'})
 

@@ -84,6 +84,7 @@ public class FileSystemUtil {
   public static final String SCHEME_COS = "cosn";
   public static final String SCHEME_OSS = "oss";
   public static final String SCHEME_SFS = "sfs";
+  public static final String SCHEME_OBS = "obs";
 
   public static final String NO_ERASURE_CODE_LABEL = "NONE";
 
@@ -115,6 +116,7 @@ public class FileSystemUtil {
           .add(SCHEME_GCS)
           .add(SCHEME_COS)
           .add(SCHEME_OSS)
+          .add(SCHEME_OBS)
           .build();
 
   /**
@@ -131,6 +133,7 @@ public class FileSystemUtil {
           .add(SCHEME_GCS)
           .add(SCHEME_COS)
           .add(SCHEME_OSS)
+          .add(SCHEME_OBS)
           .build();
 
   /**
@@ -148,6 +151,7 @@ public class FileSystemUtil {
           .add(SCHEME_GCS)
           .add(SCHEME_COS)
           .add(SCHEME_OSS)
+          .add(SCHEME_OBS)
           .build();
 
   /**
@@ -566,6 +570,13 @@ public class FileSystemUtil {
   }
 
   /**
+   * Returns true iff the filesystem is a OBSFileSystem.
+   */
+  public static boolean isOBSFileSystem(FileSystem fs) {
+    return hasScheme(fs, SCHEME_OBS);
+  }
+
+  /**
    * Returns true iff the filesystem is AdlFileSystem.
    */
   public static boolean isADLFileSystem(FileSystem fs) {
@@ -676,7 +687,8 @@ public class FileSystemUtil {
     GCS,
     COS,
     OSS,
-    SFS;
+    SFS,
+    OBS;
 
     private static final Map<String, FsType> SCHEME_TO_FS_MAPPING =
         ImmutableMap.<String, FsType>builder()
@@ -692,6 +704,7 @@ public class FileSystemUtil {
             .put(SCHEME_GCS, GCS)
             .put(SCHEME_COS, COS)
             .put(SCHEME_OSS, OSS)
+            .put(SCHEME_OBS, OBS)
             .build();
 
     /**

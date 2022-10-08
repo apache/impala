@@ -29,8 +29,7 @@ from hive_metastore.ttypes import SerDeInfo
 from tests.util.event_processor_utils import EventProcessorUtils
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.util.filesystem_utils import (IS_S3, IS_ADLS, IS_GCS, IS_COS, IS_OSS)
-
+from tests.util.filesystem_utils import IS_HDFS, IS_OZONE
 
 class TestMetastoreService(CustomClusterTestSuite):
     """
@@ -1210,9 +1209,9 @@ class TestMetastoreService(CustomClusterTestSuite):
       test_part_names = list(part_names)
       if expect_files:
         assert get_parts_by_names_result.dictionary is not None
-        # obj_dict will only be populated when the table is on HDFS
+        # obj_dict will only be populated when the table is on HDFS or OZONE
         # where block locations are available.
-        if not IS_S3 and not IS_GCS and not IS_COS and not IS_ADLS and not IS_OSS:
+        if IS_HDFS or IS_OZONE:
           assert len(get_parts_by_names_result.dictionary.values) > 0
       else:
         assert get_parts_by_names_result.dictionary is None
@@ -1238,9 +1237,9 @@ class TestMetastoreService(CustomClusterTestSuite):
       assert filemetadata is not None
       assert filemetadata.data is not None
       assert obj_dict is not None
-      # obj_dict will only be populated when the table is on HDFS
+      # obj_dict will only be populated when the table is on HDFS or OZONE
       # where block locations are available.
-      if not IS_S3 and not IS_GCS and not IS_COS and not IS_ADLS and not IS_OSS:
+      if IS_HDFS or IS_OZONE:
         assert len(obj_dict.values) > 0
 
     def __assert_no_filemd(self, filemetadata, obj_dict):

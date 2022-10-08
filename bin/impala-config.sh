@@ -250,6 +250,7 @@ export IMPALA_RELOAD4j_VERSION=1.2.22
 export IMPALA_SLF4J_VERSION=2.0.3
 export IMPALA_SPRINGFRAMEWORK_VERSION=5.3.20
 export IMPALA_XMLSEC_VERSION=2.2.3
+export IMPALA_OBS_VERSION=3.1.1-hw-42
 
 # When Impala is building docker images on Redhat-based distributions,
 # it is useful to be able to customize the base image. Some users will
@@ -699,6 +700,14 @@ elif [ "${TARGET_FILESYSTEM}" = "oss" ]; then
   fi
   DEFAULT_FS="oss://${OSS_BUCKET}"
   export DEFAULT_FS
+elif [ "${TARGET_FILESYSTEM}" = "obs" ]; then
+  # Basic error checking
+  OBS_ACCESS_KEY="${OBS_ACCESS_KEY:?OBS_ACCESS_KEY cannot be an empty string for OBS}"
+  OBS_SECRET_KEY="${OBS_SECRET_KEY:?OBS_SECRET_KEY cannot be an empty string for OBS}"
+  OBS_ENDPOINT="${OBS_ENDPOINT:?OBS_ENDPOINT cannot be an empty string for OBS}"
+  OBS_BUCKET="${OBS_BUCKET:?OBS_BUCKET cannot be an empty string for OBS}"
+  DEFAULT_FS="obs://${OBS_BUCKET}"
+  export OBS_ACCESS_KEY OBS_SECRET_KEY OBS_ENDPOINT DEFAULT_FS ENABLE_OBS_FILESYSTEM=true
 elif [ "${TARGET_FILESYSTEM}" = "isilon" ]; then
   if [ "${ISILON_NAMENODE}" = "" ]; then
     echo "In order to access the Isilon filesystem, ISILON_NAMENODE"
@@ -972,6 +981,7 @@ echo "IMPALA_RANGER_VERSION   = $IMPALA_RANGER_VERSION"
 echo "IMPALA_ICEBERG_VERSION  = $IMPALA_ICEBERG_VERSION"
 echo "IMPALA_COS_VERSION      = $IMPALA_COS_VERSION"
 echo "IMPALA_OSS_VERSION      = $IMPALA_OSS_VERSION"
+echo "IMPALA_OBS_VERSION      = $IMPALA_OBS_VERSION"
 
 # Kerberos things.  If the cluster exists and is kerberized, source
 # the required environment.  This is required for any hadoop tool to

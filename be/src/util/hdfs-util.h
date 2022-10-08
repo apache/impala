@@ -84,6 +84,9 @@ bool IsOzonePath(const char* path, bool check_default_fs = true);
 /// Returns true iff the path refers to a location on an SFS filesystem.
 bool IsSFSPath(const char* path, bool check_default_fs = true);
 
+/// Returns true iff the path refers to a location on an OBS filesystem.
+bool IsOBSPath(const char* path, bool check_default_fs = true);
+
 /// Returns true iff 'pathA' and 'pathB' are on the same filesystem and bucket.
 /// Most filesystems embed bucket in the authority, but Ozone's ofs protocol allows
 /// addressing volume/bucket via the path and does not allow renames across them.

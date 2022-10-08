@@ -34,6 +34,7 @@ IS_ABFS = FILESYSTEM == "abfs"
 IS_GCS = FILESYSTEM == "gs"
 IS_COS = FILESYSTEM == "cosn"
 IS_OSS = FILESYSTEM == "oss"
+IS_OBS = FILESYSTEM == "obs"
 IS_OZONE = FILESYSTEM == "ozone"
 IS_EC = os.getenv("ERASURE_CODING") == "true"
 IS_ENCRYPTED = os.getenv("USE_OZONE_ENCRYPTION") == "true"
@@ -61,7 +62,8 @@ ADLS_CLIENT_SECRET = os.getenv("azure_client_secret")
 
 # A map of FILESYSTEM values to their corresponding Scan Node types
 fs_to_name = {'s3': 'S3', 'hdfs': 'HDFS', 'local': 'LOCAL', 'adls': 'ADLS',
-              'abfs': 'ADLS', 'gs': 'GCS', 'cosn': 'COS', 'ozone': 'OZONE', 'oss': 'OSS'}
+              'abfs': 'ADLS', 'gs': 'GCS', 'cosn': 'COS', 'ozone': 'OZONE',
+              'oss': 'OSS', 'obs': 'OBS'}
 
 
 def get_fs_name(fs):

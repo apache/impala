@@ -59,6 +59,7 @@ DECLARE_int32(num_oss_io_threads);
 DECLARE_int32(num_remote_hdfs_file_oper_io_threads);
 DECLARE_int32(num_s3_file_oper_io_threads);
 DECLARE_int32(num_sfs_io_threads);
+DECLARE_int32(num_obs_io_threads);
 
 #ifndef NDEBUG
 DECLARE_int32(stress_disk_read_delay_ms);
@@ -1723,7 +1724,8 @@ TEST_F(DiskIoMgrTest, VerifyNumThreadsParameter) {
       + FLAGS_num_remote_hdfs_file_oper_io_threads
       + FLAGS_num_s3_file_oper_io_threads + FLAGS_num_gcs_io_threads
       + FLAGS_num_cos_io_threads
-      + FLAGS_num_sfs_io_threads;
+      + FLAGS_num_sfs_io_threads
+      + FLAGS_num_obs_io_threads;
 
   // Verify num_io_threads_per_rotational_disk and num_io_threads_per_solid_state_disk.
   // Since we do not have control over which disk is used, we check for either type

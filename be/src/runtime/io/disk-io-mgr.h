@@ -342,6 +342,9 @@ class DiskIoMgr : public CacheLineAligned {
   /// The disk ID (and therefore disk_queues_ index) used for SFS accesses.
   int RemoteSFSDiskId() const { return num_local_disks() + REMOTE_SFS_DISK_OFFSET; }
 
+  /// The disk ID (and therefore disk_queues_ index) used for OBS accesses.
+  int RemoteOBSDiskId() const { return num_local_disks() + REMOTE_OBS_DISK_OFFSET; }
+
   /// Dumps the disk IoMgr queues (for readers and disks)
   std::string DebugString();
 
@@ -399,6 +402,7 @@ class DiskIoMgr : public CacheLineAligned {
     REMOTE_S3_DISK_FILE_OPER_OFFSET,
     REMOTE_SFS_DISK_OFFSET,
     REMOTE_OSS_DISK_OFFSET,
+    REMOTE_OBS_DISK_OFFSET,
     REMOTE_NUM_DISKS
   };
 
