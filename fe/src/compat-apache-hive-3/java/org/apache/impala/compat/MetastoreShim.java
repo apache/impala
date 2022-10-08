@@ -88,6 +88,8 @@ import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.impala.util.HiveMetadataFormatUtils.formatOutput;
+
 /**
  * A wrapper around some of Hive's Metastore API's to abstract away differences
  * between major versions of different Hive publishers. This implements the shimmed
@@ -901,5 +903,15 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
       }
     }
     return reads;
+  }
+
+  public static void getMaterializedViewInfo(StringBuilder tableInfo,
+      Table tbl, boolean isOutputPadded) {
+    formatOutput("View Original Text:", tbl.getViewOriginalText(), tableInfo);
+    formatOutput("View Expanded Text:", tbl.getViewExpandedText(), tableInfo);
+    formatOutput("Rewrite Enabled:", tbl.isRewriteEnabled() ? "Yes" : "No", tableInfo);
+    // TODO: IMPALA-11815: hive metastore doesn't privide api to judge whether the
+    //  materialized view is outdated for rewriting, so set the flag to "Unknown"
+    formatOutput("Outdated for Rewriting:", "Unknown", tableInfo);
   }
 }

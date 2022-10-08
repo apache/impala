@@ -51,6 +51,7 @@ import org.apache.hadoop.hive.ql.metadata.PrimaryKeyInfo;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.compat.MetastoreShim;
 
 /**
  * Most of the code in this class is copied from Hive 2.1.1. This is used so that
@@ -522,6 +523,11 @@ public class HiveMetadataFormatUtils {
     if (TableType.VIRTUAL_VIEW.equals(TableType.valueOf(table.getTableType()))) {
       tableInfo.append(LINE_DELIM).append("# View Information").append(LINE_DELIM);
       getViewInfo(tableInfo, table);
+    } else if (TableType.MATERIALIZED_VIEW.equals(
+      TableType.valueOf(table.getTableType()))) {
+      tableInfo.append(LINE_DELIM).append("# Materialized View Information")
+          .append(LINE_DELIM);
+      MetastoreShim.getMaterializedViewInfo(tableInfo, table, isOutputPadded);
     }
 
     return tableInfo.toString();
@@ -619,7 +625,7 @@ public class HiveMetadataFormatUtils {
    * @param value The value to print - might contain newlines
    * @param tableInfo The target builder
    */
-  private static void formatOutput(String name, String value, StringBuilder tableInfo) {
+  public static void formatOutput(String name, String value, StringBuilder tableInfo) {
     tableInfo.append(String.format("%-" + ALIGNMENT + "s", name)).append(FIELD_DELIM);
     int colNameLength = ALIGNMENT > name.length() ? ALIGNMENT : name.length();
     indentMultilineValue(value, tableInfo, new int[]{0, colNameLength}, true);

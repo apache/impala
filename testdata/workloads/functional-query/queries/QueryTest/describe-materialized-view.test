@@ -1,0 +1,25 @@
+====
+---- QUERY
+# Test DESCRIBE FORMATTED Materialized View
+DESCRIBE FORMATTED functional_parquet.materialized_view
+---- RESULTS: VERIFY_IS_SUBSET
+'# Materialized View Information','NULL','NULL'
+'View Original Text: ','SELECT * FROM functional_parquet.insert_only_transactional_table','NULL'
+'View Expanded Text: ','SELECT `insert_only_transactional_table`.`col1` FROM `functional_parquet`.`insert_only_transactional_table`','NULL'
+'Rewrite Enabled:    ','Yes                 ','NULL'
+'Outdated for Rewriting:','Unknown             ','NULL'
+---- TYPES
+string,string,string
+====
+---- QUERY
+# Test DESCRIBE EXTENDED Materialized View
+DESCRIBE EXTENDED functional_parquet.materialized_view
+---- RESULTS: VERIFY_IS_SUBSET
+'# Materialized View Information','NULL','NULL'
+'View Original Text: ','SELECT * FROM functional_parquet.insert_only_transactional_table','NULL'
+'View Expanded Text: ','SELECT `insert_only_transactional_table`.`col1` FROM `functional_parquet`.`insert_only_transactional_table`','NULL'
+'Rewrite Enabled:    ','Yes                 ','NULL'
+'Outdated for Rewriting:','Unknown             ','NULL'
+---- TYPES
+string,string,string
+====

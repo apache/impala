@@ -21,6 +21,8 @@ import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.ACCES
 import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.ACCESSTYPE_READONLY;
 import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.ACCESSTYPE_READWRITE;
 import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.ACCESSTYPE_WRITEONLY;
+import static org.apache.impala.util.HiveMetadataFormatUtils.LINE_DELIM;
+import static org.apache.impala.util.HiveMetadataFormatUtils.formatOutput;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -31,6 +33,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -65,6 +68,7 @@ import org.apache.hadoop.hive.metastore.api.NotificationEventResponse;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PartitionsRequest;
 import org.apache.hadoop.hive.metastore.api.SetPartitionsStatsRequest;
+import org.apache.hadoop.hive.metastore.api.SourceTable;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.WriteEventInfo;
 import org.apache.hadoop.hive.metastore.api.WriteNotificationLogRequest;
@@ -79,6 +83,7 @@ import org.apache.hadoop.hive.metastore.messaging.MessageFactory;
 import org.apache.hadoop.hive.metastore.messaging.MessageSerializer;
 import org.apache.hadoop.hive.metastore.messaging.json.JSONDropDatabaseMessage;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
+import org.apache.hadoop.hive.ql.metadata.formatting.TextMetaDataTable;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
@@ -819,6 +824,40 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
     @Override
     protected boolean shouldSkipWhenSyncingToLatestEventId() {
       return false;
+    }
+  }
+
+  public static void getMaterializedViewInfo(StringBuilder tableInfo, Table tbl,
+       boolean isOutputPadded) {
+    formatOutput("View Original Text:", tbl.getViewOriginalText(), tableInfo);
+    formatOutput("View Expanded Text:", tbl.getViewExpandedText(), tableInfo);
+    formatOutput("Rewrite Enabled:", tbl.isRewriteEnabled() ? "Yes" : "No", tableInfo);
+    // TODO: IMPALA-11815: hive metastore doesn't privide api to judge whether the
+    //  materialized view is outdated for rewriting, so set the flag to "Unknown"
+    formatOutput("Outdated for Rewriting:", "Unknown", tableInfo);
+
+    tableInfo.append(LINE_DELIM)
+        .append("# Materialized View Source table information")
+        .append(LINE_DELIM);
+    TextMetaDataTable metaDataTable = new TextMetaDataTable();
+    metaDataTable.addRow("Table name", "I/U/D since last rebuild");
+    List<SourceTable> sourceTableList =
+        new ArrayList<>(tbl.getCreationMetadata().getSourceTables());
+    sourceTableList.sort(
+        Comparator
+            .<SourceTable, String>comparing(
+                sourceTable -> sourceTable.getTable().getDbName())
+            .thenComparing(sourceTable -> sourceTable.getTable().getTableName()));
+    for (SourceTable sourceTable : sourceTableList) {
+      String qualifiedTableName = org.apache.hadoop.hive.common.TableName.getQualified(
+          sourceTable.getTable().getCatName(),
+          sourceTable.getTable().getDbName(),
+          sourceTable.getTable().getTableName());
+      metaDataTable.addRow(qualifiedTableName,
+          String.format("%d/%d/%d",
+              sourceTable.getInsertedCount(), sourceTable.getUpdatedCount(),
+              sourceTable.getDeletedCount()));
+      tableInfo.append(metaDataTable.renderTable(isOutputPadded));
     }
   }
 }
