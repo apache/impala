@@ -55,4 +55,8 @@
     <name>impala.admission-control.clamp-mem-limit-query-option.root.queueC</name>
     <value>false</value>
   </property>
+  <property>
+    <name>impala.admission-control.max-query-processing-cost-limit.root.queueC</name>
+    <value>1000</value>
+  </property>
 </configuration>

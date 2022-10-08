@@ -695,9 +695,10 @@ class TestExecutorGroups(CustomClusterTestSuite):
                                  "resources")
     # Define two group sets: small and large
     fs_allocation_path = os.path.join(RESOURCES_DIR, "fair-scheduler-2-groups.xml")
-    # Define the min-query-mem-limit and max-query-mem-limit properties of the two sets:
-    # small: [0, 64MB]
-    # large: [64MB+1Byte, 8PB]
+    # Define the min-query-mem-limit, max-query-mem-limit and
+    # max-query-processing-cost-limit properties of the two sets:
+    # small: [0, 64MB, 64MB]
+    # large: [64MB+1Byte, 8PB, 8PB]
     llama_site_path = os.path.join(RESOURCES_DIR, "llama-site-2-groups.xml")
     # Start with a regular admission config with multiple pools and no resource limits.
     self._restart_coordinators(num_coordinators=1,

@@ -90,6 +90,16 @@
     "key": "admission-controller.pool-clamp-mem-limit-query-option.$0"
   },
   {
+    "description": "Resource Pool $0 Max Query Processing Cost Limit",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Max Query Processing Cost Limit",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "admission-controller.pool-max-query-processing-cost-limit.$0"
+  },
+  {
     "description": "Resource Pool $0 Aggregate Queue Size",
     "contexts": [
       "RESOURCE_POOL"

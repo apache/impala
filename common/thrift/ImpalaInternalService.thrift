@@ -195,6 +195,11 @@ struct TPoolConfig {
   // maximum, the mt_dop setting is reduced to the maximum. If the max_mt_dop is
   // negative, no limit is enforced.
   9: required i64 max_mt_dop = -1;
+
+  // Maximum processing cost which is the amount of data in bytes to process for a query.
+  // A value of 0 effectively disables the pool. -1 indicates no limit. Default value is
+  // set as -1.
+  10: required i64 max_query_processing_cost_limit = -1;
 }
 
 struct TParseDateStringResult {
