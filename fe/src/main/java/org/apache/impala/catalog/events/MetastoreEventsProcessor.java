@@ -26,6 +26,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -497,7 +498,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
 
   // The event id and eventTime of the latest event in HMS. Only used in metrics to show
   // how far we are lagging behind.
-  private final AtomicLong latestEventId_ = new AtomicLong(-1);
+  private final AtomicLong latestEventId_ = new AtomicLong(0);
   private final AtomicLong latestEventTimeMs_ = new AtomicLong(0);
 
   // The duration in nanoseconds of the processing of the last event batch.
@@ -888,7 +889,10 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       eventRequest.setMaxEvents(1);
       NotificationEventResponse response = MetastoreShim
           .getNextNotification(msClient.getHiveClient(), eventRequest);
-      NotificationEvent event = response.getEventsIterator().next();
+      Iterator<NotificationEvent> eventIter = response.getEventsIterator();
+      // Events could be empty if they are just cleaned up.
+      if (!eventIter.hasNext()) return;
+      NotificationEvent event = eventIter.next();
       Preconditions.checkState(event.getEventId() == currentEventId);
       LOG.info("Latest event in HMS: id={}, time={}", currentEventId,
           event.getEventTime());
