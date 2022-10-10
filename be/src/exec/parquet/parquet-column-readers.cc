@@ -253,7 +253,7 @@ class ScalarColumnReader : public BaseScalarColumnReader {
 
   void __attribute__((noinline)) SetBoolDecodeError() {
     parent_->parse_status_ = Status(TErrorCode::PARQUET_CORRUPT_BOOL_VALUE, filename(),
-        PrintThriftEnum(page_encoding_), col_chunk_reader_.stream()->file_offset());
+        PrintValue(page_encoding_), col_chunk_reader_.stream()->file_offset());
   }
 
   ParquetTimestampDecoder& GetTimestampDecoder() {
@@ -1522,7 +1522,7 @@ bool BaseScalarColumnReader::JumpToNextPage() {
 Status BaseScalarColumnReader::GetUnsupportedDecodingError() {
   return Status(Substitute(
       "File '$0' is corrupt: unexpected encoding: $1 for data page of column '$2'.",
-      filename(), PrintThriftEnum(page_encoding_), schema_element().name));
+      filename(), PrintValue(page_encoding_), schema_element().name));
 }
 
 Status BaseScalarColumnReader::LogCorruptNumValuesInMetadataError() {

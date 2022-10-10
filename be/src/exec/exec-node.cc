@@ -244,7 +244,7 @@ ExecNode::ExecNode(ObjectPool* pool, const PlanNode& pnode, const DescriptorTbl&
     resource_profile_(pnode.tnode_->resource_profile),
     limit_(pnode.tnode_->limit),
     runtime_profile_(RuntimeProfile::Create(
-        pool_, Substitute("$0 (id=$1)", PrintThriftEnum(type_), id_))),
+        pool_, Substitute("$0 (id=$1)", PrintValue(type_), id_))),
     rows_returned_counter_(nullptr),
     rows_returned_rate_(nullptr),
     containing_subplan_(nullptr),
@@ -277,7 +277,7 @@ Status ExecNode::Prepare(RuntimeState* state) {
     RETURN_IF_ERROR(children_[i]->Prepare(state));
   }
   reservation_manager_.Init(
-      Substitute("$0 id=$1 ptr=$2", PrintThriftEnum(type_), id_, this), runtime_profile_,
+      Substitute("$0 id=$1 ptr=$2", PrintValue(type_), id_, this), runtime_profile_,
       state->instance_buffer_reservation(), mem_tracker_.get(), resource_profile_,
       debug_options_);
   if (!IsInSubplan()) {

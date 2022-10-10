@@ -649,7 +649,7 @@ string Coordinator::FilterDebugString() {
       for (int i = 0; i < 3; ++i) row.push_back("");
     } else if (state.is_min_max_filter()) {
       // Add the filter type for minmax filters.
-      row.push_back(PrintThriftEnum(state.desc().type));
+      row.push_back(PrintValue(state.desc().type));
       row.push_back("");
 
       // Also add the min/max value for the accumulated filter as follows.
@@ -685,7 +685,7 @@ string Coordinator::FilterDebugString() {
       }
       row.push_back("");
     } else if (state.is_in_list_filter()) {
-      row.push_back(PrintThriftEnum(state.desc().type));
+      row.push_back(PrintValue(state.desc().type));
       // Skip 3 fields belong to Bloom/MinMax filters.
       for (int i = 0; i < 3; ++i) row.push_back("");
       const InListFilterPB& in_list_filterPB =

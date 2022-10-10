@@ -1364,7 +1364,7 @@ void PhjBuilderConfig::Codegen(FragmentState* state) {
 
 string PhjBuilder::DebugString() const {
   stringstream ss;
-  ss << " PhjBuilder op=" << PrintThriftEnum(join_op_)
+  ss << " PhjBuilder op=" << join_op_
      << " is_separate_build=" << is_separate_build_
      << " num_probe_threads=" << num_probe_threads_
      << " state=" << PrintState(state_)

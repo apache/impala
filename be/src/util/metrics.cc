@@ -67,9 +67,9 @@ void ScalarMetric<T, metric_kind_t>::ToJson(Document* document, Value* val) {
   ToJsonValue(GetValue(), TUnit::NONE, document, &metric_value);
   container.AddMember("value", metric_value, document->GetAllocator());
 
-  Value type_value(PrintThriftEnum(kind()).c_str(), document->GetAllocator());
+  Value type_value(PrintValue(kind()).c_str(), document->GetAllocator());
   container.AddMember("kind", type_value, document->GetAllocator());
-  Value units(PrintThriftEnum(unit()).c_str(), document->GetAllocator());
+  Value units(PrintValue(unit()).c_str(), document->GetAllocator());
   container.AddMember("units", units, document->GetAllocator());
   *val = container;
 }
@@ -85,7 +85,7 @@ void ScalarMetric<T, metric_kind_t>::ToLegacyJson(Document* document) {
 template <typename T, TMetricKind::type metric_kind_t>
 TMetricKind::type ScalarMetric<T, metric_kind_t>::ToPrometheus(
     string name, stringstream* val, stringstream* metric_kind) {
-  string metric_type = PrintThriftEnum(kind()).c_str();
+  string metric_type = PrintValue(kind()).c_str();
   // prometheus doesn't support 'property', so ignore it
   if (!metric_type.compare("property")) {
     return TMetricKind::PROPERTY;

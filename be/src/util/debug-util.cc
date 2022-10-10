@@ -69,43 +69,6 @@ DECLARE_string(hostname);
 
 namespace impala {
 
-#define PRINT_THRIFT_ENUM_IMPL(T) \
-  string PrintThriftEnum(const T::type& value) { \
-    map<int, const char*>::const_iterator it = _##T##_VALUES_TO_NAMES.find(value); \
-    return it == _##T##_VALUES_TO_NAMES.end() ? std::to_string(value) : it->second; \
-  }
-
-PRINT_THRIFT_ENUM_IMPL(QueryState)
-PRINT_THRIFT_ENUM_IMPL(Encoding)
-PRINT_THRIFT_ENUM_IMPL(TCatalogObjectType)
-PRINT_THRIFT_ENUM_IMPL(TCatalogOpType)
-PRINT_THRIFT_ENUM_IMPL(TDdlType)
-PRINT_THRIFT_ENUM_IMPL(TExplainLevel)
-PRINT_THRIFT_ENUM_IMPL(THdfsCompression)
-PRINT_THRIFT_ENUM_IMPL(THdfsFileFormat)
-PRINT_THRIFT_ENUM_IMPL(THdfsSeqCompressionMode)
-PRINT_THRIFT_ENUM_IMPL(TImpalaQueryOptions)
-PRINT_THRIFT_ENUM_IMPL(TJoinDistributionMode)
-PRINT_THRIFT_ENUM_IMPL(TJoinOp)
-PRINT_THRIFT_ENUM_IMPL(TKuduReadMode)
-PRINT_THRIFT_ENUM_IMPL(TMetricKind)
-PRINT_THRIFT_ENUM_IMPL(TParquetArrayResolution)
-PRINT_THRIFT_ENUM_IMPL(TSchemaResolutionStrategy)
-PRINT_THRIFT_ENUM_IMPL(TPlanNodeType)
-PRINT_THRIFT_ENUM_IMPL(TPrefetchMode)
-PRINT_THRIFT_ENUM_IMPL(TReplicaPreference)
-PRINT_THRIFT_ENUM_IMPL(TRuntimeFilterMode)
-PRINT_THRIFT_ENUM_IMPL(TRuntimeFilterType)
-PRINT_THRIFT_ENUM_IMPL(TSessionType)
-PRINT_THRIFT_ENUM_IMPL(TStmtType)
-PRINT_THRIFT_ENUM_IMPL(TUnit)
-PRINT_THRIFT_ENUM_IMPL(TParquetTimestampType)
-PRINT_THRIFT_ENUM_IMPL(TTransactionalType)
-PRINT_THRIFT_ENUM_IMPL(TMinmaxFilteringLevel)
-PRINT_THRIFT_ENUM_IMPL(TKuduReplicaSelection)
-PRINT_THRIFT_ENUM_IMPL(TMinmaxFilterFastCodePathMode)
-PRINT_THRIFT_ENUM_IMPL(TParquetBloomFilterWrite)
-
 string PrintId(const TUniqueId& id, const string& separator) {
   stringstream out;
   // Outputting the separator string resets the stream width.

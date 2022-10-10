@@ -51,38 +51,13 @@ class TupleRow;
 // Forward declaration to avoid including descriptors.h.
 typedef std::vector<int> SchemaPath;
 
-// TODO: remove these functions and use operator << after upgrading to Thrift 0.11.0 or
-// higher.
-std::string PrintThriftEnum(const beeswax::QueryState::type& value);
-std::string PrintThriftEnum(const parquet::Encoding::type& value);
-std::string PrintThriftEnum(const TCatalogObjectType::type& value);
-std::string PrintThriftEnum(const TCatalogOpType::type& value);
-std::string PrintThriftEnum(const TDdlType::type& value);
-std::string PrintThriftEnum(const TExplainLevel::type& value);
-std::string PrintThriftEnum(const THdfsCompression::type& value);
-std::string PrintThriftEnum(const THdfsFileFormat::type& value);
-std::string PrintThriftEnum(const THdfsSeqCompressionMode::type& value);
-std::string PrintThriftEnum(const TImpalaQueryOptions::type& value);
-std::string PrintThriftEnum(const TJoinDistributionMode::type& value);
-std::string PrintThriftEnum(const TJoinOp::type& value);
-std::string PrintThriftEnum(const TKuduReadMode::type& value);
-std::string PrintThriftEnum(const TMetricKind::type& value);
-std::string PrintThriftEnum(const TParquetArrayResolution::type& value);
-std::string PrintThriftEnum(const TSchemaResolutionStrategy::type& value);
-std::string PrintThriftEnum(const TPlanNodeType::type& value);
-std::string PrintThriftEnum(const TPrefetchMode::type& value);
-std::string PrintThriftEnum(const TReplicaPreference::type& value);
-std::string PrintThriftEnum(const TRuntimeFilterMode::type& value);
-std::string PrintThriftEnum(const TRuntimeFilterType::type& value);
-std::string PrintThriftEnum(const TSessionType::type& value);
-std::string PrintThriftEnum(const TStmtType::type& value);
-std::string PrintThriftEnum(const TUnit::type& value);
-std::string PrintThriftEnum(const TParquetTimestampType::type& value);
-std::string PrintThriftEnum(const TTransactionalType::type& value);
-std::string PrintThriftEnum(const TMinmaxFilteringLevel::type& value);
-std::string PrintThriftEnum(const TKuduReplicaSelection::type& value);
-std::string PrintThriftEnum(const TMinmaxFilterFastCodePathMode::type& value);
-std::string PrintThriftEnum(const TParquetBloomFilterWrite::type& value);
+// Converts a value for which operator<< is defined to a std::string.
+template<class T>
+std::string PrintValue(const T& value) {
+  std::stringstream s;
+  s << value;
+  return s.str();
+}
 
 std::string PrintTuple(const Tuple* t, const TupleDescriptor& d);
 std::string PrintRow(TupleRow* row, const RowDescriptor& d);

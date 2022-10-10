@@ -272,7 +272,7 @@ Status HdfsScanPlanNode::ProcessScanRangesAndInitSharedState(FragmentState* stat
         // TODO: this should be a DCHECK but we sometimes hit it. It's likely IMPALA-1702.
         LOG(ERROR) << "Bad table descriptor! table_id=" << hdfs_table_->id()
                    << " partition_id=" << split.partition_id() << "\n"
-                   << PrintThrift(state->fragment())
+                   << state->fragment()
                    << state->fragment_ctx().DebugString();
         return Status("Query encountered invalid metadata, likely due to IMPALA-1702."
                       " Try rerunning the query.");
@@ -754,7 +754,7 @@ void HdfsScanNodeBase::SkipScanRange(io::ScanRange* scan_range) {
   HdfsPartitionDescriptor* partition = hdfs_table_->GetPartition(partition_id);
   DCHECK(partition != nullptr) << "table_id=" << hdfs_table_->id()
                                << " partition_id=" << partition_id << "\n"
-                               << PrintThrift(runtime_state_->instance_ctx());
+                               << runtime_state_->instance_ctx();
   const HdfsFileDesc* desc = GetFileDesc(partition_id, *scan_range->file_string());
   if (metadata->is_sequence_header) {
     // File ranges haven't been issued yet, skip entire file.
@@ -1155,26 +1155,26 @@ void HdfsScanNodeBase::StopAndFinalizeCounters() {
           if (file_format == THdfsFileFormat::PARQUET) {
             // If a scan range stored as parquet is skipped, its compression type
             // cannot be figured out without reading the data.
-            ss << PrintThriftEnum(file_format) << "/" << "Unknown" << "(Skipped):"
+            ss << file_format << "/" << "Unknown" << "(Skipped):"
                << file_cnt << " ";
           } else {
-            ss << PrintThriftEnum(file_format) << "/"
-               << PrintThriftEnum(compressions_set.GetFirstType()) << "(Skipped):"
+            ss << file_format << "/"
+               << compressions_set.GetFirstType() << "(Skipped):"
                << file_cnt << " ";
           }
         } else if (compressions_set.Size() == 1) {
-          ss << PrintThriftEnum(file_format) << "/"
-             << PrintThriftEnum(compressions_set.GetFirstType()) << ":" << file_cnt
+          ss << file_format << "/"
+             << compressions_set.GetFirstType() << ":" << file_cnt
              << " ";
         } else {
-          ss << PrintThriftEnum(file_format) << "/" << "(";
+          ss << file_format << "/" << "(";
           bool first = true;
           for (auto& elem : _THdfsCompression_VALUES_TO_NAMES) {
             THdfsCompression::type type = static_cast<THdfsCompression::type>(
                 elem.first);
             if (!compressions_set.HasType(type)) continue;
             if (!first) ss << ",";
-            ss << PrintThriftEnum(type);
+            ss << type;
             first = false;
           }
           ss << "):" << file_cnt << " ";

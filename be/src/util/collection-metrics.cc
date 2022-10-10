@@ -128,7 +128,7 @@ void StatsMetric<T, StatsSelection>::ToJson(
   lock_guard<mutex> l(lock_);
   rapidjson::Value container(rapidjson::kObjectType);
   AddStandardFields(document, &container);
-  rapidjson::Value units(PrintThriftEnum(unit_).c_str(), document->GetAllocator());
+  rapidjson::Value units(PrintValue(unit_).c_str(), document->GetAllocator());
   container.AddMember("units", units, document->GetAllocator());
 
   if (StatsSelection & StatsType::COUNT) {

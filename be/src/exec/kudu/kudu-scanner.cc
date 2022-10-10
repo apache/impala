@@ -199,7 +199,7 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token, bool* eos) {
   RETURN_IF_ERROR(StringToKuduReadMode(FLAGS_kudu_read_mode, &mode));
   if (state_->query_options().kudu_read_mode != TKuduReadMode::DEFAULT) {
     RETURN_IF_ERROR(StringToKuduReadMode(
-        PrintThriftEnum(state_->query_options().kudu_read_mode), &mode));
+        PrintValue(state_->query_options().kudu_read_mode), &mode));
   }
   KUDU_RETURN_IF_ERROR(
       scanner_->SetReadMode(mode), BuildErrorString("Could not set scanner ReadMode"));

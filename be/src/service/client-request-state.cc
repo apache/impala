@@ -143,7 +143,7 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
 
   profile_->set_name("Query (id=" + PrintId(query_id()) + ")");
   summary_profile_->AddInfoString("Session ID", PrintId(session_id()));
-  summary_profile_->AddInfoString("Session Type", PrintThriftEnum(session_type()));
+  summary_profile_->AddInfoString("Session Type", PrintValue(session_type()));
   if (session_type() == TSessionType::HIVESERVER2 ||
       session_type() == TSessionType::EXTERNAL_FRONTEND) {
     summary_profile_->AddInfoString("HiveServer2 Protocol Version",
@@ -155,7 +155,7 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
       TimePrecision::Nanosecond));
   summary_profile_->AddInfoString("End Time", "");
   summary_profile_->AddInfoString("Query Type", "N/A");
-  summary_profile_->AddInfoString("Query State", PrintThriftEnum(BeeswaxQueryState()));
+  summary_profile_->AddInfoString("Query State", PrintValue(BeeswaxQueryState()));
   summary_profile_->AddInfoString(
       "Impala Query State", ExecStateToString(exec_state()));
   summary_profile_->AddInfoString("Query Status", "OK");
@@ -223,7 +223,7 @@ Status ClientRequestState::Exec() {
   MarkActive();
 
   profile_->AddChild(server_profile_);
-  summary_profile_->AddInfoString("Query Type", PrintThriftEnum(stmt_type()));
+  summary_profile_->AddInfoString("Query Type", PrintValue(stmt_type()));
   summary_profile_->AddInfoString("Query Options (set by configuration)",
       DebugQueryOptions(query_ctx_.client_request.query_options));
   summary_profile_->AddInfoString("Query Options (set by configuration and planner)",
@@ -754,7 +754,7 @@ bool ClientRequestState::ShouldRunExecDdlAsync() {
 
 Status ClientRequestState::ExecDdlRequest() {
   string op_type = catalog_op_type() == TCatalogOpType::DDL ?
-      PrintThriftEnum(ddl_type()) : PrintThriftEnum(catalog_op_type());
+      PrintValue(ddl_type()) : PrintValue(catalog_op_type());
   bool async_ddl = ShouldRunExecDdlAsync();
   bool async_ddl_enabled = exec_request_->query_options.enable_async_ddl_execution;
   string exec_mode = (async_ddl && async_ddl_enabled) ? "asynchronous" : "synchronous";
@@ -1008,7 +1008,7 @@ Status ClientRequestState::Finalize(bool check_inflight, const Status* cause) {
 Status ClientRequestState::Exec(const TMetadataOpRequest& exec_request) {
   TResultSet metadata_op_result;
   // Like the other Exec(), fill out as much profile information as we're able to.
-  summary_profile_->AddInfoString("Query Type", PrintThriftEnum(TStmtType::DDL));
+  summary_profile_->AddInfoString("Query Type", PrintValue(TStmtType::DDL));
   RETURN_IF_ERROR(frontend_->ExecHiveServer2MetadataOp(exec_request,
       &metadata_op_result));
   result_metadata_ = metadata_op_result.schema;
@@ -1667,7 +1667,7 @@ void ClientRequestState::ClearResultCache() {
 
 void ClientRequestState::UpdateExecState(ExecState exec_state) {
   exec_state_.Store(exec_state);
-  summary_profile_->AddInfoString("Query State", PrintThriftEnum(BeeswaxQueryState()));
+  summary_profile_->AddInfoString("Query State", PrintValue(BeeswaxQueryState()));
   summary_profile_->AddInfoString("Impala Query State", ExecStateToString(exec_state));
 }
 
@@ -1905,13 +1905,12 @@ Status ClientRequestState::LogAuditRecord(const Status& query_status) {
   writer.String("statement_type");
   if (request.stmt_type == TStmtType::DDL) {
     if (request.catalog_op_request.op_type == TCatalogOpType::DDL) {
-      writer.String(
-          PrintThriftEnum(request.catalog_op_request.ddl_params.ddl_type).c_str());
+      writer.String(PrintValue(request.catalog_op_request.ddl_params.ddl_type).c_str());
     } else {
-      writer.String(PrintThriftEnum(request.catalog_op_request.op_type).c_str());
+      writer.String(PrintValue(request.catalog_op_request.op_type).c_str());
     }
   } else {
-    writer.String(PrintThriftEnum(request.stmt_type).c_str());
+    writer.String(PrintValue(request.stmt_type).c_str());
   }
   writer.String("network_address");
   writer.String(TNetworkAddressToString(
@@ -1928,7 +1927,7 @@ Status ClientRequestState::LogAuditRecord(const Status& query_status) {
     writer.String("name");
     writer.String(event.name.c_str());
     writer.String("object_type");
-    writer.String(PrintThriftEnum(event.object_type).c_str());
+    writer.String(PrintValue(event.object_type).c_str());
     writer.String("privilege");
     writer.String(event.privilege.c_str());
     writer.EndObject();

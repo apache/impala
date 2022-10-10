@@ -339,8 +339,8 @@ void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instan
       if (rows_counter != nullptr) {
         summary_data->set_rows_returned(rows_counter->value());
         // row count stats for a join node
-        string hash_type = PrintThriftEnum(TPlanNodeType::HASH_JOIN_NODE);
-        string nested_loop_type = PrintThriftEnum(TPlanNodeType::NESTED_LOOP_JOIN_NODE);
+        string hash_type = PrintValue(TPlanNodeType::HASH_JOIN_NODE);
+        string nested_loop_type = PrintValue(TPlanNodeType::NESTED_LOOP_JOIN_NODE);
         if (node->name().rfind(hash_type, 0) == 0
             || node->name().rfind(nested_loop_type, 0) == 0) {
           per_join_rows_produced[node->metadata().plan_node_id] = rows_counter->value();

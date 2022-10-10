@@ -568,7 +568,7 @@ void ImpalaHttpHandler::SessionsHandler(const Webserver::WebRequest& req,
            server_->session_state_map_) {
     shared_ptr<ImpalaServer::SessionState> state = session.second;
     Value session_json(kObjectType);
-    Value type(PrintThriftEnum(state->session_type).c_str(), document->GetAllocator());
+    Value type(PrintValue(state->session_type).c_str(), document->GetAllocator());
     session_json.AddMember("type", type, document->GetAllocator());
 
     session_json.AddMember("inflight_queries",
