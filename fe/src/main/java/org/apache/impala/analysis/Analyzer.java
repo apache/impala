@@ -4091,8 +4091,8 @@ public class Analyzer {
    * and register in globalState_. We use this to simplify outer joins of inline view.
    * eg: t1, (select t3.id c from t2 left join t3 on t1.id = t2.id) t4 where t1.id = t4.c
    */
-  private void getNonnullableOjTidsFromIjOnClause(TableRef tblRef,
-      Set<TupleId> nonnullableTids) {
+  private void getNullRejectingOjTidsFromIjOnClause(TableRef tblRef,
+      Set<TupleId> nullRejectingTids) {
     List<Expr> onConjuncts = new ArrayList<>();
     for (Map.Entry<ExprId, TableRef> entry : globalState_.ijClauseByConjunct.entrySet()) {
       if (entry.getValue() == tblRef) {
@@ -4112,7 +4112,7 @@ public class Analyzer {
           List<TupleId> ids = new ArrayList<>();
           e.getIds(ids, null);
           for (TupleId id : ids) {
-            if (isOuterJoined(id)) nonnullableTids.add(id);
+            if (isOuterJoined(id)) nullRejectingTids.add(id);
           }
         }
       } catch (InternalException ex) {
@@ -4129,10 +4129,10 @@ public class Analyzer {
    */
   private boolean simplifyOuterJoinsByIjOnClause(List<TableRef> tableRefs,
       TableRef ijTableRef) {
-    Set<TupleId> nonnullableTidSet = new HashSet<>();
-    getNonnullableOjTidsFromIjOnClause(ijTableRef, nonnullableTidSet);
-    if (!nonnullableTidSet.isEmpty()) {
-      return simplifyOuterJoins(tableRefs, nonnullableTidSet);
+    Set<TupleId> nullRejectingTidSet = new HashSet<>();
+    getNullRejectingOjTidsFromIjOnClause(ijTableRef, nullRejectingTidSet);
+    if (!nullRejectingTidSet.isEmpty()) {
+      return simplifyOuterJoins(tableRefs, nullRejectingTidSet);
     }
     return false;
   }
@@ -4153,7 +4153,7 @@ public class Analyzer {
    * least one null rejecting condition on the inner table.
    */
   public boolean simplifyOuterJoins(List<TableRef> tableRefs,
-      Set<TupleId> nonnullableTids) {
+      Set<TupleId> nullRejectingTids) {
     boolean isSimplified = false;
     List<TableRef> processedTblRefs = new ArrayList<>();
     for (TableRef tableRef : tableRefs) {
@@ -4167,7 +4167,7 @@ public class Analyzer {
         }
         case LEFT_OUTER_JOIN: {
           TupleId id = tableRef.getId();
-          if (nonnullableTids.contains(id) || hasNullRejectingConjucts(id.asList())) {
+          if (nullRejectingTids.contains(id) || hasNullRejectingConjucts(id.asList())) {
             tableRef.setJoinOp(JoinOperator.INNER_JOIN);
             removeOuterJoinedTupleIds(id.asList());
             ojToIjOnClauseConjucts(tableRef);
@@ -4179,9 +4179,12 @@ public class Analyzer {
         }
         case RIGHT_OUTER_JOIN: {
           List<TupleId> ids = tableRef.getLeftTblRef().getAllTableRefIds();
-          if (TupleId.intersect(ids, nonnullableTids) || hasNullRejectingConjucts(ids)) {
+          // find out all null-rejecting TupleIds in 'ids'
+          boolean hasNullRejectingTid = gatherNullRejectingTids(ids, nullRejectingTids);
+          if (hasNullRejectingTid || TupleId.intersect(ids, nullRejectingTids) ||
+              hasNullRejectingConjucts(ids)) {
             tableRef.setJoinOp(JoinOperator.INNER_JOIN);
-            removeOuterJoinedTupleIds(ids);
+            removeOuterJoinedTupleIds(new ArrayList<TupleId>(nullRejectingTids));
             ojToIjOnClauseConjucts(tableRef);
             reRegisterIsNotEmptyPredicates(tableRef);
             simplifyOuterJoinsByIjOnClause(processedTblRefs, tableRef);
@@ -4191,23 +4194,26 @@ public class Analyzer {
         }
         case FULL_OUTER_JOIN: {
           List<TupleId> ids = tableRef.getLeftTblRef().getAllTableRefIds();
-          if (TupleId.intersect(ids, nonnullableTids) || hasNullRejectingConjucts(ids)) {
+          // find out all null-rejecting TupleIds in 'ids'
+          boolean hasNullRejectingTid = gatherNullRejectingTids(ids, nullRejectingTids);
+          if (hasNullRejectingTid || TupleId.intersect(ids, nullRejectingTids) ||
+              hasNullRejectingConjucts(ids)) {
             removeFullOuterJoinedTupleIdsAndConjuncts(ids);
             removeFullOuterJoinedTupleIdsAndConjuncts(tableRef.getId().asList());
-            if (nonnullableTids.contains(tableRef.getId()) ||
+            if (nullRejectingTids.contains(tableRef.getId()) ||
                 hasNullRejectingConjucts(tableRef.getId().asList())) {
               tableRef.setJoinOp(JoinOperator.INNER_JOIN);
-              removeOuterJoinedTupleIds(ids);
-              removeOuterJoinedTupleIds(tableRef.getId().asList());
+              nullRejectingTids.add(tableRef.getId());
+              removeOuterJoinedTupleIds(new ArrayList<TupleId>(nullRejectingTids));
               ojToIjOnClauseConjucts(tableRef);
               reRegisterIsNotEmptyPredicates(tableRef);
               simplifyOuterJoinsByIjOnClause(processedTblRefs, tableRef);
             } else {
               tableRef.setJoinOp(JoinOperator.LEFT_OUTER_JOIN);
-              removeOuterJoinedTupleIds(ids);
+              removeOuterJoinedTupleIds(new ArrayList<TupleId>(nullRejectingTids));
             }
             isSimplified = true;
-          } else if (nonnullableTids.contains(tableRef.getId()) ||
+          } else if (nullRejectingTids.contains(tableRef.getId()) ||
               hasNullRejectingConjucts(tableRef.getId().asList())) {
             tableRef.setJoinOp(JoinOperator.RIGHT_OUTER_JOIN);
             removeOuterJoinedTupleIds(tableRef.getId().asList());
@@ -4221,5 +4227,41 @@ public class Analyzer {
       processedTblRefs.add(tableRef);
     }
     return isSimplified;
+  }
+
+   /**
+   * Get the tuple ids that satisfy null-rejecting from the where or having onjuncts.
+   * Return true if has null rejecting tid in tupleIds.
+   */
+  private boolean gatherNullRejectingTids(List<TupleId> tupleIds,
+      Set<TupleId> nullRejectingTids) {
+    boolean hasNullRejectingTid = false;
+    for (TupleId id : tupleIds) {
+      List<Expr> conjuncts = getTableConjuncts(id);
+      for (Expr e : conjuncts) {
+        // Skip not null-rejecting conjunct
+        if (isNullableConjunct(e, tupleIds)) continue;
+
+        try {
+          // Check whether 'e' evaluates to true when all its referenced slots are NULL,
+          // The false result indicates that 'e' is null-rejecting conjunct.
+          if (!isTrueWithNullSlots(e)) {
+            if (LOG.isTraceEnabled()) {
+              LOG.trace("Tuple " + id + " has null rejecting conjunct: "
+                  + e.debugString());
+            }
+            nullRejectingTids.add(id);
+            hasNullRejectingTid = true;
+            break;
+          }
+        } catch (InternalException ex) {
+          // Expr evaluation failed in the backend. Skip 'e' since we cannot
+          // determine whether it is null-rejecting conjunct.
+          LOG.warn("Fail to verify " + e.toSql() + " being null-rejecting because of the"
+              + " backend evaluation failure", ex);
+        }
+      }
+    }
+    return hasNullRejectingTid;
   }
 }
