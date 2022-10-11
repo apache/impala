@@ -63,8 +63,10 @@ public class FoldConstantsRule implements ExprRewriteRule {
       expr.analyze(analyzer);
       if (!expr.isConstant()) return expr;
     }
+    // Force the type to be preserved if it is an explicit cast (see IMPALA-11462).
+    boolean isExplicitCast = expr instanceof CastExpr && !expr.isImplicitCast();
     Expr result = LiteralExpr.createBounded(expr, analyzer.getQueryCtx(),
-      LiteralExpr.MAX_STRING_LITERAL_SIZE);
+      LiteralExpr.MAX_STRING_LITERAL_SIZE, isExplicitCast);
 
     // Preserve original type so parent Exprs do not need to be re-analyzed.
     if (result != null) return result.castTo(expr.getType());

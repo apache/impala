@@ -246,3 +246,45 @@ class TestUtcTimestampFunctions(ImpalaTestSuite):
     vector.get_value('exec_option')['enable_expr_rewrites'] = \
         vector.get_value('enable_expr_rewrites')
     self.run_test_case('QueryTest/utc-timestamp-functions', vector)
+
+
+class TestConstantFoldingNoTypeLoss(ImpalaTestSuite):
+  """"Regression tests for IMPALA-11462."""
+
+  @classmethod
+  def get_workload(self):
+    return "functional-query"
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestConstantFoldingNoTypeLoss, cls).add_test_dimensions()
+    # Test with and without expr rewrites to verify that constant folding does not change
+    # the behaviour.
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('enable_expr_rewrites', *[0,1]))
+    # We don't actually use a table so one file format is enough.
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format in ['parquet'])
+
+  def test_shiftleft(self, vector):
+    """ Tests that the return values of the 'shiftleft' functions are correct for the
+    input types (the return type should be the same as the first argument)."""
+    types_and_widths = [
+      ("TINYINT", 8),
+      ("SMALLINT", 16),
+      ("INT", 32),
+      ("BIGINT", 64)
+    ]
+    query_template = ("select shiftleft(cast(1 as {typename}), z) c "
+        "from (select {shift_val} z ) x")
+    for (typename, width) in types_and_widths:
+      shift_val = width - 2  # Valid and positive for signed types.
+      expected_value = 1 << shift_val
+      result = self.execute_query_expect_success(self.client,
+          query_template.format(typename=typename, shift_val=shift_val))
+      assert result.data == [str(expected_value)]
+
+  def test_addition(self, vector):
+    query = "select typeof(cast(1 as bigint) + cast(rand() as tinyint))"
+    result = self.execute_query_expect_success(self.client, query)
+    assert result.data == ["BIGINT"]

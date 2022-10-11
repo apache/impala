@@ -198,10 +198,13 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
    * in cases where the corresponding LiteralExpr is not able to represent the evaluation
    * result, e.g., NaN or infinity. Returns null if the expr evaluation encountered errors
    * or warnings in the BE.
+   * If 'keepOriginalIntType' is true, the type of the result will be the same as the type
+   * of 'constExpr'; otherwise for integers a shorter type may be used if it is big enough
+   * to hold the value.
    * TODO: Support non-scalar types.
    */
   public static LiteralExpr createBounded(Expr constExpr, TQueryCtx queryCtx,
-    int maxResultSize) throws AnalysisException {
+    int maxResultSize, boolean keepOriginalIntType) throws AnalysisException {
     Preconditions.checkState(constExpr.isConstant());
     Preconditions.checkState(constExpr.getType().isValid());
     if (constExpr instanceof LiteralExpr) return (LiteralExpr) constExpr;
@@ -224,24 +227,10 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
         if (val.isSetBool_val()) result = new BoolLiteral(val.bool_val);
         break;
       case TINYINT:
-        if (val.isSetByte_val()) {
-          result = new NumericLiteral(BigDecimal.valueOf(val.byte_val));
-        }
-        break;
       case SMALLINT:
-        if (val.isSetShort_val()) {
-          result = new NumericLiteral(BigDecimal.valueOf(val.short_val));
-        }
-        break;
       case INT:
-        if (val.isSetInt_val()) {
-          result = new NumericLiteral(BigDecimal.valueOf(val.int_val));
-        }
-        break;
       case BIGINT:
-        if (val.isSetLong_val()) {
-          result = new NumericLiteral(BigDecimal.valueOf(val.long_val));
-        }
+        result = createIntegerLiteral(val, constExpr.getType(), keepOriginalIntType);
         break;
       case FLOAT:
       case DOUBLE:
@@ -312,6 +301,11 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
     return result;
   }
 
+  public static LiteralExpr createBounded(Expr constExpr, TQueryCtx queryCtx,
+    int maxResultSize) throws AnalysisException {
+    return createBounded(constExpr, queryCtx, maxResultSize, false);
+  }
+
   // Order NullLiterals based on the SQL ORDER BY default behavior: NULLS LAST.
   @Override
   public int compareTo(LiteralExpr other) {
@@ -320,5 +314,30 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
     if (Expr.IS_NULL_LITERAL.apply(other)) return 1;
     if (getClass() != other.getClass()) return -1;
     return 0;
+  }
+
+  static private NumericLiteral createIntegerLiteral(TColumnValue val, Type type,
+      boolean keepOriginalIntType) throws SqlCastException {
+    BigDecimal value = null;
+    switch (type.getPrimitiveType()) {
+      case TINYINT:
+        if (val.isSetByte_val()) value = BigDecimal.valueOf(val.byte_val);
+        break;
+      case SMALLINT:
+        if (val.isSetShort_val()) value = BigDecimal.valueOf(val.short_val);
+        break;
+      case INT:
+        if (val.isSetInt_val()) value = BigDecimal.valueOf(val.int_val);
+        break;
+      case BIGINT:
+        if (val.isSetLong_val()) value = BigDecimal.valueOf(val.long_val);
+        break;
+      default:
+        Preconditions.checkState(false,
+            String.format("Integer type expected, got '%s'.", type.toSql()));
+    }
+    if (value == null) return null;
+    return keepOriginalIntType ?
+        new NumericLiteral(value, type) : new NumericLiteral(value);
   }
 }
