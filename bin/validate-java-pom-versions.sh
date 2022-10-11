@@ -38,11 +38,12 @@ popd > /dev/null 2>&1
 
 RETVAL=0
 NO_MATCH_FILES=()
-for pom_file in $(find ${IMPALA_HOME} -name pom.xml); do
+for pom_file in $(find ${IMPALA_HOME} -path ${IMPALA_TOOLCHAIN} -prune \
+    -o -name pom.xml -print); do
   # If this is a git checkout, then only do the check for pom.xml
   # files known to git. If this is not a git checkout, then it should
   # be building from a tarball, and there should not be extra
-  # pom.xml files.
+  # pom.xml files except in the toolchain folder.
   if ${IS_GIT_CHECKOUT} &&
      ! git ls-files --error-unmatch ${pom_file} > /dev/null 2>&1 ; then
     # This pom.xml file is not known to git.
