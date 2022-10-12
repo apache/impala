@@ -49,7 +49,7 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
       self.test_suite = test_suite
       self.db_name = db_name
       self.tbl_name = tbl_name
-      self.fq_tbl_name = "%s.%s" % (self.db_name, self.tbl_name)
+      self.fq_tbl_name = self._generate_fq_tbl_name(self.db_name, self.tbl_name)
 
     def expect_no_time_change(self, query):
       """Neither transient_lastDdlTime or impala.lastComputeStatsTime should be
@@ -72,34 +72,40 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
       """
       self.run_test(query, False, True)
 
-    def run_test(self, query, expect_changed_ddl_time, expect_changed_stats_time):
+    def expect_ddl_time_change_on_rename(self, new_tbl_name):
+      """
+      Checks that after an ALTER TABLE ... RENAME query transient_lastDdlTime is higher on
+      the new table than it was on the old table.
+      """
+      query = "alter table %(TBL)s rename to {}".format(self.db_name + "." + new_tbl_name)
+      self.run_test(query, True, False, new_tbl_name)
+
+    def run_test(self, query, expect_changed_ddl_time, expect_changed_stats_time,
+        new_tbl_name=None):
       """
       Runs the query and compares the last ddl/compute stats time before and after
       executing the query. If expect_changed_ddl_time or expect_changed_stat_time
       is true, then we expect the given table property to be increased, otherwise we
       expect it to be unchanged.
+      If the query renames the table, the new table name has to be provided in
+      'new_tbl_name' so that the new table is checked after the query.
       The following strings are substituted in the query: "%(TBL)s" and "%(WAREHOUSE)s"
       """
-
-      HIVE_LAST_DDL_TIME_PARAM_KEY = "transient_lastDdlTime"
-      LAST_COMPUTE_STATS_TIME_KEY = "impala.lastComputeStatsTime"
-
       # Get timestamps before executing query.
-      table = self.test_suite.hive_client.get_table(self.db_name, self.tbl_name)
-      assert table is not None
-      beforeDdlTime = table.parameters[HIVE_LAST_DDL_TIME_PARAM_KEY]
-      beforeStatsTime = table.parameters[LAST_COMPUTE_STATS_TIME_KEY]
+      (beforeDdlTime, beforeStatsTime) = self._get_ddl_and_stats_time(
+          self.db_name, self.tbl_name)
       # HMS uses a seconds granularity on the last ddl time - sleeping 1100 ms should be
       # enough to ensure that the new timestamps are strictly greater than the old ones.
       time.sleep (1.1)
 
       self.test_suite.execute_query(query %
         {'TBL': self.fq_tbl_name, 'WAREHOUSE': WAREHOUSE})
+      if new_tbl_name is not None:
+        self._update_name(new_tbl_name)
 
       # Get timestamps after executing query.
-      table = self.test_suite.hive_client.get_table(self.db_name, self.tbl_name)
-      afterDdlTime = table.parameters[HIVE_LAST_DDL_TIME_PARAM_KEY]
-      afterStatsTime = table.parameters[LAST_COMPUTE_STATS_TIME_KEY]
+      (afterDdlTime, afterStatsTime) = self._get_ddl_and_stats_time(
+          self.db_name, self.tbl_name)
 
       if expect_changed_ddl_time:
         # check that the new ddlTime is strictly greater than the old one.
@@ -113,17 +119,46 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
       else:
         assert long(afterStatsTime) == long(beforeStatsTime)
 
-  def test_alter(self, vector, unique_database):
-    TBL_NAME = "alter_test_tbl"
-    FQ_TBL_NAME = unique_database + "." + TBL_NAME
+    def _update_name(self, new_tbl_name):
+      """"
+      Update the name, for example because of a table rename ddl. The database name does
+      not change.
+      """
+      self.tbl_name = new_tbl_name
+      self.fq_tbl_name = self._generate_fq_tbl_name(self.db_name, self.tbl_name)
 
-    self.execute_query("create external table %s (i int) "
-                       "partitioned by (j int, s string)" % FQ_TBL_NAME)
+    def _generate_fq_tbl_name(self, db_name, tbl_name):
+      return "%s.%s" % (db_name, tbl_name)
+
+    def _get_ddl_and_stats_time(self, db_name, tbl_name):
+      HIVE_LAST_DDL_TIME_PARAM_KEY = "transient_lastDdlTime"
+      LAST_COMPUTE_STATS_TIME_KEY = "impala.lastComputeStatsTime"
+
+      table = self.test_suite.hive_client.get_table(db_name, tbl_name)
+      assert table is not None
+      ddlTime = table.parameters[HIVE_LAST_DDL_TIME_PARAM_KEY]
+      statsTime = table.parameters[LAST_COMPUTE_STATS_TIME_KEY]
+      return (ddlTime, statsTime)
+
+  def _create_table(self, fq_tbl_name, is_kudu):
+    if is_kudu:
+      self.execute_query("create table %s (i int primary key) "
+                         "partition by hash(i) partitions 3 stored as kudu" % fq_tbl_name)
+    else:
+      self.execute_query("create external table %s (i int) "
+                         "partitioned by (j int, s string)" % fq_tbl_name)
+
+  def _create_and_init_test_helper(self, unique_database, tbl_name, is_kudu):
+    helper = TestLastDdlTimeUpdate.TestHelper(self, unique_database, tbl_name)
+    self._create_table(helper.fq_tbl_name, is_kudu)
 
     # compute statistics to fill table property impala.lastComputeStatsTime
-    self.execute_query("compute stats %s" % FQ_TBL_NAME)
+    self.execute_query("compute stats %s" % helper.fq_tbl_name)
+    return helper
 
-    h = TestLastDdlTimeUpdate.TestHelper(self, unique_database, TBL_NAME)
+  def test_alter(self, vector, unique_database):
+    TBL_NAME = "alter_test_tbl"
+    h = self._create_and_init_test_helper(unique_database, TBL_NAME, False)
 
     # add/drop partitions
     h.expect_no_time_change("alter table %(TBL)s add partition (j=1, s='2012')")
@@ -140,8 +175,8 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
     self.run_common_test_cases(h)
 
     # prepare for incremental statistics tests
-    self.execute_query("drop stats %s" % FQ_TBL_NAME)
-    self.execute_query("alter table %s add partition (j=1, s='2012')" % FQ_TBL_NAME)
+    self.execute_query("drop stats %s" % h.fq_tbl_name)
+    self.execute_query("alter table %s add partition (j=1, s='2012')" % h.fq_tbl_name)
 
     # compute incremental statistics
     h.expect_stat_time_change("compute incremental stats %(TBL)s")
@@ -154,7 +189,7 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
     # prepare for table sample statistics tests
     self.execute_query(
         "alter table %s set tblproperties ('impala.enable.stats.extrapolation'='true')"
-        % FQ_TBL_NAME)
+        % h.fq_tbl_name)
 
     # compute sampled statistics
     h.expect_stat_time_change("compute stats %(TBL)s tablesample system(20)")
@@ -162,14 +197,7 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
 
   def test_insert(self, vector, unique_database):
     TBL_NAME = "insert_test_tbl"
-    FQ_TBL_NAME = unique_database + "." + TBL_NAME
-    self.execute_query("create external table %s (i int) "
-                       "partitioned by (j int, s string)" % FQ_TBL_NAME)
-
-    # initialize compute stats time
-    self.execute_query("compute stats %s" % FQ_TBL_NAME)
-
-    h = TestLastDdlTimeUpdate.TestHelper(self, unique_database, TBL_NAME)
+    h = self._create_and_init_test_helper(unique_database, TBL_NAME, False)
 
     # static partition insert
     h.expect_no_time_change("insert into %(TBL)s partition(j=1, s='2012') select 10")
@@ -183,21 +211,28 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
     # dynamic partition insert modifying an existing partition
     h.expect_no_time_change("insert into %(TBL)s partition(j, s) select 20, 1, '2012'")
 
-  def test_kudu(self, vector, unique_database):
+  def test_kudu_alter_and_insert(self, vector, unique_database):
     TBL_NAME = "kudu_test_tbl"
-    FQ_TBL_NAME = unique_database + "." + TBL_NAME
-    self.execute_query("create table %s (i int primary key) "
-                       "partition by hash(i) partitions 3 stored as kudu" % FQ_TBL_NAME)
-
-    # initialize last compute stats time
-    self.execute_query("compute stats %s" % FQ_TBL_NAME)
-
-    h = TestLastDdlTimeUpdate.TestHelper(self, unique_database, TBL_NAME)
+    h = self._create_and_init_test_helper(unique_database, TBL_NAME, True)
 
     # insert
-    h.expect_no_time_change("insert into %s values (1)" % FQ_TBL_NAME)
+    h.expect_no_time_change("insert into %s values (1)" % h.fq_tbl_name)
 
     self.run_common_test_cases(h)
+
+  def test_rename(self, vector, unique_database):
+    # Test non-Kudu table
+    OLD_TBL_NAME = "rename_from_test_tbl"
+    NEW_TBL_NAME = "rename_to_test_tbl"
+
+    h = self._create_and_init_test_helper(unique_database, OLD_TBL_NAME, False)
+    h.expect_ddl_time_change_on_rename(NEW_TBL_NAME)
+
+    # Test Kudu table
+    OLD_KUDU_TBL_NAME = "kudu_rename_from_test_tbl"
+    NEW_KUDU_TBL_NAME = "kudu_rename_to_test_tbl"
+    h = self._create_and_init_test_helper(unique_database, OLD_KUDU_TBL_NAME, True)
+    h.expect_ddl_time_change_on_rename(NEW_KUDU_TBL_NAME)
 
   # Tests that should behave the same with HDFS and Kudu tables.
   def run_common_test_cases(self, test_helper):

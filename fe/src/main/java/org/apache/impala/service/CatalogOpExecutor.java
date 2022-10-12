@@ -5036,6 +5036,7 @@ public class CatalogOpExecutor {
     boolean needsHmsAlterTable = !isSynchronizedTable || !integratedHmsTable;
     if (needsHmsAlterTable) {
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+        Table.updateTimestampProperty(msTbl, Table.TBL_PROP_LAST_DDL_TIME);
         msClient.getHiveClient().alter_table(
             tableName.getDb(), tableName.getTbl(), msTbl);
       } catch (TException e) {
