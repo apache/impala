@@ -220,9 +220,12 @@ class TestMinMaxFilters(ImpalaTestSuite):
     # Enable query option ASYNC_CODEGEN for slow build
     if build_runs_slowly:
       add_exec_option_dimension(cls, "async_codegen", 1)
+    # IMPALA-10715. Enable only min/max since the bloom filters will return
+    # rows only satisfying the join predicates. This test requires the return
+    # of non-qualifying rows to succeed.
+    add_exec_option_dimension(cls, "ENABLED_RUNTIME_FILTER_TYPES", "MIN_MAX")
 
   def test_min_max_filters(self, vector):
-    self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=MIN_MAX")
     self.execute_query("SET MINMAX_FILTER_THRESHOLD=0.5")
     self.run_test_case('QueryTest/min_max_filters', vector,
         test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
