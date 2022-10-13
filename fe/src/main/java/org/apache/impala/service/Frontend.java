@@ -1838,10 +1838,6 @@ public class Frontend {
         Preconditions.checkNotNull(poolConfig);
         new_entry.setMax_mem_limit(poolConfig.getMax_query_mem_limit() > 0 ?
             poolConfig.getMax_query_mem_limit() : Long.MAX_VALUE);
-        // TODO IMPALA-11604: set max_processing_cost_limit for executor group set
-        // new_entry.setMax_processing_cost_limit(
-        //   poolConfig.getMax_query_processing_cost_limit() >= 0 ?
-        //   poolConfig.getMax_query_processing_cost_limit() : Long.MAX_VALUE);
       } else {
         // Set to max possible threshold value when there is no pool service
         new_entry.setMax_mem_limit(Long.MAX_VALUE);

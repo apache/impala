@@ -29,9 +29,7 @@ class ResourcePoolConfig(object):
 
   # Mapping of config strings used in the llama_site file with those used on the impala
   # metrics debug page. Add to this dictionary if other configs are need for tests.
-  CONFIG_TO_METRIC_STR_MAPPING = {
-      'max-query-mem-limit': 'pool-max-query-mem-limit',
-      'max-query-processing-cost-limit': 'pool-max-query-processing-cost-limit'}
+  CONFIG_TO_METRIC_STR_MAPPING = {'max-query-mem-limit': 'pool-max-query-mem-limit'}
 
   """'impala_service' should point to an impalad to be used for running queries.
   'ac_service' should point to the service running the admission controller and is used

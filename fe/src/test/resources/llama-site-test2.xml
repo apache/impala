@@ -66,10 +66,6 @@
     <value>10</value>
   </property>
   <property>
-    <name>impala.admission-control.max-query-processing-cost-limit.root.queueD</name>
-    <value>62914560</value>
-  </property>
-  <property>
     <name>llama.am.throttling.maximum.placed.reservations.root.queueD</name>
     <value>6</value>
   </property>

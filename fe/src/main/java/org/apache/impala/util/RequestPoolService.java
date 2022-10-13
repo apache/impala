@@ -123,10 +123,6 @@ public class RequestPoolService {
   // Key for specifying the "Max mt_dop" configuration of the pool
   private final static String MAX_MT_DOP = "impala.admission-control.max-mt-dop";
 
-  // Keys for the pool max query processing cost limits (in bytes).
-  private final static String MAX_QUERY_PROCESSING_COST_LIMIT_BYTES =
-      "impala.admission-control.max-query-processing-cost-limit";
-
   // String format for a per-pool configuration key. First parameter is the key for the
   // default, e.g. MAX_PLACED_RESERVATIONS_KEY, and the second parameter is the
   // pool name.
@@ -392,18 +388,16 @@ public class RequestPoolService {
           getPoolConfigValue(currentConf, pool, CLAMP_MEM_LIMIT_QUERY_OPTION, true));
       result.setMax_mt_dop(
           getPoolConfigValue(currentConf, pool, MAX_MT_DOP, -1));
-      result.setMax_query_processing_cost_limit(getPoolConfigValue(
-          currentConf, pool, MAX_QUERY_PROCESSING_COST_LIMIT_BYTES, -1));
     }
     if (LOG.isTraceEnabled()) {
       LOG.debug("getPoolConfig(pool={}): max_mem_resources={}, max_requests={},"
               + " max_queued={},  queue_timeout_ms={}, default_query_options={},"
               + " max_query_mem_limit={}, min_query_mem_limit={},"
-              + " clamp_mem_limit_query_option={}, max_query_processing_cost_limit={}",
+              + " clamp_mem_limit_query_option={}",
           pool, result.max_mem_resources, result.max_requests, result.max_queued,
           result.queue_timeout_ms, result.default_query_options,
           result.max_query_mem_limit, result.min_query_mem_limit,
-          result.clamp_mem_limit_query_option, result.max_query_processing_cost_limit);
+          result.clamp_mem_limit_query_option);
     }
     return result;
   }

@@ -24,11 +24,6 @@
     <value>0</value>
   </property>
   <property>
-    <name>impala.admission-control.max-query-processing-cost-limit.root.small</name>
-    <!-- 64 MB -->
-    <value>67108864</value>
-  </property>
-  <property>
     <name>impala.admission-control.max-query-mem-limit.root.large</name>
    <!-- 8 PB -->
     <value>9007199254740992</value>
@@ -37,10 +32,5 @@
     <name>impala.admission-control.min-query-mem-limit.root.large</name>
    <!-- 64MB+1 -->
     <value>67108865</value>
-  </property>
-  <property>
-    <name>impala.admission-control.max-query-processing-cost-limit.root.large</name>
-    <!-- 8 PB -->
-    <value>9007199254740992</value>
   </property>
 </configuration>

@@ -13,10 +13,6 @@
     <name>impala.admission-control.clamp-mem-limit-query-option.root.regularPoolWithoutClamping</name>
     <value>false</value>
   </property>
-  <property>
-    <name>impala.admission-control.max-query-processing-cost-limit.root.regularPoolWithoutClamping</name>
-    <value>1610612736</value><!--1.5GB-->
-  </property>
   <!--poolLowMinLimit pool config-->
   <property>
     <name>impala.admission-control.min-query-mem-limit.root.poolLowMinLimit</name>
@@ -40,10 +36,6 @@
     <name>impala.admission-control.clamp-mem-limit-query-option.root.regularPool</name>
     <value>true</value>
   </property>
-  <property>
-    <name>impala.admission-control.max-query-processing-cost-limit.root.regularPool</name>
-    <value>1610612736</value><!--1.5GB-->
-  </property>
   <!--regularPoolNoMinLimit pool config-->
   <property>
     <name>impala.admission-control.max-query-mem-limit.root.regularPoolNoMinLimit</name>
@@ -57,10 +49,6 @@
     <name>impala.admission-control.clamp-mem-limit-query-option.root.regularPoolNoMinLimit</name>
     <value>true</value>
   </property>
-  <property>
-    <name>impala.admission-control.max-query-processing-cost-limit.root.regularPoolNoMinLimit</name>
-    <value>1610612736</value><!--1.5GB-->
-  </property>
   <!--poolNoMemLimits pool config-->
   <property>
     <name>impala.admission-control.max-query-mem-limit.root.poolNoMemLimits</name>
@@ -70,10 +58,6 @@
     <name>impala.admission-control.min-query-mem-limit.root.poolNoMemLimits</name>
     <value>0</value>
   </property>
-  <property>
-    <name>impala.admission-control.max-query-processing-cost-limit.root.poolNoMemLimits</name>
-    <value>-1</value>
-  </property>
   <!--maxLessThanMinLimit pool config-->
   <property>
     <name>impala.admission-control.max-query-mem-limit.root.maxLessThanMinLimit</name>
@@ -82,10 +66,6 @@
   <property>
     <name>impala.admission-control.min-query-mem-limit.root.maxLessThanMinLimit</name>
     <value>100001</value>
-  </property>
-  <property>
-    <name>impala.admission-control.max-query-processing-cost-limit.root.maxLessThanMinLimit</name>
-    <value>100000</value>
   </property>
   <!--maxMemLessThanMinLimit pool config-->
   <property>
@@ -100,10 +80,6 @@
   <property>
     <name>impala.admission-control.min-query-mem-limit.root.invalidTestPool</name>
     <value>26214400</value>
-  </property>
-  <property>
-    <name>impala.admission-control.max-query-processing-cost-limit.root.invalidTestPool</name>
-    <value>-1</value>
   </property>
   <property>
     <name>llama.am.throttling.maximum.placed.reservations.root.invalidTestPool</name>

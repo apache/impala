@@ -224,10 +224,6 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
     &lt;name>impala.admission-control.<b>clamp-mem-limit-query-option</b>.root.default.regularPool&lt;/name>
     &lt;value>true&lt;/value>
   &lt;/property>
-  &lt;property>
-    &lt;name>impala.admission-control.<b>max-query-processing-cost-limit</b>.root.default.regularPool&lt;/name>
-    &lt;value>1610612736&lt;/value>&lt;!--1.5GB-->
-  &lt;/property>
 &lt;/configuration>
 </codeblock>
 
