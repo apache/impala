@@ -130,8 +130,9 @@ else
     FAILED="${FAILED}:${DESCRIPTION}"
   fi
 
-  # Reset the files changed by mvn versions:set
-  git reset --hard HEAD
+  if ! git reset --hard HEAD ; then
+    echo "Failed to reset the files changed by mvn versions:set"
+  fi
 
   ccache -s
   bin/jenkins/get_maven_statistics.sh logs/mvn/mvn.log
