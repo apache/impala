@@ -624,6 +624,7 @@ public class CreateTableStmt extends StatementBase {
     putGeneratedProperty(IcebergTable.KEY_STORAGE_HANDLER,
         IcebergTable.ICEBERG_STORAGE_HANDLER);
     putGeneratedProperty(TableProperties.ENGINE_HIVE_ENABLED, "true");
+    addMergeOnReadPropertiesIfNeeded();
 
     String fileformat = getTblProperties().get(IcebergTable.ICEBERG_FILE_FORMAT);
     TIcebergFileFormat icebergFileFormat = IcebergUtil.getIcebergFileFormat(fileformat);
@@ -650,6 +651,28 @@ public class CreateTableStmt extends StatementBase {
       catalog = IcebergUtil.getTIcebergCatalog(catalogStr);
     }
     validateIcebergTableProperties(catalog);
+  }
+
+  /**
+   * When creating an Iceberg table that supports row-level modifications
+   * (format-version >= 2) we set write modes to "merge-on-read" which is the write
+   * mode Impala will eventually support (IMPALA-11664).
+   */
+  private void addMergeOnReadPropertiesIfNeeded() {
+    Map<String, String> tblProps = getTblProperties();
+    String formatVersion = tblProps.get(TableProperties.FORMAT_VERSION);
+    if (formatVersion == null ||
+        Integer.valueOf(formatVersion) < IcebergTable.ICEBERG_FORMAT_V2) {
+      return;
+    }
+
+    // Only add "merge-on-read" if none of the write modes are specified.
+    final String MERGE_ON_READ = IcebergTable.MERGE_ON_READ;
+    if (!IcebergUtil.isAnyWriteModeSet(tblProps)) {
+      putGeneratedProperty(TableProperties.DELETE_MODE, MERGE_ON_READ);
+      putGeneratedProperty(TableProperties.UPDATE_MODE, MERGE_ON_READ);
+      putGeneratedProperty(TableProperties.MERGE_MODE, MERGE_ON_READ);
+    }
   }
 
   private void validateIcebergParquetCompressionCodec(

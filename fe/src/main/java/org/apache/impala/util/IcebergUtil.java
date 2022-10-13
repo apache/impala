@@ -51,6 +51,7 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.StructLike;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.TableScan;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -830,6 +831,16 @@ public class IcebergUtil {
       return rowGroupSize;
     }
     return IcebergTable.UNSET_PARQUET_ROW_GROUP_SIZE;
+  }
+
+  /**
+   * @return true if any of the write modes is being set in 'tblProperties'.
+   */
+  public static boolean isAnyWriteModeSet(Map<String, String> tblProperties) {
+    return
+        tblProperties.get(TableProperties.DELETE_MODE) != null ||
+        tblProperties.get(TableProperties.UPDATE_MODE) != null ||
+        tblProperties.get(TableProperties.MERGE_MODE) != null;
   }
 
   public static Long parseParquetPageSize(Map<String, String> tblProperties,

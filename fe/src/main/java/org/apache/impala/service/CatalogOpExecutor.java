@@ -80,6 +80,7 @@ import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.mr.Catalogs;
 import org.apache.impala.analysis.AlterTableSortByStmt;
@@ -1412,8 +1413,31 @@ public class CatalogOpExecutor {
     TAlterTableSetTblPropertiesParams setPropsParams =
         params.getSet_tbl_properties_params();
     if (setPropsParams.getTarget() != TTablePropertyType.TBL_PROPERTY) return false;
+
+    addMergeOnReadPropertiesIfNeeded(tbl, setPropsParams.getProperties());
     IcebergCatalogOpExecutor.setTblProperties(iceTxn, setPropsParams.getProperties());
     return true;
+  }
+
+  /**
+   * Iceberg format from V2 supports row-level modifications. We set write modes to
+   * "merge-on-read" which is the write mode Impala will eventually
+   * support (IMPALA-11664). Unless the user specified otherwise in the table properties.
+   */
+  private void addMergeOnReadPropertiesIfNeeded(IcebergTable tbl,
+      Map<String, String> properties) {
+    String formatVersion = properties.get(TableProperties.FORMAT_VERSION);
+    if (formatVersion == null ||
+        Integer.valueOf(formatVersion) < IcebergTable.ICEBERG_FORMAT_V2) {
+      return;
+    }
+    if (!IcebergUtil.isAnyWriteModeSet(properties) &&
+        !IcebergUtil.isAnyWriteModeSet(tbl.getMetaStoreTable().getParameters())) {
+      final String MERGE_ON_READ = IcebergTable.MERGE_ON_READ;
+      properties.put(TableProperties.DELETE_MODE, MERGE_ON_READ);
+      properties.put(TableProperties.UPDATE_MODE, MERGE_ON_READ);
+      properties.put(TableProperties.MERGE_MODE, MERGE_ON_READ);
+    }
   }
 
   /**

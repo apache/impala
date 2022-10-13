@@ -938,3 +938,77 @@ LOCATION '$$location_uri$$'
 TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
 'engine.hive.enabled'='true', 'table_type'='ICEBERG')
 ====
+---- CREATE_TABLE
+# Creating V1 tables explicitly should not set 'merge-on-read' write modes if no write mode is
+# specified.
+CREATE TABLE ice_explicit_v1 (i int)
+STORED AS ICEBERG
+TBLPROPERTIES('format-version'='1')
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.ice_explicit_v1 (i INT NULL)
+STORED AS ICEBERG
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
+ 'engine.hive.enabled'='true', 'table_type'='ICEBERG')
+====
+---- CREATE_TABLE
+# Creating V2 tables should set 'merge-on-read' write modes if no write mode is specified.
+CREATE TABLE ice_v2 (i int)
+STORED AS ICEBERG
+TBLPROPERTIES('format-version'='2')
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.ice_v2 (i INT NULL)
+STORED AS ICEBERG
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
+ 'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.delete.mode'='merge-on-read',
+ 'write.update.mode'='merge-on-read', 'write.merge.mode'='merge-on-read')
+====
+---- CREATE_TABLE
+# Creating V2 tables should not set write mode if user specified any of it to any value.
+CREATE TABLE ice_v2_explicit_delete (i int)
+STORED AS ICEBERG
+TBLPROPERTIES('format-version'='2', 'write.delete.mode'='merge-on-read')
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.ice_v2_explicit_delete (i INT NULL)
+STORED AS ICEBERG
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
+ 'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.delete.mode'='merge-on-read')
+====
+---- CREATE_TABLE
+# Creating V2 tables should not set write mode if user specified any of it to any value.
+CREATE TABLE ice_v2_explicit_delete_2 (i int)
+STORED AS ICEBERG
+TBLPROPERTIES('format-version'='2', 'write.delete.mode'='copy-on-write')
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.ice_v2_explicit_delete_2 (i INT NULL)
+STORED AS ICEBERG
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
+ 'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.delete.mode'='copy-on-write')
+====
+---- CREATE_TABLE
+# Creating V2 tables should not set write mode if user specified any of it to any value.
+CREATE TABLE ice_v2_explicit_update (i int)
+STORED AS ICEBERG
+TBLPROPERTIES('format-version'='2', 'write.update.mode'='copy-on-write')
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.ice_v2_explicit_update (i INT NULL)
+STORED AS ICEBERG
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
+ 'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.update.mode'='copy-on-write')
+====
+---- CREATE_TABLE
+# Creating V2 tables should not set write mode if user specified any of it to any value.
+CREATE TABLE ice_v2_explicit_merge (i int)
+STORED AS ICEBERG
+TBLPROPERTIES('format-version'='2', 'write.merge.mode'='copy-on-write')
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.ice_v2_explicit_merge (i INT NULL)
+STORED AS ICEBERG
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
+ 'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.merge.mode'='copy-on-write')
+====

@@ -75,6 +75,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
   // Iceberg catalog type key in tblproperties
   public static final String ICEBERG_CATALOG = "iceberg.catalog";
 
+  // Iceberg format version numbers
+  public static final int ICEBERG_FORMAT_V1 = 1;
+  public static final int ICEBERG_FORMAT_V2 = 2;
+
   // Iceberg table catalog location key in tblproperties when using HadoopCatalog
   // This property is necessary for both managed and external Iceberg table with
   // 'hadoop.catalog'
@@ -93,6 +97,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
       "write.parquet.compression-codec";
   public static final String PARQUET_COMPRESSION_LEVEL =
       "write.parquet.compression-level";
+
+  public static final String MERGE_ON_READ = "merge-on-read";
 
   // Default values for parquet compression codec.
   public static final THdfsCompression DEFAULT_PARQUET_COMPRESSION_CODEC =
