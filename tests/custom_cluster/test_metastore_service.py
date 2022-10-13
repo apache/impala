@@ -18,6 +18,7 @@
 import pytest
 from hive_metastore.ttypes import Database
 from hive_metastore.ttypes import FieldSchema
+from hive_metastore.ttypes import FindNextCompactRequest
 from hive_metastore.ttypes import GetTableRequest
 from hive_metastore.ttypes import GetPartitionsByNamesRequest
 from hive_metastore.ttypes import TruncateTableRequest
@@ -972,6 +973,43 @@ class TestMetastoreService(CustomClusterTestSuite):
                 catalog_hms_client.shutdown()
             if self.__get_database_no_throw(db_name) is not None:
                 self.hive_client.drop_database(db_name, True, True)
+
+    @pytest.mark.execute_serially
+    @CustomClusterTestSuite.with_args(
+        impalad_args="--use_local_catalog=true",
+        catalogd_args="--catalog_topic_mode=minimal "
+                      "--start_hms_server=true "
+                      "--hms_port=5899 "
+                      "--fallback_to_hms_on_errors=true "
+    )
+    def test_compaction_apis(self):
+        """
+        The test verifies if the following HMS compaction apis are
+        reachable from impala (so that MetastoreServiceHandler in impala
+        can talk to HMS through these APIs):
+        1.  find_next_compact2
+        """
+        catalog_hms_client = None
+        tbl_name = ImpalaTestSuite.get_random_name(
+            "test_table_compaction_seq_tbl_")
+        try:
+            catalog_hms_client, hive_transport = \
+                ImpalaTestSuite.create_hive_client(5899)
+            assert catalog_hms_client is not None
+            # create managed table
+            self.run_stmt_in_hive("create transactional table default.{0} (c1 int)"
+              .format(tbl_name))
+            self.run_stmt_in_hive("alter table default.{0} compact 'minor'"
+              .format(tbl_name))
+            compactRequest = FindNextCompactRequest()
+            compactRequest.workerId = "myworker"
+            compactRequest.workerVersion = "4.0.0"
+            optionalCi = catalog_hms_client.find_next_compact2(compactRequest)
+            # If the above call is successful then find_next_compact2 api is reachable.
+            catalog_hms_client.drop_table("default", tbl_name, True)
+        finally:
+            if catalog_hms_client is not None:
+                catalog_hms_client.shutdown()
 
     def __create_test_tbls_from_hive(self, db_name):
       """Util method to create test tables from hive in the given database. It creates

@@ -85,6 +85,7 @@ import org.apache.hadoop.hive.metastore.api.DropPartitionsResult;
 import org.apache.hadoop.hive.metastore.api.EnvironmentContext;
 import org.apache.hadoop.hive.metastore.api.ExtendedTableInfo;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.FindNextCompactRequest;
 import org.apache.hadoop.hive.metastore.api.FindSchemasByColsResp;
 import org.apache.hadoop.hive.metastore.api.FindSchemasByColsRqst;
 import org.apache.hadoop.hive.metastore.api.FireEventRequest;
@@ -2396,6 +2397,14 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       throws MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       return client.getHiveClient().getThriftClient().find_next_compact(s);
+    }
+  }
+
+  @Override
+  public OptionalCompactionInfoStruct find_next_compact2(FindNextCompactRequest rqst)
+      throws MetaException, TException {
+    try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
+      return client.getHiveClient().getThriftClient().find_next_compact2(rqst);
     }
   }
 
