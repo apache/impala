@@ -61,6 +61,7 @@ under the License.
 <codeblock>CREATE VIEW [IF NOT EXISTS] <varname>view_name</varname>
     [(<varname>column_name</varname> [COMMENT '<varname>column_comment</varname>'][, ...])]
     [COMMENT '<varname>view_comment</varname>']
+    [TBLPROPERTIES ('<varname>name</varname>' = '<varname>value</varname>'[, ...])]
   AS <varname>select_statement</varname></codeblock>
 
     <p conref="../shared/impala_common.xml#common/ddl_blurb"/>
@@ -160,6 +161,9 @@ CREATE VIEW v6 AS SELECT t1.c1, t2.c2 FROM t1 JOIN t2 ON t1.id = t2.id;
 
 -- Create a view with a column comment and a table comment.
 CREATE VIEW v7 (c1 COMMENT 'Comment for c1', c2) COMMENT 'Comment for v7' AS SELECT t1.c1, t1.c2 FROM t1;
+
+-- Create a view with tblproperties.
+CREATE VIEW v7 (c1 , c2) TBLPROPERTIES ('tblp1' = '1', 'tblp2' = '2') AS SELECT t1.c1, t1.c2 FROM t1;
 </codeblock>
 
     <p conref="../shared/impala_common.xml#common/related_info"/>

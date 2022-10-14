@@ -68,6 +68,12 @@ ALTER VIEW [<varname>database_name</varname>.]<varname>view_name</varname>
    RENAME TO [<varname>database_name</varname>.]<varname>view_name</varname>;
 
 ALTER VIEW [<varname>database_name</varname>.]<varname>view_name</varname> SET OWNER USER user_name;
+
+ALTER VIEW [<varname>database_name</varname>.]<varname>view_name</varname>
+    SET TBLPROPERTIES ('<varname>name</varname>' = '<varname>value</varname>'[, '<varname>name</varname>' = '<varname>value</varname>' ...]);
+
+ALTER VIEW [<varname>database_name</varname>.]<varname>view_name</varname>
+    UNSET TBLPROPERTIES ('<varname>name</varname>'[, ...]);
 </codeblock>
 
     <ul>
@@ -108,6 +114,24 @@ ALTER VIEW db1.v1 RENAME TO db2.v1; -- Move the view to a difference database wi
           <codeph>ALL</codeph> privilege that is explicitly granted via the
           <codeph>GRANT</codeph> statement and a privilege that is implicitly granted by the
           <codeph>CREATE VIEW</codeph> statement.
+        </p>
+      </li>
+
+      <li rev="IMPALA-11420">
+        The <codeph>SET TBLPROPERTIES</codeph> clause is primarily a way to associate arbitrary
+        user-specified data items with a particular view.
+        <p>
+          You can associate arbitrary items of metadata with a table by specifying the
+          <codeph>TBLPROPERTIES</codeph> clause. This clause takes a comma-separated list of
+          key-value pairs and stores those items in the metastore database. You can also unset the
+          view properties later with an <codeph>UNSET TBLPROPERTIES</codeph> clause.
+        </p>
+
+        <p>
+          For example:
+<codeblock>ALTER VIEW v1 SET TBLPROPERTIES ('tblp1' = '1', 'tblp2' = '2');
+ALTER VIEW v1 UNSET TBLPROPERTIES ('tblp1', 'tblp2');
+</codeblock>
         </p>
       </li>
     </ul>
