@@ -329,8 +329,13 @@ public class Planner {
         tableNames.add(tableName.db_name + "." + tableName.table_name);
       }
       str.append(
-          "WARNING: The following tables have potentially corrupt table statistics.\n" +
-          "Drop and re-compute statistics to resolve this problem.\n" +
+          "The row count in one or more partitions in the following tables \n" +
+          "is either a) less than -1, or b) 0 but the size of all the files inside \n" +
+          "the partition(s) is positive.\n" +
+          "The latter case does not necessarily imply the existence of corrupt \n" +
+          "statistics when the corresponding tables are transactional.\n" +
+          "If it is suspected that there may be corrupt statistics, drop and \n" +
+          "re-compute statistics could resolve this problem.\n" +
           Joiner.on(", ").join(tableNames) + "\n");
       hasHeader = true;
     }
