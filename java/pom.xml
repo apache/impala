@@ -25,6 +25,11 @@ under the License.
   <packaging>pom</packaging>
   <name>Apache Impala Parent POM</name>
 
+  <!--
+  When adding new properties to control library versions, also add them to
+  bin/impala-config.sh as environment variables so other branches can easily override
+  them in bin/impala-config-branch.sh for cleaner patches.
+  -->
   <properties>
     <surefire.reports.dir>${env.IMPALA_LOGS_DIR}/fe_tests</surefire.reports.dir>
     <jacoco.skip>true</jacoco.skip>
@@ -53,30 +58,28 @@ under the License.
     <impala.query.event.hook.api.version>${project.version}</impala.query.event.hook.api.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <kudu.version>${env.IMPALA_KUDU_VERSION}</kudu.version>
-    <commons-io.version>2.6</commons-io.version>
-    <slf4j.version>2.0.3</slf4j.version>
-    <reload4j.version>1.2.22</reload4j.version>
-    <junit.version>4.12</junit.version>
+    <slf4j.version>${env.IMPALA_SLF4J_VERSION}</slf4j.version>
+    <reload4j.version>${env.IMPALA_RELOAD4j_VERSION}</reload4j.version>
+    <junit.version>${env.IMPALA_JUNIT_VERSION}</junit.version>
     <!-- Beware compatibility requirements with Thrift and
          KMS; see IMPALA-4210. -->
-    <httpcomponents.core.version>4.4.9</httpcomponents.core.version>
+    <httpcomponents.core.version>${env.IMPALA_HTTP_CORE_VERSION}</httpcomponents.core.version>
     <yarn-extras.version>${project.version}</yarn-extras.version>
     <eclipse.output.directory>eclipse-classes</eclipse.output.directory>
     <!-- hive-exec seems to leak this version of guava onto our classpath,
          so it's important to depend on the same one -->
-    <guava.version>28.1-jre</guava.version>
-    <derby.version>10.14.2.0</derby.version>
-    <jackson-databind.version>2.12.6.1</jackson-databind.version>
+    <guava.version>${env.IMPALA_GUAVA_VERSION}</guava.version>
+    <derby.version>${env.IMPALA_DERBY_VERSION}</derby.version>
+    <jackson-databind.version>${env.IMPALA_JACKSON_DATABIND_VERSION}</jackson-databind.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <iceberg.version>${env.IMPALA_ICEBERG_VERSION}</iceberg.version>
-    <pac4j.version>4.5.5</pac4j.version>
+    <pac4j.version>${env.IMPALA_PAC4J_VERSION}</pac4j.version>
     <!-- xmlsec, bcprov-jdk15on and springframework are not used by Impala directly,
-         but they are needed by pac4j. This uses a newer xmlsec/spring to address CVEs,
-         but bcprov-jdk15on matches the versions from pac4j 4.5.5. -->
-    <xmlsec.version>2.2.3</xmlsec.version>
-    <bouncy-castle.version>1.68</bouncy-castle.version>
-    <springframework.version>5.3.20</springframework.version>
-    <json-smart.version>2.4.7</json-smart.version>
+         but they are needed by pac4j. This uses newer versions to address CVEs. -->
+    <xmlsec.version>${env.IMPALA_XMLSEC_VERSION}</xmlsec.version>
+    <bouncy-castle.version>${env.IMPALA_BOUNCY_CASTLE_VERSION}</bouncy-castle.version>
+    <springframework.version>${env.IMPALA_SPRINGFRAMEWORK_VERSION}</springframework.version>
+    <json-smart.version>${env.IMPALA_JSON_SMART_VERSION}</json-smart.version>
   </properties>
 
   <repositories>

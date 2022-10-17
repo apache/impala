@@ -221,10 +221,24 @@ export APACHE_OZONE_VERSION=1.2.1
 
 export ARCH_NAME=$(uname -p)
 
+# Java dependencies that are not also runtime components. Declaring versions here allows
+# other branches to override them in impala-config-branch.sh for cleaner patches.
+export IMPALA_BOUNCY_CASTLE_VERSION=1.68
+export IMPALA_COS_VERSION=3.1.0-8.0.8
+export IMPALA_DERBY_VERSION=10.14.2.0
+export IMPALA_GUAVA_VERSION=31.1-jre
 export IMPALA_HUDI_VERSION=0.5.0-incubating
+export IMPALA_HTTP_CORE_VERSION=4.4.14
+export IMPALA_JACKSON_DATABIND_VERSION=2.13.4.2
+export IMPALA_JSON_SMART_VERSION=2.4.7
+export IMPALA_JUNIT_VERSION=4.12
 export IMPALA_KITE_VERSION=1.1.0
 export IMPALA_ORC_JAVA_VERSION=1.7.6
-export IMPALA_COS_VERSION=3.1.0-8.0.8
+export IMPALA_PAC4J_VERSION=4.5.5
+export IMPALA_RELOAD4j_VERSION=1.2.22
+export IMPALA_SLF4J_VERSION=2.0.3
+export IMPALA_SPRINGFRAMEWORK_VERSION=5.3.20
+export IMPALA_XMLSEC_VERSION=2.2.3
 
 # When Impala is building docker images on Redhat-based distributions,
 # it is useful to be able to customize the base image. Some users will
