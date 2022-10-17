@@ -33,13 +33,6 @@ under the License.
   <name>Apache Impala Query Engine Frontend</name>
 
   <dependencies>
-    <!-- Pin json-smart dependency. -->
-    <dependency>
-      <groupId>net.minidev</groupId>
-      <artifactId>json-smart</artifactId>
-      <version>${json-smart.version}</version>
-    </dependency>
-
     <dependency>
       <groupId>org.apache.impala</groupId>
       <artifactId>impala-executor-deps</artifactId>
@@ -64,15 +57,6 @@ under the License.
       <artifactId>hadoop-auth</artifactId>
       <version>${hadoop.version}</version>
       <exclusions>
-        <!-- Exclude json-smart to pin the version -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.slf4j</groupId>
-          <artifactId>slf4j-log4j12</artifactId>
-        </exclusion>
         <exclusion>
           <groupId>log4j</groupId>
           <artifactId>log4j</artifactId>
@@ -89,14 +73,6 @@ under the License.
             <!-- IMPALA-9647 (re: CVE-2014-3577, CVE-2015-5262) -->
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>fluent-hc</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.apache.parquet</groupId>
-            <artifactId>parquet-avro</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.apache.avro</groupId>
-            <artifactId>*</artifactId>
           </exclusion>
           <exclusion>
             <groupId>org.apache.hadoop</groupId>
@@ -122,11 +98,6 @@ under the License.
         <!-- Ranger jar also includes solr artifacts which we not exclude here since
         they are used during the instantiation of RangerAuthorizationFactory
         (See IMPALA-10644 for more details. -->
-        <!-- Exclude json-smart to pin the version -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
         <!-- We need to exclude ranger-plugins-audit here, or the build will fail
         to resolve dependencies for cruise-control-metrics-reporter, which is
         unneeded and not uploaded to toolchain. -->
@@ -179,11 +150,6 @@ under the License.
         We do not explicitly exclude all artifacts in org.eclipse.jetty because
         jetty-client is needed.
         -->
-        <!-- Exclude json-smart to pin the version -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
         <!-- We exclude hive-exec which this jar includes because hive-exec
         brings with it tons of other unnecessary dependencies including thrift 0.9.3
         which can cause build failures.
@@ -239,7 +205,6 @@ under the License.
     <dependency>
       <groupId>org.apache.avro</groupId>
       <artifactId>avro</artifactId>
-      <version>${avro.version}</version>
     </dependency>
 
     <dependency>
@@ -280,22 +245,6 @@ under the License.
       <groupId>org.apache.thrift</groupId>
       <artifactId>libthrift</artifactId>
       <version>${thrift.version}</version>
-      <!-- httpcore overriden below -->
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.httpcomponents</groupId>
-          <artifactId>httpcore</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <!-- Override httpcore from libthrift to a later maintenance version. Noticed
-        certain SPNEGO auth errors when connecting to kerberized HTTP endpoints
-        using v4.4.1 pulled by libthrift. -->
-    <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpcore</artifactId>
-      <version>${httpcomponents.core.version}</version>
     </dependency>
 
     <dependency>
@@ -325,20 +274,7 @@ under the License.
 
     <dependency>
       <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-      <version>${slf4j.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.slf4j</groupId>
       <artifactId>slf4j-reload4j</artifactId>
-      <version>${slf4j.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
-      <version>${guava.version}</version>
     </dependency>
 
     <dependency>
@@ -484,11 +420,6 @@ under the License.
           <groupId>io.netty</groupId>
           <artifactId>*</artifactId>
         </exclusion>
-        <!-- Exclude json-smart to pin the version -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -510,11 +441,6 @@ under the License.
         <exclusion>
           <groupId>org.apache.logging.log4j</groupId>
           <artifactId>log4j-1.2-api</artifactId>
-        </exclusion>
-        <!-- Exclude json-smart to pin the version -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.apache.hive</groupId>
@@ -585,16 +511,6 @@ under the License.
           <artifactId>javassist</artifactId>
         </exclusion>
         <exclusion>
-          <!-- The dependency included in pac4j is old and has known CVEs.
-          We exclude it from here and add a separate dependency down below.-->
-          <groupId>org.bouncycastle</groupId>
-          <artifactId>org.bouncycastle</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.santuario</groupId>
-          <artifactId>xmlsec</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>commons-collections</groupId>
           <artifactId>commons-collections</artifactId>
         </exclusion>
@@ -609,19 +525,8 @@ under the License.
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>org.bouncycastle</groupId>
-      <artifactId>bcprov-jdk15on</artifactId>
-      <version>${bcprov-jdk15on.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.santuario</groupId>
-      <artifactId>xmlsec</artifactId>
-      <version>${xmlsec.version}</version>
-    </dependency>
-    <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-core</artifactId>
-      <version>${springframework.version}</version>
     </dependency>
   </dependencies>
 
@@ -863,10 +768,10 @@ under the License.
                     <exclude>ant-contrib:*</exclude>
                     <exclude>org.apache.ant:*</exclude>
                     <exclude>org.eclipse.jetty:*</exclude>
-                    <!-- We use reload4j, avoid all log4j 1.x implementations -->
+                    <!-- We use reload4j, exclude log4j 1.x and 2.x -->
                     <exclude>org.apache.logging.log4j:log4j-slf4j-impl</exclude>
                     <exclude>org.apache.logging.log4j:log4j-1.2-api</exclude>
-                    <exclude>log4j:log4j</exclude>
+                    <exclude>log4j:*</exclude>
                     <exclude>org.slf4j:slf4j-log4j12</exclude>
                     <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
                     <exclude>org.fusesource.leveldbjni:*</exclude>
@@ -1163,23 +1068,4 @@ under the License.
       </properties>
     </profile>
   </profiles>
-
-  <dependencyManagement>
-    <dependencies>
-      <!--
-      Pin org.glassfish:javax.el explicitly.
-
-      HBase depends on this indirectly, and it's configured with
-      a range of versions. This causes Maven to talk to all configured
-      repositories, leading both to a lot of chattiness, and also
-      failures if one of the repositories is unavailable.
-      -->
-      <dependency>
-        <groupId>org.glassfish</groupId>
-        <artifactId>javax.el</artifactId>
-        <version>3.0.1-b08</version>
-      </dependency>
-
-    </dependencies>
-  </dependencyManagement>
 </project>
