@@ -17,6 +17,15 @@ show column stats ice_alltypes;
 STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
+show table stats ice_alltypes
+---- LABELS
+#ROWS, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental stats, Location
+---- RESULTS: VERIFY_IS_EQUAL
+2,1,'2.33KB','NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/$DATABASE.db/ice_alltypes'
+---- TYPES
+BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
 # Table-level stats are automatically updated.
 # 'impala.lastComputeStatsTime' is not set yet.
 describe formatted ice_alltypes;

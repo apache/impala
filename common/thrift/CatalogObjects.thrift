@@ -578,6 +578,7 @@ struct TIcebergPartitionSpec {
 struct TIcebergPartitionStats {
   1: required i64 num_files;
   2: required i64 num_rows;
+  3: required i64 file_size_in_bytes;
 }
 
 struct TIcebergTable {

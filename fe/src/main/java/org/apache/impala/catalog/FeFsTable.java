@@ -440,7 +440,7 @@ public interface FeFsTable extends FeTable {
       result.setRows(new ArrayList<>());
 
       if (table instanceof FeIcebergTable) {
-        return getIcebergTableFiles((FeIcebergTable) table, result);
+        return FeIcebergTable.Utils.getIcebergTableFiles((FeIcebergTable) table, result);
       }
 
       List<? extends FeFsPartition> orderedPartitions;
@@ -462,24 +462,6 @@ public interface FeFsTable extends FeTable {
           rowBuilder.add(p.getPartitionName());
           result.addToRows(rowBuilder.get());
         }
-      }
-      return result;
-    }
-
-    /**
-     * Get file info for the given fe iceberg table.
-     */
-    private static TResultSet getIcebergTableFiles(FeIcebergTable table,
-        TResultSet result) {
-      List<FileDescriptor> orderedFds = Lists
-          .newArrayList(table.getPathHashToFileDescMap().values());
-      Collections.sort(orderedFds);
-      for (FileDescriptor fd : orderedFds) {
-        TResultRowBuilder rowBuilder = new TResultRowBuilder();
-        rowBuilder.add(fd.getAbsolutePath(table.getLocation()));
-        rowBuilder.add(PrintUtils.printBytes(fd.getFileLength()));
-        rowBuilder.add("");
-        result.addToRows(rowBuilder.get());
       }
       return result;
     }
