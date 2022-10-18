@@ -527,6 +527,13 @@ under the License.
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-core</artifactId>
+      <exclusions>
+        <!-- IMPALA-11673: spring-jcl conflicts with commons-logging -->
+        <exclusion>
+          <groupId>org.springframework</groupId>
+          <artifactId>spring-jcl</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
 
@@ -791,6 +798,8 @@ under the License.
                     <exclude>org.glassfish.jersey.core:jersey-servlet</exclude>
                     <!-- IMPALA-9708: Sentry is removed. -->
                     <exclude>org.apache.sentry:*</exclude>
+                    <!-- IMPALA-11673: Ensure spring-jcl is not present. -->
+                    <exclude>org.springframework:spring-jcl</exclude>
                     <!-- Assert that we only use artifacts from only the specified
                          version of these components. -->
                     <exclude>org.apache.hadoop:*</exclude>
