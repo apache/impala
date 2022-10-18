@@ -335,6 +335,10 @@ do
   # to the file-list-begin*.log from the beginning of the iteration to see if files
   # are not being cleaned up. This is most useful on the first iteration, when
   # the list of files is from dataload.
+  if [[ "${TARGET_FILESYSTEM}" = "ozone" ]]; then
+    # Clean up trash to avoid HDDS-4974 causing the next command to fail.
+    ozone fs -rm -r -skipTrash ${FILESYSTEM_PREFIX}/test-warehouse/.Trash
+  fi
   hdfs dfs -ls -R ${FILESYSTEM_PREFIX}/test-warehouse \
       > ${IMPALA_LOGS_DIR}/file-list-end-${i}.log 2>&1
 
