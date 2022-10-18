@@ -27,6 +27,7 @@ public enum HmsApiNameEnum {
   GET_PARTITION_BY_NAMES("get_partitions_by_names_req"),
   CREATE_DATABASE("create_database"),
   DROP_DATABASE("drop_database"),
+  DROP_DATABASE_REQ("drop_database_req"),
   ALTER_DATABASE("alter_database"),
   CREATE_TABLE("create_table"),
   CREATE_TABLE_REQ("create_table_req"),

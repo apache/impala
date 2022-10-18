@@ -33,6 +33,7 @@ import org.apache.hadoop.hive.metastore.api.AlterTableRequest;
 import org.apache.hadoop.hive.metastore.api.AlterTableResponse;
 import org.apache.hadoop.hive.metastore.api.CreateTableRequest;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.DropDatabaseRequest;
 import org.apache.hadoop.hive.metastore.api.DropPartitionsRequest;
 import org.apache.hadoop.hive.metastore.api.DropPartitionsResult;
 import org.apache.hadoop.hive.metastore.api.EnvironmentContext;
@@ -60,6 +61,7 @@ import org.apache.hadoop.hive.metastore.api.SQLUniqueConstraint;
 import org.apache.hadoop.hive.metastore.api.TruncateTableRequest;
 import org.apache.hadoop.hive.metastore.api.TruncateTableResponse;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
+import org.apache.hadoop.util.StringUtils;
 import org.apache.impala.catalog.CatalogHmsAPIHelper;
 import org.apache.impala.catalog.events.DeleteEventLog;
 import org.apache.impala.catalog.events.MetastoreEvents;
@@ -239,11 +241,11 @@ public class CatalogMetastoreServiceHandler extends MetastoreServiceHandler {
 
   @Override
   public void drop_database(String databaseName, boolean deleteData,
-      boolean ignoreUnknownDb) throws NoSuchObjectException,
+      boolean cascade) throws NoSuchObjectException,
           InvalidOperationException, MetaException, TException {
     if (!BackendConfig.INSTANCE.enableCatalogdHMSCache() ||
             !BackendConfig.INSTANCE.enableSyncToLatestEventOnDdls()) {
-      super.drop_database(databaseName, deleteData, ignoreUnknownDb);
+      super.drop_database(databaseName, deleteData, cascade);
       return;
     }
     // TODO: The complete logic can be moved to
@@ -255,7 +257,7 @@ public class CatalogMetastoreServiceHandler extends MetastoreServiceHandler {
     try  {
       try {
         currentEventId = super.get_current_notificationEventId().getEventId();
-        super.drop_database(databaseName, deleteData, ignoreUnknownDb);
+        super.drop_database(databaseName, deleteData, cascade);
       } catch (NoSuchObjectException e) {
         // db does not exist in metastore, remove it from
         // catalog if exists
@@ -265,7 +267,46 @@ public class CatalogMetastoreServiceHandler extends MetastoreServiceHandler {
         }
         throw e;
       }
-      dropDbIfExists(databaseName, ignoreUnknownDb, currentEventId, apiName);
+      dropDbIfExists(databaseName, false, currentEventId, apiName);
+    } finally {
+      catalogOpExecutor_.getMetastoreDdlLock().unlock();
+    }
+  }
+
+  @Override
+  public void drop_database_req(final DropDatabaseRequest dropDatabaseRequest)
+      throws NoSuchObjectException, InvalidOperationException, MetaException {
+    if (!BackendConfig.INSTANCE.enableCatalogdHMSCache() ||
+        !BackendConfig.INSTANCE.enableSyncToLatestEventOnDdls()) {
+      super.drop_database_req(dropDatabaseRequest);
+      return;
+    }
+    String apiName = HmsApiNameEnum.DROP_DATABASE_REQ.apiName();
+    String dbName =
+        MetaStoreUtils.parseDbName(dropDatabaseRequest.getName(), serverConf_)[1];
+    long currentEventId = -1;
+    catalogOpExecutor_.getMetastoreDdlLock().lock();
+    try  {
+      try {
+        currentEventId = super.get_current_notificationEventId().getEventId();
+        super.drop_database_req(dropDatabaseRequest);
+      } catch (NoSuchObjectException e) {
+        // db does not exist in metastore, remove it from
+        // catalog if exists
+        if (catalog_.removeDb(dbName) != null) {
+          LOG.info("Db {} not known to metastore, removed it from catalog for " +
+              "metastore api {}", dbName, apiName);
+        }
+        throw e;
+        // TODO: We should add TException to method signature in hive and we can remove
+        // following two catch blocks.
+      } catch (InvalidOperationException|MetaException e) {
+        throw e;
+      } catch (TException e) {
+        throw new MetaException(StringUtils.stringifyException(e));
+      }
+      dropDbIfExists(dropDatabaseRequest.getName(),
+          dropDatabaseRequest.isIgnoreUnknownDb(), currentEventId, apiName);
     } finally {
       catalogOpExecutor_.getMetastoreDdlLock().unlock();
     }
