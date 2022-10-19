@@ -4497,6 +4497,35 @@ public class CatalogOpExecutor {
   public int reloadPartitionsIfExist(long eventId, String dbName, String tblName,
       List<Partition> partsFromEvent, String reason,
       FileMetadataLoadOpts fileMetadataLoadOpts) throws CatalogException {
+    List<String> partNames = new ArrayList<>();
+    Table table = catalog_.getTable(dbName, tblName);
+    if (table instanceof HdfsTable) {
+      HdfsTable hdfsTable = (HdfsTable) table;
+      for (Partition part : partsFromEvent) {
+        partNames.add(FileUtils.makePartName(hdfsTable.getClusteringColNames(),
+            part.getValues(), null));
+      }
+    }
+    return reloadPartitionsFromNamesIfExists(eventId, dbName, tblName, partNames,
+        reason, fileMetadataLoadOpts);
+  }
+
+  /**
+   * Reloads the given partitions from partiton names if they exist and have not been
+   * removed since the event was generated.
+   *
+   * @param eventId EventId being processed.
+   * @param dbName Database name for the partition
+   * @param tblName Table name for the partition
+   * @param partNames List of partition names from the events to be reloaded.
+   * @param reason Reason for reloading the partitions for logging purposes.
+   * @param fileMetadataLoadOpts describes how to reload file metadata for partsFromEvent
+   * @return the number of partitions which were reloaded. If the table does not exist,
+   * returns 0. Some partitions could be skipped if they don't exist anymore.
+   */
+  public int reloadPartitionsFromNamesIfExists (long eventId, String dbName,
+      String tblName, List<String> partNames, String reason,
+      FileMetadataLoadOpts fileMetadataLoadOpts) throws CatalogException {
     Table table = catalog_.getTable(dbName, tblName);
     if (table == null) {
       DeleteEventLog deleteEventLog = catalog_.getMetastoreEventProcessor()
@@ -4536,13 +4565,8 @@ public class CatalogOpExecutor {
       }
       HdfsTable hdfsTable = (HdfsTable) table;
       // some partitions from the event or the table itself
-      // may not exist in HMS anymore. Hence, we collect the names here and re-fetch
+      // may not exist in HMS anymore. Hence, we re-fetch
       // the partitions from HMS.
-      List<String> partNames = new ArrayList<>();
-      for (Partition part : partsFromEvent) {
-        partNames.add(FileUtils.makePartName(hdfsTable.getClusteringColNames(),
-            part.getValues(), null));
-      }
       int numOfPartsReloaded;
       try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
         numOfPartsReloaded = hdfsTable.reloadPartitionsFromNames(
@@ -4551,7 +4575,7 @@ public class CatalogOpExecutor {
       hdfsTable.setCatalogVersion(newCatalogVersion);
       return numOfPartsReloaded;
     } catch (TableLoadingException e) {
-      LOG.info("Could not reload {} partitions of table {}", partsFromEvent.size(),
+      LOG.info("Could not reload {} partitions of table {}", partNames.size(),
           table.getFullName(), e);
     } catch (InternalException e) {
       errorOccured = true;

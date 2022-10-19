@@ -267,6 +267,94 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     check_self_events("refresh {}.{}".format(unique_database, test_reload_table))
 
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=1")
+  def test_commit_compaction_events(self, unique_database):
+    """Test is to verify Impala-11626, commit compaction events triggered in HMS would
+    be consumed by CatalogD's event processor.
+    """
+
+    # Test scenario 1: partitioned table
+    test_cc_part_table = "test_cc_partitioned_table"
+    self.run_stmt_in_hive(
+      "create transactional table {}.{} (i int) partitioned by (year int)"
+      .format(unique_database, test_cc_part_table))
+    for i in range(2):
+        self.run_stmt_in_hive(
+          "insert into {}.{} partition (year=2022) values (1),(2),(3)"
+          .format(unique_database, test_cc_part_table))
+    EventProcessorUtils.wait_for_event_processing(self)
+    parts_refreshed_before_compaction = EventProcessorUtils.get_int_metric(
+      "partitions-refreshed")
+    self.client.execute(
+      "select * from {}.{} limit 2"
+      .format(unique_database, test_cc_part_table))
+    self.run_stmt_in_hive(
+      "alter table {}.{} partition(year=2022) compact 'minor' and wait"
+      .format(unique_database, test_cc_part_table))
+    EventProcessorUtils.wait_for_event_processing(self)
+    parts_refreshed_after_compaction = EventProcessorUtils.get_int_metric(
+      "partitions-refreshed")
+    assert parts_refreshed_after_compaction > parts_refreshed_before_compaction
+
+    # Test scenario 2:
+    test_cc_unpart_tab = "test_cc_unpart_table"
+    self.run_stmt_in_hive(
+      "create transactional table {}.{} (i int)"
+      .format(unique_database, test_cc_unpart_tab))
+    for i in range(2):
+        self.run_stmt_in_hive(
+          "insert into {}.{} values (1),(2),(3)"
+          .format(unique_database, test_cc_unpart_tab))
+    EventProcessorUtils.wait_for_event_processing(self)
+    tables_refreshed_before_compaction = EventProcessorUtils.get_int_metric(
+      "tables-refreshed")
+    self.client.execute(
+      "select * from {}.{} limit 2"
+      .format(unique_database, test_cc_unpart_tab))
+    self.run_stmt_in_hive("alter table {}.{} compact 'minor' and wait"
+      .format(unique_database, test_cc_unpart_tab))
+    EventProcessorUtils.wait_for_event_processing(self)
+    tables_refreshed_after_compaction = EventProcessorUtils.get_int_metric(
+      "tables-refreshed")
+    assert tables_refreshed_after_compaction > tables_refreshed_before_compaction
+
+    # Test scenario 3: partitioned table has partition deleted
+    test_cc_part_table = "test_cc_partitioned_table_error"
+    self.run_stmt_in_hive(
+      "create transactional table {}.{} (i int) partitioned by (year int)"
+      .format(unique_database, test_cc_part_table))
+    for i in range(2):
+        self.run_stmt_in_hive(
+          "insert into {}.{} partition (year=2022) values (1),(2),(3)"
+          .format(unique_database, test_cc_part_table))
+    EventProcessorUtils.wait_for_event_processing(self)
+    self.client.execute(
+      "select * from {}.{} limit 2"
+      .format(unique_database, test_cc_part_table))
+    self.run_stmt_in_hive(
+      "alter table {}.{} partition(year=2022) compact 'minor' and wait"
+      .format(unique_database, test_cc_part_table))
+    self.run_stmt_in_hive("alter table {}.{} Drop if exists partition(year=2022)"
+      .format(unique_database, test_cc_part_table))
+    EventProcessorUtils.wait_for_event_processing(self)
+    assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+
+    # Test scenario 4: process commit compaction for an unloaded table
+    test_cc_part_table = "test_cc_table_unloaded"
+    self.run_stmt_in_hive(
+      "create transactional table {}.{} (i int) partitioned by (year int)"
+      .format(unique_database, test_cc_part_table))
+    for i in range(2):
+        self.run_stmt_in_hive(
+          "insert into {}.{} partition (year=2022) values (1),(2),(3)"
+          .format(unique_database, test_cc_part_table))
+    EventProcessorUtils.wait_for_event_processing(self)
+    self.run_stmt_in_hive(
+      "alter table {}.{} partition(year=2022) compact 'minor' and wait"
+      .format(unique_database, test_cc_part_table))
+    EventProcessorUtils.wait_for_event_processing(self)
+    assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+
+  @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=1")
   def test_event_batching(self, unique_database):
     """Runs queries which generate multiple ALTER_PARTITION events which must be
     batched by events processor. Runs as a custom cluster test to isolate the metric

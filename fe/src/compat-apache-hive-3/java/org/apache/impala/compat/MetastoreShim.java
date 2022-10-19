@@ -444,6 +444,14 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
   }
 
   /**
+   *   CDP Hive-3 only function.
+   */
+  public static String getPartitionNameFromCommitCompactionEvent(
+      NotificationEvent event) {
+    throw new UnsupportedOperationException("CommitCompaction event is not supported.");
+  }
+
+  /**
    * Use thrift API directly instead of HiveMetastoreClient#getNextNotification because
    * the HMS client can throw an IllegalStateException when there is a gap between the
    * eventIds returned.

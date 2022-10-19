@@ -75,6 +75,7 @@ import org.apache.hadoop.hive.metastore.api.WriteNotificationLogRequest;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
 import org.apache.hadoop.hive.metastore.messaging.CommitTxnMessage;
+import org.apache.hadoop.hive.metastore.messaging.CommitCompactionMessage;
 import org.apache.hadoop.hive.metastore.messaging.EventMessage;
 import org.apache.hadoop.hive.metastore.messaging.MessageBuilder;
 import org.apache.hadoop.hive.metastore.messaging.MessageDeserializer;
@@ -563,6 +564,20 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
       throw new MetastoreNotificationException(e);
     }
     return updatedFields;
+  }
+
+  /**
+   *  This method extracts the partition name field from the
+   *  notification event and returns it in the form of string.
+   *
+   * @param event Metastore notification event,
+   * @return the partition name, required for the commit compaction event.
+   */
+  public static String getPartitionNameFromCommitCompactionEvent(
+      NotificationEvent event) {
+    CommitCompactionMessage commitCompactionMessage = MetastoreEventsProcessor.
+        getMessageDeserializer().getCommitCompactionMessage(event.getMessage());
+    return commitCompactionMessage.getPartName();
   }
 
   /**

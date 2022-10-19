@@ -125,6 +125,7 @@ public class MetastoreEvents {
     ALLOC_WRITE_ID_EVENT("ALLOC_WRITE_ID_EVENT"),
     COMMIT_TXN("COMMIT_TXN"),
     ABORT_TXN("ABORT_TXN"),
+    COMMIT_COMPACTION("COMMIT_COMPACTION_EVENT"),
     OTHER("OTHER");
 
     private final String eventType_;
@@ -218,6 +219,8 @@ public class MetastoreEvents {
           return new ReloadEvent(catalogOpExecutor_, metrics, event);
         case INSERT:
           return new InsertEvent(catalogOpExecutor_, metrics, event);
+        case COMMIT_COMPACTION:
+          return new CommitCompactionEvent(catalogOpExecutor_, metrics, event);
         default:
           // ignore all the unknown events by creating a IgnoredEvent
           return new IgnoredEvent(catalogOpExecutor_, metrics, event);
@@ -920,6 +923,24 @@ public class MetastoreEvents {
       }
     }
 
+    protected void reloadPartitionsFromNames(List<String> partitionNames, String reason,
+        FileMetadataLoadOpts fileMetadataLoadOpts) throws CatalogException {
+      try {
+        int numPartsRefreshed = catalogOpExecutor_.reloadPartitionsFromNamesIfExists(
+            getEventId(), dbName_, tblName_, partitionNames, reason,
+            fileMetadataLoadOpts);
+        if (numPartsRefreshed > 0) {
+          metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_PARTITION_REFRESHES)
+                  .inc(numPartsRefreshed);
+        }
+      } catch (TableNotLoadedException e) {
+        debugLog("Ignoring the event since table {} is not loaded",
+            getFullyQualifiedTblName());
+      } catch (DatabaseNotFoundException | TableNotFoundException e) {
+        debugLog("Ignoring the event since table {} is not found",
+            getFullyQualifiedTblName());
+      }
+    }
 
     /**
      * To decide whether to skip processing this event, fetch table from cache
@@ -2619,6 +2640,64 @@ public class MetastoreEvents {
     @Override
     protected boolean shouldSkipWhenSyncingToLatestEventId() {
       return false;
+    }
+  }
+
+  /**
+   * Metastore event handler for COMMIT_COMPACTION events. Handles
+   * COMMIT_COMPACTION event for transactional tables.
+   */
+  public static class CommitCompactionEvent extends MetastoreTableEvent {
+    private String partitionName_;
+
+    CommitCompactionEvent(CatalogOpExecutor catalogOpExecutor, Metrics metrics,
+        NotificationEvent event) throws MetastoreNotificationException {
+      super(catalogOpExecutor, metrics, event);
+      Preconditions.checkState(
+          getEventType().equals(MetastoreEventType.COMMIT_COMPACTION));
+      Preconditions.checkNotNull(event.getMessage());
+      try {
+        partitionName_ =
+            MetastoreShim.getPartitionNameFromCommitCompactionEvent(event);
+        org.apache.impala.catalog.Table tbl = catalog_.getTable(dbName_, tblName_);
+        if (tbl != null && tbl.getCreateEventId() < getEventId()) {
+          msTbl_ = tbl.getMetaStoreTable();
+        }
+      } catch (Exception ex) {
+        throw new MetastoreNotificationException(debugString("Unable to "
+            + "parse commit compaction message"), ex);
+      }
+    }
+
+    @Override
+    protected void process() throws MetastoreNotificationException {
+      try {
+        if (partitionName_ == null) {
+          reloadTableFromCatalog("Commit Compaction event", true);
+        } else {
+          reloadPartitionsFromNames(Arrays.asList(partitionName_),
+                  "Commit compaction event", FileMetadataLoadOpts.FORCE_LOAD);
+        }
+      } catch (CatalogException e) {
+        throw new MetastoreNotificationNeedsInvalidateException(debugString("Failed to "
+            + "commit compaction for the table {}. Event processing cannot "
+            + "continue. Issue an invalidate metadata command to reset " +
+            "event processor.", tblName_), e);
+      }
+    }
+
+    @Override
+    protected SelfEventContext getSelfEventContext() {
+      throw new UnsupportedOperationException("Self-event evaluation is not needed for "
+          + "this event type");
+    }
+
+    @Override
+    protected boolean isEventProcessingDisabled() {
+      if (msTbl_ == null) {
+        return false;
+      }
+      return super.isEventProcessingDisabled();
     }
   }
 
