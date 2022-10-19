@@ -155,6 +155,9 @@ class TAcceptQueueServer::Task : public Runnable {
         // read() or peek() of the socket.
         if (eventHandler != nullptr && server_.idle_poll_period_ms_ > 0 &&
             (IsReadTimeoutTException(ttx) || IsPeekTimeoutTException(ttx))) {
+          VLOG(2) << Substitute("Socket read or peek timeout encountered "
+                                "(idle_poll_period_ms_=$0). $1",
+              server_.idle_poll_period_ms_, ttx.what());
           ThriftServer::ThriftServerEventProcessor* thriftServerHandler =
               static_cast<ThriftServer::ThriftServerEventProcessor*>(eventHandler.get());
           if (thriftServerHandler->IsIdleContext(connectionContext)) {

@@ -65,7 +65,7 @@ using namespace apache::thrift::concurrency;
 // TSocket.cpp and TSSLSocket.cpp. Those functions may change between different versions
 // of Thrift.
 #define NEW_THRIFT_VERSION_MSG \
-    "Thrift 0.11.0 is expected. Please check Thrift error codes during Thrift upgrade."
+  "Thrift 0.16.0 is expected. Please check Thrift error codes during Thrift upgrade."
 static_assert(PACKAGE_VERSION[0] == '0', NEW_THRIFT_VERSION_MSG);
 static_assert(PACKAGE_VERSION[1] == '.', NEW_THRIFT_VERSION_MSG);
 static_assert(PACKAGE_VERSION[2] == '1', NEW_THRIFT_VERSION_MSG);
@@ -253,18 +253,18 @@ bool TNetworkAddressComparator(const TNetworkAddress& a, const TNetworkAddress& 
 
 bool IsReadTimeoutTException(const TTransportException& e) {
   // String taken from TSocket::read() Thrift's TSocket.cpp and TSSLSocket.cpp.
-  return (e.getType() == TTransportException::TIMED_OUT &&
-             strstr(e.what(), "EAGAIN (timed out)") != nullptr) ||
-         (e.getType() == TTransportException::INTERNAL_ERROR &&
-             strstr(e.what(), "SSL_read: Resource temporarily unavailable") != nullptr);
+  // Specifically, "THRIFT_EAGAIN (timed out)" from TSocket.cpp,
+  // and "THRIFT_POLL (timed out)" from TSSLSocket.cpp.
+  return (e.getType() == TTransportException::TIMED_OUT
+      && strstr(e.what(), "(timed out)") != nullptr);
 }
 
 bool IsPeekTimeoutTException(const TTransportException& e) {
   // String taken from TSocket::peek() Thrift's TSocket.cpp and TSSLSocket.cpp.
-  return (e.getType() == TTransportException::UNKNOWN &&
-             strstr(e.what(), "recv(): Resource temporarily unavailable") != nullptr) ||
-         (e.getType() == TTransportException::INTERNAL_ERROR &&
-             strstr(e.what(), "SSL_peek: Resource temporarily unavailable") != nullptr);
+  return (e.getType() == TTransportException::UNKNOWN
+             && strstr(e.what(), "recv(): Resource temporarily unavailable") != nullptr)
+      || (e.getType() == TTransportException::TIMED_OUT
+             && strstr(e.what(), "THRIFT_POLL (timed out)") != nullptr);
 }
 
 bool IsConnResetTException(const TTransportException& e) {
