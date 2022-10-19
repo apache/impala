@@ -555,16 +555,11 @@ under the License.
           <groupId>xalan</groupId>
           <artifactId>xalan</artifactId>
         </exclusion>
+        <!-- Exclude spring components except spring-core -->
         <exclusion>
           <groupId>org.springframework</groupId>
-          <artifactId>*</artifactId>
+          <artifactId>spring-orm</artifactId>
         </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.springframework</groupId>
-      <artifactId>spring-core</artifactId>
-      <exclusions>
         <!-- IMPALA-11673: spring-jcl conflicts with commons-logging -->
         <exclusion>
           <groupId>org.springframework</groupId>
