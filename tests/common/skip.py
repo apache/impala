@@ -141,7 +141,6 @@ class SkipIfBuildType:
       reason="Test depends on running against a local Impala cluster")
 
 class SkipIfEC:
-  oom = pytest.mark.skipif(IS_EC, reason="Probably broken by HDFS-13540.")
   contain_full_explain = pytest.mark.skipif(IS_EC, reason="Contain full explain output "
               "for hdfs tables.")
   different_scan_split = pytest.mark.skipif(IS_EC, reason="Scan split of row "

@@ -114,7 +114,6 @@ class TestInsertParquetQueries(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').compression_codec == 'none')
 
-  @SkipIfEC.oom
   @SkipIfLocal.multiple_impalad
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_insert_parquet(self, vector, unique_database):

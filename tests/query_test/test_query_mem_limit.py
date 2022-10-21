@@ -88,7 +88,6 @@ class TestQueryMemLimit(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('exec_option')['batch_size'] == 0)
 
-  @SkipIfEC.oom
   @pytest.mark.execute_serially
   def test_mem_limit(self, vector):
     mem_limit = copy(vector.get_value('mem_limit'))
