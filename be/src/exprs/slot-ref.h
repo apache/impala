@@ -63,6 +63,7 @@ class SlotRef : public ScalarExpr {
   const SlotId& slot_id() const { return slot_id_; }
   static const char* LLVM_CLASS_NAME;
   NullIndicatorOffset GetNullIndicatorOffset() const { return null_indicator_offset_; }
+  const SlotDescriptor* GetSlotDescriptor() const { return slot_desc_; }
   int GetSlotOffset() const { return slot_offset_; }
   virtual const TupleDescriptor* GetCollectionTupleDesc() const override;
 

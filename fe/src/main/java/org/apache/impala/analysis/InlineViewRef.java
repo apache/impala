@@ -297,137 +297,152 @@ public class InlineViewRef extends TableRef {
     SlotDescriptor slotDesc = analyzer.registerSlotRef(p, false);
     slotDesc.setSourceExpr(colExpr);
     slotDesc.setStats(ColumnStats.fromExpr(colExpr));
-    SlotRef slotRef = new SlotRef(slotDesc);
-    smap_.put(slotRef, colExpr);
-    baseTblSmap_.put(slotRef, baseTableExpr);
+
+    putExprsIntoSmaps(analyzer, slotDesc, colExpr, baseTableExpr);
+  }
+
+  // Inserts elements into 'smap_' and 'baseTblSmap_'. The key will be a new slot ref
+  // created from 'slotDesc' in both smaps; the value will be 'colExpr' in 'smap_' and
+  // 'baseTableExpr' in 'baseTblSmap_'. If 'recurse' is true, also adds struct members and
+  // collection items.
+  private void putExprsIntoSmaps(Analyzer analyzer,
+      SlotDescriptor slotDesc, Expr colExpr, Expr baseTableExpr, boolean recurse) {
+    SlotRef key = new SlotRef(slotDesc);
+
+    smap_.put(key, colExpr);
+    baseTblSmap_.put(key, baseTableExpr);
+
     if (createAuxPredicate(colExpr)) {
       analyzer.createAuxEqPredicate(new SlotRef(slotDesc), colExpr.clone());
     }
 
-    if (colExpr.getType().isCollectionType()) {
-      // Calling registerSlotRef() above created a new SlotDescriptor + TupleDescriptor
-      // hierarchy for Array types. Walk through this hiararchy and add all slot refs
-      // to smap_ and baseTblSmap_.
-      // Source must be a SlotRef
-      SlotRef srcSlotRef = (SlotRef) colExpr;
-      SlotRef baseTableSlotRef = (SlotRef) baseTableExpr;
-      SlotDescriptor srcSlotDesc = srcSlotRef.getDesc();
-      SlotDescriptor baseTableSlotDesc = baseTableSlotRef.getDesc();
-      TupleDescriptor itemTupleDesc = slotDesc.getItemTupleDesc();
-      TupleDescriptor srcItemTupleDesc = srcSlotDesc.getItemTupleDesc();
-      TupleDescriptor baseTableItemTupleDesc = baseTableSlotDesc.getItemTupleDesc();
-      // We don't recurse deeper and only add the immediate item child to the
-      // substitution map. This is enough both for collections in select list and in
-      // from clause.
-      if (itemTupleDesc != null) {
-        Preconditions.checkState(srcItemTupleDesc != null);
-        Preconditions.checkState(baseTableItemTupleDesc != null);
+    if (recurse) {
+      if (colExpr.getType().isCollectionType()) {
+        Preconditions.checkState(colExpr instanceof SlotRef);
+        Preconditions.checkState(baseTableExpr instanceof SlotRef);
 
-        final int num_slots = itemTupleDesc.getSlots().size();
-        Preconditions.checkState(srcItemTupleDesc.getSlots().size() == num_slots);
-        Preconditions.checkState(baseTableItemTupleDesc.getSlots().size() == num_slots);
+        putCollectionItemsIntoSmaps(analyzer, slotDesc, (SlotRef) colExpr,
+            (SlotRef) baseTableExpr);
+      } else if (colExpr.getType().isStructType()) {
+        Preconditions.checkState(colExpr instanceof SlotRef);
+        Preconditions.checkState(baseTableExpr instanceof SlotRef);
 
-        // There is one slot for arrays and two for maps. When we add support for structs
-        // in collections in the select list, there may be more slots.
-        for (int i = 0; i < num_slots; i++) {
-          SlotDescriptor itemSlotDesc = itemTupleDesc.getSlots().get(i);
-          SlotDescriptor srcItemSlotDesc = srcItemTupleDesc.getSlots().get(i);
-          SlotDescriptor baseTableItemSlotDesc = baseTableItemTupleDesc.getSlots().get(i);
-          SlotRef itemSlotRef = new SlotRef(itemSlotDesc);
-          SlotRef srcItemSlotRef = new SlotRef(srcItemSlotDesc);
-          SlotRef beseTableItemSlotRef = new SlotRef(baseTableItemSlotDesc);
-          smap_.put(itemSlotRef, srcItemSlotRef);
-          baseTblSmap_.put(itemSlotRef, beseTableItemSlotRef);
-          if (createAuxPredicate(colExpr)) {
-            analyzer.createAuxEqPredicate(
-                new SlotRef(itemSlotDesc), srcItemSlotRef.clone());
-          }
-        }
-      }
-    }
-
-    if (colExpr.getType().isStructType()) {
-      Preconditions.checkState(colExpr instanceof SlotRef);
-      Preconditions.checkState(baseTableExpr instanceof SlotRef);
-      putStructMembersIntoSmap(smap_, slotDesc, (SlotRef) colExpr);
-      putStructMembersIntoSmap(baseTblSmap_, slotDesc, (SlotRef) baseTableExpr);
-      createAuxPredicatesForStructMembers(analyzer, slotDesc, (SlotRef) colExpr);
-    }
-  }
-
-  // Puts the fields of 'rhsStruct' into 'smap' as right hand side (mapped) values,
-  // recursively. The keys (left hand side values) are constructed based on the
-  // corresponding slot descriptors in the itemTupleDesc of 'lhsSlotDesc'.
-  private void putStructMembersIntoSmap(ExprSubstitutionMap smap,
-      SlotDescriptor lhsSlotDesc, SlotRef rhsStruct) {
-    for (Pair<SlotDescriptor, SlotRef> pair :
-        getStructSlotDescSlotRefPairs(lhsSlotDesc, rhsStruct)) {
-      SlotDescriptor lhs = pair.first;
-      SlotRef rhs = pair.second;
-      smap.put(new SlotRef(lhs), rhs);
-    }
-  }
-
-  private void createAuxPredicatesForStructMembers(Analyzer analyzer,
-      SlotDescriptor structSlotDesc, SlotRef structExpr) {
-    for (Pair<SlotDescriptor, SlotRef> pair :
-        getStructSlotDescSlotRefPairs(structSlotDesc, structExpr)) {
-      SlotDescriptor structMemberSlotDesc = pair.first;
-      SlotRef structMemberExpr = pair.second;
-
-      if (createAuxPredicate(structMemberExpr)) {
-        analyzer.createAuxEqPredicate(
-            new SlotRef(structMemberSlotDesc), structMemberExpr.clone());
+        putStructMembersIntoSmaps(analyzer, slotDesc, (SlotRef) colExpr,
+            (SlotRef) baseTableExpr);
       }
     }
   }
 
-  /**
-   * Given a slot desc and a SlotRef expression, both referring to the same struct,
-   * returns a list of corresponding SlotDescriptor/SlotRef pairs of the struct members,
-   * recursively.
-   */
-  private List<Pair<SlotDescriptor, SlotRef>> getStructSlotDescSlotRefPairs(
-      SlotDescriptor structSlotDesc, SlotRef structExpr) {
-    Preconditions.checkState(structSlotDesc.getType().isStructType());
-    Preconditions.checkState(structExpr.getType().isStructType());
-    Preconditions.checkState(structSlotDesc.getType().equals(structExpr.getType()));
+  private void putExprsIntoSmaps(Analyzer analyzer,
+      SlotDescriptor slotDesc, Expr colExpr, Expr baseTableExpr) {
+    putExprsIntoSmaps(analyzer, slotDesc, colExpr, baseTableExpr, true);
+  }
 
-    List<Pair<SlotDescriptor, SlotRef>> result = new ArrayList<>();
+  // Add slot refs for collection items to smap_ and baseTblSmap_.
+  private void putCollectionItemsIntoSmaps(Analyzer analyzer, SlotDescriptor slotDesc,
+      SlotRef colExpr, SlotRef baseTableExpr) {
+    // Source must be a SlotRef
+    SlotDescriptor srcSlotDesc = colExpr.getDesc();
+    SlotDescriptor baseTableSlotDesc = baseTableExpr.getDesc();
 
-    TupleDescriptor lhsItemTupleDesc = structSlotDesc.getItemTupleDesc();
-    Preconditions.checkNotNull(lhsItemTupleDesc);
-    List<SlotDescriptor> lhsChildSlotDescs = lhsItemTupleDesc.getSlots();
-    Preconditions.checkState(
-        lhsChildSlotDescs.size() == structExpr.getChildren().size());
-    for (int i = 0; i < lhsChildSlotDescs.size(); i++) {
-      SlotDescriptor lhsChildSlotDesc = lhsChildSlotDescs.get(i);
+    TupleDescriptor itemTupleDesc = slotDesc.getItemTupleDesc();
+    TupleDescriptor srcItemTupleDesc = srcSlotDesc.getItemTupleDesc();
+    TupleDescriptor baseTableItemTupleDesc = baseTableSlotDesc.getItemTupleDesc();
+    if (itemTupleDesc != null) {
+      Preconditions.checkState(srcItemTupleDesc != null);
+      Preconditions.checkState(baseTableItemTupleDesc != null);
 
-      Expr rhsChild = structExpr.getChildren().get(i);
-      Preconditions.checkState(rhsChild instanceof SlotRef);
-      SlotRef rhsChildSlotRef = (SlotRef) rhsChild;
+      final int num_slots = itemTupleDesc.getSlots().size();
+      // There is one slot for arrays and two for maps.
+      Preconditions.checkState(num_slots == 1 || num_slots == 2);
+      Preconditions.checkState(srcItemTupleDesc.getSlots().size() == num_slots);
+      Preconditions.checkState(baseTableItemTupleDesc.getSlots().size() == num_slots);
 
-      List<String> lhsRawPath = lhsChildSlotDesc.getPath().getRawPath();
-      Path rhsPath = rhsChildSlotRef.getResolvedPath();
+      for (int i = 0; i < num_slots; i++) {
+        SlotDescriptor itemSlotDesc = itemTupleDesc.getSlots().get(i);
+        SlotDescriptor srcItemSlotDesc = srcItemTupleDesc.getSlots().get(i);
+        SlotDescriptor baseTableItemSlotDesc = baseTableItemTupleDesc.getSlots().get(i);
+        SlotRef srcItemSlotRef = new SlotRef(srcItemSlotDesc);
+        SlotRef baseTableItemSlotRef = new SlotRef(baseTableItemSlotDesc);
+
+        Preconditions.checkState(itemSlotDesc.getType().equals(srcItemSlotRef.getType()));
+        Preconditions.checkState(itemSlotDesc.getType().equals(
+              baseTableItemSlotRef.getType()));
+
+        // We don't recurse deeper and only add the immediate item child to the
+        // substitution map. This is enough both for collections in select list and in
+        // from clause.
+        putExprsIntoSmaps(analyzer, itemSlotDesc, srcItemSlotRef, baseTableItemSlotRef,
+            false);
+      }
+    }
+  }
+
+  // Put struct members into 'smap_' and 'baseTblSmap_'. 'slotDesc', 'colExpr' and
+  // 'baseTableExpr' should all belong to the same struct. The struct tree is traversed;
+  // keys in both maps will be slot refs created from the elements of the tree rooted at
+  // 'slotDesc'. The values in 'smap_' will be the expressions in the tree of 'colExpr'
+  // and the values in 'baseTblSmap_' will be the expressions in the tree of
+  // 'baseTableExpr'
+  private void putStructMembersIntoSmaps(Analyzer analyzer, SlotDescriptor slotDesc,
+      SlotRef colExpr, SlotRef baseTableExpr) {
+    Preconditions.checkState(slotDesc.getType().isStructType());
+    Preconditions.checkState(colExpr.getType().isStructType());
+    Preconditions.checkState(baseTableExpr.getType().isStructType());
+
+    Preconditions.checkState(slotDesc.getType().equals(colExpr.getType()));
+    Preconditions.checkState(slotDesc.getType().equals(baseTableExpr.getType()));
+
+    TupleDescriptor itemTupleDesc = slotDesc.getItemTupleDesc();
+    Preconditions.checkNotNull(itemTupleDesc);
+
+    List<SlotDescriptor> childSlotDescs = itemTupleDesc.getSlots();
+    Preconditions.checkState(childSlotDescs.size() == colExpr.getChildren().size());
+    Preconditions.checkState(childSlotDescs.size() == baseTableExpr.getChildren().size());
+
+    for (int i = 0; i < childSlotDescs.size(); i++) {
+      SlotDescriptor childSlotDesc = childSlotDescs.get(i);
+
+      Expr childColExpr = colExpr.getChildren().get(i);
+      Preconditions.checkState(childColExpr instanceof SlotRef);
+      SlotRef childColExprSlotRef = (SlotRef) childColExpr;
+
+      Expr childBaseTableExpr = baseTableExpr.getChildren().get(i);
+      Preconditions.checkState(childBaseTableExpr instanceof SlotRef);
+      SlotRef childBaseTableExprSlotRef = (SlotRef) childBaseTableExpr;
+
+      Path childColExprPath = childColExprSlotRef.getResolvedPath();
+      Path childBaseTableExprPath = childBaseTableExprSlotRef.getResolvedPath();
 
       // The path can be null in the case of the sorting tuple.
-      if (rhsPath != null) {
-        List<String> rhsRawPath = rhsPath.getRawPath();
+      if (childColExprPath != null) {
+        verifySameChild(childSlotDesc.getPath(), childColExprPath,
+            childBaseTableExprPath);
 
-        // Check that the children come in the same order on both lhs and rhs. If not, the
-        // last part of the paths would be different.
-        Preconditions.checkState(lhsRawPath.get(lhsRawPath.size() - 1)
-            .equals(rhsRawPath.get(rhsRawPath.size() - 1)));
-
-        result.add(new Pair(lhsChildSlotDesc, rhsChildSlotRef));
-
-        if (rhsChildSlotRef.getType().isStructType()) {
-          result.addAll(
-              getStructSlotDescSlotRefPairs(lhsChildSlotDesc, rhsChildSlotRef));
-        }
+        putExprsIntoSmaps(analyzer, childSlotDesc, childColExprSlotRef,
+            childBaseTableExprSlotRef);
       }
     }
-    return result;
+  }
+
+  // Verify that the paths belong to the same struct child.
+  private static void verifySameChild(Path childSlotDescPath, Path childColExprPath,
+      Path childBaseTableExprPath) {
+    List<String> childSlotDescRawPath = childSlotDescPath.getRawPath();
+    List<String> childColExprRawPath = childColExprPath.getRawPath();
+    List<String> childBaseTableExprRawPath = childBaseTableExprPath.getRawPath();
+
+    // Check that the children come in the same order for all of 'slotDesc', 'colExpr'
+    // and 'baseTableExpr'. If not, the last part of the paths would be different.
+    String childSlotDescPathEnd =
+        childSlotDescRawPath.get(childSlotDescRawPath.size() - 1);
+    String childColExprPathEnd =
+        childColExprRawPath.get(childColExprRawPath.size() - 1);
+    String childBaseTableExprPathEnd =
+        childBaseTableExprRawPath.get(childBaseTableExprRawPath.size() - 1);
+
+    Preconditions.checkState(childSlotDescPathEnd.equals(childColExprPathEnd));
+    Preconditions.checkState(childSlotDescPathEnd.equals(childBaseTableExprPathEnd));
   }
 
   /**

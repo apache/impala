@@ -79,7 +79,7 @@ INT
 set EXPAND_COMPLEX_TYPES=1;
 select nested_struct.* from complextypestbl
 ---- CATCH
-AnalysisException: Struct containing a collection type is not allowed in the select list.
+AnalysisException: Struct type in select list is not allowed when Codegen is ON. You might want to set DISABLE_CODEGEN=true
 ====
 ---- QUERY
 # Test resolving explicit STAR path on a nested struct column inside array

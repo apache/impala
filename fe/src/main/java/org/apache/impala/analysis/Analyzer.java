@@ -17,10 +17,12 @@
 
 package org.apache.impala.analysis;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -237,6 +239,48 @@ public class Analyzer {
   // Total records num V2 is calculated by all DataFiles without corresponding DeleteFiles
   // to be applied of the Iceberg V2 table.
   private long totalRecordsNumV2_;
+
+  // The method 'registerSlotRef()' is called recursively for complex types (structs and
+  // collections). When creating new 'SlotDescriptor's it is important that they are
+  // inserted into the correct 'TupleDescriptor'. This stack is used to keep track of the
+  // current (most nested) 'TupleDescriptor' at each step.
+  //
+  // When a new top-level path is registered, the root descriptor of the path is pushed on
+  // the stack. When registering a complex type, we push its item tuple desc on the stack
+  // before analysing the children, and pop it afterwards. New 'SlotDescriptor's are
+  // always added to the 'TupleDescriptor' at the top of the stack.
+  //
+  // To ensure that every push operation has a corresponding pop operation, these should
+  // not be called manually. Instead, use 'TupleStackGuard' objects in try-with-resources
+  // blocks; see more in its documentation.
+  private Deque<TupleDescriptor> tupleStack_ = new ArrayDeque<>();
+
+  // When created, pushes the provided TupleDescriptor to the enclosing Analyzer object's
+  // 'tupleStack_' and pops it in the close() method. Implements the AutoCloseable
+  // interface so it can be used in try-with-resources blocks.
+  private class TupleStackGuard implements AutoCloseable {
+    private final TupleDescriptor tupleDesc_;
+    private boolean isClosed_ = false;
+    private final int stackLen_;
+
+    public TupleStackGuard(TupleDescriptor tupleDesc) {
+      Preconditions.checkNotNull(tupleStack_);
+      Preconditions.checkNotNull(tupleDesc);
+      tupleDesc_ = tupleDesc;
+      stackLen_ = tupleStack_.size();
+      tupleStack_.push(tupleDesc_);
+    }
+
+    @Override
+    public void close() {
+      if (!isClosed_) {
+        Preconditions.checkState(tupleStack_.peek() == tupleDesc_);
+        tupleStack_.pop();
+        Preconditions.checkState(tupleStack_.size() == stackLen_);
+        isClosed_ = true;
+      }
+    }
+  }
 
   // Required Operation type: Read, write, any(read or write).
   public enum OperationType {
@@ -1496,55 +1540,74 @@ public class Analyzer {
 
   /**
    * Returns an existing or new SlotDescriptor for the given path.
-   * If duplicateIfCollections is true, then always returns
-   * a new empty SlotDescriptor for paths with a collection-typed destination.
+   * If 'duplicateIfCollections' is true, then always returns a new empty SlotDescriptor
+   * for paths with a collection-typed destination.
    */
-  public SlotDescriptor registerSlotRef(Path slotPath, boolean duplicateIfCollections)
-      throws AnalysisException {
+  public SlotDescriptor registerSlotRef(Path slotPath,
+      boolean duplicateIfCollections) throws AnalysisException {
     Preconditions.checkState(slotPath.isRootedAtTuple());
-    if (slotPath.destType().isCollectionType() && duplicateIfCollections) {
-      // Register a new slot descriptor for collection types. The BE currently
-      // relies on this behavior for setting unnested collection slots to NULL.
-      return createAndRegisterSlotDesc(slotPath, false);
-    }
-    // SlotRefs with scalar or struct types are registered against the slot's
-    // fully-qualified lowercase path.
-    List<String> key = slotPath.getFullyQualifiedRawPath();
-    Preconditions.checkState(key.stream().allMatch(s -> s.equals(s.toLowerCase())),
-        "Slot paths should be lower case: " + key);
-    SlotDescriptor existingSlotDesc = slotPathMap_.get(key);
-    if (existingSlotDesc != null) return existingSlotDesc;
+    // If 'tupleStack_' is empty then this is a top level call to this function (not a
+    // recursive call) and we push the root TupleDescriptor to 'tupleStack_'.
+    try (TupleStackGuard guard = tupleStack_.isEmpty()
+        ? new TupleStackGuard(slotPath.getRootDesc()) : null) {
+      if (slotPath.destType().isCollectionType() && duplicateIfCollections) {
+        // Register a new slot descriptor for collection types. The BE currently
+        // relies on this behavior for setting unnested collection slots to NULL.
+        return createAndRegisterRawSlotDesc(slotPath, false);
+      }
+      // SlotRefs with scalar or struct types are registered against the slot's
+      // fully-qualified lowercase path.
+      List<String> key = slotPath.getFullyQualifiedRawPath();
+      Preconditions.checkState(key.stream().allMatch(s -> s.equals(s.toLowerCase())),
+          "Slot paths should be lower case: " + key);
+      SlotDescriptor existingSlotDesc = slotPathMap_.get(key);
+      if (existingSlotDesc != null) return existingSlotDesc;
 
+      return createAndRegisterSlotDesc(slotPath);
+    }
+  }
+
+  private SlotDescriptor createAndRegisterSlotDesc(Path slotPath)
+      throws AnalysisException {
     if (slotPath.destType().isCollectionType()) {
       SlotDescriptor result = registerCollectionSlotRef(slotPath);
-      result.setPath(slotPath);
-      slotPathMap_.put(slotPath.getFullyQualifiedRawPath(), result);
-      registerColumnPrivReq(result);
+      registerSlotDesc(slotPath, result, true);
       return result;
     }
 
+    SlotDescriptor result = createAndRegisterRawSlotDesc(slotPath, true);
     if (slotPath.destType().isStructType()) {
-      // 'slotPath' refers to a struct that has no ancestor that is also needed in the
-      // query. We also create the child slot descriptors.
-      SlotDescriptor result = createAndRegisterSlotDesc(slotPath, true);
       createStructTuplesAndSlotDescs(result);
-      return result;
     }
-
-    SlotDescriptor result = createAndRegisterSlotDesc(slotPath, true);
     return result;
   }
 
-  private SlotDescriptor createAndRegisterSlotDesc(Path slotPath,
+  /**
+   * Creates a new SlotDescriptor with path 'slotPath' in the tuple at the top of
+   * 'tupleStack_'. Does not create SlotDescriptors for children of complex types. If
+   * 'insertIntoSlotPath' is true, inserts the new SlotDescriptor into 'slotPathMap_'.
+   * Also registers a column-level privilege request for the new SlotDescriptor.
+   */
+  private SlotDescriptor createAndRegisterRawSlotDesc(Path slotPath,
+      boolean insertIntoSlotPathMap) {
+    final SlotDescriptor result = addSlotDescriptorAtCurrentLevel();
+    registerSlotDesc(slotPath, result, insertIntoSlotPathMap);
+    return result;
+  }
+
+  /**
+   *  Sets 'slotPath' as the path of 'desc' and registers a column-level privilege request
+   *  for it. If 'insertIntoSlotPath' is true, inserts the new SlotDescriptor into
+   *  'slotPathMap_'.
+   */
+  private void registerSlotDesc(Path slotPath, SlotDescriptor desc,
       boolean insertIntoSlotPathMap) {
     Preconditions.checkState(slotPath.isRootedAtTuple());
-    final SlotDescriptor result = addSlotDescriptor(slotPath.getRootDesc());
-    result.setPath(slotPath);
+    desc.setPath(slotPath);
     if (insertIntoSlotPathMap) {
-      slotPathMap_.put(slotPath.getFullyQualifiedRawPath(), result);
+      slotPathMap_.put(slotPath.getFullyQualifiedRawPath(), desc);
     }
-    registerColumnPrivReq(result);
-    return result;
+    registerColumnPrivReq(desc);
   }
 
   public void createStructTuplesAndSlotDescs(SlotDescriptor desc)
@@ -1557,23 +1620,35 @@ public class Analyzer {
     structTuple.setType(type);
     structTuple.setParentSlotDesc(desc);
     desc.setItemTupleDesc(structTuple);
-    for (StructField structField : type.getFields()) {
-      SlotDescriptor childDesc = getDescTbl().addSlotDescriptor(structTuple);
-      globalState_.blockBySlot.put(childDesc.getId(), this);
-      // 'slotPath' could be null e.g. when the query has an order by clause and
-      // this is the sorting tuple.
-      if (slotPath != null) {
-        Path relPath = Path.createRelPath(slotPath, structField.getName());
-        relPath.resolve();
-        childDesc.setPath(relPath);
-        registerColumnPrivReq(childDesc);
-        slotPathMap_.putIfAbsent(relPath.getFullyQualifiedRawPath(), childDesc);
-      }
-      childDesc.setType(structField.getType());
 
-      if (childDesc.getType().isStructType()) {
-        createStructTuplesAndSlotDescs(childDesc);
+    try (TupleStackGuard guard = new TupleStackGuard(structTuple)) {
+      for (StructField structField : type.getFields()) {
+        // 'slotPath' could be null e.g. when the query has an order by clause and
+        // this is the sorting tuple.
+        // TODO: IMPALA-10939: When we enable collections in sorting tuples we need to
+        // revisit this. Currently collection SlotDescriptors cannot be created without a
+        // path.
+        if (slotPath == null) {
+          createStructTuplesAndSlotDescsWithoutPath(slotPath, structField);
+        } else {
+          Path childRelPath = Path.createRelPath(slotPath, structField.getName());
+          childRelPath.resolve();
+          SlotDescriptor childDesc = createAndRegisterSlotDesc(childRelPath);
+        }
       }
+    }
+  }
+
+  private void createStructTuplesAndSlotDescsWithoutPath(Path slotPath,
+      StructField structField) throws AnalysisException {
+    Preconditions.checkState(slotPath == null);
+    Preconditions.checkState(!structField.getType().isCollectionType());
+
+    SlotDescriptor childDesc = addSlotDescriptorAtCurrentLevel();
+    childDesc.setType(structField.getType());
+
+    if (childDesc.getType().isStructType()) {
+      createStructTuplesAndSlotDescs(childDesc);
     }
   }
 
@@ -1604,18 +1679,20 @@ public class Analyzer {
     SlotDescriptor desc = ((SlotRef) collTblRef.getCollectionExpr()).getDesc();
     desc.setIsMaterializedRecursively(true);
 
-    if (slotPath.destType().isArrayType()) {
-      // Resolve path
-      List<String> rawPathToItem = Arrays.asList(Path.ARRAY_ITEM_FIELD_NAME);
-      resolveAndRegisterDescendantPath(collTblRef, rawPathToItem);
-    } else {
-      Preconditions.checkState(slotPath.destType().isMapType());
+    try (TupleStackGuard guard = new TupleStackGuard(desc.getItemTupleDesc())) {
+      if (slotPath.destType().isArrayType()) {
+        // Resolve path
+        List<String> rawPathToItem = Arrays.asList(Path.ARRAY_ITEM_FIELD_NAME);
+        resolveAndRegisterDescendantPath(collTblRef, rawPathToItem);
+      } else {
+        Preconditions.checkState(slotPath.destType().isMapType());
 
-      List<String> rawPathToKey = Arrays.asList(Path.MAP_KEY_FIELD_NAME);
-      resolveAndRegisterDescendantPath(collTblRef, rawPathToKey);
+        List<String> rawPathToKey = Arrays.asList(Path.MAP_KEY_FIELD_NAME);
+        resolveAndRegisterDescendantPath(collTblRef, rawPathToKey);
 
-      List<String> rawPathToValue = Arrays.asList(Path.MAP_VALUE_FIELD_NAME);
-      resolveAndRegisterDescendantPath(collTblRef, rawPathToValue);
+        List<String> rawPathToValue = Arrays.asList(Path.MAP_VALUE_FIELD_NAME);
+        resolveAndRegisterDescendantPath(collTblRef, rawPathToValue);
+      }
     }
 
     return desc;
@@ -1627,10 +1704,6 @@ public class Analyzer {
     boolean isResolved = resolvedPath.resolve();
     Preconditions.checkState(isResolved);
 
-    if (resolvedPath.destType().isStructType()) {
-      throw new AnalysisException(
-          "STRUCT type inside collection types is not supported.");
-    }
     if (resolvedPath.destType().isBinary()) {
       throw new AnalysisException(
           "Binary type inside collection types is not supported (IMPALA-11491).");
@@ -1696,6 +1769,16 @@ public class Analyzer {
     SlotDescriptor result = globalState_.descTbl.addSlotDescriptor(tupleDesc);
     globalState_.blockBySlot.put(result.getId(), this);
     return result;
+  }
+
+  /**
+   * Creates a new slot descriptor and related state in globalState. The new slot
+   * descriptor will be created in the tuple at the top of 'tupleStack_'.
+   */
+  private SlotDescriptor addSlotDescriptorAtCurrentLevel() {
+    TupleDescriptor tupleDesc = tupleStack_.peek();
+    Preconditions.checkNotNull(tupleDesc);
+    return addSlotDescriptor(tupleDesc);
   }
 
   /**

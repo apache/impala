@@ -217,7 +217,8 @@ public class SlotDescriptor {
   }
 
   /**
-   * Returns the slot descs of the structs that contain this slot desc, recursively.
+   * Returns the slot descs of the structs that contain this slot desc, recursively; stops
+   * at collection items, does not continue to the parent collection.
    * For an example struct 'outer: <middle: <inner: <i: int>>>', called for the slot desc
    * of 'i', the returned list will contain the slot descs of 'inner', 'middle' and
    * 'outer'.
@@ -229,7 +230,8 @@ public class SlotDescriptor {
   }
 
   /**
-   * Returns the tuple descs enclosing this slot desc, recursively.
+   * Returns the tuple descs enclosing this slot desc, recursively; stops at collection
+   * items, does not continue to the parent collection.
    * For an example struct 'outer: <middle: <inner: <i: int>>>', called for the slot desc
    * of 'i', the returned list will contain the 'itemTupleDesc_'s of 'inner', 'middle'
    * and 'outer' as well as the tuple desc of the main tuple (the 'parent_' of the slot
@@ -239,6 +241,26 @@ public class SlotDescriptor {
     List<TupleDescriptor> result = new ArrayList<>();
     getEnclosingStructSlotAndTupleDescs(null, result);
     return result;
+  }
+
+  /**
+   * Climbs up the struct hierarchy and returns the tuple desc that holds the top level
+   * struct that contains this slot desc; stops at collection items, does not continue to
+   * the parent collection.
+   * For a slot desc that is not within a struct, simply returns 'parent_'.
+   * For an example struct 'outer: <middle: <inner: <i: int>>>', called for the slot desc
+   * of 'i', returns the tuple desc of the main tuple (the 'parent_' of the slot desc of
+   * 'outer').
+   */
+  public TupleDescriptor getTopEnclosingTupleDesc() {
+    List<TupleDescriptor> enclosingTuples = getEnclosingTupleDescs();
+    if (enclosingTuples.isEmpty()) {
+      Preconditions.checkState(getParent() == null);
+      return null;
+    }
+
+    // Return the last enclosing tuple, going upward.
+    return enclosingTuples.get(enclosingTuples.size() - 1);
   }
 
   /**

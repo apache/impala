@@ -863,7 +863,12 @@ public class SingleNodePlanner {
           SlotRef collectionExpr =
               (SlotRef) collectionTableRef.getCollectionExpr();
           if (collectionExpr != null) {
-            requiredTids.add(collectionExpr.getDesc().getParent().getId());
+            // If the collection is within a (possibly nested) struct, add the tuple in
+            // which the top level struct is located.
+            SlotDescriptor desc = collectionExpr.getDesc();
+            List<TupleDescriptor> enclosingTupleDescs = desc.getEnclosingTupleDescs();
+            TupleDescriptor topTuple = desc.getTopEnclosingTupleDesc();
+            requiredTids.add(topTuple.getId());
           } else {
             requiredTids.add(collectionTableRef.getResolvedPath().getRootDesc().getId());
           }

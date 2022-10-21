@@ -632,10 +632,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     testTableRefPath("select 1 from d.t7.c3.item.a2.item.a3", path(2, 0, 1, 0, 2), null);
     testSlotRefPath("select item from d.t7.c3.a2.a3", path(2, 0, 1, 0, 2, 0));
     testSlotRefPath("select item from d.t7.c3.item.a2.item.a3", path(2, 0, 1, 0, 2, 0));
-    AnalysisContext ctx = createAnalysisCtx();
-    ctx.getQueryOptions().setDisable_codegen(true);
-    AnalysisError("select item from d.t7.c3", ctx,
-        "Struct containing a collection type is not allowed in the select list.");
+    testSlotRefPath("select item from d.t7.c3", path(2, 0));
     // Test path assembly with multiple tuple descriptors.
     testTableRefPath("select 1 from d.t7, t7.c3, c3.a2, a2.a3",
         path(2, 0, 1, 0, 2), path(2, 0, 1, 0, 2));
@@ -784,17 +781,16 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "Querying STRUCT is only supported for ORC and Parquet file formats.");
     AnalyzesOk("select alltypes from functional_orc_def.complextypes_structs", ctx);
 
-    // Check if a struct in the select list raises an error if it contains collections.
+    // Check that a struct in the select list doesn't raise an error if it contains
+    // collections.
     addTestTable(
         "create table nested_structs (s1 struct<s2:struct<i:int>>) stored as orc");
     addTestTable("create table nested_structs_with_list " +
         "(s1 struct<s2:struct<a:array<int>>>) stored as orc");
     AnalyzesOk("select s1 from nested_structs", ctx);
     AnalyzesOk("select s1.s2 from nested_structs", ctx);
-    AnalysisError("select s1 from nested_structs_with_list", ctx, "Struct containing " +
-        "a collection type is not allowed in the select list.");
-    AnalysisError("select s1.s2 from nested_structs_with_list", ctx, "Struct " +
-        "containing a collection type is not allowed in the select list.");
+    AnalyzesOk("select s1 from nested_structs_with_list", ctx);
+    AnalyzesOk("select s1.s2 from nested_structs_with_list", ctx);
   }
 
   @Test
@@ -1088,19 +1084,15 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select * from (select int_map, int_map_array from " +
             "functional_parquet.complextypestbl) v",ctx);
 
-    ctx.getQueryOptions().setDisable_codegen(false);
-
     AnalyzesOk("select * from functional_parquet.complextypes_arrays",ctx);
     AnalyzesOk("select * from " +
             "functional_parquet.complextypes_arrays_only_view",ctx);
     AnalyzesOk("select v.id, v.* from " +
             "(select * from functional_parquet.complextypes_arrays) v",ctx);
 
-    AnalysisError("select * from functional.allcomplextypes",
-            ctx,"STRUCT type inside collection types is not supported.");
-
-    AnalysisError("select * from functional_orc_def.complextypestbl", ctx,
-        "Struct containing a collection type is not allowed in the select list.");
+    // Allow also structs in collections and vice versa.
+    AnalyzesOk("select * from functional_parquet.allcomplextypes", ctx);
+    AnalyzesOk("select * from functional_orc_def.complextypestbl", ctx);
 
     AnalysisError("select * from functional_parquet.binary_in_complex_types", ctx,
         "Binary type inside collection types is not supported (IMPALA-11491).");

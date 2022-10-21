@@ -294,7 +294,7 @@ public class TupleDescriptor {
    * Materialize all slots.
    */
   public void materializeSlots() {
-    for (SlotDescriptor slot: slots_) slot.setIsMaterialized(true);
+    for (SlotDescriptor slot: getSlotsRecursively()) slot.setIsMaterialized(true);
   }
 
   public TTupleDescriptor toThrift(Integer tableId) {

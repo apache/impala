@@ -20,6 +20,8 @@ package org.apache.impala.analysis;
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.analysis.TableRef.ZippingUnnestType;
 import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.ArrayType;
+import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 
@@ -62,6 +64,12 @@ public class UnnestExpr extends SlotRef {
     // find the corresponding CollectionTableRef during resolution.
     Path resolvedPath = resolveAndVerifyRawPath(analyzer);
     Preconditions.checkNotNull(resolvedPath);
+    verifyNotInsideStruct(resolvedPath);
+
+    Type type = resolvedPath.getMatchedTypes().get(
+        resolvedPath.getMatchedTypes().size() - 1);
+    verifyContainsNoStruct(type);
+
     if (!rawPathWithoutItem_.isEmpty()) rawPathWithoutItem_.clear();
     rawPathWithoutItem_.addAll(rawPath_);
 
@@ -81,6 +89,37 @@ public class UnnestExpr extends SlotRef {
     super.analyzeImpl(analyzer);
     Preconditions.checkState(tblRef.desc_.getSlots().size() == 1);
     analyzer.addZippingUnnestTupleId(desc_.getParent().getId());
+  }
+
+  // Verifies that the given path does not refer to a value that is within a struct.
+  // Note: If using the FROM clause zipping unnest syntax, this check has to be performed
+  // in CollectionTableRef.analyze().
+  public static void verifyNotInsideStruct(Path resolvedPath) throws AnalysisException {
+    for (Type type : resolvedPath.getMatchedTypes()) {
+      if (type.isStructType()) {
+          throw new AnalysisException(
+              "Zipping unnest on an array that is within a struct is not supported.");
+      }
+    }
+  }
+
+  // Verifies that the given type does not contain a struct. Descends along array items
+  // and map keys/values.
+  // Note: If using the FROM clause zipping unnest syntax, this check has to be performed
+  // in CollectionTableRef.analyze().
+  public static void verifyContainsNoStruct(Type type) throws AnalysisException {
+    if (type.isStructType()) {
+          throw new AnalysisException(
+              "Zipping unnest on an array that (recursively) " +
+              "contains a struct is not supported.");
+    } else if (type.isArrayType()) {
+      ArrayType arrType = (ArrayType) type;
+      verifyContainsNoStruct(arrType.getItemType());
+    } else if (type.isMapType()) {
+      MapType mapType = (MapType) type;
+      verifyContainsNoStruct(mapType.getKeyType());
+      verifyContainsNoStruct(mapType.getValueType());
+    }
   }
 
   private void verifyTableRefs(Analyzer analyzer) throws AnalysisException {

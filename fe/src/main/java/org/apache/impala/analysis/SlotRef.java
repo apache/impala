@@ -212,10 +212,6 @@ public class SlotRef extends Expr {
         throw new AnalysisException("Unsupported type '"
             + fieldType.toSql() + "' in '" + toSql() + "'.");
       }
-      if (fieldType.isCollectionType()) {
-        throw new AnalysisException("Struct containing a collection type is not " +
-            "allowed in the select list.");
-      }
       if (fieldType.isBinary()) {
         throw new AnalysisException("Struct containing a BINARY type is not " +
             "allowed in the select list (IMPALA-11491).");

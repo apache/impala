@@ -1,0 +1,551 @@
+====
+---- QUERY
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+select
+  id,
+  struct_contains_arr,
+  struct_contains_map,
+  arr_contains_struct,
+  arr_contains_nested_struct,
+  struct_contains_nested_arr,
+  all_mix
+from collection_struct_mix;
+---- RESULTS
+1,'{"arr":[1,2,3,4,null,null,5]}','{"m":{1:"one",2:"two",0:null}}','[{"i":1},{"i":2},{"i":3},{"i":4},null,{"i":5},{"i":null}]','[{"inner_struct":{"str":"","l":0},"small":2},null,{"inner_struct":{"str":"some_string","l":5},"small":20}]','{"arr":[["2022-12-05","2022-12-06",null,"2022-12-07"],["2022-12-08","2022-12-09",null]],"i":2}','{10:{"big":{"arr":[{"inner_arr":[[0,null,-1,-5,null,8],[20,null]],"m":"2022-12-05 14:30:00"},{"inner_arr":[[12,1024,null],[null,null,84],[null,15,null]],"m":"2022-12-06 16:20:52"}],"n":98},"small":{"str":"somestring","i":100}}}'
+2,'{"arr":null}','{"m":null}','[{"i":100},{"i":8},{"i":35},{"i":45},null,{"i":193},{"i":null}]','[{"inner_struct":null,"small":104},{"inner_struct":{"str":"aaa","l":28},"small":105},null]','{"arr":[["2022-12-10","2022-12-11",null,"2022-12-12"],null],"i":2754}','{20:{"big":{"arr":[null,{"inner_arr":[[12,1024,null],[null,null,84],[null,15,null]],"m":"2022-12-10 08:15:12"}],"n":95},"small":{"str":"otherstring","i":2048}},21:{"big":{"arr":null,"n":8},"small":{"str":"textstring","i":0}},22:{"big":null,"small":{"str":"nextstring","i":128}},23:null}'
+---- TYPES
+INT,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+select tbl.nested_struct from complextypestbl tbl;
+---- RESULTS
+'{"a":1,"b":[1],"c":{"d":[[{"e":10,"f":"aaa"},{"e":-10,"f":"bbb"}],[{"e":11,"f":"c"}]]},"g":{"foo":{"h":{"i":[1.1]}}}}'
+'{"a":null,"b":[null],"c":{"d":[[{"e":null,"f":null},{"e":10,"f":"aaa"},{"e":null,"f":null},{"e":-10,"f":"bbb"},{"e":null,"f":null}],[{"e":11,"f":"c"},null],[],null]},"g":{"g1":{"h":{"i":[2.2,null]}},"g2":{"h":{"i":[]}},"g3":null,"g4":{"h":{"i":null}},"g5":{"h":null}}}'
+'{"a":null,"b":null,"c":{"d":[]},"g":{}}'
+'{"a":null,"b":null,"c":{"d":null},"g":null}'
+'{"a":null,"b":null,"c":null,"g":{"foo":{"h":{"i":[2.2,3.3]}}}}'
+'NULL'
+'{"a":7,"b":[2,3,null],"c":{"d":[[],[null],null]},"g":null}'
+'{"a":-1,"b":[-1],"c":{"d":[[{"e":-1,"f":"nonnullable"}]]},"g":{}}'
+---- TYPES
+STRING
+====
+---- QUERY
+select tbl.nested_struct.c from complextypestbl tbl;
+---- RESULTS
+'{"d":[[{"e":10,"f":"aaa"},{"e":-10,"f":"bbb"}],[{"e":11,"f":"c"}]]}'
+'{"d":[[{"e":null,"f":null},{"e":10,"f":"aaa"},{"e":null,"f":null},{"e":-10,"f":"bbb"},{"e":null,"f":null}],[{"e":11,"f":"c"},null],[],null]}'
+'{"d":[]}'
+'{"d":null}'
+'NULL'
+'NULL'
+'{"d":[[],[null],null]}'
+'{"d":[[{"e":-1,"f":"nonnullable"}]]}'
+---- TYPES
+STRING
+====
+---- QUERY
+# Structs inside arrays are supported.
+select nested_struct.c.d from complextypestbl;
+---- RESULTS
+'[[{"e":10,"f":"aaa"},{"e":-10,"f":"bbb"}],[{"e":11,"f":"c"}]]'
+'[[{"e":null,"f":null},{"e":10,"f":"aaa"},{"e":null,"f":null},{"e":-10,"f":"bbb"},{"e":null,"f":null}],[{"e":11,"f":"c"},null],[],null]'
+'[]'
+'NULL'
+'NULL'
+'NULL'
+'[[],[null],null]'
+'[[{"e":-1,"f":"nonnullable"}]]'
+---- TYPES
+STRING
+====
+---- QUERY
+# Structs inside maps are supported.
+select nested_struct.g from complextypestbl;
+---- RESULTS
+'{"foo":{"h":{"i":[1.1]}}}'
+'{"g1":{"h":{"i":[2.2,null]}},"g2":{"h":{"i":[]}},"g3":null,"g4":{"h":{"i":null}},"g5":{"h":null}}'
+'{}'
+'NULL'
+'{"foo":{"h":{"i":[2.2,3.3]}}}'
+'NULL'
+'NULL'
+'{}'
+---- TYPES
+STRING
+====
+---- QUERY
+# Select struct field from inline view.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+with sub as (select id, struct_contains_nested_arr from collection_struct_mix)
+select sub.id, sub.struct_contains_nested_arr.arr from sub;
+---- RESULTS
+1,'[["2022-12-05","2022-12-06",null,"2022-12-07"],["2022-12-08","2022-12-09",null]]'
+2,'[["2022-12-10","2022-12-11",null,"2022-12-12"],null]'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Select struct field from HMS view.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+select id, struct_contains_nested_arr.arr from collection_struct_mix_view;
+---- RESULTS
+1,'[["2022-12-05","2022-12-06",null,"2022-12-07"],["2022-12-08","2022-12-09",null]]'
+2,'[["2022-12-10","2022-12-11",null,"2022-12-12"],null]'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Select array in struct from inline view and join-unnest it.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+with sub as (select id, struct_contains_nested_arr from collection_struct_mix)
+select id, arr.item from sub, sub.struct_contains_nested_arr.arr arr;
+---- RESULTS
+1,'["2022-12-05","2022-12-06",null,"2022-12-07"]'
+1,'["2022-12-08","2022-12-09",null]'
+2,'["2022-12-10","2022-12-11",null,"2022-12-12"]'
+2,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Select array in struct from HMS view and join-unnest it.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+select id, arr.item from collection_struct_mix_view, collection_struct_mix_view.struct_contains_nested_arr.arr arr;
+---- RESULTS
+1,'["2022-12-05","2022-12-06",null,"2022-12-07"]'
+1,'["2022-12-08","2022-12-09",null]'
+2,'["2022-12-10","2022-12-11",null,"2022-12-12"]'
+2,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Select array in struct from nested inline view and join-unnest it.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+with sub as (select id, struct_contains_nested_arr from collection_struct_mix),
+  sub2 as (select id, struct_contains_nested_arr s from sub)
+select id, item from sub2, sub2.s.arr arr;
+---- RESULTS
+1,'["2022-12-05","2022-12-06",null,"2022-12-07"]'
+1,'["2022-12-08","2022-12-09",null]'
+2,'["2022-12-10","2022-12-11",null,"2022-12-12"]'
+2,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Unnest an array that contains structs.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+select id, item from collection_struct_mix, collection_struct_mix.arr_contains_nested_struct arr;
+---- RESULTS
+1,'{"inner_struct":{"str":"","l":0},"small":2}'
+1,'NULL'
+1,'{"inner_struct":{"str":"some_string","l":5},"small":20}'
+2,'{"inner_struct":null,"small":104}'
+2,'{"inner_struct":{"str":"aaa","l":28},"small":105}'
+2,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Unnest an array that contains structs from a nested inline view.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+with sub as (select id, arr_contains_nested_struct arr from collection_struct_mix),
+  sub2 as (select id, arr arr2 from sub)
+select id, item from sub2, sub2.arr2 a;
+---- RESULTS
+1,'{"inner_struct":{"str":"","l":0},"small":2}'
+1,'NULL'
+1,'{"inner_struct":{"str":"some_string","l":5},"small":20}'
+2,'{"inner_struct":null,"small":104}'
+2,'{"inner_struct":{"str":"aaa","l":28},"small":105}'
+2,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Unnest an array that contains structs from a HMS view.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+select id, item from collection_struct_mix_view,
+  collection_struct_mix_view.arr_contains_nested_struct a;
+---- RESULTS
+1,'{"inner_struct":{"str":"","l":0},"small":2}'
+1,'NULL'
+1,'{"inner_struct":{"str":"some_string","l":5},"small":20}'
+2,'{"inner_struct":null,"small":104}'
+2,'{"inner_struct":{"str":"aaa","l":28},"small":105}'
+2,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Doubly unnest two-level array from nested inline view, displaying the unnested results
+# at both levels.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+with sub as (select id, struct_contains_nested_arr from collection_struct_mix),
+  sub2 as (select id, struct_contains_nested_arr s from sub)
+select id, arr.item, inner_arr.item from sub2, sub2.s.arr arr, arr.item inner_arr;
+---- RESULTS
+1,'["2022-12-05","2022-12-06",null,"2022-12-07"]',2022-12-05
+1,'["2022-12-05","2022-12-06",null,"2022-12-07"]',2022-12-06
+1,'["2022-12-05","2022-12-06",null,"2022-12-07"]',NULL
+1,'["2022-12-05","2022-12-06",null,"2022-12-07"]',2022-12-07
+1,'["2022-12-08","2022-12-09",null]',2022-12-08
+1,'["2022-12-08","2022-12-09",null]',2022-12-09
+1,'["2022-12-08","2022-12-09",null]',NULL
+2,'["2022-12-10","2022-12-11",null,"2022-12-12"]',2022-12-10
+2,'["2022-12-10","2022-12-11",null,"2022-12-12"]',2022-12-11
+2,'["2022-12-10","2022-12-11",null,"2022-12-12"]',NULL
+2,'["2022-12-10","2022-12-11",null,"2022-12-12"]',2022-12-12
+---- TYPES
+INT,STRING,DATE
+====
+---- QUERY
+# Doubly unnest two-level array from HMS view, displaying the unnested results at both
+# levels.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+select id, arr.item, inner_arr.item from collection_struct_mix_view,
+  collection_struct_mix_view.struct_contains_nested_arr.arr arr, arr.item inner_arr;
+---- RESULTS
+1,'["2022-12-05","2022-12-06",null,"2022-12-07"]',2022-12-05
+1,'["2022-12-05","2022-12-06",null,"2022-12-07"]',2022-12-06
+1,'["2022-12-05","2022-12-06",null,"2022-12-07"]',NULL
+1,'["2022-12-05","2022-12-06",null,"2022-12-07"]',2022-12-07
+1,'["2022-12-08","2022-12-09",null]',2022-12-08
+1,'["2022-12-08","2022-12-09",null]',2022-12-09
+1,'["2022-12-08","2022-12-09",null]',NULL
+2,'["2022-12-10","2022-12-11",null,"2022-12-12"]',2022-12-10
+2,'["2022-12-10","2022-12-11",null,"2022-12-12"]',2022-12-11
+2,'["2022-12-10","2022-12-11",null,"2022-12-12"]',NULL
+2,'["2022-12-10","2022-12-11",null,"2022-12-12"]',2022-12-12
+---- TYPES
+INT,STRING,DATE
+====
+---- QUERY
+# Join unnest array containing struct and also query struct fields.
+select id, a.item, a.item.inner_struct, a.item.small from collection_struct_mix,
+  collection_struct_mix.arr_contains_nested_struct a;
+---- RESULTS
+1,'{"inner_struct":{"str":"","l":0},"small":2}','{"str":"","l":0}',2
+1,'NULL','NULL',NULL
+1,'{"inner_struct":{"str":"some_string","l":5},"small":20}','{"str":"some_string","l":5}',20
+2,'{"inner_struct":null,"small":104}','NULL',104
+2,'{"inner_struct":{"str":"aaa","l":28},"small":105}','{"str":"aaa","l":28}',105
+2,'NULL','NULL',NULL
+---- TYPES
+INT,STRING,STRING,SMALLINT
+====
+---- QUERY
+# Join unnest array containing struct from HMS view and also query struct fields.
+select id, a.item, a.item.inner_struct, a.item.small from collection_struct_mix_view,
+  collection_struct_mix_view.arr_contains_nested_struct a;
+---- RESULTS
+1,'{"inner_struct":{"str":"","l":0},"small":2}','{"str":"","l":0}',2
+1,'NULL','NULL',NULL
+1,'{"inner_struct":{"str":"some_string","l":5},"small":20}','{"str":"some_string","l":5}',20
+2,'{"inner_struct":null,"small":104}','NULL',104
+2,'{"inner_struct":{"str":"aaa","l":28},"small":105}','{"str":"aaa","l":28}',105
+2,'NULL','NULL',NULL
+---- TYPES
+INT,STRING,STRING,SMALLINT
+====
+---- QUERY
+# Join unnest array containing struct from inline view and also query struct fields.
+with sub as (select id, arr_contains_nested_struct from collection_struct_mix_view)
+select id, a.item, a.item.inner_struct, a.item.small from sub,
+  sub.arr_contains_nested_struct a;
+---- RESULTS
+1,'{"inner_struct":{"str":"","l":0},"small":2}','{"str":"","l":0}',2
+1,'NULL','NULL',NULL
+1,'{"inner_struct":{"str":"some_string","l":5},"small":20}','{"str":"some_string","l":5}',20
+2,'{"inner_struct":null,"small":104}','NULL',104
+2,'{"inner_struct":{"str":"aaa","l":28},"small":105}','{"str":"aaa","l":28}',105
+2,'NULL','NULL',NULL
+---- TYPES
+INT,STRING,STRING,SMALLINT
+====
+---- QUERY
+# Zipping unnest an array that contains a struct.
+select unnest(arr_contains_struct) from collection_struct_mix;
+---- CATCH
+AnalysisException: Zipping unnest on an array that (recursively) contains a struct is not supported.
+====
+---- QUERY
+# Zipping unnest on an array that contains a struct with FROM-clause unnest syntax.
+select a.item from collection_struct_mix,
+  unnest(collection_struct_mix.arr_contains_struct) as (a);
+---- CATCH
+AnalysisException: Zipping unnest on an array that (recursively) contains a struct is not supported.
+====
+---- QUERY
+# Zipping unnest of two arrays that contain a structs.
+select unnest(arr_contains_struct), unnest(arr_contains_nested_struct)
+from collection_struct_mix;
+---- CATCH
+AnalysisException: Zipping unnest on an array that (recursively) contains a struct is not supported.
+====
+---- QUERY
+# Zipping unnest of two arrays that contain a structs, from view
+select unnest(arr_contains_struct), unnest(arr_contains_nested_struct)
+from collection_struct_mix_view;
+---- CATCH
+AnalysisException: Zipping unnest on an array that (recursively) contains a struct is not supported.
+====
+---- QUERY
+# Zipping unnest of two arrays that contain structs, from view.
+with unnesting as (
+  select unnest(arr_contains_struct) struct1, unnest(arr_contains_nested_struct) struct2
+  from collection_struct_mix_view)
+select struct1, struct2 from unnesting
+where struct1.i > 2;
+---- CATCH
+AnalysisException: Zipping unnest on an array that (recursively) contains a struct is not supported.
+====
+---- QUERY
+# Zipping unnest on an array that is in a struct is not supported.
+select unnest(struct_contains_nested_arr.arr) from collection_struct_mix;
+---- CATCH
+AnalysisException: Zipping unnest on an array that is within a struct is not supported.
+====
+---- QUERY
+# Zipping unnest on an array that is in a struct is not supported with FROM-clause unnest
+# syntax.
+select a.item from collection_struct_mix,
+  unnest(collection_struct_mix.struct_contains_nested_arr.arr) as (a);
+---- RESULTS
+---- CATCH
+AnalysisException: Zipping unnest on an array that is within a struct is not supported.
+---- TYPES
+STRING
+====
+---- QUERY
+# Zipping unnest on an array that is in a struct is not supported; querying from a HMS
+# view.
+select unnest(struct_contains_nested_arr.arr) from collection_struct_mix_view;
+---- RESULTS
+---- CATCH
+AnalysisException: Zipping unnest on an array that is within a struct is not supported.
+---- TYPES
+STRING
+====
+---- QUERY
+# Zipping unnest on an array that is in a struct is not supported; querying from an inline
+# view.
+with sub as (select struct_contains_nested_arr from collection_struct_mix)
+select unnest(struct_contains_nested_arr.arr) from sub;
+---- RESULTS
+---- CATCH
+AnalysisException: Zipping unnest on an array that is within a struct is not supported.
+---- TYPES
+STRING
+====
+---- QUERY
+# Test that NULL map keys are printed correctly with STRINGIFY_MAP_KEYS=true.
+set STRINGIFY_MAP_KEYS=1;
+select id, struct_contains_map from collection_struct_mix;
+---- RESULTS
+1,'{"m":{"1":"one","2":"two","0":null}}'
+2,'{"m":null}'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Using different kinds of views and adding WHERE clauses at different levels.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+with sub as (select id, struct_contains_nested_arr from collection_struct_mix_view)
+select id, struct_contains_nested_arr.arr from (select id, struct_contains_nested_arr from sub) sub2
+where struct_contains_nested_arr.i > 4;
+---- RESULTS
+2,'[["2022-12-10","2022-12-11",null,"2022-12-12"],null]'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Using different kinds of views and adding WHERE clauses at different levels.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+with sub as (select id, struct_contains_nested_arr from collection_struct_mix_view)
+select id, struct_contains_nested_arr.arr from
+  (select id, struct_contains_nested_arr
+   from sub
+   where struct_contains_nested_arr.i > 4) sub2;
+---- RESULTS
+2,'[["2022-12-10","2022-12-11",null,"2022-12-12"],null]'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Using different kinds of views and adding WHERE clauses at different levels.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+with sub as (
+  select id, struct_contains_nested_arr
+  from collection_struct_mix_view
+  where struct_contains_nested_arr.i > 4)
+select id, struct_contains_nested_arr.arr from (select id, struct_contains_nested_arr from
+sub) sub2;
+---- RESULTS
+2,'[["2022-12-10","2022-12-11",null,"2022-12-12"],null]'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Using different kinds of views and adding WHERE clauses at different levels.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+with sub as (
+  select id, struct_contains_nested_arr
+  from collection_struct_mix_view)
+select id, arr2.item from (
+  select id, arr.item single_arr
+  from sub, sub.struct_contains_nested_arr.arr arr) sub2, sub2.single_arr arr2
+where arr2.item > "2022-12-06";
+---- RESULTS
+1,2022-12-07
+1,2022-12-08
+1,2022-12-09
+2,2022-12-10
+2,2022-12-11
+2,2022-12-12
+---- TYPES
+INT,DATE
+====
+---- QUERY
+# Using different kinds of views and adding WHERE clauses at different levels.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+with sub as (
+  select id, struct_contains_nested_arr
+  from collection_struct_mix_view)
+select id, arr2.item from (
+  select id, arr.item single_arr
+  from sub, sub.struct_contains_nested_arr.arr arr
+  where sub.struct_contains_nested_arr.i > 4) sub2, sub2.single_arr arr2
+where arr2.item > "2022-12-06";
+---- RESULTS
+2,2022-12-10
+2,2022-12-11
+2,2022-12-12
+---- TYPES
+INT,DATE
+====
+---- QUERY
+# Using different kinds of views and adding WHERE clauses at different levels.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+with sub as (
+  select id, arr1.item single_arr
+  from collection_struct_mix, collection_struct_mix.struct_contains_nested_arr.arr arr1
+  where struct_contains_nested_arr.i > 4)
+select id, d from (
+  select id, arr2.item d
+  from sub, sub.single_arr arr2) sub2
+where d > "2022-12-06";
+---- RESULTS
+2,2022-12-10
+2,2022-12-11
+2,2022-12-12
+---- TYPES
+INT,DATE
+====
+---- QUERY
+# Using WHERE filters on the same column at different view levels.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+with project as (
+  select id, struct_contains_nested_arr.arr nested_array from collection_struct_mix_view
+),
+unnest_to_1d_array as (
+  select id, item array_1d from project, project.nested_array
+),
+unnest_to_scalars as (
+  select id, item scalar_item from unnest_to_1d_array, unnest_to_1d_array.array_1d
+  where item > "2022-12-05"
+)
+select id, scalar_item from unnest_to_scalars
+where scalar_item < "2022-12-11";
+---- RESULTS
+1,2022-12-06
+1,2022-12-07
+1,2022-12-08
+1,2022-12-09
+2,2022-12-10
+---- TYPES
+INT,DATE
+====
+---- QUERY
+# Test that complex types are propagated through views with EXPAND_COMPLEX_TYPES=1.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+set EXPAND_COMPLEX_TYPES=1;
+with sub as (
+  select * from collection_struct_mix)
+select * from (
+  select * from sub
+) sub2;
+---- RESULTS
+1,'{"arr":[1,2,3,4,null,null,5]}','{"m":{1:"one",2:"two",0:null}}','[{"i":1},{"i":2},{"i":3},{"i":4},null,{"i":5},{"i":null}]','[{"inner_struct":{"str":"","l":0},"small":2},null,{"inner_struct":{"str":"some_string","l":5},"small":20}]','{"arr":[["2022-12-05","2022-12-06",null,"2022-12-07"],["2022-12-08","2022-12-09",null]],"i":2}','{10:{"big":{"arr":[{"inner_arr":[[0,null,-1,-5,null,8],[20,null]],"m":"2022-12-05 14:30:00"},{"inner_arr":[[12,1024,null],[null,null,84],[null,15,null]],"m":"2022-12-06 16:20:52"}],"n":98},"small":{"str":"somestring","i":100}}}'
+2,'{"arr":null}','{"m":null}','[{"i":100},{"i":8},{"i":35},{"i":45},null,{"i":193},{"i":null}]','[{"inner_struct":null,"small":104},{"inner_struct":{"str":"aaa","l":28},"small":105},null]','{"arr":[["2022-12-10","2022-12-11",null,"2022-12-12"],null],"i":2754}','{20:{"big":{"arr":[null,{"inner_arr":[[12,1024,null],[null,null,84],[null,15,null]],"m":"2022-12-10 08:15:12"}],"n":95},"small":{"str":"otherstring","i":2048}},21:{"big":{"arr":null,"n":8},"small":{"str":"textstring","i":0}},22:{"big":null,"small":{"str":"nextstring","i":128}},23:null}'
+---- TYPES
+INT,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Test that struct elements can be star-exanded with EXPAND_COMPLEX_TYPES=0;
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+set EXPAND_COMPLEX_TYPES=0;
+with sub as (
+  select id, arr_contains_nested_struct, struct_contains_nested_arr from
+collection_struct_mix)
+select id, arr_contains_nested_struct, struct_contains_nested_arr.* from (
+  select id, arr_contains_nested_struct, struct_contains_nested_arr from sub
+) sub2;
+---- RESULTS
+1,'[{"inner_struct":{"str":"","l":0},"small":2},null,{"inner_struct":{"str":"some_string","l":5},"small":20}]',2
+2,'[{"inner_struct":null,"small":104},{"inner_struct":{"str":"aaa","l":28},"small":105},null]',2754
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+# Test that struct elements can be star-exanded with EXPAND_COMPLEX_TYPES=1;
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+set EXPAND_COMPLEX_TYPES=1;
+with sub as (
+  select id, arr_contains_nested_struct, struct_contains_nested_arr from
+collection_struct_mix)
+select id, arr_contains_nested_struct, struct_contains_nested_arr.* from (
+  select id, arr_contains_nested_struct, struct_contains_nested_arr from sub
+) sub2;
+---- RESULTS
+1,'[{"inner_struct":{"str":"","l":0},"small":2},null,{"inner_struct":{"str":"some_string","l":5},"small":20}]','[["2022-12-05","2022-12-06",null,"2022-12-07"],["2022-12-08","2022-12-09",null]]',2
+2,'[{"inner_struct":null,"small":104},{"inner_struct":{"str":"aaa","l":28},"small":105},null]','[["2022-12-10","2022-12-11",null,"2022-12-12"],null]',2754
+---- TYPES
+INT,STRING,STRING,INT
+====
+---- QUERY
+# Test that struct elements from unnested array can be star-exanded with
+# EXPAND_COMPLEX_TYPES=0;
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+set EXPAND_COMPLEX_TYPES=0;
+select id, arr.item.*
+from collection_struct_mix, collection_struct_mix.arr_contains_nested_struct arr;
+---- RESULTS
+1,2
+1,NULL
+1,20
+2,104
+2,105
+2,NULL
+---- TYPES
+INT,SMALLINT
+====
+---- QUERY
+# Test that struct elements from unnested array can be star-exanded with
+# EXPAND_COMPLEX_TYPES=1;
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+set EXPAND_COMPLEX_TYPES=1;
+select id, arr.item.*
+from collection_struct_mix, collection_struct_mix.arr_contains_nested_struct arr;
+---- RESULTS
+1,'{"str":"","l":0}',2
+1,'NULL',NULL
+1,'{"str":"some_string","l":5}',20
+2,'NULL',104
+2,'{"str":"aaa","l":28}',105
+2,'NULL',NULL
+---- TYPES
+INT,STRING,SMALLINT
+====

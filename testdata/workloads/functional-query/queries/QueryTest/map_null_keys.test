@@ -15,12 +15,13 @@ select
  map_char_key,
  map_varchar_key,
  map_timestamp_key,
- map_date_key
+ map_date_key,
+ struct_contains_map
 from map_null_keys;
 ---- RESULTS
-1,'{true:"true",null:"null"}','{-1:"one",null:"null"}','{-1:"one",null:"null"}','{-1:"one",null:"null"}','{-1.75:"a",null:"null"}','{-1.75:"a",null:"null"}','{-1.8:"a",null:"null"}','{"one":1,null:null}','{"Mon":1,null:null}','{"a":"A",null:null}','{"2022-12-10 08:15:12":"Saturday morning",null:"null"}','{"2022-12-10":"Saturday",null:"null"}'
+1,'{true:"true",null:"null"}','{-1:"one",null:"null"}','{-1:"one",null:"null"}','{-1:"one",null:"null"}','{-1.75:"a",null:"null"}','{-1.75:"a",null:"null"}','{-1.8:"a",null:"null"}','{"one":1,null:null}','{"Mon":1,null:null}','{"a":"A",null:null}','{"2022-12-10 08:15:12":"Saturday morning",null:"null"}','{"2022-12-10":"Saturday",null:"null"}','{"m":{1:"one",null:"null"},"s":"some_string"}'
 ---- TYPES
-INT,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+INT,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 =====
 ---- QUERY
 -- Test that NULL map keys are printed correctly with STRINGIFY_MAP_KEYS=true.
@@ -39,10 +40,11 @@ select
  map_char_key,
  map_varchar_key,
  map_timestamp_key,
- map_date_key
+ map_date_key,
+ struct_contains_map
 from map_null_keys;
 ---- RESULTS
-1,'{"true":"true","null":"null"}','{"-1":"one","null":"null"}','{"-1":"one","null":"null"}','{"-1":"one","null":"null"}','{"-1.75":"a","null":"null"}','{"-1.75":"a","null":"null"}','{"-1.8":"a","null":"null"}','{"one":1,"null":null}','{"Mon":1,"null":null}','{"a":"A","null":null}','{"2022-12-10 08:15:12":"Saturday morning","null":"null"}','{"2022-12-10":"Saturday","null":"null"}'
+1,'{"true":"true","null":"null"}','{"-1":"one","null":"null"}','{"-1":"one","null":"null"}','{"-1":"one","null":"null"}','{"-1.75":"a","null":"null"}','{"-1.75":"a","null":"null"}','{"-1.8":"a","null":"null"}','{"one":1,"null":null}','{"Mon":1,"null":null}','{"a":"A","null":null}','{"2022-12-10 08:15:12":"Saturday morning","null":"null"}','{"2022-12-10":"Saturday","null":"null"}','{"m":{"1":"one","null":"null"},"s":"some_string"}'
 ---- TYPES
-INT,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+INT,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 =====

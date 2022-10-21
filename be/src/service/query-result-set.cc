@@ -252,9 +252,14 @@ void QueryResultSet::PrintComplexValue(ScalarExprEvaluator* expr_eval,
   } else {
     DCHECK(type.IsStructType());
     const StructVal* struct_val = static_cast<const StructVal*>(value);
+    const SlotDescriptor* slot_desc =
+        static_cast<const SlotRef&>(scalar_expr).GetSlotDescriptor();
+    DCHECK(slot_desc != nullptr);
+    DCHECK_EQ(type, slot_desc->type());
+
     ComplexValueWriter<rapidjson::BasicOStreamWrapper<stringstream>>
         complex_value_writer(&writer, stringify_map_keys);
-    complex_value_writer.StructValToJSON(*struct_val, type);
+    complex_value_writer.StructValToJSON(*struct_val, *slot_desc);
   }
 }
 

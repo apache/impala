@@ -182,7 +182,39 @@ class TestNestedCollectionsInSelectList(ImpalaTestSuite):
     """Queries where a map has null keys. Is only possible in ORC, not Parquet."""
     if vector.get_value('table_format').file_format == 'parquet':
       pytest.skip()
+    # Structs in select list are not supported with codegen enabled: see IMPALA-10851.
+    if vector.get_value('exec_option')['disable_codegen'] == 'False':
+      pytest.skip()
     self.run_test_case('QueryTest/map_null_keys', vector)
+
+
+class TestMixedCollectionsAndStructsInSelectList(ImpalaTestSuite):
+  """Functional tests for the case where collections and structs are embedded into one
+  another and they are provided in the select list."""
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestMixedCollectionsAndStructsInSelectList, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format in ['parquet', 'orc'])
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('mt_dop', 0, 2))
+    cls.ImpalaTestMatrix.add_dimension(
+        create_exec_option_dimension_from_dict({
+            'disable_codegen': ['False', 'True']}))
+    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('orc_schema_resolution', 0, 1))
+    cls.ImpalaTestMatrix.add_constraint(orc_schema_resolution_constraint)
+
+  def test_mixed_complex_types_in_select_list(self, vector, unique_database):
+    """Queries where structs and collections are embedded into one another."""
+    # Structs in select list are not supported with codegen enabled: see IMPALA-10851.
+    if vector.get_value('exec_option')['disable_codegen'] == 'False':
+      pytest.skip()
+    self.run_test_case('QueryTest/mixed-collections-and-structs', vector)
 
 
 class TestComputeStatsWithNestedTypes(ImpalaTestSuite):

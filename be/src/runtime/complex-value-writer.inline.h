@@ -81,6 +81,51 @@ void ComplexValueWriter<JsonStream>::WriteNull(bool map_key) {
   }
 }
 
+// Structs in collections are not converted to StructVal but are left as they are in the
+// tuple.
+template <class JsonStream>
+void ComplexValueWriter<JsonStream>::StructInCollectionToJSON(Tuple* item_tuple,
+    const SlotDescriptor& struct_slot_desc) {
+  const TupleDescriptor* children_tuple_desc =
+      struct_slot_desc.children_tuple_descriptor();
+  DCHECK(children_tuple_desc != nullptr);
+
+  const ColumnType& struct_type = struct_slot_desc.type();
+  const std::vector<SlotDescriptor*>& child_slots = children_tuple_desc->slots();
+
+  DCHECK(struct_type.type == TYPE_STRUCT);
+  DCHECK_EQ(child_slots.size(), struct_type.children.size());
+
+  writer_->StartObject();
+  for (int i = 0; i < child_slots.size(); ++i) {
+    writer_->String(struct_type.field_names[i].c_str());
+
+    const SlotDescriptor& child_slot_desc = *child_slots[i];
+    bool element_is_null = item_tuple->IsNull(child_slot_desc.null_indicator_offset());
+    if (element_is_null) {
+      WriteNull(writer_);
+      continue;
+    }
+
+    const ColumnType& child_type = child_slot_desc.type();
+    void* child = item_tuple->GetSlot(child_slot_desc.tuple_offset());
+    if (child_type.IsStructType()) {
+      StructInCollectionToJSON(item_tuple, child_slot_desc);
+    } else if (child_type.IsCollectionType()) {
+      const CollectionValue* nested_collection_val =
+          reinterpret_cast<CollectionValue*>(child);
+      const TupleDescriptor* child_item_tuple_desc =
+          child_slot_desc.children_tuple_descriptor();
+      DCHECK(child_item_tuple_desc != nullptr);
+      CollectionValueToJSON(*nested_collection_val, child_type.type,
+          child_item_tuple_desc);
+    } else {
+      PrimitiveValueToJSON(child, child_type, false);
+    }
+  }
+  writer_->EndObject();
+}
+
 template <class JsonStream>
 void ComplexValueWriter<JsonStream>::CollectionElementToJSON(Tuple* item_tuple,
     const SlotDescriptor& slot_desc, bool map_key) {
@@ -91,7 +136,8 @@ void ComplexValueWriter<JsonStream>::CollectionElementToJSON(Tuple* item_tuple,
   if (element_is_null) {
     WriteNull(map_key);
   } else if (element_type.IsStructType()) {
-    DCHECK(false) << "Structs in collections are not supported yet.";
+    DCHECK(!map_key) << "Structs cannot be map keys.";
+    StructInCollectionToJSON(item_tuple, slot_desc);
   } else if (element_type.IsCollectionType()) {
     const CollectionValue* nested_collection_val =
       reinterpret_cast<CollectionValue*>(element);
@@ -179,18 +225,32 @@ void ComplexValueWriter<JsonStream>::CollectionValueToJSON(
 
 template <class JsonStream>
 void ComplexValueWriter<JsonStream>::StructValToJSON(const StructVal& struct_val,
-    const ColumnType& column_type) {
-  DCHECK(column_type.type == TYPE_STRUCT);
-  DCHECK_EQ(struct_val.num_children, column_type.children.size());
+    const SlotDescriptor& slot_desc) {
+  const ColumnType& struct_type = slot_desc.type();
+  DCHECK(struct_type.type == TYPE_STRUCT);
+  DCHECK_EQ(struct_val.num_children, struct_type.children.size());
+
+  const TupleDescriptor* children_item_tuple_desc = slot_desc.children_tuple_descriptor();
+  DCHECK(children_item_tuple_desc != nullptr);
+  const std::vector<SlotDescriptor*>& child_slot_descs =
+      children_item_tuple_desc->slots();
+  DCHECK_EQ(struct_val.num_children, child_slot_descs.size());
+
   writer_->StartObject();
   for (int i = 0; i < struct_val.num_children; ++i) {
-    writer_->String(column_type.field_names[i].c_str());
+    writer_->String(struct_type.field_names[i].c_str());
     void* child = (void*)(struct_val.ptr[i]);
-    const ColumnType& child_type = column_type.children[i];
+    const SlotDescriptor& child_slot_desc = *child_slot_descs[i];
+    const ColumnType& child_type = struct_type.children[i];
+    DCHECK_EQ(child_type, child_slot_desc.type());
     if (child == nullptr) {
       WriteNull(false);
     } else if (child_type.IsStructType()) {
-      StructValToJSON(*((StructVal*)child), child_type);
+      StructValToJSON(*((StructVal*)child), child_slot_desc);
+    } else if (child_type.IsCollectionType()) {
+      CollectionValue* collection_child = reinterpret_cast<CollectionValue*>(child);
+      ComplexValueWriter::CollectionValueToJSON(*collection_child, child_type.type,
+          child_slot_desc.children_tuple_descriptor());
     } else {
       PrimitiveValueToJSON(child, child_type, false);
     }

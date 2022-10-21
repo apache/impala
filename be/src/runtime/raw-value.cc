@@ -301,7 +301,7 @@ void RawValue::PrintValue(
     case TYPE_BOOLEAN: {
       bool val = *reinterpret_cast<const bool*>(value);
       *stream << (val ? "true" : "false");
-      return;
+      break;
     }
     case TYPE_TINYINT:
       // Extra casting for chars since they should not be interpreted as ASCII.
@@ -410,12 +410,4 @@ template void RawValue::WritePrimitive<true>(const void* value, Tuple* tuple,
 template void RawValue::WritePrimitive<false>(const void* value, Tuple* tuple,
       const SlotDescriptor* slot_desc, MemPool* pool,
       std::vector<StringValue*>* string_values);
-
-bool PrintNestedValueIfNull(const SlotDescriptor& slot_desc, Tuple* item,
-    stringstream* stream) {
-  bool is_null = item->IsNull(slot_desc.null_indicator_offset());
-  if (is_null) *stream << RawValue::NullLiteral(false);
-  return is_null;
-}
-
 }

@@ -26,6 +26,7 @@
 #include "common/logging.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/slot-ref.h"
 #include "gen-cpp/TCLIService_constants.h"
 #include "runtime/date-value.h"
 #include "runtime/complex-value-writer.inline.h"
@@ -371,7 +372,8 @@ static void DecimalExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
 
 static void StructExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     const TColumnType& type, RowBatch* batch, int start_idx, int num_rows,
-    uint32_t output_row_idx, apache::hive::service::cli::thrift::TColumn* column) {
+    uint32_t output_row_idx, bool stringify_map_keys,
+    apache::hive::service::cli::thrift::TColumn* column) {
   DCHECK(type.types.size() > 1);
   ReserveSpace(num_rows, output_row_idx, &column->stringVal);
   // The buffer used by rapidjson::Writer. We reuse it to eliminate allocations.
@@ -381,16 +383,19 @@ static void StructExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     if (struct_val.is_null) {
       column->stringVal.values.emplace_back();
     } else {
-      int idx = 0;
-      ColumnType column_type(type.types, &idx);
+      const impala::ScalarExpr& scalar_expr = expr_eval->root();
+      // Currently scalar_expr can be only a slot ref as no functions return arrays.
+      DCHECK(scalar_expr.IsSlotRef());
+      const SlotDescriptor* slot_desc =
+          static_cast<const SlotRef&>(scalar_expr).GetSlotDescriptor();
+      DCHECK(slot_desc != nullptr);
 
       buffer.Clear();
       rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
 
-      // TODO: Create a stringify_map_keys parameter and pass that when
-      // "IMPALA-9551: Allow mixed complex types in select list" is done.
-      ComplexValueWriter<rapidjson::StringBuffer> complex_value_writer(&writer, false);
-      complex_value_writer.StructValToJSON(struct_val, column_type);
+      ComplexValueWriter<rapidjson::StringBuffer> complex_value_writer(&writer,
+          stringify_map_keys);
+      complex_value_writer.StructValToJSON(struct_val, *slot_desc);
 
       column->stringVal.values.emplace_back(buffer.GetString());
     }
@@ -451,8 +456,8 @@ void impala::ExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
   // to inline the expression evaluation into the loop body.
   switch (type.types[0].type) {
     case TTypeNodeType::STRUCT:
-      StructExprValuesToHS2TColumn(
-          expr_eval, type, batch, start_idx, num_rows, output_row_idx, column);
+      StructExprValuesToHS2TColumn(expr_eval, type, batch, start_idx, num_rows,
+          output_row_idx, stringify_map_keys, column);
       return;
     case TTypeNodeType::ARRAY:
     case TTypeNodeType::MAP:

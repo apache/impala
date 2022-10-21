@@ -3783,6 +3783,7 @@ map_char_key MAP<CHAR(3), INT>
 map_varchar_key MAP<VARCHAR(3), STRING>
 map_timestamp_key MAP<TIMESTAMP, STRING>
 map_date_key MAP<DATE, STRING>
+struct_contains_map STRUCT<m: MAP<INT, STRING>, s: STRING>
 ---- DEPENDENT_LOAD_HIVE
 INSERT OVERWRITE {db_name}{db_suffix}.{table_name} VALUES
   (1,
@@ -3799,8 +3800,136 @@ INSERT OVERWRITE {db_name}{db_suffix}.{table_name} VALUES
    map(cast("a" as VARCHAR(3)), "A", if(false, cast("" as VARCHAR(3)), NULL), NULL),
    map(to_utc_timestamp("2022-12-10 08:15:12", "UTC"), "Saturday morning",
        if(false, to_utc_timestamp("2022-12-10 08:15:12", "UTC"), NULL), "null"),
-   map(to_date("2022-12-10"), "Saturday", if(false, to_date("2022-12-10"), NULL), "null")
+   map(to_date("2022-12-10"), "Saturday", if(false, to_date("2022-12-10"), NULL), "null"),
+   named_struct("m", map(1, "one", if(false, 1, NULL), "null"), "s", "some_string")
   );
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+collection_struct_mix
+---- COLUMNS
+id INT
+struct_contains_arr STRUCT<arr: ARRAY<INT>>
+struct_contains_map STRUCT<m: MAP<INT, STRING>>
+arr_contains_struct ARRAY<STRUCT<i: BIGINT>>
+arr_contains_nested_struct ARRAY<STRUCT<inner_struct: STRUCT<str: STRING, l: INT>, small: SMALLINT>>
+struct_contains_nested_arr STRUCT<arr: ARRAY<ARRAY<DATE>>, i: INT>
+all_mix MAP<INT, STRUCT<big: STRUCT<arr: ARRAY<STRUCT<inner_arr: ARRAY<ARRAY<INT>>, m: TIMESTAMP>>, n: INT>, small: STRUCT<str: STRING, i: INT>>>
+---- DEPENDENT_LOAD_HIVE
+INSERT OVERWRITE {db_name}{db_suffix}.{table_name} VALUES
+  (
+    1,
+    named_struct("arr", array(1, 2, 3, 4, NULL, NULL, 5)),
+    named_struct("m", map(1, "one", 2, "two", 0, NULL)),
+    array(named_struct("i", 1L), named_struct("i", 2L), named_struct("i", 3L),
+          named_struct("i", 4L), NULL, named_struct("i", 5L), named_struct("i", NULL)),
+    array(named_struct("inner_struct", named_struct("str", "", "l", 0), "small", 2S), NULL,
+          named_struct("inner_struct", named_struct("str", "some_string", "l", 5), "small", 20S)),
+    named_struct("arr", array(array(to_date("2022-12-05"), to_date("2022-12-06"), NULL, to_date("2022-12-07")),
+                              array(to_date("2022-12-08"), to_date("2022-12-09"), NULL)), "i", 2),
+    map(
+      10,
+      named_struct(
+        "big", named_struct(
+          "arr", array(
+            named_struct(
+              "inner_arr", array(array(0, NULL, -1, -5, NULL, 8), array(20, NULL)),
+              "m", to_utc_timestamp("2022-12-05 14:30:00", "UTC")
+            ),
+            named_struct(
+              "inner_arr", array(array(12, 1024, NULL), array(NULL, NULL, 84), array(NULL, 15, NULL)),
+              "m", to_utc_timestamp("2022-12-06 16:20:52", "UTC")
+            )
+          ),
+          "n", 98
+        ),
+        "small", named_struct(
+          "str", "somestring",
+          "i", 100
+        )
+      )
+    )
+  ),
+  (
+    2,
+    named_struct("arr", if(false, array(1), NULL)),
+    named_struct("m", if(false, map(1, "one"), NULL)),
+    array(named_struct("i", 100L), named_struct("i", 8L), named_struct("i", 35L),
+          named_struct("i", 45L), NULL, named_struct("i", 193L), named_struct("i", NULL)),
+    array(named_struct("inner_struct", if(false, named_struct("str", "", "l", 0), NULL), "small", 104S),
+          named_struct("inner_struct", named_struct("str", "aaa", "l", 28), "small", 105S), NULL),
+    named_struct("arr", array(array(to_date("2022-12-10"), to_date("2022-12-11"), NULL, to_date("2022-12-12")),
+                              if(false, array(to_date("2022-12-12")), NULL)), "i", 2754),
+    map(
+      20,
+      named_struct(
+        "big", named_struct(
+          "arr", array(
+            if(false, named_struct(
+              "inner_arr", array(array(0)),
+              "m", to_utc_timestamp("2022-12-10 08:01:05", "UTC")
+            ), NULL),
+            named_struct(
+              "inner_arr", array(array(12, 1024, NULL), array(NULL, NULL, 84), array(NULL, 15, NULL)),
+              "m", to_utc_timestamp("2022-12-10 08:15:12", "UTC")
+            )
+          ),
+          "n", 95
+        ),
+        "small", named_struct(
+          "str", "otherstring",
+          "i", 2048
+        )
+      ),
+      21,
+      named_struct(
+        "big", named_struct(
+          "arr", if(false, array(
+            named_struct(
+              "inner_arr", array(array(0, NULL, -1, -5, NULL, 8), array(20, NULL)),
+              "m", to_utc_timestamp("2022-12-15 05:46:24", "UTC")
+            )
+          ), NULL),
+          "n", 8
+        ),
+        "small", named_struct(
+          "str", "textstring",
+          "i", 0
+        )
+      ),
+      22,
+      named_struct(
+        "big", if(false, named_struct(
+          "arr", array(
+            named_struct(
+              "inner_arr", array(array(0)),
+              "m", if(false, to_utc_timestamp("2022-12-15 05:46:24", "UTC"), NULL)
+            )
+          ),
+          "n", 93
+        ), NULL),
+        "small", named_struct(
+          "str", "nextstring",
+          "i", 128
+        )
+      ),
+      23,
+      NULL
+    )
+  );
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+collection_struct_mix_view
+---- CREATE
+SET disable_codegen=1;
+DROP VIEW IF EXISTS {db_name}{db_suffix}.{table_name};
+CREATE VIEW {db_name}{db_suffix}.{table_name}
+AS SELECT id, arr_contains_struct, arr_contains_nested_struct, struct_contains_nested_arr FROM {db_name}{db_suffix}.collection_struct_mix;
 ---- LOAD
 ====
 ---- DATASET

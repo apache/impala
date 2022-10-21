@@ -44,15 +44,17 @@ class ComplexValueWriter {
   void CollectionValueToJSON(const CollectionValue& collection_value,
       PrimitiveType collection_type, const TupleDescriptor* item_tuple_desc);
 
-  // Gets a non-null StructVal and writes it in JSON format. Uses 'column_type' to figure
+  // Gets a non-null StructVal and writes it in JSON format. Uses 'slot_desc' to figure
   // out field names and types. This function can call itself recursively in case of
   // nested structs.
   void StructValToJSON(const impala_udf::StructVal& struct_val,
-      const ColumnType& column_type);
+      const SlotDescriptor& slot_desc);
 
  private:
   void PrimitiveValueToJSON(void* value, const ColumnType& type, bool map_key);
   void WriteNull(bool map_key);
+  void StructInCollectionToJSON(Tuple* item_tuple,
+      const SlotDescriptor& struct_slot_desc);
   void CollectionElementToJSON(Tuple* item_tuple, const SlotDescriptor& slot_desc,
       bool map_key);
   void ArrayValueToJSON(const CollectionValue& array_value,

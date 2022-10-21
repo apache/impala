@@ -597,16 +597,6 @@ where alltypes in (select alltypes from functional_parquet.complextypes_structs)
 AnalysisException: A subquery can't return complex types. (SELECT alltypes FROM functional_parquet.complextypes_structs)
 ====
 ---- QUERY
-select tbl.nested_struct from complextypestbl tbl;
----- CATCH
-AnalysisException: Struct containing a collection type is not allowed in the select list.
-====
----- QUERY
-select tbl.nested_struct.c from complextypestbl tbl;
----- CATCH
-AnalysisException: Struct containing a collection type is not allowed in the select list.
-====
----- QUERY
 # Unioning structs is not supported.
 # IMPALA-10752
 select id, tiny_struct from complextypes_structs
@@ -635,16 +625,4 @@ select id, tiny_struct from complextypes_structs
 order by 3
 ---- CATCH
 AnalysisException: ORDER BY: ordinal exceeds the number of items in the SELECT list: 3
-====
----- QUERY
-# Structs inside arrays are not yet supported.
-select nested_struct.c.d from complextypestbl;
----- CATCH
-AnalysisException: STRUCT type inside collection types is not supported.
-====
----- QUERY
-# Structs inside maps are not yet supported.
-select nested_struct.g from complextypestbl;
----- CATCH
-AnalysisException: STRUCT type inside collection types is not supported.
 ====

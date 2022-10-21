@@ -352,17 +352,17 @@ TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
 
 void TupleDescriptor::AddSlot(SlotDescriptor* slot) {
   slots_.push_back(slot);
+  // If this is a tuple for struct children then we populate the 'string_slots_' field (in
+  // case of a var len string type) or the 'collection_slots_' field (in case of a
+  // collection type) of the topmost tuple and not this one.
+  TupleDescriptor* const target_tuple = isTupleOfStructSlot() ? master_tuple_ : this;
   if (slot->type().IsVarLenStringType()) {
-    TupleDescriptor* target_tuple = this;
-    // If this is a tuple for struct children then we populate the 'string_slots_' of
-    // the topmost tuple and not this one.
-    if (isTupleOfStructSlot()) target_tuple = master_tuple_;
     target_tuple->string_slots_.push_back(slot);
     target_tuple->has_varlen_slots_ = true;
   }
   if (slot->type().IsCollectionType()) {
-    collection_slots_.push_back(slot);
-    has_varlen_slots_ = true;
+    target_tuple->collection_slots_.push_back(slot);
+    target_tuple->has_varlen_slots_ = true;
   }
 }
 

@@ -19,6 +19,7 @@ package org.apache.impala.analysis;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
@@ -98,6 +99,13 @@ public class CollectionTableRef extends TableRef {
     InlineViewRef sourceView = null;
     if (resolvedPath_.getRootDesc() != null) {
       sourceView = resolvedPath_.getRootDesc().getSourceView();
+    }
+    if (zippingUnnestType_ == ZippingUnnestType.FROM_CLAUSE_ZIPPING_UNNEST) {
+      UnnestExpr.verifyNotInsideStruct(resolvedPath_);
+
+      Type type = resolvedPath_.getMatchedTypes().get(
+          resolvedPath_.getMatchedTypes().size() - 1);
+      UnnestExpr.verifyContainsNoStruct(type);
     }
     if (sourceView != null && zippingUnnestType_ ==
         ZippingUnnestType.FROM_CLAUSE_ZIPPING_UNNEST) {
