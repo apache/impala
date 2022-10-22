@@ -6,16 +6,16 @@ WITH cte1
     AS (SELECT  c1,
                 c2,
                 orderkey
-         FROM   (SELECT Repeat(Group_concat(o_comment, o_comment), 20) AS c1,
-                        Repeat(Group_concat(o_comment, o_comment), 20) AS c2,
+         FROM   (SELECT Repeat(Group_concat(distinct o_clerk, '|'), 200) AS c1,
+                        Repeat(Group_concat(distinct o_clerk, '|'), 200) AS c2,
                         o_orderkey % 700                               AS
                         orderkey
                 FROM   orders
                 WHERE  o_orderkey < 800000000
                 GROUP  BY orderkey
                 UNION ALL
-                SELECT  Repeat(Group_concat(o_comment, o_comment), 20) AS c1,
-                        Repeat(Group_concat(o_comment, o_comment), 20) AS c2,
+                SELECT  Repeat(Group_concat(distinct o_clerk, '|'), 200) AS c1,
+                        Repeat(Group_concat(distinct o_clerk, '|'), 200) AS c2,
                         o_orderkey % 700                               AS
                         orderkey
                 FROM    orders
@@ -40,7 +40,7 @@ FROM   cte1 t1
        JOIN /* +shuffle */ cte2 t2
          ON t1.orderkey = t2.orderkey
 ---- RESULTS
-703,4251520,4251520,30,30
+703,2905400,2905400,30,30
 ---- TYPES
 BIGINT, INT, INT, INT, INT
 ---- RUNTIME_PROFILE
