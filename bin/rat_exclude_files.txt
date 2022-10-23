@@ -104,6 +104,7 @@ README*.md
 */README.dox
 */README.txt
 testdata/bin/README-BENCHMARK-TEST-GENERATION
+testdata/scale_test_metadata/README.md
 tests/comparison/ORACLE.txt
 bin/distcc/README.md
 tests/comparison/POSTGRES.txt

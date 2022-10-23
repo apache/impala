@@ -47,6 +47,8 @@ DECLARE_int32(state_store_port);
 
 DECLARE_int32(beeswax_port);
 
+DECLARE_int32(thrift_rpc_max_message_size);
+
 static string IMPALA_HOME(getenv("IMPALA_HOME"));
 static const string& SERVER_CERT =
     Substitute("$0/be/src/testutil/server-cert.pem", IMPALA_HOME);
@@ -144,6 +146,38 @@ TEST(ThriftTestBase, Connectivity) {
 
   // Test that client recovers from failure to connect.
   ASSERT_OK(wrong_port_client.Open());
+}
+
+void TestMaxMessageSize(std::string subscriber_id, bool expect_throw) {
+  auto s = ScopedFlagSetter<int>::Make(&FLAGS_thrift_rpc_max_message_size, 128 * 1024);
+  int port = GetServerPort();
+  ThriftServer* server;
+  EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port).Build(&server));
+  ASSERT_OK(server->Start());
+
+  ThriftClient<StatestoreServiceClientWrapper> client(
+      "localhost", port, "", nullptr, false);
+  ASSERT_OK(client.Open());
+  TRegisterSubscriberRequest req;
+  TRegisterSubscriberResponse resp;
+  bool send_done = false;
+
+  req.subscriber_id = subscriber_id;
+  if (expect_throw) {
+    EXPECT_THROW(
+        client.iface()->RegisterSubscriber(resp, req, &send_done), TTransportException);
+  } else {
+    EXPECT_NO_THROW(client.iface()->RegisterSubscriber(resp, req, &send_done));
+  }
+}
+
+TEST(ThriftTestBase, MaxMessageSizeFit) {
+  TestMaxMessageSize("dummy_id", false);
+}
+
+TEST(ThriftTestBase, MaxMessageSizeExceeded) {
+  std::string long_id(256 * 1024, 'a');
+  TestMaxMessageSize(long_id, true);
 }
 
 TEST_P(ThriftKerberizedParamsTest, SslConnectivity) {

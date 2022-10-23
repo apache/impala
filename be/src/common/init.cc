@@ -78,6 +78,7 @@ DECLARE_string(re2_mem_limit);
 DECLARE_string(reserved_words_version);
 DECLARE_bool(symbolize_stacktrace);
 DECLARE_string(debug_actions);
+DECLARE_int32(thrift_rpc_max_message_size);
 
 DEFINE_int32(memory_maintenance_sleep_time_ms, 10000, "Sleep time in milliseconds "
     "between memory maintenance iterations");
@@ -357,6 +358,13 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
         " be one of [\"2.11.0\", \"3.0.0\"], while the provided value is $0.",
         FLAGS_reserved_words_version));
   }
+
+  if (!impala::TestInfo::is_test() && FLAGS_thrift_rpc_max_message_size > 0
+      && FLAGS_thrift_rpc_max_message_size < ThriftDefaultMaxMessageSize()) {
+    CLEAN_EXIT_WITH_ERROR(Substitute("thrift_rpc_max_message_size must be >= $0 or <= 0.",
+        ThriftDefaultMaxMessageSize()));
+  }
+
   impala::InitGoogleLoggingSafe(argv[0]);
   // Breakpad needs flags and logging to initialize.
   if (!external_fe) {

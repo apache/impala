@@ -139,6 +139,7 @@ Status ThriftClientImpl::CreateSocket() {
       return Status(TErrorCode::SSL_SOCKET_CREATION_FAILED, e.what());
     }
   }
+  if (socket_ != nullptr) AssignDefaultTConfiguration(socket_.get());
 
   return Status::OK();
 }

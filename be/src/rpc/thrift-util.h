@@ -24,6 +24,7 @@
 #include <sstream>
 #include <vector>
 #include <thrift/TApplicationException.h>
+#include <thrift/TConfiguration.h>
 #include <thrift/protocol/TDebugProtocol.h>
 #include <thrift/transport/TBufferTransports.h>
 #include <thrift/transport/TSSLSocket.h>
@@ -168,6 +169,16 @@ bool IsPeekTimeoutTException(const apache::thrift::transport::TTransportExceptio
 /// Returns true if the exception indicates the other end of the TCP socket was closed.
 bool IsConnResetTException(const apache::thrift::transport::TTransportException& e);
 
+inline int ThriftDefaultMaxMessageSize() {
+  return apache::thrift::TConfiguration::DEFAULT_MAX_MESSAGE_SIZE;
+}
+
+/// Return the default Thrift's TConfiguration based on given backend config flags.
+std::shared_ptr<apache::thrift::TConfiguration> DefaultTConfiguration();
+
+/// Assign given TTransport with the default TConfiguration and update the known message
+/// size accordingly.
+void AssignDefaultTConfiguration(apache::thrift::transport::TTransport* transport);
 }
 
 #endif

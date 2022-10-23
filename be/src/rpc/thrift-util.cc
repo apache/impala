@@ -17,6 +17,7 @@
 
 #include "rpc/thrift-util.h"
 
+#include <gtest/gtest.h>
 #include <thrift/config.h>
 
 #include "kudu/security/security_flags.h"
@@ -44,6 +45,7 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wstring-plus-int"
 #include <gutil/strings/substitute.h>
+#include <thrift/TConfiguration.h>
 #include <thrift/Thrift.h>
 #include <thrift/transport/TSocket.h>
 #include <thrift/transport/TServerSocket.h>
@@ -53,6 +55,11 @@
 #pragma clang diagnostic pop
 
 #include "common/names.h"
+
+DEFINE_int32(thrift_rpc_max_message_size, (1024 * 1024 * 1024),
+    "The maximum size of a message that any RPC that the server will accept. "
+    "Default to 1GB. Setting 0 or negative value will use the default defined in the "
+    "Thrift. The upper limit is 2147483647 bytes.");
 
 using namespace apache::thrift;
 using namespace apache::thrift::transport;
@@ -278,4 +285,18 @@ bool IsConnResetTException(const TTransportException& e) {
              strstr(e.what(), "SSL_read: Connection reset by peer") != nullptr);
 }
 
+shared_ptr<TConfiguration> DefaultTConfiguration() {
+  return make_shared<TConfiguration>(FLAGS_thrift_rpc_max_message_size <= 0 ?
+          ThriftDefaultMaxMessageSize() :
+          FLAGS_thrift_rpc_max_message_size);
+}
+
+void AssignDefaultTConfiguration(TTransport* transport) {
+  // TODO: Find way to assign TConfiguration through TTransportFactory instead.
+  transport->setConfiguration(DefaultTConfiguration());
+  transport->updateKnownMessageSize(-1);
+  EXPECT_NO_THROW(transport->checkReadBytesAvailable(
+      FLAGS_thrift_rpc_max_message_size <= 0 ? ThriftDefaultMaxMessageSize() :
+                                               FLAGS_thrift_rpc_max_message_size));
+}
 }

@@ -43,6 +43,8 @@ DEFINE_int32(accepted_cnxn_setup_thread_pool_size, 2,
     "post-accept, pre-setup connection queue in each thrift server set up to service "
     "Impala internal and external connections.");
 
+DECLARE_int32(thrift_rpc_max_message_size);
+
 namespace apache {
 namespace thrift {
 namespace server {
@@ -242,6 +244,7 @@ void TAcceptQueueServer::SetupConnection(shared_ptr<TAcceptQueueEntry> entry) {
     // TSaslServerTransport::Factory is not required anymore.
     DCHECK(inputTransportFactory_ == outputTransportFactory_);
     io_transport = inputTransportFactory_->getTransport(client);
+    AssignDefaultTConfiguration(io_transport.get());
 
     shared_ptr<TProtocol> inputProtocol =
         inputProtocolFactory_->getProtocol(io_transport);

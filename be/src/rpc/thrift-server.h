@@ -30,6 +30,7 @@
 #include "common/status.h"
 #include "gen-cpp/Frontend_types.h"
 #include "kudu/security/security_flags.h"
+#include "rpc/thrift-util.h"
 #include "util/condition-variable.h"
 #include "util/metrics-fwd.h"
 #include "util/thread.h"
@@ -76,8 +77,12 @@ class ThriftServer {
         std::shared_ptr<apache::thrift::transport::TTransport> trans) {
       std::shared_ptr<apache::thrift::transport::TTransport> wrapped =
           wrapped_factory_->getTransport(trans);
-      return std::shared_ptr<apache::thrift::transport::TTransport>(
-          new apache::thrift::transport::TBufferedTransport(wrapped, buffer_size_));
+      AssignDefaultTConfiguration(wrapped.get());
+      std::shared_ptr<apache::thrift::transport::TTransport> buffered_wrapped =
+          std::shared_ptr<apache::thrift::transport::TTransport>(
+              new apache::thrift::transport::TBufferedTransport(wrapped, buffer_size_));
+      AssignDefaultTConfiguration(buffered_wrapped.get());
+      return buffered_wrapped;
     }
    private:
     uint32_t buffer_size_;
