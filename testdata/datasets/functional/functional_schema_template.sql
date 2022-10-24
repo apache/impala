@@ -3741,5 +3741,40 @@ values (
   map(cast("key1" as binary), 1, cast("key2" as binary), 2),
   map(1, cast("value1" as binary), 2, cast("value2" as binary)),
   named_struct("i", 0, "b", cast("member" as binary))
-  )
+  );
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+insert_only_minor_compacted
+---- COLUMNS
+id bigint
+---- DEPENDENT_LOAD_HIVE
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} VALUES (1);
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} VALUES (2);
+ALTER TABLE {db_name}{db_suffix}.{table_name} compact 'minor' AND WAIT;
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} VALUES (3);
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} VALUES (4);
+---- TABLE_PROPERTIES
+transactional=true
+transactional_properties=insert_only
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+insert_only_major_and_minor_compacted
+---- COLUMNS
+id bigint
+---- DEPENDENT_LOAD_HIVE
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} VALUES (1);
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} VALUES (2);
+ALTER TABLE {db_name}{db_suffix}.{table_name} compact 'major' AND WAIT;
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} VALUES (3);
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} VALUES (4);
+ALTER TABLE {db_name}{db_suffix}.{table_name} compact 'minor' AND WAIT;
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} VALUES (5);
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} VALUES (6);
+---- TABLE_PROPERTIES
+transactional=true
+transactional_properties=insert_only
 ====

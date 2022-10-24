@@ -146,22 +146,40 @@ public class FileMetadataLoaderTest extends FrontendTestBase {
         relPaths.get(0));
   }
 
+  private FileMetadataLoader getLoaderForAcidTable(
+      String validWriteIdString, String path, HdfsFileFormat format)
+      throws IOException, CatalogException {
+    ListMap<TNetworkAddress> hostIndex = new ListMap<>();
+    ValidWriteIdList writeIds =
+        MetastoreShim.getValidWriteIdListFromString(validWriteIdString);
+    Path tablePath = new Path(path);
+    FileMetadataLoader fml = new FileMetadataLoader(tablePath, /* recursive=*/true,
+        /* oldFds = */ Collections.emptyList(), hostIndex, new ValidReadTxnList(""),
+        writeIds, format);
+    fml.load();
+    return fml;
+  }
+
   @Test
   public void testAcidMinorCompactionLoading() throws IOException, CatalogException {
     //TODO(IMPALA-9042): Remove "throws CatalogException"
-    ListMap<TNetworkAddress> hostIndex = new ListMap<>();
-    ValidWriteIdList writeIds = MetastoreShim.getValidWriteIdListFromString(
-        "functional_orc_def.complextypestbl_minor_compacted:10:10::");
-    Path tablePath = new Path("hdfs://localhost:20500/test-warehouse/managed/" +
-                              "functional_orc_def.db/" +
-                              "complextypestbl_minor_compacted_orc_def/");
-    FileMetadataLoader fml = new FileMetadataLoader(tablePath, /* recursive=*/true,
-        /* oldFds = */ Collections.emptyList(), hostIndex, new ValidReadTxnList(""),
-        writeIds, HdfsFileFormat.ORC);
-    fml.load();
+    FileMetadataLoader fml = getLoaderForAcidTable(
+        "functional_orc_def.complextypestbl_minor_compacted:10:10::",
+        "hdfs://localhost:20500/test-warehouse/managed/functional_orc_def.db/" +
+            "complextypestbl_minor_compacted_orc_def/",
+        HdfsFileFormat.ORC);
     // Only load the compacted file.
     assertEquals(1, fml.getStats().loadedFiles);
     assertEquals(8, fml.getStats().filesSupersededByAcidState);
+
+    fml = getLoaderForAcidTable(
+        "functional_parquet.insert_only_minor_compacted:6:6::",
+        "hdfs://localhost:20500/test-warehouse/managed/functional_parquet.db/" +
+            "insert_only_minor_compacted_parquet/",
+        HdfsFileFormat.PARQUET);
+    // Only load files after compaction.
+    assertEquals(3, fml.getStats().loadedFiles);
+    assertEquals(2, fml.getStats().filesSupersededByAcidState);
   }
 
   @Test

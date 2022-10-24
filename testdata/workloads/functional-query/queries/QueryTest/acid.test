@@ -136,3 +136,28 @@ from functional_orc_def.complextypestbl_minor_compacted;
 ---- TYPES
 BIGINT,BIGINT
 ====
+---- QUERY
+# Test that Impala sees the compacted delta dir in a minor-compacted insert-only table.
+show files in functional_parquet.insert_only_minor_compacted;
+---- LABELS
+Path,Size,Partition
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/managed/functional_parquet.db/insert_only_minor_compacted_parquet/delta_0000001_0000002_v\d+/000000_0','.+B',''
+row_regex:'$NAMENODE/test-warehouse/managed/functional_parquet.db/insert_only_minor_compacted_parquet/delta_0000003_0000003_0000/000000_0','.+B',''
+row_regex:'$NAMENODE/test-warehouse/managed/functional_parquet.db/insert_only_minor_compacted_parquet/delta_0000004_0000004_0000/000000_0','.+B',''
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Test that Impala sees the compacted delta dir in a first major then minor-compacted insert-only table.
+show files in functional_parquet.insert_only_major_and_minor_compacted;
+---- LABELS
+Path,Size,Partition
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/managed/functional_parquet.db/insert_only_major_and_minor_compacted_parquet/base_0000002_v\d+/000000_0','.+B',''
+row_regex:'$NAMENODE/test-warehouse/managed/functional_parquet.db/insert_only_major_and_minor_compacted_parquet/delta_0000003_0000004_v\d+/000000_0','.+B',''
+row_regex:'$NAMENODE/test-warehouse/managed/functional_parquet.db/insert_only_major_and_minor_compacted_parquet/delta_0000005_0000005_0000/000000_0','.+B',''
+row_regex:'$NAMENODE/test-warehouse/managed/functional_parquet.db/insert_only_major_and_minor_compacted_parquet/delta_0000006_0000006_0000/000000_0','.+B',''
+---- TYPES
+STRING,STRING,STRING
+====
