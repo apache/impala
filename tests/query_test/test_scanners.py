@@ -35,7 +35,6 @@ from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import (
     SkipIf,
     SkipIfFS,
-    SkipIfEC,
     SkipIfHive2,
     SkipIfHive3,
     SkipIfLocal,
@@ -721,9 +720,8 @@ class TestParquet(ImpalaTestSuite):
     assert len(result.data) == 1
     assert "AAAAAAAACPKFFAAA" in result.data
 
-  @SkipIfFS.hdfs_block_size
+  @SkipIfFS.hdfs_small_block
   @SkipIfLocal.multiple_impalad
-  @SkipIfEC.fix_later
   def test_misaligned_parquet_row_groups(self, vector):
     """IMPALA-3989: Test that no warnings are issued when misaligned row groups are
     encountered. Make sure that 'NumScannersWithNoReads' counters are set to the number of
@@ -775,9 +773,8 @@ class TestParquet(ImpalaTestSuite):
       total += int(n)
     assert total == num_scanners_with_no_reads
 
-  @SkipIfFS.hdfs_block_size
+  @SkipIfFS.hdfs_small_block
   @SkipIfLocal.multiple_impalad
-  @SkipIfEC.fix_later
   def test_multiple_blocks_mt_dop(self, vector):
     """Sanity check for MT scan nodes to make sure all blocks from the same file are read.
     2 scan ranges per node should be created to read 'lineitem_sixblocks' because
@@ -821,9 +818,8 @@ class TestParquet(ImpalaTestSuite):
     finally:
       self.client.clear_configuration()
 
-  @SkipIfFS.hdfs_block_size
+  @SkipIfFS.hdfs_small_block
   @SkipIfLocal.multiple_impalad
-  @SkipIfEC.fix_later
   def test_multiple_blocks(self, vector):
     # For IMPALA-1881. The table functional_parquet.lineitem_multiblock has 3 blocks, so
     # each impalad should read 1 scan range.
@@ -834,9 +830,8 @@ class TestParquet(ImpalaTestSuite):
     # there are 6 blocks and 3 scan nodes.
     self._multiple_blocks_helper(table_name, 40000, ranges_per_node=2)
 
-  @SkipIfFS.hdfs_block_size
+  @SkipIfFS.hdfs_small_block
   @SkipIfLocal.multiple_impalad
-  @SkipIfEC.fix_later
   def test_multiple_blocks_one_row_group(self, vector):
     # For IMPALA-1881. The table functional_parquet.lineitem_multiblock_one_row_group has
     # 3 blocks but only one row group across these blocks. We test to see that only one
@@ -1573,8 +1568,7 @@ class TestOrc(ImpalaTestSuite):
       lambda v: v.get_value('table_format').file_format == 'orc')
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('orc_schema_resolution', 0, 1))
 
-  @SkipIfFS.hdfs_block_size
-  @SkipIfEC.fix_later
+  @SkipIfFS.hdfs_small_block
   @SkipIfLocal.multiple_impalad
   def test_misaligned_orc_stripes(self, vector, unique_database):
     self._build_lineitem_table_helper(unique_database, 'lineitem_threeblocks',

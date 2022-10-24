@@ -24,6 +24,7 @@ import os
 import pipes
 from subprocess import check_call
 from tests.common.impala_cluster import ImpalaCluster
+from tests.util.filesystem_utils import IS_EC
 from threading import Event, Thread
 
 IMPALA_HOME = os.environ["IMPALA_HOME"]
@@ -255,6 +256,8 @@ class AutoScaler(object):
         "-vmodule=admission-controller=3,cluster-membership-mgr=3",
         "-admission_control_slots=%s" % executor_slots,
         "-shutdown_grace_period_s=2"]
+    if IS_EC:
+      impalad_args.append("--default_query_options=allow_erasure_coded_files=true")
 
     options += ["--impalad_args=%s" % a for a in impalad_args]
 

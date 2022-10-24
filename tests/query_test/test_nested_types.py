@@ -21,7 +21,7 @@ import pytest
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfFS, SkipIfEC, SkipIfHive2, SkipIfNotHdfsMinicluster
+from tests.common.skip import SkipIfFS, SkipIfHive2, SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (create_exec_option_dimension,
     create_exec_option_dimension_from_dict, create_client_protocol_dimension,
     create_orc_dimension, orc_schema_resolution_constraint)
@@ -300,7 +300,6 @@ class TestNestedTypesNoMtDop(ImpalaTestSuite):
     self.run_test_case('QueryTest/nested-types-tpch-errors',
                        vector, use_db='tpch_nested' + db_suffix)
 
-  @SkipIfEC.fix_later
   def test_parquet_stats(self, vector):
     """Queries that test evaluation of Parquet row group statistics."""
     if vector.get_value('table_format').file_format == 'orc':

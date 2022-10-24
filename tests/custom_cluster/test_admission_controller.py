@@ -437,7 +437,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
                        ".* is greater than pool max mem resources 10.00 MB", str(ex))
 
   @SkipIfFS.hdfs_block_size
-  @SkipIfEC.fix_later
+  @SkipIfEC.parquet_file_size
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=1,

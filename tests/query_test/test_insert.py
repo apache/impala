@@ -25,7 +25,7 @@ from testdata.common import widetable
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import (SkipIfFS, SkipIfEC, SkipIfLocal, SkipIfHive2,
+from tests.common.skip import (SkipIfFS, SkipIfLocal, SkipIfHive2,
     SkipIfNotHdfsMinicluster)
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
@@ -133,8 +133,6 @@ class TestInsertQueries(ImpalaTestSuite):
     super(TestInsertQueries, cls).setup_class()
 
   @UniqueDatabase.parametrize(sync_ddl=True)
-  # Erasure coding doesn't respect memory limit
-  @SkipIfEC.fix_later
   # ABFS partition names cannot end in periods
   @SkipIfFS.file_or_folder_name_ends_with_period
   def test_insert(self, vector, unique_database):

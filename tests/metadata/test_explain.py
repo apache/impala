@@ -26,7 +26,6 @@ from tests.util.filesystem_utils import WAREHOUSE
 # Tests the different explain levels [0-3] on a few queries.
 # TODO: Clean up this test to use an explain level test dimension and appropriate
 # result sub-sections for the expected explain plans.
-@SkipIfEC.fix_later
 class TestExplain(ImpalaTestSuite):
   # Value for the num_scanner_threads query option to ensure that the memory estimates of
   # scan nodes are consistent even when run on machines with different numbers of cores.
@@ -53,18 +52,21 @@ class TestExplain(ImpalaTestSuite):
     self.run_test_case('QueryTest/explain-level0', vector)
 
   @SkipIfNotHdfsMinicluster.plans
+  @SkipIfEC.contain_full_explain
   def test_explain_level1(self, vector):
     vector.get_value('exec_option')['num_scanner_threads'] = self.NUM_SCANNER_THREADS
     vector.get_value('exec_option')['explain_level'] = 1
     self.run_test_case('QueryTest/explain-level1', vector)
 
   @SkipIfNotHdfsMinicluster.plans
+  @SkipIfEC.contain_full_explain
   def test_explain_level2(self, vector):
     vector.get_value('exec_option')['num_scanner_threads'] = self.NUM_SCANNER_THREADS
     vector.get_value('exec_option')['explain_level'] = 2
     self.run_test_case('QueryTest/explain-level2', vector)
 
   @SkipIfNotHdfsMinicluster.plans
+  @SkipIfEC.contain_full_explain
   def test_explain_level3(self, vector):
     vector.get_value('exec_option')['num_scanner_threads'] = self.NUM_SCANNER_THREADS
     vector.get_value('exec_option')['explain_level'] = 3

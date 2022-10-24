@@ -120,8 +120,7 @@ class TestMtDopParquet(ImpalaTestSuite):
     vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/mt-dop-parquet-nested', vector)
 
-  # Impala scans fewer row groups than it should with erasure coding.
-  @SkipIfEC.fix_later
+  @SkipIfEC.parquet_file_size
   def test_parquet_filtering(self, vector):
     """IMPALA-4624: Test that dictionary filtering eliminates row groups correctly."""
     vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')

@@ -34,7 +34,7 @@ class TestResourceLimits(ImpalaTestSuite):
         create_parquet_dimension(cls.get_workload()))
 
   @SkipIfLocal.multiple_impalad
-  @SkipIfEC.fix_later
+  @SkipIfEC.parquet_file_size
   def test_thread_limits(self, vector):
     # Remove option from vector to allow test file to override it per query.
     del vector.get_value('exec_option')['num_nodes']

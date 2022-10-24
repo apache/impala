@@ -25,15 +25,14 @@ from subprocess import check_call
 from tests.common.environ import build_flavor_timeout, IS_DOCKERIZED_TEST_CLUSTER
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
-from tests.common.skip import SkipIfFS, SkipIfEC, SkipIfDockerizedCluster
+from tests.common.skip import SkipIfFS, SkipIfDockerizedCluster
 from tests.common.test_dimensions import create_single_exec_option_dimension
-from tests.util.filesystem_utils import get_fs_path
+from tests.util.filesystem_utils import get_fs_path, IS_EC
 from tests.util.shell_util import exec_process
 
 
 # End to end test that hdfs caching is working.
 @SkipIfFS.hdfs_caching  # missing coverage: verify SET CACHED gives error
-@SkipIfEC.fix_later
 class TestHdfsCaching(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -83,6 +82,8 @@ class TestHdfsCaching(ImpalaTestSuite):
 
     if IS_DOCKERIZED_TEST_CLUSTER:
       assert num_metrics_increased == 0, "HDFS caching is disabled in dockerised cluster."
+    elif IS_EC:
+      assert num_metrics_increased == 0, "HDFS caching is disabled with erasure coding."
     elif num_metrics_increased != 1:
       # Test failed, print the metrics
       for i in range(0, len(cached_bytes_before)):

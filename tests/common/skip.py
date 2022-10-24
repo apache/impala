@@ -48,7 +48,11 @@ class SkipIfFS:
   hdfs_caching = pytest.mark.skipif(not IS_HDFS, reason="SET CACHED not implemented")
   hdfs_encryption = pytest.mark.skipif(not IS_HDFS,
       reason="HDFS encryption is not supported")
-  hdfs_block_size = pytest.mark.skipif(not IS_HDFS, reason="uses it's own block size")
+  # EC reports block groups of 3 blocks, and the minimum block size is 1MB.
+  hdfs_small_block = pytest.mark.skipif(not IS_HDFS or IS_EC,
+      reason="Requires tables with 1MB block size")
+  hdfs_block_size = pytest.mark.skipif(not IS_HDFS,
+      reason="Size of block reported to Impala is not ~128MB")
   hdfs_acls = pytest.mark.skipif(not IS_HDFS, reason="HDFS acls are not supported")
   # TODO: IMPALA-11584: see if this can be collapsed into SkipIfNotHdfsMinicluster
   always_remote = pytest.mark.skipif(IS_EC or not (IS_HDFS or IS_OZONE)
@@ -66,7 +70,7 @@ class SkipIfFS:
       reason="IMPALA-10562")
   late_filters = pytest.mark.skipif(IS_ISILON, reason="IMPALA-6998")
   read_past_eof = pytest.mark.skipif(IS_S3 or IS_GCS, reason="IMPALA-2512")
-  large_block_size = pytest.mark.skipif(IS_OZONE,
+  large_block_size = pytest.mark.skipif(IS_OZONE or IS_EC,
       reason="block size is larger than 128MB")
 
   # These need test infra work to re-enable.
@@ -137,15 +141,13 @@ class SkipIfBuildType:
       reason="Test depends on running against a local Impala cluster")
 
 class SkipIfEC:
-  remote_read = pytest.mark.skipif(IS_EC, reason="EC files are read remotely and "
-      "features relying on local read do not work.")
   oom = pytest.mark.skipif(IS_EC, reason="Probably broken by HDFS-13540.")
-  fix_later = pytest.mark.skipif(IS_EC, reason="It should work but doesn't.")
   contain_full_explain = pytest.mark.skipif(IS_EC, reason="Contain full explain output "
               "for hdfs tables.")
-  different_schedule = pytest.mark.skipif(IS_EC, reason="Query is scheduled differently.")
   different_scan_split = pytest.mark.skipif(IS_EC, reason="Scan split of row "
               "groups for Parquet tables created in EC mode is different.")
+  parquet_file_size = pytest.mark.skipif(IS_EC,
+      reason="Fewer parquet files due to large block size, reducing parallelism")
 
 
 class SkipIfDockerizedCluster:

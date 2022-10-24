@@ -24,7 +24,6 @@ from time import sleep, time
 from tests.util.auto_scaler import AutoScaler
 from tests.util.concurrent_workload import ConcurrentWorkload
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfEC
 
 LOG = logging.getLogger("test_auto_scaling")
 TOTAL_BACKENDS_METRIC_NAME = "cluster-membership.backends.total"
@@ -66,7 +65,6 @@ class TestAutoScaling(CustomClusterTestSuite):
     LOG.info("Current running queries: %s", running_queries)
     return running_queries
 
-  @SkipIfEC.fix_later
   def test_single_workload(self):
     """This test exercises the auto-scaling logic in the admission controller. It spins up
     a base cluster (coordinator, catalog, statestore), runs a workload to initiate a
@@ -121,7 +119,6 @@ class TestAutoScaling(CustomClusterTestSuite):
       LOG.info("Stopping auto scaler")
       auto_scaler.stop()
 
-  @SkipIfEC.fix_later
   def test_single_group_maxed_out(self):
     """This test starts an auto scaler and limits it to a single executor group. It then
     makes sure that the query throughput does not exceed the expected limit."""
@@ -181,7 +178,6 @@ class TestAutoScaling(CustomClusterTestSuite):
       LOG.info("Stopping auto scaler")
       auto_scaler.stop()
 
-  @SkipIfEC.fix_later
   def test_sequential_startup(self):
     """This test starts an executor group sequentially and observes that no queries are
     admitted until the group has been fully started."""

@@ -49,13 +49,14 @@ def _get_rpc_fail_action(port):
 def _get_disk_fail_action(port):
   return "IMPALA_TMP_FILE_WRITE:127.0.0.1:{port}:FAIL".format(port=port)
 
+
 # All tests in this class have SkipIfEC because all tests run a query and expect
 # the query to be retried when killing a random impalad. On EC this does not always work
 # because many queries that might run on three impalads for HDFS / S3 builds, might only
 # run on two instances on EC builds. The difference is that EC creates smaller tables
 # compared to data stored on HDFS / S3. If the query is only run on two instances, then
 # randomly killing one impalad won't necessarily trigger a retry of the query.
-@SkipIfEC.fix_later
+@SkipIfEC.parquet_file_size
 class TestQueryRetries(CustomClusterTestSuite):
 
   # A query that shuffles a lot of data. Useful when testing query retries since it
