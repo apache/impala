@@ -459,6 +459,7 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
   if (IsS3APath(tmp_hdfs_file_name_cstr) ||
       IsABFSPath(tmp_hdfs_file_name_cstr) ||
       IsADLSPath(tmp_hdfs_file_name_cstr) ||
+      IsOSSPath(tmp_hdfs_file_name_cstr) ||
       IsGcsPath(tmp_hdfs_file_name_cstr) ||
       IsCosPath(tmp_hdfs_file_name_cstr) ||
       IsSFSPath(tmp_hdfs_file_name_cstr) ||

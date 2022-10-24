@@ -119,7 +119,7 @@ fi
 TIMEOUT_PID=$!
 
 SCHEMA_MISMATCH_ERROR="A schema change has been detected in the metadata, "
-SCHEMA_MISMATCH_ERROR+="but it cannot be loaded on Isilon, s3, gcs, cos or local "
+SCHEMA_MISMATCH_ERROR+="but it cannot be loaded on Isilon, s3, gcs, cos, oss or local "
 SCHEMA_MISMATCH_ERROR+="filesystem, and the filesystem is ${TARGET_FILESYSTEM}".
 
 if [[ $SKIP_METADATA_LOAD -eq 0  && "$SNAPSHOT_FILE" = "" ]]; then
@@ -135,10 +135,10 @@ elif [ $SKIP_SNAPSHOT_LOAD -eq 0 ]; then
   if ! ${IMPALA_HOME}/testdata/bin/check-schema-diff.sh; then
     if [[ "${TARGET_FILESYSTEM}" == "isilon" || "${TARGET_FILESYSTEM}" == "s3" || \
           "${TARGET_FILESYSTEM}" == "local" || "${TARGET_FILESYSTEM}" == "gs" || \
-          "${TARGET_FILESYSTEM}" == "cosn" ]] ; then
+          "${TARGET_FILESYSTEM}" == "cosn" || "${TARGET_FILESYSTEM}" == "oss" ]] ; then
       echo "ERROR in $0 at line $LINENO: A schema change has been detected in the"
-      echo "metadata, but it cannot be loaded on isilon, s3, gcs, cos or local and the"
-      echo "target file system is ${TARGET_FILESYSTEM}.  Exiting."
+      echo "metadata, but it cannot be loaded on isilon, s3, gcs, cos, oss or local"
+      echo "and the target file system is ${TARGET_FILESYSTEM}.  Exiting."
       # Generate an explicit JUnitXML symptom report here for easier triaging
       ${IMPALA_HOME}/bin/generate_junitxml.py --phase=dataload \
           --step=check-schema-diff.sh --error "${SCHEMA_MISMATCH_ERROR}"

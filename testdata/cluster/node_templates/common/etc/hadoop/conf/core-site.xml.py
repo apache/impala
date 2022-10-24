@@ -108,6 +108,16 @@ CONFIG = {
   'fs.cosn.bucket.region': '${COS_REGION}',
   'fs.cosn.impl': 'org.apache.hadoop.fs.CosFileSystem',
   'fs.AbstractFileSystem.cosn.impl': 'org.apache.hadoop.fs.CosN',
+
+   # OSS configuration
+   # Note: This is needed even when not running on OSS, because some frontend tests
+   # include OSS paths that require initializing an OSS filesystem.
+   # See ExplainTest.testScanNodeFsScheme().
+   'fs.oss.accessKeyId': '${OSS_ACCESS_KEY_ID}',
+   'fs.oss.accessKeySecret': '${OSS_SECRET_ACCESS_KEY}',
+   'fs.oss.endpoint': '${OSS_ACCESS_ENDPOINT}',
+   'fs.oss.impl': 'org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem',
+   'fs.AbstractFileSystem.oss.impl': 'org.apache.hadoop.fs.aliyun.oss.OSS',
 }
 
 if target_filesystem == 's3':

@@ -69,6 +69,7 @@ from tests.util.filesystem_utils import (
     IS_ADLS,
     IS_GCS,
     IS_COS,
+    IS_OSS,
     IS_HDFS,
     S3_BUCKET_NAME,
     S3GUARD_ENABLED,
@@ -271,6 +272,9 @@ class ImpalaTestSuite(BaseTestSuite):
     elif IS_COS:
       # COS is implemented via HDFS command line client
       cls.filesystem_client = HadoopFsCommandLineClient("COS")
+    elif IS_OSS:
+      # OSS is implemented via HDFS command line client
+      cls.filesystem_client = HadoopFsCommandLineClient("OSS")
     elif IS_OZONE:
       cls.filesystem_client = HadoopFsCommandLineClient("Ozone")
 

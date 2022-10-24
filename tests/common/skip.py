@@ -32,6 +32,7 @@ from tests.util.filesystem_utils import (
     IS_ADLS,
     IS_GCS,
     IS_COS,
+    IS_OSS,
     IS_EC,
     IS_HDFS,
     IS_ISILON,
@@ -64,9 +65,9 @@ class SkipIfFS:
       reason="Empty directories are not supported on S3")
   file_or_folder_name_ends_with_period = pytest.mark.skipif(IS_ABFS,
       reason="ABFS does not support file / directories that end with a period")
-  stress_insert_timeouts = pytest.mark.skipif(IS_COS or IS_GCS,
+  stress_insert_timeouts = pytest.mark.skipif(IS_COS or IS_GCS or IS_OSS,
       reason="IMPALA-10563, IMPALA-10773")
-  shutdown_idle_fails = pytest.mark.skipif(IS_COS or IS_GCS,
+  shutdown_idle_fails = pytest.mark.skipif(IS_COS or IS_GCS or IS_OSS,
       reason="IMPALA-10562")
   late_filters = pytest.mark.skipif(IS_ISILON, reason="IMPALA-6998")
   read_past_eof = pytest.mark.skipif(IS_S3 or IS_GCS, reason="IMPALA-2512")
@@ -80,9 +81,9 @@ class SkipIfFS:
       reason="Tests rely on HDFS qualified paths, IMPALA-1872")
   no_partial_listing = pytest.mark.skipif(not IS_HDFS,
       reason="Tests rely on HDFS partial listing.")
-  variable_listing_times = pytest.mark.skipif(IS_S3 or IS_GCS or IS_COS,
+  variable_listing_times = pytest.mark.skipif(IS_S3 or IS_GCS or IS_COS or IS_OSS,
       reason="Flakiness due to unpredictable listing times on S3.")
-  eventually_consistent = pytest.mark.skipif(IS_ADLS or IS_COS,
+  eventually_consistent = pytest.mark.skipif(IS_ADLS or IS_COS or IS_OSS,
       reason="The client is slow to realize changes to file metadata")
 
 class SkipIfKudu:

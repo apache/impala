@@ -178,7 +178,7 @@ public class TestUtils {
    */
   public static final ResultFilter SCAN_NODE_SCHEME_FILTER = new ResultFilter() {
 
-    private final String fsSchemes = "(HDFS|S3|LOCAL|ADLS)";
+    private final String fsSchemes = "(HDFS|S3|LOCAL|ADLS|OSS)";
     private final Pattern scanNodeFsScheme = Pattern.compile("SCAN " + fsSchemes);
     // We don't match the size because the FILE_SIZE_FILTER could remove it
     private final Pattern scanNodeInputMetadata =

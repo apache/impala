@@ -867,6 +867,12 @@ public class HdfsTable extends Table implements FeFsTable {
     // So calling getPermissions() on COS files make no sense. Assume all COS files have
     // READ_WRITE permissions.
     if (FileSystemUtil.isCOSFileSystem(fs)) return true;
+
+    // In OSS, file owner and group are persisted, but the permissions model is not
+    // enforced. Authorization occurs at the level of the entire Aliyun account via Aliyun
+    // Resource Access Management.
+    // The append operation is not supported.
+    if (FileSystemUtil.isOSSFileSystem(fs)) return true;
     return false;
   }
 
