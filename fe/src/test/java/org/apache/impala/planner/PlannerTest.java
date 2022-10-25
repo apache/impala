@@ -20,6 +20,8 @@ package org.apache.impala.planner;
 import static org.junit.Assert.assertEquals;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.ColumnStats;
@@ -46,6 +48,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 
@@ -848,25 +851,33 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testStructFieldSlotSharedWithStruct() throws ImpalaException {
-    // Tests that in the case where a struct and one of its fields are both present in the
-    // select list, no extra slot is generated in the row for the struct field but the
-    // memory of the struct is reused, i.e. the row size is the same as when only the
+    // Tests that in the case where both a struct and some of its fields are present in
+    // the select list, no extra slots are generated in the row for the struct fields but
+    // the memory of the struct is reused, i.e. the row size is the same as when only the
     // struct is queried.
 
-    // For comlex types in the select list, we have to turn codegen off.
+    // For complex types in the select list, we have to turn codegen off.
     TQueryOptions queryOpts = defaultQueryOptions();
     queryOpts.setDisable_codegen(true);
 
-    String queryWithoutField =
-        "select id, outer_struct from functional_orc_def.complextypes_nested_structs";
-    int rowSizeWithoutField = getRowSize(queryWithoutField, queryOpts);
+    String queryTemplate =
+        "select %s from functional_orc_def.complextypes_nested_structs";
 
-    String queryWithField =
-        "select id, outer_struct, outer_struct.str " +
-        "from functional_orc_def.complextypes_nested_structs";
-    int rowSizeWithField = getRowSize(queryWithField, queryOpts);
+    // The base case is when the top-level struct is selected.
+    String queryWithoutFields =
+        String.format(queryTemplate, "outer_struct");
+    int rowSizeWithoutFields = getRowSize(queryWithoutFields, queryOpts);
 
-    Assert.assertEquals(rowSizeWithoutField, rowSizeWithField);
+    // Try permutations of (nested) fields of the top-level struct.
+    String[] fields = {"outer_struct", "outer_struct.str", "outer_struct.inner_struct3",
+      "outer_struct.inner_struct3.s"};
+    Collection<List<String>> permutations =
+      Collections2.permutations(java.util.Arrays.asList(fields));
+    for (List<String> permutation : permutations) {
+      String query = String.format(queryTemplate, String.join(", ", permutation));
+      int rowSize = getRowSize(query, queryOpts);
+      Assert.assertEquals(rowSizeWithoutFields, rowSize);
+    }
   }
 
   @Test

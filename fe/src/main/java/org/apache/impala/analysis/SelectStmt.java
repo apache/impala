@@ -355,11 +355,10 @@ public class SelectStmt extends QueryStmt {
           .filter(path -> path != null)
           .filter(path -> path.destType().isStructType())
           .collect(Collectors.toList());
-      // Sort paths by length in descending order so that structs that contain other
+      // Sort paths by length in ascending order so that structs that contain other
       // structs come before their children.
       Collections.sort(paths,
-          Comparator.<Path>comparingInt(path -> path.getMatchedTypes().size())
-          .reversed());
+          Comparator.<Path>comparingInt(path -> path.getMatchedTypes().size()));
       for (Path p : paths) {
         analyzer_.registerSlotRef(p);
       }

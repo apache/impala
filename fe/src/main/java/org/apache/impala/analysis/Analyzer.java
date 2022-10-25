@@ -1474,13 +1474,6 @@ public class Analyzer {
       return result;
     }
 
-    final int highestAncestorDistance = getHighestLevelAncestorDistance(slotPath);
-    if (highestAncestorDistance > 0 && isOnlyWithinStructs(slotPath)) {
-      // 'slotPath' is within a struct that is also needed in the query.
-      return registerSlotRefWithinStruct(slotPath, highestAncestorDistance);
-    }
-
-    Preconditions.checkState(highestAncestorDistance == 0);
     if (slotPath.destType().isStructType()) {
       // 'slotPath' refers to a struct that has no ancestor that is also needed in the
       // query. We also create the child slot descriptors.
@@ -1493,87 +1486,6 @@ public class Analyzer {
     return result;
   }
 
-  // Returns whether all ancestors of 'slotPath' are structs (and for example not arrays).
-  private static boolean isOnlyWithinStructs(Path slotPath) {
-    List<Type> matchedTypes = slotPath.getMatchedTypes();
-    List<Type> ancestorTypes = matchedTypes.subList(0, matchedTypes.size() - 1);
-    for (Type ancestorType : ancestorTypes) {
-      if (!ancestorType.isStructType()) return false;
-    }
-    return true;
-  }
-
-  /**
-   * If there is
-   *   a) a struct expression and
-   *   b) another expression that is a (possibly multiply) embedded field in the
-   *      struct expresssion
-   * in the select list or any other part of the query (WHERE clause, sorting etc.), we
-   * would like the tuple memory corresponding to the embedded expression to be shared
-   * between the struct expression and the embedded expression. Therefore, if we get the
-   * path of the embedded expression, we should return a slot descriptor that is within
-   * the tree of the struct expression.
-   *
-   * This is easy if we encounter the path of the struct expression first and the path of
-   * the embedded expression later: when we encounter the path of the embedded expression
-   * we simply traverse the tree of slot and tuple descriptors belonging to the struct
-   * expression and return the 'SlotDescriptor' corresponding to the embedded expression.
-   *
-   * If the order was reversed, the 'SlotDescriptor' for the ancestor struct wouldn't yet
-   * exist at the time we encountered the embedded expression. Therefore, in the
-   * 'SelectStmt' class we make sure that all struct paths are registered in descending
-   * order of raw path length (meaning the number of path elements, not string length):
-   * see 'SelectStmt.registerStructSlotRefPathsWithAnalyzer()'.
-   *
-   * If we encounter a path that is within a struct, we find the highest level enclosing
-   * struct that is needed in the query. This is not necessarily the top level struct
-   * enclosing the embedded field as that may not be used in the query - take the
-   * following example:
-   *     outer: struct<middle: struct<inner: struct<field: int>>>
-   * and suppose that 'outer' is not present in the query but 'field' and 'middle' are
-   * both in the select list. The highest level enclosing struct for 'field' that is
-   * present in the query is 'middle' in this case.
-   *
-   * We traverse the tree of the highest level enclosing struct expression ('middle' in
-   * the example) to find the 'SlotDescriptor' corresponding to the original path ('field'
-   * in the example) and return it.
-   *
-   * The parameter 'slotPath' is the path that we want to register and return the
-   * 'SlotDescriptor' for; 'highestAncestorDistance' is the distance in the expression
-   * tree from 'slotPath' to the highest level ancestor present in the query: in the
-   * example it is the distance from 'field' to 'middle', which is 1.
-   */
-  private SlotDescriptor registerSlotRefWithinStruct(Path slotPath,
-      int highestAncestorDistance) throws AnalysisException {
-    Preconditions.checkState(highestAncestorDistance > 0);
-
-    final List<String> rawPath = slotPath.getRawPath();
-    final int topStructPathLen = rawPath.size() - highestAncestorDistance;
-    Preconditions.checkState(topStructPathLen > 0);
-    final Path topStructPath = new Path(slotPath.getRootDesc(),
-        rawPath.subList(0, topStructPathLen));
-    Path topStructResolvedPath = null;
-    try {
-      topStructResolvedPath = resolvePathWithMasking(topStructPath.getRawPath(),
-          PathType.SLOT_REF);
-    } catch (TableLoadingException e) {
-      // Should never happen because we only check registered table aliases.
-      Preconditions.checkState(false);
-    }
-    Preconditions.checkState(topStructResolvedPath != null);
-    Preconditions.checkState(topStructResolvedPath.isResolved());
-    List<String> topStructKey = topStructResolvedPath.getFullyQualifiedRawPath();
-    SlotDescriptor topStructSlotDesc = slotPathMap_.get(topStructKey);
-
-    // Structs should already be registered when their members are registered.
-    Preconditions.checkNotNull(topStructSlotDesc);
-
-    List<String> remainingPath = rawPath.subList(topStructPathLen, rawPath.size());
-    SlotDescriptor childSlotRef = findChildSlotDesc(topStructSlotDesc, remainingPath);
-    Preconditions.checkState(childSlotRef != null);
-    return childSlotRef;
-  }
-
   private SlotDescriptor createAndRegisterSlotDesc(Path slotPath,
       boolean insertIntoSlotPathMap) {
     Preconditions.checkState(slotPath.isRootedAtTuple());
@@ -1584,23 +1496,6 @@ public class Analyzer {
     }
     registerColumnPrivReq(result);
     return result;
-  }
-
-  private int getHighestLevelAncestorDistance(Path slotPath) {
-    Optional<Integer> greatestDistanceAncestor = slotPathMap_.entrySet().stream()
-      .filter(entry -> entry.getValue().getType().isStructType()) // only structs
-      .map(entry -> entry.getKey()) // take only the paths, not the SlotDescriptors
-      .map(parentPath -> Path.getRawPathWithoutPrefix(slotPath.getFullyQualifiedRawPath(),
-            parentPath)) // null for non-ancestors
-      .filter(remainingPath -> remainingPath != null) // only ancestors remain
-      .map(remainingPath -> remainingPath.size()) // distance from ancestor
-      .max(java.util.Comparator.naturalOrder());
-
-    if (greatestDistanceAncestor.isPresent()) {
-      return greatestDistanceAncestor.get();
-    } else {
-      return 0; // There is no ancestor, this is a top level path within the query.
-    }
   }
 
   public void createStructTuplesAndSlotDescs(SlotDescriptor desc)
@@ -1631,25 +1526,6 @@ public class Analyzer {
         createStructTuplesAndSlotDescs(childDesc);
       }
     }
-  }
-
-  private SlotDescriptor findChildSlotDesc(SlotDescriptor parent, List<String> path) {
-    if (path.isEmpty()) return parent;
-
-    final TupleDescriptor tuple = parent.getItemTupleDesc();
-    if (tuple == null) return null;
-
-    final int parentPathLen = parent.getPath().getRawPath().size();
-    SlotDescriptor childSlotDesc = null;
-    for (SlotDescriptor desc : tuple.getSlots()) {
-      if (desc.getPath().getRawPath().get(parentPathLen).equals(path.get(0))) {
-        childSlotDesc = desc;
-        break;
-      }
-    }
-
-    if (childSlotDesc == null) return null;
-    return findChildSlotDesc(childSlotDesc, path.subList(1, path.size()));
   }
 
   /**
