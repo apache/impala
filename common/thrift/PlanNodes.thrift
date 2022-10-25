@@ -224,7 +224,7 @@ struct THdfsFileSplit {
   // any consistent hash.
   9: required i32 partition_path_hash
 
-  // The absolute path of the file, it`s used only when data files are outside of
+  // The absolute path of the file, it's used only when data files are outside of
   // the Iceberg table location (IMPALA-11507).
   10: optional string absolute_path
 }

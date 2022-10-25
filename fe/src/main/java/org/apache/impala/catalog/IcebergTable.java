@@ -17,16 +17,18 @@
 
 package org.apache.impala.catalog;
 
+import com.codahale.metrics.Timer;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.hadoop.hive.common.StatsSetupConst;
-import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
+import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.IcebergPartitionTransform;
@@ -50,10 +52,6 @@ import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.thrift.TException;
-
-import com.codahale.metrics.Timer;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 
 /**
  * Representation of an Iceberg table in the catalog cache.
@@ -359,6 +357,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
             .load(false, msClient, msTable_, true, true, false, null, null,null, reason);
         fileStore_ = Utils.loadAllPartition(this);
         partitionStats_ = Utils.loadPartitionStats(this);
+        setIcebergTableStats();
         loadAllColumnStats(msClient);
       } catch (Exception e) {
         throw new IcebergTableLoadingException("Error loading metadata for Iceberg table "

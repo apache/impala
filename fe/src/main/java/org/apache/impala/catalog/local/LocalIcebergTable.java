@@ -127,6 +127,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     icebergParquetPlainPageSize_ = Utils.getIcebergParquetPlainPageSize(msTable);
     icebergParquetDictPageSize_ = Utils.getIcebergParquetDictPageSize(msTable);
     partitionStats_ = tableInfo.getIceberg_table().getPartition_stats();
+    setIcebergTableStats();
     addVirtualColumns(ref.getVirtualColumns());
   }
 

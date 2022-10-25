@@ -97,6 +97,8 @@ public class IcebergContentFileStore {
 
   public List<FileDescriptor> getDeleteFiles() { return deleteFiles_; }
 
+  public long getNumFiles() { return dataFiles_.size() + deleteFiles_.size(); }
+
   public Iterable<FileDescriptor> getAllFiles() {
     return Iterables.concat(dataFiles_, deleteFiles_);
   }

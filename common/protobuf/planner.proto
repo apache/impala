@@ -55,7 +55,7 @@ message HdfsFileSplitPB {
   // any consistent hash.
   optional int32 partition_path_hash = 9;
 
-  // The absolute path of the file, it`s used only when data files are outside of
+  // The absolute path of the file, it's used only when data files are outside of
   // the Iceberg table location (IMPALA-11507).
   optional string absolute_path = 10;
 }

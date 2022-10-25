@@ -312,6 +312,22 @@ public interface FeIcebergTable extends FeFsTable {
   }
 
   /**
+   * Sets 'tableStats_' for the Iceberg table by it's partition stats.
+   * TODO: Now the calculation of V2 Iceberg table is not accurate. After
+   * IMPALA-11516(Return better partition stats for V2 tables) is ready, this method can
+   * be considered to replace
+   * {@link Table#setTableStats(org.apache.hadoop.hive.metastore.api.Table)}.
+   */
+  default void setIcebergTableStats() {
+    Preconditions.checkState(getTTableStats() != null);
+    Preconditions.checkState(getIcebergPartitionStats() != null);
+    if (getTTableStats().getNum_rows() < 0) {
+      getTTableStats().setNum_rows(Utils.calculateNumRows(this));
+    }
+    getTTableStats().setTotal_file_bytes(Utils.calculateFileSizeInBytes(this));
+  }
+
+  /**
    * Utility functions
    */
   public static abstract class Utils {
@@ -397,17 +413,9 @@ public interface FeIcebergTable extends FeFsTable {
       result.setSchema(resultSchema);
 
       TResultRowBuilder rowBuilder = new TResultRowBuilder();
-      Map<String, TIcebergPartitionStats> nameToStats = table.getIcebergPartitionStats();
-      if (table.getNumRows() >= 0) {
-        rowBuilder.add(table.getNumRows());
-      } else {
-        rowBuilder.add(nameToStats.values().stream().mapToLong(
-            TIcebergPartitionStats::getNum_rows).sum());
-      }
-      rowBuilder.add(nameToStats.values().stream().mapToLong(
-          TIcebergPartitionStats::getNum_files).sum());
-      rowBuilder.addBytes(nameToStats.values().stream().mapToLong(
-          TIcebergPartitionStats::getFile_size_in_bytes).sum());
+      rowBuilder.add(table.getNumRows());
+      rowBuilder.add(table.getContentFileStore().getNumFiles());
+      rowBuilder.addBytes(table.getTTableStats().getTotal_file_bytes());
       if (!table.isMarkedCached()) {
         rowBuilder.add("NOT CACHED");
         rowBuilder.add("NOT CACHED");
@@ -434,6 +442,24 @@ public interface FeIcebergTable extends FeFsTable {
       result.addToRows(rowBuilder.get());
 
       return result;
+    }
+
+    /**
+     * Calculate num rows for the given iceberg table by it's partition stats.
+     * The result is computed by all DataFiles without any DeleteFile.
+     */
+    public static long calculateNumRows(FeIcebergTable table) {
+      return table.getIcebergPartitionStats().values().stream()
+          .mapToLong(TIcebergPartitionStats::getNum_rows).sum();
+    }
+
+    /**
+     * Calculate file size in bytes for the given iceberg table by it's partition stats.
+     * The result is computed by all ContentFiles, including DataFile and DeleteFile.
+     */
+    public static long calculateFileSizeInBytes(FeIcebergTable table) {
+      return table.getIcebergPartitionStats().values().stream()
+          .mapToLong(TIcebergPartitionStats::getFile_size_in_bytes).sum();
     }
 
     /**
