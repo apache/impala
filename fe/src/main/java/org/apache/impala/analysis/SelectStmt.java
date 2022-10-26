@@ -713,9 +713,10 @@ public class SelectStmt extends QueryStmt {
     }
 
     /**
-     * Expand "*" select list item, ignoring semi-joined tables as well as
-     * complex-typed fields because those are currently illegal in any select
-     * list (even for inline views, etc.)
+     * Expand "*" select list item, ignoring semi-joined tables because those are
+     * currently illegal in any select list (even for inline views, etc.). Also ignores
+     * complex-typed fields for backwards compatibility unless EXPAND_COMPLEX_TYPES is set
+     * to true.
      */
     private void expandStar() throws AnalysisException {
       if (fromClause_.isEmpty()) {
@@ -734,8 +735,8 @@ public class SelectStmt extends QueryStmt {
     }
 
     /**
-     * Expand "path.*" from a resolved path, ignoring complex-typed fields
-     * for backwards compatibility.
+     * Expand "path.*" from a resolved path, ignoring complex-typed fields for backwards
+     * compatibility unless EXPAND_COMPLEX_TYPES is set to true.
      */
     private void expandStar(Path resolvedPath)
         throws AnalysisException {
@@ -806,9 +807,6 @@ public class SelectStmt extends QueryStmt {
       Preconditions.checkState(slotRef.isAnalyzed(),
           "Analysis should be done in constructor");
 
-      if(slotRef.getType().isStructType()){
-        slotRef.reExpandStruct(analyzer_);
-      }
       // Empty matched types means this is expanded from star of a catalog table.
       // For star of complex types, e.g. my_struct.*, my_array.*, my_map.*, the matched
       // types will have the complex type so it's not empty.

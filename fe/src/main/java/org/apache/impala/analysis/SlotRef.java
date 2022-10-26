@@ -88,6 +88,9 @@ public class SlotRef extends Expr {
     String alias = desc.getParent().getAlias();
     label_ = (alias != null ? alias + "." : "") + desc.getLabel();
     numDistinctValues_ = adjustNumDistinctValues();
+
+    if (type_.isStructType()) addStructChildrenAsSlotRefs();
+
     analysisDone();
   }
 
@@ -191,7 +194,10 @@ public class SlotRef extends Expr {
         }
       }
     }
-    if (type_.isStructType()) addStructChildrenAsSlotRefs(analyzer);
+    if (type_.isStructType()) {
+      addStructChildrenAsSlotRefs();
+      checkForUnsupportedStructFields();
+    }
   }
 
   /**
@@ -205,15 +211,16 @@ public class SlotRef extends Expr {
     children_.clear();
 
     analyzer.createStructTuplesAndSlotDescs(desc_);
-    addStructChildrenAsSlotRefs(analyzer);
+    addStructChildrenAsSlotRefs();
+    checkForUnsupportedStructFields();
   }
 
-  // Expects the type of this SlotRef as a StructType. Throws an AnalysisException if any
-  // of the struct fields of this Slot ref is a collection or unsupported type.
-  private void checkForUnsupportedFieldsForStruct() throws AnalysisException {
+  // Throws an AnalysisException if any of the struct fields, recursively, of this SlotRef
+  // is a collection or unsupported type. Should only be used if this is a struct.
+  private void checkForUnsupportedStructFields() throws AnalysisException {
     Preconditions.checkState(type_ instanceof StructType);
-    for (StructField structField : ((StructType)type_).getFields()) {
-      final Type fieldType = structField.getType();
+    for (Expr child : getChildren()) {
+      final Type fieldType = child.getType();
       if (!fieldType.isSupported()) {
         throw new AnalysisException("Unsupported type '"
             + fieldType.toSql() + "' in '" + toSql() + "'.");
@@ -226,22 +233,24 @@ public class SlotRef extends Expr {
         throw new AnalysisException("Struct containing a BINARY type is not " +
             "allowed in the select list (IMPALA-11491).");
       }
+
+      if (fieldType.isStructType()) {
+        Preconditions.checkState(child instanceof SlotRef);
+        ((SlotRef) child).checkForUnsupportedStructFields();
+      }
     }
   }
 
   // Assumes this 'SlotRef' is a struct and that desc_.itemTupleDesc_ has already been
   // filled. Creates the children 'SlotRef's for the struct recursively.
-  private void addStructChildrenAsSlotRefs(Analyzer analyzer) throws AnalysisException {
+  private void addStructChildrenAsSlotRefs() {
     Preconditions.checkState(desc_.getType().isStructType());
-    checkForUnsupportedFieldsForStruct();
     TupleDescriptor structTuple = desc_.getItemTupleDesc();
     Preconditions.checkState(structTuple != null);
     for (SlotDescriptor childSlot : structTuple.getSlots()) {
+      // If 'childSlot' is also a struct, the constructor will call this method on it.
       SlotRef childSlotRef = new SlotRef(childSlot);
       children_.add(childSlotRef);
-      if (childSlot.getType().isStructType()) {
-        childSlotRef.addStructChildrenAsSlotRefs(analyzer);
-      }
     }
   }
 

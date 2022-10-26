@@ -162,3 +162,60 @@ where s.id = a.id and s.id = m.id and s.id = 3
 ---- TYPES
 INT, STRING, INT, BIGINT
 ====
+---- QUERY
+# Combining star expansion with an explicitly given struct.
+set EXPAND_COMPLEX_TYPES=true;
+select outer_struct, * from functional_orc_def.complextypes_nested_structs where id = 1;
+---- RESULTS
+'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}',1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
+---- TYPES
+STRING, INT, STRING
+====
+---- QUERY
+# Combining star expansion with an explicitly given struct.
+set EXPAND_COMPLEX_TYPES=true;
+select *, outer_struct from functional_orc_def.complextypes_nested_structs where id = 1;
+---- RESULTS
+1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}','{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+# Combining star expansion with an explicitly given struct field.
+set EXPAND_COMPLEX_TYPES=true;
+select *, outer_struct.str
+from functional_orc_def.complextypes_nested_structs where id = 1;
+---- RESULTS
+1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}','somestr1'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+# Combining star expansion with an explicitly given struct field.
+set EXPAND_COMPLEX_TYPES=true;
+select outer_struct.str, *
+from functional_orc_def.complextypes_nested_structs where id = 1;
+---- RESULTS
+'somestr1',1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
+---- TYPES
+STRING, INT, STRING
+====
+---- QUERY
+# Combining star expansion with explicitly given structs and struct fields.
+set EXPAND_COMPLEX_TYPES=true;
+select outer_struct.inner_struct1, *, outer_struct, outer_struct.str
+from functional_orc_def.complextypes_nested_structs where id = 1;
+---- RESULTS
+'{"str":"somestr2","de":12345.12}',1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}','{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}','somestr1'
+---- TYPES
+STRING, INT, STRING, STRING, STRING
+====
+---- QUERY
+# Two stars including complex types.
+set EXPAND_COMPLEX_TYPES=true;
+select *, * from functional_orc_def.complextypes_nested_structs where id = 1;
+---- RESULTS
+1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}',1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
+---- TYPES
+INT, STRING, INT, STRING
+====
