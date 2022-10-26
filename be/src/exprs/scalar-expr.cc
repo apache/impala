@@ -142,13 +142,13 @@ Status ScalarExpr::CreateNode(
     case TExprNodeType::TIMESTAMP_LITERAL:
     case TExprNodeType::DATE_LITERAL:
       *expr = pool->Add(new Literal(texpr_node));
-      return Status::OK();
+      break;
     case TExprNodeType::CASE_EXPR:
       if (!texpr_node.__isset.case_expr) {
         return Status("Case expression not set in thrift node");
       }
       *expr = pool->Add(new CaseExpr(texpr_node));
-      return Status::OK();
+      break;
     case TExprNodeType::COMPOUND_PRED:
       if (texpr_node.fn.name.function_name == "and") {
         *expr = pool->Add(new AndPredicate(texpr_node));
@@ -158,19 +158,19 @@ Status ScalarExpr::CreateNode(
         DCHECK_EQ(texpr_node.fn.name.function_name, "not");
         *expr = pool->Add(new ScalarFnCall(texpr_node));
       }
-      return Status::OK();
+      break;
     case TExprNodeType::NULL_LITERAL:
       *expr = pool->Add(new NullLiteral(texpr_node));
-      return Status::OK();
+      break;
     case TExprNodeType::SLOT_REF:
       if (!texpr_node.__isset.slot_ref) {
         return Status("Slot reference not set in thrift node");
       }
       *expr = pool->Add(new SlotRef(texpr_node));
-      return Status::OK();
+      break;
     case TExprNodeType::TUPLE_IS_NULL_PRED:
       *expr = pool->Add(new TupleIsNullPredicate(texpr_node));
-      return Status::OK();
+      break;
     case TExprNodeType::FUNCTION_CALL:
       if (!texpr_node.__isset.fn) {
         return Status("Function not set in thrift node");
@@ -193,22 +193,24 @@ Status ScalarExpr::CreateNode(
       } else {
         *expr = pool->Add(new ScalarFnCall(texpr_node));
       }
-      return Status::OK();
+      break;
     case TExprNodeType::IS_NOT_EMPTY_PRED:
       *expr = pool->Add(new IsNotEmptyPredicate(texpr_node));
-      return Status::OK();
+      break;
     case TExprNodeType::KUDU_PARTITION_EXPR:
       *expr = pool->Add(new KuduPartitionExpr(texpr_node));
-      return Status::OK();
+      break;
     case TExprNodeType::VALID_TUPLE_ID_EXPR:
       *expr = pool->Add(new ValidTupleIdExpr(texpr_node));
-      return Status::OK();
+      break;
     default:
       *expr = nullptr;
       stringstream os;
       os << "Unknown expr node type: " << texpr_node.node_type;
       return Status(os.str());
   }
+  DCHECK(*expr != nullptr);
+  return Status::OK();
 }
 
 Status ScalarExpr::OpenEvaluator(FunctionContext::FunctionStateScope scope,

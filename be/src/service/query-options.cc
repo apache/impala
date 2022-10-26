@@ -849,6 +849,17 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_async_codegen(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::DISABLE_CODEGEN_CACHE: {
+        query_options->__set_disable_codegen_cache(IsTrue(value));
+        break;
+      }
+      case TImpalaQueryOptions::CODEGEN_CACHE_MODE: {
+        TCodeGenCacheMode::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(
+            value, "CodeGen Cache Mode", _TCodeGenCacheMode_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_codegen_cache_mode(enum_type);
+        break;
+      }
       case TImpalaQueryOptions::ENABLE_DISTINCT_SEMI_JOIN_OPTIMIZATION: {
         query_options->__set_enable_distinct_semi_join_optimization(IsTrue(value));
         break;

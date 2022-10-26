@@ -755,3 +755,11 @@ def assert_codegen_enabled(profile_string, exec_node_ids):
     for exec_options in get_node_exec_options(profile_string, exec_node_id):
       assert 'Codegen Enabled' in exec_options
       assert not 'Codegen Disabled' in exec_options
+
+
+def assert_codegen_cache_hit(profile_string, expect_hit):
+  assert "NumCachedFunctions" in profile_string
+  if expect_hit:
+    assert "NumCachedFunctions: 0 " not in profile_string
+  else:
+    assert "NumCachedFunctions: 0 " in profile_string

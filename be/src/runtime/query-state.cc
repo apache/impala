@@ -19,6 +19,7 @@
 
 #include <mutex>
 
+#include "codegen/llvm-codegen-cache.h"
 #include "codegen/llvm-codegen.h"
 #include "common/thread-debug-info.h"
 #include "exec/kudu/kudu-util.h"
@@ -798,6 +799,11 @@ bool QueryState::WaitForFinishOrTimeout(int32_t timeout_ms) {
   bool timed_out = false;
   instances_finished_barrier_->Wait(timeout_ms, &timed_out);
   return !timed_out;
+}
+
+bool QueryState::codegen_cache_enabled() const {
+  return !query_options().disable_codegen_cache && !disable_codegen_cache_
+      && ExecEnv::GetInstance()->codegen_cache_enabled();
 }
 
 bool QueryState::StartFInstances() {

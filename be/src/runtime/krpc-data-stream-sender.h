@@ -173,7 +173,7 @@ class KrpcDataStreamSender : public DataSink {
 
   /// Evaluates the input row against partition expressions and hashes the expression
   /// values. Returns the final hash value.
-  uint64_t HashRow(TupleRow* row);
+  uint64_t HashRow(TupleRow* row, uint64_t seed);
 
   /// Used when 'partition_type_' is HASH_PARTITIONED. Call HashRow() against each row
   /// in the input batch and adds it to the corresponding channel based on the hash value.

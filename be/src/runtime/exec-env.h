@@ -69,6 +69,7 @@ class SystemStateInfo;
 class ThreadResourceMgr;
 class TmpFileMgr;
 class Webserver;
+class CodeGenCache;
 
 namespace io {
   class DiskIoMgr;
@@ -151,6 +152,8 @@ class ExecEnv {
   Scheduler* scheduler() { return scheduler_.get(); }
   AdmissionController* admission_controller() { return admission_controller_.get(); }
   StatestoreSubscriber* subscriber() { return statestore_subscriber_.get(); }
+  CodeGenCache* codegen_cache() const { return codegen_cache_.get(); }
+  bool codegen_cache_enabled() const { return codegen_cache_ != nullptr; }
 
   const TNetworkAddress& configured_backend_address() const {
     return configured_backend_address_;
@@ -231,6 +234,9 @@ class ExecEnv {
 
   /// Tracks system resource usage which we then include in profiles.
   boost::scoped_ptr<SystemStateInfo> system_state_info_;
+
+  /// Singleton cache for codegen functions.
+  boost::scoped_ptr<CodeGenCache> codegen_cache_;
 
   /// Not owned by this class
   ImpalaServer* impala_server_ = nullptr;

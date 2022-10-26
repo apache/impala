@@ -91,6 +91,7 @@ class ImpalaMCJITMemoryManager;
 class SubExprElimination;
 class Thread;
 class TupleDescriptor;
+class CodeGenCacheKey;
 
 /// Define builder subclass in case we want to change the template arguments later
 class LlvmBuilder : public llvm::IRBuilder<> {
@@ -188,6 +189,9 @@ class LlvmCodeGen {
 
   /// Turns on/off optimization passes
   void EnableOptimizations(bool enable);
+
+  std::string DebugCacheEntryString(
+      CodeGenCacheKey& key, bool is_lookup, bool debug_mode, bool success = true) const;
 
   /// For debugging. Returns the IR that was generated.  If full_module, the
   /// entire module is dumped, including what was loaded from precompiled IR.
@@ -428,6 +432,9 @@ class LlvmCodeGen {
   /// be deleted in FinalizeModule(), otherwise, it returns the function object.
   llvm::Function* FinalizeFunction(llvm::Function* function);
 
+  /// Prunes any unused functions from the module.
+  void PruneModule();
+
   /// Adds the function to be automatically jit compiled when the codegen object is
   /// finalized. FinalizeModule() will set *fn_ptr to point to the jitted function.
   ///
@@ -629,6 +636,8 @@ class LlvmCodeGen {
   friend class LlvmCodeGenTest_CpuAttrWhitelist_Test;
   friend class LlvmCodeGenTest_HashTest_Test;
   friend class SubExprElimination;
+  friend class CodeGenCache;
+  friend class LlvmCodeGenCacheTest;
 
   /// Top level codegen object. 'module_id' is used for debugging when outputting the IR.
   LlvmCodeGen(FragmentState* state, ObjectPool* pool, MemTracker* parent_mem_tracker,
@@ -703,6 +712,12 @@ class LlvmCodeGen {
   // Used for testing.
   void ResetVerification() { is_corrupt_ = false; }
 
+  // Lookup the codegen functions from the cache to reduce optimization time.
+  bool LookupCache(CodeGenCacheKey& key);
+
+  // Store the codegen functions to the cache if codegen cache is enabled.
+  Status StoreCache(CodeGenCacheKey& key);
+
   /// Optimizes the module. This includes pruning the module of any unused functions.
   Status OptimizeModule();
 
@@ -746,6 +761,16 @@ class LlvmCodeGen {
   /// Destroy the IR module, freeing memory used by the IR. Any machine code that was
   /// generated is retained by the execution engine.
   void DestroyModule();
+
+  /// Generate a string containing all jitted function names from fns_to_jit_compile_.
+  /// The generation of the string is simply the concatenation of all the names by
+  /// sequence in fns_to_jit_compile_. Would be used in the codegen cache lookup to
+  /// confirm whether a cache entry matches the need of the LlvmCodeGen.
+  std::string GetAllFunctionNames();
+
+  /// Generate and store the hash code of all the function names. Will be used to
+  /// codegen cache only.
+  void GenerateFunctionNamesHashCode();
 
   /// Disable CPU attributes in 'cpu_attrs' that are not present in
   /// the '--llvm_cpu_attr_whitelist' flag. The same attributes in the input are
@@ -800,6 +825,13 @@ class LlvmCodeGen {
   /// Time spent creating the initial module with the cross-compiled Impala IR.
   RuntimeProfile::Counter* prepare_module_timer_;
 
+  /// Time spent generating module bitcode.
+  RuntimeProfile::Counter* module_bitcode_gen_timer_;
+
+  /// Time spent for codegen cache look up and save.
+  RuntimeProfile::Counter* codegen_cache_lookup_timer_;
+  RuntimeProfile::Counter* codegen_cache_save_timer_;
+
   /// Time spent by ExecNodes while adding IR to the module. Update by
   /// FragmentInstanceState during its 'CODEGEN_START' state.
   RuntimeProfile::Counter* ir_generation_timer_;
@@ -824,6 +856,9 @@ class LlvmCodeGen {
   RuntimeProfile::Counter* num_functions_;
   RuntimeProfile::Counter* num_instructions_;
 
+  /// Number of functions that are used and cached.
+  RuntimeProfile::Counter* num_cached_functions_;
+
   /// Aggregated llvm thread counters. Also includes the phase represented by
   /// 'ir_generation_timer_' and hence is also updated by FragmentInstanceState.
   RuntimeProfile::ThreadCounters* llvm_thread_counters_;
@@ -832,6 +867,9 @@ class LlvmCodeGen {
 
   /// whether or not optimizations are enabled
   bool optimizations_enabled_;
+
+  /// Whether or not codegen cache is enabled.
+  bool codegen_cache_enabled_ = true;
 
   /// If true, the module is corrupt and we cannot codegen this query.
   /// TODO: we could consider just removing the offending function and attempting to
@@ -855,7 +893,10 @@ class LlvmCodeGen {
   llvm::Module* module_;
 
   /// Execution/Jitting engine.
-  std::unique_ptr<llvm::ExecutionEngine> execution_engine_;
+  std::shared_ptr<llvm::ExecutionEngine> execution_engine_;
+
+  /// Cached Execution/Jitting engine.
+  std::shared_ptr<llvm::ExecutionEngine> execution_engine_cached_;
 
   /// The memory manager used by 'execution_engine_'. Owned by 'execution_engine_'.
   ImpalaMCJITMemoryManager* memory_manager_;
@@ -892,6 +933,11 @@ class LlvmCodeGen {
   /// The vector of functions to automatically JIT compile after FinalizeModule().
   std::vector<std::pair<llvm::Function*, CodegenFnPtrBase*>> fns_to_jit_compile_;
 
+  /// The hash code generated from all the function names in fns_to_jit_compile_.
+  /// Used by the codegen cache only.
+  uint64_t function_names_hashcode_;
+
+  /// The symbol emitted associated with 'execution_engine_'. Methods on
   /// llvm representation of a few common types.  Owned by context.
   llvm::PointerType* ptr_type_;             // int8_t*
   llvm::Type* void_type_;                   // void

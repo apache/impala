@@ -72,7 +72,7 @@ DECLARE_int32(rpc_retry_interval_ms);
 namespace impala {
 
 const char* KrpcDataStreamSender::HASH_ROW_SYMBOL =
-    "KrpcDataStreamSender7HashRowEPNS_8TupleRowE";
+    "KrpcDataStreamSender7HashRowEPNS_8TupleRowEm";
 const char* KrpcDataStreamSender::LLVM_CLASS_NAME = "class.impala::KrpcDataStreamSender";
 const char* KrpcDataStreamSender::TOTAL_BYTES_SENT_COUNTER = "TotalBytesSent";
 
@@ -807,7 +807,8 @@ Status KrpcDataStreamSender::Open(RuntimeState* state) {
 // An example of generated code with int type.
 //
 // define i64 @KrpcDataStreamSenderHashRow(%"class.impala::KrpcDataStreamSender"* %this,
-//                                         %"class.impala::TupleRow"* %row) #46 {
+//                                         %"class.impala::TupleRow"* %row,
+//                                         i64 %seed) #52 {
 // entry:
 //   %0 = alloca i32
 //   %1 = call %"class.impala::ScalarExprEvaluator"*
@@ -833,7 +834,7 @@ Status KrpcDataStreamSender::Open(RuntimeState* state) {
 //   %hash_val = call i64
 //       @_ZN6impala8RawValue20GetHashValueFastHashEPKvRKNS_10ColumnTypeEm(
 //           i8* %val_ptr_phi, %"struct.impala::ColumnType"* @expr_type_arg,
-//               i64 7403188670037225271)
+//               i64 %seed)
 //   ret i64 %hash_val
 // }
 Status KrpcDataStreamSenderConfig::CodegenHashRow(
@@ -847,15 +848,15 @@ Status KrpcDataStreamSenderConfig::CodegenHashRow(
       "this", codegen->GetNamedPtrType(KrpcDataStreamSender::LLVM_CLASS_NAME)));
   prototype.AddArgument(
       LlvmCodeGen::NamedVariable("row", codegen->GetStructPtrType<TupleRow>()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("seed", codegen->i64_type()));
 
-  llvm::Value* args[2];
+  llvm::Value* args[3];
   llvm::Function* hash_row_fn = prototype.GeneratePrototype(&builder, args);
   llvm::Value* this_arg = args[0];
   llvm::Value* row_arg = args[1];
 
   // Store the initial seed to hash_val
-  llvm::Value* hash_val =
-      codegen->GetI64Constant(exchange_hash_seed_);
+  llvm::Value* hash_val = args[2];
 
   // Unroll the loop and codegen each of the partition expressions
   for (int i = 0; i < partition_exprs_.size(); ++i) {
@@ -922,7 +923,6 @@ Status KrpcDataStreamSenderConfig::CodegenHashRow(
   if (*fn == nullptr) {
     return Status("Codegen'd KrpcDataStreamSenderHashRow() fails verification. See log");
   }
-
   return Status::OK();
 }
 
@@ -987,8 +987,8 @@ Status KrpcDataStreamSender::AddRowToChannel(const int channel_id, TupleRow* row
   return channels_[channel_id]->AddRow(row);
 }
 
-uint64_t KrpcDataStreamSender::HashRow(TupleRow* row) {
-  uint64_t hash_val = exchange_hash_seed_;
+uint64_t KrpcDataStreamSender::HashRow(TupleRow* row, uint64_t seed) {
+  uint64_t hash_val = seed;
   for (ScalarExprEvaluator* eval : partition_expr_evals_) {
     void* partition_val = eval->GetValue(row);
     // We can't use the crc hash function here because it does not result in

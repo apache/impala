@@ -1,0 +1,24 @@
+====
+---- QUERY
+# Test identity functions
+select identity(true);
+---- TYPES
+boolean
+---- RESULTS
+true
+====
+---- QUERY
+select test_count(int_col) from functional.alltypestiny;
+---- RESULTS
+8
+---- TYPES
+bigint
+====
+---- QUERY
+# Test UDFs over tables
+select sum(identity(bigint_col)) from functional.alltypes
+---- TYPES
+bigint
+---- RESULTS
+328500
+====

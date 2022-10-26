@@ -742,6 +742,18 @@ enum TImpalaQueryOptions {
 
   // Specify the database name which stores global udf
   FALLBACK_DB_FOR_FUNCTIONS = 148;
+
+  // Specify whether to use codegen cache.
+  DISABLE_CODEGEN_CACHE = 149;
+
+  // Specify how the entry stores to the codegen cache, would affect the entry size.
+  // Possible values are NORMAL, OPTIMAL, NORMAL_DEBUG and OPTIMAL_DEBUG.
+  // The normal mode will use a full key for the cache, while the optimal mode uses
+  // a hashcode of 128 bits for the key to save the memory consumption.
+  // The debug mode of each of them allows more logs, would be helpful to target
+  // an issue.
+  // Only valid if DISABLE_CODEGEN_CACHE is set to false.
+  CODEGEN_CACHE_MODE = 150;
 }
 
 // The summary of a DML statement.

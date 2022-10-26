@@ -16,12 +16,12 @@
 // under the License.
 
 #include "codegen/llvm-codegen.h"
+#include "codegen/llvm-codegen-cache.h"
 
 #include <fstream>
+#include <mutex>
 #include <sstream>
 #include <unordered_set>
-
-#include <mutex>
 #include <boost/algorithm/string.hpp>
 #include <boost/assert/source_location.hpp>
 #include <gutil/strings/substitute.h>
@@ -31,6 +31,7 @@
 #include <llvm/Analysis/Passes.h>
 #include <llvm/Analysis/TargetTransformInfo.h>
 #include <llvm/Bitcode/BitcodeReader.h>
+#include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/IR/Constants.h>
@@ -65,18 +66,19 @@
 #include "codegen/mcjit-mem-mgr.h"
 #include "common/logging.h"
 #include "exprs/anyval-util.h"
+#include "gutil/sysinfo.h"
 #include "impala-ir/impala-ir-names.h"
 #include "runtime/collection-value.h"
 #include "runtime/descriptors.h"
+#include "runtime/exec-env.h"
+#include "runtime/fragment-state.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
-#include "runtime/fragment-state.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
-#include "gutil/sysinfo.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/hdfs-util.h"
@@ -85,6 +87,7 @@
 #include "util/symbols-util.h"
 #include "util/test-info.h"
 #include "util/thread.h"
+#include "util/thrift-debug-util.h"
 
 #include "common/names.h"
 
@@ -226,6 +229,9 @@ LlvmCodeGen::LlvmCodeGen(FragmentState* state, ObjectPool* pool,
   context_->setDiagnosticHandler(&DiagnosticHandler::DiagnosticHandlerFn, this);
   load_module_timer_ = ADD_TIMER(profile_, "LoadTime");
   prepare_module_timer_ = ADD_TIMER(profile_, "PrepareTime");
+  codegen_cache_lookup_timer_ = ADD_TIMER(profile_, "CodegenCacheLookupTime");
+  codegen_cache_save_timer_ = ADD_TIMER(profile_, "CodegenCacheSaveTime");
+  module_bitcode_gen_timer_ = ADD_TIMER(profile_, "ModuleBitcodeGenTime");
   module_bitcode_size_ = ADD_COUNTER(profile_, "ModuleBitcodeSize", TUnit::BYTES);
   ir_generation_timer_ = ADD_TIMER(profile_, "IrGenerationTime");
   optimization_timer_ = ADD_TIMER(profile_, "OptimizationTime");
@@ -235,6 +241,7 @@ LlvmCodeGen::LlvmCodeGen(FragmentState* state, ObjectPool* pool,
       ASYNC_CODEGEN_THREAD_COUNTERS_PREFIX);
   num_functions_ = ADD_COUNTER(profile_, "NumFunctions", TUnit::UNIT);
   num_instructions_ = ADD_COUNTER(profile_, "NumInstructions", TUnit::UNIT);
+  num_cached_functions_ = ADD_COUNTER(profile_, "NumCachedFunctions", TUnit::UNIT);
   llvm_thread_counters_ = ADD_THREAD_COUNTERS(profile_, "Codegen");
 }
 
@@ -513,6 +520,7 @@ void LlvmCodeGen::Close() {
 
   // Execution engine executes callback on event listener, so tear down engine first.
   execution_engine_.reset();
+  execution_engine_cached_.reset();
   symbol_emitter_.reset();
   module_ = nullptr;
 }
@@ -914,6 +922,18 @@ Status LlvmCodeGen::LoadFunction(const TFunction& fn, const string& symbol,
     // Associate the dynamically loaded function pointer with the Function* we defined.
     // This tells LLVM where the compiled function definition is located in memory.
     execution_engine_->addGlobalMapping(*llvm_fn, fn_ptr);
+    // Disable the codegen cache because codegen cache uses the llvm module bitcode as
+    // the key while the bitcode doesn't contain the global function mapping of the
+    // execution engine. If the mapping is changed during running, like udf recreation,
+    // the function mapping in the cache could point to an old address and lead to a
+    // crash while calling the udf,  so block the codegen cache for native udfs.
+    // Builtin functions should not have the issue, because they should not change
+    // during runtime.
+    if (fn.binary_type == TFunctionBinaryType::NATIVE) {
+      // Should be before compilation.
+      DCHECK(!is_compiled_);
+      codegen_cache_enabled_ = false;
+    }
   } else if (fn.binary_type == TFunctionBinaryType::BUILTIN) {
     // In this path, we're running a builtin with the UDF interface. The IR is
     // in the llvm module. Builtin functions may use Expr::GetConstant(). Clone the
@@ -1112,6 +1132,123 @@ Status LlvmCodeGen::FinalizeLazyMaterialization() {
   return MaterializeModule();
 }
 
+bool LlvmCodeGen::LookupCache(CodeGenCacheKey& cache_key) {
+  DCHECK(!cache_key.empty());
+  CodeGenCacheEntry entry;
+  CodeGenCache* cache = ExecEnv::GetInstance()->codegen_cache();
+  DCHECK(cache != nullptr);
+  Status lookup_status = cache->Lookup(cache_key,
+      state_->query_options().codegen_cache_mode, &entry, &execution_engine_cached_);
+  bool entry_exist = lookup_status.ok() && !entry.Empty();
+  LOG(INFO) << DebugCacheEntryString(cache_key, true /*is_lookup*/,
+      CodeGenCacheModeAnalyzer::is_debug(state_->query_options().codegen_cache_mode),
+      entry_exist);
+  if (entry_exist) {
+    // Fallback to normal procedure if function names hashcode is not expected.
+    // The names hashcode should be the same unless there is a collision on the
+    // key, we expect this case is very rare.
+    if (function_names_hashcode_ != entry.function_names_hashcode) {
+      LOG(WARNING)
+          << "The codegen cache entry contains a different function names hashcode: "
+          << " function names hashcode expected: " << function_names_hashcode_
+          << " actual: " << entry.function_names_hashcode
+          << " key hash_code=" << cache_key.hash_code();
+      cache->IncHitOrMissCount(/*hit*/ false);
+      return false;
+    }
+
+    // execution_engine_cached_ is used to keep the life of the jitted functions in
+    // case the engine is evicted in the global cache.
+    DCHECK(execution_engine_cached_ != nullptr);
+    vector<void*> jitted_funcs;
+    // Get pointers to all codegen'd functions.
+    for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {
+      llvm::Function* function = fns_to_jit_compile_[i].first;
+      DCHECK(function != nullptr);
+      // Using the function getFunctionAddress() with a non-existent function name
+      // would hit an assertion during the test, could be a bug in llvm 5, need to
+      // review after upgrade llvm. But because we already checked the names hashcode
+      // for key collision cases, we expect all the functions should be in the
+      // cached execution engine.
+      void* jitted_function = reinterpret_cast<void*>(
+          execution_engine_cached_->getFunctionAddress(function->getName()));
+      if (jitted_function == nullptr) {
+        LOG(WARNING) << "Failed to get a jitted function from cache: "
+                     << function->getName().data()
+                     << " key hash_code=" << cache_key.hash_code();
+        cache->IncHitOrMissCount(/*hit*/ false);
+        return false;
+      }
+      jitted_funcs.emplace_back(jitted_function);
+    }
+    DCHECK_EQ(jitted_funcs.size(), fns_to_jit_compile_.size());
+    for (int i = 0; i < jitted_funcs.size(); i++) {
+      fns_to_jit_compile_[i].second->store(jitted_funcs[i]);
+    }
+
+    // Because we cache the entire execution engine, the cached number of functions should
+    // be the same as the total function number.
+    COUNTER_SET(num_cached_functions_, entry.num_functions);
+    COUNTER_SET(num_functions_, entry.num_functions);
+    COUNTER_SET(num_instructions_, entry.num_instructions);
+  }
+  cache->IncHitOrMissCount(/*hit*/ entry_exist);
+  return entry_exist;
+}
+
+string LlvmCodeGen::GetAllFunctionNames() {
+  stringstream result;
+  // The way to concat would be like "function1,function2".
+  const char separator = ',';
+  for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {
+    llvm::Function* function = fns_to_jit_compile_[i].first;
+    DCHECK(function != nullptr);
+    result << function->getName().data() << separator;
+  }
+  return result.str();
+}
+
+void LlvmCodeGen::GenerateFunctionNamesHashCode() {
+  string function_names = GetAllFunctionNames();
+  // Use the same hash seed as the codegen cache key.
+  function_names_hashcode_ = HashUtil::MurmurHash2_64(function_names.c_str(),
+      function_names.length(), CodeGenCacheKeyConstructor::CODEGEN_CACHE_HASH_SEED_CONST);
+}
+
+Status LlvmCodeGen::StoreCache(CodeGenCacheKey& cache_key) {
+  DCHECK(!cache_key.empty());
+  Status store_status = ExecEnv::GetInstance()->codegen_cache()->Store(
+      cache_key, this, state_->query_options().codegen_cache_mode);
+  LOG(INFO) << DebugCacheEntryString(cache_key, false /*is_lookup*/,
+      CodeGenCacheModeAnalyzer::is_debug(state_->query_options().codegen_cache_mode));
+  return store_status;
+}
+
+void LlvmCodeGen::PruneModule() {
+  SCOPED_TIMER(optimization_timer_);
+  llvm::TargetIRAnalysis target_analysis =
+      execution_engine_->getTargetMachine()->getTargetIRAnalysis();
+
+  // Before running any other optimization passes, run the internalize pass, giving it
+  // the names of all functions registered by AddFunctionToJit(), followed by the
+  // global dead code elimination pass. This causes all functions not registered to be
+  // JIT'd to be marked as internal, and any internal functions that are not used are
+  // deleted by DCE pass. This greatly decreases compile time by removing unused code.
+  unordered_set<string> exported_fn_names;
+  for (auto& entry : fns_to_jit_compile_) {
+    exported_fn_names.insert(entry.first->getName().str());
+  }
+  unique_ptr<llvm::legacy::PassManager> module_pass_manager(
+      new llvm::legacy::PassManager());
+  module_pass_manager->add(llvm::createTargetTransformInfoWrapperPass(target_analysis));
+  module_pass_manager->add(
+      llvm::createInternalizePass([&exported_fn_names](const llvm::GlobalValue& gv) {
+        return exported_fn_names.find(gv.getName().str()) != exported_fn_names.end();
+      }));
+  module_pass_manager->add(llvm::createGlobalDCEPass());
+  module_pass_manager->run(*module_);
+}
+
 Status LlvmCodeGen::FinalizeModule() {
   DCHECK(!is_compiled_);
   is_compiled_ = true;
@@ -1157,6 +1294,27 @@ Status LlvmCodeGen::FinalizeModule() {
   }
 
   RETURN_IF_ERROR(FinalizeLazyMaterialization());
+  PruneModule();
+
+  bool codegen_cache_enabled = state_->codegen_cache_enabled() && codegen_cache_enabled_;
+  CodeGenCacheKey cache_key;
+  if (codegen_cache_enabled) {
+    string bitcode;
+    SCOPED_TIMER(codegen_cache_lookup_timer_);
+    {
+      SCOPED_TIMER(module_bitcode_gen_timer_);
+      llvm::raw_string_ostream bitcode_stream(bitcode);
+      llvm::WriteBitcodeToFile(module_, bitcode_stream);
+      bitcode_stream.flush();
+    }
+    CodeGenCacheKeyConstructor::construct(bitcode, &cache_key);
+    // Generate the function names hashcode no matter the look up result, will be used
+    // in the cache store process if look up failed.
+    GenerateFunctionNamesHashCode();
+    DCHECK(!cache_key.empty());
+    if (LookupCache(cache_key)) return Status::OK();
+  }
+
   if (optimizations_enabled_ && !FLAGS_disable_optimization_passes) {
     RETURN_IF_ERROR(OptimizeModule());
   }
@@ -1179,16 +1337,26 @@ Status LlvmCodeGen::FinalizeModule() {
   }
 
   SetFunctionPointers();
-  DestroyModule();
-
-  // Track the memory consumed by the compiled code.
-  int64_t bytes_allocated = memory_manager_->bytes_allocated();
-  if (!mem_tracker_->TryConsume(bytes_allocated)) {
-    const string& msg = Substitute(
-        "Failed to allocate '$0' bytes for compiled code module", bytes_allocated);
-    return mem_tracker_->MemLimitExceeded(NULL, msg, bytes_allocated);
+  Status store_cache_status;
+  if (codegen_cache_enabled) {
+    SCOPED_TIMER(codegen_cache_save_timer_);
+    store_cache_status = StoreCache(cache_key);
+    LOG(INFO) << DebugCacheEntryString(cache_key, false /*is_lookup*/,
+        CodeGenCacheModeAnalyzer::is_debug(state_->query_options().codegen_cache_mode));
   }
-  memory_manager_->set_bytes_tracked(bytes_allocated);
+  // If the codegen is stored to the cache successfully, the cache will be responsible to
+  // track the memory consumption instead.
+  if (!codegen_cache_enabled || !store_cache_status.ok()) {
+    // Track the memory consumed by the compiled code.
+    int64_t bytes_allocated = memory_manager_->bytes_allocated();
+    if (!mem_tracker_->TryConsume(bytes_allocated)) {
+      const string& msg = Substitute(
+          "Failed to allocate '$0' bytes for compiled code module", bytes_allocated);
+      return mem_tracker_->MemLimitExceeded(NULL, msg, bytes_allocated);
+    }
+    memory_manager_->set_bytes_tracked(bytes_allocated);
+  }
+  DestroyModule();
   return Status::OK();
 }
 
@@ -1242,25 +1410,8 @@ Status LlvmCodeGen::OptimizeModule() {
   // machine to optimisation passes, e.g. the cost model.
   llvm::TargetIRAnalysis target_analysis =
       execution_engine_->getTargetMachine()->getTargetIRAnalysis();
-
-  // Before running any other optimization passes, run the internalize pass, giving it
-  // the names of all functions registered by AddFunctionToJit(), followed by the
-  // global dead code elimination pass. This causes all functions not registered to be
-  // JIT'd to be marked as internal, and any internal functions that are not used are
-  // deleted by DCE pass. This greatly decreases compile time by removing unused code.
-  unordered_set<string> exported_fn_names;
-  for (auto& entry : fns_to_jit_compile_) {
-    exported_fn_names.insert(entry.first->getName().str());
-  }
   unique_ptr<llvm::legacy::PassManager> module_pass_manager(
       new llvm::legacy::PassManager());
-  module_pass_manager->add(llvm::createTargetTransformInfoWrapperPass(target_analysis));
-  module_pass_manager->add(
-      llvm::createInternalizePass([&exported_fn_names](const llvm::GlobalValue& gv) {
-        return exported_fn_names.find(gv.getName().str()) != exported_fn_names.end();
-      }));
-  module_pass_manager->add(llvm::createGlobalDCEPass());
-  module_pass_manager->run(*module_);
 
   // Update counters before final optimization, but after removing unused functions. This
   // gives us a rough measure of how much work the optimization and compilation must do.
@@ -1833,6 +1984,36 @@ string LlvmCodeGen::DiagnosticHandler::GetErrorString() {
     return return_msg;
   }
   return "";
+}
+
+string LlvmCodeGen::DebugCacheEntryString(
+    CodeGenCacheKey& key, bool is_lookup, bool debug_mode, bool success) const {
+  stringstream out;
+  if (is_lookup) {
+    out << "Look up codegen cache ";
+  } else {
+    out << "Store to codegen cache ";
+  }
+  if (success) {
+    out << "succeeded. ";
+  } else {
+    if (is_lookup) {
+      out << "missed. ";
+    } else {
+      out << "failed. ";
+    }
+  }
+  out << "CodeGen Cache Key hash_code=" << key.hash_code();
+  out << " query_id=" << PrintId(state_->query_id()) << "\n";
+  if (UNLIKELY(debug_mode)) {
+    out << "Fragment Plan: " << apache::thrift::ThriftDebugString(state_->fragment())
+        << "\n";
+    out << "CodeGen Functions: \n";
+    for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {
+      out << "  " << fns_to_jit_compile_[i].first->getName().data() << "\n";
+    }
+  }
+  return out.str();
 }
 }
 

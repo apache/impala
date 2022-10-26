@@ -60,6 +60,7 @@ class FragmentState {
   ObjectPool* obj_pool() { return &obj_pool_; }
   int fragment_idx() const { return fragment_.idx; }
   const TQueryOptions& query_options() const { return query_state_->query_options(); }
+  const TQueryCtx& query_ctx() const { return query_state_->query_ctx(); }
   const TPlanFragment& fragment() const { return fragment_; }
   const PlanFragmentCtxPB& fragment_ctx() const { return fragment_ctx_; }
   const std::vector<const TPlanFragmentInstanceCtx*>& instance_ctxs() const {
@@ -68,6 +69,8 @@ class FragmentState {
   const std::vector<const PlanFragmentInstanceCtxPB*>& instance_ctx_pbs() const {
     return instance_ctx_pbs_;
   }
+  /// Return whether the codegen cache is enabled. It relies on the setting of the query.
+  bool codegen_cache_enabled() const { return query_state_->codegen_cache_enabled(); }
   /// Return the minimum per-fragment index of an instance on this backend.
   int min_per_fragment_instance_idx() const {
     // 'instance_ctxs_' is in ascending order, so can just return the first one.
@@ -79,6 +82,7 @@ class FragmentState {
   const TUniqueId& query_id() const { return query_state_->query_id(); }
   const DescriptorTbl& desc_tbl() const { return query_state_->desc_tbl(); }
   MemTracker* query_mem_tracker() const { return query_state_->query_mem_tracker(); }
+  QueryState* query_state() const { return query_state_; }
   RuntimeProfile* runtime_profile() { return runtime_profile_; }
 
   static const std::string FSTATE_THREAD_GROUP_NAME;

@@ -20,6 +20,66 @@
     "key": "external-data-source.class-cache.hits"
   },
   {
+    "description": "The total number of cache misses in the CodeGen Cache",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "CodeGen Cache Misses",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala.codegen-cache.misses"
+  },
+  {
+    "description": "The number of in-use CodeGen Cache Entries",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "In-use CodeGen Cache Entries",
+    "units": "UNIT",
+    "kind": "GAUGE",
+    "key": "impala.codegen-cache.entries-in-use"
+  },
+  {
+    "description": "The total bytes of in-use CodeGen Cache Entries",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "In-use CodeGen Cache Entries total bytes",
+    "units": "UNIT",
+    "kind": "GAUGE",
+    "key": "impala.codegen-cache.entries-in-use-bytes"
+  },
+  {
+    "description": "The number of evicted CodeGen Cache Entries",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Evicted CodeGen Cache Entries",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala.codegen-cache.entries-evicted"
+  },
+  {
+    "description": "The total number of cache hits in the CodeGen Cache",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "CodeGen Cache Hits",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala.codegen-cache.hits"
+  },
+  {
+    "description": "Statistics for codegen cache entry sizes allocated from the system.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "CodeGen Cache Entry Sizes.",
+    "units": "BYTES",
+    "kind": "HISTOGRAM",
+    "key": "impala.codegen-cache.entry-sizes"
+  },
+  {
     "description": "Resource Pool $0 Configured Max Mem Resources",
     "contexts": [
       "RESOURCE_POOL"

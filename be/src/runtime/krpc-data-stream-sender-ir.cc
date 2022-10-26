@@ -35,7 +35,7 @@ Status KrpcDataStreamSender::HashAndAddRows(RowBatch* batch) {
     int row_count = 0;
     FOREACH_ROW_LIMIT(batch, row_idx, RowBatch::HASH_BATCH_SIZE, row_batch_iter) {
       TupleRow* row = row_batch_iter.Get();
-      channel_ids[row_count++] = HashRow(row) % num_channels;
+      channel_ids[row_count++] = HashRow(row, exchange_hash_seed_) % num_channels;
     }
     row_count = 0;
     FOREACH_ROW_LIMIT(batch, row_idx, RowBatch::HASH_BATCH_SIZE, row_batch_iter) {

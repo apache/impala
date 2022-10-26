@@ -24,6 +24,7 @@
 #include <gutil/strings/substitute.h>
 
 #include "catalog/catalog-service-client-wrapper.h"
+#include "codegen/llvm-codegen-cache.h"
 #include "common/logging.h"
 #include "common/object-pool.h"
 #include "exec/kudu/kudu-util.h"
@@ -99,6 +100,8 @@ DEFINE_int32(admission_control_slots, 0,
     "this backend. The degree of parallelism of the query determines the number of slots "
     "that it needs. Defaults to number of cores / -num_cores for executors, and 8x that "
     "value for dedicated coordinators).");
+DEFINE_string(codegen_cache_capacity, "1GB",
+    "Specify the capacity of the codegen cache. If set to 0, codegen cache is disabled.");
 
 DEFINE_bool(use_local_catalog, false,
     "Use the on-demand metadata feature in coordinators. If this is set, coordinators "
@@ -164,6 +167,10 @@ DEFINE_string(metrics_webserver_interface, "",
     "Interface to start metrics webserver on. If blank, webserver binds to 0.0.0.0");
 
 const static string DEFAULT_FS = "fs.defaultFS";
+
+// The max percentage that the codegen cache can take from the total process memory.
+// The value is set to 20%.
+const double MAX_CODEGEN_CACHE_MEM_PERCENT = 0.2;
 
 // The multiplier for how many queries a dedicated coordinator can run compared to an
 // executor. This is only effective when using non-default settings for executor groups
@@ -443,6 +450,25 @@ Status ExecEnv::Init() {
 
   RETURN_IF_ERROR(admission_controller_->Init());
   RETURN_IF_ERROR(InitHadoopConfig());
+  int64_t codegen_cache_capacity =
+      ParseUtil::ParseMemSpec(FLAGS_codegen_cache_capacity, &is_percent, 0);
+  if (codegen_cache_capacity > 0) {
+    int64_t codegen_cache_limit = mem_tracker_->limit() * MAX_CODEGEN_CACHE_MEM_PERCENT;
+    DCHECK(codegen_cache_limit > 0);
+    if (codegen_cache_capacity > codegen_cache_limit) {
+      LOG(INFO) << "CodeGen Cache capacity changed to "
+                << PrettyPrinter::Print(codegen_cache_capacity, TUnit::BYTES) << " from "
+                << PrettyPrinter::Print(codegen_cache_limit, TUnit::BYTES)
+                << " due to reaching the limit.";
+      codegen_cache_capacity = codegen_cache_limit;
+    }
+    codegen_cache_.reset(new CodeGenCache(metrics_.get()));
+    RETURN_IF_ERROR(codegen_cache_->Init(codegen_cache_capacity));
+    LOG(INFO) << "CodeGen Cache initialized with capacity "
+              << PrettyPrinter::Print(codegen_cache_capacity, TUnit::BYTES);
+  } else {
+    LOG(INFO) << "CodeGen Cache is disabled.";
+  }
   return Status::OK();
 }
 

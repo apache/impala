@@ -51,6 +51,7 @@ class FragmentState;
 class FragmentInstanceState;
 class InitialReservations;
 class LlvmCodeGen;
+class CodeGenCache;
 class MemTracker;
 class PlanNode;
 class PublishFilterParamsPB;
@@ -150,6 +151,7 @@ class QueryState {
   const TQueryOptions& query_options() const {
     return query_ctx_.client_request.query_options;
   }
+  bool codegen_cache_enabled() const;
   MemTracker* query_mem_tracker() const { return query_mem_tracker_; }
   RuntimeProfile* host_profile() const { return host_profile_; }
   UniqueIdPB GetCoordinatorBackendId() const;
@@ -461,6 +463,9 @@ class QueryState {
   /// 0 on a successful report. Used to track how long we've been trying unsuccessfully to
   /// send a status report so that we can cancel after a configurable timeout.
   int64_t failed_report_time_ms_ = 0;
+
+  /// Indicator of whether to disable the codegen cache for the query.
+  bool disable_codegen_cache_ = false;
 
   /// Create QueryState w/ a refcnt of 0 and a memory limit of 'mem_limit' bytes applied
   /// to the query mem tracker. The query is associated with the resource pool set in

@@ -85,6 +85,15 @@ enum TMinmaxFilterFastCodePathMode {
   VERIFICATION=2
 }
 
+// The options for CodeGen Cache.
+// The debug options allow more logs, the value equal to the mode plus 256.
+enum TCodeGenCacheMode {
+  NORMAL = 0
+  OPTIMAL = 1
+  NORMAL_DEBUG = 256
+  OPTIMAL_DEBUG = 257
+}
+
 // Options for when to write Parquet Bloom filters for supported types.
 enum TParquetBloomFilterWrite {
   // Never write Parquet Bloom filters.
@@ -599,6 +608,10 @@ struct TQueryOptions {
   148: optional bool expand_complex_types = false;
 
   149: optional string fallback_db_for_functions;
+
+  // See comment in ImpalaService.thrift
+  150: optional bool disable_codegen_cache = false;
+  151: optional TCodeGenCacheMode codegen_cache_mode = TCodeGenCacheMode.NORMAL;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

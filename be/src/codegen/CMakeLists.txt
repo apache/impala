@@ -32,6 +32,7 @@ add_library(CodeGen
   codegen-symbol-emitter.cc
   codegen-util.cc
   llvm-codegen.cc
+  llvm-codegen-cache.cc
   instruction-counter.cc
   ${IR_C_FILE}
   ${LEGACY_AVX_IR_C_FILE}
@@ -130,5 +131,6 @@ add_custom_target(test-loop.bc
 # Exception to unified be tests: custom main initializes LLVM
 ADD_BE_LSAN_TEST(llvm-codegen-test)
 add_dependencies(llvm-codegen-test test-loop.bc)
+ADD_BE_LSAN_TEST(llvm-codegen-cache-test LlvmCodegenCacheTest.*)
 
 ADD_UNIFIED_BE_LSAN_TEST(instruction-counter-test InstructionCounterTest.*)
