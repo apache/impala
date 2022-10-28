@@ -146,6 +146,7 @@ class RequestRange : public InternalQueue<RequestRange>::Node {
   int64_t offset() const { return offset_; }
   int64_t len() const { return len_; }
   int disk_id() const { return disk_id_; }
+  bool is_erasure_coded() const { return is_erasure_coded_; }
   RequestType::type request_type() const { return request_type_; }
 
  protected:
@@ -170,6 +171,9 @@ class RequestRange : public InternalQueue<RequestRange>::Node {
 
   /// Id of disk queue containing byte range.
   int disk_id_;
+
+  /// Whether file is erasure coded.
+  bool is_erasure_coded_;
 
   /// The type of IO request, READ or WRITE.
   RequestType::type request_type_;
@@ -261,11 +265,26 @@ class ScanRange : public RequestRange {
     int64_t length;
   };
 
+  /// Struct for passing file info for constructing ScanRanges. Only contains details
+  /// consistent across all ranges for a given file. Filename is only used for the
+  /// duration of calls accepting FileInfo.
+  struct FileInfo {
+    const char *filename;
+    hdfsFS fs = nullptr;
+    int64_t mtime = ScanRange::INVALID_MTIME;
+    bool is_erasure_coded = false;
+  };
+
   /// Allocate a scan range object stored in the given 'obj_pool' and calls Reset() on it
   /// with the rest of the input variables.
-  static ScanRange* AllocateScanRange(ObjectPool* obj_pool, hdfsFS fs, const char* file,
+  static ScanRange* AllocateScanRange(ObjectPool* obj_pool, const FileInfo &fi,
       int64_t len, int64_t offset, std::vector<SubRange>&& sub_ranges, void* metadata,
-      int disk_id, bool expected_local, int64_t mtime, const BufferOpts& buffer_opts);
+      int disk_id, bool expected_local, const BufferOpts& buffer_opts);
+
+  /// Get file info for the current scan range.
+  FileInfo GetFileInfo() const {
+    return FileInfo{file_.c_str(), fs_, mtime_, is_erasure_coded_};
+  }
 
   /// Resets this scan range object with the scan range description. The scan range
   /// is for bytes [offset, offset + len) in 'file' on 'fs' (which is nullptr for the
@@ -285,15 +304,14 @@ class ScanRange : public RequestRange {
   /// TODO: IMPALA-4249: clarify if a ScanRange can be reused after Reset(). Currently
   /// it is not generally safe to do so, but some unit tests reuse ranges after
   /// successfully reading to eos.
-  void Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset, int disk_id,
-      bool expected_local, int64_t mtime, const BufferOpts& buffer_opts,
-      void* meta_data = nullptr, DiskFile* disk_file = nullptr,
-      DiskFile* disk_buffer_file = nullptr);
+  void Reset(const FileInfo &fi, int64_t len, int64_t offset, int disk_id,
+      bool expected_local, const BufferOpts& buffer_opts, void* meta_data = nullptr,
+      DiskFile* disk_file = nullptr, DiskFile* disk_buffer_file = nullptr);
 
   /// Same as above, but it also adds sub-ranges. No need to merge contiguous sub-ranges
   /// in advance, as this method will do the merge.
-  void Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset, int disk_id,
-      bool expected_local, int64_t mtime, const BufferOpts& buffer_opts,
+  void Reset(const FileInfo &fi, int64_t len, int64_t offset, int disk_id,
+      bool expected_local, const BufferOpts& buffer_opts,
       std::vector<SubRange>&& sub_ranges, void* meta_data = nullptr,
       DiskFile* disk_file = nullptr, DiskFile* disk_buffer_file = nullptr);
 

@@ -96,12 +96,10 @@ Status ParquetPageIndex::ReadAll(int row_group_idx) {
   int cache_options =
       scanner_->metadata_range_->cache_options() & ~BufferOpts::USE_HDFS_CACHE;
   ScanRange* object_range = scanner_->scan_node_->AllocateScanRange(
-      scanner_->metadata_range_->fs(), scanner_->filename(), scan_range_size,
-      scan_range_start, move(sub_ranges), partition_id,
-      scanner_->metadata_range_->disk_id(), scanner_->metadata_range_->expected_local(),
-      scanner_->metadata_range_->mtime(),
-      BufferOpts::ReadInto(page_index_buffer_.buffer(), page_index_buffer_.Size(),
-          cache_options));
+      scanner_->metadata_range_->GetFileInfo(), scan_range_size, scan_range_start,
+      move(sub_ranges), partition_id, scanner_->metadata_range_->disk_id(),
+      scanner_->metadata_range_->expected_local(), BufferOpts::ReadInto(
+          page_index_buffer_.buffer(), page_index_buffer_.Size(), cache_options));
 
   unique_ptr<BufferDescriptor> io_buffer;
   bool needs_buffers;

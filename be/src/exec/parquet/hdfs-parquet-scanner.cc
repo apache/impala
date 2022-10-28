@@ -1913,10 +1913,8 @@ Status HdfsParquetScanner::ReadToBuffer(uint64_t offset, uint8_t* buffer, uint64
   const int cache_options =
       metadata_range_->cache_options() & ~BufferOpts::USE_HDFS_CACHE;
   ScanRange* object_range = scan_node_->AllocateScanRange(
-      metadata_range_->fs(), filename(), size,
-      offset, partition_id,
+      metadata_range_->GetFileInfo(), size, offset, partition_id,
       metadata_range_->disk_id(), metadata_range_->expected_local(),
-      metadata_range_->mtime(),
       BufferOpts::ReadInto(buffer, size, cache_options));
   unique_ptr<BufferDescriptor> io_buffer;
   bool needs_buffers;

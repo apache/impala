@@ -227,6 +227,9 @@ struct THdfsFileSplit {
   // The absolute path of the file, it's used only when data files are outside of
   // the Iceberg table location (IMPALA-11507).
   10: optional string absolute_path
+
+  // Whether the HDFS file is stored with erasure coding.
+  11: optional bool is_erasure_coded
 }
 
 // Key range for single THBaseScanNode. Corresponds to HBaseKeyRangePB and should be kept

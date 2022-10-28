@@ -412,6 +412,9 @@ void HdfsFileReader::GetHdfsStatistics(hdfsFile hdfs_file, bool log_stats) {
       scan_range_->reader_->bytes_read_short_circuit_.Add(
           stats->totalShortCircuitBytesRead);
       scan_range_->reader_->bytes_read_dn_cache_.Add(stats->totalZeroCopyBytesRead);
+      if (scan_range_->is_erasure_coded()) {
+        scan_range_->reader_->bytes_read_ec_.Add(stats->totalBytesRead);
+      }
       if (stats->totalLocalBytesRead != stats->totalBytesRead) {
         num_remote_bytes_ += stats->totalBytesRead - stats->totalLocalBytesRead;
       }

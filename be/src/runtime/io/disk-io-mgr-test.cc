@@ -131,8 +131,8 @@ class DiskIoMgrTest : public testing::Test {
     }
     if (status.ok()) {
       ScanRange* scan_range = pool_.Add(new ScanRange());
-      scan_range->Reset(nullptr, (*written_range)->file(), (*written_range)->len(),
-          (*written_range)->offset(), 0, false, ScanRange::INVALID_MTIME,
+      scan_range->Reset(ScanRange::FileInfo{(*written_range)->file()},
+          (*written_range)->len(), (*written_range)->offset(), 0, false,
           BufferOpts::Uncached());
       ValidateSyncRead(io_mgr, reader, client, scan_range,
           reinterpret_cast<const char*>(data), sizeof(int32_t));
@@ -300,8 +300,8 @@ class DiskIoMgrTest : public testing::Test {
     ScanRange* range = pool->Add(new ScanRange);
     int cache_options =
         is_hdfs_cached ? BufferOpts::USE_HDFS_CACHE : BufferOpts::NO_CACHING;
-    range->Reset(nullptr, file_path, len, offset, disk_id, true, mtime,
-        BufferOpts(cache_options), move(sub_ranges), meta_data);
+    range->Reset(ScanRange::FileInfo{file_path, nullptr, mtime}, len, offset, disk_id,
+        true, BufferOpts(cache_options), move(sub_ranges), meta_data);
     EXPECT_EQ(mtime, range->mtime());
     return range;
   }
@@ -1591,7 +1591,7 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBuffer) {
     vector<uint8_t> client_buffer(buffer_len);
     int scan_len = min(len, buffer_len);
     ScanRange* range = pool_.Add(new ScanRange);
-    range->Reset(nullptr, tmp_file, scan_len, 0, 0, true, ScanRange::INVALID_MTIME,
+    range->Reset(ScanRange::FileInfo{tmp_file}, scan_len, 0, 0, true,
         BufferOpts::ReadInto(client_buffer.data(), buffer_len, BufferOpts::NO_CACHING));
     bool needs_buffers;
     ASSERT_OK(reader->StartScanRange(range, &needs_buffers));
@@ -1638,8 +1638,8 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBufferSubRanges) {
     vector<uint8_t> client_buffer(result_len);
     ScanRange* range = pool_.Add(new ScanRange);
     int cache_options = fake_cache ? BufferOpts::USE_HDFS_CACHE : BufferOpts::NO_CACHING;
-    range->Reset(nullptr, tmp_file, data_len, 0, 0, true, stat_val.st_mtime,
-        BufferOpts::ReadInto(cache_options, client_buffer.data(), result_len),
+    range->Reset(ScanRange::FileInfo{tmp_file, nullptr, stat_val.st_mtime}, data_len, 0,
+        0, true, BufferOpts::ReadInto(cache_options, client_buffer.data(), result_len),
         move(sub_ranges));
     if (fake_cache) {
       SetReaderStub(range, make_unique<CacheReaderTestStub>(range, cache, data_len));
@@ -1688,7 +1688,7 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBufferError) {
         LARGE_RESERVATION_LIMIT, LARGE_INITIAL_RESERVATION, &read_client);
     unique_ptr<RequestContext> reader = io_mgr->RegisterContext();
     ScanRange* range = pool_.Add(new ScanRange);
-    range->Reset(nullptr, tmp_file, SCAN_LEN, 0, 0, true, ScanRange::INVALID_MTIME,
+    range->Reset(ScanRange::FileInfo{tmp_file}, SCAN_LEN, 0, 0, true,
         BufferOpts::ReadInto(client_buffer.data(), SCAN_LEN, BufferOpts::NO_CACHING));
     bool needs_buffers;
     ASSERT_OK(reader->StartScanRange(range, &needs_buffers));
@@ -2059,8 +2059,9 @@ TEST_F(DiskIoMgrTest, WriteToRemoteSuccess) {
     auto data = datas.at(i);
     size_t buffer_len = sizeof(int32_t);
     vector<uint8_t> client_buffer(buffer_len);
-    scan_range->Reset(hdfsConnect("default", 0), range->file(), range->len(),
-        range->offset(), 0, false, mtime,
+    scan_range->Reset(
+        ScanRange::FileInfo{range->file(), hdfsConnect("default", 0), mtime},
+        range->len(), range->offset(), 0, false,
         BufferOpts::ReadInto(client_buffer.data(), buffer_len, BufferOpts::NO_CACHING),
         nullptr, (*new_tmp_file_obj)->DiskFile(), (*new_tmp_file_obj)->DiskBufferFile());
     bool needs_buffers;
@@ -2085,8 +2086,9 @@ TEST_F(DiskIoMgrTest, WriteToRemoteSuccess) {
     auto data = datas.at(i);
     size_t buffer_len = sizeof(int32_t);
     vector<uint8_t> client_buffer(buffer_len);
-    scan_range->Reset(hdfsConnect("default", 0), range->file(), range->len(),
-        range->offset(), 0, false, mtime,
+    scan_range->Reset(
+        ScanRange::FileInfo{range->file(), hdfsConnect("default", 0), mtime},
+        range->len(), range->offset(), 0, false,
         BufferOpts::ReadInto(client_buffer.data(), buffer_len, BufferOpts::NO_CACHING),
         nullptr, (*new_tmp_file_obj)->DiskFile(), (*new_tmp_file_obj)->DiskBufferFile());
     bool needs_buffers;
@@ -2169,8 +2171,9 @@ TEST_F(DiskIoMgrTest, WriteToRemotePartialFileSuccess) {
   ScanRange* scan_range = tmp_pool.Add(new ScanRange);
   size_t buffer_len = sizeof(int32_t);
   vector<uint8_t> client_buffer(buffer_len);
-  scan_range->Reset(hdfsConnect("default", 0), (*new_range)->file(), (*new_range)->len(),
-      (*new_range)->offset(), 0, false, mtime,
+  scan_range->Reset(
+      ScanRange::FileInfo{(*new_range)->file(), hdfsConnect("default", 0), mtime},
+      (*new_range)->len(), (*new_range)->offset(), 0, false,
       BufferOpts::ReadInto(client_buffer.data(), buffer_len, BufferOpts::NO_CACHING),
       nullptr, (*new_tmp_file_obj)->DiskFile(), (*new_tmp_file_obj)->DiskBufferFile());
   bool needs_buffers;
@@ -2588,8 +2591,9 @@ TEST_F(DiskIoMgrTest, WriteToRemoteFileDeleted) {
     auto range = ranges.at(0);
     size_t buffer_len = sizeof(int32_t);
     vector<uint8_t> client_buffer(buffer_len);
-    scan_range->Reset(hdfsConnect("default", 0), range->file(), range->len(),
-        range->offset(), 0, false, 1000000,
+    scan_range->Reset(
+        ScanRange::FileInfo{range->file(), hdfsConnect("default", 0), 1000000},
+        range->len(), range->offset(), 0, false,
         BufferOpts::ReadInto(client_buffer.data(), buffer_len, BufferOpts::NO_CACHING),
         nullptr, tmp_file.DiskFile(), tmp_file.DiskBufferFile());
     bool needs_buffers;

@@ -466,57 +466,57 @@ ScanRange::~ScanRange() {
   DCHECK(!read_in_flight_);
 }
 
-void ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset,
-    int disk_id, bool expected_local, int64_t mtime, const BufferOpts& buffer_opts,
-    void* meta_data, DiskFile* disk_file, DiskFile* disk_buffer_file) {
-  Reset(fs, file, len, offset, disk_id, expected_local, mtime, buffer_opts, {}, meta_data,
-      disk_file, disk_buffer_file);
+void ScanRange::Reset(const FileInfo &fi, int64_t len, int64_t offset, int disk_id,
+    bool expected_local, const BufferOpts& buffer_opts, void* meta_data,
+    DiskFile* disk_file, DiskFile* disk_buffer_file) {
+  Reset(fi, len, offset, disk_id, expected_local, buffer_opts, {},
+      meta_data, disk_file, disk_buffer_file);
 }
 
-ScanRange* ScanRange::AllocateScanRange(ObjectPool* obj_pool, hdfsFS fs, const char* file,
+ScanRange* ScanRange::AllocateScanRange(ObjectPool* obj_pool, const FileInfo &fi,
     int64_t len, int64_t offset, std::vector<SubRange>&& sub_ranges, void* metadata,
-    int disk_id, bool expected_local, int64_t mtime, const BufferOpts& buffer_opts) {
+    int disk_id, bool expected_local, const BufferOpts& buffer_opts) {
   DCHECK_GE(disk_id, -1);
   DCHECK_GE(offset, 0);
   DCHECK_GE(len, 0);
   disk_id = ExecEnv::GetInstance()->disk_io_mgr()->AssignQueue(
-      file, disk_id, expected_local, /* check_default_fs */ true);
+      fi.filename, disk_id, expected_local, /* check_default_fs */ true);
   ScanRange* range = obj_pool->Add(new ScanRange);
-  range->Reset(fs, file, len, offset, disk_id, expected_local, mtime, buffer_opts,
+  range->Reset(fi, len, offset, disk_id, expected_local, buffer_opts,
       move(sub_ranges), metadata);
   return range;
 }
 
-void ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset,
-    int disk_id, bool expected_local, int64_t mtime, const BufferOpts& buffer_opts,
-    vector<SubRange>&& sub_ranges, void* meta_data, DiskFile* disk_file,
-    DiskFile* disk_buffer_file) {
+void ScanRange::Reset(const FileInfo &fi, int64_t len, int64_t offset, int disk_id,
+    bool expected_local, const BufferOpts& buffer_opts, vector<SubRange>&& sub_ranges,
+    void* meta_data, DiskFile* disk_file, DiskFile* disk_buffer_file) {
   DCHECK(buffer_manager_->is_readybuffer_empty());
   DCHECK(!read_in_flight_);
-  DCHECK(file != nullptr);
+  DCHECK(fi.filename != nullptr);
   DCHECK_GE(len, 0);
   DCHECK_GE(offset, 0);
   DCHECK(buffer_opts.client_buffer_ == nullptr ||
          buffer_opts.client_buffer_len_ >= len_);
-  fs_ = fs;
-  if (fs != nullptr) {
+  fs_ = fi.fs;
+  if (fs_ != nullptr) {
     file_reader_ = make_unique<HdfsFileReader>(this, fs_, false);
     local_buffer_reader_ = make_unique<LocalFileReader>(this);
   } else {
     file_reader_ = make_unique<LocalFileReader>(this);
   }
-  file_ = file;
+  file_ = fi.filename;
   len_ = len;
   bytes_to_read_ = len;
   offset_ = offset;
   disk_id_ = disk_id;
+  is_erasure_coded_ = fi.is_erasure_coded;
   cache_options_ = buffer_opts.cache_options_;
   disk_file_ = disk_file;
   disk_buffer_file_ = disk_buffer_file;
 
   // HDFS ranges must have an mtime > 0. Local ranges do not use mtime.
-  if (fs_) DCHECK_GT(mtime, 0);
-  mtime_ = mtime;
+  mtime_ = fi.mtime;
+  if (fs_) DCHECK_GT(mtime_, 0);
   meta_data_ = meta_data;
   if (buffer_opts.client_buffer_ != nullptr) {
     buffer_manager_->set_client_buffer();

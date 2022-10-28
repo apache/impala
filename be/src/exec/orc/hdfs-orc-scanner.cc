@@ -155,8 +155,9 @@ Status HdfsOrcScanner::ScanRangeInputStream::readRandom(
   bool expected_local = split_range->ExpectedLocalRead(offset, length);
   int cache_options = split_range->cache_options() & ~BufferOpts::USE_HDFS_CACHE;
   ScanRange* range = scanner_->scan_node_->AllocateScanRange(
-      metadata_range->fs(), scanner_->filename(), length, offset, partition_id,
-      split_range->disk_id(), expected_local, split_range->mtime(),
+      ScanRange::FileInfo{scanner_->filename(), metadata_range->fs(),
+          split_range->mtime(), split_range->is_erasure_coded()},
+      length, offset, partition_id, split_range->disk_id(), expected_local,
       BufferOpts::ReadInto(reinterpret_cast<uint8_t*>(buf), length, cache_options));
   unique_ptr<BufferDescriptor> io_buffer;
   Status status;
@@ -255,9 +256,11 @@ Status HdfsOrcScanner::StartColumnReading(const orc::StripeInformation& stripe) 
       string msg = Substitute("Invalid read len.");
       return Status(msg);
     }
-    ScanRange* scan_range = scan_node_->AllocateScanRange(metadata_range_->fs(),
-        filename(), range.length_, range.offset_, partition_id, split_range->disk_id(),
-        col_range_local, split_range->mtime(), BufferOpts(split_range->cache_options()));
+    ScanRange* scan_range = scan_node_->AllocateScanRange(
+        ScanRange::FileInfo{filename(), metadata_range_->fs(), split_range->mtime(),
+            split_range->is_erasure_coded()},
+        range.length_, range.offset_, partition_id, split_range->disk_id(),
+        col_range_local, BufferOpts(split_range->cache_options()));
     RETURN_IF_ERROR(
         context_->AddAndStartStream(scan_range, range.io_reservation, &range.stream_));
   }

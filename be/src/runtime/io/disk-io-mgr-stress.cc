@@ -261,8 +261,8 @@ void DiskIoMgrStress::NewClient(int i) {
     range_len = min(range_len, file_len - assigned_len);
 
     ScanRange* range = client.obj_pool.Add(new ScanRange);
-    range->Reset(NULL, files_[client.file_idx].filename.c_str(), range_len, assigned_len,
-        0, false, ScanRange::INVALID_MTIME, BufferOpts::Uncached());
+    range->Reset(ScanRange::FileInfo{files_[client.file_idx].filename.c_str()},
+        range_len, assigned_len, 0, false, BufferOpts::Uncached());
     client.scan_ranges.push_back(range);
     assigned_len += range_len;
   }

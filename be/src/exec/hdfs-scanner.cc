@@ -888,10 +888,9 @@ Status HdfsScanner::IssueFooterRanges(HdfsScanNodeBase* scan_node,
         // metadata associated with the footer range.
         ScanRange* footer_range;
         if (footer_split != nullptr) {
-          footer_range = scan_node->AllocateScanRange(files[i]->fs,
-              files[i]->filename.c_str(), footer_size, footer_start,
-              split_metadata->partition_id, footer_split->disk_id(),
-              footer_split->expected_local(), files[i]->mtime,
+          footer_range = scan_node->AllocateScanRange(files[i]->GetFileInfo(),
+              footer_size, footer_start, split_metadata->partition_id,
+              footer_split->disk_id(), footer_split->expected_local(),
               BufferOpts(footer_split->cache_options()), split);
         } else {
           // If we did not find the last split, we know it is going to be a remote read.
@@ -899,9 +898,9 @@ Status HdfsScanner::IssueFooterRanges(HdfsScanNodeBase* scan_node,
           int cache_options = !scan_node->IsDataCacheDisabled() ?
               BufferOpts::USE_DATA_CACHE : BufferOpts::NO_CACHING;
           footer_range =
-              scan_node->AllocateScanRange(files[i]->fs, files[i]->filename.c_str(),
-                   footer_size, footer_start, split_metadata->partition_id, -1,
-                   expected_local, files[i]->mtime, BufferOpts(cache_options), split);
+              scan_node->AllocateScanRange(files[i]->GetFileInfo(),
+                  footer_size, footer_start, split_metadata->partition_id, -1,
+                  expected_local, BufferOpts(cache_options), split);
         }
         footer_ranges.push_back(footer_range);
       } else {

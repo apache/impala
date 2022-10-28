@@ -1629,16 +1629,18 @@ Status TmpFileGroup::ReadAsync(TmpWriteHandle* handle, MemRange buffer) {
     DiskFile* local_read_buffer_file = tmp_file->GetReadBufferFile(offset);
     DiskFile* remote_file = tmp_file->DiskFile();
     // Reset the read_range, use the remote filesystem's disk id.
-    handle->read_range_->Reset(tmp_file->hdfs_conn_, remote_file->path().c_str(),
-        handle->write_range_->len(), offset, tmp_file->disk_id(), false, tmp_file->mtime_,
+    handle->read_range_->Reset(
+        ScanRange::FileInfo{
+            remote_file->path().c_str(), tmp_file->hdfs_conn_, tmp_file->mtime_},
+        handle->write_range_->len(), offset, tmp_file->disk_id(), false,
         BufferOpts::ReadInto(
             read_buffer.data(), read_buffer.len(), BufferOpts::NO_CACHING),
         nullptr, remote_file, local_read_buffer_file);
   } else {
     // Read from local.
-    handle->read_range_->Reset(nullptr, handle->write_range_->file(),
+    handle->read_range_->Reset(
+        ScanRange::FileInfo{handle->write_range_->file()},
         handle->write_range_->len(), offset, handle->write_range_->disk_id(), false,
-        ScanRange::INVALID_MTIME,
         BufferOpts::ReadInto(
             read_buffer.data(), read_buffer.len(), BufferOpts::NO_CACHING));
   }

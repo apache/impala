@@ -410,6 +410,16 @@
     "key": "impala-server.io-mgr.cached-bytes-read"
   },
   {
+    "description": "Total number of erasure-coded bytes read by the IO manager.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Erasure Coded Bytes Read",
+    "units": "BYTES",
+    "kind": "COUNTER",
+    "key": "impala-server.io-mgr.erasure-coded-bytes-read"
+  },
+  {
     "description": "Total number of local bytes read by the IO manager.",
     "contexts": [
       "IMPALAD"

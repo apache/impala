@@ -111,6 +111,8 @@ PROFILE_DEFINE_COUNTER(BytesReadShortCircuit, STABLE_LOW, TUnit::BYTES,
     "The total number of bytes read via short circuit read");
 PROFILE_DEFINE_COUNTER(BytesReadDataNodeCache, STABLE_HIGH, TUnit::BYTES,
     "The total number of bytes read from data node cache");
+PROFILE_DEFINE_COUNTER(BytesReadErasureCoded, STABLE_LOW, TUnit::BYTES,
+    "The total number of bytes read from erasure-coded data");
 PROFILE_DEFINE_COUNTER(RemoteScanRanges, STABLE_HIGH, TUnit::UNIT,
     "The total number of remote scan ranges");
 PROFILE_DEFINE_COUNTER(BytesReadRemoteUnexpected, STABLE_LOW, TUnit::BYTES,
@@ -298,6 +300,7 @@ Status HdfsScanPlanNode::ProcessScanRangesAndInitSharedState(FragmentState* stat
         file_desc->file_length = split.file_length();
         file_desc->mtime = split.mtime();
         file_desc->file_compression = CompressionTypePBToThrift(split.file_compression());
+        file_desc->is_erasure_coded = split.is_erasure_coded();
         file_desc->file_format = partition_desc->file_format();
         file_desc->file_metadata = file_metadata;
         RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
@@ -328,10 +331,9 @@ Status HdfsScanPlanNode::ProcessScanRangesAndInitSharedState(FragmentState* stat
       }
       ScanRangeMetadata* metadata =
           obj_pool->Add(new ScanRangeMetadata(split.partition_id(), nullptr));
-      file_desc->splits.push_back(ScanRange::AllocateScanRange(obj_pool, file_desc->fs,
-          file_desc->filename.c_str(), split.length(), split.offset(), {}, metadata,
-          params.volume_id(), expected_local, file_desc->mtime,
-          BufferOpts(cache_options)));
+      file_desc->splits.push_back(ScanRange::AllocateScanRange(obj_pool,
+          file_desc->GetFileInfo(), split.length(), split.offset(), {}, metadata,
+          params.volume_id(), expected_local, BufferOpts(cache_options)));
       total_splits++;
     }
     // Update server wide metrics for number of scan ranges and ranges that have
@@ -608,6 +610,7 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
   bytes_read_short_circuit_ =
       PROFILE_BytesReadShortCircuit.Instantiate(runtime_profile());
   bytes_read_dn_cache_ = PROFILE_BytesReadDataNodeCache.Instantiate(runtime_profile());
+  bytes_read_ec_ = PROFILE_BytesReadErasureCoded.Instantiate(runtime_profile());
   num_remote_ranges_ = PROFILE_RemoteScanRanges.Instantiate(runtime_profile());
   unexpected_remote_bytes_ =
       PROFILE_BytesReadRemoteUnexpected.Instantiate(runtime_profile());
@@ -822,37 +825,37 @@ int64_t HdfsScanNodeBase::IncreaseReservationIncrementally(int64_t curr_reservat
   return curr_reservation;
 }
 
-ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
+ScanRange* HdfsScanNodeBase::AllocateScanRange(const ScanRange::FileInfo &fi,
     int64_t len, int64_t offset, int64_t partition_id, int disk_id, bool expected_local,
-    int64_t mtime,  const BufferOpts& buffer_opts, const ScanRange* original_split) {
-  ScanRangeMetadata* metadata =
-      shared_state_->obj_pool()->Add(new ScanRangeMetadata(partition_id, original_split));
-  return AllocateScanRange(fs, file, len, offset, {}, metadata, disk_id, expected_local,
-      mtime, buffer_opts);
-}
-
-ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
-    int64_t len, int64_t offset, vector<ScanRange::SubRange>&& sub_ranges,
-    int64_t partition_id, int disk_id, bool expected_local, int64_t mtime,
     const BufferOpts& buffer_opts, const ScanRange* original_split) {
   ScanRangeMetadata* metadata =
       shared_state_->obj_pool()->Add(new ScanRangeMetadata(partition_id, original_split));
-  return AllocateScanRange(fs, file, len, offset, move(sub_ranges), metadata,
-      disk_id, expected_local, mtime, buffer_opts);
+  return AllocateScanRange(fi, len, offset, {}, metadata, disk_id, expected_local,
+      buffer_opts);
 }
 
-ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
-    int64_t offset, vector<ScanRange::SubRange>&& sub_ranges, ScanRangeMetadata* metadata,
-    int disk_id, bool expected_local, int64_t mtime,
+ScanRange* HdfsScanNodeBase::AllocateScanRange(const ScanRange::FileInfo &fi,
+    int64_t len, int64_t offset, vector<ScanRange::SubRange>&& sub_ranges,
+    int64_t partition_id, int disk_id, bool expected_local,
+    const BufferOpts& buffer_opts, const ScanRange* original_split) {
+  ScanRangeMetadata* metadata =
+      shared_state_->obj_pool()->Add(new ScanRangeMetadata(partition_id, original_split));
+  return AllocateScanRange(fi, len, offset, move(sub_ranges), metadata,
+      disk_id, expected_local, buffer_opts);
+}
+
+ScanRange* HdfsScanNodeBase::AllocateScanRange(const ScanRange::FileInfo &fi,
+    int64_t len, int64_t offset, vector<ScanRange::SubRange>&& sub_ranges,
+    ScanRangeMetadata* metadata, int disk_id, bool expected_local,
     const BufferOpts& buffer_opts) {
   // Require that the scan range is within [0, file_length). While this cannot be used
   // to guarantee safety (file_length metadata may be stale), it avoids different
   // behavior between Hadoop FileSystems (e.g. s3n hdfsSeek() returns error when seeking
   // beyond the end of the file).
-  DCHECK_LE(offset + len, GetFileDesc(metadata->partition_id, file)->file_length)
+  DCHECK_LE(offset + len, GetFileDesc(metadata->partition_id, fi.filename)->file_length)
       << "Scan range beyond end of file (offset=" << offset << ", len=" << len << ")";
-  return ScanRange::AllocateScanRange(shared_state_->obj_pool(), fs, file, len, offset,
-      move(sub_ranges), metadata, disk_id, expected_local, mtime, buffer_opts);
+  return ScanRange::AllocateScanRange(shared_state_->obj_pool(), fi, len, offset,
+      move(sub_ranges), metadata, disk_id, expected_local, buffer_opts);
 }
 
 const CodegenFnPtrBase* HdfsScanNodeBase::GetCodegenFn(THdfsFileFormat::type type) {
@@ -1213,6 +1216,7 @@ void HdfsScanNodeBase::StopAndFinalizeCounters() {
     bytes_read_local_->Set(reader_context_->bytes_read_local());
     bytes_read_short_circuit_->Set(reader_context_->bytes_read_short_circuit());
     bytes_read_dn_cache_->Set(reader_context_->bytes_read_dn_cache());
+    bytes_read_ec_->Set(reader_context_->bytes_read_ec());
     num_remote_ranges_->Set(reader_context_->num_remote_ranges());
     unexpected_remote_bytes_->Set(reader_context_->unexpected_remote_bytes());
     cached_file_handles_hit_count_->Set(reader_context_->cached_file_handles_hit_count());
@@ -1237,6 +1241,8 @@ void HdfsScanNodeBase::StopAndFinalizeCounters() {
         bytes_read_short_circuit_->value());
     ImpaladMetrics::IO_MGR_CACHED_BYTES_READ->Increment(
         bytes_read_dn_cache_->value());
+    ImpaladMetrics::IO_MGR_ERASURE_CODED_BYTES_READ->Increment(
+        bytes_read_ec_->value());
   }
 }
 

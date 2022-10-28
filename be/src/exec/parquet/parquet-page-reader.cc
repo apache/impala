@@ -87,10 +87,11 @@ Status ParquetPageReader::InitColumnChunk(const HdfsFileDesc& file_desc,
       static_cast<ScanRangeMetadata*>(metadata_range->meta_data())->original_split;
   // Determine if the column is completely contained within a local split.
   bool col_range_local = split_range->ExpectedLocalRead(col_start, col_len);
-  scan_range_ = parent_->scan_node_->AllocateScanRange(metadata_range->fs(),
-      filename(), col_len, col_start, move(sub_ranges),
-      partition_id, split_range->disk_id(),
-      col_range_local, file_desc.mtime, BufferOpts(split_range->cache_options()));
+  ScanRange::FileInfo fi = metadata_range->GetFileInfo();
+  fi.mtime = file_desc.mtime;
+  scan_range_ = parent_->scan_node_->AllocateScanRange(fi,
+      col_len, col_start, move(sub_ranges), partition_id, split_range->disk_id(),
+      col_range_local, BufferOpts(split_range->cache_options()));
   page_headers_read_ = 0;
   dictionary_header_encountered_ = false;
   state_ = State::Initialized;
