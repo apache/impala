@@ -21,8 +21,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -283,6 +284,41 @@ public class SelectStmt extends QueryStmt {
     private List<FunctionCallExpr> aggExprs_;
     private ExprSubstitutionMap countAllMap_;
 
+    private class StarExpandedPathInfo {
+      public StarExpandedPathInfo(Path expandedPath, Path originalRootPath) {
+        expandedPath_ = expandedPath;
+        originalRootPath_ = originalRootPath;
+      }
+
+      public Path getExpandedPath() { return expandedPath_; }
+      public boolean shouldRegisterForColumnMasking() {
+        // Empty matched types means this is expanded from star of a catalog table. For
+        // star of complex types, e.g. my_struct.*, my_array.*, my_map.*, the matched
+        // types will have the complex type so it's not empty.
+        // TODO: IMPALA-11712: We should sort out column masking and complex types. The
+        // above comment may not always be true: in the query
+        //   select a.* from mix_struct_array t, t.struct_in_arr a;
+        // getMatchedTypes() returns an empty list for the star path even though it is not
+        // from a catalog table.
+        // We should also find out whether we can determine from the expanded path alone
+        // (and not from the path of the star item) whether we need to register it for
+        // column masking, for example by checking if it is within a complex type.
+        return originalRootPath_.getMatchedTypes().isEmpty();
+      }
+
+      // The path expanded from a star select list item.
+      private final Path expandedPath_;
+
+      // The original path of the star select list item from which 'expandedPath_' was
+      // expanded.
+      // Can be the path of a table, a struct or a collection.
+      private final Path originalRootPath_;
+    }
+
+    // A map from star 'SelectListItem's to the paths to which they are expanded.
+    private final Map<SelectListItem, List<StarExpandedPathInfo>> starExpandedPaths_
+        = new HashMap<>();
+
     private SelectAnalyzer(Analyzer analyzer) {
       this.analyzer_ = analyzer;
     }
@@ -291,6 +327,10 @@ public class SelectStmt extends QueryStmt {
       // Start out with table refs to establish aliases.
       fromClause_.analyze(analyzer_);
 
+      // Register struct paths (including those expanded from star expressions) before
+      // analyzeSelectClause() to guarantee tuple memory sharing between structs and
+      // struct members. See registerStructSlotRefPathsWithAnalyzer().
+      collectStarExpandedPaths();
       registerStructSlotRefPathsWithAnalyzer();
 
       analyzeSelectClause();
@@ -333,14 +373,43 @@ public class SelectStmt extends QueryStmt {
       analyzer_.setSimpleLimitStatus(checkSimpleLimitStmt());
     }
 
-    /* Register paths that point to structs. This is to unify expressions and allow
-     * embedded (struct member) expressions to share the tuple memory of their enclosing
-     * expressions.
+    /** Ensure that embedded (struct member) expressions share the tuple memory of their
+     * enclosing struct expressions by registering struct paths before analysis of select
+     * list items. Struct paths are registered in order of increasing number of path
+     * elements - this guarantees that when a struct member path is registered, its
+     * enclosing struct has already been registered, so Analyzer.registerSlotRef() can
+     * return the SlotDescriptor already created for the struct member within the struct,
+     * instead of creating a new SlotDescriptor for the struct member outside of the
+     * struct.
+     *
+     * Note that struct members can themselves be structs: this is the reason that
+     * ordering by increasing path element number (increasing embedding depth) is
+     * necessary and simply registering struct paths before other paths is not enough.
      */
     private void registerStructSlotRefPathsWithAnalyzer() throws AnalysisException {
+      Stream<Path> nonStarPaths = collectNonStarPaths();
+      Stream<Path> starExpandedPaths = starExpandedPaths_.values().stream()
+          // Get a flat list of paths (and booleans) belonging to all star items.
+          .flatMap(pathList -> pathList.stream())
+          // Discard the booleans and keep only the actual paths.
+          .map((StarExpandedPathInfo pathInfo)  -> pathInfo.getExpandedPath());
+
+      Stream<Path> allPaths = Stream.concat(nonStarPaths, starExpandedPaths);
+      List<Path> structPaths = allPaths
+          .filter(path -> path.destType().isStructType())
+          .collect(Collectors.toList());
+
+      // Sort paths by length in ascending order so that structs that contain other
+      // structs come before their children.
+      Collections.sort(structPaths,
+          Comparator.<Path>comparingInt(path -> path.getMatchedTypes().size()));
+      for (Path p : structPaths) {
+        analyzer_.registerSlotRef(p);
+      }
+    }
+
+    private Stream<Path> collectNonStarPaths() {
       Preconditions.checkNotNull(selectList_);
-      // Note: if we in the future include complex types in star expressions, we will have
-      // to expand star expressions here.
       Stream<Expr> selectListExprs = selectList_.getItems().stream()
         .filter(elem -> !elem.isStar())
         .map(elem -> elem.getExpr());
@@ -348,20 +417,13 @@ public class SelectStmt extends QueryStmt {
 
       Stream<Expr> exprs = Stream.concat(selectListExprs, nonSelectListExprs);
 
-      HashSet<SlotRef> slotRefs = new HashSet<>();
+      // Use a LinkedHashSet for deterministic iteration order.
+      LinkedHashSet<SlotRef> slotRefs = new LinkedHashSet<>();
       exprs.forEach(expr -> expr.collect(SlotRef.class, slotRefs));
 
-      List<Path> paths = slotRefs.stream().map(this::slotRefToResolvedPath)
-          .filter(path -> path != null)
-          .filter(path -> path.destType().isStructType())
-          .collect(Collectors.toList());
-      // Sort paths by length in ascending order so that structs that contain other
-      // structs come before their children.
-      Collections.sort(paths,
-          Comparator.<Path>comparingInt(path -> path.getMatchedTypes().size()));
-      for (Path p : paths) {
-        analyzer_.registerSlotRef(p);
-      }
+      return slotRefs.stream()
+          .map(this::slotRefToResolvedPath)
+          .filter(path -> path != null);
     }
 
     private Stream<Expr> collectExprsOutsideSelectList() {
@@ -419,53 +481,70 @@ public class SelectStmt extends QueryStmt {
       for (int i = 0; i < selectList_.getItems().size(); ++i) {
         SelectListItem item = selectList_.getItems().get(i);
         if (item.isStar()) {
-          if (item.getRawPath() != null) {
-            Path resolvedPath = analyzeStarPath(item.getRawPath(), analyzer_);
-            expandStar(resolvedPath);
-          } else {
-            expandStar();
-          }
+          analyzeStarItem(item);
         } else {
-          // Analyze the resultExpr before generating a label to ensure enforcement
-          // of expr child and depth limits (toColumn() label may call toSql()).
-          item.getExpr().analyze(analyzer_);
-          // Check for scalar subquery types which are not supported
-          List<Subquery> subqueryExprs = new ArrayList<>();
-          item.getExpr().collect(Subquery.class, subqueryExprs);
-          for (Subquery s : subqueryExprs) {
-            Preconditions.checkState(s.getStatement() instanceof SelectStmt);
-            if (!s.returnsScalarColumn()) {
-              throw new AnalysisException("A non-scalar subquery is not supported in "
-                  + "the expression: " + item.getExpr().toSql());
-            }
-            if (s.getStatement().isRuntimeScalar()) {
-              throw new AnalysisException(
-                  "A subquery which may return more than one row is not supported in "
-                  + "the expression: " + item.getExpr().toSql());
-            }
-            if (!((SelectStmt)s.getStatement()).returnsAtMostOneRow()) {
-              throw new AnalysisException("Only subqueries that are guaranteed to return "
-                   + "a single row are supported: " + item.getExpr().toSql());
-            }
-          }
-          resultExprs_.add(item.getExpr());
-          String label = item.toColumnLabel(i, analyzer_.useHiveColLabels());
-          SlotRef aliasRef = new SlotRef(label);
-          Expr existingAliasExpr = existingAliasExprs.get(label);
-          if (existingAliasExpr != null && !existingAliasExpr.equals(item.getExpr())) {
-            // If we have already seen this alias, it refers to more than one column and
-            // therefore is ambiguous.
-            ambiguousAliasList_.add(aliasRef);
-          } else {
-            existingAliasExprs.put(label, item.getExpr());
-          }
-          aliasSmap_.put(aliasRef, item.getExpr().clone());
-          colLabels_.add(label);
+          analyzeNonStarItem(item, existingAliasExprs, i);
         }
       }
       if (LOG.isTraceEnabled()) {
         LOG.trace("Analyzed select clause aliasSmap={}", aliasSmap_.debugString());
       }
+    }
+
+    private void analyzeStarItem(SelectListItem item) throws AnalysisException {
+      Preconditions.checkState(item.isStar());
+      List<StarExpandedPathInfo> starExpandedPathInfos = starExpandedPaths_.get(item);
+      // If complex types are not expanded, a star item may expand to zero items, in which
+      // case starExpandedPaths_ does not have a value for it.
+      if (starExpandedPathInfos == null) {
+        Preconditions.checkState(
+            !analyzer_.getQueryCtx().client_request.query_options.expand_complex_types);
+        return;
+      }
+
+      for (StarExpandedPathInfo pathInfo : starExpandedPathInfos) {
+        addStarExpandedPathResultExpr(pathInfo);
+      }
+    }
+
+    private void analyzeNonStarItem(SelectListItem item,
+        Map<String, Expr> existingAliasExprs, int selectListPos)
+        throws AnalysisException {
+      // Analyze the resultExpr before generating a label to ensure enforcement
+      // of expr child and depth limits (toColumn() label may call toSql()).
+      item.getExpr().analyze(analyzer_);
+      // Check for scalar subquery types which are not supported
+      List<Subquery> subqueryExprs = new ArrayList<>();
+      item.getExpr().collect(Subquery.class, subqueryExprs);
+      for (Subquery s : subqueryExprs) {
+        Preconditions.checkState(s.getStatement() instanceof SelectStmt);
+        if (!s.returnsScalarColumn()) {
+          throw new AnalysisException("A non-scalar subquery is not supported in "
+              + "the expression: " + item.getExpr().toSql());
+        }
+        if (s.getStatement().isRuntimeScalar()) {
+          throw new AnalysisException(
+              "A subquery which may return more than one row is not supported in "
+              + "the expression: " + item.getExpr().toSql());
+        }
+        if (!((SelectStmt)s.getStatement()).returnsAtMostOneRow()) {
+          throw new AnalysisException("Only subqueries that are guaranteed to return "
+              + "a single row are supported: " + item.getExpr().toSql());
+        }
+      }
+      resultExprs_.add(item.getExpr());
+      String label = item.toColumnLabel(selectListPos, analyzer_.useHiveColLabels());
+      SlotRef aliasRef = new SlotRef(label);
+      Expr existingAliasExpr = existingAliasExprs.get(label);
+      if (existingAliasExpr != null && !existingAliasExpr.equals(item.getExpr())) {
+        // If we have already seen this alias, it refers to more than one column and
+        // therefore is ambiguous.
+        ambiguousAliasList_.add(aliasRef);
+      } else {
+        existingAliasExprs.put(label, item.getExpr());
+      }
+      aliasSmap_.put(aliasRef, item.getExpr().clone());
+      colLabels_.add(label);
     }
 
     private void verifyResultExprs() throws AnalysisException {
@@ -718,7 +797,7 @@ public class SelectStmt extends QueryStmt {
      * complex-typed fields for backwards compatibility unless EXPAND_COMPLEX_TYPES is set
      * to true.
      */
-    private void expandStar() throws AnalysisException {
+    private void expandStar(SelectListItem selectListItem) throws AnalysisException {
       if (fromClause_.isEmpty()) {
         throw new AnalysisException(
             "'*' expression in select list requires FROM clause.");
@@ -730,7 +809,7 @@ public class SelectStmt extends QueryStmt {
         Path resolvedPath = new Path(tableRef.getDesc(),
             Collections.<String>emptyList());
         Preconditions.checkState(resolvedPath.resolve());
-        expandStar(resolvedPath);
+        expandStar(selectListItem, resolvedPath);
       }
     }
 
@@ -738,7 +817,7 @@ public class SelectStmt extends QueryStmt {
      * Expand "path.*" from a resolved path, ignoring complex-typed fields for backwards
      * compatibility unless EXPAND_COMPLEX_TYPES is set to true.
      */
-    private void expandStar(Path resolvedPath)
+    private void expandStar(SelectListItem selectListItem, Path resolvedPath)
         throws AnalysisException {
       Preconditions.checkState(resolvedPath.isResolved());
       if (resolvedPath.destTupleDesc() != null &&
@@ -749,7 +828,7 @@ public class SelectStmt extends QueryStmt {
         TupleDescriptor tupleDesc = resolvedPath.destTupleDesc();
         FeTable table = tupleDesc.getTable();
         for (Column c: table.getColumnsInHiveOrder()) {
-          addStarResultExpr(resolvedPath, c.getName());
+          addStarExpandedPath(selectListItem, resolvedPath, c.getName());
         }
       } else {
         // The resolved path does not target the descriptor of a catalog table.
@@ -767,54 +846,82 @@ public class SelectStmt extends QueryStmt {
         if (structType instanceof CollectionStructType) {
           CollectionStructType cst = (CollectionStructType) structType;
           if (cst.isMapStruct()) {
-            addStarResultExpr(resolvedPath, Path.MAP_KEY_FIELD_NAME);
+            addStarExpandedPath(selectListItem, resolvedPath, Path.MAP_KEY_FIELD_NAME);
           }
           if (cst.getOptionalField().getType().isStructType()) {
             structType = (StructType) cst.getOptionalField().getType();
             for (StructField f: structType.getFields()) {
-              addStarResultExpr(
-                  resolvedPath, cst.getOptionalField().getName(), f.getName());
+              addStarExpandedPath(selectListItem, resolvedPath,
+                  cst.getOptionalField().getName(), f.getName());
             }
           } else if (cst.isMapStruct()) {
-            addStarResultExpr(resolvedPath, Path.MAP_VALUE_FIELD_NAME);
+            addStarExpandedPath(selectListItem, resolvedPath, Path.MAP_VALUE_FIELD_NAME);
           } else {
-            addStarResultExpr(resolvedPath, Path.ARRAY_ITEM_FIELD_NAME);
+            addStarExpandedPath(selectListItem, resolvedPath, Path.ARRAY_ITEM_FIELD_NAME);
           }
         } else {
           // Default star expansion.
           for (StructField f: structType.getFields()) {
             if (f.isHidden()) continue;
-            addStarResultExpr(resolvedPath, f.getName());
+            addStarExpandedPath(selectListItem, resolvedPath, f.getName());
           }
         }
       }
     }
 
     /**
-     * Helper function used during star expansion to add a single result expr
-     * based on a given raw path to be resolved relative to an existing path.
+     * Expand star items to paths and store them in 'starExpandedPaths_'.
      */
-    private void addStarResultExpr(Path resolvedPath,
+    private void collectStarExpandedPaths() throws AnalysisException {
+      for (SelectListItem item : selectList_.getItems()) {
+        if (item.isStar()) {
+          if (item.getRawPath() != null) {
+            Path resolvedPath = analyzeStarPath(item.getRawPath(), analyzer_);
+            expandStar(item, resolvedPath);
+          } else {
+            expandStar(item);
+          }
+        }
+      }
+    }
+
+    /**
+     * Helper function used during star expansion to add a single expanded path based on a
+     * given raw path to be resolved relative to an existing path.
+     */
+    private void addStarExpandedPath(SelectListItem selectListItem, Path resolvedRootPath,
         String... relRawPath) throws AnalysisException {
-      Path p = Path.createRelPath(resolvedPath, relRawPath);
-      Preconditions.checkState(p.resolve());
-      if (p.destType().isComplexType() &&
+      Path starExpandedPath = Path.createRelPath(resolvedRootPath, relRawPath);
+      Preconditions.checkState(starExpandedPath.resolve());
+      if (starExpandedPath.destType().isComplexType() &&
           !analyzer_.getQueryCtx().client_request.query_options.expand_complex_types) {
         return;
       }
-      SlotDescriptor slotDesc = analyzer_.registerSlotRef(p, false);
+
+      if (!starExpandedPaths_.containsKey(selectListItem)) {
+        starExpandedPaths_.put(selectListItem, new ArrayList<>());
+      }
+      List<StarExpandedPathInfo> pathsOfStarItem = starExpandedPaths_.get(selectListItem);
+      pathsOfStarItem.add(new StarExpandedPathInfo(starExpandedPath, resolvedRootPath));
+    }
+
+    private void addStarExpandedPathResultExpr(StarExpandedPathInfo starExpandedPathInfo)
+        throws AnalysisException {
+      Preconditions.checkState(starExpandedPathInfo.getExpandedPath().isResolved());
+
+      SlotDescriptor slotDesc = analyzer_.registerSlotRef(
+          starExpandedPathInfo.getExpandedPath(), false);
       SlotRef slotRef = new SlotRef(slotDesc);
       Preconditions.checkState(slotRef.isAnalyzed(),
           "Analysis should be done in constructor");
 
-      // Empty matched types means this is expanded from star of a catalog table.
-      // For star of complex types, e.g. my_struct.*, my_array.*, my_map.*, the matched
-      // types will have the complex type so it's not empty.
-      if (resolvedPath.getMatchedTypes().isEmpty()) {
+      if (starExpandedPathInfo.shouldRegisterForColumnMasking()) {
         analyzer_.registerColumnForMasking(slotDesc);
       }
       resultExprs_.add(slotRef);
-      colLabels_.add(relRawPath[relRawPath.length - 1]);
+      final List<String> starExpandedRawPath = starExpandedPathInfo
+        .getExpandedPath().getRawPath();
+      colLabels_.add(starExpandedRawPath.get(starExpandedRawPath.size() - 1));
     }
 
     /**

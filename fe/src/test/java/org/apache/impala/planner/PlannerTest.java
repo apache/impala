@@ -857,6 +857,7 @@ public class PlannerTest extends PlannerTestBase {
     // struct is queried.
 
     // For complex types in the select list, we have to turn codegen off.
+    // TODO: Remove this when IMPALA-10851 is fixed.
     TQueryOptions queryOpts = defaultQueryOptions();
     queryOpts.setDisable_codegen(true);
 
@@ -871,6 +872,39 @@ public class PlannerTest extends PlannerTestBase {
     // Try permutations of (nested) fields of the top-level struct.
     String[] fields = {"outer_struct", "outer_struct.str", "outer_struct.inner_struct3",
       "outer_struct.inner_struct3.s"};
+    Collection<List<String>> permutations =
+      Collections2.permutations(java.util.Arrays.asList(fields));
+    for (List<String> permutation : permutations) {
+      String query = String.format(queryTemplate, String.join(", ", permutation));
+      int rowSize = getRowSize(query, queryOpts);
+      Assert.assertEquals(rowSizeWithoutFields, rowSize);
+    }
+  }
+
+  @Test
+  public void testStructFieldSlotSharedWithStructFromStarExpansion()
+      throws ImpalaException {
+    // Like testStructFieldSlotSharedWithStruct(), but involving structs that come from a
+    // star expansion.
+
+    TQueryOptions queryOpts = defaultQueryOptions();
+    // For complex types in the select list, we have to turn codegen off.
+    // TODO: Remove this when IMPALA-10851 is fixed.
+    queryOpts.setDisable_codegen(true);
+    // Enable star-expandion of complex types.
+    queryOpts.setExpand_complex_types(true);
+
+    String queryTemplate =
+        "select %s from functional_orc_def.complextypes_nested_structs";
+
+    // The base case is when only the star is given in the select list.
+    String queryWithoutFields =
+        String.format(queryTemplate, "*");
+    int rowSizeWithoutFields = getRowSize(queryWithoutFields, queryOpts);
+
+    // Try permutations of (nested) fields of the top-level struct.
+    String[] fields = {"*", "outer_struct", "outer_struct.inner_struct1",
+      "outer_struct.inner_struct1.str"};
     Collection<List<String>> permutations =
       Collections2.permutations(java.util.Arrays.asList(fields));
     for (List<String> permutation : permutations) {
