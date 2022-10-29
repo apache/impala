@@ -1568,7 +1568,7 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Comparator that breaks ties when two queries have identical expiration deadlines.
   struct ExpirationEventComparator {
-    bool operator()(const ExpirationEvent& t1, const ExpirationEvent& t2) {
+    bool operator()(const ExpirationEvent& t1, const ExpirationEvent& t2) const {
       if (t1.deadline < t2.deadline) return true;
       if (t2.deadline < t1.deadline) return false;
       if (t1.query_id < t2.query_id) return true;

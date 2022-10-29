@@ -96,7 +96,7 @@ void FileMetadataUtils::AddIcebergColumns(MemPool* mem_pool, Tuple** template_tu
     const ColumnDescriptor& col_desc =
         scan_node_->hdfs_table()->col_descs()[path.front()];
     int field_id = col_desc.field_id();
-    for (int i = 0; i < transforms->Length(); ++i) {
+    for (int i = 0; i < transforms->size(); ++i) {
       auto transform = transforms->Get(i);
       if (transform->transform_type() !=
           FbIcebergTransformType::FbIcebergTransformType_IDENTITY) {
@@ -161,7 +161,7 @@ bool FileMetadataUtils::IsValuePartitionCol(const SlotDescriptor* slot_desc) {
   const FbIcebergMetadata* ice_metadata = file_metadata->iceberg_metadata();
   auto transforms = ice_metadata->partition_keys();
   if (transforms == nullptr) return false;
-  for (int i = 0; i < transforms->Length(); ++i) {
+  for (int i = 0; i < transforms->size(); ++i) {
     auto transform = transforms->Get(i);
     if (transform->source_id() == field_id &&
         transform->transform_type() ==

@@ -28,7 +28,7 @@ separate_arguments(HIDE_SYMBOLS_ARGS)
 # This should be called with the .cc src file and it will generate a
 # src-file-ir target that can be built.
 # e.g. COMPILE_TO_IR(test.cc) generates the "test-ir" make target.
-set(IR_COMPILE_FLAGS "-emit-llvm" "-O3" "-std=c++14" "-c" "-I../" ${HIDE_SYMBOLS_ARGS})
+set(IR_COMPILE_FLAGS "-emit-llvm" "-O3" "-std=c++17" "-c" "-I../" ${HIDE_SYMBOLS_ARGS})
 set(IR_COMPILE_FLAGS ${IR_COMPILE_FLAGS} ${CLANG_BASE_FLAGS})
 function(COMPILE_TO_IR SRC_FILE)
   get_filename_component(BASE_NAME ${SRC_FILE} NAME_WE)

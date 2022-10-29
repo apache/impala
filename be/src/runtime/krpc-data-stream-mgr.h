@@ -358,7 +358,7 @@ class KrpcDataStreamMgr : public CacheLineAligned {
   /// the fragment instance ID is the query ID with the lower bits set to the
   /// index of the fragment instance within the query.
   struct ComparisonOp {
-    bool operator()(const RecvrId& a, const RecvrId& b) {
+    bool operator()(const RecvrId& a, const RecvrId& b) const {
       if (a.first.hi < b.first.hi) {
         return true;
       } else if (a.first.hi > b.first.hi) {

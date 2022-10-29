@@ -45,7 +45,7 @@ endif()
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wall -Wno-sign-compare -Wno-unknown-pragmas -pthread")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fno-strict-aliasing -fno-omit-frame-pointer")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fsigned-char")
-SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -std=c++14")
+SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -std=c++17")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated -Wno-vla")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_SYSTEM_NO_DEPRECATED")
@@ -117,16 +117,6 @@ SET(CXX_GCC_FLAGS "-g -Wno-unused-local-typedefs -gdwarf-4 -Wno-maybe-uninitiali
 #    are not clean yet (including some LLVM code).
 # TODO: These should be cleaned up and reenabled.
 SET(CXX_GCC_FLAGS "${CXX_GCC_FLAGS} -Wno-class-memaccess -Wno-init-list-lifetime")
-if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
-  # We need to add additional arguments for GCC 7+. We go down this branch if building
-  # with a non-GCC compiler of version 7+, but in that case CXX_GCC_FLAGS is not used,
-  # so it is inconsequential. TODO: IMPALA-5490: make this non-conditional when we
-  # upgrade GCC.
-  #  -faligned-new: new will automatically align types. Otherwise "new Counter()" in the
-  #       Kudu util code produces a warning (see KUDU-2094).
-  #   TODO: -faligned-new is part of C++17, remove flag when we bump language version.
-  SET(CXX_GCC_FLAGS "${CXX_GCC_FLAGS} -faligned-new")
-endif()
 
 # compiler flags for different build types (run 'cmake -DCMAKE_BUILD_TYPE=<type> .')
 # For CMAKE_BUILD_TYPE=DEBUG_NOOPT
@@ -302,7 +292,7 @@ add_definitions(-DKUDU_HEADERS_USE_RICH_SLICE -DKUDU_HEADERS_NO_STUBS)
 #  -Wno-return-type-c-linkage: UDFs return C++ classes but use C linkage to prevent
 #       mangling
 #  -DBOOST_NO_EXCEPTIONS: call a custom error handler for exceptions in codegen'd code.
-set(CLANG_IR_CXX_FLAGS "-emit-llvm" "-c" "-std=c++14" "-DIR_COMPILE" "-DHAVE_INTTYPES_H"
+set(CLANG_IR_CXX_FLAGS "-emit-llvm" "-c" "-std=c++17" "-DIR_COMPILE" "-DHAVE_INTTYPES_H"
   "-DHAVE_NETINET_IN_H" "-DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG" "-DBOOST_NO_EXCEPTIONS"
   "-DBOOST_BIND_GLOBAL_PLACEHOLDERS" "-DBOOST_ALLOW_DEPRECATED_HEADERS"
   "-DKUDU_HEADERS_NO_STUBS" "-fcolor-diagnostics" "-Wno-deprecated"
