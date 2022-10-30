@@ -546,11 +546,6 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   if (!external_fe) {
     ABORT_IF_ERROR(RegisterMinidump(argv[0]));
   }
-#ifndef THREAD_SANITIZER
-#ifndef __aarch64__
-  AtomicOps_x86CPUFeaturesInit();
-#endif
-#endif
   impala::InitThreading();
   impala::datetime_parse_util::SimpleDateFormatTokenizer::InitCtx();
   impala::SeedOpenSSLRNG();
