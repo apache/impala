@@ -19,6 +19,7 @@
 
 #include <sstream>
 
+#include "rpc/thrift-util.h"
 #include "transport/THttpTransport.h"
 
 #include "common/logging.h"
@@ -34,7 +35,8 @@ const char* THttpTransport::CRLF = "\r\n";
 const int THttpTransport::CRLF_LEN = 2;
 
 THttpTransport::THttpTransport(std::shared_ptr<TTransport> transport)
-  : transport_(transport),
+  : TVirtualTransport(impala::DefaultTConfiguration()),
+    transport_(transport),
     origin_(""),
     readHeaders_(true),
     readWholeBodyForAuth_(false),

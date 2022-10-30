@@ -16,6 +16,7 @@
 // under the License.
 
 #include <stdio.h>
+#include <sstream>
 
 #include "rpc/thrift-util.h"
 #include "testutil/gtest-util.h"
@@ -23,6 +24,8 @@
 #include "util/network-util.h"
 
 #include "gen-cpp/RuntimeProfile_types.h"
+#include "gen-cpp/CatalogObjects_types.h"
+#include "gen-cpp/CatalogService_types.h"
 
 #include "common/names.h"
 
@@ -73,6 +76,56 @@ TEST(ThriftUtil, SimpleSerializeDeserialize) {
     EXPECT_OK(DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(str.data()), &len2,
         compact, &deserialized_counter_2));
     EXPECT_EQ(counter, deserialized_counter_2);
+  }
+}
+
+TEST(ThriftUtil, SerDeBuffer100MB) {
+  // Test ThriftSerializer and DeserializeThriftMsg to handle a little over 100MB
+  // buffer serialization and deserialization, mimicking content of
+  // TGetPartialCatalogObjectResponse.table_info.
+  std::ostringstream ss;
+  ss << "/p2=";
+  ss << std::setw(250) << std::setfill('0') << 1;
+  ss << "/p3=";
+  ss << std::setw(250) << std::setfill('0') << 1;
+  ss << "/";
+  std::string suffix = ss.str();
+
+  // Loop over compact and binary protocols.
+  for (int i = 0; i < 2; ++i) {
+    bool compact = (i == 0);
+    ThriftSerializer serializer(compact);
+
+    TPartialTableInfo table_info;
+    vector<TPartialPartitionInfo> partitions;
+    for (int j = 1; j < 150000; ++j) {
+      std::ostringstream p1;
+      p1 << "/test-warehouse/1k_col_tbl/p1=";
+      p1 << std::setw(250) << std::setfill('0') << j;
+      p1 << suffix;
+
+      THdfsPartitionLocation part_location;
+      part_location.__set_suffix(p1.str());
+
+      TPartialPartitionInfo part_info;
+      part_info.__set_id(j);
+      part_info.__set_location(part_location);
+      partitions.push_back(part_info);
+    }
+    table_info.__set_partitions(partitions);
+
+    uint8_t* buffer;
+    uint32_t len;
+    EXPECT_OK(serializer.SerializeToBuffer(&table_info, &len, &buffer));
+    DCHECK_GT(len, 100 * 1024 * 1024);
+
+    TPartialTableInfo deserialized_table_info;
+    EXPECT_OK(DeserializeThriftMsg(buffer, &len, compact, &deserialized_table_info));
+    EXPECT_EQ(table_info.partitions.size(), deserialized_table_info.partitions.size());
+    for (int j = 0; j < table_info.partitions.size(); ++j) {
+      EXPECT_EQ(table_info.partitions[j].location.suffix,
+              deserialized_table_info.partitions[j].location.suffix);
+    }
   }
 }
 

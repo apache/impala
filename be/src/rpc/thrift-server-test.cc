@@ -149,7 +149,6 @@ TEST(ThriftTestBase, Connectivity) {
 }
 
 void TestMaxMessageSize(std::string subscriber_id, bool expect_throw) {
-  auto s = ScopedFlagSetter<int>::Make(&FLAGS_thrift_rpc_max_message_size, 128 * 1024);
   int port = GetServerPort();
   ThriftServer* server;
   EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port).Build(&server));
@@ -749,6 +748,7 @@ TEST(NoPasswordPemFile, BadServerCertificate) {
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
+  FLAGS_thrift_rpc_max_message_size = 128 * 1024;
 
   int port = impala::FindUnusedEphemeralPort();
   std::unique_ptr<impala::MiniKdcWrapper> kdc;

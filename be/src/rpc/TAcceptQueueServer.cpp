@@ -223,6 +223,7 @@ void TAcceptQueueServer::SetupConnection(shared_ptr<TAcceptQueueEntry> entry) {
   if (metrics_enabled_) queue_size_metric_->Increment(-1);
   shared_ptr<TTransport> io_transport;
   shared_ptr<TTransport> client = entry->client_;
+  SetMaxMessageSize(client.get());
   const string& socket_info = reinterpret_cast<TSocket*>(client.get())->getSocketInfo();
   VLOG(2) << Substitute("TAcceptQueueServer: $0 started connection setup for client $1",
       name_, socket_info);
@@ -244,7 +245,7 @@ void TAcceptQueueServer::SetupConnection(shared_ptr<TAcceptQueueEntry> entry) {
     // TSaslServerTransport::Factory is not required anymore.
     DCHECK(inputTransportFactory_ == outputTransportFactory_);
     io_transport = inputTransportFactory_->getTransport(client);
-    AssignDefaultTConfiguration(io_transport.get());
+    SetMaxMessageSize(io_transport.get());
 
     shared_ptr<TProtocol> inputProtocol =
         inputProtocolFactory_->getProtocol(io_transport);

@@ -83,8 +83,8 @@ static_assert(PACKAGE_VERSION[6] == '\0', NEW_THRIFT_VERSION_MSG);
 
 namespace impala {
 
-ThriftSerializer::ThriftSerializer(bool compact, int initial_buffer_size) :
-    mem_buffer_(new TMemoryBuffer(initial_buffer_size)) {
+ThriftSerializer::ThriftSerializer(bool compact, int initial_buffer_size)
+  : mem_buffer_(new TMemoryBuffer(initial_buffer_size, DefaultTConfiguration())) {
   if (compact) {
     TCompactProtocolFactoryT<TMemoryBuffer> factory;
     protocol_ = factory.getProtocol(mem_buffer_);
@@ -285,18 +285,19 @@ bool IsConnResetTException(const TTransportException& e) {
              strstr(e.what(), "SSL_read: Connection reset by peer") != nullptr);
 }
 
-shared_ptr<TConfiguration> DefaultTConfiguration() {
-  return make_shared<TConfiguration>(FLAGS_thrift_rpc_max_message_size <= 0 ?
-          ThriftDefaultMaxMessageSize() :
-          FLAGS_thrift_rpc_max_message_size);
+int ThriftRpcMaxMessageSize() {
+  return FLAGS_thrift_rpc_max_message_size <= 0 ? ThriftDefaultMaxMessageSize() :
+                                                  FLAGS_thrift_rpc_max_message_size;
 }
 
-void AssignDefaultTConfiguration(TTransport* transport) {
+shared_ptr<TConfiguration> DefaultTConfiguration() {
+  return make_shared<TConfiguration>(ThriftRpcMaxMessageSize());
+}
+
+void SetMaxMessageSize(TTransport* transport) {
   // TODO: Find way to assign TConfiguration through TTransportFactory instead.
-  transport->setConfiguration(DefaultTConfiguration());
+  transport->getConfiguration()->setMaxMessageSize(ThriftRpcMaxMessageSize());
   transport->updateKnownMessageSize(-1);
-  EXPECT_NO_THROW(transport->checkReadBytesAvailable(
-      FLAGS_thrift_rpc_max_message_size <= 0 ? ThriftDefaultMaxMessageSize() :
-                                               FLAGS_thrift_rpc_max_message_size));
+  EXPECT_NO_THROW(transport->checkReadBytesAvailable(ThriftRpcMaxMessageSize()));
 }
 }

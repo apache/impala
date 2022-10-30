@@ -36,6 +36,7 @@
 #pragma clang diagnostic pop
 
 #include "exec/parquet/parquet-common.h"
+#include "rpc/thrift-util.h"
 #include "runtime/mem-pool.h"
 #include "util/codec.h"
 #include "util/rle-encoding.h"
@@ -72,7 +73,9 @@ template <class T>
 bool DeserializeThriftMsg(
     uint8_t* buf, uint32_t* len, bool compact, T* deserialized_msg) {
   // Deserialize msg bytes into c++ thrift msg using memory transport.
-  std::shared_ptr<TMemoryBuffer> tmem_transport(new TMemoryBuffer(buf, *len));
+  std::shared_ptr<TMemoryBuffer> tmem_transport(new TMemoryBuffer(buf, *len,
+      apache::thrift::transport::TMemoryBuffer::MemoryPolicy::OBSERVE,
+      impala::DefaultTConfiguration()));
   std::shared_ptr<TProtocol> tproto =
       CreateDeserializeProtocol(tmem_transport, compact);
   try {

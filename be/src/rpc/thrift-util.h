@@ -38,6 +38,21 @@ class TColumnValue;
 class TNetworkAddress;
 class ThriftServer;
 
+/// Default max message size from Thrift library.
+inline int ThriftDefaultMaxMessageSize() {
+  return apache::thrift::TConfiguration::DEFAULT_MAX_MESSAGE_SIZE;
+}
+
+/// Return the effective max message size based on 'thrift_rpc_max_message_size' flag.
+int ThriftRpcMaxMessageSize();
+
+/// Return the default Thrift's TConfiguration based on given backend config flags.
+std::shared_ptr<apache::thrift::TConfiguration> DefaultTConfiguration();
+
+/// Set the max message size of a given TTransport with the effective value based on
+/// 'thrift_rpc_max_message_size' flag.
+void SetMaxMessageSize(apache::thrift::transport::TTransport* transport);
+
 /// Utility class to serialize thrift objects to a binary format.  This object
 /// should be reused if possible to reuse the underlying memory.
 /// Note: thrift will encode NULLs into the serialized buffer so it is not valid
@@ -110,7 +125,9 @@ Status DeserializeThriftMsg(const uint8_t* buf, uint32_t* len, bool compact,
   /// transport. TMemoryBuffer is not const-safe, although we use it in
   /// a const-safe way, so we have to explicitly cast away the const.
   std::shared_ptr<apache::thrift::transport::TMemoryBuffer> tmem_transport(
-      new apache::thrift::transport::TMemoryBuffer(const_cast<uint8_t*>(buf), *len));
+      new apache::thrift::transport::TMemoryBuffer(const_cast<uint8_t*>(buf), *len,
+          apache::thrift::transport::TMemoryBuffer::MemoryPolicy::OBSERVE,
+          DefaultTConfiguration()));
   std::shared_ptr<apache::thrift::protocol::TProtocol> tproto =
       CreateDeserializeProtocol(tmem_transport, compact);
   try {
@@ -168,17 +185,6 @@ bool IsPeekTimeoutTException(const apache::thrift::transport::TTransportExceptio
 
 /// Returns true if the exception indicates the other end of the TCP socket was closed.
 bool IsConnResetTException(const apache::thrift::transport::TTransportException& e);
-
-inline int ThriftDefaultMaxMessageSize() {
-  return apache::thrift::TConfiguration::DEFAULT_MAX_MESSAGE_SIZE;
-}
-
-/// Return the default Thrift's TConfiguration based on given backend config flags.
-std::shared_ptr<apache::thrift::TConfiguration> DefaultTConfiguration();
-
-/// Assign given TTransport with the default TConfiguration and update the known message
-/// size accordingly.
-void AssignDefaultTConfiguration(apache::thrift::transport::TTransport* transport);
 }
 
 #endif

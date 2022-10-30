@@ -27,6 +27,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include <thrift/transport/TBufferTransports.h>
+#include "rpc/thrift-util.h"
 #include "transport/TSaslTransport.h"
 
 #include "common/names.h"
@@ -37,8 +38,9 @@ const int32_t DEFAULT_MEM_BUF_SIZE = 32 * 1024;
 namespace apache { namespace thrift { namespace transport {
 
   TSaslTransport::TSaslTransport(std::shared_ptr<TTransport> transport)
-      : transport_(transport),
-        memBuf_(new TMemoryBuffer(DEFAULT_MEM_BUF_SIZE)),
+      : TVirtualTransport(impala::DefaultTConfiguration()),
+        transport_(transport),
+        memBuf_(new TMemoryBuffer(DEFAULT_MEM_BUF_SIZE, impala::DefaultTConfiguration())),
         sasl_(NULL),
         shouldWrap_(false),
         isClient_(false) {
@@ -46,8 +48,9 @@ namespace apache { namespace thrift { namespace transport {
 
   TSaslTransport::TSaslTransport(std::shared_ptr<sasl::TSasl> saslClient,
                                  std::shared_ptr<TTransport> transport)
-      : transport_(transport),
-        memBuf_(new TMemoryBuffer()),
+      : TVirtualTransport(impala::DefaultTConfiguration()),
+        transport_(transport),
+        memBuf_(new TMemoryBuffer(impala::DefaultTConfiguration())),
         sasl_(saslClient),
         shouldWrap_(false),
         isClient_(true) {

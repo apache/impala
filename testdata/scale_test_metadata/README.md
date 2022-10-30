@@ -48,8 +48,8 @@ test that coordinator-to-catalogd RPC works well. The steps are follow:
      --catalogd_args="--catalog_topic_mode=minimal"
 
    # Restart catalogd with additional args and jvm args
-   bin/start-impala-cluster.py -s 1 --restart_catalogd_only --jvm_args=-Xmx12g \
-   --catalogd_args=" --catalog_topic_mode=minimal --thrift_rpc_max_message_size=0 --warn_catalog_response_size_mb=1"
+   ./bin/start-impala-cluster.py -s 1 --restart_catalogd_only --jvm_args=-Xmx12g \
+     --catalogd_args=" --catalog_topic_mode=minimal --thrift_rpc_max_message_size=0 --warn_catalog_response_size_mb=1"
    ```
 
 5. Run the following EXPLAIN query with impala-shell.
@@ -81,8 +81,8 @@ test that coordinator-to-catalogd RPC works well. The steps are follow:
      --catalogd_args="--catalog_topic_mode=minimal"
 
    # Restart catalogd with additional args and jvm args
-   bin/start-impala-cluster.py -s 1 --restart_catalogd_only --jvm_args=-Xmx12g \
-   --catalogd_args="--catalog_topic_mode=minimal --warn_catalog_response_size_mb=1"
+   ./bin/start-impala-cluster.py -s 1 --restart_catalogd_only --jvm_args=-Xmx12g \
+     --catalogd_args="--catalog_topic_mode=minimal --warn_catalog_response_size_mb=1"
    ```
 
 7. Run the same EXPLAIN query again. This should run successfully, because the default
@@ -90,3 +90,13 @@ test that coordinator-to-catalogd RPC works well. The steps are follow:
    ```
    impala-shell.sh -q 'EXPLAIN SELECT id FROM 1k_col_tbl'
    ```
+
+To exercise Impala with SSL, add the following args in each daemon start up args.
+```
+--ssl_client_ca_certificate=$IMPALA_HOME/be/src/testutil/server-cert.pem --ssl_server_certificate=$IMPALA_HOME/be/src/testutil/server-cert.pem --ssl_private_key=$IMPALA_HOME/be/src/testutil/server-key.pem --hostname=localhost
+```
+
+And use the following impala-shell command.
+```
+impala-shell.sh --ssl --ca_cert=$IMPALA_HOME/be/src/testutil/server-cert.pem -q 'EXPLAIN SELECT id FROM 1k_col_tbl'
+```

@@ -75,13 +75,15 @@ class ThriftServer {
 
     virtual std::shared_ptr<apache::thrift::transport::TTransport> getTransport(
         std::shared_ptr<apache::thrift::transport::TTransport> trans) {
+      DCHECK_EQ(ThriftRpcMaxMessageSize(),
+          trans->getConfiguration()->getMaxMessageSize());
       std::shared_ptr<apache::thrift::transport::TTransport> wrapped =
           wrapped_factory_->getTransport(trans);
-      AssignDefaultTConfiguration(wrapped.get());
+      SetMaxMessageSize(wrapped.get());
       std::shared_ptr<apache::thrift::transport::TTransport> buffered_wrapped =
           std::shared_ptr<apache::thrift::transport::TTransport>(
-              new apache::thrift::transport::TBufferedTransport(wrapped, buffer_size_));
-      AssignDefaultTConfiguration(buffered_wrapped.get());
+              new apache::thrift::transport::TBufferedTransport(
+                  wrapped, buffer_size_, DefaultTConfiguration()));
       return buffered_wrapped;
     }
    private:
