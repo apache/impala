@@ -399,17 +399,17 @@ void kll_sketch<T, C, S, A>::serialize(std::ostream& os) const {
     | (is_single_item ? 1 << flags::IS_SINGLE_ITEM : 0)
   );
   os.write(reinterpret_cast<const char*>(&flags_byte), sizeof(flags_byte));
-  os.write((char*)&k_, sizeof(k_));
-  os.write((char*)&m_, sizeof(m_));
+  os.write((const char*)&k_, sizeof(k_));
+  os.write((const char*)&m_, sizeof(m_));
   const uint8_t unused = 0;
   os.write(reinterpret_cast<const char*>(&unused), sizeof(unused));
   if (is_empty()) return;
   if (!is_single_item) {
-    os.write((char*)&n_, sizeof(n_));
-    os.write((char*)&min_k_, sizeof(min_k_));
-    os.write((char*)&num_levels_, sizeof(num_levels_));
-    os.write((char*)&unused, sizeof(unused));
-    os.write((char*)levels_.data(), sizeof(levels_[0]) * num_levels_);
+    os.write((const char*)&n_, sizeof(n_));
+    os.write((const char*)&min_k_, sizeof(min_k_));
+    os.write((const char*)&num_levels_, sizeof(num_levels_));
+    os.write((const char*)&unused, sizeof(unused));
+    os.write((const char*)levels_.data(), sizeof(levels_[0]) * num_levels_);
     S().serialize(os, min_value_, 1);
     S().serialize(os, max_value_, 1);
   }

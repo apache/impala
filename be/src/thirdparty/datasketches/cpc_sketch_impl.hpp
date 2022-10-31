@@ -430,29 +430,29 @@ void cpc_sketch_alloc<A>::serialize(std::ostream& os) const {
   );
   os.write(reinterpret_cast<const char*>(&flags_byte), sizeof(flags_byte));
   const uint16_t seed_hash(compute_seed_hash(seed));
-  os.write((char*)&seed_hash, sizeof(seed_hash));
+  os.write((const char*)&seed_hash, sizeof(seed_hash));
   if (!is_empty()) {
-    os.write((char*)&num_coupons, sizeof(num_coupons));
+    os.write((const char*)&num_coupons, sizeof(num_coupons));
     if (has_table && has_window) {
       // if there is no window it is the same as number of coupons
-      os.write((char*)&compressed.table_num_entries, sizeof(compressed.table_num_entries));
+      os.write((const char*)&compressed.table_num_entries, sizeof(compressed.table_num_entries));
       // HIP values can be in two different places in the sequence of fields
       // this is the first HIP decision point
       if (has_hip) write_hip(os);
     }
     if (has_table) {
-      os.write((char*)&compressed.table_data_words, sizeof(compressed.table_data_words));
+      os.write((const char*)&compressed.table_data_words, sizeof(compressed.table_data_words));
     }
     if (has_window) {
-      os.write((char*)&compressed.window_data_words, sizeof(compressed.window_data_words));
+      os.write((const char*)&compressed.window_data_words, sizeof(compressed.window_data_words));
     }
     // this is the second HIP decision point
     if (has_hip && !(has_table && has_window)) write_hip(os);
     if (has_window) {
-      os.write((char*)compressed.window_data.data(), compressed.window_data_words * sizeof(uint32_t));
+      os.write((const char*)compressed.window_data.data(), compressed.window_data_words * sizeof(uint32_t));
     }
     if (has_table) {
-      os.write((char*)compressed.table_data.data(), compressed.table_data_words * sizeof(uint32_t));
+      os.write((const char*)compressed.table_data.data(), compressed.table_data_words * sizeof(uint32_t));
     }
   }
 }

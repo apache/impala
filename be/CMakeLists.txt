@@ -183,8 +183,9 @@ SET(CXX_FLAGS_TIDY "${CXX_FLAGS_TIDY} -O1")
 SET(CXX_FLAGS_TIDY "${CXX_FLAGS_TIDY} -DNDEBUG")
 # Turn all warnings back on. Some will be ignored via .clang-tidy's "Checks" value, but
 # this allows different "Checks" settings to be used in different clang-tidy runs without
-# recompiling.
-SET(CXX_FLAGS_TIDY "${CXX_FLAGS_TIDY} -Wall -W -Weverything")
+# recompiling. There are two exceptions: C++98 compatibility and padding are not interesting
+# and excluding them dramatically reduces the output.
+SET(CXX_FLAGS_TIDY "${CXX_FLAGS_TIDY} -Wall -W -Weverything -Wno-c++98-compat -Wno-padded")
 # The Tidy build is so verbose (becasue of -Weverything) that it is unlikely to be viewed
 # in a terminal and most likely will be redirecto to less, a log file, or /dev/null. In
 # those places color codes just make the output harder to read.
