@@ -396,6 +396,8 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
         requests.add(createRequest.apply(RangerUtil.createColumnResource(p)));
       } else if (p.getUri() != null) {
         requests.add(createRequest.apply(RangerUtil.createUriResource(p)));
+      } else if (p.getFn_name() != null) {
+        requests.add(createRequest.apply(RangerUtil.createFunctionResource(p)));
       } else if (p.getDb_name() != null) {
         // DB is used by column and function resources.
         requests.add(createRequest.apply(RangerUtil.createColumnResource(p)));

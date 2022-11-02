@@ -294,8 +294,8 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
     Optional<String> storageUri = getResourceName(
         RangerImpalaResourceBuilder.STORAGE_URL, privilege.getStorage_url(),
         accessResult);
-    Optional<String> udf = getResourceName(RangerImpalaResourceBuilder.UDF, ANY,
-        accessResult);
+    Optional<String> udf = getResourceName(RangerImpalaResourceBuilder.UDF,
+        privilege.getFn_name(), accessResult);
 
     return new RangerResultRow(type, principal, database.orElse(""), table.orElse(""),
         column.orElse(""), uri.orElse(""), storageType.orElse(""), storageUri.orElse(""),
@@ -314,6 +314,8 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
       resources.add(RangerUtil.createColumnResource(privilege));
     } else if (privilege.getUri() != null) {
       resources.add(RangerUtil.createUriResource(privilege));
+    } else if (privilege.getFn_name() != null) {
+      resources.add(RangerUtil.createFunctionResource(privilege));
     } else if (privilege.getDb_name() != null) {
       // DB is used by column and function resources.
       resources.add(RangerUtil.createColumnResource(privilege));
@@ -398,6 +400,8 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
           resourceResult.addColumnResult(row);
         } else if (!row.table_.equals("*") && !row.table_.isEmpty()) {
           resourceResult.addTableResult(row);
+        } else if (!row.udf_.equals("*") && !row.udf_.isEmpty()) {
+          resourceResult.addUdfResult(row);
         } else if (!row.database_.equals("*") && !row.database_.isEmpty()) {
           resourceResult.addDatabaseResult(row);
         } else {
@@ -436,6 +440,7 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
     private List<RangerResultRow> database = new ArrayList<>();
     private List<RangerResultRow> table = new ArrayList<>();
     private List<RangerResultRow> column = new ArrayList<>();
+    private List<RangerResultRow> udf = new ArrayList<>();
 
     public RangerResourceResult() { }
 
@@ -459,6 +464,11 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
       return this;
     }
 
+    public RangerResourceResult addUdfResult(RangerResultRow result) {
+      udf.add(result);
+      return this;
+    }
+
     /**
      * For each disjoint List corresponding to a given resource, if there exists a
      * RangerResultRow indicating the specified principal's privilege of
@@ -472,6 +482,7 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
       results.addAll(filterIfAll(database));
       results.addAll(filterIfAll(table));
       results.addAll(filterIfAll(column));
+      results.addAll(filterIfAll(udf));
       return results;
     }
 

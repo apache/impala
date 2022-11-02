@@ -329,7 +329,7 @@ terminal
   KW_STRING, KW_STRUCT, KW_SYMBOL, KW_SYSTEM_TIME, KW_SYSTEM_VERSION,
   KW_TABLE, KW_TABLES, KW_TABLESAMPLE, KW_TBLPROPERTIES,
   KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TRUNCATE, KW_STATS,
-  KW_TO, KW_TRUE, KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UNKNOWN, KW_UNNEST, KW_UNSET,
+  KW_TO, KW_TRUE, KW_UDF, KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UNKNOWN, KW_UNNEST, KW_UNSET,
   KW_UPDATE, KW_UPDATE_FN, KW_UPSERT, KW_USE, KW_USING, KW_VALIDATE, KW_VALUES,
   KW_VARCHAR, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH, KW_ZORDER;
 
@@ -1046,6 +1046,12 @@ show_grant_principal_stmt ::=
         PrivilegeSpec.createStorageHandlerUriScopedPriv(TPrivilegeLevel.RWSTORAGE,
         new StorageHandlerUri(storage_handler_uri)));
   :}
+  | KW_SHOW KW_GRANT principal_type:type ident_or_default:name KW_ON KW_UDF
+  function_name:fn_name
+  {:
+    RESULT = new ShowGrantPrincipalStmt(name, type,
+        PrivilegeSpec.createUdfScopedPriv(TPrivilegeLevel.ALL, fn_name));
+  :}
   ;
 
 create_drop_role_stmt ::=
@@ -1114,6 +1120,8 @@ privilege_spec ::=
   {: RESULT = PrivilegeSpec.createDbScopedPriv(priv, db_name); :}
   | privilege:priv KW_ON KW_TABLE table_name:tbl_name
   {: RESULT = PrivilegeSpec.createTableScopedPriv(priv, tbl_name); :}
+  | privilege:priv KW_ON KW_UDF function_name:fn_name
+  {: RESULT = PrivilegeSpec.createUdfScopedPriv(priv, fn_name); :}
   | privilege:priv LPAREN opt_ident_list:cols RPAREN KW_ON KW_TABLE table_name:tbl_name
   {: RESULT = PrivilegeSpec.createColumnScopedPriv(priv, tbl_name, cols); :}
   | privilege:priv KW_ON uri_ident:uri_kw STRING_LITERAL:uri
@@ -4497,6 +4505,8 @@ word ::=
   | KW_TO:r
   {: RESULT = r.toString(); :}
   | KW_TRUE:r
+  {: RESULT = r.toString(); :}
+  | KW_UDF:r
   {: RESULT = r.toString(); :}
   | KW_UNBOUNDED:r
   {: RESULT = r.toString(); :}

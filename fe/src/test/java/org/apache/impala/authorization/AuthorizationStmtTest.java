@@ -553,6 +553,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
     // Select a UDF.
     ScalarFunction fn = addFunction("functional", "f");
+    ScalarFunction fn2 = addFunction("functional", "f2");
     try {
       authorize("select functional.f()")
           .ok(onServer(TPrivilegeLevel.ALL))
@@ -561,13 +562,37 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
           .ok(onDatabase("functional", TPrivilegeLevel.ALL))
           .ok(onDatabase("functional", TPrivilegeLevel.OWNER))
           .ok(onDatabase("functional", viewMetadataPrivileges()))
-          .error(accessError("functional"))
-          .error(accessError("functional"), onServer(allExcept(
+          // We do not have to explicitly grant the SELECT privilege on the UDF if we
+          // already grant the SELECT privilege on the database where the UDF belongs
+          // in that granting the SELECT privilege on the database also implies granting
+          // the SELECT privilege on all the UDF's in the database.
+          .ok(onDatabase("functional", TPrivilegeLevel.SELECT))
+          .ok(onUdf("functional", "f", TPrivilegeLevel.SELECT),
+              onDatabase("functional", TPrivilegeLevel.INSERT))
+          .ok(onUdf("functional", "f", TPrivilegeLevel.SELECT),
+              onDatabase("functional", TPrivilegeLevel.REFRESH))
+          .error(selectFunctionError("functional.f"))
+          .error(selectFunctionError("functional.f"), onServer(allExcept(
               viewMetadataPrivileges())))
-          .error(accessError("functional"), onDatabase("functional", allExcept(
-              viewMetadataPrivileges())));
+          .error(selectFunctionError("functional.f"), onDatabase("functional", allExcept(
+              viewMetadataPrivileges())))
+          .error(accessError("functional"),
+              onUdf("functional", "f", TPrivilegeLevel.SELECT))
+          .error(accessError("functional"),
+              onUdf("functional", "f", TPrivilegeLevel.SELECT),
+              onServer(allExcept(viewMetadataPrivileges())))
+          .error(accessError("functional"),
+              onUdf("functional", "f", TPrivilegeLevel.SELECT),
+              onDatabase("functional", allExcept(viewMetadataPrivileges())))
+          .error(selectFunctionError("functional.f"),
+              onDatabase("functional", TPrivilegeLevel.INSERT),
+              onUdf("functional", "f2", TPrivilegeLevel.SELECT))
+          .error(selectFunctionError("functional.f"),
+              onDatabase("functional", TPrivilegeLevel.REFRESH),
+              onUdf("functional", "f2", TPrivilegeLevel.SELECT));;
     } finally {
       removeFunction(fn);
+      removeFunction(fn2);
     }
 
     // Select from non-existent database.
@@ -2945,26 +2970,52 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
             .ok(onDatabase("functional", TPrivilegeLevel.ALL))
             .ok(onDatabase("functional", TPrivilegeLevel.OWNER))
             .ok(onDatabase("functional", viewMetadataPrivileges()))
-            .error(accessError("functional"))
-            .error(accessError("functional"), onDatabase("functional",
-                allExcept(viewMetadataPrivileges())));
+            .error(selectFunctionError("functional.to_lower"))
+            .error(selectFunctionError("functional.to_lower"), onDatabase("functional",
+                allExcept(viewMetadataPrivileges())))
+            .error(accessError("functional"), onUdf("functional", "to_lower",
+                TPrivilegeLevel.SELECT))
+            .error(accessError("functional"),
+                onDatabase("functional", allExcept(viewMetadataPrivileges())),
+                onUdf("functional", "to_lower", TPrivilegeLevel.SELECT));
       }
     } finally {
       removeFunction(fn);
     }
 
-    // IMPALA-11728: Make sure use of functions in the fallback database requires SELECT
-    // (or higher) privilege on the database.
+    // IMPALA-11728: Make sure use of a UDF in the fallback database requires a) any
+    // of the INSERT, REFRESH, SELECT privileges on all the tables and columns in the
+    // database, and b) the SELECT privilege on the UDF in the database.
     fn = addFunction("functional", "f");
     try {
       TQueryOptions options = new TQueryOptions();
       options.setFallback_db_for_functions("functional");
       authorize(createAnalysisCtx(options, authzFactory_, user_.getName()), "select f()")
+          // When the scope of a privilege is database, all the tables, columns, as well
+          // as UDF's will be covered. A requesting user granted any of the ALL, OWNER,
+          // or SELECT privileges on the database will be allowed to execute the UDF.
           .ok(onDatabase("functional", TPrivilegeLevel.ALL))
           .ok(onDatabase("functional", TPrivilegeLevel.OWNER))
           .ok(onDatabase("functional", viewMetadataPrivileges()))
-          .error(accessError("functional"))
+          // We do not have to explicitly grant the SELECT privilege on the UDF if we
+          // already grant the SELECT privilege on the database where the UDF belongs
+          // in that granting the SELECT privilege on the database also implies granting
+          // the SELECT privilege on all the UDF's in the database.
+          .ok(onDatabase("functional", TPrivilegeLevel.SELECT))
+          .ok(onDatabase("functional", TPrivilegeLevel.INSERT),
+              onUdf("functional", "f", TPrivilegeLevel.SELECT))
+          .ok(onDatabase("functional", TPrivilegeLevel.REFRESH),
+              onUdf("functional", "f", TPrivilegeLevel.SELECT))
+          .error(selectFunctionError("functional.f"))
+          .error(selectFunctionError("functional.f"),
+              onDatabase("functional", allExcept(viewMetadataPrivileges())))
           .error(accessError("functional"),
+              onUdf("functional", "f", TPrivilegeLevel.SELECT))
+          .error(accessError("functional"),
+              onUdf("functional", "f", TPrivilegeLevel.SELECT),
+              onServer(allExcept(viewMetadataPrivileges())))
+          .error(accessError("functional"),
+              onUdf("functional", "f", TPrivilegeLevel.SELECT),
               onDatabase("functional", allExcept(viewMetadataPrivileges())));
     } finally {
       removeFunction(fn);

@@ -75,7 +75,9 @@ public class FunctionName {
   }
 
   public String getDb() { return db_; }
+  public void setDb(String db) { db_ = db; }
   public String getFunction() { return fn_; }
+  public void setFunction(String fn) { fn_ = fn; }
   public boolean isFullyQualified() { return db_ != null; }
   public boolean isBuiltin() { return isBuiltin_; }
   public List<String> getFnNamePath() { return fnNamePath_; }
@@ -107,7 +109,8 @@ public class FunctionName {
    *     database.
    *   - Else, set the database name to the current session DB name.
    * - When preferBuiltinsDb is false: set the database name to current session DB name.
-   *   Only for CREATE/DROP FUNCTION statements, preferBuiltinsDb is false.
+   *   For CREATE/DROP FUNCTION and GRANT/REVOKE <privilege> ON USER_DEFINED_FN
+   *   statements, preferBuiltinsDb is false.
    */
   public void analyze(Analyzer analyzer, boolean preferBuiltinsDb)
       throws AnalysisException {
@@ -148,8 +151,10 @@ public class FunctionName {
       return false;
     }
     // Execute a UDF of the fallback database in a SELECT statement, the requesting user
-    // has be to granted any one of the INSERT, REFRESH, SELECT privileges on the
-    // fallback database.
+    // has be to granted a) the SELECT privilege on the UDF, and b) any one of the
+    // INSERT, REFRESH, SELECT privileges on the fallback database.
+    analyzer.registerPrivReq(builder ->
+        builder.allOf(Privilege.SELECT).onFunction(dbName, getFunction()).build());
     FeDb feDb = analyzer.getDb(dbName, Privilege.VIEW_METADATA, false);
     return feDb != null && feDb.containsFunction(fn_);
   }

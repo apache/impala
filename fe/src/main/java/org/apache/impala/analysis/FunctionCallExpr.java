@@ -572,6 +572,9 @@ public class FunctionCallExpr extends Expr {
           profile.appendInfoString(udfInfoStringKey, functionName);
         }
       }
+      analyzer.registerPrivReq(builder ->
+          builder.allOf(Privilege.SELECT)
+          .onFunction(fnName_.getDb(), fnName_.getFunction()).build());
     }
 
     if (isMergeAggFn()) {

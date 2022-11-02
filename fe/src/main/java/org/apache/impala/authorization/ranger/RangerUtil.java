@@ -67,7 +67,7 @@ public class RangerUtil {
     Map<String, String> resource = new HashMap<>();
 
     resource.put(RangerImpalaResourceBuilder.DATABASE, getOrAll(privilege.getDb_name()));
-    resource.put(RangerImpalaResourceBuilder.UDF, "*");
+    resource.put(RangerImpalaResourceBuilder.UDF, getOrAll(privilege.getFn_name()));
 
     return resource;
   }

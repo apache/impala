@@ -734,6 +734,7 @@ enum TPrivilegeScope {
   COLUMN = 4
   STORAGE_TYPE = 5
   STORAGEHANDLER_URI = 6
+  USER_DEFINED_FN = 7
 }
 
 // The privilege level allowed.
@@ -783,7 +784,7 @@ struct TPrivilege {
   // Set if scope is SERVER, URI, DATABASE, or TABLE
   7: optional string server_name
 
-  // Set if scope is DATABASE or TABLE
+  // Set if scope is DATABASE or TABLE or USER_DEFINED_FN
   8: optional string db_name
 
   // Unqualified table name. Set if scope is TABLE.
@@ -801,6 +802,9 @@ struct TPrivilege {
   13: optional string storage_type
 
   14: optional string storage_url
+
+  // Set if scope is USER_DEFINED_FN
+  15: optional string fn_name
 }
 
 // Thrift representation of an HdfsCachePool.

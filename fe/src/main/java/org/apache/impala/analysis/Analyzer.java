@@ -3541,6 +3541,10 @@ public class Analyzer {
     return tableName.isFullyQualified() ? tableName.getDb() : getDefaultDb();
   }
 
+  public String getTargetDbName(FunctionName functionName) {
+    return functionName.isFullyQualified() ? functionName.getDb() : getDefaultDb();
+  }
+
   /**
    * Returns the fully-qualified table name of tableName. If tableName
    * is already fully qualified, returns tableName.

@@ -1755,6 +1755,26 @@ public class ToSqlTest extends FrontendTestBase {
               pt, testRole));
         }
 
+        privileges = Arrays.stream(Privilege.values())
+            .filter(p -> p != Privilege.OWNER &&
+                (p == Privilege.CREATE ||
+                p == Privilege.DROP ||
+                p == Privilege.SELECT))
+            .collect(Collectors.toList());
+
+        for (Privilege p : privileges) {
+          testToSql(ctx, String.format("GRANT %s ON USER_DEFINED_FN " +
+              "functional.identity TO %s %s", p, pt, testRole));
+          testToSql(ctx, String.format("GRANT %s ON USER_DEFINED_FN " +
+              "functional.identity TO %s %s WITH GRANT OPTION", p, pt, testRole));
+          testToSql(ctx, String.format(
+              "REVOKE %s ON USER_DEFINED_FN functional.identity FROM %s %s", p, pt,
+              testRole));
+          testToSql(ctx, String.format(
+              "REVOKE GRANT OPTION FOR %s ON USER_DEFINED_FN functional.identity " +
+              "FROM %s %s", p, pt, testRole));
+        }
+
         // Uri (Only ALL is supported)
         testToSql(ctx, String.format("GRANT ALL ON URI '%s' TO %s %s", testUri, pt,
             testRole));

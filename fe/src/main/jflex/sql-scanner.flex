@@ -270,6 +270,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("to", SqlParserSymbols.KW_TO);
     keywordMap.put("true", SqlParserSymbols.KW_TRUE);
     keywordMap.put("truncate", SqlParserSymbols.KW_TRUNCATE);
+    keywordMap.put("user_defined_fn", SqlParserSymbols.KW_UDF);
     keywordMap.put("unbounded", SqlParserSymbols.KW_UNBOUNDED);
     keywordMap.put("uncached", SqlParserSymbols.KW_UNCACHED);
     keywordMap.put("union", SqlParserSymbols.KW_UNION);

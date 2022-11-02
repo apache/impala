@@ -24,8 +24,10 @@ import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeDataSourceTable;
+import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TPrivilege;
@@ -49,6 +51,7 @@ public class PrivilegeSpec extends StmtNode {
   private final String storageType_;
   private final String storageUri_;
   private final List<String> columnNames_;
+  private final FunctionName functionName_;
 
   // Set/modified during analysis
   private String dbName_;
@@ -56,7 +59,8 @@ public class PrivilegeSpec extends StmtNode {
 
   private PrivilegeSpec(TPrivilegeLevel privilegeLevel, TPrivilegeScope scope,
       String serverName, String dbName, TableName tableName, HdfsUri uri,
-      String storageType, String storageUri, List<String> columnNames) {
+      String storageType, String storageUri, List<String> columnNames,
+      FunctionName functionName) {
     Preconditions.checkNotNull(scope);
     Preconditions.checkNotNull(privilegeLevel);
     privilegeLevel_ = privilegeLevel;
@@ -68,6 +72,7 @@ public class PrivilegeSpec extends StmtNode {
     storageType_ = storageType;
     storageUri_ = storageUri;
     columnNames_ = columnNames;
+    functionName_= functionName;
   }
 
   public static PrivilegeSpec createServerScopedPriv(TPrivilegeLevel privilegeLevel) {
@@ -77,21 +82,28 @@ public class PrivilegeSpec extends StmtNode {
   public static PrivilegeSpec createServerScopedPriv(TPrivilegeLevel privilegeLevel,
       String serverName) {
     return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.SERVER, serverName, null,
-        null, null, null, null, null);
+        null, null, null, null, null, null);
   }
 
   public static PrivilegeSpec createDbScopedPriv(TPrivilegeLevel privilegeLevel,
       String dbName) {
     Preconditions.checkNotNull(dbName);
     return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.DATABASE, null, dbName,
-        null, null, null, null, null);
+        null, null, null, null, null, null);
   }
 
   public static PrivilegeSpec createTableScopedPriv(TPrivilegeLevel privilegeLevel,
       TableName tableName) {
     Preconditions.checkNotNull(tableName);
     return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.TABLE, null, null,
-        tableName, null, null, null, null);
+        tableName, null, null, null, null, null);
+  }
+
+  public static PrivilegeSpec createUdfScopedPriv(TPrivilegeLevel privilegeLevel,
+      FunctionName functionName) {
+    Preconditions.checkNotNull(functionName);
+    return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.USER_DEFINED_FN, null, null,
+        null, null, null, null, null, functionName);
   }
 
   public static PrivilegeSpec createColumnScopedPriv(TPrivilegeLevel privilegeLevel,
@@ -99,14 +111,14 @@ public class PrivilegeSpec extends StmtNode {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(columnNames);
     return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.COLUMN, null, null,
-        tableName, null, null, null, columnNames);
+        tableName, null, null, null, columnNames, null);
   }
 
   public static PrivilegeSpec createUriScopedPriv(TPrivilegeLevel privilegeLevel,
       HdfsUri uri) {
     Preconditions.checkNotNull(uri);
     return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.URI, null, null, null, uri,
-        null, null, null);
+        null, null, null, null);
   }
 
   public static PrivilegeSpec createStorageHandlerUriScopedPriv(
@@ -114,7 +126,7 @@ public class PrivilegeSpec extends StmtNode {
     Preconditions.checkNotNull(storageHandlerUri);
     return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.STORAGEHANDLER_URI, null,
         null, null, null, storageHandlerUri.getStorageType(),
-        storageHandlerUri.getStoreUrl(), null);
+        storageHandlerUri.getStoreUrl(), null, null);
   }
 
   public List<TPrivilege> toThrift() {
@@ -134,6 +146,10 @@ public class PrivilegeSpec extends StmtNode {
    * Helper function to construct a TPrivilege from this privilege spec. If the scope is
    * COLUMN, 'columnName' must be a non-null column name. Otherwise, 'columnName' is
    * null.
+   *
+   * Recall that for a GRANT/REVOKE statement, Frontend#createCatalogOpRequest() is
+   * called to create a TCatalogOpRequest which will be sent from the coordinator to the
+   * catalog daemon and that TPrivilege is one of the objects that has to be set up.
    */
   private TPrivilege createTPrivilege(String columnName) {
     Preconditions.checkState(columnName == null ^ scope_ == TPrivilegeScope.COLUMN);
@@ -148,6 +164,7 @@ public class PrivilegeSpec extends StmtNode {
     if (storageType_ != null) privilege.setStorage_type(storageType_);
     if (storageUri_ != null) privilege.setStorage_url(storageUri_);
     if (columnName != null) privilege.setColumn_name(columnName);
+    if (functionName_ != null) privilege.setFn_name(functionName_.getFunction());
     privilege.setCreate_time_ms(-1);
     return privilege;
   }
@@ -181,6 +198,8 @@ public class PrivilegeSpec extends StmtNode {
       sb.append(" " + dbName_);
     } else if (scope_ == TPrivilegeScope.TABLE) {
       sb.append(" " + tableName_.toString());
+    } else if (scope_ == TPrivilegeScope.USER_DEFINED_FN) {
+      sb.append(" " + functionName_.toString());
     } else if (scope_ == TPrivilegeScope.COLUMN) {
       sb.append(" (");
       sb.append(Joiner.on(",").join(columnNames_));
@@ -241,6 +260,9 @@ public class PrivilegeSpec extends StmtNode {
         break;
       case COLUMN:
         analyzeColumnPrivScope(analyzer);
+        break;
+      case USER_DEFINED_FN:
+        analyzeUdf(analyzer);
         break;
       default:
         throw new IllegalStateException("Unknown TPrivilegeScope in privilege spec: " +
@@ -312,6 +334,30 @@ public class PrivilegeSpec extends StmtNode {
     }
     Preconditions.checkNotNull(table);
     return table;
+  }
+
+  private void analyzeUdf(Analyzer analyzer) throws AnalysisException {
+    Preconditions.checkState(scope_ == TPrivilegeScope.USER_DEFINED_FN);
+
+    // Wildcard function names in the forms of `*`.`*`, <db_name>.`*`, or `*`.<fn_name>
+    // are supported.
+    List<String> path = functionName_.getFnNamePath();
+    if (path.size() == 2 &&
+        (path.get(0).equals("*") || path.get(1).equals("*"))) {
+      dbName_ = path.get(0);
+      functionName_.setDb(path.get(0));
+      functionName_.setFunction(path.get(1));
+      return;
+    }
+
+    // Call analyze() to perform path resolution so that 'db_' and 'fn_' of
+    // 'functionName_' will be set up.
+    functionName_.analyze(analyzer, /* preferBuiltinsDb */ false);
+    Preconditions.checkArgument(!functionName_.getDb().equals("*"));
+    Preconditions.checkArgument(!functionName_.getFunction().equals("*"));
+    // Need to set up 'dbName_', which in turn is used to set up 'db_name' of the
+    // TPrivilege in createTPrivilege().
+    dbName_ = analyzer.getTargetDbName(functionName_);
   }
 
   public TPrivilegeScope getScope() { return scope_; }

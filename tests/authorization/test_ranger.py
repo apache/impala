@@ -199,6 +199,7 @@ class TestRanger(CustomClusterTestSuite):
     admin_client = self.create_impala_client()
     unique_db = unique_name + "_db"
     unique_table = unique_name + "_tbl"
+    udf = "identity"
 
     try:
       # Create test database/table
@@ -211,7 +212,7 @@ class TestRanger(CustomClusterTestSuite):
       for data in test_data:
         # Test basic show grant functionality for user/group
         self._test_show_grant_basic(admin_client, data[1], data[0], unique_db,
-                                    unique_table)
+                                    unique_table, udf)
         # Test that omitting ON <resource> results in failure
         self._test_show_grant_without_on(data[1], data[0])
 
@@ -221,6 +222,9 @@ class TestRanger(CustomClusterTestSuite):
 
       # Test ALL privilege hides other privileges
       self._test_show_grant_mask(admin_client, user)
+
+      # Test ALL privilege on UDF hides other privileges
+      self._test_show_grant_mask_on_udf(admin_client, data[1], data[0], unique_db, udf)
 
       # Test USER inherits privileges for their GROUP
       self._test_show_grant_user_group(admin_client, user, group, unique_db)
@@ -312,7 +316,54 @@ class TestRanger(CustomClusterTestSuite):
       for privilege in privs_excl_rwstorage:
         admin_client.execute("revoke {0} on server from user {1}".format(privilege, user))
 
-  def _test_show_grant_basic(self, admin_client, kw, id, unique_database, unique_table):
+  def _test_show_grant_mask_on_udf(self, admin_client, kw, id, unique_database, udf):
+    try:
+      # Grant the CREATE privilege and verify.
+      admin_client.execute("grant create on user_defined_fn {0}.{1} to {2} {3}"
+                           .format(unique_database, udf, kw, id))
+      result = self.client.execute("show grant {0} {1} on user_defined_fn {2}.{3}"
+                                   .format(kw, id, unique_database, udf))
+      TestRanger._check_privileges(result, [
+        [kw, id, unique_database, "", "", "", "", "", udf, "create", "false"]])
+
+      # Grant the DROP privilege and verify.
+      admin_client.execute("grant drop on user_defined_fn {0}.{1} to {2} {3}"
+                           .format(unique_database, udf, kw, id))
+      result = self.client.execute("show grant {0} {1} on user_defined_fn {2}.{3}"
+                                   .format(kw, id, unique_database, udf))
+      TestRanger._check_privileges(result, [
+        [kw, id, unique_database, "", "", "", "", "", udf, "create", "false"],
+        [kw, id, unique_database, "", "", "", "", "", udf, "drop", "false"]])
+
+      # Grant the SELECT privilege and verify.
+      admin_client.execute("grant select on user_defined_fn {0}.{1} to {2} {3}"
+                           .format(unique_database, udf, kw, id))
+      result = self.client.execute("show grant {0} {1} on user_defined_fn {2}.{3}"
+                                   .format(kw, id, unique_database, udf))
+      TestRanger._check_privileges(result, [
+        [kw, id, unique_database, "", "", "", "", "", udf, "create", "false"],
+        [kw, id, unique_database, "", "", "", "", "", udf, "drop", "false"],
+        [kw, id, unique_database, "", "", "", "", "", udf, "select", "false"]])
+
+      # Grant the ALL privilege and verify other privileges are masked.
+      admin_client.execute("grant all on user_defined_fn {0}.{1} to {2} {3}"
+                           .format(unique_database, udf, kw, id))
+      result = self.client.execute("show grant {0} {1} on user_defined_fn {2}.{3}"
+                                   .format(kw, id, unique_database, udf))
+      TestRanger._check_privileges(result, [
+        [kw, id, unique_database, "", "", "", "", "", udf, "all", "false"]])
+    finally:
+      admin_client.execute("revoke create on user_defined_fn {0}.{1} from {2} {3}"
+                           .format(unique_database, udf, kw, id))
+      admin_client.execute("revoke drop on user_defined_fn {0}.{1} from {2} {3}"
+                           .format(unique_database, udf, kw, id))
+      admin_client.execute("revoke select on user_defined_fn {0}.{1} from {2} {3}"
+                           .format(unique_database, udf, kw, id))
+      admin_client.execute("revoke all on user_defined_fn {0}.{1} from {2} {3}"
+                           .format(unique_database, udf, kw, id))
+
+  def _test_show_grant_basic(self, admin_client, kw, id, unique_database, unique_table,
+                             udf):
     uri = WAREHOUSE_PREFIX + '/tmp'
     database = 'functional'
     table = 'alltypes'
@@ -412,6 +463,68 @@ class TestRanger(CustomClusterTestSuite):
                                    .format(kw, id, unique_database, unique_table))
       TestRanger._check_privileges(result, [])
 
+      # Grant a privilege on a UDF with a wildcard for both database name and function
+      # name.
+      admin_client.execute("grant select on user_defined_fn `*`.`*` to {0} {1}"
+                           .format(kw, id))
+      result = self.client.execute("show grant {0} {1} on user_defined_fn `*`.`*`"
+                                   .format(kw, id))
+      TestRanger._check_privileges(result, [
+        [kw, id, "*", "", "", "", "", "", "*", "select", "false"]])
+
+      # Revoke the granted privilege and verify.
+      admin_client.execute("revoke select on user_defined_fn `*`.`*` from {0} {1}"
+                           .format(kw, id))
+      result = self.client.execute("show grant {0} {1} on user_defined_fn `*`.`*`"
+                                   .format(kw, id))
+      TestRanger._check_privileges(result, [])
+
+      # Grant a privilege on a UDF with a wildcard for functional name.
+      admin_client.execute("grant select on user_defined_fn {0}.`*` to {1} {2}"
+                           .format(unique_database, kw, id))
+      result = self.client.execute("show grant {0} {1} on user_defined_fn {2}.`*`"
+                                   .format(kw, id, unique_database))
+      TestRanger._check_privileges(result, [
+        [kw, id, unique_database, "", "", "", "", "", "*", "select", "false"]])
+
+      # Revoke the granted privilege and verify.
+      admin_client.execute("revoke select on user_defined_fn {0}.`*` from {1} {2}"
+                           .format(unique_database, kw, id))
+      result = self.client.execute("show grant {0} {1} on user_defined_fn {2}.`*`"
+                                   .format(kw, id, unique_database))
+      TestRanger._check_privileges(result, [])
+
+      # Grant a privilege on a UDF with a wildcard for database name but a
+      # non-wildcard for functional name.
+      admin_client.execute("grant select on user_defined_fn `*`.{0} to {1} {2}"
+                           .format(udf, kw, id))
+      result = self.client.execute("show grant {0} {1} on user_defined_fn `*`.{2}"
+                                   .format(kw, id, udf))
+      TestRanger._check_privileges(result, [
+        [kw, id, "*", "", "", "", "", "", udf, "select", "false"]])
+
+      # Revoke the granted privilege and verify.
+      admin_client.execute("revoke select on user_defined_fn `*`.{0} from {1} {2}"
+                           .format(udf, kw, id))
+      result = self.client.execute("show grant {0} {1} on user_defined_fn `*`.{2}"
+                                   .format(kw, id, udf))
+      TestRanger._check_privileges(result, [])
+
+      # Grant a privilege on a UDF and verify.
+      admin_client.execute("grant select on user_defined_fn {0}.{1} to {2} {3}"
+                           .format(unique_database, udf, kw, id))
+      result = self.client.execute("show grant {0} {1} on user_defined_fn {2}.{3}"
+                                   .format(kw, id, unique_database, udf))
+      TestRanger._check_privileges(result, [
+        [kw, id, unique_database, "", "", "", "", "", udf, "select", "false"]])
+
+      # Revoke the granted privilege and verify.
+      admin_client.execute("revoke select on user_defined_fn {0}.{1} from {2} {3}"
+                           .format(unique_database, udf, kw, id))
+      result = self.client.execute("show grant {0} {1} on user_defined_fn {2}.{3}"
+                                   .format(kw, id, unique_database, udf))
+      TestRanger._check_privileges(result, [])
+
       # Grant column privileges and verify
       admin_client.execute("grant select(x) on table {0}.{1} to {2} {3}"
                            .format(unique_database, unique_table, kw, id))
@@ -437,6 +550,14 @@ class TestRanger(CustomClusterTestSuite):
                            .format(unique_database, kw, id))
       admin_client.execute("revoke select on table {0}.{1} from {2} {3}"
                            .format(unique_database, unique_table, kw, id))
+      admin_client.execute("revoke select on user_defined_fn `*`.`*` from {0} {1}"
+                           .format(kw, id))
+      admin_client.execute("revoke select on user_defined_fn {0}.`*` from {1} {2}"
+                           .format(unique_database, kw, id))
+      admin_client.execute("revoke select on user_defined_fn `*`.{0} from {1} {2}"
+                           .format(udf, kw, id))
+      admin_client.execute("revoke select on user_defined_fn {0}.{1} from {2} {3}"
+                           .format(unique_database, udf, kw, id))
       admin_client.execute("revoke select(x) on table {0}.{1} from {2} {3}"
                            .format(unique_database, unique_table, kw, id))
 
@@ -1048,6 +1169,128 @@ class TestRanger(CustomClusterTestSuite):
       self._run_query_as_user("drop database {0} cascade".format(unique_database),
                               ADMIN, True)
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_select_function(self, unique_name):
+    """Verifies that to execute a UDF in a database, a user has to be granted a) the
+    SELECT privilege on the UDF, and b) any of the SELECT, INSERT, REFRESH privileges on
+    all the tables, columns in the database."""
+    test_user = "non_owner"
+    admin_client = self.create_impala_client()
+    unique_database = unique_name + "_db"
+    fs_prefix = os.getenv("FILESYSTEM_PREFIX") or str()
+    try:
+      # Create a temporary database and a user-defined function.
+      admin_client.execute("drop database if exists {0} cascade".format(unique_database),
+                           user=ADMIN)
+      admin_client.execute("create database {0}".format(unique_database), user=ADMIN)
+      admin_client.execute("create function {0}.identity(bigint) "
+                           "RETURNS bigint "
+                           "LOCATION "
+                           "'{1}/test-warehouse/impala-hive-udfs.jar' "
+                           "SYMBOL='org.apache.impala.TestUdf'"
+                           .format(unique_database, fs_prefix), user=ADMIN)
+
+      # A user not granted any privilege is not allowed to execute the UDF.
+      result = self._run_query_as_user("select {0}.identity(1)".format(unique_database),
+                                       test_user, False)
+      err = "User '{0}' does not have privileges to SELECT functions in: " \
+            "{1}.identity".format(test_user, unique_database)
+      assert err in str(result)
+
+      view_metadata_privileges = ["select", "insert", "refresh"]
+      for privilege_on_database in view_metadata_privileges:
+        try:
+          # A user is allowed to execute a UDF in a database if the user has been granted
+          # the SELECT privilege on the database. Such a privilege covers all the tables,
+          # columns, as well as UDFs in the database.
+          admin_client.execute("grant {0} on database {1} to user {2}"
+                               .format(privilege_on_database, unique_database, test_user),
+                               user=ADMIN)
+          result = admin_client.execute("show grant user {0} on database {1}"
+                               .format(test_user, unique_database), user=ADMIN)
+          TestRanger._check_privileges(result, [
+              ["USER", test_user, unique_database, "", "", "", "", "", "*",
+               privilege_on_database, "false"],
+              ["USER", test_user, unique_database, "*", "*", "", "", "", "",
+               privilege_on_database, "false"]])
+          # Query succeeds only if 'privilege_on_database' is "select".
+          if privilege_on_database != "select":
+            result = self._run_query_as_user("select {0}.identity(1)"
+                                             .format(unique_database), test_user, False)
+            err = "User '{0}' does not have privileges to SELECT functions in: " \
+                  "{1}.identity".format(test_user, unique_database)
+            assert err in str(result)
+          else:
+            self._run_query_as_user("select {0}.identity(1)".format(unique_database),
+                                    test_user, True)
+
+          # A user not being granted the SELECT privilege on any UDF in the database is
+          # not allowed to execute the UDF even though the user has
+          # the 'privilege_on_database' privilege on all the tables, columns in the
+          # database.
+          admin_client.execute("revoke {0} on user_defined_fn {1}.`*` from user {2}"
+                               .format(privilege_on_database, unique_database,
+                               test_user), user=ADMIN)
+          result = admin_client.execute("show grant user {0} on database {1}"
+                                        .format(test_user, unique_database), user=ADMIN)
+          TestRanger._check_privileges(result, [
+            ["USER", test_user, unique_database, "*", "*", "", "", "", "",
+             privilege_on_database, "false"]])
+          result = self._run_query_as_user("select {0}.identity(1)"
+                                           .format(unique_database), test_user, False)
+          err = "User '{0}' does not have privileges to SELECT functions in: " \
+                "{1}.identity".format(test_user, unique_database)
+          assert err in str(result)
+
+          # A user is allowed to execute the UDF if the user is explicitly granted the
+          # SELECT privilege on the UDF.
+          admin_client.execute("grant select on user_defined_fn {0}.identity to user {1}"
+                               .format(unique_database, test_user), user=ADMIN)
+          result = admin_client.execute("show grant user {0} "
+                                        "on user_defined_fn {1}.identity"
+                                        .format(test_user, unique_database), user=ADMIN)
+          TestRanger._check_privileges(result, [
+              ["USER", test_user, unique_database, "", "", "", "", "", "identity",
+               "select", "false"]])
+          self._run_query_as_user("select {0}.identity(1)".format(unique_database),
+                                  test_user, True)
+
+          # Even though a user is explicitly granted the SELECT privilege on the UDF, the
+          # user is not allowed to execute the UDF if the user is not granted any of the
+          # SELECT, INSERT, or REFRESH privileges on all the tables and columns in the
+          # database.
+          admin_client.execute("revoke {0} on database {1} from user {2}"
+                               .format(privilege_on_database, unique_database,
+                                       test_user), user=ADMIN)
+          result = admin_client.execute("show grant user {0} on database {1}"
+                                        .format(test_user, unique_database), user=ADMIN)
+          TestRanger._check_privileges(result, [])
+          result = admin_client.execute("show grant user {0} "
+                                        "on user_defined_fn {1}.identity"
+                                        .format(test_user, unique_database), user=ADMIN)
+          TestRanger._check_privileges(result, [
+              ["USER", test_user, unique_database, "", "", "", "", "", "identity",
+               "select", "false"]])
+          result = self._run_query_as_user("select {0}.identity(1)"
+                                           .format(unique_database), test_user, False)
+          err = "User '{0}' does not have privileges to access: {1}"\
+                .format(test_user, unique_database)
+          assert err in str(result)
+        finally:
+          # Revoke the granted privileges.
+          admin_client.execute("revoke {0} on database {1} from user {2}"
+                               .format(privilege_on_database, unique_database,
+                                       test_user), user=ADMIN)
+          admin_client.execute("revoke select on user_defined_fn {0}.identity "
+                               "from user {1}"
+                               .format(unique_database, test_user), user=ADMIN)
+    finally:
+      # Drop the database.
+      self._run_query_as_user("drop database {0} cascade".format(unique_database),
+                              ADMIN, True)
+
   def _test_ownership(self):
     """Tests ownership privileges for databases and tables with ranger along with
     some known quirks in the implementation."""
@@ -1111,7 +1354,7 @@ class TestRanger(CustomClusterTestSuite):
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
   def test_select_function_with_fallback_db(self, unique_name):
     """Verifies that Impala should not allow using functions in the fallback database
-    unless the user has some privileges on the given database."""
+    unless the user has been granted sufficient privileges on the given database."""
     test_user = "non_owner"
     admin_client = self.create_impala_client()
     non_owner_client = self.create_impala_client()
@@ -1130,8 +1373,8 @@ class TestRanger(CustomClusterTestSuite):
                            .format(unique_database, WAREHOUSE), user=ADMIN)
       # A user not granted any privilege is not allowed to execute the UDF.
       result = self._run_query_as_user("select identity(1)", test_user, False)
-      err = "User '{0}' does not have privileges to access: default".format(
-        test_user)
+      err = "User '{0}' does not have privileges to SELECT functions in: " \
+            "default.identity".format(test_user)
       assert err in str(result)
 
       admin_client.execute(
@@ -1148,19 +1391,25 @@ class TestRanger(CustomClusterTestSuite):
       result = self.execute_query_expect_failure(
           non_owner_client, "select identity(1)", query_options={
               'FALLBACK_DB_FOR_FUNCTIONS': unique_database}, user=test_user)
-      err = "User '{0}' does not have privileges to access: {1}".format(
-        test_user, unique_database)
+      err = "User '{0}' does not have privileges to SELECT functions in: " \
+            "{1}.identity".format(test_user, unique_database)
       assert err in str(result)
 
       result = self.execute_query_expect_failure(
           non_owner_client, "select fn()", query_options={
               'FALLBACK_DB_FOR_FUNCTIONS': unique_database}, user=test_user)
-      err = "User '{0}' does not have privileges to access: {1}".format(
-        test_user, unique_database)
+      err = "User '{0}' does not have privileges to SELECT functions in: " \
+            "{1}.fn".format(test_user, unique_database)
       assert err in str(result)
 
+      # A user has to be granted a) any of the INSERT, REFRESH, SELECT privileges on all
+      # the tables and columns in the fallback database, and b) the SELECT privilege on
+      # the UDF in the fallback database in order to execute the UDF.
       admin_client.execute(
-          "grant select on database {0} to user {1}".format(
+          "grant insert on database {0} to user {1}".format(
+              unique_database, test_user), user=ADMIN)
+      admin_client.execute(
+          "grant select on user_defined_fn {0}.identity to user {1}".format(
               unique_database, test_user), user=ADMIN)
       self._refresh_authorization(admin_client, refresh_stmt)
 
@@ -1174,9 +1423,11 @@ class TestRanger(CustomClusterTestSuite):
     finally:
       # Revoke the granted privileges.
       admin_client.execute("revoke select on database default from user {0}"
-                               .format(test_user), user=ADMIN)
-      admin_client.execute("revoke select on database {0} from user {1}"
-                               .format(unique_database, test_user), user=ADMIN)
+                           .format(test_user), user=ADMIN)
+      admin_client.execute("revoke insert on database {0} from user {1}"
+                           .format(unique_database, test_user), user=ADMIN)
+      admin_client.execute("revoke select on user_defined_fn {0}.identity from user {1}"
+                           .format(unique_database, test_user), user=ADMIN)
       # Drop the database.
       self._run_query_as_user("drop database {0} cascade".format(unique_database),
                               ADMIN, True)

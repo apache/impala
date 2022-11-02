@@ -510,6 +510,23 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
     return privileges;
   }
 
+  protected TPrivilege[] onUdf(String db, String fn, TPrivilegeLevel... levels) {
+    return onUdf(false, db, fn, levels);
+  }
+
+  protected TPrivilege[] onUdf(boolean grantOption, String db, String fn,
+      TPrivilegeLevel... levels) {
+    TPrivilege[] privileges = new TPrivilege[levels.length];
+    for (int i = 0; i < levels.length; i++) {
+      privileges[i] = new TPrivilege(levels[i], TPrivilegeScope.USER_DEFINED_FN, false);
+      privileges[i].setServer_name(SERVER_NAME);
+      privileges[i].setDb_name(db);
+      privileges[i].setFn_name(fn);
+      privileges[i].setHas_grant_opt(grantOption);
+    }
+    return privileges;
+  }
+
   private void authzOk(String stmt, WithPrincipal withPrincipal) throws ImpalaException {
     authzOk(authzCtx_, stmt, withPrincipal, /* expectAnalysisOk */ true);
   }
@@ -697,6 +714,10 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
 
   protected static String accessFunctionError(String object) {
     return "User '%s' does not have privileges to ANY functions in: " + object;
+  }
+
+  protected static String selectFunctionError(String object) {
+    return "User '%s' does not have privileges to SELECT functions in: " + object;
   }
 
   protected static String columnMaskError(String object) {
