@@ -273,7 +273,7 @@ public class CreateTableStmt extends StatementBase {
       String lineDelimiter = getRowFormat().getLineDelimiter();
       String escapeChar = getRowFormat().getEscapeChar();
       if (getFileFormat() != THdfsFileFormat.TEXT
-          || getFileFormat() != THdfsFileFormat.SEQUENCE_FILE) {
+          && getFileFormat() != THdfsFileFormat.SEQUENCE_FILE) {
         if (fieldDelimiter != null) {
           analyzer.addWarning("'ROW FORMAT DELIMITED FIELDS TERMINATED BY '"
               + fieldDelimiter + "'' is ignored.");

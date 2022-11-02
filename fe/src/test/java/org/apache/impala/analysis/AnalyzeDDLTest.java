@@ -49,7 +49,6 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
-import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TBackendGflags;
@@ -2314,16 +2313,20 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "explicitly specify the column type for column 'new_col'.");
 
     // IMPALA-9822 Row Format Delimited is valid only for Text Files
-    String[] fileFormats = {"PARQUET", "ICEBERG"};
-    for (String format : fileFormats) {
+    String[] fileFormats = {"TEXTFILE", "PARQUET", "ICEBERG"};
+    for (int i = 0; i < fileFormats.length; ++i) {
+      String format = fileFormats[i];
       for (String rowFormat : ImmutableList.of(
                "FIELDS TERMINATED BY ','", "LINES TERMINATED BY ','", "ESCAPED BY ','")) {
-        AnalyzesOk(
-            String.format(
-                "create table new_table row format delimited %s stored as %s as select *"
-                    + " from functional.child_table",
-                rowFormat, format),
-            "'ROW FORMAT DELIMITED " + rowFormat + "' is ignored.");
+        String stmt = String.format(
+            "create table new_table row format delimited %s stored as %s as select *"
+                + " from functional.child_table", rowFormat, format);
+        if (i == 0) {
+          // No warrnings for TEXT tables
+          AnalyzesOkWithoutWarnings(stmt);
+        } else {
+          AnalyzesOk(stmt, "'ROW FORMAT DELIMITED " + rowFormat + "' is ignored.");
+        }
       }
     }
   }
@@ -2583,14 +2586,18 @@ public class AnalyzeDDLTest extends FrontendTestBase {
       formatIndx++;
     }
 
-    for (formatIndx = 2; formatIndx < fileFormats.length; formatIndx++) {
+    for (formatIndx = 0; formatIndx < fileFormats.length; formatIndx++) {
       for (String rowFormat : ImmutableList.of(
                "FIELDS TERMINATED BY ','", "LINES TERMINATED BY ','", "ESCAPED BY ','")) {
-        AnalyzesOk(
-            String.format(
-                "create table new_table (i int) row format delimited %s stored as %s",
-                rowFormat, fileFormats[formatIndx]),
-            "'ROW FORMAT DELIMITED " + rowFormat + "' is ignored");
+        String stmt = String.format(
+            "create table new_table (i int) row format delimited %s stored as %s",
+            rowFormat, fileFormats[formatIndx]);
+        if (formatIndx < 2) {
+          // No warrnings for TEXT and SEQUENCE tables
+          AnalyzesOkWithoutWarnings(stmt);
+        } else {
+          AnalyzesOk(stmt, "'ROW FORMAT DELIMITED " + rowFormat + "' is ignored");
+        }
       }
     }
 

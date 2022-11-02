@@ -1989,7 +1989,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   */
   private boolean hasStraightJoin(String stmt, String expectedWarning){
     AnalysisContext ctx = createAnalysisCtx();
-    AnalyzesOk(stmt,ctx, expectedWarning);
+    if (expectedWarning == null) {
+      AnalyzesOkWithoutWarnings(stmt, ctx);
+    } else {
+      AnalyzesOk(stmt, ctx, expectedWarning);
+    }
     return ctx.getAnalyzer().isStraightJoin();
   }
 

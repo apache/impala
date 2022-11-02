@@ -194,9 +194,17 @@ public class FrontendTestBase extends AbstractFrontendTest {
   /**
    * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
    * If 'expectedWarning' is not null, asserts that a warning is produced.
+   * Otherwise, asserts no warnings.
    */
   public ParseNode AnalyzesOk(String stmt, String expectedWarning) {
-    return AnalyzesOk(stmt, createAnalysisCtx(), expectedWarning);
+    return AnalyzesOk(stmt, createAnalysisCtx(), expectedWarning, true);
+  }
+
+  /**
+   * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error or warnings.
+   */
+  public ParseNode AnalyzesOkWithoutWarnings(String stmt) {
+    return AnalyzesOk(stmt, createAnalysisCtx(), null, true);
   }
 
   protected AnalysisContext createAnalysisCtx() {
@@ -241,11 +249,21 @@ public class FrontendTestBase extends AbstractFrontendTest {
   /**
    * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
    * If 'expectedWarning' is not null, asserts that a warning is produced.
+   * Otherwise, asserts no warnings if 'assertNoWarnings' is true.
    */
-  public ParseNode AnalyzesOk(String stmt, AnalysisContext ctx, String expectedWarning) {
+  public ParseNode AnalyzesOk(String stmt, AnalysisContext ctx, String expectedWarning,
+      boolean assertNoWarnings) {
     try (FrontendProfile.Scope scope = FrontendProfile.createNewWithScope()) {
-      return feFixture_.analyzeStmt(stmt, ctx, expectedWarning);
+      return feFixture_.analyzeStmt(stmt, ctx, expectedWarning, assertNoWarnings);
     }
+  }
+
+  public ParseNode AnalyzesOk(String stmt, AnalysisContext ctx, String expectedWarning) {
+    return AnalyzesOk(stmt, ctx, expectedWarning, false);
+  }
+
+  public ParseNode AnalyzesOkWithoutWarnings(String stmt, AnalysisContext ctx) {
+    return AnalyzesOk(stmt, ctx, null, true);
   }
 
   /**
