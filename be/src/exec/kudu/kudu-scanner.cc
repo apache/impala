@@ -19,10 +19,13 @@
 
 #include <string>
 #include <vector>
+
+#include <kudu/client/resource_metrics.h>
 #include <kudu/client/row_result.h>
 #include <kudu/client/value.h>
 #include <thrift/protocol/TDebugProtocol.h>
 
+#include "common/names.h"
 #include "exec/exec-node.inline.h"
 #include "exec/kudu/kudu-util.h"
 #include "exprs/scalar-expr-evaluator.h"
@@ -48,14 +51,13 @@
 #include "util/periodic-counter-updater.h"
 #include "util/runtime-profile-counters.h"
 
-#include "common/names.h"
-
 using kudu::client::KuduClient;
 using kudu::client::KuduPredicate;
 using kudu::client::KuduScanBatch;
 using kudu::client::KuduSchema;
 using kudu::client::KuduTable;
 using kudu::client::KuduValue;
+using kudu::client::ResourceMetrics;
 
 DEFINE_string(kudu_read_mode, "READ_LATEST", "(Advanced) Sets the Kudu scan ReadMode. "
     "Supported Kudu read modes are READ_LATEST and READ_AT_SNAPSHOT. Can be overridden "
@@ -67,7 +69,6 @@ DEFINE_int32(kudu_scanner_keep_alive_period_sec, 15,
 DECLARE_int32(kudu_operation_timeout_ms);
 
 namespace impala {
-
 
 KuduScanner::KuduScanner(KuduScanNodeBase* scan_node, RuntimeState* state)
   : scan_node_(scan_node),
@@ -124,6 +125,7 @@ Status KuduScanner::GetNextWithCountStarOptimization(RowBatch* row_batch, bool* 
   int64_t tuple_buffer_size;
   uint8_t* tuple_buffer;
   int capacity = 1;
+  SCOPED_TIMER(scan_node_->materialize_tuple_timer());
   RETURN_IF_ERROR(row_batch->ResizeAndAllocateTupleBuffer(state_,
       row_batch->tuple_data_pool(), row_batch->row_desc()->GetRowSize(), &capacity,
       &tuple_buffer_size, &tuple_buffer));
@@ -141,7 +143,6 @@ Status KuduScanner::GetNextWithCountStarOptimization(RowBatch* row_batch, bool* 
 }
 
 Status KuduScanner::GetNext(RowBatch* row_batch, bool* eos) {
-  SCOPED_TIMER(scan_node_->materialize_tuple_timer());
   // Optimized scanning for count(*), only write the NumRows
   if (scan_node_->optimize_count_star()) {
     return GetNextWithCountStarOptimization(row_batch, eos);
@@ -311,6 +312,19 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token, bool* eos) {
 
 void KuduScanner::CloseCurrentClientScanner() {
   DCHECK_NOTNULL(scanner_.get());
+
+  std::map<std::string, int64_t> metrics = scanner_->GetResourceMetrics().Get();
+  COUNTER_ADD(scan_node_->bytes_read_counter(), metrics["bytes_read"]);
+  COUNTER_ADD(
+      scan_node_->kudu_scanner_total_duration_time(), metrics["total_duration_nanos"]);
+  COUNTER_ADD(
+      scan_node_->kudu_scanner_queue_duration_time(), metrics["queue_duration_nanos"]);
+  COUNTER_ADD(scan_node_->kudu_scanner_cpu_user_time(), metrics["cpu_user_nanos"]);
+  COUNTER_ADD(scan_node_->kudu_scanner_cpu_sys_time(), metrics["cpu_system_nanos"]);
+  COUNTER_ADD(
+      scan_node_->kudu_scanner_cfile_cache_hit_bytes(), metrics["cfile_cache_hit_bytes"]);
+  COUNTER_ADD(scan_node_->kudu_scanner_cfile_cache_miss_bytes(),
+      metrics["cfile_cache_miss_bytes"]);
   scanner_->Close();
   scanner_.reset();
 }
@@ -341,6 +355,7 @@ Status KuduScanner::HandleEmptyProjection(RowBatch* row_batch) {
 }
 
 Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_mem) {
+  SCOPED_TIMER(scan_node_->materialize_tuple_timer());
   // Short-circuit for empty projection cases.
   if (scan_node_->tuple_desc()->slots().empty()) {
     return HandleEmptyProjection(row_batch);

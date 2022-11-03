@@ -95,6 +95,13 @@ class KuduScanNodeBase : public ScanNode {
   RuntimeProfile::Counter* kudu_round_trips_ = nullptr;
   RuntimeProfile::Counter* kudu_remote_tokens_ = nullptr;
   RuntimeProfile::Counter* kudu_client_time_ = nullptr;
+  RuntimeProfile::Counter* kudu_scanner_total_duration_time_ = nullptr;
+  RuntimeProfile::Counter* kudu_scanner_queue_duration_time_ = nullptr;
+  RuntimeProfile::Counter* kudu_scanner_cpu_user_time_ = nullptr;
+  RuntimeProfile::Counter* kudu_scanner_cpu_sys_time_ = nullptr;
+  RuntimeProfile::Counter* kudu_scanner_cfile_cache_hit_bytes_ = nullptr;
+  RuntimeProfile::Counter* kudu_scanner_cfile_cache_miss_bytes_ = nullptr;
+
   static const std::string KUDU_ROUND_TRIPS;
   static const std::string KUDU_REMOTE_TOKENS;
   static const std::string KUDU_CLIENT_TIME;
@@ -102,5 +109,23 @@ class KuduScanNodeBase : public ScanNode {
   kudu::client::KuduClient* kudu_client() { return client_.get(); }
   RuntimeProfile::Counter* kudu_round_trips() const { return kudu_round_trips_; }
   RuntimeProfile::Counter* kudu_client_time() const { return kudu_client_time_; }
+  RuntimeProfile::Counter* kudu_scanner_total_duration_time() const {
+    return kudu_scanner_total_duration_time_;
+  }
+  RuntimeProfile::Counter* kudu_scanner_queue_duration_time() const {
+    return kudu_scanner_queue_duration_time_;
+  }
+  RuntimeProfile::Counter* kudu_scanner_cpu_user_time() const {
+    return kudu_scanner_cpu_user_time_;
+  }
+  RuntimeProfile::Counter* kudu_scanner_cpu_sys_time() const {
+    return kudu_scanner_cpu_sys_time_;
+  }
+  RuntimeProfile::Counter* kudu_scanner_cfile_cache_hit_bytes() const {
+    return kudu_scanner_cfile_cache_hit_bytes_;
+  }
+  RuntimeProfile::Counter* kudu_scanner_cfile_cache_miss_bytes() const {
+    return kudu_scanner_cfile_cache_miss_bytes_;
+  }
 };
 } // namespace impala

@@ -45,6 +45,20 @@ using kudu::client::KuduTable;
 namespace impala {
 
 PROFILE_DECLARE_COUNTER(ScanRangesComplete);
+PROFILE_DEFINE_TIMER(KuduScannerTotalDurationTime, STABLE_LOW,
+    "Total time taken for all scan rpc requests to complete for Kudu scanners.");
+PROFILE_DEFINE_TIMER(KuduScannerQueueDurationTime, STABLE_LOW,
+    "Total time taken between scan rpc requests being accepted and when they were "
+    "handled by Kudu scanners.");
+PROFILE_DEFINE_TIMER(KuduScannerCpuUserTime, STABLE_LOW,
+    "Total elapsed CPU user time for all scan rpc requests for Kudu scanners.");
+PROFILE_DEFINE_TIMER(KuduScannerCpuSysTime, STABLE_LOW,
+    "Total elapsed CPU system time for all scan rpc requests for Kudu scanners.");
+PROFILE_DEFINE_COUNTER(KuduScannerCfileCacheHitBytes, STABLE_LOW, TUnit::BYTES,
+    "Number of bytes that were read from the block cache because of a hit for Kudu "
+    "scanners.");
+PROFILE_DEFINE_COUNTER(KuduScannerCfileCacheMissBytes, STABLE_LOW, TUnit::BYTES,
+    "Number of bytes that were read because of a block cache miss for Kudu scanners.");
 
 const string KuduScanNodeBase::KUDU_ROUND_TRIPS = "TotalKuduScanRoundTrips";
 const string KuduScanNodeBase::KUDU_REMOTE_TOKENS = "KuduRemoteScanTokens";
@@ -69,11 +83,25 @@ KuduScanNodeBase::~KuduScanNodeBase() {
 Status KuduScanNodeBase::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ScanNode::Prepare(state));
 
+  AddBytesReadCounters();
   scan_ranges_complete_counter_ =
       PROFILE_ScanRangesComplete.Instantiate(runtime_profile());
   kudu_round_trips_ = ADD_COUNTER(runtime_profile(), KUDU_ROUND_TRIPS, TUnit::UNIT);
   kudu_remote_tokens_ = ADD_COUNTER(runtime_profile(), KUDU_REMOTE_TOKENS, TUnit::UNIT);
   kudu_client_time_ = ADD_TIMER(runtime_profile(), KUDU_CLIENT_TIME);
+
+  kudu_scanner_total_duration_time_ =
+      PROFILE_KuduScannerTotalDurationTime.Instantiate(runtime_profile());
+  kudu_scanner_queue_duration_time_ =
+      PROFILE_KuduScannerQueueDurationTime.Instantiate(runtime_profile());
+  kudu_scanner_cpu_user_time_ =
+      PROFILE_KuduScannerCpuUserTime.Instantiate(runtime_profile());
+  kudu_scanner_cpu_sys_time_ =
+      PROFILE_KuduScannerCpuSysTime.Instantiate(runtime_profile());
+  kudu_scanner_cfile_cache_hit_bytes_ =
+      PROFILE_KuduScannerCfileCacheHitBytes.Instantiate(runtime_profile());
+  kudu_scanner_cfile_cache_miss_bytes_ =
+      PROFILE_KuduScannerCfileCacheMissBytes.Instantiate(runtime_profile());
 
   DCHECK(state->desc_tbl().GetTupleDescriptor(tuple_id_) != NULL);
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
