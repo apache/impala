@@ -37,6 +37,7 @@ import org.apache.hadoop.hdfs.client.HdfsAdmin;
 import org.apache.hadoop.hdfs.protocol.EncryptionZone;
 import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.util.DebugUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -865,6 +866,11 @@ public class FileSystemUtil {
    */
   private static final List<String> TMP_DIR_PREFIX_LIST = new ArrayList<>();
   static {
+    if (BackendConfig.INSTANCE == null) {
+      BackendConfig.create(new TBackendGflags());
+      LOG.warn("Initialized BackendConfig.INSTANCE lazily. This should only happen in" +
+          " tests.");
+    }
     String s = BackendConfig.INSTANCE.getIgnoredDirPrefixList();
     for (String prefix : s.split(",")) {
       if (!prefix.isEmpty()) {
