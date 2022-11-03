@@ -328,6 +328,7 @@ class AdmissionController {
   // Profile info strings
   static const std::string PROFILE_INFO_KEY_ADMISSION_RESULT;
   static const std::string PROFILE_INFO_VAL_ADMIT_IMMEDIATELY;
+  static const std::string PROFILE_INFO_VAL_ADMIT_TRIVIAL;
   static const std::string PROFILE_INFO_VAL_QUEUED;
   static const std::string PROFILE_INFO_VAL_CANCELLED_IN_QUEUE;
   static const std::string PROFILE_INFO_VAL_ADMIT_QUEUED;
@@ -546,23 +547,30 @@ class AdmissionController {
     };
 
     PoolStats(AdmissionController* parent, const std::string& name)
-      : name_(name), parent_(parent), agg_num_running_(0), agg_num_queued_(0),
-        agg_mem_reserved_(0), local_mem_admitted_(0), wait_time_ms_ema_(0.0) {
+      : name_(name),
+        parent_(parent),
+        agg_num_running_(0),
+        agg_num_queued_(0),
+        agg_mem_reserved_(0),
+        local_trivial_running_(0),
+        local_mem_admitted_(0),
+        wait_time_ms_ema_(0.0) {
       peak_mem_histogram_.resize(HISTOGRAM_NUM_OF_BINS, 0);
       InitMetrics();
     }
 
     int64_t agg_num_running() const { return agg_num_running_; }
     int64_t agg_num_queued() const { return agg_num_queued_; }
+    int64_t local_trivial_running() const { return local_trivial_running_; }
     int64_t EffectiveMemReserved() const {
       return std::max(agg_mem_reserved_, local_mem_admitted_);
     }
 
     // ADMISSION LIFECYCLE METHODS
     /// Updates the pool stats when the request represented by 'state' is admitted.
-    void AdmitQueryAndMemory(const ScheduleState& state);
+    void AdmitQueryAndMemory(const ScheduleState& state, bool is_trivial);
     /// Updates the pool stats except the memory admitted stat.
-    void ReleaseQuery(int64_t peak_mem_consumption);
+    void ReleaseQuery(int64_t peak_mem_consumption, bool is_trivial);
     /// Releases the specified memory from the pool stats.
     void ReleaseMem(int64_t mem_to_release);
     /// Updates the pool stats when the request represented by 'state' is queued.
@@ -630,6 +638,9 @@ class AdmissionController {
 
     const std::string& name() const { return name_; }
 
+    /// The max number of running trivial queries that can be allowed at the same time.
+    static const int MAX_NUM_TRIVIAL_QUERY_RUNNING;
+
    private:
     const std::string name_;
     AdmissionController* parent_;
@@ -647,6 +658,13 @@ class AdmissionController {
     /// every host, i.e. the sum of all local_stats_.mem_reserved from all
     /// other hosts. Updated only by UpdateAggregates().
     int64_t agg_mem_reserved_;
+
+    /// Number of running trivial queries in this pool that have been admitted by this
+    /// local coordinator. The purpose of it is to control the concurrency of running
+    /// trivial queries in case they may consume too many resources because trivial
+    /// queries bypass the normal admission control procedure.
+    /// Updated only in AdmitQueryAndMemory() and ReleaseQuery().
+    int64_t local_trivial_running_;
 
     /// Memory in this pool (across all nodes) that is needed for requests that have been
     /// admitted by this local coordinator. Updated only on Admit() and Release(). Stored
@@ -855,6 +873,9 @@ class AdmissionController {
     /// Map from backend addresses to the resouces this query was allocated on them. When
     /// backends are released, they are removed from this map.
     std::unordered_map<NetworkAddressPB, BackendAllocation> per_backend_resources;
+
+    /// Indicate whether the query is admitted as a trivial query.
+    bool is_trivial;
   };
 
   /// Map from host id to a map from query id of currently running queries to information
@@ -933,9 +954,12 @@ class AdmissionController {
   /// true and keeps queue_node->admitted_schedule unset if the query cannot be admitted
   /// now, but also does not need to be rejected. If the query must be rejected, this
   /// method returns false and sets queue_node->not_admitted_reason.
+  /// The is_trivial is set to true when is_trivial is not null if the query is admitted
+  /// as a trivial query.
   bool FindGroupToAdmitOrReject(ClusterMembershipMgr::SnapshotPtr membership_snapshot,
       const TPoolConfig& pool_config, bool admit_from_queue, PoolStats* pool_stats,
-      QueueNode* queue_node, bool& coordinator_resource_limited);
+      QueueNode* queue_node, bool& coordinator_resource_limited,
+      bool* is_trivial = nullptr);
 
   /// Dequeues the queued queries when notified by dequeue_cv_ and admits them if they
   /// have not been cancelled yet.
@@ -951,6 +975,10 @@ class AdmissionController {
   bool CanAdmitRequest(const ScheduleState& state, const TPoolConfig& pool_cfg,
       bool admit_from_queue, string* not_admitted_reason, string* not_admitted_details,
       bool& coordinator_resource_limited);
+
+  /// Returns true if the query can be admitted as a trivial query, therefore it can
+  /// bypass the admission control immediately.
+  bool CanAdmitTrivialRequest(const ScheduleState& state);
 
   /// Returns true if all executors can accommodate the largest initial reservation of
   /// any executor and the backend running the coordinator fragment can accommodate its
@@ -988,7 +1016,7 @@ class AdmissionController {
   /// Updates the memory admitted and the num of queries running for each backend in
   /// 'state'. Also updates the stats of its associated resource pool. Used only when
   /// the 'state' is admitted.
-  void UpdateStatsOnAdmission(const ScheduleState& state);
+  void UpdateStatsOnAdmission(const ScheduleState& state, bool is_trivial);
 
   /// Updates the memory admitted and the num of queries running for each backend in
   /// 'state' which have been release/completed. The list of completed backends is
@@ -1057,7 +1085,7 @@ class AdmissionController {
   /// Sets the per host mem limit and mem admitted in the schedule and does the necessary
   /// accounting and logging on successful submission.
   /// Caller must hold 'admission_ctrl_lock_'.
-  void AdmitQuery(QueueNode* node, bool was_queued);
+  void AdmitQuery(QueueNode* node, bool was_queued, bool is_trivial);
 
   /// Same as PoolToJson() but requires 'admission_ctrl_lock_' to be held by the caller.
   /// Is a helper method used by both PoolToJson() and AllPoolsToJson()

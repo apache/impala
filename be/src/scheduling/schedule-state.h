@@ -177,6 +177,9 @@ class ScheduleState {
   /// dedicated coordinator.
   int64_t GetDedicatedCoordMemoryEstimate() const;
 
+  /// Return whether the request is a trivial query.
+  bool GetIsTrivialQuery() const;
+
   /// Helper methods used by scheduler to populate this ScheduleState.
   void IncNumScanRanges(int64_t delta);
 

@@ -103,6 +103,9 @@ class TestSessionExpiration(CustomClusterTestSuite):
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
     client.execute("SET IDLE_SESSION_TIMEOUT=3")
+    # Set disable the trivial query otherwise "select 1" would be admitted as a
+    # trivial query.
+    client.execute("set enable_trivial_query_for_admission=false")
     client.execute_async("select sleep(10000)")
     queued_handle = client.execute_async("select 1")
     impalad.service.wait_for_metric_value(

@@ -218,6 +218,11 @@ int64_t ScheduleState::GetDedicatedCoordMemoryEstimate() const {
   return request_.dedicated_coord_mem_estimate;
 }
 
+bool ScheduleState::GetIsTrivialQuery() const {
+  DCHECK(request_.__isset.is_trivial_query);
+  return request_.is_trivial_query;
+}
+
 void ScheduleState::IncNumScanRanges(int64_t delta) {
   query_schedule_pb_->set_num_scan_ranges(query_schedule_pb_->num_scan_ranges() + delta);
 }

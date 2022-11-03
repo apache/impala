@@ -314,6 +314,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
 
       # Also try setting a valid pool
       client.set_configuration({'request_pool': 'root.queueB'})
+      client.execute('set enable_trivial_query_for_admission=false')
       result = client.execute("select 1")
       # Query should execute in queueB which doesn't have a default mem limit set in the
       # llama-site.xml, so it should inherit the value from the default process query
@@ -325,6 +326,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       # queueA allows only 1 running query and has a queue timeout of 50ms, so the
       # second concurrent query should time out quickly.
       client.set_configuration({'request_pool': 'root.queueA'})
+      client.execute('set enable_trivial_query_for_admission=false')
       handle = client.execute_async("select sleep(1000)")
       # Wait for query to clear admission control and get accounted for
       client.wait_for_admission_control(handle)
@@ -344,6 +346,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       # proc/pool default.
       client.execute("set mem_limit=31337")
       client.execute("set abort_on_error=1")
+      client.execute('set enable_trivial_query_for_admission=false')
       result = client.execute("select 1")
       self.__check_query_options(result.runtime_profile,
           ['MEM_LIMIT=31337', 'ABORT_ON_ERROR=1', 'QUERY_TIMEOUT_S=5',
@@ -353,6 +356,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       # config overlay sent with the query RPC. mem_limit is a pool-level override and
       # max_io_buffers has no proc/pool default.
       client.set_configuration({'request_pool': 'root.queueA', 'mem_limit': '12345'})
+      client.execute('set enable_trivial_query_for_admission=false')
       result = client.execute("select 1")
       self.__check_query_options(result.runtime_profile,
           ['MEM_LIMIT=12345', 'QUERY_TIMEOUT_S=5', 'REQUEST_POOL=root.queueA',
@@ -364,6 +368,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       # abort on error, because it's back to being the default.
       client.execute('set mem_limit=""')
       client.execute('set abort_on_error=""')
+      client.execute('set enable_trivial_query_for_admission=false')
       client.set_configuration({'request_pool': 'root.queueA'})
       result = client.execute("select 1")
       self.__check_query_options(result.runtime_profile,
@@ -756,6 +761,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     try:
       client.set_configuration_option("debug_action", "AC_BEFORE_ADMISSION:SLEEP@2000")
       client.set_configuration_option("mem_limit", self.PROC_MEM_TEST_LIMIT + 1)
+      client.set_configuration_option('enable_trivial_query_for_admission', 'false')
       handle = client.execute_async("select 1")
       sleep(1)
       client.close_query(handle)
@@ -764,6 +770,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       client.clear_configuration()
 
       client.set_configuration_option("debug_action", "AC_BEFORE_ADMISSION:SLEEP@2000")
+      client.set_configuration_option('enable_trivial_query_for_admission', 'false')
       handle = client.execute_async("select 2")
       sleep(1)
       client.close_query(handle)
@@ -772,6 +779,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
 
       client.set_configuration_option("debug_action",
           "CRS_BEFORE_COORD_STARTS:SLEEP@2000")
+      client.set_configuration_option('enable_trivial_query_for_admission', 'false')
       handle = client.execute_async("select 3")
       sleep(1)
       client.close_query(handle)
@@ -779,6 +787,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
           "Cancelled right after starting the coordinator query id=")
 
       client.set_configuration_option("debug_action", "CRS_AFTER_COORD_STARTS:SLEEP@2000")
+      client.set_configuration_option('enable_trivial_query_for_admission', 'false')
       handle = client.execute_async("select 4")
       sleep(1)
       client.close_query(handle)
@@ -789,6 +798,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       handle = client.execute_async("select sleep(10000)")
       client.set_configuration_option("debug_action",
           "AC_AFTER_ADMISSION_OUTCOME:SLEEP@2000")
+      client.set_configuration_option('enable_trivial_query_for_admission', 'false')
       queued_query_handle = client.execute_async("select 5")
       sleep(1)
       assert client.get_state(queued_query_handle) == QueryState.COMPILED
@@ -805,6 +815,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
           self.get_ac_log_name(), 'INFO', "Dequeued cancelled query=")
       client.clear_configuration()
 
+      client.set_configuration_option('enable_trivial_query_for_admission', 'false')
       handle = client.execute_async("select sleep(10000)")
       queued_query_handle = client.execute_async("select 6")
       sleep(1)
@@ -832,6 +843,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
           pool_max_mem=1024 * 1024 * 1024),
       statestored_args=_STATESTORED_ARGS)
   def test_queue_reasons_num_queries(self):
+    self.client.set_configuration_option('enable_trivial_query_for_admission', 'false')
+
     """Test that queue details appear in the profile when queued based on num_queries."""
     # Run a bunch of queries - one should get admitted immediately, the rest should
     # be dequeued one-by-one.
@@ -864,6 +877,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
           pool_max_mem=10 * 1024 * 1024),
       statestored_args=_STATESTORED_ARGS)
   def test_queue_reasons_memory(self):
+    self.client.set_configuration_option('enable_trivial_query_for_admission', 'false')
+
     """Test that queue details appear in the profile when queued based on memory."""
     # Run a bunch of queries with mem_limit set so that only one can be admitted at a
     # time- one should get admitted immediately, the rest should be dequeued one-by-one.
@@ -905,6 +920,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
         queue_wait_timeout_ms=1000),
       statestored_args=_STATESTORED_ARGS)
   def test_timeout_reason_host_memory(self):
+    self.client.set_configuration_option('enable_trivial_query_for_admission', 'false')
+
     """Test that queue details appear in the profile when queued and then timed out
     due to a small 2MB host memory limit configuration."""
     # Run a bunch of queries with mem_limit set so that only one can be admitted
@@ -937,6 +954,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
         queue_wait_timeout_ms=1000),
       statestored_args=_STATESTORED_ARGS)
   def test_timeout_reason_pool_memory(self):
+    self.client.set_configuration_option('enable_trivial_query_for_admission', 'false')
+
     """Test that queue details appear in the profile when queued and then timed out
     due to a small 2MB pool memory limit configuration."""
     # Run a bunch of queries with mem_limit set so that only one can be admitted
@@ -1094,11 +1113,13 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     pool_name = "invalidTestPool"
     config_str = "max-query-mem-limit"
     self.client.set_configuration_option('request_pool', pool_name)
+    self.client.set_configuration_option('enable_trivial_query_for_admission', 'false')
     # Setup to queue a query.
     sleep_query_handle = self.client.execute_async("select sleep(10000)")
     self.client.wait_for_admission_control(sleep_query_handle)
     self._wait_for_change_to_profile(sleep_query_handle,
                                       "Admission result: Admitted immediately")
+    self.client.execute("set enable_trivial_query_for_admission=false")
     queued_query_handle = self.client.execute_async("select 2")
     self._wait_for_change_to_profile(queued_query_handle, "Admission result: Queued")
 
@@ -1135,6 +1156,175 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     self.wait_for_state(queued_query_handle, QueryState.EXCEPTION, 20),
     self.close_query(queued_query_handle)
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=1,
+      pool_max_mem=1024 * 1024 * 1024),
+    statestored_args=_STATESTORED_ARGS)
+  def test_trivial_query(self):
+    self.client.execute("set enable_trivial_query_for_admission=false")
+
+    # Test the second request does need to queue when trivial query is disabled.
+    sleep_query_handle = self.client.execute_async("select sleep(10000)")
+    self.client.wait_for_admission_control(sleep_query_handle)
+    self._wait_for_change_to_profile(sleep_query_handle,
+                                      "Admission result: Admitted immediately")
+    trivial_query_handle = self.client.execute_async("select 2")
+    self._wait_for_change_to_profile(trivial_query_handle, "Admission result: Queued")
+    self.client.close_query(sleep_query_handle)
+    self.client.close_query(trivial_query_handle)
+
+    self.client.execute("set enable_trivial_query_for_admission=true")
+    # Test when trivial query is enabled, all trivial queries should be
+    # admitted immediately.
+    sleep_query_handle = self.client.execute_async("select sleep(10000)")
+    self.client.wait_for_admission_control(sleep_query_handle)
+    self._wait_for_change_to_profile(sleep_query_handle,
+                                      "Admission result: Admitted immediately")
+    # Test the trivial queries.
+    self._test_trivial_queries_suc()
+    # Test the queries that are not trivial.
+    self._test_trivial_queries_negative()
+    self.client.close_query(sleep_query_handle)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=1,
+      pool_max_mem=1),
+    statestored_args=_STATESTORED_ARGS)
+  def test_trivial_query_low_mem(self):
+    # Test whether it will fail for a normal query.
+    failed_query_handle = self.client.execute_async(
+            "select * from functional_parquet.alltypes limit 100")
+    self.wait_for_state(failed_query_handle, QueryState.EXCEPTION, 20)
+    self.client.close_query(failed_query_handle)
+    # Test it should pass all the trivial queries.
+    self._test_trivial_queries_suc()
+
+  class MultiTrivialRunThread(threading.Thread):
+    def __init__(self, admit_obj, sql, expect_err=False):
+        super(self.__class__, self).__init__()
+        self.admit_obj = admit_obj
+        self.sql = sql
+        self.error = None
+        self.expect_err = expect_err
+
+    def run(self):
+        try:
+          self._test_multi_trivial_query_runs()
+        except Exception as e:
+          LOG.exception(e)
+          self.error = e
+          raise e
+
+    def _test_multi_trivial_query_runs(self):
+      timeout = 10
+      admit_obj = self.admit_obj
+      client = admit_obj.cluster.impalads[0].service.create_beeswax_client()
+      for i in range(100):
+        handle = client.execute_async(self.sql)
+        if not self.expect_err:
+          assert client.wait_for_finished_timeout(handle, timeout)
+        else:
+          if not client.wait_for_finished_timeout(handle, timeout):
+            self.error = Exception("Wait timeout " + str(timeout) + " seconds.")
+            break
+        result = client.fetch(self.sql, handle)
+        assert result.success
+        client.close_query(handle)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=100000,
+      pool_max_mem=1024 * 1024 * 1024),
+    statestored_args=_STATESTORED_ARGS)
+  def test_trivial_query_multi_runs(self):
+    threads = []
+    # Test mixed trivial and non-trivial queries workload, and should successfully run
+    # for all.
+    # Test the case when the number of trivial queries is over the maximum pallelism,
+    # which is three.
+    for i in range(5):
+      thread_instance = self.MultiTrivialRunThread(self, "select 1")
+      threads.append(thread_instance)
+    # Runs non-trivial queries below.
+    for i in range(2):
+      thread_instance = self.MultiTrivialRunThread(self, "select sleep(1)")
+      threads.append(thread_instance)
+    for thread_instance in threads:
+      thread_instance.start()
+    for thread_instance in threads:
+      thread_instance.join()
+    for thread_instance in threads:
+      if thread_instance.error is not None:
+        raise thread_instance.error
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=100000,
+      pool_max_mem=1024 * 1024 * 1024),
+    statestored_args=_STATESTORED_ARGS)
+  def test_trivial_query_multi_runs_fallback(self):
+    threads = []
+    # Test the case when the number of trivial queries is over the maximum pallelism,
+    # which is three, other trivial queries should fall back to normal process and
+    # blocked by the long sleep query in our testcase, then leads to a timeout error.
+    long_query_handle = self.client.execute_async("select sleep(100000)")
+    for i in range(5):
+      thread_instance = self.MultiTrivialRunThread(self, "select 1", True)
+      threads.append(thread_instance)
+    for thread_instance in threads:
+      thread_instance.start()
+    for thread_instance in threads:
+      thread_instance.join()
+    has_error = False
+    for thread_instance in threads:
+      if thread_instance.error is not None:
+        assert "Wait timeout" in str(thread_instance.error)
+        has_error = True
+    assert has_error
+    self.client.close_query(long_query_handle)
+
+  def _test_trivial_queries_suc(self):
+    self._test_trivial_queries_helper("select 1")
+    self._test_trivial_queries_helper(
+            "select * from functional_parquet.alltypes limit 0")
+    self._test_trivial_queries_helper("select 1, (2 + 3)")
+    self._test_trivial_queries_helper(
+            "select id from functional_parquet.alltypes limit 0 union all select 1")
+    self._test_trivial_queries_helper(
+            "select 1 union all select id from functional_parquet.alltypes limit 0")
+
+  # Test the cases that do not fit for trivial queries.
+  def _test_trivial_queries_negative(self):
+    self._test_trivial_queries_helper("select 1 union all select 2", False)
+    self._test_trivial_queries_helper(
+            "select * from functional_parquet.alltypes limit 1", False)
+
+    # Cases when the query contains function sleep().
+    self._test_trivial_queries_helper(
+            "select 1 union all select sleep(1)", False)
+    self._test_trivial_queries_helper(
+            "select 1 from functional.alltypes limit 0 union all select sleep(1)",
+            False)
+    self._test_trivial_queries_helper(
+            "select a from (select 1 a, sleep(1)) s", False)
+    self._test_trivial_queries_helper("select sleep(1)", False)
+    self._test_trivial_queries_helper("select ISTRUE(sleep(1))", False)
+    self._test_trivial_queries_helper(
+            "select 1 from functional.alltypes limit 0 "
+            "union all select ISTRUE(sleep(1))",
+            False)
+
+  def _test_trivial_queries_helper(self, sql, expect_trivial=True):
+    trivial_query_handle = self.client.execute_async(sql)
+    if expect_trivial:
+      expect_msg = "Admission result: Admitted as a trivial query"
+    else:
+      expect_msg = "Admission result: Queued"
+    self._wait_for_change_to_profile(trivial_query_handle, expect_msg)
+    self.client.close_query(trivial_query_handle)
+
   def _wait_for_change_to_profile(
       self, query_handle, search_string, timeout=20, client=None):
     if client is None:
@@ -1161,7 +1351,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     # Ensure that the query has started executing.
     self.wait_for_admission_control(long_query_resp.operationHandle)
     # Submit another query.
-    queued_query_resp = self.execute_statement("select 1")
+    queued_query_resp = self.execute_statement("select sleep(1)")
     # Wait until the query is queued.
     self.wait_for_operation_state(queued_query_resp.operationHandle,
             TCLIService.TOperationState.PENDING_STATE)
@@ -1193,6 +1383,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
           STALE_TOPIC_THRESHOLD_MS),
       statestored_args=_STATESTORED_ARGS)
   def test_statestore_outage(self):
+    self.client.set_configuration_option('enable_trivial_query_for_admission', 'false')
+
     """Test behaviour with a failed statestore. Queries should continue to be admitted
     but we should generate diagnostics about the stale topic."""
     self.cluster.statestored.kill()
@@ -1270,7 +1462,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     # With a new client, execute a query and observe that it gets queued and ultimately
     # succeeds.
     client = self.create_impala_client()
-    result = self.execute_query_expect_success(client, "select 1")
+    result = self.execute_query_expect_success(client, "select sleep(1)")
     start_cluster_thread.join()
     profile = result.runtime_profile
     reasons = self.__extract_init_queue_reasons([profile])

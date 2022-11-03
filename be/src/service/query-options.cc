@@ -598,6 +598,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_max_mem_estimate_for_admission(mem_spec_val.value);
         break;
       }
+      case TImpalaQueryOptions::ENABLE_TRIVIAL_QUERY_FOR_ADMISSION: {
+        query_options->__set_enable_trivial_query_for_admission(IsTrue(value));
+        break;
+      }
       case TImpalaQueryOptions::THREAD_RESERVATION_LIMIT: {
         int32_t int32_t_val = 0;
         RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckInclusiveLowerBound<int32_t>(

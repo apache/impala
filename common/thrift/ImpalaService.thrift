@@ -757,6 +757,9 @@ enum TImpalaQueryOptions {
 
   // Convert non-string map keys to string to produce valid JSON.
   STRINGIFY_MAP_KEYS = 151
+
+  // Enable immediate admission for trivial queries.
+  ENABLE_TRIVIAL_QUERY_FOR_ADMISSION = 152
 }
 
 // The summary of a DML statement.

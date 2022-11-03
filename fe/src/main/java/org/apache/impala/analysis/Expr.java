@@ -363,6 +363,18 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         }
       };
 
+  // Returns true if an Expr is a builtin sleep function.
+  public static final com.google.common.base.Predicate<Expr> IS_FN_SLEEP =
+      new com.google.common.base.Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr arg) {
+          return arg instanceof FunctionCallExpr
+              && ((FunctionCallExpr) arg).getFnName().isBuiltin()
+              && ((FunctionCallExpr) arg).getFnName().getFunction() != null
+              && ((FunctionCallExpr) arg).getFnName().getFunction().equals("sleep");
+        }
+      };
+
   // id that's unique across the entire query statement and is assigned by
   // Analyzer.registerConjuncts(); only assigned for the top-level terms of a
   // conjunction, and therefore null for most Exprs

@@ -743,7 +743,7 @@ TEST_F(AdmissionControllerTest, PoolStats) {
   CheckPoolStatsEmpty(pool_stats);
 
   // Show that Admit and Release leave stats at zero.
-  pool_stats->AdmitQueryAndMemory(*schedule_state);
+  pool_stats->AdmitQueryAndMemory(*schedule_state, false);
   ASSERT_EQ(1, pool_stats->agg_num_running());
   ASSERT_EQ(1, pool_stats->metrics()->agg_num_running->GetValue());
   int64_t mem_to_release = 0;
@@ -752,7 +752,7 @@ TEST_F(AdmissionControllerTest, PoolStats) {
         admission_controller->GetMemToAdmit(*schedule_state, backend_state.second);
   }
   pool_stats->ReleaseMem(mem_to_release);
-  pool_stats->ReleaseQuery(0);
+  pool_stats->ReleaseQuery(0, false);
   CheckPoolStatsEmpty(pool_stats);
 }
 

@@ -421,6 +421,9 @@ public class Planner {
     // profiles bottom-up since a fragment's profile may depend on its descendants.
     PlanFragment rootFragment = planRoots.get(0);
     List<PlanFragment> allFragments = rootFragment.getNodesPostOrder();
+    boolean trivial =
+        TrivialQueryChecker.IsTrivial(rootFragment, queryOptions, isQueryStmt);
+
     for (PlanFragment fragment: allFragments) {
       // Compute the per-node, per-sink and aggregate profiles for the fragment.
       fragment.computeResourceProfile(planCtx.getRootAnalyzer());
@@ -450,6 +453,7 @@ public class Planner {
     maxPerHostPeakResources = MIN_PER_HOST_RESOURCES.max(maxPerHostPeakResources);
 
     request.setPer_host_mem_estimate(maxPerHostPeakResources.getMemEstimateBytes());
+    request.setIs_trivial_query(trivial);
     request.setMax_per_host_min_mem_reservation(
         maxPerHostPeakResources.getMinMemReservationBytes());
     request.setMax_per_host_thread_reservation(

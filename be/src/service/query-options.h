@@ -50,7 +50,7 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
 // time we add or remove a query option to/from the enum TImpalaQueryOptions.
 #define QUERY_OPTS_TABLE                                                                 \
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),                                 \
-      TImpalaQueryOptions::STRINGIFY_MAP_KEYS + 1);                                    \
+      TImpalaQueryOptions::ENABLE_TRIVIAL_QUERY_FOR_ADMISSION + 1);                      \
   REMOVED_QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED) \
   QUERY_OPT_FN(abort_on_error, ABORT_ON_ERROR, TQueryOptionLevel::REGULAR)               \
   REMOVED_QUERY_OPT_FN(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS)             \
@@ -282,7 +282,8 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
       disable_codegen_cache, DISABLE_CODEGEN_CACHE, TQueryOptionLevel::ADVANCED)         \
   QUERY_OPT_FN(codegen_cache_mode, CODEGEN_CACHE_MODE, TQueryOptionLevel::DEVELOPMENT)   \
   QUERY_OPT_FN(stringify_map_keys, STRINGIFY_MAP_KEYS, TQueryOptionLevel::ADVANCED)      \
-;
+  QUERY_OPT_FN(enable_trivial_query_for_admission, ENABLE_TRIVIAL_QUERY_FOR_ADMISSION,   \
+      TQueryOptionLevel::REGULAR);
 
 /// Enforce practical limits on some query options to avoid undesired query state.
 static const int64_t SPILLABLE_BUFFER_LIMIT = 1LL << 40; // 1 TB

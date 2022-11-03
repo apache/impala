@@ -45,6 +45,7 @@ class TestShellInteractive(CustomClusterTestSuite):
     for vector in\
         [ImpalaTestVector([value]) for value in create_client_protocol_dimension()]:
       proc = spawn_shell(get_shell_cmd(vector))
+      proc.sendline("set enable_trivial_query_for_admission=false;")
       # Check with only live_summary set to true.
       proc.expect("{0}] default>".format(get_impalad_port(vector)))
       proc.sendline("set live_summary=true;")

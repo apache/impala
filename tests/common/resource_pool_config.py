@@ -65,6 +65,7 @@ class ResourcePoolConfig(object):
     metric_key = "admission-controller.{0}.root.{1}".format(metric_str, pool_name)
     start_time = time()
     while (time() - start_time < timeout):
+      client.execute("set enable_trivial_query_for_admission=false")
       handle = client.execute_async("select 'wait_for_config_change'")
       client.close_query(handle)
       current_val = str(self.ac_service.get_metric_value(metric_key))

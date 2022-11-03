@@ -615,6 +615,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   152: optional bool stringify_map_keys = false;
+
+  // See comment in ImpalaService.thrift
+  153: optional bool enable_trivial_query_for_admission = true;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external
@@ -889,5 +892,8 @@ struct TQueryExecRequest {
   // fragment will run on a dedicated coordinator. Set by the planner and used by
   // admission control.
   12: optional i64 dedicated_coord_mem_estimate;
+
+  // Indicate whether the request is a trivial query. Used by admission control.
+  13: optional bool is_trivial_query
 }
 
