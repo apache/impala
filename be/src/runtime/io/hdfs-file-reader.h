@@ -36,7 +36,8 @@ public:
 
   virtual Status Open(bool use_file_handle_cache) override;
   virtual Status ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_t* buffer,
-      int64_t bytes_to_read, int64_t* bytes_read, bool* eof) override;
+      int64_t bytes_to_read, int64_t* bytes_read, bool* eof,
+      bool use_file_handle_cache) override;
   virtual void Close() override;
   virtual void ResetState() override;
   virtual std::string DebugString() const override;
@@ -50,6 +51,12 @@ public:
   virtual void CachedFile(uint8_t** data, int64_t* length) override;
 
 private:
+
+  /// Performs the actual work of opening a file handle. When using a file handle or data
+  /// cache, opening a file handle is delayed until remote data needs to be read. Not
+  /// thread safe, claim lock_ before calling.
+  Status DoOpen();
+
   /// Probes 'remote_data_cache' for a hit. The requested file's name and mtime
   /// are stored in 'scan_range_'. 'file_offset' is the offset into the file to read
   /// and 'bytes_to_read' is the number of bytes requested. On success, copies the

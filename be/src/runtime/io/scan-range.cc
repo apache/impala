@@ -235,9 +235,10 @@ ReadOutcome ScanRange::DoReadInternal(DiskQueue* queue, int disk_id, bool use_lo
         read_status =
             file_reader->ReadFromPos(queue, offset_ + bytes_read_, buffer_desc->buffer_,
                 min(bytes_to_read() - bytes_read_, buffer_desc->buffer_len_),
-                &buffer_desc->len_, &eof);
+                &buffer_desc->len_, &eof, use_file_handle_cache);
       } else {
-        read_status = ReadSubRanges(queue, buffer_desc.get(), &eof, file_reader);
+        read_status = ReadSubRanges(queue, buffer_desc.get(), &eof, file_reader,
+            use_file_handle_cache);
       }
 
       COUNTER_ADD_IF_NOT_NULL(reader_->bytes_read_counter_, buffer_desc->len_);
@@ -328,7 +329,8 @@ ReadOutcome ScanRange::DoRead(DiskQueue* queue, int disk_id) {
 }
 
 Status ScanRange::ReadSubRanges(
-    DiskQueue* queue, BufferDescriptor* buffer_desc, bool* eof, FileReader* file_reader) {
+    DiskQueue* queue, BufferDescriptor* buffer_desc, bool* eof, FileReader* file_reader,
+    bool use_file_handle_cache) {
   buffer_desc->len_ = 0;
   while (buffer_desc->len() < buffer_desc->buffer_len()
       && sub_range_pos_.index < sub_ranges_.size()) {
@@ -344,7 +346,7 @@ Status ScanRange::ReadSubRanges(
       int64_t current_bytes_read;
       Status read_status = file_reader->ReadFromPos(queue, offset,
           buffer_desc->buffer_ + buffer_desc->len(), bytes_to_read, &current_bytes_read,
-          eof);
+          eof, use_file_handle_cache);
       if (!read_status.ok()) return read_status;
       if (current_bytes_read != bytes_to_read) {
         DCHECK(*eof);

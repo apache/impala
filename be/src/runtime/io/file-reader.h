@@ -51,7 +51,8 @@ public:
   /// Metrics in 'queue' are updated with the size and latencies of the read
   /// operations on the underlying file system.
   virtual Status ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_t* buffer,
-      int64_t bytes_to_read, int64_t* bytes_read, bool* eof) = 0;
+      int64_t bytes_to_read, int64_t* bytes_read, bool* eof,
+      bool use_file_handle_cache) = 0;
 
   /// ***Currently only for HDFS***
   /// When successful, sets 'data' to a buffer that contains the contents of a file,

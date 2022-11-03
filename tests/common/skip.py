@@ -130,7 +130,7 @@ class SkipIfNotHdfsMinicluster:
       not IS_HDFS or IS_EC or IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),
       reason="Test is tuned for 3-node HDFS minicluster with no EC")
   scheduling = pytest.mark.skipif(
-      not IS_HDFS or IS_EC or pytest.config.option.testing_remote_cluster,
+      not (IS_HDFS or IS_OZONE) or IS_EC or pytest.config.option.testing_remote_cluster,
       reason="Test is tuned for scheduling decisions made on a 3-node HDFS minicluster "
              "with no EC")
 

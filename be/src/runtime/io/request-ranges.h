@@ -470,7 +470,8 @@ class ScanRange : public RequestRange {
   /// files. 'queue' is updated with the latencies and sizes of reads from the underlying
   /// filesystem.
   Status ReadSubRanges(
-      DiskQueue* queue, BufferDescriptor* buffer, bool* eof, FileReader* file_reader);
+      DiskQueue* queue, BufferDescriptor* buffer, bool* eof, FileReader* file_reader,
+      bool use_file_handle_cache);
 
   /// Validates the internal state of this range. lock_ must be taken
   /// before calling this. Need to take a lock on 'lock_' via

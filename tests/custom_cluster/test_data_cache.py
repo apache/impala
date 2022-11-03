@@ -21,7 +21,6 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIf, SkipIfNotHdfsMinicluster
 
 
-@SkipIf.not_hdfs
 @SkipIf.is_buggy_el6_kernel
 @SkipIfNotHdfsMinicluster.scheduling
 class TestDataCache(CustomClusterTestSuite):
@@ -58,6 +57,7 @@ class TestDataCache(CustomClusterTestSuite):
     a single node to make it easier to verify the runtime profile. Also enables higher
     write concurrency and uses a single shard to avoid non-determinism.
     """
+    opened_file_handles_metric = 'impala-server.io.mgr.cached-file-handles-miss-count'
     self.run_test_case('QueryTest/data-cache', vector, unique_database)
     assert self.get_metric('impala-server.io-mgr.remote-data-cache-dropped-bytes') >= 0
     assert self.get_metric('impala-server.io-mgr.remote-data-cache-dropped-entries') >= 0
@@ -71,6 +71,12 @@ class TestDataCache(CustomClusterTestSuite):
     assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-entries') > 0
     assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-writes') > 0
 
+    # Expect all cache hits results in no opened files.
+    opened_file_handles_metric = 'impala-server.io.mgr.cached-file-handles-miss-count'
+    baseline = self.get_metric(opened_file_handles_metric)
+    self.execute_query("select count(distinct l_orderkey) from test_parquet")
+    assert self.get_metric(opened_file_handles_metric) == baseline
+
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args=get_impalad_args("LRU"),
@@ -83,6 +89,13 @@ class TestDataCache(CustomClusterTestSuite):
       impalad_args=get_impalad_args("LIRS"),
       start_args=CACHE_START_ARGS, cluster_size=1)
   def test_data_cache_deterministic_lirs(self, vector, unique_database):
+    self.__test_data_cache_deterministic(vector, unique_database)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=get_impalad_args("LRU") + " --max_cached_file_handles=0",
+      start_args=CACHE_START_ARGS, cluster_size=1)
+  def test_data_cache_deterministic_no_file_handle_cache(self, vector, unique_database):
     self.__test_data_cache_deterministic(vector, unique_database)
 
   def __test_data_cache(self, vector):

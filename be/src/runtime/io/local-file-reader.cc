@@ -52,7 +52,8 @@ Status LocalFileReader::Open(bool use_file_handle_cache) {
 }
 
 Status LocalFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset,
-    uint8_t* buffer, int64_t bytes_to_read, int64_t* bytes_read, bool* eof) {
+    uint8_t* buffer, int64_t bytes_to_read, int64_t* bytes_read, bool* eof,
+    bool use_file_handle_cache) {
   DCHECK(scan_range_->read_in_flight());
   DCHECK_GE(bytes_to_read, 0);
   // Delay before acquiring the lock, to allow triggering IMPALA-6587 race.
