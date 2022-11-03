@@ -25,13 +25,15 @@ class AuthenticationHash;
 
 // Takes a single 'key=value' pair from a 'Cookie' header and attempts to verify its
 // signature with 'hash'. If verification is successful and the cookie is still valid,
-// sets 'username' to the corresponding username and returns OK.
-Status AuthenticateCookie(const AuthenticationHash& hash,
-    const std::string& cookie_header, std::string* username);
+// sets 'username' and 'rand' (if specified) to the corresponding values and returns OK.
+Status AuthenticateCookie(
+    const AuthenticationHash& hash, const std::string& cookie_header,
+    std::string* username, std::string* rand = nullptr);
 
 // Generates and returns a cookie containing the username set on 'connection_context' and
-// a signature generated with 'hash'.
-std::string GenerateCookie(const std::string& username, const AuthenticationHash& hash);
+// a signature generated with 'hash'. If specified, sets 'rand' to the 'r=' cookie value.
+std::string GenerateCookie(const std::string& username, const AuthenticationHash& hash,
+    std::string* rand = nullptr);
 
 // Returns a empty cookie. Returned in a 'Set-Cookie' when cookie auth fails to indicate
 // to the client that the cookie should be deleted.
@@ -50,5 +52,7 @@ bool IsTrustedDomain(const std::string& origin, const std::string& trusted_domai
 // form <username>:<password>, an error status otherwise.
 Status BasicAuthExtractCredentials(
     const string& token, string& username, string& password);
+
+constexpr int RAND_MAX_LENGTH = 10;
 
 } // namespace impala

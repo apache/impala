@@ -28,7 +28,7 @@ import org.apache.directory.server.annotations.CreateLdapServer;
 import org.apache.directory.server.annotations.CreateTransport;
 import org.apache.directory.server.core.annotations.ApplyLdifFiles;
 import org.apache.directory.server.core.integ.CreateLdapServerRule;
-import org.apache.impala.util.Metrics;
+import org.apache.impala.testutil.WebClient;
 import org.junit.Assume;
 import org.junit.ClassRule;
 
@@ -47,7 +47,7 @@ public class LdapImpalaShellTest {
   // Includes a special character to test HTTP path encoding.
   protected static final String delegateUser_ = "proxyUser$";
 
-  private Metrics metrics = new Metrics();
+  private WebClient client_ = new WebClient();
 
   public void setUp(String extraArgs) throws Exception {
     String uri =
@@ -76,20 +76,20 @@ public class LdapImpalaShellTest {
   private void verifyMetrics(Range<Long> expectedBasicSuccess,
       Range<Long> expectedBasicFailure, Range<Long> expectedCookieSuccess,
       Range<Long> expectedCookieFailure) throws Exception {
-    long actualBasicSuccess = (long) metrics.getMetric(
+    long actualBasicSuccess = (long) client_.getMetric(
         "impala.thrift-server.hiveserver2-http-frontend.total-basic-auth-success");
     assertTrue("Expected: " + expectedBasicSuccess + ", Actual: " + actualBasicSuccess,
         expectedBasicSuccess.contains(actualBasicSuccess));
-    long actualBasicFailure = (long) metrics.getMetric(
+    long actualBasicFailure = (long) client_.getMetric(
         "impala.thrift-server.hiveserver2-http-frontend.total-basic-auth-failure");
     assertTrue("Expected: " + expectedBasicFailure + ", Actual: " + actualBasicFailure,
         expectedBasicFailure.contains(actualBasicFailure));
 
-    long actualCookieSuccess = (long) metrics.getMetric(
+    long actualCookieSuccess = (long) client_.getMetric(
         "impala.thrift-server.hiveserver2-http-frontend.total-cookie-auth-success");
     assertTrue("Expected: " + expectedCookieSuccess + ", Actual: " + actualCookieSuccess,
         expectedCookieSuccess.contains(actualCookieSuccess));
-    long actualCookieFailure = (long) metrics.getMetric(
+    long actualCookieFailure = (long) client_.getMetric(
         "impala.thrift-server.hiveserver2-http-frontend.total-cookie-auth-failure");
     assertTrue("Expected: " + expectedCookieFailure + ", Actual: " + actualCookieFailure,
         expectedCookieFailure.contains(actualCookieFailure));

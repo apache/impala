@@ -21,12 +21,15 @@ import static org.apache.impala.testutil.LdapUtil.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -40,10 +43,14 @@ import org.apache.directory.server.annotations.CreateTransport;
 import org.apache.directory.server.core.annotations.ApplyLdifFiles;
 import org.apache.directory.server.core.integ.CreateLdapServerRule;
 import org.apache.hive.service.rpc.thrift.*;
-import org.apache.impala.util.Metrics;
-import org.apache.log4j.Logger;
+import org.apache.http.cookie.Cookie;
+import org.apache.http.message.BasicHeader;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.NameValuePair;
+import org.apache.impala.testutil.WebClient;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.transport.THttpClient;
+import org.json.simple.JSONObject;
 import org.junit.After;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -54,13 +61,12 @@ import org.junit.Test;
     transports = { @CreateTransport(protocol = "LDAP", address = "localhost") })
 @ApplyLdifFiles({"users.ldif"})
 public class LdapWebserverTest {
-  private static final Logger LOG = Logger.getLogger(LdapWebserverTest.class);
   @ClassRule
   public static CreateLdapServerRule serverRule = new CreateLdapServerRule();
 
   private static final Range<Long> zero = Range.closed(0L, 0L);
 
-  Metrics metrics_ = new Metrics(TEST_USER_1, TEST_PASSWORD_1);
+  WebClient client_ = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
 
   public void setUp(String extraArgs, String startArgs) throws Exception {
     String uri =
@@ -75,38 +81,38 @@ public class LdapWebserverTest {
     env.put("IMPALA_WEBSERVER_USERNAME", TEST_USER_1);
     env.put("IMPALA_WEBSERVER_PASSWORD", TEST_PASSWORD_1);
     int ret = CustomClusterRunner.StartImpalaCluster(impalaArgs, env, startArgs);
-    assertEquals(ret, 0);
+    assertEquals(0, ret);
   }
 
   @After
   public void cleanUp() throws IOException {
-    metrics_.Close();
+    client_.Close();
   }
 
   private void verifyMetrics(Range<Long> expectedBasicSuccess,
       Range<Long> expectedBasicFailure, Range<Long> expectedCookieSuccess,
       Range<Long> expectedCookieFailure) throws Exception {
     long actualBasicSuccess =
-        (long) metrics_.getMetric("impala.webserver.total-basic-auth-success");
+        (long) client_.getMetric("impala.webserver.total-basic-auth-success");
     assertTrue("Expected: " + expectedBasicSuccess + ", Actual: " + actualBasicSuccess,
         expectedBasicSuccess.contains(actualBasicSuccess));
     long actualBasicFailure =
-        (long) metrics_.getMetric("impala.webserver.total-basic-auth-failure");
+        (long) client_.getMetric("impala.webserver.total-basic-auth-failure");
     assertTrue("Expected: " + expectedBasicFailure + ", Actual: " + actualBasicFailure,
         expectedBasicFailure.contains(actualBasicFailure));
 
     long actualCookieSuccess =
-        (long) metrics_.getMetric("impala.webserver.total-cookie-auth-success");
+        (long) client_.getMetric("impala.webserver.total-cookie-auth-success");
     assertTrue("Expected: " + expectedCookieSuccess + ", Actual: " + actualCookieSuccess,
         expectedCookieSuccess.contains(actualCookieSuccess));
     long actualCookieFailure =
-        (long) metrics_.getMetric("impala.webserver.total-cookie-auth-failure");
+        (long) client_.getMetric("impala.webserver.total-cookie-auth-failure");
     assertTrue("Expected: " + expectedCookieFailure + ", Actual: " + actualCookieFailure,
         expectedCookieFailure.contains(actualCookieFailure));
   }
 
   private void verifyTrustedDomainMetrics(Range<Long> expectedSuccess) throws Exception {
-    long actualSuccess = (long) metrics_
+    long actualSuccess = (long) client_
         .getMetric("impala.webserver.total-trusted-domain-check-success");
     assertTrue("Expected: " + expectedSuccess + ", Actual: " + actualSuccess,
         expectedSuccess.contains(actualSuccess));
@@ -114,7 +120,7 @@ public class LdapWebserverTest {
 
   private void verifyTrustedAuthHeaderMetrics(Range<Long> expectedSuccess)
       throws Exception {
-    long actualSuccess = (long) metrics_.getMetric(
+    long actualSuccess = (long) client_.getMetric(
         "impala.webserver.total-trusted-auth-header-check-success");
     assertTrue("Expected: " + expectedSuccess + ", Actual: " + actualSuccess,
         expectedSuccess.contains(actualSuccess));
@@ -123,11 +129,11 @@ public class LdapWebserverTest {
   private void verifyJwtAuthMetrics(
       Range<Long> expectedAuthSuccess, Range<Long> expectedAuthFailure) throws Exception {
     long actualAuthSuccess =
-        (long) metrics_.getMetric("impala.webserver.total-jwt-token-auth-success");
+        (long) client_.getMetric("impala.webserver.total-jwt-token-auth-success");
     assertTrue("Expected: " + expectedAuthSuccess + ", Actual: " + actualAuthSuccess,
         expectedAuthSuccess.contains(actualAuthSuccess));
     long actualAuthFailure =
-        (long) metrics_.getMetric("impala.webserver.total-jwt-token-auth-failure");
+        (long) client_.getMetric("impala.webserver.total-jwt-token-auth-failure");
     assertTrue("Expected: " + expectedAuthFailure + ", Actual: " + actualAuthFailure,
         expectedAuthFailure.contains(actualAuthFailure));
   }
@@ -140,14 +146,14 @@ public class LdapWebserverTest {
     verifyMetrics(Range.atLeast(1L), zero, Range.atLeast(1L), zero);
 
     // Attempt to access the webserver without a username/password.
-    Metrics noUsername = new Metrics();
+    WebClient noUsername = new WebClient();
     String result = noUsername.readContent("/");
     assertTrue(result, result.contains("Must authenticate with Basic authentication."));
     // Check that there is one unsuccessful auth attempt.
     verifyMetrics(Range.atLeast(1L), Range.closed(1L, 1L), Range.atLeast(1L), zero);
 
     // Attempt to access the webserver with invalid username/password.
-    Metrics invalidUserPass = new Metrics("invalid", "invalid");
+    WebClient invalidUserPass = new WebClient("invalid", "invalid");
     result = invalidUserPass.readContent("/");
     assertTrue(result, result.contains("Must authenticate with Basic authentication."));
     // Check that there is now two unsuccessful auth attempts.
@@ -174,23 +180,23 @@ public class LdapWebserverTest {
 
     // Access the webserver with a user that passes the group filter but not the user
     // filter, should fail.
-    Metrics metricsUser2 = new Metrics(TEST_USER_2, TEST_PASSWORD_2);
-    String result = metricsUser2.readContent("/");
+    WebClient user2 = new WebClient(TEST_USER_2, TEST_PASSWORD_2);
+    String result = user2.readContent("/");
     assertTrue(result, result.contains("Must authenticate with Basic authentication."));
     // Check that there is one unsuccessful auth attempt.
     verifyMetrics(Range.atLeast(1L), Range.closed(1L, 1L), Range.atLeast(1L), zero);
 
     // Access the webserver with a user that passes the user filter but not the group
     // filter, should fail.
-    Metrics metricsUser3 = new Metrics(TEST_USER_3, TEST_PASSWORD_3);
-    result = metricsUser3.readContent("/");
+    WebClient user3 = new WebClient(TEST_USER_3, TEST_PASSWORD_3);
+    result = user3.readContent("/");
     assertTrue(result, result.contains("Must authenticate with Basic authentication."));
     // Check that there is now two unsuccessful auth attempts.
     verifyMetrics(Range.atLeast(1L), Range.closed(2L, 2L), Range.atLeast(1L), zero);
 
     // Access the webserver with a user that doesn't pass either filter, should fail.
-    Metrics metricsUser4 = new Metrics(TEST_USER_4, TEST_PASSWORD_4);
-    result = metricsUser4.readContent("/");
+    WebClient user4 = new WebClient(TEST_USER_4, TEST_PASSWORD_4);
+    result = user4.readContent("/");
     assertTrue(result, result.contains("Must authenticate with Basic authentication."));
     // Check that there is now three unsuccessful auth attempts.
     verifyMetrics(Range.atLeast(1L), Range.closed(3L, 3L), Range.atLeast(1L), zero);
@@ -205,17 +211,17 @@ public class LdapWebserverTest {
     // Use 'per_impalad_args' to turn the metrics webserver on only for the first impalad.
     setUp("", "--per_impalad_args=--metrics_webserver_port=25030");
     // Attempt to access the regular webserver without a username/password, should fail.
-    Metrics noUsername = new Metrics();
+    WebClient noUsername = new WebClient();
     String result = noUsername.readContent("/");
     assertTrue(result, result.contains("Must authenticate with Basic authentication."));
 
     // Attempt to access the regular webserver with invalid username/password.
-    Metrics invalidUserPass = new Metrics("invalid", "invalid");
+    WebClient invalidUserPass = new WebClient("invalid", "invalid");
     result = invalidUserPass.readContent("/");
     assertTrue(result, result.contains("Must authenticate with Basic authentication."));
 
     // Attempt to access the metrics webserver without a username/password.
-    Metrics noUsernameMetrics = new Metrics(25030);
+    WebClient noUsernameMetrics = new WebClient(25030);
     // Should succeed for the metrics endpoints.
     for (String endpoint :
         new String[] {"/metrics", "/jsonmetrics", "/metrics_prometheus", "/healthz"}) {
@@ -266,7 +272,7 @@ public class LdapWebserverTest {
 
     // Case 6: Verify that there are no changes in metrics for trusted domain
     // check if the X-Forwarded-For header is not present
-    long successMetricBefore = (long) metrics_
+    long successMetricBefore = (long) client_
         .getMetric("impala.webserver.total-trusted-domain-check-success");
     attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", null, false);
     verifyTrustedDomainMetrics(Range.closed(successMetricBefore, successMetricBefore));
@@ -295,7 +301,7 @@ public class LdapWebserverTest {
 
     // Case 4: Verify that there are no changes in metrics for trusted auth header
     // check if the trusted auth header is not present.
-    long successMetricBefore = (long) metrics_.getMetric(
+    long successMetricBefore = (long) client_.getMetric(
         "impala.webserver.total-trusted-auth-header-check-success");
     attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", null, false);
     verifyTrustedAuthHeaderMetrics(
@@ -368,27 +374,195 @@ public class LdapWebserverTest {
     String cancelQueryUrl = String.format("/cancel_query?query_id=%s", queryId);
     String textProfileUrl = String.format("/query_profile_plain_text?query_id=%s",
             queryId);
-    metrics_.readContent(cancelQueryUrl);
-    String response =  metrics_.readContent(textProfileUrl);
+    client_.readContent(cancelQueryUrl);
+    String response =  client_.readContent(textProfileUrl);
     String cancelStatus = String.format("Cancelled from Impala&apos;s debug web interface"
         + " by user: &apos;%s&apos; at", TEST_USER_1);
     assertTrue(response.contains(cancelStatus));
     // Wait for logs to flush
     TimeUnit.SECONDS.sleep(6);
-    response = metrics_.readContent("/logs");
+    response = client_.readContent("/logs");
     assertTrue(response.contains(cancelStatus));
 
     // Session closing from the WebUI does not produce the cause message in the profile,
     // so we will skip checking the runtime profile.
     String sessionId = PrintId(openResp.getSessionHandle().getSessionId());
     String closeSessionUrl =  String.format("/close_session?session_id=%s", sessionId);
-    metrics_.readContent(closeSessionUrl);
+    client_.readContent(closeSessionUrl);
     // Wait for logs to flush
     TimeUnit.SECONDS.sleep(6);
     String closeStatus = String.format("Session closed from Impala&apos;s debug web"
         + " interface by user: &apos;%s&apos; at", TEST_USER_1);
-    response = metrics_.readContent("/logs");
+    response = client_.readContent("/logs");
     assertTrue(response.contains(closeStatus));
+  }
+
+  /*
+   * Test that we can set glog level.
+   */
+  @Test
+  public void testSetGLogLevel() throws Exception {
+    setUp("", "");
+    // Validate defaults
+    JSONObject json = client_.jsonGet("/log_level?json");
+    assertEquals("1", json.get("glog_level"));
+
+    // Test GET set_glog_level returns an error
+    json = client_.jsonGet("/set_glog_level?glog=0&json");
+    assertEquals("1", json.get("glog_level"));
+    assertEquals("Use form input to update glog level", json.get("error"));
+
+    // Test GET reset_glog_level returns an error
+    json = client_.jsonGet("/reset_glog_level?json");
+    assertEquals("1", json.get("glog_level"));
+    assertEquals("Use form input to reset glog level", json.get("error"));
+
+    // Clients persist state like 400 errors and cookies. Use new client for each test.
+    BasicHeader[] headers = { new BasicHeader("X-Requested-By", "anything") };
+    List<NameValuePair> params = new ArrayList<>();
+    params.add(new BasicNameValuePair("glog", "0"));
+
+    // Test POST set_glog_level fails
+    WebClient client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
+    String body = client.post("/set_glog_level?json", null, params, 403);
+    assertEquals("rejected POST missing X-Requested-By header", body);
+
+    // Test POST reset_glog_level fails
+    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
+    body = client.post("/reset_glog_level?json", null, null, 403);
+    assertEquals("rejected POST missing X-Requested-By header", body);
+
+    // Test POST set_glog_level with X-Requested-By succeeds
+    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
+    json = client.jsonPost("/set_glog_level?json", headers, params);
+    assertEquals("0", json.get("glog_level"));
+
+    // Test POST reset_glog_level with X-Requested-By succeeds
+    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
+    json = client.jsonPost("/reset_glog_level?json", headers, null);
+    assertEquals("1", json.get("glog_level"));
+
+    // Test POST set_glog_level with cookie gives 403
+    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
+    json = client.jsonGet("/log_level?json");
+    assertEquals("1", json.get("glog_level"));
+    body = client.post("/set_glog_level?json", null, params, 403);
+    assertEquals("", body);
+
+    // Test POST reset_glog_level with cookie gives 403
+    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
+    json = client.jsonGet("/log_level?json");
+    assertEquals("1", json.get("glog_level"));
+    body = client.post("/reset_glog_level?json", null, null, 403);
+    assertEquals("", body);
+
+    // Create a new client, get a cookie, and add csrf_token based on the cookie
+    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
+    json = client.jsonGet("/log_level?json");
+    assertEquals("1", json.get("glog_level"));
+    String rand = getRandToken(client.getCookies());
+    params.add(new BasicNameValuePair("csrf_token", rand));
+
+    // Test POST set_glog_level with cookie and csrf_token succeeds
+    json = client.jsonPost("/set_glog_level?json", null, params);
+    assertEquals("0", json.get("glog_level"));
+
+    // Test POST reset_glog_level with cookie and csrf_token succeeds
+    json = client.jsonPost("/reset_glog_level?json", null, params);
+    assertEquals("1", json.get("glog_level"));
+  }
+
+  /*
+   * Test that we can set java log level.
+   */
+  @Test
+  public void testSetJavaLogLevel() throws Exception {
+    setUp("", "");
+    // Validate defaults
+    JSONObject json = client_.jsonGet("/log_level?json");
+    assertEquals("org.apache.impala : DEBUG\n", json.get("get_java_loglevel_result"));
+
+    // Test GET set_java_loglevel does nothing
+    json = client_.jsonGet("/set_java_loglevel?class=org.apache&level=WARN&json");
+    assertEquals("org.apache.impala : DEBUG\n", json.get("get_java_loglevel_result"));
+    assertEquals("Use form input to update java log levels", json.get("error"));
+
+    // Test GET reset_java_loglevel does nothing
+    json = client_.jsonGet("/reset_java_loglevel?json");
+    assertEquals("org.apache.impala : DEBUG\n", json.get("get_java_loglevel_result"));
+    assertEquals("Use form input to reset java log levels", json.get("error"));
+
+    // Clients persist state like 400 errors and cookies. Use new client for each test.
+    BasicHeader[] headers = { new BasicHeader("X-Requested-By", "anything") };
+    List<NameValuePair> params = new ArrayList<>();
+    params.add(new BasicNameValuePair("class", "org.apache"));
+    params.add(new BasicNameValuePair("level", "WARN"));
+
+    // Test POST set_java_loglevel fails
+    WebClient client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
+    String body = client.post("/set_java_loglevel?json", null, params, 403);
+    assertEquals("rejected POST missing X-Requested-By header", body);
+
+    // Test POST reset_java_loglevel fails
+    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
+    body = client.post("/reset_java_loglevel?json", null, null, 403);
+    assertEquals("rejected POST missing X-Requested-By header", body);
+
+    // Test POST set_glog_level with X-Requested-By succeeds
+    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
+    json = client.jsonPost("/set_java_loglevel?json", headers, params);
+    assertEquals("org.apache : WARN\norg.apache.impala : DEBUG\n",
+        json.get("get_java_loglevel_result"));
+
+    // Test POST reset_glog_level with X-Requested-By succeeds
+    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
+    json = client.jsonPost("/reset_java_loglevel?json", headers, null);
+    assertEquals("org.apache.impala : DEBUG\n", json.get("get_java_loglevel_result"));
+
+    // Test POST set_java_loglevel with cookie gives 403
+    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
+    json = client.jsonGet("/log_level?json");
+    assertEquals("org.apache.impala : DEBUG\n", json.get("get_java_loglevel_result"));
+    body = client.post("/set_java_loglevel?json", null, params, 403);
+    assertEquals("", body);
+
+    // Test POST reset_java_loglevel with cookie gives 403
+    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
+    json = client.jsonGet("/log_level?json");
+    assertEquals("org.apache.impala : DEBUG\n", json.get("get_java_loglevel_result"));
+    body = client.post("/reset_java_loglevel?json", null, null, 403);
+    assertEquals("", body);
+
+    // Create a new client, get a cookie, and add csrf_token based on the cookie
+    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
+    json = client.jsonGet("/log_level?json");
+    assertEquals("org.apache.impala : DEBUG\n", json.get("get_java_loglevel_result"));
+    String rand = getRandToken(client.getCookies());
+    params.add(new BasicNameValuePair("csrf_token", rand));
+
+    // Test POST set_java_loglevel with cookie and csrf_token succeeds
+    json = client.jsonPost("/set_java_loglevel?json", null, params);
+    assertEquals("org.apache : WARN\norg.apache.impala : DEBUG\n",
+        json.get("get_java_loglevel_result"));
+
+    // Test POST reset_java_loglevel with cookie and csrf_token succeeds
+    json = client.jsonPost("/reset_java_loglevel?json", null, params);
+    assertEquals("org.apache.impala : DEBUG\n", json.get("get_java_loglevel_result"));
+  }
+
+  private String getRandToken(List<Cookie> cookies) {
+    for (Cookie cookie : cookies) {
+      String[] tokens = cookie.getValue().split("&");
+      for (String token : tokens) {
+        if (token.charAt(0) == 'r' && token.charAt(1) == '=') {
+          String rand = token.substring(2);
+          assertTrue("Expected number: " + rand, rand.matches("^[1-9][0-9]*$"));
+          return rand;
+        }
+      }
+    }
+    fail("Expected cookie to contain random number");
+    return "";
   }
 
   // Helper method to make a get call to the webserver using the input basic

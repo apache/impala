@@ -149,7 +149,12 @@ void GetJavaLogLevels(Document* document) {
 
 // Callback handler for /set_java_loglevel.
 void SetJavaLogLevelCallback(const Webserver::WebRequest& req, Document* document) {
-  const auto& args = req.parsed_args;
+  if (req.request_method != "POST") {
+    AddDocumentMember("Use form input to update java log levels", "error", document);
+    return;
+  }
+
+  Webserver::ArgumentMap args = Webserver::GetVars(req.post_data);
   Webserver::ArgumentMap::const_iterator classname = args.find("class");
   Webserver::ArgumentMap::const_iterator level = args.find("level");
   if (classname == args.end() || classname->second.empty() ||
@@ -179,6 +184,11 @@ void SetJavaLogLevelCallback(const Webserver::WebRequest& req, Document* documen
 
 // Callback handler for /reset_java_loglevel.
 void ResetJavaLogLevelCallback(const Webserver::WebRequest& req, Document* document) {
+  if (req.request_method != "POST") {
+    AddDocumentMember("Use form input to reset java log levels", "error", document);
+    return;
+  }
+
   Status status = ResetJavaLogLevels();
   if (!status.ok()) {
     AddDocumentMember(status.GetDetail(), "error", document);
@@ -202,7 +212,12 @@ void GetGlogLevel(Document* document) {
 
 // Callback handler for /set_glog_level
 void SetGlogLevelCallback(const Webserver::WebRequest& req, Document* document) {
-  const auto& args = req.parsed_args;
+  if (req.request_method != "POST") {
+    AddDocumentMember("Use form input to update glog level", "error", document);
+    return;
+  }
+
+  Webserver::ArgumentMap args = Webserver::GetVars(req.post_data);
   Webserver::ArgumentMap::const_iterator glog_level = args.find("glog");
   if (glog_level == args.end() || glog_level->second.empty()) {
     AddDocumentMember("Bad glog level input. Valid inputs are integers in the "
@@ -221,6 +236,11 @@ void SetGlogLevelCallback(const Webserver::WebRequest& req, Document* document) 
 
 // Callback handler for /reset_glog_level
 void ResetGlogLevelCallback(const Webserver::WebRequest& req, Document* document) {
+  if (req.request_method != "POST") {
+    AddDocumentMember("Use form input to reset glog level", "error", document);
+    return;
+  }
+
   string new_log_level = google::SetCommandLineOption("v",
       to_string(FLAGS_v_original_value).data());
   VLOG(1) << "New glog level set: " << new_log_level;

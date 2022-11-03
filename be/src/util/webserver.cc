@@ -321,7 +321,7 @@ Webserver::Webserver(const string& interface, const int port, MetricGroup* metri
     total_basic_auth_failure_ =
         metrics->AddCounter("impala.webserver.total-basic-auth-failure", 0);
   }
-  if (use_cookies_ && (auth_mode_ == AuthMode::SPNEGO || auth_mode_ == AuthMode::LDAP)) {
+  if (use_cookies_ && auth_mode_ != AuthMode::NONE) {
     total_cookie_auth_success_ =
         metrics->AddCounter("impala.webserver.total-cookie-auth-success", 0);
     total_cookie_auth_failure_ =
@@ -552,13 +552,18 @@ void Webserver::Init() {
       "$0://$1:$2", IsSecure() ? "https" : "http", hostname_, http_address_.port);
 }
 
-void Webserver::GetCommonJson(
-    Document* document, const struct sq_connection* connection, const WebRequest& req) {
+void Webserver::GetCommonJson(Document* document, const struct sq_connection* connection,
+    const WebRequest& req, const std::string& csrf_token) {
   DCHECK(document != nullptr);
   Value obj(kObjectType);
   obj.AddMember("process-name",
       rapidjson::StringRef(google::ProgramInvocationShortName()),
       document->GetAllocator());
+  if (!csrf_token.empty()) {
+    obj.AddMember("csrf_token",
+        Value(csrf_token.c_str(), document->GetAllocator()),
+        document->GetAllocator());
+  }
 
   // If Apacke Knox is being used to proxy connections to the webserver, the
   // 'x-forwarded-context' header will be present.
@@ -637,6 +642,16 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
 
   vector<string> response_headers;
   bool authenticated = false;
+  // Random value from cookie that we'll also use as a csrf_token to implement the
+  // "Double Submit Cookie" and custom header (X-Requested-By) patterns for preventing
+  // cross-site request forgery (CSRF).
+  std::string cookie_rand_value;
+  // With JWTs we can skip CSRF protection because browsers won't send "Authorization:
+  // Bearer" headers automatically.
+  bool check_csrf_protection = true;
+  // Flags if we have a valid cookie to test for CSRF.
+  bool cookie_authenticated = false;
+
   // Try authenticating with JWT token first, if enabled.
   if (use_jwt_) {
     const char* auth_value = nullptr;
@@ -654,6 +669,7 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
         if (JWTTokenAuth(jwt_token, connection, request_info)) {
           total_jwt_token_auth_success_->Increment(1);
           authenticated = true;
+          check_csrf_protection = false;
           // TODO: cookies are not added, but are not needed right now
         } else {
           LOG(INFO) << "Invalid JWT token provided: " << jwt_token;
@@ -662,17 +678,25 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
       }
     }
   }
-  if (!authenticated) {
-    authenticated = auth_mode_ != AuthMode::SPNEGO && auth_mode_ != AuthMode::LDAP;
+
+  if (!authenticated && auth_mode_ == AuthMode::NONE) {
+    // With AuthMode::NONE, any protection can be bypassed. We sometimes initialize a 2nd
+    // Metrics webserver using AuthMode::NONE, and metrics counters are not named
+    // uniquely to work with two webservers using cookies so we skip using cookies.
+    authenticated = true;
+    check_csrf_protection = false;
   }
+
   // Try authenticating with a cookie, if enabled.
   if (!authenticated && use_cookies_) {
     const char* cookie_header = sq_get_header(connection, "Cookie");
     string username;
     if (cookie_header != nullptr) {
-      Status cookie_status = AuthenticateCookie(hash_, cookie_header, &username);
+      Status cookie_status =
+          AuthenticateCookie(hash_, cookie_header, &username, &cookie_rand_value);
       if (cookie_status.ok()) {
         authenticated = true;
+        cookie_authenticated = true;
         request_info->remote_user = strdup(username.c_str());
         total_cookie_auth_success_->Increment(1);
       } else {
@@ -682,6 +706,14 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
         total_cookie_auth_failure_->Increment(1);
       }
     }
+  }
+
+  if (!authenticated && auth_mode_ == AuthMode::HTPASSWD) {
+    // Squeasel already handled HTPASSWD authentication. We still enable CSRF protection
+    // as browsers automatically include HTPASSWD credentials in requests, so add and use
+    // cookies to avoid requiring the custom header.
+    authenticated = true;
+    AddCookie(request_info->remote_user, &response_headers, &cookie_rand_value);
   }
 
   // Connections originating from trusted domains should not require authentication.
@@ -699,7 +731,7 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
       if (TrustedDomainCheck(origin, connection, request_info)) {
         total_trusted_domain_check_success_->Increment(1);
         authenticated = true;
-        AddCookie(request_info, &response_headers);
+        AddCookie(request_info->remote_user, &response_headers, &cookie_rand_value);
       }
     }
   }
@@ -712,7 +744,7 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
       if (GetUsernameFromAuthHeader(connection, request_info, err_msg)) {
         total_trusted_auth_header_check_success_->Increment(1);
         authenticated = true;
-        AddCookie(request_info, &response_headers);
+        AddCookie(request_info->remote_user, &response_headers, &cookie_rand_value);
       } else {
         LOG(ERROR) << "Found trusted auth header but " << err_msg;
       }
@@ -725,7 +757,7 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
           HandleSpnego(connection, request_info, &response_headers);
       if (spnego_result == SQ_CONTINUE_HANDLING) {
         // Spnego negotiation was successful.
-        AddCookie(request_info, &response_headers);
+        AddCookie(request_info->remote_user, &response_headers, &cookie_rand_value);
       } else {
         // Spnego negotiation is incomplete or failed, stop processing the request.
         return spnego_result;
@@ -736,7 +768,7 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
       if (basic_status.ok()) {
         // Basic auth was successful.
         total_basic_auth_success_->Increment(1);
-        AddCookie(request_info, &response_headers);
+        AddCookie(request_info->remote_user, &response_headers, &cookie_rand_value);
       } else {
         total_basic_auth_failure_->Increment(1);
         if (!sq_get_header(connection, "Authorization")) {
@@ -831,6 +863,44 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
       req.post_data.append(buf, n);
       rem -= n;
     }
+
+    if (check_csrf_protection) {
+      // Always require 1) a csrf_token and cookie or 2) X-Requested-By header.
+      if (cookie_authenticated) {
+        std::vector<char> csrf_token(RAND_MAX_LENGTH+1, '\0');
+        int csrf_len = sq_get_var(req.post_data.c_str(), req.post_data.size(),
+            "csrf_token", csrf_token.data(), csrf_token.size());
+        if (csrf_len == -1) {
+          LOG(WARNING) << "CSRF protection: rejected POST without CSRF token";
+          sq_printf(connection, "HTTP/1.1 403 Forbidden\r\n");
+          return SQ_HANDLED_CLOSE_CONNECTION;
+        } else if (csrf_len == -2) {
+          LOG(WARNING) << "CSRF protection: CSRF token is too long";
+          sq_printf(connection, "HTTP/1.1 403 Forbidden\r\n");
+          return SQ_HANDLED_CLOSE_CONNECTION;
+        }
+        DCHECK(csrf_len >= 0 && csrf_len < csrf_token.size());
+
+        // Prevent CSRF for POSTs using the Double Submit Cookie pattern only if cookie
+        // authentication succeeded.
+        if (cookie_rand_value != csrf_token.data()) {
+          LOG(WARNING) << "CSRF protection: rejected POST with token mismatch: "
+                      << cookie_rand_value << " != " << csrf_token.data();
+          const char* msg = "please refresh the page and try again";
+          SendResponse(connection, "403 Forbidden", "text/plain", msg, response_headers);
+          return SQ_HANDLED_CLOSE_CONNECTION;
+        }
+      } else {
+        // Require a custom header matching csrf_token in the POST body.
+        const char* csrf_header = sq_get_header(connection, "X-Requested-By");
+        if (csrf_header == nullptr) {
+          const char* msg = "rejected POST missing X-Requested-By header";
+          LOG(WARNING) << "CSRF protection: " << msg;
+          SendResponse(connection, "403 Forbidden", "text/plain", msg, response_headers);
+          return SQ_HANDLED_CLOSE_CONNECTION;
+        }
+      }
+    }
   }
 
   // The output of this page is accumulated into this stringstream.
@@ -842,7 +912,8 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
     content_type = PLAIN;
     url_handler->raw_callback()(req, &output, &response);
   } else {
-    RenderUrlWithTemplate(connection, req, *url_handler, &output, &content_type);
+    RenderUrlWithTemplate(
+        connection, req, *url_handler, &output, &content_type, cookie_rand_value);
   }
 
   VLOG(3) << "Rendering page " << request_info->uri << " took "
@@ -986,8 +1057,8 @@ Status Webserver::HandleBasic(struct sq_connection* connection,
   return Status::Expected("Failed to authenticate to LDAP.");
 }
 
-void Webserver::AddCookie(
-    struct sq_request_info* request_info, vector<string>* response_headers) {
+void Webserver::AddCookie(const char* user, vector<string>* response_headers,
+    string* cookie_rand_value) {
   if (use_cookies_) {
     // If cookie auth failed and we generated a 'delete cookie' header, remove it.
     auto eq = [](const string& header) { return header.rfind("Set-Cookie", 0) == 0; };
@@ -996,17 +1067,17 @@ void Webserver::AddCookie(
       response_headers->erase(it);
     }
     // Generate a cookie to return.
-    response_headers->push_back(
-        Substitute("Set-Cookie: $0", GenerateCookie(request_info->remote_user, hash_)));
+    response_headers->push_back(Substitute("Set-Cookie: $0",
+        GenerateCookie(user, hash_, cookie_rand_value)));
   }
 }
 
 void Webserver::RenderUrlWithTemplate(const struct sq_connection* connection,
     const WebRequest& req, const UrlHandler& url_handler, stringstream* output,
-    ContentType* content_type) {
+    ContentType* content_type, const std::string& csrf_token) {
   Document document;
   document.SetObject();
-  GetCommonJson(&document, connection, req);
+  GetCommonJson(&document, connection, req, csrf_token);
 
   const auto& arguments = req.parsed_args;
   url_handler.callback()(req, &document);
@@ -1091,5 +1162,11 @@ Webserver::AuthMode Webserver::GetConfiguredAuthMode() {
     return AuthMode::LDAP;
   }
   return AuthMode::NONE;
+}
+
+Webserver::ArgumentMap Webserver::GetVars(const std::string& data) {
+  ArgumentMap vars;
+  BuildArgumentMap(data, &vars);
+  return vars;
 }
 }

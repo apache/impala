@@ -22,8 +22,6 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.common.collect.Lists;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.util.Arrays;
 import java.util.List;
 
@@ -33,7 +31,7 @@ import org.apache.directory.server.annotations.CreateLdapServer;
 import org.apache.directory.server.annotations.CreateTransport;
 import org.apache.directory.server.core.annotations.ApplyLdifFiles;
 import org.apache.directory.server.core.integ.CreateLdapServerRule;
-import org.apache.impala.util.Metrics;
+import org.apache.impala.testutil.WebClient;
 import org.apache.log4j.Logger;
 import com.google.common.collect.Range;
 import org.junit.After;
@@ -72,7 +70,7 @@ public class LdapImpylaHttpTest {
   // Includes a special character to test HTTP path encoding.
   private static final String delegateUser_ = "proxyUser$";
 
-  Metrics metrics = new Metrics();
+  WebClient client_ = new WebClient();
 
   @Before
   public void setUp() throws Exception {
@@ -96,20 +94,20 @@ public class LdapImpylaHttpTest {
   private void verifyMetrics(Range<Long> expectedBasicSuccess,
       Range<Long> expectedBasicFailure, Range<Long> expectedCookieSuccess,
       Range<Long> expectedCookieFailure) throws Exception {
-    long actualBasicSuccess = (long) metrics.getMetric(
+    long actualBasicSuccess = (long) client_.getMetric(
         "impala.thrift-server.hiveserver2-http-frontend.total-basic-auth-success");
     assertTrue("Expected: " + expectedBasicSuccess + ", Actual: " + actualBasicSuccess,
         expectedBasicSuccess.contains(actualBasicSuccess));
-    long actualBasicFailure = (long) metrics.getMetric(
+    long actualBasicFailure = (long) client_.getMetric(
         "impala.thrift-server.hiveserver2-http-frontend.total-basic-auth-failure");
     assertTrue("Expected: " + expectedBasicFailure + ", Actual: " + actualBasicFailure,
         expectedBasicFailure.contains(actualBasicFailure));
 
-    long actualCookieSuccess = (long) metrics.getMetric(
+    long actualCookieSuccess = (long) client_.getMetric(
         "impala.thrift-server.hiveserver2-http-frontend.total-cookie-auth-success");
     assertTrue("Expected: " + expectedCookieSuccess + ", Actual: " + actualCookieSuccess,
         expectedCookieSuccess.contains(actualCookieSuccess));
-    long actualCookieFailure = (long) metrics.getMetric(
+    long actualCookieFailure = (long) client_.getMetric(
         "impala.thrift-server.hiveserver2-http-frontend.total-cookie-auth-failure");
     assertTrue("Expected: " + expectedCookieFailure + ", Actual: " + actualCookieFailure,
         expectedCookieFailure.contains(actualCookieFailure));
@@ -131,10 +129,10 @@ public class LdapImpylaHttpTest {
 
     // 2. Invalid username password combination. Should fail.
     long successBasicAuthBefore =
-        (long) metrics.getMetric("impala.thrift-server.hiveserver2-http-frontend."
+        (long) client_.getMetric("impala.thrift-server.hiveserver2-http-frontend."
             + "total-basic-auth-success");
     long successCookieAuthBefore =
-        (long) metrics.getMetric("impala.thrift-server.hiveserver2-http-frontend."
+        (long) client_.getMetric("impala.thrift-server.hiveserver2-http-frontend."
             + "total-cookie-auth-success");
     String[] invalidCmd = buildCommand("foo", "bar", null, null);
     RunShellCommand.Run(
@@ -146,7 +144,7 @@ public class LdapImpylaHttpTest {
 
     // 3. Without username and password. Should fail.
     long failedBasicAuthBefore =
-        (long) metrics.getMetric("impala.thrift-server.hiveserver2-http-frontend."
+        (long) client_.getMetric("impala.thrift-server.hiveserver2-http-frontend."
             + "total-basic-auth-failure");
     String[] noAuthCmd = {"impala-python", helper_, "--query", query_};
     RunShellCommand.Run(
@@ -168,7 +166,7 @@ public class LdapImpylaHttpTest {
     // 5. Valid username, password, and HTTP cookie names.
     // Should succeed with cookie authentication.
     successBasicAuthBefore =
-        (long) metrics.getMetric("impala.thrift-server.hiveserver2-http-frontend."
+        (long) client_.getMetric("impala.thrift-server.hiveserver2-http-frontend."
             + "total-basic-auth-success");
     String[] validCookieNamesCmd =
         buildCommand(testUser_, testPassword_, null, "impala.auth");
@@ -181,10 +179,10 @@ public class LdapImpylaHttpTest {
     // 6. Valid username and password, but HTTP cookie names don't consist of
     // "impala.auth". Should succeed with cookie authentication failures.
     successBasicAuthBefore =
-        (long) metrics.getMetric("impala.thrift-server.hiveserver2-http-frontend."
+        (long) client_.getMetric("impala.thrift-server.hiveserver2-http-frontend."
             + "total-basic-auth-success");
     successCookieAuthBefore =
-        (long) metrics.getMetric("impala.thrift-server.hiveserver2-http-frontend."
+        (long) client_.getMetric("impala.thrift-server.hiveserver2-http-frontend."
             + "total-cookie-auth-success");
     String[] nonAuthCookieNamesCmd = buildCommand(testUser_, testPassword_, null,
         "impala.session.id");

@@ -19,7 +19,6 @@ package org.apache.impala.customcluster;
 
 import static org.apache.impala.testutil.LdapUtil.*;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -30,7 +29,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.google.common.collect.Range;
-import org.apache.impala.util.Metrics;
+import org.apache.impala.testutil.WebClient;
 import org.junit.After;
 import org.junit.Test;
 
@@ -40,7 +39,7 @@ import org.junit.Test;
 public class JwtWebserverTest {
   private static final Range<Long> zero = Range.closed(0L, 0L);
 
-  Metrics metrics_ = new Metrics(TEST_USER_1, TEST_PASSWORD_1);
+  WebClient client_ = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
 
   public void setUp(String extraArgs, String startArgs) throws Exception {
     Map<String, String> env = new HashMap<>();
@@ -54,17 +53,17 @@ public class JwtWebserverTest {
   public void cleanUp() throws Exception {
     // Leave a cluster running with the default configuration.
     CustomClusterRunner.StartImpalaCluster();
-    metrics_.Close();
+    client_.Close();
   }
 
   private void verifyJwtAuthMetrics(
       Range<Long> expectedAuthSuccess, Range<Long> expectedAuthFailure) throws Exception {
     long actualAuthSuccess =
-        (long) metrics_.getMetric("impala.webserver.total-jwt-token-auth-success");
+        (long) client_.getMetric("impala.webserver.total-jwt-token-auth-success");
     assertTrue("Expected: " + expectedAuthSuccess + ", Actual: " + actualAuthSuccess,
         expectedAuthSuccess.contains(actualAuthSuccess));
     long actualAuthFailure =
-        (long) metrics_.getMetric("impala.webserver.total-jwt-token-auth-failure");
+        (long) client_.getMetric("impala.webserver.total-jwt-token-auth-failure");
     assertTrue("Expected: " + expectedAuthFailure + ", Actual: " + actualAuthFailure,
         expectedAuthFailure.contains(actualAuthFailure));
   }

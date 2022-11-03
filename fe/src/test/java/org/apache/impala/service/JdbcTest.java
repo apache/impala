@@ -36,7 +36,7 @@ import java.util.Map;
 
 import org.apache.impala.testutil.ImpalaJdbcClient;
 import org.apache.impala.testutil.TestUtils;
-import org.apache.impala.util.Metrics;
+import org.apache.impala.testutil.WebClient;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
@@ -615,7 +615,7 @@ public class JdbcTest extends JdbcTestBase {
   @Test
   public void testConcurrentSessionMixedIdleTimeout() throws Exception {
     // Test for concurrent idle sessions' expiration with mixed timeout durations.
-    Metrics metrics = new Metrics();
+    WebClient client = new WebClient();
 
     List<Integer> timeoutPeriods = Arrays.asList(0, 3, 15);
     List<Connection> connections = new ArrayList<>();
@@ -626,9 +626,9 @@ public class JdbcTest extends JdbcTestBase {
           createConnection(ImpalaJdbcClient.getNoAuthConnectionStr(connectionType_)));
     }
 
-    Long numOpenSessions = (Long)metrics.getMetric(
+    Long numOpenSessions = (Long)client.getMetric(
         "impala-server.num-open-hiveserver2-sessions");
-    Long numExpiredSessions = (Long)metrics.getMetric(
+    Long numExpiredSessions = (Long)client.getMetric(
         "impala-server.num-sessions-expired");
 
     for (int i = 0; i < connections.size(); ++i) {
@@ -642,9 +642,9 @@ public class JdbcTest extends JdbcTestBase {
       lastTimeSessionActive.add(System.currentTimeMillis() / 1000);
     }
 
-    assertEquals(numOpenSessions, (Long)metrics.getMetric(
+    assertEquals(numOpenSessions, (Long)client.getMetric(
         "impala-server.num-open-hiveserver2-sessions"));
-    assertEquals(numExpiredSessions, (Long)metrics.getMetric(
+    assertEquals(numExpiredSessions, (Long)client.getMetric(
         "impala-server.num-sessions-expired"));
 
     for (int timeout : timeoutPeriods) {
@@ -679,9 +679,9 @@ public class JdbcTest extends JdbcTestBase {
         }
       }
 
-      assertEquals(numOpenSessions, (Long)metrics.getMetric(
+      assertEquals(numOpenSessions, (Long)client.getMetric(
           "impala-server.num-open-hiveserver2-sessions"));
-      assertEquals(numExpiredSessions, (Long)metrics.getMetric(
+      assertEquals(numExpiredSessions, (Long)client.getMetric(
           "impala-server.num-sessions-expired"));
     }
 

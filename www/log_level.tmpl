@@ -31,7 +31,7 @@ under the License.
 <h5>Current frontend log level:</h5>
 <span style="white-space: pre-line">{{get_java_loglevel_result}}</span>
 <br>
-<form action="set_java_loglevel">{{>www/form-hidden-inputs.tmpl}}
+<form action="set_java_loglevel" method="post">{{>www/form-hidden-inputs.tmpl}}
   <div class="form-group" name="level">
     <input type="text" class="form-control" name="class" placeholder="e.g. org.apache.impala.analysis.Analyzer">
     <br>
@@ -51,7 +51,7 @@ under the License.
     </div>
   </div>
 </form>
-<form action="reset_java_loglevel">{{>www/form-hidden-inputs.tmpl}}
+<form action="reset_java_loglevel" method="post">{{>www/form-hidden-inputs.tmpl}}
   <div class="col-xs-20">
     <button type="submit" class="btn btn-primary btn-sm">Reset Frontend Log Levels</button>
     <strong>{{reset_java_loglevel_result}}</strong>
@@ -62,7 +62,7 @@ under the License.
 
 <h2>Backend log level configuration (glog)</h2>
 <h5>Current backend log level: <span id="glog_text"></span></h5>
-<form action="set_glog_level">{{>www/form-hidden-inputs.tmpl}}
+<form action="set_glog_level" method="post">{{>www/form-hidden-inputs.tmpl}}
   <div class="form-group" name="level">
     <div class="col-xs-20">
       <label>Log level:</label>
@@ -76,7 +76,7 @@ under the License.
     </div>
   </div>
 </form>
-<form action="reset_glog_level">{{>www/form-hidden-inputs.tmpl}}
+<form action="reset_glog_level" method="post">{{>www/form-hidden-inputs.tmpl}}
   <div class="col-xs-20">
     <button type="submit" class="btn btn-primary btn-sm">Reset Backend Log Level</button>
     <strong>&nbsp &nbsp Default backend log level: {{default_glog_level}}</strong>

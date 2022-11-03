@@ -183,6 +183,27 @@ class TestWebPage(ImpalaTestSuite):
       assert 'Content-Security-Policy' in response.headers, "CSP header missing"
     return responses
 
+  def post_and_check_status(self, url, data={}, string_to_search="", ports_to_test=None):
+    """Helper method that posts to a given url, then asserts the return code is ok and
+    the response contains the expected string."""
+    if ports_to_test is None:
+      ports_to_test = self.TEST_PORTS_WITH_SS
+
+    responses = []
+    for port in ports_to_test:
+      input_url = url.format(port)
+      response = requests.head(input_url)
+      assert response.status_code == requests.codes.ok, "URL: {0} Str:'{1}'\nResp:{2}"\
+        .format(input_url, string_to_search, response.text)
+      response = requests.post(input_url, data=data)
+      assert response.status_code == requests.codes.ok, "URL: {0} Str:'{1}'\nResp:{2}"\
+        .format(input_url, string_to_search, response.text)
+      assert string_to_search in response.text, "URL: {0} Str:'{1}'\nResp:{2}".format(
+        input_url, string_to_search, response.text)
+      responses.append(response)
+      assert 'Content-Security-Policy' in response.headers, "CSP header missing"
+    return responses
+
   def get_debug_page(self, page_url, port=25000):
     """Returns the content of the debug page 'page_url' as json."""
     responses = self.get_and_check_status(page_url + "?json", ports_to_test=[port])
@@ -193,6 +214,11 @@ class TestWebPage(ImpalaTestSuite):
   def get_and_check_status_jvm(self, url, string_to_search=""):
     """Calls get_and_check_status() for impalad and catalogd only"""
     return self.get_and_check_status(url, string_to_search,
+                              ports_to_test=self.TEST_PORTS_WITHOUT_SS)
+
+  def post_and_check_status_jvm(self, url, data={}, string_to_search=""):
+    """Calls post_and_check_status() for impalad and catalogd only"""
+    return self.post_and_check_status(url, data, string_to_search,
                               ports_to_test=self.TEST_PORTS_WITHOUT_SS)
 
   def test_content_type(self):
@@ -211,52 +237,46 @@ class TestWebPage(ImpalaTestSuite):
     malformed inputs. This however does not test that the log level changes are actually
     in effect."""
     # Check that the log_level end points are accessible.
-    self.get_and_check_status_jvm(self.SET_JAVA_LOGLEVEL_URL)
-    self.get_and_check_status_jvm(self.RESET_JAVA_LOGLEVEL_URL)
-    self.get_and_check_status(self.SET_GLOG_LOGLEVEL_URL)
-    self.get_and_check_status(self.RESET_GLOG_LOGLEVEL_URL)
+    self.post_and_check_status_jvm(self.SET_JAVA_LOGLEVEL_URL)
+    self.post_and_check_status_jvm(self.RESET_JAVA_LOGLEVEL_URL)
+    self.post_and_check_status(self.SET_GLOG_LOGLEVEL_URL)
+    self.post_and_check_status(self.RESET_GLOG_LOGLEVEL_URL)
 
     # Set the log level of a class to TRACE and confirm the setting is in place
-    set_loglevel_url = (self.SET_JAVA_LOGLEVEL_URL + "?class" +
-        "=org.apache.impala.catalog.HdfsTable&level=trace")
-    self.get_and_check_status_jvm(
-      set_loglevel_url,
-      "org.apache.impala.catalog.HdfsTable : TRACE")
+    self.post_and_check_status_jvm(self.SET_JAVA_LOGLEVEL_URL,
+        {"class": "org.apache.impala.catalog.HdfsTable", "level": "trace"},
+        "org.apache.impala.catalog.HdfsTable : TRACE")
 
     # Reset Java logging levels
-    self.get_and_check_status_jvm(self.RESET_JAVA_LOGLEVEL_URL, "Java log levels reset.")
+    self.post_and_check_status_jvm(self.RESET_JAVA_LOGLEVEL_URL, {},
+        "Java log levels reset.")
 
     # Set a new glog level and make sure the setting has been applied.
-    set_glog_url = (self.SET_GLOG_LOGLEVEL_URL + "?glog=3")
-    self.get_and_check_status(set_glog_url, "val(3)")
+    self.post_and_check_status(self.SET_GLOG_LOGLEVEL_URL, {"glog": 3}, "val(3)")
 
     # Try resetting the glog logging defaults again.
-    self.get_and_check_status(self.RESET_GLOG_LOGLEVEL_URL, "Current backend log level: ")
+    self.post_and_check_status(self.RESET_GLOG_LOGLEVEL_URL, {},
+        "Current backend log level: ")
 
-    # Same as above, for set log level request
-    set_loglevel_url = (self.SET_JAVA_LOGLEVEL_URL + "?class=")
-    self.get_and_check_status_jvm(set_loglevel_url)
+    # Try to set the log level with an empty class input
+    self.post_and_check_status_jvm(self.SET_JAVA_LOGLEVEL_URL, {"class": ""})
 
     # Empty input for setting a glog level request
-    set_glog_url = (self.SET_GLOG_LOGLEVEL_URL + "?glog=")
-    self.get_and_check_status(set_glog_url)
+    self.post_and_check_status(self.SET_GLOG_LOGLEVEL_URL, {"glog": ""})
 
     # Try setting a non-existent log level on a valid class. In such cases,
     # log4j automatically sets it as DEBUG. This is the behavior of
     # Level.toLevel() method.
-    set_loglevel_url = (self.SET_JAVA_LOGLEVEL_URL + "?class" +
-        "=org.apache.impala.catalog.HdfsTable&level=foo&")
-    self.get_and_check_status_jvm(
-      set_loglevel_url,
-      "org.apache.impala.catalog.HdfsTable : DEBUG")
+    self.post_and_check_status_jvm(self.SET_JAVA_LOGLEVEL_URL,
+        {"class": "org.apache.impala.catalog.HdfsTable", "level": "foo"},
+        "org.apache.impala.catalog.HdfsTable : DEBUG")
 
     # Try setting an invalid glog level.
-    set_glog_url = self.SET_GLOG_LOGLEVEL_URL + "?glog=foo"
-    self.get_and_check_status(set_glog_url, "Bad glog level input")
+    self.post_and_check_status(self.SET_GLOG_LOGLEVEL_URL, {"glog": "foo"},
+        "Bad glog level input")
 
     # Try a non-existent endpoint on log_level URL.
-    bad_loglevel_url = self.SET_GLOG_LOGLEVEL_URL + "?badurl=foo"
-    self.get_and_check_status(bad_loglevel_url)
+    self.post_and_check_status(self.SET_GLOG_LOGLEVEL_URL, {"badurl": "foo"})
 
   @pytest.mark.execute_serially
   def test_uda_with_log_level(self):
@@ -264,15 +284,15 @@ class TestWebPage(ImpalaTestSuite):
     to 3. Running this test serially not to interfere with other tests setting the log
     level."""
     # Check that the log_level end points are accessible.
-    self.get_and_check_status(self.SET_GLOG_LOGLEVEL_URL)
-    self.get_and_check_status(self.RESET_GLOG_LOGLEVEL_URL)
+    self.post_and_check_status(self.SET_GLOG_LOGLEVEL_URL)
+    self.post_and_check_status(self.RESET_GLOG_LOGLEVEL_URL)
     # Set log level to 3.
-    set_glog_url = (self.SET_GLOG_LOGLEVEL_URL + "?glog=3")
-    self.get_and_check_status(set_glog_url, "val(3)")
+    self.post_and_check_status(self.SET_GLOG_LOGLEVEL_URL, {"glog": 3}, "val(3)")
     # Check that Impala doesn't crash when running a query that aggregates.
     self.client.execute("select avg(int_col) from functional.alltypessmall")
     # Reset log level.
-    self.get_and_check_status(self.RESET_GLOG_LOGLEVEL_URL, "Current backend log level: ")
+    self.post_and_check_status(self.RESET_GLOG_LOGLEVEL_URL, {},
+        "Current backend log level: ")
 
   def test_catalog(self, cluster_properties, unique_database):
     """Tests the /catalog and /catalog_object endpoints."""

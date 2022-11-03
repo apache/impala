@@ -34,10 +34,9 @@ import org.apache.directory.server.annotations.CreateTransport;
 import org.apache.directory.server.core.annotations.ApplyLdifFiles;
 import org.apache.directory.server.core.integ.CreateLdapServerRule;
 import org.apache.hive.service.rpc.thrift.*;
-import org.apache.impala.util.Metrics;
+import org.apache.impala.testutil.WebClient;
 import org.apache.thrift.transport.THttpClient;
 import org.apache.thrift.protocol.TBinaryProtocol;
-import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
 
@@ -54,7 +53,7 @@ public class LdapHS2Test {
   @ClassRule
   public static CreateLdapServerRule serverRule = new CreateLdapServerRule();
 
-  Metrics metrics = new Metrics();
+  WebClient client_ = new WebClient();
 
   public void setUp(String extraArgs) throws Exception {
     String uri =
@@ -112,26 +111,26 @@ public class LdapHS2Test {
 
   private void verifyMetrics(long expectedBasicAuthSuccess, long expectedBasicAuthFailure)
       throws Exception {
-    long actualBasicAuthSuccess = (long) metrics.getMetric(
+    long actualBasicAuthSuccess = (long) client_.getMetric(
         "impala.thrift-server.hiveserver2-http-frontend.total-basic-auth-success");
     assertEquals(expectedBasicAuthSuccess, actualBasicAuthSuccess);
-    long actualBasicAuthFailure = (long) metrics.getMetric(
+    long actualBasicAuthFailure = (long) client_.getMetric(
         "impala.thrift-server.hiveserver2-http-frontend.total-basic-auth-failure");
     assertEquals(expectedBasicAuthFailure, actualBasicAuthFailure);
   }
 
   private void verifyCookieMetrics(
       long expectedCookieAuthSuccess, long expectedCookieAuthFailure) throws Exception {
-    long actualCookieAuthSuccess = (long) metrics.getMetric(
+    long actualCookieAuthSuccess = (long) client_.getMetric(
         "impala.thrift-server.hiveserver2-http-frontend.total-cookie-auth-success");
     assertEquals(expectedCookieAuthSuccess, actualCookieAuthSuccess);
-    long actualCookieAuthFailure = (long) metrics.getMetric(
+    long actualCookieAuthFailure = (long) client_.getMetric(
         "impala.thrift-server.hiveserver2-http-frontend.total-cookie-auth-failure");
     assertEquals(expectedCookieAuthFailure, actualCookieAuthFailure);
   }
 
   private void verifyTrustedDomainMetrics(long expectedAuthSuccess) throws Exception {
-    long actualAuthSuccess = (long) metrics
+    long actualAuthSuccess = (long) client_
         .getMetric("impala.thrift-server.hiveserver2-http-frontend."
             + "total-trusted-domain-check-success");
     assertEquals(expectedAuthSuccess, actualAuthSuccess);
@@ -139,7 +138,7 @@ public class LdapHS2Test {
 
   private void verifyTrustedAuthHeaderMetrics(long expectedAuthSuccess) throws Exception {
     long actualAuthSuccess =
-        (long) metrics.getMetric("impala.thrift-server.hiveserver2-http-frontend."
+        (long) client_.getMetric("impala.thrift-server.hiveserver2-http-frontend."
             + "total-trusted-auth-header-check-success");
     assertEquals(expectedAuthSuccess, actualAuthSuccess);
   }
@@ -147,11 +146,11 @@ public class LdapHS2Test {
   private void verifyJwtAuthMetrics(long expectedAuthSuccess, long expectedAuthFailure)
       throws Exception {
     long actualAuthSuccess =
-        (long) metrics.getMetric("impala.thrift-server.hiveserver2-http-frontend."
+        (long) client_.getMetric("impala.thrift-server.hiveserver2-http-frontend."
             + "total-jwt-token-auth-success");
     assertEquals(expectedAuthSuccess, actualAuthSuccess);
     long actualAuthFailure =
-        (long) metrics.getMetric("impala.thrift-server.hiveserver2-http-frontend."
+        (long) client_.getMetric("impala.thrift-server.hiveserver2-http-frontend."
             + "total-jwt-token-auth-failure");
     assertEquals(expectedAuthFailure, actualAuthFailure);
   }
@@ -511,7 +510,7 @@ public class LdapHS2Test {
     // Case 4: Verify that there are no changes in metrics for trusted auth
     // header check if the X-Trusted-Proxy-Auth-Header header is not present
     long successMetricBefore =
-        (long) metrics.getMetric("impala.thrift-server.hiveserver2-http-frontend."
+        (long) client_.getMetric("impala.thrift-server.hiveserver2-http-frontend."
             + "total-trusted-auth-header-check-success");
     headers.put("Authorization", "Basic VGVzdDFMZGFwOjEyMzQ1");
     headers.remove("X-Trusted-Proxy-Auth-Header");

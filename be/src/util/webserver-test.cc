@@ -21,6 +21,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
 #include <gutil/strings/substitute.h>
+#include <map>
 #include <openssl/crypto.h>
 #include <openssl/ssl.h>
 #include <regex>
@@ -65,49 +66,74 @@ const string TO_ESCAPE_KEY = "ToEscape";
 const string TO_ESCAPE_VALUE = "<script language='javascript'>";
 const string ESCAPED_VALUE = "&lt;script language=&apos;javascript&apos;&gt;";
 
-// Adapted from:
-// http://stackoverflow.com/questions/10982717/get-html-without-header-with-boostasio
+struct HttpRequest {
+  string url_path = "/";
+  string host = "localhost";
+  int32_t port = FLAGS_webserver_port;
+  map<string, string> headers = {};
+
+  // Adapted from:
+  // http://stackoverflow.com/questions/10982717/get-html-without-header-with-boostasio
+  Status Do(ostream* out, int expected_code, const string& method) {
+    try {
+      tcp::iostream request_stream;
+      request_stream.connect(host, lexical_cast<string>(port));
+      if (!request_stream) return Status("Could not connect request_stream");
+
+      request_stream << method << " " << url_path << " HTTP/1.1\r\n";
+      request_stream << "Host: " << host << ":" << port <<  "\r\n";
+      request_stream << "Accept: */*\r\n";
+      request_stream << "Cache-Control: no-cache\r\n";
+      if (method == "POST") {
+        request_stream << "Content-Length: 0\r\n";
+      }
+      for (const std::pair<string, string>& header : headers) {
+        request_stream << header.first << ": " << header.second << "\r\n";
+      }
+
+      request_stream << "Connection: close\r\n\r\n";
+      request_stream.flush();
+
+      string line1;
+      getline(request_stream, line1);
+      if (!request_stream) return Status("No response");
+
+      stringstream response_stream(line1);
+      string http_version;
+      response_stream >> http_version;
+
+      unsigned int status_code;
+      response_stream >> status_code;
+
+      string status_message;
+      getline(response_stream, status_message);
+      if (!response_stream || http_version.substr(0,5) != "HTTP/") {
+        return Status("Malformed response");
+      }
+
+      if (status_code != expected_code) {
+        return Status(Substitute("Unexpected status code: $0", status_code));
+      }
+
+      (*out) << request_stream.rdbuf();
+      return Status::OK();
+    } catch (const std::exception& e){
+      return Status(e.what());
+    }
+  }
+
+  Status Get(ostream* out, int expected_code = 200) {
+    return Do(out, expected_code, "GET");
+  }
+
+  Status Post(ostream* out, int expected_code = 200) {
+    return Do(out, expected_code, "POST");
+  }
+};
+
 Status HttpGet(const string& host, const int32_t& port, const string& url_path,
     ostream* out, int expected_code = 200, const string& method = "GET") {
-  try {
-    tcp::iostream request_stream;
-    request_stream.connect(host, lexical_cast<string>(port));
-    if (!request_stream) return Status("Could not connect request_stream");
-
-    request_stream << method << " " << url_path << " HTTP/1.1\r\n";
-    request_stream << "Host: " << host << ":" << port <<  "\r\n";
-    request_stream << "Accept: */*\r\n";
-    request_stream << "Cache-Control: no-cache\r\n";
-
-    request_stream << "Connection: close\r\n\r\n";
-    request_stream.flush();
-
-    string line1;
-    getline(request_stream, line1);
-    if (!request_stream) return Status("No response");
-
-    stringstream response_stream(line1);
-    string http_version;
-    response_stream >> http_version;
-
-    unsigned int status_code;
-    response_stream >> status_code;
-
-    string status_message;
-    getline(response_stream,status_message);
-    if (!response_stream || http_version.substr(0,5) != "HTTP/") {
-      return Status("Malformed response");
-    }
-
-    if (status_code != expected_code) {
-      return Status(Substitute("Unexpected status code: $0", status_code));
-    }
-
-    (*out) << request_stream.rdbuf();
-    return Status::OK();
-  } catch (const std::exception& e){
-    return Status(e.what());
-  }
+  return HttpRequest{url_path, host, port}.Do(out, expected_code, method);
 }
 
 TEST(Webserver, SmokeTest) {
@@ -118,6 +144,30 @@ TEST(Webserver, SmokeTest) {
 
   stringstream contents;
   ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port, "/", &contents));
+}
+
+void PostOnlyCallback(bool* success, const Webserver::WebRequest& req,
+    Document* document) {
+  *success = req.request_method == "POST";
+}
+
+TEST(Webserver, PostTest) {
+  MetricGroup metrics("webserver-test");
+  Webserver webserver("", FLAGS_webserver_port, &metrics);
+
+  const string POST_TEST_PATH = "/post-test";
+  bool success = false;
+  Webserver::UrlCallback callback = bind<void>(PostOnlyCallback, &success , _1, _2);
+  webserver.RegisterUrlCallback(POST_TEST_PATH, "raw_text.tmpl", callback, false);
+
+  ASSERT_OK(webserver.Start());
+  stringstream contents;
+  HttpRequest req{POST_TEST_PATH};
+  ASSERT_OK(req.Get(&contents));
+  ASSERT_FALSE(success) << "GET unexpectedly succeeded";
+
+  ASSERT_OK(req.Post(&contents));
+  ASSERT_TRUE(success) << "POST unexpectedly failed";
 }
 
 void AssertArgsCallback(bool* success, const Webserver::WebRequest& req,
@@ -402,7 +452,68 @@ void CheckAuthMetrics(MetricGroup* metrics, int num_negotiate_success,
   ASSERT_EQ(cookie_failure_metric->GetValue(), num_cookie_failure);
 }
 
-TEST(Webserver, TestWithSpnego) {
+void curl_version(string* curl_output, bool* curl_7_64_or_above = nullptr) {
+  // TODO(todd) IMPALA-8987: import curl into native-toolchain and test this with
+  // authentication.
+  RunShellProcess("curl --version", curl_output);
+
+  // Detect curl version. We only care about the major and minor.
+  std::regex curl_version_regex = std::regex("curl ([0-9]+)\\.([0-9]+)\\.[0-9]+");
+  std::smatch match_result;
+  ASSERT_TRUE(std::regex_search(*curl_output, match_result, curl_version_regex));
+  ASSERT_EQ(match_result.size(), 3);
+
+  int curl_major_version = std::stoi(match_result[1]);
+  int curl_minor_version = std::stoi(match_result[2]);
+  if (curl_7_64_or_above) {
+    *curl_7_64_or_above = curl_major_version > 7 ||
+        (curl_major_version == 7 && curl_minor_version >= 64);
+  }
+  cout << "Detected curl version " << std::to_string(curl_major_version) << "."
+       << std::to_string(curl_minor_version)
+       << (curl_7_64_or_above == nullptr ? " " :
+            (*curl_7_64_or_above ? " is at least 7.64" : " is below 7.64")) << endl;
+}
+
+string curl(const string& curl_options, int32_t port = FLAGS_webserver_port) {
+  string cmd = Substitute("curl -v -f $0 'http://127.0.0.1:$1'", curl_options, port);
+  cout << cmd << endl;
+  return cmd;
+}
+
+class CookieJar {
+public:
+  CookieJar() : dir_(filesystem::unique_path()), path_(dir_ / "cookiejar") {
+    filesystem::create_directories(dir_);
+    cout << "Storing cookies in " << path_ << endl;
+  }
+  ~CookieJar() {
+    filesystem::remove_all(dir_);
+  }
+  const filesystem::path& path() { return path_; }
+  string token() {
+    const char* rand_key = "&r=";
+    string rand, line;
+    ifstream cookie_file(path_.string());
+    while (cookie_file) {
+      getline(cookie_file, line);
+      size_t rand_idx = line.rfind(rand_key);
+      if (rand_idx != string::npos) {
+        // Relies on the random value being the last element in the cookie.
+        rand = line.substr(rand_idx + strlen(rand_key));
+        break;
+      }
+    }
+    return rand;
+  }
+
+private:
+  const filesystem::path dir_, path_;
+};
+
+void EmptyCallback(const Webserver::WebRequest& req, Document* document) { }
+
+TEST(Webserver, TestGetWithSpnego) {
   MiniKdc kdc(MiniKdcOptions{});
   KUDU_ASSERT_OK(kdc.Start());
   kdc.SetKrb5Environment();
@@ -420,6 +531,7 @@ TEST(Webserver, TestWithSpnego) {
   MetricGroup metrics("webserver-test");
   Webserver webserver("", FLAGS_webserver_port, &metrics);
   ASSERT_OK(webserver.Start());
+  webserver.RegisterUrlCallback("/", "raw_text.tmpl", EmptyCallback, false);
 
   // Don't expect HTTP requests to work without Kerberos credentials.
   stringstream contents;
@@ -428,46 +540,21 @@ TEST(Webserver, TestWithSpnego) {
   // There should be one failed auth attempt.
   CheckAuthMetrics(&metrics, 0, 1, 0, 0);
 
-  // TODO(todd) IMPALA-8987: import curl into native-toolchain and test this with
-  // authentication.
   string curl_output;
-  RunShellProcess("curl --version", &curl_output);
-
-  // Detect curl version. We only care about the major and minor.
-  std::regex curl_version_regex = std::regex("curl ([0-9]+)\\.([0-9]+)\\.[0-9]+");
-  std::smatch match_result;
-  ASSERT_TRUE(std::regex_search(curl_output, match_result, curl_version_regex));
-  ASSERT_EQ(match_result.size(), 3);
-
-  int curl_major_version = std::stoi(match_result[1]);
-  int curl_minor_version = std::stoi(match_result[2]);
-  bool curl_7_64_or_above = true;
-  if (curl_major_version < 7 ||
-      (curl_major_version == 7 && curl_minor_version < 64)) {
-    curl_7_64_or_above = false;
-  }
-  LOG(INFO) << "Detected curl version " << std::to_string(curl_major_version) << "."
-            << std::to_string(curl_minor_version) << " "
-            << (curl_7_64_or_above ? "is at least 7.64" : "is below 7.64");
-
+  bool curl_7_64_or_above;
+  curl_version(&curl_output, &curl_7_64_or_above);
   if (curl_output.find("GSS-API") != string::npos
       && curl_output.find("SPNEGO") != string::npos) {
     // Test that OPTIONS works with and without having kinit-ed.
-    string options_cmd =
-        Substitute("curl -X OPTIONS -v --negotiate -u : 'http://127.0.0.1:$0'",
-            FLAGS_webserver_port);
+    string options_cmd = curl("-X OPTIONS --negotiate -u :");
     system(options_cmd.c_str());
     KUDU_ASSERT_OK(kdc.Kinit("alice"));
     system(options_cmd.c_str());
 
     // Test that GET works with cookies.
-    filesystem::path cookie_dir = filesystem::unique_path();
-    filesystem::create_directories(cookie_dir);
-    filesystem::path cookie_path = cookie_dir / "cookiejar";
-    LOG(INFO) << "Storing cookies in " << cookie_path;
+    CookieJar cookie;
     string curl_cmd =
-        Substitute("curl -c $0 -b $0 -X GET -v --negotiate -u : 'http://127.0.0.1:$1'",
-            cookie_path.string(), FLAGS_webserver_port);
+        curl(Substitute("-c $0 -b $0 --negotiate -u :", cookie.path().string()));
     // Run the command twice, the first time we should authenticate with SPNEGO, the
     // second time with a cookie.
     system(Substitute("$0 && $0", curl_cmd).c_str());
@@ -486,11 +573,56 @@ TEST(Webserver, TestWithSpnego) {
     // webserver uses a different HMAC key. See above note about curl 7.64.0 or above.
     system(curl_cmd.c_str());
     CheckAuthMetrics(&metrics2, 1, (curl_7_64_or_above ? 0 : 1), 0, 1);
-
-    filesystem::remove_all(cookie_dir);
   } else {
-    LOG(INFO) << "Skipping test, curl was not present or did not have the required "
-              << "features: " << curl_output;
+    cout << "Skipping test, curl was not present or did not have the required "
+         << "features: " << curl_output << endl;
+  }
+}
+
+TEST(Webserver, TestPostWithSpnego) {
+  MiniKdc kdc(MiniKdcOptions{});
+  KUDU_ASSERT_OK(kdc.Start());
+  kdc.SetKrb5Environment();
+
+  string kt_path;
+  KUDU_ASSERT_OK(kdc.CreateServiceKeytab("HTTP/127.0.0.1", &kt_path));
+  CHECK_ERR(setenv("KRB5_KTNAME", kt_path.c_str(), 1));
+  KUDU_ASSERT_OK(kdc.CreateUserPrincipal("alice"));
+
+  gflags::FlagSaver saver;
+  FLAGS_webserver_require_spnego = true;
+  FLAGS_webserver_ldap_passwords_in_clear_ok = true;
+  FLAGS_cookie_require_secure = false;
+
+  MetricGroup metrics("webserver-test");
+  Webserver webserver("", FLAGS_webserver_port, &metrics);
+  ASSERT_OK(webserver.Start());
+  webserver.RegisterUrlCallback("/", "raw_text.tmpl", EmptyCallback, false);
+
+  string curl_output;
+  curl_version(&curl_output);
+  if (curl_output.find("GSS-API") != string::npos
+      && curl_output.find("SPNEGO") != string::npos) {
+    // POST fails without a header
+    ASSERT_NE(system(curl("-d '' --negotiate -u :").c_str()), 0);
+    // POST succeeds with X-Requested-By header
+    ASSERT_EQ(system(curl("-d '' -H 'X-Requested-By: me' --negotiate -u :").c_str()), 0);
+
+    CookieJar cookie;
+    // GET with SPNEGO succeeds and returns a cookie.
+    ASSERT_EQ(system(curl("--negotiate -u : -c " + cookie.path().string()).c_str()), 0);
+    // Verify we got a cookie and can read the random token.
+    string token = cookie.token();
+    ASSERT_FALSE(token.empty());
+    // Post with the cookie fails due to CSRF protection.
+    ASSERT_NE(system(curl("-d '' -b " + cookie.path().string()).c_str()), 0);
+
+    // Include the cookie's random token as csrf_token and request should succeed.
+    ASSERT_EQ(system(curl(Substitute(
+        "-b $0 -d 'csrf_token=$1'", cookie.path().string(), token)).c_str()), 0);
+  } else {
+    cout << "Skipping test, curl was not present or did not have the required "
+         << "features: " << curl_output << endl;
   }
 }
 
@@ -500,17 +632,46 @@ TEST(Webserver, StartWithPasswordFileTest) {
   auto password =
       ScopedFlagSetter<string>::Make(&FLAGS_webserver_password_file, password_file.str());
 
+  gflags::FlagSaver saver;
+  FLAGS_cookie_require_secure = false;
+
   MetricGroup metrics("webserver-test");
   Webserver webserver("", FLAGS_webserver_port, &metrics);
   if (FIPS_mode()) {
     ASSERT_FALSE(webserver.Start().ok());
   } else {
     ASSERT_OK(webserver.Start());
+    webserver.RegisterUrlCallback("/", "raw_text.tmpl", EmptyCallback, false);
 
     // Don't expect HTTP requests to work without a password
     stringstream contents;
     ASSERT_ERROR_MSG(HttpGet("localhost", FLAGS_webserver_port, "/", &contents),
         "Unexpected status code: 401");
+
+    // Succeeds with user and password
+    string curl_output;
+    curl_version(&curl_output);
+    ASSERT_EQ(system(curl("--digest -u test:test").c_str()), 0);
+
+    // POST is rejected without header
+    ASSERT_NE(system(curl("-d '' --digest -u test:test").c_str()), 0);
+    ASSERT_EQ(system(
+        curl("-d '' --digest -u test:test -H 'X-Requested-By: me'").c_str()), 0);
+
+    CookieJar cookie;
+    // GET with user and password succeeds and returns a cookie.
+    ASSERT_EQ(system(curl(Substitute("--digest -u test:test -c $0",
+        cookie.path().string())).c_str()), 0);
+    // Verify we got a cookie and can read the random token.
+    string token = cookie.token();
+    ASSERT_FALSE(token.empty());
+    // Post with the cookie fails due to CSRF protection.
+    ASSERT_NE(system(curl(Substitute("--digest -u test:test -b $0 -d ''",
+        cookie.path().string())).c_str()), 0);
+
+    // Include the cookie's random token as csrf_token and request should succeed.
+    ASSERT_EQ(system(curl(Substitute("--digest -u test:test -b $0 -d 'csrf_token=$1'",
+        cookie.path().string(), token)).c_str()), 0);
   }
 }
 

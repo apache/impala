@@ -35,6 +35,8 @@ DEFINE_bool(cookie_require_secure, true,
 DEFINE_int64(max_cookie_lifetime_s, 24 * 60 * 60,
     "Maximum amount of time in seconds that an authentication cookie will remain valid. "
     "Setting to 0 disables use of cookies. Defaults to 1 day.");
+DEFINE_bool(samesite_strict, false,
+    "(Advanced) If true, authentication cookies will include SameSite=Strict.");
 
 using namespace strings;
 
@@ -59,13 +61,14 @@ static const int SHA256_BASE64_LEN =
     CalculateBase64EscapedLen(AuthenticationHash::HashLen(), /* do_padding */ true);
 
 // Since we only return cookies with a single name, well behaved clients should only ever
-// return one cookie to us. To accomodate non-malicious but poorly behaved clients, we
+// return one cookie to us. To accommodate non-malicious but poorly behaved clients, we
 // allow for checking a limited number of cookies, up to MAX_COOKIES_TO_CHECK or until we
 // find the first one with COOKIE_NAME.
 static const int MAX_COOKIES_TO_CHECK = 5;
 
 Status AuthenticateCookie(
-    const AuthenticationHash& hash, const string& cookie_header, string* username) {
+    const AuthenticationHash& hash, const string& cookie_header,
+    string* username, string* rand) {
   // The 'Cookie' header allows sending multiple name/value pairs separated by ';'.
   vector<string> cookies = strings::Split(cookie_header, ";");
   if (cookies.size() > MAX_COOKIES_TO_CHECK) {
@@ -125,6 +128,11 @@ Status AuthenticateCookie(
       if (!TryStripPrefixString(cookie_value_split[0], USERNAME_KEY, username)) {
         return Status("The cookie username value has an invalid format.");
       }
+      if (rand != nullptr) {
+        if (!TryStripPrefixString(cookie_value_split[2], RAND_KEY, rand)) {
+          return Status("The cookie rand value has an invalid format.");
+        }
+      }
       // We've successfully authenticated.
       return Status::OK();
     } else {
@@ -135,12 +143,18 @@ Status AuthenticateCookie(
   return Status(Substitute("Did not find expected cookie name: $0", COOKIE_NAME));
 }
 
-string GenerateCookie(const string& username, const AuthenticationHash& hash) {
+string GenerateCookie(const string& username, const AuthenticationHash& hash,
+    std::string* srand) {
   // Its okay to use rand() here even though its a weak RNG because being able to guess
   // the random numbers generated won't help an attacker. The important thing is that
   // we're using a strong RNG to create the key and a strong HMAC function.
+  int cookie_rand = rand();
+  string cookie_rand_s = std::to_string(cookie_rand);
+  if (srand != nullptr) {
+    *srand = cookie_rand_s;
+  }
   string cookie_value = StrCat(USERNAME_KEY, username, COOKIE_SEPARATOR, TIMESTAMP_KEY,
-      MonotonicMillis(), COOKIE_SEPARATOR, RAND_KEY, rand());
+      MonotonicMillis(), COOKIE_SEPARATOR, RAND_KEY, cookie_rand_s);
   uint8_t signature[AuthenticationHash::HashLen()];
   Status compute_status =
       hash.Compute(reinterpret_cast<const uint8_t*>(cookie_value.data()),
@@ -155,12 +169,13 @@ string GenerateCookie(const string& username, const AuthenticationHash& hash) {
       SHA256_BASE64_LEN, /* do_padding */ true);
   base64_signature[SHA256_BASE64_LEN] = '\0';
 
-  const char* secure_flag = ";Secure";
-  if (!FLAGS_cookie_require_secure) {
-    secure_flag = "";
-  }
-  return Substitute("$0=$1$2$3;HttpOnly;Max-Age=$4$5", COOKIE_NAME, base64_signature,
-      COOKIE_SEPARATOR, cookie_value, FLAGS_max_cookie_lifetime_s, secure_flag);
+  const char* secure_flag = FLAGS_cookie_require_secure ? ";Secure" : "";
+  const char* samesite_flag = FLAGS_samesite_strict ? ";SameSite=Strict" : "";
+  // Add SameSite=Strict to notify the browser it should avoid sending the cookie with
+  // requests from other domains.
+  return Substitute("$0=$1$2$3;HttpOnly;Max-Age=$4$5$6", COOKIE_NAME, base64_signature,
+      COOKIE_SEPARATOR, cookie_value, FLAGS_max_cookie_lifetime_s, secure_flag,
+      samesite_flag);
 }
 
 string GetDeleteCookie() {
