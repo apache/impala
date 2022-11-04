@@ -143,6 +143,7 @@ set_dep_root(ZLIB)
 set_dep_root(CCTZ)
 set_dep_root(CURL)
 set_dep_root(CALLONCEHACK)
+set_dep_root(CLOUDFLAREZLIB)
 
 # The boost-cmake project hasn't been maintained for years. Let's make sure we
 # don't accidentally use it if it can be found.
@@ -214,6 +215,9 @@ IMPALA_ADD_THIRDPARTY_LIB(openssl_crypto "" "" ${OPENSSL_CRYPTO_LIBRARY})
 find_package(Bzip2 REQUIRED)
 IMPALA_ADD_THIRDPARTY_LIB(bzip2 ${BZIP2_INCLUDE_DIR} ${BZIP2_STATIC_LIBRARIES} "")
 
+if ($ENV{IMPALA_USE_CLOUDFLARE_ZLIB} STREQUAL "true")
+  set(ZLIB_ROOT ${CLOUDFLAREZLIB_ROOT})
+endif()
 find_package(Zlib REQUIRED)
 IMPALA_ADD_THIRDPARTY_LIB(zlib ${ZLIB_INCLUDE_DIR} ${ZLIB_STATIC_LIBRARIES}
   ${ZLIB_SHARED_LIBRARIES})

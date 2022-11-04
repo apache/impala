@@ -173,6 +173,8 @@ export IMPALA_TPC_H_VERSION=2.17.0
 unset IMPALA_TPC_H_URL
 export IMPALA_ZLIB_VERSION=1.2.13
 unset IMPALA_ZLIB_URL
+export IMPALA_CLOUDFLAREZLIB_VERSION=9e601a3f37
+unset IMPALA_CLOUDFLAREZLIB_URL
 export IMPALA_CALLONCEHACK_VERSION=1.0.0
 unset IMPALA_CALLONCEHACK_URL
 # Thrift related environment variables.
@@ -268,6 +270,13 @@ export IMPALA_REDHAT8_DOCKER_BASE=${IMPALA_REDHAT8_DOCKER_BASE:-"rockylinux:8.5"
 # Docker image, and it has no impact on what version of Java is used to compile
 # Impala's Java code.
 export IMPALA_DOCKER_USE_JAVA11=${IMPALA_DOCKER_USE_JAVA11:-"false"}
+
+# There are multiple compatible implementations of zlib. Cloudflare Zlib is an
+# implementation with optimizations to use platform-specific CPU features that are not
+# in the standard Zlib implementation. When set to true, this builds and links against
+# Cloudflare Zlib. When false, the build uses the regular Madler Zlib. This defaults
+# to true due to the large performance benefits.
+export IMPALA_USE_CLOUDFLARE_ZLIB=${IMPALA_USE_CLOUDFLARE_ZLIB:-"true"}
 
 # When IMPALA_(CDP_COMPONENT)_URL are overridden, they may contain '$(platform_label)'
 # which will be substituted for the CDP platform label in bootstrap_toolchain.py
