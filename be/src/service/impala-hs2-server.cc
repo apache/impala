@@ -904,6 +904,10 @@ void ImpalaServer::GetOperationStatus(TGetOperationStatusResp& return_val,
           session_id, SecretArg::Operation(op_secret, query_id), &session),
       SQLSTATE_GENERAL_ERROR);
 
+  // When using long polling, this waits up to long_polling_time_ms milliseconds for
+  // query completion.polling
+  query_handle->WaitForCompletionExecState();
+
   {
     lock_guard<mutex> l(*query_handle->lock());
     TOperationState::type operation_state = query_handle->TOperationState();

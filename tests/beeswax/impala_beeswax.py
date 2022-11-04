@@ -389,11 +389,20 @@ class ImpalaBeeswaxClient(object):
   def close_query(self, handle):
     self.__do_rpc(lambda: self.imp_service.close(handle))
 
+  def _get_sleep_interval(self, start_time):
+    """Returns the time to sleep in seconds before polling again. This uses a fixed
+       50 millisecond sleep that doesn't vary by elapsed time. This is only used for
+       testing, and there is no reason to sleep longer for test environments."""
+    return 0.05
+
   def wait_for_finished(self, query_handle):
     """Given a query handle, polls the coordinator waiting for the query to transition to
        'FINISHED' state"""
+    loop_start = time.time()
     while True:
+      start_rpc_time = time.time()
       query_state = self.get_state(query_handle)
+      rpc_time = time.time() - start_rpc_time
       # if the rpc succeeded, the output is the query state
       if query_state == self.query_states["FINISHED"]:
         break
@@ -404,14 +413,18 @@ class ImpalaBeeswaxClient(object):
           raise ImpalaBeeswaxException(error_log, None)
         finally:
           self.close_query(query_handle)
-      time.sleep(0.05)
+      sleep_time = self._get_sleep_interval(loop_start)
+      if rpc_time < sleep_time:
+        time.sleep(sleep_time - rpc_time)
 
   def wait_for_finished_timeout(self, query_handle, timeout=10):
     """Given a query handle and a timeout, polls the coordinator waiting for the query to
        transition to 'FINISHED' state till 'timeout' seconds"""
     start_time = time.time()
     while (time.time() - start_time < timeout):
+      start_rpc_time = time.time()
       query_state = self.get_state(query_handle)
+      rpc_time = time.time() - start_rpc_time
       # if the rpc succeeded, the output is the query state
       if query_state == self.query_states["FINISHED"]:
         return True
@@ -422,7 +435,9 @@ class ImpalaBeeswaxClient(object):
           raise ImpalaBeeswaxException(error_log, None)
         finally:
           self.close_query(query_handle)
-      time.sleep(0.05)
+      sleep_time = self._get_sleep_interval(start_time)
+      if rpc_time < sleep_time:
+        time.sleep(sleep_time - rpc_time)
     return False
 
   def wait_for_admission_control(self, query_handle):

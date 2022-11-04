@@ -309,6 +309,11 @@ class ClientRequestState {
   /// ExecState is stored using an AtomicEnum, so reads do not require holding lock_.
   ExecState exec_state() const { return exec_state_.Load(); }
 
+  /// WaitForCompletionExecState waits until the state reaches FINISHED or ERROR
+  /// or it reaches the timeout. The timeout is specified using the long_polling_time_ms
+  /// query option.
+  void WaitForCompletionExecState();
+
   /// RetryState is stored using an AtomicEnum, so reads do not require holding lock_.
   RetryState retry_state() const { return retry_state_.Load(); }
 
@@ -569,6 +574,13 @@ class ClientRequestState {
   /// Condition variable used to signal the threads that are blocked on Wait() to finish.
   /// Callers are expected to use BlockOnWait() for Wait() to finish.
   ConditionVariable block_on_wait_cv_;
+
+  /// Lock used to synchronize access for exec_state_cv_. Some callers hold lock_ while
+  /// acquiring this lock, so if lock_ is needed it must be acquired before this lock.
+  std::mutex exec_state_lock_;
+
+  /// Condition variable used to signal threads that are watching the exec_state_.
+  ConditionVariable exec_state_cv_;
 
   /// Wait condition used in conjunction with block_on_wait_cv_.
   bool is_wait_done_ = false;

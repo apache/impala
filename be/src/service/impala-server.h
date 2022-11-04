@@ -191,6 +191,7 @@ class TQueryExecRequest;
 /// 6. ClientRequestState::lock
 /// 7. ClientRequestState::expiration_data_lock_
 /// 8. Coordinator::exec_summary_lock
+/// 9. ClientRequestState::exec_state_lock_
 ///
 /// The following locks are not held in conjunction with other locks:
 /// * query_log_lock_

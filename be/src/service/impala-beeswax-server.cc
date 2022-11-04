@@ -324,6 +324,11 @@ beeswax::QueryState::type ImpalaServer::get_state(
   // Validate that query can be accessed by user.
   RAISE_IF_ERROR(CheckClientRequestSession(session.get(), query_handle->effective_user(),
       query_id), SQLSTATE_GENERAL_ERROR);
+
+  // When using long polling, this waits up to long_polling_time_ms milliseconds for
+  // query completion.polling
+  query_handle->WaitForCompletionExecState();
+
   // Take the lock to ensure that if the client sees a query_state == EXCEPTION, it is
   // guaranteed to see the error query_status.
   lock_guard<mutex> l(*query_handle->lock());

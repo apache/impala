@@ -364,6 +364,101 @@ class TestHS2(HS2TestSuite):
         get_operation_status_resp.errorMessage is not ""
     assert get_operation_status_resp.sqlState == SQLSTATE_GENERAL_ERROR
 
+  @needs_session(conf_overlay={"long_polling_time_ms": "10000"})
+  def test_long_polling_success(self):
+    """Tests that GetOperationStatus waits for the query to complete and is interrupted
+    by the completion."""
+
+    # alltypestiny has 8 rows, so this statement is about 80ms of sleeps plus some
+    # regular execution.
+    statement = "SELECT count(sleep(10)) from functional.alltypestiny"
+    execute_statement_resp = self.execute_statement(statement)
+
+    start_time = time.time()
+    get_operation_status_resp = \
+        self.get_operation_status(execute_statement_resp.operationHandle)
+    end_time = time.time()
+    TestHS2.check_response(get_operation_status_resp)
+    # With long polling, get_operation_status only exits if it reaches a completion
+    # state within the interval. This is a short query that must complete before the
+    # long_polling_wait_time_ms of 10 seconds. This must have reached the FINISHED
+    # state.
+    assert get_operation_status_resp.operationState == \
+        TCLIService.TOperationState.FINISHED_STATE
+    # The long polling wait must have been interrupted by the completion, so it should
+    # not come anywhere close to waiting the full 10 seconds. 1 second is not a very
+    # tight time bound.
+    time_diff = end_time - start_time
+    assert time_diff < 1
+    # This should take at least 80ms, because that is the amount of time the query
+    # should sleep
+    assert time_diff >= 0.08
+
+    # Fetch the results so the query completes successfully
+    fetch_results_req = TCLIService.TFetchResultsReq()
+    fetch_results_req.operationHandle = execute_statement_resp.operationHandle
+    fetch_results_req.maxRows = 100
+    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
+    TestHS2.check_response(fetch_results_resp)
+
+  @needs_session(conf_overlay={"long_polling_time_ms": "50"})
+  def test_long_polling_full_sleep(self):
+    """Tests that GetOperationStatus breaks out of its sleep at the proper time."""
+
+    # alltypestiny has 8 rows, so this statement is about 800ms of sleeps plus some
+    # regular execution.
+    statement = "SELECT count(sleep(100)) from functional.alltypestiny"
+    execute_statement_resp = self.execute_statement(statement)
+
+    while True:
+      start_time = time.time()
+      get_operation_status_resp = \
+          self.get_operation_status(execute_statement_resp.operationHandle)
+      end_time = time.time()
+      TestHS2.check_response(get_operation_status_resp)
+      # Each call into get_operation_status should wait at most 50ms. Verify that the
+      # sleeps are never longer than 100ms.
+      assert end_time - start_time < 0.1
+      if get_operation_status_resp.operationState == \
+         TCLIService.TOperationState.FINISHED_STATE:
+        break
+      # If this did not reach the finished state, then it should have waited at least
+      # 50ms.
+      if get_operation_status_resp.operationState != \
+         TCLIService.TOperationState.FINISHED_STATE:
+        assert end_time - start_time >= 0.050
+
+    # Fetch the results so the query completes successfully
+    fetch_results_req = TCLIService.TFetchResultsReq()
+    fetch_results_req.operationHandle = execute_statement_resp.operationHandle
+    fetch_results_req.maxRows = 100
+    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
+    TestHS2.check_response(fetch_results_resp)
+
+  @needs_session(conf_overlay={"abort_on_error": "1", "long_polling_time_ms": "10000"})
+  def test_long_polling_error(self):
+    """Tests that GetOperationStatus waits for the query to hit an error and is
+    interrupted by the error."""
+
+    # This is the same as test_get_operation_status_error above with long polling.
+    # With long polling, get_operation_status waits for completion, but it will exit
+    # immediately when the statement hits an error. Because it waits, we know that
+    # exactly one get_operation_status call is enough (no need for a loop).
+    statement = "SELECT * FROM functional.alltypeserror"
+    execute_statement_resp = self.execute_statement(statement)
+    start_time = time.time()
+    get_operation_status_resp = \
+        self.get_operation_status(execute_statement_resp.operationHandle)
+    end_time = time.time()
+    TestHS2.check_response(get_operation_status_resp)
+    assert get_operation_status_resp.operationState == \
+        TCLIService.TOperationState.ERROR_STATE
+
+    # The long polling wait must have been interrupted by the error, so it should
+    # not come anywhere close to waiting the full 10 seconds. This is a very short
+    # statement, so it should hit the error within 1 second.
+    assert end_time - start_time < 1.0
+
   @needs_session()
   def test_malformed_get_operation_status(self):
     """Tests that a short guid / secret returns an error (regression would be to crash

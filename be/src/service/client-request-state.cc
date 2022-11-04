@@ -1841,9 +1841,28 @@ void ClientRequestState::ClearResultCache() {
 }
 
 void ClientRequestState::UpdateExecState(ExecState exec_state) {
-  exec_state_.Store(exec_state);
-  summary_profile_->AddInfoString("Query State", PrintValue(BeeswaxQueryState()));
-  summary_profile_->AddInfoString("Impala Query State", ExecStateToString(exec_state));
+  {
+    lock_guard<mutex> l(exec_state_lock_);
+    exec_state_.Store(exec_state);
+    summary_profile_->AddInfoString("Query State", PrintValue(BeeswaxQueryState()));
+    summary_profile_->AddInfoString("Impala Query State", ExecStateToString(exec_state));
+  }
+  // Drop exec_state_lock_ before signalling
+  exec_state_cv_.NotifyAll();
+}
+
+void ClientRequestState::WaitForCompletionExecState() {
+  if (query_options().long_polling_time_ms <= 0) return;
+  int64_t timeout_us = query_options().long_polling_time_ms * MICROS_PER_MILLI;
+  unique_lock<mutex> l(exec_state_lock_);
+  timespec deadline;
+  TimeFromNowMicros(timeout_us, &deadline);
+  bool timed_out = false;
+  while (exec_state() != ExecState::FINISHED &&
+         exec_state() != ExecState::ERROR &&
+         !timed_out) {
+    timed_out = !exec_state_cv_.WaitUntil(l, deadline);
+  }
 }
 
 TOperationState::type ClientRequestState::TOperationState() const {

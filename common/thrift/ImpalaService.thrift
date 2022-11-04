@@ -956,6 +956,12 @@ enum TImpalaQueryOptions {
 
   // Turns off optimized JSON count star (zero slots) scan, falls back to rapidjson parse.
   DISABLE_OPTIMIZED_JSON_COUNT_STAR = 181
+
+  // How long to wait for statement completion for ExecuteStatement/executeAndWait and
+  // GetOperationStatus/get_state RPCs. Waiting on the server side allows for immediate
+  // notification when the query completes and avoid added latency from waiting on the
+  // client side. This defaults to off (0ms).
+  LONG_POLLING_TIME_MS = 182
 }
 
 // The summary of a DML statement.

@@ -269,7 +269,9 @@ class ImpalaClient(object):
     If 'periodic_callback' is provided, it is called periodically with no arguments."""
     loop_start = time.time()
     while True:
+      start_rpc_time = time.time()
       query_state = self.get_query_state(last_query_handle)
+      rpc_time = time.time() - start_rpc_time
       if query_state == self.FINISHED_STATE:
         break
       elif query_state in (self.ERROR_STATE, self.CANCELED_STATE):
@@ -280,7 +282,9 @@ class ImpalaClient(object):
           raise DisconnectedException("Not connected to impalad.")
 
       if periodic_callback is not None: periodic_callback()
-      time.sleep(self._get_sleep_interval(loop_start))
+      sleep_time = self._get_sleep_interval(loop_start)
+      if rpc_time < sleep_time:
+        time.sleep(sleep_time - rpc_time)
 
   def get_query_state(self, last_query_handle):
     """Return the query state string for 'last_query_handle'. Returns self.ERROR_STATE
