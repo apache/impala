@@ -28,7 +28,7 @@ setup_report_build_error
 # Allow picking up strategy from environment
 : ${EXPLORATION_STRATEGY:=core}
 : ${NUM_TEST_ITERATIONS:=1}
-: ${MAX_PYTEST_FAILURES:=10}
+: ${MAX_PYTEST_FAILURES:=100}
 : ${TIMEOUT_FOR_RUN_ALL_TESTS_MINS:=1200}
 KERB_ARGS=""
 

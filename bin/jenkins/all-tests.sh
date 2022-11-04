@@ -25,6 +25,8 @@ setup_report_build_error
 cd "${IMPALA_HOME}"
 
 export IMPALA_MAVEN_OPTIONS="-U"
+# Allow unlimited pytest failures
+export MAX_PYTEST_FAILURES=0
 
 # When UBSAN_FAIL is "death", the logs are monitored for UBSAN errors. Any errors will
 # then cause this script to exit.
