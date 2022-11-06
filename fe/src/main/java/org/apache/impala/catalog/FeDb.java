@@ -23,6 +23,8 @@ import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.KuduPartitionParam;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TFunctionCategory;
 import org.apache.impala.util.PatternMatcher;
@@ -121,8 +123,8 @@ public interface FeDb extends HasName {
    * Create a target Kudu table object for CTAS.
    */
   FeKuduTable createKuduCtasTarget(Table msTbl, List<ColumnDef> columnDefs,
-      List<ColumnDef> primaryKeyColumnDefs,
-      List<KuduPartitionParam> kuduPartitionParams);
+      List<ColumnDef> primaryKeyColumnDefs, boolean isPrimaryKeyUnique,
+      List<KuduPartitionParam> kuduPartitionParams) throws ImpalaRuntimeException;
 
   /**
    * Create a target FS table object for CTAS.

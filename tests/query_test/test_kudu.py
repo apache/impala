@@ -664,8 +664,8 @@ class TestCreateExternalTable(KuduTestSuite):
         table_desc = [[col.strip() if col else col for col in row] for row in cursor]
         # Pytest shows truncated output on failure, so print the details just in case.
         LOG.info(table_desc)
-        assert ["ts", "timestamp", "", "false", "true", "1230768000000000", \
-          "AUTO_ENCODING", "DEFAULT_COMPRESSION", "0"] in table_desc
+        assert ["ts", "timestamp", "", "false", "", "true", "1230768000000000",
+            "AUTO_ENCODING", "DEFAULT_COMPRESSION", "0"] in table_desc
     finally:
       if kudu_client.table_exists(name):
         kudu_client.delete_table(name)
@@ -705,7 +705,7 @@ class TestCreateExternalTable(KuduTestSuite):
       with self.drop_impala_table_after_context(cursor, impala_table_name):
         cursor.execute("DESCRIBE %s" % impala_table_name)
         kudu_schema = kudu_table.schema
-        for i, (col_name, col_type, _, _, _, _, _, _, _) in enumerate(cursor):
+        for i, (col_name, col_type, _, _, _, _, _, _, _, _) in enumerate(cursor):
           kudu_col = kudu_schema[i]
           assert col_name == kudu_col.name
           assert col_type.upper() == \
@@ -776,7 +776,7 @@ class TestCreateExternalTable(KuduTestSuite):
         with self.drop_impala_table_after_context(cursor, impala_table_name):
           cursor.execute("DESCRIBE %s" % impala_table_name)
           assert cursor.fetchall() == \
-              [("a", "bigint", "", "true", "false", "", "AUTO_ENCODING",
+              [("a", "bigint", "", "true", "true", "false", "", "AUTO_ENCODING",
                 "DEFAULT_COMPRESSION", "0")]
 
   @SkipIfKudu.hms_integration_enabled
@@ -1266,7 +1266,7 @@ class TestImpalaKuduIntegration(KuduTestSuite):
           impala_table_name, props))
       cursor.execute("DESCRIBE %s" % (impala_table_name))
       assert cursor.fetchall() == \
-          [("a", "int", "", "true", "false", "", "AUTO_ENCODING",
+          [("a", "int", "", "true", "true", "false", "", "AUTO_ENCODING",
             "DEFAULT_COMPRESSION", "0")]
 
       # Drop the underlying Kudu table and replace it with another Kudu table that has
@@ -1284,9 +1284,9 @@ class TestImpalaKuduIntegration(KuduTestSuite):
         cursor.execute("REFRESH %s" % (impala_table_name))
         cursor.execute("DESCRIBE %s" % (impala_table_name))
         assert cursor.fetchall() == \
-            [("b", "string", "", "true", "false", "", "AUTO_ENCODING",
+            [("b", "string", "", "true", "true", "false", "", "AUTO_ENCODING",
               "DEFAULT_COMPRESSION", "0"),
-             ("c", "string", "", "false", "true", "", "AUTO_ENCODING",
+             ("c", "string", "", "false", "", "true", "", "AUTO_ENCODING",
               "DEFAULT_COMPRESSION", "0")]
 
   @SkipIfKudu.hms_integration_enabled
@@ -1302,7 +1302,7 @@ class TestImpalaKuduIntegration(KuduTestSuite):
           impala_table_name, props))
       cursor.execute("DESCRIBE %s" % (impala_table_name))
       assert cursor.fetchall() == \
-          [("a", "int", "", "true", "false", "", "AUTO_ENCODING",
+          [("a", "int", "", "true", "true", "false", "", "AUTO_ENCODING",
             "DEFAULT_COMPRESSION", "0")]
       # Drop the underlying Kudu table
       kudu_client.delete_table(kudu_table.name)

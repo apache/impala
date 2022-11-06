@@ -358,3 +358,98 @@ update tdata set vali = -1
 NumModifiedRows: 7300
 NumRowErrors: 0
 ====
+---- QUERY
+# Create Kudu table with non unique primary key
+create table update_non_unique_key_test non unique primary key (id)
+partition by hash (id) partitions 3 stored as kudu
+as select id, int_col from functional.alltypestiny;
+select * from update_non_unique_key_test order by id;
+---- RESULTS
+0,0
+1,1
+2,0
+3,1
+4,0
+5,1
+6,0
+7,1
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Test a UPDATE with non unique primary key
+update update_non_unique_key_test set int_col = -1 where id < 3;
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumRowErrors: 0
+====
+---- QUERY
+select * from update_non_unique_key_test order by id;
+---- RESULTS
+0,-1
+1,-1
+2,-1
+3,1
+4,0
+5,1
+6,0
+7,1
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Test a UPDATE with non key column
+update update_non_unique_key_test set id = -1 where int_col = 1;
+---- CATCH
+AnalysisException: Key column 'id' cannot be updated.
+====
+---- QUERY
+# Test a UPDATE with non key column
+update update_non_unique_key_test set int_col = -2 where int_col = 0;
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumRowErrors: 0
+====
+---- QUERY
+select * from update_non_unique_key_test order by id;
+---- RESULTS
+0,-1
+1,-1
+2,-1
+3,1
+4,-2
+5,1
+6,-2
+7,1
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Test a UPDATE to update auto_incrementing_id column
+update update_non_unique_key_test set auto_incrementing_id = 100 where id = 1;
+---- CATCH
+AnalysisException: System generated key column 'auto_incrementing_id' cannot be updated.
+====
+---- QUERY
+# Test a UPDATE with auto-incrementing column in where clause
+update update_non_unique_key_test set int_col = 0
+where id = 0 and auto_incrementing_id < 10;
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+====
+---- QUERY
+select id, int_col from update_non_unique_key_test
+group by id, int_col, auto_incrementing_id order by id;
+---- RESULTS
+0,0
+1,-1
+2,-1
+3,1
+4,-2
+5,1
+6,-2
+7,1
+---- TYPES
+INT,INT
+====

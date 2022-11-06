@@ -27,23 +27,29 @@ import org.apache.impala.util.KuduUtil;
 import org.apache.kudu.ColumnSchema.CompressionAlgorithm;
 import org.apache.kudu.ColumnSchema.Encoding;
 import org.apache.kudu.ColumnSchema;
+import org.apache.kudu.Schema;
 
 /**
  *  Represents a Kudu column.
  *
  *  This class extends Column with Kudu-specific information:
  *  - primary key
+ *  - primary key unique
  *  - nullability constraint
+ *  - auto_incrementing
  *  - encoding
  *  - compression
  *  - default value
  *  - desired block size
  */
 public class KuduColumn extends Column {
+
   // The name of the column as it appears in Kudu, i.e. not converted to lower case.
   private final String kuduName_;
   private final boolean isKey_;
+  private final boolean isPrimaryKeyUnique_;
   private final boolean isNullable_;
+  private final boolean isAutoIncrementing_;
   private final Encoding encoding_;
   private final CompressionAlgorithm compression_;
   private final int blockSize_;
@@ -55,15 +61,23 @@ public class KuduColumn extends Column {
   // to hide this complexity externally.
   private final LiteralExpr defaultValue_;
 
-  private KuduColumn(String name, Type type, boolean isKey, boolean isNullable,
-      Encoding encoding, CompressionAlgorithm compression, LiteralExpr defaultValue,
-      int blockSize, String comment, int position) {
+  private KuduColumn(String name, Type type, boolean isKey, boolean isPrimaryKeyUnique,
+      boolean isNullable, boolean isAutoIncrementing, Encoding encoding,
+      CompressionAlgorithm compression, LiteralExpr defaultValue, int blockSize,
+      String comment, int position) {
     super(name.toLowerCase(), type, comment, position);
     Preconditions.checkArgument(defaultValue == null || type == defaultValue.getType()
         || (type.isTimestamp() && defaultValue.getType().isIntegerType()));
+    if (isKey) {
+      Preconditions.checkArgument(!isPrimaryKeyUnique || !isAutoIncrementing);
+    } else {
+      Preconditions.checkArgument(!isPrimaryKeyUnique && !isAutoIncrementing);
+    }
     kuduName_ = name;
     isKey_ = isKey;
+    isPrimaryKeyUnique_ = isPrimaryKeyUnique;
     isNullable_ = isNullable;
+    isAutoIncrementing_ = isAutoIncrementing;
     encoding_ = encoding;
     compression_ = compression;
     defaultValue_ = defaultValue;
@@ -88,15 +102,17 @@ public class KuduColumn extends Column {
     }
     String comment = !colSchema.getComment().isEmpty() ? colSchema.getComment() : null;
     return new KuduColumn(colSchema.getName(), type, colSchema.isKey(),
-        colSchema.isNullable(), colSchema.getEncoding(),
-        colSchema.getCompressionAlgorithm(), defaultValueExpr,
+        colSchema.isKeyUnique(), colSchema.isNullable(), colSchema.isAutoIncrementing(),
+        colSchema.getEncoding(), colSchema.getCompressionAlgorithm(), defaultValueExpr,
         colSchema.getDesiredBlockSize(), comment, position);
   }
 
   public static KuduColumn fromThrift(TColumn column, int position)
       throws ImpalaRuntimeException {
     Preconditions.checkState(column.isSetIs_key());
-    Preconditions.checkState(column.isSetIs_nullable());
+    Preconditions.checkState(column.isSetIs_primary_key_unique());
+    boolean isNullable = false;
+    if (column.isSetIs_nullable()) isNullable = column.isIs_nullable();
     Type columnType = Type.fromThrift(column.getColumnType());
     Encoding encoding = null;
     if (column.isSetEncoding()) encoding = KuduUtil.fromThrift(column.getEncoding());
@@ -116,13 +132,30 @@ public class KuduColumn extends Column {
     String comment = (column.isSetComment() && !column.getComment().isEmpty()) ?
         column.getComment() : null;
     return new KuduColumn(column.getKudu_column_name(), columnType, column.isIs_key(),
-        column.isIs_nullable(), encoding, compression, defaultValue, blockSize, comment,
-        position);
+        column.isIs_primary_key_unique(), isNullable, column.isIs_auto_incrementing(),
+        encoding, compression, defaultValue, blockSize, comment, position);
+  }
+
+  // Create KuduColumn for auto-incrementing column in given 'position'.
+  // This function is called when creating temporary KuduTable object for CTAS when
+  // the primary key is not unique.
+  public static KuduColumn createAutoIncrementingColumn(int position)
+      throws ImpalaRuntimeException {
+    org.apache.kudu.Type kuduType = Schema.getAutoIncrementingColumnType();
+    Preconditions.checkArgument(kuduType != org.apache.kudu.Type.DECIMAL &&
+        kuduType != org.apache.kudu.Type.VARCHAR);
+    Type type = KuduUtil.toImpalaType(kuduType, null);
+    return new KuduColumn(Schema.getAutoIncrementingColumnName(), type,
+        /* isKey */true, /* isPrimaryKeyUnique */false, /* isNullable */false,
+        /* isAutoIncrementing */true, /* encoding */null, /* compression */null,
+        /* defaultValue */null, /* blockSize */0, /* comment */"", position);
   }
 
   public String getKuduName() { return kuduName_; }
   public boolean isKey() { return isKey_; }
+  public boolean isPrimaryKeyUnique() { return isPrimaryKeyUnique_; }
   public boolean isNullable() { return isNullable_; }
+  public boolean isAutoIncrementing() { return isAutoIncrementing_; }
   public Encoding getEncoding() { return encoding_; }
   public CompressionAlgorithm getCompression() { return compression_; }
   public int getBlockSize() { return blockSize_; }
@@ -154,8 +187,9 @@ public class KuduColumn extends Column {
   @Override
   public TColumn toThrift() {
     TColumn colDesc = new TColumn(name_, type_.toThrift());
-    KuduUtil.setColumnOptions(colDesc, isKey_, isNullable_, encoding_, compression_,
-        defaultValue_, blockSize_, kuduName_);
+    KuduUtil.setColumnOptions(
+        colDesc, isKey_, isPrimaryKeyUnique_, isNullable_, isAutoIncrementing_,
+        encoding_, compression_, defaultValue_, blockSize_, kuduName_);
     if (comment_ != null) colDesc.setComment(comment_);
     colDesc.setCol_stats(getStats().toThrift());
     colDesc.setPosition(position_);

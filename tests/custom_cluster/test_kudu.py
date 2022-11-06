@@ -318,7 +318,7 @@ class TestKuduHMSIntegration(CustomKuduTest):
         external_table_name, props))
       cursor.execute("DESCRIBE %s" % (external_table_name))
       assert cursor.fetchall() == \
-             [("a", "int", "", "true", "false", "", "AUTO_ENCODING",
+             [("a", "int", "", "true", "true", "false", "", "AUTO_ENCODING",
                "DEFAULT_COMPRESSION", "0")]
       # Drop the underlying Kudu table
       kudu_client.delete_table(kudu_table.name)

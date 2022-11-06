@@ -24,10 +24,12 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableAddColsParams;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableType;
+import org.apache.impala.util.KuduUtil;
 
 import java.util.HashSet;
 import java.util.List;
@@ -93,8 +95,9 @@ public class AlterTableAddColsStmt extends AlterTableStmt {
               c.toString());
         }
         if (c.isPrimaryKey()) {
-          throw new AnalysisException("Cannot add a primary key using an ALTER TABLE " +
-              "ADD COLUMNS statement: " + c.toString());
+          throw new AnalysisException("Cannot add a " +
+              KuduUtil.getPrimaryKeyString(c.isPrimaryKeyUnique()) +
+              " using an ALTER TABLE ADD COLUMNS statement: " + c.toString());
         }
         if (c.isExplicitNotNullable() && !c.hasDefaultValue()) {
           throw new AnalysisException("A new non-null column must have a default " +

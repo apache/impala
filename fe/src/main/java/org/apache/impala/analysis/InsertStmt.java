@@ -358,7 +358,11 @@ public class InsertStmt extends StatementBase {
       analysisColumnPermutation = new ArrayList<>();
       List<Column> tableColumns = table_.getColumns();
       for (int i = numClusteringCols; i < tableColumns.size(); ++i) {
-        analysisColumnPermutation.add(tableColumns.get(i).getName());
+        Column c = tableColumns.get(i);
+        // Omit auto-incrementing column for Kudu table since the values of the column
+        // will be assigned by Kudu engine.
+        if (c instanceof KuduColumn && ((KuduColumn)c).isAutoIncrementing()) continue;
+        analysisColumnPermutation.add(c.getName());
       }
     }
 
@@ -492,6 +496,9 @@ public class InsertStmt extends StatementBase {
     if (isUpsert_) {
       if (!(table_ instanceof FeKuduTable)) {
         throw new AnalysisException("UPSERT is only supported for Kudu tables");
+      } else if (((FeKuduTable)table_).hasAutoIncrementingColumn()) {
+        throw new AnalysisException(
+            "UPSERT is not supported for Kudu tables with auto-incrementing column");
       }
     } else {
       analyzeTableForInsert(analyzer);
@@ -769,8 +776,12 @@ public class InsertStmt extends StatementBase {
     List<String> keyColumns = ((FeKuduTable) table_).getPrimaryKeyColumnNames();
     List<String> missingKeyColumnNames = new ArrayList<>();
     for (Column column : table_.getColumns()) {
+      Preconditions.checkState(column instanceof KuduColumn);
+      // Omit auto-incrementing column for Kudu table since the values of the column
+      // will be assigned by Kudu engine.
       if (!mentionedColumnNames.contains(column.getName())
-          && keyColumns.contains(column.getName())) {
+          && keyColumns.contains(column.getName())
+          && !((KuduColumn)column).isAutoIncrementing()) {
         missingKeyColumnNames.add(column.getName());
       }
     }
@@ -969,7 +980,8 @@ public class InsertStmt extends StatementBase {
           if (isKuduTable) {
             Preconditions.checkState(tblColumn instanceof KuduColumn);
             KuduColumn kuduCol = (KuduColumn) tblColumn;
-            if (!kuduCol.hasDefaultValue() && !kuduCol.isNullable()) {
+            if (!kuduCol.hasDefaultValue() && !kuduCol.isNullable()
+                && !kuduCol.isAutoIncrementing()) {
               throw new AnalysisException("Missing values for column that is not " +
                   "nullable and has no default value " + kuduCol.getName());
             }

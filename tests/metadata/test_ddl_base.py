@@ -123,7 +123,7 @@ class TestDdlBase(ImpalaTestSuite):
     comments = dict()
     for row in result.data:
       cols = row.split('\t')
-      if len(cols) <= 9:
+      if len(cols) <= 10:
         comments[cols[0].rstrip()] = cols[2].rstrip()
     return comments.get(col_name)
 

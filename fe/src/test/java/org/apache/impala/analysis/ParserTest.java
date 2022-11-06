@@ -2794,10 +2794,19 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("CREATE TABLE foo (i INT, j INT, PRIMARY KEY (j, i)) STORED AS KUDU");
     ParsesOk("CREATE TABLE foo (i INT PRIMARY KEY, PRIMARY KEY(i)) STORED AS KUDU");
     ParsesOk("CREATE TABLE foo (i INT PRIMARY KEY, j INT PRIMARY KEY) STORED AS KUDU");
+    ParsesOk("CREATE TABLE foo (i INT NON UNIQUE PRIMARY KEY) STORED AS KUDU");
+    ParsesOk("CREATE TABLE foo (i INT NON UNIQUE PRIMARY KEY, "
+        + "NON UNIQUE PRIMARY KEY(i)) STORED AS KUDU");
+    ParsesOk("CREATE TABLE foo (i INT, j INT, NON UNIQUE PRIMARY KEY (i, j)) "
+        + "STORED AS KUDU");
+    ParsesOk("CREATE TABLE foo (i INT NON UNIQUE PRIMARY KEY, "
+        + "j INT NON UNIQUE PRIMARY KEY) STORED AS KUDU");
     ParserError("CREATE TABLE foo (i INT) PRIMARY KEY (i) STORED AS KUDU");
     ParserError("CREATE TABLE foo (i INT, PRIMARY KEY) STORED AS KUDU");
     ParserError("CREATE TABLE foo (PRIMARY KEY(a), a INT) STORED AS KUDU");
-    ParserError("CREATE TABLE foo (i INT) PRIMARY KEY (i) STORED AS KUDU");
+    ParserError("CREATE TABLE foo (i INT) NON UNIQUE PRIMARY KEY (i) STORED AS KUDU");
+    ParserError("CREATE TABLE foo (i INT, NON UNIQUE PRIMARY KEY) STORED AS KUDU");
+    ParserError("CREATE TABLE foo (NON UNIQUE PRIMARY KEY(a), a INT) STORED AS KUDU");
 
     // Supported storage engines
     ParsesOk("CREATE TABLE foo (i INT) STORED BY KUDU");
@@ -3044,6 +3053,8 @@ public class ParserTest extends FrontendTestBase {
                   "%s %s %s %s %s) STORED AS KUDU", enc, comp, def, block, nul));
               ParsesOk(String.format("CREATE TABLE Foo (i int PRIMARY KEY " +
                   "%s %s %s %s %s) STORED AS KUDU", enc, comp, block, def, nul));
+              ParsesOk(String.format("CREATE TABLE Foo (i int NON UNIQUE PRIMARY KEY " +
+                  "%s %s %s %s %s) STORED AS KUDU", nul, enc, comp, def, block));
             }
           }
         }

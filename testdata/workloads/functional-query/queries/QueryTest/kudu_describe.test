@@ -2,23 +2,23 @@
 ---- QUERY
 describe functional_kudu.alltypes
 ---- LABELS
-NAME,TYPE,COMMENT,PRIMARY_KEY,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
+NAME,TYPE,COMMENT,PRIMARY_KEY,KEY_UNIQUE,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
 ---- RESULTS
-'bigint_col','bigint','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'bool_col','boolean','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'date_string_col','string','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'double_col','double','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'float_col','float','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'id','int','','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'int_col','int','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'month','int','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'smallint_col','smallint','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'string_col','string','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'timestamp_col','timestamp','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'tinyint_col','tinyint','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'year','int','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'bigint_col','bigint','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'bool_col','boolean','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'date_string_col','string','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'double_col','double','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'float_col','float','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'id','int','','true','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'int_col','int','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'month','int','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'smallint_col','smallint','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'string_col','string','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'timestamp_col','timestamp','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'tinyint_col','tinyint','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'year','int','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
 ---- TYPES
-STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ====
 ---- QUERY
 # Test composite primary key and column options.
@@ -34,16 +34,16 @@ partition by hash (pk1) partitions 3
 stored as kudu;
 describe describe_test;
 ---- LABELS
-NAME,TYPE,COMMENT,PRIMARY_KEY,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
+NAME,TYPE,COMMENT,PRIMARY_KEY,KEY_UNIQUE,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
 ---- RESULTS
-'pk1','int','','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'pk2','int','','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'pk3','string','','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'c1','string','testing','false','true','abc','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'c2','int','','false','false','100','PLAIN_ENCODING','SNAPPY','0'
-'c3','int','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','8388608'
+'pk1','int','','true','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'pk2','int','','true','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'pk3','string','','true','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'c1','string','testing','false','','true','abc','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'c2','int','','false','','false','100','PLAIN_ENCODING','SNAPPY','0'
+'c3','int','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','8388608'
 ---- TYPES
-STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ====
 ---- QUERY
 # Test decimal columns and primary key
@@ -56,14 +56,14 @@ create table describe_decimal_test
 stored as kudu;
 describe describe_decimal_test;
 ---- LABELS
-NAME,TYPE,COMMENT,PRIMARY_KEY,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
+NAME,TYPE,COMMENT,PRIMARY_KEY,KEY_UNIQUE,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
 ---- RESULTS
-'decimal_default','decimal(9,0)','','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'decimal_4','decimal(9,9)','','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'decimal_8','decimal(18,2)','','false','false','100.00','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'decimal_16','decimal(38,0)','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'decimal_default','decimal(9,0)','','true','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'decimal_4','decimal(9,9)','','false','','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'decimal_8','decimal(18,2)','','false','','false','100.00','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'decimal_16','decimal(38,0)','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
 ---- TYPES
-STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ====
 ---- QUERY
 # IMPALA-7781: Test unescaped default column values
@@ -77,15 +77,15 @@ CREATE TABLE IF NOT EXISTS unescaped_str_defaults (
 ) STORED AS KUDU;
 DESCRIBE unescaped_str_defaults;
 ---- LABELS
-NAME,TYPE,COMMENT,PRIMARY_KEY,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
+NAME,TYPE,COMMENT,PRIMARY_KEY,KEY_UNIQUE,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
 ---- RESULTS
-'id','int','','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'s1','string','','false','true','"','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'s2','string','','false','true','''','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'s3','string','','false','true','\\"','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'s4','string','','false','true','\\''','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'id','int','','true','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'s1','string','','false','','true','"','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'s2','string','','false','','true','''','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'s3','string','','false','','true','\\"','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'s4','string','','false','','true','\\''','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
 ---- TYPES
-STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ====
 ---- QUERY
 # Test date columns and primary key
@@ -97,13 +97,13 @@ create table describe_date_test
 stored as kudu;
 describe describe_date_test;
 ---- LABELS
-NAME,TYPE,COMMENT,PRIMARY_KEY,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
+NAME,TYPE,COMMENT,PRIMARY_KEY,KEY_UNIQUE,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
 ---- RESULTS
-'date_pk','date','','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'date_val','date','','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'date_null','date','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'date_pk','date','','true','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'date_val','date','','false','','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'date_null','date','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
 ---- TYPES
-STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ====
 ---- QUERY
 # Test varchar columns and primary key
@@ -116,12 +116,100 @@ create table describe_varchar_test
 stored as kudu;
 describe describe_varchar_test;
 ---- LABELS
-NAME,TYPE,COMMENT,PRIMARY_KEY,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
+NAME,TYPE,COMMENT,PRIMARY_KEY,KEY_UNIQUE,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
 ---- RESULTS
-'varchar_pk','varchar(1000)','','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'varchar_val','varchar(500)','','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'varchar_default','varchar(200)','','false','false','foo','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'varchar_null','varchar(100)','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'varchar_pk','varchar(1000)','','true','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'varchar_val','varchar(500)','','false','','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'varchar_default','varchar(200)','','false','','false','foo','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'varchar_null','varchar(100)','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
 ---- TYPES
-STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Create Kudu table with non unique primary key.
+# Verify that auto_incrementing_id column is added by Kudu.
+create table describe_non_unique_key_test (key int non unique primary key, name string)
+  partition by hash (key) partitions 3
+  stored as kudu;
+describe describe_non_unique_key_test;
+---- LABELS
+NAME,TYPE,COMMENT,PRIMARY_KEY,KEY_UNIQUE,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
+---- RESULTS
+'key','int','','true','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'auto_incrementing_id','bigint','','true','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'name','string','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+---- TYPES
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Create Kudu table with non unique composite primary keys.
+# Verify that auto_incrementing_id column is added by Kudu.
+create table describe_non_unique_composite_key_test
+  (a int, b string, c float, non unique primary key(a, b))
+  partition by hash (a) partitions 3
+  stored as kudu;
+describe describe_non_unique_composite_key_test;
+---- LABELS
+NAME,TYPE,COMMENT,PRIMARY_KEY,KEY_UNIQUE,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
+---- RESULTS
+'a','int','','true','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'b','string','','true','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'auto_incrementing_id','bigint','','true','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'c','float','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+---- TYPES
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Create Kudu table in CTAS statement with non unique primary key.
+# Verify that auto_incrementing_id column is added by Kudu.
+create table describe_ctas_non_unique_key_test non unique primary key (id, int_col)
+  partition by hash (id) partitions 3 stored as kudu
+  as select id, int_col, float_col, string_col from functional.alltypestiny;
+describe describe_ctas_non_unique_key_test;
+---- LABELS
+NAME,TYPE,COMMENT,PRIMARY_KEY,KEY_UNIQUE,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
+---- RESULTS
+'id','int','','true','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'int_col','int','','true','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'auto_incrementing_id','bigint','','true','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'float_col','float','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'string_col','string','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+---- TYPES
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Create Kudu table without primary key columns.
+# Verify that partition columns 'a' and 'b' are promoted as non unique key columns and
+# auto_incrementing_id column is added by Kudu.
+create table describe_promote_partition_keys_as_non_unique_key_test
+  (a int, b string, c float)
+  partition by hash (a, b) partitions 3
+  stored as kudu;
+describe describe_promote_partition_keys_as_non_unique_key_test;
+---- LABELS
+NAME,TYPE,COMMENT,PRIMARY_KEY,KEY_UNIQUE,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
+---- RESULTS
+'a','int','','true','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'b','string','','true','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'auto_incrementing_id','bigint','','true','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'c','float','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+---- TYPES
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Create Kudu table with non unique composite primary keys, but without partitions.
+# Verify that auto_incrementing_id column is added by Kudu.
+create table describe_non_unique_key_no_partitions_test
+  (a int, b string, c float, non unique primary key(a, b))
+  stored as kudu;
+describe describe_non_unique_key_no_partitions_test;
+---- LABELS
+NAME,TYPE,COMMENT,PRIMARY_KEY,KEY_UNIQUE,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
+---- RESULTS
+'a','int','','true','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'b','string','','true','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'auto_incrementing_id','bigint','','true','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'c','float','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+---- TYPES
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ====

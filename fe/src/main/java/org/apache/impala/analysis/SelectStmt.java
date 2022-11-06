@@ -40,6 +40,7 @@ import org.apache.impala.catalog.FeIcebergTable.Utils;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
@@ -828,6 +829,8 @@ public class SelectStmt extends QueryStmt {
         TupleDescriptor tupleDesc = resolvedPath.destTupleDesc();
         FeTable table = tupleDesc.getTable();
         for (Column c: table.getColumnsInHiveOrder()) {
+          // Omit auto-incrementing column for Kudu table since it's a hidden column.
+          if (c instanceof KuduColumn && ((KuduColumn)c).isAutoIncrementing()) continue;
           addStarExpandedPath(selectListItem, resolvedPath, c.getName());
         }
       } else {

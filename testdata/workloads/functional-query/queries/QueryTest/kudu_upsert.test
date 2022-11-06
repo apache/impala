@@ -528,3 +528,18 @@ upsert into table multiple_key_cols
 ---- CATCH
 All primary key columns must be specified for UPSERTing into Kudu tables. Missing columns are: bigint_col
 ====
+---- QUERY
+# Create Kudu table with non unique primary key
+create table upsert_non_unique_key_test (id int non unique primary key, name string)
+partition by hash (id) partitions 3
+stored as kudu
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+upsert into upsert_non_unique_key_test
+(id, name) values
+(1, 'one'), (2, 'two'), (3, 'three')
+---- CATCH
+UPSERT is not supported for Kudu tables with auto-incrementing column
+====

@@ -296,6 +296,8 @@ struct TColumn {
   18: optional i32 block_size
   // The column name, in the case that it appears in Kudu.
   19: optional string kudu_column_name
+  24: optional bool is_primary_key_unique
+  25: optional bool is_auto_incrementing
 
   // Here come the Iceberg-specific fields.
   20: optional bool is_iceberg_column
@@ -573,6 +575,14 @@ struct TKuduTable {
 
   // Partitioning
   4: required list<TKuduPartitionParam> partition_by
+
+  // Set to true if primary key of the Kudu table is unique.
+  // Kudu engine automatically adds an auto-incrementing column in the table if
+  // primary key is not unique, in this case, this field is set to false.
+  5: optional bool is_primary_key_unique
+
+  // Set to true if the table has auto-incrementing column
+  6: optional bool has_auto_incrementing
 }
 
 struct TIcebergPartitionTransform {

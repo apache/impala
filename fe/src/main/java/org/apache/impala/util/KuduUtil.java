@@ -339,10 +339,13 @@ public class KuduUtil {
   }
 
   public static TColumn setColumnOptions(TColumn column, boolean isKey,
-      Boolean isNullable, Encoding encoding, CompressionAlgorithm compression,
-      Expr defaultValue, Integer blockSize, String kuduName) {
+      boolean isPrimaryKeyUnique, Boolean isNullable, boolean isAutoIncrementing,
+      Encoding encoding, CompressionAlgorithm compression, Expr defaultValue,
+      Integer blockSize, String kuduName) {
     column.setIs_key(isKey);
+    column.setIs_primary_key_unique(isPrimaryKeyUnique);
     if (isNullable != null) column.setIs_nullable(isNullable);
+    column.setIs_auto_incrementing(isAutoIncrementing);
     try {
       if (encoding != null) column.setEncoding(toThrift(encoding));
       if (compression != null) column.setCompression(toThrift(compression));
@@ -481,5 +484,13 @@ public class KuduUtil {
   // Used for test assertions
   public static int getkuduClientsSize() {
     return kuduClients_.size();
+  }
+
+  // Used for generating log messages
+  public static String getPrimaryKeyString(boolean isPrimaryKeyUnique) {
+    StringBuilder sb = new StringBuilder();
+    if (!isPrimaryKeyUnique) sb.append("NON UNIQUE ");
+    sb.append("PRIMARY KEY");
+    return sb.toString();
   }
 }

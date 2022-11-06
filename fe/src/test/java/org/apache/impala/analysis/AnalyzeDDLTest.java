@@ -442,8 +442,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Cannot ALTER ADD COLUMN primary key on Kudu table.
     AnalysisError("alter table functional_kudu.alltypes add column " +
         "new_col int primary key",
-        "Cannot add a primary key using an ALTER TABLE ADD COLUMNS statement: " +
+        "Cannot add a PRIMARY KEY using an ALTER TABLE ADD COLUMNS statement: " +
         "new_col INT PRIMARY KEY");
+    AnalysisError("alter table functional_kudu.alltypes add column " +
+        "new_col int non unique primary key",
+        "Cannot add a NON UNIQUE PRIMARY KEY using an ALTER TABLE ADD COLUMNS " +
+        "statement: new_col INT NON UNIQUE PRIMARY KEY");
 
     // A non-null column must have a default on Kudu table.
     AnalysisError("alter table functional_kudu.alltypes add column new_col int not null",
@@ -518,8 +522,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Cannot ALTER ADD COLUMNS primary key on Kudu table.
     AnalysisError("alter table functional_kudu.alltypes add columns " +
         "(new_col int primary key)",
-        "Cannot add a primary key using an ALTER TABLE ADD COLUMNS statement: " +
+        "Cannot add a PRIMARY KEY using an ALTER TABLE ADD COLUMNS statement: " +
         "new_col INT PRIMARY KEY");
+    AnalysisError("alter table functional_kudu.alltypes add columns " +
+        "(new_col int non unique primary key)",
+        "Cannot add a NON UNIQUE PRIMARY KEY using an ALTER TABLE ADD COLUMNS " +
+        "statement: new_col INT NON UNIQUE PRIMARY KEY");
 
     // A non-null column must have a default on Kudu table.
     AnalysisError("alter table functional_kudu.alltypes add columns" +
@@ -2295,6 +2303,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         " stored as kudu as select id, bool_col, tinyint_col, smallint_col, int_col, " +
         "bigint_col, float_col, double_col, date_string_col, string_col " +
         "from functional.alltypestiny");
+    AnalyzesOk("create table t non unique primary key (id) partition by hash (id) " +
+        "partitions 3 stored as kudu as select id, bool_col, tinyint_col, " +
+        "smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, " +
+        "string_col from functional.alltypestiny");
     AnalyzesOk("create table t primary key (id) partition by range (id) " +
         "(partition values < 10, partition 20 <= values < 30, partition value = 50) " +
         "stored as kudu as select id, bool_col, tinyint_col, smallint_col, int_col, " +
@@ -2349,6 +2361,21 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         " stored as kudu as SELECT INT_COL, SMALLINT_COL, ID, BIGINT_COL," +
         " DATE_STRING_COL, STRING_COL, TIMESTAMP_COL, YEAR, MONTH FROM " +
         " functional.alltypes");
+    AnalyzesOk("create table part_kudu_tbl non unique primary key(INT_COL, " +
+        "SMALLINT_COL, ID) partition by hash(INT_COL, SMALLINT_COL, ID) " +
+        "PARTITIONS 2 stored as kudu as SELECT INT_COL, SMALLINT_COL, ID, " +
+        "BIGINT_COL, DATE_STRING_COL, STRING_COL, TIMESTAMP_COL, YEAR, " +
+        "MONTH FROM functional.alltypes");
+    AnalyzesOk("create table part_kudu_tbl non unique primary key(INT_COL, " +
+        "SMALLINT_COL, ID, BIGINT_COL, DATE_STRING_COL, STRING_COL, TIMESTAMP_COL, " +
+        "YEAR, MONTH) partition by hash(INT_COL, SMALLINT_COL, ID) " +
+        "PARTITIONS 2 stored as kudu as SELECT INT_COL, SMALLINT_COL, ID, " +
+        "BIGINT_COL, DATE_STRING_COL, STRING_COL, TIMESTAMP_COL, YEAR, " +
+        "MONTH FROM functional.alltypes");
+    AnalyzesOk("create table no_part_kudu_tbl non unique primary key(INT_COL, " +
+        "SMALLINT_COL, ID) stored as kudu as SELECT INT_COL, SMALLINT_COL, ID, " +
+        "BIGINT_COL, DATE_STRING_COL, STRING_COL, TIMESTAMP_COL, YEAR, " +
+        "MONTH FROM functional.alltypes");
 
     // IMPALA-7679: Inserting a null column type without an explicit type should
     // throw an error.

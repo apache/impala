@@ -224,7 +224,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
       FeTable tmpTable = null;
       if (KuduTable.isKuduTable(msTbl)) {
         tmpTable = db.createKuduCtasTarget(msTbl, createStmt_.getColumnDefs(),
-            createStmt_.getPrimaryKeyColumnDefs(),
+            createStmt_.getPrimaryKeyColumnDefs(), createStmt_.isPrimaryKeyUnique(),
             createStmt_.getKuduPartitionParams());
       } else if (IcebergTable.isIcebergTable(msTbl)) {
         IcebergPartitionSpec partSpec = null;

@@ -290,7 +290,8 @@ public class ToSqlUtils {
     String icebergPartitionSpecs = getIcebergPartitionSpecsSql(stmt);
     // TODO: Pass the correct compression, if applicable.
     return getCreateTableSql(stmt.getDb(), stmt.getTbl(), stmt.getComment(), colsSql,
-        partitionColsSql, stmt.getTblPrimaryKeyColumnNames(), stmt.getForeignKeysSql(),
+        partitionColsSql, stmt.isPrimaryKeyUnique(),
+        stmt.getTblPrimaryKeyColumnNames(), stmt.getForeignKeysSql(),
         kuduParamsSql, new Pair<>(stmt.getSortColumns(), stmt.getSortingOrder()),
         properties, stmt.getSerdeProperties(), stmt.isExternal(), stmt.getIfNotExists(),
         stmt.getRowFormat(), HdfsFileFormat.fromThrift(stmt.getFileFormat()),
@@ -326,7 +327,7 @@ public class ToSqlUtils {
     String icebergPartitionSpecs = getIcebergPartitionSpecsSql(innerStmt);
     // TODO: Pass the correct compression, if applicable.
     String createTableSql = getCreateTableSql(innerStmt.getDb(), innerStmt.getTbl(),
-        innerStmt.getComment(), null, partitionColsSql,
+        innerStmt.getComment(), null, partitionColsSql, innerStmt.isPrimaryKeyUnique(),
         innerStmt.getTblPrimaryKeyColumnNames(), innerStmt.getForeignKeysSql(),
         kuduParamsSql, new Pair<>(innerStmt.getSortColumns(),
         innerStmt.getSortingOrder()), properties, innerStmt.getSerdeProperties(),
@@ -379,6 +380,7 @@ public class ToSqlUtils {
     TBucketInfo bucketInfo = BucketUtils.fromStorageDescriptor(msTable.getSd());
 
     String storageHandlerClassName = table.getStorageHandlerClassName();
+    boolean isPrimaryKeyUnique = true;
     List<String> primaryKeySql = new ArrayList<>();
     List<String> foreignKeySql = new ArrayList<>();
     String kuduPartitionByParams = null;
@@ -403,6 +405,7 @@ public class ToSqlUtils {
       // Internal property, should not be exposed to the user.
       properties.remove(StatsSetupConst.DO_NOT_UPDATE_STATS);
 
+      isPrimaryKeyUnique = kuduTable.isPrimaryKeyUnique();
       if (KuduTable.isSynchronizedTable(msTable)) {
         primaryKeySql.addAll(kuduTable.getPrimaryKeyColumnNames());
 
@@ -448,8 +451,9 @@ public class ToSqlUtils {
     }
 
     HdfsUri tableLocation = location == null ? null : new HdfsUri(location);
-    return getCreateTableSql(table.getDb().getName(), table.getName(), comment, colsSql,
-        partitionColsSql, primaryKeySql, foreignKeySql, kuduPartitionByParams,
+    return getCreateTableSql(
+        table.getDb().getName(), table.getName(), comment, colsSql, partitionColsSql,
+        isPrimaryKeyUnique, primaryKeySql, foreignKeySql, kuduPartitionByParams,
         new Pair<>(sortColsSql, sortingOrder), properties, serdeParameters,
         isExternal, false, rowFormat, format, compression,
         storageHandlerClassName, tableLocation, icebergPartitions, bucketInfo);
@@ -462,11 +466,11 @@ public class ToSqlUtils {
    */
   public static String getCreateTableSql(String dbName, String tableName,
       String tableComment, List<String> columnsSql, List<String> partitionColumnsSql,
-      List<String> primaryKeysSql, List<String> foreignKeysSql,
-      String kuduPartitionByParams, Pair<List<String>, TSortingOrder> sortProperties,
-      Map<String, String> tblProperties, Map<String, String> serdeParameters,
-      boolean isExternal, boolean ifNotExists, RowFormat rowFormat,
-      HdfsFileFormat fileFormat, HdfsCompression compression,
+      boolean isPrimaryKeyUnique, List<String> primaryKeysSql,
+      List<String> foreignKeysSql, String kuduPartitionByParams, Pair<List<String>,
+      TSortingOrder> sortProperties, Map<String, String> tblProperties,
+      Map<String, String> serdeParameters, boolean isExternal, boolean ifNotExists,
+      RowFormat rowFormat, HdfsFileFormat fileFormat, HdfsCompression compression,
       String storageHandlerClass, HdfsUri location, String icebergPartitions,
       TBucketInfo bucketInfo) {
     Preconditions.checkNotNull(tableName);
@@ -480,7 +484,8 @@ public class ToSqlUtils {
       sb.append(" (\n  ");
       sb.append(Joiner.on(",\n  ").join(columnsSql));
       if (CollectionUtils.isNotEmpty(primaryKeysSql)) {
-        sb.append(",\n  PRIMARY KEY (");
+        sb.append(",\n  ");
+        sb.append(KuduUtil.getPrimaryKeyString(isPrimaryKeyUnique)).append(" (");
         Joiner.on(", ").appendTo(sb, primaryKeysSql).append(")");
       }
       if (CollectionUtils.isNotEmpty(foreignKeysSql)) {
@@ -491,7 +496,8 @@ public class ToSqlUtils {
     } else {
       // CTAS for Kudu tables still print the primary key
       if (primaryKeysSql != null && !primaryKeysSql.isEmpty()) {
-        sb.append("\n PRIMARY KEY (");
+        sb.append("\n ");
+        sb.append(KuduUtil.getPrimaryKeyString(isPrimaryKeyUnique)).append(" (");
         Joiner.on(", ").appendTo(sb, primaryKeysSql).append(")");
       }
     }

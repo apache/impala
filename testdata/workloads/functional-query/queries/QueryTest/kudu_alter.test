@@ -347,6 +347,12 @@ alter table tbl_to_alter add columns (invalid_col int not null)
 A new non-null column must have a default value
 ====
 ---- QUERY
+# Add a column with name reserved by Kudu engine
+alter table tbl_to_alter add columns (auto_incrementing_id bigint)
+---- CATCH
+Column name auto_incrementing_id is reserved by Kudu engine
+====
+---- QUERY
 # Drop a column
 alter table tbl_to_alter drop column vali
 ---- RESULTS
@@ -577,16 +583,16 @@ alter table kudu_tbl_to_alter alter column new_col4
   set encoding plain_encoding compression lz4 block_size 1000;
 describe kudu_tbl_to_alter;
 ---- LABELS
-NAME,TYPE,COMMENT,PRIMARY_KEY,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
+NAME,TYPE,COMMENT,PRIMARY_KEY,KEY_UNIQUE,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
 ---- RESULTS
-'id','int','','true','false','','RLE','SNAPPY','100'
-'last_name','string','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'name','string','','false','true','name_default','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'new_col1','int','','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'new_col2','bigint','','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'new_col4','int','','false','true','-1','PLAIN_ENCODING','LZ4','1000'
+'id','int','','true','true','false','','RLE','SNAPPY','100'
+'last_name','string','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'name','string','','false','','true','name_default','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'new_col1','int','','false','','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'new_col2','bigint','','false','','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'new_col4','int','','false','','true','-1','PLAIN_ENCODING','LZ4','1000'
 ---- TYPES
-STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ====
 ---- QUERY
 # check that we can insert and scan after the storage attribute changes
@@ -664,4 +670,57 @@ describe formatted external_tbl_new;
 '','kudu.table_name     ','impala::$DATABASE.temp_kudu_table'
 ---- TYPES
 STRING,STRING,STRING
-----
+====
+---- QUERY
+# Create Kudu table with non unique primary key
+create table alter_non_unique_key_test (id int non unique primary key, name string)
+partition by hash (id) partitions 3
+stored as kudu
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+alter table alter_non_unique_key_test add columns (new_col1 int not null default 10)
+---- RESULTS
+'Column(s) have been added.'
+====
+---- QUERY
+alter table alter_non_unique_key_test add columns (auto_incrementing_id bigint not null default 10)
+---- CATCH
+AnalysisException: Column already exists: auto_incrementing_id
+====
+---- QUERY
+alter table alter_non_unique_key_test drop column new_col1
+---- RESULTS
+'Column has been dropped.'
+====
+---- QUERY
+alter table alter_non_unique_key_test drop column id
+---- CATCH
+NonRecoverableException: cannot remove a key column: id
+====
+---- QUERY
+alter table alter_non_unique_key_test alter column id set default 10
+---- CATCH
+AnalysisException: Cannot set default value for primary key column 'id'
+====
+---- QUERY
+alter table alter_non_unique_key_test alter column id set block_size 100
+---- RESULTS
+'Column has been altered.'
+====
+---- QUERY
+alter table alter_non_unique_key_test drop column auto_incrementing_id
+---- CATCH
+IllegalArgumentException: Cannot remove auto-incrementing column auto_incrementing_id
+====
+---- QUERY
+alter table alter_non_unique_key_test alter column auto_incrementing_id set default 10
+---- CATCH
+AnalysisException: Cannot set default value for system generated primary key column 'auto_incrementing_id'
+====
+---- QUERY
+alter table alter_non_unique_key_test alter column auto_incrementing_id set block_size 1
+---- RESULTS
+'Column has been altered.'
+====

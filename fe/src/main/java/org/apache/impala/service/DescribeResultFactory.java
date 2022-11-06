@@ -300,6 +300,12 @@ public class DescribeResultFactory {
       // Kudu-specific describe info.
       TColumnValue pkCol = new TColumnValue();
       pkCol.setString_val(Boolean.toString(kuduColumn.isKey()));
+      TColumnValue pkUniqueCol = new TColumnValue();
+      if (kuduColumn.isKey()) {
+        pkUniqueCol.setString_val(Boolean.toString(kuduColumn.isPrimaryKeyUnique()));
+      } else {
+        pkUniqueCol.setString_val("");
+      }
       TColumnValue nullableCol = new TColumnValue();
       nullableCol.setString_val(Boolean.toString(kuduColumn.isNullable()));
       TColumnValue defaultValCol = new TColumnValue();
@@ -315,8 +321,8 @@ public class DescribeResultFactory {
       TColumnValue blockSizeCol = new TColumnValue();
       blockSizeCol.setString_val(Integer.toString(kuduColumn.getBlockSize()));
       descResult.results.add(new TResultRow(
-          Lists.newArrayList(colNameCol, dataTypeCol, commentCol, pkCol, nullableCol,
-              defaultValCol, encodingCol, compressionCol, blockSizeCol)));
+          Lists.newArrayList(colNameCol, dataTypeCol, commentCol, pkCol, pkUniqueCol,
+              nullableCol, defaultValCol, encodingCol, compressionCol, blockSizeCol)));
     }
     return descResult;
   }

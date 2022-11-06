@@ -605,6 +605,7 @@ public class Frontend {
       if (descStmt.getTable() instanceof FeKuduTable
           && descStmt.getOutputStyle() == TDescribeOutputStyle.MINIMAL) {
         columns.add(new TColumn("primary_key", Type.STRING.toThrift()));
+        columns.add(new TColumn("key_unique", Type.STRING.toThrift()));
         columns.add(new TColumn("nullable", Type.STRING.toThrift()));
         columns.add(new TColumn("default_value", Type.STRING.toThrift()));
         columns.add(new TColumn("encoding", Type.STRING.toThrift()));

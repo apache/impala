@@ -188,6 +188,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("merge_fn", SqlParserSymbols.KW_MERGE_FN);
     keywordMap.put("metadata", SqlParserSymbols.KW_METADATA);
     keywordMap.put("minus", SqlParserSymbols.KW_MINUS);
+    keywordMap.put("non", SqlParserSymbols.KW_NON);
     keywordMap.put("norely", SqlParserSymbols.KW_NORELY);
     keywordMap.put("not", SqlParserSymbols.KW_NOT);
     keywordMap.put("novalidate", SqlParserSymbols.KW_NOVALIDATE);
@@ -274,6 +275,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("unbounded", SqlParserSymbols.KW_UNBOUNDED);
     keywordMap.put("uncached", SqlParserSymbols.KW_UNCACHED);
     keywordMap.put("union", SqlParserSymbols.KW_UNION);
+    keywordMap.put("unique", SqlParserSymbols.KW_UNIQUE);
     keywordMap.put("unknown", SqlParserSymbols.KW_UNKNOWN);
     keywordMap.put("unnest", SqlParserSymbols.KW_UNNEST);
     keywordMap.put("unset", SqlParserSymbols.KW_UNSET);
@@ -393,7 +395,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
         "substring_regex", "succeeds", "sum", "symmetric", "system", "system_time",
         "system_user", "tan", "tanh", "time", "timezone_hour", "timezone_minute",
         "trailing", "translate", "translate_regex", "translation", "treat", "trigger",
-        "trim", "trim_array", "uescape", "unique", "unknown", "update  ",
+        "trim", "trim_array", "uescape", "unknown", "update  ",
         "upper", "user", "value", "value_of", "var_pop", "var_samp", "varbinary",
         "varying", "versioning", "whenever", "width_bucket", "window", "within",
         "without", "year"}));

@@ -171,3 +171,84 @@ select count(*) from functional_kudu.alltypes where rand() + id < 0.0;
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# Create Kudu table with non unique primary key
+create table non_unique_key_scan_tbl1 non unique primary key (id)
+partition by range (id)
+(partition value = 0, partition value = 1,
+ partition value = 2, partition value = 3,
+ partition value = 4, partition value = 5,
+ partition value = 6, partition value = 7)
+stored as kudu
+as select id, int_col from functional.alltypestiny;
+---- RESULTS
+'Inserted 8 row(s)'
+====
+---- QUERY
+# auto-incrementing column is not shown for SELECT *
+select * from non_unique_key_scan_tbl1 order by id asc;
+---- RESULTS
+0,0
+1,1
+2,0
+3,1
+4,0
+5,1
+6,0
+7,1
+---- TYPES
+INT,INT
+====
+---- QUERY
+# auto-incrementing column is shown when the column is specified in SELECT statement
+select id, int_col, auto_incrementing_id from non_unique_key_scan_tbl1 order by id asc,
+auto_incrementing_id desc;
+---- RESULTS
+0,0,1
+1,1,1
+2,0,1
+3,1,1
+4,0,1
+5,1,1
+6,0,1
+7,1,1
+---- TYPES
+INT,INT,BIGINT
+====
+---- QUERY
+# Query with auto-incrementing column in where clause
+select id, int_col, auto_incrementing_id from non_unique_key_scan_tbl1
+where auto_incrementing_id = 1 and id < 3
+group by id, int_col, auto_incrementing_id;
+---- RESULTS
+0,0,1
+1,1,1
+2,0,1
+---- TYPES
+INT,INT,BIGINT
+====
+---- QUERY
+# Create unpartitioned Kudu table with non unique primary key.
+create table non_unique_key_scan_tbl2 non unique primary key (id)
+stored as kudu
+as select id, int_col from functional.alltypestiny order by id asc limit 100;
+---- RESULTS
+'Inserted 8 row(s)'
+====
+---- QUERY
+# Query with auto-incrementing column in ORDER BY.
+# All rows are added to one tablet-server so auto_incrementing_id shows insertion order.
+select id, int_col, auto_incrementing_id from non_unique_key_scan_tbl2
+order by auto_incrementing_id asc;
+---- RESULTS
+0,0,1
+1,1,2
+2,0,3
+3,1,4
+4,0,5
+5,1,6
+6,0,7
+7,1,8
+---- TYPES
+INT,INT,BIGINT
+====

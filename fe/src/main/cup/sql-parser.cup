@@ -316,7 +316,7 @@ terminal
   KW_INTERMEDIATE, KW_INTERSECT, KW_INTERVAL, KW_INTO, KW_INVALIDATE, KW_IREGEXP, KW_IS,
   KW_JOIN, KW_JSONFILE, KW_KUDU, KW_LAST, KW_LEFT, KW_LEXICAL, KW_LIKE, KW_LIMIT, KW_LINES,
   KW_LOAD, KW_LOCATION, KW_LOGICAL_OR, KW_MANAGED_LOCATION, KW_MAP, KW_MERGE_FN,
-  KW_METADATA, KW_MINUS, KW_NORELY, KW_NOT,
+  KW_METADATA, KW_MINUS, KW_NON, KW_NORELY, KW_NOT,
   KW_NOVALIDATE, KW_NULL, KW_NULLS, KW_OF, KW_OFFSET, KW_ON, KW_OR,
   KW_ORC, KW_ORDER, KW_OUTER,
   KW_OVER, KW_OVERWRITE, KW_PARQUET, KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED,
@@ -329,9 +329,9 @@ terminal
   KW_STRING, KW_STRUCT, KW_SYMBOL, KW_SYSTEM_TIME, KW_SYSTEM_VERSION,
   KW_TABLE, KW_TABLES, KW_TABLESAMPLE, KW_TBLPROPERTIES,
   KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TRUNCATE, KW_STATS,
-  KW_TO, KW_TRUE, KW_UDF, KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UNKNOWN, KW_UNNEST, KW_UNSET,
-  KW_UPDATE, KW_UPDATE_FN, KW_UPSERT, KW_USE, KW_USING, KW_VALIDATE, KW_VALUES,
-  KW_VARCHAR, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH, KW_ZORDER;
+  KW_TO, KW_TRUE, KW_UDF, KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UNIQUE, KW_UNKNOWN,
+  KW_UNNEST, KW_UNSET, KW_UPDATE, KW_UPDATE_FN, KW_UPSERT, KW_USE, KW_USING, KW_VALIDATE,
+  KW_VALUES, KW_VARCHAR, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH, KW_ZORDER;
 
 terminal UNUSED_RESERVED_WORD;
 
@@ -402,7 +402,8 @@ nonterminal SelectListItem star_expr;
 nonterminal Expr expr, non_pred_expr, arithmetic_expr, timestamp_arithmetic_expr;
 nonterminal List<Expr> expr_list;
 nonterminal String alias_clause;
-nonterminal List<String> ident_list, primary_keys;
+nonterminal List<String> ident_list;
+nonterminal Pair<List<String>, Boolean> primary_keys;
 nonterminal List<String> opt_ident_list;
 nonterminal Pair<TBucketInfo, Pair<List<String>, TSortingOrder>> opt_clustered;
 nonterminal Pair<List<String>, TSortingOrder> opt_sort_cols;
@@ -536,7 +537,7 @@ nonterminal THdfsFileFormat storage_engine_val;
 nonterminal THdfsFileFormat file_format_create_table_val;
 nonterminal Boolean if_exists_val;
 nonterminal Boolean if_not_exists_val;
-nonterminal Boolean is_primary_key_val;
+nonterminal Pair<Boolean, Boolean> is_primary_key_val;
 nonterminal HdfsUri location_val;
 nonterminal HdfsUri managed_location_val;
 nonterminal RowFormat row_format_val, opt_row_format_val;
@@ -1417,7 +1418,8 @@ create_tbl_as_select_params ::=
     tbl_options:options
     KW_AS query_stmt:select_stmt
   {:
-    tbl_def.getPrimaryKeyColumnNames().addAll(primary_keys);
+    tbl_def.getPrimaryKeyColumnNames().addAll(primary_keys.first);
+    tbl_def.setPrimaryKeyUnique(primary_keys.second);
     tbl_def.getKuduPartitionParams().addAll(partition_params.getKuduPartitionParams());
     tbl_def.getIcebergPartitionSpecs().addAll(partition_params.getIcebergPartitionSpecs());
     tbl_def.setOptions(options);
@@ -1551,9 +1553,10 @@ tbl_def_with_col_defs ::=
     primary_keys:primary_keys RPAREN
   {:
     tbl_def.getColumnDefs().addAll(list);
-    tbl_def.getPrimaryKeyColumnNames().addAll(primary_keys);
+    tbl_def.getPrimaryKeyColumnNames().addAll(primary_keys.first);
+    tbl_def.setPrimaryKeyUnique(primary_keys.second);
     TableDef.PrimaryKey pk = new TableDef.PrimaryKey(tbl_def.getTblName(),
-        primary_keys, null, true, false, false);
+        primary_keys.first, null, true, false, false);
     tbl_def.setPrimaryKey(pk);
     RESULT = tbl_def;
   :}
@@ -1562,8 +1565,9 @@ tbl_def_with_col_defs ::=
       rely_spec:rely_spec RPAREN
   {:
     tbl_def.getColumnDefs().addAll(list);
+    tbl_def.setPrimaryKeyUnique(primary_keys.second);
     TableDef.PrimaryKey pk = new TableDef.PrimaryKey(tbl_def.getTblName(),
-        primary_keys, null, rely_spec, validate_spec, enable_spec);
+        primary_keys.first, null, rely_spec, validate_spec, enable_spec);
     tbl_def.setPrimaryKey(pk);
     RESULT = tbl_def;
   :}
@@ -1573,8 +1577,9 @@ tbl_def_with_col_defs ::=
     rely_spec:rely_spec COMMA foreign_keys_list:foreign_keys_list RPAREN
   {:
     tbl_def.getColumnDefs().addAll(list);
+    tbl_def.setPrimaryKeyUnique(primary_keys.second);
     TableDef.PrimaryKey pk = new TableDef.PrimaryKey(tbl_def.getTblName(),
-      primary_keys, null, rely_spec, validate_spec, enable_spec);
+      primary_keys.first, null, rely_spec, validate_spec, enable_spec);
     tbl_def.setPrimaryKey(pk);
     tbl_def.getForeignKeysList().addAll(foreign_keys_list);
     RESULT = tbl_def;
@@ -1585,8 +1590,9 @@ tbl_def_with_col_defs ::=
     enable_spec:enable_spec validate_spec:validate_spec rely_spec:rely_spec RPAREN
   {:
     tbl_def.getColumnDefs().addAll(list);
+    tbl_def.setPrimaryKeyUnique(primary_keys.second);
     TableDef.PrimaryKey pk = new TableDef.PrimaryKey(tbl_def.getTblName(),
-        primary_keys, null, rely_spec, validate_spec, enable_spec);
+        primary_keys.first, null, rely_spec, validate_spec, enable_spec);
     tbl_def.setPrimaryKey(pk);
     tbl_def.getForeignKeysList().addAll(foreign_keys_list);
     RESULT = tbl_def;
@@ -1623,7 +1629,9 @@ foreign_keys_list ::=
 
 primary_keys ::=
   KW_PRIMARY key_ident LPAREN ident_list:col_names RPAREN
-  {: RESULT = col_names; :}
+  {: RESULT = new Pair<List<String>, Boolean>(col_names, true); :}
+  | KW_NON KW_UNIQUE KW_PRIMARY key_ident LPAREN ident_list:col_names RPAREN
+  {: RESULT = new Pair<List<String>, Boolean>(col_names, false); :}
   ;
 
 rely_spec ::=
@@ -2227,7 +2235,9 @@ column_option ::=
 
 is_primary_key_val ::=
   KW_PRIMARY key_ident
-  {: RESULT = true; :}
+  {: RESULT = new Pair<Boolean, Boolean>(true, true); :}
+  | KW_NON KW_UNIQUE KW_PRIMARY key_ident
+  {: RESULT = new Pair<Boolean, Boolean>(true, false); :}
   ;
 
 nullability_val ::=
@@ -4346,6 +4356,8 @@ word ::=
   {: RESULT = r.toString(); :}
   | KW_MINUS:r
   {: RESULT = r.toString(); :}
+  | KW_NON:r
+  {: RESULT = r.toString(); :}
   | KW_NORELY:r
   {: RESULT = r.toString(); :}
   | KW_NOT:r
@@ -4513,6 +4525,8 @@ word ::=
   | KW_UNCACHED:r
   {: RESULT = r.toString(); :}
   | KW_UNION:r
+  {: RESULT = r.toString(); :}
+  | KW_UNIQUE:r
   {: RESULT = r.toString(); :}
   | KW_UNKNOWN:r
   {: RESULT = r.toString(); :}

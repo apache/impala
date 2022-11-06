@@ -116,6 +116,7 @@ public class CreateTableStmt extends StatementBase {
   public List<ColumnDef> getPrimaryKeyColumnDefs() {
     return tableDef_.getPrimaryKeyColumnDefs();
   }
+  public boolean isPrimaryKeyUnique() { return tableDef_.isPrimaryKeyUnique(); }
   public List<SQLPrimaryKey> getPrimaryKeys() { return tableDef_.getSqlPrimaryKeys(); }
   public List<SQLForeignKey> getForeignKeys() { return tableDef_.getSqlForeignKeys(); }
   public boolean isExternal() { return tableDef_.isExternal(); }
@@ -220,6 +221,7 @@ public class CreateTableStmt extends StatementBase {
     params.setTable_properties(Maps.newHashMap(getTblProperties()));
     params.getTable_properties().putAll(Maps.newHashMap(getGeneratedKuduProperties()));
     params.setSerde_properties(getSerdeProperties());
+    params.setIs_primary_key_unique(isPrimaryKeyUnique());
     for (KuduPartitionParam d: getKuduPartitionParams()) {
       params.addToPartition_by(d.toThrift());
     }

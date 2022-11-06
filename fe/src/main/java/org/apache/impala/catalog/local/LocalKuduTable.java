@@ -53,8 +53,10 @@ import com.google.errorprone.annotations.Immutable;
 
 public class LocalKuduTable extends LocalTable implements FeKuduTable {
   private final TableParams tableParams_;
-  private final List<KuduPartitionParam> partitionBy_;
+  private final boolean isPrimaryKeyUnique_;
+  private final boolean hasAutoIncrementingColumn_;
   private final ImmutableList<String> primaryKeyColumnNames_;
+  private final List<KuduPartitionParam> partitionBy_;
 
   private final org.apache.kudu.client.KuduTable kuduTable_;
 
@@ -81,7 +83,9 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
     // Use the schema derived from Kudu, rather than the one stored in the HMS.
     msTable.getSd().setCols(fieldSchemas);
 
-
+    boolean isPrimaryKeyUnique = kuduTable.getSchema().isPrimaryKeyUnique();
+    boolean hasAutoIncrementingColumn =
+        kuduTable.getSchema().hasAutoIncrementingColumn();
     List<String> pkNames = new ArrayList<>();
     for (ColumnSchema c: kuduTable.getSchema().getPrimaryKeyColumns()) {
       pkNames.add(c.getName().toLowerCase());
@@ -91,32 +95,43 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
 
     ColumnMap cmap = new ColumnMap(cols, /*numClusteringCols=*/0, fullTableName,
         /*isFullAcidSchema=*/false);
-    return new LocalKuduTable(db, msTable, ref, cmap, kuduTable, pkNames, partitionBy);
+    return new LocalKuduTable(db, msTable, ref, cmap, kuduTable, isPrimaryKeyUnique,
+        pkNames, hasAutoIncrementingColumn, partitionBy);
   }
 
-
   public static FeKuduTable createCtasTarget(LocalDb db, Table msTable,
-      List<ColumnDef> columnDefs, List<ColumnDef> primaryKeyColumnDefs,
-      List<KuduPartitionParam> kuduPartitionParams) {
+      List<ColumnDef> columnDefs, boolean isPrimaryKeyUnique,
+      List<ColumnDef> primaryKeyColumnDefs,
+      List<KuduPartitionParam> kuduPartitionParams) throws ImpalaRuntimeException {
     String fullTableName = msTable.getDbName() + "." + msTable.getTableName();
 
+    boolean hasAutoIncrementingColumn = false;
     List<Column> columns = new ArrayList<>();
     List<String> pkNames = new ArrayList<>();
     int pos = 0;
     for (ColumnDef colDef: columnDefs) {
-      // TODO(todd): it seems odd that for CTAS targets, the columns are of type
-      // 'Column' instead of 'KuduColumn'.
-      columns.add(new Column(colDef.getColName(), colDef.getType(), pos++));
+      columns.add(KuduColumn.fromThrift(colDef.toThrift(), pos++));
+      // Simulate Kudu engine to add auto-incrementing column as the key column in the
+      // temporary KuduTable if the primary key is not unique so that analysis module
+      // could find the right position for each column.
+      if (!isPrimaryKeyUnique && pos == primaryKeyColumnDefs.size()) {
+        columns.add(KuduColumn.createAutoIncrementingColumn(pos++));
+        hasAutoIncrementingColumn = true;
+      }
     }
     for (ColumnDef pkColDef: primaryKeyColumnDefs) {
       pkNames.add(pkColDef.getColName());
+    }
+    if (!isPrimaryKeyUnique) {
+      // Add auto-incrementing column's name to the list of key column's name
+      pkNames.add(Schema.getAutoIncrementingColumnName());
     }
 
     ColumnMap cmap = new ColumnMap(columns, /*numClusteringCols=*/0, fullTableName,
         /*isFullAcidSchema=*/false);
 
     return new LocalKuduTable(db, msTable, /*ref=*/null, cmap, /*kuduTable*/null,
-        pkNames, kuduPartitionParams);
+        isPrimaryKeyUnique, pkNames, hasAutoIncrementingColumn, kuduPartitionParams);
   }
 
   private static void convertColsFromKudu(Schema schema, List<Column> cols,
@@ -141,14 +156,16 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
   }
 
   private LocalKuduTable(LocalDb db, Table msTable, TableMetaRef ref, ColumnMap cmap,
-      org.apache.kudu.client.KuduTable kuduTable,
-      List<String> primaryKeyColumnNames,
+      org.apache.kudu.client.KuduTable kuduTable, boolean isPrimaryKeyUnique,
+      List<String> primaryKeyColumnNames, boolean hasAutoIncrementingColumn,
       List<KuduPartitionParam> partitionBy)  {
     super(db, msTable, ref, cmap);
     kuduTable_ = kuduTable;
     tableParams_ = new TableParams(msTable);
     partitionBy_ = ImmutableList.copyOf(partitionBy);
+    isPrimaryKeyUnique_ = isPrimaryKeyUnique;
     primaryKeyColumnNames_ = ImmutableList.copyOf(primaryKeyColumnNames);
+    hasAutoIncrementingColumn_ = hasAutoIncrementingColumn;
   }
 
   @Override
@@ -166,6 +183,16 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
    */
   public org.apache.kudu.client.KuduTable getKuduTable() {
     return kuduTable_;
+  }
+
+  @Override
+  public boolean isPrimaryKeyUnique() {
+    return isPrimaryKeyUnique_;
+  }
+
+  @Override
+  public boolean hasAutoIncrementingColumn() {
+    return hasAutoIncrementingColumn_;
   }
 
   @Override
@@ -187,6 +214,8 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
         getNumClusteringCols(),
         name_, db_.getName());
     TKuduTable tbl = new TKuduTable();
+    tbl.setIs_primary_key_unique(isPrimaryKeyUnique_);
+    tbl.setHas_auto_incrementing(hasAutoIncrementingColumn_);
     tbl.setKey_columns(Preconditions.checkNotNull(primaryKeyColumnNames_));
     tbl.setMaster_addresses(tableParams_.getMastersAsList());
     tbl.setTable_name(tableParams_.kuduTableName_);

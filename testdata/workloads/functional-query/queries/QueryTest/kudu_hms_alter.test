@@ -567,16 +567,16 @@ alter table kudu_tbl_to_alter alter column new_col4
   set encoding plain_encoding compression lz4 block_size 1000;
 describe kudu_tbl_to_alter;
 ---- LABELS
-NAME,TYPE,COMMENT,PRIMARY_KEY,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
+NAME,TYPE,COMMENT,PRIMARY_KEY,KEY_UNIQUE,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
 ---- RESULTS
-'id','int','','true','false','','RLE','SNAPPY','100'
-'last_name','string','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'name','string','','false','true','name_default','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'new_col1','int','','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'new_col2','bigint','','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'new_col4','int','','false','true','-1','PLAIN_ENCODING','LZ4','1000'
+'id','int','','true','true','false','','RLE','SNAPPY','100'
+'last_name','string','','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'name','string','','false','','true','name_default','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'new_col1','int','','false','','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'new_col2','bigint','','false','','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'new_col4','int','','false','','true','-1','PLAIN_ENCODING','LZ4','1000'
 ---- TYPES
-STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ====
 ---- QUERY
 # check that we can insert and scan after the storage attribute changes

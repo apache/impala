@@ -410,3 +410,67 @@ select * from impala_3454
 ---- TYPES
 TINYINT,BIGINT
 ====
+---- QUERY
+# Create Kudu table with non unique primary key
+create table delete_non_unique_key_test non unique primary key (id)
+partition by hash (id) partitions 3 stored as kudu
+as select id, int_col from functional.alltypestiny;
+select * from delete_non_unique_key_test order by id;
+---- RESULTS
+0,0
+1,1
+2,0
+3,1
+4,0
+5,1
+6,0
+7,1
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Test a DELETE with non unique primary key
+delete delete_non_unique_key_test where id < 3;
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumRowErrors: 0
+====
+---- QUERY
+select * from delete_non_unique_key_test order by id;
+---- RESULTS
+3,1
+4,0
+5,1
+6,0
+7,1
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Test a DELETE with non key column
+delete delete_non_unique_key_test where int_col = 0;
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumRowErrors: 0
+====
+---- QUERY
+select * from delete_non_unique_key_test order by id;
+---- RESULTS
+3,1
+5,1
+7,1
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Test a DELETE with auto-incrementing column in where clause
+delete delete_non_unique_key_test where auto_incrementing_id < 10;
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumRowErrors: 0
+====
+---- QUERY
+select count(*) from delete_non_unique_key_test;
+---- RESULTS
+0
+====

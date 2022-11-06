@@ -58,6 +58,16 @@ public interface FeKuduTable extends FeTable {
   String getKuduTableName();
 
   /**
+   * Return true if the primary key is unique.
+   */
+  boolean isPrimaryKeyUnique();
+
+  /**
+   * Return true if the table has auto-incrementing column.
+   */
+  boolean hasAutoIncrementingColumn();
+
+  /**
    * Return the names of the columns that make up the primary key
    * of this table.
    */

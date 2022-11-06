@@ -594,6 +594,9 @@ struct TCreateTableParams {
 
   // Bucket desc for created bucketed table
   22: optional CatalogObjects.TBucketInfo bucket_info
+
+  // Primary key is unique (Kudu-only)
+  23: optional bool is_primary_key_unique
 }
 
 // Parameters of a CREATE VIEW or ALTER VIEW AS SELECT command

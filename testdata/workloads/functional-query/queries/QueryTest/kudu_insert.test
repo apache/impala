@@ -534,3 +534,149 @@ select o_orderkey from tpch_kudu.orders;
 NumModifiedRows: 1500000
 NumRowErrors: 0
 ====
+---- QUERY
+# Create Kudu table with non unique primary key
+create table insert_non_unique_key_test_tbl1
+  (id int non unique primary key, vali bigint null, valv string null)
+  PARTITION BY RANGE (PARTITION VALUES < 10, PARTITION 10 <= VALUES < 30,
+  PARTITION 30 <= VALUES) STORED AS KUDU
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Insert VALUES with single row
+insert into insert_non_unique_key_test_tbl1 values (1, 1, 'one')
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, VALI, VALV
+---- DML_RESULTS: insert_non_unique_key_test_tbl1
+1,1,'one'
+---- TYPES
+INT,BIGINT,STRING
+====
+---- QUERY
+# Insert VALUES with multiple rows
+insert into insert_non_unique_key_test_tbl1
+(id, vali, valv) values (2, 2, 'two'), (3, 3, 'three')
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumRowErrors: 0
+====
+---- QUERY
+# Try to insert a row with value for auto_incrementing_id column
+insert into insert_non_unique_key_test_tbl1
+(id, auto_incrementing_id, vali, valv) values (4, 4, 4, 'four')
+---- CATCH
+auto-incrementing column is incorrectly set
+====
+---- QUERY
+# Try to insert a row with value for auto_incrementing_id column
+insert into insert_non_unique_key_test_tbl1
+(id, auto_incrementing_id) values (5, 50000)
+---- CATCH
+auto-incrementing column is incorrectly set
+====
+---- QUERY
+# Try to insert a row without value for key column
+insert into insert_non_unique_key_test_tbl1
+(vali, valv) values (6, 'six')
+---- CATCH
+AnalysisException: All primary key columns must be specified for INSERTing into Kudu tables. Missing columns are: id
+====
+---- QUERY
+# Insert VALUES with SELECT from other table
+insert into insert_non_unique_key_test_tbl1
+select id, bigint_col, string_col from functional.alltypes where id = 10
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+====
+---- QUERY
+select * from insert_non_unique_key_test_tbl1 order by id;
+---- RESULTS
+1,1,'one'
+2,2,'two'
+3,3,'three'
+10,0,'0'
+---- TYPES
+INT,BIGINT,STRING
+====
+---- QUERY
+# Create Kudu table in CTAS statement with non unique primary key
+create table insert_non_unique_key_test_tbl2 non unique primary key (id)
+  partition by hash (id) partitions 3
+  stored as kudu
+  as select * from insert_non_unique_key_test_tbl1;
+select * from insert_non_unique_key_test_tbl2 order by id;
+---- RESULTS
+1,1,'one'
+2,2,'two'
+3,3,'three'
+10,0,'0'
+---- TYPES
+INT,BIGINT,STRING
+====
+---- QUERY
+# Create Kudu table with non unique primary key
+create table insert_non_unique_key_test_tbl3
+  (id int non unique primary key, vali bigint null, valv string null)
+  partition by hash (id) partitions 3 stored as kudu
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Insert VALUES with SELECT from other table
+insert into insert_non_unique_key_test_tbl3
+  select * from insert_non_unique_key_test_tbl2
+---- RUNTIME_PROFILE
+NumModifiedRows: 4
+NumRowErrors: 0
+====
+---- QUERY
+select * from insert_non_unique_key_test_tbl3 order by id;
+---- RESULTS
+1,1,'one'
+2,2,'two'
+3,3,'three'
+10,0,'0'
+---- TYPES
+INT,BIGINT,STRING
+====
+---- QUERY
+# Create Kudu table with non unique primary key
+create table insert_non_unique_key_test_tbl4
+  (id int non unique primary key, vali bigint null, valv string null)
+  partition by range (id)
+    (partition value = 0, partition value = 1,
+     partition value = 2, partition value = 3)
+  stored as kudu
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Insert two rows
+insert into insert_non_unique_key_test_tbl4 values (1, 1, 'one'), (2, 2, 'two');
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumRowErrors: 0
+====
+---- QUERY
+# Insert two rows with duplicated values for non unique primary key
+insert into insert_non_unique_key_test_tbl4 values (1, 10, 'ten'), (1, 11, 'eleven');
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumRowErrors: 0
+====
+---- QUERY
+select id, vali, valv, auto_incrementing_id from insert_non_unique_key_test_tbl4
+  order by id, auto_incrementing_id;
+---- RESULTS
+1,1,'one',1
+1,10,'ten',2
+1,11,'eleven',3
+2,2,'two',1
+---- TYPES
+INT,BIGINT,STRING,BIGINT
+====

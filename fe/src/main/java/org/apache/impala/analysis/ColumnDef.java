@@ -29,6 +29,7 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TColumn;
@@ -74,8 +75,11 @@ public class ColumnDef {
 
   // Kudu-specific column options
   //
-  // Set to true if the user specified "PRIMARY KEY" in the column definition.
+  // Set to true if the user specified "PRIMARY KEY" or "NON UNIQUE PRIMARY KEY" in the
+  // column definition.
   private boolean isPrimaryKey_;
+  // Set to false if the user specified "NON UNIQUE PRIMARY KEY" in the column definition.
+  private boolean isPrimaryKeyUnique_;
   // Set to true if this column may contain null values. Can be NULL if
   // not specified.
   private Boolean isNullable_;
@@ -106,8 +110,9 @@ public class ColumnDef {
     for (Map.Entry<Option, Object> option: options.entrySet()) {
       switch (option.getKey()) {
         case IS_PRIMARY_KEY:
-          Preconditions.checkState(option.getValue() instanceof Boolean);
-          isPrimaryKey_ = (Boolean) option.getValue();
+          Preconditions.checkState(option.getValue() instanceof Pair);
+          isPrimaryKey_ = ((Pair<Boolean, Boolean>)option.getValue()).first;
+          isPrimaryKeyUnique_ = ((Pair<Boolean, Boolean>)option.getValue()).second;
           break;
         case IS_NULLABLE:
           Preconditions.checkState(option.getValue() instanceof Boolean);
@@ -166,6 +171,7 @@ public class ColumnDef {
   public Type getType() { return type_; }
   public TypeDef getTypeDef() { return typeDef_; }
   boolean isPrimaryKey() { return isPrimaryKey_; }
+  boolean isPrimaryKeyUnique() { return isPrimaryKeyUnique_; }
   public void setComment(String comment) { comment_ = comment; }
   public String getComment() { return comment_; }
   public boolean hasKuduOptions() {
@@ -222,8 +228,8 @@ public class ColumnDef {
 
   private void analyzeKuduOptions(Analyzer analyzer) throws AnalysisException {
     if (isPrimaryKey_ && isNullable_ != null && isNullable_) {
-      throw new AnalysisException("Primary key columns cannot be nullable: " +
-          toString());
+      throw new AnalysisException(KuduUtil.getPrimaryKeyString(isPrimaryKeyUnique_) +
+          " columns cannot be nullable: " + toString());
     }
     // Encoding value
     if (encodingVal_ != null) {
@@ -332,7 +338,9 @@ public class ColumnDef {
     } else {
       sb.append(typeDef_.toSql());
     }
-    if (isPrimaryKey_) sb.append(" PRIMARY KEY");
+    if (isPrimaryKey_) {
+      sb.append(" ").append(KuduUtil.getPrimaryKeyString(isPrimaryKeyUnique_));
+    }
     if (isNullable_ != null) sb.append(isNullable_ ? " NULL" : " NOT NULL");
     if (encoding_ != null) sb.append(" ENCODING " + encoding_.toString());
     if (compression_ != null) sb.append(" COMPRESSION " + compression_.toString());
@@ -352,6 +360,7 @@ public class ColumnDef {
         .append(colName_, rhs.colName_)
         .append(comment_, rhs.comment_)
         .append(isPrimaryKey_, rhs.isPrimaryKey_)
+        .append(isPrimaryKeyUnique_, rhs.isPrimaryKeyUnique_)
         .append(typeDef_, rhs.typeDef_)
         .append(type_, rhs.type_)
         .append(isNullable_, rhs.isNullable_)
@@ -366,8 +375,9 @@ public class ColumnDef {
     TColumn col = new TColumn(getColName(), type_.toThrift());
     Integer blockSize =
         blockSize_ == null ? null : (int) ((NumericLiteral) blockSize_).getIntValue();
-    KuduUtil.setColumnOptions(col, isPrimaryKey_, isNullable_, encoding_,
-        compression_, outputDefaultValue_, blockSize, colName_);
+    KuduUtil.setColumnOptions(col, isPrimaryKey_, isPrimaryKeyUnique_, isNullable_,
+        /* isAutoIncrementing */false, encoding_, compression_, outputDefaultValue_,
+        blockSize, colName_);
     if (comment_ != null) col.setComment(comment_);
     return col;
   }

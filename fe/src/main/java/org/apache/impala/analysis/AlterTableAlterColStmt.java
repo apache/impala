@@ -156,6 +156,7 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
     }
     if (t instanceof FeKuduTable) {
       KuduColumn col = (KuduColumn) t.getColumn(colName_);
+      boolean isSystemGeneratedColumn = col.isAutoIncrementing();
       if (!col.getType().equals(newColDef_.getType())) {
         throw new AnalysisException(String.format("Cannot change the type of a Kudu " +
             "column using an ALTER TABLE CHANGE COLUMN statement: (%s vs %s)",
@@ -163,8 +164,9 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
       }
       if (col.isKey() && newColDef_.hasDefaultValue()) {
         throw new AnalysisException(String.format(
-            "Cannot %s default value for primary key column '%s'",
-            isDropDefault_ ? "drop" : "set", colName_));
+            "Cannot %s default value for %sprimary key column '%s'",
+            isDropDefault_ ? "drop" : "set",
+            isSystemGeneratedColumn ? "system generated " : "", colName_));
       }
       if (newColDef_.isPrimaryKey()) {
         throw new AnalysisException(

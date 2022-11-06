@@ -123,14 +123,18 @@ public class KuduCatalogOpExecutor {
     }
   }
 
-  private static ColumnSchema createColumnSchema(TColumn column, boolean isKey)
-      throws ImpalaRuntimeException {
+  private static ColumnSchema createColumnSchema(TColumn column, boolean isKey,
+      boolean isKeyUnique) throws ImpalaRuntimeException {
     Type type = Type.fromThrift(column.getColumnType());
     Preconditions.checkState(type != null);
     org.apache.kudu.Type kuduType = KuduUtil.fromImpalaType(type);
 
     ColumnSchemaBuilder csb = new ColumnSchemaBuilder(column.getColumnName(), kuduType);
-    csb.key(isKey);
+    if (isKey && !isKeyUnique) {
+      csb.nonUniqueKey(true);
+    } else {
+      csb.key(isKey);
+    }
     if (column.isSetIs_nullable()) {
       // If nullability is explicitly set and the column is a key, it must have been
       // set as NOT NULL. This is the default, but it is also valid to specify it.
@@ -182,8 +186,9 @@ public class KuduCatalogOpExecutor {
 
     if (!leadingColNames.equals(keyColNames)) {
       throw new ImpalaRuntimeException(String.format(
-          "Kudu PRIMARY KEY columns must be specified as the first columns " +
+          "Kudu %s columns must be specified as the first columns " +
           "in the table (expected leading columns (%s) but found (%s))",
+          KuduUtil.getPrimaryKeyString(params.is_primary_key_unique),
           PrintUtils.joinQuoted(keyColNames),
           PrintUtils.joinQuoted(leadingColNames)));
     }
@@ -191,7 +196,8 @@ public class KuduCatalogOpExecutor {
     List<ColumnSchema> colSchemas = new ArrayList<>(params.getColumnsSize());
     for (TColumn column: params.getColumns()) {
       boolean isKey = colSchemas.size() < keyColNames.size();
-      colSchemas.add(createColumnSchema(column, isKey));
+      boolean isKeyUnique = isKey ? params.is_primary_key_unique : false;
+      colSchemas.add(createColumnSchema(column, isKey, isKeyUnique));
     }
     return new Schema(colSchemas);
   }
@@ -503,7 +509,7 @@ public class KuduCatalogOpExecutor {
       throws ImpalaRuntimeException {
     AlterTableOptions alterTableOptions = new AlterTableOptions();
     for (TColumn column: columns) {
-      alterTableOptions.addColumn(createColumnSchema(column, false));
+      alterTableOptions.addColumn(createColumnSchema(column, false, false));
     }
     String errMsg = "Error adding columns to Kudu table " + tbl.getName();
     alterKuduTable(tbl, alterTableOptions, errMsg);

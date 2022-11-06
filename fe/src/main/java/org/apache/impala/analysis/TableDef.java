@@ -25,6 +25,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -49,6 +50,7 @@ import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.util.AcidUtils;
+import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.thrift.TException;
 
@@ -82,6 +84,11 @@ class TableDef {
   // Names of primary key columns. Populated by the parser. An empty value doesn't
   // mean no primary keys were specified as the columnDefs_ could contain primary keys.
   private final List<String> primaryKeyColNames_ = new ArrayList<>();
+
+  // If true, the primary key is unique. If not, an auto-incrementing column will be
+  // added automatically by Kudu engine. This extra key column helps produce a unique
+  // composite primary key (primary keys + auto-incrementing construct).
+  private boolean isPrimaryKeyUnique_;
 
   // If true, the table's data will be preserved if dropped.
   private final boolean isExternal_;
@@ -356,9 +363,14 @@ class TableDef {
     return columnDefs_.stream().map(col -> col.getType()).collect(Collectors.toList());
   }
 
-  public void setPrimaryKey(TableDef.PrimaryKey primaryKey_) {
-    this.primaryKey_ = primaryKey_;
+  public void setPrimaryKey(TableDef.PrimaryKey primaryKey) {
+    this.primaryKey_ = primaryKey;
   }
+
+  public void setPrimaryKeyUnique(boolean isKeyUnique) {
+    this.isPrimaryKeyUnique_ = isKeyUnique;
+  }
+
   List<String> getPartitionColumnNames() {
     return ColumnDef.toColumnNames(getPartitionColumnDefs());
   }
@@ -371,6 +383,7 @@ class TableDef {
   boolean isIcebergTable() { return options_.fileFormat == THdfsFileFormat.ICEBERG; }
   List<String> getPrimaryKeyColumnNames() { return primaryKeyColNames_; }
   List<ColumnDef> getPrimaryKeyColumnDefs() { return primaryKeyColDefs_; }
+  boolean isPrimaryKeyUnique() { return isPrimaryKeyUnique_; }
   boolean isExternal() { return isExternal_; }
   boolean getIfNotExists() { return ifNotExists_; }
   Map<String, String> getGeneratedProperties() { return generatedProperties_; }
@@ -417,7 +430,7 @@ class TableDef {
     fqTableName_.analyze();
     analyzeAcidProperties(analyzer);
     analyzeColumnDefs(analyzer);
-    analyzePrimaryKeys();
+    analyzePrimaryKeys(analyzer);
     analyzeForeignKeys(analyzer);
 
     if (analyzer.dbContainsTable(getTblName().getDb(), getTbl(), Privilege.CREATE)
@@ -493,28 +506,75 @@ class TableDef {
    * in the table column definitions and if composite primary keys are properly defined
    * using the PRIMARY KEY (col,..col) clause.
    */
-  private void analyzePrimaryKeys() throws AnalysisException {
+  private void analyzePrimaryKeys(Analyzer analyzer) throws AnalysisException {
     for (ColumnDef colDef: columnDefs_) {
-      if (colDef.isPrimaryKey()) primaryKeyColDefs_.add(colDef);
+      if (colDef.isPrimaryKey()) {
+        primaryKeyColDefs_.add(colDef);
+        if (!colDef.isPrimaryKeyUnique() && !isKuduTable()) {
+          throw new AnalysisException(
+              "Non unique primary key is only supported for Kudu.");
+        }
+      }
     }
     if (primaryKeyColDefs_.size() > 1) {
-      throw new AnalysisException("Multiple primary keys specified. " +
-          "Composite primary keys can be specified using the " +
-          "PRIMARY KEY (col1, col2, ...) syntax at the end of the column definition.");
+      String primaryKeyString =
+          KuduUtil.getPrimaryKeyString(primaryKeyColDefs_.get(0).isPrimaryKeyUnique());
+      throw new AnalysisException(String.format(
+          "Multiple %sS specified. Composite %s can be specified using the %s " +
+          "(col1, col2, ...) syntax at the end of the column definition.",
+          primaryKeyString, primaryKeyString, primaryKeyString));
     }
 
     if (primaryKeyColNames_.isEmpty()) {
       if (primaryKey_ == null || primaryKey_.getPrimaryKeyColNames().isEmpty()) {
-        return;
+        if (!isKuduTable()) return;
+
+        if (!primaryKeyColDefs_.isEmpty()) {
+          setPrimaryKeyUnique(primaryKeyColDefs_.get(0).isPrimaryKeyUnique());
+          return;
+        } else if (!getKuduPartitionParams().isEmpty()) {
+          // Promote all partition columns as non unique primary key columns if primary
+          // keys are not declared by the user for the Kudu table. Since key columns
+          // must be as the first columns in the table, only all partition columns which
+          // are the beginning columns of the table can be promoted as non unique primary
+          // key columns.
+          List<String> colNames = getColumnNames();
+          TreeMap<Integer, String> partitionCols = new TreeMap<Integer, String>();
+          for (KuduPartitionParam partitionParam: getKuduPartitionParams()) {
+            for (String colName: partitionParam.getColumnNames()) {
+              int index = colNames.indexOf(colName);
+              Preconditions.checkState(index >= 0);
+              partitionCols.put(index, colName);
+            }
+          }
+          if (partitionCols.size() > 0
+              && partitionCols.lastKey() == partitionCols.size() - 1) {
+            primaryKeyColNames_.addAll(partitionCols.values());
+            setPrimaryKeyUnique(false);
+            analyzer.addWarning(String.format(
+                "Partition columns (%s) are promoted as non unique primary key.",
+                String.join(", ", partitionCols.values())));
+          } else {
+            throw new AnalysisException(
+                "Specify primary key or non unique primary key for the Kudu table, " +
+                "or create partitions with the beginning columns of the table.");
+          }
+        }
+        if (primaryKeyColNames_.isEmpty()) return;
       } else {
         primaryKeyColNames_.addAll(primaryKey_.getPrimaryKeyColNames());
       }
     }
 
+    String primaryKeyString = KuduUtil.getPrimaryKeyString(isPrimaryKeyUnique_);
     if (!primaryKeyColDefs_.isEmpty()) {
-      throw new AnalysisException("Multiple primary keys specified. " +
-          "Composite primary keys can be specified using the " +
-          "PRIMARY KEY (col1, col2, ...) syntax at the end of the column definition.");
+      throw new AnalysisException(String.format(
+          "Multiple %sS specified. Composite %s can be specified using the %s " +
+          "(col1, col2, ...) syntax at the end of the column definition.",
+          primaryKeyString, primaryKeyString, primaryKeyString));
+    } else if (!primaryKeyColNames_.isEmpty() && !isPrimaryKeyUnique()
+        && !isKuduTable()) {
+      throw new AnalysisException(primaryKeyString + " is only supported for Kudu.");
     }
     Map<String, ColumnDef> colDefsByColName = ColumnDef.mapByColumnNames(columnDefs_);
     int keySeq = 1;
@@ -525,13 +585,13 @@ class TableDef {
       if (colDef == null) {
         if (ColumnDef.toColumnNames(primaryKeyColDefs_).contains(colName)) {
           throw new AnalysisException(String.format("Column '%s' is listed multiple " +
-              "times as a PRIMARY KEY.", colName));
+              "times as a %s.", colName, primaryKeyString));
         }
-        throw new AnalysisException(String.format(
-            "PRIMARY KEY column '%s' does not exist in the table", colName));
+        throw new AnalysisException(String.format("%s column '%s' does not exist in " +
+            "the table", primaryKeyString, colName));
       }
       if (colDef.isExplicitNullable()) {
-        throw new AnalysisException("Primary key columns cannot be nullable: " +
+        throw new AnalysisException(primaryKeyString + " columns cannot be nullable: " +
             colDef.toString());
       }
       // HDFS Table specific analysis.

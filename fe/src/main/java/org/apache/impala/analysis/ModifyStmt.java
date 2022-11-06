@@ -31,6 +31,7 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
@@ -285,7 +286,10 @@ public abstract class ModifyStmt extends StatementBase {
       }
 
       if (keySlots.contains(lhsSlotRef.getSlotId())) {
-        throw new AnalysisException(format("Key column '%s' cannot be updated.",
+        boolean isSystemGeneratedColumn =
+            c instanceof KuduColumn && ((KuduColumn)c).isAutoIncrementing();
+        throw new AnalysisException(format("%s column '%s' cannot be updated.",
+            isSystemGeneratedColumn ? "System generated key" : "Key",
             lhsSlotRef.toSql()));
       }
 
