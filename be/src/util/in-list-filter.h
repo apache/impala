@@ -136,20 +136,29 @@ class InListFilterImpl : public InListFilter {
   std::unordered_set<T> values_;
 };
 
+/// String set that wraps a boost::unordered_set<StringValue> and tracks the total length
+/// of strings in the set. Exposes the same methods of boost::unordered_set that are used
+/// in InListFilters.
 struct StringSetWithTotalLen {
   boost::unordered_set<StringValue> values;
   uint32_t total_len = 0;
 
-  inline bool insert(StringValue v) {
-    const auto& res = values.insert(v);
+  typedef typename boost::unordered_set<StringValue>::iterator iterator;
+
+  /// Inserts a new StringValue. Returns a pair consisting of an iterator to the element
+  /// in the set, and a bool denoting whether the insertion took place (true if insertion
+  /// happened, false if it did not, i.e. already exists).
+  inline pair<iterator, bool> insert(StringValue v) {
+    const auto& res = values.emplace(v);
     total_len += (res.second? v.len : 0);
-    return res.second;
+    return res;
   }
 
-  inline bool insert(const string& s) {
+  /// Same as the above one but inserts a value of std::string
+  inline pair<iterator, bool> insert(const string& s) {
     const auto& res = values.emplace(s);
     total_len += (res.second ? s.length() : 0);
-    return res.second;
+    return res;
   }
 
   inline bool find(StringValue v) const {
@@ -159,6 +168,10 @@ struct StringSetWithTotalLen {
   inline void clear() {
     values.clear();
     total_len = 0;
+  }
+
+  inline size_t size() const {
+    return values.size();
   }
 };
 
@@ -196,7 +209,7 @@ class InListFilterImpl<StringValue, SLOT_TYPE> : public InListFilter {
   MemPool mem_pool_;
   StringSetWithTotalLen values_;
   /// Temp set used to insert new values. They will be transferred to values_ in
-  /// MaterializeValues().
+  /// MaterializeValues(). Values should always be inserted into this set first.
   StringSetWithTotalLen newly_inserted_values_;
   /// Type len for CHAR type.
   int type_len_;

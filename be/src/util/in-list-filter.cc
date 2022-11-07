@@ -132,10 +132,7 @@ void InListFilterImpl<StringValue, SLOT_TYPE>::MaterializeValues() {
     VLOG_QUERY << "Not enough memory in materializing string IN-list filters. "
         << "Fallback to always true. New string batch size: "
         << newly_inserted_values_.total_len << "\n" << mem_pool_.DebugString();
-    always_true_ = true;
-    values_.clear();
-    newly_inserted_values_.clear();
-    total_entries_ = 0;
+    Reset();
     return;
   }
   // Transfer values to the finial set. Don't need to update total_entries_ since it's
@@ -148,23 +145,31 @@ void InListFilterImpl<StringValue, SLOT_TYPE>::MaterializeValues() {
   newly_inserted_values_.clear();
 }
 
-#define IN_LIST_FILTER_INSERT_BATCH(TYPE, SLOT_TYPE, PB_VAL_METHOD)                      \
+#define IN_LIST_FILTER_INSERT_BATCH(TYPE, SLOT_TYPE, PB_VAL_METHOD, SET_VAR)             \
   template<>                                                                             \
   void InListFilterImpl<TYPE, SLOT_TYPE>::InsertBatch(const ColumnValueBatchPB& batch) { \
     for (const ColumnValuePB& v : batch) {                                               \
-      DCHECK(v.has_##PB_VAL_METHOD());                                                   \
-      values_.insert(v.PB_VAL_METHOD());                                                 \
+      DCHECK(v.has_##PB_VAL_METHOD()) << v.ShortDebugString();                           \
+      const auto& res = SET_VAR.insert(v.PB_VAL_METHOD());                               \
+      if (res.second) {                                                                  \
+        ++total_entries_;                                                                \
+        if (UNLIKELY(total_entries_ > entry_limit_)) {                                   \
+          Reset();                                                                       \
+          break;                                                                         \
+        }                                                                                \
+      }                                                                                  \
     }                                                                                    \
+    DCHECK_EQ(total_entries_, SET_VAR.size());                                           \
   }
 
-IN_LIST_FILTER_INSERT_BATCH(int8_t, TYPE_TINYINT, byte_val)
-IN_LIST_FILTER_INSERT_BATCH(int16_t, TYPE_SMALLINT, short_val)
-IN_LIST_FILTER_INSERT_BATCH(int32_t, TYPE_INT, int_val)
-IN_LIST_FILTER_INSERT_BATCH(int64_t, TYPE_BIGINT, long_val)
-IN_LIST_FILTER_INSERT_BATCH(int32_t, TYPE_DATE, int_val)
-IN_LIST_FILTER_INSERT_BATCH(StringValue, TYPE_STRING, string_val)
-IN_LIST_FILTER_INSERT_BATCH(StringValue, TYPE_VARCHAR, string_val)
-IN_LIST_FILTER_INSERT_BATCH(StringValue, TYPE_CHAR, string_val)
+IN_LIST_FILTER_INSERT_BATCH(int8_t, TYPE_TINYINT, byte_val, values_)
+IN_LIST_FILTER_INSERT_BATCH(int16_t, TYPE_SMALLINT, short_val, values_)
+IN_LIST_FILTER_INSERT_BATCH(int32_t, TYPE_INT, int_val, values_)
+IN_LIST_FILTER_INSERT_BATCH(int64_t, TYPE_BIGINT, long_val, values_)
+IN_LIST_FILTER_INSERT_BATCH(int32_t, TYPE_DATE, int_val, values_)
+IN_LIST_FILTER_INSERT_BATCH(StringValue, TYPE_STRING, string_val, newly_inserted_values_)
+IN_LIST_FILTER_INSERT_BATCH(StringValue, TYPE_VARCHAR, string_val, newly_inserted_values_)
+IN_LIST_FILTER_INSERT_BATCH(StringValue, TYPE_CHAR, string_val, newly_inserted_values_)
 
 #define NUMERIC_IN_LIST_FILTER_TO_PROTOBUF(TYPE, SLOT_TYPE, PB_VAL_METHOD)             \
   template<>                                                                           \
@@ -182,7 +187,7 @@ NUMERIC_IN_LIST_FILTER_TO_PROTOBUF(int8_t, TYPE_TINYINT, byte_val)
 NUMERIC_IN_LIST_FILTER_TO_PROTOBUF(int16_t, TYPE_SMALLINT, short_val)
 NUMERIC_IN_LIST_FILTER_TO_PROTOBUF(int32_t, TYPE_INT, int_val)
 NUMERIC_IN_LIST_FILTER_TO_PROTOBUF(int64_t, TYPE_BIGINT, long_val)
-NUMERIC_IN_LIST_FILTER_TO_PROTOBUF(int32_t, TYPE_DATE, long_val)
+NUMERIC_IN_LIST_FILTER_TO_PROTOBUF(int32_t, TYPE_DATE, int_val)
 
 #define STRING_IN_LIST_FILTER_TO_PROTOBUF(SLOT_TYPE)                                   \
   template<>                                                                           \

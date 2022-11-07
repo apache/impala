@@ -74,10 +74,11 @@ struct FilterRegistration {
 ///
 /// All producers and consumers of filters must register via RegisterProducer() and
 /// RegisterConsumer(). Local plan fragments update the filters by calling
-/// UpdateFilterFromLocal(), with either a bloom filter or a min-max filter, depending
-/// on the filter's type. The 'bloom_filter' or 'min_max_filter' that is passed into
-/// UpdateFilterFromLocal() must have been allocated by AllocateScratch*Filter(); this
-/// allows RuntimeFilterBank to manage all memory associated with filters.
+/// UpdateFilterFromLocal(), with either a bloom filter, a min-max filter, or an in-list
+/// filter, depending on the filter's type. The 'bloom_filter', 'min_max_filter' or
+/// 'in_list_filter' that is passed into UpdateFilterFromLocal() must have been allocated
+/// by AllocateScratch*Filter(); this allows RuntimeFilterBank to manage all memory
+/// associated with filters.
 ///
 /// Filters are aggregated, first locally in this RuntimeFilterBank, if there are multiple
 /// producers, and then made available to consumers after PublishGlobalFilter() has been
@@ -85,10 +86,11 @@ struct FilterRegistration {
 /// of time so that RuntimeFilterBank knows when the filter is complete.
 ///
 /// After PublishGlobalFilter() has been called (at most once per filter_id), the
-/// RuntimeFilter object associated with filter_id will have a valid bloom_filter or
-/// min_max_filter, and may be used for filter evaluation. This operation occurs
-/// without synchronisation, and neither the thread that calls PublishGlobalFilter()
-/// nor the thread that may call RuntimeFilter::Eval() need to coordinate in any way.
+/// RuntimeFilter object associated with filter_id will have a valid bloom_filter,
+/// min_max_filter or in_list_filter, and may be used for filter evaluation. This
+/// operation occurs without synchronisation, and neither the thread that calls
+/// PublishGlobalFilter() nor the thread that may call RuntimeFilter::Eval() need to
+/// coordinate in any way.
 class RuntimeFilterBank {
  public:
   /// 'filters': contains an entry for every filter produced or consumed on this backend.
@@ -127,7 +129,7 @@ class RuntimeFilterBank {
   void UpdateFilterFromLocal(int32_t filter_id, BloomFilter* bloom_filter,
       MinMaxFilter* min_max_filter, InListFilter* in_list_filter);
 
-  /// Makes a bloom_filter (aggregated globally from all producer fragments) available for
+  /// Makes a filter (aggregated globally from all producer fragments) available for
   /// consumption by operators that wish to use it for filtering.
   void PublishGlobalFilter(
       const PublishFilterParamsPB& params, kudu::rpc::RpcContext* context);

@@ -23,6 +23,32 @@
 
 using namespace impala;
 
+template<typename T>
+void VerifyItems(InListFilter* f, ColumnType col_type, T min_value, T max_value,
+    bool contains_null) {
+  int num_items = max_value - min_value + 1;
+  if (contains_null) ++num_items;
+  EXPECT_EQ(num_items, f->NumItems());
+  EXPECT_EQ(contains_null, f->ContainsNull());
+  for (T v = min_value; v <= max_value; ++v) {
+    EXPECT_TRUE(f->Find(&v, col_type)) << v << " not found in " << f->DebugString();
+  }
+  T i = min_value - 1;
+  EXPECT_FALSE(f->Find(&i, col_type));
+  i = max_value + 1;
+  EXPECT_FALSE(f->Find(&i, col_type));
+
+  EXPECT_FALSE(f->AlwaysFalse());
+  EXPECT_FALSE(f->AlwaysTrue());
+}
+
+InListFilter* CloneFromProtobuf(InListFilter* filter, ColumnType col_type,
+    uint32_t entry_limit, ObjectPool* pool, MemTracker* mem_tracker) {
+  InListFilterPB pb;
+  InListFilter::ToProtobuf(filter, &pb);
+  return InListFilter::Create(pb, col_type, entry_limit, pool, mem_tracker);
+}
+
 template<typename T, PrimitiveType SLOT_TYPE>
 void TestNumericInListFilter() {
   MemTracker mem_tracker;
@@ -32,35 +58,40 @@ void TestNumericInListFilter() {
   EXPECT_TRUE(filter->AlwaysFalse());
   EXPECT_FALSE(filter->AlwaysTrue());
 
+  // Insert 20 values
   for (T v = -10; v < 10; ++v) {
     filter->Insert(&v);
   }
-  // Insert duplicated values again
+  // Insert some duplicated values again
   for (T v = 9; v >= 0; --v) {
     filter->Insert(&v);
   }
-  EXPECT_EQ(20, filter->NumItems());
-  EXPECT_FALSE(filter->ContainsNull());
+  VerifyItems<T>(filter, col_type, -10, 9, false);
+
+  // Copy the filter through protobuf for testing InsertBatch()
+  InListFilter* filter2 = CloneFromProtobuf(filter, col_type, 20, &obj_pool,
+      &mem_tracker);
+  VerifyItems<T>(filter2, col_type, -10, 9, false);
+
+  // Insert NULL
   filter->Insert(nullptr);
-  EXPECT_TRUE(filter->ContainsNull());
-  EXPECT_EQ(21, filter->NumItems());
+  VerifyItems<T>(filter, col_type, -10, 9, true);
 
-  for (T v = -10; v < 10; ++v) {
-    EXPECT_TRUE(filter->Find(&v, col_type));
-  }
-  T i = -11;
-  EXPECT_FALSE(filter->Find(&i, col_type));
-  i = 10;
-  EXPECT_FALSE(filter->Find(&i, col_type));
-
-  EXPECT_FALSE(filter->AlwaysFalse());
-  EXPECT_FALSE(filter->AlwaysTrue());
+  filter2 = CloneFromProtobuf(filter, col_type, 20, &obj_pool, &mem_tracker);
+  VerifyItems<T>(filter2, col_type, -10, 9, true);
 
   // Test falling back to an always_true filter when #items exceeds the limit
-  filter->Insert(&i);
-  EXPECT_FALSE(filter->AlwaysFalse());
-  EXPECT_TRUE(filter->AlwaysTrue());
-  EXPECT_EQ(0, filter->NumItems());
+  T value = 10;
+  filter->Insert(&value);
+  filter2 = CloneFromProtobuf(filter, col_type, 20, &obj_pool, &mem_tracker);
+
+  int i = 0;
+  for (InListFilter* f : {filter, filter2}) {
+    EXPECT_FALSE(f->AlwaysFalse());
+    EXPECT_TRUE(f->AlwaysTrue());
+    EXPECT_EQ(0, f->NumItems()) << "Error in filter " << i;
+    ++i;
+  }
 }
 
 TEST(InListFilterTest, TestTinyint) {
@@ -101,15 +132,23 @@ TEST(InListFilterTest, TestDate) {
   }
   EXPECT_EQ(5, filter->NumItems());
   EXPECT_FALSE(filter->ContainsNull());
-  filter->Insert(nullptr);
-  EXPECT_TRUE(filter->ContainsNull());
-  EXPECT_EQ(6, filter->NumItems());
+  InListFilter* filter2 = CloneFromProtobuf(filter, col_type, 20, &obj_pool,
+      &mem_tracker);
+  EXPECT_EQ(5, filter2->NumItems());
+  EXPECT_FALSE(filter2->ContainsNull());
 
-  for (const auto& v : values) {
-    EXPECT_TRUE(filter->Find(&v, col_type));
+  filter->Insert(nullptr);
+  filter2 = CloneFromProtobuf(filter, col_type, 20, &obj_pool, &mem_tracker);
+
+  for (InListFilter* f : {filter, filter2}) {
+    EXPECT_TRUE(f->ContainsNull());
+    EXPECT_EQ(6, f->NumItems());
+    for (const auto& v : values) {
+      EXPECT_TRUE(f->Find(&v, col_type));
+    }
+    DateValue d(60000);
+    EXPECT_FALSE(f->Find(&d, col_type));
   }
-  DateValue d(60000);
-  EXPECT_FALSE(filter->Find(&d, col_type));
 }
 
 void TestStringInListFilter(const ColumnType& col_type) {
@@ -135,21 +174,30 @@ void TestStringInListFilter(const ColumnType& col_type) {
     filter->Insert(&s);
   }
   filter->MaterializeValues();
-
   EXPECT_EQ(5, filter->NumItems());
   EXPECT_FALSE(filter->ContainsNull());
+
+  InListFilter* filter2 = CloneFromProtobuf(filter, col_type, 20, &obj_pool,
+      &mem_tracker);
+  EXPECT_EQ(5, filter2->NumItems());
+  EXPECT_FALSE(filter2->ContainsNull());
+  filter2->Close();
+
   filter->Insert(nullptr);
-  EXPECT_TRUE(filter->ContainsNull());
-  EXPECT_EQ(6, filter->NumItems());
+  filter2 = CloneFromProtobuf(filter, col_type, 20, &obj_pool, &mem_tracker);
 
   // Merge ss2 to ss1
   ss1.insert(ss1.end(), ss2.begin(), ss2.end());
-  for (const StringValue& s : ss1) {
-    EXPECT_TRUE(filter->Find(&s, col_type));
+  for (InListFilter* f : {filter, filter2}) {
+    EXPECT_TRUE(f->ContainsNull());
+    EXPECT_EQ(6, f->NumItems());
+    for (const StringValue& s : ss1) {
+      EXPECT_TRUE(f->Find(&s, col_type));
+    }
+    StringValue d("d");
+    EXPECT_FALSE(f->Find(&d, col_type));
+    f->Close();
   }
-  StringValue d("d");
-  EXPECT_FALSE(filter->Find(&d, col_type));
-  filter->Close();
 }
 
 TEST(InListFilterTest, TestString) {
@@ -188,16 +236,25 @@ TEST(InListFilterTest, TestChar) {
 
   EXPECT_EQ(5, filter->NumItems());
   EXPECT_FALSE(filter->ContainsNull());
-  filter->Insert(nullptr);
-  EXPECT_TRUE(filter->ContainsNull());
-  EXPECT_EQ(6, filter->NumItems());
+  InListFilter* filter2 = CloneFromProtobuf(filter, col_type, 20, &obj_pool,
+      &mem_tracker);
+  EXPECT_EQ(5, filter2->NumItems());
+  EXPECT_FALSE(filter2->ContainsNull());
+  filter2->Close();
 
-  ptr = str_buffer;
-  for (int i = 0; i < 5; ++i) {
-    EXPECT_TRUE(filter->Find(ptr, col_type));
-    ptr += 2;
+  filter->Insert(nullptr);
+  filter2 = CloneFromProtobuf(filter, col_type, 20, &obj_pool, &mem_tracker);
+  for (InListFilter* f : {filter, filter2}) {
+    EXPECT_TRUE(f->ContainsNull());
+    EXPECT_EQ(6, f->NumItems());
+
+    ptr = str_buffer;
+    for (int i = 0; i < 5; ++i) {
+      EXPECT_TRUE(f->Find(ptr, col_type));
+      ptr += 2;
+    }
+    ptr = "gg";
+    EXPECT_FALSE(f->Find(ptr, col_type));
+    f->Close();
   }
-  ptr = "gg";
-  EXPECT_FALSE(filter->Find(ptr, col_type));
-  filter->Close();
 }
