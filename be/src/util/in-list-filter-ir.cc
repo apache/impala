@@ -40,6 +40,7 @@ int32_t InListFilterImpl<int32_t, TYPE_DATE>::GetValue(const void* val) {
         Reset();                                                                      \
       }                                                                               \
     }                                                                                 \
+    DCHECK_EQ(total_entries_, values_.size());                                        \
   }                                                                                   \
                                                                                       \
   template<>                                                                          \
@@ -72,14 +73,15 @@ StringValue InListFilterImpl<StringValue, TYPE_CHAR>::GetValue(const void* val,
     }                                                                                   \
     StringValue s = GetValue(val, type_len_);                                           \
     if (!values_.find(s)) {                                                             \
-      bool res = newly_inserted_values_.insert(s);                                      \
-      if (res) {                                                                        \
+      const auto& res = newly_inserted_values_.insert(s);                               \
+      if (res.second) {                                                                 \
         ++total_entries_;                                                               \
         uint32_t str_total_len = values_.total_len + newly_inserted_values_.total_len;  \
         if (UNLIKELY(total_entries_ > entry_limit_                                      \
             || str_total_len >= STRING_SET_MAX_TOTAL_LENGTH)) {                         \
           Reset();                                                                      \
         }                                                                               \
+        DCHECK_EQ(total_entries_, values_.size() + newly_inserted_values_.size());      \
       }                                                                                 \
     }                                                                                   \
   }                                                                                     \
