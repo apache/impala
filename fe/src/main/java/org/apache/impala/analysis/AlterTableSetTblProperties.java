@@ -179,28 +179,6 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     if (IcebergUtil.getIcebergFileFormat(fileformat) == null) {
       throw new AnalysisException("Invalid fileformat for Iceberg table: " + fileformat);
     }
-    try {
-      FeIcebergTable iceTable = (FeIcebergTable)getTargetTable();
-      List<DataFile> dataFiles = IcebergUtil.getIcebergFiles(iceTable,
-          new ArrayList<>(), /*timeTravelSpec=*/null).first;
-      if (dataFiles.isEmpty()) return;
-      DataFile firstFile = dataFiles.get(0);
-      String errorMsg = "Attempt to set Iceberg data file format to %s, but found data " +
-          "file %s with file format %s.";
-      if (!firstFile.format().name().equalsIgnoreCase(fileformat)) {
-        throw new AnalysisException(String.format(errorMsg, fileformat, firstFile.path(),
-        firstFile.format().name()));
-      }
-      //TODO(IMPALA-10610): Iceberg tables with mixed file formats are not readable.
-      for (DataFile df : dataFiles) {
-        if (df.format() != firstFile.format()) {
-          throw new AnalysisException(String.format(errorMsg, fileformat, df.path(),
-              df.format().name()));
-        }
-      }
-    } catch (TableLoadingException e) {
-      throw new AnalysisException(e);
-    }
   }
 
   private void icebergParquetCompressionCodecCheck() throws AnalysisException {

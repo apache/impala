@@ -174,13 +174,13 @@ INT
 ====
 ---- QUERY
 ALTER TABLE iceberg_changing_fileformats set TBLPROPERTIES('write.format.default'='ORC');
----- CATCH
-Attempt to set Iceberg data file format to ORC
+---- RESULTS: VERIFY_IS_SUBSET
+'Updated table.'
 ====
 ---- QUERY
 DESCRIBE FORMATTED iceberg_changing_fileformats;
 ---- RESULTS: VERIFY_IS_SUBSET
-'','write.format.default','parquet             '
+'','write.format.default','ORC                 '
 ---- TYPES
 string, string, string
 ====
