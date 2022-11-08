@@ -53,8 +53,13 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ---- QUERY
 explain select count(*) from corrupted where org = 1;
 ---- RESULTS: VERIFY_IS_SUBSET
-'WARNING: The following tables have potentially corrupt table statistics.'
-'Drop and re-compute statistics to resolve this problem.'
+'The row count in one or more partitions in the following tables '
+'is either a) less than -1, or b) 0 but the size of all the files inside '
+'the partition(s) is positive.'
+'The latter case does not necessarily imply the existence of corrupt '
+'statistics when the corresponding tables are transactional.'
+'If it is suspected that there may be corrupt statistics, dropping and '
+'re-computing statistics could resolve this problem.'
 '$DATABASE.corrupted'
 ''
 '03:AGGREGATE [FINALIZE]'
@@ -132,8 +137,13 @@ STRING
 alter table corrupted partition(org=2) set tblproperties('numRows'='-1234', 'STATS_GENERATED_VIA_STATS_TASK'='true');
 explain select count(*) from corrupted where org = 2;
 ---- RESULTS: VERIFY_IS_SUBSET
-'WARNING: The following tables have potentially corrupt table statistics.'
-'Drop and re-compute statistics to resolve this problem.'
+'The row count in one or more partitions in the following tables '
+'is either a) less than -1, or b) 0 but the size of all the files inside '
+'the partition(s) is positive.'
+'The latter case does not necessarily imply the existence of corrupt '
+'statistics when the corresponding tables are transactional.'
+'If it is suspected that there may be corrupt statistics, dropping and '
+'re-computing statistics could resolve this problem.'
 '$DATABASE.corrupted'
 ''
 '03:AGGREGATE [FINALIZE]'
@@ -192,8 +202,13 @@ BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ---- QUERY
 explain select count(*) from corrupted_no_part;
 ---- RESULTS: VERIFY_IS_SUBSET
-'WARNING: The following tables have potentially corrupt table statistics.'
-'Drop and re-compute statistics to resolve this problem.'
+'The row count in one or more partitions in the following tables '
+'is either a) less than -1, or b) 0 but the size of all the files inside '
+'the partition(s) is positive.'
+'The latter case does not necessarily imply the existence of corrupt '
+'statistics when the corresponding tables are transactional.'
+'If it is suspected that there may be corrupt statistics, dropping and '
+'re-computing statistics could resolve this problem.'
 '$DATABASE.corrupted_no_part'
 ''
 '03:AGGREGATE [FINALIZE]'
@@ -215,8 +230,13 @@ STRING
 alter table corrupted_no_part set tblproperties('numRows'='-1234', 'STATS_GENERATED_VIA_STATS_TASK'='true');
 explain select count(*) from corrupted_no_part;
 ---- RESULTS: VERIFY_IS_SUBSET
-'WARNING: The following tables have potentially corrupt table statistics.'
-'Drop and re-compute statistics to resolve this problem.'
+'The row count in one or more partitions in the following tables '
+'is either a) less than -1, or b) 0 but the size of all the files inside '
+'the partition(s) is positive.'
+'The latter case does not necessarily imply the existence of corrupt '
+'statistics when the corresponding tables are transactional.'
+'If it is suspected that there may be corrupt statistics, dropping and '
+'re-computing statistics could resolve this problem.'
 '$DATABASE.corrupted_no_part'
 ''
 '03:AGGREGATE [FINALIZE]'

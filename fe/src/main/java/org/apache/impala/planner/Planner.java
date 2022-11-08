@@ -334,8 +334,8 @@ public class Planner {
           "the partition(s) is positive.\n" +
           "The latter case does not necessarily imply the existence of corrupt \n" +
           "statistics when the corresponding tables are transactional.\n" +
-          "If it is suspected that there may be corrupt statistics, drop and \n" +
-          "re-compute statistics could resolve this problem.\n" +
+          "If it is suspected that there may be corrupt statistics, dropping and \n" +
+          "re-computing statistics could resolve this problem.\n" +
           Joiner.on(", ").join(tableNames) + "\n");
       hasHeader = true;
     }
