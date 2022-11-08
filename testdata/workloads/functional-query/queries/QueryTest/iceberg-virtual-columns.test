@@ -1,0 +1,39 @@
+====
+---- QUERY
+create table ice_tbl (
+  col_b boolean,
+  col_i int,
+  col_bi bigint,
+  col_str string,
+  col_ts timestamp,
+  col_dt date
+) partitioned by spec (col_b) stored as iceberg;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into
+  ice_tbl
+values
+  (true, 0, 12345678900, 'Abc', '1800-01-01 00:00:00', DATE'1800-01-01'),
+  (false, 1, 12345678902,  'aBc', '1800-01-01 02:02:02', DATE'1800-01-01'),
+  (false, 3, 12345678907, 'abC', '1900-01-01 01:01:01', DATE'1900-01-01'),
+  (false, 5, 12345678908, '', '1900-01-01 02:02:02', DATE'1900-01-01');
+select count(1) from ice_tbl;
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
+---- QUERY
+select input__file__name, file__position from ice_tbl order by 1,2 desc;
+---- LABELS
+input__file__name, file__position
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_b=false/.*.0.parq',2
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_b=false/.*.0.parq',1
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_b=false/.*.0.parq',0
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_b=true/.*.0.parq',0
+---- TYPES
+STRING, BIGINT
+====

@@ -89,6 +89,8 @@ void FileMetadataUtils::AddIcebergColumns(MemPool* mem_pool, Tuple** template_tu
     *template_tuple = Tuple::Create(tuple_desc->byte_size(), mem_pool);
   }
   for (const SlotDescriptor* slot_desc : scan_node_->tuple_desc()->slots()) {
+    // The partition column of Iceberg tables must not be virtual column
+    if (slot_desc->IsVirtual()) continue;
     const SchemaPath& path = slot_desc->col_path();
     if (path.size() != 1) continue;
     const ColumnDescriptor& col_desc =

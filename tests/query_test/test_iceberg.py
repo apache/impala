@@ -851,6 +851,9 @@ class TestIcebergTable(IcebergTestSuite):
   def test_compute_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-compute-stats', vector, unique_database)
 
+  def test_virtual_columns(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-virtual-columns', vector, unique_database)
+
 
 class TestIcebergV2Table(IcebergTestSuite):
   """Tests related to Iceberg V2 tables."""
