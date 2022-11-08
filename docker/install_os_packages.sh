@@ -154,6 +154,11 @@ if ! locale -a | grep en_US.utf8 ; then
   exit 1
 fi
 
+# Impala will fail to start if the permissions on /var/tmp are not set to include
+# the sticky bit (i.e. +t). Some versions of Redhat UBI images do not have
+# this set by default, so specifically set the sticky bit for both /tmp and /var/tmp.
+chmod a=rwx,o+t /var/tmp /tmp
+
 # To minimize the size for the Docker image, clean up any unnecessary files.
 if [[ $DISTRIBUTION == Ubuntu ]]; then
   apt-get clean
