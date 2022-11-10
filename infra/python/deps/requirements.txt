@@ -37,7 +37,10 @@ flake8 == 3.9.2
     contextlib2 == 0.6.0
     pathlib2 == 2.3.7.post1
     zipp == 1.2.0
-gcovr == 3.4
+gcovr == 4.2
+  Jinja2 == 2.11.3
+    MarkupSafe == 1.1.1
+  lxml == 4.9.1
 hdfs == 2.0.2
   docopt == 0.6.2
   execnet == 1.4.0

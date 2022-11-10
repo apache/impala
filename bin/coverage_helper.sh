@@ -66,6 +66,10 @@ fi
 if [ ${REPORT_ACTION} -eq 1 ]; then
   mkdir -p "${REPORT_DIRECTORY}"
   rm -f "${REPORT_DIRECTORY}"/index*.html
+  if ! which gcov > /dev/null; then
+    export PATH="$PATH:$IMPALA_TOOLCHAIN_PACKAGES_HOME/gcc-$IMPALA_GCC_VERSION/bin"
+  fi
+  echo "Using gcov at `which gcov`"
   # src/util/bit-packing.inline.h gets lots of hits, so generating a detailed report
   # for it takes several minutes. Exclude it to keep the execution time down.
   # gcovr excludes are buggy, so on some environments these excludes won't work.

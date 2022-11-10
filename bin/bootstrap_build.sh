@@ -35,7 +35,7 @@ export DEBIAN_FRONTEND=noninteractive
 sudo -E apt-get update
 sudo -E apt-get --yes install g++ gcc git libsasl2-dev libssl-dev make python-dev \
      python-setuptools python3-dev python3-setuptools libffi-dev libkrb5-dev \
-     krb5-admin-server krb5-kdc krb5-user
+     krb5-admin-server krb5-kdc krb5-user libxml2-dev libxslt-dev
 
 source /etc/lsb-release
 
