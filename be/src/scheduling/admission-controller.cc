@@ -60,6 +60,9 @@ DEFINE_int64_hidden(admission_control_stale_topic_threshold_ms, 5 * 1000,
     "capture most cases where the Impala daemon is disconnected from the statestore "
     "or topic updates are seriously delayed.");
 
+DECLARE_bool(is_coordinator);
+DECLARE_bool(is_executor);
+
 namespace impala {
 
 const int64_t AdmissionController::PoolStats::HISTOGRAM_NUM_OF_BINS = 128;
@@ -660,9 +663,13 @@ Status AdmissionController::Init() {
   auto cb = [this](
       const StatestoreSubscriber::TopicDeltaMap& state,
       vector<TTopicDelta>* topic_updates) { UpdatePoolStats(state, topic_updates); };
+  // The executor only needs to read the entry with the key prefix "POOL:" from the topic.
+  // This can effectively reduce the network load of the statestore.
+  string filter_prefix =
+      FLAGS_is_executor && !FLAGS_is_coordinator ? TOPIC_KEY_POOL_PREFIX : "";
   Status status = subscriber_->AddTopic(Statestore::IMPALA_REQUEST_QUEUE_TOPIC,
       /* is_transient=*/true, /* populate_min_subscriber_topic_version=*/false,
-      /* filter_prefix=*/"", cb);
+      filter_prefix, cb);
   if (!status.ok()) {
     status.AddDetail("AdmissionController failed to register request queue topic");
   }
