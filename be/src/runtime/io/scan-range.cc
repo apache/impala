@@ -123,7 +123,7 @@ void ScanRange::AddUnusedBuffers(vector<unique_ptr<BufferDescriptor>>&& buffers,
   if (unblocked) ScheduleScanRange();
 }
 
-bool ScanRange::FileHandleCacheEnabled() {
+bool ScanRange::FileHandleCacheEnabled() const {
   // Global flag for all file handle caching
   if (!is_file_handle_caching_enabled()) return false;
 
@@ -224,8 +224,12 @@ ReadOutcome ScanRange::DoReadInternal(DiskQueue* queue, int disk_id, bool use_lo
     VLOG_FILE << (use_file_handle_cache ? "Using" : "Skipping")
               << " file handle cache for " << (expected_local_ ? "local" : "remote")
               << " file " << file();
-
-    read_status = file_reader->Open(use_file_handle_cache);
+    // Delay open if configured to use a file handle cache or data cache as cache hits
+    // don't require an explicit Open.
+    if (!file_reader->SupportsDelayedOpen()
+        || !(use_file_handle_cache || UseDataCache())) {
+      read_status = file_reader->Open();
+    }
     if (read_status.ok()) {
       COUNTER_ADD_IF_NOT_NULL(reader_->active_read_thread_counter_, 1L);
       COUNTER_BITOR_IF_NOT_NULL(reader_->disks_accessed_bitmap_, 1LL << disk_id);
@@ -235,10 +239,9 @@ ReadOutcome ScanRange::DoReadInternal(DiskQueue* queue, int disk_id, bool use_lo
         read_status =
             file_reader->ReadFromPos(queue, offset_ + bytes_read_, buffer_desc->buffer_,
                 min(bytes_to_read() - bytes_read_, buffer_desc->buffer_len_),
-                &buffer_desc->len_, &eof, use_file_handle_cache);
+                &buffer_desc->len_, &eof);
       } else {
-        read_status = ReadSubRanges(queue, buffer_desc.get(), &eof, file_reader,
-            use_file_handle_cache);
+        read_status = ReadSubRanges(queue, buffer_desc.get(), &eof, file_reader);
       }
 
       COUNTER_ADD_IF_NOT_NULL(reader_->bytes_read_counter_, buffer_desc->len_);
@@ -329,8 +332,7 @@ ReadOutcome ScanRange::DoRead(DiskQueue* queue, int disk_id) {
 }
 
 Status ScanRange::ReadSubRanges(
-    DiskQueue* queue, BufferDescriptor* buffer_desc, bool* eof, FileReader* file_reader,
-    bool use_file_handle_cache) {
+    DiskQueue* queue, BufferDescriptor* buffer_desc, bool* eof, FileReader* file_reader) {
   buffer_desc->len_ = 0;
   while (buffer_desc->len() < buffer_desc->buffer_len()
       && sub_range_pos_.index < sub_ranges_.size()) {
@@ -346,7 +348,7 @@ Status ScanRange::ReadSubRanges(
       int64_t current_bytes_read;
       Status read_status = file_reader->ReadFromPos(queue, offset,
           buffer_desc->buffer_ + buffer_desc->len(), bytes_to_read, &current_bytes_read,
-          eof, use_file_handle_cache);
+          eof);
       if (!read_status.ok()) return read_status;
       if (current_bytes_read != bytes_to_read) {
         DCHECK(*eof);
@@ -610,7 +612,7 @@ Status ScanRange::ReadFromCache(
   DCHECK(UseHdfsCache());
   DCHECK_EQ(bytes_read_, 0);
   *read_succeeded = false;
-  Status status = file_reader_->Open(false);
+  Status status = file_reader_->Open();
   if (!status.ok()) return status;
 
   // Check cancel status.

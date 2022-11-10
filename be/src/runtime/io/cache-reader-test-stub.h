@@ -37,13 +37,12 @@ public:
 
   ~CacheReaderTestStub() {}
 
-  virtual Status Open(bool use_file_handle_cache) override {
+  virtual Status Open() override {
     return Status::OK();
   }
 
   virtual Status ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_t* buffer,
-      int64_t bytes_to_read, int64_t* bytes_read, bool* eof,
-      bool use_file_handle_cache) override {
+      int64_t bytes_to_read, int64_t* bytes_read, bool* eof) override {
     DCHECK(false);
     return Status("Not implemented");
   }

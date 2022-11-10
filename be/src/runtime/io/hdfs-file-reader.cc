@@ -57,19 +57,11 @@ HdfsFileReader::~HdfsFileReader() {
   DCHECK(cached_buffer_ == nullptr) << "Cached buffer was not released.";
 }
 
-Status HdfsFileReader::Open(bool use_file_handle_cache) {
+Status HdfsFileReader::Open() {
   unique_lock<SpinLock> hdfs_lock(lock_);
   RETURN_IF_ERROR(scan_range_->cancel_status_);
 
   if (exclusive_hdfs_fh_ != nullptr) return Status::OK();
-  // If using file handle caching, the reader does not maintain its own
-  // hdfs file handle, so it can skip opening a file handle.
-  if (use_file_handle_cache) return Status::OK();
-  if (scan_range_->UseDataCache() &&
-      scan_range_->io_mgr_->remote_data_cache() != nullptr) {
-    // Use delayed open when using a remote data cache.
-    return Status::OK();
-  }
   return DoOpen();
 }
 
@@ -115,7 +107,7 @@ std::string HdfsFileReader::GetHostList(int64_t file_offset,
 }
 
 Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_t* buffer,
-    int64_t bytes_to_read, int64_t* bytes_read, bool* eof, bool use_file_handle_cache) {
+    int64_t bytes_to_read, int64_t* bytes_read, bool* eof) {
   DCHECK(scan_range_->read_in_flight());
   DCHECK_GE(bytes_to_read, 0);
   // Delay before acquiring the lock, to allow triggering IMPALA-6587 race.
@@ -165,7 +157,7 @@ Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_
     hdfsFile hdfs_file;
     if (exclusive_hdfs_fh_ != nullptr) {
       hdfs_file = exclusive_hdfs_fh_->file();
-    } else if (use_file_handle_cache) {
+    } else if (scan_range_->FileHandleCacheEnabled()) {
       RETURN_IF_ERROR(io_mgr->GetCachedHdfsFileHandle(hdfs_fs_,
           scan_range_->file_string(), scan_range_->mtime(), request_context, &accessor));
       hdfs_file = accessor.Get()->file();

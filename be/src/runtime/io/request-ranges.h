@@ -420,7 +420,7 @@ class ScanRange : public RequestRange {
       boost::shared_lock<boost::shared_mutex>* local_file_lock = nullptr);
 
   /// Whether to use file handle caching for the current file.
-  bool FileHandleCacheEnabled();
+  bool FileHandleCacheEnabled() const;
 
   /// Same as Cancel() except it doesn't remove the scan range from
   /// reader_->active_scan_ranges_ or call WaitForInFlightRead(). This allows for
@@ -488,8 +488,7 @@ class ScanRange : public RequestRange {
   /// files. 'queue' is updated with the latencies and sizes of reads from the underlying
   /// filesystem.
   Status ReadSubRanges(
-      DiskQueue* queue, BufferDescriptor* buffer, bool* eof, FileReader* file_reader,
-      bool use_file_handle_cache);
+      DiskQueue* queue, BufferDescriptor* buffer, bool* eof, FileReader* file_reader);
 
   /// Validates the internal state of this range. lock_ must be taken
   /// before calling this. Need to take a lock on 'lock_' via

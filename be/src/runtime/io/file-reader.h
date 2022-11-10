@@ -42,8 +42,7 @@ public:
   virtual ~FileReader() {}
 
   /// Opens file that is associated with 'scan_range_'.
-  /// 'use_file_handle_cache' currently only used by HdfsFileReader.
-  virtual Status Open(bool use_file_handle_cache) = 0;
+  virtual Status Open() = 0;
 
   /// Reads bytes from given position ('file_offset'). Tries to read
   /// 'bytes_to_read' amount of bytes. 'bytes_read' contains the number of
@@ -51,18 +50,21 @@ public:
   /// Metrics in 'queue' are updated with the size and latencies of the read
   /// operations on the underlying file system.
   virtual Status ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_t* buffer,
-      int64_t bytes_to_read, int64_t* bytes_read, bool* eof,
-      bool use_file_handle_cache) = 0;
+      int64_t bytes_to_read, int64_t* bytes_read, bool* eof) = 0;
 
   /// ***Currently only for HDFS***
   /// When successful, sets 'data' to a buffer that contains the contents of a file,
-  /// and 'length' is set to the length of the data.
+  /// and 'length' is set to the length of the data. Does not support delayed open.
   /// When unsuccessful, 'data' is set to nullptr.
   virtual void CachedFile(uint8_t** data, int64_t* length) = 0;
 
   /// Closes the file associated with 'scan_range_'. It doesn't have effect on other
   /// scan ranges.
   virtual void Close() = 0;
+
+  /// Override to return true if the implementation supports ReadFromPos without first
+  /// calling Open. This can be useful when caching data or file handles.
+  virtual bool SupportsDelayedOpen() const { return false; }
 
   /// Resets internal bookkeeping
   virtual void ResetState() {}

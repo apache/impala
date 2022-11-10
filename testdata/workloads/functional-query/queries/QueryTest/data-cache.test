@@ -49,3 +49,9 @@ row_regex: .*DataCacheHitCount: 0 \(0\).*
 row_regex: .*DataCacheMissCount: 2 \(2\).*
 row_regex: .*DataCachePartialHitCount: 0 \(0\).*
 ====
+---- QUERY
+# Exercise HDFS cache
+select count(*) from tpch.nation;
+---- RESULTS
+25
+====
