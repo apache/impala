@@ -180,6 +180,12 @@ class TestNestedCollectionsInSelectList(ImpalaTestSuite):
     """Queries where a map column is in the select list"""
     self.run_test_case('QueryTest/nested-map-in-select-list', vector)
 
+  def test_map_null_keys(self, vector, unique_database):
+    """Queries where a map has null keys. Is only possible in ORC, not Parquet."""
+    if vector.get_value('table_format').file_format == 'parquet':
+      pytest.skip()
+    self.run_test_case('QueryTest/map_null_keys', vector)
+
 
 # Moved this to a separate test class from TestNestedTypesInSelectList because this needs
 # a narrower test vector.

@@ -20,9 +20,14 @@
 #include <sstream>
 #include <boost/scoped_ptr.hpp>
 
+#include <rapidjson/ostreamwrapper.h>
+#include <rapidjson/rapidjson.h>
+#include <rapidjson/writer.h>
+
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/slot-ref.h"
 #include "rpc/thrift-util.h"
+#include "runtime/complex-value-writer.inline.h"
 #include "runtime/descriptors.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
@@ -198,8 +203,7 @@ Status AsciiQueryResultSet::AddRows(const vector<ScalarExprEvaluator*>& expr_eva
       } else if (metadata_.columns[i].columnType.types.size() > 1) {
         ColumnType col_type = ColumnType::FromThrift(metadata_.columns[i].columnType);
         DCHECK(col_type.IsArrayType() || col_type.IsMapType());
-        PrintCollectionValue(expr_evals[i], it.Get(), scales[i], &out_stream,
-            col_type.IsMapType());
+        PrintCollectionValue(expr_evals[i], it.Get(), &out_stream, col_type.type);
       } else {
         DCHECK(false);
       }
@@ -211,7 +215,9 @@ Status AsciiQueryResultSet::AddRows(const vector<ScalarExprEvaluator*>& expr_eva
 }
 
 void QueryResultSet::PrintCollectionValue(ScalarExprEvaluator* expr_eval,
-    const TupleRow* row, int scale, stringstream *stream, bool is_map) {
+    const TupleRow* row, stringstream *stream, PrimitiveType collection_type) {
+  DCHECK(collection_type == PrimitiveType::TYPE_ARRAY
+      || collection_type == PrimitiveType::TYPE_MAP);
   const ScalarExpr& scalar_expr = expr_eval->root();
   // Currently scalar_expr can be only a slot ref as no functions return arrays.
   DCHECK(scalar_expr.IsSlotRef());
@@ -220,7 +226,18 @@ void QueryResultSet::PrintCollectionValue(ScalarExprEvaluator* expr_eval,
   const CollectionValue* array_val =
       static_cast<const CollectionValue*>(expr_eval->GetValue(row));
 
-  RawValue::PrintCollectionValue(array_val, item_tuple_desc, scale, stream, is_map);
+  if (array_val != nullptr) {
+    rapidjson::BasicOStreamWrapper<stringstream> wrapped_stream(*stream);
+    rapidjson::Writer<rapidjson::BasicOStreamWrapper<stringstream>> writer(
+        wrapped_stream);
+
+    ComplexValueWriter<rapidjson::BasicOStreamWrapper<stringstream>>
+        ::CollectionValueToJSON(*array_val,
+            collection_type,
+            item_tuple_desc, &writer);
+  } else {
+    (*stream) << RawValue::NullLiteral(/*top-level*/ true);
+  }
 }
 
 Status AsciiQueryResultSet::AddOneRow(const TResultRow& row) {

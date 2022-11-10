@@ -40,17 +40,6 @@ constexpr float RawValue::CANONICAL_FLOAT_NAN;
 constexpr double RawValue::CANONICAL_DOUBLE_ZERO;
 constexpr float RawValue::CANONICAL_FLOAT_ZERO;
 
-namespace {
-
-// Top level null values are printed as "NULL"; collections and structs are printed in
-// JSON format, which requires "null".
-constexpr const char* NullLiteral(bool top_level) {
-  if (top_level) return "NULL";
-  return "null";
-}
-
-}
-
 void RawValue::PrintValueAsBytes(const void* value, const ColumnType& type,
                                  stringstream* stream) {
   if (value == NULL) return;
@@ -425,80 +414,8 @@ template void RawValue::WritePrimitive<false>(const void* value, Tuple* tuple,
 bool PrintNestedValueIfNull(const SlotDescriptor& slot_desc, Tuple* item,
     stringstream* stream) {
   bool is_null = item->IsNull(slot_desc.null_indicator_offset());
-  if (is_null) *stream << NullLiteral(false);
+  if (is_null) *stream << RawValue::NullLiteral(false);
   return is_null;
-}
-
-void PrintNonNullNestedCollection(const SlotDescriptor& slot_desc, Tuple* item, int scale,
-    stringstream* stream) {
-  const CollectionValue* nested_collection_val =
-      item->GetCollectionSlot(slot_desc.tuple_offset());
-  DCHECK(nested_collection_val != nullptr);
-  const TupleDescriptor* child_item_tuple_desc =
-      slot_desc.children_tuple_descriptor();
-  DCHECK(child_item_tuple_desc != nullptr);
-  RawValue::PrintCollectionValue(nested_collection_val, child_item_tuple_desc, scale,
-      stream, slot_desc.type().IsMapType());
-}
-
-void PrintNonNullNestedPrimitive(const SlotDescriptor& slot_desc, Tuple* item, int scale,
-    stringstream* stream) {
-  RawValue::PrintValue(item->GetSlot(slot_desc.tuple_offset()), slot_desc.type(), scale,
-      stream, true);
-}
-
-void PrintNestedValue(const SlotDescriptor& slot_desc, Tuple* item, int scale,
-    stringstream* stream) {
-  bool is_null = PrintNestedValueIfNull(slot_desc, item, stream);
-  if (is_null) return;
-
-  if (slot_desc.type().IsCollectionType()) {
-    // The item is also an array or a map, recurse deeper if not NULL.
-    PrintNonNullNestedCollection(slot_desc, item, scale, stream);
-  } else if (!slot_desc.type().IsComplexType()) {
-    // The item is a scalar, print it with the usual PrintValue.
-    PrintNonNullNestedPrimitive(slot_desc, item, scale, stream);
-  } else {
-    DCHECK(false);
-  }
-}
-
-void RawValue::PrintCollectionValue(const CollectionValue* coll_val,
-    const TupleDescriptor* item_tuple_desc, int scale, stringstream *stream,
-    bool is_map) {
-  DCHECK(item_tuple_desc != nullptr);
-  if (coll_val == nullptr) {
-    // We only reach this code path if this is a top level collection. Otherwise
-    // PrintNestedValue() handles the printing of the NULL literal.
-    *stream << NullLiteral(true);
-    return;
-  }
-  int item_byte_size = item_tuple_desc->byte_size();
-
-  const vector<SlotDescriptor*>& slot_descs = item_tuple_desc->slots();
-  // TODO: This has to be changed once structs are supported too.
-  if (is_map) {
-    DCHECK(slot_descs.size() == 2);
-    DCHECK(slot_descs[0] != nullptr);
-    DCHECK(slot_descs[1] != nullptr);
-  } else {
-    DCHECK(slot_descs.size() == 1);
-    DCHECK(slot_descs[0] != nullptr);
-  }
-
-  *stream << (is_map ? "{" : "[");
-  for (int i = 0; i < coll_val->num_tuples; ++i) {
-    Tuple* item = reinterpret_cast<Tuple*>(coll_val->ptr + i * item_byte_size);
-
-    PrintNestedValue(*slot_descs[0], item, scale, stream);
-    if (is_map) {
-      *stream << ":";
-      PrintNestedValue(*slot_descs[1], item, scale, stream);
-    }
-
-    if (i < coll_val->num_tuples - 1) *stream << ",";
-  }
-  *stream << (is_map ? "}" : "]");
 }
 
 }

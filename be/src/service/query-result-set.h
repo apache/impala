@@ -23,6 +23,7 @@
 #include "gen-cpp/Results_types.h"
 #include "gen-cpp/TCLIService_types.h"
 #include "runtime/runtime-state.h"
+#include "runtime/types.h"
 
 #include <vector>
 #include <sstream>
@@ -78,10 +79,10 @@ class QueryResultSet {
       apache::hive::service::cli::thrift::TRowSet* rowset);
 
 protected:
-  /// Wrapper to call RawValue::PrintCollectionValue for a given collection column.
-  /// expr_eval must be a SlotRef on a collection slot.
+  /// Wrapper to callComplexValueWriter::CollectionValueToJSON() for a given collection
+  /// column. expr_eval must be a SlotRef on a collection slot.
   static void PrintCollectionValue(ScalarExprEvaluator* expr_eval, const TupleRow* row,
-      int scale, std::stringstream *stream, bool is_map);
+      std::stringstream *stream, PrimitiveType collection_type);
 
 };
 }

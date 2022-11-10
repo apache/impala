@@ -3700,9 +3700,21 @@ map_1d MAP<INT, STRING>
 map_2d MAP<INT,MAP<INT,STRING>>
 map_3d MAP<INT,MAP<INT,MAP<INT,STRING>>>
 map_map_array MAP<INT,MAP<INT,ARRAY<INT>>>
+map_bool_key MAP<BOOLEAN, STRING>
+map_tinyint_key MAP<TINYINT, STRING>
+map_smallint_key MAP<SMALLINT, STRING>
+map_bigint_key MAP<BIGINT, STRING>
+map_float_key MAP<FLOAT, STRING>
+map_double_key MAP<DOUBLE, STRING>
+map_decimal_key MAP<DECIMAL(2,1), STRING>
+map_string_key MAP<STRING, INT>
+map_char_key MAP<CHAR(3), INT>
+map_varchar_key MAP<VARCHAR(3), STRING>
+map_timestamp_key MAP<TIMESTAMP, STRING>
+map_date_key MAP<DATE, STRING>
 ---- DEPENDENT_LOAD_HIVE
 -- It would be nice to insert NULLs, but I couldn't find a way in Hive.
-INSERT INTO {db_name}{db_suffix}.{table_name} VALUES
+INSERT OVERWRITE {db_name}{db_suffix}.{table_name} VALUES
   (1,
    array(1, 2, NULL),
    array(array(1, 2, NULL), array(3)),
@@ -3719,7 +3731,65 @@ INSERT INTO {db_name}{db_suffix}.{table_name} VALUES
    map(
        1, map(10, array(100, 200), 20, array(300, 400)),
        2, map(30, array(500, 600), 40, array(700, 800))
-   )
+   ),
+   map(true, "true", false, "false"),
+   map(-1Y, "a", 0Y, "b", 1Y, "c"),
+   map(-1S, "a", 0S, "b", 1S, "c"),
+   map(-1L, "a", 0L, "b", 1L, "c"),
+   map(cast(-1.5 as FLOAT), "a", cast(0.25 as FLOAT), "b", cast(1.75 as FLOAT), "c"),
+   map(cast(-1.5 as DOUBLE), "a", cast(0.25 as DOUBLE), "b", cast(1.75 as DOUBLE), "c"),
+   map(-1.8, "a", 0.2, "b", 1.2, "c"),
+   map("one", 1, "two", 2, "three", 3),
+   map(cast("Mon" as CHAR(3)), 1,
+       cast("Tue" as CHAR(3)), 2,
+       cast("Wed" as CHAR(3)), 3,
+       cast("Thu" as CHAR(3)), 4,
+       cast("Fri" as CHAR(3)), 5,
+       cast("Sat" as CHAR(3)), 6,
+       cast("Sun" as CHAR(3)), 7
+      ),
+   map(cast("a" as VARCHAR(3)), "A", cast("ab" as VARCHAR(3)), "AB", cast("abc" as VARCHAR(3)), "ABC"),
+   map(to_utc_timestamp("2022-12-10 08:15:12", "UTC"), "Saturday morning",
+       to_utc_timestamp("2022-12-09 18:15:12", "UTC"), "Friday evening"),
+   map(to_date("2022-12-10"), "Saturday", to_date("2022-12-09"), "Friday")
+  );
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+map_null_keys
+---- COLUMNS
+id INT
+map_bool_key MAP<BOOLEAN, STRING>
+map_tinyint_key MAP<TINYINT, STRING>
+map_smallint_key MAP<SMALLINT, STRING>
+map_bigint_key MAP<BIGINT, STRING>
+map_float_key MAP<FLOAT, STRING>
+map_double_key MAP<DOUBLE, STRING>
+map_decimal_key MAP<DECIMAL(2,1), STRING>
+map_string_key MAP<STRING, INT>
+map_char_key MAP<CHAR(3), INT>
+map_varchar_key MAP<VARCHAR(3), STRING>
+map_timestamp_key MAP<TIMESTAMP, STRING>
+map_date_key MAP<DATE, STRING>
+---- DEPENDENT_LOAD_HIVE
+INSERT OVERWRITE {db_name}{db_suffix}.{table_name} VALUES
+  (1,
+   map(true, "true", if(false, false, NULL), "null"),
+   map(-1Y, "one", if(false, 1Y, NULL), "null"),
+   map(-1S, "one", if(false, 1S, NULL), "null"),
+   map(-1L, "one", if(false, 1L, NULL), "null"),
+   map(cast(-1.75 as FLOAT), "a", if(false, cast(1.5 as FLOAT), NULL), "null"),
+   map(cast(-1.75 as DOUBLE), "a", if(false, cast(1.5 as DOUBLE), NULL), "null"),
+   map(-1.8, "a",if(false, 1.5, NULL), "null"),
+   map("one", 1, if(false, "", NULL), NULL),
+   map(cast("Mon" as CHAR(3)), 1,
+       if(false, cast("NUL" as CHAR(3)), NULL), NULL),
+   map(cast("a" as VARCHAR(3)), "A", if(false, cast("" as VARCHAR(3)), NULL), NULL),
+   map(to_utc_timestamp("2022-12-10 08:15:12", "UTC"), "Saturday morning",
+       if(false, to_utc_timestamp("2022-12-10 08:15:12", "UTC"), NULL), "null"),
+   map(to_date("2022-12-10"), "Saturday", if(false, to_date("2022-12-10"), NULL), "null")
   );
 ---- LOAD
 ====

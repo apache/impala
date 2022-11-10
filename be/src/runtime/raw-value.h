@@ -67,12 +67,6 @@ class RawValue {
     return str;
   }
 
-  /// Similar to PrintValue() but works with collection values.
-  /// Converts 'coll_val' collection into ascii and writes to 'stream'.
-  static void PrintCollectionValue(const CollectionValue* coll_val,
-      const TupleDescriptor* item_tuple_desc, int scale, std::stringstream *stream,
-      bool is_map);
-
   /// Writes the byte representation of a value to a stringstream character-by-character
   static void PrintValueAsBytes(const void* value, const ColumnType& type,
                                 std::stringstream* stream);
@@ -162,6 +156,12 @@ class RawValue {
 
   // Returns positive zero for floating point types.
   static inline const void* PositiveFloatingZero(const ColumnType& type);
+
+  // Top level null values are printed as "NULL"; collections and structs are printed in
+  // JSON format, which requires "null".
+  static constexpr const char* NullLiteral(bool top_level) {
+    return top_level ? "NULL" : "null";
+  }
 
 private:
   /// Recursive helper function for Write() to handle struct slots.
