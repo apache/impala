@@ -40,6 +40,17 @@ constexpr float RawValue::CANONICAL_FLOAT_NAN;
 constexpr double RawValue::CANONICAL_DOUBLE_ZERO;
 constexpr float RawValue::CANONICAL_FLOAT_ZERO;
 
+namespace {
+
+// Top level null values are printed as "NULL"; collections and structs are printed in
+// JSON format, which requires "null".
+constexpr const char* NullLiteral(bool top_level) {
+  if (top_level) return "NULL";
+  return "null";
+}
+
+}
+
 void RawValue::PrintValueAsBytes(const void* value, const ColumnType& type,
                                  stringstream* stream) {
   if (value == NULL) return;
@@ -93,7 +104,7 @@ void RawValue::PrintValueAsBytes(const void* value, const ColumnType& type,
 void RawValue::PrintValue(const void* value, const ColumnType& type, int scale,
                           string* str) {
   if (value == NULL) {
-    *str = "NULL";
+    *str = NullLiteral(true);
     return;
   }
 
@@ -283,7 +294,7 @@ void RawValue::PrintValue(
     const void* value, const ColumnType& type, int scale, std::stringstream* stream,
     bool quote_val) {
   if (value == NULL) {
-    *stream << "NULL";
+    *stream << NullLiteral(true);
     return;
   }
 
@@ -414,7 +425,7 @@ template void RawValue::WritePrimitive<false>(const void* value, Tuple* tuple,
 bool PrintNestedValueIfNull(const SlotDescriptor& slot_desc, Tuple* item,
     stringstream* stream) {
   bool is_null = item->IsNull(slot_desc.null_indicator_offset());
-  if (is_null) *stream << "NULL";
+  if (is_null) *stream << NullLiteral(false);
   return is_null;
 }
 
@@ -457,7 +468,9 @@ void RawValue::PrintCollectionValue(const CollectionValue* coll_val,
     bool is_map) {
   DCHECK(item_tuple_desc != nullptr);
   if (coll_val == nullptr) {
-    *stream << "NULL";
+    // We only reach this code path if this is a top level collection. Otherwise
+    // PrintNestedValue() handles the printing of the NULL literal.
+    *stream << NullLiteral(true);
     return;
   }
   int item_byte_size = item_tuple_desc->byte_size();

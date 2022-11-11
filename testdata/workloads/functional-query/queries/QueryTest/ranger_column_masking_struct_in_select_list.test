@@ -21,7 +21,7 @@ INT,STRING,STRING
 select id, int_array from functional_orc_def.complextypestbl
 ---- RESULTS
 NULL,'[1,2,3]'
-NULL,'[NULL,1,2,NULL,3,NULL]'
+NULL,'[null,1,2,null,3,null]'
 NULL,'[]'
 NULL,'NULL'
 NULL,'NULL'
@@ -38,12 +38,12 @@ select id, int_array_array from functional_orc_def.complextypestbl
 ---- RESULTS
 NULL,'[[-1,-2],[]]'
 NULL,'[[1,2],[3,4]]'
-NULL,'[[NULL,1,2,NULL],[3,NULL,4],[],NULL]'
-NULL,'[NULL]'
+NULL,'[[null,1,2,null],[3,null,4],[],null]'
+NULL,'[null]'
 NULL,'[]'
 NULL,'NULL'
 NULL,'NULL'
-NULL,'[NULL,[5,6]]'
+NULL,'[null,[5,6]]'
 ---- TYPES
 bigint,string
 ====
@@ -52,12 +52,12 @@ select id, int_map from functional_orc_def.complextypestbl
 ---- RESULTS
 NULL,'{"k1":-1}'
 NULL,'{"k1":1,"k2":100}'
-NULL,'{"k1":2,"k2":NULL}'
+NULL,'{"k1":2,"k2":null}'
 NULL,'{}'
 NULL,'{}'
 NULL,'{}'
 NULL,'NULL'
-NULL,'{"k1":NULL,"k3":NULL}'
+NULL,'{"k1":null,"k3":null}'
 ---- TYPES
 bigint,string
 ====
@@ -68,8 +68,8 @@ select id, int_map_array from functional_orc_def.complextypestbl
 ---- RESULTS
 NULL,'[{},{"k1":1},{},{}]'
 NULL,'[{"k1":1}]'
-NULL,'[{"k3":NULL,"k1":1},NULL,{}]'
-NULL,'[NULL,NULL]'
+NULL,'[{"k3":null,"k1":1},null,{}]'
+NULL,'[null,null]'
 NULL,'[]'
 NULL,'NULL'
 NULL,'NULL'

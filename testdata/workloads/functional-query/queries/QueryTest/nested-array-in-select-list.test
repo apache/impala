@@ -3,7 +3,7 @@
 select id, int_array from complextypestbl
 ---- RESULTS
 1,'[1,2,3]'
-2,'[NULL,1,2,NULL,3,NULL]'
+2,'[null,1,2,null,3,null]'
 3,'[]'
 4,'NULL'
 5,'NULL'
@@ -25,12 +25,12 @@ select id, int_array, int_array_array from complextypestbl
 ---- RESULTS
 8,'[-1]','[[-1,-2],[]]'
 1,'[1,2,3]','[[1,2],[3,4]]'
-2,'[NULL,1,2,NULL,3,NULL]','[[NULL,1,2,NULL],[3,NULL,4],[],NULL]'
-3,'[]','[NULL]'
+2,'[null,1,2,null,3,null]','[[null,1,2,null],[3,null,4],[],null]'
+3,'[]','[null]'
 4,'NULL','[]'
 5,'NULL','NULL'
 6,'NULL','NULL'
-7,'NULL','[NULL,[5,6]]'
+7,'NULL','[null,[5,6]]'
 ---- TYPES
 bigint,string,string
 ====
@@ -45,7 +45,7 @@ IllegalStateException: Sorting is not supported if the select list contains coll
 select id, int_array, int_array from complextypestbl
 ---- RESULTS
 1,'[1,2,3]','[1,2,3]'
-2,'[NULL,1,2,NULL,3,NULL]','[NULL,1,2,NULL,3,NULL]'
+2,'[null,1,2,null,3,null]','[null,1,2,null,3,null]'
 3,'[]','[]'
 4,'NULL','NULL'
 5,'NULL','NULL'
@@ -66,7 +66,7 @@ select t1.id, t1.int_array, t2.int_array
 7,'NULL','NULL'
 8,'[-1]','[-1]'
 1,'[1,2,3]','[1,2,3]'
-2,'[NULL,1,2,NULL,3,NULL]','[NULL,1,2,NULL,3,NULL]'
+2,'[null,1,2,null,3,null]','[null,1,2,null,3,null]'
 4,'NULL','NULL'
 6,'NULL','NULL'
 ---- TYPES
@@ -76,7 +76,7 @@ bigint,string,string
 select id, int_array from complextypestbl union all select id, int_array from complextypestbl
 ---- RESULTS
 1,'[1,2,3]'
-2,'[NULL,1,2,NULL,3,NULL]'
+2,'[null,1,2,null,3,null]'
 3,'[]'
 4,'NULL'
 5,'NULL'
@@ -84,7 +84,7 @@ select id, int_array from complextypestbl union all select id, int_array from co
 7,'NULL'
 8,'[-1]'
 1,'[1,2,3]'
-2,'[NULL,1,2,NULL,3,NULL]'
+2,'[null,1,2,null,3,null]'
 3,'[]'
 4,'NULL'
 5,'NULL'
@@ -135,7 +135,7 @@ tinyint
 select id, int_array from (select id, int_array from complextypestbl) s;
 ---- RESULTS
 1,'[1,2,3]'
-2,'[NULL,1,2,NULL,3,NULL]'
+2,'[null,1,2,null,3,null]'
 3,'[]'
 4,'NULL'
 5,'NULL'
@@ -150,7 +150,7 @@ with s as (select id, t.int_array from complextypestbl t)
 select id, int_array from s;
 ---- RESULTS
 1,'[1,2,3]'
-2,'[NULL,1,2,NULL,3,NULL]'
+2,'[null,1,2,null,3,null]'
 3,'[]'
 4,'NULL'
 5,'NULL'
@@ -164,7 +164,7 @@ bigint,string
 select id, int_array from complextypes_arrays_only_view;
 ---- RESULTS
 1,'[1,2,3]'
-2,'[NULL,1,2,NULL,3,NULL]'
+2,'[null,1,2,null,3,null]'
 3,'[]'
 4,'NULL'
 5,'NULL'
@@ -277,8 +277,8 @@ select item from unnest(complextypestbl.int_array_array)
 '[]'
 '[1,2]'
 '[3,4]'
-'[NULL,1,2,NULL]'
-'[3,NULL,4]'
+'[null,1,2,null]'
+'[3,null,4]'
 '[]'
 'NULL'
 'NULL'
@@ -388,7 +388,7 @@ INT,INT,STRING
 #   IMPALA-11434: "More than 1 2d arrays in select list causes analysis error"
 select id, arr_int_1d, arr_int_2d, arr_int_3d, arr_string_1d, arr_string_2d, arr_string_3d from collection_tbl;
 ---- RESULTS
-1,'[1,2,NULL]','[[1,2,NULL],[3]]','[[[1,2,NULL],[3]],[[4]]]','["1","2",NULL]','[["1","2",NULL],["3"]]','[[["1","2",NULL],["3"]],[["4"]]]'
+1,'[1,2,null]','[[1,2,null],[3]]','[[[1,2,null],[3]],[[4]]]','["1","2",null]','[["1","2",null],["3"]]','[[["1","2",null],["3"]],[["4"]]]'
 ---- TYPES
 INT,STRING,STRING,STRING,STRING,STRING,STRING
 ====
@@ -401,7 +401,7 @@ from alltypestiny a left outer join
 on a.id = b.id where a.id < 3;
 ---- RESULTS
 0,'NULL','NULL'
-1,'[1,2,NULL]','[[1,2,NULL],[3]]'
+1,'[1,2,null]','[[1,2,null],[3]]'
 2,'NULL','NULL'
 ---- TYPES
 INT,STRING,STRING

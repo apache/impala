@@ -3,12 +3,12 @@
 select id, int_map from complextypestbl
 ---- RESULTS
 1,'{"k1":1,"k2":100}'
-2,'{"k1":2,"k2":NULL}'
+2,'{"k1":2,"k2":null}'
 3,'{}'
 4,'{}'
 5,'{}'
 6,'NULL'
-7,'{"k1":NULL,"k3":NULL}'
+7,'{"k1":null,"k3":null}'
 8,'{"k1":-1}'
 ---- TYPES
 bigint,string
@@ -24,12 +24,12 @@ bigint,string
 select id, int_map, int_map_array from complextypestbl
 ---- RESULTS
 1,'{"k1":1,"k2":100}','[{"k1":1}]'
-2,'{"k1":2,"k2":NULL}','[{"k3":NULL,"k1":1},NULL,{}]'
-3,'{}','[NULL,NULL]'
+2,'{"k1":2,"k2":null}','[{"k3":null,"k1":1},null,{}]'
+3,'{}','[null,null]'
 4,'{}','[]'
 5,'{}','NULL'
 6,'NULL','NULL'
-7,'{"k1":NULL,"k3":NULL}','NULL'
+7,'{"k1":null,"k3":null}','NULL'
 8,'{"k1":-1}','[{},{"k1":1},{},{}]'
 ---- TYPES
 bigint,string,string
@@ -45,12 +45,12 @@ IllegalStateException: Sorting is not supported if the select list contains coll
 select id, int_map, int_map from complextypestbl
 ---- RESULTS
 1,'{"k1":1,"k2":100}','{"k1":1,"k2":100}'
-2,'{"k1":2,"k2":NULL}','{"k1":2,"k2":NULL}'
+2,'{"k1":2,"k2":null}','{"k1":2,"k2":null}'
 3,'{}','{}'
 4,'{}','{}'
 5,'{}','{}'
 6,'NULL','NULL'
-7,'{"k1":NULL,"k3":NULL}','{"k1":NULL,"k3":NULL}'
+7,'{"k1":null,"k3":null}','{"k1":null,"k3":null}'
 8,'{"k1":-1}','{"k1":-1}'
 ---- TYPES
 bigint,string,string
@@ -62,12 +62,12 @@ select t1.id, t1.int_map, t2.int_map
  on t1.id = t2.id
 ---- RESULTS
 1,'{"k1":1,"k2":100}','{"k1":1,"k2":100}'
-2,'{"k1":2,"k2":NULL}','{"k1":2,"k2":NULL}'
+2,'{"k1":2,"k2":null}','{"k1":2,"k2":null}'
 3,'{}','{}'
 4,'{}','{}'
 5,'{}','{}'
 6,'NULL','NULL'
-7,'{"k1":NULL,"k3":NULL}','{"k1":NULL,"k3":NULL}'
+7,'{"k1":null,"k3":null}','{"k1":null,"k3":null}'
 8,'{"k1":-1}','{"k1":-1}'
 ---- TYPES
 bigint,string,string
@@ -76,20 +76,20 @@ bigint,string,string
 select id, int_map from complextypestbl union all select id, int_map from complextypestbl
 ---- RESULTS
 1,'{"k1":1,"k2":100}'
-2,'{"k1":2,"k2":NULL}'
+2,'{"k1":2,"k2":null}'
 3,'{}'
 4,'{}'
 5,'{}'
 6,'NULL'
-7,'{"k1":NULL,"k3":NULL}'
+7,'{"k1":null,"k3":null}'
 8,'{"k1":-1}'
 1,'{"k1":1,"k2":100}'
-2,'{"k1":2,"k2":NULL}'
+2,'{"k1":2,"k2":null}'
 3,'{}'
 4,'{}'
 5,'{}'
 6,'NULL'
-7,'{"k1":NULL,"k3":NULL}'
+7,'{"k1":null,"k3":null}'
 8,'{"k1":-1}'
 ---- TYPES
 bigint,string
@@ -135,12 +135,12 @@ tinyint
 select id, int_map from (select id, int_map from complextypestbl) s;
 ---- RESULTS
 1,'{"k1":1,"k2":100}'
-2,'{"k1":2,"k2":NULL}'
+2,'{"k1":2,"k2":null}'
 3,'{}'
 4,'{}'
 5,'{}'
 6,'NULL'
-7,'{"k1":NULL,"k3":NULL}'
+7,'{"k1":null,"k3":null}'
 8,'{"k1":-1}'
 ---- TYPES
 bigint,string
@@ -150,12 +150,12 @@ with s as (select id, t.int_map from complextypestbl t)
 select id, int_map from s;
 ---- RESULTS
 1,'{"k1":1,"k2":100}'
-2,'{"k1":2,"k2":NULL}'
+2,'{"k1":2,"k2":null}'
 3,'{}'
 4,'{}'
 5,'{}'
 6,'NULL'
-7,'{"k1":NULL,"k3":NULL}'
+7,'{"k1":null,"k3":null}'
 8,'{"k1":-1}'
 ---- TYPES
 bigint,string
@@ -164,12 +164,12 @@ bigint,string
 select id, int_map from complextypes_maps_view;
 ---- RESULTS
 1,'{"k1":1,"k2":100}'
-2,'{"k1":2,"k2":NULL}'
+2,'{"k1":2,"k2":null}'
 3,'{}'
 4,'{}'
 5,'{}'
 6,'NULL'
-7,'{"k1":NULL,"k3":NULL}'
+7,'{"k1":null,"k3":null}'
 8,'{"k1":-1}'
 ---- TYPES
 bigint,string
@@ -265,7 +265,7 @@ bigint,string,int
 select item from unnest(complextypestbl.int_map_array)
 ---- RESULTS
 '{"k1":1}'
-'{"k3":NULL,"k1":1}'
+'{"k3":null,"k1":1}'
 'NULL'
 '{}'
 'NULL'
@@ -309,7 +309,7 @@ BIGINT,STRING,INT
 #   IMPALA-11434: "More than 1 2d arrays in select list causes analysis error"
 select id, map_1d, map_2d, map_3d, arr_int_3d, map_map_array from collection_tbl;
 ---- RESULTS
-1,'{1:"first",2:"second"}','{1:{10:"ten",20:"twenty"},2:{30:"thirty",40:"forty"}}','{1:{10:{100:"hundred",200:"two hundred"},20:{300:"three hundred",400:"four hundred"}},2:{30:{500:"five hundred",600:"six hundred"},40:{700:"seven hundred",800:"eight hundred"}}}','[[[1,2,NULL],[3]],[[4]]]','{1:{10:[100,200],20:[300,400]},2:{30:[500,600],40:[700,800]}}'
+1,'{1:"first",2:"second"}','{1:{10:"ten",20:"twenty"},2:{30:"thirty",40:"forty"}}','{1:{10:{100:"hundred",200:"two hundred"},20:{300:"three hundred",400:"four hundred"}},2:{30:{500:"five hundred",600:"six hundred"},40:{700:"seven hundred",800:"eight hundred"}}}','[[[1,2,null],[3]],[[4]]]','{1:{10:[100,200],20:[300,400]},2:{30:[500,600],40:[700,800]}}'
 ---- TYPES
 INT,STRING,STRING,STRING,STRING,STRING
 =====
