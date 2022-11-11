@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog.local;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -33,8 +34,8 @@ import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.IcebergContentFileStore;
-import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
@@ -87,6 +88,8 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
       TableParams tableParams = new TableParams(msTable);
       TPartialTableInfo tableInfo = db.getCatalog().getMetaProvider()
           .loadIcebergTable(ref);
+      LocalFsTable fsTable = LocalFsTable.load(db, msTable, ref);
+      warmupMetaProviderCache(db, msTable, ref, fsTable);
       org.apache.iceberg.Table icebergApiTable = db.getCatalog().getMetaProvider()
           .loadIcebergApiTable(ref, tableParams, msTable);
       List<Column> iceColumns = IcebergSchemaConverter.convertToImpalaSchema(
@@ -96,8 +99,11 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
           /*numClusteringCols=*/ 0,
           db.getName() + "." + msTable.getTableName(),
           /*isFullAcidSchema=*/false);
-      return new LocalIcebergTable(db, msTable, ref, colMap, tableInfo, tableParams,
-          icebergApiTable);
+      return new LocalIcebergTable(db, msTable, ref, fsTable, colMap, tableInfo,
+          tableParams, icebergApiTable);
+    } catch (InconsistentMetadataFetchException e) {
+      // Just rethrow this so the query can be retried by the Frontend.
+      throw e;
     } catch (Exception e) {
       String fullTableName = msTable.getDbName() + "." + msTable.getTableName();
       throw new TableLoadingException(
@@ -105,13 +111,37 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     }
   }
 
+  /**
+   * Eagerly warmup metaprovider cache before calling loadIcebergApiTable(). So
+   * later they can be served from cache when really needed. Otherwise, if there are
+   * frequent updates to the table, CatalogD might refresh the Iceberg table during
+   * loadIcebergApiTable().
+   * If that happens, subsequent load*() calls via the metaprovider would
+   * fail due to InconsistentMetadataFetchException.
+   */
+  private static void warmupMetaProviderCache(LocalDb db, Table msTable, TableMetaRef ref,
+      LocalFsTable fsTable) throws Exception {
+    db.getCatalog().getMetaProvider().loadTableColumnStatistics(ref,
+        getHmsColumnNames(msTable));
+    FeCatalogUtils.loadAllPartitions(fsTable);
+  }
+
+  private static List<String> getHmsColumnNames(Table msTable) {
+    List<String> ret = new ArrayList<>();
+    for (FieldSchema fs : msTable.getSd().getCols()) {
+      ret.add(fs.getName());
+    }
+    return ret;
+  }
+
   private LocalIcebergTable(LocalDb db, Table msTable, MetaProvider.TableMetaRef ref,
-      ColumnMap cmap, TPartialTableInfo tableInfo, TableParams tableParams,
-      org.apache.iceberg.Table icebergApiTable) throws TableLoadingException {
+      LocalFsTable fsTable, ColumnMap cmap, TPartialTableInfo tableInfo,
+      TableParams tableParams, org.apache.iceberg.Table icebergApiTable)
+      throws TableLoadingException {
     super(db, msTable, ref, cmap);
 
     Preconditions.checkNotNull(tableInfo);
-    localFsTable_ = LocalFsTable.load(db, msTable, ref);
+    localFsTable_ = fsTable;
     tableParams_ = tableParams;
     fileStore_ = IcebergContentFileStore.fromThrift(
         tableInfo.getIceberg_table().getContent_files(),
