@@ -37,7 +37,6 @@ import org.apache.hadoop.hdfs.client.HdfsAdmin;
 import org.apache.hadoop.hdfs.protocol.EncryptionZone;
 import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.service.BackendConfig;
-import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.util.DebugUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -860,21 +859,31 @@ public class FileSystemUtil {
     return false;
   }
 
+  public static final String DOT = ".";
+  public static final String HIVE_TEMP_FILE_PREFIX = "_tmp.";
+  public static final String SPARK_TEMP_FILE_PREFIX = "_spark_metadata";
+
   /**
    * Prefix string used by tools like hive/spark/flink to write certain temporary or
    * "non-data" files in the table location
    */
   private static final List<String> TMP_DIR_PREFIX_LIST = new ArrayList<>();
   static {
-    if (BackendConfig.INSTANCE == null) {
-      BackendConfig.create(new TBackendGflags());
-      LOG.warn("Initialized BackendConfig.INSTANCE lazily. This should only happen in" +
-          " tests.");
-    }
-    String s = BackendConfig.INSTANCE.getIgnoredDirPrefixList();
-    for (String prefix : s.split(",")) {
-      if (!prefix.isEmpty()) {
-        TMP_DIR_PREFIX_LIST.add(prefix);
+    // Use hard-coded prefix-list if BackendConfig is uninitialized. Note that
+    // getIgnoredDirPrefixList() could return null if BackendConfig is created with
+    // initialize=false in external FE (IMPALA-10515).
+    if (BackendConfig.INSTANCE == null
+        || BackendConfig.INSTANCE.getIgnoredDirPrefixList() == null) {
+      TMP_DIR_PREFIX_LIST.add(DOT);
+      TMP_DIR_PREFIX_LIST.add(HIVE_TEMP_FILE_PREFIX);
+      TMP_DIR_PREFIX_LIST.add(SPARK_TEMP_FILE_PREFIX);
+      LOG.warn("BackendConfig.INSTANCE uninitialized. Use hard-coded prefix-list.");
+    } else {
+      String s = BackendConfig.INSTANCE.getIgnoredDirPrefixList();
+      for (String prefix : s.split(",")) {
+        if (!prefix.isEmpty()) {
+          TMP_DIR_PREFIX_LIST.add(prefix);
+        }
       }
     }
     LOG.info("Prefix list of ignored dirs: " + TMP_DIR_PREFIX_LIST);
