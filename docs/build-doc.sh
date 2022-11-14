@@ -20,17 +20,30 @@
 set -euo pipefail
 
 function usage() {
-  echo "$0 <file_format> <output_file> <filter_file> <log_file>"
+  echo "$0 <file_format> <output_file> <filter_file> <log_file> [--pretty]"
   exit 1
 }
 
-[[ $# -eq 4 ]] || usage
+[[ $# -eq 4 || $# -eq 5 ]] || usage
 
 FILE_FORMAT=$1
 OUTPUT_FILE=$2
 FILTER_FILE=$3
 LOG_FILE=$4
 
-dita -i impala.ditamap -f ${FILE_FORMAT} -o ${OUTPUT_FILE} -filter ${FILTER_FILE} 2>&1 \
+if [[ $# -eq 4 || $5 != "--pretty" ]]; then
+  dita -i impala.ditamap -f ${FILE_FORMAT} -o ${OUTPUT_FILE} -filter ${FILTER_FILE} 2>&1 \
     | tee ${LOG_FILE}
+else
+  dita -i impala.ditamap -f ${FILE_FORMAT} -o ${OUTPUT_FILE} \
+    -Dnav-toc=partial \
+    -Dargs.copycss=yes \
+    -Dargs.csspath=css \
+    -Dargs.cssroot=$PWD/css \
+    -Dargs.css=dita-ot-doc.css \
+    -Dargs.hdr=$PWD/shared/header.xml \
+    -filter ${FILTER_FILE} 2>&1 \
+    | tee ${LOG_FILE}
+fi
+
 [[ -z $(grep "\[ERROR\]" ${LOG_FILE}) ]] || exit 1

@@ -15,18 +15,23 @@
 # specific language governing permissions and limitations
 # under the License.
 
-.PHONY: all html pdf
+.PHONY: all plain-html asf-site-html pdf
 
-all: html pdf
+all: plain-html asf-site-html pdf
 
-html: build/html/index.html
+plain-html: build/plain-html/index.html
+
+asf-site-html: build/asf-site-html/index.html
 
 pdf: build/impala.pdf
 
 ALL_DEPS=Makefile impala.ditamap shared/*.xml images/* topics/*.xml
 
-build/html/index.html: impala_html.ditaval ${ALL_DEPS}
-	./build-doc.sh xhtml $(dir $@) $< gen-html.log
+build/plain-html/index.html: impala_html.ditaval ${ALL_DEPS}
+	./build-doc.sh xhtml $(dir $@) $< gen-plain-html.log
+
+build/asf-site-html/index.html: impala_html.ditaval ${ALL_DEPS}
+	./build-doc.sh html5 $(dir $@) $< gen-asf-site-html.log --pretty
 
 build/impala.pdf: impala_pdf.ditaval ${ALL_DEPS}
 	./build-doc.sh pdf $(dir $@) $< gen-pdf.log

@@ -672,6 +672,8 @@ be/src/thirdparty/pcg-cpp-0.98: Apache 2.0 license
 be/src/expr/hll-bias.h: Apache 2.0 license
 shell/ext-py/sasl-0.2.1: Apache 2.0 license
 shell/ext-py/thrift_sasl-0.4.2: Apache 2.0 license
+docs/css/dita-ot-doc.css: Apache 2.0 license
+docs/shared/header.xml: Apache 2.0 license
 
 --------------------------------------------------------------------------------
 

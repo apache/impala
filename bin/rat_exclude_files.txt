@@ -92,6 +92,8 @@ be/src/util/cache/cache-test.h
 be/src/util/cache/cache-test.cc
 be/src/util/cache/rl-cache.cc
 be/src/util/cache/rl-cache-test.cc
+docs/css/dita-ot-doc.css
+docs/shared/header.xml
 
 # http://www.apache.org/legal/src-headers.html: "Short informational text files; for
 # example README, INSTALL files. The expectation is that these files make it obvious which
