@@ -158,8 +158,8 @@ under the License.
     </dependency>
 
     <dependency>
-      <groupId>${ozone.groupId}</groupId>
-      <artifactId>${ozone.artifactId}</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-filesystem-hadoop3</artifactId>
       <version>${ozone.version}</version>
       <!-- Remove all transitive dependencies from the Apache Ozone dependency.
       ozone-filesystem-hadoop3 is a shaded-jar, which already includes

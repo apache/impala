@@ -349,26 +349,13 @@ if [[ "${IMPALA_HIVE_MAJOR_VERSION}" == "1" ||
   return 1
 fi
 
-# Defaults to Apache because Ozone in newer CDP releases is currently unmaintained
-export USE_APACHE_OZONE=${USE_APACHE_OZONE-true}
+export USE_APACHE_OZONE=${USE_APACHE_OZONE-false}
 if $USE_APACHE_OZONE; then
-  export IMPALA_OZONE_DIST_TYPE="apache-ozone"
   export IMPALA_OZONE_VERSION=${APACHE_OZONE_VERSION}
   export IMPALA_OZONE_URL=${APACHE_OZONE_URL-}
 else
-  export IMPALA_OZONE_DIST_TYPE="ozone"
   export IMPALA_OZONE_VERSION=${CDP_OZONE_VERSION}
   export IMPALA_OZONE_URL=${CDP_OZONE_URL-}
-fi
-
-# Ozone changed jar groupId and artifactId in Ozone 1.2
-export IMPALA_OZONE_MINOR_VERSION=$(echo "$IMPALA_OZONE_VERSION" | cut -d . -f 2)
-if [[ ${IMPALA_OZONE_MINOR_VERSION} < 2 ]]; then
-  export IMPALA_OZONE_JAR_GROUP_ID="org.apache.hadoop"
-  export IMPALA_OZONE_JAR_ARTIFACT_ID="hadoop-ozone-filesystem-hadoop3"
-else
-  export IMPALA_OZONE_JAR_GROUP_ID="org.apache.ozone"
-  export IMPALA_OZONE_JAR_ARTIFACT_ID="ozone-filesystem-hadoop3"
 fi
 
 # It is important to have a coherent view of the JAVA_HOME and JAVA executable.
@@ -797,7 +784,7 @@ export HADOOP_LIB_DIR=${HADOOP_LIB_DIR_OVERRIDE:-"${HADOOP_HOME}/lib"}
 export HADOOP_CLASSPATH="${HADOOP_CLASSPATH-}"
 # Add Ozone Hadoop filesystem implementation when using Ozone
 if [ "${TARGET_FILESYSTEM}" = "ozone" ]; then
-  OZONE_JAR="${IMPALA_OZONE_JAR_ARTIFACT_ID}-${IMPALA_OZONE_VERSION}.jar"
+  OZONE_JAR="ozone-filesystem-hadoop3-${IMPALA_OZONE_VERSION}.jar"
   HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:${OZONE_HOME}/share/ozone/lib/${OZONE_JAR}"
 fi
 # Add the path containing the hadoop-aws jar, which is required to access AWS from the

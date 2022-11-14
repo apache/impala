@@ -517,8 +517,7 @@ def get_hadoop_downloads():
   if use_apache_ozone:
     ozone = ApacheComponent("ozone", component_path_tmpl="ozone/${version}")
   else:
-    ozone = CdpComponent("ozone", archive_basename_tmpl="hadoop-ozone-${version}",
-                        unpack_directory_tmpl="ozone-${version}")
+    ozone = CdpComponent("ozone")
 
   use_apache_hive = os.environ["USE_APACHE_HIVE"] == "true"
   if use_apache_hive:
