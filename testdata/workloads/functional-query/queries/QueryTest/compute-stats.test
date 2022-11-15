@@ -15,35 +15,35 @@ STRING
 ---- QUERY
 show table stats alltypes
 ---- LABELS
-YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-'2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','2',280,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','3',310,1,'24.67KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','4',300,1,'24.06KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','1',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','2',280,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','3',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','4',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'Total','',7300,24,'586.84KB','0B','','','',''
+'2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','2',280,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','3',310,1,'24.67KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','4',300,1,'24.06KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','1',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','2',280,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','3',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','4',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total','',7300,24,'586.84KB','0B','','','','',''
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats alltypes
@@ -158,35 +158,35 @@ drop stats alltypes
 ---- QUERY
 show table stats alltypes
 ---- LABELS
-YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-'2009','1',-1,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','10',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','11',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','12',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','2',-1,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','3',-1,1,'24.67KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','4',-1,1,'24.06KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','5',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','6',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','7',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','8',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','9',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','1',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','10',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','11',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','12',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','2',-1,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','3',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','4',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','5',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','6',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','7',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','8',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','9',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'Total','',-1,24,'586.84KB','0B','','','',''
+'2009','1',-1,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','10',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','11',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','12',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','2',-1,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','3',-1,1,'24.67KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','4',-1,1,'24.06KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','5',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','6',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','7',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','8',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','9',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','1',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','10',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','11',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','12',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','2',-1,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','3',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','4',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','5',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','6',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','7',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','8',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','9',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total','',-1,24,'586.84KB','0B','','','','',''
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Note - the NDV for partition columns is read from the table metadata.
@@ -226,35 +226,35 @@ STRING
 ---- QUERY
 show table stats alltypes_for_coltest
 ---- LABELS
-YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-'2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','2',280,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','3',310,1,'24.67KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','4',300,1,'24.06KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','1',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','2',280,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','3',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','4',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'Total','',7300,24,'586.84KB','0B','','','',''
+'2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','2',280,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','3',310,1,'24.67KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','4',300,1,'24.06KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','1',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','2',280,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','3',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','4',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total','',7300,24,'586.84KB','0B','','','','',''
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats alltypes_for_coltest
@@ -293,35 +293,35 @@ STRING
 ---- QUERY
 show table stats alltypes_no_col_stats
 ---- LABELS
-YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-'2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','2',280,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','3',310,1,'24.67KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','4',300,1,'24.06KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2009','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','1',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','2',280,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','3',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','4',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2010','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'Total','',7300,24,'586.84KB','0B','','','',''
+'2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','2',280,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','3',310,1,'24.67KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','4',300,1,'24.06KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','1',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','2',280,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','3',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','4',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total','',7300,24,'586.84KB','0B','','','','',''
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats alltypes_no_col_stats
@@ -472,11 +472,11 @@ STRING
 ---- QUERY
 show table stats alltypesnopart
 ---- LABELS
-#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-100,3,'7.73KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+100,3,'7.73KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
 ---- TYPES
-BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats alltypesnopart
@@ -504,11 +504,11 @@ alter table alltypesnopart set column stats string_col ('numDVs'='10');
 alter table alltypesnopart add columns (new_col int);
 show table stats alltypesnopart;
 ---- LABELS
-#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-100,3,'7.73KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+100,3,'7.73KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
 ---- TYPES
-BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # test computing stats on a partitioned parquet table with all types
@@ -527,35 +527,35 @@ STRING
 ---- QUERY
 show table stats alltypes_parquet
 ---- LABELS
-YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-'2009','1',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','2',280,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','3',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','4',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','5',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','6',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','7',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','8',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','9',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','10',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','11',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','12',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','1',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','2',280,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','3',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','4',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','5',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','6',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','7',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','8',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','9',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','10',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','11',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','12',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'Total','',7300,24,regex:.+KB,'0B','','','',''
+'2009','1',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','2',280,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','3',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','4',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','5',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','6',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','7',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','8',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','9',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','10',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','11',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','12',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','1',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','2',280,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','3',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','4',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','5',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','6',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','7',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','8',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','9',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','10',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','11',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','12',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'Total','',7300,24,regex:.+KB,'0B','','','','',''
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats alltypes_parquet
@@ -585,35 +585,35 @@ alter table alltypes_parquet set column stats string_col ('numDVs'='10');
 alter table alltypes_parquet add columns (new_col int);
 show table stats alltypes_parquet;
 ---- LABELS
-YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-'2009','1',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','2',280,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','3',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','4',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','5',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','6',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','7',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','8',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','9',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','10',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','11',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','12',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','1',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','2',280,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','3',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','4',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','5',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','6',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','7',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','8',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','9',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','10',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','11',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','12',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'Total','',7300,24,regex:.+KB,'0B','','','',''
+'2009','1',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','2',280,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','3',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','4',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','5',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','6',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','7',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','8',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','9',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','10',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','11',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2009','12',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','1',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','2',280,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','3',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','4',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','5',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','6',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','7',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','8',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','9',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','10',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','11',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'2010','12',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+'Total','',7300,24,regex:.+KB,'0B','','','','',''
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # test computing stats on an empty table
@@ -629,11 +629,11 @@ STRING
 ---- QUERY
 show table stats alltypes_empty
 ---- LABELS
-YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-'Total','',0,0,'0B','0B','','','',''
+'Total','',0,0,'0B','0B','','','','',''
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats alltypes_empty
@@ -671,10 +671,10 @@ STRING
 ---- QUERY
 show table stats empty_partitioned
 ---- RESULTS
-'1',0,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'Total',0,0,'0B','0B','','','',''
+'1',0,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',0,0,'0B','0B','','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Insert non empty partition to the table with empty partition.
@@ -696,11 +696,11 @@ STRING
 ---- QUERY
 show table stats empty_partitioned
 ---- RESULTS
-'1',0,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'Total',1,1,'2B','0B','','','',''
+'1',0,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',1,1,'2B','0B','','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Verify partition stats work with empty and non-empty partition.
@@ -714,11 +714,11 @@ STRING
 ---- QUERY
 show table stats empty_partitioned
 ---- RESULTS
-'1',0,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'Total',1,1,'2B','0B','','','',''
+'1',0,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',1,1,'2B','0B','','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # IMPALA-1614 Verify that COMPUTE STATS works on a table whose name starts with numbers.
@@ -735,10 +735,10 @@ STRING
 ---- QUERY
 show table stats `123_table`
 ---- RESULTS
-'1',0,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'Total',0,0,'0B','0B','','','',''
+'1',0,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',0,0,'0B','0B','','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # IMPALA-1629: Verify that the column stats for CHAR/VARCHAR columns are populated.
@@ -1844,11 +1844,11 @@ STRING
 # test show table stats on a materialized view
 show table stats functional_orc_def.mv2_alltypes_jointbl;
 ---- LABELS
-#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-7,1,regex:.+B,'NOT CACHED','NOT CACHED','ORC','false',regex:.*
+7,1,regex:.+B,'NOT CACHED','NOT CACHED','ORC','false',regex:.*,'$ERASURECODE_POLICY'
 ---- TYPES
-BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # test show column stats on a materialized view

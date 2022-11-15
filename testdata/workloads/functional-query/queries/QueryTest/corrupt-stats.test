@@ -11,13 +11,13 @@ insert into corrupted partition (org=2) values (4, "Martin"), (5, "Hans"), (6, "
 ---- QUERY
 show table stats corrupted;
 ---- LABELS
-ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-'1',-1,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=1'
-'2',-1,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=2'
-'Total',-1,2,'48B','0B','','','',''
+'1',-1,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=1','$ERASURECODE_POLICY'
+'2',-1,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=2','$ERASURECODE_POLICY'
+'Total',-1,2,'48B','0B','','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 compute stats corrupted;
@@ -25,13 +25,13 @@ compute stats corrupted;
 ---- QUERY
 show table stats corrupted;
 ---- LABELS
-ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-'1',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=1'
-'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=2'
-'Total',6,2,'48B','0B','','','',''
+'1',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=1','$ERASURECODE_POLICY'
+'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=2','$ERASURECODE_POLICY'
+'Total',6,2,'48B','0B','','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 alter table corrupted partition(org=1) set tblproperties('numRows'='0', 'STATS_GENERATED_VIA_STATS_TASK'='true');
@@ -42,13 +42,13 @@ invalidate metadata corrupted;
 ---- QUERY
 show table stats corrupted;
 ---- LABELS
-ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-'1',0,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=1'
-'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=2'
-'Total',6,2,'48B','0B','','','',''
+'1',0,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=1','$ERASURECODE_POLICY'
+'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=2','$ERASURECODE_POLICY'
+'Total',6,2,'48B','0B','','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 explain select count(*) from corrupted where org = 1;
@@ -86,13 +86,13 @@ alter table corrupted set tblproperties('numRows'='0', 'STATS_GENERATED_VIA_STAT
 ---- QUERY
 show table stats corrupted;
 ---- LABELS
-ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-'1',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=1'
-'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=2'
-'Total',0,2,'48B','0B','','','',''
+'1',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=1','$ERASURECODE_POLICY'
+'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=2','$ERASURECODE_POLICY'
+'Total',0,2,'48B','0B','','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 explain select count(*) from corrupted;
@@ -112,13 +112,13 @@ alter table corrupted set tblproperties('numRows'='6', 'STATS_GENERATED_VIA_STAT
 ---- QUERY
 show table stats corrupted;
 ---- LABELS
-ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-'1',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=1'
-'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=2'
-'Total',6,2,'48B','0B','','','',''
+'1',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=1','$ERASURECODE_POLICY'
+'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted/org=2','$ERASURECODE_POLICY'
+'Total',6,2,'48B','0B','','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 explain select count(*) from corrupted;
@@ -168,11 +168,11 @@ compute stats corrupted_no_part;
 ---- QUERY
 show table stats corrupted_no_part;
 ---- LABELS
-#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-3,1,'6B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted_no_part'
+3,1,'6B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted_no_part','$ERASURECODE_POLICY'
 ---- TYPES
-BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 -- Check that small query optimization is executed.
@@ -193,11 +193,11 @@ alter table corrupted_no_part set tblproperties('numRows'='0', 'STATS_GENERATED_
 ---- QUERY
 show table stats corrupted_no_part;
 ---- LABELS
-#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-0,1,'6B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted_no_part'
+0,1,'6B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted_no_part','$ERASURECODE_POLICY'
 ---- TYPES
-BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 explain select count(*) from corrupted_no_part;

@@ -9,12 +9,12 @@ partition (i=2) location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/i1670B_
 partition (i=3) uncached;
 show partitions i1670B_alter;
 ---- RESULTS
-'1',-1,0,'0B','0B','3','TEXT','false',regex:.*/i1
-'2',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/i2
-'3',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/i=3
-'Total',-1,0,'0B','0B','','','',''
+'1',-1,0,'0B','0B','3','TEXT','false',regex:.*/i1,regex:.*
+'2',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/i2,'$ERASURECODE_POLICY'
+'3',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/i=3,'$ERASURECODE_POLICY'
+'Total',-1,0,'0B','0B','','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # IMPALA-1670: Set up i1670C_alter table for the next test case.
@@ -25,11 +25,11 @@ cached in 'testPool' with replication=2
 partition (i=4) location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/i1670C_alter/i4A' uncached;
 show partitions i1670C_alter;
 ---- RESULTS
-'2',-1,0,'0B','0B','2','TEXT','false',regex:.*/i2A
-'4',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/i4A
-'Total',-1,0,'0B','0B','','','',''
+'2',-1,0,'0B','0B','2','TEXT','false',regex:.*/i2A,regex:.*
+'4',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/i4A,'$ERASURECODE_POLICY'
+'Total',-1,0,'0B','0B','','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # IMPALA-1670: If 'IF NOT EXISTS' is used ALTER TABLE ADD PARTITION works with preexisting
@@ -43,13 +43,13 @@ partition (i=4) location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/i1670C_
 cached in 'testPool' with replication=4;
 show partitions i1670C_alter;
 ---- RESULTS
-'1',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/i1B
-'2',-1,0,'0B','0B','2','TEXT','false',regex:.*/i2A
-'3',-1,0,'0B','0B','3','TEXT','false',regex:.*/i3B
-'4',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/i4A
-'Total',-1,0,'0B','0B','','','',''
+'1',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/i1B,'$ERASURECODE_POLICY'
+'2',-1,0,'0B','0B','2','TEXT','false',regex:.*/i2A,regex:.*
+'3',-1,0,'0B','0B','3','TEXT','false',regex:.*/i3B,regex:.*
+'4',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/i4A,'$ERASURECODE_POLICY'
+'Total',-1,0,'0B','0B','','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # IMPALA-1670: Partitions without explicit CACHED IN/UNCACHED clause inherit cacheop from
@@ -63,13 +63,13 @@ partition (i=3) uncached
 partition (i=4);
 show partitions i1670D_alter;
 ---- RESULTS
-'1',-1,0,'0B','0B','5','TEXT','false',regex:.*/i=1
-'2',-1,0,'0B','0B','7','TEXT','false',regex:.*/i=2
-'3',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/i=3
-'4',-1,0,'0B','0B','7','TEXT','false',regex:.*/i=4
-'Total',-1,0,'0B','0B','','','',''
+'1',-1,0,'0B','0B','5','TEXT','false',regex:.*/i=1,regex:.*
+'2',-1,0,'0B','0B','7','TEXT','false',regex:.*/i=2,regex:.*
+'3',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/i=3,'$ERASURECODE_POLICY'
+'4',-1,0,'0B','0B','7','TEXT','false',regex:.*/i=4,regex:.*
+'Total',-1,0,'0B','0B','','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # IMPALA-1670: After INVALIDATE METADATA Impala can access previously added partitions and
@@ -87,12 +87,12 @@ invalidate metadata i1670E_alter;
 ---- QUERY
 show partitions i1670E_alter;
 ---- RESULTS
-'1',-1,1,regex:.*,'NOT CACHED','NOT CACHED','TEXT','false',regex:.*/x=1
-'2',-1,1,regex:.*,'NOT CACHED','NOT CACHED','TEXT','false',regex:.*/x=2
-'3',-1,1,regex:.*,regex:.*,'7','TEXT','false',regex:.*/x3
-'Total',-1,3,regex:.*,regex:.*,'','','',''
+'1',-1,1,regex:.*,'NOT CACHED','NOT CACHED','TEXT','false',regex:.*/x=1,'$ERASURECODE_POLICY'
+'2',-1,1,regex:.*,'NOT CACHED','NOT CACHED','TEXT','false',regex:.*/x=2,'$ERASURECODE_POLICY'
+'3',-1,1,regex:.*,regex:.*,'7','TEXT','false',regex:.*/x3,regex:.*
+'Total',-1,3,regex:.*,regex:.*,'','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 select x, a from i1670E_alter order by x, a;

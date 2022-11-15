@@ -47,9 +47,9 @@ STRING,DECIMAL
 ---- QUERY
 SHOW FILES IN iceberg_hadoop_catalogs_with_id;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/ice_hadoop_cat/org/db/tbl/data/label=ice/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/ice_hadoop_cat/org/db/tbl/data/label=ice/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 CREATE EXTERNAL TABLE iceberg_hadoop_cat_with_id_ext
@@ -118,9 +118,9 @@ STRING,DECIMAL
 ---- QUERY
 SHOW FILES IN iceberg_hive_catalogs;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_hive_catalogs/data/label=ice/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_hive_catalogs/data/label=ice/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 CREATE EXTERNAL TABLE iceberg_hive_catalogs_ext

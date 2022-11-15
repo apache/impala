@@ -119,9 +119,9 @@ INT
 ---- QUERY
 show files in iceberg_hadoop_cat;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hadoop_catalog_test/$DATABASE/iceberg_hadoop_cat/data/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hadoop_catalog_test/$DATABASE/iceberg_hadoop_cat/data/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Insert into hadoop catalog with custom table identifier.
@@ -146,9 +146,9 @@ INT
 ---- QUERY
 show files in iceberg_hadoop_cat_ti;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hadoop_catalog_test/test/custom_db/int_table/data/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hadoop_catalog_test/test/custom_db/int_table/data/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Insert into table stored in Iceberg's HiveCatalog
@@ -266,9 +266,9 @@ INT
 ---- QUERY
 show files in iceberg_hive_cat_custom_loc;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/custom_hive_cat/data/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/custom_hive_cat/data/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Create a table that is a subset of 'alltypes' table, i.e. it only

@@ -60,11 +60,11 @@ INT
 ---- QUERY
 show files in insertonly_nopart_ctas;
 ---- LABELS
-Path,Size,Partition
+Path,Size,Partition,EC Policy
 ---- RESULTS
-row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/insertonly_nopart_ctas/delta_1_1/.*','\d+B',''
+row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/insertonly_nopart_ctas/delta_1_1/.*','\d+B','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING,STRING,STRING
+STRING,STRING,STRING,STRING
 ====
 ---- QUERY
 drop table insertonly_nopart_ctas;
@@ -172,13 +172,13 @@ INT,INT
 ---- QUERY
 show files in insertonly_part_ctas;
 ---- LABELS
-Path,Size,Partition
+Path,Size,Partition,EC Policy
 ---- RESULTS
-row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/insertonly_part_ctas/p=1/delta_1_1/.*','\d+B','p=1'
-row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/insertonly_part_ctas/p=2/delta_1_1/.*','\d+B','p=2'
-row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/insertonly_part_ctas/p=3/delta_1_1/.*','\d+B','p=3'
-row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/insertonly_part_ctas/p=4/delta_1_1/.*','\d+B','p=4'
-row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/insertonly_part_ctas/p=5/delta_1_1/.*','\d+B','p=5'
+row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/insertonly_part_ctas/p=1/delta_1_1/.*','\d+B','p=1','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/insertonly_part_ctas/p=2/delta_1_1/.*','\d+B','p=2','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/insertonly_part_ctas/p=3/delta_1_1/.*','\d+B','p=3','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/insertonly_part_ctas/p=4/delta_1_1/.*','\d+B','p=4','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/insertonly_part_ctas/p=5/delta_1_1/.*','\d+B','p=5','$ERASURECODE_POLICY'
 ---- TYPES
-STRING,STRING,STRING
+STRING,STRING,STRING,STRING
 ====

@@ -151,24 +151,24 @@ aggregation(SUM, NumRowGroups): 2
 ---- QUERY
 show files in ice_part_transform;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=0/col_str_trunc=__HIVE_DEFAULT_PARTITION__/col_ts_day=2001-02-03/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=0/col_str_trunc=__HIVE_DEFAULT_PARTITION__/col_ts_day=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=0/col_str_trunc=t/col_ts_day=2001-02-03/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=0/col_str_trunc=t/col_ts_day=2002-03-03/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=0/col_str_trunc=t/col_ts_day=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=1/col_str_trunc=__HIVE_DEFAULT_PARTITION__/col_ts_day=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=2/col_str_trunc=__HIVE_DEFAULT_PARTITION__/col_ts_day=2001-01-03/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=2/col_str_trunc=f/col_ts_day=2003-05-03/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=2/col_str_trunc=o/col_ts_day=2001-01-03/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=2/col_str_trunc=o/col_ts_day=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=__HIVE_DEFAULT_PARTITION__/col_str_trunc=__HIVE_DEFAULT_PARTITION__/col_ts_day=2001-04-03/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=__HIVE_DEFAULT_PARTITION__/col_str_trunc=__HIVE_DEFAULT_PARTITION__/col_ts_day=2001-05-03/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=__HIVE_DEFAULT_PARTITION__/col_str_trunc=f/col_ts_day=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=__HIVE_DEFAULT_PARTITION__/col_str_trunc=o/col_ts_day=2001-01-03/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=__HIVE_DEFAULT_PARTITION__/col_str_trunc=t/col_ts_day=2001-02-03/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=__HIVE_DEFAULT_PARTITION__/col_str_trunc=z/col_ts_day=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=0/col_str_trunc=__HIVE_DEFAULT_PARTITION__/col_ts_day=2001-02-03/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=0/col_str_trunc=__HIVE_DEFAULT_PARTITION__/col_ts_day=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=0/col_str_trunc=t/col_ts_day=2001-02-03/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=0/col_str_trunc=t/col_ts_day=2002-03-03/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=0/col_str_trunc=t/col_ts_day=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=1/col_str_trunc=__HIVE_DEFAULT_PARTITION__/col_ts_day=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=2/col_str_trunc=__HIVE_DEFAULT_PARTITION__/col_ts_day=2001-01-03/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=2/col_str_trunc=f/col_ts_day=2003-05-03/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=2/col_str_trunc=o/col_ts_day=2001-01-03/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=2/col_str_trunc=o/col_ts_day=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=__HIVE_DEFAULT_PARTITION__/col_str_trunc=__HIVE_DEFAULT_PARTITION__/col_ts_day=2001-04-03/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=__HIVE_DEFAULT_PARTITION__/col_str_trunc=__HIVE_DEFAULT_PARTITION__/col_ts_day=2001-05-03/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=__HIVE_DEFAULT_PARTITION__/col_str_trunc=f/col_ts_day=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=__HIVE_DEFAULT_PARTITION__/col_str_trunc=o/col_ts_day=2001-01-03/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=__HIVE_DEFAULT_PARTITION__/col_str_trunc=t/col_ts_day=2001-02-03/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transform/data/col_i_bucket=__HIVE_DEFAULT_PARTITION__/col_str_trunc=z/col_ts_day=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-string, string, string
+string, string, string, string
 ====
 ---- QUERY
 # Test partitioned INSERTs with single column that is also
@@ -194,13 +194,13 @@ STRING
 ---- QUERY
 show files in single_col_bucket;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=0/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=2/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=4/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=6/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=__HIVE_DEFAULT_PARTITION__/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=0/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=2/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=4/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=6/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=__HIVE_DEFAULT_PARTITION__/.*.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -250,12 +250,12 @@ INT,STRING,DATE,TIMESTAMP
 ---- QUERY
 show files in multi_col_bucket;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_bucket/data/i_bucket=0/s_bucket=1/d_bucket=2/t_bucket=4/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_bucket/data/i_bucket=0/s_bucket=2/d_bucket=3/t_bucket=0/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_bucket/data/i_bucket=0/s_bucket=4/d_bucket=1/t_bucket=3/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_bucket/data/i_bucket=2/s_bucket=0/d_bucket=0/t_bucket=4/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_bucket/data/i_bucket=0/s_bucket=1/d_bucket=2/t_bucket=4/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_bucket/data/i_bucket=0/s_bucket=2/d_bucket=3/t_bucket=0/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_bucket/data/i_bucket=0/s_bucket=4/d_bucket=1/t_bucket=3/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_bucket/data/i_bucket=2/s_bucket=0/d_bucket=0/t_bucket=4/.*.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -346,14 +346,14 @@ DECIMAL
 ---- QUERY
 show files in single_col_truncate;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=1.1200/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=10.5400/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=200.7800/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=314.1500/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=98765.4300/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=__HIVE_DEFAULT_PARTITION__/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=1.1200/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=10.5400/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=200.7800/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=314.1500/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=98765.4300/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=__HIVE_DEFAULT_PARTITION__/.*.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -427,14 +427,14 @@ INT,BIGINT,DECIMAL,STRING
 ---- QUERY
 show files in multi_col_truncate;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick brown/i_trunc=0/b_trunc=11/d_trunc=11111.100000/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick brown/i_trunc=0/b_trunc=220/d_trunc=421.000000/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick brown/i_trunc=5/b_trunc=330/d_trunc=113211.200000/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick fox b/i_trunc=5/b_trunc=440/d_trunc=1111154.100000/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick impal/i_trunc=15/b_trunc=550/d_trunc=9999913.200000/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=__HIVE_DEFAULT_PARTITION__/i_trunc=__HIVE_DEFAULT_PARTITION__/b_trunc=__HIVE_DEFAULT_PARTITION__/d_trunc=__HIVE_DEFAULT_PARTITION__/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick brown/i_trunc=0/b_trunc=11/d_trunc=11111.100000/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick brown/i_trunc=0/b_trunc=220/d_trunc=421.000000/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick brown/i_trunc=5/b_trunc=330/d_trunc=113211.200000/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick fox b/i_trunc=5/b_trunc=440/d_trunc=1111154.100000/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick impal/i_trunc=15/b_trunc=550/d_trunc=9999913.200000/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=__HIVE_DEFAULT_PARTITION__/i_trunc=__HIVE_DEFAULT_PARTITION__/b_trunc=__HIVE_DEFAULT_PARTITION__/d_trunc=__HIVE_DEFAULT_PARTITION__/.*.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -551,12 +551,12 @@ TIMESTAMP,DATE
 ---- QUERY
 show files in year_transform;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/year_transform/data/t_year=1969/d_year=1969/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/year_transform/data/t_year=1970/d_year=1970/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/year_transform/data/t_year=2021/d_year=2021/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/year_transform/data/t_year=__HIVE_DEFAULT_PARTITION__/d_year=__HIVE_DEFAULT_PARTITION__/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/year_transform/data/t_year=1969/d_year=1969/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/year_transform/data/t_year=1970/d_year=1970/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/year_transform/data/t_year=2021/d_year=2021/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/year_transform/data/t_year=__HIVE_DEFAULT_PARTITION__/d_year=__HIVE_DEFAULT_PARTITION__/.*.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -674,14 +674,14 @@ TIMESTAMP,DATE
 ---- QUERY
 show files in month_transform;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=1969-02/d_month=1969-02/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=1969-12/d_month=1969-12/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=1970-01/d_month=1970-01/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=1970-11/d_month=1970-11/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=2021-01/d_month=2021-01/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=__HIVE_DEFAULT_PARTITION__/d_month=__HIVE_DEFAULT_PARTITION__/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=1969-02/d_month=1969-02/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=1969-12/d_month=1969-12/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=1970-01/d_month=1970-01/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=1970-11/d_month=1970-11/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=2021-01/d_month=2021-01/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=__HIVE_DEFAULT_PARTITION__/d_month=__HIVE_DEFAULT_PARTITION__/.*.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -787,15 +787,15 @@ TIMESTAMP,DATE
 ---- QUERY
 show files in day_transform;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=1969-02-15/d_day=1969-02-15/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=1969-12-15/d_day=1969-12-15/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=1970-01-01/d_day=1970-01-01/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=1970-11-01/d_day=1970-11-01/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=2021-01-07/d_day=2021-01-07/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=2021-01-08/d_day=2021-01-08/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=__HIVE_DEFAULT_PARTITION__/d_day=__HIVE_DEFAULT_PARTITION__/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=1969-02-15/d_day=1969-02-15/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=1969-12-15/d_day=1969-12-15/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=1970-01-01/d_day=1970-01-01/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=1970-11-01/d_day=1970-11-01/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=2021-01-07/d_day=2021-01-07/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=2021-01-08/d_day=2021-01-08/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=__HIVE_DEFAULT_PARTITION__/d_day=__HIVE_DEFAULT_PARTITION__/.*.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -917,15 +917,15 @@ TIMESTAMP
 ---- QUERY
 show files in hour_transform;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=1969-12-31-22/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=1969-12-31-23/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=1970-01-01-00/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=1970-01-01-01/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=2021-01-08-14/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=2021-01-08-15/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=__HIVE_DEFAULT_PARTITION__/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=1969-12-31-22/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=1969-12-31-23/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=1970-01-01-00/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=1970-01-01-01/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=2021-01-08-14/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=2021-01-08-15/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=__HIVE_DEFAULT_PARTITION__/.*.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -1009,14 +1009,14 @@ STRING,BIGINT,DECIMAL,TIMESTAMP,DATE
 ---- QUERY
 show files in mixed_and_shuffled;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=1971-07-01/da_year=1971/s_trunc=green/b_bucket=1/de_trunc=71.00/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=1999-09-09/da_year=1999/s_trunc=pink /b_bucket=1/de_trunc=9.00/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=2020-01-06/da_year=2020/s_trunc=quick/b_bucket=1/de_trunc=3333.00/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=2021-01-01/da_year=2021/s_trunc=quick/b_bucket=1/de_trunc=543.00/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=2021-01-01/da_year=2021/s_trunc=quick/b_bucket=2/de_trunc=123.00/.*.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=__HIVE_DEFAULT_PARTITION__/da_year=__HIVE_DEFAULT_PARTITION__/s_trunc=__HIVE_DEFAULT_PARTITION__/b_bucket=__HIVE_DEFAULT_PARTITION__/de_trunc=__HIVE_DEFAULT_PARTITION__/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=1971-07-01/da_year=1971/s_trunc=green/b_bucket=1/de_trunc=71.00/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=1999-09-09/da_year=1999/s_trunc=pink /b_bucket=1/de_trunc=9.00/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=2020-01-06/da_year=2020/s_trunc=quick/b_bucket=1/de_trunc=3333.00/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=2021-01-01/da_year=2021/s_trunc=quick/b_bucket=1/de_trunc=543.00/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=2021-01-01/da_year=2021/s_trunc=quick/b_bucket=2/de_trunc=123.00/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=__HIVE_DEFAULT_PARTITION__/da_year=__HIVE_DEFAULT_PARTITION__/s_trunc=__HIVE_DEFAULT_PARTITION__/b_bucket=__HIVE_DEFAULT_PARTITION__/de_trunc=__HIVE_DEFAULT_PARTITION__/.*.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.

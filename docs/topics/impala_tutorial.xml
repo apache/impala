@@ -1634,60 +1634,60 @@ WARNINGS: Impala does not have READ_WRITE access to path 'hdfs://myhost.com:8020
           </ul></p>
 
 <codeblock>> SHOW TABLE STATS airlines_external;
-+-------+--------+--------+--------------+-------------------+---------+-------------------+
-| #Rows | #Files | Size   | Bytes Cached | Cache Replication | Format  | Incremental stats |
-+-------+--------+--------+--------------+-------------------+---------+-------------------+
-| -1    | 8      | 1.34GB | NOT CACHED   | NOT CACHED        | PARQUET | false             |
-+-------+--------+--------+--------------+-------------------+---------+-------------------+
++-------+--------+--------+--------------+-------------------+---------+-------------------+-------------------------------+-----------+
+| #Rows | #Files | Size   | Bytes Cached | Cache Replication | Format  | Incremental stats | Location                      | EC Policy |
++-------+--------+--------+--------------+-------------------+---------+-------------------+-------------------------------+-----------+
+| -1    | 8      | 1.34GB | NOT CACHED   | NOT CACHED        | PARQUET | false             | /user/impala/staging/airlines | NONE      |
++-------+--------+--------+--------------+-------------------+---------+-------------------+-------------------------------+-----------+
 
 > SHOW FILES IN airlines_external;
-+----------------------------------------------------------------------------------------+----------+-----------+
-| path                                                                                   | size     | partition |
-+----------------------------------------------------------------------------------------+----------+-----------+
-| /user/impala/staging/airlines/4345e5eef217aa1b-c8f16177f35fd983_1150363067_data.0.parq | 252.99MB |           |
-| /user/impala/staging/airlines/4345e5eef217aa1b-c8f16177f35fd983_1150363067_data.1.parq | 13.43MB  |           |
-| /user/impala/staging/airlines/4345e5eef217aa1b-c8f16177f35fd984_501176748_data.0.parq  | 252.84MB |           |
-| /user/impala/staging/airlines/4345e5eef217aa1b-c8f16177f35fd984_501176748_data.1.parq  | 63.92MB  |           |
-| /user/impala/staging/airlines/4345e5eef217aa1b-c8f16177f35fd985_1199995767_data.0.parq | 183.64MB |           |
-| /user/impala/staging/airlines/4345e5eef217aa1b-c8f16177f35fd986_2086627597_data.0.parq | 240.04MB |           |
-| /user/impala/staging/airlines/4345e5eef217aa1b-c8f16177f35fd987_1048668565_data.0.parq | 211.35MB |           |
-| /user/impala/staging/airlines/4345e5eef217aa1b-c8f16177f35fd988_1432111844_data.0.parq | 151.46MB |           |
-+----------------------------------------------------------------------------------------+----------+-----------+
++----------------------------------------------------------------------------------------+----------+-----------+-----------+
+| Path                                                                                   | Size     | Partition | EC Policy |
++----------------------------------------------------------------------------------------+----------+-----------+-----------+
+| /user/impala/staging/airlines/4345e5eef217aa1b-c8f16177f35fd983_1150363067_data.0.parq | 252.99MB |           | NONE      |
+| /user/impala/staging/airlines/4345e5eef217aa1b-c8f16177f35fd983_1150363067_data.1.parq | 13.43MB  |           | NONE      |
+| /user/impala/staging/airlines/4345e5eef217aa1b-c8f16177f35fd984_501176748_data.0.parq  | 252.84MB |           | NONE      |
+| /user/impala/staging/airlines/4345e5eef217aa1b-c8f16177f35fd984_501176748_data.1.parq  | 63.92MB  |           | NONE      |
+| /user/impala/staging/airlines/4345e5eef217aa1b-c8f16177f35fd985_1199995767_data.0.parq | 183.64MB |           | NONE      |
+| /user/impala/staging/airlines/4345e5eef217aa1b-c8f16177f35fd986_2086627597_data.0.parq | 240.04MB |           | NONE      |
+| /user/impala/staging/airlines/4345e5eef217aa1b-c8f16177f35fd987_1048668565_data.0.parq | 211.35MB |           | NONE      |
+| /user/impala/staging/airlines/4345e5eef217aa1b-c8f16177f35fd988_1432111844_data.0.parq | 151.46MB |           | NONE      |
++----------------------------------------------------------------------------------------+----------+-----------+-----------+
 
 > DESCRIBE airlines_external;
-+---------------------+--------+---------------------------------------------------+
-| name                | type   | comment                                           |
-+---------------------+--------+---------------------------------------------------+
-| year                | int    | Inferred from Parquet file.                       |
-| month               | int    | Inferred from Parquet file.                       |
-| day                 | int    | Inferred from Parquet file.                       |
-| dayofweek           | int    | Inferred from Parquet file.                       |
-| dep_time            | int    | Inferred from Parquet file.                        |
-| crs_dep_time        | int    | Inferred from Parquet file.                       |
-| arr_time            | int    | Inferred from Parquet file.                       |
-| crs_arr_time        | int    | Inferred from Parquet file.                       |
-| carrier             | string | Inferred from Parquet file.                       |
-| flight_num          | int    | Inferred from Parquet file.                       |
-| tail_num            | int    | Inferred from Parquet file.                       |
-| actual_elapsed_time | int    | Inferred from Parquet file.                       |
-| crs_elapsed_time    | int    | Inferred from Parquet file.                       |
-| airtime             | int    | Inferred from Parquet file.                       |
-| arrdelay            | int    | Inferred from Parquet file.                       |
-| depdelay            | int    | Inferred from Parquet file.                       |
-| origin              | string | Inferred from Parquet file.                       |
-| dest                | string | Inferred from Parquet file.                       |
-| distance            | int    | Inferred from Parquet file.                       |
-| taxi_in             | int    | Inferred from Parquet file.                       |
-| taxi_out            | int    | Inferred from Parquet file.                       |
-| cancelled           | int    | Inferred from Parquet file.                       |
-| cancellation_code   | string | Inferred from Parquet file.                       |
-| diverted            | int    | Inferred from Parquet file.                       |
-| carrier_delay       | int    | Inferred from Parquet file.                       |
-| weather_delay       | int    | Inferred from Parquet file.                       |
-| nas_delay           | int    | Inferred from Parquet file.                       |
-| security_delay      | int    | Inferred from Parquet file.                       |
-| late_aircraft_delay | int    | Inferred from Parquet file.                       |
-+---------------------+--------+---------------------------------------------------+
++---------------------+--------+-----------------------------+
+| name                | type   | comment                     |
++---------------------+--------+-----------------------------+
+| year                | int    | Inferred from Parquet file. |
+| month               | int    | Inferred from Parquet file. |
+| day                 | int    | Inferred from Parquet file. |
+| dayofweek           | int    | Inferred from Parquet file. |
+| dep_time            | int    | Inferred from Parquet file. |
+| crs_dep_time        | int    | Inferred from Parquet file. |
+| arr_time            | int    | Inferred from Parquet file. |
+| crs_arr_time        | int    | Inferred from Parquet file. |
+| carrier             | string | Inferred from Parquet file. |
+| flight_num          | int    | Inferred from Parquet file. |
+| tail_num            | int    | Inferred from Parquet file. |
+| actual_elapsed_time | int    | Inferred from Parquet file. |
+| crs_elapsed_time    | int    | Inferred from Parquet file. |
+| airtime             | int    | Inferred from Parquet file. |
+| arrdelay            | int    | Inferred from Parquet file. |
+| depdelay            | int    | Inferred from Parquet file. |
+| origin              | string | Inferred from Parquet file. |
+| dest                | string | Inferred from Parquet file. |
+| distance            | int    | Inferred from Parquet file. |
+| taxi_in             | int    | Inferred from Parquet file. |
+| taxi_out            | int    | Inferred from Parquet file. |
+| cancelled           | int    | Inferred from Parquet file. |
+| cancellation_code   | string | Inferred from Parquet file. |
+| diverted            | int    | Inferred from Parquet file. |
+| carrier_delay       | int    | Inferred from Parquet file. |
+| weather_delay       | int    | Inferred from Parquet file. |
+| nas_delay           | int    | Inferred from Parquet file. |
+| security_delay      | int    | Inferred from Parquet file. |
+| late_aircraft_delay | int    | Inferred from Parquet file. |
++---------------------+--------+-----------------------------+
 
 > DESCRIBE FORMATTED airlines_external;
 +------------------------------+-------------------------------
@@ -2128,33 +2128,33 @@ is in each partition.
 +-------------------------------------------+
 
 > SHOW TABLE STATS airlines;
-+-------+-----------+--------+----------+--------------+-------------------+---------+-------------------+----------------------------------------------------------------------------------------------------------+
-| year  | #Rows     | #Files | Size     | Bytes Cached | Cache Replication | Format  | Incremental stats | Location                                                                                                 |
-+-------+-----------+--------+----------+--------------+-------------------+---------+-------------------+----------------------------------------------------------------------------------------------------------+
-| 1987  | 1311826   | 1      | 11.75MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1987 |
-| 1988  | 5202096   | 1      | 44.04MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1988 |
-| 1989  | 5041200   | 1      | 46.07MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1989 |
-| 1990  | 5270893   | 1      | 46.25MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1990 |
-| 1991  | 5076925   | 1      | 46.77MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1991 |
-| 1992  | 5092157   | 1      | 48.21MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1992 |
-| 1993  | 5070501   | 1      | 47.46MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1993 |
-| 1994  | 5180048   | 1      | 47.47MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1994 |
-| 1995  | 5327435   | 1      | 62.40MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1995 |
-| 1996  | 5351983   | 1      | 62.93MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1996 |
-| 1997  | 5411843   | 1      | 65.05MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1997 |
-| 1998  | 5384721   | 1      | 62.21MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1998 |
-| 1999  | 5527884   | 1      | 65.10MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1999 |
-| 2000  | 5683047   | 1      | 67.68MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=2000 |
-| 2001  | 5967780   | 1      | 74.03MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=2001 |
-| 2002  | 5271359   | 1      | 74.00MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=2002 |
-| 2003  | 6488540   | 1      | 99.35MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=2003 |
-| 2004  | 7129270   | 1      | 123.29MB | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=2004 |
-| 2005  | 7140596   | 1      | 120.72MB | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=2005 |
-| 2006  | 7141922   | 1      | 121.88MB | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=2006 |
-| 2007  | 7453215   | 1      | 130.87MB | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=2007 |
-| 2008  | 7009728   | 1      | 123.14MB | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=2008 |
-| Total | 123534969 | 22     | 1.55GB   | 0B           |                   |         |                   |                                                                                                          |
-+-------+-----------+--------+----------+--------------+-------------------+---------+-------------------+----------------------------------------------------------------------------------------------------------+
++-------+-----------+--------+----------+--------------+-------------------+---------+-------------------+-------------------------------------------------------------------------------+-----------+
+| year  | #Rows     | #Files | Size     | Bytes Cached | Cache Replication | Format  | Incremental stats | Location                                                                      | EC Policy |
++-------+-----------+--------+----------+--------------+-------------------+---------+-------------------+-------------------------------------------------------------------------------+-----------+
+| 1987  | 1311826   | 1      | 11.75MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1987 | NONE      |
+| 1988  | 5202096   | 1      | 44.04MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1988 | NONE      |
+| 1989  | 5041200   | 1      | 46.07MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1989 | NONE      |
+| 1990  | 5270893   | 1      | 46.25MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1990 | NONE      |
+| 1991  | 5076925   | 1      | 46.77MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1991 | NONE      |
+| 1992  | 5092157   | 1      | 48.21MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1992 | NONE      |
+| 1993  | 5070501   | 1      | 47.46MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1993 | NONE      |
+| 1994  | 5180048   | 1      | 47.47MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1994 | NONE      |
+| 1995  | 5327435   | 1      | 62.40MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1995 | NONE      |
+| 1996  | 5351983   | 1      | 62.93MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1996 | NONE      |
+| 1997  | 5411843   | 1      | 65.05MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1997 | NONE      |
+| 1998  | 5384721   | 1      | 62.21MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1998 | NONE      |
+| 1999  | 5527884   | 1      | 65.10MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=1999 | NONE      |
+| 2000  | 5683047   | 1      | 67.68MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=2000 | NONE      |
+| 2001  | 5967780   | 1      | 74.03MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=2001 | NONE      |
+| 2002  | 5271359   | 1      | 74.00MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=2002 | NONE      |
+| 2003  | 6488540   | 1      | 99.35MB  | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=2003 | NONE      |
+| 2004  | 7129270   | 1      | 123.29MB | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=2004 | NONE      |
+| 2005  | 7140596   | 1      | 120.72MB | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=2005 | NONE      |
+| 2006  | 7141922   | 1      | 121.88MB | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=2006 | NONE      |
+| 2007  | 7453215   | 1      | 130.87MB | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=2007 | NONE      |
+| 2008  | 7009728   | 1      | 123.14MB | NOT CACHED   | NOT CACHED        | PARQUET | true              | hdfs://myhost.com:8020/user/hive/warehouse/airline_data.db/airlines/year=2008 | NONE      |
+| Total | 123534969 | 22     | 1.55GB   | 0B           |                   |         |                   |                                                                               |           |
++-------+-----------+--------+----------+--------------+-------------------+---------+-------------------+-------------------------------------------------------------------------------+-----------+
 </codeblock>
 
 <p> At this point, we sanity check the partitioning we did. All the partitions

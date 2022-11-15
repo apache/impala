@@ -14,15 +14,15 @@ compute stats date_tbl_copy;
 ---- QUERY
 show table stats date_tbl_copy;
 ---- LABELS
-date_part, #Rows, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental Stats, Location
+date_part, #Rows, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental Stats, Location, EC Policy
 ---- RESULTS
-'0001-01-01',7,1,'83B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'1399-06-27',3,1,'34B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2017-11-27',10,1,'140B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'9999-12-31',2,1,'28B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'Total',22,4,'285B','0B','','','',''
+'0001-01-01',7,1,'83B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'1399-06-27',3,1,'34B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2017-11-27',10,1,'140B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'9999-12-31',2,1,'28B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',22,4,'285B','0B','','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats date_tbl_copy;
@@ -60,15 +60,15 @@ drop stats date_tbl_copy;
 ---- QUERY
 show table stats date_tbl_copy;
 ---- LABELS
-date_part, #Rows, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental Stats, Location
+date_part, #Rows, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental Stats, Location, EC POLICY
 ---- RESULTS
-'0001-01-01',-1,1,'83B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'1399-06-27',-1,1,'34B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2017-11-27',-1,1,'140B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'9999-12-31',-1,1,'28B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'Total',-1,4,'285B','0B','','','',''
+'0001-01-01',-1,1,'83B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'1399-06-27',-1,1,'34B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2017-11-27',-1,1,'140B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'9999-12-31',-1,1,'28B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',-1,4,'285B','0B','','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats date_tbl_copy;

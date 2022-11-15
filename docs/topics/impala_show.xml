@@ -175,19 +175,19 @@ show files in sample_table partition (month like 'J%');
 [localhost:21000] > insert into unpart_text (x, s) select id, name
                   > from oreilly.sample_data limit 20e6;
 [localhost:21000] > show files in unpart_text;
-+--------------------------------------------------------------------------------------+----------+-----------+
-| path                                                                                 | size     | partition |
-+--------------------------------------------------------------------------------------+----------+-----------+
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/35665776ef85cfaf_1012432410_data.0. | 448.31MB |           |
-+--------------------------------------------------------------------------------------+----------+-----------+
++--------------------------------------------------------------------------------------+----------+-----------+-----------+
+| Path                                                                                 | Size     | Partition | EC Policy |
++--------------------------------------------------------------------------------------+----------+-----------+-----------+
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/35665776ef85cfaf_1012432410_data.0. | 448.31MB |           | NONE      |
++--------------------------------------------------------------------------------------+----------+-----------+-----------+
 [localhost:21000] > insert into unpart_text (x, s) select id, name from oreilly.sample_data limit 100e6;
 [localhost:21000] > show files in unpart_text;
-+--------------------------------------------------------------------------------------+----------+-----------+
-| path                                                                                 | size     | partition |
-+--------------------------------------------------------------------------------------+----------+-----------+
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/35665776ef85cfaf_1012432410_data.0. | 448.31MB |           |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/ac3dba252a8952b8_1663177415_data.0. | 2.19GB   |           |
-+--------------------------------------------------------------------------------------+----------+-----------+
++--------------------------------------------------------------------------------------+----------+-----------+-----------+
+| Path                                                                                 | Size     | Partition | EC Policy
++--------------------------------------------------------------------------------------+----------+-----------+-----------+
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/35665776ef85cfaf_1012432410_data.0. | 448.31MB |           | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/ac3dba252a8952b8_1663177415_data.0. | 2.19GB   |           | NONE      |
++--------------------------------------------------------------------------------------+----------+-----------+-----------+
 </codeblock>
 
       <p>
@@ -200,14 +200,14 @@ show files in sample_table partition (month like 'J%');
 <codeblock scale="60">[localhost:21000] > insert into unpart_text values (10,'hello'), (20, 'world');
 [localhost:21000] > insert into unpart_text values (-1,'foo'), (-1000, 'bar');
 [localhost:21000] > show files in unpart_text;
-+--------------------------------------------------------------------------------------+----------+-----------+
-| path                                                                                 | size     | partition |
-+--------------------------------------------------------------------------------------+----------+-----------+
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/4f11b8bdf8b6aa92_238145083_data.0.  | 18B      |           |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/35665776ef85cfaf_1012432410_data.0. | 448.31MB |           |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/ac3dba252a8952b8_1663177415_data.0. | 2.19GB   |           |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/cfb8252452445682_1868457216_data.0. | 17B      |           |
-+--------------------------------------------------------------------------------------+----------+-----------+
++--------------------------------------------------------------------------------------+----------+-----------+-----------+
+| Path                                                                                 | Size     | Partition | EC Policy |
++--------------------------------------------------------------------------------------+----------+-----------+-----------+
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/4f11b8bdf8b6aa92_238145083_data.0.  | 18B      |           | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/35665776ef85cfaf_1012432410_data.0. | 448.31MB |           | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/ac3dba252a8952b8_1663177415_data.0. | 2.19GB   |           | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/cfb8252452445682_1868457216_data.0. | 17B      |           | NONE      |
++--------------------------------------------------------------------------------------+----------+-----------+-----------+
 [localhost:21000] > create table unpart_parq stored as parquet as select * from unpart_text;
 +---------------------------+
 | summary                   |
@@ -215,18 +215,18 @@ show files in sample_table partition (month like 'J%');
 | Inserted 120000002 row(s) |
 +---------------------------+
 [localhost:21000] > show files in unpart_parq;
-+------------------------------------------------------------------------------------------+----------+
-| path                                                                                     | size     |
-+------------------------------------------------------------------------------------------+----------+
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_parq/60798d96ba630184_549959007_data.0.parq  | 255.36MB |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_parq/60798d96ba630184_549959007_data.1.parq  | 178.52MB |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_parq/60798d96ba630185_549959007_data.0.parq  | 255.37MB |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_parq/60798d96ba630185_549959007_data.1.parq  | 57.71MB  |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_parq/60798d96ba630186_2141167244_data.0.parq | 255.40MB |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_parq/60798d96ba630186_2141167244_data.1.parq | 175.52MB |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_parq/60798d96ba630187_1006832086_data.0.parq | 255.40MB |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_parq/60798d96ba630187_1006832086_data.1.parq | 214.61MB |
-+------------------------------------------------------------------------------------------+----------+
++------------------------------------------------------------------------------------------+----------+-----------+-----------+
+| Path                                                                                     | Size     | Partition | EC Policy |
++------------------------------------------------------------------------------------------+----------+-----------+-----------+
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_parq/60798d96ba630184_549959007_data.0.parq  | 255.36MB |           | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_parq/60798d96ba630184_549959007_data.1.parq  | 178.52MB |           | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_parq/60798d96ba630185_549959007_data.0.parq  | 255.37MB |           | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_parq/60798d96ba630185_549959007_data.1.parq  | 57.71MB  |           | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_parq/60798d96ba630186_2141167244_data.0.parq | 255.40MB |           | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_parq/60798d96ba630186_2141167244_data.1.parq | 175.52MB |           | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_parq/60798d96ba630187_1006832086_data.0.parq | 255.40MB |           | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_parq/60798d96ba630187_1006832086_data.1.parq | 214.61MB |           | NONE      |
++------------------------------------------------------------------------------------------+----------+-----------+-----------+
 </codeblock>
 
       <p>
@@ -245,28 +245,28 @@ where id between 1 and 1000000;
 [localhost:21000] > alter table part_text add partition (year=2014,month=1,day=3);
 [localhost:21000] > alter table part_text add partition (year=2014,month=1,day=4);
 [localhost:21000] > show partitions part_text;
-+-------+-------+-----+-------+--------+---------+--------------+-------------------+--------+-------------------+
-| year  | month | day | #Rows | #Files | Size    | Bytes Cached | Cache Replication | Format | Incremental stats |
-+-------+-------+-----+-------+--------+---------+--------------+-------------------+--------+-------------------+
-| 2014  | 1     | 1   | -1    | 4      | 25.16MB | NOT CACHED   | NOT CACHED        | TEXT   | false             |
-| 2014  | 1     | 2   | -1    | 4      | 26.22MB | NOT CACHED   | NOT CACHED        | TEXT   | false             |
-| 2014  | 1     | 3   | -1    | 0      | 0B      | NOT CACHED   | NOT CACHED        | TEXT   | false             |
-| 2014  | 1     | 4   | -1    | 0      | 0B      | NOT CACHED   | NOT CACHED        | TEXT   | false             |
-| Total |       |     | -1    | 8      | 51.38MB | 0B           |                   |        |                   |
-+-------+-------+-----+-------+--------+---------+--------------+-------------------+--------+-------------------+
++-------+-------+-----+-------+--------+---------+--------------+-------------------+--------+-------------------+------------------------------------------------------------------------+-----------+
+| year  | month | day | #Rows | #Files | Size    | Bytes Cached | Cache Replication | Format | Incremental stats | Location                                                               | EC Policy |
++-------+-------+-----+-------+--------+---------+--------------+-------------------+--------+-------------------+------------------------------------------------------------------------+-----------+
+| 2014  | 1     | 1   | -1    | 4      | 25.16MB | NOT CACHED   | NOT CACHED        | TEXT   | false             | hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=1 | NONE      |
+| 2014  | 1     | 2   | -1    | 4      | 26.22MB | NOT CACHED   | NOT CACHED        | TEXT   | false             | hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=2 | NONE      |
+| 2014  | 1     | 3   | -1    | 0      | 0B      | NOT CACHED   | NOT CACHED        | TEXT   | false             | hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=3 | NONE      |
+| 2014  | 1     | 4   | -1    | 0      | 0B      | NOT CACHED   | NOT CACHED        | TEXT   | false             | hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=4 | NONE      |
+| Total |       |     | -1    | 8      | 51.38MB | 0B           |                   |        |                   |                                                                        |           |
++-------+-------+-----+-------+--------+---------+--------------+-------------------+--------+-------------------+------------------------------------------------------------------------+-----------+
 [localhost:21000] > show files in part_text;
-+-----------------------------------------------------------------------------------------------------------------------+--------+-------------------------+
-| path                                                                                                                  | size   | partition               |
-+-----------------------------------------------------------------------------------------------------------------------+--------+-------------------------+
-| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc80689f_1418645991_data.0.  | 5.77MB | year=2014/month=1/day=1 |
-| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc8068a0_1418645991_data.0.  | 6.25MB | year=2014/month=1/day=1 |
-| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc8068a1_147082319_data.0.   | 7.16MB | year=2014/month=1/day=1 |
-| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc8068a2_2111411753_data.0.  | 5.98MB | year=2014/month=1/day=1 |
-| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbb_501271652_data.0.  | 6.42MB | year=2014/month=1/day=2 |
-| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbc_501271652_data.0.  | 6.62MB | year=2014/month=1/day=2 |
-| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbd_1393490200_data.0. | 6.98MB | year=2014/month=1/day=2 |
-| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbe_1393490200_data.0. | 6.20MB | year=2014/month=1/day=2 |
-+-----------------------------------------------------------------------------------------------------------------------+--------+-------------------------+
++------------------------------------------------------------------------------------------------------------+--------+-------------------------+-----------+
+| Path                                                                                                       | Size   | Partition               | EC Policy |
++------------------------------------------------------------------------------------------------------------+--------+-------------------------+-----------+
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc80689f_1418645991_data.0.  | 5.77MB | year=2014/month=1/day=1 | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc8068a0_1418645991_data.0.  | 6.25MB | year=2014/month=1/day=1 | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc8068a1_147082319_data.0.   | 7.16MB | year=2014/month=1/day=1 | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc8068a2_2111411753_data.0.  | 5.98MB | year=2014/month=1/day=1 | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbb_501271652_data.0.  | 6.42MB | year=2014/month=1/day=2 | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbc_501271652_data.0.  | 6.62MB | year=2014/month=1/day=2 | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbd_1393490200_data.0. | 6.98MB | year=2014/month=1/day=2 | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbe_1393490200_data.0. | 6.20MB | year=2014/month=1/day=2 | NONE      |
++------------------------------------------------------------------------------------------------------------+--------+-------------------------+-----------+
 </codeblock>
       <p>
         The following example shows a <codeph>SHOW FILES</codeph> statement for a partitioned Parquet table.
@@ -278,24 +278,24 @@ where id between 1 and 1000000;
 <codeblock scale="60">[localhost:21000] > create table part_parq (x bigint, y int, s string) partitioned by (year bigint, month bigint, day bigint) stored as parquet;
 [localhost:21000] > insert into part_parq partition (year,month,day) select x, y, s, year, month, day from partitioned_text;
 [localhost:21000] > show partitions part_parq;
-+-------+-------+-----+-------+--------+---------+--------------+-------------------+---------+-------------------+
-| year  | month | day | #Rows | #Files | Size    | Bytes Cached | Cache Replication | Format  | Incremental stats |
-+-------+-------+-----+-------+--------+---------+--------------+-------------------+---------+-------------------+
-| 2014  | 1     | 1   | -1    | 3      | 17.89MB | NOT CACHED   | NOT CACHED        | PARQUET | false             |
-| 2014  | 1     | 2   | -1    | 3      | 17.89MB | NOT CACHED   | NOT CACHED        | PARQUET | false             |
-| Total |       |     | -1    | 6      | 35.79MB | 0B           |                   |         |                   |
-+-------+-------+-----+-------+--------+---------+--------------+-------------------+---------+-------------------+
++-------+-------+-----+-------+--------+---------+--------------+-------------------+---------+-------------------+------------------------------------------------------------------------+-----------+
+| year  | month | day | #Rows | #Files | Size    | Bytes Cached | Cache Replication | Format  | Incremental stats | Location                                                               | EC Policy |
++-------+-------+-----+-------+--------+---------+--------------+-------------------+---------+-------------------+------------------------------------------------------------------------+-----------+
+| 2014  | 1     | 1   | -1    | 3      | 17.89MB | NOT CACHED   | NOT CACHED        | PARQUET | false             | hdfs://<varname>impala_data_dir</varname>/show_files.db/part_parq/year=2014/month=1/day=1 | NONE      |
+| 2014  | 1     | 2   | -1    | 3      | 17.89MB | NOT CACHED   | NOT CACHED        | PARQUET | false             | hdfs://<varname>impala_data_dir</varname>/show_files.db/part_parq/year=2014/month=1/day=2 | NONE      |
+| Total |       |     | -1    | 6      | 35.79MB | 0B           |                   |         |                   |                                                                        |           |
++-------+-------+-----+-------+--------+---------+--------------+-------------------+---------+-------------------+------------------------------------------------------------------------+-----------+
 [localhost:21000] > show files in part_parq;
-+-----------------------------------------------------------------------------------------------+--------+-------------------------+
-| path                                                                                          | size   | partition               |
-+-----------------------------------------------------------------------------------------------+--------+-------------------------+
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_parq/year=2014/month=1/day=1/1134113650_data.0.parq | 4.49MB | year=2014/month=1/day=1 |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_parq/year=2014/month=1/day=1/617567880_data.0.parq  | 5.14MB | year=2014/month=1/day=1 |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_parq/year=2014/month=1/day=1/2099499416_data.0.parq | 8.27MB | year=2014/month=1/day=1 |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_parq/year=2014/month=1/day=2/945567189_data.0.parq  | 8.80MB | year=2014/month=1/day=2 |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_parq/year=2014/month=1/day=2/2145850112_data.0.parq | 4.80MB | year=2014/month=1/day=2 |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_parq/year=2014/month=1/day=2/665613448_data.0.parq  | 4.29MB | year=2014/month=1/day=2 |
-+-----------------------------------------------------------------------------------------------+--------+-------------------------+
++-----------------------------------------------------------------------------------------------+--------+-------------------------+-----------+
+| Path                                                                                          | Size   | Partition               | EC Policy |
++-----------------------------------------------------------------------------------------------+--------+-------------------------+-----------+
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_parq/year=2014/month=1/day=1/1134113650_data.0.parq | 4.49MB | year=2014/month=1/day=1 | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_parq/year=2014/month=1/day=1/617567880_data.0.parq  | 5.14MB | year=2014/month=1/day=1 | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_parq/year=2014/month=1/day=1/2099499416_data.0.parq | 8.27MB | year=2014/month=1/day=1 | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_parq/year=2014/month=1/day=2/945567189_data.0.parq  | 8.80MB | year=2014/month=1/day=2 | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_parq/year=2014/month=1/day=2/2145850112_data.0.parq | 4.80MB | year=2014/month=1/day=2 | NONE      |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_parq/year=2014/month=1/day=2/665613448_data.0.parq  | 4.29MB | year=2014/month=1/day=2 | NONE      |
++-----------------------------------------------------------------------------------------------+--------+-------------------------+-----------+
 </codeblock>
 <p>
   The following example shows output from the <codeph>SHOW FILES</codeph> statement
@@ -303,7 +303,7 @@ where id between 1 and 1000000;
 </p>
 <codeblock scale="70">[localhost:21000] > show files in s3_testing.sample_data_s3;
 +-----------------------------------------------------------------------+---------+
-| path                                                                  | size    |
+| Path                                                                  | Size    |
 +-----------------------------------------------------------------------+---------+
 | s3a://impala-demo/sample_data/e065453cba1988a6_1733868553_data.0.parq | 24.84MB |
 +-----------------------------------------------------------------------+---------+
@@ -988,18 +988,18 @@ show table stats kudu_table;
       </p>
 
 <codeblock>show table stats store_sales;
-+-------+--------+----------+--------------+--------+-------------------+
-| #Rows | #Files | Size     | Bytes Cached | Format | Incremental stats |
-+-------+--------+----------+--------------+--------+-------------------+
-| -1    | 1      | 370.45MB | NOT CACHED   | TEXT   | false             |
-+-------+--------+----------+--------------+--------+-------------------+
++-------+--------+----------+--------------+--------+-------------------+------------------------------------+-----------+
+| #Rows | #Files | Size     | Bytes Cached | Format | Incremental stats | Location                           | EC Policy |
++-------+--------+----------+--------------+--------+-------------------+------------------------------------+-----------+
+| -1    | 1      | 370.45MB | NOT CACHED   | TEXT   | false             | hdfs://<varname>impala_data_dir</varname>/store_sales | NONE      |
++-------+--------+----------+--------------+--------+-------------------+------------------------------------+-----------+
 
 show table stats customer;
-+-------+--------+---------+--------------+--------+-------------------+
-| #Rows | #Files | Size    | Bytes Cached | Format | Incremental stats |
-+-------+--------+---------+--------------+--------+-------------------+
-| -1    | 1      | 12.60MB | NOT CACHED   | TEXT   | false             |
-+-------+--------+---------+--------------+--------+-------------------+
++-------+--------+---------+--------------+--------+-------------------+---------------------------------+-----------+
+| #Rows | #Files | Size    | Bytes Cached | Format | Incremental stats | Location                        | EC Policy |
++-------+--------+---------+--------------+--------+-------------------+---------------------------------+-----------+
+| -1    | 1      | 12.60MB | NOT CACHED   | TEXT   | false             | hdfs://<varname>impala_data_dir</varname>/customer | NONE      |
++-------+--------+---------+--------------+--------+-------------------+---------------------------------+-----------+
 </codeblock>
 
       <p>
@@ -1018,11 +1018,11 @@ show table stats customer;
 +------------------------------------------+
 
 show table stats customer;
-+--------+--------+---------+--------------+--------+-------------------+
-| #Rows  | #Files | Size    | Bytes Cached | Format | Incremental stats |
-+--------+--------+---------+--------------+--------+-------------------+
-| 100000 | 1      | 12.60MB | NOT CACHED   | TEXT   | false             |
-+--------+--------+---------+--------------+--------+-------------------+
++--------+--------+---------+--------------+--------+-------------------+---------------------------------+-----------+
+| #Rows  | #Files | Size    | Bytes Cached | Format | Incremental stats | Location                        | EC Policy |
++--------+--------+---------+--------------+--------+-------------------+---------------------------------+-----------+
+| 100000 | 1      | 12.60MB | NOT CACHED   | TEXT   | false             | hdfs://<varname>impala_data_dir</varname>/customer | NONE      |
++--------+--------+---------+--------------+--------+-------------------+---------------------------------+-----------+
 
 compute incremental stats store_sales;
 +------------------------------------------+
@@ -1032,11 +1032,11 @@ compute incremental stats store_sales;
 +------------------------------------------+
 
 show table stats store_sales;
-+---------+--------+----------+--------------+--------+-------------------+
-| #Rows   | #Files | Size     | Bytes Cached | Format | Incremental stats |
-+---------+--------+----------+--------------+--------+-------------------+
-| 2880404 | 1      | 370.45MB | NOT CACHED   | TEXT   | false             |
-+---------+--------+----------+--------------+--------+-------------------+
++---------+--------+----------+--------------+--------+-------------------+------------------------------------+-----------+
+| #Rows   | #Files | Size     | Bytes Cached | Format | Incremental stats | Location                           | EC Policy |
++---------+--------+----------+--------------+--------+-------------------+------------------------------------+-----------+
+| 2880404 | 1      | 370.45MB | NOT CACHED   | TEXT   | false             | hdfs://<varname>impala_data_dir</varname>/store_sales | NONE      |
++---------+--------+----------+--------------+--------+-------------------+------------------------------------+-----------+
 </codeblock>
 
       <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
@@ -1304,18 +1304,18 @@ show column stats store_sales;
       </p>
 
 <codeblock rev="1.4.0">[localhost:21000] &gt; show partitions census;
-+-------+-------+--------+------+---------+
-| year  | #Rows | #Files | Size | Format  |
-+-------+-------+--------+------+---------+
-| 2000  | -1    | 0      | 0B   | TEXT    |
-| 2004  | -1    | 0      | 0B   | TEXT    |
-| 2008  | -1    | 0      | 0B   | TEXT    |
-| 2010  | -1    | 0      | 0B   | TEXT    |
-| 2011  | 4     | 1      | 22B  | TEXT    |
-| 2012  | 4     | 1      | 22B  | TEXT    |
-| 2013  | 1     | 1      | 231B | PARQUET |
-| Total | 9     | 3      | 275B |         |
-+-------+-------+--------+------+---------+
++-------+-------+--------+------+---------+-------------------+-----------------------------------------+-----------+
+| year  | #Rows | #Files | Size | Format  | Incremental stats | Location                                | EC Policy |
++-------+-------+--------+------+---------+-------------------+-----------------------------------------+-----------+
+| 2000  | -1    | 0      | 0B   | TEXT    | false             | hdfs://<varname>impala_data_dir</varname>/census/year=2000 | NONE      |
+| 2004  | -1    | 0      | 0B   | TEXT    | false             | hdfs://<varname>impala_data_dir</varname>/census/year=2000 | NONE      |
+| 2008  | -1    | 0      | 0B   | TEXT    | false             | hdfs://<varname>impala_data_dir</varname>/census/year=2000 | NONE      |
+| 2010  | -1    | 0      | 0B   | TEXT    | false             | hdfs://<varname>impala_data_dir</varname>/census/year=2000 | NONE      |
+| 2011  | 4     | 1      | 22B  | TEXT    | false             | hdfs://<varname>impala_data_dir</varname>/census/year=2000 | NONE      |
+| 2012  | 4     | 1      | 22B  | TEXT    | false             | hdfs://<varname>impala_data_dir</varname>/census/year=2000 | NONE      |
+| 2013  | 1     | 1      | 231B | PARQUET | false             | hdfs://<varname>impala_data_dir</varname>/census/year=2000 | NONE      |
+| Total | 9     | 3      | 275B |         |                   |                                         |           |
++-------+-------+--------+------+---------+-------------------+-----------------------------------------+-----------+
 </codeblock>
 
       <p rev="kudu IMPALA-4403">

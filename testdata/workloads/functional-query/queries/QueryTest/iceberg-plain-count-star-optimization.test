@@ -24,9 +24,9 @@ values
   (5, "odd");
 show files in ice_tbl;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=odd/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=odd/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 select count(*) from ice_tbl;
@@ -58,10 +58,10 @@ values
   (6, "even");
 show files in ice_tbl;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=even/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=odd/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=even/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=odd/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 select count(*) from ice_tbl;
@@ -92,12 +92,12 @@ values
   (2, "even");
 show files in ice_tbl;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=even/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=even/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=odd/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=odd/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=even/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=even/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=odd/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_s=odd/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 select count(*) from ice_tbl;

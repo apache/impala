@@ -15,9 +15,9 @@ INT,BIGINT
 ---- QUERY
 show files in ice_ctas;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_ctas/data/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_ctas/data/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Test partitioned table in Iceberg HiveCatalog.
@@ -32,9 +32,9 @@ STRING,TIMESTAMP,DATE
 ---- QUERY
 show files in ice_ctas_part;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_ctas_part/data/d=2021-02-26/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_ctas_part/data/d=2021-02-26/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 SHOW PARTITIONS ice_ctas_part;
@@ -56,10 +56,10 @@ STRING,TIMESTAMP,DATE
 ---- QUERY
 show files in ice_ctas_part;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_ctas_part/data/d=2021-02-26/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_ctas_part/data/d=2021-02-27/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_ctas_part/data/d=2021-02-26/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_ctas_part/data/d=2021-02-27/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 SHOW PARTITIONS ice_ctas_part;
@@ -86,9 +86,9 @@ STRING,TIMESTAMP,DATE
 ---- QUERY
 show files in ice_ctas_hadoop_tables_part;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/loc_test/data/d_month=2021-02/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/loc_test/data/d_month=2021-02/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 SHOW PARTITIONS ice_ctas_hadoop_tables_part;
@@ -148,10 +148,10 @@ INT,STRING,DATE
 ---- QUERY
 show files in ice_ctas_hadoop_catalog_part;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/cat_loc/ns1/ns2/ctas/data/s_trunc=imp/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/cat_loc/ns1/ns2/ctas/data/s_trunc=lio/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/cat_loc/ns1/ns2/ctas/data/s_trunc=imp/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/cat_loc/ns1/ns2/ctas/data/s_trunc=lio/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 SHOW PARTITIONS ice_ctas_hadoop_catalog_part;

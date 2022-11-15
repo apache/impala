@@ -495,6 +495,7 @@ class ImpalaTestSuite(BaseTestSuite):
         "MANAGED_WAREHOUSE_DIR",
         "EXTERNAL_WAREHOUSE_DIR"])
     repl.update({
+        '$ERASURECODE_POLICY': os.getenv("HDFS_ERASURECODE_POLICY", "NONE"),
         '$SECONDARY_FILESYSTEM': os.getenv("SECONDARY_FILESYSTEM", ""),
         '$WAREHOUSE_LOCATION_PREFIX': os.getenv("WAREHOUSE_LOCATION_PREFIX", ""),
         '$USER': getuser()})

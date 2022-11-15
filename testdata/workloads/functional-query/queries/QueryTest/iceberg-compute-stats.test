@@ -19,14 +19,14 @@ STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ---- QUERY
 show table stats ice_alltypes
 ---- LABELS
-#ROWS, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental stats, Location
+#ROWS, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental stats, Location, EC Policy
 ---- RESULTS: VERIFY_IS_EQUAL
 # The file size is on the boundary between 2.32KB and 2.33KB. The build version is written
 # into the file, and "x.y.z-RELEASE" is one byte shorter than "x.y.z-SNAPSHOT". In release
 # builds the file size is 2.32KB, in snapshot builds it is 2.33KB.
-2,1,regex:'2.3[23]KB','NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/$DATABASE.db/ice_alltypes'
+2,1,regex:'2.3[23]KB','NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/$DATABASE.db/ice_alltypes','$ERASURECODE_POLICY'
 ---- TYPES
-BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING
+BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ====
 ---- QUERY
 # Table-level stats are automatically updated.

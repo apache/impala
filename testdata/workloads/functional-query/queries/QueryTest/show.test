@@ -262,47 +262,47 @@ STRING,STRING
 ---- QUERY
 show files in alltypesagg
 ---- LABELS
-Path,Size,Partition
+Path,Size,Partition,EC Policy
 ---- RESULTS
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__/000000_0',regex:.*,'year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt',regex:.*,'year=2010/month=1/day=1'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt',regex:.*,'year=2010/month=1/day=2'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt',regex:.*,'year=2010/month=1/day=3'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt',regex:.*,'year=2010/month=1/day=4'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt',regex:.*,'year=2010/month=1/day=5'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt',regex:.*,'year=2010/month=1/day=6'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt',regex:.*,'year=2010/month=1/day=7'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt',regex:.*,'year=2010/month=1/day=8'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt',regex:.*,'year=2010/month=1/day=9'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt',regex:.*,'year=2010/month=1/day=10'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__/000000_0',regex:.*,'year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt',regex:.*,'year=2010/month=1/day=1','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt',regex:.*,'year=2010/month=1/day=2','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt',regex:.*,'year=2010/month=1/day=3','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt',regex:.*,'year=2010/month=1/day=4','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt',regex:.*,'year=2010/month=1/day=5','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt',regex:.*,'year=2010/month=1/day=6','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt',regex:.*,'year=2010/month=1/day=7','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt',regex:.*,'year=2010/month=1/day=8','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt',regex:.*,'year=2010/month=1/day=9','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt',regex:.*,'year=2010/month=1/day=10','$ERASURECODE_POLICY'
 ---- TYPES
-STRING,STRING,STRING
+STRING,STRING,STRING,STRING
 ====
 ---- QUERY
 show files in functional.alltypesagg
 ---- LABELS
-Path,Size,Partition
+Path,Size,Partition,EC Policy
 ---- RESULTS
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__/000000_0',regex:.*,'year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt',regex:.*,'year=2010/month=1/day=1'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt',regex:.*,'year=2010/month=1/day=2'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt',regex:.*,'year=2010/month=1/day=3'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt',regex:.*,'year=2010/month=1/day=4'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt',regex:.*,'year=2010/month=1/day=5'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt',regex:.*,'year=2010/month=1/day=6'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt',regex:.*,'year=2010/month=1/day=7'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt',regex:.*,'year=2010/month=1/day=8'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt',regex:.*,'year=2010/month=1/day=9'
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt',regex:.*,'year=2010/month=1/day=10'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__/000000_0',regex:.*,'year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt',regex:.*,'year=2010/month=1/day=1','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt',regex:.*,'year=2010/month=1/day=2','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt',regex:.*,'year=2010/month=1/day=3','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt',regex:.*,'year=2010/month=1/day=4','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt',regex:.*,'year=2010/month=1/day=5','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt',regex:.*,'year=2010/month=1/day=6','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt',regex:.*,'year=2010/month=1/day=7','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt',regex:.*,'year=2010/month=1/day=8','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt',regex:.*,'year=2010/month=1/day=9','$ERASURECODE_POLICY'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt',regex:.*,'year=2010/month=1/day=10','$ERASURECODE_POLICY'
 ---- TYPES
-STRING,STRING,STRING
+STRING,STRING,STRING,STRING
 ====
 ---- QUERY
 show files in alltypesagg partition(year=2010,month=1,day=NULL)
 ---- LABELS
-Path,Size,Partition
+Path,Size,Partition,EC Policy
 ---- RESULTS
-'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__/000000_0',regex:.*,'year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__'
+'$NAMENODE/test-warehouse/alltypesagg/year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__/000000_0',regex:.*,'year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__','$ERASURECODE_POLICY'
 ---- TYPES
-STRING,STRING,STRING
+STRING,STRING,STRING,STRING
 ====

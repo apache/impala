@@ -26,14 +26,14 @@ aggregation(SUM, RowsRead): 9
 ---- QUERY
 show files in functional_parquet.iceberg_multiple_storage_locations;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations_data/col_int=0/.*1.parquet','.*',''
-row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations_data/col_int=1/.*2.parquet','.*',''
-row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations_data01/col_int=1/.*1.parquet','.*',''
-row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations_data01/col_int=2/.*2.parquet','.*',''
-row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations_data02/col_int=0/.*2.parquet','.*',''
-row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations_data02/col_int=2/.*1.parquet','.*',''
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations_data/col_int=0/.*1.parquet','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations_data/col_int=1/.*2.parquet','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations_data01/col_int=1/.*1.parquet','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations_data01/col_int=2/.*2.parquet','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations_data02/col_int=0/.*2.parquet','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations_data02/col_int=2/.*1.parquet','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 select

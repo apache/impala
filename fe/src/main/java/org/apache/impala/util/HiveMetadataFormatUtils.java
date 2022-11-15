@@ -30,6 +30,7 @@ import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang3.text.translate.CharSequenceTranslator;
 import org.apache.commons.lang3.text.translate.EntityArrays;
 import org.apache.commons.lang3.text.translate.LookupTranslator;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.BinaryColumnStatsData;
@@ -49,6 +50,7 @@ import org.apache.hadoop.hive.ql.metadata.ForeignKeyInfo;
 import org.apache.hadoop.hive.ql.metadata.PrimaryKeyInfo;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.impala.catalog.IcebergTable;
+import org.apache.impala.common.FileSystemUtil;
 
 /**
  * Most of the code in this class is copied from Hive 2.1.1. This is used so that
@@ -540,11 +542,10 @@ public class HiveMetadataFormatUtils {
     formatOutput("LastAccessTime:", formatDate(tbl.getLastAccessTime()), tableInfo);
     formatOutput("Retention:", Integer.toString(tbl.getRetention()), tableInfo);
     if (!TableType.VIRTUAL_VIEW.toString().equals(tbl.getTableType())) {
-      String location = null;
-      if (tbl.getSd() != null) {
-        location = tbl.getSd().getLocation();
-      }
+      String location = tbl.getSd().getLocation();
       formatOutput("Location:", location, tableInfo);
+      String ecPolicy = FileSystemUtil.getErasureCodingPolicy(new Path(location));
+      formatOutput("Erasure Coding Policy:", ecPolicy, tableInfo);
     }
     formatOutput("Table Type:", tbl.getTableType(), tableInfo);
 

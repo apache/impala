@@ -187,9 +187,9 @@ delete from acid_part_key_scan where p = 1;
 refresh acid_part_key_scan;
 show partitions acid_part_key_scan;
 ---- RESULTS
-'0',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*
-'1',-1,3,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*
-'Total',-1,4,regex:.+,regex:.+,'','','',''
+'0',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*,'$ERASURECODE_POLICY'
+'1',-1,3,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*,'$ERASURECODE_POLICY'
+'Total',-1,4,regex:.+,regex:.+,'','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====

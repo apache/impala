@@ -25,17 +25,17 @@ create table like_cached_tbl_nopart like cached_tbl_nopart
 # like_cached_tbl_nopart shouldn't inhert the caching settings
 show table stats like_cached_tbl_nopart
 ---- RESULTS
--1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
 ---- TYPES
-BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Unpartitioned table shows correct caching
 show table stats cached_tbl_nopart
 ---- RESULTS
--1,1,'2B',regex:.+B,'1','TEXT','false',regex:.*
+-1,1,'2B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
 ---- TYPES
-BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Unpartitioned table is no longer cached
@@ -44,9 +44,9 @@ alter table cached_tbl_nopart set uncached
 ---- QUERY
 show table stats cached_tbl_nopart
 ---- RESULTS
--1,1,'2B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+-1,1,'2B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
 ---- TYPES
-BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 drop table if exists cached_tbl_part
@@ -68,12 +68,12 @@ alter table cached_tbl_part add partition (j=2) cached in 'testPool'
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-'0',-1,0,'0B',regex:.+B,'9','TEXT','false',regex:.*
-'1',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2',-1,0,'0B',regex:.+B,'9','TEXT','false',regex:.*
-'Total',-1,0,'0B',regex:.+B,'','','',''
+'0',-1,0,'0B',regex:.+B,'9','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'1',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2',-1,0,'0B',regex:.+B,'9','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',-1,0,'0B',regex:.+B,'','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 drop table if exists cached_tbl_part
@@ -95,12 +95,12 @@ alter table cached_tbl_part add partition (j=2) cached in 'testPool'
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-'0',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*
-'1',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*
-'Total',-1,0,'0B',regex:.+B,'','','',''
+'0',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'1',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',-1,0,'0B',regex:.+B,'','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # uncache one of the partitions
@@ -109,12 +109,12 @@ alter table cached_tbl_part partition (j=2) set uncached
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-'0',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*
-'1',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'Total',-1,0,'0B',regex:.+B,'','','',''
+'0',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'1',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',-1,0,'0B',regex:.+B,'','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Can uncache the same partition twice without an error.
@@ -123,12 +123,12 @@ alter table cached_tbl_part partition (j=2) set uncached
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-'0',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*
-'1',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'Total',-1,0,'0B',regex:.+B,'','','',''
+'0',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'1',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',-1,0,'0B',regex:.+B,'','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # mark an uncached partition as cached
@@ -137,12 +137,12 @@ alter table cached_tbl_part partition (j=1) set cached in 'testPool'
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-'0',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*
-'1',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*
-'2',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'Total',-1,0,'0B',regex:.+B,'','','',''
+'0',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'1',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',-1,0,'0B',regex:.+B,'','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # dynamic partition insert inherits table properties
@@ -158,14 +158,14 @@ alter table cached_tbl_part partition (j=3) set cached in 'testPool' with replic
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-'0',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*
-'1',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*
-'2',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'3',-1,1,'2B',regex:.+B,'4','TEXT','false',regex:.*
-'4',-1,1,'2B',regex:.+B,'1','TEXT','false',regex:.*
-'Total',-1,2,'4B',regex:.+B,'','','',''
+'0',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'1',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'3',-1,1,'2B',regex:.+B,'4','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'4',-1,1,'2B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',-1,2,'4B',regex:.+B,'','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Set uncached clears all cache requests
@@ -174,14 +174,14 @@ alter table cached_tbl_part set uncached
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-'0',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'1',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'3',-1,1,'2B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'4',-1,1,'2B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'Total',-1,2,'4B',regex:.+B,'','','',''
+'0',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'1',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'3',-1,1,'2B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'4',-1,1,'2B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',-1,2,'4B',regex:.+B,'','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Can call set uncached multiple times on the same partitioned table
@@ -194,14 +194,14 @@ alter table cached_tbl_part set cached in 'testPool'
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-'0',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*
-'1',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*
-'2',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*
-'3',-1,1,'2B',regex:.+B,'1','TEXT','false',regex:.*
-'4',-1,1,'2B',regex:.+B,'1','TEXT','false',regex:.*
-'Total',-1,2,'4B',regex:.+B,'','','',''
+'0',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'1',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'3',-1,1,'2B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'4',-1,1,'2B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',-1,2,'4B',regex:.+B,'','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Can call set cached multiple times on the same partitioned table.
@@ -210,14 +210,14 @@ alter table cached_tbl_part set cached in 'testPool'
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-'0',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*
-'1',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*
-'2',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*
-'3',-1,1,'2B',regex:.+B,'1','TEXT','false',regex:.*
-'4',-1,1,'2B',regex:.+B,'1','TEXT','false',regex:.*
-'Total',-1,2,'4B',regex:.+B,'','','',''
+'0',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'1',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'3',-1,1,'2B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'4',-1,1,'2B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',-1,2,'4B',regex:.+B,'','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Modify partition cache replication in preparation for table level alteration
@@ -230,14 +230,14 @@ alter table cached_tbl_part partition (j=1) set uncached
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-'0',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*
-'1',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'2',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*
-'3',-1,1,'2B',regex:.+B,'4','TEXT','false',regex:.*
-'4',-1,1,'2B',regex:.+B,'1','TEXT','false',regex:.*
-'Total',-1,2,'4B',regex:.+B,'','','',''
+'0',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'1',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'3',-1,1,'2B',regex:.+B,'4','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'4',-1,1,'2B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',-1,2,'4B',regex:.+B,'','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Set replication factor for all partitions regardless of their current state
@@ -246,14 +246,14 @@ alter table cached_tbl_part set cached in 'testPool' with replication = 8
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-'0',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*
-'1',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*
-'2',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*
-'3',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*
-'4',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*
-'Total',-1,2,'4B',regex:.+B,'','','',''
+'0',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'1',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'3',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'4',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',-1,2,'4B',regex:.+B,'','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Add partition with different replication
@@ -262,15 +262,15 @@ alter table cached_tbl_part add partition(j=5) cached in 'testPool' with replica
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-'0',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*
-'1',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*
-'2',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*
-'3',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*
-'4',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*
-'5',-1,0,'0B',regex:.+B,'3','TEXT','false',regex:.*
-'Total',-1,2,'4B',regex:.+B,'','','',''
+'0',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'1',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'3',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'4',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'5',-1,0,'0B',regex:.+B,'3','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',-1,2,'4B',regex:.+B,'','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Change replication for a partition
@@ -279,15 +279,15 @@ alter table cached_tbl_part partition(j=2) set cached in 'testPool' with replica
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-'0',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*
-'1',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*
-'2',-1,0,'0B',regex:.+B,'3','TEXT','false',regex:.*
-'3',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*
-'4',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*
-'5',-1,0,'0B',regex:.+B,'3','TEXT','false',regex:.*
-'Total',-1,2,'4B',regex:.+B,'','','',''
+'0',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'1',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2',-1,0,'0B',regex:.+B,'3','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'3',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'4',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'5',-1,0,'0B',regex:.+B,'3','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',-1,2,'4B',regex:.+B,'','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Add partition with inherited replication from table
@@ -296,16 +296,16 @@ alter table cached_tbl_part add partition(j=6) cached in 'testPool'
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-'0',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*
-'1',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*
-'2',-1,0,'0B',regex:.+B,'3','TEXT','false',regex:.*
-'3',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*
-'4',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*
-'5',-1,0,'0B',regex:.+B,'3','TEXT','false',regex:.*
-'6',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*
-'Total',-1,2,'4B',regex:.+B,'','','',''
+'0',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'1',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2',-1,0,'0B',regex:.+B,'3','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'3',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'4',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'5',-1,0,'0B',regex:.+B,'3','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'6',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',-1,2,'4B',regex:.+B,'','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Add a partition with uncacheable location and it should fail
@@ -322,17 +322,17 @@ location 'file://$IMPALA_HOME/testdata/data/cache_tbl_part' uncached
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-'0',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*
-'1',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*
-'2',-1,0,'0B',regex:.+B,'3','TEXT','false',regex:.*
-'3',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*
-'4',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*
-'5',-1,0,'0B',regex:.+B,'3','TEXT','false',regex:.*
-'6',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*
-'7',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'Total',-1,2,'4B',regex:.+B,'','','',''
+'0',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'1',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'2',-1,0,'0B',regex:.+B,'3','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'3',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'4',-1,1,'2B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'5',-1,0,'0B',regex:.+B,'3','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'6',-1,0,'0B',regex:.+B,'8','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'7',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'NONE'
+'Total',-1,2,'4B',regex:.+B,'','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Create a table which resides on the local file system
@@ -379,11 +379,11 @@ Table cachedb.cached_tbl_local cannot be cached. Please check if the table or pa
 ---- QUERY
 show partitions cached_tbl_local;
 ---- RESULTS
-'0',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
-'1',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*
-'Total',-1,0,'0B',regex:.+B,'','','',''
+'0',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'NONE'
+'1',-1,0,'0B',regex:.+B,'1','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
+'Total',-1,0,'0B',regex:.+B,'','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # IMPALA-9055: Cannot cache table in pool with max TTL.

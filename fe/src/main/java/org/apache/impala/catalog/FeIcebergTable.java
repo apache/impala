@@ -349,9 +349,11 @@ public interface FeIcebergTable extends FeFsTable {
       Collections.sort(orderedFds);
       for (FileDescriptor fd : orderedFds) {
         TResultRowBuilder rowBuilder = new TResultRowBuilder();
-        rowBuilder.add(fd.getAbsolutePath(table.getLocation()));
+        String absPath = fd.getAbsolutePath(table.getLocation());
+        rowBuilder.add(absPath);
         rowBuilder.add(PrintUtils.printBytes(fd.getFileLength()));
         rowBuilder.add("");
+        rowBuilder.add(FileSystemUtil.getErasureCodingPolicy(new Path(absPath)));
         result.addToRows(rowBuilder.get());
       }
       return result;
@@ -410,6 +412,7 @@ public interface FeIcebergTable extends FeFsTable {
       resultSchema.addToColumns(new TColumn("Format", Type.STRING.toThrift()));
       resultSchema.addToColumns(new TColumn("Incremental stats", Type.STRING.toThrift()));
       resultSchema.addToColumns(new TColumn("Location", Type.STRING.toThrift()));
+      resultSchema.addToColumns(new TColumn("EC Policy", Type.STRING.toThrift()));
       result.setSchema(resultSchema);
 
       TResultRowBuilder rowBuilder = new TResultRowBuilder();
@@ -439,6 +442,8 @@ public interface FeIcebergTable extends FeFsTable {
       rowBuilder.add(table.getIcebergFileFormat().toString());
       rowBuilder.add(Boolean.FALSE.toString());
       rowBuilder.add(table.getLocation());
+      rowBuilder.add(
+          FileSystemUtil.getErasureCodingPolicy(new Path(table.getLocation())));
       result.addToRows(rowBuilder.get());
 
       return result;

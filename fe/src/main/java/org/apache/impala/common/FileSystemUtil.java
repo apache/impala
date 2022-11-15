@@ -35,6 +35,7 @@ import org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.client.HdfsAdmin;
 import org.apache.hadoop.hdfs.protocol.EncryptionZone;
+import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
 import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.util.DebugUtils;
@@ -74,6 +75,8 @@ public class FileSystemUtil {
   public static final String SCHEME_COS = "cosn";
   public static final String SCHEME_OSS = "oss";
   public static final String SCHEME_SFS = "sfs";
+
+  public static final String NO_ERASURE_CODE_LABEL = "NONE";
 
   /**
    * Set containing all FileSystem scheme that known to supports storage UUIDs in
@@ -189,6 +192,23 @@ public class FileSystemUtil {
     if (z1 == null && z2 == null) return true;
     if (z1 == null || z2 == null) return false;
     return z1.equals(z2);
+  }
+
+  /**
+   * Returns the erasure coding policy for the path, or NONE if not set.
+   */
+  public static String getErasureCodingPolicy(Path p) {
+    if (isDistributedFileSystem(p)) {
+      try {
+        ErasureCodingPolicy policy = getDistributedFileSystem().getErasureCodingPolicy(p);
+        if (policy != null) {
+          return policy.getName();
+        }
+      } catch (IOException e) {
+        LOG.warn("Unable to retrieve erasure coding policy for {}", p, e);
+      }
+    }
+    return NO_ERASURE_CODE_LABEL;
   }
 
   /**
@@ -443,7 +463,7 @@ public class FileSystemUtil {
   /**
    * Returns true iff the path is on a S3AFileSystem.
    */
-  public static boolean isS3AFileSystem(Path path) throws IOException {
+  public static boolean isS3AFileSystem(Path path) {
     return hasScheme(path, SCHEME_S3A);
   }
 
@@ -478,7 +498,7 @@ public class FileSystemUtil {
   /**
    * Returns true iff the path is on AdlFileSystem.
    */
-  public static boolean isADLFileSystem(Path path) throws IOException {
+  public static boolean isADLFileSystem(Path path) {
     return hasScheme(path, SCHEME_ADL);
   }
 
@@ -497,7 +517,7 @@ public class FileSystemUtil {
    * Returns true iff the path is on AzureBlobFileSystem or
    * SecureAzureBlobFileSystem.
    */
-  public static boolean isABFSFileSystem(Path path) throws IOException {
+  public static boolean isABFSFileSystem(Path path) {
     return hasScheme(path, SCHEME_ABFS) || hasScheme(path, SCHEME_ABFSS);
   }
 
@@ -511,7 +531,7 @@ public class FileSystemUtil {
   /**
    * Return true iff path is on a local filesystem.
    */
-  public static boolean isLocalFileSystem(Path path) throws IOException {
+  public static boolean isLocalFileSystem(Path path) {
     return hasScheme(path, SCHEME_FILE);
   }
 
@@ -525,7 +545,7 @@ public class FileSystemUtil {
   /**
    * Return true iff path is on a DFS filesystem.
    */
-  public static boolean isDistributedFileSystem(Path path) throws IOException {
+  public static boolean isDistributedFileSystem(Path path) {
     return hasScheme(path, SCHEME_HDFS);
   }
 
@@ -539,7 +559,7 @@ public class FileSystemUtil {
   /**
    * Returns true iff the path is on OzoneFileSystem.
    */
-  public static boolean isOzoneFileSystem(Path path) throws IOException {
+  public static boolean isOzoneFileSystem(Path path) {
     return hasScheme(path, SCHEME_O3FS) || hasScheme(path, SCHEME_OFS);
   }
 
@@ -692,11 +712,7 @@ public class FileSystemUtil {
    * Returns true if the given path is a location which supports caching (e.g. HDFS).
    */
   public static boolean isPathCacheable(Path path) {
-    try {
-      return isDistributedFileSystem(path);
-    } catch (IOException e) {
-      return false;
-    }
+    return isDistributedFileSystem(path);
   }
 
   /**

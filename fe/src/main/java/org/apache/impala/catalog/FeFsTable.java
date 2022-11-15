@@ -437,6 +437,7 @@ public interface FeFsTable extends FeTable {
       resultSchema.addToColumns(new TColumn("Path", Type.STRING.toThrift()));
       resultSchema.addToColumns(new TColumn("Size", Type.STRING.toThrift()));
       resultSchema.addToColumns(new TColumn("Partition", Type.STRING.toThrift()));
+      resultSchema.addToColumns(new TColumn("EC Policy", Type.STRING.toThrift()));
       result.setRows(new ArrayList<>());
 
       if (table instanceof FeIcebergTable) {
@@ -457,9 +458,11 @@ public interface FeFsTable extends FeTable {
         Collections.sort(orderedFds);
         for (FileDescriptor fd: orderedFds) {
           TResultRowBuilder rowBuilder = new TResultRowBuilder();
-          rowBuilder.add(fd.getAbsolutePath(p.getLocation()));
+          String absPath = fd.getAbsolutePath(p.getLocation());
+          rowBuilder.add(absPath);
           rowBuilder.add(PrintUtils.printBytes(fd.getFileLength()));
           rowBuilder.add(p.getPartitionName());
+          rowBuilder.add(FileSystemUtil.getErasureCodingPolicy(new Path(absPath)));
           result.addToRows(rowBuilder.get());
         }
       }

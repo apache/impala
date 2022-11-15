@@ -32,11 +32,11 @@ select * from tt
 ---- QUERY
 show files in tt;
 ---- LABELS
-Path,Size,Partition
+Path,Size,Partition,EC Policy
 ---- RESULTS
-row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/tt/base_0000003_v\d+/000000_0','\d+B',''
+row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/tt/base_0000003_v\d+/000000_0','\d+B','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING,STRING,STRING
+STRING,STRING,STRING,STRING
 ====
 ---- HIVE_QUERY
 use $DATABASE;
@@ -100,9 +100,9 @@ select * from full_acid
 ---- QUERY
 show files in full_acid;
 ---- LABELS
-Path,Size,Partition
+Path,Size,Partition,EC Policy
 ---- RESULTS
-row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/full_acid/base_0000003_v\d+/.*','\d+B',''
+row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/full_acid/base_0000003_v\d+/.*','\d+B','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING,STRING,STRING
+STRING,STRING,STRING,STRING
 ====

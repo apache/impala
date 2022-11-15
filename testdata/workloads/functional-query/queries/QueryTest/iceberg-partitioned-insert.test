@@ -25,15 +25,15 @@ INT
 ---- QUERY
 show files in ice_only_part;
 ---- LABELS
-Path,Size,Partition
+Path,Size,Partition,EC Policy
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=1/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=2/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=3/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=4/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=3/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=4/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 SHOW PARTITIONS ice_only_part;
@@ -113,17 +113,17 @@ INT, DATE, STRING
 ---- QUERY
 show files in ice_multi_part;
 ---- LABELS
-Path,Size,Partition
+Path,Size,Partition,EC Policy
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=1/d=2020-12-07/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=2/d=2020-12-08/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=6/d=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=7/d=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=__HIVE_DEFAULT_PARTITION__/d=2022-07-26/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=__HIVE_DEFAULT_PARTITION__/d=2022-07-27/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=__HIVE_DEFAULT_PARTITION__/d=2022-07-28/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=1/d=2020-12-07/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=2/d=2020-12-08/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=6/d=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=7/d=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=__HIVE_DEFAULT_PARTITION__/d=2022-07-26/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=__HIVE_DEFAULT_PARTITION__/d=2022-07-27/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=__HIVE_DEFAULT_PARTITION__/d=2022-07-28/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 select * from ice_multi_part
@@ -222,18 +222,18 @@ BIGINT
 ---- QUERY
 show files in alltypes_part;
 ---- LABELS
-Path,Size,Partition
+Path,Size,Partition,EC Policy
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=0/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-01-01/string_col=0/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=1/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-01-01/string_col=1/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=2/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-02-01/string_col=0/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=3/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-02-01/string_col=1/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=4/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-03-01/string_col=0/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=5/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-03-01/string_col=1/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=6/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-04-01/string_col=0/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=7/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-04-01/string_col=1/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=0/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-01-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=1/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-01-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=2/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-02-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=3/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-02-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=4/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-03-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=5/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-03-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=6/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-04-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=7/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-04-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 SHOW PARTITIONS alltypes_part;
@@ -367,18 +367,18 @@ BIGINT
 ---- QUERY
 show files in alltypes_part_2;
 ---- LABELS
-Path,Size,Partition
+Path,Size,Partition,EC Policy
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=0/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-01-01/string_col=0/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=1/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-01-01/string_col=1/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=2/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-02-01/string_col=0/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=3/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-02-01/string_col=1/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=4/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-03-01/string_col=0/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=5/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-03-01/string_col=1/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=6/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-04-01/string_col=0/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=7/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-04-01/string_col=1/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=0/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-01-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=1/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-01-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=2/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-02-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=3/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-02-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=4/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-03-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=5/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-03-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=6/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-04-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=7/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-04-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Iceberg partitions independent of column order
@@ -404,12 +404,12 @@ aggregation(SUM, NumRowGroups): 1
 ---- QUERY
 show files in ice_part_non_order;
 ---- LABELS
-Path,Size,Partition
+Path,Size,Partition,EC Policy
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_non_order/data/s=first/d=2020-12-07/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_non_order/data/s=second/d=2020-12-08/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_non_order/data/s=first/d=2020-12-07/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_non_order/data/s=second/d=2020-12-08/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 SHOW PARTITIONS ice_part_non_order;
@@ -475,15 +475,15 @@ INT, DATE, STRING
 ---- QUERY
 show files in ice_alter_part;
 ---- LABELS
-Path,Size,Partition
+Path,Size,Partition,EC Policy
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/[^=]*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/i=3/d=2020-12-09/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/i=4/d=2020-12-10/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/d_year=2020/i=5/s_bucket=2/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/d_year=2020/i=6/s_bucket=0/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/[^=]*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/i=3/d=2020-12-09/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/i=4/d=2020-12-10/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/d_year=2020/i=5/s_bucket=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/d_year=2020/i=6/s_bucket=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 SHOW PARTITIONS ice_alter_part;
@@ -516,13 +516,13 @@ INT, STRING, DATE
 ---- QUERY
 show files in ice_void;
 ---- LABELS
-Path,Size,Partition
+Path,Size,Partition,EC Policy
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 SHOW PARTITIONS ice_void;
@@ -549,14 +549,14 @@ INT, STRING, DATE
 ---- QUERY
 show files in ice_void;
 ---- LABELS
-Path,Size,Partition
+Path,Size,Partition,EC Policy
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=4/d_year=2004/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=4/d_year=2004/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 SHOW PARTITIONS ice_void;
@@ -586,15 +586,15 @@ INT, STRING, DATE
 ---- QUERY
 show files in ice_void;
 ---- LABELS
-Path,Size,Partition
+Path,Size,Partition,EC Policy
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=4/d_year=2004/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=5/[^=/]*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=4/d_year=2004/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=5/[^=/]*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 SHOW PARTITIONS ice_void;
@@ -627,16 +627,16 @@ INT, STRING, DATE
 ---- QUERY
 show files in ice_void;
 ---- LABELS
-Path,Size,Partition
+Path,Size,Partition,EC Policy
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=4/d_year=2004/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=5/[^=/]*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/[^=/]*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=4/d_year=2004/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=5/[^=/]*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/[^=/]*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 SHOW PARTITIONS ice_void;

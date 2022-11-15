@@ -2609,6 +2609,7 @@ public class HdfsTable extends Table implements FeFsTable {
     resultSchema.addToColumns(new TColumn("Format", Type.STRING.toThrift()));
     resultSchema.addToColumns(new TColumn("Incremental stats", Type.STRING.toThrift()));
     resultSchema.addToColumns(new TColumn("Location", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("EC Policy", Type.STRING.toThrift()));
 
     // Pretty print partitions and their stats.
     List<FeFsPartition> orderedPartitions = new ArrayList<>(
@@ -2672,6 +2673,7 @@ public class HdfsTable extends Table implements FeFsTable {
       rowBuilder.add(p.getFileFormat().toString());
       rowBuilder.add(String.valueOf(p.hasIncrementalStats()));
       rowBuilder.add(p.getLocation());
+      rowBuilder.add(FileSystemUtil.getErasureCodingPolicy(p.getLocationPath()));
       result.addToRows(rowBuilder.get());
     }
 
@@ -2696,7 +2698,7 @@ public class HdfsTable extends Table implements FeFsTable {
       }
       rowBuilder.add(totalNumFiles)
           .addBytes(totalBytes)
-          .addBytes(totalCachedBytes).add("").add("").add("").add("");
+          .addBytes(totalCachedBytes).add("").add("").add("").add("").add("");
       result.addToRows(rowBuilder.get());
     }
     return result;

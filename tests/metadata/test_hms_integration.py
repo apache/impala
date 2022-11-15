@@ -206,18 +206,12 @@ class TestHmsIntegration(ImpalaTestSuite):
     output = self.client.execute('show table stats %s' % table).get_data()
     output_lines = output.split('\n')
     result = {}
+    headers = ['#rows', '#files', 'size', 'bytes cached', 'cache replication',
+        'format', 'incremental stats', 'location', 'ec policy']
     for line in output_lines:
       parts = line.split('\t')
-      stats = {}
-      stats['location'] = parts[-1]
-      stats['incremental stats'] = parts[-2]
-      stats['format'] = parts[-3]
-      stats['cache replication'] = parts[-4]
-      stats['bytes cached'] = parts[-5]
-      stats['size'] = parts[-6]
-      stats['#files'] = parts[-7]
-      stats['#rows'] = parts[-8]
-      result[tuple(parts[:-8])] = stats
+      id_parts, stat_parts = parts[:-len(headers)], parts[-len(headers):]
+      result[tuple(id_parts)] = dict(zip(headers, stat_parts))
     return result
 
   def impala_all_column_stats(self, table):

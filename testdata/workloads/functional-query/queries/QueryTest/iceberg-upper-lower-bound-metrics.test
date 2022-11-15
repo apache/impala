@@ -25,11 +25,11 @@ aggregation(SUM, NumFileMetadataRead): 0
 ---- QUERY
 show files in ice_types1;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types1/data/p=0/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types1/data/p=1/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types1/data/p=2/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types1/data/p=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types1/data/p=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types1/data/p=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Lower/upper bounds metrics eliminate all row groups
@@ -257,11 +257,11 @@ aggregation(SUM, NumFileMetadataRead): 0
 ---- QUERY
 show files in ice_types2;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types2/data/p=0/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types2/data/p=1/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types2/data/p=2/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types2/data/p=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types2/data/p=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types2/data/p=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Lower/upper bounds metrics eliminate all row groups
@@ -375,11 +375,11 @@ aggregation(SUM, NumFileMetadataRead): 0
 ---- QUERY
 show files in ice_types3;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types3/data/p=0/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types3/data/p=1/.*.0.parq','.*',''
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types3/data/p=2/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types3/data/p=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types3/data/p=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types3/data/p=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Lower/upper bounds metrics eliminate all row groups

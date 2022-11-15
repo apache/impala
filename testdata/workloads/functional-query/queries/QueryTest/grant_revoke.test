@@ -305,11 +305,11 @@ partition (j=1)
 partition (j=2) location '$FILESYSTEM_PREFIX/test-warehouse/grant_rev_test_prt';
 show partitions grant_rev_db.test_tbl_partitioned;
 ---- RESULTS
-'1',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/j=1
-'2',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/grant_rev_test_prt'
-'Total',-1,0,'0B','0B','','','',''
+'1',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/j=1,'$ERASURECODE_POLICY'
+'2',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/grant_rev_test_prt','$ERASURECODE_POLICY'
+'Total',-1,0,'0B','0B','','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # We have to specify the resource for SHOW GRANT since SHOW GRANT is not supported

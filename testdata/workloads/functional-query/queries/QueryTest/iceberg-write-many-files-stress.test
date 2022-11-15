@@ -11,9 +11,9 @@ AS SELECT * FROM tpch_parquet.lineitem;
 # 'data/.*.10.parq' means that there are at least 10 Parquet files.
 SHOW FILES IN line_ice;
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/line_ice/data/.*.10.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/line_ice/data/.*.10.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 SELECT count(*) FROM line_ice;
@@ -41,9 +41,9 @@ INSERT INTO line_ice SELECT * FROM line_ice UNION ALL
 
 SHOW FILES IN line_ice;
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/line_ice/data/.*.180.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/line_ice/data/.*.180.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 SELECT count(*) FROM line_ice;
@@ -64,9 +64,9 @@ AS SELECT * FROM tpch_parquet.lineitem;
 # Test that there are multiple Parquet files in the data directory.
 SHOW FILES IN line_ice_part;
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/line_ice_part/data/l_returnflag=N/.*.5.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/line_ice_part/data/l_returnflag=N/.*.5.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
-STRING, STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 SELECT count(*) FROM line_ice_part;

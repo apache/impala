@@ -3,127 +3,127 @@
 # Stats on a partitioned Hdfs table stored as text
 show table stats alltypes
 ---- LABELS
-YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-'2009','1',310,1,'19.95KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=1'
-'2009','2',280,1,'18.12KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=2'
-'2009','3',310,1,'20.06KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=3'
-'2009','4',300,1,'19.61KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=4'
-'2009','5',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=5'
-'2009','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=6'
-'2009','7',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=7'
-'2009','8',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=8'
-'2009','9',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=9'
-'2009','10',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=10'
-'2009','11',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=11'
-'2009','12',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=12'
-'2010','1',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=1'
-'2010','2',280,1,'18.39KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=2'
-'2010','3',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=3'
-'2010','4',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=4'
-'2010','5',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=5'
-'2010','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=6'
-'2010','7',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=7'
-'2010','8',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=8'
-'2010','9',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=9'
-'2010','10',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=10'
-'2010','11',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=11'
-'2010','12',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=12'
-'Total','',7300,24,'478.45KB','0B','','','',''
+'2009','1',310,1,'19.95KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=1','$ERASURECODE_POLICY'
+'2009','2',280,1,'18.12KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=2','$ERASURECODE_POLICY'
+'2009','3',310,1,'20.06KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=3','$ERASURECODE_POLICY'
+'2009','4',300,1,'19.61KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=4','$ERASURECODE_POLICY'
+'2009','5',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=5','$ERASURECODE_POLICY'
+'2009','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=6','$ERASURECODE_POLICY'
+'2009','7',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=7','$ERASURECODE_POLICY'
+'2009','8',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=8','$ERASURECODE_POLICY'
+'2009','9',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=9','$ERASURECODE_POLICY'
+'2009','10',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=10','$ERASURECODE_POLICY'
+'2009','11',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=11','$ERASURECODE_POLICY'
+'2009','12',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=12','$ERASURECODE_POLICY'
+'2010','1',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=1','$ERASURECODE_POLICY'
+'2010','2',280,1,'18.39KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=2','$ERASURECODE_POLICY'
+'2010','3',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=3','$ERASURECODE_POLICY'
+'2010','4',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=4','$ERASURECODE_POLICY'
+'2010','5',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=5','$ERASURECODE_POLICY'
+'2010','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=6','$ERASURECODE_POLICY'
+'2010','7',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=7','$ERASURECODE_POLICY'
+'2010','8',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=8','$ERASURECODE_POLICY'
+'2010','9',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=9','$ERASURECODE_POLICY'
+'2010','10',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=10','$ERASURECODE_POLICY'
+'2010','11',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=11','$ERASURECODE_POLICY'
+'2010','12',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=12','$ERASURECODE_POLICY'
+'Total','',7300,24,'478.45KB','0B','','','','',''
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # SHOW PARTITIONS returns the same results as SHOW TABLE STATS.
 show partitions alltypes
 ---- LABELS
-YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-'2009','1',310,1,'19.95KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=1'
-'2009','2',280,1,'18.12KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=2'
-'2009','3',310,1,'20.06KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=3'
-'2009','4',300,1,'19.61KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=4'
-'2009','5',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=5'
-'2009','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=6'
-'2009','7',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=7'
-'2009','8',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=8'
-'2009','9',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=9'
-'2009','10',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=10'
-'2009','11',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=11'
-'2009','12',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=12'
-'2010','1',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=1'
-'2010','2',280,1,'18.39KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=2'
-'2010','3',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=3'
-'2010','4',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=4'
-'2010','5',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=5'
-'2010','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=6'
-'2010','7',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=7'
-'2010','8',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=8'
-'2010','9',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=9'
-'2010','10',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=10'
-'2010','11',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=11'
-'2010','12',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=12'
-'Total','',7300,24,'478.45KB','0B','','','',''
+'2009','1',310,1,'19.95KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=1','$ERASURECODE_POLICY'
+'2009','2',280,1,'18.12KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=2','$ERASURECODE_POLICY'
+'2009','3',310,1,'20.06KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=3','$ERASURECODE_POLICY'
+'2009','4',300,1,'19.61KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=4','$ERASURECODE_POLICY'
+'2009','5',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=5','$ERASURECODE_POLICY'
+'2009','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=6','$ERASURECODE_POLICY'
+'2009','7',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=7','$ERASURECODE_POLICY'
+'2009','8',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=8','$ERASURECODE_POLICY'
+'2009','9',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=9','$ERASURECODE_POLICY'
+'2009','10',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=10','$ERASURECODE_POLICY'
+'2009','11',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=11','$ERASURECODE_POLICY'
+'2009','12',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=12','$ERASURECODE_POLICY'
+'2010','1',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=1','$ERASURECODE_POLICY'
+'2010','2',280,1,'18.39KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=2','$ERASURECODE_POLICY'
+'2010','3',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=3','$ERASURECODE_POLICY'
+'2010','4',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=4','$ERASURECODE_POLICY'
+'2010','5',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=5','$ERASURECODE_POLICY'
+'2010','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=6','$ERASURECODE_POLICY'
+'2010','7',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=7','$ERASURECODE_POLICY'
+'2010','8',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=8','$ERASURECODE_POLICY'
+'2010','9',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=9','$ERASURECODE_POLICY'
+'2010','10',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=10','$ERASURECODE_POLICY'
+'2010','11',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=11','$ERASURECODE_POLICY'
+'2010','12',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=12','$ERASURECODE_POLICY'
+'Total','',7300,24,'478.45KB','0B','','','','',''
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Stats on an unpartitioned Hdfs table stored as text
 show table stats alltypesaggmultifilesnopart
 ---- LABELS
-#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-11000,4,'805.23KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypesaggmultifilesnopart'
+11000,4,'805.23KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypesaggmultifilesnopart','$ERASURECODE_POLICY'
 ---- TYPES
-BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Stats on an Hdfs with mixed partition formats
 show table stats alltypesmixedformat
 ---- LABELS
-YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS: VERIFY_IS_EQUAL
-'2009','1',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypesmixedformat/year=2009/month=1'
-'2009','2',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','SEQUENCE_FILE','false','$NAMENODE/test-warehouse/alltypesmixedformat/year=2009/month=2'
-'2009','3',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','RC_FILE','false','$NAMENODE/test-warehouse/alltypesmixedformat/year=2009/month=3'
-'2009','4',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypesmixedformat/year=2009/month=4'
-'Total','',-1,4,regex:.+KB,'0B','','','',''
+'2009','1',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypesmixedformat/year=2009/month=1','$ERASURECODE_POLICY'
+'2009','2',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','SEQUENCE_FILE','false','$NAMENODE/test-warehouse/alltypesmixedformat/year=2009/month=2','$ERASURECODE_POLICY'
+'2009','3',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','RC_FILE','false','$NAMENODE/test-warehouse/alltypesmixedformat/year=2009/month=3','$ERASURECODE_POLICY'
+'2009','4',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypesmixedformat/year=2009/month=4','$ERASURECODE_POLICY'
+'Total','',-1,4,regex:.+KB,'0B','','','','',''
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Stats on a table that has no statistics
 show table stats functional_parquet.alltypes
 ---- LABELS
-YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-'2009','1',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=1'
-'2009','2',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=2'
-'2009','3',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=3'
-'2009','4',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=4'
-'2009','5',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=5'
-'2009','6',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=6'
-'2009','7',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=7'
-'2009','8',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=8'
-'2009','9',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=9'
-'2009','10',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=10'
-'2009','11',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=11'
-'2009','12',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=12'
-'2010','1',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=1'
-'2010','2',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=2'
-'2010','3',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=3'
-'2010','4',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=4'
-'2010','5',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=5'
-'2010','6',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=6'
-'2010','7',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=7'
-'2010','8',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=8'
-'2010','9',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=9'
-'2010','10',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=10'
-'2010','11',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=11'
-'2010','12',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=12'
-'Total','',-1,24,regex:.+KB,'0B','','','',''
+'2009','1',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=1','$ERASURECODE_POLICY'
+'2009','2',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=2','$ERASURECODE_POLICY'
+'2009','3',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=3','$ERASURECODE_POLICY'
+'2009','4',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=4','$ERASURECODE_POLICY'
+'2009','5',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=5','$ERASURECODE_POLICY'
+'2009','6',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=6','$ERASURECODE_POLICY'
+'2009','7',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=7','$ERASURECODE_POLICY'
+'2009','8',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=8','$ERASURECODE_POLICY'
+'2009','9',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=9','$ERASURECODE_POLICY'
+'2009','10',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=10','$ERASURECODE_POLICY'
+'2009','11',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=11','$ERASURECODE_POLICY'
+'2009','12',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2009/month=12','$ERASURECODE_POLICY'
+'2010','1',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=1','$ERASURECODE_POLICY'
+'2010','2',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=2','$ERASURECODE_POLICY'
+'2010','3',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=3','$ERASURECODE_POLICY'
+'2010','4',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=4','$ERASURECODE_POLICY'
+'2010','5',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=5','$ERASURECODE_POLICY'
+'2010','6',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=6','$ERASURECODE_POLICY'
+'2010','7',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=7','$ERASURECODE_POLICY'
+'2010','8',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=8','$ERASURECODE_POLICY'
+'2010','9',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=9','$ERASURECODE_POLICY'
+'2010','10',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=10','$ERASURECODE_POLICY'
+'2010','11',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=11','$ERASURECODE_POLICY'
+'2010','12',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypes_parquet/year=2010/month=12','$ERASURECODE_POLICY'
+'Total','',-1,24,regex:.+KB,'0B','','','','',''
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Column stats on an HdfsTable
@@ -177,12 +177,12 @@ STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 # two single quotes inside a single-quoted string is escaped to a single quote.
 show partitions functional.part_strings_with_quotes
 ---- LABELS
-p, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+p, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
 ---- RESULTS
-'"',1,1,regex:.+B,'NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/part_strings_with_quotes/p=%22'
-'''',1,1,regex:.+B,'NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/part_strings_with_quotes/p=%27'
-'\\"',1,1,regex:.+B,'NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/part_strings_with_quotes/p=%5C%22'
-'\\''',1,1,regex:.+B,'NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/part_strings_with_quotes/p=%5C%27'
-'Total',4,4,'8B','0B','','','',''
+'"',1,1,regex:.+B,'NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/part_strings_with_quotes/p=%22','$ERASURECODE_POLICY'
+'''',1,1,regex:.+B,'NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/part_strings_with_quotes/p=%27','$ERASURECODE_POLICY'
+'\\"',1,1,regex:.+B,'NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/part_strings_with_quotes/p=%5C%22','$ERASURECODE_POLICY'
+'\\''',1,1,regex:.+B,'NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/part_strings_with_quotes/p=%5C%27','$ERASURECODE_POLICY'
+'Total',4,4,'8B','0B','','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
