@@ -19,14 +19,14 @@
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.network import get_external_ip
-from tests.common.skip import SkipIfFS
+from tests.common.skip import SkipIfNotHdfsMinicluster
 
 
 LOCAL_ASSIGNMENTS_METRIC = "simple-scheduler.local-assignments.total"
 TOTAL_ASSIGNMENTS_METRIC = "simple-scheduler.assignments.total"
 
 
-@SkipIfFS.always_remote
+@SkipIfNotHdfsMinicluster.tuned_for_minicluster
 class TestSchedulerLocality(CustomClusterTestSuite):
   """Tests for local and remote disk scheduling."""
 

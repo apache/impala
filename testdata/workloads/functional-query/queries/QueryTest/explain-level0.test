@@ -12,8 +12,8 @@ row_regex:.*Per-Host Resource Estimates: Memory=[0-9.]*MB.*
 '04:EXCHANGE [UNPARTITIONED]'
 '02:HASH JOIN [INNER JOIN, BROADCAST]'
 '|--03:EXCHANGE [BROADCAST]'
-'|  01:SCAN HDFS [tpch.orders]'
-'00:SCAN HDFS [tpch.lineitem]'
+'|  01:SCAN $FILESYSTEM_NAME [tpch.orders]'
+'00:SCAN $FILESYSTEM_NAME [tpch.lineitem]'
 ====
 ---- QUERY
 # Tests the warning about missing table stats in the explain header.

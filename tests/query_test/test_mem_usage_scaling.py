@@ -23,7 +23,7 @@ from tests.common.test_dimensions import (create_avro_snappy_dimension,
     create_parquet_dimension)
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfNotHdfsMinicluster
+from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfFS
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.verifiers.metric_verifier import MetricVerifier
@@ -400,6 +400,7 @@ class TestHashJoinMemLimit(ImpalaTestSuite):
 
 
 @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+@SkipIfFS.read_speed_dependent
 class TestExchangeMemUsage(ImpalaTestSuite):
   """Targeted test for exchange memory limits."""
 

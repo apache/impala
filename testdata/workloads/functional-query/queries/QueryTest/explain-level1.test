@@ -19,11 +19,11 @@ row_regex:.*row-size=.* cardinality=.*
 '|'
 '|--03:EXCHANGE [BROADCAST]'
 '|  |'
-'|  01:SCAN HDFS [tpch.orders]'
+'|  01:SCAN $FILESYSTEM_NAME [tpch.orders]'
 row_regex:.*partitions=1/1 files=1 size=.*
 row_regex:.*row-size=.* cardinality=.*
 '|'
-'00:SCAN HDFS [tpch.lineitem]'
+'00:SCAN $FILESYSTEM_NAME [tpch.lineitem]'
 row_regex:.*partitions=1/1 files=1 size=.*
 '   runtime filters: RF000 -> l_orderkey'
 row_regex:.*row-size=.* cardinality=.*

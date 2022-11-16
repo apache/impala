@@ -1125,6 +1125,7 @@ class TestParquet(ImpalaTestSuite):
       for summary in page_size_summaries:
         assert not self._is_summary_stats_counter_empty(summary)
 
+  @SkipIfFS.hdfs_small_block
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   def test_bytes_read_per_column(self, vector):
     """IMPALA-6964: Test that the counter Parquet[Un]compressedBytesReadPerColumn is

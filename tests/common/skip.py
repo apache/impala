@@ -55,10 +55,6 @@ class SkipIfFS:
   hdfs_block_size = pytest.mark.skipif(not IS_HDFS,
       reason="Size of block reported to Impala is not ~128MB")
   hdfs_acls = pytest.mark.skipif(not IS_HDFS, reason="HDFS acls are not supported")
-  # TODO: IMPALA-11584: see if this can be collapsed into SkipIfNotHdfsMinicluster
-  always_remote = pytest.mark.skipif(IS_EC or not (IS_HDFS or IS_OZONE)
-      or IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),
-      reason="Only HDFS and Ozone tests are run co-located")
 
   # Special case product limitations.
   empty_directory = pytest.mark.skipif(IS_S3,
@@ -73,6 +69,8 @@ class SkipIfFS:
   read_past_eof = pytest.mark.skipif(IS_S3 or IS_GCS, reason="IMPALA-2512")
   large_block_size = pytest.mark.skipif(IS_OZONE or IS_EC,
       reason="block size is larger than 128MB")
+  read_speed_dependent = pytest.mark.skipif(not IS_HDFS or IS_EC,
+      reason="success depends on fast scan node performance")
 
   # These need test infra work to re-enable.
   hive = pytest.mark.skipif(not IS_HDFS, reason="Hive doesn't work")
@@ -133,10 +131,10 @@ class SkipIfLocal:
 class SkipIfNotHdfsMinicluster:
   # These are skipped when not running against a local HDFS mini-cluster.
   plans = pytest.mark.skipif(
-      not IS_HDFS or IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),
+      not (IS_HDFS or IS_OZONE) or IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),
       reason="Test assumes plans from local HDFS mini-cluster")
-  tuned_for_minicluster = pytest.mark.skipif(
-      not IS_HDFS or IS_EC or IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),
+  tuned_for_minicluster = pytest.mark.skipif(not (IS_HDFS or IS_OZONE)
+      or IS_EC or IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),
       reason="Test is tuned for 3-node HDFS minicluster with no EC")
   scheduling = pytest.mark.skipif(
       not (IS_HDFS or IS_OZONE) or IS_EC or pytest.config.option.testing_remote_cluster,

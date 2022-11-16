@@ -44,9 +44,9 @@ row_regex:.*AdmissionSlots: 4 .*
 row_regex:.*F04:ROOT * 1 * 1 .*
 row_regex:.*04:AGGREGATE * 3 * 12 .*
 row_regex:.*00:UNION * 3 * 12 *
-row_regex:.*02:SCAN HDFS * 3 * 12 .*alltypessmall.*
-row_regex:.*03:SCAN HDFS * 3 * 12 .*alltypestiny.*
-row_regex:.*01:SCAN HDFS * 3 * 12 .*alltypes.*
+row_regex:.*02:SCAN (HDFS|OZONE) * 3 * 12 .*alltypessmall.*
+row_regex:.*03:SCAN (HDFS|OZONE) * 3 * 12 .*alltypestiny.*
+row_regex:.*01:SCAN (HDFS|OZONE) * 3 * 12 .*alltypes.*
 ====
 ---- QUERY
 # Same idea, but with smallest scan first to check that the scheduler is taking the
@@ -64,9 +64,9 @@ row_regex:.*AdmissionSlots: 4 .*
 row_regex:.*F04:ROOT * 1 * 1 .*
 row_regex:.*04:AGGREGATE * 3 * 12 .*
 row_regex:.*00:UNION * 3 * 12 *
-row_regex:.*02:SCAN HDFS * 3 * 12 .*alltypessmall.*
-row_regex:.*03:SCAN HDFS * 3 * 12 .*alltypes.*
-row_regex:.*01:SCAN HDFS * 3 * 12 .*alltypestiny.*
+row_regex:.*02:SCAN (HDFS|OZONE) * 3 * 12 .*alltypessmall.*
+row_regex:.*03:SCAN (HDFS|OZONE) * 3 * 12 .*alltypes.*
+row_regex:.*01:SCAN (HDFS|OZONE) * 3 * 12 .*alltypestiny.*
 ====
 ---- QUERY
 # This query should have one scan and one exchange in the interior fragment.
@@ -85,8 +85,8 @@ row_regex:.*04:AGGREGATE * 3 * 12 .*
 row_regex:.*06:AGGREGATE * 3 * 12 .*
 row_regex:.*03:AGGREGATE * 3 * 12 .*
 row_regex:.*00:UNION * 3 * 12 *
-row_regex:.*02:SCAN HDFS * 3 * 12 .*alltypes.*
-row_regex:.*01:SCAN HDFS * 3 * 12 .*alltypestiny.*
+row_regex:.*02:SCAN (HDFS|OZONE) * 3 * 12 .*alltypes.*
+row_regex:.*01:SCAN (HDFS|OZONE) * 3 * 12 .*alltypestiny.*
 ====
 ---- QUERY
 # This query should have one scan and one exchange in the interior fragment.
@@ -107,8 +107,8 @@ row_regex:.*04:AGGREGATE * 3 * 12 .*
 row_regex:.*06:AGGREGATE * 3 * 12 .*
 row_regex:.*03:AGGREGATE * 3 * 4 .*
 row_regex:.*00:UNION * 3 * 12 *
-row_regex:.*02:SCAN HDFS * 3 * 4 .*alltypestiny.*
-row_regex:.*01:SCAN HDFS * 3 * 12 .*alltypes.*
+row_regex:.*02:SCAN (HDFS|OZONE) * 3 * 4 .*alltypestiny.*
+row_regex:.*01:SCAN (HDFS|OZONE) * 3 * 12 .*alltypes.*
 ====
 ---- QUERY
 # This query should have one scan and two exchanges in the interior fragment.
@@ -128,6 +128,6 @@ row_regex:.*AdmissionSlots: 2.*
 row_regex:.*00:UNION * 3 * 6 .*
 row_regex:.*08:AGGREGATE * 3 * 6 .*
 row_regex:.*03:AGGREGATE * 3 * 6 .*
-row_regex:.*04:SCAN HDFS * 3 * 6 .*
-row_regex:.*01:SCAN HDFS * 3 * 6 .*
+row_regex:.*04:SCAN (HDFS|OZONE) * 3 * 6 .*
+row_regex:.*01:SCAN (HDFS|OZONE) * 3 * 6 .*
 ====

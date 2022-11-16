@@ -38,7 +38,7 @@ row_regex:.*mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-re
 '  |     tuple-ids=1 row-size=171B cardinality=1.50M'
 '  |     in pipelines: 01(GETNEXT)'
 '  |'
-'  00:SCAN HDFS [tpch.lineitem, RANDOM]'
+'  00:SCAN $FILESYSTEM_NAME [tpch.lineitem, RANDOM]'
 row_regex:.*partitions=1/1 files=1 size=.*
 '     runtime filters: RF000[bloom] -> l_orderkey'
 '     stored statistics:'
@@ -50,11 +50,11 @@ row_regex:.*mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-re
 '     tuple-ids=0 row-size=231B cardinality=6.00M'
 '     in pipelines: 00(GETNEXT)'
 ''
-'F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2'
+row_regex:.*F01:PLAN FRAGMENT \[RANDOM\] hosts=[1-2] instances=[1-2]
 row_regex:.*Per-Host Resources: mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=.*
 '  DATASTREAM SINK [FRAGMENT=F00, EXCHANGE=03, BROADCAST]'
 row_regex:.*  |  mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=0
-'  01:SCAN HDFS [tpch.orders, RANDOM]'
+'  01:SCAN $FILESYSTEM_NAME [tpch.orders, RANDOM]'
 row_regex:.*partitions=1/1 files=1 size=.*
 '     stored statistics:'
 row_regex:.*table: rows=[0-9.]*[A-Z]* size=.*
