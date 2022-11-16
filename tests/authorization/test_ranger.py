@@ -32,7 +32,7 @@ from tests.common.test_dimensions import (create_client_protocol_dimension,
     create_exec_option_dimension, create_orc_dimension)
 from tests.util.hdfs_util import NAMENODE
 from tests.util.calculation_util import get_random_id
-from tests.util.filesystem_utils import WAREHOUSE_PREFIX
+from tests.util.filesystem_utils import WAREHOUSE_PREFIX, WAREHOUSE
 
 ADMIN = "admin"
 RANGER_AUTH = ("admin", "admin")
@@ -1105,6 +1105,81 @@ class TestRanger(CustomClusterTestSuite):
       assert err in str(result)
     finally:
       self._run_query_as_user("drop database {0} cascade".format(test_db), ADMIN, True)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_select_function_with_fallback_db(self, unique_name):
+    """Verifies that Impala should not allow using functions in the fallback database
+    unless the user has some privileges on the given database."""
+    test_user = "non_owner"
+    admin_client = self.create_impala_client()
+    non_owner_client = self.create_impala_client()
+    refresh_stmt = "refresh authorization"
+    unique_database = unique_name + "_db"
+
+    try:
+      admin_client.execute("drop database if exists {0} cascade".format(unique_database),
+                           user=ADMIN)
+      admin_client.execute("create database %s" % unique_database, user=ADMIN)
+      admin_client.execute("create function {0}.identity(bigint) "
+                           "RETURNS bigint "
+                           "LOCATION "
+                           "'{1}/libTestUdfs.so' "
+                           "SYMBOL='Identity'"
+                           .format(unique_database, WAREHOUSE), user=ADMIN)
+      # A user not granted any privilege is not allowed to execute the UDF.
+      result = self._run_query_as_user("select identity(1)", test_user, False)
+      err = "User '{0}' does not have privileges to access: default".format(
+        test_user)
+      assert err in str(result)
+
+      admin_client.execute(
+          "grant select on database default to user {0}".format(test_user),
+          user=ADMIN)
+      self._refresh_authorization(admin_client, refresh_stmt)
+
+      result = self._run_query_as_user("select identity(1)", test_user, False)
+      err = "default.identity() unknown for database default."
+      assert err in str(result)
+
+      # A user is not allowed to access fallback database if the user has no
+      # privileges on it, whether the function exists or not.
+      result = self.execute_query_expect_failure(
+          non_owner_client, "select identity(1)", query_options={
+              'FALLBACK_DB_FOR_FUNCTIONS': unique_database}, user=test_user)
+      err = "User '{0}' does not have privileges to access: {1}".format(
+        test_user, unique_database)
+      assert err in str(result)
+
+      result = self.execute_query_expect_failure(
+          non_owner_client, "select fn()", query_options={
+              'FALLBACK_DB_FOR_FUNCTIONS': unique_database}, user=test_user)
+      err = "User '{0}' does not have privileges to access: {1}".format(
+        test_user, unique_database)
+      assert err in str(result)
+
+      admin_client.execute(
+          "grant select on database {0} to user {1}".format(
+              unique_database, test_user), user=ADMIN)
+      self._refresh_authorization(admin_client, refresh_stmt)
+
+      # A user is allowed to use functions in the fallback database if the user is
+      # explicitly granted the SELECT privilege.
+      self.execute_query_expect_success(
+          non_owner_client,
+          "select identity(1)",
+          query_options={'FALLBACK_DB_FOR_FUNCTIONS': unique_database},
+          user=test_user)
+    finally:
+      # Revoke the granted privileges.
+      admin_client.execute("revoke select on database default from user {0}"
+                               .format(test_user), user=ADMIN)
+      admin_client.execute("revoke select on database {0} from user {1}"
+                               .format(unique_database, test_user), user=ADMIN)
+      # Drop the database.
+      self._run_query_as_user("drop database {0} cascade".format(unique_database),
+                              ADMIN, True)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

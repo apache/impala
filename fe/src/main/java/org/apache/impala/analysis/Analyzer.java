@@ -3188,6 +3188,14 @@ public class Analyzer {
   }
 
   public String getDefaultDb() { return globalState_.queryCtx.session.database; }
+
+  public String getFallbackDbForFunctions() {
+    return getQueryCtx()
+        .getClient_request()
+        .getQuery_options()
+        .getFallback_db_for_functions();
+  }
+
   public User getUser() { return user_; }
   public String getUserShortName() throws AnalysisException {
     try {

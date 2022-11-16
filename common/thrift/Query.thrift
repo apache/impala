@@ -597,6 +597,8 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   148: optional bool expand_complex_types = false;
+
+  149: optional string fallback_db_for_functions;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

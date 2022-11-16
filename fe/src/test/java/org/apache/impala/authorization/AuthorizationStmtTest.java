@@ -2952,6 +2952,23 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
     } finally {
       removeFunction(fn);
     }
+
+    // IMPALA-11728: Make sure use of functions in the fallback database requires SELECT
+    // (or higher) privilege on the database.
+    fn = addFunction("functional", "f");
+    try {
+      TQueryOptions options = new TQueryOptions();
+      options.setFallback_db_for_functions("functional");
+      authorize(createAnalysisCtx(options, authzFactory_, user_.getName()), "select f()")
+          .ok(onDatabase("functional", TPrivilegeLevel.ALL))
+          .ok(onDatabase("functional", TPrivilegeLevel.OWNER))
+          .ok(onDatabase("functional", viewMetadataPrivileges()))
+          .error(accessError("functional"))
+          .error(accessError("functional"),
+              onDatabase("functional", allExcept(viewMetadataPrivileges())));
+    } finally {
+      removeFunction(fn);
+    }
   }
 
   @Test

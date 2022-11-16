@@ -740,6 +740,8 @@ enum TImpalaQueryOptions {
   // Expands complex types in star queries
   EXPAND_COMPLEX_TYPES = 147
 
+  // Specify the database name which stores global udf
+  FALLBACK_DB_FOR_FUNCTIONS = 148;
 }
 
 // The summary of a DML statement.

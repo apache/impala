@@ -31,7 +31,7 @@ from tests.common.test_dimensions import (
     create_exec_option_dimension_from_dict,
     create_uncompressed_text_dimension)
 from tests.util.calculation_util import get_random_id
-from tests.util.filesystem_utils import get_fs_path, IS_S3
+from tests.util.filesystem_utils import get_fs_path, WAREHOUSE
 from tests.verifiers.metric_verifier import MetricVerifier
 
 class TestUdfBase(ImpalaTestSuite):
@@ -643,3 +643,40 @@ class TestUdfTargeted(TestUdfBase):
     assert re.search(
         "User Defined Functions \(UDFs\): {0}\.hive_substring\s*[\r\n]".format(
             unique_database), profile)
+
+  def test_set_fallback_db_for_functions(self, vector, unique_database):
+    """IMPALA-11728: Set fallback database for functions."""
+    create_function_stmt = "create function `{0}`.fn() returns int "\
+          "location '{1}/libTestUdfs.so' symbol='NoArgs'".format(unique_database,
+          WAREHOUSE)
+    self.client.execute(create_function_stmt)
+
+    # case 1: When the function name is fully qualified then this query option
+    # has no effect.
+    assert '6' == self.execute_scalar("select {0}.fn() from functional.alltypes "
+          "limit 1".format(unique_database))
+
+    # case 2: Throw an exception without specifying the database.
+    query_stmt = "select fn() from functional.alltypes limit 1"
+    result = self.execute_query_expect_failure(self.client, query_stmt)
+    assert "default.fn() unknown for database default" in str(result)
+
+    # case 3: Use fn() in fallback db after setting FALLBACK_DB_FOR_FUNCTIONS
+    assert '6' == self.execute_scalar(query_stmt, query_options={
+        'fallback_db_for_functions': unique_database})
+
+    # case 4: Test a function name that also exists as builtin function.
+    # Use function in _impala_builtins.
+    create_function_stmt = "create function `{0}`.abs(int) returns int "\
+          "location '{1}/libTestUdfs.so' symbol='Identity'".format(unique_database,
+          WAREHOUSE)
+    self.client.execute(create_function_stmt)
+
+    assert '1' == self.execute_scalar("select abs(-1)", query_options={
+        'fallback_db_for_functions': unique_database})
+
+    # case 5: It should return empty result for show function, even when
+    # FALLBACK_DB_FOR_FUNCTIONS is set.
+    result = self.execute_scalar("show functions", query_options={
+        'fallback_db_for_functions': unique_database})
+    assert result is None
