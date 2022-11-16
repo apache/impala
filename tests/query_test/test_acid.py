@@ -304,7 +304,7 @@ class TestAcid(ImpalaTestSuite):
     assert len(self.execute_query("select * from {}".format(tbl_name)).data) == 0
 
   @SkipIfHive2.acid
-  @SkipIf.not_hdfs
+  @SkipIf.not_dfs
   def test_full_acid_schema_without_file_metadata_tag(self, vector, unique_database):
     """IMPALA-10115: Some files have full ACID schema without having
     'hive.acid.version' set. We still need to identify such files as full ACID"""
@@ -315,7 +315,7 @@ class TestAcid(ImpalaTestSuite):
     table_uri = self._get_table_location(fq_table_name, vector)
     acid_file = (os.environ['IMPALA_HOME'] +
         "/testdata/data/full_acid_schema_but_no_acid_version.orc")
-    self.hdfs_client.copy_from_local(acid_file, table_uri + "/bucket_00000")
+    self.filesystem_client.copy_from_local(acid_file, table_uri + "/bucket_00000")
     self.execute_query("refresh {}".format(fq_table_name))
     result = self.execute_query("select count(*) from {0}".format(fq_table_name))
     assert "3" in result.data

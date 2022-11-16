@@ -126,17 +126,17 @@ class TestIcebergTable(IcebergTestSuite):
   # trigger a known bug: IMPALA-11509. Hence, turning this test off until there is a fix
   # for this issue. Note, we could add a sleep righ after table creation that could
   # workaround the above mentioned bug but then we would hit another issue: IMPALA-11502.
-  @SkipIf.not_hdfs
+  @SkipIf.not_dfs
   def test_drop_incomplete_table(self, vector, unique_database):
     """Test DROP TABLE when the underlying directory is deleted. In that case table
     loading fails, but we should be still able to drop the table from Impala."""
-    pytest.skip()
+    pytest.skip("Gets into a metadata update loop")
     tbl_name = unique_database + ".synchronized_iceberg_tbl"
-    cat_location = "/test-warehouse/" + unique_database
+    cat_location = get_fs_path("/test-warehouse/" + unique_database)
     self.client.execute("""create table {0} (i int) stored as iceberg
         tblproperties('iceberg.catalog'='hadoop.catalog',
                       'iceberg.catalog_location'='{1}')""".format(tbl_name, cat_location))
-    self.hdfs_client.delete_file_dir(cat_location, True)
+    self.filesystem_client.delete_file_dir(cat_location, True)
     self.execute_query_expect_success(self.client, """drop table {0}""".format(tbl_name))
 
   def test_insert(self, vector, unique_database):
@@ -455,7 +455,7 @@ class TestIcebergTable(IcebergTestSuite):
       except Exception as e:
         assert "Cannot find a snapshot older than" in str(e)
 
-  @SkipIf.not_hdfs
+  @SkipIf.not_dfs
   def test_strings_utf8(self, vector, unique_database):
     # Create table
     table_name = "ice_str_utf8"
@@ -542,7 +542,7 @@ class TestIcebergTable(IcebergTestSuite):
         os.remove(local_path)
     return datafiles
 
-  @SkipIf.not_hdfs
+  @SkipIf.not_dfs
   def test_writing_metrics_to_metadata(self, vector, unique_database):
     # Create table
     table_name = "ice_stats"
@@ -872,17 +872,17 @@ class TestIcebergV2Table(IcebergTestSuite):
   # the data files via full URI, i.e. they start with 'hdfs://localhost:2050/...'. In the
   # dockerised environment the namenode is accessible on a different hostname/port.
   @SkipIfDockerizedCluster.internal_hostname
-  @SkipIf.not_hdfs
+  @SkipIf.hardcoded_uris
   def test_read_position_deletes(self, vector):
     self.run_test_case('QueryTest/iceberg-v2-read-position-deletes', vector)
 
   @SkipIfDockerizedCluster.internal_hostname
-  @SkipIf.not_hdfs
+  @SkipIf.hardcoded_uris
   def test_read_position_deletes_orc(self, vector):
     self.run_test_case('QueryTest/iceberg-v2-read-position-deletes-orc', vector)
 
   @SkipIfDockerizedCluster.internal_hostname
-  @SkipIf.not_hdfs
+  @SkipIf.hardcoded_uris
   def test_table_sampling_v2(self, vector):
     self.run_test_case('QueryTest/iceberg-tablesample-v2', vector,
         use_db="functional_parquet")

@@ -277,7 +277,7 @@ class TestScratchDir(CustomClusterTestSuite):
     client.close()
 
   @pytest.mark.execute_serially
-  @SkipIf.not_hdfs
+  @SkipIf.not_scratch_fs
   def test_scratch_dirs_remote_spill(self, vector):
     # Test one remote directory with one its local buffer directory.
     normal_dirs = self.generate_dirs(1)
@@ -305,7 +305,7 @@ class TestScratchDir(CustomClusterTestSuite):
     client.close()
 
   @pytest.mark.execute_serially
-  @SkipIf.not_hdfs
+  @SkipIf.not_scratch_fs
   def test_scratch_dirs_mix_local_and_remote_dir_spill_local_only(self, vector):
     '''Two local directories, the first one is always used as local buffer for
        remote directories. Set the second directory big enough so that only spills
@@ -338,7 +338,7 @@ class TestScratchDir(CustomClusterTestSuite):
     client.close()
 
   @pytest.mark.execute_serially
-  @SkipIf.not_hdfs
+  @SkipIf.not_scratch_fs
   def test_scratch_dirs_mix_local_and_remote_dir_spill_both(self, vector):
     '''Two local directories, the first one is always used as local buffer for
        remote directories. Set the second directory small enough so that it spills
@@ -372,7 +372,7 @@ class TestScratchDir(CustomClusterTestSuite):
     client.close()
 
   @pytest.mark.execute_serially
-  @SkipIf.not_hdfs
+  @SkipIf.not_scratch_fs
   def test_scratch_dirs_remote_spill_with_options(self, vector):
     # One local buffer directory and one remote directory.
     normal_dirs = self.generate_dirs(1)
@@ -402,7 +402,7 @@ class TestScratchDir(CustomClusterTestSuite):
     client.close()
 
   @pytest.mark.execute_serially
-  @SkipIf.not_hdfs
+  @SkipIf.not_scratch_fs
   def test_scratch_dirs_remote_spill_concurrent(self, vector):
     '''Concurrently execute multiple queries that trigger the spilling to the remote
     directory to test if there is a deadlock issue.'''
@@ -449,7 +449,7 @@ class TestScratchDir(CustomClusterTestSuite):
     assert (total_size > 0 and total_size % (8 * 1024 * 1024) == 0)
 
   @pytest.mark.execute_serially
-  @SkipIf.not_hdfs
+  @SkipIf.not_scratch_fs
   def test_scratch_dirs_batch_reading(self, vector):
     # Set the buffer directory small enough to spill to the remote one.
     normal_dirs = self.generate_dirs(1)

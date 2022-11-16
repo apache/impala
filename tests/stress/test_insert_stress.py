@@ -25,6 +25,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import SkipIf
 from tests.stress.stress_util import run_tasks, Task
+from tests.util.filesystem_utils import WAREHOUSE
 
 
 # Stress test for concurrent INSERT operations.
@@ -103,7 +104,7 @@ class TestInsertStress(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   @pytest.mark.stress
-  @SkipIf.not_hdfs
+  @SkipIf.not_dfs
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_iceberg_inserts(self, unique_database):
     """Issues INSERT statements against multiple impalads in a way that some
@@ -114,7 +115,7 @@ class TestInsertStress(ImpalaTestSuite):
     self.client.execute("""create table {0} (wid int, i int) stored as iceberg
         tblproperties('iceberg.catalog'='hadoop.catalog',
                       'iceberg.catalog_location'='{1}')""".format(
-        tbl_name, '/test-warehouse/' + unique_database))
+        tbl_name, "{0}/{1}".format(WAREHOUSE, unique_database)))
 
     counter = Value('i', 0)
     num_writers = 4

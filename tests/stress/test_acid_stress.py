@@ -190,7 +190,7 @@ class TestAcidInsertsBasic(TestAcidStress):
 
   @pytest.mark.execute_serially
   @pytest.mark.stress
-  @SkipIf.not_hdfs
+  @SkipIf.not_dfs
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_partitioned_inserts(self, unique_database):
     """Check that the different ACID write operations take appropriate locks.

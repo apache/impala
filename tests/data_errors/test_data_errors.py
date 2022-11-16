@@ -26,6 +26,8 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIf, SkipIfFS
 from tests.common.test_dimensions import create_exec_option_dimension
+from tests.util.filesystem_utils import get_fs_path
+
 
 class TestDataErrors(ImpalaTestSuite):
   # batch_size of 1 can expose some interesting corner cases at row batch boundaries.
@@ -42,12 +44,13 @@ class TestDataErrors(ImpalaTestSuite):
   def get_workload(self):
     return 'functional-query'
 
+
 # Regression test for IMP-633. Added as a part of IMPALA-5198.
-@SkipIf.not_hdfs
+@SkipIf.not_dfs
 class TestHdfsFileOpenFailErrors(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_hdfs_file_open_fail(self):
-    absolute_location = "/test-warehouse/file_open_fail"
+    absolute_location = get_fs_path("/test-warehouse/file_open_fail")
     create_stmt = \
         "create table file_open_fail (x int) location '" + absolute_location + "'"
     insert_stmt = "insert into file_open_fail values(1)"
@@ -63,6 +66,7 @@ class TestHdfsFileOpenFailErrors(ImpalaTestSuite):
     except ImpalaBeeswaxException as e:
       assert "Failed to open HDFS file" in str(e)
     self.client.execute(drop_stmt)
+
 
 # Test for IMPALA-5331 to verify that the libHDFS API hdfsGetLastExceptionRootCause()
 # works.
@@ -160,6 +164,7 @@ class TestAvroErrors(TestDataErrors):
   def test_avro_errors(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = 0
     self.run_test_case('DataErrorsTest/avro-errors', vector)
+
 
 class TestHBaseDataErrors(TestDataErrors):
   @classmethod

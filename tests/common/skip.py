@@ -98,7 +98,15 @@ class SkipIf:
   skip_hbase = pytest.mark.skipif(pytest.config.option.skip_hbase,
       reason="--skip_hbase argument specified")
   not_s3 = pytest.mark.skipif(not IS_S3, reason="S3 Filesystem needed")
-  not_hdfs = pytest.mark.skipif(not IS_HDFS, reason="HDFS Filesystem needed")
+  not_hdfs = pytest.mark.skipif(not IS_HDFS, reason="HDFS admin needed")
+  not_dfs = pytest.mark.skipif(not (IS_HDFS or IS_OZONE),
+      reason="HDFS/Ozone Filesystem needed")
+  not_scratch_fs = pytest.mark.skipif(not IS_HDFS,
+      reason="Scratch dirs for temporary file spilling not supported")
+  sfs_unsupported = pytest.mark.skipif(not (IS_HDFS or IS_S3 or IS_ABFS or IS_ADLS
+      or IS_GCS), reason="Hive support for sfs+ is limited, HIVE-26757")
+  hardcoded_uris = pytest.mark.skipif(not IS_HDFS,
+      reason="Iceberg delete files hardcode the full URI in parquet files")
   not_ec = pytest.mark.skipif(not IS_EC, reason="Erasure Coding needed")
   no_secondary_fs = pytest.mark.skipif(not SECONDARY_FILESYSTEM,
       reason="Secondary filesystem needed")

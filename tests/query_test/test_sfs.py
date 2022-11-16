@@ -21,8 +21,10 @@
 from tests.common.file_utils import copy_files_to_hdfs_dir
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIf
+from tests.util.filesystem_utils import WAREHOUSE
 
 
+@SkipIf.sfs_unsupported
 class TestSFS(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):
@@ -37,14 +39,13 @@ class TestSFS(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('exec_option')['disable_codegen'] is False)
 
-  @SkipIf.not_hdfs
   def test_sfs(self, vector, unique_database):
     files_for_external_tables = ["testdata/data/sfs_d1.parq", "testdata/data/sfs_d2.txt",
                                  "testdata/data/sfs_d3.parq", "testdata/data/sfs_d4.txt"]
     files_for_managed_tables = ["testdata/data/sfs_d3.parq", "testdata/data/sfs_d4.txt"]
-    hdfs_dir_for_external_tables = "/test-warehouse/{0}.db/".format(unique_database)
+    hdfs_dir_for_external_tables = "{0}/{1}.db/".format(WAREHOUSE, unique_database)
     hdfs_dir_for_managed_tables =\
-        "/test-warehouse/managed/{0}.db/".format(unique_database)
+        "{0}/managed/{1}.db/".format(WAREHOUSE, unique_database)
 
     copy_files_to_hdfs_dir(files_for_external_tables, hdfs_dir_for_external_tables)
     copy_files_to_hdfs_dir(files_for_managed_tables, hdfs_dir_for_managed_tables)

@@ -19,7 +19,7 @@ import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import SkipIf
+from tests.common.skip import SkipIfFS
 
 
 class TestDisableFeatures(CustomClusterTestSuite):
@@ -29,7 +29,7 @@ class TestDisableFeatures(CustomClusterTestSuite):
   def get_workload(self):
     return 'functional-query'
 
-  @SkipIf.not_hdfs
+  @SkipIfFS.hdfs_caching
   @pytest.mark.execute_serially
   @UniqueDatabase.parametrize(sync_ddl=True)
   @CustomClusterTestSuite.with_args(

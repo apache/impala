@@ -455,7 +455,7 @@ class TestDdlStatements(TestDdlBase):
     self.run_test_case('QueryTest/alter-table', vector, use_db=unique_database,
         multiple_impalad=self._use_multiple_impalad(vector))
 
-  @SkipIf.not_hdfs
+  @SkipIfFS.hdfs_caching
   @SkipIfLocal.hdfs_client
   @UniqueDatabase.parametrize(sync_ddl=True, num_dbs=2)
   def test_alter_table_hdfs_caching(self, vector, unique_database):
