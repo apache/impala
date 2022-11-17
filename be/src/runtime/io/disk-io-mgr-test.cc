@@ -74,8 +74,6 @@ const int64_t LARGE_INITIAL_RESERVATION = 128L * 1024L * 1024L;
 const int64_t BUFFER_POOL_CAPACITY = LARGE_RESERVATION_LIMIT;
 
 /// For testing spill to remote.
-static const string HDFS_LOCAL_URL = "hdfs://localhost:20500/tmp";
-static const string REMOTE_URL = HDFS_LOCAL_URL;
 static const string LOCAL_BUFFER_PATH = "/tmp/tmp-file-mgr-test-buffer";
 
 namespace impala {
@@ -95,6 +93,7 @@ class DiskIoMgrTest : public testing::Test {
     ASSERT_OK(test_env_->Init());
     metrics_.reset(new MetricGroup("disk-io-mgr-test"));
     RandTestUtil::SeedRng("DISK_IO_MGR_TEST_SEED", &rng_);
+    remote_url_ = test_env_->GetDefaultFsPath("/tmp");
   }
 
   virtual void TearDown() {
@@ -173,7 +172,7 @@ class DiskIoMgrTest : public testing::Test {
     if (io_mgr == nullptr) io_mgr = test_env_->exec_env()->disk_io_mgr();
     vector<string> tmp_dirs({LOCAL_BUFFER_PATH});
     RemoveAndCreateDirs(tmp_dirs);
-    tmp_dirs.push_back(REMOTE_URL);
+    tmp_dirs.push_back(remote_url_);
     Status status = tmp_file_mgr->InitCustom(tmp_dirs, true, "", false, metrics_.get());
     if (!status.ok()) return nullptr;
     return pool_.Add(new TmpFileGroup(tmp_file_mgr, io_mgr, NewProfile(), TUniqueId()));
@@ -349,6 +348,9 @@ class DiskIoMgrTest : public testing::Test {
   mutex oper_mutex_;
   ConditionVariable oper_done_;
   int num_oper_;
+
+  /// URL for remote spilling.
+  string remote_url_;
 };
 
 TEST_F(DiskIoMgrTest, TestDisk) {
@@ -1933,7 +1935,7 @@ TEST_F(DiskIoMgrTest, MetricsOfWriteIoError) {
 TEST_F(DiskIoMgrTest, WriteToRemoteSuccess) {
   InitRootReservation(LARGE_RESERVATION_LIMIT);
   num_ranges_written_ = 0;
-  string remote_file_path = REMOTE_URL + "/test";
+  string remote_file_path = remote_url_ + "/test";
   string new_file_path_local_buffer = LOCAL_BUFFER_PATH + "/test";
   int32_t file_size = 1024;
   FLAGS_remote_tmp_file_size = "1K";
@@ -1967,7 +1969,7 @@ TEST_F(DiskIoMgrTest, WriteToRemoteSuccess) {
 
   TmpFileRemote** new_tmp_file_obj = tmp_pool.Add(new TmpFileRemote*);
   *new_tmp_file_obj = tmp_pool.Add(new TmpFileRemote(tmp_file_grp, 0, remote_file_path,
-      new_file_path_local_buffer, false, REMOTE_URL.c_str()));
+      new_file_path_local_buffer, false, remote_url_.c_str()));
 
   vector<WriteRange*> ranges;
   vector<int32_t> datas;
@@ -2113,7 +2115,7 @@ TEST_F(DiskIoMgrTest, WriteToRemoteSuccess) {
 TEST_F(DiskIoMgrTest, WriteToRemotePartialFileSuccess) {
   InitRootReservation(LARGE_RESERVATION_LIMIT);
   num_ranges_written_ = 0;
-  string remote_file_path = REMOTE_URL + "/test";
+  string remote_file_path = remote_url_ + "/test";
   string new_file_path_local_buffer = LOCAL_BUFFER_PATH + "/test";
   FLAGS_remote_tmp_file_size = "1K";
 
@@ -2138,7 +2140,7 @@ TEST_F(DiskIoMgrTest, WriteToRemotePartialFileSuccess) {
 
   TmpFileRemote** new_tmp_file_obj = tmp_pool.Add(new TmpFileRemote*);
   *new_tmp_file_obj = tmp_pool.Add(new TmpFileRemote(tmp_file_grp, 0, remote_file_path,
-      new_file_path_local_buffer, false, REMOTE_URL.c_str()));
+      new_file_path_local_buffer, false, remote_url_.c_str()));
 
   int32_t* data = tmp_pool.Add(new int32_t);
   *data = rand();
@@ -2195,7 +2197,7 @@ TEST_F(DiskIoMgrTest, WriteToRemotePartialFileSuccess) {
 TEST_F(DiskIoMgrTest, WriteToRemoteUploadFailed) {
   InitRootReservation(LARGE_RESERVATION_LIMIT);
   num_oper_ = 0;
-  string remote_file_path = REMOTE_URL + "/test";
+  string remote_file_path = remote_url_ + "/test";
   string non_existent_dir = "/non-existent-dir/test";
   FLAGS_remote_tmp_file_size = "1K";
   int64_t file_size = 1024;
@@ -2215,7 +2217,7 @@ TEST_F(DiskIoMgrTest, WriteToRemoteUploadFailed) {
 
   TmpFileRemote** new_tmp_file_obj = tmp_pool.Add(new TmpFileRemote*);
   *new_tmp_file_obj = tmp_pool.Add(new TmpFileRemote(
-      tmp_file_grp, 0, remote_file_path, non_existent_dir, false, REMOTE_URL.c_str()));
+      tmp_file_grp, 0, remote_file_path, non_existent_dir, false, remote_url_.c_str()));
 
   DiskFile* remote_file = (*new_tmp_file_obj)->DiskFile();
   DiskFile* local_buffer_file = (*new_tmp_file_obj)->DiskBufferFile();
@@ -2253,7 +2255,7 @@ TEST_F(DiskIoMgrTest, WriteToRemoteUploadFailed) {
 TEST_F(DiskIoMgrTest, WriteToRemoteEvictLocal) {
   InitRootReservation(LARGE_RESERVATION_LIMIT);
   num_ranges_written_ = 0;
-  string remote_file_path = REMOTE_URL + "/test1";
+  string remote_file_path = remote_url_ + "/test1";
   string local_buffer_file_path = LOCAL_BUFFER_PATH + "/test1";
   int32_t file_size = 1024;
   FLAGS_remote_tmp_file_size = "1K";
@@ -2273,7 +2275,7 @@ TEST_F(DiskIoMgrTest, WriteToRemoteEvictLocal) {
   unique_ptr<RequestContext> io_ctx = io_mgr.RegisterContext();
 
   TmpFileRemote* new_tmp_file_obj = new TmpFileRemote(tmp_file_grp, 0, remote_file_path,
-      local_buffer_file_path, false, REMOTE_URL.c_str());
+      local_buffer_file_path, false, remote_url_.c_str());
   shared_ptr<TmpFileRemote> shared_tmp_file;
   shared_tmp_file.reset(move(new_tmp_file_obj));
 
@@ -2351,7 +2353,7 @@ TEST_F(DiskIoMgrTest, WriteToRemoteEvictLocal) {
 // Use an invalid block size to emulate the case when memory allocation failed.
 TEST_F(DiskIoMgrTest, WriteToRemoteFailMallocBlock) {
   num_ranges_written_ = 0;
-  string remote_file_path = REMOTE_URL + "/test1";
+  string remote_file_path = remote_url_ + "/test1";
   string local_buffer_file_path = LOCAL_BUFFER_PATH + "/test1";
   int64_t invalid_block_size = -1;
 
@@ -2366,7 +2368,7 @@ TEST_F(DiskIoMgrTest, WriteToRemoteFailMallocBlock) {
 
   TmpFileRemote** new_tmp_file_obj = tmp_pool.Add(new TmpFileRemote*);
   *new_tmp_file_obj = tmp_pool.Add(new TmpFileRemote(tmp_file_grp, 0, remote_file_path,
-      local_buffer_file_path, false, REMOTE_URL.c_str()));
+      local_buffer_file_path, false, remote_url_.c_str()));
 
   RemoteOperRange::RemoteOperDoneCallback u_callback = [this](
                                                            const Status& upload_status) {
@@ -2399,7 +2401,7 @@ TEST_F(DiskIoMgrTest, WriteToRemoteFailMallocBlock) {
 TEST_F(DiskIoMgrTest, WriteToRemoteDiffPagesSuccess) {
   InitRootReservation(LARGE_RESERVATION_LIMIT);
   num_ranges_written_ = 0;
-  string remote_file_path = REMOTE_URL + "/test";
+  string remote_file_path = remote_url_ + "/test";
   string new_file_path_local_buffer = LOCAL_BUFFER_PATH + "/test";
   int32_t block_size = 1024;
   FLAGS_remote_tmp_file_size = "1K";
@@ -2423,7 +2425,7 @@ TEST_F(DiskIoMgrTest, WriteToRemoteDiffPagesSuccess) {
 
   TmpFileRemote** new_tmp_file_obj = tmp_pool.Add(new TmpFileRemote*);
   *new_tmp_file_obj = tmp_pool.Add(new TmpFileRemote(tmp_file_grp, 0, remote_file_path,
-      new_file_path_local_buffer, false, REMOTE_URL.c_str()));
+      new_file_path_local_buffer, false, remote_url_.c_str()));
 
   WriteRange::WriteDoneCallback callback = [=](const Status& status) {
     ASSERT_EQ(0, status.code());
@@ -2487,7 +2489,7 @@ TEST_F(DiskIoMgrTest, WriteToRemoteDiffPagesSuccess) {
 TEST_F(DiskIoMgrTest, WriteToRemoteFileDeleted) {
   num_oper_ = 0;
   num_ranges_written_ = 0;
-  string remote_file_path = REMOTE_URL + "/test";
+  string remote_file_path = remote_url_ + "/test";
   string local_buffer_path = LOCAL_BUFFER_PATH + "/test";
   FLAGS_remote_tmp_file_size = "1K";
   int64_t file_size = 1024;
@@ -2511,7 +2513,7 @@ TEST_F(DiskIoMgrTest, WriteToRemoteFileDeleted) {
   unique_ptr<RequestContext> io_ctx = io_mgr.RegisterContext();
 
   TmpFileRemote tmp_file(
-      tmp_file_grp, 0, remote_file_path, local_buffer_path, false, REMOTE_URL.c_str());
+      tmp_file_grp, 0, remote_file_path, local_buffer_path, false, remote_url_.c_str());
   DiskFile* remote_file = tmp_file.DiskFile();
   DiskFile* local_buffer_file = tmp_file.DiskBufferFile();
   tmp_file.GetWriteFile()->SetActualFileSize(file_size);

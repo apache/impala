@@ -62,6 +62,7 @@ Status TestEnv::Init() {
   exec_env_.reset(new ExecEnv);
   // Populate the ExecEnv state that the backend tests need.
   RETURN_IF_ERROR(exec_env_->disk_io_mgr()->Init());
+  RETURN_IF_ERROR(exec_env_->InitHadoopConfig());
   exec_env_->tmp_file_mgr_.reset(new TmpFileMgr);
   if (have_tmp_file_mgr_args_) {
     RETURN_IF_ERROR(tmp_file_mgr()->InitCustom(tmp_dirs_, one_tmp_dir_per_device_,
@@ -138,6 +139,14 @@ int64_t TestEnv::TotalQueryMemoryConsumption() {
     total += query_state->query_mem_tracker()->consumption();
   }
   return total;
+}
+
+std::string TestEnv::GetDefaultFsPath(std::string path) {
+  const char* filesystem_prefix = getenv("FILESYSTEM_PREFIX");
+  if (filesystem_prefix != nullptr && filesystem_prefix[0] != '\0') {
+    return Substitute("$0$1", filesystem_prefix, path);
+  }
+  return Substitute("$0$1", exec_env_->default_fs(), path);
 }
 
 Status TestEnv::CreateQueryState(

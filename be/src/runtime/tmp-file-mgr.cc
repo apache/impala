@@ -290,7 +290,8 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
     string tmp_dir_spec_trimmed(boost::algorithm::trim_left_copy(tmp_dir_spec));
     std::unique_ptr<TmpDir> tmp_dir;
 
-    if (IsHdfsPath(tmp_dir_spec_trimmed.c_str(), false)) {
+    if (IsHdfsPath(tmp_dir_spec_trimmed.c_str(), false)
+        || IsOzonePath(tmp_dir_spec_trimmed.c_str(), false)) {
       tmp_dir = std::make_unique<TmpDirHdfs>(tmp_dir_spec_trimmed);
     } else if (IsS3APath(tmp_dir_spec_trimmed.c_str(), false)) {
       // Initialize the S3 options for later getting S3 connection.
@@ -645,105 +646,72 @@ Status TmpFileMgr::TmpDirRemoteCtrl::SetUpReadBufferParams() {
   return Status::OK();
 }
 
-TmpDir::TmpDir(const string& raw_path, const string& prefix, bool is_local)
-  : raw_path_(raw_path), prefix_(prefix), is_local_dir_(is_local), is_parsed_(false) {}
-
-Status TmpDir::GetPathFromToks(const vector<string>& toks, string* path, int* offset) {
-  DCHECK(path != nullptr);
-  DCHECK(offset != nullptr);
-  string parsed_raw_path = prefix_;
-  // The ordinary format of the directory input after split by colon is
-  // ["path", "bytes_limit", "priority"].
-  parsed_raw_path.append(toks[0]);
-  *path = parsed_raw_path;
-  *offset = 1;
-  return Status::OK();
-}
-
-Status TmpDir::ParsePath(const vector<string>& toks, int* offset) {
-  string parsed_raw_path;
-  RETURN_IF_ERROR(GetPathFromToks(toks, &parsed_raw_path, offset));
-  parsed_raw_path = trim_right_copy_if(parsed_raw_path, is_any_of("/"));
-
-  // Construct the complete scratch directory path.
-  boost::filesystem::path tmp_path(parsed_raw_path);
-  if (is_local_dir_) {
-    tmp_path = absolute(tmp_path);
-    parsed_raw_path = tmp_path.string();
+Status TmpDir::ParseByteLimit(const string& byte_limit) {
+  bool is_percent;
+  bytes_limit_ = ParseUtil::ParseMemSpec(byte_limit, &is_percent, 0);
+  if (bytes_limit_ < 0 || is_percent) {
+    return Status(Substitute(
+        "Malformed scratch directory capacity configuration '$0'", raw_path_));
+  } else if (bytes_limit_ == 0) {
+    // Interpret -1, 0 or empty string as no limit.
+    bytes_limit_ = numeric_limits<int64_t>::max();
   }
-  boost::filesystem::path scratch_subdir_path(tmp_path / TMP_SUB_DIR_NAME);
-  parsed_raw_path_ = parsed_raw_path;
-  path_ = scratch_subdir_path.string();
-
   return Status::OK();
 }
 
-Status TmpDir::ParseByteLimit(const vector<string>& toks, int index) {
-  DCHECK_GE(index, 0);
-  int64_t bytes_limit = numeric_limits<int64_t>::max();
-  if (index < toks.size()) {
-    // Parse option byte_limit.
-    bool is_percent;
-    bytes_limit = ParseUtil::ParseMemSpec(toks[index], &is_percent, 0);
-    if (bytes_limit < 0 || is_percent) {
-      return Status(Substitute(
-          "Malformed scratch directory capacity configuration '$0'", raw_path_));
-    } else if (bytes_limit == 0) {
-      // Interpret -1, 0 or empty string as no limit.
-      bytes_limit = numeric_limits<int64_t>::max();
-    }
-  }
-  bytes_limit_ = bytes_limit;
-  return Status::OK();
-}
-
-Status TmpDir::ParsePriority(const vector<string>& toks, int index) {
-  DCHECK_GE(index, 0);
-  int priority = numeric_limits<int>::max();
-  if (index < toks.size() && !toks[index].empty()) {
+Status TmpDir::ParsePriority(const string& priority) {
+  if (!priority.empty()) {
     StringParser::ParseResult result;
-    priority =
-        StringParser::StringToInt<int>(toks[index].data(), toks[index].size(), &result);
+    priority_ = StringParser::StringToInt<int>(
+        priority.c_str(), priority.size(), &result);
     if (result != StringParser::PARSE_SUCCESS) {
       return Status(Substitute(
           "Malformed scratch directory priority configuration '$0'", raw_path_));
     }
   }
-  priority_ = priority;
-  return Status::OK();
-}
-
-Status TmpDir::ParseTokens() {
-  vector<string> toks;
-  string path_without_prefix = raw_path_.substr(strlen(prefix_.c_str()));
-  split(toks, path_without_prefix, is_any_of(":"), token_compress_off);
-  int offset = 0;
-  RETURN_IF_ERROR(ParsePath(toks, &offset));
-  const int max_num_options = 2;
-  // The max size after the split by colon.
-  int max_num_tokens = max_num_options + offset;
-  if (toks.size() > max_num_tokens) {
-    return Status(Substitute(
-        "Could not parse temporary dir specifier, too many colons: '$0'", raw_path_));
-  }
-  // The scratch path may have two options "bytes limit" and "priority".
-  // The priority should be the first option.
-  RETURN_IF_ERROR(ParseByteLimit(toks, offset++));
-  // The priority should be the second option.
-  RETURN_IF_ERROR(ParsePriority(toks, offset));
   return Status::OK();
 }
 
 Status TmpDir::Parse() {
-  DCHECK(!is_parsed_);
-  RETURN_IF_ERROR(ParseTokens());
-  is_parsed_ = true;
+  DCHECK(parsed_raw_path_.empty() && path_.empty());
+
+  vector<string> toks;
+  RETURN_IF_ERROR(ParsePathTokens(toks));
+
+  constexpr int max_num_tokens = 3;
+  if (toks.size() > max_num_tokens) {
+    return Status(Substitute(
+        "Could not parse temporary dir specifier, too many colons: '$0'", raw_path_));
+  }
+
+  // Construct the complete scratch directory path.
+  toks[0] = trim_right_copy_if(toks[0], is_any_of("/"));
+  parsed_raw_path_ = toks[0];
+  path_ = (boost::filesystem::path(toks[0]) / TMP_SUB_DIR_NAME).string();
+
+  // The scratch path may have two options "bytes limit" and "priority".
+  // The bytes limit should be the first option.
+  if (toks.size() > 1) {
+    RETURN_IF_ERROR(ParseByteLimit(toks[1]));
+  }
+  // The priority should be the second option.
+  if (toks.size() > 2) {
+    RETURN_IF_ERROR(ParsePriority(toks[2]));
+  }
+  return Status::OK();
+}
+
+Status TmpDirLocal::ParsePathTokens(vector<string>& toks) {
+  // The ordinary format of the directory input after split by colon is
+  // {path, [bytes_limit, [priority]]}.
+  split(toks, raw_path_, is_any_of(":"), token_compress_off);
+  toks[0] = absolute(toks[0]).string();
   return Status::OK();
 }
 
 Status TmpDirLocal::VerifyAndCreate(MetricGroup* metrics,
     vector<bool>* is_tmp_dir_on_disk, bool need_local_buffer_dir, TmpFileMgr* tmp_mgr) {
-  DCHECK(is_parsed_);
+  DCHECK(!parsed_raw_path_.empty());
   // The path must be a writable directory.
   Status status = FileSystemUtil::VerifyIsDirectory(parsed_raw_path_);
   if (!status.ok()) {
@@ -784,6 +752,7 @@ Status TmpDirLocal::VerifyAndCreate(MetricGroup* metrics,
 Status TmpDirLocal::CreateLocalDirectory(MetricGroup* metrics,
     vector<bool>* is_tmp_dir_on_disk, bool need_local_buffer_dir, int disk_id,
     TmpFileMgr* tmp_mgr) {
+  DCHECK(!path_.empty());
   // Create the directory, destroying if already present. If this succeeds, we will
   // have an empty writable scratch directory.
   Status status = FileSystemUtil::RemoveAndCreateDirectory(path_);
@@ -807,7 +776,8 @@ Status TmpDirLocal::CreateLocalDirectory(MetricGroup* metrics,
     if (disk_id >= 0) (*is_tmp_dir_on_disk)[disk_id] = true;
     LOG(INFO) << "Using scratch directory " << path_ << " on "
               << "disk " << disk_id
-              << " limit: " << PrettyPrinter::PrintBytes(bytes_limit_);
+              << " limit: " << PrettyPrinter::PrintBytes(bytes_limit_)
+              << ", priority: " << priority_;
     bytes_used_metric_ = metrics->AddGauge(
         SCRATCH_DIR_BYTES_USED_FORMAT, 0, Substitute("$0", tmp_mgr->tmp_dirs_.size()));
   } else {
@@ -818,45 +788,44 @@ Status TmpDirLocal::CreateLocalDirectory(MetricGroup* metrics,
   return status;
 }
 
+Status TmpDirS3::ParsePathTokens(vector<string>& toks) {
+  // The ordinary format of the directory input after split by colon is
+  // {scheme, path, [bytes_limit, [priority]]}. Combine scheme and path.
+  split(toks, raw_path_, is_any_of(":"), token_compress_off);
+  // Only called on paths starting with `s3a://`, so there will always be at least 2.
+  DCHECK(toks.size() >= 2);
+  toks[0] = Substitute("$0:$1", toks[0], toks[1]);
+  toks.erase(toks.begin()+1);
+  return Status::OK();
+}
+
 Status TmpDirS3::VerifyAndCreate(MetricGroup* metrics, vector<bool>* is_tmp_dir_on_disk,
     bool need_local_buffer_dir, TmpFileMgr* tmp_mgr) {
   // For the S3 path, it doesn't need to create the directory for the uploading
   // as long as the S3 address is correct.
-  DCHECK(is_parsed_);
+  DCHECK(!path_.empty());
   hdfsFS hdfs_conn;
   RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
       path_, &hdfs_conn, &(tmp_mgr->hdfs_conns_), tmp_mgr->s3a_options()));
   return Status::OK();
 }
 
-Status TmpDirHdfs::GetPathFromToks(
-    const vector<string>& toks, string* parsed_path, int* offset) {
-  DCHECK(parsed_path != nullptr);
-  DCHECK(offset != nullptr);
+Status TmpDirHdfs::ParsePathTokens(vector<string>& toks) {
   // We enforce the HDFS scratch path to have the port number, and the format after split
-  // by colon is ["path", "port_num", "bytes_limit", "priority"], therefore, the offset
-  // to be returned is 2.
-  if (toks.size() < 2) {
+  // by colon is {scheme, path, port_num, [bytes_limit, [priority]]}. Coalesce the URI.
+  split(toks, raw_path_, is_any_of(":"), token_compress_off);
+  if (toks.size() < 3) {
     return Status(
-        Substitute("The scrach path should have the port number: '$0'", raw_path_));
+        Substitute("The scratch path should have the port number: '$0'", raw_path_));
   }
-  string parsed_raw_path = prefix_;
-  parsed_raw_path.append(toks[0]).append(":").append(toks[1]);
-  *parsed_path = parsed_raw_path;
-  *offset = 2;
-  return Status::OK();
-}
-
-Status TmpDirHdfs::Parse() {
-  DCHECK(!is_parsed_);
-  RETURN_IF_ERROR(ParseTokens());
-  is_parsed_ = true;
+  toks[0] = Substitute("$0:$1:$2", toks[0], toks[1], toks[2]);
+  toks.erase(toks.begin()+1, toks.begin()+3);
   return Status::OK();
 }
 
 Status TmpDirHdfs::VerifyAndCreate(MetricGroup* metrics, vector<bool>* is_tmp_dir_on_disk,
     bool need_local_buffer_dir, TmpFileMgr* tmp_mgr) {
-  DCHECK(is_parsed_);
+  DCHECK(!path_.empty());
   hdfsFS hdfs_conn;
   // If the HDFS path doesn't exist, it would fail while uploading, so we
   // create the HDFS path if it doesn't exist.
@@ -977,6 +946,10 @@ TmpFileRemote::TmpFileRemote(TmpFileGroup* file_group, TmpFileMgr::DeviceId devi
   if (IsHdfsPath(hdfs_url, false)) {
     disk_type_ = io::DiskFileType::DFS;
     disk_id_ = file_group->io_mgr_->RemoteDfsDiskId();
+    disk_id_file_op_ = file_group->io_mgr_->RemoteDfsDiskFileOperId();
+  } else if (IsOzonePath(hdfs_url, false)) {
+    disk_type_ = io::DiskFileType::DFS;
+    disk_id_ = file_group->io_mgr_->RemoteOzoneDiskId();
     disk_id_file_op_ = file_group->io_mgr_->RemoteDfsDiskFileOperId();
   } else if (IsS3APath(hdfs_url, false)) {
     disk_type_ = io::DiskFileType::S3;
@@ -1382,8 +1355,9 @@ Status TmpFileGroup::AllocateRemoteSpace(int64_t num_bytes, TmpFile** tmp_file,
     int64_t* file_offset, vector<int>* at_capacity_dirs) {
   // Only one remote dir supported currently.
   string dir = tmp_file_mgr_->tmp_dirs_remote_->path();
-  // It is not supposed to have a remote directory other than HDFS or S3.
-  DCHECK(IsHdfsPath(dir.c_str(), false) || IsS3APath(dir.c_str(), false));
+  // It is not supposed to have a remote directory other than HDFS, Ozone, or S3.
+  DCHECK(IsHdfsPath(dir.c_str(), false) || IsOzonePath(dir.c_str(), false)
+      || IsS3APath(dir.c_str(), false));
 
   // Look for the space from a previous created file.
   if (!tmp_files_remote_.empty()) {

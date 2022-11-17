@@ -82,6 +82,9 @@ class TestEnv {
     exec_env_->codegen_cache_.reset(new CodeGenCache(metrics));
   }
 
+  /// Get a full URI for the provided path based on the default filesystem.
+  std::string GetDefaultFsPath(std::string path);
+
   ExecEnv* exec_env() { return exec_env_.get(); }
   MetricGroup* metrics() { return exec_env_->metrics(); }
   TmpFileMgr* tmp_file_mgr() { return exec_env_->tmp_file_mgr(); }

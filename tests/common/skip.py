@@ -99,7 +99,7 @@ class SkipIf:
   not_hdfs = pytest.mark.skipif(not IS_HDFS, reason="HDFS admin needed")
   not_dfs = pytest.mark.skipif(not (IS_HDFS or IS_OZONE),
       reason="HDFS/Ozone Filesystem needed")
-  not_scratch_fs = pytest.mark.skipif(not IS_HDFS,
+  not_scratch_fs = pytest.mark.skipif(not (IS_HDFS or IS_OZONE),
       reason="Scratch dirs for temporary file spilling not supported")
   sfs_unsupported = pytest.mark.skipif(not (IS_HDFS or IS_S3 or IS_ABFS or IS_ADLS
       or IS_GCS), reason="Hive support for sfs+ is limited, HIVE-26757")

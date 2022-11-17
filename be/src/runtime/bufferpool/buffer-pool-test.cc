@@ -66,8 +66,6 @@ DECLARE_string(remote_tmp_file_size);
 const string SCRATCH_SUFFIX = "/impala-scratch";
 
 /// For testing spill to remote.
-static const string HDFS_LOCAL_URL = "hdfs://localhost:20500/tmp";
-static const string REMOTE_URL = HDFS_LOCAL_URL;
 static const string LOCAL_BUFFER_PATH = "/tmp/buffer-pool-test-buffer";
 
 namespace impala {
@@ -87,6 +85,7 @@ class BufferPoolTest : public ::testing::Test {
     test_env_->DisableBufferPool();
     ASSERT_OK(test_env_->Init());
     RandTestUtil::SeedRng("BUFFER_POOL_TEST_SEED", &rng_);
+    remote_url_ = test_env_->GetDefaultFsPath("/tmp");
   }
 
   virtual void TearDown() {
@@ -160,7 +159,7 @@ class BufferPoolTest : public ::testing::Test {
     } else {
       tmp_dirs.push_back(Substitute(LOCAL_BUFFER_PATH + ":$0", local_buffer_limit));
     }
-    tmp_dirs.push_back(REMOTE_URL);
+    tmp_dirs.push_back(remote_url_);
     EXPECT_OK(FileSystemUtil::RemoveAndCreateDirectory(LOCAL_BUFFER_PATH));
     for (int i = 0; i < num_local_dirs; ++i) {
       const string& create_dir = Substitute("/tmp/buffer-pool-test.$0", i);
@@ -472,6 +471,9 @@ class BufferPoolTest : public ::testing::Test {
   /// of the map are protected by query_reservations_lock_.
   unordered_map<int64_t, ReservationTracker*> query_reservations_;
   SpinLock query_reservations_lock_;
+
+  /// URL for remote spilling.
+  string remote_url_;
 };
 
 const int64_t BufferPoolTest::TEST_BUFFER_LEN;
