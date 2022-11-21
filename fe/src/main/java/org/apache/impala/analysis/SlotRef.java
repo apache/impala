@@ -25,7 +25,6 @@ import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
-import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
@@ -180,23 +179,10 @@ public class SlotRef extends Expr {
       // The NDV cannot exceed the #rows in the table.
       numDistinctValues_ = Math.min(numDistinctValues_, rootTable.getNumRows());
     }
-    if (type_.isStructType() && rootTable != null) {
-      if (!(rootTable instanceof FeFsTable)) {
-        throw new AnalysisException(String.format(
-            "%s is not supported when querying STRUCT type %s",
-            rootTable, type_.toSql()));
-      }
-      FeFsTable feTable = (FeFsTable)rootTable;
-      for (HdfsFileFormat format : feTable.getFileFormats()) {
-        if (format != HdfsFileFormat.ORC && format != HdfsFileFormat.PARQUET) {
-          throw new AnalysisException("Querying STRUCT is only supported for ORC and " +
-              "Parquet file formats.");
-        }
-      }
-    }
+
     if (type_.isStructType()) {
       addStructChildrenAsSlotRefs();
-      checkForUnsupportedStructFields();
+      checkForUnsupportedStructFeatures();
     }
   }
 
@@ -212,12 +198,13 @@ public class SlotRef extends Expr {
 
     analyzer.createStructTuplesAndSlotDescs(desc_);
     addStructChildrenAsSlotRefs();
-    checkForUnsupportedStructFields();
+    checkForUnsupportedStructFeatures();
   }
 
   // Throws an AnalysisException if any of the struct fields, recursively, of this SlotRef
-  // is a collection or unsupported type. Should only be used if this is a struct.
-  private void checkForUnsupportedStructFields() throws AnalysisException {
+  // is a collection or unsupported type or has any other unsupported feature.
+  // Should only be used if this is a struct.
+  public void checkForUnsupportedStructFeatures() throws AnalysisException {
     Preconditions.checkState(type_ instanceof StructType);
     for (Expr child : getChildren()) {
       final Type fieldType = child.getType();
@@ -236,7 +223,24 @@ public class SlotRef extends Expr {
 
       if (fieldType.isStructType()) {
         Preconditions.checkState(child instanceof SlotRef);
-        ((SlotRef) child).checkForUnsupportedStructFields();
+        ((SlotRef) child).checkForUnsupportedStructFeatures();
+      }
+    }
+    if (resolvedPath_ != null) {
+      FeTable rootTable = resolvedPath_.getRootTable();
+      if (rootTable != null) {
+        if (!(rootTable instanceof FeFsTable)) {
+          throw new AnalysisException(
+              String.format("%s is not supported when querying STRUCT type %s", rootTable,
+                  type_.toSql()));
+        }
+        FeFsTable feTable = (FeFsTable) rootTable;
+        for (HdfsFileFormat format : feTable.getFileFormats()) {
+          if (format != HdfsFileFormat.ORC && format != HdfsFileFormat.PARQUET) {
+            throw new AnalysisException("Querying STRUCT is only supported for ORC and "
+                + "Parquet file formats.");
+          }
+        }
       }
     }
   }

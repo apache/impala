@@ -1098,6 +1098,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     AnalysisError("select * from functional.allcomplextypes",
             ctx,"STRUCT type inside collection types is not supported.");
+
+    AnalysisError("select * from functional_orc_def.complextypestbl", ctx,
+        "Struct containing a collection type is not allowed in the select list.");
+
+    AnalysisError("select * from functional_parquet.binary_in_complex_types", ctx,
+        "Binary type inside collection types is not supported (IMPALA-11491).");
   }
 
   @Test

@@ -912,6 +912,9 @@ public class SelectStmt extends QueryStmt {
       SlotDescriptor slotDesc = analyzer_.registerSlotRef(
           starExpandedPathInfo.getExpandedPath(), false);
       SlotRef slotRef = new SlotRef(slotDesc);
+      if (slotRef.getType().isStructType()) {
+        slotRef.checkForUnsupportedStructFeatures();
+      }
       Preconditions.checkState(slotRef.isAnalyzed(),
           "Analysis should be done in constructor");
 
