@@ -312,6 +312,22 @@ int,string,string
 4,'Alex','view'
 ====
 ---- QUERY
+# Test filter NULL
+SELECT * from iceberg_partitioned_orc_external
+where action = NULL
+---- TYPES
+int,string,string
+---- RESULTS
+====
+---- QUERY
+# Test filter !=NULL
+SELECT * from iceberg_partitioned_orc_external
+where action != NULL
+---- TYPES
+int,string,string
+---- RESULTS
+====
+---- QUERY
 SHOW PARTITIONS iceberg_partitioned_orc_external
 ---- TYPES
 string,bigint,bigint

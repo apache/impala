@@ -556,6 +556,11 @@ public class IcebergScanPlanner {
       return null;
     }
 
+    // Cannot push BinaryPredicate with null literal values
+    if (Expr.IS_NULL_LITERAL.apply(literal)) {
+      return null;
+    }
+
     Object value = getIcebergValue(ref, literal);
     if (value == null) {
       return null;
