@@ -86,7 +86,7 @@ Status CopyHdfsFile(const hdfsFS& src_conn, const string& src_path,
   return Status::OK();
 }
 
-bool IsSpecificPath(
+static bool IsSpecificPath(
     const char* path, const char* specific_prefix, bool check_default_fs) {
   size_t prefix_len = strlen(specific_prefix);
   if (check_default_fs && strstr(path, ":/") == NULL) {
@@ -154,7 +154,7 @@ static int GetFilesystemNameLength(const char* path) {
   return after_authority - path;
 }
 
-bool FilesystemsMatch(const char* path_a, const char* path_b) {
+static bool FilesystemsMatch(const char* path_a, const char* path_b) {
   int fs_a_name_length = GetFilesystemNameLength(path_a);
   int fs_b_name_length = GetFilesystemNameLength(path_b);
 
@@ -177,6 +177,39 @@ bool FilesystemsMatch(const char* path_a, const char* path_b) {
   // Both fully qualified: check the filesystem prefix.
   if (fs_a_name_length != fs_b_name_length) return false;
   return strncmp(path_a, path_b, fs_a_name_length) == 0;
+}
+
+static int VolumeBucketLength(const char* path) {
+  if (*path == '\0') return 0;
+  const char* afterVolume = strstr(path, "/");
+  if (afterVolume == nullptr) return strlen(path);
+  const char* afterBucket = strstr(afterVolume + 1, "/");
+  if (afterBucket == nullptr) return strlen(path);
+  return afterBucket - path;
+}
+
+static bool OfsBucketsMatch(const char* path_a, const char* path_b) {
+  // Examine only the path elements.
+  path_a = path_a + GetFilesystemNameLength(path_a);
+  path_b = path_b + GetFilesystemNameLength(path_b);
+  // Skip past starting slash for comparison to unqualified paths.
+  if (*path_a == '/') ++path_a;
+  if (*path_b == '/') ++path_b;
+
+  int vba_len = VolumeBucketLength(path_a);
+  int vbb_len = VolumeBucketLength(path_b);
+  if (vba_len != vbb_len) return false;
+  return strncmp(path_a, path_b, vba_len) == 0;
+}
+
+bool FilesystemsAndBucketsMatch(const char* path_a, const char* path_b) {
+  if (!FilesystemsMatch(path_a, path_b)) return false;
+
+  // path_a and path_b are in the same filesystem, so we just need to check one prefix.
+  if (IsSpecificPath(path_a, FILESYS_PREFIX_OFS, true)) {
+    return OfsBucketsMatch(path_a, path_b);
+  }
+  return true;
 }
 
 string GetBaseName(const char* path) {

@@ -17,6 +17,7 @@
 
 package org.apache.impala.common;
 
+import org.apache.impala.common.Pair;
 import static org.apache.impala.common.FileSystemUtil.HIVE_TEMP_FILE_PREFIX;
 import static org.apache.impala.common.FileSystemUtil.SPARK_TEMP_FILE_PREFIX;
 import static org.apache.impala.common.FileSystemUtil.isIgnoredDir;
@@ -209,6 +210,23 @@ public class FileSystemUtilTest {
                       FileSystemUtil.isPathOnFileSystem(mockFile, fs));
         }
       }
+    }
+  }
+
+  @Test
+  public void testVolumeBucketSubstring() throws IOException {
+    List<Pair<String, String>> cases = Arrays.asList(
+      Pair.create(mockLocation(FileSystemUtil.SCHEME_OFS), "volume1/bucket2"),
+      Pair.create("ofs://svc1:9876/volume/bucket/file", "volume/bucket"),
+      Pair.create("ofs://svc1:9876/volume/bucket/", "volume/bucket"),
+      Pair.create("ofs://svc1:9876/volume/bucket", "volume/bucket"),
+      Pair.create("ofs://svc1:9876/volume/", "volume"),
+      Pair.create("ofs://svc1:9876/volume", "volume"),
+      Pair.create("ofs://svc1:9876/", "")
+    );
+    for (Pair<String, String> c : cases) {
+      Path p = new Path(c.first);
+      assertEquals(c.second, FileSystemUtil.volumeBucketSubstring(p));
     }
   }
 

@@ -297,7 +297,9 @@ Status DmlExecState::FinalizeHdfsInsert(const TFinalizeParams& params,
       dir_deletion_ops.Add(DELETE, move.first);
     } else {
       VLOG_ROW << "Moving tmp file: " << move.first << " to " << move.second;
-      if (FilesystemsMatch(move.first.c_str(), move.second.c_str())) {
+      // Files can't be renamed across different filesystems (considering both scheme and
+      // authority) or across different Ozone buckets/volumes.
+      if (FilesystemsAndBucketsMatch(move.first.c_str(), move.second.c_str())) {
         move_ops.Add(RENAME, move.first, move.second);
       } else {
         move_ops.Add(MOVE, move.first, move.second);

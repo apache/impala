@@ -28,7 +28,7 @@ from tests.common.test_dimensions import (
     create_uncompressed_text_dimension)
 from tests.common.skip import SkipIfLocal
 from tests.common.test_vector import ImpalaTestDimension
-from tests.util.filesystem_utils import WAREHOUSE
+from tests.util.filesystem_utils import get_fs_path, WAREHOUSE
 
 TEST_TBL_PART = "test_load"
 TEST_TBL_NOPART = "test_load_nopart"
@@ -37,6 +37,8 @@ ALLTYPES_PATH = "%s/alltypes/year=2010/month=1/100101.txt" % WAREHOUSE
 MULTIAGG_PATH = '%s/alltypesaggmultifiles/year=2010/month=1/day=1' % WAREHOUSE
 HIDDEN_FILES = ["{0}/3/.100101.txt".format(STAGING_PATH),
                 "{0}/3/_100101.txt".format(STAGING_PATH)]
+# A path outside WAREHOUSE, which will be a different bucket for Ozone/ofs.
+TMP_STAGING_PATH = get_fs_path('/tmp/test_load_staging')
 
 @SkipIfLocal.hdfs_client
 class TestLoadData(ImpalaTestSuite):
@@ -105,6 +107,45 @@ class TestLoadData(ImpalaTestSuite):
     # The hidden files should not have been moved as part of the load operation.
     for file_ in HIDDEN_FILES:
       assert self.filesystem_client.exists(file_), "{0} does not exist".format(file_)
+
+
+@SkipIfLocal.hdfs_client
+class TestLoadDataExternal(ImpalaTestSuite):
+
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestLoadDataExternal, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
+
+  def _clean_test_tables(self):
+    self.client.execute("drop table if exists functional.{0}".format(TEST_TBL_NOPART))
+    self.filesystem_client.delete_file_dir(TMP_STAGING_PATH, recursive=True)
+
+  def teardown_method(self, method):
+    self._clean_test_tables()
+
+  def setup_method(self, method):
+    # Defensively clean the data dirs if they exist.
+    self._clean_test_tables()
+
+    self.filesystem_client.make_dir(TMP_STAGING_PATH)
+    self.filesystem_client.copy(ALLTYPES_PATH, "{0}/100101.txt".format(TMP_STAGING_PATH))
+
+    self.client.execute("create table functional.{0} like functional.alltypesnopart"
+        " location '{1}/{0}'".format(TEST_TBL_NOPART, WAREHOUSE))
+
+  def test_load(self, vector):
+    self.execute_query_expect_success(self.client, "load data inpath '{0}/100101.txt'"
+        " into table functional.{1}".format(TMP_STAGING_PATH, TEST_TBL_NOPART))
+    result = self.execute_scalar(
+        "select count(*) from functional.{0}".format(TEST_TBL_NOPART))
+    assert(result == '310')
 
 
 @SkipIfLocal.hdfs_client

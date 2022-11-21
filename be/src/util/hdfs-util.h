@@ -33,6 +33,7 @@ extern const char* FILESYS_PREFIX_ADL;
 extern const char* FILESYS_PREFIX_GCS;
 extern const char* FILESYS_PREFIX_COS;
 extern const char* FILESYS_PREFIX_OZONE;
+extern const char* FILESYS_PREFIX_OFS;
 
 /// Utility function to get error messages from HDFS. This function takes prefix/file and
 /// appends errno to it. Note: any stdlib function can reset errno, this should be called
@@ -83,8 +84,10 @@ bool IsOzonePath(const char* path, bool check_default_fs = true);
 /// Returns true iff the path refers to a location on an SFS filesystem.
 bool IsSFSPath(const char* path, bool check_default_fs = true);
 
-/// Returns true iff 'pathA' and 'pathB' are on the same filesystem.
-bool FilesystemsMatch(const char* pathA, const char* pathB);
+/// Returns true iff 'pathA' and 'pathB' are on the same filesystem and bucket.
+/// Most filesystems embed bucket in the authority, but Ozone's ofs protocol allows
+/// addressing volume/bucket via the path and does not allow renames across them.
+bool FilesystemsAndBucketsMatch(const char* pathA, const char* pathB);
 
 /// Returns the terminal component of 'path'.
 /// E.g. if 'path' is "hdfs://localhost:8020/a/b/c", "c" is returned.

@@ -247,6 +247,32 @@ public class FileSystemUtil {
     return numFilesMoved;
   }
 
+  // Returns the first two elements (volume, bucket) of the unqualified path.
+  public static String volumeBucketSubstring(Path p) {
+    String path = Path.getPathWithoutSchemeAndAuthority(p).toString();
+    if (path.startsWith("/")) path = path.substring(1);
+    int afterVolume = path.indexOf('/');
+    if (afterVolume == -1) return path;
+    int afterBucket = path.indexOf('/', afterVolume + 1);
+    if (afterBucket == -1) return path;
+    return path.substring(0, afterBucket);
+  }
+
+  /*
+   * Returns true if the source and path are in the same bucket. Ozone's ofs encodes
+   * volume/bucket into the path. All other filesystems make it part of the authority
+   * portion of the URI.
+   */
+  public static boolean isSameBucket(Path source, Path dest) throws IOException {
+    if (!isPathOnFileSystem(source, dest.getFileSystem(CONF))) return false;
+
+    // Return true for anything besides OFS.
+    if (!hasScheme(source, SCHEME_OFS)) return true;
+
+    // Compare (volume, bucket) for source and dest.
+    return volumeBucketSubstring(source).equals(volumeBucketSubstring(dest));
+  }
+
   /**
    * Relocates the given file to a new location (either another directory or a
    * file in the same or different filesystem). The file is generally moved (renamed) to
@@ -261,7 +287,6 @@ public class FileSystemUtil {
   public static void relocateFile(Path sourceFile, Path dest,
       boolean renameIfAlreadyExists) throws IOException {
     FileSystem destFs = dest.getFileSystem(CONF);
-    FileSystem sourceFs = sourceFile.getFileSystem(CONF);
 
     Path destFile =
         destFs.isDirectory(dest) ? new Path(dest, sourceFile.getName()) : dest;
@@ -272,7 +297,7 @@ public class FileSystemUtil {
       destFile = new Path(destDir,
           appendToBaseFileName(destFile.getName(), UUID.randomUUID().toString()));
     }
-    boolean sameFileSystem = isPathOnFileSystem(sourceFile, destFs);
+    boolean sameBucket = isSameBucket(sourceFile, dest);
     boolean destIsDfs = isDistributedFileSystem(destFs);
 
     // If the source and the destination are on different file systems, or in different
@@ -282,15 +307,12 @@ public class FileSystemUtil {
         arePathsInSameHdfsEncryptionZone(destFs, sourceFile, destFile);
     // We can do a rename if the src and dst are in the same encryption zone in the same
     // distributed filesystem.
-    boolean doRename = destIsDfs && sameFileSystem && sameEncryptionZone;
+    boolean doRename = destIsDfs && sameBucket && sameEncryptionZone;
     // Alternatively, we can do a rename if the src and dst are on the same
-    // non-distributed filesystem.
-    if (!doRename) doRename = !destIsDfs && sameFileSystem;
+    // non-distributed filesystem in the same bucket (if it has that concept).
+    if (!doRename) doRename = !destIsDfs && sameBucket;
     if (doRename) {
-      if (LOG.isTraceEnabled()) {
-        LOG.trace(String.format(
-            "Moving '%s' to '%s'", sourceFile.toString(), destFile.toString()));
-      }
+      LOG.trace("Moving '{}' to '{}'", sourceFile, destFile);
       // Move (rename) the file.
       if (!destFs.rename(sourceFile, destFile)) {
         throw new IOException(String.format(
@@ -298,24 +320,20 @@ public class FileSystemUtil {
       }
       return;
     }
-    if (destIsDfs && sameFileSystem) {
-      Preconditions.checkState(!doRename);
-      // We must copy rather than move if the source and dest are in different
-      // encryption zones. A move would return an error from the NN because a move is a
+    Preconditions.checkState(!doRename);
+    if (destIsDfs && sameBucket) {
+      Preconditions.checkState(!sameEncryptionZone);
+      // We must copy rather than move if the source and dest are in different encryption
+      // zones or buckets. A move would return an error from the NN because a move is a
       // metadata-only operation and the files would not be encrypted/decrypted properly
       // on the DNs.
-      if (LOG.isTraceEnabled()) {
-        LOG.trace(String.format(
-            "Copying source '%s' to '%s' because HDFS encryption zones are different.",
-            sourceFile, destFile));
-      }
+      LOG.trace(
+          "Copying source '{}' to '{}' because HDFS encryption zones are different.",
+          sourceFile, destFile);
     } else {
-      Preconditions.checkState(!sameFileSystem);
-      if (LOG.isTraceEnabled()) {
-        LOG.trace(String.format("Copying '%s' to '%s' between filesystems.",
-            sourceFile, destFile));
-      }
+      LOG.trace("Copying '{}' to '{}' between filesystems.", sourceFile, destFile);
     }
+    FileSystem sourceFs = sourceFile.getFileSystem(CONF);
     FileUtil.copy(sourceFs, sourceFile, destFs, destFile, true, true, CONF);
   }
 

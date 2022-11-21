@@ -244,7 +244,7 @@ class ExecEnv {
   friend class DataStreamTest;
 
   // For access to InitHadoopConfig().
-  FRIEND_TEST(HdfsUtilTest, CheckFilesystemsMatch);
+  FRIEND_TEST(HdfsUtilTest, CheckFilesystemsAndBucketsMatch);
 
   static ExecEnv* exec_env_;
   bool is_fe_tests_ = false;
