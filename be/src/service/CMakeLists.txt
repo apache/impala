@@ -56,6 +56,18 @@ add_dependencies(ServiceTests gen-deps)
 add_library(fesupport SHARED
   fe-support.cc
 )
+
+# Hide all symbols from compression libraries so that users of this libfesupport.so
+# don't have conflicts with libhadoop or other libraries.
+# TODO: This should also hide most other symbols as a precaution.
+set(LINK_FLAGS "-Wl,--exclude-libs=libbz2")
+set(LINK_FLAGS "${LINK_FLAGS} -Wl,--exclude-libs=liblz4")
+set(LINK_FLAGS "${LINK_FLAGS} -Wl,--exclude-libs=libsnappy")
+set(LINK_FLAGS "${LINK_FLAGS} -Wl,--exclude-libs=libz")
+set(LINK_FLAGS "${LINK_FLAGS} -Wl,--exclude-libs=libzstd")
+set_target_properties(fesupport
+  PROPERTIES
+  LINK_FLAGS "${LINK_FLAGS}")
 add_dependencies(fesupport gen-deps)
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN"
