@@ -91,6 +91,7 @@ if [[ $DISTRIBUTION == Ubuntu ]]; then
     apt-get install -y openjdk-8-jre-headless
   fi
   apt-get install -y \
+      hostname \
       krb5-user \
       language-pack-en \
       libsasl2-2 \
@@ -120,6 +121,7 @@ elif [[ $DISTRIBUTION == Redhat ]]; then
   yum install -y --disableplugin=subscription-manager \
       cyrus-sasl-gssapi \
       cyrus-sasl-plain \
+      hostname \
       krb5-workstation \
       openldap-devel \
       tzdata
@@ -151,6 +153,11 @@ fi
 # Verify en_US.utf8 is present
 if ! locale -a | grep en_US.utf8 ; then
   echo "ERROR: en_US.utf8 locale is not present."
+  exit 1
+fi
+
+if ! hostname ; then
+  echo "ERROR: 'hostname' command failed."
   exit 1
 fi
 
