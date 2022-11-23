@@ -327,3 +327,31 @@ select * from v where ii > 1003;
 ---- TYPES
 BIGINT, STRING
 ====
+---- QUERY
+select *
+from functional_parquet.iceberg_v2_partitioned_position_deletes_orc a,
+     functional_parquet.iceberg_partitioned_orc_external b
+where a.action = b.action and b.id=3;
+---- RESULTS
+12,'Alan','click',2020-01-01 10:00:00,3,'Alan','click'
+10,'Alan','click',2020-01-01 10:00:00,3,'Alan','click'
+18,'Alan','click',2020-01-01 10:00:00,3,'Alan','click'
+---- TYPES
+INT, STRING, STRING, TIMESTAMP, INT, STRING, STRING
+====
+---- QUERY
+select a.input__file__name, a.*
+from iceberg_partitioned_orc_external a,
+     iceberg_partitioned_orc_external b
+where a.id = b.id and a.action = b.action and b.user = 'Lisa'
+order by a.id;
+---- RESULTS
+regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=download/.*orc',2,'Lisa','download'
+regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=download/.*orc',5,'Lisa','download'
+regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=download/.*orc',7,'Lisa','download'
+regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=download/.*orc',8,'Lisa','download'
+regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=download/.*orc',14,'Lisa','download'
+regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=download/.*orc',16,'Lisa','download'
+---- TYPES
+STRING, INT, STRING, STRING
+====

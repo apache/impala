@@ -739,14 +739,13 @@ bool HdfsScanNodeBase::FilePassesFilterPredicates(RuntimeState* state, HdfsFileD
   if (filter_ctxs_.size() == 0) return true;
   ScanRangeMetadata* metadata =
       static_cast<ScanRangeMetadata*>(file->splits[0]->meta_data());
-  if (!PartitionPassesFilters(metadata->partition_id, FilterStats::FILES_KEY,
-      filter_ctxs)) {
-    return false;
-  } else if (hdfs_table_->IsIcebergTable() && !IcebergPartitionPassesFilters(
-      metadata->partition_id, FilterStats::FILES_KEY, filter_ctxs, file, state)) {
-    return false;
+  if (hdfs_table_->IsIcebergTable()) {
+    return IcebergPartitionPassesFilters(
+        metadata->partition_id, FilterStats::FILES_KEY, filter_ctxs, file, state);
+  } else {
+    return PartitionPassesFilters(metadata->partition_id, FilterStats::FILES_KEY,
+        filter_ctxs);
   }
-  return true;
 }
 
 void HdfsScanNodeBase::SkipScanRange(io::ScanRange* scan_range) {
@@ -781,7 +780,8 @@ Status HdfsScanNodeBase::StartNextScanRange(const std::vector<FilterContext>& fi
     if (filter_ctxs.size() > 0) {
       int64_t partition_id =
           static_cast<ScanRangeMetadata*>((*scan_range)->meta_data())->partition_id;
-      if (!PartitionPassesFilters(partition_id, FilterStats::SPLITS_KEY, filter_ctxs)) {
+      if (!hdfs_table()->IsIcebergTable() &&
+          !PartitionPassesFilters(partition_id, FilterStats::SPLITS_KEY, filter_ctxs)) {
         SkipScanRange(*scan_range);
         *scan_range = nullptr;
       }
@@ -967,6 +967,7 @@ void HdfsScanNodeBase::InitNullCollectionValues(RowBatch* row_batch) const {
 
 bool HdfsScanNodeBase::PartitionPassesFilters(int32_t partition_id,
     const string& stats_name, const vector<FilterContext>& filter_ctxs) {
+  DCHECK(!hdfs_table()->IsIcebergTable());
   if (filter_ctxs.empty()) return true;
   if (FilterContext::CheckForAlwaysFalse(stats_name, filter_ctxs)) return false;
   DCHECK_EQ(filter_ctxs.size(), filter_ctxs_.size())
@@ -992,6 +993,7 @@ bool HdfsScanNodeBase::PartitionPassesFilters(int32_t partition_id,
 bool HdfsScanNodeBase::IcebergPartitionPassesFilters(int64_t partition_id,
     const string& stats_name, const vector<FilterContext>& filter_ctxs,
     HdfsFileDesc* file, RuntimeState* state) {
+  DCHECK(hdfs_table()->IsIcebergTable());
   file_metadata_utils_.SetFile(state, file);
   // Create the template tuple based on file metadata
   std::map<const SlotId, const SlotDescriptor*> slot_descs_written;

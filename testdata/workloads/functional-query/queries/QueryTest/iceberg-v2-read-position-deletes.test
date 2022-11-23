@@ -530,3 +530,33 @@ select * from v where ii > 1003;
 ---- TYPES
 BIGINT, STRING
 ====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+select *
+from functional_parquet.iceberg_v2_partitioned_position_deletes a,
+     functional_parquet.iceberg_partitioned b
+where a.action = b.action and b.id=3;
+---- RESULTS
+12,'Alan','click',2020-01-01 10:00:00,3,'Alan','click',2020-01-01 10:00:00
+10,'Alan','click',2020-01-01 10:00:00,3,'Alan','click',2020-01-01 10:00:00
+18,'Alan','click',2020-01-01 10:00:00,3,'Alan','click',2020-01-01 10:00:00
+---- TYPES
+INT, STRING, STRING, TIMESTAMP, INT, STRING, STRING, TIMESTAMP
+====
+---- QUERY
+SET TIMEZONE='Europe/Budapest';
+select a.input__file__name, a.*
+from iceberg_partitioned a,
+     iceberg_partitioned b
+where a.id = b.id and a.action = b.action and b.user = 'Lisa'
+order by a.id;
+---- RESULTS
+regex:'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-10/action=download/.*parquet',2,'Lisa','download',2020-01-01 11:00:00
+regex:'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-10/action=download/.*parquet',5,'Lisa','download',2020-01-01 11:00:00
+regex:'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-10/action=download/.*parquet',7,'Lisa','download',2020-01-01 11:00:00
+regex:'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-10/action=download/.*parquet',8,'Lisa','download',2020-01-01 11:00:00
+regex:'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-10/action=download/.*parquet',14,'Lisa','download',2020-01-01 11:00:00
+regex:'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-10/action=download/.*parquet',16,'Lisa','download',2020-01-01 11:00:00
+---- TYPES
+STRING, INT, STRING, STRING, TIMESTAMP
+====

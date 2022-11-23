@@ -840,11 +840,13 @@ Status HdfsOrcScanner::GetNextInternal(RowBatch* row_batch) {
   // Apply any runtime filters to static tuples containing the partition keys for this
   // partition. If any filter fails, we return immediately and stop processing this
   // scan range.
-  if (!scan_node_->PartitionPassesFilters(context_->partition_descriptor()->id(),
-      FilterStats::ROW_GROUPS_KEY, context_->filter_ctxs())) {
-    eos_ = true;
-    DCHECK(parse_status_.ok());
-    return Status::OK();
+  if (!scan_node_->hdfs_table()->IsIcebergTable()) {
+    if (!scan_node_->PartitionPassesFilters(context_->partition_descriptor()->id(),
+        FilterStats::ROW_GROUPS_KEY, context_->filter_ctxs())) {
+      eos_ = true;
+      DCHECK(parse_status_.ok());
+      return Status::OK();
+    }
   }
   assemble_rows_timer_.Start();
   Status status = AssembleRows(row_batch);
