@@ -2110,6 +2110,8 @@ public class HdfsScanNode extends ScanNode {
 
   @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
+    // Update 'useMtScanNode_' before any return cases. It's used in BE.
+    useMtScanNode_ = queryOptions.mt_dop > 0;
     Preconditions.checkNotNull(scanRangeSpecs_, "Cost estimation requires scan ranges.");
     long scanRangeSize =
         scanRangeSpecs_.getConcrete_rangesSize() + generatedScanRangeCount_;
@@ -2149,7 +2151,6 @@ public class HdfsScanNode extends ScanNode {
     }
 
     // The non-MT scan node requires at least one scanner thread.
-    useMtScanNode_ = queryOptions.mt_dop > 0;
     int requiredThreads = useMtScanNode_ ? 0 : 1;
     int maxScannerThreads = computeMaxNumberOfScannerThreads(queryOptions,
         perHostScanRanges);
