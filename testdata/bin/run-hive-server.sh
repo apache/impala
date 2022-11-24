@@ -140,6 +140,11 @@ fi
 # Include the latest libfesupport.so in the JAVA_LIBRARY_PATH
 export JAVA_LIBRARY_PATH="${JAVA_LIBRARY_PATH-}:${IMPALA_HOME}/be/build/latest/service/"
 
+# Add the toolchain's libstdc++ to the LD_LIBRARY_PATH, because libfesupport.so may
+# need the newer version.
+GCC_HOME="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/gcc-${IMPALA_GCC_VERSION}"
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH-}:${GCC_HOME}/lib64"
+
 export HIVESERVER2_HADOOP_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,\
 suspend=n,address=30020"
 if [ ${START_HIVESERVER} -eq 1 ]; then
