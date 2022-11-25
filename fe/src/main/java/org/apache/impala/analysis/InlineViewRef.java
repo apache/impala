@@ -523,6 +523,11 @@ public class InlineViewRef extends TableRef {
     return queryStmt_.getColLabels();
   }
 
+  @Override
+  public List<Column> getColumnsInHiveOrder() {
+    return view_.getColumnsInHiveOrder();
+  }
+
   public FeView getView() { return view_; }
 
   public boolean isTableMaskingView() { return isTableMaskingView_; }

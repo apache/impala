@@ -934,7 +934,10 @@ public class Analyzer {
       dbName = resolvedTableRef.getTable().getDb().getName();
       tblName = resolvedTableRef.getTable().getName();
     }
-    List<Column> columns = resolvedTableRef.getColumns();
+    // The selected columns should be in the same relative order as they are in the
+    // corresponding Hive table so that the order of the SelectListItem's in the
+    // table mask view (if needs masking or filtering) would be correct.
+    List<Column> columns = resolvedTableRef.getSelectedColumnsInHiveOrder();
     TableMask tableMask = new TableMask(authChecker, dbName, tblName, columns, user_);
     try {
       if (resolvedTableRef instanceof CollectionTableRef) {
@@ -1701,7 +1704,9 @@ public class Analyzer {
   }
 
   /**
-   * Register scalar columns. Used in resolving column mask.
+   * Register columns for resolving column mask. The order in which columns are registered
+   * is not necessarily the same as the relative order of those columns in the
+   * corresponding Hive table.
    */
   public void registerColumnForMasking(SlotDescriptor slotDesc) {
     Preconditions.checkNotNull(slotDesc.getPath());
