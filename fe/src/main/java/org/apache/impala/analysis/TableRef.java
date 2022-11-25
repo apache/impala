@@ -21,6 +21,7 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -156,7 +157,7 @@ public class TableRef extends StmtNode {
   protected boolean exposeNestedColumnsByTableMaskView_ = false;
 
   // Columns referenced in the query. Used in resolving column mask.
-  protected Map<String, Column> columns_ = new LinkedHashMap<>();
+  protected Map<String, Column> columns_ = new HashMap<>();
 
   // Time travel spec of this table ref. It contains information specified in the
   // FOR SYSTEM_TIME AS OF <timestamp> or FOR SYSTEM_TIME AS OF <version> clause.
@@ -778,8 +779,34 @@ public class TableRef extends StmtNode {
     columns_.put(column.getName(), column);
   }
 
-  public List<Column> getColumns() {
-    return new ArrayList<>(columns_.values());
+  /**
+   * @return an unmodifiable list of all columns, but with partition columns at the end of
+   * the list rather than the beginning. This is equivalent to the order in which Hive
+   * enumerates columns.
+   */
+  public List<Column> getColumnsInHiveOrder() {
+    return getTable().getColumnsInHiveOrder();
+  }
+
+  public List<Column> getSelectedColumnsInHiveOrder() {
+    // Map from column name to the Column object (null if not selected).
+    // Use LinkedHashMap to preserve the order.
+    Map<String, Column> colSelection = new LinkedHashMap<>();
+    for (Column c : getColumnsInHiveOrder()) {
+      colSelection.put(c.getName(), null);
+    }
+    // Update 'colSelection' with selected columns. Virtual columns will also be added.
+    for (String colName : columns_.keySet()) {
+      colSelection.put(colName, columns_.get(colName));
+    }
+    List<Column> res = new ArrayList<>();
+    for (Column c : colSelection.values()) {
+      if (c != null) res.add(c);
+    }
+    // Make sure not missing any columns
+    Preconditions.checkState(res.size() == columns_.size(),
+        "missing columns: " + res.size() + " != " + columns_.size());
+    return res;
   }
 
   void migratePropertiesTo(TableRef other) {
