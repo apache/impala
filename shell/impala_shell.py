@@ -2099,6 +2099,9 @@ def impala_shell_main():
         print("Error retrieving LDAP password (command was '%s', error was: "
               "'%s')" % (options.ldap_password_cmd, stderr.strip()), file=sys.stderr)
         raise FatalShellException()
+      if sys.version_info.major > 2:
+        # Ensure we can manipulate the password as a string later.
+        options.ldap_password = options.ldap_password.decode('utf-8')
     except Exception as e:
       print("Error retrieving LDAP password (command was: '%s', exception "
             "was: '%s')" % (options.ldap_password_cmd, e), file=sys.stderr)
