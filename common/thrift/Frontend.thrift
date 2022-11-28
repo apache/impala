@@ -372,6 +372,22 @@ struct TLoadDataReq {
   // An optional partition spec. Set if this operation should apply to a specific
   // partition rather than the base table.
   4: optional list<CatalogObjects.TPartitionKeyValue> partition_spec
+
+  // True if the destination table is an Iceberg table, in this case we need to insert
+  // data to the Iceberg table based on the given files.
+  5: optional bool iceberg_tbl
+
+  // For Iceberg data load. Query template to create a temporary with table location
+  // pointing to the new files. The table location is unknown during planning, these are
+  // filled during execution.
+  6: optional string create_tmp_tbl_query_template
+
+  // For Iceberg data load. Query to insert into the destination table from the
+  // temporary table.
+  7: optional string insert_into_dst_tbl_query
+
+  // For Iceberg data load. Query to drop the temporary table.
+  8: optional string drop_tmp_tbl_query
 }
 
 // Response of a LOAD DATA statement.
@@ -385,6 +401,13 @@ struct TLoadDataResp {
 
   // This is needed to issue TUpdateCatalogRequest
   3: string partition_name = ""
+
+  // For Iceberg data load. The query template after the required fields are substituted.
+  4: optional string create_tmp_tbl_query
+
+  // For Iceberg data load. The temporary table location, used to restore data in case of
+  // query failure.
+  5: optional string create_location
 }
 
 enum TCatalogOpType {

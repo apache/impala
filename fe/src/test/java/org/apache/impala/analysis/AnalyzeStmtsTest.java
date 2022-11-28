@@ -4026,6 +4026,22 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestIcebergLoadData() throws AnalysisException {
+    AnalyzesOk("load data inpath "
+        + "'/test-warehouse/iceberg_test/iceberg_non_partitioned/data' into table "
+        + "functional_parquet.iceberg_non_partitioned");
+    AnalyzesOk("load data inpath "
+        + "'/test-warehouse/iceberg_test/iceberg_non_partitioned/data' overwrite into "
+        + "table functional_parquet.iceberg_non_partitioned");
+    AnalysisError("load data inpath "
+        + "'/test-warehouse/iceberg_test/iceberg_partitioned/data/"
+        + "event_time_hour=2020-01-01-08/action=view/' into table "
+        + "functional_parquet.iceberg_partitioned partition "
+        + "(event_time_hour='2020-01-01-08', action='view');", "PARTITION clause is not "
+        + "supported for Iceberg tables.");
+  }
+
+  @Test
   public void TestInsert() throws AnalysisException {
     for (String qualifier: ImmutableList.of("INTO", "OVERWRITE")) {
       testInsertStatic(qualifier);

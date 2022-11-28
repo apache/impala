@@ -303,8 +303,9 @@ public class FileSystemUtil {
    * destination location. Instead, a UUID will be appended to the base file name,
    * preserving the existing file extension. If renameIfAlreadyExists is false, an
    * IOException will be thrown if there is a file name conflict.
+   * Returns the Path that points to the destination file.
    */
-  public static void relocateFile(Path sourceFile, Path dest,
+  public static Path relocateFile(Path sourceFile, Path dest,
       boolean renameIfAlreadyExists) throws IOException {
     FileSystem destFs = dest.getFileSystem(CONF);
 
@@ -338,7 +339,7 @@ public class FileSystemUtil {
         throw new IOException(String.format(
             "Failed to move '%s' to '%s'", sourceFile, destFile));
       }
-      return;
+      return destFile;
     }
     Preconditions.checkState(!doRename);
     if (destIsDfs && sameBucket) {
@@ -355,6 +356,7 @@ public class FileSystemUtil {
     }
     FileSystem sourceFs = sourceFile.getFileSystem(CONF);
     FileUtil.copy(sourceFs, sourceFile, destFs, destFile, true, true, CONF);
+    return destFile;
   }
 
   /**
@@ -365,6 +367,22 @@ public class FileSystemUtil {
     InputStream fileStream = fs.open(file);
     try {
       return IOUtils.toString(fileStream);
+    } finally {
+      IOUtils.closeQuietly(fileStream);
+    }
+  }
+
+  /**
+   * Reads the first 4 bytes of the file and returns it as a string. It is used to
+   * identify the file format.
+   */
+  public static String readMagicString(Path file) throws IOException {
+    FileSystem fs = file.getFileSystem(CONF);
+    InputStream fileStream = fs.open(file);
+    byte[] buffer = new byte[4];
+    try {
+      IOUtils.read(fileStream, buffer, 0, 4);
+      return  new String(buffer);
     } finally {
       IOUtils.closeQuietly(fileStream);
     }

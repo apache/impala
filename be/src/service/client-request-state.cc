@@ -789,6 +789,9 @@ void ClientRequestState::ExecLoadDataRequestImpl(bool exec_in_worker_thread) {
 
   TLoadDataResp response;
   Status status = frontend_->LoadData(exec_request_->load_data_request, &response);
+  if (exec_request_->load_data_request.iceberg_tbl) {
+    ExecLoadIcebergDataRequestImpl(response);
+  }
   {
     lock_guard<mutex> l(lock_);
     RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
@@ -835,6 +838,56 @@ void ClientRequestState::ExecLoadDataRequestImpl(bool exec_in_worker_thread) {
   {
     lock_guard<mutex> l(lock_);
     RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
+  }
+}
+
+void ClientRequestState::ExecLoadIcebergDataRequestImpl(TLoadDataResp response) {
+  TLoadDataReq load_data_req = exec_request_->load_data_request;
+  RuntimeProfile* child_profile =
+      RuntimeProfile::Create(&profile_pool_, "Child Queries");
+  profile_->AddChild(child_profile);
+  // Add child queries for computing table and column stats.
+  vector<ChildQuery> child_queries;
+  // Prepare CREATE
+  RuntimeProfile* create_profile =
+      RuntimeProfile::Create(&profile_pool_, "Create table query");
+  child_profile->AddChild(create_profile);
+  child_queries.emplace_back(response.create_tmp_tbl_query, this, parent_server_,
+      create_profile, &profile_pool_);
+  // Prepare INSERT
+  RuntimeProfile* insert_profile =
+      RuntimeProfile::Create(&profile_pool_, "Insert query");
+  child_profile->AddChild(insert_profile);
+  child_queries.emplace_back(load_data_req.insert_into_dst_tbl_query, this,
+      parent_server_, insert_profile, &profile_pool_);
+  // Prepare DROP
+  RuntimeProfile* drop_profile =
+      RuntimeProfile::Create(&profile_pool_, "Drop table query");
+  child_profile->AddChild(drop_profile);
+  child_queries.emplace_back(load_data_req.drop_tmp_tbl_query, this,
+      parent_server_, drop_profile, &profile_pool_);
+  // Execute queries
+  RETURN_VOID_IF_ERROR(child_query_executor_->ExecAsync(move(child_queries)));
+  vector<ChildQuery*>* completed_queries = new vector<ChildQuery*>();
+  Status query_status = child_query_executor_->WaitForAll(completed_queries);
+  hdfsFS fs = hdfsConnect("default", 0);
+  if (query_status.ok()) {
+    if (hdfsDelete(fs, response.create_location.c_str(), 1)) {
+      Status hdfs_ret("Failed to remove staging data under '" + response.create_location
+          + "' after query failure: " + query_status.msg().msg());
+      lock_guard<mutex> l(lock_);
+      RETURN_VOID_IF_ERROR(UpdateQueryStatus(hdfs_ret));
+    }
+  } else {
+    for (string path : response.loaded_files) {
+      if (hdfsMove(fs, path.c_str(), fs, load_data_req.source_path.c_str())) {
+        Status hdfs_ret("Failed to revert data movement, some files might still be in '"
+            + response.create_location + "' after query failure: "
+            + query_status.msg().msg());
+        lock_guard<mutex> l(lock_);
+        RETURN_VOID_IF_ERROR(UpdateQueryStatus(hdfs_ret));
+      }
+    }
   }
 }
 

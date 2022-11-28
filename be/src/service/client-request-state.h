@@ -716,6 +716,9 @@ class ClientRequestState {
   /// Core logic of executing a load data statement.
   void ExecLoadDataRequestImpl(bool exec_in_worker_thread);
 
+  /// Executes LOAD DATA related sub-queries for Iceberg tables.
+  void ExecLoadIcebergDataRequestImpl(TLoadDataResp response);
+
   /// Executes a shut down request.
   Status ExecShutdownRequest() WARN_UNUSED_RESULT;
 

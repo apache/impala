@@ -857,7 +857,10 @@ public class Frontend {
         String.format("load table data %s.%s", tableName.db_name, tableName.table_name));
     while (true) {
       try {
-        return doLoadTableData(request);
+        if (!request.iceberg_tbl)
+          return doLoadTableData(request);
+        else
+          return doLoadIcebergTableData(request);
       } catch(InconsistentMetadataFetchException e) {
         retries.handleRetryOrThrow(e);
       }
@@ -922,6 +925,51 @@ public class Frontend {
     if (partitionName != null && !partitionName.isEmpty()) {
       response.setPartition_name(partitionName);
     }
+    return response;
+  }
+
+  private TLoadDataResp doLoadIcebergTableData(TLoadDataReq request)
+      throws ImpalaException, IOException {
+    TLoadDataResp response = new TLoadDataResp();
+    TableName tableName = TableName.fromThrift(request.getTable_name());
+    FeCatalog catalog = getCatalog();
+    String destPathString = catalog.getTable(tableName.getDb(), tableName.getTbl())
+        .getMetaStoreTable().getSd().getLocation();
+    Path destPath = new Path(destPathString);
+    Path sourcePath = new Path(request.source_path);
+    FileSystem sourceFs = sourcePath.getFileSystem(FileSystemUtil.getConfiguration());
+
+    // Create a temporary directory within the final destination directory to stage the
+    // file move.
+    Path tmpDestPath = FileSystemUtil.makeTmpSubdirectory(destPath);
+
+    int numFilesLoaded = 0;
+    List<Path> filesLoaded = new ArrayList<>();
+    String destFile;
+    if (sourceFs.isDirectory(sourcePath)) {
+      numFilesLoaded = FileSystemUtil.relocateAllVisibleFiles(sourcePath,
+          tmpDestPath, filesLoaded);
+      destFile = filesLoaded.get(0).toString();
+    } else {
+      Path destFilePath = FileSystemUtil.relocateFile(sourcePath, tmpDestPath,
+          true);
+      filesLoaded.add(new Path(tmpDestPath.toString() + Path.SEPARATOR
+          + sourcePath.getName()));
+      numFilesLoaded = 1;
+      destFile = destFilePath.toString();
+    }
+
+    String createTmpTblQuery = String.format(request.create_tmp_tbl_query_template,
+        destFile, tmpDestPath.toString());
+
+    TColumnValue col = new TColumnValue();
+    String loadMsg = String.format("Loaded %d file(s).", numFilesLoaded);
+    col.setString_val(loadMsg);
+    response.setLoaded_files(filesLoaded.stream().map(Path::toString)
+        .collect(Collectors.toList()));
+    response.setLoad_summary(new TResultRow(Lists.newArrayList(col)));
+    response.setCreate_tmp_tbl_query(createTmpTblQuery);
+    response.setCreate_location(tmpDestPath.toString());
     return response;
   }
 

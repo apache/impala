@@ -1,0 +1,142 @@
+====
+---- QUERY
+create table test_iceberg_load_parquet like iceberg_mixed_file_format_test
+stored as iceberg;
+====
+---- QUERY
+# Test 1-2: Recovery from child query failure, first file then directory location
+set mem_limit=1;
+load data inpath '/tmp/$DATABASE/parquet/00000-0-data-gfurnstahl_20220906113044_157fc172-f5d3-4c70-8653-fff150b6136a-job_16619542960420_0002-1-00001.parquet'
+into table test_iceberg_load_parquet;
+---- CATCH
+minimum memory reservation is greater than memory available to the query for buffer reservations
+====
+---- QUERY
+select count(*) from test_iceberg_load_parquet;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+set mem_limit=1;
+load data inpath '/tmp/$DATABASE/parquet/' into table test_iceberg_load_parquet;
+---- CATCH
+minimum memory reservation is greater than memory available to the query for buffer reservations
+====
+---- QUERY
+select count(*) from test_iceberg_load_parquet;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Test 3-4: Load a parquet file then a directory into test table
+load data inpath '/tmp/$DATABASE/parquet/00000-0-data-gfurnstahl_20220906113044_157fc172-f5d3-4c70-8653-fff150b6136a-job_16619542960420_0002-1-00001.parquet'
+into table test_iceberg_load_parquet;
+---- RESULTS
+'Loaded 1 file(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+select count(*) from test_iceberg_load_parquet;
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+load data inpath '/tmp/$DATABASE/parquet/' into table test_iceberg_load_parquet;
+---- RESULTS
+'Loaded 1 file(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+select count(*) from test_iceberg_load_parquet;
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Test 5-6: Load an orc file then a directory into test table
+create table test_iceberg_load_orc like iceberg_mixed_file_format_test
+stored as iceberg;
+====
+---- QUERY
+load data inpath '/tmp/$DATABASE/orc/00000-0-data-gfurnstahl_20220906113255_8d49367d-e338-4996-ade5-ee500a19c1d1-job_16619542960420_0003-1-00001.orc'
+into table test_iceberg_load_orc;
+---- RESULTS
+'Loaded 1 file(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+select count(*) from test_iceberg_load_orc;
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+load data inpath '/tmp/$DATABASE/orc/' into table test_iceberg_load_orc;
+---- RESULTS
+'Loaded 1 file(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+select count(*) from test_iceberg_load_orc;
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Test 7: Overwrite the existing table from Test 1
+load data inpath '/tmp/$DATABASE/overwrite/' overwrite into table test_iceberg_load_parquet;
+---- RESULTS
+'Loaded 1 file(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+select count(*) from test_iceberg_load_parquet;
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Test 8: Mismatching target table and file schema
+create table test_iceberg_load_schema_mismatch (i int)
+stored as iceberg;
+====
+---- QUERY
+load data inpath '/tmp/$DATABASE/mismatching_schema/' overwrite into table test_iceberg_load_schema_mismatch;
+---- CATCH
+AnalysisException: Target table 'test_load_a61184e9.test_iceberg_load_schema_mismatch' has fewer columns (1) than the SELECT / VALUES clause returns (4)
+====
+---- QUERY
+# Test 9: Partitioned Iceberg table
+---- QUERY
+create table test_iceberg_load_partitioned like functional_parquet.iceberg_partitioned
+stored as iceberg;
+====
+---- QUERY
+load data inpath '/tmp/$DATABASE/partitioned/' overwrite into table test_iceberg_load_partitioned;
+---- RESULTS
+'Loaded 1 file(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+select count(*) from test_iceberg_load_partitioned;
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
