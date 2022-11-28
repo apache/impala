@@ -44,7 +44,18 @@ public class CompressionUtil {
     // Deflater with 'BEST_SPEED' level provided reasonable compression ratios at much
     // faster speeds compared to other modes like BEST_COMPRESSION/DEFAULT_COMPRESSION.
     DeflaterOutputStream stream =
-        new DeflaterOutputStream(bos, new Deflater(Deflater.BEST_SPEED));
+        new DeflaterOutputStream(bos, new Deflater(Deflater.BEST_SPEED)) {
+          // IMPALA-11753: to avoid CatalogD OOM we invoke def.end() which frees
+          // the natively allocated memory by the Deflater. See details in Jira.
+          @Override
+          public void close() throws IOException {
+            try {
+              super.close();
+            } finally {
+              def.end();
+            }
+          }
+        };
     try {
       stream.write(input);
       stream.close();
