@@ -120,7 +120,7 @@ Status HdfsAvroScanner::ReadFileHeader() {
 
   // Transfer ownership so the memory remains valid for subsequent scanners that process
   // the data portions of the file.
-  scan_node_->TransferToScanNodePool(template_tuple_pool_.get());
+  scan_node_->TransferToSharedStatePool(template_tuple_pool_.get());
   return Status::OK();
 }
 
@@ -289,6 +289,8 @@ Status HdfsAvroScanner::ResolveSchemas(const AvroSchemaElement& table_root,
 
 Status HdfsAvroScanner::WriteDefaultValue(
     SlotDescriptor* slot_desc, avro_datum_t default_value, const char* field_name) {
+  // avro_header could have null template_tuple here if no partition columns are
+  // materialized and no default values are set yet.
   if (avro_header_->template_tuple == nullptr) {
     if (template_tuple_ != nullptr) {
       avro_header_->template_tuple = template_tuple_;

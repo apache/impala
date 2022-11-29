@@ -34,11 +34,11 @@ class RuntimeState;
 /// aggregate the rows into its hash table, but if there is not enough memory available or
 /// if the reduction from the aggregation is not very good, it will 'stream' the rows
 /// through and return them without aggregating them instead of spilling. After all of the
-/// input as been processed from child(0), subsequent calls to GetNext() will return any
+/// input has been processed from child(0), subsequent calls to GetNext() will return any
 /// rows that were aggregated in the Aggregator's hash table.
 ///
 /// Since the rows returned by GetNext() may be only partially aggregated if there are
-/// memory contraints, this is a preliminary aggregation step that functions as an
+/// memory constraints, this is a preliminary aggregation step that functions as an
 /// optimization and will always be followed in the plan by an AggregationNode that does
 /// the final aggregation.
 ///

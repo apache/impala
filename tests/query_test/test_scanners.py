@@ -84,12 +84,14 @@ class TestScannersAllTableFormats(ImpalaTestSuite):
         ImpalaTestDimension('batch_size', *TestScannersAllTableFormats.BATCH_SIZES))
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('debug_action', *DEBUG_ACTION_DIMS))
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('mt_dop', *MT_DOP_VALUES))
 
   def test_scanners(self, vector):
     new_vector = deepcopy(vector)
     # Copy over test dimensions to the matching query options.
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     new_vector.get_value('exec_option')['debug_action'] = vector.get_value('debug_action')
+    new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/scanners', new_vector)
 
   def test_many_nulls(self, vector):
@@ -100,6 +102,7 @@ class TestScannersAllTableFormats(ImpalaTestSuite):
     new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     new_vector.get_value('exec_option')['debug_action'] = vector.get_value('debug_action')
+    new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/scanners-many-nulls', new_vector)
 
   def test_hdfs_scanner_profile(self, vector):

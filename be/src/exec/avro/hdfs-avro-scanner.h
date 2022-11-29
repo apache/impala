@@ -121,8 +121,9 @@ class HdfsAvroScanner : public BaseSequenceScanner {
     /// Set to nullptr if there are no materialized partition keys and no default values
     /// are necessary (i.e., all materialized fields are present in the file schema).
     /// This tuple is created by the scanner processing the initial scan range with
-    /// the header. The ownership of memory is transferred to the scan-node pool,
-    /// such that it remains live when subsequent scanners process data ranges.
+    /// the header. The ownership of memory is transferred to the template pool of
+    /// ScanRangeSharedState, such that it remains live when subsequent scanners process
+    /// data ranges.
     Tuple* template_tuple;
 
     /// True if this file can use the codegen'd version of DecodeAvroData() (i.e. its

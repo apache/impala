@@ -104,9 +104,6 @@ class HdfsScanNode : public HdfsScanNodeBase {
       const std::vector<THdfsCompression::type>& compression_type, bool skipped = false)
       override;
 
-  /// Transfers all memory from 'pool' to 'scan_node_pool_'.
-  virtual void TransferToScanNodePool(MemPool* pool) override;
-
   virtual ExecutionModel getExecutionModel() const override {
     return NON_TASK_BASED_SYNC;
   }

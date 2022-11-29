@@ -53,6 +53,157 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
+# Non-empty Avro table with matching column definitions and Avro schema
+create external table avro_hive_alltypes_ext
+like functional_avro_snap.alltypes;
+alter table avro_hive_alltypes_ext
+set location '/test-warehouse/alltypes_avro_snap';
+alter table avro_hive_alltypes_ext recover partitions;
+compute stats avro_hive_alltypes_ext;
+---- RESULTS
+'Updated 24 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats avro_hive_alltypes_ext
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+'2009','1',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','2',280,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','3',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','4',300,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','5',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','6',300,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','7',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','8',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','9',300,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','10',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','11',300,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','12',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','1',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','2',280,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','3',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','4',300,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','5',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','6',300,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','7',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','8',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','9',300,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','10',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','11',300,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','12',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'Total','',7300,24,regex:.*,'0B','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+show column stats avro_hive_alltypes_ext
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
+---- RESULTS
+'id','INT',7300,0,4,4,-1,-1
+'bool_col','BOOLEAN',2,0,1,1,3650,3650
+'tinyint_col','INT',10,0,4,4,-1,-1
+'smallint_col','INT',10,0,4,4,-1,-1
+'int_col','INT',10,0,4,4,-1,-1
+'bigint_col','BIGINT',10,0,8,8,-1,-1
+'float_col','FLOAT',10,0,4,4,-1,-1
+'double_col','DOUBLE',10,0,8,8,-1,-1
+'date_string_col','STRING',736,0,8,8,-1,-1
+'string_col','STRING',10,0,1,1,-1,-1
+'timestamp_col','STRING',7224,0,22,21.66438293457031,-1,-1
+'year','INT',2,0,4,4,-1,-1
+'month','INT',12,0,4,4,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+# Non-empty Avro table with matching column definitions and Avro schema, but with
+# different partition schema. Note that we use INT for tinyint_col and smallint_col,
+# and STRING for timestamp_col. See HIVE_TO_AVRO_TYPE_MAP in
+# testdata/bin/generate-schema-statements.py
+create external table avro_hive_alltypes_str_part (
+  id int,
+  bool_col boolean,
+  tinyint_col int,
+  smallint_col int,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string,
+  timestamp_col string
+) partitioned by (
+  year string,
+  month string
+)
+stored as avro
+location '/test-warehouse/alltypes_avro_snap';
+alter table avro_hive_alltypes_str_part recover partitions;
+compute stats avro_hive_alltypes_str_part;
+---- RESULTS
+'Updated 24 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats avro_hive_alltypes_str_part
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+'2009','1',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','2',280,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','3',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','4',300,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','5',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','6',300,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','7',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','8',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','9',300,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','10',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','11',300,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2009','12',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','1',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','2',280,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','3',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','4',300,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','5',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','6',300,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','7',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','8',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','9',300,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','10',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','11',300,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'2010','12',310,1,regex:.*,'NOT CACHED','NOT CACHED','AVRO','false',regex:.*
+'Total','',7300,24,regex:.*,'0B','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+show column stats avro_hive_alltypes_str_part
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
+---- RESULTS
+'id','INT',7300,0,4,4,-1,-1
+'bool_col','BOOLEAN',2,0,1,1,3650,3650
+'tinyint_col','INT',10,0,4,4,-1,-1
+'smallint_col','INT',10,0,4,4,-1,-1
+'int_col','INT',10,0,4,4,-1,-1
+'bigint_col','BIGINT',10,0,8,8,-1,-1
+'float_col','FLOAT',10,0,4,4,-1,-1
+'double_col','DOUBLE',10,0,8,8,-1,-1
+'date_string_col','STRING',736,0,8,8,-1,-1
+'string_col','STRING',10,0,1,1,-1,-1
+'timestamp_col','STRING',7224,0,22,21.66438293457031,-1,-1
+'year','STRING',2,0,-1,-1,-1,-1
+'month','STRING',12,0,-1,-1,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
 # Avro table with an extra column definition.
 compute stats avro_hive_alltypes_extra_coldef
 ---- RESULTS

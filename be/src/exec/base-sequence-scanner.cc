@@ -168,7 +168,7 @@ Status BaseSequenceScanner::GetNextInternal(RowBatch* row_batch) {
       return Status::OK();
     }
     // Header is parsed, set the metadata in the scan node and issue more ranges.
-    static_cast<HdfsScanNodeBase*>(scan_node_)->SetFileMetadata(
+    scan_node_->SetFileMetadata(
         context_->partition_descriptor()->id(), stream_->filename(), header_);
     const HdfsFileDesc* desc = scan_node_->GetFileDesc(
         context_->partition_descriptor()->id(), stream_->filename());

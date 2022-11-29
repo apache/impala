@@ -197,11 +197,6 @@ void HdfsScanNode::RangeComplete(const THdfsFileFormat::type& file_type,
   HdfsScanNodeBase::RangeComplete(file_type, compression_type, skipped);
 }
 
-void HdfsScanNode::TransferToScanNodePool(MemPool* pool) {
-  unique_lock<timed_mutex> l(lock_);
-  HdfsScanNodeBase::TransferToScanNodePool(pool);
-}
-
 void HdfsScanNode::AddMaterializedRowBatch(unique_ptr<RowBatch> row_batch) {
   InitNullCollectionValues(row_batch.get());
   thread_state_.EnqueueBatch(move(row_batch));
