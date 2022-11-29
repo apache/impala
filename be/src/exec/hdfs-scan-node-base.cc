@@ -465,7 +465,6 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
   }
 
   // One-time initialization of state that is constant across scan ranges
-  scan_node_pool_.reset(new MemPool(mem_tracker()));
   runtime_profile()->AddInfoString("Table Name", hdfs_table_->fully_qualified_name());
 
   if (HasRowBatchQueue()) {
@@ -626,8 +625,6 @@ void HdfsScanNodeBase::Close(RuntimeState* state) {
 
   // There should be no active hdfs read threads.
   DCHECK_EQ(active_hdfs_read_thread_counter_.value(), 0);
-
-  if (scan_node_pool_.get() != NULL) scan_node_pool_->FreeAll();
 
   // Close collection conjuncts
   for (auto& tid_conjunct_eval : conjunct_evals_map_) {
@@ -988,8 +985,8 @@ void HdfsScanPlanNode::ComputeSlotMaterializationOrder(
   }
 }
 
-void HdfsScanNodeBase::TransferToScanNodePool(MemPool* pool) {
-  scan_node_pool_->AcquireData(pool, false);
+void HdfsScanNodeBase::TransferToSharedStatePool(MemPool* pool) {
+  shared_state_->TransferToSharedStatePool(pool);
 }
 
 void HdfsScanNodeBase::UpdateHdfsSplitStats(
@@ -1191,6 +1188,11 @@ Tuple* ScanRangeSharedState::GetTemplateTupleForPartitionId(int64_t partition_id
   DCHECK(partition_template_tuple_map_.find(partition_id)
       != partition_template_tuple_map_.end());
   return partition_template_tuple_map_[partition_id];
+}
+
+void ScanRangeSharedState::TransferToSharedStatePool(MemPool* pool) {
+  unique_lock<mutex> l(metadata_lock_);
+  template_pool_->AcquireData(pool, false);
 }
 
 void ScanRangeSharedState::UpdateRemainingScanRangeSubmissions(int32_t delta) {

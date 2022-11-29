@@ -191,6 +191,9 @@ class ScanRangeSharedState {
   /// cancellation. Must be called before adding or removing scan ranges to the queue.
   void AddCancellationHook(RuntimeState* state);
 
+  /// Transfers all memory from 'pool' to 'template_pool_'.
+  void TransferToSharedStatePool(MemPool* pool);
+
  private:
   friend class HdfsScanPlanNode;
 
@@ -602,8 +605,8 @@ class HdfsScanNodeBase : public ScanNode {
         && (IsZeroSlotTableScan() || optimize_count_star());
   }
 
-  /// Transfers all memory from 'pool' to 'scan_node_pool_'.
-  virtual void TransferToScanNodePool(MemPool* pool);
+  /// Transfers all memory from 'pool' to shared state of all scanners.
+  void TransferToSharedStatePool(MemPool* pool);
 
   /// map from volume id to <number of split, per volume split lengths>
   typedef boost::unordered_map<int32_t, std::pair<int, int64_t>> PerVolumeStats;
@@ -779,10 +782,6 @@ class HdfsScanNodeBase : public ScanNode {
   /// HDFS read thread concurrency bucket: bucket[i] refers to the number of sample
   /// taken where there are i concurrent hdfs read thread running. Created in Open().
   std::vector<RuntimeProfile::Counter*>* hdfs_read_thread_concurrency_bucket_ = nullptr;
-
-  /// Pool for allocating some amounts of memory that is shared between scanners.
-  /// e.g. partition key tuple and their string buffers
-  boost::scoped_ptr<MemPool> scan_node_pool_;
 
   /// Status of failed operations.  This is set in the ScannerThreads
   /// Returned in GetNext() if an error occurred.  An non-ok status triggers cleanup
