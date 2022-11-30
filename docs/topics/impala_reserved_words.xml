@@ -1554,6 +1554,13 @@ See the history, any recent changes, here:
                 <entry/>
               </row>
               <row>
+                <entry><codeph>iceberg</codeph></entry>
+                <entry/>
+                <entry/>
+                <entry>X<fn>Impala 4.0 and higher</fn></entry>
+                <entry/>
+              </row>
+              <row>
                 <entry><codeph>identity</codeph></entry>
                 <entry>X</entry>
                 <entry/>

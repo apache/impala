@@ -241,17 +241,17 @@ parser code {:
     result.append("Encountered: ");
     String lastToken =
       SqlScanner.tokenIdMap.get(Integer.valueOf(errorToken_.sym));
+
     if (lastToken != null) {
       result.append(lastToken);
-    } else if (SqlScanner.isReserved((String)errorToken_.value)) {
-      result.append("A reserved word cannot be used as an identifier: ")
-          .append((String)errorToken_.value);
     } else {
       result.append("Unknown last token with id: " + errorToken_.sym);
     }
+    result.append("\n");
+
+    boolean identifierExpected = false;
 
     // append expected tokens
-    result.append('\n');
     result.append("Expected: ");
     if (expectedTokenName_ == null) {
       String expectedToken = null;
@@ -260,15 +260,29 @@ parser code {:
         tokenId = expectedTokenIds_.get(i);
         if (reportExpectedToken(tokenId, expectedTokenIds_.size())) {
           expectedToken = SqlScanner.tokenIdMap.get(tokenId);
+          if(expectedToken.equals(SqlScanner.tokenIdMap.get(SqlParserSymbols.IDENT))) {
+            identifierExpected = true;
+          }
           result.append(expectedToken + ", ");
         }
       }
       // remove trailing ", "
       result.delete(result.length()-2, result.length());
     } else {
+      if(expectedTokenName_.equals(SqlScanner.tokenIdMap.get(SqlParserSymbols.IDENT))) {
+        identifierExpected = true;
+      }
       result.append(expectedTokenName_);
     }
-    result.append('\n');
+    result.append("\n\n");
+
+    // Giving hints if the parsing failed on a reserved word when expected an identifier
+    if(identifierExpected && errorToken_.value != null &&
+        SqlScanner.isReserved(errorToken_.value.toString())) {
+      result.append(
+          "Hint: reserved words have to be escaped when used as an identifier, e.g. `")
+          .append(errorToken_.value.toString()).append("`\n");
+    }
 
     return result.toString();
   }

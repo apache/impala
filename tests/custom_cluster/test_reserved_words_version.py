@@ -21,18 +21,27 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 
 class TestReservedWordsVersion(CustomClusterTestSuite):
+  def __test_common(self):
+    self.execute_query_expect_success(self.client, "select 1 as year")
+    self.execute_query_expect_success(self.client, "select 1 as avg")
+
+    assert "Hint: reserved words have to be escaped when used as an identifier, e.g. " \
+      "`iceberg`" in str(self.execute_query_expect_failure(self.client,
+                                                          "create database iceberg"))
+    self.execute_query_expect_success(self.client, "create database `iceberg`")
+    self.execute_query_expect_success(self.client, "drop database `iceberg`")
+
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--reserved_words_version=3.0.0")
   def test_3_0(self):
-    assert "A reserved word cannot be used as an identifier: at" in \
-        str(self.execute_query_expect_failure(self.client, "select 1 as at"))
+    assert "Hint: reserved words have to be escaped when used as an identifier, e.g. " \
+      "`at`" in str(self.execute_query_expect_failure(self.client, "select 1 as at"))
     self.execute_query_expect_success(self.client, "select 1 as `at`")
-    self.execute_query_expect_success(self.client, "select 1 as year")
-    self.execute_query_expect_success(self.client, "select 1 as avg")
+    self.__test_common()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--reserved_words_version=2.11.0")
   def test_2_11(self):
     self.execute_query_expect_success(self.client, "select 1 as at")
-    self.execute_query_expect_success(self.client, "select 1 as year")
-    self.execute_query_expect_success(self.client, "select 1 as avg")
+
+    self.__test_common()

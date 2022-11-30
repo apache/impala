@@ -3570,7 +3570,10 @@ public class ParserTest extends FrontendTestBase {
         "Encountered: FROM\n" +
         "Expected: ALL, CASE, CAST, DATE, DEFAULT, DISTINCT, EXISTS, FALSE, GROUPING, " +
         "IF, INTERVAL, LEFT, NOT, NULL, REPLACE, RIGHT, STRAIGHT_JOIN, TRUNCATE, TRUE, " +
-        "UNNEST, IDENTIFIER");
+        "UNNEST, IDENTIFIER\n" +
+        "\n" +
+        "Hint: reserved words have to be escaped when used as an identifier, e.g. `from`"
+        );
 
     // missing from
     ParserError("select c, b, c where a = 5",
@@ -3580,7 +3583,10 @@ public class ParserTest extends FrontendTestBase {
         "Encountered: WHERE\n" +
         "Expected: AND, AS, BETWEEN, DEFAULT, DIV, EXCEPT, FROM, ILIKE, IN, INTERSECT, " +
         "IREGEXP, IS, LIKE, LIMIT, ||, MINUS, NOT, OR, ORDER, REGEXP, RLIKE, UNION, " +
-        "COMMA, IDENTIFIER\n");
+        "COMMA, IDENTIFIER\n" +
+        "\n" +
+        "Hint: reserved words have to be escaped when used as an identifier, e.g. `where`"
+        );
 
     // missing table list
     ParserError("select c, b, c from where a = 5",
@@ -3588,7 +3594,10 @@ public class ParserTest extends FrontendTestBase {
         "select c, b, c from where a = 5\n" +
         "                    ^\n" +
         "Encountered: WHERE\n" +
-        "Expected: DEFAULT, UNNEST, IDENTIFIER\n");
+        "Expected: DEFAULT, UNNEST, IDENTIFIER\n" +
+        "\n" +
+        "Hint: reserved words have to be escaped when used as an identifier, e.g. `where`"
+        );
 
     // missing predicate in where clause (no group by)
     ParserError("select c, b, c from t where",
@@ -3608,7 +3617,10 @@ public class ParserTest extends FrontendTestBase {
         "Encountered: GROUP\n" +
         "Expected: CASE, CAST, DATE, DEFAULT, EXISTS, FALSE, GROUPING, IF, INTERVAL, " +
         "LEFT, NOT, NULL, REPLACE, RIGHT, STRAIGHT_JOIN, TRUNCATE, TRUE, UNNEST, " +
-        "IDENTIFIER");
+        "IDENTIFIER\n" +
+        "\n" +
+        "Hint: reserved words have to be escaped when used as an identifier, e.g. `group`"
+        );
 
     // unmatched string literal starting with "
     ParserError("select c, \"b, c from t",
