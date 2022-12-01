@@ -547,7 +547,7 @@ public class HdfsScanNode extends ScanNode {
   private void buildBinaryStatsPredicate(Analyzer analyzer, SlotRef inputSlot,
       BinaryPredicate inputPred, BinaryPredicate.Operator op) {
     // Obtain the rhs expr of the input predicate
-    Expr constExpr = inputPred.getChild(1);
+    Expr constExpr = inputPred.getChild(1).clone();
     Preconditions.checkState(constExpr.isConstant());
 
     // Make a new slot descriptor, which adds it to the tuple descriptor.
