@@ -28,6 +28,8 @@ import org.apache.hadoop.hive.ql.exec.FunctionUtils.UDFClassType;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.HdfsUri;
@@ -70,6 +72,7 @@ public class HiveGenericJavaFunction implements HiveJavaFunction {
   private final Function hiveFn_;
 
   private final Type retType_;
+  private final ObjectInspector returnOi_;
 
   private final Type[] parameterTypes_;
 
@@ -83,6 +86,7 @@ public class HiveGenericJavaFunction implements HiveJavaFunction {
       retType_ = retType;
       parameterTypes_ = parameterTypes;
       genericUDF_ = createGenericUDFInstance(udfClass);
+      returnOi_ = initializeWrapper();
       checkValidFunction();
     } catch (CatalogException e) {
       String errorMsg = "Error retrieving class " + udfClass + ": " + e.getMessage();
@@ -120,6 +124,10 @@ public class HiveGenericJavaFunction implements HiveJavaFunction {
     return retType_;
   }
 
+  public ObjectInspector getReturnObjectInspector() {
+    return returnOi_;
+  }
+
   public Type[] getParameterTypes() {
     return parameterTypes_;
   }
@@ -141,51 +149,62 @@ public class HiveGenericJavaFunction implements HiveJavaFunction {
   }
 
   private void checkValidFunction() throws CatalogException {
+    if (returnOi_ != getInspector(retType_, true)
+        && returnOi_ != getInspector(retType_, false)
+        && !returnOi_.getTypeName().equals("void")) {
+      throw new CatalogException("Function expected return type " +
+          returnOi_.getTypeName() + " but was created with " + retType_);
+    }
+  }
+
+  private ObjectInspector initializeWrapper() throws CatalogException {
+    ObjectInspector[] parameterOIs = getInspectors(parameterTypes_, true);
     try {
-      ObjectInspector[] parameterOIs = getInspectors(parameterTypes_);
-      // Call the initialize method which will give us the return type that
-      // the GenericUDF produces. Then we check if it matches what we expect.
-      ObjectInspector returnOI = genericUDF_.initialize(parameterOIs);
-      if (returnOI != getInspector(retType_) && !returnOI.getTypeName().equals("void")) {
-        throw new CatalogException("Function expected return type " +
-            returnOI.getTypeName() + " but was created with " + retType_);
-      }
+      return genericUDF_.initialize(parameterOIs);
     } catch (UDFArgumentException e) {
-      LOG.error(e.getMessage());
+      LOG.info("GenericUDF initialization failed: " + e.getMessage());
       throw new CatalogException("Function cannot be created with the following " +
           "parameters: (" + Joiner.on(",").join(parameterTypes_) + "). ");
     }
   }
 
-  private ObjectInspector[] getInspectors(Type[] typeArray)
+  private ObjectInspector[] getInspectors(Type[] typeArray, boolean useWritable)
       throws CatalogException {
     ObjectInspector[] OIArray = new ObjectInspector[typeArray.length];
     for (int i = 0; i < typeArray.length; ++i) {
-      OIArray[i] = getInspector(typeArray[i]);
+      OIArray[i] = getInspector(typeArray[i], useWritable);
     }
     return OIArray;
   }
 
-  private ObjectInspector getInspector(Type t) throws CatalogException {
+  private ObjectInspector getInspector(Type t, boolean useWritable)
+      throws CatalogException {
+    PrimitiveCategory cat = getPrimitiveCategory(t);
+    return useWritable
+        ? PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(cat)
+        : PrimitiveObjectInspectorFactory.getPrimitiveJavaObjectInspector(cat);
+  }
+
+  private PrimitiveCategory getPrimitiveCategory(Type t) throws CatalogException {
     switch (t.getPrimitiveType().toThrift()) {
       case BOOLEAN:
-        return PrimitiveObjectInspectorFactory.writableBooleanObjectInspector;
+        return PrimitiveCategory.BOOLEAN;
       case TINYINT:
-        return PrimitiveObjectInspectorFactory.writableByteObjectInspector;
+        return PrimitiveCategory.BYTE;
       case SMALLINT:
-        return PrimitiveObjectInspectorFactory.writableShortObjectInspector;
+        return PrimitiveCategory.SHORT;
       case INT:
-        return PrimitiveObjectInspectorFactory.writableIntObjectInspector;
+        return PrimitiveCategory.INT;
       case BIGINT:
-        return PrimitiveObjectInspectorFactory.writableLongObjectInspector;
+        return PrimitiveCategory.LONG;
       case FLOAT:
-        return PrimitiveObjectInspectorFactory.writableFloatObjectInspector;
+        return PrimitiveCategory.FLOAT;
       case DOUBLE:
-        return PrimitiveObjectInspectorFactory.writableDoubleObjectInspector;
+        return PrimitiveCategory.DOUBLE;
       case STRING:
-        return PrimitiveObjectInspectorFactory.writableStringObjectInspector;
+        return PrimitiveCategory.STRING;
       case BINARY:
-        return PrimitiveObjectInspectorFactory.writableBinaryObjectInspector;
+        return PrimitiveCategory.BINARY;
       default:
         throw new CatalogException("Unsupported type: " + t);
     }

@@ -83,7 +83,7 @@ public class HiveUdfExecutorGeneric extends HiveUdfExecutor {
    */
   public HiveUdfExecutorGeneric(THiveUdfExecutorCtorParams request,
       HiveGenericJavaFunction hiveJavaFn) throws ImpalaRuntimeException {
-    super(request, JavaUdfDataType.getType(hiveJavaFn.getRetType()),
+    super(request, JavaUdfDataType.getType(hiveJavaFn.getReturnObjectInspector()),
         JavaUdfDataType.getTypes(hiveJavaFn.getParameterTypes()));
     genericUDF_ = hiveJavaFn.getGenericUDFInstance();
     deferredParameters_ = createDeferredObjects();

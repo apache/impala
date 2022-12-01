@@ -29,6 +29,7 @@ import org.apache.hadoop.hive.ql.udf.UDFAcos;
 import org.apache.hadoop.hive.ql.udf.UDFAscii;
 import org.apache.hadoop.hive.ql.udf.UDFAsin;
 import org.apache.hadoop.hive.ql.udf.UDFAtan;
+import org.apache.hadoop.hive.ql.udf.UDFBase64;
 import org.apache.hadoop.hive.ql.udf.UDFBin;
 import org.apache.hadoop.hive.ql.udf.UDFConv;
 import org.apache.hadoop.hive.ql.udf.UDFCos;
@@ -52,6 +53,7 @@ import org.apache.hadoop.hive.ql.udf.UDFSpace;
 import org.apache.hadoop.hive.ql.udf.UDFSqrt;
 import org.apache.hadoop.hive.ql.udf.UDFSubstr;
 import org.apache.hadoop.hive.ql.udf.UDFTan;
+import org.apache.hadoop.hive.ql.udf.UDFUnbase64;
 import org.apache.hadoop.hive.ql.udf.UDFUnhex;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFBRound;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFUpper;
@@ -189,9 +191,10 @@ public class UdfExecutorTest {
       return Type.FLOAT;
     } else if (w instanceof ImpalaDoubleWritable) {
       return Type.DOUBLE;
-    } else if (w instanceof ImpalaBytesWritable || w instanceof ImpalaTextWritable
-        || w instanceof String) {
+    } else if (w instanceof ImpalaTextWritable || w instanceof String) {
       return Type.STRING;
+    } else if (w instanceof ImpalaBytesWritable) {
+      return Type.BINARY;
     }
     Preconditions.checkArgument(false);
     return Type.INVALID;
@@ -202,6 +205,7 @@ public class UdfExecutorTest {
   void validateArgType(Object w) {
     if (w instanceof String ||
         w instanceof Text ||
+        w instanceof ImpalaBytesWritable ||
         w instanceof ImpalaIntWritable ||
         w instanceof ImpalaFloatWritable ||
         w instanceof ImpalaBigIntWritable ||
@@ -347,7 +351,8 @@ public class UdfExecutorTest {
             errMsgs.add("Actual double:   " + actual);
           }
           break;
-        case STRING: {
+        case STRING:
+        case BINARY: {
           byte[] expectedBytes = null;
           if (expectedValue instanceof ImpalaBytesWritable) {
             expectedBytes = ((ImpalaBytesWritable)expectedValue).getBytes();
@@ -435,13 +440,15 @@ public class UdfExecutorTest {
     TestHiveUdf(UDFE.class, createDouble(Math.E));
     TestHiveUdf(UDFSign.class, createDouble(1), createDouble(3));
 
-    TestHiveUdf(UDFBin.class, createBytes("1100100"), createBigInt(100));
+    TestHiveUdf(UDFBin.class, createText("1100100"), createBigInt(100));
 
-    TestHiveUdf(UDFHex.class, createBytes("1F4"), createBigInt(500));
-    TestHiveUdf(UDFHex.class, createBytes("3E8"), createBigInt(1000));
+    TestHiveUdf(UDFHex.class, createText("1F4"), createBigInt(500));
+    TestHiveUdf(UDFHex.class, createText("3E8"), createBigInt(1000));
 
     TestHiveUdf(UDFHex.class, createText("31303030"), "1000");
-    TestHiveUdf(UDFUnhex.class, createText("aAzZ"), "61417A5A");
+    TestHiveUdf(UDFUnhex.class, createBytes("aAzZ"), "61417A5A");
+    TestHiveUdf(UDFBase64.class, createText("YWJjZA=="), createBytes("abcd"));
+    TestHiveUdf(UDFUnbase64.class, createBytes("abcd"), "YWJjZA==");
     TestHiveUdf(UDFConv.class, createText("1111011"),
         "123", createInt(10), createInt(2));
     freeAllocations();
@@ -471,42 +478,47 @@ public class UdfExecutorTest {
     TestHiveUdf(GenericUDFUpper.class, createText("HELLO"), createText("Hello"));
   }
 
+
+  void TestGenericUdf(Writable expectedValue, Object... args)
+      throws MalformedURLException, ImpalaException, TException {
+    // Test with both TestGenericUdf and TestGenericUdfWithJavaReturnTypes to cover
+    // both Writable and primitive Java return types.
+    TestUdf(null, TestGenericUdf.class, expectedValue, args);
+    TestUdf(null, TestGenericUdfWithJavaReturnTypes.class, expectedValue, args);
+  }
+
   @Test
   // Test GenericUDF for all supported types
   public void BasicGenericTest()
       throws ImpalaException, MalformedURLException, TException {
-    TestUdf(null, TestGenericUdf.class, createBoolean(true), createBoolean(true));
-    TestUdf(null, TestGenericUdf.class, createTinyInt(1), createTinyInt(1));
-    TestUdf(null, TestGenericUdf.class, createSmallInt(1), createSmallInt(1));
-    TestUdf(null, TestGenericUdf.class, createInt(1), createInt(1));
-    TestUdf(null, TestGenericUdf.class, createBigInt(1), createBigInt(1));
-    TestUdf(null, TestGenericUdf.class, createFloat(1.1f), createFloat(1.1f));
-    TestUdf(null, TestGenericUdf.class, createDouble(1.1), createDouble(1.1));
-    TestUdf(null, TestGenericUdf.class, createText("ABCD"), createText("ABCD"));
-    TestUdf(null, TestGenericUdf.class, createDouble(3),
-        createDouble(1), createDouble(2));
-    TestUdf(null, TestGenericUdf.class, createText("ABCXYZ"), createText("ABC"),
-        createText("XYZ"));
-    TestUdf(null, TestGenericUdf.class, createInt(3), createInt(1), createInt(2));
-    TestUdf(null, TestGenericUdf.class, createFloat(1.1f + 1.2f),
-        createFloat(1.1f), createFloat(1.2f));
-    TestUdf(null, TestGenericUdf.class, createDouble(1.1 + 1.2 + 1.3),
+    TestGenericUdf(createBoolean(true), createBoolean(true));
+    TestGenericUdf(createTinyInt(1), createTinyInt(1));
+    TestGenericUdf(createSmallInt(1), createSmallInt(1));
+    TestGenericUdf(createInt(1), createInt(1));
+    TestGenericUdf(createBigInt(1), createBigInt(1));
+    TestGenericUdf(createFloat(1.1f), createFloat(1.1f));
+    TestGenericUdf(createDouble(1.1), createDouble(1.1));
+    TestGenericUdf(createText("ABCD"), createText("ABCD"));
+    TestGenericUdf(createBytes("ABCD"), createBytes("ABCD"));
+    TestGenericUdf(createDouble(3), createDouble(1), createDouble(2));
+    TestGenericUdf(createText("ABCXYZ"), createText("ABC"), createText("XYZ"));
+    TestGenericUdf(createInt(3), createInt(1), createInt(2));
+    TestGenericUdf(createFloat(1.1f + 1.2f), createFloat(1.1f), createFloat(1.2f));
+    TestGenericUdf(createDouble(1.1 + 1.2 + 1.3),
         createDouble(1.1), createDouble(1.2), createDouble(1.3));
-    TestUdf(null, TestGenericUdf.class, createSmallInt(1 + 2), createSmallInt(1),
-        createSmallInt(2));
-    TestUdf(null, TestGenericUdf.class, createBoolean(true),
-        createBoolean(true), createBoolean(false));
-    TestUdf(null, TestGenericUdf.class, createInt(5 + 6 + 7), createInt(5),
-        createInt(6), createInt(7));
-    TestUdf(null, TestGenericUdf.class, createBoolean(true),
+    TestGenericUdf(createSmallInt(1 + 2), createSmallInt(1), createSmallInt(2));
+    TestGenericUdf(createBoolean(true), createBoolean(true), createBoolean(false));
+    TestGenericUdf(createInt(5 + 6 + 7), createInt(5), createInt(6), createInt(7));
+    TestGenericUdf(createBoolean(true),
         createBoolean(false), createBoolean(false), createBoolean(true));
-    TestUdf(null, TestGenericUdf.class, createFloat(1.1f + 1.2f + 1.3f),
+    TestGenericUdf(createFloat(1.1f + 1.2f + 1.3f),
         createFloat(1.1f), createFloat(1.2f), createFloat(1.3f));
-    TestUdf(null, TestGenericUdf.class, createInt(5 + 6 + 7 + 8), createInt(5),
+    TestGenericUdf(createInt(5 + 6 + 7 + 8), createInt(5),
         createInt(6), createInt(7), createInt(8));
-    TestUdf(null, TestGenericUdf.class, createBoolean(true),
+    TestGenericUdf(createBoolean(true),
         createBoolean(true), createBoolean(true), createBoolean(true),
         createBoolean(true));
+    TestGenericUdf(createBytes("ABCDEFGH"), createBytes("ABCD"), createBytes("EFGH"));
     freeAllocations();
   }
 

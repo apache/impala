@@ -20,6 +20,10 @@ package org.apache.impala.hive.executor;
 import org.apache.hadoop.hive.serde2.io.ByteWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.AbstractPrimitiveWritableObjectInspector;
 import org.apache.hadoop.io.BooleanWritable;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.FloatWritable;
@@ -29,6 +33,8 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.thrift.TPrimitiveType;
+
+import com.google.common.base.Preconditions;
 
   // Data types that are supported as return or argument types in Java UDFs.
   public enum JavaUdfDataType {
@@ -103,6 +109,36 @@ import org.apache.impala.thrift.TPrimitiveType;
           return JavaUdfDataType.TEXT;
         case BINARY:
           return JavaUdfDataType.BYTES_WRITABLE;
+        default:
+          return null;
+      }
+    }
+
+    public static JavaUdfDataType getType(ObjectInspector oi) {
+      // Only primitive objects are supported currently.
+      Preconditions.checkState(oi instanceof PrimitiveObjectInspector);
+      PrimitiveObjectInspector primOi = (PrimitiveObjectInspector) oi;
+      PrimitiveCategory cat = primOi.getPrimitiveCategory();
+      boolean writable = primOi.preferWritable();
+      switch (cat) {
+        case BOOLEAN:
+          return writable ? JavaUdfDataType.BOOLEAN_WRITABLE : JavaUdfDataType.BOOLEAN;
+        case BYTE:
+          return writable ? JavaUdfDataType.BYTE_WRITABLE : JavaUdfDataType.TINYINT;
+        case SHORT:
+          return writable ? JavaUdfDataType.SHORT_WRITABLE : JavaUdfDataType.SMALLINT;
+        case INT:
+          return writable ? JavaUdfDataType.INT_WRITABLE : JavaUdfDataType.INT;
+        case LONG:
+          return writable ? JavaUdfDataType.LONG_WRITABLE : JavaUdfDataType.BIGINT;
+        case FLOAT:
+          return writable ? JavaUdfDataType.FLOAT_WRITABLE : JavaUdfDataType.FLOAT;
+        case DOUBLE:
+          return writable ? JavaUdfDataType.DOUBLE_WRITABLE : JavaUdfDataType.DOUBLE;
+        case STRING:
+          return writable ? JavaUdfDataType.TEXT : JavaUdfDataType.STRING;
+        case BINARY:
+          return writable ? JavaUdfDataType.BYTES_WRITABLE : JavaUdfDataType.BYTE_ARRAY;
         default:
           return null;
       }

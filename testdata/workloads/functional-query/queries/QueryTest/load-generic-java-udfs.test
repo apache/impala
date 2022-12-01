@@ -60,6 +60,14 @@ create function generic_add(string, string, string) returns string
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestGenericUdf';
 
+create function generic_add(binary, binary) returns binary
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+
+create function generic_add(binary, binary, binary) returns binary
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+
 create function generic_add(smallint, smallint) returns smallint
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestGenericUdf';
@@ -87,4 +95,48 @@ symbol='org.apache.impala.GenericReplaceStringUdf';
 create function generic_import_nearby_classes(string) returns string
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.GenericImportsNearbyClassesUdf';
+
+create function generic_identity_java_ret_type(boolean) returns boolean
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdfWithJavaReturnTypes';
+
+create function generic_identity_java_ret_type(tinyint) returns tinyint
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdfWithJavaReturnTypes';
+
+create function generic_identity_java_ret_type(smallint) returns smallint
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdfWithJavaReturnTypes';
+
+create function generic_identity_java_ret_type(int) returns int
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdfWithJavaReturnTypes';
+
+create function generic_identity_java_ret_type(bigint) returns bigint
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdfWithJavaReturnTypes';
+
+create function generic_identity_java_ret_type(float) returns float
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdfWithJavaReturnTypes';
+
+create function generic_identity_java_ret_type(double) returns double
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdfWithJavaReturnTypes';
+
+create function generic_identity_java_ret_type(string) returns string
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdfWithJavaReturnTypes';
+
+create function generic_identity_java_ret_type(binary) returns binary
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdfWithJavaReturnTypes';
+
+create function generic_add_java_ret_type(int, int) returns int
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdfWithJavaReturnTypes';
+
+create function generic_add_java_ret_type(string, string, string) returns string
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdfWithJavaReturnTypes';
 ====

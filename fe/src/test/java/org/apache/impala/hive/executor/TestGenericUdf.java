@@ -31,6 +31,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.WritableIntObjectInspector;
 import org.apache.hadoop.io.BooleanWritable;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.FloatWritable;
@@ -46,27 +47,29 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+
 /**
  * Simple Generic UDFs for testing.
  *
  * Udf that takes a variable number of arguments of the same type and applies
- * the "+" operator to them. The "+" is a concatenation for string types. For
- * boolean types, it applies the OR operation. If only one argument is provided,
- * it returns that argument.
+ * the "+" operator to them. The "+" is a concatenation for string and binary types.
+ * For boolean types, it applies the OR operation. If only one argument is provided,
+ * it returns that argument. If any argument is NULL, it returns NULL.
+ *
+ * For all argument types the return type is Writable class (e.g. IntWritable).
+ * Generic UDfs can also return Java primitive classes (e.g. Integer). A separate
+ * UDF class (TestGenericUdfWithJavaReturnTypes) is created with similar behavior
+ * as this but different return types.
  *
  * This class is duplicated in fe and java/test-hive-udfs. We need this class in a
  * separate project so we can test loading UDF jars that are not already on the
  * classpath, and we can't delete the FE's class because UdfExecutorTest depends
  * on it.
  *
- * The jar for this file can be built by running "mvn clean package" in
- * tests/test-hive-udfs. This is run in testdata/bin/create-load-data.sh, and
- * copied to HDFS in testdata/bin/copy-udfs-uda.sh.
- *
  */
 public class TestGenericUdf extends GenericUDF {
 
-  private List<PrimitiveCategory> inputTypes_ = new ArrayList<>();
+  private List<PrimitiveCategory> inputTypes_;
   private PrimitiveObjectInspector retTypeOI_;
   private PrimitiveCategory argAndRetType_;
 
@@ -94,6 +97,8 @@ public class TestGenericUdf extends GenericUDF {
       throw new UDFArgumentException("No arguments provided.");
     }
 
+    // Resetting here as initialize can be called more than once by Hive.
+    inputTypes_  = new ArrayList<>();
     for (ObjectInspector oi : arguments) {
       if (!(oi instanceof PrimitiveObjectInspector)) {
         throw new UDFArgumentException("Found an input that is not a primitive.");
@@ -102,8 +107,8 @@ public class TestGenericUdf extends GenericUDF {
       inputTypes_.add(poi.getPrimitiveCategory());
     }
 
-    // return type is always same as last argument
-    retTypeOI_ = (PrimitiveObjectInspector) arguments[0];
+    // return type is always same as first argument
+    retTypeOI_ = getReturnObjectInspector((PrimitiveObjectInspector) arguments[0]);
 
     argAndRetType_ = retTypeOI_.getPrimitiveCategory();
 
@@ -111,32 +116,40 @@ public class TestGenericUdf extends GenericUDF {
     return retTypeOI_;
   }
 
+  protected PrimitiveObjectInspector getReturnObjectInspector(
+        PrimitiveObjectInspector oi) {
+    // Simply returns the same object inspector. Subclasses can override this to return
+    // different types of object inspectors.
+    return oi;
+  }
+
   @Override
   public Object evaluate(DeferredObject[] arguments)
       throws HiveException {
     if (arguments.length != inputTypes_.size()) {
       throw new HiveException("Number of arguments passed in did not match number of " +
-          "arguments expected.");
+          "arguments expected. Expected: "
+              + inputTypes_.size() + " actual: " +  arguments.length);
     }
     switch (argAndRetType_) {
       case BOOLEAN:
-        return evaluateBoolean(arguments);
+        return evaluateBooleanWrapped(arguments);
       case BYTE:
-        return evaluateByte(arguments);
+        return evaluateByteWrapped(arguments);
       case SHORT:
-        return evaluateShort(arguments);
+        return evaluateShortWrapped(arguments);
       case INT:
-        return evaluateInt(arguments);
+        return evaluateIntWrapped(arguments);
       case LONG:
-        return evaluateLong(arguments);
+        return evaluateLongWrapped(arguments);
       case FLOAT:
-        return evaluateFloat(arguments);
+        return evaluateFloatWrapped(arguments);
       case DOUBLE:
-        return evaluateDouble(arguments);
+        return evaluateDoubleWrapped(arguments);
       case STRING:
-        return evaluateString(arguments);
+        return evaluateStringWrapped(arguments);
       case BINARY:
-        return evaluateBinary(arguments);
+        return evaluateBinaryWrapped(arguments);
       case DATE:
       case TIMESTAMP:
       default:
@@ -164,8 +177,7 @@ public class TestGenericUdf extends GenericUDF {
     }
   }
 
-  public BooleanWritable evaluateBoolean(DeferredObject[] inputs) throws HiveException {
-    List<BooleanWritable> booleanInputs = new ArrayList<>();
+  protected Boolean evaluateBoolean(DeferredObject[] inputs) throws HiveException {
     boolean finalBoolean = false;
     for (DeferredObject input : inputs) {
       if (input == null) {
@@ -177,13 +189,10 @@ public class TestGenericUdf extends GenericUDF {
       boolean currentBool = ((BooleanWritable) input.get()).get();
       finalBoolean |= currentBool;
     }
-    BooleanWritable resultBool = new BooleanWritable();
-    resultBool.set(finalBoolean);
-    return resultBool;
+    return finalBoolean;
   }
 
-  public ByteWritable evaluateByte(DeferredObject[] inputs) throws HiveException {
-    List<ByteWritable> byteInputs = new ArrayList<>();
+  protected Byte evaluateByte(DeferredObject[] inputs) throws HiveException {
     byte finalByte = 0;
     for (DeferredObject input : inputs) {
       if (input == null) {
@@ -195,13 +204,10 @@ public class TestGenericUdf extends GenericUDF {
       byte currentByte = ((ByteWritable) input.get()).get();
       finalByte += currentByte;
     }
-    ByteWritable resultByte = new ByteWritable();
-    resultByte.set(finalByte);
-    return resultByte;
+    return finalByte;
   }
 
-  public ShortWritable evaluateShort(DeferredObject[] inputs) throws HiveException {
-    List<ShortWritable> shortInputs = new ArrayList<>();
+  protected Short evaluateShort(DeferredObject[] inputs) throws HiveException {
     short finalShort = 0;
     for (DeferredObject input : inputs) {
       if (input == null) {
@@ -213,13 +219,10 @@ public class TestGenericUdf extends GenericUDF {
       short currentShort = ((ShortWritable) input.get()).get();
       finalShort += currentShort;
     }
-    ShortWritable resultShort = new ShortWritable();
-    resultShort.set(finalShort);
-    return resultShort;
+    return finalShort;
   }
 
-  public IntWritable evaluateInt(DeferredObject[] inputs) throws HiveException {
-    List<IntWritable> intInputs = new ArrayList<>();
+  protected Integer evaluateInt(DeferredObject[] inputs) throws HiveException {
     int finalInt = 0;
     for (DeferredObject input : inputs) {
       if (input == null) {
@@ -231,13 +234,10 @@ public class TestGenericUdf extends GenericUDF {
       int currentInt = ((IntWritable) input.get()).get();
       finalInt += currentInt;
     }
-    IntWritable resultInt = new IntWritable();
-    resultInt.set(finalInt);
-    return resultInt;
+    return finalInt;
   }
 
-  public LongWritable evaluateLong(DeferredObject[] inputs) throws HiveException {
-    List<LongWritable> longInputs = new ArrayList<>();
+  protected Long evaluateLong(DeferredObject[] inputs) throws HiveException {
     long finalLong = 0;
     for (DeferredObject input : inputs) {
       if (input == null) {
@@ -249,13 +249,10 @@ public class TestGenericUdf extends GenericUDF {
       long currentLong = ((LongWritable) input.get()).get();
       finalLong += currentLong;
     }
-    LongWritable resultLong = new LongWritable();
-    resultLong.set(finalLong);
-    return resultLong;
+    return finalLong;
   }
 
-  public FloatWritable evaluateFloat(DeferredObject[] inputs) throws HiveException {
-    List<FloatWritable> floatInputs = new ArrayList<>();
+  protected Float evaluateFloat(DeferredObject[] inputs) throws HiveException {
     float finalFloat = 0.0F;
     for (DeferredObject input : inputs) {
       if (input == null) {
@@ -267,13 +264,10 @@ public class TestGenericUdf extends GenericUDF {
       float currentFloat = ((FloatWritable) input.get()).get();
       finalFloat += currentFloat;
     }
-    FloatWritable resultFloat = new FloatWritable();
-    resultFloat.set(finalFloat);
-    return resultFloat;
+    return finalFloat;
   }
 
-  public DoubleWritable evaluateDouble(DeferredObject[] inputs) throws HiveException {
-    List<DoubleWritable> doubleInputs = new ArrayList<>();
+  protected Double evaluateDouble(DeferredObject[] inputs) throws HiveException {
     double finalDouble = 0.0;
     for (DeferredObject input : inputs) {
       if (input == null) {
@@ -285,13 +279,10 @@ public class TestGenericUdf extends GenericUDF {
       double currentDouble = ((DoubleWritable) input.get()).get();
       finalDouble  += currentDouble;
     }
-    DoubleWritable resultDouble = new DoubleWritable();
-    resultDouble.set(finalDouble);
-    return resultDouble;
+    return finalDouble;
   }
 
-  public Text evaluateString(DeferredObject[] inputs) throws HiveException {
-    List<String> stringInputs = new ArrayList<>();
+  protected String evaluateString(DeferredObject[] inputs) throws HiveException {
     String finalString = "";
     for (DeferredObject input : inputs) {
       if (input == null) {
@@ -303,13 +294,12 @@ public class TestGenericUdf extends GenericUDF {
       String currentString = ((Text) input.get()).toString();
       finalString += currentString;
     }
-    Text resultString = new Text();
-    resultString.set(finalString);
-    return resultString;
+    return finalString;
   }
 
-  public BytesWritable evaluateBinary(DeferredObject[] inputs) throws HiveException {
-    byte[] result = null;
+  protected byte[] evaluateBinary(DeferredObject[] inputs) throws HiveException {
+    int resultLength = 0;
+
     for (DeferredObject input : inputs) {
       if (input == null) {
         return null;
@@ -319,15 +309,87 @@ public class TestGenericUdf extends GenericUDF {
             "Expected BytesWritable but got " + input.get().getClass());
       }
       byte[] currentArray = ((BytesWritable) input.get()).getBytes();
-      // Unlike other functions, simply return last argument.
-      result = currentArray;
+      resultLength += currentArray.length;
     }
+    int pos = 0;
+    byte[] result = new byte[resultLength];
+    for (DeferredObject input : inputs) {
+      byte[] currentArray = ((BytesWritable) input.get()).getBytes();
+      System.arraycopy(
+          currentArray, 0, result, pos, currentArray.length);
+      pos += currentArray.length;
+    }
+    return result;
+  }
+
+  // The evaluate*Wrapped functions below get the result from evaluate*
+  // and wrap in a Writable* class.
+
+  protected Object evaluateBooleanWrapped(DeferredObject[] inputs)
+      throws HiveException {
+    BooleanWritable resultBool = new BooleanWritable();
+    resultBool.set(evaluateBoolean(inputs));
+    return resultBool;
+  }
+
+  protected Object evaluateByteWrapped(DeferredObject[] inputs)
+      throws HiveException {
+    ByteWritable resultByte = new ByteWritable();
+    resultByte.set(evaluateByte(inputs));
+    return resultByte;
+  }
+
+  protected Object evaluateShortWrapped(DeferredObject[] inputs)
+     throws HiveException {
+    ShortWritable resultShort = new ShortWritable();
+    resultShort.set(evaluateShort(inputs));
+    return resultShort;
+  }
+
+  protected Object evaluateIntWrapped(DeferredObject[] inputs)
+      throws HiveException {
+    IntWritable resultInt = new IntWritable();
+    resultInt.set(evaluateInt(inputs));
+    return resultInt;
+  }
+
+  protected Object evaluateLongWrapped(DeferredObject[] inputs)
+      throws HiveException {
+    LongWritable resultLong = new LongWritable();
+    resultLong.set(evaluateLong(inputs));
+    return resultLong;
+  }
+
+  protected Object evaluateFloatWrapped(DeferredObject[] inputs)
+      throws HiveException {
+    FloatWritable resultFloat = new FloatWritable();
+    resultFloat.set(evaluateFloat(inputs));
+    return resultFloat;
+  }
+
+  protected Object evaluateDoubleWrapped(DeferredObject[] inputs)
+      throws HiveException {
+    DoubleWritable resultDouble = new DoubleWritable();
+    resultDouble.set(evaluateDouble(inputs));
+    return resultDouble;
+  }
+
+  protected Object evaluateStringWrapped(DeferredObject[] inputs) throws HiveException {
+    Text resultString = new Text();
+    resultString.set(evaluateString(inputs));
+    return resultString;
+  }
+
+  protected Object evaluateBinaryWrapped(DeferredObject[] inputs)
+      throws HiveException {
+    byte[] result = evaluateBinary(inputs);
+    if (result == null) return null;
     BytesWritable resultBinary = new BytesWritable();
-    if (result != null) resultBinary.set(result, 0, result.length);
+    resultBinary.set(result, 0, result.length);
     return resultBinary;
   }
 
-  private String getSignatureString(PrimitiveCategory argAndRetType_,
+  protected String getSignatureString(PrimitiveCategory argAndRetType_,
       List<PrimitiveCategory> inputTypes_) {
     return argAndRetType_ + "TestGenericUdf(" + Joiner.on(",").join(inputTypes_) + ")";
   }

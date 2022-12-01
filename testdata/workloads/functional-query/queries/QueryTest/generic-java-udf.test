@@ -22,53 +22,76 @@ STRING
 ====
 ---- QUERY
 #Test GenericUDF functions
-select generic_identity(true), generic_identity(cast(NULL as boolean));
+select generic_identity(true), generic_identity(cast(NULL as boolean)),
+    generic_identity_java_ret_type(true),
+    generic_identity_java_ret_type(cast(NULL as boolean));
 ---- TYPES
-boolean, boolean
+boolean, boolean, boolean, boolean
 ---- RESULTS
-true,NULL
+true,NULL,true,NULL
 ====
 ---- QUERY
-select generic_identity(cast(10 as tinyint)), generic_identity(cast(NULL as tinyint));
+select generic_identity(cast(10 as tinyint)), generic_identity(cast(NULL as tinyint)),
+    generic_identity_java_ret_type(cast(10 as tinyint)),
+    generic_identity_java_ret_type(cast(NULL as tinyint));
 ---- TYPES
-tinyint, tinyint
+tinyint, tinyint, tinyint, tinyint
 ---- RESULTS
-10,NULL
+10,NULL,10,NULL
 ====
 ---- QUERY
-select generic_identity(cast(10 as smallint)), generic_identity(cast(NULL as smallint));
+select generic_identity(cast(10 as smallint)), generic_identity(cast(NULL as smallint)),
+    generic_identity_java_ret_type(cast(10 as smallint)),
+    generic_identity_java_ret_type(cast(NULL as smallint));
 ---- TYPES
-smallint, smallint
+smallint, smallint, smallint, smallint
 ---- RESULTS
-10,NULL
+10,NULL,10,NULL
 ====
 ---- QUERY
-select generic_identity(cast(10 as int)), generic_identity(cast(NULL as int));
+select generic_identity(cast(10 as int)), generic_identity(cast(NULL as int)),
+    generic_identity_java_ret_type(cast(10 as int)),
+    generic_identity_java_ret_type(cast(NULL as int));
 ---- TYPES
-int, int
+int, int, int, int
 ---- RESULTS
-10,NULL
+10,NULL,10,NULL
 ====
 ---- QUERY
-select generic_identity(cast(10 as bigint)), generic_identity(cast(NULL as bigint));
+select generic_identity(cast(10 as bigint)), generic_identity(cast(NULL as bigint)),
+    generic_identity_java_ret_type(cast(10 as bigint)),
+    generic_identity_java_ret_type(cast(NULL as bigint));
 ---- TYPES
-bigint, bigint
+bigint, bigint, bigint, bigint
 ---- RESULTS
-10,NULL
+10,NULL,10,NULL
 ====
 ---- QUERY
-select generic_identity(cast(10.0 as float)), generic_identity(cast(NULL as float));
+select generic_identity(cast(10.0 as float)), generic_identity(cast(NULL as float)),
+    generic_identity_java_ret_type(cast(10.0 as float)),
+    generic_identity_java_ret_type(cast(NULL as float));
 ---- TYPES
-float, float
+float, float, float, float
 ---- RESULTS
-10,NULL
+10,NULL,10,NULL
 ====
 ---- QUERY
-select generic_identity(cast(10.0 as double)), generic_identity(cast(NULL as double));
+select generic_identity(cast(10.0 as double)), generic_identity(cast(NULL as double)),
+    generic_identity_java_ret_type(cast(10.0 as double)),
+    generic_identity_java_ret_type(cast(NULL as double));
 ---- TYPES
-double, double
+double, double, double, double
 ---- RESULTS
-10,NULL
+10,NULL,10,NULL
+====
+---- QUERY
+select generic_identity(cast("a" as binary)), generic_identity(cast(NULL as binary)),
+    generic_identity_java_ret_type(cast("a" as binary)),
+    generic_identity_java_ret_type(cast(NULL as binary))
+---- TYPES
+binary, binary, binary, binary
+---- RESULTS
+'a','NULL','a','NULL'
 ====
 ---- QUERY
 # IMPALA-1134. Tests that strings are copied correctly
@@ -81,11 +104,24 @@ int, int, int
 10,20,30
 ====
 ---- QUERY
-select generic_identity(cast("a" as binary)), generic_identity(cast(NULL as binary));
+# IMPALA-1134. Tests that binaries are copied correctly
+select length(generic_identity(cast("0123456789" as binary))),
+       length(generic_add(cast("0123456789" as binary), cast("0123456789" as binary))),
+       length(generic_add(cast("0123456789" as binary), cast("0123456789" as binary),
+           cast("0123456789" as binary)));
 ---- TYPES
-binary, binary
+int, int, int
 ---- RESULTS
-'a','NULL'
+10,20,30
+====
+---- QUERY
+# Test UDFs with java return types with multiple arguements.
+select generic_add_java_ret_type(1, 2),
+       generic_add_java_ret_type("a", "bc", "d");
+---- TYPES
+int, string
+---- RESULTS
+3,'abcd'
 ====
 ---- QUERY
 # IMPALA-1392: Hive UDFs that throw exceptions should return NULL
