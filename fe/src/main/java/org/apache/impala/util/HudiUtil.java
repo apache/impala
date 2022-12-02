@@ -17,12 +17,17 @@
 package org.apache.impala.util;
 
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.hadoop.HoodieROTablePathFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class HudiUtil {
+  private final static Logger LOG = LoggerFactory.getLogger(HudiUtil.class);
+
   /**
    * This method will remove invalid FileStatus from the list based on Hudi's timestamp,
    * and return a list of file status contains only the latest version parquet files.
@@ -32,7 +37,16 @@ public class HudiUtil {
   public static List<FileStatus> filterFilesForHudiROPath(List<FileStatus> stats) {
     List<FileStatus> validStats = new ArrayList<>(stats);
     HoodieROTablePathFilter hudiFilter = new HoodieROTablePathFilter();
-    validStats.removeIf(f -> !hudiFilter.accept(f.getPath()));
+    validStats.removeIf(f -> {
+      try {
+        // Ozone can throw an exception if it considers the path invalid. Since we're
+        // searching for a valid path, log the exception and continue.
+        return !hudiFilter.accept(f.getPath());
+      } catch (HoodieException e) {
+        LOG.debug("Unable to check Hudi path {}", f.getPath(), e);
+        return false;
+      }
+    });
     return validStats;
   }
 }
