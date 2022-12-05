@@ -90,7 +90,7 @@ public class HiveJdbcClientPool implements Closeable {
      */
     public ResultSet execQuery(String query) throws SQLException {
       validateConnection();
-      LOG.debug("Executing: " + query);
+      LOG.info("Executing: " + query);
       return stmt_.executeQuery(query);
     }
 
@@ -99,7 +99,7 @@ public class HiveJdbcClientPool implements Closeable {
      */
     public boolean executeSql(String sql) throws SQLException {
       validateConnection();
-      LOG.debug("Executing sql : " + sql);
+      LOG.info("Executing sql : " + sql);
       return stmt_.execute(sql);
     }
   }

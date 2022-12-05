@@ -20,6 +20,8 @@ package org.apache.impala.catalog;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.InternalException;
@@ -50,7 +52,9 @@ import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,6 +80,9 @@ public class PartialCatalogInfoWriteIdTest {
   private static final String testPartitionedTbl = "insert_only_partitioned";
   private static final String testAcidTblName = "test_full_acid";
 
+  @Rule
+  public TestName name = new TestName();
+
   @BeforeClass
   public static void setupTestEnv() throws SQLException, ClassNotFoundException {
     catalog_ = CatalogServiceTestCatalog.create();
@@ -94,6 +101,7 @@ public class PartialCatalogInfoWriteIdTest {
 
   @Before
   public void createTestTbls() throws Exception {
+    LOG.info("Creating test tables for {}", name.getMethodName());
     Stopwatch st = Stopwatch.createStarted();
     ImpalaJdbcClient client = ImpalaJdbcClient
         .createClientUsingHiveJdbcDriver();
@@ -602,13 +610,26 @@ public class PartialCatalogInfoWriteIdTest {
     int afterFileCount = afterPartitionInfo.getFile_descriptorsSize()
         + afterPartitionInfo.getInsert_file_descriptorsSize()
         + afterPartitionInfo.getDelete_file_descriptorsSize();
-    Assert.assertEquals(expectedFileCount, afterFileCount);
+    String message = "Actual file_descriptors:\n" +
+        getPathsFromFileDescriptors(afterPartitionInfo.getFile_descriptors()) +
+        "\nActual insert_file_descriptors:\n" +
+        getPathsFromFileDescriptors(afterPartitionInfo.getInsert_file_descriptors()) +
+        "\nActual delete_file_descriptors:\n" +
+        getPathsFromFileDescriptors(afterPartitionInfo.getDelete_file_descriptors());
+    Assert.assertEquals(message, expectedFileCount, afterFileCount);
     long numMissesAfterMinor =
         getMetricCount(testDbName, tableName, HdfsTable.FILEMETADATA_CACHE_MISS_METRIC);
     long numHitsAfterMinor =
         getMetricCount(testDbName, tableName, HdfsTable.FILEMETADATA_CACHE_HIT_METRIC);
     Assert.assertEquals(numHits + 1, numHitsAfterMinor);
     Assert.assertEquals(numMisses, numMissesAfterMinor);
+  }
+
+  private List<String> getPathsFromFileDescriptors(List<THdfsFileDesc> fileDescriptors) {
+    return fileDescriptors.stream()
+        .map(HdfsPartition.FileDescriptor::fromThrift)
+        .map(HdfsPartition.FileDescriptor::getPath)
+        .collect(Collectors.toList());
   }
 
   /**

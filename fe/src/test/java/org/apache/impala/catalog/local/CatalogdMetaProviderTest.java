@@ -20,6 +20,7 @@ package org.apache.impala.catalog.local;
 import static org.junit.Assert.*;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -27,10 +28,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.local.CatalogdMetaProvider.SizeOfWeigher;
 import org.apache.impala.catalog.local.MetaProvider.PartitionMetadata;
 import org.apache.impala.catalog.local.MetaProvider.PartitionRef;
@@ -55,7 +58,9 @@ import org.apache.impala.thrift.TRuntimeProfileNode;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.util.ListMap;
 import org.junit.Assume;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,6 +80,8 @@ public class CatalogdMetaProviderTest {
   private final TableMetaRef tableRef_;
 
   private CacheStats prevStats_;
+  @Rule
+  public TestName name = new TestName();
 
   private static HiveJdbcClientPool hiveJdbcClientPool_;
   private static final String testDbName_ = "catalogd_meta_provider_test";
@@ -107,6 +114,8 @@ public class CatalogdMetaProviderTest {
   }
 
   private void createTestTbls() throws Exception {
+    LOG.info("Creating test tables for {}", name.getMethodName());
+    Stopwatch st = Stopwatch.createStarted();
     ImpalaJdbcClient client = ImpalaJdbcClient.createClientUsingHiveJdbcDriver();
     client.connect();
     try {
@@ -122,6 +131,8 @@ public class CatalogdMetaProviderTest {
           + " (c1 int) partitioned by (part int) stored as orc "
           + "tblproperties ('transactional'='true')");
     } finally {
+      LOG.info("Time taken for createTestTbls {} msec",
+          st.stop().elapsed(TimeUnit.MILLISECONDS));
       client.close();
     }
   }
@@ -622,9 +633,12 @@ public class CatalogdMetaProviderTest {
       Map<String, TCounter> counters = Maps.uniqueIndex(prof.counters, TCounter::getName);
       assertEquals(1, counters.get("CatalogFetch.Partitions.Requests").getValue());
       assertEquals(1, counters.get("CatalogFetch.Partitions.Misses").getValue());
-      int afterFileCount = partMap.values().stream()
-          .map(PartitionMetadata::getFileDescriptors).mapToInt(List::size).sum();
-      assertEquals(1, afterFileCount);
+      List<String> paths = partMap.values().stream()
+          .map(PartitionMetadata::getFileDescriptors)
+          .flatMap(Collection::stream)
+          .map(HdfsPartition.FileDescriptor::getPath)
+          .collect(Collectors.toList());
+      assertEquals("Actual paths: " + paths, 1, paths.size());
     }
   }
 }
