@@ -34,7 +34,7 @@ import time
 import traceback
 
 from optparse import OptionParser
-from tests.beeswax.impala_beeswax import *
+from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient
 from multiprocessing.pool import ThreadPool
 
 LOG = logging.getLogger('load-data.py')
@@ -159,11 +159,17 @@ def exec_hive_query_from_file_beeline(file_name):
 
   return is_success
 
-def exec_hbase_query_from_file(file_name):
+
+def exec_hbase_query_from_file(file_name, step_name):
   if not os.path.exists(file_name): return
+  LOG.info('Begin step "%s".' % step_name)
+  start_time = time.time()
   hbase_cmd = "hbase shell %s" % file_name
   LOG.info('Executing HBase Command: %s' % hbase_cmd)
   exec_cmd(hbase_cmd, error_msg='Error executing hbase create commands')
+  total_time = time.time() - start_time
+  LOG.info('End step "%s". Total time: %.2fs\n' % (step_name, total_time))
+
 
 # KERBEROS TODO: fails when kerberized and impalad principal isn't "impala"
 def exec_impala_query_from_file(file_name):
@@ -263,7 +269,8 @@ def exec_hadoop_fs_cmd(args, exit_on_error=True):
   exec_cmd(cmd, error_msg="Error executing Hadoop command, exiting",
       exit_on_error=exit_on_error)
 
-def exec_query_files_parallel(thread_pool, query_files, execution_type):
+
+def exec_query_files_parallel(thread_pool, query_files, execution_type, step_name):
   """Executes the query files provided using the execution engine specified
      in parallel using the given thread pool. Aborts immediately if any execution
      encounters an error."""
@@ -274,16 +281,23 @@ def exec_query_files_parallel(thread_pool, query_files, execution_type):
   elif execution_type == 'hive':
     execution_function = exec_hive_query_from_file_beeline
 
+  LOG.info('Begin step "%s".' % step_name)
+  start_time = time.time()
   for result in thread_pool.imap_unordered(execution_function, query_files):
     if not result:
       thread_pool.terminate()
       sys.exit(1)
+  total_time = time.time() - start_time
+  LOG.info('End step "%s". Total time: %.2fs\n' % (step_name, total_time))
 
-def impala_exec_query_files_parallel(thread_pool, query_files):
-  exec_query_files_parallel(thread_pool, query_files, 'impala')
 
-def hive_exec_query_files_parallel(thread_pool, query_files):
-  exec_query_files_parallel(thread_pool, query_files, 'hive')
+def impala_exec_query_files_parallel(thread_pool, query_files, step_name):
+  exec_query_files_parallel(thread_pool, query_files, 'impala', step_name)
+
+
+def hive_exec_query_files_parallel(thread_pool, query_files, step_name):
+  exec_query_files_parallel(thread_pool, query_files, 'hive', step_name)
+
 
 def main():
   logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%H:%M:%S')
@@ -446,38 +460,40 @@ def main():
     # so they're done at the end. Finally, the Hbase Tables that have been filled with data
     # need to be flushed.
 
-    impala_exec_query_files_parallel(thread_pool, impala_create_files)
+    impala_exec_query_files_parallel(thread_pool, impala_create_files, "Impala Create")
 
     # There should be at most one hbase creation script
     assert(len(hbase_create_files) <= 1)
     for hbase_create in hbase_create_files:
-      exec_hbase_query_from_file(hbase_create)
+      exec_hbase_query_from_file(hbase_create, "HBase Create")
 
     # If this is loading text tables plus multiple other formats, the text tables
     # need to be loaded first
     assert(len(hive_load_text_files) <= 1)
-    hive_exec_query_files_parallel(thread_pool, hive_load_text_files)
+    hive_exec_query_files_parallel(thread_pool, hive_load_text_files, "Hive Load Text")
     # IMPALA-9923: Run ORC serially separately from other non-text formats. This hacks
-    # around flakiness seen when loading this in parallel. This should be removed as
-    # soon as possible.
+    # around flakiness seen when loading this in parallel (see IMPALA-12630 comments for
+    # broken tests). This should be removed as soon as possible.
     assert(len(hive_load_orc_files) <= 1)
-    hive_exec_query_files_parallel(thread_pool, hive_load_orc_files)
+    hive_exec_query_files_parallel(thread_pool, hive_load_orc_files, "Hive Load ORC")
 
     # Load all non-text formats (goes parallel)
-    hive_exec_query_files_parallel(thread_pool, hive_load_nontext_files)
+    hive_exec_query_files_parallel(thread_pool, hive_load_nontext_files,
+        "Hive Load Non-Text")
 
     assert(len(hbase_postload_files) <= 1)
     for hbase_postload in hbase_postload_files:
-      exec_hbase_query_from_file(hbase_postload)
+      exec_hbase_query_from_file(hbase_postload, "HBase Post-Load")
 
     # Invalidate so that Impala sees the loads done by Hive before loading Parquet/Kudu
     # Note: This only invalidates tables for this workload.
     assert(len(invalidate_files) <= 1)
     if impala_load_files:
-      impala_exec_query_files_parallel(thread_pool, invalidate_files)
-      impala_exec_query_files_parallel(thread_pool, impala_load_files)
+      impala_exec_query_files_parallel(thread_pool, invalidate_files,
+          "Impala Invalidate 1")
+      impala_exec_query_files_parallel(thread_pool, impala_load_files, "Impala Load")
     # Final invalidate for this workload
-    impala_exec_query_files_parallel(thread_pool, invalidate_files)
+    impala_exec_query_files_parallel(thread_pool, invalidate_files, "Impala Invalidate 2")
     loading_time_map[workload] = time.time() - start_time
 
   total_time = 0.0

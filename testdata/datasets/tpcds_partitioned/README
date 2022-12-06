@@ -1,0 +1,5 @@
+This dataset is a fully-partitioned version of tpcds dataset.
+This dataset can not be loaded independently and requires the base
+'tpcds' db from the tpcds dataset to be preloaded first. An example of
+how to load this dataset can be seen at function load-tpcds-data in
+bin/create-load-data.sh.

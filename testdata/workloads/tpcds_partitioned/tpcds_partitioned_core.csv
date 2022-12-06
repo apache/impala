@@ -1,0 +1,1 @@
+file_format: parquet, dataset: tpcds_partitioned, compression_codec: snap, compression_type: block

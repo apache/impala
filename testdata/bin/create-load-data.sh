@@ -234,12 +234,12 @@ function load-data {
   TABLE_FORMATS=${3:-}
   FORCE_LOAD=${4:-}
 
-  MSG="Loading workload '$WORKLOAD'"
+  LOAD_MSG="Loading workload '$WORKLOAD'"
   ARGS=("--workloads $WORKLOAD")
-  MSG+=" using exploration strategy '$EXPLORATION_STRATEGY'"
+  LOAD_MSG+=" using exploration strategy '$EXPLORATION_STRATEGY'"
   ARGS+=("-e $EXPLORATION_STRATEGY")
   if [ $TABLE_FORMATS ]; then
-    MSG+=" in table formats '$TABLE_FORMATS'"
+    LOAD_MSG+=" in table formats '$TABLE_FORMATS'"
     ARGS+=("--table_formats $TABLE_FORMATS")
   fi
   if [ $LOAD_DATA_ARGS ]; then
@@ -282,13 +282,18 @@ function load-data {
   fi
 
   LOG_FILE=${IMPALA_DATA_LOADING_LOGS_DIR}/${LOG_BASENAME}
-  echo "$MSG. Logging to ${LOG_FILE}"
+  echo "$LOAD_MSG. Logging to ${LOG_FILE}"
   # Use unbuffered logging by executing with -u
   if ! impala-python -u ${IMPALA_HOME}/bin/load-data.py ${ARGS[@]} &> ${LOG_FILE}; then
     echo Error loading data. The end of the log file is:
     tail -n 50 $LOG_FILE
     return 1
   fi
+}
+
+function load-tpcds-data {
+  load-data "tpcds" "core"
+  load-data "tpcds_partitioned" "core"
 }
 
 function cache-test-tables {
@@ -570,7 +575,7 @@ if [ $SKIP_METADATA_LOAD -eq 0 ]; then
   run-step-backgroundable "Loading functional-query data" load-functional-query.log \
       load-data "functional-query" "exhaustive"
   run-step-backgroundable "Loading TPC-H data" load-tpch.log load-data "tpch" "core"
-  run-step-backgroundable "Loading TPC-DS data" load-tpcds.log load-data "tpcds" "core"
+  run-step-backgroundable "Loading TPC-DS data" load-tpcds.log load-tpcds-data
   run-step-wait-all
   # Load tpch nested data.
   # TODO: Hacky and introduces more complexity into the system, but it is expedient.

@@ -18,7 +18,7 @@
 # For details on this file format please see ../README
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 time_dim
 ---- COLUMNS
@@ -33,19 +33,12 @@ t_shift                   string
 t_sub_shift               string
 t_meal_time               string
 primary key (t_time_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/time_dim/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+SELECT * FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 date_dim
 ---- COLUMNS
@@ -78,19 +71,12 @@ d_current_month           string
 d_current_quarter         string
 d_current_year            string
 primary key (d_date_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/date_dim/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+SELECT * FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 reason
 ---- COLUMNS
@@ -98,19 +84,12 @@ r_reason_sk           int
 r_reason_id           string
 r_reason_desc         string
 primary key (r_reason_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/reason/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+SELECT * FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 customer_address
 ---- COLUMNS
@@ -128,19 +107,12 @@ ca_country                string
 ca_gmt_offset             decimal(5,2)
 ca_location_type          string
 primary key (ca_address_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/customer_address/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+SELECT * FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 income_band
 ---- COLUMNS
@@ -148,19 +120,12 @@ ib_income_band_sk         int
 ib_lower_bound            int
 ib_upper_bound            int
 primary key (ib_income_band_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/income_band/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+SELECT * FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 household_demographics
 ---- COLUMNS
@@ -171,20 +136,12 @@ hd_dep_count              int
 hd_vehicle_count          int
 primary key (hd_demo_sk) DISABLE NOVALIDATE RELY
 foreign key (hd_income_band_sk) references {db_name}{db_suffix}.income_band (ib_income_band_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH
-'{impala_home}/testdata/impala-data/{db_name}/household_demographics/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+SELECT * FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 customer_demographics
 ---- COLUMNS
@@ -198,20 +155,12 @@ cd_dep_count              int
 cd_dep_employed_count     int
 cd_dep_college_count      int
 primary key (cd_demo_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH
-'{impala_home}/testdata/impala-data/{db_name}/customer_demographics/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+SELECT * FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 ship_mode
 ---- COLUMNS
@@ -222,19 +171,12 @@ sm_code                   string
 sm_carrier                string
 sm_contract               string
 primary key (sm_ship_mode_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/ship_mode/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+SELECT * FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 item
 ---- COLUMNS
@@ -261,19 +203,12 @@ i_container               string
 i_manager_id              int
 i_product_name            string
 primary key (i_item_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/item/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+SELECT * FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 warehouse
 ---- COLUMNS
@@ -292,19 +227,12 @@ w_zip                     string
 w_country                 string
 w_gmt_offset              decimal(5,2)
 primary key (w_warehouse_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/warehouse/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+SELECT * FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 call_center
 ---- COLUMNS
@@ -342,20 +270,12 @@ cc_tax_percentage         decimal(5,2)
 primary key (cc_call_center_sk) DISABLE NOVALIDATE RELY
 foreign key (cc_closed_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
 foreign key (cc_open_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH
-'{impala_home}/testdata/impala-data/{db_name}/call_center/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+SELECT * FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 customer
 ---- COLUMNS
@@ -383,19 +303,12 @@ foreign key (c_current_cdemo_sk) references {db_name}{db_suffix}.customer_demogr
 foreign key (c_current_hdemo_sk) references {db_name}{db_suffix}.household_demographics (hd_demo_sk) DISABLE NOVALIDATE RELY
 foreign key (c_first_sales_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
 foreign key (c_first_shipto_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/customer/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+SELECT * FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 promotion
 ---- COLUMNS
@@ -422,19 +335,12 @@ primary key (p_promo_sk) DISABLE NOVALIDATE RELY
 foreign key (p_start_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
 foreign key (p_end_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
 foreign key (p_item_sk) references {db_name}{db_suffix}.item (i_item_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/promotion/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+SELECT * FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 store
 ---- COLUMNS
@@ -469,19 +375,12 @@ s_gmt_offset              decimal(5,2)
 s_tax_precentage          decimal(5,2)
 primary key (s_store_sk) DISABLE NOVALIDATE RELY
 foreign key (s_closed_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/store/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+SELECT * FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 catalog_page
 ---- COLUMNS
@@ -497,20 +396,12 @@ cp_type                   string
 primary key (cp_catalog_page_sk) DISABLE NOVALIDATE RELY
 foreign key (cp_start_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
 foreign key (cp_end_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH
-'{impala_home}/testdata/impala-data/{db_name}/catalog_page/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+SELECT * FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 web_page
 ---- COLUMNS
@@ -532,19 +423,12 @@ primary key (wp_web_page_sk) DISABLE NOVALIDATE RELY
 foreign key (wp_creation_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
 foreign key (wp_access_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
 foreign key (wp_customer_sk) references {db_name}{db_suffix}.customer (c_customer_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/web_page/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+SELECT * FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 web_site
 ---- COLUMNS
@@ -577,55 +461,47 @@ web_tax_percentage    decimal(5,2)
 primary key (web_site_sk) DISABLE NOVALIDATE RELY
 foreign key (web_open_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
 foreign key (web_close_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/web_site/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+SELECT * FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 inventory
 ---- COLUMNS
-inv_date_sk                int
 inv_item_sk                bigint
 inv_warehouse_sk           int
 inv_quantity_on_hand       int
-primary key (inv_date_sk, inv_item_sk, inv_warehouse_sk) DISABLE NOVALIDATE RELY
+primary key (inv_item_sk, inv_warehouse_sk) DISABLE NOVALIDATE RELY
 foreign key (inv_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
 foreign key (inv_item_sk) references {db_name}{db_suffix}.item (i_item_sk) DISABLE NOVALIDATE RELY
 foreign key (inv_warehouse_sk) references {db_name}{db_suffix}.warehouse (w_warehouse_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
+---- PARTITION_COLUMNS
+inv_date_sk                int
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-set hive.exec.max.dynamic.partitions.pernode=10000;
-set hive.exec.max.dynamic.partitions=10000;
-set hive.exec.dynamic.partition.mode=nonstrict;
-set hive.exec.dynamic.partition=true;
-set hive.optimize.sort.dynamic.partition=true;
-set hive.optimize.sort.dynamic.partition.threshold=1;
-set hive.exec.reducers.max=32;
+-- The following query options are set to optimize small scale fact tables with 3 impalads.
+-- Small MAX_SCAN_RANGE_LENGTH will split 1 file into few scan ranges that can be
+-- distributed across 3 impalads in minicluster. Without this, only 1 fragment at 1
+-- impalad does the reading and writing.
+SET MAX_SCAN_RANGE_LENGTH=1mb;
+-- MT_DOP=4 is to increase number of scanner and writer to 12 at max for single insert
+-- overwrite query.
+SET MT_DOP=4;
 
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/inventory/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(inv_date_sk)
+SELECT
+  inv_item_sk,
+  inv_warehouse_sk,
+  inv_quantity_on_hand,
+  inv_date_sk
+FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 catalog_sales
 ---- COLUMNS
-cs_sold_date_sk           int
 cs_sold_time_sk           int
 cs_ship_date_sk           int
 cs_bill_customer_sk       int
@@ -677,24 +553,52 @@ foreign key (cs_ship_mode_sk) references {db_name}{db_suffix}.ship_mode (sm_ship
 foreign key (cs_warehouse_sk) references {db_name}{db_suffix}.warehouse (w_warehouse_sk) DISABLE NOVALIDATE RELY
 foreign key (cs_item_sk) references {db_name}{db_suffix}.item (i_item_sk) DISABLE NOVALIDATE RELY
 foreign key (cs_promo_sk) references {db_name}{db_suffix}.promotion (p_promo_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
+---- PARTITION_COLUMNS
+cs_sold_date_sk           int
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH
-'{impala_home}/testdata/impala-data/{db_name}/catalog_sales/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(cs_sold_date_sk)
+SELECT
+  cs_sold_time_sk,
+  cs_ship_date_sk,
+  cs_bill_customer_sk,
+  cs_bill_cdemo_sk,
+  cs_bill_hdemo_sk,
+  cs_bill_addr_sk,
+  cs_ship_customer_sk,
+  cs_ship_cdemo_sk,
+  cs_ship_hdemo_sk,
+  cs_ship_addr_sk,
+  cs_call_center_sk,
+  cs_catalog_page_sk,
+  cs_ship_mode_sk,
+  cs_warehouse_sk,
+  cs_item_sk,
+  cs_promo_sk,
+  cs_order_number,
+  cs_quantity,
+  cs_wholesale_cost,
+  cs_list_price,
+  cs_sales_price,
+  cs_ext_discount_amt,
+  cs_ext_sales_price,
+  cs_ext_wholesale_cost,
+  cs_ext_list_price,
+  cs_ext_tax,
+  cs_coupon_amt,
+  cs_ext_ship_cost,
+  cs_net_paid,
+  cs_net_paid_inc_tax,
+  cs_net_paid_inc_ship,
+  cs_net_paid_inc_ship_tax,
+  cs_net_profit,
+  cs_sold_date_sk
+FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 catalog_returns
 ---- COLUMNS
-cr_returned_date_sk       int
 cr_returned_time_sk       int
 cr_item_sk                bigint
 cr_refunded_customer_sk   int
@@ -739,59 +643,42 @@ foreign key (cr_ship_mode_sk) references {db_name}{db_suffix}.ship_mode (sm_ship
 foreign key (cr_warehouse_sk) references {db_name}{db_suffix}.warehouse (w_warehouse_sk) DISABLE NOVALIDATE RELY
 foreign key (cr_reason_sk) references {db_name}{db_suffix}.reason (r_reason_sk) DISABLE NOVALIDATE RELY
 foreign key (cr_item_sk, cr_order_number) references {db_name}{db_suffix}.catalog_sales (cs_item_sk, cs_order_number) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
+---- PARTITION_COLUMNS
+cr_returned_date_sk       int
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH
-'{impala_home}/testdata/impala-data/{db_name}/catalog_returns/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(cr_returned_date_sk)
+SELECT
+  cr_returned_time_sk,
+  cr_item_sk,
+  cr_refunded_customer_sk,
+  cr_refunded_cdemo_sk,
+  cr_refunded_hdemo_sk,
+  cr_refunded_addr_sk,
+  cr_returning_customer_sk,
+  cr_returning_cdemo_sk,
+  cr_returning_hdemo_sk,
+  cr_returning_addr_sk,
+  cr_call_center_sk,
+  cr_catalog_page_sk,
+  cr_ship_mode_sk,
+  cr_warehouse_sk,
+  cr_reason_sk,
+  cr_order_number,
+  cr_return_quantity,
+  cr_return_amount,
+  cr_return_tax,
+  cr_return_amt_inc_tax,
+  cr_fee,
+  cr_return_ship_cost,
+  cr_refunded_cash,
+  cr_reversed_charge,
+  cr_store_credit,
+  cr_net_loss,
+  cr_returned_date_sk
+FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
----- BASE_TABLE_NAME
-store_sales_unpartitioned
----- COLUMNS
-ss_sold_date_sk           int
-ss_sold_time_sk           int
-ss_item_sk                bigint
-ss_customer_sk            int
-ss_cdemo_sk               int
-ss_hdemo_sk               int
-ss_addr_sk                int
-ss_store_sk               int
-ss_promo_sk               int
-ss_ticket_number          bigint
-ss_quantity               int
-ss_wholesale_cost         decimal(7,2)
-ss_list_price             decimal(7,2)
-ss_sales_price            decimal(7,2)
-ss_ext_discount_amt       decimal(7,2)
-ss_ext_sales_price        decimal(7,2)
-ss_ext_wholesale_cost     decimal(7,2)
-ss_ext_list_price         decimal(7,2)
-ss_ext_tax                decimal(7,2)
-ss_coupon_amt             decimal(7,2)
-ss_net_paid               decimal(7,2)
-ss_net_paid_inc_tax       decimal(7,2)
-ss_net_profit             decimal(7,2)
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
----- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/store_sales/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
-====
----- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 store_sales
 ---- COLUMNS
@@ -829,42 +716,7 @@ foreign key (ss_store_sk) references {db_name}{db_suffix}.store (s_store_sk) DIS
 foreign key (ss_promo_sk) references {db_name}{db_suffix}.promotion (p_promo_sk) DISABLE NOVALIDATE RELY
 ---- PARTITION_COLUMNS
 ss_sold_date_sk int
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
 ---- DEPENDENT_LOAD
--- partitioned_insert: ss_sold_date_sk,2450800,2452700,450
--- TODO: Dynamically scale this based on the scale factor?
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_sold_date_sk)
-{hint} SELECT ss_sold_time_sk,
-  ss_item_sk,
-  ss_customer_sk,
-  ss_cdemo_sk,
-  ss_hdemo_sk,
-  ss_addr_sk,
-  ss_store_sk,
-  ss_promo_sk,
-  ss_ticket_number,
-  ss_quantity,
-  ss_wholesale_cost,
-  ss_list_price,
-  ss_sales_price,
-  ss_ext_discount_amt,
-  ss_ext_sales_price,
-  ss_ext_wholesale_cost,
-  ss_ext_list_price,
-  ss_ext_tax,
-  ss_coupon_amt,
-  ss_net_paid,
-  ss_net_paid_inc_tax,
-  ss_net_profit,
-  ss_sold_date_sk
-FROM {db_name}.{table_name}
-{part_predicate};
----- LOAD
--- partitioned_insert: ss_sold_date_sk,2450800,2452700,450
--- TODO: Dynamically scale this based on the scale factor?
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_sold_date_sk)
 SELECT ss_sold_time_sk,
   ss_item_sk,
@@ -889,16 +741,13 @@ SELECT ss_sold_time_sk,
   ss_net_paid_inc_tax,
   ss_net_profit,
   ss_sold_date_sk
-FROM {db_name}.store_sales_unpartitioned
-{part_predicate}
-DISTRIBUTE BY ss_sold_date_sk;
+FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 store_returns
 ---- COLUMNS
-sr_returned_date_sk       int
 sr_return_time_sk         int
 sr_item_sk                bigint
 sr_customer_sk            int
@@ -929,23 +778,38 @@ foreign key (sr_addr_sk) references {db_name}{db_suffix}.customer_address (ca_ad
 foreign key (sr_store_sk) references {db_name}{db_suffix}.store (s_store_sk) DISABLE NOVALIDATE RELY
 foreign key (sr_reason_sk) references {db_name}{db_suffix}.reason (r_reason_sk) DISABLE NOVALIDATE RELY
 foreign key (sr_item_sk, sr_ticket_number) references {db_name}{db_suffix}.store_sales (ss_item_sk, ss_ticket_number) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
+---- PARTITION_COLUMNS
+sr_returned_date_sk       int
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/store_returns/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(sr_returned_date_sk)
+SELECT
+  sr_return_time_sk,
+  sr_item_sk,
+  sr_customer_sk,
+  sr_cdemo_sk,
+  sr_hdemo_sk,
+  sr_addr_sk,
+  sr_store_sk,
+  sr_reason_sk,
+  sr_ticket_number,
+  sr_return_quantity,
+  sr_return_amt,
+  sr_return_tax,
+  sr_return_amt_inc_tax,
+  sr_fee,
+  sr_return_ship_cost,
+  sr_refunded_cash,
+  sr_reversed_charge,
+  sr_store_credit,
+  sr_net_loss,
+  sr_returned_date_sk
+FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 web_sales
 ---- COLUMNS
-ws_sold_date_sk           int
 ws_sold_time_sk           int
 ws_ship_date_sk           int
 ws_item_sk                bigint
@@ -997,23 +861,52 @@ foreign key (ws_web_site_sk) references {db_name}{db_suffix}.web_site (web_site_
 foreign key (ws_ship_mode_sk) references {db_name}{db_suffix}.ship_mode (sm_ship_mode_sk) DISABLE NOVALIDATE RELY
 foreign key (ws_warehouse_sk) references {db_name}{db_suffix}.warehouse (w_warehouse_sk) DISABLE NOVALIDATE RELY
 foreign key (ws_promo_sk) references {db_name}{db_suffix}.promotion (p_promo_sk) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
+---- PARTITION_COLUMNS
+ws_sold_date_sk           int
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/web_sales/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(ws_sold_date_sk)
+SELECT
+  ws_sold_time_sk,
+  ws_ship_date_sk,
+  ws_item_sk,
+  ws_bill_customer_sk,
+  ws_bill_cdemo_sk,
+  ws_bill_hdemo_sk,
+  ws_bill_addr_sk,
+  ws_ship_customer_sk,
+  ws_ship_cdemo_sk,
+  ws_ship_hdemo_sk,
+  ws_ship_addr_sk,
+  ws_web_page_sk,
+  ws_web_site_sk,
+  ws_ship_mode_sk,
+  ws_warehouse_sk,
+  ws_promo_sk,
+  ws_order_number,
+  ws_quantity,
+  ws_wholesale_cost,
+  ws_list_price,
+  ws_sales_price,
+  ws_ext_discount_amt,
+  ws_ext_sales_price,
+  ws_ext_wholesale_cost,
+  ws_ext_list_price,
+  ws_ext_tax,
+  ws_coupon_amt,
+  ws_ext_ship_cost,
+  ws_net_paid,
+  ws_net_paid_inc_tax,
+  ws_net_paid_inc_ship,
+  ws_net_paid_inc_ship_tax,
+  ws_net_profit,
+  ws_sold_date_sk
+FROM tpcds.{table_name};
 ====
 ---- DATASET
-tpcds
+tpcds_partitioned
 ---- BASE_TABLE_NAME
 web_returns
 ---- COLUMNS
-wr_returned_date_sk       int
 wr_returned_time_sk       int
 wr_item_sk                bigint
 wr_refunded_customer_sk   int
@@ -1052,14 +945,34 @@ foreign key (wr_returning_addr_sk) references {db_name}{db_suffix}.customer_addr
 foreign key (wr_web_page_sk) references {db_name}{db_suffix}.web_page (wp_web_page_sk) DISABLE NOVALIDATE RELY
 foreign key (wr_reason_sk) references {db_name}{db_suffix}.reason (r_reason_sk) DISABLE NOVALIDATE RELY
 foreign key (wr_item_sk, wr_order_number) references {db_name}{db_suffix}.web_sales (ws_item_sk, ws_order_number) DISABLE NOVALIDATE RELY
----- ROW_FORMAT
-delimited fields terminated by '|'
----- TABLE_PROPERTIES
-text:serialization.null.format=
+---- PARTITION_COLUMNS
+wr_returned_date_sk       int
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/web_returns/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(wr_returned_date_sk)
+SELECT
+  wr_returned_time_sk,
+  wr_item_sk,
+  wr_refunded_customer_sk,
+  wr_refunded_cdemo_sk,
+  wr_refunded_hdemo_sk,
+  wr_refunded_addr_sk,
+  wr_returning_customer_sk,
+  wr_returning_cdemo_sk,
+  wr_returning_hdemo_sk,
+  wr_returning_addr_sk,
+  wr_web_page_sk,
+  wr_reason_sk,
+  wr_order_number,
+  wr_return_quantity,
+  wr_return_amt,
+  wr_return_tax,
+  wr_return_amt_inc_tax,
+  wr_fee,
+  wr_return_ship_cost,
+  wr_refunded_cash,
+  wr_reversed_charge,
+  wr_account_credit,
+  wr_net_loss,
+  wr_returned_date_sk
+FROM tpcds.{table_name};
 ====

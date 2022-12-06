@@ -96,23 +96,19 @@
 #
 from __future__ import absolute_import, division, print_function
 from builtins import object
-import collections
-import csv
-import glob
 import json
-import math
 import os
-import random
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
-from itertools import product
 from optparse import OptionParser
 from tests.common.environ import HIVE_MAJOR_VERSION
-from tests.util.test_file_parser import *
-from tests.common.test_dimensions import *
+from tests.util.test_file_parser import parse_table_constraints, parse_test_file
+from tests.common.test_dimensions import (
+  FILE_FORMAT_TO_STORED_AS_MAP, TableFormatInfo, get_dataset_from_workload,
+  load_table_info_dimension)
 
 parser = OptionParser()
 parser.add_option("-e", "--exploration_strategy", dest="exploration_strategy",
@@ -195,20 +191,6 @@ AVRO_COMPRESSION_MAP = {
   'none': '',
   }
 
-FILE_FORMAT_MAP = {
-  'text': 'TEXTFILE',
-  'seq': 'SEQUENCEFILE',
-  'rc': 'RCFILE',
-  'orc': 'ORC',
-  'parquet': 'PARQUET',
-  'hudiparquet': 'HUDIPARQUET',
-  'avro': 'AVRO',
-  'hbase': "'org.apache.hadoop.hive.hbase.HBaseStorageHandler'",
-  'kudu': "KUDU",
-  'iceberg': "ICEBERG",
-  'json': "JSONFILE",
-  }
-
 HIVE_TO_AVRO_TYPE_MAP = {
   'STRING': 'string',
   'INT': 'int',
@@ -240,6 +222,14 @@ WITH SERDEPROPERTIES (
 
 KNOWN_EXPLORATION_STRATEGIES = ['core', 'pairwise', 'exhaustive']
 
+PARTITIONED_INSERT_RE = re.compile(
+  # Capture multi insert specification.
+  # Each group represent partition column, min value, max value,
+  # and num partition per insert.
+  r'-- partitioned_insert: ([a-z_]+),(\d+),(\d+),(\d+)')
+
+HINT_SHUFFLE = "/* +shuffle, clustered */"
+
 def build_create_statement(table_template, table_name, db_name, db_suffix,
                            file_format, compression, hdfs_location,
                            force_reload):
@@ -257,11 +247,12 @@ def build_create_statement(table_template, table_name, db_name, db_suffix,
     # Remove location part from the format string
     table_template = table_template.replace("LOCATION '{hdfs_location}'", "")
 
-  create_stmt += table_template.format(db_name=db_name,
-                                       db_suffix=db_suffix,
-                                       table_name=table_name,
-                                       file_format=FILE_FORMAT_MAP[file_format],
-                                       hdfs_location=hdfs_location)
+  create_stmt += table_template.format(
+    db_name=db_name,
+    db_suffix=db_suffix,
+    table_name=table_name,
+    file_format=FILE_FORMAT_TO_STORED_AS_MAP[file_format],
+    hdfs_location=hdfs_location)
   return create_stmt
 
 
@@ -473,17 +464,59 @@ def build_impala_parquet_codec_statement(codec):
   parquet_codec = IMPALA_PARQUET_COMPRESSION_MAP[codec]
   return IMPALA_COMPRESSION_CODEC % parquet_codec
 
+
+def build_partitioned_load(insert, re_match, can_hint, params):
+  part_col = re_match.group(1)
+  min_val = int(re_match.group(2))
+  max_val = int(re_match.group(3))
+  batch = int(re_match.group(4))
+  insert = PARTITIONED_INSERT_RE.sub("", insert)
+  statements = []
+  params["hint"] = HINT_SHUFFLE if can_hint else ''
+  first_part = min_val
+  while first_part < max_val:
+    if first_part + batch >= max_val:
+      # This is the last batch
+      if first_part == min_val:
+        # There is only 1 batch in this insert. No predicate needed.
+        params["part_predicate"] = ''
+      else:
+        # Insert the remaining partitions + NULL partition
+        params["part_predicate"] = "WHERE {0} <= {1} OR {2} IS NULL".format(
+          first_part, part_col, part_col)
+    elif first_part == min_val:
+      # This is the first batch.
+      params["part_predicate"] = "WHERE {0} < {1}".format(
+        part_col, first_part + batch)
+    else:
+      # This is the middle batch.
+      params["part_predicate"] = "WHERE {0} <= {1} AND {2} < {3}".format(
+        first_part, part_col, part_col, first_part + batch)
+    statements.append(insert.format(**params))
+    first_part += batch
+  return "\n".join(statements)
+
+
 def build_insert_into_statement(insert, db_name, db_suffix, table_name, file_format,
                                 hdfs_path, for_impala=False):
-  insert_hint = ""
-  if for_impala and (file_format == 'parquet' or is_iceberg_table(file_format)):
-    insert_hint = "/* +shuffle, clustered */"
-  insert_statement = insert.format(db_name=db_name,
-                                   db_suffix=db_suffix,
-                                   table_name=table_name,
-                                   hdfs_location=hdfs_path,
-                                   impala_home=os.getenv("IMPALA_HOME"),
-                                   hint=insert_hint)
+  can_hint = for_impala and (file_format == 'parquet' or is_iceberg_table(file_format))
+  params = {
+    "db_name": db_name,
+    "db_suffix": db_suffix,
+    "table_name": table_name,
+    "hdfs_location": hdfs_path,
+    "impala_home": os.getenv("IMPALA_HOME"),
+    "hint": "",
+    "part_predicate": ""
+  }
+
+  m = PARTITIONED_INSERT_RE.search(insert)
+  if m:
+    insert_statement = build_partitioned_load(insert, m, can_hint, params)
+  else:
+    if can_hint:
+      params["hint"] = HINT_SHUFFLE
+    insert_statement = insert.format(**params)
 
   # Kudu tables are managed and don't support OVERWRITE, so we replace OVERWRITE
   # with INTO to make this a regular INSERT.
@@ -539,6 +572,7 @@ def build_insert(insert, db_name, db_suffix, file_format,
                                         for_impala) + "\n"
   return output
 
+
 def build_load_statement(load_template, db_name, db_suffix, table_name):
   # hbase does not need the hdfs path.
   if table_name.startswith('hbase'):
@@ -547,11 +581,23 @@ def build_load_statement(load_template, db_name, db_suffix, table_name):
                                          db_suffix=db_suffix)
   else:
     base_load_dir = os.getenv("REMOTE_LOAD", os.getenv("IMPALA_HOME"))
-    load_template = load_template.format(table_name=table_name,
-                                         db_name=db_name,
-                                         db_suffix=db_suffix,
-                                         impala_home = base_load_dir)
+    params = {
+      "db_name": db_name,
+      "db_suffix": db_suffix,
+      "table_name": table_name,
+      "impala_home": base_load_dir,
+      "hint": "",
+      "part_predicate": ""
+    }
+
+    m = PARTITIONED_INSERT_RE.search(load_template)
+    if m:
+      load_template = build_partitioned_load(load_template, m, False, params)
+    else:
+      load_template = load_template.format(**params)
+
   return load_template
+
 
 def build_hbase_create_stmt(db_name, table_name, column_families, region_splits):
   hbase_table_name = "{db_name}_hbase.{table_name}".format(db_name=db_name,

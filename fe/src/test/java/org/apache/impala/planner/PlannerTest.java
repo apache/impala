@@ -1410,7 +1410,8 @@ public class PlannerTest extends PlannerTestBase {
     options.setProcessing_cost_min_threads(2);
     options.setMax_fragment_instances_per_node(16);
     runPlannerTestFile(
-        "tpcds-processing-cost", "tpcds_parquet", options, tpcdsParquetTestOptions());
+        "tpcds-processing-cost", "tpcds_partitioned_parquet_snap", options,
+        tpcdsParquetTestOptions());
   }
 
   /**

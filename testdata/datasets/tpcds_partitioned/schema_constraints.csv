@@ -1,0 +1,4 @@
+# Table level constraints:
+# Allows for defining constraints on which file formats to generate for an individual
+# table. The table name should match the base table name defined in the schema template
+# file.
