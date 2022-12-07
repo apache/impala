@@ -903,7 +903,7 @@ bool ScalarColumnReader<bool, parquet::Type::BOOLEAN, true>::DecodeValues(
 template <typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
 void ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::
     ReadFilePositionBatched(int16_t rep_level, int64_t* file_pos) {
-  *file_pos = current_row_;
+  *file_pos = FilePositionOfCurrentRow();
 }
 
 template <typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
@@ -1068,7 +1068,8 @@ Status BaseScalarColumnReader::Reset(const HdfsFileDesc& file_desc,
   // See ColumnReader constructor.
   rep_level_ = max_rep_level() == 0 ? 0 : ParquetLevel::INVALID_LEVEL;
   pos_current_value_ = ParquetLevel::INVALID_POS;
-  current_row_ = row_group_first_row - 1;
+  row_group_first_row_ = row_group_first_row;
+  current_row_ = -1;
 
   vector<ScanRange::SubRange> sub_ranges;
   CreateSubRanges(&sub_ranges);
@@ -1466,7 +1467,7 @@ int BaseScalarColumnReader::FillPositionsInCandidateRange(int rows_remaining,
     }
     ++val_count;
     if (file_pos_writer.IsValid()) {
-      *file_pos_writer.Advance() = current_row_;
+      *file_pos_writer.Advance() = FilePositionOfCurrentRow();
     } else if (pos_writer.IsValid()) {
       if (rep_level <= max_rep_level() - 1) pos_current_value_ = 0;
       *pos_writer.Advance() = pos_current_value_++;
@@ -1672,6 +1673,7 @@ bool BaseScalarColumnReader::SkipRowsInternal(int64_t num_rows, int64_t skip_row
       while (num_rows > current_page_values) {
         COUNTER_ADD(parent_->num_pages_skipped_by_late_materialization_counter_, 1);
         num_rows -= current_page_values;
+        current_row_ += current_page_values;
         if (!col_chunk_reader_.SkipPageData().ok() || !AdvanceNextPageHeader()) {
           return false;
         }

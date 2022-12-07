@@ -500,12 +500,18 @@ class TestParquet(ImpalaTestSuite):
   def test_virtual_column_file_position_parquet(self, vector, unique_database):
     # Parquet-specific tests for virtual column FILE__POSITION
     create_table_from_parquet(self.client, unique_database, 'alltypes_tiny_pages')
+    create_table_from_parquet(self.client, unique_database,
+        'customer_multiblock_page_index')
+    create_table_from_parquet(self.client, unique_database,
+        'customer_nested_multiblock_multipage')
     new_vector = deepcopy(vector)
     for late_mat in [-1, 1, 17]:
       new_vector.get_value('exec_option')['parquet_late_materialization_threshold'] = \
           late_mat
-      self.run_test_case('QueryTest/virtual-column-file-position-parquet', new_vector,
-          unique_database)
+      for read_stats in ['true', 'false']:
+        new_vector.get_value('exec_option')['parquet_read_statistics'] = read_stats
+        self.run_test_case('QueryTest/virtual-column-file-position-parquet', new_vector,
+            unique_database)
 
   def test_corrupt_files(self, vector):
     new_vector = deepcopy(vector)

@@ -225,6 +225,9 @@ class ParquetColumnReader {
   const SlotDescriptor* pos_slot_desc_ = nullptr;
   const SlotDescriptor* file_pos_slot_desc_ = nullptr;
 
+  /// Index within the file of the first row in the row group.
+  int64_t row_group_first_row_ = 0;
+
   /// The next value to write into the position slot, if there is one. 64-bit int because
   /// the pos slot is always a BIGINT Set to ParquetLevel::INVALID_POS when this column
   /// reader does not have a current rep and def level (i.e. before the first NextLevels()
@@ -376,6 +379,12 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   template <bool ADVANCE_REP_LEVEL>
   bool NextLevels();
 
+  /// Returns file position of current row ('current_row_' is the index of the row
+  /// within the row group).
+  int64_t FilePositionOfCurrentRow() const {
+    return row_group_first_row_ + current_row_;
+  }
+
  protected:
   // Friend parent scanner so it can perform validation (e.g. ValidateEndOfRowGroup())
   friend class HdfsParquetScanner;
@@ -414,7 +423,8 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// Metadata for the column for the current row group.
   const parquet::ColumnMetaData* metadata_ = nullptr;
 
-  /// Index of the current top-level row. It is updated together with the rep/def levels.
+  /// Index of the current top-level row within the row group. It is updated together
+  /// with the rep/def levels.
   /// When updated, and its value is N, it means that we already processed the Nth row
   /// completely, hence the initial value is '-1', because '0' would mean that we already
   /// processed the first (zeroeth) row.
@@ -685,7 +695,7 @@ inline void ParquetColumnReader::ReadFilePositionNonBatched(int64_t* file_pos) {
   DCHECK_GE(def_level_, 0);
   DCHECK_GE(def_level_, def_level_of_immediate_repeated_ancestor()) <<
       "Caller should have called NextLevels() until we are ready to read a value";
-  *file_pos = LastProcessedRow() + 1;
+  *file_pos = row_group_first_row_ + LastProcessedRow() + 1;
 }
 
 // Change 'val_count' to zero to exercise IMPALA-5197. This verifies the error handling

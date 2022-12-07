@@ -221,3 +221,59 @@ where id = l_orderkey and
 ---- TYPES
 BIGINT, BIGINT, INT, BIGINT
 ====
+---- QUERY
+select file__position, * from customer_multiblock_page_index where c_customer_sk = 99331;
+---- RESULTS
+1119,99331,'AAAAAAAADAEIBAAA',22643,7071,15946,2452620,2452590,'Mr.','Joseph','Mueller','N',2,10,1970,'VANUATU','NULL','Joseph.Mueller@yF61aCQLo7P.com','2452638'
+---- TYPES
+BIGINT, INT, STRING, INT, INT, INT, INT, INT, STRING, STRING, STRING, STRING, INT, INT, INT, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select file__position, * from customer_multiblock_page_index where c_customer_sk > 10000 and c_customer_sk < 10500;
+---- RESULTS
+303,10380,'AAAAAAAAMIICAAAA',6555,6205,18255,2452491,2452461,'Sir','William','Hunter','N',4,7,1964,'NAURU','NULL','William.Hunter@Kljv1U5NvPb.org','2452386'
+1219,10396,'AAAAAAAAMJICAAAA',24791,6556,15968,2450865,2450835,'Mr.','Gerald','Manley','N',14,10,1939,'PORTUGAL','NULL','Gerald.Manley@JVFnqX5nFxPqVU.org','2452430'
+1292,10208,'AAAAAAAAAOHCAAAA',26660,2359,9211,2452596,2452566,'Dr.','Lowell','Amos','N',26,10,1977,'SENEGAL','NULL','Lowell.Amos@cCFzlM.org','2452391'
+1300,10343,'AAAAAAAAHGICAAAA',26829,222,42462,2451479,2451449,'Sir','Bruce','Grice','N',23,1,1949,'CAYMAN ISLANDS','NULL','Bruce.Grice@s6LUofKyc.edu','2452313'
+1738,10153,'AAAAAAAAJKHCAAAA',35544,1696,35848,2449126,2449096,'Mr.','Wesley','Hooker','Y',23,2,1986,'NEW ZEALAND','NULL','Wesley.Hooker@mFyd27PhXy.org','2452527'
+1842,10353,'AAAAAAAABHICAAAA',37434,1053,15825,2451525,2451495,'Mrs.','Lucinda','Pierson','N',13,3,1980,'ARUBA','NULL','Lucinda.Pierson@27yDPr8kIQ5I2qN.edu','2452450'
+1856,10316,'AAAAAAAAMEICAAAA',37920,2586,49299,2452571,2452541,'Ms.','Carolyn','Guajardo','Y',11,7,1931,'MYANMAR','NULL','Carolyn.Guajardo@7gSYU.com','2452600'
+---- TYPES
+BIGINT, INT, STRING, INT, INT, INT, INT, INT, STRING, STRING, STRING, STRING, INT, INT, INT, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select file__position, * from customer_multiblock_page_index where c_first_sales_date_sk = 2449000;
+---- RESULTS
+1452,99451,'AAAAAAAALHEIBAAA',29723,723,35323,2449030,2449000,'Mrs.','Judy','Grant','N',28,1,1955,'INDIA','NULL','Judy.Grant@YdXFRcSxUuNf1N5Ej.edu','2452566'
+---- TYPES
+BIGINT, INT, STRING, INT, INT, INT, INT, INT, STRING, STRING, STRING, STRING, INT, INT, INT, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from customer_nested_multiblock_multipage where c_custkey = 300;
+---- RESULTS
+300,'Customer#000000300','I0fJfo60DRqQ',7,'17-165-193-5964',8084.92,'AUTOMOBILE','p fluffily among the slyly express grouches. furiously express instruct'
+---- TYPES
+BIGINT, STRING, STRING, SMALLINT, STRING, DECIMAL, STRING, STRING
+====
+---- QUERY
+select * from customer_nested_multiblock_multipage where c_name = 'Customer#000000295';
+---- RESULTS
+295,'Customer#000000295','mk649IH6njR14woTVZ1cxtlNs URxBHD5o5z2',0,'10-340-773-4322',9497.89,'HOUSEHOLD','play according to the quickly ironic instructions-- unusual, bol'
+---- TYPES
+BIGINT, STRING, STRING, SMALLINT, STRING, DECIMAL, STRING, STRING
+====
+---- QUERY
+select file__position, l_shipdate from customer_nested_multiblock_multipage c, c.c_orders.o_lineitems where l_shipdate='1998-11-26';
+---- RESULTS
+80,'1998-11-26'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
+select file__position, l_shipdate from customer_nested_multiblock_multipage c, c.c_orders.o_lineitems where l_partkey = 199994;
+---- RESULTS
+51,'1993-05-13'
+82,'1994-01-17'
+---- TYPES
+BIGINT, STRING
+====

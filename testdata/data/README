@@ -633,6 +633,17 @@ In order to generate this file, execute the following instruments:
    WHERE c_current_cdemo_sk IS NOT NULL ORDER BY c_current_cdemo_sk LIMIT 2000;
 generated file will contains multi blocks, multi pages per block.
 
+customer_nested_multiblock_multipage.parquet
+Parquet file that contains multiple row groups multiple pages and store nested
+data.
+Used Hive (version 3.1.3000.7.2.16.0-233) to generate Parquet file:
+1. SET parquet.block.size=8192;
+2. SET parquet.page.row.count.limit=20;
+3. CREATE TABLE customer_nested_multiblock_multipage
+   LIKE tpch_nested_parquet.customer STORED AS PARQUET;
+4. INSERT INTO customer_nested_multiblock_multipage
+   SELECT * FROM tpch_nested_parquet.customer ORDER BY c_custkey LIMIT 300;
+
 IMPALA-10361: Use field id to resolve columns for Iceberg tables
 We generated data by spark-shell, version is 2.4.x, and table data is in
 testdata/data/iceberg_test/hadoop_catalog/iceberg_resolution_test, this table
