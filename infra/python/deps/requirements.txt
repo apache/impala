@@ -71,7 +71,7 @@ requests == 2.20.0
   chardet == 3.0.4
   idna == 2.8
   urllib3 == 1.24.2
-  certifi == 2020.12.5
+  certifi == 2022.12.7
 sasl == 0.2.1
 sh == 1.11
 six == 1.14.0
