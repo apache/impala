@@ -57,7 +57,7 @@ STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 create external table avro_hive_alltypes_ext
 like functional_avro_snap.alltypes;
 alter table avro_hive_alltypes_ext
-set location '/test-warehouse/alltypes_avro_snap';
+set location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_avro_snap';
 alter table avro_hive_alltypes_ext recover partitions;
 compute stats avro_hive_alltypes_ext;
 ---- RESULTS
@@ -141,7 +141,7 @@ create external table avro_hive_alltypes_str_part (
   month string
 )
 stored as avro
-location '/test-warehouse/alltypes_avro_snap';
+location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_avro_snap';
 alter table avro_hive_alltypes_str_part recover partitions;
 compute stats avro_hive_alltypes_str_part;
 ---- RESULTS
