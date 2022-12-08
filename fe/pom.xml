@@ -135,6 +135,14 @@ under the License.
         to resolve dependencies for cruise-control-metrics-reporter, which is
         unneeded and not uploaded to toolchain. -->
         <exclusion>
+          <groupId>com.cloudera</groupId>
+          <artifactId>jwtprovider-api</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.cloudera</groupId>
+          <artifactId>jwtprovider-knox</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>org.apache.ranger</groupId>
           <artifactId>ranger-plugins-audit</artifactId>
         </exclusion>
@@ -160,6 +168,14 @@ under the License.
         <!-- Ranger jar also includes solr artifacts which we not exclude here since
         they are used during the instantiation of RangerAuthorizationFactory
         (See IMPALA-10644 for more details. -->
+        <exclusion>
+          <groupId>com.cloudera</groupId>
+          <artifactId>jwtprovider-api</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.cloudera</groupId>
+          <artifactId>jwtprovider-knox</artifactId>
+        </exclusion>
         <exclusion>
           <groupId>org.apache.kafka</groupId>
           <artifactId>*</artifactId>

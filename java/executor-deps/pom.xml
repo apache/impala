@@ -97,6 +97,14 @@ under the License.
           <artifactId>aws-java-sdk-bundle</artifactId>
         </exclusion>
         <exclusion>
+          <groupId>com.cloudera</groupId>
+          <artifactId>jwtprovider-api</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.cloudera</groupId>
+          <artifactId>jwtprovider-knox</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>org.eclipse.jetty</groupId>
           <artifactId>*</artifactId>
         </exclusion>
