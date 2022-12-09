@@ -29,10 +29,13 @@ import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
+import org.apache.iceberg.DataFile;
+import org.apache.iceberg.DeleteFile;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.IcebergPartitionTransform;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
@@ -355,8 +358,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
         icebergParquetDictPageSize_ = Utils.getIcebergParquetDictPageSize(msTbl);
         hdfsTable_
             .load(false, msClient, msTable_, true, true, false, null, null,null, reason);
-        fileStore_ = Utils.loadAllPartition(this);
-        partitionStats_ = Utils.loadPartitionStats(this);
+        Pair<List<DataFile>, Set<DeleteFile>> icebergFiles = IcebergUtil
+            .getIcebergFiles(this, new ArrayList<>(), /*timeTravelSpec=*/null);
+        fileStore_ = Utils.loadAllPartition(this, icebergFiles);
+        partitionStats_ = Utils.loadPartitionStats(this, icebergFiles);
         setIcebergTableStats();
         loadAllColumnStats(msClient);
         setAvroSchema(msClient, msTbl, fileStore_);

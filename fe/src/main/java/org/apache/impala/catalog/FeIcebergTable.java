@@ -669,7 +669,8 @@ public interface FeIcebergTable extends FeFsTable {
      * path, using org.apache.hadoop.fs.Path to normalize the paths.
      */
     public static IcebergContentFileStore loadAllPartition(
-        IcebergTable table) throws IOException, TableLoadingException {
+        IcebergTable table, Pair<List<DataFile>, Set<DeleteFile>> icebergFiles)
+        throws IOException, TableLoadingException {
       Map<String, HdfsPartition.FileDescriptor> hdfsFileDescMap = new HashMap<>();
       Collection<HdfsPartition> partitions =
           ((HdfsTable)table.getFeFsTable()).partitionMap_.values();
@@ -680,9 +681,8 @@ public interface FeIcebergTable extends FeFsTable {
         }
       }
       IcebergContentFileStore fileStore = new IcebergContentFileStore();
-      Pair<List<DataFile>, Set<DeleteFile>> allFiles = IcebergUtil.getIcebergFiles(
-          table, new ArrayList<>(), /*timeTravelSpecl=*/null);
-      for (ContentFile contentFile : Iterables.concat(allFiles.first, allFiles.second)) {
+      for (ContentFile contentFile : Iterables.concat(icebergFiles.first,
+                                                      icebergFiles.second)) {
         addContentFileToFileStore(contentFile, fileStore, table, hdfsFileDescMap);
       }
       return fileStore;
@@ -736,9 +736,8 @@ public interface FeIcebergTable extends FeFsTable {
      * TODO(IMPALA-11516): Return better partition stats for V2 tables.
      */
     public static Map<String, TIcebergPartitionStats> loadPartitionStats(
-        IcebergTable table) throws TableLoadingException {
-      Pair<List<DataFile>, Set<DeleteFile>> icebergFiles = IcebergUtil
-          .getIcebergFiles(table, new ArrayList<>(), /*timeTravelSpec=*/null);
+        IcebergTable table, Pair<List<DataFile>, Set<DeleteFile>> icebergFiles)
+        throws TableLoadingException {
       List<DataFile> dataFileList = icebergFiles.first;
       Set<DeleteFile> deleteFileList = icebergFiles.second;
       Map<String, TIcebergPartitionStats> nameToStats = new HashMap<>();
