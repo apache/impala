@@ -80,3 +80,43 @@ NULL,0,1
 ---- TYPES
 TINYINT, INT, BIGINT
 ====
+---- QUERY
+# IMPALA-11779: test null slots in the sort tuple
+with v1 as (
+  select '0' as a1, '' as b1 from alltypestiny
+), v2 as (
+  select '' as a2, null as b2
+), v3 as (
+  select b1 as b
+  from v1 left join v2 on a1 = a2
+)
+select 1 from (
+  select row_number() over (partition by b order by b) rnk
+  from v3
+) v
+where rnk = 1
+---- RESULTS
+1
+---- TYPES
+TINYINT
+====
+---- QUERY
+# IMPALA-11779: test null slots in the sort tuple
+with v1 as (
+  select '0' as a1, '' as b1 from alltypes
+), v2 as (
+  select '' as a2, null as b2
+), v3 as (
+  select b1 as b
+  from v1 left join v2 on a1 = a2
+)
+select count(*) from (
+  select row_number() over (partition by b order by b) rnk
+  from v3
+) v
+where rnk < 10
+---- RESULTS
+9
+---- TYPES
+BIGINT
+====

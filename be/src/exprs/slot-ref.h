@@ -45,6 +45,10 @@ class SlotRef : public ScalarExpr {
   /// does not generate the appropriate exprs).
   SlotRef(const SlotDescriptor* desc, const ColumnType& type);
 
+  /// Create a SlotRef based on the given SlotDescriptor 'desc' and make sure the type is
+  /// not TYPE_NULL (if so, replaced it with TYPE_BOOLEAN).
+  static SlotRef* TypeSafeCreate(const SlotDescriptor* desc);
+
   /// Used for testing.  GetValue will return tuple + offset interpreted as 'type'
   SlotRef(const ColumnType& type, int offset, const bool nullable = false);
 
