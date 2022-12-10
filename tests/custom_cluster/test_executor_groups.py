@@ -587,7 +587,10 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # and mem_admitted is used for this. Since mem_limit is being used here, both will be
     # identical but this will at least test that code path as a sanity check.
     second_coord_client.clear_configuration()
-    second_coord_client.set_configuration({'mem_limit': '4g'})
+    # The maximum memory can be used for query needs to subtract the codegen cache
+    # capacity, which is 4GB - 10% * 4GB = 3.6GB.
+    query_mem_limit = 4 * (1 - 0.1)
+    second_coord_client.set_configuration({'mem_limit': str(query_mem_limit) + 'g'})
     handle_for_second = second_coord_client.execute_async(QUERY)
     # Verify that the first coordinator knows about the query running on the second
     self.coordinator.service.wait_for_metric_value(

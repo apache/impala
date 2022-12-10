@@ -169,8 +169,8 @@ DEFINE_string(metrics_webserver_interface, "",
 const static string DEFAULT_FS = "fs.defaultFS";
 
 // The max percentage that the codegen cache can take from the total process memory.
-// The value is set to 20%.
-const double MAX_CODEGEN_CACHE_MEM_PERCENT = 0.2;
+// The value is set to 10%.
+const double MAX_CODEGEN_CACHE_MEM_PERCENT = 0.1;
 
 // The multiplier for how many queries a dedicated coordinator can run compared to an
 // executor. This is only effective when using non-default settings for executor groups
@@ -332,7 +332,35 @@ Status ExecEnv::Init() {
     }
   }
 
-  bool is_percent;
+  bool is_percent = false;
+  int64_t codegen_cache_capacity =
+      ParseUtil::ParseMemSpec(FLAGS_codegen_cache_capacity, &is_percent, 0);
+  if (codegen_cache_capacity > 0) {
+    // If codegen_cache_capacity is larger than 0, the number should not be a percentage.
+    DCHECK(!is_percent);
+    int64_t codegen_cache_limit = admit_mem_limit_ * MAX_CODEGEN_CACHE_MEM_PERCENT;
+    DCHECK(codegen_cache_limit > 0);
+    if (codegen_cache_capacity > codegen_cache_limit) {
+      LOG(INFO) << "CodeGen Cache capacity changed from "
+                << PrettyPrinter::Print(codegen_cache_capacity, TUnit::BYTES) << " to "
+                << PrettyPrinter::Print(codegen_cache_limit, TUnit::BYTES)
+                << " due to reaching the limit.";
+      codegen_cache_capacity = codegen_cache_limit;
+    }
+    codegen_cache_.reset(new CodeGenCache(metrics_.get()));
+    RETURN_IF_ERROR(codegen_cache_->Init(codegen_cache_capacity));
+    LOG(INFO) << "CodeGen Cache initialized with capacity "
+              << PrettyPrinter::Print(codegen_cache_capacity, TUnit::BYTES);
+    // Preserve the memory for codegen cache.
+    admit_mem_limit_ -= codegen_cache_capacity;
+    DCHECK_GT(admit_mem_limit_, 0);
+  } else {
+    LOG(INFO) << "CodeGen Cache is disabled.";
+  }
+
+  LOG(INFO) << "Admit memory limit: "
+            << PrettyPrinter::Print(admit_mem_limit_, TUnit::BYTES);
+
   int64_t buffer_pool_limit = ParseUtil::ParseMemSpec(FLAGS_buffer_pool_limit,
       &is_percent, admit_mem_limit_);
   if (buffer_pool_limit <= 0) {
@@ -450,25 +478,6 @@ Status ExecEnv::Init() {
 
   RETURN_IF_ERROR(admission_controller_->Init());
   RETURN_IF_ERROR(InitHadoopConfig());
-  int64_t codegen_cache_capacity =
-      ParseUtil::ParseMemSpec(FLAGS_codegen_cache_capacity, &is_percent, 0);
-  if (codegen_cache_capacity > 0) {
-    int64_t codegen_cache_limit = mem_tracker_->limit() * MAX_CODEGEN_CACHE_MEM_PERCENT;
-    DCHECK(codegen_cache_limit > 0);
-    if (codegen_cache_capacity > codegen_cache_limit) {
-      LOG(INFO) << "CodeGen Cache capacity changed to "
-                << PrettyPrinter::Print(codegen_cache_capacity, TUnit::BYTES) << " from "
-                << PrettyPrinter::Print(codegen_cache_limit, TUnit::BYTES)
-                << " due to reaching the limit.";
-      codegen_cache_capacity = codegen_cache_limit;
-    }
-    codegen_cache_.reset(new CodeGenCache(metrics_.get()));
-    RETURN_IF_ERROR(codegen_cache_->Init(codegen_cache_capacity));
-    LOG(INFO) << "CodeGen Cache initialized with capacity "
-              << PrettyPrinter::Print(codegen_cache_capacity, TUnit::BYTES);
-  } else {
-    LOG(INFO) << "CodeGen Cache is disabled.";
-  }
   return Status::OK();
 }
 

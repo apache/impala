@@ -128,7 +128,8 @@ RESOURCES_DIR = os.path.join(os.environ['IMPALA_HOME'], "fe", "src", "test", "re
 
 def impalad_admission_ctrl_flags(max_requests, max_queued, pool_max_mem,
                                  proc_mem_limit=None, queue_wait_timeout_ms=None,
-                                 admission_control_slots=None, executor_groups=None):
+                                 admission_control_slots=None, executor_groups=None,
+                                 codegen_cache_capacity=0):
   extra_flags = ""
   if proc_mem_limit is not None:
     extra_flags += " -mem_limit={0}".format(proc_mem_limit)
@@ -138,6 +139,7 @@ def impalad_admission_ctrl_flags(max_requests, max_queued, pool_max_mem,
     extra_flags += " -admission_control_slots={0}".format(admission_control_slots)
   if executor_groups is not None:
     extra_flags += " -executor_groups={0}".format(executor_groups)
+  extra_flags += " -codegen_cache_capacity={0}".format(codegen_cache_capacity)
 
   return ("-vmodule admission-controller=3 -default_pool_max_requests {0} "
           "-default_pool_max_queued {1} -default_pool_mem_limit {2} {3}".format(
