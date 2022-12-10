@@ -72,6 +72,16 @@ SlotRef::SlotRef(const ColumnType& type, int offset, const bool nullable /* = fa
     null_indicator_offset_(0, nullable ? offset : -1),
     slot_id_(-1) {}
 
+SlotRef* SlotRef::TypeSafeCreate(const SlotDescriptor* desc) {
+  if (desc->type().type == TYPE_NULL) {
+    // ScalarExprEvaluator requires a non-null type for the expr. It returns nullptr for
+    // null values of all types. So replacing TYPE_NULL to an arbitrary type is ok.
+    // Here we use TYPE_BOOLEAN for consistency with other places.
+    return new SlotRef(desc, ColumnType(TYPE_BOOLEAN));
+  }
+  return new SlotRef(desc);
+}
+
 Status SlotRef::Init(
     const RowDescriptor& row_desc, bool is_entry_point, FragmentState* state) {
   DCHECK(type_.IsStructType() || children_.size() == 0);

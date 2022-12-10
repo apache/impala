@@ -103,10 +103,8 @@ Status GroupingAggregatorConfig::Init(
   for (int i = 0; i < grouping_exprs_.size(); ++i) {
     SlotDescriptor* desc = intermediate_tuple_desc_->slots()[i];
     DCHECK(desc->type().type == TYPE_NULL || desc->type() == grouping_exprs_[i]->type());
-    // Hack to avoid TYPE_NULL SlotRefs.
-    SlotRef* build_expr = state->obj_pool()->Add(desc->type().type != TYPE_NULL ?
-            new SlotRef(desc) :
-            new SlotRef(desc, ColumnType(TYPE_BOOLEAN)));
+    // Use SlotRef::TypeSafeCreate() to avoid TYPE_NULL SlotRefs.
+    SlotRef* build_expr = state->obj_pool()->Add(SlotRef::TypeSafeCreate(desc));
     build_exprs_.push_back(build_expr);
     // Not an entry point because all hash table callers support codegen.
     RETURN_IF_ERROR(

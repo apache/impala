@@ -95,8 +95,7 @@ Status TopNPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
 
     // Construct SlotRefs that simply copy the output tuple to itself.
     for (const SlotDescriptor* slot_desc : output_tuple_desc_->slots()) {
-      SlotRef* slot_ref =
-          state->obj_pool()->Add(new SlotRef(slot_desc, slot_desc->type()));
+      SlotRef* slot_ref = state->obj_pool()->Add(SlotRef::TypeSafeCreate(slot_desc));
       noop_tuple_exprs_.push_back(slot_ref);
       RETURN_IF_ERROR(slot_ref->Init(*row_descriptor_, true, state));
     }
