@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="expand_complex_types">
+
+ <title>EXPAND_COMPLEX_TYPES Query Option</title>
+ <titlealts audience="PDF"><navtitle>EXPAND_COMPLEX_TYPES</navtitle></titlealts>
+ <prolog>
+  <metadata>
+   <data name="Category" value="Impala"/>
+   <data name="Category" value="Impala Query Options"/>
+   <data name="Category" value="Troubleshooting"/>
+   <data name="Category" value="Querying"/>
+   <data name="Category" value="Developers"/>
+   <data name="Category" value="Data Analysts"/>
+  </metadata>
+ </prolog>
+
+ <conbody>
+  <p>
+   <indexterm audience="hidden">EXPAND_COMPLEX_TYPES Query Option</indexterm> Older versions of
+   Impala did not support complex types in the select list, and therefore a <codeph>SELECT
+   *</codeph> statement only expanded to primitive types even when the table contained complex-typed
+   columns. Support for complex types in the select list has since been added, but for backward
+   compatibility the behaviour that <q>*</q> expressions skip complex types has been kept as the
+   default. If the EXPAND_COMPLEX_TYPES query option is set to true, <q>*</q> expressions will
+   include complex types as well.
+  </p>
+
+  <p>
+   Note: even if EXPAND_COMPLEX_TYPES is false, complex-typed columns that are listed explicitly in
+   the select list (i.e. not as a <q>*</q> expression) will be included in the result.
+  </p>
+
+  <p><b>Type:</b>BOOLEAN</p>
+  <p><b>Default:</b>FALSE</p>
+  <p><b>Added in:</b>Impala 4.2</p>
+  <p conref="../shared/impala_common.xml#common/related_info"/>
+  <p>
+   <xref href="impala_complex_types.xml"/>,
+  </p>
+ </conbody>
+</concept>
+

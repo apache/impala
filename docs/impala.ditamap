@@ -257,6 +257,7 @@ under the License.
           <topicref href="topics/impala_timezone.xml"/>
           <topicref href="topics/impala_topn_bytes_limit.xml"/>
           <topicref href="topics/impala_utf8_mode.xml"/>
+          <topicref href="topics/impala_expand_complex_types.xml"/>
         </topicref>
       </topicref>
       <topicref href="topics/impala_show.xml"/>

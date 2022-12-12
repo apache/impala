@@ -692,9 +692,9 @@ under the License.
         </p>
 
         <p>
-          Because the complex columns are omitted from the result set of an Impala <codeph>SELECT *</codeph> or <codeph>SELECT
-          <varname>col_name</varname></codeph> query, and because Impala currently does not support writing Parquet files with complex type
-          columns, you cannot use the <codeph>CREATE TABLE AS SELECT</codeph> syntax to create a table with nested type columns.
+          Because Impala currently does not support writing Parquet files with complex type columns,
+          you cannot use the <codeph>CREATE TABLE AS SELECT</codeph> syntax to create a table with
+          nested type columns.
         </p>
 
         <note>
@@ -971,29 +971,86 @@ STORED AS PARQUET;
 
 <!-- Hive does the JSON output business: http://www.datascience-labs.com/hive/hiveql-data-manipulation/ -->
 
-<!-- SELECT * works but skips any nested type coloumns. -->
-
           <p>
-            The result set of an Impala query always contains all scalar types; the elements and fields within any complex type queries must
-            be <q>unpacked</q> using join queries. A query cannot directly retrieve the entire value for a complex type column. Impala
-            returns an error in this case. Queries using <codeph>SELECT *</codeph> are allowed for tables with complex types, but the
-            columns with complex types are skipped.
+            The result set of an Impala query can contain both scalar and complex types. A query can
+            either retrieve the complex values directly or <q>unpack</q> the elements and fields
+            within a complex type using join queries, with the limitation that direct retrieval is
+            currently not supported for complex types where collections (maps or arrays) are
+            embedded within structs or structs are embedded within collections.
           </p>
 
           <p>
-            The following example shows how referring directly to a complex type column returns an error, while <codeph>SELECT *</codeph> on
-            the same table succeeds, but only retrieves the scalar columns.
+            Here are some complex types that are supported in the select list:
+            <ul>
+              <li>
+                <p>
+                  <codeph>STRUCT&lt;i: INT&gt;</codeph>
+                </p>
+              </li>
+              <li>
+                <p>
+                  <codeph>STRUCT&lt;s: STRUCT&lt;i: INT&gt;&gt;</codeph>
+                </p>
+              </li>
+              <li>
+                <p>
+                  <codeph>ARRAY&lt;INT&gt;</codeph>
+                </p>
+              </li>
+              <li>
+                <p>
+                  <codeph>ARRAY&lt;ARRAY&lt;INT&gt;&gt;</codeph>
+                </p>
+              </li>
+              <li>
+                <p>
+                  <codeph>ARRAY&lt;MAP&lt;INT&gt;&gt;</codeph>
+                </p>
+              </li>
+            </ul>
+          </p>
+
+          <p>
+            And here are some that are not supported in the select list:
+            <ul>
+              <li>
+                <p>
+                  <codeph>STRUCT&lt;a: ARRAY&lt;INT&gt;&gt;</codeph>
+                </p>
+              </li>
+              <li>
+                <p>
+                  <codeph>ARRAY&lt;STRUCT&lt;i: INT&gt;&gt;</codeph>
+                </p>
+              </li>
+              <li>
+                <p>
+                  <codeph>MAP&lt;INT, STRUCT&lt;s: STRING&gt;&gt;</codeph>
+                </p>
+              </li>
+            </ul>
+          </p>
+
+          <p>
+            Because of backward compatibility with earlier versions of Impala that did not support
+            complex types in the result set, queries using <codeph>SELECT *</codeph> skip complex
+            types by default. To include complex types in <codeph>SELECT *</codeph> queries, set the
+            EXPAND_COMPLEX_TYPES query option to true (see the
+            <xref href="impala_expand_complex_types.xml"/>).
+          </p>
+
+          <p>
+            The following example shows how referring directly to a column with a complex type where
+            a struct is embedded in a collection (an array) returns an error, while
+            <codeph>SELECT *</codeph> on the same table succeeds, but only retrieves the scalar
+            columns. Note that if EXPAND_COMPLEX_TYPES is true, the <codeph>SELECT *</codeph> query
+            also fails with the same error.
           </p>
 
           <note conref="../shared/impala_common.xml#common/complex_type_schema_pointer"/>
 
-<!-- Original error message:
-ERROR: AnalysisException: Expr 'c_orders' in select list returns a complex type 'ARRAY<STRUCT<o_orderkey:BIGINT,o_orderstatus:STRING,o_totalprice:DECIMAL(12,2),o_orderdate:STRING,o_orderpriority:STRING,o_clerk:STRING,o_shippriority:INT,o_comment:STRING,o_lineitems:ARRAY<STRUCT<l_partkey:BIGINT,l_suppkey:BIGINT,l_linenumber:INT,l_quantity:DECIMAL(12,2),l_extendedprice:DECIMAL(12,2),l_discount:DECIMAL(12,2),l_tax:DECIMAL(12,2),l_returnflag:STRING,l_linestatus:STRING,l_shipdate:STRING,l_commitdate:STRING,l_receiptdate:STRING,l_shipinstruct:STRING,l_shipmode:STRING,l_comment:STRING>>>>'.
--->
-
 <codeblock><![CDATA[SELECT c_orders FROM customer LIMIT 1;
-ERROR: AnalysisException: Expr 'c_orders' in select list returns a complex type 'ARRAY<STRUCT<o_orderkey:BIGINT,o_orderstatus:STRING, ... l_receiptdate:STRING,l_shipinstruct:STRING,l_shipmode:STRING,l_comment:STRING>>>>'.
-Only scalar types are allowed in the select list.
+ERROR: AnalysisException: STRUCT type inside collection types is not supported.
 
 -- Original column has several scalar and one complex column.
 DESCRIBE customer;
