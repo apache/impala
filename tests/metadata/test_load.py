@@ -32,6 +32,7 @@ from tests.util.filesystem_utils import get_fs_path, WAREHOUSE
 
 TEST_TBL_PART = "test_load"
 TEST_TBL_NOPART = "test_load_nopart"
+TEST_TBL_NOPART_EXT = "test_load_nopart_ext"
 STAGING_PATH = '%s/test_load_staging' % WAREHOUSE
 ALLTYPES_PATH = "%s/alltypes/year=2010/month=1/100101.txt" % WAREHOUSE
 MULTIAGG_PATH = '%s/alltypesaggmultifiles/year=2010/month=1/day=1' % WAREHOUSE
@@ -124,7 +125,7 @@ class TestLoadDataExternal(ImpalaTestSuite):
         create_uncompressed_text_dimension(cls.get_workload()))
 
   def _clean_test_tables(self):
-    self.client.execute("drop table if exists functional.{0}".format(TEST_TBL_NOPART))
+    self.client.execute("drop table if exists functional.{0}".format(TEST_TBL_NOPART_EXT))
     self.filesystem_client.delete_file_dir(TMP_STAGING_PATH, recursive=True)
 
   def teardown_method(self, method):
@@ -138,13 +139,13 @@ class TestLoadDataExternal(ImpalaTestSuite):
     self.filesystem_client.copy(ALLTYPES_PATH, "{0}/100101.txt".format(TMP_STAGING_PATH))
 
     self.client.execute("create table functional.{0} like functional.alltypesnopart"
-        " location '{1}/{0}'".format(TEST_TBL_NOPART, WAREHOUSE))
+        " location '{1}/{0}'".format(TEST_TBL_NOPART_EXT, WAREHOUSE))
 
   def test_load(self, vector):
     self.execute_query_expect_success(self.client, "load data inpath '{0}/100101.txt'"
-        " into table functional.{1}".format(TMP_STAGING_PATH, TEST_TBL_NOPART))
+        " into table functional.{1}".format(TMP_STAGING_PATH, TEST_TBL_NOPART_EXT))
     result = self.execute_scalar(
-        "select count(*) from functional.{0}".format(TEST_TBL_NOPART))
+        "select count(*) from functional.{0}".format(TEST_TBL_NOPART_EXT))
     assert(result == '310')
 
 
