@@ -207,14 +207,11 @@ string ImpalaServer::ColumnTypeToBeeswaxTypeString(const TColumnType& type) {
     DCHECK(type.types[0].__isset.scalar_type);
     return TypeToOdbcString(type);
   } else if (type.types[0].type == TTypeNodeType::ARRAY
-      || type.types[0].type == TTypeNodeType::MAP) {
+      || type.types[0].type == TTypeNodeType::MAP
+      || type.types[0].type == TTypeNodeType::STRUCT) {
     DCHECK_GT(type.types.size(), 1);
     // TODO (IMPALA-11041): consider returning the real type
     return "string";
-  } else if (type.types[0].type == TTypeNodeType::STRUCT) {
-    DCHECK_GT(type.types.size(), 1);
-    RaiseBeeswaxException("Returning struct types is not supported through the "
-        "beeswax interface", SQLSTATE_GENERAL_ERROR);
   } else {
     DCHECK(false);
     return "";

@@ -202,8 +202,7 @@ Status AsciiQueryResultSet::AddRows(const vector<ScalarExprEvaluator*>& expr_eva
             &out_stream);
       } else if (metadata_.columns[i].columnType.types.size() > 1) {
         ColumnType col_type = ColumnType::FromThrift(metadata_.columns[i].columnType);
-        DCHECK(col_type.IsArrayType() || col_type.IsMapType());
-        PrintCollectionValue(expr_evals[i], it.Get(), &out_stream, col_type.type);
+        PrintComplexValue(expr_evals[i], it.Get(), &out_stream, col_type);
       } else {
         DCHECK(false);
       }
@@ -214,29 +213,34 @@ Status AsciiQueryResultSet::AddRows(const vector<ScalarExprEvaluator*>& expr_eva
   return Status::OK();
 }
 
-void QueryResultSet::PrintCollectionValue(ScalarExprEvaluator* expr_eval,
-    const TupleRow* row, stringstream *stream, PrimitiveType collection_type) {
-  DCHECK(collection_type == PrimitiveType::TYPE_ARRAY
-      || collection_type == PrimitiveType::TYPE_MAP);
+void QueryResultSet::PrintComplexValue(ScalarExprEvaluator* expr_eval,
+    const TupleRow* row, stringstream *stream, const ColumnType& type) {
+  DCHECK(type.IsComplexType());
   const ScalarExpr& scalar_expr = expr_eval->root();
-  // Currently scalar_expr can be only a slot ref as no functions return arrays.
+  // Currently scalar_expr can be only a slot ref as no functions return complex types.
   DCHECK(scalar_expr.IsSlotRef());
-  const TupleDescriptor* item_tuple_desc = scalar_expr.GetCollectionTupleDesc();
-  DCHECK(item_tuple_desc != nullptr);
-  const CollectionValue* array_val =
-      static_cast<const CollectionValue*>(expr_eval->GetValue(row));
+  void* value = expr_eval->GetValue(row);
 
-  if (array_val != nullptr) {
-    rapidjson::BasicOStreamWrapper<stringstream> wrapped_stream(*stream);
-    rapidjson::Writer<rapidjson::BasicOStreamWrapper<stringstream>> writer(
-        wrapped_stream);
+  if (value == nullptr) {
+    (*stream) << RawValue::NullLiteral(/*top-level*/ true);
+    return;
+  }
+
+  rapidjson::BasicOStreamWrapper<stringstream> wrapped_stream(*stream);
+  rapidjson::Writer<rapidjson::BasicOStreamWrapper<stringstream>> writer(wrapped_stream);
+
+  if (type.IsCollectionType()) {
+    const CollectionValue* collection_val = static_cast<const CollectionValue*>(value);
+    const TupleDescriptor* item_tuple_desc = scalar_expr.GetCollectionTupleDesc();
+    DCHECK(item_tuple_desc != nullptr);
 
     ComplexValueWriter<rapidjson::BasicOStreamWrapper<stringstream>>
-        ::CollectionValueToJSON(*array_val,
-            collection_type,
-            item_tuple_desc, &writer);
+        ::CollectionValueToJSON(*collection_val, type.type, item_tuple_desc, &writer);
   } else {
-    (*stream) << RawValue::NullLiteral(/*top-level*/ true);
+    DCHECK(type.IsStructType());
+    const StructVal* struct_val = static_cast<const StructVal*>(value);
+    ComplexValueWriter<rapidjson::BasicOStreamWrapper<stringstream>>
+        ::StructValToJSON(*struct_val, type, &writer);
   }
 }
 

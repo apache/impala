@@ -129,8 +129,6 @@ class TestNestedStructsInSelectList(ImpalaTestSuite):
         create_exec_option_dimension_from_dict({
             'disable_codegen': ['False', 'True']}))
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
-    cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('protocol') == 'hs2')
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('orc_schema_resolution', 0, 1))
     cls.ImpalaTestMatrix.add_constraint(orc_schema_resolution_constraint)
 
@@ -185,33 +183,6 @@ class TestNestedCollectionsInSelectList(ImpalaTestSuite):
     if vector.get_value('table_format').file_format == 'parquet':
       pytest.skip()
     self.run_test_case('QueryTest/map_null_keys', vector)
-
-
-# Moved this to a separate test class from TestNestedTypesInSelectList because this needs
-# a narrower test vector.
-class TestNestedTypesInSelectListWithBeeswax(ImpalaTestSuite):
-  """Functional tests for nested types provided in the select list."""
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestNestedTypesInSelectListWithBeeswax, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
-    cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('protocol') == 'beeswax')
-    cls.ImpalaTestMatrix.add_dimension(create_orc_dimension(cls.get_workload()))
-    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
-        disable_codegen_options=[True]))
-
-  def test_struct_with_beeswax(self, vector):
-    expected_err = "Returning struct types is not supported through the beeswax " + \
-        "interface"
-    err = self.execute_query_expect_failure(self.client,
-        "select tiny_struct from functional_orc_def.complextypes_structs",
-        vector.get_value('exec_option'))
-    assert expected_err in str(err)
 
 
 class TestComputeStatsWithNestedTypes(ImpalaTestSuite):

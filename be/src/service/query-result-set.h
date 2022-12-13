@@ -79,11 +79,11 @@ class QueryResultSet {
       apache::hive::service::cli::thrift::TRowSet* rowset);
 
 protected:
-  /// Wrapper to callComplexValueWriter::CollectionValueToJSON() for a given collection
-  /// column. expr_eval must be a SlotRef on a collection slot.
-  static void PrintCollectionValue(ScalarExprEvaluator* expr_eval, const TupleRow* row,
-      std::stringstream *stream, PrimitiveType collection_type);
-
+  /// Wrapper to call ComplexValueWriter::CollectionValueToJSON() or
+  /// ComplexValueWriter::StructValToJSON() for a given complex column. expr_eval must be
+  /// a SlotRef on a complex-typed (collection or struct) slot.
+  static void PrintComplexValue(ScalarExprEvaluator* expr_eval, const TupleRow* row,
+      std::stringstream *stream, const ColumnType& type);
 };
 }
 
