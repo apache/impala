@@ -922,6 +922,7 @@ public class IcebergUtil {
     if (fileFormat != -1) {
       FbIcebergMetadata.addFileFormat(fbb, fileFormat);
     }
+    FbIcebergMetadata.addRecordCount(fbb, cf.recordCount());
     if (partKeysOffset != -1) {
       FbIcebergMetadata.addPartitionKeys(fbb, partKeysOffset);
     }
@@ -1015,14 +1016,26 @@ public class IcebergUtil {
     });
   }
 
-  public static boolean isPartitionColumn(IcebergColumn column,
+  /**
+   * Returns the partition transform type used for this column in the given spec.
+   * Returns TIcebergPartitionTransformType.VOID if the column is not used as a
+   * partitioning column.
+   */
+  public static TIcebergPartitionTransformType getPartitionTransformType(
+      IcebergColumn column,
       IcebergPartitionSpec spec) {
-    if (!spec.hasPartitionFields()) return false;
+    if (!spec.hasPartitionFields()) return TIcebergPartitionTransformType.VOID;
     for (IcebergPartitionField partField : spec.getIcebergPartitionFields()) {
       if (partField.getTransformType() == TIcebergPartitionTransformType.VOID) continue;
-      if (column.getFieldId() != partField.getSourceId()) continue;
-      return true;
+      if (column.getFieldId() == partField.getSourceId()) {
+        return partField.getTransformType();
+      }
     }
-    return false;
+    return TIcebergPartitionTransformType.VOID;
+  }
+
+  public static boolean isPartitionColumn(IcebergColumn column,
+      IcebergPartitionSpec spec) {
+    return getPartitionTransformType(column, spec) != TIcebergPartitionTransformType.VOID;
   }
 }

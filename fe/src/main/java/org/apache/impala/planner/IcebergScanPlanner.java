@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.apache.curator.shaded.com.google.common.collect.Lists;
@@ -51,6 +52,7 @@ import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.DateLiteral;
 import org.apache.impala.analysis.MultiAggregateInfo;
@@ -80,6 +82,7 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.thrift.TColumnStats;
+import org.apache.impala.thrift.TIcebergPartitionTransformType;
 import org.apache.impala.thrift.TVirtualColumnType;
 import org.apache.impala.util.ExprUtil;
 import org.apache.impala.util.IcebergUtil;
@@ -110,6 +113,9 @@ public class IcebergScanPlanner {
   private List<FileDescriptor> dataFilesWithoutDeletes_ = new ArrayList<>();
   private List<FileDescriptor> dataFilesWithDeletes_ = new ArrayList<>();
   private Set<FileDescriptor> deleteFiles_ = new HashSet<>();
+
+  // Conjuncts on columns not involved in IDENTITY-partitioning.
+  private List<Expr> nonIdentityConjuncts_ = new ArrayList<>();
 
   // Statistics about the data and delete files. Useful for memory estimates of the
   // ANTI JOIN
@@ -143,7 +149,7 @@ public class IcebergScanPlanner {
       // If there are no delete files we can just create a single SCAN node.
       Preconditions.checkState(dataFilesWithDeletes_.isEmpty());
       ret = new IcebergScanNode(ctx_.getNextNodeId(), tblRef_, conjuncts_,
-          aggInfo_, dataFilesWithoutDeletes_);
+          aggInfo_, dataFilesWithoutDeletes_, nonIdentityConjuncts_);
       ret.init(analyzer_);
     } else {
       // Let's create a bit more complex plan in the presence of delete files.
@@ -172,7 +178,8 @@ public class IcebergScanPlanner {
 
   private PlanNode planWithoutIceberg() throws ImpalaException {
     PlanNode ret = new IcebergScanNode(ctx_.getNextNodeId(), tblRef_, conjuncts_,
-        aggInfo_, getIceTable().getContentFileStore().getDataFiles());
+        aggInfo_, getIceTable().getContentFileStore().getDataFiles(),
+        nonIdentityConjuncts_);
     ret.init(analyzer_);
     return ret;
   }
@@ -187,7 +194,8 @@ public class IcebergScanPlanner {
     // If there are data files without corresponding delete files to be applied, we
     // can just create a SCAN node for these and do a UNION ALL with the ANTI JOIN.
     IcebergScanNode dataScanNode = new IcebergScanNode(
-      ctx_.getNextNodeId(), tblRef_, conjuncts_, aggInfo_, dataFilesWithoutDeletes_);
+        ctx_.getNextNodeId(), tblRef_, conjuncts_, aggInfo_, dataFilesWithoutDeletes_,
+        nonIdentityConjuncts_);
     dataScanNode.init(analyzer_);
     List<Expr> outputExprs = tblRef_.getDesc().getSlots().stream().map(
         entry -> new SlotRef(entry)).collect(Collectors.toList());
@@ -217,13 +225,14 @@ public class IcebergScanPlanner {
     addDataVirtualPositionSlots(tblRef_);
     addDeletePositionSlots(deleteDeltaRef);
     IcebergScanNode dataScanNode = new IcebergScanNode(
-      dataScanNodeId, tblRef_, conjuncts_, aggInfo_, dataFilesWithDeletes_);
+        dataScanNodeId, tblRef_, conjuncts_, aggInfo_, dataFilesWithDeletes_,
+        nonIdentityConjuncts_);
     dataScanNode.init(analyzer_);
     IcebergScanNode deleteScanNode = new IcebergScanNode(
         deleteScanNodeId, deleteDeltaRef, /*conjuncts=*/Collections.emptyList(),
-        aggInfo_, Lists.newArrayList(deleteFiles_));
+        aggInfo_, Lists.newArrayList(deleteFiles_),
+        /*nonIdentityConjuncts=*/Collections.emptyList());
     deleteScanNode.init(analyzer_);
-    deleteScanNode.setCardinality(deletesRecordCount_);
 
     // Now let's create the JOIN node
     List<BinaryPredicate> positionJoinConjuncts = createPositionJoinConjuncts(
@@ -248,6 +257,14 @@ public class IcebergScanPlanner {
       rawPath.add(posField);
       SingleNodePlanner.addSlotRefToDesc(analyzer_, rawPath);
       rawPath.remove(rawPath.size() - 1);
+    }
+    for (SlotDescriptor insertSlotDesc : tblRef.getDesc().getSlots()) {
+      TVirtualColumnType virtColType = insertSlotDesc.getVirtualColumnType();
+      if (virtColType == TVirtualColumnType.INPUT_FILE_NAME) {
+        insertSlotDesc.setStats(virtualInputFileNameStats());
+      } else if (virtColType == TVirtualColumnType.FILE_POSITION) {
+        insertSlotDesc.setStats(virtualFilePositionStats());
+      }
     }
   }
 
@@ -294,6 +311,18 @@ public class IcebergScanPlanner {
       }
       Preconditions.checkState(foundMatch);
     }
+    return ret;
+  }
+
+  private ColumnStats virtualInputFileNameStats() {
+    ColumnStats ret = new ColumnStats(Type.STRING);
+    ret.setNumDistinctValues(dataFilesWithDeletes_.size());
+    return ret;
+  }
+
+  private ColumnStats virtualFilePositionStats() {
+    ColumnStats ret = new ColumnStats(Type.BIGINT);
+    ret.setNumDistinctValues(deletesRecordCount_ / dataFilesWithDeletes_.size());
     return ret;
   }
 
@@ -434,25 +463,49 @@ public class IcebergScanPlanner {
   private void extractIcebergConjuncts() throws ImpalaException {
     boolean isPartitionColumnIncluded = false;
     Map<SlotId, SlotDescriptor> idToSlotDesc = new HashMap<>();
+    Set<Expr> identityConjuncts = new HashSet<>();
     for (SlotDescriptor slotDesc : tblRef_.getDesc().getSlots()) {
       idToSlotDesc.put(slotDesc.getId(), slotDesc);
     }
     for (Expr expr : conjuncts_) {
       if (isPartitionColumnIncluded(expr, idToSlotDesc)) {
         isPartitionColumnIncluded = true;
-        break;
+        if (isIdentityPartitionIncluded(expr, idToSlotDesc)) {
+          identityConjuncts.add(expr);
+        }
       }
     }
     if (!isPartitionColumnIncluded) {
+      // No partition conjuncts, i.e. every conjunct is non-identity conjunct.
+      nonIdentityConjuncts_ = conjuncts_;
       return;
     }
     for (Expr expr : conjuncts_) {
-      tryConvertIcebergPredicate(expr);
+      if (tryConvertIcebergPredicate(expr)) {
+        if (!identityConjuncts.contains(expr)) {
+          nonIdentityConjuncts_.add(expr);
+        }
+      } else {
+        nonIdentityConjuncts_.add(expr);
+      }
     }
   }
 
   private boolean isPartitionColumnIncluded(Expr expr,
       Map<SlotId, SlotDescriptor> idToSlotDesc) {
+    return hasPartitionTransformType(expr, idToSlotDesc,
+        transformType -> transformType != TIcebergPartitionTransformType.VOID);
+  }
+
+  private boolean isIdentityPartitionIncluded(Expr expr,
+      Map<SlotId, SlotDescriptor> idToSlotDesc) {
+    return hasPartitionTransformType(expr, idToSlotDesc,
+        transformType -> transformType == TIcebergPartitionTransformType.IDENTITY);
+  }
+
+  private boolean hasPartitionTransformType(Expr expr,
+      Map<SlotId, SlotDescriptor> idToSlotDesc,
+      Predicate<TIcebergPartitionTransformType> pred) {
     List<TupleId> tupleIds = Lists.newArrayList();
     List<SlotId> slotIds = Lists.newArrayList();
     expr.getIds(tupleIds, slotIds);
@@ -467,8 +520,11 @@ public class IcebergScanPlanner {
       if (col == null) continue;
       Preconditions.checkState(col instanceof IcebergColumn);
       IcebergColumn iceCol = (IcebergColumn)col;
-      if (IcebergUtil.isPartitionColumn(iceCol,
-          getIceTable().getDefaultPartitionSpec())) {
+      TIcebergPartitionTransformType transformType =
+          IcebergUtil.getPartitionTransformType(
+              iceCol,
+              getIceTable().getDefaultPartitionSpec());
+      if (pred.test(transformType)) {
         return true;
       }
     }
@@ -508,13 +564,15 @@ public class IcebergScanPlanner {
   /**
    * Transform impala predicate to iceberg predicate
    */
-  private void tryConvertIcebergPredicate(Expr expr)
+  private boolean tryConvertIcebergPredicate(Expr expr)
       throws ImpalaException {
     Expression predicate = convertIcebergPredicate(expr);
     if (predicate != null) {
       icebergPredicates_.add(predicate);
       LOG.debug("Push down the predicate: " + predicate + " to iceberg");
+      return true;
     }
+    return false;
   }
 
   private Expression convertIcebergPredicate(Expr expr)

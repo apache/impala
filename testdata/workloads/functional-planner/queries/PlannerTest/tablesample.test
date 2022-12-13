@@ -263,7 +263,7 @@ PLAN-ROOT SINK
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=6
    mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=44B cardinality=2
+   tuple-ids=0 row-size=44B cardinality=3
    in pipelines: 00(GETNEXT)
 ====
 # Sampling Iceberg tables. Count(*) is not optimized.
@@ -288,7 +288,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=6
    mem-estimate=32.00MB mem-reservation=8.00KB thread-reservation=1
-   tuple-ids=0 row-size=0B cardinality=2
+   tuple-ids=0 row-size=0B cardinality=3
    in pipelines: 00(GETNEXT)
 ====
 # Sampling partitioned Iceberg tables.
@@ -331,7 +331,7 @@ PLAN-ROOT SINK
    parquet statistics predicates: action = 'click'
    parquet dictionary predicates: action = 'click'
    mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=44B cardinality=1
+   tuple-ids=0 row-size=44B cardinality=4
    in pipelines: 00(GETNEXT)
 ====
 # Sampling Iceberg V2 tables. Delete files are not sampled, only the data files. So we
@@ -348,13 +348,13 @@ PLAN-ROOT SINK
 04:UNION
 |  pass-through-operands: all
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0 row-size=36B cardinality=4.85K
+|  tuple-ids=0 row-size=36B cardinality=4
 |  in pipelines: 03(GETNEXT), 00(GETNEXT)
 |
 |--02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
 |  |  hash predicates: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.file__position = functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete.pos, functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.input__file__name = functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete.file_path
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0 row-size=36B cardinality=2.42K
+|  |  tuple-ids=0 row-size=36B cardinality=3
 |  |  in pipelines: 00(GETNEXT), 01(OPEN)
 |  |
 |  |--01:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-POSITION-DELETE-01 functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete]
@@ -374,7 +374,7 @@ PLAN-ROOT SINK
 |       columns missing stats: i, s
 |     extrapolated-rows=disabled max-scan-range-rows=10
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
-|     tuple-ids=0 row-size=36B cardinality=1
+|     tuple-ids=0 row-size=36B cardinality=3
 |     in pipelines: 00(GETNEXT)
 |
 03:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files]

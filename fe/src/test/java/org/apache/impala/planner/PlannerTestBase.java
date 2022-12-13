@@ -246,6 +246,11 @@ public class PlannerTestBase extends FrontendTestBase {
         // All partitions of insertTableId are okay.
         if (tableDesc.getId() == insertTableId) continue;
         if (!tableDesc.isSetHdfsTable()) continue;
+        // Iceberg partitions are handled differently, in Impala there's always a single
+        // HMS partition in an Iceberg table and actual partition/file pruning is
+        // handled by Iceberg. This means 'scanRangePartitions' can be empty while the
+        // descriptor table still has the single HMS partition.
+        if (tableDesc.isSetIcebergTable() && scanRangePartitions.isEmpty()) continue;
         THdfsTable hdfsTable = tableDesc.getHdfsTable();
         for (Map.Entry<Long, THdfsPartition> e :
              hdfsTable.getPartitions().entrySet()) {

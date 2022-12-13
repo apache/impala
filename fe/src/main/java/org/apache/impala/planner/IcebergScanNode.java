@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.TableRef;
@@ -34,9 +35,12 @@ import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.fb.FbIcebergDataFileFormat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -45,11 +49,18 @@ import com.google.common.collect.Lists;
  * Scan of a single iceberg table.
  */
 public class IcebergScanNode extends HdfsScanNode {
+  private final static Logger LOG = LoggerFactory.getLogger(IcebergScanNode.class);
 
   private List<FileDescriptor> fileDescs_;
+  // Conjuncts on columns not involved in IDENTITY-partitioning. Subset of 'conjuncts_',
+  // but this does not include conjuncts on IDENTITY-partitioned columns, because such
+  // conjuncts have already been pushed to Iceberg to filter out partitions/files, so
+  // they don't have further selectivity on the surviving files.
+  private List<Expr> nonIdentityConjuncts_;
 
   public IcebergScanNode(PlanNodeId id, TableRef tblRef, List<Expr> conjuncts,
-      MultiAggregateInfo aggInfo, List<FileDescriptor> fileDescs)
+      MultiAggregateInfo aggInfo, List<FileDescriptor> fileDescs,
+      List<Expr> nonIdentityConjuncts)
       throws ImpalaRuntimeException {
     super(id, tblRef.getDesc(), conjuncts,
         getIcebergPartition(((FeIcebergTable)tblRef.getTable()).getFeFsTable()), tblRef,
@@ -58,6 +69,7 @@ public class IcebergScanNode extends HdfsScanNode {
     Preconditions.checkState(partitions_.size() == 1);
 
     fileDescs_ = fileDescs;
+    nonIdentityConjuncts_ = nonIdentityConjuncts;
     //TODO IMPALA-11577: optimize file format counting
     boolean hasParquet = false;
     boolean hasOrc = false;
@@ -90,10 +102,53 @@ public class IcebergScanNode extends HdfsScanNode {
   }
 
   /**
-   * In some cases we exactly know the cardinality, e.g. POSITION DELETE scan node.
+   * Computes cardinalities of the Iceberg scan node. Implemented based on
+   * HdfsScanNode.computeCardinalities with some modifications:
+   *   - we exactly know the record counts of the data files
+   *   - IDENTITY-based partition conjuncts already filtered out the files, so
+   *     we don't need their selectivity
    */
-  public void setCardinality(long cardinality) {
-    cardinality_ = cardinality;
+  @Override
+  protected void computeCardinalities(Analyzer analyzer) {
+    cardinality_ = 0;
+
+    if (sampledFiles_ != null) {
+      for (List<FileDescriptor> sampledFileDescs : sampledFiles_.values()) {
+        for (FileDescriptor fd : sampledFileDescs) {
+          cardinality_ += fd.getFbFileMetadata().icebergMetadata().recordCount();
+        }
+      }
+    } else {
+      for (FileDescriptor fd : fileDescs_) {
+        cardinality_ += fd.getFbFileMetadata().icebergMetadata().recordCount();
+      }
+    }
+
+    // Adjust cardinality for all collections referenced along the tuple's path.
+    for (Type t: desc_.getPath().getMatchedTypes()) {
+      if (t.isCollectionType()) cardinality_ *= PlannerContext.AVG_COLLECTION_SIZE;
+    }
+    inputCardinality_ = cardinality_;
+
+    if (cardinality_ > 0) {
+      double selectivity = computeCombinedSelectivity(nonIdentityConjuncts_);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("cardinality_=" + Long.toString(cardinality_) +
+                  " sel=" + Double.toString(selectivity));
+      }
+      cardinality_ = applySelectivity(cardinality_, selectivity);
+    }
+
+    cardinality_ = capCardinalityAtLimit(cardinality_);
+
+    if (countStarSlot_ != null) {
+      // We are doing optimized count star. Override cardinality with total num files.
+      inputCardinality_ = fileDescs_.size();
+      cardinality_ = fileDescs_.size();
+    }
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("IcebergScanNode: cardinality_=" + Long.toString(cardinality_));
+    }
   }
 
   /**

@@ -328,6 +328,9 @@ public class HdfsScanNode extends ScanNode {
   // this scan node has the count(*) optimization enabled.
   protected SlotDescriptor countStarSlot_ = null;
 
+  // Sampled file descriptors if table sampling is used.
+  Map<SampledPartitionMetadata, List<FileDescriptor>> sampledFiles_ = null;
+
   // Conjuncts used to trim the set of partitions passed to this node.
   // Used only to display EXPLAIN information.
   private final List<Expr> partitionConjuncts_;
@@ -1135,7 +1138,6 @@ public class HdfsScanNode extends ScanNode {
    */
   private void computeScanRangeLocations(Analyzer analyzer)
       throws ImpalaRuntimeException {
-    Map<SampledPartitionMetadata, List<FileDescriptor>> sampledFiles = null;
     if (sampleParams_ != null) {
       long percentBytes = sampleParams_.getPercentBytes();
       long randomSeed;
@@ -1147,15 +1149,15 @@ public class HdfsScanNode extends ScanNode {
       // Pass a minimum sample size of 0 because users cannot set a minimum sample size
       // for scans directly. For compute stats, a minimum sample size can be set, and
       // the sampling percent is adjusted to reflect it.
-      sampledFiles = getFilesSample(percentBytes, 0, randomSeed);
+      sampledFiles_ = getFilesSample(percentBytes, 0, randomSeed);
     }
 
     long scanRangeBytesLimit = analyzer.getQueryCtx().client_request.getQuery_options()
         .getMax_scan_range_length();
     scanRangeSpecs_ = new TScanRangeSpec();
 
-    if (sampledFiles != null) {
-      numPartitionsPerFs_ = sampledFiles.keySet().stream().collect(Collectors.groupingBy(
+    if (sampledFiles_ != null) {
+      numPartitionsPerFs_ = sampledFiles_.keySet().stream().collect(Collectors.groupingBy(
           SampledPartitionMetadata::getPartitionFsType, Collectors.counting()));
     } else {
       numPartitionsPerFs_.putAll(partitions_.stream().collect(
@@ -1191,9 +1193,9 @@ public class HdfsScanNode extends ScanNode {
       // conservatively estimate 1 row per file
       simpleLimitNumRows += fileDescs.size();
 
-      if (sampledFiles != null) {
+      if (sampledFiles_ != null) {
         // If we are sampling, check whether this partition is included in the sample.
-        fileDescs = sampledFiles.get(
+        fileDescs = sampledFiles_.get(
             new SampledPartitionMetadata(partition.getId(), partition.getFsType()));
         if (fileDescs == null) continue;
       }
@@ -1482,7 +1484,7 @@ public class HdfsScanNode extends ScanNode {
    * Sets these members:
    * extrapolatedNumRows_, inputCardinality_, cardinality_
    */
-  private void computeCardinalities(Analyzer analyzer) {
+  protected void computeCardinalities(Analyzer analyzer) {
     // Choose between the extrapolated row count and the one based on stored stats.
     extrapolatedNumRows_ = FeFsTable.Utils.getExtrapolatedNumRows(tbl_,
             sumValues(totalBytesPerFs_));

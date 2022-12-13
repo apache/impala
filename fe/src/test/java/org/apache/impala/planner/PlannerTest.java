@@ -1281,8 +1281,7 @@ public class PlannerTest extends PlannerTestBase {
   @Test
   public void testIcebergV2TableScans() {
     runPlannerTestFile("iceberg-v2-tables", "functional_parquet",
-        ImmutableSet.of(
-            PlannerTestOption.DO_NOT_VALIDATE_ROWCOUNT_ESTIMATION_FOR_PARTITIONS));
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
   /**
