@@ -216,6 +216,8 @@ class ImpalaShell(cmd.Cmd, object):
     self.cached_prompt = str()
 
     self.show_profiles = options.show_profiles
+    self.rpc_stdout = options.rpc_stdout
+    self.rpc_file = options.rpc_file
 
     # Output formatting flags/options
     self.output_file = options.output_file
@@ -607,7 +609,8 @@ class ImpalaShell(cmd.Cmd, object):
                           self.ca_cert, self.user, self.ldap_password, True,
                           self.client_connect_timeout_ms, self.verbose,
                           use_http_base_transport=False, http_path=self.http_path,
-                          http_cookie_names=None, value_converter=value_converter)
+                          http_cookie_names=None, value_converter=value_converter,
+                          rpc_stdout=self.rpc_stdout, rpc_file=self.rpc_file)
       elif protocol == 'hs2-http':
         return StrictHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
@@ -615,14 +618,16 @@ class ImpalaShell(cmd.Cmd, object):
                           self.client_connect_timeout_ms, self.verbose,
                           use_http_base_transport=True, http_path=self.http_path,
                           http_cookie_names=self.http_cookie_names,
-                          value_converter=value_converter)
+                          value_converter=value_converter, rpc_stdout=self.rpc_stdout,
+                          rpc_file=self.rpc_file)
     if protocol == 'hs2':
       return ImpalaHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
                           self.ca_cert, self.user, self.ldap_password, self.use_ldap,
                           self.client_connect_timeout_ms, self.verbose,
                           use_http_base_transport=False, http_path=self.http_path,
-                          http_cookie_names=None, value_converter=value_converter)
+                          http_cookie_names=None, value_converter=value_converter,
+                          rpc_stdout=self.rpc_stdout, rpc_file=self.rpc_file)
     elif protocol == 'hs2-http':
       return ImpalaHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
@@ -632,7 +637,8 @@ class ImpalaShell(cmd.Cmd, object):
                           http_cookie_names=self.http_cookie_names,
                           http_socket_timeout_s=self.http_socket_timeout_s,
                           value_converter=value_converter,
-                          connect_max_tries=self.connect_max_tries)
+                          connect_max_tries=self.connect_max_tries,
+                          rpc_stdout=self.rpc_stdout, rpc_file=self.rpc_file)
     elif protocol == 'beeswax':
       return ImpalaBeeswaxClient(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,

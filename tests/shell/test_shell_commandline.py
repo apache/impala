@@ -1408,3 +1408,106 @@ class TestImpalaShell(ImpalaTestSuite):
     result = run_impala_shell_cmd(vector, args)
 
     assert expected_py2 in result.stdout or expected_py3 in result.stdout
+
+  def test_output_rpc_to_screen_and_file(self, vector, populated_table, tmp_file):
+    """Tests the flags that output hs2 rpc call details to both stdout
+    and a file.  Asserts the expected text is written."""
+    self.skip_if_protocol_is_beeswax(vector)
+
+    args = ['--rpc_stdout', '--rpc_file', tmp_file,
+            '-q', 'select * from {0}'.format(populated_table)]
+    result = run_impala_shell_cmd(vector, args)
+
+    stdout_data = result.stdout.strip()
+    rpc_file_data = open(tmp_file, "r").read().strip()
+
+    def check_multiline(check_desc, regex_lines):
+      """Build and runs a multi-line regular expression against both the
+      shell's stdout and rpc file contents to ensure the expected data about
+      the hs2 rpc calls was outputted."""
+      the_re = re.compile("^" + "\n".join(regex_lines) + "$", re.MULTILINE)
+      assert the_re.search(stdout_data), \
+             "'{0}' assert failed in stdout: \n{1}" \
+             .format(check_desc, stdout_data)
+      assert the_re.search(rpc_file_data), \
+             "'{0}' assert failed in the rpc file contents: \n{1}" \
+             .format(check_desc, rpc_file_data)
+
+    check_multiline("Open Session Request",
+                    [
+                      "{0}{1}".format(
+                        "\\[\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{6}\\] ",
+                        "RPC CALL STARTED:"),
+                      "OPERATION: OpenSession",
+                      "DETAILS:",
+                      "  \\* Impala Session Id: None",
+                      "  \\* Impala Query Id:   None",
+                      "  \\* Attempt Count:     1",
+                      "",
+                      "RPC REQUEST:",
+                      "\\<TOpenSessionReq\\>",
+                      "    - client_protocol: 5",
+                      "    - configuration: <None>",
+                      "    - password: <None>",
+                      "    - username: .*?",
+                    ])
+
+    check_multiline("Open Session Response",
+                    [
+                      "{0}{1}".format(
+                        "\\[\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{6}\\] ",
+                        "RPC CALL FINISHED:"),
+                      "OPERATION: OpenSession",
+                      "DETAILS:",
+                      "  \\* Time:   \\d+(\\.\\d+)?ms",
+                      "  \\* Result: SUCCESS",
+                      "",
+                      "RPC RESPONSE:",
+                      "\\<TOpenSessionResp\\>",
+                      "    - configuration: .*?",
+                      "    - serverProtocolVersion: .*?",
+                      "    - sessionHandle: \\<TSessionHandle\\>",
+                      "                       - sessionId: \\<THandleIdentifier\\>",
+                      "                                      - guid: \\<binary data\\>",
+                      "                                      - secret: "
+                      "\\*\\*\\*\\*\\*\\*\\*",
+                      "    - status: \\<TStatus\\>",
+                      "                - errorCode: \\<None\\>",
+                      "                - errorMessage: \\<None\\>",
+                      "                - infoMessages: \\<None\\>",
+                      "                - sqlState: \\<None\\>",
+                      "                - statusCode: 0",
+                    ])
+
+    check_multiline("Session and Query Id",
+                    [
+                      "{0}{1}".format(
+                        "\\[\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{6}\\] ",
+                        "RPC CALL STARTED:"),
+                      "OPERATION: FetchResults",
+                      "DETAILS:",
+                      "  \\* Impala Session Id: [a-z0-9]*:[a-z0-9]*",
+                      "  \\* Impala Query Id:   [a-z0-9]*:[a-z0-9]*",
+                    ])
+
+    check_multiline("TRowSet Skipped",
+                    [
+                      "{0}{1}".format(
+                        "\\[\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{6}\\] ",
+                        "RPC CALL FINISHED:"),
+                      "OPERATION: FetchResults",
+                      "DETAILS:",
+                      "  \\* Time:   \\d+(\\.\\d+)?ms",
+                      "  \\* Result: SUCCESS",
+                      "",
+                      "RPC RESPONSE:",
+                      "<TFetchResultsResp>",
+                      "    - hasMoreRows: False",
+                      "    - results: <TRowSet> - <skipping>",
+                      "    - status: <TStatus>",
+                      "                - errorCode: <None>",
+                      "                - errorMessage: <None>",
+                      "                - infoMessages: <None>",
+                      "                - sqlState: <None>",
+                      "                - statusCode: 0",
+                    ])

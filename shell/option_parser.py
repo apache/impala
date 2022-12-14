@@ -206,6 +206,14 @@ def get_option_parser(defaults):
   parser.add_option("-p", "--show_profiles", dest="show_profiles",
                     action="store_true",
                     help="Always display query profiles after execution")
+  parser.add_option("--rpc_stdout", dest="rpc_stdout",
+                    action="store_true",
+                    help="Output hs2 rpc details to stdout. "
+                    "Ignored if protocol is beeswax.")
+  parser.add_option("--rpc_file", dest="rpc_file",
+                    help="Write hs2 rpc call details to the given file. "
+                    "If the file exists, rpc call details will be appended to the "
+                    "file. Ignored if protocol is beeswax.")
   parser.add_option("--quiet", dest="verbose",
                     action="store_false",
                     help="Disable verbose output")
