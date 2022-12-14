@@ -116,7 +116,7 @@ else
       -i impala-config.sh
   popd
   pushd java
-  mvn versions:set -DnewVersion=${NEW_MAVEN_VERSION}
+  mvn org.codehaus.mojo:versions-maven-plugin:2.13.0:set -DnewVersion=${NEW_MAVEN_VERSION}
   popd
 
   if ! ./bin/clean.sh; then
