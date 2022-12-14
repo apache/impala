@@ -94,8 +94,6 @@ if [[ "${ERASURE_CODING}" = true ]]; then
   # We do not run FE tests when erasure coding is enabled because planner tests
   # would fail.
   FE_TEST=false
-  TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} \
-    --impalad_args=--default_query_options=allow_erasure_coded_files=true"
 fi
 
 # Indicates whether code coverage reports should be generated.

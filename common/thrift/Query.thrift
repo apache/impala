@@ -339,7 +339,7 @@ struct TQueryOptions {
   68: optional TKuduReadMode kudu_read_mode = TKuduReadMode.DEFAULT;
 
   // Allow reading of erasure coded files in HDFS.
-  69: optional bool allow_erasure_coded_files = false;
+  69: optional bool allow_erasure_coded_files = true;
 
   // See comment in ImpalaService.thrift.
   70: optional string timezone = ""

@@ -178,14 +178,12 @@ class TestObservability(ImpalaTestSuite):
     expected_str = ("Query Options (set by configuration and planner): "
         "MEM_LIMIT=8589934592,"
         "NUM_NODES=1,NUM_SCANNER_THREADS=1,"
-        "RUNTIME_FILTER_MODE=OFF,MT_DOP=0,{erasure_coding}TIMEZONE={timezone},"
+        "RUNTIME_FILTER_MODE=OFF,MT_DOP=0,TIMEZONE={timezone},"
         "CLIENT_IDENTIFIER="
         "query_test/test_observability.py::TestObservability::()::test_query_options,"
         "SPOOL_QUERY_RESULTS=0"
         "\n")
-    expected_str = expected_str.format(
-        erasure_coding="ALLOW_ERASURE_CODED_FILES=1," if IS_EC else "",
-        timezone=server_timezone)
+    expected_str = expected_str.format(timezone=server_timezone)
     assert expected_str in profile, profile
 
   def test_exec_summary(self):

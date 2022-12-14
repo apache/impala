@@ -40,8 +40,7 @@ under the License.
 
     <p>
       Use the <codeph>ALLOW_ERASURE_CODED_FILES</codeph> query option to enable or disable the
-      support of erasure coded files in Impala. Until Impala is fully tested and certified with
-      erasure coded files, this query option is set to <codeph>FALSE</codeph> by default.
+      support of erasure coded files in Impala.
     </p>
 
     <p>
@@ -55,7 +54,7 @@ under the License.
     </p>
 
     <p>
-      <b>Default:</b> <codeph>FALSE</codeph>
+      <b>Default:</b> <codeph>TRUE</codeph>
     </p>
 
     <p>
