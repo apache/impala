@@ -754,6 +754,9 @@ enum TImpalaQueryOptions {
   // an issue.
   // Only valid if DISABLE_CODEGEN_CACHE is set to false.
   CODEGEN_CACHE_MODE = 150;
+
+  // Convert non-string map keys to string to produce valid JSON.
+  STRINGIFY_MAP_KEYS = 151
 }
 
 // The summary of a DML statement.

@@ -612,6 +612,9 @@ struct TQueryOptions {
   // See comment in ImpalaService.thrift
   150: optional bool disable_codegen_cache = false;
   151: optional TCodeGenCacheMode codegen_cache_mode = TCodeGenCacheMode.NORMAL;
+
+  // See comment in ImpalaService.thrift
+  152: optional bool stringify_map_keys = false;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

@@ -67,23 +67,27 @@ class QueryResultSet {
   /// Returns the size of this result set in number of rows.
   virtual size_t size() = 0;
 
-  /// Returns a result set suitable for Beeswax-based clients.
+  /// Returns a result set suitable for Beeswax-based clients. If 'stringift_map_keys' is
+  /// true, converts map keys to strings; see IMPALA-11778.
   static QueryResultSet* CreateAsciiQueryResultSet(
-      const TResultSetMetadata& metadata, std::vector<std::string>* rowset);
+      const TResultSetMetadata& metadata, std::vector<std::string>* rowset,
+      bool stringify_map_keys);
 
   /// Returns a result set suitable for HS2-based clients. If 'rowset' is nullptr, the
-  /// returned object will allocate and manage its own rowset.
+  /// returned object will allocate and manage its own rowset. If 'stringift_map_keys' is
+  /// true, converts map keys to strings; see IMPALA-11778.
   static QueryResultSet* CreateHS2ResultSet(
       apache::hive::service::cli::thrift::TProtocolVersion::type version,
       const TResultSetMetadata& metadata,
-      apache::hive::service::cli::thrift::TRowSet* rowset);
+      apache::hive::service::cli::thrift::TRowSet* rowset, bool stringify_map_keys);
 
 protected:
   /// Wrapper to call ComplexValueWriter::CollectionValueToJSON() or
   /// ComplexValueWriter::StructValToJSON() for a given complex column. expr_eval must be
-  /// a SlotRef on a complex-typed (collection or struct) slot.
+  /// a SlotRef on a complex-typed (collection or struct) slot. If 'stringify_map_keys' is
+  /// true, converts map keys to strings; see IMPALA-11778.
   static void PrintComplexValue(ScalarExprEvaluator* expr_eval, const TupleRow* row,
-      std::stringstream *stream, const ColumnType& type);
+      std::stringstream *stream, const ColumnType& type, bool stringify_map_keys);
 };
 }
 

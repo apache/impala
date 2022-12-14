@@ -624,7 +624,8 @@ Status ImpalaServer::FetchInternal(TUniqueId query_id, const bool start_over,
   query_results->data.clear();
   if (!query_handle->eos()) {
     scoped_ptr<QueryResultSet> result_set(QueryResultSet::CreateAsciiQueryResultSet(
-        *query_handle->result_metadata(), &query_results->data));
+        *query_handle->result_metadata(), &query_results->data,
+        query_handle->query_options().stringify_map_keys));
     fetch_rows_status =
         query_handle->FetchRows(fetch_size, result_set.get(), block_on_wait_time_us);
   }

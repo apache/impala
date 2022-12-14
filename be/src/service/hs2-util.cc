@@ -387,8 +387,11 @@ static void StructExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
       buffer.Clear();
       rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
 
-      ComplexValueWriter<rapidjson::StringBuffer>::StructValToJSON(
-          struct_val, column_type, &writer);
+      // TODO: Create a stringify_map_keys parameter and pass that when
+      // "IMPALA-9551: Allow mixed complex types in select list" is done.
+      ComplexValueWriter<rapidjson::StringBuffer> complex_value_writer(&writer, false);
+      complex_value_writer.StructValToJSON(struct_val, column_type);
+
       column->stringVal.values.emplace_back(buffer.GetString());
     }
     SetNullBit(output_row_idx, struct_val.is_null, &column->stringVal.nulls);
@@ -398,7 +401,8 @@ static void StructExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
 
 static void CollectionExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     const TColumnType& type, RowBatch* batch, int start_idx, int num_rows,
-    uint32_t output_row_idx, apache::hive::service::cli::thrift::TColumn* column) {
+    uint32_t output_row_idx, bool stringify_map_keys,
+    apache::hive::service::cli::thrift::TColumn* column) {
   DCHECK(type.types.size() > 1);
   TTypeNodeType::type coll_thrift_type = type.types[0].type;
   DCHECK(coll_thrift_type == TTypeNodeType::ARRAY ||
@@ -424,8 +428,11 @@ static void CollectionExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
       buffer.Clear();
       rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
 
-      ComplexValueWriter<rapidjson::StringBuffer>::CollectionValueToJSON(
-          value, coll_impala_type, item_tuple_desc, &writer);
+      ComplexValueWriter<rapidjson::StringBuffer> complex_value_writer(
+          &writer, stringify_map_keys);
+      complex_value_writer.CollectionValueToJSON(value, coll_impala_type,
+          item_tuple_desc);
+
       column->stringVal.values.emplace_back(buffer.GetString());
     }
     SetNullBit(output_row_idx, coll_val.is_null, &column->stringVal.nulls);
@@ -436,7 +443,8 @@ static void CollectionExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
 // For V6 and above
 void impala::ExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     const TColumnType& type, RowBatch* batch, int start_idx, int num_rows,
-    uint32_t output_row_idx, apache::hive::service::cli::thrift::TColumn* column) {
+    uint32_t output_row_idx, bool stringify_map_keys,
+    apache::hive::service::cli::thrift::TColumn* column) {
   // Dispatch to a templated function for the loop over rows. This avoids branching on
   // the type for every row.
   // TODO: instead of relying on stamped out implementations, we could codegen this loop
@@ -448,8 +456,8 @@ void impala::ExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
       return;
     case TTypeNodeType::ARRAY:
     case TTypeNodeType::MAP:
-      CollectionExprValuesToHS2TColumn(
-          expr_eval, type, batch, start_idx, num_rows, output_row_idx, column);
+      CollectionExprValuesToHS2TColumn(expr_eval, type, batch, start_idx, num_rows,
+          output_row_idx, stringify_map_keys, column);
       return;
     default:
       break;

@@ -219,7 +219,8 @@ Status ImpalaServer::FetchInternal(TUniqueId query_id, SessionState* session,
   TProtocolVersion::type version = is_child_query ?
       TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V1 : session->hs2_version;
   scoped_ptr<QueryResultSet> result_set(QueryResultSet::CreateHS2ResultSet(
-      version, *(query_handle->result_metadata()), &(fetch_results->results)));
+      version, *(query_handle->result_metadata()), &(fetch_results->results),
+      query_handle->query_options().stringify_map_keys));
   RETURN_IF_ERROR(
       query_handle->FetchRows(fetch_size, result_set.get(), block_on_wait_time_us));
   *num_results = result_set->size();
@@ -541,7 +542,8 @@ Status ImpalaServer::SetupResultsCacheing(const QueryHandle& query_handle,
   if (cache_num_rows > 0) {
     const TResultSetMetadata* result_set_md = query_handle->result_metadata();
     QueryResultSet* result_set =
-        QueryResultSet::CreateHS2ResultSet(session->hs2_version, *result_set_md, nullptr);
+        QueryResultSet::CreateHS2ResultSet(session->hs2_version, *result_set_md, nullptr,
+            query_handle->query_options().stringify_map_keys);
     RETURN_IF_ERROR(query_handle->SetResultCache(result_set, cache_num_rows));
   }
   return Status::OK();

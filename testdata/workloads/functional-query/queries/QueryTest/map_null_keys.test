@@ -22,3 +22,27 @@ from map_null_keys;
 ---- TYPES
 INT,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 =====
+---- QUERY
+-- Test that NULL map keys are printed correctly with STRINGIFY_MAP_KEYS=true.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+set STRINGIFY_MAP_KEYS=1;
+select
+ id,
+ map_bool_key,
+ map_tinyint_key,
+ map_smallint_key,
+ map_bigint_key,
+ map_float_key,
+ map_double_key,
+ map_decimal_key,
+ map_string_key,
+ map_char_key,
+ map_varchar_key,
+ map_timestamp_key,
+ map_date_key
+from map_null_keys;
+---- RESULTS
+1,'{"true":"true","null":"null"}','{"-1":"one","null":"null"}','{"-1":"one","null":"null"}','{"-1":"one","null":"null"}','{"-1.75":"a","null":"null"}','{"-1.75":"a","null":"null"}','{"-1.8":"a","null":"null"}','{"one":1,"null":null}','{"Mon":1,"null":null}','{"a":"A","null":null}','{"2022-12-10 08:15:12":"Saturday morning","null":"null"}','{"2022-12-10":"Saturday","null":"null"}'
+---- TYPES
+INT,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+=====

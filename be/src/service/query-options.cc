@@ -1052,6 +1052,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_fallback_db_for_functions(value);
         break;
       }
+      case TImpalaQueryOptions::STRINGIFY_MAP_KEYS: {
+        query_options->__set_stringify_map_keys(IsTrue(value));
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

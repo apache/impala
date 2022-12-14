@@ -58,8 +58,9 @@ namespace impala {
 class AsciiQueryResultSet : public QueryResultSet {
  public:
   /// Rows are added into 'rowset'.
-  AsciiQueryResultSet(const TResultSetMetadata& metadata, vector<string>* rowset)
-    : metadata_(metadata), result_set_(rowset) {}
+  AsciiQueryResultSet(const TResultSetMetadata& metadata, vector<string>* rowset,
+      bool stringify_map_keys)
+    : metadata_(metadata), result_set_(rowset), stringify_map_keys_(stringify_map_keys) {}
 
   virtual ~AsciiQueryResultSet() {}
 
@@ -83,13 +84,17 @@ class AsciiQueryResultSet : public QueryResultSet {
 
   /// Points to the result set to be filled. Not owned by this object.
   vector<string>* result_set_;
+
+  // If true, converts map keys to strings; see IMPALA-11778.
+  const bool stringify_map_keys_;
 };
 
 /// Result set container for Hive protocol versions >= V6, where results are returned in
 /// column-orientation.
 class HS2ColumnarResultSet : public QueryResultSet {
  public:
-  HS2ColumnarResultSet(const TResultSetMetadata& metadata, TRowSet* rowset);
+  HS2ColumnarResultSet(const TResultSetMetadata& metadata, TRowSet* rowset,
+      bool stringify_map_keys);
 
   virtual ~HS2ColumnarResultSet() {}
 
@@ -121,6 +126,9 @@ class HS2ColumnarResultSet : public QueryResultSet {
   boost::scoped_ptr<TRowSet> owned_result_set_;
 
   int64_t num_rows_;
+
+  // If true, converts map keys to strings; see IMPALA-11778.
+  const bool stringify_map_keys_;
 
   void InitColumns();
 };
@@ -160,16 +168,17 @@ class HS2RowOrientedResultSet : public QueryResultSet {
 };
 
 QueryResultSet* QueryResultSet::CreateAsciiQueryResultSet(
-    const TResultSetMetadata& metadata, vector<string>* rowset) {
-  return new AsciiQueryResultSet(metadata, rowset);
+    const TResultSetMetadata& metadata, vector<string>* rowset, bool stringify_map_keys) {
+  return new AsciiQueryResultSet(metadata, rowset, stringify_map_keys);
 }
 
 QueryResultSet* QueryResultSet::CreateHS2ResultSet(
-    TProtocolVersion::type version, const TResultSetMetadata& metadata, TRowSet* rowset) {
+    TProtocolVersion::type version, const TResultSetMetadata& metadata, TRowSet* rowset,
+    bool stringify_map_keys) {
   if (version < TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V6) {
     return new HS2RowOrientedResultSet(metadata, rowset);
   } else {
-    return new HS2ColumnarResultSet(metadata, rowset);
+    return new HS2ColumnarResultSet(metadata, rowset, stringify_map_keys);
   }
 }
 
@@ -202,7 +211,8 @@ Status AsciiQueryResultSet::AddRows(const vector<ScalarExprEvaluator*>& expr_eva
             &out_stream);
       } else if (metadata_.columns[i].columnType.types.size() > 1) {
         ColumnType col_type = ColumnType::FromThrift(metadata_.columns[i].columnType);
-        PrintComplexValue(expr_evals[i], it.Get(), &out_stream, col_type);
+        PrintComplexValue(expr_evals[i], it.Get(), &out_stream, col_type,
+            stringify_map_keys_);
       } else {
         DCHECK(false);
       }
@@ -214,7 +224,8 @@ Status AsciiQueryResultSet::AddRows(const vector<ScalarExprEvaluator*>& expr_eva
 }
 
 void QueryResultSet::PrintComplexValue(ScalarExprEvaluator* expr_eval,
-    const TupleRow* row, stringstream *stream, const ColumnType& type) {
+    const TupleRow* row, stringstream *stream, const ColumnType& type,
+    bool stringify_map_keys) {
   DCHECK(type.IsComplexType());
   const ScalarExpr& scalar_expr = expr_eval->root();
   // Currently scalar_expr can be only a slot ref as no functions return complex types.
@@ -235,12 +246,15 @@ void QueryResultSet::PrintComplexValue(ScalarExprEvaluator* expr_eval,
     DCHECK(item_tuple_desc != nullptr);
 
     ComplexValueWriter<rapidjson::BasicOStreamWrapper<stringstream>>
-        ::CollectionValueToJSON(*collection_val, type.type, item_tuple_desc, &writer);
+        complex_value_writer(&writer, stringify_map_keys);
+    complex_value_writer.CollectionValueToJSON(*collection_val, type.type,
+            item_tuple_desc);
   } else {
     DCHECK(type.IsStructType());
     const StructVal* struct_val = static_cast<const StructVal*>(value);
     ComplexValueWriter<rapidjson::BasicOStreamWrapper<stringstream>>
-        ::StructValToJSON(*struct_val, type, &writer);
+        complex_value_writer(&writer, stringify_map_keys);
+    complex_value_writer.StructValToJSON(*struct_val, type);
   }
 }
 
@@ -323,8 +337,9 @@ uint32_t TColumnByteSize(const ThriftTColumn& col, uint32_t start_idx, uint32_t 
 // Result set container for Hive protocol versions >= V6, where results are returned in
 // column-orientation.
 HS2ColumnarResultSet::HS2ColumnarResultSet(
-    const TResultSetMetadata& metadata, TRowSet* rowset)
-  : metadata_(metadata), result_set_(rowset), num_rows_(0) {
+    const TResultSetMetadata& metadata, TRowSet* rowset, bool stringify_map_keys)
+  : metadata_(metadata), result_set_(rowset), num_rows_(0),
+    stringify_map_keys_(stringify_map_keys) {
   if (rowset == NULL) {
     owned_result_set_.reset(new TRowSet());
     result_set_ = owned_result_set_.get();
@@ -341,7 +356,7 @@ Status HS2ColumnarResultSet::AddRows(const vector<ScalarExprEvaluator*>& expr_ev
     const TColumnType& type = metadata_.columns[i].columnType;
     ScalarExprEvaluator* expr_eval = expr_evals[i];
     ExprValuesToHS2TColumn(expr_eval, type, batch, start_idx, num_rows, num_rows_,
-        &(result_set_->columns[i]));
+        stringify_map_keys_, &(result_set_->columns[i]));
   }
   num_rows_ += num_rows;
   return Status::OK();

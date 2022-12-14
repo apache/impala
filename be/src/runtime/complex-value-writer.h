@@ -30,34 +30,40 @@
 
 namespace impala {
 
-// Class with static methods that write complex types (collections and structs) in JSON
-// format.
+// Class that writes complex types (collections and structs) in the JSON format.
 template <class JsonStream>
 class ComplexValueWriter {
  public:
-  // Gets a non-null CollectionValue and writes it in JSON format using 'writer'.
-  // 'collection_type' should be either TYPE_ARRAY or TYPE_MAP.
-  static void CollectionValueToJSON(const CollectionValue& collection_value,
-      PrimitiveType collection_type, const TupleDescriptor* item_tuple_desc,
-      rapidjson::Writer<JsonStream>* writer);
+   // Will use 'writer' to write JSON text. Does not take ownership of 'writer', the
+   // caller is responsible for managing its lifetime. If 'stringify_map_keys' is true,
+   // converts map keys to strings; see IMPALA-11778.
+   ComplexValueWriter(rapidjson::Writer<JsonStream>* writer, bool stringify_map_keys);
 
-  // Gets a non-null StructVal and writes it in JSON format using 'writer'. Uses
-  // 'column_type' to figure out field names and types. This function can call itself
-  // recursively in case of nested structs.
-  static void StructValToJSON(const impala_udf::StructVal& struct_val,
-      const ColumnType& column_type, rapidjson::Writer<JsonStream>* writer);
+  // Gets a non-null CollectionValue and writes it in JSON format. 'collection_type'
+  // should be either TYPE_ARRAY or TYPE_MAP.
+  void CollectionValueToJSON(const CollectionValue& collection_value,
+      PrimitiveType collection_type, const TupleDescriptor* item_tuple_desc);
+
+  // Gets a non-null StructVal and writes it in JSON format. Uses 'column_type' to figure
+  // out field names and types. This function can call itself recursively in case of
+  // nested structs.
+  void StructValToJSON(const impala_udf::StructVal& struct_val,
+      const ColumnType& column_type);
 
  private:
-  static void PrimitiveValueToJSON(void* value, const ColumnType& type, bool map_key,
-      rapidjson::Writer<JsonStream>* writer);
-  static void WriteNull(rapidjson::Writer<JsonStream>* writer);
-  static void CollectionElementToJSON(Tuple* item_tuple, const SlotDescriptor& slot_desc,
-      bool map_key, rapidjson::Writer<JsonStream>* writer);
-  static void ArrayValueToJSON(const CollectionValue& array_value,
-    const TupleDescriptor* item_tuple_desc, rapidjson::Writer<JsonStream>* writer);
-  static void MapValueToJSON(const CollectionValue& map_value,
-      const TupleDescriptor* item_tuple_desc, rapidjson::Writer<JsonStream>* writer);
+  void PrimitiveValueToJSON(void* value, const ColumnType& type, bool map_key);
+  void WriteNull(bool map_key);
+  void CollectionElementToJSON(Tuple* item_tuple, const SlotDescriptor& slot_desc,
+      bool map_key);
+  void ArrayValueToJSON(const CollectionValue& array_value,
+    const TupleDescriptor* item_tuple_desc);
+  void MapValueToJSON(const CollectionValue& map_value,
+      const TupleDescriptor* item_tuple_desc);
 
+  rapidjson::Writer<JsonStream>* const writer_;
+
+  // If true, converts map keys to strings; see IMPALA-11778.
+  const bool stringify_map_keys_;
 };
 
 } // namespace impala

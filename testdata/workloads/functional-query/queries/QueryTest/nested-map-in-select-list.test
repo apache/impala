@@ -346,3 +346,26 @@ from collection_tbl;
 ---- TYPES
 STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 =====
+---- QUERY
+-- Test that map keys are printed correctly with STRINGIFY_MAP_KEYS=true.
+set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
+set STRINGIFY_MAP_KEYS=1;
+select
+ map_bool_key,
+ map_tinyint_key,
+ map_smallint_key,
+ map_bigint_key,
+ map_float_key,
+ map_double_key,
+ map_decimal_key,
+ map_string_key,
+ map_char_key,
+ map_varchar_key,
+ map_timestamp_key,
+ map_date_key
+from collection_tbl;
+---- RESULTS
+'{"true":"true","false":"false"}','{"-1":"a","0":"b","1":"c"}','{"-1":"a","0":"b","1":"c"}','{"-1":"a","0":"b","1":"c"}','{"-1.5":"a","0.25":"b","1.75":"c"}','{"-1.5":"a","0.25":"b","1.75":"c"}','{"-1.8":"a","0.2":"b","1.2":"c"}','{"one":1,"two":2,"three":3}','{"Mon":1,"Tue":2,"Wed":3,"Thu":4,"Fri":5,"Sat":6,"Sun":7}','{"a":"A","ab":"AB","abc":"ABC"}','{"2022-12-10 08:15:12":"Saturday morning","2022-12-09 18:15:12":"Friday evening"}','{"2022-12-10":"Saturday","2022-12-09":"Friday"}'
+---- TYPES
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+=====
