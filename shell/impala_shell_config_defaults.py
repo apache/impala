@@ -58,5 +58,5 @@ impala_shell_defaults = {
             'http_socket_timeout_s': None,
             'global_config_default_path': '/etc/impalarc',
             'strict_hs2_protocol': False,
-            'fp_format_specification': None
+            'hs2_fp_format': None
     }
