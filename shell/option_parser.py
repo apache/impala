@@ -333,6 +333,11 @@ def get_option_parser(defaults):
                     "returned in an http response by the server or an intermediate proxy "
                     "then it will be included in each subsequent request for the same "
                     "connection.")
+  parser.add_option("--no_http_tracing", dest="no_http_tracing",
+                    action="store_true",
+                    help="Tracing http headers 'X-Request-Id', 'X-Impala-Session-Id', "
+                    "and 'X-Impala-Query-Id' will not be added to each http request "
+                    "(hs2-http protocol only).")
   parser.add_option("--hs2_fp_format", type="str",
                     dest="hs2_fp_format", default=None,
                     help="Sets the printing format specification for floating point "

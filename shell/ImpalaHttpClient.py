@@ -133,6 +133,7 @@ class ImpalaHttpClient(TTransportBase):
     self.__get_custom_headers_func = None
     self.__basic_auth = None
     self.__kerb_service = None
+    self.__add_custom_headers_funcs = []
 
   @staticmethod
   def basic_proxy_auth_header(proxy):
@@ -227,12 +228,40 @@ class ImpalaHttpClient(TTransportBase):
     # auth mechanism: None
     self.__get_custom_headers_func = self.getCustomHeadersWithoutAuth
 
+  # Whenever http(s) calls are made to the backend impala, each function
+  # added through this method will be called.  Thus, arbitrary custom
+  # headers can be set on each request.
+  # parameters:
+  #  funcs - tuple of functions where each takes no arguments and returns
+  #      a dict of http headers
+  # Note:  if the custom function returns a http header with a name that
+  # does not start with "X-" or "x-", it will cause an error to be thrown
+  def addCustomHeaderFunc(self, *funcs):
+    if funcs is None:
+      return
+
+    for f in funcs:
+      self.__add_custom_headers_funcs.append(f)
+
   # Update HTTP headers based on the saved cookies and auth mechanism.
   def refreshCustomHeaders(self):
+    self.__custom_headers = {}
+
     if self.__get_custom_headers_func:
       cookie_header, has_auth_cookie = self.getHttpCookieHeaderForRequest()
       self.__custom_headers = \
           self.__get_custom_headers_func(cookie_header, has_auth_cookie)
+
+    for f in self.__add_custom_headers_funcs:
+      headers = f()
+      if headers is not None:
+        for key in headers:
+          assert key[0:2].lower() == "x-", \
+            "header '{0}' is not valid, all custom headers must start with "\
+            "'X-' or 'x-'".format(key)
+          assert key not in self.__custom_headers, \
+            "header '{0}' already exists in custom headers dictionary".format(key)
+          self.__custom_headers[key] = headers[key]
 
   # Return first value as a cookie list for Cookie header. It's a list of name-value
   # pairs in the form of <cookie-name>=<cookie-value>. Pairs in the list are separated by

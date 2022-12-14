@@ -30,6 +30,7 @@ import ssl
 import sys
 import time
 from datetime import datetime
+import uuid
 
 from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
@@ -133,7 +134,7 @@ class ImpalaClient(object):
                ldap_password=None, use_ldap=False, client_connect_timeout_ms=60000,
                verbose=True, use_http_base_transport=False, http_path=None,
                http_cookie_names=None, http_socket_timeout_s=None, value_converter=None,
-               connect_max_tries=4, rpc_stdout=False, rpc_file=None):
+               connect_max_tries=4, rpc_stdout=False, rpc_file=None, http_tracing=True):
     self.connected = False
     self.impalad_host = impalad[0]
     self.impalad_port = int(impalad[1])
@@ -155,6 +156,7 @@ class ImpalaClient(object):
     self.use_http_base_transport = use_http_base_transport
     self.http_path = http_path
     self.http_cookie_names = http_cookie_names
+    self.http_tracing = http_tracing
     # This is set from ImpalaShell's signal handler when a query is cancelled
     # from command line via CTRL+C. It is used to suppress error messages of
     # query cancellation.
@@ -429,6 +431,8 @@ class ImpalaClient(object):
     else:
       transport.setNoneAuth()
 
+    transport.addCustomHeaderFunc(self.get_custom_http_headers)
+
     # Without buffering Thrift would call socket.recv() each time it deserializes
     # something (e.g. a member in a struct).
     transport = TBufferedTransport(transport)
@@ -643,6 +647,12 @@ class ImpalaClient(object):
     if not self.connected:
       raise DisconnectedException("Not connected (use CONNECT to establish a connection)")
 
+  def get_custom_http_headers(self):
+    # When the transport is http, subclasses can override this function
+    # to add arbitrary http headers.
+    return None
+
+
 class ImpalaHS2Client(ImpalaClient):
   """Impala client. Uses the HS2 protocol plus Impala-specific extensions."""
   def __init__(self, *args, **kwargs):
@@ -672,6 +682,9 @@ class ImpalaHS2Client(ImpalaClient):
     if self.rpc_stdout or self.rpc_stdout is not None:
       self.thrift_printer = ThriftPrettyPrinter()
 
+    self._base_request_id = str(uuid.uuid1())
+    self._request_num = 0
+
   def _get_thrift_client(self, protocol):
     return ImpalaHiveServer2Service.Client(protocol)
 
@@ -696,6 +709,25 @@ class ImpalaHS2Client(ImpalaClient):
     self.session_handle = resp.sessionHandle
 
     self._populate_query_options()
+
+  def get_custom_http_headers(self):
+    headers = {}
+
+    if self.http_tracing:
+      session_id = self.get_session_id()
+      if session_id is not None:
+        headers["X-Impala-Session-Id"] = session_id
+
+      current_query_id = self.get_query_id_str(self._current_query_handle)
+      if current_query_id is not None:
+        headers["X-Impala-Query-Id"] = current_query_id
+
+      assert getattr(self, "_current_request_id", None) is not None, \
+        "request id was not set"
+      headers["X-Request-Id"] = self._current_request_id
+
+    return headers
+
 
   def close_connection(self):
     if self.session_handle is not None:
@@ -813,7 +845,6 @@ class ImpalaHS2Client(ImpalaClient):
         # Attach the schema to the handle for convenience.
         handle.schema = resp.schema
       handle.is_closed = False
-      self._clear_current_query_handle()
       return handle
     finally:
       self._clear_current_query_handle()
@@ -1075,6 +1106,10 @@ class ImpalaHS2Client(ImpalaClient):
     If 'retry_on_error' is true, the rpc is retried if an exception is raised. The maximum
     number of tries is determined by 'self.max_tries'. Retries, if enabled, are attempted
     for all exceptions other than TApplicationException."""
+
+    self._request_num += 1
+    self._current_request_id = "{0}-{1}".format(self._base_request_id, self._request_num)
+
     self._check_connected()
     num_tries = 1
     max_tries = num_tries

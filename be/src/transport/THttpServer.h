@@ -152,6 +152,14 @@ public:
   void setCallbacks(const HttpCallbacks& callbacks) { callbacks_ = callbacks; }
 
 protected:
+  // Names of HTTP headers that are meaningful.
+  // Client-defined string identifying the HTTP request, meaningful only to the client.
+  static const std::string HEADER_REQUEST_ID;
+  // Impala session id specified by the Impala backend.  Used for tracing HTTP requests.
+  static const std::string HEADER_IMPALA_SESSION_ID;
+  // Impala query id specified by the Impala backend.  Used for tracing HTTP requests.
+  static const std::string HEADER_IMPALA_QUERY_ID;
+
   void readHeaders();
   virtual void parseHeader(char* header);
   virtual bool parseStatusLine(char* status);
@@ -223,6 +231,15 @@ protected:
   // Used to collect all information about the http request. Can be passed to the
   // Frontend. Currently only used by SAML SSO.
   impala::TWrappedHttpRequest* wrapped_request_ = nullptr;
+
+  // The value from the 'X-Request-Id' header.
+  std::string header_x_request_id_ = "";
+
+  // The value from the 'X-Impala-Session-Id' header.
+  std::string header_x_session_id_ = "";
+
+  // The value from the 'X-Impala-Query-Id' header.
+  std::string header_x_query_id_ = "";
 };
 
 /**

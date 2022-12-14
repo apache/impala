@@ -33,6 +33,7 @@
 
 #include "gen-cpp/Frontend_types.h"
 #include "util/metrics.h"
+#include "common/logging.h"
 
 DECLARE_bool(trusted_domain_use_xff_header);
 DECLARE_bool(saml2_ee_test_mode);
@@ -125,6 +126,10 @@ THttpServer::~THttpServer() {
   #define THRIFT_strcasestr(haystack, needle) strcasestr(haystack, needle)
 #endif
 
+const std::string THttpServer::HEADER_REQUEST_ID = "X-Request-Id";
+const std::string THttpServer::HEADER_IMPALA_SESSION_ID = "X-Impala-Session-Id";
+const std::string THttpServer::HEADER_IMPALA_QUERY_ID = "X-Impala-Query-Id";
+
 void THttpServer::parseHeader(char* header) {
   char* colon = strchr(header, ':');
   if (colon == NULL) {
@@ -169,6 +174,15 @@ void THttpServer::parseHeader(char* header) {
   } else if (check_trusted_auth_header_
       && THRIFT_strncasecmp(header, FLAGS_trusted_auth_header.c_str(), sz) == 0) {
     found_trusted_auth_header_ = true;
+  } else if (THRIFT_strncasecmp(header, HEADER_REQUEST_ID.c_str(), sz) == 0) {
+    header_x_request_id_ = string(value);
+    StripWhiteSpace(&header_x_request_id_);
+  } else if (THRIFT_strncasecmp(header, HEADER_IMPALA_SESSION_ID.c_str(), sz) == 0) {
+    header_x_session_id_ = string(value);
+    StripWhiteSpace(&header_x_session_id_);
+  } else if (THRIFT_strncasecmp(header, HEADER_IMPALA_QUERY_ID.c_str(), sz) == 0) {
+    header_x_query_id_ = string(value);
+    StripWhiteSpace(&header_x_query_id_);
   }
 }
 
@@ -229,6 +243,14 @@ bool THttpServer::parseStatusLine(char* status) {
 }
 
 void THttpServer::headersDone() {
+  if (!header_x_request_id_.empty() || !header_x_session_id_.empty() ||
+      !header_x_query_id_.empty()) {
+    VLOG_RPC << "HTTP Connection Tracing Headers"
+        << (header_x_request_id_.empty() ? "" : " x-request-id=" + header_x_request_id_)
+        << (header_x_session_id_.empty() ? "" : " x-session-id=" + header_x_session_id_)
+        << (header_x_query_id_.empty() ? "" : " x-query-id=" + header_x_query_id_);
+  }
+
   if (!has_ldap_ && !has_kerberos_ && !has_saml_ && !has_jwt_) {
     // We don't need to authenticate.
     resetAuthState();

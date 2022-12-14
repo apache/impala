@@ -137,6 +137,10 @@ def create_client_protocol_dimension():
   return ImpalaTestDimension('protocol', 'beeswax', 'hs2', 'hs2-http')
 
 
+def create_client_protocol_http_transport():
+  return ImpalaTestDimension('protocol', 'hs2-http')
+
+
 def create_client_protocol_strict_dimension():
   # only support strict dimensions if the file system is HDFS, since that is
   # where the hive cluster is run.

@@ -263,6 +263,7 @@ class ImpalaShell(cmd.Cmd, object):
     self.http_path = options.http_path
     self.fetch_size = options.fetch_size
     self.http_cookie_names = options.http_cookie_names
+    self.http_tracing = not options.no_http_tracing
 
     # Due to a readline bug in centos/rhel7, importing it causes control characters to be
     # printed. This breaks any scripting against the shell in non-interactive mode. Since
@@ -610,7 +611,8 @@ class ImpalaShell(cmd.Cmd, object):
                           self.client_connect_timeout_ms, self.verbose,
                           use_http_base_transport=False, http_path=self.http_path,
                           http_cookie_names=None, value_converter=value_converter,
-                          rpc_stdout=self.rpc_stdout, rpc_file=self.rpc_file)
+                          rpc_stdout=self.rpc_stdout, rpc_file=self.rpc_file,
+                          http_tracing=self.http_tracing)
       elif protocol == 'hs2-http':
         return StrictHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
@@ -619,7 +621,7 @@ class ImpalaShell(cmd.Cmd, object):
                           use_http_base_transport=True, http_path=self.http_path,
                           http_cookie_names=self.http_cookie_names,
                           value_converter=value_converter, rpc_stdout=self.rpc_stdout,
-                          rpc_file=self.rpc_file)
+                          rpc_file=self.rpc_file, http_tracing=self.http_tracing)
     if protocol == 'hs2':
       return ImpalaHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
@@ -627,7 +629,8 @@ class ImpalaShell(cmd.Cmd, object):
                           self.client_connect_timeout_ms, self.verbose,
                           use_http_base_transport=False, http_path=self.http_path,
                           http_cookie_names=None, value_converter=value_converter,
-                          rpc_stdout=self.rpc_stdout, rpc_file=self.rpc_file)
+                          rpc_stdout=self.rpc_stdout, rpc_file=self.rpc_file,
+                          http_tracing=self.http_tracing)
     elif protocol == 'hs2-http':
       return ImpalaHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
@@ -638,7 +641,8 @@ class ImpalaShell(cmd.Cmd, object):
                           http_socket_timeout_s=self.http_socket_timeout_s,
                           value_converter=value_converter,
                           connect_max_tries=self.connect_max_tries,
-                          rpc_stdout=self.rpc_stdout, rpc_file=self.rpc_file)
+                          rpc_stdout=self.rpc_stdout, rpc_file=self.rpc_file,
+                          http_tracing=self.http_tracing)
     elif protocol == 'beeswax':
       return ImpalaBeeswaxClient(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
@@ -1346,7 +1350,8 @@ class ImpalaShell(cmd.Cmd, object):
         num_rows = 0
 
         for rows in rows_fetched:
-          # IMPALA-4418: Break out of the loop to prevent printing an unnecessary empty line.
+          # IMPALA-4418: Break out of the loop to prevent printing an unnecessary
+          # empty line.
           if len(rows) == 0:
             continue
           self.output_stream.write(rows)
