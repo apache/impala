@@ -173,6 +173,11 @@ under the License.
         <xref href="#datetime_functions/int_months_between"
           >INT_MONTHS_BETWEEN</xref>
       </li>
+      
+      <li>
+        <xref href="#datetime_functions/last_day"
+          >LAST_DAY</xref>
+      </li>
 
       <li>
         <xref href="#datetime_functions/microseconds_add"
