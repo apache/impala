@@ -602,6 +602,17 @@ under the License.
                     <codeph>'hs2-http'</codeph> option.</p><p>Beeswax support is
                   deprecated and will be removed in the future.</p></entry>
             </row>
+            <row rev="4.2.0 IMPALA-10660">
+              <entry>--hs2_fp_format=<varname>HS2_FP_FORMAT</varname></entry>
+              <entry>hs2_fp_format=<varname>HS2_FP_FORMAT</varname></entry>
+              <entry>
+                Sets the printing format specification for floating point values when using HS2
+                protocol. The default behaviour makes the values handled by Python's str() built-in
+                method. Use '16G' to match Beeswax protocol's floating-point output format
+
+                This feature is available in <keyword keyref="impala42_full"/> and higher.
+              </entry>
+            </row>
           </tbody>
         </tgroup>
       </table>

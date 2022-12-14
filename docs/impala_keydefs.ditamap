@@ -10592,6 +10592,7 @@ under the License.
   <keydef keys="impala132"><topicmeta><keywords><keyword>Impala 1.3.2</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala130"><topicmeta><keywords><keyword>Impala 1.3.0</keyword></keywords></topicmeta></keydef>
 
+  <keydef keys="impala42_full"><topicmeta><keywords><keyword>Impala 4.2</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala34_full"><topicmeta><keywords><keyword>Impala 3.4</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala33_full"><topicmeta><keywords><keyword>Impala 3.3</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala32_full"><topicmeta><keywords><keyword>Impala 3.2</keyword></keywords></topicmeta></keydef>
