@@ -53,6 +53,8 @@ NUM_EXCLUSIVE_COORDINATORS = 'num_exclusive_coordinators'
 STATESTORED_TIMEOUT_S = 'statestored_timeout_s'
 IMPALAD_TIMEOUT_S = 'impalad_timeout_s'
 EXPECT_CORES = 'expect_cores'
+# Additional arg to determine whether we should reset the Ranger policy repository.
+RESET_RANGER = 'reset_ranger'
 
 # Run with fast topic updates by default to reduce time to first query running.
 DEFAULT_STATESTORE_ARGS = '--statestore_update_frequency_ms=50 \
@@ -106,7 +108,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       start_args=None, default_query_options=None,
       impala_log_dir=None, hive_conf_dir=None, cluster_size=None,
       num_exclusive_coordinators=None, kudu_args=None, statestored_timeout_s=None,
-      impalad_timeout_s=None, expect_cores=None):
+      impalad_timeout_s=None, expect_cores=None, reset_ranger=False):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     def decorate(func):
@@ -135,6 +137,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         func.func_dict[IMPALAD_TIMEOUT_S] = impalad_timeout_s
       if expect_cores is not None:
         func.func_dict[EXPECT_CORES] = expect_cores
+      if reset_ranger is not False:
+        func.func_dict[RESET_RANGER] = True
       return func
     return decorate
 
@@ -156,6 +160,9 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
     if KUDU_ARGS in method.func_dict:
       self._restart_kudu_service(method.func_dict[KUDU_ARGS])
+
+    if RESET_RANGER in method.func_dict:
+      self._reset_ranger_policy_repository()
 
     cluster_size = DEFAULT_CLUSTER_SIZE
     if CLUSTER_SIZE in method.func_dict:
@@ -252,6 +259,21 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     subprocess.check_call([os.path.join(IMPALA_HOME,
                                         "testdata/bin/kill-hive-server.sh")],
                           close_fds=True)
+
+  @classmethod
+  def _reset_ranger_policy_repository(cls):
+    script_kill_ranger = os.path.join(os.environ['IMPALA_HOME'],
+                                      'testdata/bin/kill-ranger-server.sh')
+    script_run_ranger = os.path.join(os.environ['IMPALA_HOME'],
+                                     'testdata/bin/run-ranger-server.sh')
+    script_create_test_config = os.path.join(os.environ['IMPALA_HOME'],
+                                             'bin/create-test-configuration.sh')
+    script_setup_ranger = os.path.join(os.environ['IMPALA_HOME'],
+                                       'testdata/bin/setup-ranger.sh')
+    check_call([script_kill_ranger])
+    check_call([script_create_test_config, '-create_ranger_policy_db'])
+    check_call([script_run_ranger])
+    check_call([script_setup_ranger])
 
   @classmethod
   def _start_impala_cluster(cls,

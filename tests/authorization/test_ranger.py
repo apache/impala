@@ -726,15 +726,9 @@ class TestRanger(CustomClusterTestSuite):
       admin_client.execute("drop database if exists {0} cascade".format(unique_db),
                            user=ADMIN)
 
-  # TODO(IMPALA-10399, IMPALA-10401): We found that if this test is run after
-  # test_grant_revoke_with_role() in the exhaustive tests, the test could fail due to an
-  # empty list returned from the first call to _get_ranger_privileges_db() although a
-  # list consisting of "lock" and "select" is expected. We suspect there might be
-  # something wrong with the underlying Ranger API but it requires more thorough
-  # investigation.
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS, reset_ranger=True)
   def test_show_grant_hive_privilege(self, unique_name):
     user = getuser()
     admin_client = self.create_impala_client()
