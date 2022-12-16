@@ -1,0 +1,175 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2022"><meta name="DC.rights.owner" content="(C) Copyright 2022"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="revoke"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>REVOKE Statement (Impala 2.0 or higher only)</title></head><body id="revoke"><header role="banner"><!--
+The DITA Open Toolkit is licensed for use under the the Apache
+Software Foundation License v2.0.
+
+A copy of the Apache Software Foundation License 2.0 is
+available at http://opensource.org/licenses/apache2.0.php
+
+This statement must be included in any copies of DITA Open
+Toolkit code.
+--><div class="header">
+  <p>Apache Impala</p>
+  <hr>
+</div></header><nav role="toc"><ul><li><a href="../topics/impala_intro.html">Introducing Apache Impala</a></li><li><a href="../topics/impala_concepts.html">Concepts and Architecture</a></li><li><a href="../topics/impala_planning.html">Deployment Planning</a></li><li><a href="../topics/impala_install.html">Installing Impala</a></li><li><a href="../topics/impala_config.html">Managing Impala</a></li><li><a href="../topics/impala_upgrading.html">Upgrading Impala</a></li><li><a href="../topics/impala_processes.html">Starting Impala</a></li><li><a href="../topics/impala_tutorial.html">Tutorials</a></li><li><a href="../topics/impala_admin.html">Administration</a></li><li><a href="../topics/impala_security.html">Impala Security</a></li><li><a href="../topics/impala_langref.html">SQL Reference</a><ul><li><a href="../topics/impala_comments.html">Comments</a></li><li><a href="../topics/impala_datatypes.html">Data Types</a></li><li><a href="../topics/impala_literals.html">Literals</a></li><li><a href="../topics/impala_operators.html">SQL Operators</a></li><li><a href="../topics/impala_schema_objects.html">Schema Objects and Object Names</a></li><li><a href="../topics/impala_transactions.html">Transactions</a></li><li><a href="../topics/impala_langref_sql.html">SQL Statements</a><ul><li><a href="../topics/impala_ddl.html">DDL Statements</a></li><li><a href="../topics/impala_dml.html">DML Statements</a></li><li><a href="../topics/impala_alter_database.html">ALTER DATABASE</a></li><li><a href="../topics/impala_alter_table.html">ALTER TABLE</a></li><li><a href="../topics/impala_alter_view.html">ALTER VIEW</a></li><li><a href="../topics/impala_comment.html">COMMENT</a></li><li><a href="../topics/impala_compute_stats.html">COMPUTE STATS</a></li><li><a href="../topics/impala_create_database.html">CREATE DATABASE</a></li><li><a href="../topics/impala_create_function.html">CREATE FUNCTION</a></li><li><a href="../topics/impala_create_role.html">CREATE ROLE</a></li><li><a href="../topics/impala_create_table.html">CREATE TABLE</a></li><li><a href="../topics/impala_create_view.html">CREATE VIEW</a></li><li><a href="../topics/impala_delete.html">DELETE</a></li><li><a href="../topics/impala_describe.html">DESCRIBE</a></li><li><a href="../topics/impala_drop_database.html">DROP DATABASE</a></li><li><a href="../topics/impala_drop_function.html">DROP FUNCTION</a></li><li><a href="../topics/impala_drop_role.html">DROP ROLE</a></li><li><a href="../topics/impala_drop_stats.html">DROP STATS</a></li><li><a href="../topics/impala_drop_table.html">DROP TABLE</a></li><li><a href="../topics/impala_drop_view.html">DROP VIEW</a></li><li><a href="../topics/impala_explain.html">EXPLAIN</a></li><li><a href="../topics/impala_grant.html">GRANT</a></li><li><a href="../topics/impala_insert.html">INSERT</a></li><li><a href="../topics/impala_invalidate_metadata.html">INVALIDATE METADATA</a></li><li><a href="../topics/impala_load_data.html">LOAD DATA</a></li><li><a href="../topics/impala_refresh.html">REFRESH</a></li><li><a href="../topics/impala_refresh_authorization.html">REFRESH AUTHORIZATION</a></li><li><a href="../topics/impala_refresh_functions.html">REFRESH FUNCTIONS</a></li><li class="active"><a href="../topics/impala_revoke.html">REVOKE</a></li><li><a href="../topics/impala_select.html">SELECT</a></li><li><a href="../topics/impala_set.html">SET</a></li><li><a href="../topics/impala_show.html">SHOW</a></li><li><a href="../topics/impala_shutdown.html">SHUTDOWN</a></li><li><a href="../topics/impala_truncate_table.html">TRUNCATE TABLE</a></li><li><a href="../topics/impala_update.html">UPDATE</a></li><li><a href="../topics/impala_upsert.html">UPSERT</a></li><li><a href="../topics/impala_use.html">USE</a></li><li><a href="../topics/impala_values.html">VALUES</a></li><li><a href="../topics/impala_hints.html">Optimizer Hints</a></li></ul></li><li><a href="../topics/impala_functions.html">Built-In Functions</a></li><li><a href="../topics/impala_udf.html">User-Defined Functions (UDFs)</a></li><li><a href="../topics/impala_langref_unsupported.html">SQL Differences Between Impala and Hive</a></li><li><a href="../topics/impala_porting.html">Porting SQL</a></li><li><a href="../topics/impala_utf_8.html">UTF-8 Support</a></li></ul></li><li><a href="../topics/impala_performance.html">Performance Tuning</a></li><li><a href="../topics/impala_scalability.html">Scalability Considerations</a></li><li><a href="../topics/impala_resource_management.html">Resource Management</a></li><li><a href="../topics/impala_partitioning.html">Partitioning</a></li><li><a href="../topics/impala_file_formats.html">File Formats</a></li><li><a href="../topics/impala_kudu.html">Using Impala to Query Kudu Tables</a></li><li><a href="../topics/impala_hbase.html">HBase Tables</a></li><li><a href="../topics/impala_iceberg.html">Iceberg Tables</a></li><li><a href="../topics/impala_s3.html">S3 Tables</a></li><li><a href="../topics/impala_adls.html">ADLS Tables</a></li><li><a href="../topics/impala_isilon.html">Isilon Storage</a></li><li><a href="../topics/impala_logging.html">Logging</a></li><li><a href="../topics/impala_client.html">Client Access</a></li><li><a href="../topics/impala_fault_tolerance.html">Fault Tolerance</a></li><li><a href="../topics/impala_troubleshooting.html">Troubleshooting Impala</a></li><li><a href="../topics/impala_ports.html">Ports Used by Impala</a></li><li><a href="../topics/impala_reserved_words.html">Impala Reserved Words</a></li><li><a href="../topics/impala_faq.html">Impala Frequently Asked Questions</a></li><li><a href="../topics/impala_release_notes.html">Impala Release Notes</a></li></ul></nav><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">REVOKE Statement (<span class="keyword">Impala 2.0</span> or higher only)</h1>
+
+  
+
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      The <code class="ph codeph">REVOKE</code> statement revokes roles or privileges on a specified object
+      from groups, roles, or users.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+    <p class="p">
+      The following syntax is supported when Impala is using Ranger to manage authorization.
+    </p>
+
+<pre class="pre codeblock"><code>REVOKE ROLE <var class="keyword varname">role_name</var> FROM GROUP <var class="keyword varname">group_name</var>
+
+REVOKE <var class="keyword varname">privilege</var> ON <var class="keyword varname">object_type</var> <var class="keyword varname">object_name</var>
+  FROM USER <var class="keyword varname">user_name</var>
+
+REVOKE <var class="keyword varname">privilege</var> ON <var class="keyword varname">object_type</var> <var class="keyword varname">object_name</var>
+  FROM GROUP <var class="keyword varname">group_name</var>
+
+REVOKE [GRANT OPTION FOR] <var class="keyword varname">privilege</var> ON <var class="keyword varname">object_type</var> <var class="keyword varname">object_name</var>
+  FROM [ROLE] <var class="keyword varname">role_name</var>
+<span class="ph">
+
+  privilege ::= ALL | ALTER | CREATE | DROP | INSERT | REFRESH | SELECT | SELECT(<var class="keyword varname">column_name</var>)
+</span>
+<span class="ph">object_type ::= SERVER | URI | DATABASE | TABLE</span></code></pre>
+
+    <p class="p">
+      <strong class="ph b">Usage notes:</strong>
+    </p>
+
+    <p class="p">
+      See <a href="impala_grant.html"><span class="keyword">GRANT Statement (Impala 2.0 or higher only)</span></a> for the required privileges and the scope for SQL
+      operations.
+    </p>
+
+    <p class="p">
+      The <code class="ph codeph">ALL</code> privilege is a distinct privilege and not a union of all other
+      privileges. Revoking <code class="ph codeph">SELECT</code>, <code class="ph codeph">INSERT</code>, etc. from a role
+      that only has the <code class="ph codeph">ALL</code> privilege has no effect. To reduce the privileges
+      of that role you must <code class="ph codeph">REVOKE ALL</code> and <code class="ph codeph">GRANT</code> the desired
+      privileges.
+    </p>
+
+    <p class="p">
+      You cannot revoke a privilege granted with the <code class="ph codeph">WITH GRANT OPTION</code>. If a
+      privilege is granted with the <code class="ph codeph">WITH GRANT OPTION</code>, first revoke the grant
+      option, and then revoke the privilege.
+    </p>
+
+    <div class="p">
+      For example:
+<pre class="pre codeblock"><code>GRANT ALL ON SERVER TO ROLE foo_role;
+...
+REVOKE GRANT OPTION FOR ALL ON SERVER FROM ROLE foo_role;
+REVOKE ALL ON SERVER FROM ROLE foo_role;</code></pre>
+    </div>
+
+    <p class="p">
+      Typically, the object name is an identifier. For URIs, it is a string literal.
+    </p>
+
+    <p class="p">
+      The ability to grant or revoke <code class="ph codeph">SELECT</code> privilege on specific columns is
+      available in <span class="keyword">Impala 2.3</span> and higher. See
+      <span class="xref">the documentation for Apache Sentry</span> for details.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Required privileges:</strong>
+      </p>
+
+    <p class="p">
+      Only administrative users for Ranger can use this statement.
+    </p>
+
+    <p class="p">
+      Only Ranger administrative users can revoke the role from a group.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Compatibility:</strong>
+      </p>
+
+    <div class="p">
+      <ul class="ul">
+        <li class="li">
+          The <code class="ph codeph">REVOKE</code> statements are available in
+          <span class="keyword">Impala 2.0</span> and higher.
+        </li>
+
+        <li class="li">
+          Impala makes use of any roles and privileges specified by the <code class="ph codeph">GRANT</code>
+          and <code class="ph codeph">REVOKE</code> statements in Hive, when your system is configured to use the
+          Ranger service instead of the file-based policy mechanism.
+        </li>
+
+        <li class="li">
+          The Impala <code class="ph codeph">REVOKE</code> statements do not require the <code class="ph codeph">ROLE</code>
+          keyword to be repeated before each role name, unlike the equivalent Hive statements.
+        </li>
+
+        <li class="li">
+          Currently, each Impala <code class="ph codeph">GRANT</code> or <code class="ph codeph">REVOKE</code> statement can
+          only grant or revoke a single privilege to or from a single role.
+        </li>
+      </ul>
+    </div>
+
+    <p class="p">
+        <strong class="ph b">Cancellation:</strong> Cannot be cancelled.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">HDFS permissions:</strong> This statement does not touch any HDFS files or directories,
+        therefore no HDFS permissions are required.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Kudu considerations:</strong>
+      </p>
+
+    <div class="p"> Access to Kudu tables must be granted to
+        and revoked from principal with the following considerations: <ul class="ul">
+          <li class="li"> Only users with the <code class="ph codeph">ALL</code> privilege on <code class="ph codeph">SERVER</code> can
+            create external Kudu tables. </li>
+          <li class="li"> The <code class="ph codeph">ALL</code> privileges on <code class="ph codeph">SERVER</code> is required to specify
+            the <code class="ph codeph">kudu.master_addresses</code> property in the <code class="ph codeph">CREATE TABLE</code>
+            statements for managed tables as well as external tables. </li>
+          <li class="li"> Access to Kudu tables is enforced at the table level and at the column level. </li>
+          <li class="li"> The <code class="ph codeph">SELECT</code>- and <code class="ph codeph">INSERT</code>-specific permissions are
+            supported. </li>
+          <li class="li"> The <code class="ph codeph">DELETE</code>, <code class="ph codeph">UPDATE</code>, and <code class="ph codeph">UPSERT</code>
+            operations require the <code class="ph codeph">ALL</code> privilege. </li>
+        </ul></div>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      <a class="xref" href="impala_authorization.html#authorization">Impala Authorization</a>,
+      <a class="xref" href="impala_grant.html#grant">GRANT Statement (Impala 2.0 or higher only)</a> <a class="xref" href="impala_create_role.html#create_role">CREATE ROLE Statement (Impala 2.0 or higher only)</a>,
+      <a class="xref" href="impala_drop_role.html#drop_role">DROP ROLE Statement (Impala 2.0 or higher only)</a>, <a class="xref" href="impala_show.html#show">SHOW Statement</a>
+    </p>
+
+  </div>
+
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>

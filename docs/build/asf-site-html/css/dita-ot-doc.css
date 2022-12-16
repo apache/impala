@@ -1,0 +1,268 @@
+/*************************************************************
+The DITA Open Toolkit is licensed for use under the the Apache
+Software Foundation License v2.0.
+
+A copy of the Apache Software Foundation License 2.0 is
+available at http://opensource.org/licenses/apache2.0.php
+
+This statement must be included in any copies of DITA Open
+Toolkit code.
+*************************************************************/
+
+/* DITA Open Toolkit documentation style */
+
+/*************************************************************
+Basic fonts and typography
+*************************************************************/
+
+article {
+  color: #333;
+}
+
+body {
+  background-color: white;
+  background-image: -webkit-linear-gradient(left, #eee 0%, #fff 300px); /* Chrome10+,Safari5.1+ */
+  background-image:    -moz-linear-gradient(left, #eee 0%, #fff 300px); /* FF3.6+ */
+  background-image:         linear-gradient(left, #eee 0%, #fff 300px); /* W3C */
+  color: #333;
+  margin: 0;
+  padding: 1em;
+}
+
+div.header {
+  font-size: 18pt;
+  margin: 0;
+  padding: 0 12px;
+}
+
+div.header p {
+  color: #777;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  line-height: 1.3;
+  margin: 0;
+}
+
+div.header hr {
+  border: 0;
+  border-bottom: 1px solid #eee;
+  height: 0;
+}
+
+body,
+caption,
+td,
+th {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 10pt;
+}
+
+code,
+pre,
+.cmdname,
+.filepath,
+.msgnum,
+.option,
+.parmname {
+  color: #777;
+  font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
+  font-size: 90%;
+}
+
+/*************************************************************
+Headings
+*************************************************************/
+
+h1,
+h2,
+h3 {
+  color: #1d365d;
+  font-size: 12pt;
+  font-weight: bold;
+  margin-bottom: 0.75em;
+  margin-left: 0;
+  margin-right: 0;
+  margin-top: 1em;
+  padding: 0;
+}
+
+h1 .filepath,
+h2 .filepath,
+h3 .filepath {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 12pt;
+  font-weight: bold;
+}
+
+h1 .filepath {
+  color: #1d365d;
+}
+
+.sectiontitle {
+  color: #1d365d;
+  font-weight: bold;
+}
+
+.topictitle1 {
+  margin-top: 1em;
+}
+
+/*************************************************************
+Basic identation, padding, and margins
+*************************************************************/
+
+main {
+  margin-left: 300px;
+}
+
+blockquote,
+li,
+p {
+  line-height: 125%;
+  margin-bottom: 0.75em;
+  margin-left: 0;
+  margin-right: 0;
+  margin-top: 0.75em;
+  padding: 0;
+}
+
+dd {
+  line-height: 125%;
+  margin-bottom: 0.75em;
+  margin-top: 0.75em;
+}
+
+dl {
+  line-height: 125%;
+  margin-bottom: 0.75em;
+  margin-left: 2em;
+  margin-right: 0;
+  margin-top: 0.75em;
+  padding: 0;
+}
+
+ol,
+ul {
+  margin-bottom: 0.75em;
+  margin-left: 2em;
+  margin-right: 0;
+  margin-top: 0.75em;
+  padding: 0;
+}
+
+pre {
+  margin-bottom: 0.75em;
+  margin-left: 2em;
+  margin-top: 0.75em;
+  padding: 0;
+}
+
+/*************************************************************
+Block elements
+*************************************************************/
+
+.codeblock,
+.screen {
+  background-color: #eee;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 6px;
+}
+
+/*************************************************************
+Figures
+*************************************************************/
+
+figcaption {
+  font-style: italic;
+}
+
+/*************************************************************
+In-line elements
+*************************************************************/
+
+.cmdname,
+.msgnum {
+  font-weight: bold;
+}
+
+/*************************************************************
+Links
+*************************************************************/
+
+a:link {
+  color: #3563ab;
+  text-decoration: none;
+}
+
+a:visited {
+  color: #3563ab;
+}
+
+a:active,
+a:hover {
+  color: #1d365d;
+  text-decoration: underline;
+}
+
+.related-links {
+  color: #555;
+}
+
+.linklist {
+  margin-top: 1em;
+}
+
+/*************************************************************
+Notes
+*************************************************************/
+
+.note {
+  line-height: 125%;
+  margin-left: 2em;
+  margin-right: 0;
+  padding: 0;
+}
+
+.caution,
+.notelisttitle,
+.note__title {
+  font-weight: bold;
+}
+
+/*************************************************************
+Tables
+*************************************************************/
+
+table {
+  border-color: Silver;
+  border-style: solid;
+  border-width: 1px;
+  margin-bottom: 1em;
+  margin-top: 1em;
+  padding: 1px;
+}
+
+tr {
+  border-color: Silver;
+}
+
+td {
+  border-color: Silver;
+}
+
+th {
+  background-color: #eee;
+}
+
+/*************************************************************
+Navigation
+*************************************************************/
+
+nav[role=toc] {
+  float: left;
+  width: 300px;
+}
+
+nav[role=toc] li.active > a {
+  font-weight: bold;
+}

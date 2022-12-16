@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2022" />
+<meta name="DC.rights.owner" content="(C) Copyright 2022" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Using the Hudi File Format" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_file_formats.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="hudi" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Using the Hudi File Format</title>
+</head>
+<body id="hudi">
+
+  
+  <h1 class="title topictitle1" id="ariaid-title1">Using the Hudi File Format</h1>
+
+  
+  
+  
+  <div class="body conbody">
+    
+    <p class="p">
+       Impala supports Read Optimized
+      Queries on Hudi tables as an experimental feature. Read Optimized Queries treat the latest
+      table snapshot as the commit or compaction action, expose only base/columnar files in latest
+      file slices, and guarantee the same columnar query performance as a non-Hudi columnar
+      table.</p>
+
+    <p class="p"></p>
+
+    
+    
+<div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" class="table" frame="border" border="1" rules="all"><caption><span class="tablecap"><span class="table--title-label">Table 1. </span>Hudi Format Support in Impala</span></caption><colgroup><col style="width:10%" /><col style="width:10%" /><col style="width:20%" /><col style="width:30%" /><col style="width:30%" /></colgroup><thead class="thead" style="text-align:left;">
+          <tr class="row">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d98433e72">
+              File Type
+            </th>
+
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d98433e75">
+              Format
+            </th>
+
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d98433e78">
+              Compression Codecs
+            </th>
+
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d98433e81">
+              Impala Can CREATE?
+            </th>
+
+            <th class="entry cell-norowborder" style="vertical-align:top;" id="d98433e84">
+              Impala Can INSERT?
+            </th>
+
+          </tr>
+
+        </thead>
+<tbody class="tbody">
+          <tr class="row">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d98433e72 ">
+              <a class="xref" href="impala_hudi.html#hudi">Hudi</a>
+            </td>
+
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d98433e75 ">Structured</td>
+
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d98433e78 ">Snappy, gzip, zstd, lz4; currently Snappy by default </td>
+
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d98433e81 ">Yes, support for Read Optimized Queries is experimental.</td>
+
+            <td class="entry cellrowborder" style="vertical-align:top;" headers="d98433e84 ">No. Create an external table in Impala. Set the table location to the Hudi table
+              directory. Alternatively, create the Hudi table in Hive. </td>
+
+          </tr>
+
+        </tbody>
+</table>
+</div>
+
+  </div>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_file_formats.html">How Impala Works with Hadoop File Formats</a></div>
+</div>
+</div></body>
+</html>

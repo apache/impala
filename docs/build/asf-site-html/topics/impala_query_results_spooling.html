@@ -1,0 +1,121 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2022"><meta name="DC.rights.owner" content="(C) Copyright 2022"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_client.html"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="data_sink"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>Spooling Impala Query Results</title></head><body id="data_sink"><header role="banner"><!--
+The DITA Open Toolkit is licensed for use under the the Apache
+Software Foundation License v2.0.
+
+A copy of the Apache Software Foundation License 2.0 is
+available at http://opensource.org/licenses/apache2.0.php
+
+This statement must be included in any copies of DITA Open
+Toolkit code.
+--><div class="header">
+  <p>Apache Impala</p>
+  <hr>
+</div></header><nav role="toc"><ul><li><a href="../topics/impala_intro.html">Introducing Apache Impala</a></li><li><a href="../topics/impala_concepts.html">Concepts and Architecture</a></li><li><a href="../topics/impala_planning.html">Deployment Planning</a></li><li><a href="../topics/impala_install.html">Installing Impala</a></li><li><a href="../topics/impala_config.html">Managing Impala</a></li><li><a href="../topics/impala_upgrading.html">Upgrading Impala</a></li><li><a href="../topics/impala_processes.html">Starting Impala</a></li><li><a href="../topics/impala_tutorial.html">Tutorials</a></li><li><a href="../topics/impala_admin.html">Administration</a></li><li><a href="../topics/impala_security.html">Impala Security</a></li><li><a href="../topics/impala_langref.html">SQL Reference</a></li><li><a href="../topics/impala_performance.html">Performance Tuning</a></li><li><a href="../topics/impala_scalability.html">Scalability Considerations</a></li><li><a href="../topics/impala_resource_management.html">Resource Management</a></li><li><a href="../topics/impala_partitioning.html">Partitioning</a></li><li><a href="../topics/impala_file_formats.html">File Formats</a></li><li><a href="../topics/impala_kudu.html">Using Impala to Query Kudu Tables</a></li><li><a href="../topics/impala_hbase.html">HBase Tables</a></li><li><a href="../topics/impala_iceberg.html">Iceberg Tables</a></li><li><a href="../topics/impala_s3.html">S3 Tables</a></li><li><a href="../topics/impala_adls.html">ADLS Tables</a></li><li><a href="../topics/impala_isilon.html">Isilon Storage</a></li><li><a href="../topics/impala_logging.html">Logging</a></li><li><a href="../topics/impala_client.html">Client Access</a><ul><li><a href="../topics/impala_impala_shell.html">The Impala Shell</a></li><li><a href="../topics/impala_odbc.html">Configuring Impala to Work with ODBC</a></li><li><a href="../topics/impala_jdbc.html">Configuring Impala to Work with JDBC</a></li><li class="active"><a href="../topics/impala_query_results_spooling.html">Spooling Impala Query Results</a></li></ul></li><li><a href="../topics/impala_fault_tolerance.html">Fault Tolerance</a></li><li><a href="../topics/impala_troubleshooting.html">Troubleshooting Impala</a></li><li><a href="../topics/impala_ports.html">Ports Used by Impala</a></li><li><a href="../topics/impala_reserved_words.html">Impala Reserved Words</a></li><li><a href="../topics/impala_faq.html">Impala Frequently Asked Questions</a></li><li><a href="../topics/impala_release_notes.html">Impala Release Notes</a></li></ul></nav><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  <h1 class="title topictitle1" id="ariaid-title1">Spooling Impala Query Results</h1>
+  <div class="body conbody">
+    <p class="p">In Impala, you can control how query results are materialized and
+      returned to clients, e.g. impala-shell, Hue, JDBC apps.</p>
+    <ul class="ul">
+      <li class="li">When query result spooling is disabled, Impala relies on clients to
+        fetch results to trigger the generation of more result row batches until
+        all the result rows have been produced. If a client issues a query
+        without fetching all the results, the query fragments continue to
+        consume the resources until the query is cancelled and unregistered,
+        potentially tying up resources and causing other queries to wait for an
+        extended period of time in admission control.<p class="p">Impala would materialize
+          rows on-demand where rows are created only when the client requests
+          them.</p></li>
+      <li class="li">When query result spooling is enabled, result sets of queries are
+        eagerly fetched and spooled in the spooling location, either in memory
+        or on disk. <p class="p">Once all result rows have been fetched and stored in the
+          spooling location, the resources are freed up. Incoming client fetches
+          can get the data from the spooled results.</p></li>
+    </ul>
+    <p class="p">Result spooling is turned off by default, but can be enabled via the
+        <code class="ph codeph">SPOOL_QUERY_RESULTS</code> query option.</p>
+    <section class="section" id="data_sink__section_av4_hsy_2jb"><h2 class="title sectiontitle">Admission Control and Result Spooling</h2>
+      
+      <div class="p">Query results spooling collects and stores query results in memory that
+        is controlled by admission control. Use the following query options to
+        calibrate how much memory to use and when to spill to disk.<dl class="dl">
+          
+            <dt class="dt dlterm">MAX_RESULT_SPOOLING_MEM</dt>
+            <dd class="dd">
+              <p class="p">The maximum amount of memory used when spooling query results.
+                If this value is exceeded when spooling results, all memory will
+                most likely be spilled to disk. Set to 100 MB by default. </p>
+            </dd>
+          
+          
+            <dt class="dt dlterm">MAX_SPILLED_RESULT_SPOOLING_MEM</dt>
+            <dd class="dd">
+              <p class="p">The maximum amount of memory that can be spilled to disk when
+                spooling query results. Must be greater than or equal to
+                  <code class="ph codeph">MAX_RESULT_SPOOLING_MEM</code>. If this value is
+                exceeded, the coordinator fragment will block until the client
+                has consumed enough rows to free up more memory. Set to 1 GB by
+                default.</p>
+            </dd>
+          
+        </dl></div>
+    </section>
+    <section class="section" id="data_sink__section_oh2_fsy_2jb"><h2 class="title sectiontitle">Fetch Timeout</h2>
+      
+      <div class="p">Resources for a query are released when the query completes its
+        execution. To prevent clients from indefinitely waiting for query
+        results, use the <code class="ph codeph">FETCH_ROWS_TIMEOUT_MS</code> query option to
+        set the timeout when clients fetch rows. Timeout applies both when query
+        result spooling is enabled and disabled:<ul class="ul">
+          <li class="li">When result spooling is disabled (<code class="ph codeph">SPOOL_QUERY_RESULTS =
+              FALSE</code>), the timeout controls how long a client waits for
+            a single row batch to be produced by the coordinator. </li>
+          <li class="li">When result spooling is enabled ( (<code class="ph codeph">SPOOL_QUERY_RESULTS =
+              TRUE</code>), a client can fetch multiple row batches at a time,
+            so this timeout controls the total time a client waits for row
+            batches to be produced.</li>
+        </ul></div>
+    </section>
+    <section class="section" id="data_sink__section_ahm_bsy_2jb"><h2 class="title sectiontitle">Explain Plans</h2>
+      
+      <div class="p">Below is the part of the <code class="ph codeph">EXPLAIN</code> plan output for
+        result spooling.<pre class="pre codeblock"><code>F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0</code></pre><ul class="ul">
+          <li class="li">The <code class="ph codeph">mem-estimate</code> for the <code class="ph codeph">PLAN-ROOT
+              SINK</code> is an estimate of the amount of memory needed to
+            spool all the rows returned by the query.</li>
+          <li class="li">The <code class="ph codeph">mem-reservation</code> is the number and size of the
+            buffers necessary to spool the query results. By default, the read
+            and write buffers are 2 MB in size each, which is why the default is
+            4 MB.</li>
+        </ul></div>
+    </section>
+    <section class="section" id="data_sink__section_ovl_ksy_2jb"><h2 class="title sectiontitle">PlanRootSink</h2>
+      
+      <p dir="ltr" class="p">In Impala, the <code class="ph codeph">PlanRootSink</code> class controls
+        the passing of batches of rows to the clients and acts as a queue of
+        rows to be sent to clients.</p>
+      <div class="p">
+        <ul class="ul">
+          <li class="li">
+            <p class="p">When result spooling is disabled, a single batch or rows is sent
+              to the <code class="ph codeph">PlanRootSink</code>, and then the client must
+              consume that batch before another one can be sent.</p>
+          </li>
+          <li class="li">
+            <p class="p">When result spooling is enabled, multiple batches of rows can be
+              sent to the <code class="ph codeph">PlanRootSink</code>, and multiple batches
+              can be consumed by the client.</p>
+          </li>
+        </ul>
+      </div>
+    </section>
+    <section class="section">
+      <p class="p"><strong class="ph b">Related information:</strong>
+        <a class="xref" href="impala_max_result_spooling_mem.html#MAX_RESULT_SPOOLING_MEM">MAX_RESULT_SPOOLING_MEM Query Option</a>, <a class="xref" href="impala_max_spilled_result_spooling_mem.html#MAX_SPILLED_RESULT_SPOOLING_MEM">MAX_SPILLED_RESULT_SPOOLING_MEM Query Option</a>, <a class="xref" href="impala_spool_query_results.html#SPOOL_QUERY_RESULTS">SPOOL_QUERY_RESULTS Query Option</a></p>
+    </section>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_client.html">Impala Client Access</a></div></div></nav></article></main></body></html>

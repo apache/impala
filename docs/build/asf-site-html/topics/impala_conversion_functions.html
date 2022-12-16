@@ -1,0 +1,1321 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2022"><meta name="DC.rights.owner" content="(C) Copyright 2022"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="conversion_functions"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>Impala Type Conversion Functions</title></head><body id="conversion_functions"><header role="banner"><!--
+The DITA Open Toolkit is licensed for use under the the Apache
+Software Foundation License v2.0.
+
+A copy of the Apache Software Foundation License 2.0 is
+available at http://opensource.org/licenses/apache2.0.php
+
+This statement must be included in any copies of DITA Open
+Toolkit code.
+--><div class="header">
+  <p>Apache Impala</p>
+  <hr>
+</div></header><nav role="toc"><ul><li><a href="../topics/impala_intro.html">Introducing Apache Impala</a></li><li><a href="../topics/impala_concepts.html">Concepts and Architecture</a></li><li><a href="../topics/impala_planning.html">Deployment Planning</a></li><li><a href="../topics/impala_install.html">Installing Impala</a></li><li><a href="../topics/impala_config.html">Managing Impala</a></li><li><a href="../topics/impala_upgrading.html">Upgrading Impala</a></li><li><a href="../topics/impala_processes.html">Starting Impala</a></li><li><a href="../topics/impala_tutorial.html">Tutorials</a></li><li><a href="../topics/impala_admin.html">Administration</a></li><li><a href="../topics/impala_security.html">Impala Security</a></li><li><a href="../topics/impala_langref.html">SQL Reference</a><ul><li><a href="../topics/impala_comments.html">Comments</a></li><li><a href="../topics/impala_datatypes.html">Data Types</a></li><li><a href="../topics/impala_literals.html">Literals</a></li><li><a href="../topics/impala_operators.html">SQL Operators</a></li><li><a href="../topics/impala_schema_objects.html">Schema Objects and Object Names</a></li><li><a href="../topics/impala_transactions.html">Transactions</a></li><li><a href="../topics/impala_langref_sql.html">SQL Statements</a></li><li><a href="../topics/impala_functions.html">Built-In Functions</a><ul><li><a href="../topics/impala_math_functions.html">Mathematical Functions</a></li><li><a href="../topics/impala_bit_functions.html">Bit Functions</a></li><li class="active"><a href="../topics/impala_conversion_functions.html">Type Conversion Functions</a></li><li><a href="../topics/impala_datetime_functions.html">Date and Time Functions</a></li><li><a href="../topics/impala_conditional_functions.html">Conditional Functions</a></li><li><a href="../topics/impala_string_functions.html">String Functions</a></li><li><a href="../topics/impala_misc_functions.html">Miscellaneous Functions</a></li><li><a href="../topics/impala_aggregate_functions.html">Aggregate Functions</a></li><li><a href="../topics/impala_analytic_functions.html">Analytic Functions</a></li></ul></li><li><a href="../topics/impala_udf.html">User-Defined Functions (UDFs)</a></li><li><a href="../topics/impala_langref_unsupported.html">SQL Differences Between Impala and Hive</a></li><li><a href="../topics/impala_porting.html">Porting SQL</a></li><li><a href="../topics/impala_utf_8.html">UTF-8 Support</a></li></ul></li><li><a href="../topics/impala_performance.html">Performance Tuning</a></li><li><a href="../topics/impala_scalability.html">Scalability Considerations</a></li><li><a href="../topics/impala_resource_management.html">Resource Management</a></li><li><a href="../topics/impala_partitioning.html">Partitioning</a></li><li><a href="../topics/impala_file_formats.html">File Formats</a></li><li><a href="../topics/impala_kudu.html">Using Impala to Query Kudu Tables</a></li><li><a href="../topics/impala_hbase.html">HBase Tables</a></li><li><a href="../topics/impala_iceberg.html">Iceberg Tables</a></li><li><a href="../topics/impala_s3.html">S3 Tables</a></li><li><a href="../topics/impala_adls.html">ADLS Tables</a></li><li><a href="../topics/impala_isilon.html">Isilon Storage</a></li><li><a href="../topics/impala_logging.html">Logging</a></li><li><a href="../topics/impala_client.html">Client Access</a></li><li><a href="../topics/impala_fault_tolerance.html">Fault Tolerance</a></li><li><a href="../topics/impala_troubleshooting.html">Troubleshooting Impala</a></li><li><a href="../topics/impala_ports.html">Ports Used by Impala</a></li><li><a href="../topics/impala_reserved_words.html">Impala Reserved Words</a></li><li><a href="../topics/impala_faq.html">Impala Frequently Asked Questions</a></li><li><a href="../topics/impala_release_notes.html">Impala Release Notes</a></li></ul></nav><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Impala Type Conversion Functions</h1>
+
+  
+
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      Conversion functions are typically used in combination with other functions to explicitly
+      pass the expected data types. Impala has strict rules regarding data types for function
+      parameters. For example, Impala does not automatically convert a <code class="ph codeph">DOUBLE</code>
+      value to <code class="ph codeph">FLOAT</code>, a <code class="ph codeph">BIGINT</code> value to <code class="ph codeph">INT</code>,
+      or other conversion where precision could be lost or overflow could occur. Also, for
+      reporting or dealing with loosely defined schemas in big data contexts, you might need to
+      convert values to or from the <code class="ph codeph">STRING</code> type.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Function reference:</strong>
+    </p>
+
+    <p class="p">
+      Impala supports the following type conversion functions:
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+        <a class="xref" href="#conversion_functions__cast">CAST</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="#conversion_functions__typeof">TYPEOF</a>
+      </li>
+    </ul>
+
+    <dl class="dl">
+      
+
+        <dt class="dt dlterm" id="conversion_functions__cast">
+          CAST(expression AS type)
+        </dt>
+
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Returns <var class="keyword varname">expression</var> converted to the
+          <var class="keyword varname">type</var> data type.
+          <div class="p">
+            If the <var class="keyword varname">expression</var> value is of a type that cannot be converted to
+            the target <var class="keyword varname">type</var>:
+            <ul class="ul">
+              <li class="li">
+                Of <code class="ph codeph">DECIMAL</code>, <code class="ph codeph">DATE</code>, and
+                <code class="ph codeph">BOOLEAN</code>, the function returns an error.
+              </li>
+
+              <li class="li">
+                Of all other types, the function returns <code class="ph codeph">NULL</code>.
+              </li>
+            </ul>
+          </div>
+
+          <p class="p">
+            <strong class="ph b">Usage notes:</strong>
+          </p>
+
+          <p class="p">
+            Use <code class="ph codeph">CAST</code> when passing a column value or literal to a function that
+            expects a parameter with a different type. Frequently used in SQL operations such as
+            <code class="ph codeph">CREATE TABLE AS SELECT</code> and <code class="ph codeph">INSERT ... VALUES</code> to
+            ensure that values from various sources are of the appropriate type for the
+            destination columns.
+          </p>
+
+          <p class="p">
+            Where practical, do a one-time <code class="ph codeph">CAST()</code> operation during the
+            ingestion process to make each column into the appropriate type, rather than using
+            many <code class="ph codeph">CAST()</code> operations in each query; doing type conversions for
+            each row during each query can be expensive for tables with millions or billions of
+            rows.
+          </p>
+
+          <p class="p">
+        The way this function deals with time zones when converting to or from
+        <code class="ph codeph">TIMESTAMP</code> values is affected by the
+        <code class="ph codeph">‑‑use_local_tz_for_unix_timestamp_conversions</code> startup flag
+        for the <span class="keyword cmdname">impalad</span> daemon. See
+        <a class="xref" href="../shared/../topics/impala_timestamp.html#timestamp">TIMESTAMP Data Type</a> for details about how
+        Impala handles time zone considerations for the <code class="ph codeph">TIMESTAMP</code> data type.
+      </p>
+
+          <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+          <p class="p">
+            For details of casts from each kind of data type, see the description of the
+            appropriate type: <a class="xref" href="impala_tinyint.html#tinyint">TINYINT Data Type</a>,
+            <a class="xref" href="impala_smallint.html#smallint">SMALLINT Data Type</a>,
+            <a class="xref" href="impala_int.html#int">INT Data Type</a>,
+            <a class="xref" href="impala_bigint.html#bigint">BIGINT Data Type</a>,
+            <a class="xref" href="impala_float.html#float">FLOAT Data Type</a>,
+            <a class="xref" href="impala_double.html#double">DOUBLE Data Type</a>,
+            <a class="xref" href="impala_decimal.html#decimal">DECIMAL Data Type</a>,
+            <a class="xref" href="impala_string.html#string">STRING Data Type</a>,
+            <a class="xref" href="impala_char.html#char">CHAR Data Type</a>,
+            <a class="xref" href="impala_varchar.html#varchar">VARCHAR Data Type</a>,
+            <a class="xref" href="impala_timestamp.html#timestamp">TIMESTAMP Data Type</a>,
+            <a class="xref" href="impala_boolean.html#boolean">BOOLEAN Data Type</a>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="conversion_functions__cast_format">
+          CAST(expression AS type FORMAT pattern)
+        </dt>
+
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Returns <var class="keyword varname">expression</var> converted to the
+          <var class="keyword varname">type</var> data type based on the <var class="keyword varname">pattern</var> format
+          string. This signature of <code class="ph codeph">CAST()</code> with the <code class="ph codeph">FORMAT</code>
+          clause is supported only for casts between <code class="ph codeph">STRING</code> /
+          <code class="ph codeph">CHAR</code> / <code class="ph codeph">VARCHAR</code> types and <code class="ph codeph">TIMESTAMP</code>
+          / <code class="ph codeph">DATE</code> types.
+          <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+            The patterns allowed in the <code class="ph codeph">FORMAT</code> clause support ISO SQL:2016
+            standard patterns. Those patterns are not the same format patterns used with the
+            other Impala conversion functions, e.g. <code class="ph codeph">TO_TIMESTAMP()</code> and
+            <code class="ph codeph">FROM_TIMESTAMP()</code>.
+          </div>
+
+          <div class="p">
+            The following rules apply to <var class="keyword varname">pattern</var>. Any exceptions to these
+            rules are noted in the Details column of the table below.
+            <ul class="ul">
+              <li class="li">
+                <var class="keyword varname">pattern</var> is a case-insensitive <code class="ph codeph">STRING</code> unless
+                noted otherwise in the table below.
+              </li>
+
+              <li class="li">
+                If <var class="keyword varname">pattern</var> is <code class="ph codeph">NULL</code>, an empty string, or a
+                number, an error returns.
+              </li>
+
+              <li class="li">
+                A fewer digits in <var class="keyword varname">expression</var> than specified in the
+                <var class="keyword varname">pattern</var> is accepted if a separator is correctly specified in
+                the <var class="keyword varname">pattern</var>. For example, <code class="ph codeph">CAST('5-01-2017' AS DATE
+                FORMAT 'MM-dd-yyyy')</code> returns <code class="ph codeph">DATE'2017-05-01'</code>.
+              </li>
+
+              <li class="li">
+                If fewer number of digits are in <var class="keyword varname">expression</var> than specified in
+                the <var class="keyword varname">pattern</var>, the current date is used to complete the year
+                pattern. For example, <code class="ph codeph">CAST('19/05' AS DATE FORMAT 'YYYY/MM')</code>
+                will return <code class="ph codeph">DATE'2019-05-01'</code> when executed on August 8, 2019.
+              </li>
+            </ul>
+          </div>
+
+          <div class="p">
+            The following format patterns are supported in the <code class="ph codeph">FORMAT</code> clause.
+            <table class="table frame-all" id="conversion_functions__table_gbt_5ym_r3b"><caption></caption><colgroup><col style="width:10.695187165775401%"><col style="width:18.71657754010695%"><col style="width:70.58823529411764%"></colgroup><thead class="thead">
+                  <tr class="row">
+                    <th class="entry cellrowborder align-left colsep-1 rowsep-1" id="conversion_functions__table_gbt_5ym_r3b__entry__1">
+                      Pattern
+                    </th>
+                    <th class="entry cellrowborder align-left colsep-1 rowsep-1" id="conversion_functions__table_gbt_5ym_r3b__entry__2">
+                      Description
+                    </th>
+                    <th class="entry cellrowborder align-left colsep-1 rowsep-1" id="conversion_functions__table_gbt_5ym_r3b__entry__3">
+                      Details
+                    </th>
+                  </tr>
+                </thead><tbody class="tbody">
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">YYYY</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      4-digit year.
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 "></td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">YYY</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Last 3 digits of a year.
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 "></td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">YY</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Last 2 digits of a year.
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 "></td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">Y</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Last digit of a year
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 "></td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">RRRR</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      4-digit round year
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        If 1,3 or 4-digit year values are provided in
+                        <var class="keyword varname">expression</var>, treated as <code class="ph codeph">YYYY</code>.
+                      </p>
+
+
+
+                      <p class="p">
+                        If 2-digit years are provided in <var class="keyword varname">expression</var>, treated
+                        as <code class="ph codeph">RR</code>.
+                      </p>
+
+
+
+                      <p class="p">
+                        For date/time to string conversions, treated as <code class="ph codeph">YYYY</code>.
+                      </p>
+
+
+
+                      <p class="p">
+                        If <code class="ph codeph">YYYY</code>, <code class="ph codeph">YYY</code>, <code class="ph codeph">YY</code>,
+                        <code class="ph codeph">Y</code>, or <code class="ph codeph">RR</code> is given in the same
+                        <var class="keyword varname">pattern</var> for a string to date/time conversion, an
+                        error returns.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">RR</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      2-digit round year.
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        For date/time to string conversions, same as <code class="ph codeph">YY</code>.
+                      </p>
+
+
+
+                      <div class="p">
+                        For string to date/time conversions, the first 2 digits of the year in
+                        the return value depends on the specified two-digit year and the last
+                        two digits of the current year as follows:
+                        <ul class="ul">
+                          <li class="li">
+                            <p class="p">
+                              If the specified 2-digit year is 00 to 49:
+                            </p>
+                            <ul class="ul">
+                              <li class="li">
+                                <p class="p">
+                                  If the last 2 digits of the current year are 00 to 49, the
+                                  returned year has the same first 2 digits as the current year.
+                                </p>
+                              </li>
+
+                              <li class="li">
+                                <p class="p">
+                                  If the last 2 digits of the current year are 50 to 99, the
+                                  first 2 digits of the returned year are 1 greater than the
+                                  first 2 digits of the current year.
+                                </p>
+                              </li>
+                            </ul>
+                          </li>
+
+                          <li class="li">
+                            <p class="p">
+                              If the specified 2-digit year is 50 to 99:
+                            </p>
+                            <ul class="ul">
+                              <li class="li">
+                                <p class="p">
+                                  If the last 2 digits of the current year are 00 to 49, the
+                                  first 2 digits of the returned year are 1 less than the first
+                                  2 digits of the current year.
+                                </p>
+                              </li>
+
+                              <li class="li">
+                                <p class="p">
+                                  If the last 2 digits of the current year are 50 to 99, the
+                                  returned year has the same first 2 digits as the current year.
+                                </p>
+                              </li>
+                            </ul>
+                          </li>
+                        </ul>
+                      </div>
+
+
+
+                      <p class="p">
+                        If <code class="ph codeph">YYYY</code>, <code class="ph codeph">YYY</code>, <code class="ph codeph">YY</code>,
+                        <code class="ph codeph">Y</code>, or <code class="ph codeph">RR</code> is given in the same
+                        <var class="keyword varname">pattern</var> for a string to date/time conversion, an
+                        error returns.
+                      </p>
+
+
+
+                      <p class="p">
+                        If 1-digit year values are provided in <var class="keyword varname">expression</var>, it
+                        is treated as <code class="ph codeph">YYYY</code>.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">Q</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Quarter of year (1-4)
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        Not supported in string to date/time conversions.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">MM</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Month number
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p"> In date/time to string conversions, 1-digit months are
+                        prefixed with a zero. </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">MONTH</code>
+
+                      <p class="p">
+                        <code class="ph codeph">Month</code>
+                      </p>
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">month</code>
+                      </p>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Full month name
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      In string to date/time conversions:
+
+                      <ul class="ul">
+                        <li class="li"> Converts a textual month name to a 2-digit month
+                          number. </li>
+
+                        <li class="li">
+                          The input strings are expected without trailing spaces, e.g.
+                          "<code class="ph codeph">June</code>", "<code class="ph codeph">August</code>".
+                        </li>
+
+                        <li class="li">
+                          If the <code class="ph codeph">FX</code> modifier is active for the token, a
+                          9-character-long full month name with trailing spaces is expected for
+                          the input string.
+                        </li>
+                      </ul>
+
+                      <div class="p">
+                        In date/time to string conversions:
+                        <ul class="ul">
+                          <li class="li">
+                            Converts to a 9-character-long full month name with trailing spaces.
+                          </li>
+
+                          <li class="li">
+                            If the <code class="ph codeph">FM</code> modifier is active for this token,
+                            converts to a month name without trailing spaces.
+                          </li>
+                        </ul>
+                      </div>
+
+
+
+                      <p class="p">
+                        This pattern token is case sensitive. <code class="ph codeph">MONTH</code>,
+                        <code class="ph codeph">Month</code>, <code class="ph codeph">month</code> would require different
+                        casing of the input in string to date/time conversions and would produce
+                        cased outputs in date/time to string conversions, For example,
+                        <code class="ph codeph">MONTH</code>, <code class="ph codeph">Month</code>, <code class="ph codeph">month</code>
+                        would convert respectively <code class="ph codeph">JULY</code>, <code class="ph codeph">July</code>,
+                        and <code class="ph codeph">july</code>.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">MON</code>
+
+                      <p class="p">
+                        <code class="ph codeph">Mon</code>
+                      </p>
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">mon</code>
+                      </p>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Abbreviated 3-character month name
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        This pattern token is case sensitive. <code class="ph codeph">MON</code>,
+                        <code class="ph codeph">Mon</code>, <code class="ph codeph">mon</code> would require different
+                        casing of the input in string to date/time conversions and would produce
+                        cased outputs in date/time to string conversions, For example,
+                        <code class="ph codeph">MON</code>, <code class="ph codeph">Mon</code>, <code class="ph codeph">mon</code> would
+                        convert respectively <code class="ph codeph">JUL</code>, <code class="ph codeph">Jul</code>, and
+                        <code class="ph codeph">jul</code>.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">WW</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Week of year (1-53)
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p"> Not supported in string to date/time conversions. </p>
+
+
+
+                      <p class="p"> The 1st week begins on January 1st and ends on January
+                        7th. </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">W</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Week of month (1-5)
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        Not supported in string to date/time conversions.
+                      </p>
+
+
+
+                      <p class="p">
+                        1st week begins on the 1st of the month and ends on the 7th.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">D</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Day of week (1-7)
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        Not supported in string to date/time conversions.
+                      </p>
+
+                      In date/time to string conversions, converts to a day number, for example,
+                      1 for Sunday, 2 for Monday.
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">DD</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Day of month (1-31)
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p"> In date/time to string conversions, 1-digit days are
+                        prefixed with a zero. </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">DDD</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Day of year (1-366)
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        In string to date/time conversions, providing <code class="ph codeph">MM</code> and
+                        <code class="ph codeph">DD</code> along with <code class="ph codeph">DDD</code> results an error,
+                        e.g. <code class="ph codeph">YYYY-MM-DDD</code>.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">DAY</code>
+
+                      <p class="p">
+                        <code class="ph codeph">Day</code>
+                      </p>
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">day</code>
+                      </p>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Day name
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        Not supported in string to date/time conversions.
+                      </p>
+
+
+
+                      <div class="p">
+                        In date/time to string conversions:
+                        <ul class="ul">
+                          <li class="li">
+                            Converts to a 9-character-long full day name with trailing spaces.
+                          </li>
+
+                          <li class="li">
+                            If the <code class="ph codeph">FM</code> modifier is active for this token,
+                            converts to a day name without trailing spaces.
+                          </li>
+                        </ul>
+                      </div>
+
+
+
+                      <p class="p">
+                        This pattern token is case sensitive. <code class="ph codeph">DAY</code>,
+                        <code class="ph codeph">Day</code>, <code class="ph codeph">day</code> would produce cased outputs
+                        in date/time to string conversions, For example, <code class="ph codeph">DAY</code>,
+                        <code class="ph codeph">Day</code>, <code class="ph codeph">day</code> would convert respectively
+                        <code class="ph codeph">MONDAY</code>, <code class="ph codeph">Monday</code>, and
+                        <code class="ph codeph">monday</code>.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">DY</code>
+
+                      <p class="p">
+                        <code class="ph codeph">Dy</code>
+                      </p>
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">dy</code>
+                      </p>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Abbreviated 3-character day name
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        Not supported in string to date/time conversions.
+                      </p>
+
+
+
+                      <p class="p">
+                        This pattern token is case sensitive. <code class="ph codeph">DY</code>,
+                        <code class="ph codeph">Dy</code>, <code class="ph codeph">dy</code> would produce cased outputs in
+                        date/time to string conversions, For example, <code class="ph codeph">DY</code>,
+                        <code class="ph codeph">Dy</code>, <code class="ph codeph">dy</code> would convert respectively
+                        <code class="ph codeph">MON</code>, <code class="ph codeph">Mon</code>, and <code class="ph codeph">mon</code>.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">HH</code>
+
+                      <p class="p">
+                        <code class="ph codeph">HH12</code>
+                      </p>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Hour of day (1-12)
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        In date/time to string conversions, 1-digit hours are prefixed with a
+                        zero.
+                      </p>
+
+
+
+                      <p class="p">
+                        If provided hour in <var class="keyword varname">expression</var> is not between 1 and
+                        12, returns an error.
+                      </p>
+
+
+
+                      <p class="p">
+                        If no AM/PM is provided in <var class="keyword varname">expression</var>, the default is
+                        <code class="ph codeph">AM</code>.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">HH24</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Hour of day (0-23)
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        In string to date/time conversions, if <code class="ph codeph">HH12</code>,
+                        <code class="ph codeph">AM</code>, <code class="ph codeph">PM</code> are given in the same
+                        <var class="keyword varname">pattern</var>, an error returns.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">MI</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Minute of hour (0-59)
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        In date/time to string conversions, 1-digit minutes are prefixed with a
+                        zero.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">SS</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Second of minute (0-59)
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        In date/time to string conversions, 1-digit seconds are prefixed with a
+                        zero.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">SSSSS</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Second of Day (0-86399)
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        In string to timestamp conversions, if <code class="ph codeph">SS</code>,
+                        <code class="ph codeph">HH</code>, <code class="ph codeph">HH12</code>, <code class="ph codeph">HH24</code>,
+                        <code class="ph codeph">MI</code>, <code class="ph codeph">AM</code>/<code class="ph codeph">PM</code> are given
+                        in the same <var class="keyword varname">pattern</var>, an error returns.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">FF</code>
+
+                      <p class="p">
+                        <code class="ph codeph">FF1</code>, ..., <code class="ph codeph">FF9</code>
+                      </p>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Fractional second
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        A number, 1 to 9, can be used to indicate the number of digits.
+                      </p>
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">FF</code> specifies a 9 digits fractional second.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">AM</code>
+
+                      <p class="p">
+                        <code class="ph codeph">PM</code>
+                      </p>
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">A.M.</code>
+                      </p>
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">P.M.</code>
+                      </p>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Meridiem indicator
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        For date/time to string conversions, <code class="ph codeph">AM</code> and
+                        <code class="ph codeph">PM</code> are treated as synonyms. For example, casting
+                        <code class="ph codeph">'2019-01-01 11:00 am'</code> to <code class="ph codeph">TIMESTAMP</code>
+                        with the <code class="ph codeph">'YYYY-MM-DD HH12:MI PM'</code> pattern returns
+                        <code class="ph codeph">01-JAN-19 11.00.00.000000 AM</code>.
+                      </p>
+
+
+
+                      <p class="p">
+                        For string to date/time conversion, <code class="ph codeph">HH24</code> in the same
+                        <var class="keyword varname">pattern</var> returns an error.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">TZH</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Timezone offset hour
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        An optional sign, + or -, and 2 digits for the value of signed numbers
+                        are allowed for the source <var class="keyword varname">expression</var>, e.g.
+                        <code class="ph codeph">+10</code>, <code class="ph codeph">-05</code>, <code class="ph codeph">04</code>.
+                      </p>
+
+
+
+                      <p class="p">
+                        The allowed values are from <code class="ph codeph">-15</code> to <code class="ph codeph">+5</code>.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">TZM</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Timezone offset minute
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        Unsigned numbers are allowed for the source
+                        <var class="keyword varname">expression</var>.
+                      </p>
+
+
+
+                      <p class="p">
+                        The allowed values are from <code class="ph codeph">0</code> to <code class="ph codeph">59</code>.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">-</code>
+
+                      <p class="p">
+                        <code class="ph codeph">.</code>
+                      </p>
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">/</code>
+                      </p>
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">,</code>
+                      </p>
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">'</code>
+                      </p>
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">;</code>
+                      </p>
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">:</code>
+                      </p>
+
+
+
+                      <p class="p">
+                        &lt;space&gt;
+                      </p>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Separator
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        For string to date/time conversions, any separator character in the
+                        <var class="keyword varname">pattern</var> string would match any separator character in
+                        the input <var class="keyword varname">expression</var>.
+                      </p>
+
+
+
+                      <p class="p">
+                        For example, <code class="ph codeph">CAST(“20191010” AS DATE FORMAT
+                        “YYYY-MM-DD”)</code> returns an error, but <code class="ph codeph">CAST("2019-.;10
+                        10" AS DATE FORMAT "YYYY-MM-DD")</code> succeeds.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">T</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Separates the date from the time.
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        This pattern is used for accepting ISO 8601 date/time formats.
+                      </p>
+
+
+
+                      <p class="p">
+                        Example: <code class="ph codeph">YYYY-MM-DD<strong class="ph b">T</strong>HH24:MI:SS.FF9Z</code>
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">Z</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Indicates the zero hour offset from UTC.
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        This pattern is used for accepting ISO 8601 date/time formats.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">FX</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Forces an exact match between the format pattern,
+                      <var class="keyword varname">pattern</var>, and the input argument,
+                      <var class="keyword varname">expression</var>.
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        Must be specified at the beginning of the format
+                        <var class="keyword varname">pattern</var> and is valid for the whole
+                        <var class="keyword varname">pattern</var>.
+                      </p>
+
+
+
+                      <p class="p">
+                        In string to date/time conversions:
+                      </p>
+
+                      <ul class="ul">
+                        <li class="li">
+                          Forces strict separator matching, including the separator character.
+                        </li>
+
+                        <li class="li">
+                          Expects all the tokens to have the maximum possible length.
+                        </li>
+                      </ul>
+
+                      <p class="p">
+                        In date/time to string conversions, the outputs are padded as follows:
+                      </p>
+
+                      <ul class="ul">
+                        <li class="li">
+                          Numeric outputs are left padded with zeros.
+                        </li>
+
+                        <li class="li">
+                          Text outputs are right padded with spaces.
+                        </li>
+                      </ul>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      <code class="ph codeph">FM</code>
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Overrides <code class="ph codeph">FX</code>.
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        In a date/time to string conversions, <code class="ph codeph">FM</code> suppresses
+                        blank padding for the element immediately following the
+                        <code class="ph codeph">FM</code> in the <var class="keyword varname">pattern</var> string, e.g.
+                        "<code class="ph codeph">2010-1-9</code>".
+                      </p>
+
+
+
+                      <div class="p">
+                        In string to date/time conversions, <code class="ph codeph">FM</code> is used to
+                        override the effect of <code class="ph codeph">FX</code> for certain tokens as
+                        follows:
+                        <ul class="ul">
+                          <li class="li">
+                            <p class="p">
+                              The length of the token in the input argument can be shorter than
+                              the max length of that token type if followed by a separator, e.g.
+                              1-digit month, less than 4-digit year.
+                            </p>
+                          </li>
+
+                          <li class="li">
+                            <p class="p">
+                              <code class="ph codeph">FM</code> modifier skips the separators and affects the
+                              next non-separator token. For example, <code class="ph codeph">CAST('1999-10-2' AS
+                              TIMESTAMP FORMAT 'FXYYYY-MM<strong class="ph b">FM</strong>-DD') </code>returns
+                              <code class="ph codeph">1999-10-02 00:00:00</code> as <code class="ph codeph">FM</code> is
+                              applied to <code class="ph codeph">DD</code> and not to the
+                              separator(<code class="ph codeph">-</code>).
+                            </p>
+                          </li>
+                        </ul>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr class="row">
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__1 ">
+                      Free text
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__2 ">
+                      Nested string
+                    </td>
+                    <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_gbt_5ym_r3b__entry__3 ">
+                      <p class="p">
+                        You can specify a free text with surrounding double quotes (") in
+                        <var class="keyword varname">pattern</var> where the same text is expected in the input
+                        argument without surrounding double quotes.
+                      </p>
+
+
+
+                      <p class="p">
+                        In date/time to string conversions, the string is included in the output
+                        with the characters' case preserved.
+                      </p>
+
+
+
+                      <p class="p">
+                        In string to date/time conversions, the nested string is not included in
+                        the resulting date/time object. However, the nested string has to match
+                        the related part of the input string, including the case.
+                      </p>
+
+
+
+                      <div class="p">
+                        The following rules apply:
+                        <ul class="ul">
+                          <li class="li">
+                            <p class="p">
+                              If the <var class="keyword varname">pattern</var> is surrounded by double quotes,
+                              double quotes surrounding the free text token must be escaped with
+                              a single backslash (<code class="ph codeph">\"</code>).
+                            </p>
+
+                            <p class="p">
+                              For example: <code class="ph codeph">CAST('"Date:"2019-11-10' AS DATE FORMAT
+                              "<strong class="ph b">\"Date:\"</strong>YYYY-MM-DD")</code>
+                            </p>
+                          </li>
+
+                          <li class="li">
+                            <p class="p">
+                              If the <var class="keyword varname">pattern</var> is surrounded by double quotes,
+                              and there is an escaped double quotes inside a text token that is
+                              itself surrounded by escaped double quotes, escape the double
+                              quotes in the free text token with a triple backslash:
+                              (<code class="ph codeph">\\\"</code>)
+                            </p>
+
+                            <p class="p">
+                              For example: <code class="ph codeph">CAST("1985 some \"text 11-28" AS DATE'''
+                              FORMAT "YYYY<strong class="ph b">\" some \\\"text \"</strong>MM-DD")</code>
+                            </p>
+                          </li>
+
+                          <li class="li">
+                            <p class="p">
+                              If the <var class="keyword varname">pattern</var> is surrounded by single quotes,
+                              the free text token can be surrounded by (non-escaped) double
+                              quotes. To include double quotes within the free text token, those
+                              double quotes must be escaped by a single backslash.
+                            </p>
+
+                            <p class="p">
+                              For example: <code class="ph codeph">CAST('"Date:"2019-11-10' AS DATE FORMAT
+                              '"<strong class="ph b">\"Date:\"</strong>"YYYY-MM-DD')</code>
+                            </p>
+                          </li>
+
+                          <li class="li">
+                            <p class="p">
+                              Literal single quotes/apostrophes (<code class="ph codeph">'</code>) in the
+                              nested string must be escaped with a single backslash if the whole
+                              pattern string is delimited by single quotes.
+                            </p>
+                          </li>
+
+                          <li class="li">
+                            <p class="p">
+                              If a free text token contains any separator characters in the
+                              beginning, and the text token is right after a separator token
+                              sequence, an error returns as it's not trivial to find where the
+                              separator sequence ends and where the free text starts. In this
+                              case, use <code class="ph codeph">FX</code> for strict matching.
+                            </p>
+
+                            <p class="p">
+                              For example: <code class="ph codeph">CAST("1985-11- ' 10" AS DATE FORMAT
+                              "YYYY-MM-<strong class="ph b">\" ' \"</strong>DD")</code> returns an error, but
+                              removing the dash before the text token makes this succeed.
+                            </p>
+                          </li>
+                        </ul>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody></table>
+          </div>
+
+          <p class="p">
+            <strong class="ph b">Examples:</strong>
+          </p>
+          <table class="table frame-all" id="conversion_functions__table_qqg_txn_r3b"><caption></caption><colgroup><col style="width:50%"><col style="width:50%"></colgroup><thead class="thead">
+                <tr class="row">
+                  <th class="entry cellrowborder align-left colsep-1 rowsep-1" id="conversion_functions__table_qqg_txn_r3b__entry__1">
+                    Input
+                  </th>
+                  <th class="entry cellrowborder align-left colsep-1 rowsep-1" id="conversion_functions__table_qqg_txn_r3b__entry__2">
+                    Output
+                  </th>
+                </tr>
+              </thead><tbody class="tbody">
+                <tr class="row">
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__1 ">
+<pre class="pre codeblock"><code>CAST("02-11-2014" AS DATE FORMAT 'dd-mm-yyyy')</code></pre>
+                  </td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__2 ">
+                    2014-11-02
+                  </td>
+                </tr>
+                <tr class="row">
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__1 ">
+<pre class="pre codeblock"><code>CAST("365 2014" AS DATE FORMAT 'DDD-YYYY')</code></pre>
+                  </td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__2 ">
+                    2014-12-31
+                  </td>
+                </tr>
+                <tr class="row">
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__1 ">
+<pre class="pre codeblock"><code>CAST("5-01-26" AS DATE FORMAT 'YY-MM-DD')</code></pre>
+                  </td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__2 ">
+                    Executed at 2019-01-01 11:11:11:
+
+                    <p class="p">
+                      2015-01-26
+                    </p>
+                  </td>
+                </tr>
+                <tr class="row">
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__1 ">
+<pre class="pre codeblock"><code>CAST('2018-11-10T15:11:04Z' AS TIMESTAMP
+   FORMAT 'YYYY-MM-DDTHH24:MI:SSZ')</code></pre>
+                  </td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__2 ">
+                    2018-11-10 15:11:04
+                  </td>
+                </tr>
+                <tr class="row">
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__1 ">
+<pre class="pre codeblock"><code>CAST("95-01-28" AS DATE
+   FORMAT 'YYY-MM-DD')</code></pre>
+                  </td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__2 ">
+                    Executed at 2019-01-01 11:11:11:
+
+                    <p class="p">
+                      2095-01-28
+                    </p>
+                  </td>
+                </tr>
+                <tr class="row">
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__1 ">
+<pre class="pre codeblock"><code>CAST("49-01-15" AS DATE 
+   FORMAT 'RR-MM-DD')</code></pre>
+                  </td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__2 ">
+                    Round year when last 2 digits of current year is greater than 49.
+
+                    <p class="p">
+                      Executed at 2099-01-01 11:11:11:
+                    </p>
+
+
+
+                    <p class="p">
+                      2149-01-15
+                    </p>
+                  </td>
+                </tr>
+                <tr class="row">
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__1 ">
+<pre class="pre codeblock"><code>CAST('2019.10.10 13:30:40.123456 +01:30'
+   AS TIMESTAMP
+   FORMAT 'YYYY-MM-DD HH24:MI:SS.FF9 TZH:TZM') </code></pre>
+                  </td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__2 ">
+                    2019-10-10 13:30:40.123456000
+                  </td>
+                </tr>
+                <tr class="row">
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__1 ">
+<pre class="pre codeblock"><code>CAST('2001-03-01 03:10:15.123456 -01:30'
+   AS TIMESTAMP
+   FORMAT 'FXYYYY-MM-DD HH12:MI:SS.FF6 TZH:TZM')</code></pre>
+                  </td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__2 ">
+                    2001-03-01 03:10:15.123456000
+                  </td>
+                </tr>
+                <tr class="row">
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__1 ">
+<pre class="pre codeblock"><code>CAST('2001-03-02 03:10:15'
+   AS TIMESTAMP
+   FORMAT 'FXYYYY MM-DD HH12:MI:SS')</code></pre>
+                  </td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__2 ">
+                    NULL because the separator between the year and month do not match.
+                  </td>
+                </tr>
+                <tr class="row">
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__1 ">
+<pre class="pre codeblock"><code>CAST('2001-3-05'
+   AS TIMESTAMP
+   FORMAT 'FXYYYY-MM-DD')</code></pre>
+                  </td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__2 ">
+                    NULL because the length of the month token does not match the
+                    <var class="keyword varname">pattern</var>.
+                  </td>
+                </tr>
+                <tr class="row">
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__1 ">
+<pre class="pre codeblock"><code>CAST('2001-3-11 3:15:00.12345'
+   AS TIMESTAMP
+   FORMAT 'FXYYYY-FMMM-DD FMHH12:MI:SS.FMFF')</code></pre>
+                  </td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__2 ">
+                    2001-03-11 03:15:00.123450000
+
+                    <p class="p">
+                      The multiple <code class="ph codeph">FM</code> modifiers for the month and hour override
+                      the <code class="ph codeph">FX</code> and suppress padding.
+                    </p>
+                  </td>
+                </tr>
+                <tr class="row">
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__1 ">
+<pre class="pre codeblock"><code>CAST('2019-01-01 01:01:01'
+   AS TIMESTAMP
+   FORMAT 'FMHH12:MI:FMSS')</code></pre>
+                  </td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__2 ">
+                    1:01:1
+                  </td>
+                </tr>
+                <tr class="row">
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__1 ">
+<pre class="pre codeblock"><code>CAST('Date: 2019-11-10'
+   AS DATE
+   FORMAT '"Date: "YYYY-MM-DD')
+</code></pre>
+                  </td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1" headers="conversion_functions__table_qqg_txn_r3b__entry__2 ">
+                    2019-11-10
+                  </td>
+                </tr>
+              </tbody></table>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="conversion_functions__typeof">
+          TYPEOF(expression)
+        </dt>
+
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Returns the name of the data type corresponding to
+          <var class="keyword varname">expression</var>. For types with extra attributes, such as length for
+          <code class="ph codeph">CHAR</code> and <code class="ph codeph">VARCHAR</code>, or precision and scale for
+          <code class="ph codeph">DECIMAL</code>, includes the full specification of the type.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
+          </p>
+
+          <p class="p">
+            <strong class="ph b">Usage notes:</strong> Typically used in interactive exploration of a schema, or in
+            application code that programmatically generates schema definitions such as
+            <code class="ph codeph">CREATE TABLE</code> statements, for example, to get the type of an
+            expression such as <code class="ph codeph">col1 / col2</code> or <code class="ph codeph">CONCAT(col1, col2,
+            col3)</code>. This function is especially useful for arithmetic expressions
+            involving <code class="ph codeph">DECIMAL</code> types because the precision and scale of the
+            result is can be different than that of the operands.
+          </p>
+
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+          <p class="p">
+            <code class="ph codeph">TYPEOF(2)</code> returns <code class="ph codeph">TINYINT</code>.
+          </p>
+
+          <p class="p">
+            <code class="ph codeph">TYPEOF(NOW())</code> returns <code class="ph codeph">TIMESTAMP</code>.
+          </p>
+        </dd>
+
+      
+    </dl>
+
+  </div>
+
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_functions.html">Impala Built-In Functions</a></div></div></nav></article></main></body></html>

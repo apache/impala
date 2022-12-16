@@ -1,0 +1,875 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2022"><meta name="DC.rights.owner" content="(C) Copyright 2022"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_release_notes.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="known_issues"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>Known Issues and Workarounds in Impala</title></head><body id="known_issues"><header role="banner"><!--
+The DITA Open Toolkit is licensed for use under the the Apache
+Software Foundation License v2.0.
+
+A copy of the Apache Software Foundation License 2.0 is
+available at http://opensource.org/licenses/apache2.0.php
+
+This statement must be included in any copies of DITA Open
+Toolkit code.
+--><div class="header">
+  <p>Apache Impala</p>
+  <hr>
+</div></header><nav role="toc"><ul><li><a href="../topics/impala_intro.html">Introducing Apache Impala</a></li><li><a href="../topics/impala_concepts.html">Concepts and Architecture</a></li><li><a href="../topics/impala_planning.html">Deployment Planning</a></li><li><a href="../topics/impala_install.html">Installing Impala</a></li><li><a href="../topics/impala_config.html">Managing Impala</a></li><li><a href="../topics/impala_upgrading.html">Upgrading Impala</a></li><li><a href="../topics/impala_processes.html">Starting Impala</a></li><li><a href="../topics/impala_tutorial.html">Tutorials</a></li><li><a href="../topics/impala_admin.html">Administration</a></li><li><a href="../topics/impala_security.html">Impala Security</a></li><li><a href="../topics/impala_langref.html">SQL Reference</a></li><li><a href="../topics/impala_performance.html">Performance Tuning</a></li><li><a href="../topics/impala_scalability.html">Scalability Considerations</a></li><li><a href="../topics/impala_resource_management.html">Resource Management</a></li><li><a href="../topics/impala_partitioning.html">Partitioning</a></li><li><a href="../topics/impala_file_formats.html">File Formats</a></li><li><a href="../topics/impala_kudu.html">Using Impala to Query Kudu Tables</a></li><li><a href="../topics/impala_hbase.html">HBase Tables</a></li><li><a href="../topics/impala_iceberg.html">Iceberg Tables</a></li><li><a href="../topics/impala_s3.html">S3 Tables</a></li><li><a href="../topics/impala_adls.html">ADLS Tables</a></li><li><a href="../topics/impala_isilon.html">Isilon Storage</a></li><li><a href="../topics/impala_logging.html">Logging</a></li><li><a href="../topics/impala_client.html">Client Access</a></li><li><a href="../topics/impala_fault_tolerance.html">Fault Tolerance</a></li><li><a href="../topics/impala_troubleshooting.html">Troubleshooting Impala</a></li><li><a href="../topics/impala_ports.html">Ports Used by Impala</a></li><li><a href="../topics/impala_reserved_words.html">Impala Reserved Words</a></li><li><a href="../topics/impala_faq.html">Impala Frequently Asked Questions</a></li><li><a href="../topics/impala_release_notes.html">Impala Release Notes</a><ul><li><a href="../topics/impala_new_features.html">New Features in Apache Impala</a></li><li><a href="../topics/impala_incompatible_changes.html">Incompatible Changes and Limitations in Apache Impala</a></li><li class="active"><a href="../topics/impala_known_issues.html">Known Issues and Workarounds in Impala</a></li><li><a href="../topics/impala_fixed_issues.html">Fixed Issues in Apache Impala</a></li></ul></li></ul></nav><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1"><span class="ph">Known Issues and Workarounds in Impala</span></h1>
+
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      The following sections describe known issues and workarounds in Impala, as of the current
+      production release. This page summarizes the most serious or frequently encountered issues
+      in the current release, to help you make planning decisions about installing and
+      upgrading. Any workarounds are listed here. The bug links take you to the Impala issues
+      site, where you can see the diagnosis and whether a fix is in the pipeline.
+    </p>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+      The online issue tracking system for Impala contains comprehensive information and is
+      updated in real time. To verify whether an issue you are experiencing has already been
+      reported, or which release an issue is fixed in, search on the
+      <a class="xref" href="https://issues.apache.org/jira/" target="_blank">issues.apache.org
+      JIRA tracker</a>.
+    </div>
+
+    <p class="p toc inpage"></p>
+
+    <p class="p">
+      For issues fixed in various Impala releases, see
+      <a class="xref" href="impala_fixed_issues.html#fixed_issues">Fixed Issues in Apache Impala</a>.
+    </p>
+
+
+
+  </div>
+
+  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_release_notes.html">Impala Release Notes</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="known_issues__known_issues_startup">
+
+    <h2 class="title topictitle2" id="ariaid-title2">Impala Known Issues: Startup</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        These issues can prevent one or more Impala-related daemons from starting properly.
+      </p>
+
+    </div>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title3" id="known_issues_startup__IMPALA-4978">
+
+      <h3 class="title topictitle3" id="ariaid-title3">Impala requires FQDN from hostname command on Kerberized clusters</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          The method Impala uses to retrieve the host name while constructing the Kerberos
+          principal is the <code class="ph codeph">gethostname()</code> system call. This function might not
+          always return the fully qualified domain name, depending on the network configuration.
+          If the daemons cannot determine the FQDN, Impala does not start on a Kerberized
+          cluster.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Workaround:</strong> Test if a host is affected by checking whether the output of the
+          <span class="keyword cmdname">hostname</span> command includes the FQDN. On hosts where
+          <span class="keyword cmdname">hostname</span>, only returns the short name, pass the command-line flag
+          <code class="ph codeph">‑‑hostname=<var class="keyword varname">fully_qualified_domain_name</var></code>
+          in the startup options of all Impala-related daemons.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-4978" target="_blank">IMPALA-4978</a>
+        </p>
+
+      </div>
+
+    </article>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="known_issues_performance__ki_performance" id="known_issues__known_issues_performance">
+
+    <h2 class="title topictitle2" id="known_issues_performance__ki_performance">Impala Known Issues: Performance</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        These issues involve the performance of operations such as queries or DDL statements.
+      </p>
+
+    </div>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title5" id="known_issues_performance__impala-6671">
+
+      <h3 class="title topictitle3" id="ariaid-title5">Metadata operations block read-only operations on unrelated tables</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          Metadata operations that change the state of a table, like <code class="ph codeph">COMPUTE
+          STATS</code> or <code class="ph codeph">ALTER RECOVER PARTITIONS</code>, may delay metadata
+          propagation of unrelated unloaded tables triggered by statements like
+          <code class="ph codeph">DESCRIBE</code> or <code class="ph codeph">SELECT</code> queries.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-6671" target="_blank">IMPALA-6671</a>
+        </p>
+
+      </div>
+
+    </article>
+
+  </article>
+
+
+
+  <article class="topic concept nested1" aria-labelledby="known_issues_drivers__ki_drivers" id="known_issues__known_issues_drivers">
+
+    <h2 class="title topictitle2" id="known_issues_drivers__ki_drivers">Impala Known Issues: JDBC and ODBC Drivers</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        These issues affect applications that use the JDBC or ODBC APIs, such as business
+        intelligence tools or custom-written applications in languages such as Java or C++.
+      </p>
+
+    </div>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title7" id="known_issues_drivers__IMPALA-1792">
+
+      <h3 class="title topictitle3" id="ariaid-title7">ImpalaODBC: Can not get the value in the SQLGetData(m-x th column) after the SQLBindCol(m th column)</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          If the ODBC <code class="ph codeph">SQLGetData</code> is called on a series of columns, the function
+          calls must follow the same order as the columns. For example, if data is fetched from
+          column 2 then column 1, the <code class="ph codeph">SQLGetData</code> call for column 1 returns
+          <code class="ph codeph">NULL</code>.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-1792" target="_blank">IMPALA-1792</a>
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Workaround:</strong> Fetch columns in the same order they are defined in the table.
+        </p>
+
+      </div>
+
+    </article>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="known_issues_security__ki_security" id="known_issues__known_issues_security">
+
+    <h2 class="title topictitle2" id="known_issues_security__ki_security">Impala Known Issues: Security</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        These issues are related to security features, such as Kerberos authentication, Sentry
+        authorization, encryption, auditing, and redaction.
+      </p>
+
+    </div>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title9" id="known_issues_security__impala-7072">
+
+      <h3 class="title topictitle3" id="ariaid-title9">Impala does not support Heimdal Kerberos</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          Heimdal Kerberos is not supported in Impala.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-7072" target="_blank">IMPALA-7072</a>
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Affected Versions:</strong> All versions of Impala
+        </p>
+
+      </div>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title10" id="known_issues_security__id_p1n_tbx_22b">
+
+      <h3 class="title topictitle3" id="ariaid-title10">Impala does not allow the use of insecure clusters with public IPs</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          Starting in <span class="keyword">Impala 2.12</span>, Impala, by default, will only allow
+          unencrypted or unauthenticated connections from trusted subnets:
+          <code class="ph codeph">127.0.0.0/8</code>, <code class="ph codeph">10.0.0.0/8</code>,
+          <code class="ph codeph">172.16.0.0/12</code>, <code class="ph codeph">192.168.0.0/16</code>,
+          <code class="ph codeph">169.254.0.0/16</code>. Unencrypted or unauthenticated connections from
+          publicly routable IPs will be rejected.
+        </p>
+
+        <p class="p">
+          The trusted subnets can be configured using the <code class="ph codeph">--trusted_subnets</code>
+          flag. Set it to '<code class="ph codeph">0.0.0.0/0</code>' to allow unauthenticated connections from
+          all remote IP addresses. However, if network access is not otherwise restricted by a
+          firewall, malicious users may be able to gain unauthorized access.
+        </p>
+
+      </div>
+
+    </article>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="known_issues_resources__ki_resources" id="known_issues__known_issues_resources">
+
+    <h2 class="title topictitle2" id="known_issues_resources__ki_resources">Impala Known Issues: Resources</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        These issues involve memory or disk usage, including out-of-memory conditions, the
+        spill-to-disk feature, and resource management features.
+      </p>
+
+    </div>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title12" id="known_issues_resources__IMPALA-5605">
+
+      <h3 class="title topictitle3" id="ariaid-title12">Configuration to prevent crashes caused by thread resource limits</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          Impala could encounter a serious error due to resource usage under very high
+          concurrency. The error message is similar to:
+        </p>
+
+<pre class="pre codeblock"><code>
+F0629 08:20:02.956413 29088 llvm-codegen.cc:111] LLVM hit fatal error: Unable to allocate section memory!
+terminate called after throwing an instance of 'boost::exception_detail::clone_impl&lt;boost::exception_detail::error_info_injector&lt;boost::thread_resource_error&gt; &gt;'
+
+</code></pre>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-5605" target="_blank">IMPALA-5605</a>
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Severity:</strong> High
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Workaround:</strong> To prevent such errors, configure each host running an
+          <span class="keyword cmdname">impalad</span> daemon with the following settings:
+        </p>
+
+<pre class="pre codeblock"><code>
+echo 2000000 &gt; /proc/sys/kernel/threads-max
+echo 2000000 &gt; /proc/sys/kernel/pid_max
+echo 8000000 &gt; /proc/sys/vm/max_map_count
+</code></pre>
+
+        <p class="p">
+          Add the following lines in <span class="ph filepath">/etc/security/limits.conf</span>:
+        </p>
+
+<pre class="pre codeblock"><code>
+impala soft nproc 262144
+impala hard nproc 262144
+</code></pre>
+
+      </div>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title13" id="known_issues_resources__drop_table_purge_s3a">
+
+      <h3 class="title topictitle3" id="ariaid-title13"><strong class="ph b">Breakpad minidumps can be very large when the thread count is high</strong></h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          The size of the breakpad minidump files grows linearly with the number of threads. By
+          default, each thread adds 8 KB to the minidump size. Minidump files could consume
+          significant disk space when the daemons have a high number of threads.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Workaround:</strong> Add
+          <samp class="ph systemoutput">--minidump_size_limit_hint_kb=size</samp>
+          to set a soft upper limit on the size of each minidump file. If the minidump file
+          would exceed that limit, Impala reduces the amount of information for each thread from
+          8 KB to 2 KB. (Full thread information is captured for the first 20 threads, then 2 KB
+          per thread after that.) The minidump file can still grow larger than the "hinted"
+          size. For example, if you have 10,000 threads, the minidump file can be more than 20
+          MB.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong>
+          <a class="xref" href="https://issues.cloudera.org/browse/IMPALA-3509" target="_blank">IMPALA-3509</a>
+        </p>
+
+      </div>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title14" id="known_issues_resources__IMPALA-691">
+
+      <h3 class="title topictitle3" id="ariaid-title14"><strong class="ph b">Process mem limit does not account for the JVM's memory usage</strong></h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          Some memory allocated by the JVM used internally by Impala is not counted against the
+          memory limit for the impalad daemon.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Workaround:</strong> To monitor overall memory usage, use the top command, or add the
+          memory figures in the Impala web UI <strong class="ph b">/memz</strong> tab to JVM memory usage shown on the
+          <strong class="ph b">/metrics</strong> tab.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong>
+          <a class="xref" href="https://issues.cloudera.org/browse/IMPALA-691" target="_blank">IMPALA-691</a>
+        </p>
+
+      </div>
+
+    </article>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="known_issues_correctness__ki_correctness" id="known_issues__known_issues_correctness">
+
+    <h2 class="title topictitle2" id="known_issues_correctness__ki_correctness">Impala Known Issues: Correctness</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        These issues can cause incorrect or unexpected results from queries. They typically only
+        arise in very specific circumstances.
+      </p>
+
+    </div>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title16" id="known_issues_correctness__IMPALA-3094">
+
+      <h3 class="title topictitle3" id="ariaid-title16">Incorrect result due to constant evaluation in query with outer join</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          An <code class="ph codeph">OUTER JOIN</code> query could omit some expected result rows due to a
+          constant such as <code class="ph codeph">FALSE</code> in another join clause. For example:
+        </p>
+
+<pre class="pre codeblock"><code>
+explain SELECT 1 FROM alltypestiny a1
+  INNER JOIN alltypesagg a2 ON a1.smallint_col = a2.year AND false
+  RIGHT JOIN alltypes a3 ON a1.year = a1.bigint_col;
++---------------------------------------------------------+
+| Explain String                                          |
++---------------------------------------------------------+
+| Estimated Per-Host Requirements: Memory=1.00KB VCores=1 |
+|                                                         |
+| 00:EMPTYSET                                             |
++---------------------------------------------------------+
+
+</code></pre>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-3094" target="_blank">IMPALA-3094</a>
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Severity:</strong> High
+        </p>
+
+      </div>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title17" id="known_issues_correctness__IMPALA-2422">
+
+      <h3 class="title topictitle3" id="ariaid-title17">% escaping does not work correctly when occurs at the end in a LIKE clause</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          If the final character in the RHS argument of a <code class="ph codeph">LIKE</code> operator is an
+          escaped <code class="ph codeph">\%</code> character, it does not match a <code class="ph codeph">%</code> final
+          character of the LHS argument.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-2422" target="_blank">IMPALA-2422</a>
+        </p>
+
+      </div>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title18" id="known_issues_correctness__IMPALA-2603">
+
+      <h3 class="title topictitle3" id="ariaid-title18">Crash: impala::Coordinator::ValidateCollectionSlots</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          A query could encounter a serious error if includes multiple nested levels of
+          <code class="ph codeph">INNER JOIN</code> clauses involving subqueries.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-2603" target="_blank">IMPALA-2603</a>
+        </p>
+
+      </div>
+
+    </article>
+
+  </article>
+
+
+
+  <article class="topic concept nested1" aria-labelledby="known_issues_interop__ki_interop" id="known_issues__known_issues_interop">
+
+    <h2 class="title topictitle2" id="known_issues_interop__ki_interop">Impala Known Issues: Interoperability</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        These issues affect the ability to interchange data between Impala and other database
+        systems. They cover areas such as data types and file formats.
+      </p>
+
+    </div>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title20" id="known_issues_interop__hadoop-15720">
+
+      <h3 class="title topictitle3" id="ariaid-title20">Queries Stuck on Failed HDFS Calls and not Timing out</h3>
+
+      <div class="body conbody">
+        <p class="p"> In Impala 3.2 and higher, if the following error appears multiple
+          times in a short duration while running a query, it would mean that
+          the connection between the <code class="ph codeph">impalad</code> and the HDFS
+          NameNode is in a bad state and hence the <code class="ph codeph">impalad</code>
+          would have to be restarted: </p>
+
+<pre class="pre codeblock"><code>"hdfsOpenFile() for &lt;filename&gt; at backend &lt;hostname:port&gt; failed to finish before the &lt;hdfs_operation_timeout_sec&gt; second timeout " </code></pre>
+        <p class="p">In Impala 3.1 and lower, the same issue would cause Impala to wait for
+          a long time or hang without showing the above error message.</p>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong>
+          <a class="xref" href="https://issues.apache.org/jira/browse/HADOOP-15720" target="_blank">HADOOP-15720</a>
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Affected Versions:</strong> All versions of Impala
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Workaround:</strong> Restart the <code class="ph codeph">impalad</code> in the bad state.
+        </p>
+
+      </div>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title21" id="known_issues_interop__describe_formatted_avro">
+
+      <h3 class="title topictitle3" id="ariaid-title21">DESCRIBE FORMATTED gives error on Avro table</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          This issue can occur either on old Avro tables (created prior to Hive 1.1) or when
+          changing the Avro schema file by adding or removing columns. Columns added to the
+          schema file will not show up in the output of the <code class="ph codeph">DESCRIBE FORMATTED</code>
+          command. Removing columns from the schema file will trigger a
+          <code class="ph codeph">NullPointerException</code>.
+        </p>
+
+        <p class="p">
+          As a workaround, you can use the output of <code class="ph codeph">SHOW CREATE TABLE</code> to drop
+          and recreate the table. This will populate the Hive metastore database with the
+          correct column definitions.
+        </p>
+
+        <div class="note warning note_warning"><span class="note__title warningtitle">Warning:</span> 
+          <div class="p">
+            Only use this for external tables, or Impala will remove the data files. In case of
+            an internal table, set it to external first:
+<pre class="pre codeblock"><code>
+ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
+</code></pre>
+            (The part in parentheses is case sensitive.) Make sure to pick the right choice
+            between internal and external when recreating the table. See
+            <a class="xref" href="impala_tables.html#tables">Overview of Impala Tables</a> for the differences between internal and
+            external tables.
+          </div>
+        </div>
+
+        <p class="p">
+          <strong class="ph b">Severity:</strong> High
+        </p>
+
+      </div>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title22" id="known_issues_interop__flume_writeformat_text">
+
+      <h3 class="title topictitle3" id="ariaid-title22">Configuration needed for Flume to be compatible with Impala</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          For compatibility with Impala, the value for the Flume HDFS Sink
+          <code class="ph codeph">hdfs.writeFormat</code> must be set to <code class="ph codeph">Text</code>, rather than
+          its default value of <code class="ph codeph">Writable</code>. The <code class="ph codeph">hdfs.writeFormat</code>
+          setting must be changed to <code class="ph codeph">Text</code> before creating data files with
+          Flume; otherwise, those files cannot be read by either Impala or Hive.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Resolution:</strong> This information has been requested to be added to the upstream
+          Flume documentation.
+        </p>
+
+      </div>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title23" id="known_issues_interop__IMPALA-635">
+
+      <h3 class="title topictitle3" id="ariaid-title23">Avro Scanner fails to parse some schemas</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          The default value in Avro schema must match type of first union type, e.g. if the
+          default value is <code class="ph codeph">null</code>, then the first type in the
+          <code class="ph codeph">UNION</code> must be <code class="ph codeph">"null"</code>.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-635" target="_blank">IMPALA-635</a>
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Workaround:</strong>Swap the order of the fields in the schema specification. For
+          example, use <code class="ph codeph">["null", "string"]</code> instead of <code class="ph codeph">["string",
+          "null"]</code>. Note that the files written with the problematic schema must be
+          rewritten with the new schema because Avro files have embedded schemas.
+        </p>
+
+      </div>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title24" id="known_issues_interop__IMPALA-1024">
+
+      <h3 class="title topictitle3" id="ariaid-title24">Impala BE cannot parse Avro schema that contains a trailing semi-colon</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          If an Avro table has a schema definition with a trailing semicolon, Impala encounters
+          an error when the table is queried.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-1024" target="_blank">IMPALA-1024</a>
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Severity:</strong> Remove trailing semicolon from the Avro schema.
+        </p>
+
+      </div>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title25" id="known_issues_interop__IMPALA-1652">
+
+      <h3 class="title topictitle3" id="ariaid-title25">Incorrect results with basic predicate on CHAR typed column</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          When comparing a <code class="ph codeph">CHAR</code> column value to a string literal, the literal
+          value is not blank-padded and so the comparison might fail when it should match.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-1652" target="_blank">IMPALA-1652</a>
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Workaround:</strong> Use the <code class="ph codeph">RPAD()</code> function to blank-pad literals
+          compared with <code class="ph codeph">CHAR</code> columns to the expected length.
+        </p>
+
+      </div>
+
+    </article>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title26" id="known_issues_interop__IMPALA-8953">
+      <h3 class="title topictitle3" id="ariaid-title26">Tables and databases sharing same name can cause query
+        failures</h3>
+      <div class="body conbody">
+        <p class="p">A table and a database that share the same name can cause a query
+          failure if the table is not readable by Impala, for example, the table
+          was created in Hive in the Open CSV Serde format. The following
+          exception will return:</p>
+        <pre class="pre codeblock"><code>CAUSED BY: TableLoadingException: Unrecognized table type for table</code></pre>
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong>
+          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-8953" target="_blank">IMPALA-8953</a>
+        </p>
+        <p class="p">
+          <strong class="ph b">Workaround:</strong> Do not create databases and tables with the same
+          names.</p>
+      </div>
+    </article>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title27" id="known_issues__known_issues_limitations">
+
+    <h2 class="title topictitle2" id="ariaid-title27">Impala Known Issues: Limitations</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        These issues are current limitations of Impala that require evaluation as you plan how
+        to integrate Impala into your data management workflow.
+      </p>
+
+    </div>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title28" id="known_issues_limitations__IMPALA-4551">
+
+      <h3 class="title topictitle3" id="ariaid-title28">Set limits on size of expression trees</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          Very deeply nested expressions within queries can exceed internal Impala limits,
+          leading to excessive memory usage.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-4551" target="_blank">IMPALA-4551</a>
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Severity:</strong> High
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Workaround:</strong> Avoid queries with extremely large expression trees. Setting the
+          query option <code class="ph codeph">disable_codegen=true</code> may reduce the impact, at a cost of
+          longer query runtime.
+        </p>
+
+      </div>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title29" id="known_issues_limitations__IMPALA-77">
+
+      <h3 class="title topictitle3" id="ariaid-title29">Impala does not support running on clusters with federated namespaces</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          Impala does not support running on clusters with federated namespaces. The
+          <code class="ph codeph">impalad</code> process will not start on a node running such a filesystem
+          based on the <code class="ph codeph">org.apache.hadoop.fs.viewfs.ViewFs</code> class.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-77" target="_blank">IMPALA-77</a>
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Anticipated Resolution:</strong> Limitation
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Workaround:</strong> Use standard HDFS on all Impala nodes.
+        </p>
+
+      </div>
+
+    </article>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title30" id="known_issues__known_issues_misc">
+
+    <h2 class="title topictitle2" id="ariaid-title30">Impala Known Issues: Miscellaneous</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        These issues do not fall into one of the above categories or have not been categorized
+        yet.
+      </p>
+
+    </div>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title31" id="known_issues_misc__IMPALA-2005">
+
+      <h3 class="title topictitle3" id="ariaid-title31">A failed CTAS does not drop the table if the insert fails</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          If a <code class="ph codeph">CREATE TABLE AS SELECT</code> operation successfully creates the target
+          table but an error occurs while querying the source table or copying the data, the new
+          table is left behind rather than being dropped.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-2005" target="_blank">IMPALA-2005</a>
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Workaround:</strong> Drop the new table manually after a failed <code class="ph codeph">CREATE TABLE AS
+          SELECT</code>.
+        </p>
+
+      </div>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title32" id="known_issues_misc__IMPALA-1821">
+
+      <h3 class="title topictitle3" id="ariaid-title32">Casting scenarios with invalid/inconsistent results</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          Using a <code class="ph codeph">CAST()</code> function to convert large literal values to smaller
+          types, or to convert special values such as <code class="ph codeph">NaN</code> or
+          <code class="ph codeph">Inf</code>, produces values not consistent with other database systems. This
+          could lead to unexpected results from queries.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-1821" target="_blank">IMPALA-1821</a>
+        </p>
+
+
+
+      </div>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title33" id="known_issues_misc__IMPALA-532">
+
+      <h3 class="title topictitle3" id="ariaid-title33">Impala should tolerate bad locale settings</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          If the <code class="ph codeph">LC_*</code> environment variables specify an unsupported locale,
+          Impala does not start.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-532" target="_blank">IMPALA-532</a>
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Workaround:</strong> Add <code class="ph codeph">LC_ALL="C"</code> to the environment settings for
+          both the Impala daemon and the Statestore daemon. See
+          <a class="xref" href="impala_config_options.html#config_options">Modifying Impala Startup Options</a> for details about modifying
+          these environment settings.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Resolution:</strong> Fixing this issue would require an upgrade to Boost 1.47 in the
+          Impala distribution.
+        </p>
+
+      </div>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title34" id="known_issues_misc__IMP-1203">
+
+      <h3 class="title topictitle3" id="ariaid-title34">Log Level 3 Not Recommended for Impala</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          The extensive logging produced by log level 3 can cause serious performance overhead
+          and capacity issues.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Workaround:</strong> Reduce the log level to its default value of 1, that is,
+          <code class="ph codeph">GLOG_v=1</code>. See <a class="xref" href="impala_logging.html#log_levels">Setting Logging Levels</a> for
+          details about the effects of setting different logging levels.
+        </p>
+
+      </div>
+
+    </article>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title35" id="known_issues__known_issues_crash">
+
+    <h2 class="title topictitle2" id="ariaid-title35">Impala Known Issues: Crashes and Hangs</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        These issues can cause Impala to quit or become unresponsive.
+      </p>
+
+    </div>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title36" id="known_issues_crash__impala-6841">
+
+      <h3 class="title topictitle3" id="ariaid-title36">Unable to view large catalog objects in catalogd Web UI</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          In <code class="ph codeph">catalogd</code> Web UI, you can list metadata objects and view their
+          details. These details are accessed via a link and printed to a string formatted using
+          thrift's <code class="ph codeph">DebugProtocol</code>. Printing large objects (&gt; 1 GB) in Web UI can
+          crash <code class="ph codeph">catalogd</code>.
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-6841" target="_blank">IMPALA-6841</a>
+        </p>
+
+      </div>
+
+    </article>
+
+  </article>
+
+</article></main></body></html>

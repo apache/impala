@@ -1,0 +1,153 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2022"><meta name="DC.rights.owner" content="(C) Copyright 2022"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="ddl"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>DDL Statements</title></head><body id="ddl"><header role="banner"><!--
+The DITA Open Toolkit is licensed for use under the the Apache
+Software Foundation License v2.0.
+
+A copy of the Apache Software Foundation License 2.0 is
+available at http://opensource.org/licenses/apache2.0.php
+
+This statement must be included in any copies of DITA Open
+Toolkit code.
+--><div class="header">
+  <p>Apache Impala</p>
+  <hr>
+</div></header><nav role="toc"><ul><li><a href="../topics/impala_intro.html">Introducing Apache Impala</a></li><li><a href="../topics/impala_concepts.html">Concepts and Architecture</a></li><li><a href="../topics/impala_planning.html">Deployment Planning</a></li><li><a href="../topics/impala_install.html">Installing Impala</a></li><li><a href="../topics/impala_config.html">Managing Impala</a></li><li><a href="../topics/impala_upgrading.html">Upgrading Impala</a></li><li><a href="../topics/impala_processes.html">Starting Impala</a></li><li><a href="../topics/impala_tutorial.html">Tutorials</a></li><li><a href="../topics/impala_admin.html">Administration</a></li><li><a href="../topics/impala_security.html">Impala Security</a></li><li><a href="../topics/impala_langref.html">SQL Reference</a><ul><li><a href="../topics/impala_comments.html">Comments</a></li><li><a href="../topics/impala_datatypes.html">Data Types</a></li><li><a href="../topics/impala_literals.html">Literals</a></li><li><a href="../topics/impala_operators.html">SQL Operators</a></li><li><a href="../topics/impala_schema_objects.html">Schema Objects and Object Names</a></li><li><a href="../topics/impala_transactions.html">Transactions</a></li><li><a href="../topics/impala_langref_sql.html">SQL Statements</a><ul><li class="active"><a href="../topics/impala_ddl.html">DDL Statements</a></li><li><a href="../topics/impala_dml.html">DML Statements</a></li><li><a href="../topics/impala_alter_database.html">ALTER DATABASE</a></li><li><a href="../topics/impala_alter_table.html">ALTER TABLE</a></li><li><a href="../topics/impala_alter_view.html">ALTER VIEW</a></li><li><a href="../topics/impala_comment.html">COMMENT</a></li><li><a href="../topics/impala_compute_stats.html">COMPUTE STATS</a></li><li><a href="../topics/impala_create_database.html">CREATE DATABASE</a></li><li><a href="../topics/impala_create_function.html">CREATE FUNCTION</a></li><li><a href="../topics/impala_create_role.html">CREATE ROLE</a></li><li><a href="../topics/impala_create_table.html">CREATE TABLE</a></li><li><a href="../topics/impala_create_view.html">CREATE VIEW</a></li><li><a href="../topics/impala_delete.html">DELETE</a></li><li><a href="../topics/impala_describe.html">DESCRIBE</a></li><li><a href="../topics/impala_drop_database.html">DROP DATABASE</a></li><li><a href="../topics/impala_drop_function.html">DROP FUNCTION</a></li><li><a href="../topics/impala_drop_role.html">DROP ROLE</a></li><li><a href="../topics/impala_drop_stats.html">DROP STATS</a></li><li><a href="../topics/impala_drop_table.html">DROP TABLE</a></li><li><a href="../topics/impala_drop_view.html">DROP VIEW</a></li><li><a href="../topics/impala_explain.html">EXPLAIN</a></li><li><a href="../topics/impala_grant.html">GRANT</a></li><li><a href="../topics/impala_insert.html">INSERT</a></li><li><a href="../topics/impala_invalidate_metadata.html">INVALIDATE METADATA</a></li><li><a href="../topics/impala_load_data.html">LOAD DATA</a></li><li><a href="../topics/impala_refresh.html">REFRESH</a></li><li><a href="../topics/impala_refresh_authorization.html">REFRESH AUTHORIZATION</a></li><li><a href="../topics/impala_refresh_functions.html">REFRESH FUNCTIONS</a></li><li><a href="../topics/impala_revoke.html">REVOKE</a></li><li><a href="../topics/impala_select.html">SELECT</a></li><li><a href="../topics/impala_set.html">SET</a></li><li><a href="../topics/impala_show.html">SHOW</a></li><li><a href="../topics/impala_shutdown.html">SHUTDOWN</a></li><li><a href="../topics/impala_truncate_table.html">TRUNCATE TABLE</a></li><li><a href="../topics/impala_update.html">UPDATE</a></li><li><a href="../topics/impala_upsert.html">UPSERT</a></li><li><a href="../topics/impala_use.html">USE</a></li><li><a href="../topics/impala_values.html">VALUES</a></li><li><a href="../topics/impala_hints.html">Optimizer Hints</a></li></ul></li><li><a href="../topics/impala_functions.html">Built-In Functions</a></li><li><a href="../topics/impala_udf.html">User-Defined Functions (UDFs)</a></li><li><a href="../topics/impala_langref_unsupported.html">SQL Differences Between Impala and Hive</a></li><li><a href="../topics/impala_porting.html">Porting SQL</a></li><li><a href="../topics/impala_utf_8.html">UTF-8 Support</a></li></ul></li><li><a href="../topics/impala_performance.html">Performance Tuning</a></li><li><a href="../topics/impala_scalability.html">Scalability Considerations</a></li><li><a href="../topics/impala_resource_management.html">Resource Management</a></li><li><a href="../topics/impala_partitioning.html">Partitioning</a></li><li><a href="../topics/impala_file_formats.html">File Formats</a></li><li><a href="../topics/impala_kudu.html">Using Impala to Query Kudu Tables</a></li><li><a href="../topics/impala_hbase.html">HBase Tables</a></li><li><a href="../topics/impala_iceberg.html">Iceberg Tables</a></li><li><a href="../topics/impala_s3.html">S3 Tables</a></li><li><a href="../topics/impala_adls.html">ADLS Tables</a></li><li><a href="../topics/impala_isilon.html">Isilon Storage</a></li><li><a href="../topics/impala_logging.html">Logging</a></li><li><a href="../topics/impala_client.html">Client Access</a></li><li><a href="../topics/impala_fault_tolerance.html">Fault Tolerance</a></li><li><a href="../topics/impala_troubleshooting.html">Troubleshooting Impala</a></li><li><a href="../topics/impala_ports.html">Ports Used by Impala</a></li><li><a href="../topics/impala_reserved_words.html">Impala Reserved Words</a></li><li><a href="../topics/impala_faq.html">Impala Frequently Asked Questions</a></li><li><a href="../topics/impala_release_notes.html">Impala Release Notes</a></li></ul></nav><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">DDL Statements</h1>
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      DDL refers to <span class="q">"Data Definition Language"</span>, a subset of SQL statements that change the structure of the
+      database schema in some way, typically by creating, deleting, or modifying schema objects such as databases,
+      tables, and views. Most Impala DDL statements start with the keywords <code class="ph codeph">CREATE</code>,
+      <code class="ph codeph">DROP</code>, or <code class="ph codeph">ALTER</code>.
+    </p>
+
+    <p class="p">
+      The Impala DDL statements are:
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+        <a class="xref" href="impala_alter_table.html#alter_table">ALTER TABLE Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_alter_view.html#alter_view">ALTER VIEW Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_compute_stats.html#compute_stats">COMPUTE STATS Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_create_database.html#create_database">CREATE DATABASE Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_create_function.html#create_function">CREATE FUNCTION Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_create_role.html#create_role">CREATE ROLE Statement (Impala 2.0 or higher only)</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_create_view.html#create_view">CREATE VIEW Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_drop_database.html#drop_database">DROP DATABASE Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_drop_function.html#drop_function">DROP FUNCTION Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_drop_role.html#drop_role">DROP ROLE Statement (Impala 2.0 or higher only)</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_drop_table.html#drop_table">DROP TABLE Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_drop_view.html#drop_view">DROP VIEW Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_grant.html#grant">GRANT Statement (Impala 2.0 or higher only)</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_revoke.html#revoke">REVOKE Statement (Impala 2.0 or higher only)</a>
+      </li>
+    </ul>
+
+    <p class="p">
+      After Impala executes a DDL command, information about available tables, columns, views, partitions, and so
+      on is automatically synchronized between all the Impala nodes in a cluster. (Prior to Impala 1.2, you had to
+      issue a <code class="ph codeph">REFRESH</code> or <code class="ph codeph">INVALIDATE METADATA</code> statement manually on the other
+      nodes to make them aware of the changes.)
+    </p>
+
+    <p class="p">
+      If the timing of metadata updates is significant, for example if you use round-robin scheduling where each
+      query could be issued through a different Impala node, you can enable the
+      <a class="xref" href="impala_sync_ddl.html#sync_ddl">SYNC_DDL</a> query option to make the DDL statement wait until
+      all nodes have been notified about the metadata changes.
+    </p>
+
+    <p class="p">
+      See <a class="xref" href="impala_s3.html#s3">Using Impala with Amazon S3 Object Store</a> for details about how Impala DDL statements interact with
+      tables and partitions stored in the Amazon S3 filesystem.
+    </p>
+
+    <p class="p">
+      Although the <code class="ph codeph">INSERT</code> statement is officially classified as a DML (data manipulation language)
+      statement, it also involves metadata changes that must be broadcast to all Impala nodes, and so is also
+      affected by the <code class="ph codeph">SYNC_DDL</code> query option.
+    </p>
+
+    <p class="p">
+      Because the <code class="ph codeph">SYNC_DDL</code> query option makes each DDL operation take longer than normal, you
+      might only enable it before the last DDL operation in a sequence. For example, if you are running a script
+      that issues multiple of DDL operations to set up an entire new schema, add several new partitions, and so on,
+      you might minimize the performance overhead by enabling the query option only before the last
+      <code class="ph codeph">CREATE</code>, <code class="ph codeph">DROP</code>, <code class="ph codeph">ALTER</code>, or <code class="ph codeph">INSERT</code> statement.
+      The script only finishes when all the relevant metadata changes are recognized by all the Impala nodes, so
+      you could connect to any node and issue queries through it.
+    </p>
+
+    <p class="p">
+      The classification of DDL, DML, and other statements is not necessarily the same between Impala and Hive.
+      Impala organizes these statements in a way intended to be familiar to people familiar with relational
+      databases or data warehouse products. Statements that modify the metastore database, such as <code class="ph codeph">COMPUTE
+      STATS</code>, are classified as DDL. Statements that only query the metastore database, such as
+      <code class="ph codeph">SHOW</code> or <code class="ph codeph">DESCRIBE</code>, are put into a separate category of utility statements.
+    </p>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+      The query types shown in the Impala debug web user interface might not match exactly the categories listed
+      here. For example, currently the <code class="ph codeph">USE</code> statement is shown as DDL in the debug web UI. The
+      query types shown in the debug web UI are subject to change, for improved consistency.
+    </div>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      The other major classifications of SQL statements are data manipulation language (see
+      <a class="xref" href="impala_dml.html#dml">DML Statements</a>) and queries (see <a class="xref" href="impala_select.html#select">SELECT Statement</a>).
+    </p>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>

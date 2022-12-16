@@ -1,0 +1,552 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2022"><meta name="DC.rights.owner" content="(C) Copyright 2022"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="impala_iceberg"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>Using Impala with Iceberg Tables</title></head><body id="impala_iceberg"><header role="banner"><!--
+The DITA Open Toolkit is licensed for use under the the Apache
+Software Foundation License v2.0.
+
+A copy of the Apache Software Foundation License 2.0 is
+available at http://opensource.org/licenses/apache2.0.php
+
+This statement must be included in any copies of DITA Open
+Toolkit code.
+--><div class="header">
+  <p>Apache Impala</p>
+  <hr>
+</div></header><nav role="toc"><ul><li><a href="../topics/impala_intro.html">Introducing Apache Impala</a></li><li><a href="../topics/impala_concepts.html">Concepts and Architecture</a></li><li><a href="../topics/impala_planning.html">Deployment Planning</a></li><li><a href="../topics/impala_install.html">Installing Impala</a></li><li><a href="../topics/impala_config.html">Managing Impala</a></li><li><a href="../topics/impala_upgrading.html">Upgrading Impala</a></li><li><a href="../topics/impala_processes.html">Starting Impala</a></li><li><a href="../topics/impala_tutorial.html">Tutorials</a></li><li><a href="../topics/impala_admin.html">Administration</a></li><li><a href="../topics/impala_security.html">Impala Security</a></li><li><a href="../topics/impala_langref.html">SQL Reference</a></li><li><a href="../topics/impala_performance.html">Performance Tuning</a></li><li><a href="../topics/impala_scalability.html">Scalability Considerations</a></li><li><a href="../topics/impala_resource_management.html">Resource Management</a></li><li><a href="../topics/impala_partitioning.html">Partitioning</a></li><li><a href="../topics/impala_file_formats.html">File Formats</a></li><li><a href="../topics/impala_kudu.html">Using Impala to Query Kudu Tables</a></li><li><a href="../topics/impala_hbase.html">HBase Tables</a></li><li class="active"><a href="../topics/impala_iceberg.html">Iceberg Tables</a></li><li><a href="../topics/impala_s3.html">S3 Tables</a></li><li><a href="../topics/impala_adls.html">ADLS Tables</a></li><li><a href="../topics/impala_isilon.html">Isilon Storage</a></li><li><a href="../topics/impala_logging.html">Logging</a></li><li><a href="../topics/impala_client.html">Client Access</a></li><li><a href="../topics/impala_fault_tolerance.html">Fault Tolerance</a></li><li><a href="../topics/impala_troubleshooting.html">Troubleshooting Impala</a></li><li><a href="../topics/impala_ports.html">Ports Used by Impala</a></li><li><a href="../topics/impala_reserved_words.html">Impala Reserved Words</a></li><li><a href="../topics/impala_faq.html">Impala Frequently Asked Questions</a></li><li><a href="../topics/impala_release_notes.html">Impala Release Notes</a></li></ul></nav><main role="main"><article role="article" aria-labelledby="impala_iceberg__iceberg">
+
+  <h1 class="title topictitle1" id="impala_iceberg__iceberg">Using Impala with Iceberg Tables</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      Impala now supports Apache Iceberg which is an open table format for huge analytic datasets.
+      With this functionality, you can access any existing Iceberg tables using SQL and perform
+      analytics over them. Using Impala you can create and write Iceberg tables in different
+      Iceberg Catalogs (e.g. HiveCatalog, HadoopCatalog). It also supports location-based
+      tables (HadoopTables).
+    </p>
+    <p class="p">
+      Currently only Iceberg V1 DML operations are allowed, i.e. INSERT INTO /INSERT OVERWRITE.
+      Iceberg V2 operations like row-level modifications (UPDATE, DELETE) are not supported yet.
+    </p>
+
+    <p class="p">
+      For more information on Iceberg, see <a class="xref" href="https://iceberg.apache.org" target="_blank">the Apache Iceberg site</a>.
+    </p>
+
+    <p class="p toc inpage"></p>
+  </div>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title2" id="impala_iceberg__iceberg_features">
+    <h2 class="title topictitle2" id="ariaid-title2">Overview of Iceberg features</h2>
+  
+  <div class="body conbody">
+    <ul class="ul">
+      <li class="li">
+        ACID compliance: DML operations are atomic, queries always read a consistent snapshot.
+      </li>
+      <li class="li">
+        Hidden partitioning: Iceberg produces partition values by taking a column value and
+        optionally transforming it. Partition information is stored in the Iceberg metadata
+        files. Iceberg is able to TRUNCATE column values or calculate
+        a hash of them and use it for partitioning. Readers don't need to be aware of the
+        partitioning of the table.
+      </li>
+      <li class="li">
+        Partition layout evolution: When the data volume or the query patterns change you
+        can update the layout of a table. Since hidden partitioning is used, you don't need to
+        rewrite the data files during partition layout evolution.
+      </li>
+      <li class="li">
+        Schema evolution: supports add, drop, update, or rename schema elements,
+        and has no side-effects.
+      </li>
+      <li class="li">
+        Time travel: enables reproducible queries that use exactly the same table
+        snapshot, or lets users easily examine changes.
+      </li>
+      <li class="li">
+        Cloning Iceberg tables: create an empty Iceberg table based on the definition of
+        another Iceberg table.
+      </li>
+    </ul>
+  </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="impala_iceberg__iceberg_create">
+
+    <h2 class="title topictitle2" id="ariaid-title3">Creating Iceberg tables with Impala</h2>
+  
+
+    <div class="body conbody">
+      <p class="p">
+        When you have an existing Iceberg table that is not yet present in the Hive Metastore,
+        you can use the <code class="ph codeph">CREATE EXTERNAL TABLE</code> command in Impala to add the table to the Hive
+        Metastore and make Impala able to interact with this table. Currently Impala supports
+        HadoopTables, HadoopCatalog, and HiveCatalog. If you have an existing table in HiveCatalog,
+        and you are using the same Hive Metastore, you need no further actions.
+      </p>
+      <ul class="ul">
+        <li class="li">
+          <strong class="ph b">HadoopTables</strong>. When the table already exists in a HadoopTable it means there is
+          a location on the file system that contains your table. Use the following command
+          to add this table to Impala's catalog:
+          <pre class="pre codeblock"><code>
+CREATE EXTERNAL TABLE ice_hadoop_tbl
+STORED AS ICEBERG
+LOCATION '/path/to/table'
+TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
+          </code></pre>
+        </li>
+        <li class="li">
+          <strong class="ph b">HadoopCatalog</strong>. A table in HadoopCatalog means that there is a catalog location
+          in the file system under which Iceberg tables are stored. Use the following command
+          to add a table in a HadoopCatalog to Impala:
+          <pre class="pre codeblock"><code>
+CREATE EXTERNAL TABLE ice_hadoop_cat
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
+              'iceberg.catalog_location'='/path/to/catalog',
+              'iceberg.table_identifier'='namespace.table');
+          </code></pre>
+        </li>
+        <li class="li">
+          Alternatively, you can also use custom catalogs to use existing tables. It means you need to define
+          your catalog in hive-site.xml.
+          The adventage of this method is that other engines are more likely to be able to interact with this table.
+          To globally register different catalogs, set the following Hadoop configurations:
+          <table class="table" id="iceberg_create__iceberg_custom_catalogs"><caption></caption><colgroup><col><col></colgroup><thead class="thead">
+                <tr class="row">
+                  <th class="entry cellrowborder colsep-1 rowsep-1" id="iceberg_create__iceberg_custom_catalogs__entry__1">Config Key</th>
+                  <th class="entry cellrowborder colsep-1 rowsep-1" id="iceberg_create__iceberg_custom_catalogs__entry__2">Description</th>
+                </tr>
+              </thead><tbody class="tbody">
+                <tr class="row">
+                  <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_create__iceberg_custom_catalogs__entry__1 ">iceberg.catalog.&lt;catalog_name&gt;.type</td>
+                  <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_create__iceberg_custom_catalogs__entry__2 ">type of catalog: hive, hadoop, or left unset if using a custom catalog</td>
+                </tr>
+                <tr class="row">
+                  <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_create__iceberg_custom_catalogs__entry__1 ">iceberg.catalog.&lt;catalog_name&gt;.catalog-impl</td>
+                  <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_create__iceberg_custom_catalogs__entry__2 ">catalog implementation, must not be null if type is empty</td>
+                </tr>
+                <tr class="row">
+                  <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_create__iceberg_custom_catalogs__entry__1 ">iceberg.catalog.&lt;catalog_name&gt;.&lt;key&gt;</td>
+                  <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_create__iceberg_custom_catalogs__entry__2 ">any config key and value pairs for the catalog</td>
+                </tr>
+              </tbody></table>
+          <div class="p">
+            For example, to register a HadoopCatalog called 'hadoop', set the following properties in hive-site.xml:
+            <pre class="pre codeblock"><code>
+iceberg.catalog.hadoop.type=hadoop;
+iceberg.catalog.hadoop.warehouse=hdfs://example.com:8020/warehouse;
+            </code></pre>
+          </div>
+          <div class="p">
+            Then in the CREATE TABLE statement you can just refer to the catalog name:
+            <pre class="pre codeblock"><code>
+CREATE EXTERNAL TABLE ice_catalogs STORED AS ICEBERG TBLPROPERTIES('iceberg.catalog'='&lt;CATALOG-NAME&gt;');
+            </code></pre>
+          </div>
+        </li>
+        <li class="li">
+          If the table already exists in HiveCatalog then Impala should be able to see it without any additional
+          commands.
+        </li>
+      </ul>
+
+      <div class="p">
+        You can also create new Iceberg tables with Impala. You can use the same commands as above, just
+        omit the <code class="ph codeph">EXTERNAL</code> keyword. To create an Iceberg table in HiveCatalog the following
+        CREATE TABLE statement can be used:
+        <pre class="pre codeblock"><code>
+CREATE TABLE ice_t (i INT) STORED AS ICEBERG;
+        </code></pre>
+      </div>
+      <p class="p">
+        By default Impala assumes that the Iceberg table uses Parquet data files. ORC is also supported,
+        but we need to tell Impala via setting the table property 'write.format.default' to 'ORC'.
+      </p>
+      <div class="p">
+        You can also use <code class="ph codeph">CREATE TABLE AS SELECT</code> to create new Iceberg tables, e.g.:
+        <pre class="pre codeblock"><code>
+CREATE TABLE ice_ctas STORED AS ICEBERG AS SELECT i, b FROM value_tbl;
+
+CREATE TABLE ice_ctas_part PARTITIONED BY(d) STORED AS ICEBERG AS SELECT s, ts, d FROM value_tbl;
+
+CREATE TABLE ice_ctas_part_spec PARTITIONED BY SPEC (truncate(3, s)) STORED AS ICEBERG AS SELECT cast(t as INT), s, d FROM value_tbl;
+        </code></pre>
+      </div>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="impala_iceberg__iceberg_drop">
+    <h2 class="title topictitle2" id="ariaid-title4">Dropping Iceberg tables</h2>
+    <div class="body conbody">
+      <div class="p">
+        One can use <code class="ph codeph">DROP TABLE</code> statement to remove an Iceberg table:
+        <pre class="pre codeblock"><code>
+          DROP TABLE ice_t;
+        </code></pre>
+      </div>
+      <p class="p">
+        When <code class="ph codeph">external.table.purge</code> table property is set to true, then the
+        <code class="ph codeph">DROP TABLE</code> statement will also delete the data files. This property
+        is set to true when Impala creates the Iceberg table via <code class="ph codeph">CREATE TABLE</code>.
+        When <code class="ph codeph">CREATE EXTERNAL TABLE</code> is used (the table already exists in some
+        catalog) then this <code class="ph codeph">external.table.purge</code> is set to false, i.e.
+        <code class="ph codeph">DROP TABLE</code> doesn't remove any files, only the table definition
+        in HMS.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="impala_iceberg__iceberg_types">
+    <h2 class="title topictitle2" id="ariaid-title5">Supported Data Types for Iceberg Columns</h2>
+    <div class="body conbody">
+
+      <p class="p">
+        You can get information about the supported Iceberg data tyeps in
+        <a class="xref" href="https://iceberg.apache.org/docs/latest/schemas/" target="_blank">
+          the Iceberg spec</a>.
+      </p>
+
+      <div class="p">
+        The Iceberg data types can be mapped to the following SQL types in Impala:
+        <table class="table" id="iceberg_types__iceberg_types_sql_types"><caption></caption><colgroup><col><col></colgroup><thead class="thead">
+              <tr class="row">
+                <th class="entry cellrowborder colsep-1 rowsep-1" id="iceberg_types__iceberg_types_sql_types__entry__1">Iceberg type</th>
+                <th class="entry cellrowborder colsep-1 rowsep-1" id="iceberg_types__iceberg_types_sql_types__entry__2">SQL type in Impala</th>
+              </tr>
+            </thead><tbody class="tbody">
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__1 ">boolean</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__2 ">BOOLEAN</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__1 ">int</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__2 ">INTEGER</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__1 ">long</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__2 ">BIGINT</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__1 ">float</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__2 ">FLOAT</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__1 ">double</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__2 ">DOUBLE</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__1 ">decimal(P, S)</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__2 ">DECIMAL(P, S)</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__1 ">date</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__2 ">DATE</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__1 ">time</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__2 ">Not supported</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__1 ">timestamp</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__2 ">TIMESTAMP</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__1 ">timestamptz</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__2 ">Only read support via TIMESTAMP</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__1 ">string</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__2 ">STRING</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__1 ">uuid</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__2 ">Not supported</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__1 ">fixed(L)</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__2 ">Not supported</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__1 ">binary</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__2 ">Not supported</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__1 ">struct</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__2 ">STRUCT (read only)</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__1 ">list</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__2 ">ARRAY (read only)</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__1 ">map</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="iceberg_types__iceberg_types_sql_types__entry__2 ">MAP (read only)</td>
+              </tr>
+            </tbody></table>
+      </div>
+    </div>
+  </article>
+
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title6" id="impala_iceberg__iceberg_schema_evolution">
+    <h2 class="title topictitle2" id="ariaid-title6">Schema evolution of Iceberg tables</h2>
+    <div class="body conbody">
+      <div class="p">
+        Iceberg assigns unique field ids to schema elements which means it is possible
+        to reorder/delete/change columns and still be able to correctly read current and
+        old data files. Impala supports the following statements to modify a table's schema:
+        <ul class="ul">
+          <li class="li"><code class="ph codeph">ALTER TABLE ... RENAME TO ...</code> (renames the table if the Iceberg catalog supports it)</li>
+          <li class="li"><code class="ph codeph">ALTER TABLE ... CHANGE COLUMN ...</code> (change name and type of a column iff the new type is compatible with the old type)</li>
+          <li class="li"><code class="ph codeph">ALTER TABLE ... ADD COLUMNS ...</code> (adds columns to the end of the table)</li>
+          <li class="li"><code class="ph codeph">ALTER TABLE ... DROP COLUMN ...</code></li>
+        </ul>
+      </div>
+      <div class="p">
+        Valid type promotions are:
+        <ul class="ul">
+          <li class="li">int to long</li>
+          <li class="li">float to double</li>
+          <li class="li">decimal(P, S) to decimal(P', S) if P' &gt; P – widen the precision of decimal types.</li>
+        </ul>
+      </div>
+      <p class="p">
+        See
+        <a class="xref" href="https://iceberg.apache.org/docs/latest/evolution/#schema-evolution" target="_blank">
+        schema evolution </a> for more details.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title7" id="impala_iceberg__iceberg_partitioning">
+    <h2 class="title topictitle2" id="ariaid-title7">Partitioning Iceberg tables</h2>
+    <div class="body conbody">
+      <p class="p">
+        <a class="xref" href="https://iceberg.apache.org/docs/latest/partitioning/" target="_blank">
+        The Iceberg spec </a> has information about partitioning Iceberg tables. With Iceberg,
+        we are not limited to value-based partitioning, we can also partition our tables via
+        several partition transforms.
+      </p>
+      <div class="p">
+        Partition transforms are IDENTITY, BUCKET, TRUNCATE, YEAR, MONTH, DAY, HOUR, and VOID.
+        Impala supports all of these transforms. To create a partitioned Iceberg table, one
+        needs to add a <code class="ph codeph">PARTITIONED BY SPEC</code> clause to the CREATE TABLE statement, e.g.:
+        <pre class="pre codeblock"><code>
+CREATE TABLE ice_p (i INT, d DATE, s STRING, t TIMESTAMP)
+PARTITIONED BY SPEC (BUCKET(5, i), MONTH(d), TRUNCATE(3, s), HOUR(t))
+STORED AS ICEBERG;
+        </code></pre>
+      </div>
+      <div class="p">
+        Iceberg also supports
+        <a class="xref" href="https://iceberg.apache.org/docs/latest/evolution/#partition-evolution" target="_blank">
+        partition evolution</a> which means that the partitioning of a table can be changed, even
+        without the need of rewriting existing data files. You can change an existing table's
+        partitioning via an <code class="ph codeph">ALTER TABLE SET PARTITION SPEC</code> statement, e.g.:
+        <pre class="pre codeblock"><code>
+ALTER TABLE ice_p SET PARTITION SPEC (VOID(i), VOID(d), TRUNCATE(3, s), HOUR(t), i);
+        </code></pre>
+      </div>
+      <div class="p">
+        Please keep in mind that for Iceberg V1 tables:
+        <ul class="ul">
+          <li class="li">Do not reorder partition fields</li>
+          <li class="li">Do not drop partition fields; instead replace the field’s transform with the void transform</li>
+          <li class="li">Only add partition fields at the end of the previous partition spec</li>
+        </ul>
+      </div>
+      <div class="p">
+        You can also use the legacy syntax to create identity-partitioned Iceberg tables:
+        <pre class="pre codeblock"><code>
+CREATE TABLE ice_p (i INT, b INT) PARTITIONED BY (p1 INT, p2 STRING) STORED AS ICEBERG;
+        </code></pre>
+      </div>
+      <p class="p">
+        One can inspect a table's partition spec by the <code class="ph codeph">SHOW PARTITIONS</code> or
+        <code class="ph codeph">SHOW CREATE TABLE</code> commands.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title8" id="impala_iceberg__iceberg_inserts">
+    <h2 class="title topictitle2" id="ariaid-title8">Writing Iceberg tables</h2>
+    <div class="body conbody">
+      <p class="p">
+        Impala is also able to insert new data to Iceberg tables. Currently the <code class="ph codeph">INSERT INTO</code>
+        and <code class="ph codeph">INSERT OVERWRITE</code> DML statements are supported. One can also remove the
+        contents of an Iceberg table via the <code class="ph codeph">TRUNCATE</code> command.
+      </p>
+      <div class="p">
+        Since Iceberg uses hidden partitioning it means you don't need a partition clause in your INSERT
+        statements. E.g. insertion to a partitioned table looks like:
+        <pre class="pre codeblock"><code>
+CREATE TABLE ice_p (i INT, b INT) PARTITIONED BY SPEC (bucket(17, i)) STORED AS ICEBERG;
+INSERT INTO ice_p VALUES (1, 2);
+        </code></pre>
+      </div>
+      <p class="p">
+        <code class="ph codeph">INSERT OVERWRITE</code> statements can replace data in the table with the result of a query.
+        For partitioned tables Impala does a dynamic overwrite, which means partitions that have rows produced
+        by the SELECT query will be replaced. And partitions that have no rows produced by the SELECT query
+        remain untouched. INSERT OVERWRITE is not allowed for tables that use the BUCKET partition transform
+        because dynamic overwrite behavior would be too random in this case. If one needs to replace all
+        contents of a table, they can still use <code class="ph codeph">TRUNCATE</code> and <code class="ph codeph">INSERT INTO</code>.
+      </p>
+      <p class="p">
+        Impala can only write Iceberg tables with Parquet data files.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title9" id="impala_iceberg__iceberg_time_travel">
+    <h2 class="title topictitle2" id="ariaid-title9">Time travel for Iceberg tables</h2>
+    <div class="body conbody">
+
+      <p class="p">
+        Iceberg stores the table states in a chain of snapshots. By default, Impala uses the current
+        snapshot of the table. But for Iceberg tables, it is also possible to query an earlier state of
+        the table.
+      </p>
+
+      <div class="p">
+        We can use the <code class="ph codeph">FOR SYSTEM_TIME AS OF</code> and <code class="ph codeph">FOR SYSTEM_VERSION AS OF</code>
+        clauses in <code class="ph codeph">SELECT</code> queries, e.g.:
+        <pre class="pre codeblock"><code>
+SELECT * FROM ice_t FOR SYSTEM_TIME AS OF '2022-01-04 10:00:00';
+SELECT * FROM ice_t FOR SYSTEM_TIME AS OF now() - interval 5 days;
+SELECT * FROM ice_t FOR SYSTEM_VERSION AS OF 123456;
+        </code></pre>
+      </div>
+
+      <div class="p">
+        If one needs to check the available snapshots of a table they can use the <code class="ph codeph">DESCRIBE HISTORY</code>
+        statement with the following syntax:
+        <pre class="pre codeblock"><code>
+DESCRIBE HISTORY [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var>
+  [FROM <var class="keyword varname">timestamp</var>];
+
+DESCRIBE HISTORY [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var>
+  [BETWEEN <var class="keyword varname">timestamp</var> AND <var class="keyword varname">timestamp</var>]
+        </code></pre>
+        For example:
+<pre class="pre codeblock"><code>
+DESCRIBE HISTORY ice_t FROM '2022-01-04 10:00:00';
+DESCRIBE HISTORY ice_t FROM now() - interval 5 days;
+DESCRIBE HISTORY ice_t BETWEEN '2022-01-04 10:00:00' AND '2022-01-05 10:00:00';
+</code></pre>
+      </div>
+
+      <p class="p">
+        Please note that during time travel, Impala uses the current table schema to query an older
+        snapshot of the table which might have had a different schema in the past.
+      </p>
+
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title10" id="impala_iceberg__iceberg_table_cloning">
+    <h2 class="title topictitle2" id="ariaid-title10">Cloning Iceberg tables (LIKE clause)</h2>
+    <div class="body conbody">
+      <div class="p">
+        Use <code class="ph codeph">CREATE TABLE ... LIKE ...</code> to create an empty Iceberg table
+        based on the definition of another Iceberg table, including any column attributes in
+        the original table:
+        <pre class="pre codeblock"><code>
+CREATE TABLE new_ice_tbl LIKE orig_ice_tbl;
+        </code></pre>
+      </div>
+      <p class="p">
+        Because of the Data Types of Iceberg and Impala do not correspond one by one, Impala
+        can only clone between Iceberg tables.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title11" id="impala_iceberg__iceberg_expire_snapshots">
+    <h2 class="title topictitle2" id="ariaid-title11">Expiring snapshots</h2>
+    <div class="body conbody">
+      <div class="p">
+        Iceberg snapshots accumulate until they are deleted by a user action. Snapshots
+        can be deleted with <code class="ph codeph">ALTER TABLE ... EXECUTE expire_snapshots(...)</code>
+        statement, which will expire snapshots that are older than the specified
+        timestamp. For example:
+        <pre class="pre codeblock"><code>
+ALTER TABLE ice_tbl EXECUTE expire_snapshots('2022-01-04 10:00:00');
+ALTER TABLE ice_tbl EXECUTE expire_snapshots(now() - interval 5 days);
+        </code></pre>
+      </div>
+      <div class="p">
+        Expire snapshots:
+        <ul class="ul">
+          <li class="li">does not remove old metadata files by default.</li>
+          <li class="li">does not remove orphaned data files.</li>
+          <li class="li">respects the minimum number of snapshots to keep:
+          <code class="ph codeph">history.expire.min-snapshots-to-keep</code> table property.</li>
+        </ul>
+      </div>
+      <p class="p">
+        Old metadata file clean up can be configured with
+        <code class="ph codeph">write.metadata.delete-after-commit.enabled=true</code> and
+        <code class="ph codeph">write.metadata.previous-versions-max</code> table properties. This
+        allows automatic metadata file removal after operations that modify metadata
+        such as expiring snapshots or inserting data.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title12" id="impala_iceberg__iceberg_table_properties">
+    <h2 class="title topictitle2" id="ariaid-title12">Iceberg table properties</h2>
+    <div class="body conbody">
+      <div class="p">
+        We can set the following table properties for Iceberg tables:
+        <ul class="ul">
+          <li class="li">
+            <code class="ph codeph">iceberg.catalog</code>: controls which catalog is used for this Iceberg table.
+            It can be 'hive.catalog' (default), 'hadoop.catalog', 'hadoop.tables', or a name that
+            identifies a catalog defined in the Hadoop configurations, e.g. hive-site.xml
+          </li>
+          <li class="li"><code class="ph codeph">iceberg.catalog_location</code>: Iceberg table catalog location when <code class="ph codeph">iceberg.catalog</code> is <code class="ph codeph">'hadoop.catalog'</code></li>
+          <li class="li"><code class="ph codeph">iceberg.table_identifier</code>: Iceberg table identifier. We use &lt;database&gt;.&lt;table&gt; instead if this property is not set</li>
+          <li class="li"><code class="ph codeph">write.format.default</code>: data file format of the table. Impala can read ORC and PARQUET data files in Iceberg tables, and can write PARQUET data files only.</li>
+          <li class="li"><code class="ph codeph">write.parquet.compression-codec</code>:
+            Parquet compression codec. Supported values are: NONE, GZIP, SNAPPY
+            (default value), LZ4, ZSTD. The table property will be ignored if
+            <code class="ph codeph">COMPRESSION_CODEC</code> query option is set.
+          </li>
+          <li class="li"><code class="ph codeph">write.parquet.compression-level</code>:
+            Parquet compression level. Used with ZSTD compression only.
+            Supported range is [1, 22]. Default value is 3. The table property
+            will be ignored if <code class="ph codeph">COMPRESSION_CODEC</code> query option is set.
+          </li>
+          <li class="li"><code class="ph codeph">write.parquet.row-group-size-bytes</code>:
+            Parquet row group size in bytes. Supported range is [8388608,
+            2146435072] (8MB - 2047MB). The table property will be ignored if
+            <code class="ph codeph">PARQUET_FILE_SIZE</code> query option is set.
+            If neither the table property nor the <code class="ph codeph">PARQUET_FILE_SIZE</code> query option
+            is set, the way Impala calculates row group size will remain
+            unchanged.
+          </li>
+          <li class="li"><code class="ph codeph">write.parquet.page-size-bytes</code>:
+            Parquet page size in bytes. Used for PLAIN encoding. Supported range
+            is [65536, 1073741824] (64KB - 1GB).
+            If the table property is unset, the way Impala calculates page size
+            will remain unchanged.
+          </li>
+          <li class="li"><code class="ph codeph">write.parquet.dict-size-bytes</code>:
+            Parquet dictionary page size in bytes. Used for dictionary encoding.
+            Supported range is [65536, 1073741824] (64KB - 1GB).
+            If the table property is unset, the way Impala calculates dictionary
+            page size will remain unchanged.
+          </li>
+        </ul>
+      </div>
+    </div>
+  </article>
+</article></main></body></html>

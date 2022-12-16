@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2022" />
+<meta name="DC.rights.owner" content="(C) Copyright 2022" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="EXPAND_COMPLEX_TYPES Query Option" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="expand_complex_types" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>EXPAND_COMPLEX_TYPES Query Option</title>
+</head>
+<body id="expand_complex_types">
+
+
+ <h1 class="title topictitle1" id="ariaid-title1">EXPAND_COMPLEX_TYPES Query Option</h1>
+
+ 
+ 
+
+ <div class="body conbody">
+  <p class="p">
+    Older versions of
+   Impala did not support complex types in the select list, and therefore a <code class="ph codeph">SELECT
+   *</code> statement only expanded to primitive types even when the table contained complex-typed
+   columns. Support for complex types in the select list has since been added, but for backward
+   compatibility the behaviour that <span class="q">"*"</span> expressions skip complex types has been kept as the
+   default. If the EXPAND_COMPLEX_TYPES query option is set to true, <span class="q">"*"</span> expressions will
+   include complex types as well.
+  </p>
+
+
+  <p class="p">
+   Note: even if EXPAND_COMPLEX_TYPES is false, complex-typed columns that are listed explicitly in
+   the select list (i.e. not as a <span class="q">"*"</span> expression) will be included in the result.
+  </p>
+
+
+  <p class="p"><strong class="ph b">Type:</strong>BOOLEAN</p>
+
+  <p class="p"><strong class="ph b">Default:</strong>FALSE</p>
+
+  <p class="p"><strong class="ph b">Added in:</strong>Impala 4.2</p>
+
+  <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+  <p class="p">
+   <a class="xref" href="impala_complex_types.html">Complex Types (Impala 2.3 or higher only)</a>,
+  </p>
+
+ </div>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

@@ -1,0 +1,91 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2022"><meta name="DC.rights.owner" content="(C) Copyright 2022"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="data_cache"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>Data Cache for Remote Reads</title></head><body id="data_cache"><header role="banner"><!--
+The DITA Open Toolkit is licensed for use under the the Apache
+Software Foundation License v2.0.
+
+A copy of the Apache Software Foundation License 2.0 is
+available at http://opensource.org/licenses/apache2.0.php
+
+This statement must be included in any copies of DITA Open
+Toolkit code.
+--><div class="header">
+  <p>Apache Impala</p>
+  <hr>
+</div></header><nav role="toc"><ul><li><a href="../topics/impala_intro.html">Introducing Apache Impala</a></li><li><a href="../topics/impala_concepts.html">Concepts and Architecture</a></li><li><a href="../topics/impala_planning.html">Deployment Planning</a></li><li><a href="../topics/impala_install.html">Installing Impala</a></li><li><a href="../topics/impala_config.html">Managing Impala</a></li><li><a href="../topics/impala_upgrading.html">Upgrading Impala</a></li><li><a href="../topics/impala_processes.html">Starting Impala</a></li><li><a href="../topics/impala_tutorial.html">Tutorials</a></li><li><a href="../topics/impala_admin.html">Administration</a></li><li><a href="../topics/impala_security.html">Impala Security</a></li><li><a href="../topics/impala_langref.html">SQL Reference</a></li><li><a href="../topics/impala_performance.html">Performance Tuning</a><ul><li><a href="../topics/impala_perf_cookbook.html">Performance Best Practices</a></li><li><a href="../topics/impala_perf_joins.html">Join Performance</a></li><li><a href="../topics/impala_perf_stats.html">Table and Column Statistics</a></li><li><a href="../topics/impala_perf_benchmarking.html">Benchmarking</a></li><li><a href="../topics/impala_perf_resources.html">Controlling Resource Usage</a></li><li><a href="../topics/impala_runtime_filtering.html">Runtime Filtering</a></li><li><a href="../topics/impala_perf_hdfs_caching.html">HDFS Caching</a></li><li><a href="../topics/impala_perf_skew.html">HDFS Block Skew</a></li><li class="active"><a href="../topics/impala_data_cache.html">Data Cache for Remote Reads</a></li><li><a href="../topics/impala_perf_testing.html">Testing Impala Performance</a></li><li><a href="../topics/impala_explain_plan.html">EXPLAIN Plans and Query Profiles</a></li></ul></li><li><a href="../topics/impala_scalability.html">Scalability Considerations</a></li><li><a href="../topics/impala_resource_management.html">Resource Management</a></li><li><a href="../topics/impala_partitioning.html">Partitioning</a></li><li><a href="../topics/impala_file_formats.html">File Formats</a></li><li><a href="../topics/impala_kudu.html">Using Impala to Query Kudu Tables</a></li><li><a href="../topics/impala_hbase.html">HBase Tables</a></li><li><a href="../topics/impala_iceberg.html">Iceberg Tables</a></li><li><a href="../topics/impala_s3.html">S3 Tables</a></li><li><a href="../topics/impala_adls.html">ADLS Tables</a></li><li><a href="../topics/impala_isilon.html">Isilon Storage</a></li><li><a href="../topics/impala_logging.html">Logging</a></li><li><a href="../topics/impala_client.html">Client Access</a></li><li><a href="../topics/impala_fault_tolerance.html">Fault Tolerance</a></li><li><a href="../topics/impala_troubleshooting.html">Troubleshooting Impala</a></li><li><a href="../topics/impala_ports.html">Ports Used by Impala</a></li><li><a href="../topics/impala_reserved_words.html">Impala Reserved Words</a></li><li><a href="../topics/impala_faq.html">Impala Frequently Asked Questions</a></li><li><a href="../topics/impala_release_notes.html">Impala Release Notes</a></li></ul></nav><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Data Cache for Remote Reads</h1>
+
+  <div class="body conbody">
+
+    <p class="p">
+      When Impala compute nodes and its storage are not co-located, the network bandwidth
+      requirement goes up as the network traffic includes the data fetch as well as the
+      shuffling exchange traffic of intermediate results.
+    </p>
+
+    <p class="p">
+      To mitigate the pressure on the network, you can enable the compute nodes to cache the
+      working set read from remote filesystems, such as, remote HDFS data node, S3, ABFS, ADLS.
+    </p>
+
+    <p class="p">
+      To enable remote data cache, set the <code class="ph codeph">--data_cache</code> Impala Daemon start-up
+      flag as below:
+    </p>
+
+<pre class="pre codeblock"><code>--data_cache=<var class="keyword varname">dir1</var>,<var class="keyword varname">dir2</var>,<var class="keyword varname">dir3</var>,...:<var class="keyword varname">quota</var></code></pre>
+
+    <p class="p">
+      The flag is set to a list of directories, separated by <code class="ph codeph">,</code>, followed by a
+      <code class="ph codeph">:</code>, and a capacity <code class="ph codeph"><var class="keyword varname">quota</var></code> per
+      directory.
+    </p>
+
+    <p class="p">
+      If set to an empty string, data caching is disabled.
+    </p>
+
+    <p class="p">
+      Cached data is stored in the specified directories.
+    </p>
+
+    <p class="p">
+      The specified directories must exist in the local filesystem of each Impala Daemon, or
+      Impala will fail to start.
+    </p>
+
+    <p class="p">
+      In addition, the filesystem which the directory resides in must support hole punching.
+    </p>
+
+    <p class="p">
+      The cache can consume up to the <code class="ph codeph">quota</code> bytes for each of the directories
+      specified.
+    </p>
+
+    <p class="p">
+      The default setting for <code class="ph codeph">--data_cache</code> is an empty string.
+    </p>
+
+    <p class="p">
+      For example, with the following setting, the data cache may use up to 1 TB, with 500 GB
+      max in <code class="ph codeph">/data/0</code> and <code class="ph codeph">/data/1</code> respectively.
+    </p>
+
+<pre class="pre codeblock"><code>--data_cache=/data/0,/data/1:500GB</code></pre>
+
+    <div class="p"> In Impala 3.4 and higher, you can configure one of the following cache eviction policies for
+      the data cache: <ul class="ul">
+        <li class="li">LRU (Least Recently Used--the default)</li>
+        <li class="li">LIRS (Inter-referenece Recency Set)</li>
+      </ul> LIRS is a scan-resistent, low performance-overhead policy. You configure a cache
+      eviction policy using the <code class="ph codeph">--data_cache_eviction_policy</code> Impala Daemon start-up
+      flag: </div>
+    <div class="p">
+<pre class="pre codeblock"><code>--data_cache_eviction_policy=<var class="keyword varname">policy</var>
+</code></pre>
+    </div>
+  </div>
+
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_performance.html">Tuning Impala for Performance</a></div></div></nav></article></main></body></html>

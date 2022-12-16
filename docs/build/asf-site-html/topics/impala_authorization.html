@@ -1,0 +1,1384 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2022"><meta name="DC.rights.owner" content="(C) Copyright 2022"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_security.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="authorization"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>Impala Authorization</title></head><body id="authorization"><header role="banner"><!--
+The DITA Open Toolkit is licensed for use under the the Apache
+Software Foundation License v2.0.
+
+A copy of the Apache Software Foundation License 2.0 is
+available at http://opensource.org/licenses/apache2.0.php
+
+This statement must be included in any copies of DITA Open
+Toolkit code.
+--><div class="header">
+  <p>Apache Impala</p>
+  <hr>
+</div></header><nav role="toc"><ul><li><a href="../topics/impala_intro.html">Introducing Apache Impala</a></li><li><a href="../topics/impala_concepts.html">Concepts and Architecture</a></li><li><a href="../topics/impala_planning.html">Deployment Planning</a></li><li><a href="../topics/impala_install.html">Installing Impala</a></li><li><a href="../topics/impala_config.html">Managing Impala</a></li><li><a href="../topics/impala_upgrading.html">Upgrading Impala</a></li><li><a href="../topics/impala_processes.html">Starting Impala</a></li><li><a href="../topics/impala_tutorial.html">Tutorials</a></li><li><a href="../topics/impala_admin.html">Administration</a></li><li><a href="../topics/impala_security.html">Impala Security</a><ul><li><a href="../topics/impala_security_guidelines.html">Security Guidelines for Impala</a></li><li><a href="../topics/impala_security_files.html">Securing Impala Data and Log Files</a></li><li><a href="../topics/impala_security_install.html">Installation Considerations for Impala Security</a></li><li><a href="../topics/impala_security_metastore.html">Securing the Hive Metastore Database</a></li><li><a href="../topics/impala_security_webui.html">Securing the Impala Web User Interface</a></li><li><a href="../topics/impala_ssl.html">Configuring TLS/SSL for Impala</a></li><li class="active"><a href="../topics/impala_authorization.html">Impala Authorization</a></li><li><a href="../topics/impala_authentication.html">Impala Authentication</a></li><li><a href="../topics/impala_auditing.html">Auditing</a></li><li><a href="../topics/impala_lineage.html">Viewing Lineage Info</a></li></ul></li><li><a href="../topics/impala_langref.html">SQL Reference</a></li><li><a href="../topics/impala_performance.html">Performance Tuning</a></li><li><a href="../topics/impala_scalability.html">Scalability Considerations</a></li><li><a href="../topics/impala_resource_management.html">Resource Management</a></li><li><a href="../topics/impala_partitioning.html">Partitioning</a></li><li><a href="../topics/impala_file_formats.html">File Formats</a></li><li><a href="../topics/impala_kudu.html">Using Impala to Query Kudu Tables</a></li><li><a href="../topics/impala_hbase.html">HBase Tables</a></li><li><a href="../topics/impala_iceberg.html">Iceberg Tables</a></li><li><a href="../topics/impala_s3.html">S3 Tables</a></li><li><a href="../topics/impala_adls.html">ADLS Tables</a></li><li><a href="../topics/impala_isilon.html">Isilon Storage</a></li><li><a href="../topics/impala_logging.html">Logging</a></li><li><a href="../topics/impala_client.html">Client Access</a></li><li><a href="../topics/impala_fault_tolerance.html">Fault Tolerance</a></li><li><a href="../topics/impala_troubleshooting.html">Troubleshooting Impala</a></li><li><a href="../topics/impala_ports.html">Ports Used by Impala</a></li><li><a href="../topics/impala_reserved_words.html">Impala Reserved Words</a></li><li><a href="../topics/impala_faq.html">Impala Frequently Asked Questions</a></li><li><a href="../topics/impala_release_notes.html">Impala Release Notes</a></li></ul></nav><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Impala Authorization</h1>
+
+  
+
+  <div class="body conbody" id="authorization__sentry">
+
+    <p class="p">
+      Authorization determines which users are allowed to access which resources, and what
+      operations they are allowed to perform. You use Apache Ranger for authorization.
+      By default, when authorization is not enabled, Impala does all read and
+      write operations with the privileges of the <code class="ph codeph">impala</code> user, which is
+      suitable for a development/test environment but not for a secure production environment.
+      When authorization is enabled, Impala uses the OS user ID of the user who runs
+      <span class="keyword cmdname">impala-shell</span> or other client programs, and associates various
+      privileges with each user.
+    </p>
+
+    <p class="p toc inpage">
+      See the following sections for details about using the Impala authorization features.
+    </p>
+
+  </div>
+
+  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_security.html">Impala Security</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="authorization__sentry_priv_model">
+
+    <h2 class="title topictitle2" id="ariaid-title2">The Privilege Model</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        Privileges can be granted on different objects in the schema. Any privilege that can be
+        granted is associated with a level in the object hierarchy. If a privilege is granted on
+        a parent object in the hierarchy, the child object automatically inherits it. This is
+        the same privilege model as Hive and other database systems.
+      </p>
+
+      <p class="p">
+        The objects in the Impala schema hierarchy are:
+      </p>
+
+<pre class="pre codeblock"><code>Server
+    URI
+    Database
+        Table
+            Column
+</code></pre>
+
+      <p class="p">
+        The table-level privileges apply to views as well. Anywhere you specify a table name,
+        you can specify a view name instead.
+      </p>
+
+      <p class="p">
+        In <span class="keyword">Impala 2.3</span> and higher, you can specify privileges for
+        individual columns.
+      </p>
+
+      <div class="p">
+        The table below lists the minimum level of privileges and the scope required to execute
+        SQL statements in <span class="keyword">Impala 3.0</span> and higher. The following notations
+        are used:
+        <ul class="ul">
+          <li class="li">The <strong class="ph b">SERVER</strong> resource type in Ranger implies all databases,
+            all tables, all columns, all UDFs, and all URIs.</li>
+          <li class="li">
+            <strong class="ph b">ANY</strong> denotes the <code class="ph codeph">SELECT</code>, <code class="ph codeph">INSERT</code>,
+            <code class="ph codeph">CREATE</code>, <code class="ph codeph">ALTER</code>, <code class="ph codeph">DROP</code>,
+            <strong class="ph b"><em class="ph i">or</em></strong> <code class="ph codeph">REFRESH</code> privilege.
+          </li>
+
+          <li class="li">
+            <strong class="ph b">ALL</strong> privilege denotes the <code class="ph codeph">SELECT</code>, <code class="ph codeph">INSERT</code>,
+            <code class="ph codeph">CREATE</code>, <code class="ph codeph">ALTER</code>, <code class="ph codeph">DROP</code>,
+            <strong class="ph b"><em class="ph i">and</em></strong> <code class="ph codeph">REFRESH</code> privileges.
+          </li>
+
+          <li class="li">
+            The owner of an object effectively has the ALL privilege on the object.
+          </li>
+
+          <li class="li">
+            The parent levels of the specified scope are implicitly supported where a scope
+            refers to the specific level in the object hierarchy that the privilege is granted.
+            For example, if a privilege is listed with the <code class="ph codeph">TABLE</code> scope, the
+            same privilege granted on <code class="ph codeph">DATABASE</code> and <code class="ph codeph">SERVER</code> will
+            allow the user to execute the specified SQL statement.
+          </li>
+        </ul>
+        <table class="table frame-all" id="sentry_priv_model__d6e178"><caption></caption><colgroup><col><col><col></colgroup><tbody class="tbody">
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  <strong class="ph b">SQL Statement</strong>
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  <strong class="ph b">Privileges</strong>
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  <strong class="ph b">Object Type / </strong><p class="p"><strong class="ph b">Resource Type</strong></p></td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1"> TABLE</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  WITH SELECT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  EXPLAIN SELECT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  INSERT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  INSERT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  EXPLAIN INSERT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  INSERT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TRUNCATE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  INSERT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  LOAD
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  INSERT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1"></td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALL
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  URI
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  CREATE DATABASE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  CREATE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SERVER
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  CREATE DATABASE LOCATION
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  CREATE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SERVER
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1"></td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALL
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  URI
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  CREATE TABLE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  CREATE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DATABASE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  CREATE TABLE LIKE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  CREATE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DATABASE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1"></td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  CREATE TABLE AS SELECT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  CREATE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DATABASE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1"></td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  INSERT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DATABASE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1"></td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  EXPLAIN CREATE TABLE AS SELECT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  CREATE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DATABASE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1"></td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  INSERT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DATABASE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1"></td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  CREATE TABLE LOCATION
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  CREATE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1"></td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALL
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  URI
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  CREATE VIEW
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  CREATE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DATABASE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1"></td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALTER DATABASE SET OWNER
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALL WITH GRANT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DATABASE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALTER TABLE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALTER
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALTER TABLE SET LOCATION
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALTER
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1"></td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALL
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  URI
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALTER TABLE RENAME
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  CREATE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DATABASE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1"></td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALL
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALTER TABLE SET OWNER
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALL WITH GRANT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALTER VIEW
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALTER
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1"></td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALTER VIEW RENAME
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  CREATE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DATABASE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1"></td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALL
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALTER VIEW SET OWNER
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALL WITH GRANT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  VIEW
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DROP DATABASE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DROP
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DATABASE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DROP TABLE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DROP
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DROP VIEW
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DROP
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  CREATE FUNCTION
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  CREATE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DATABASE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1"></td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALL
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  URI
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DROP FUNCTION
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DROP
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DATABASE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  COMPUTE STATS
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALTER and SELECT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DROP STATS
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALTER
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  INVALIDATE METADATA
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  REFRESH
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SERVER
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  INVALIDATE METADATA &lt;table&gt;
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  REFRESH
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  REFRESH &lt;table&gt;
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  REFRESH
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  REFRESH AUTHORIZATION
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  REFRESH
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SERVER
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  REFRESH FUNCTIONS
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  REFRESH
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DATABASE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  COMMENT ON DATABASE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALTER
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DATABASE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  COMMENT ON TABLE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALTER
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  COMMENT ON VIEW
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALTER
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  COMMENT ON COLUMN
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALTER
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DESCRIBE DATABASE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DATABASE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DESCRIBE &lt;table/view&gt;
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  If the user has the SELECT privilege at the COLUMN level, only the columns the
+                  user has access will show.
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  COLUMN
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  USE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ANY
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SHOW DATABASES
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ANY
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SHOW TABLES
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ANY
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SHOW FUNCTIONS
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DATABASE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SHOW PARTITIONS
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SHOW TABLE STATS
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SHOW COLUMN STATS
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SHOW FILES
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SHOW CREATE TABLE
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SHOW CREATE VIEW
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SHOW CREATE FUNCTION
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DATABASE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SHOW RANGE PARTITIONS (Kudu only)
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  UPDATE (Kudu only)
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALL
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  EXPLAIN UPDATE (Kudu only)
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALL
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  UPSERT (Kudu only)
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALL
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  WITH UPSERT (Kudu only)
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALL
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  EXPLAIN UPSERT (Kudu only)
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALL
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  DELETE (Kudu only)
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALL
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  EXPLAIN DELETE (Kudu only)
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  ALL
+                </td>
+                <td class="entry cellrowborder colsep-1 rowsep-1">
+                  TABLE
+                </td>
+              </tr>
+            </tbody></table>
+      </div>
+
+      <p class="p">
+        Privileges are managed via the <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code> SQL
+        statements that require the Ranger service enabled.
+      </p>
+
+      <p class="p">
+        If you change privileges outside of Impala, e.g. adding a user, removing a user,
+        modifying privileges, you must clear the Impala Catalog server cache by running the
+        <code class="ph codeph">REFRESH AUTHORIZATION</code> statement. <code class="ph codeph">REFRESH AUTHORIZATION</code>
+        is not required if you make the changes to privileges within Impala.
+      </p>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="authorization__concept_fgf_smj_bjb">
+
+    <h2 class="title topictitle2" id="ariaid-title3">Object Ownership in Ranger</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        Object ownership for tables, views and databases is enabled by default in Impala.
+      </p>
+
+      <p class="p">
+        To define owner specific privileges, go to ranger UI and define appropriate policies on
+        the <code class="ph codeph">{OWNER}</code> user.
+      </p>
+
+      <p class="p">
+        The <code class="ph codeph">CREATE</code> statements implicitly make the user running the statement
+        the owner of the object. For example, if <var class="keyword varname">User A</var> creates a database,
+        <var class="keyword varname">foo</var>, via the <code class="ph codeph">CREATE DATABASE</code> statement,
+        <var class="keyword varname">User A</var> now owns the <var class="keyword varname">foo</var> database and is authorized
+        to perform any operation on the <var class="keyword varname">foo</var> database.
+      </p>
+
+      <p class="p">
+        An ownership can be transferred to another user or role via the <code class="ph codeph">ALTER
+        DATABASE</code>, <code class="ph codeph">ALTER TABLE</code>, or <code class="ph codeph">ALTER VIEW</code> with the
+        <code class="ph codeph">SET OWNER</code> clause.
+      </p>
+
+      <div class="note note note_note" id="concept_fgf_smj_bjb__impala-8937"><span class="note__title notetitle">Note:</span> 
+        Currently, due to a known issue
+        (<a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-8937" target="_blank">IMPALA-8937</a>),
+        until the ownership information is fully loaded in the coordinator catalog cache, the
+        owner of a table might not be able to see the table when executing the <code class="ph codeph">SHOW
+        TABLES</code> statement The owner can still query the table.
+      </div>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="authorization__enable_ranger_authz">
+
+    <h2 class="title topictitle2" id="ariaid-title4">Starting Impala with Ranger Authorization Enabled</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        To enable authorization in an Impala cluster using Ranger:
+      </p>
+
+      <ol class="ol">
+        <li class="li">
+          Add the following options to the <code class="ph codeph">IMPALA_SERVER_ARGS</code> and the
+          <code class="ph codeph">IMPALA_CATALOG_ARGS</code> settings in the
+          <span class="ph filepath">/etc/default/impala</span> configuration file:
+          <ul class="ul">
+            <li class="li">
+              <code class="ph codeph">-server_name</code>: Specify the same name for all
+              <span class="keyword cmdname">impalad</span> nodes and the <code class="ph codeph">catalogd</code> in the cluster. </li>
+            <li class="li">
+              <code class="ph codeph">-ranger_service_type=hive</code>
+            </li>
+            <li class="li">
+              <code class="ph codeph">-ranger_app_id</code>: Set it to the Ranger application id. </li>
+            <li class="li">
+              <code class="ph codeph">-authorization_provider=ranger</code>
+            </li>
+          </ul>
+        </li>
+
+        <li class="li">
+          Restart the <code class="ph codeph">catalogd</code> and all <span class="keyword cmdname">impalad</span> daemons.
+        </li>
+      </ol>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="authorization__sentry_service">
+
+    <h2 class="title topictitle2" id="ariaid-title5">Managing Privileges</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        You set up privileges through the <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code>
+        statements in either Impala or Hive.
+      </p>
+
+      <p class="p">
+        For information about using the Impala <code class="ph codeph">GRANT</code> and
+        <code class="ph codeph">REVOKE</code> statements, see <a class="xref" href="impala_grant.html#grant">GRANT Statement (Impala 2.0 or higher only)</a>
+        and <a class="xref" href="impala_revoke.html#revoke">REVOKE Statement (Impala 2.0 or higher only)</a>.
+      </p>
+
+    </div>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title6" id="sentry_service__changing_privileges">
+
+      <h3 class="title topictitle3" id="ariaid-title6">Changing Privileges from Outside of Impala</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          If you make a change to privileges in Ranger from outside of Impala, e.g.
+          adding a user, removing a user, modifying privileges, there are two options to
+          propagate the change:
+        </p>
+
+        <ul class="ul">
+          <li class="li">
+            Use the <code class="ph codeph">ranger.plugin.hive.policy.pollIntervalMs</code> property to
+            specify how often to do a Ranger refresh. The property is specified in
+            <code class="ph codeph">ranger-hive-security.xml</code> in the <code class="ph codeph">conf</code> directory
+            under your Impala home directory.
+          </li>
+
+          <li class="li">
+            Run the <code class="ph codeph">INVALIDATE METADATA</code> or <code class="ph codeph">REFRESH
+            AUTHORIZATION</code> statement to force a refresh.
+          </li>
+        </ul>
+
+        <p class="p">
+          If you make a change to privileges within Impala, <code class="ph codeph">INVALIDATE METADATA</code>
+          is not required.
+        </p>
+
+        <div class="note warning note_warning"><span class="note__title warningtitle">Warning:</span> 
+          As <code class="ph codeph">INVALIDATE METADATA</code> is an expensive operation, you should use it
+          judiciously.
+        </div>
+
+      </div>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title7" id="sentry_service__granting_on_uri">
+
+      <h3 class="title topictitle3" id="ariaid-title7">Granting Privileges on URI</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          URIs represent the file paths you specify as part of statements such as <code class="ph codeph">CREATE
+          EXTERNAL TABLE</code> and <code class="ph codeph">LOAD DATA</code>. Typically, you specify what
+          look like UNIX paths, but these locations can also be prefixed with
+          <code class="ph codeph">hdfs://</code> to make clear that they are really URIs. To set privileges
+          for a URI, specify the name of a directory, and the privilege applies to all the files
+          in that directory and any directories underneath it.
+        </p>
+
+        <div class="p">
+          URIs must start with <code class="ph codeph">hdfs://</code>, <code class="ph codeph">s3a://</code>,
+          <code class="ph codeph">adl://</code>, or <code class="ph codeph">file://</code>. If a URI starts with an absolute
+          path, the path will be appended to the default filesystem prefix. For example, if you
+          specify:
+<pre class="pre codeblock"><code>
+GRANT ALL ON URI '/tmp';
+</code></pre>
+          The above statement effectively becomes the following where the default filesystem is
+          HDFS.
+<pre class="pre codeblock"><code>
+GRANT ALL ON URI 'hdfs://localhost:20500/tmp';
+</code></pre>
+        </div>
+
+        <div class="p">
+          When defining URIs for HDFS, you must also specify the NameNode. For example:
+<pre class="pre codeblock"><code>GRANT ALL ON URI file:///path/to/dir TO &lt;role&gt;
+GRANT ALL ON URI hdfs://namenode:port/path/to/dir TO &lt;role&gt;</code></pre>
+          <div class="note warning note_warning"><span class="note__title warningtitle">Warning:</span> 
+            Because the NameNode host and port must be specified, it is strongly recommended
+            that you use High Availability (HA). This ensures that the URI will remain constant
+            even if the NameNode changes. For example:
+<pre class="pre codeblock"><code>GRANT ALL ON URI hdfs://ha-nn-uri/path/to/dir TO &lt;role&gt;</code></pre>
+          </div>
+        </div>
+
+      </div>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title8" id="sentry_service__concept_k45_lbm_f2b">
+
+      <h3 class="title topictitle3" id="ariaid-title8">Examples of Setting up Authorization for Security Scenarios</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          The following examples show how to set up authorization to grant privileges on objects
+          to groups of users via roles.
+        </p>
+
+        <div class="example"><h4 class="title sectiontitle">A User with No Privileges</h4>
+          
+          <p class="p">
+            If a user has no privileges at all, that user cannot access any schema objects in the
+            system. The error messages do not disclose the names or existence of objects that the
+            user is not authorized to read.
+          </p>
+          <p class="p">
+            This is the experience you want a user to have if they somehow log into a system where
+            they are not an authorized Impala user. Or in a real deployment, a user might have no
+            privileges because they are not a member of any of the authorized groups.
+          </p>
+        </div>
+
+        <div class="example"><h4 class="title sectiontitle">Examples of Privileges for Administrative Users</h4>
+          
+          <p class="p">
+            In this example, the SQL statements grant the <code class="ph codeph">entire_server</code> role all
+            privileges on both the databases and URIs within the server.
+          </p>
+
+<pre class="pre codeblock"><code>CREATE ROLE entire_server;
+GRANT ROLE entire_server TO GROUP admin_group;
+GRANT ALL ON SERVER server1 TO ROLE entire_server;
+</code></pre>
+        </div>
+
+        <div class="example"><h4 class="title sectiontitle">A User with Privileges for Specific Databases and Tables</h4>
+          
+          <p class="p">
+            If a user has privileges for specific tables in specific databases, the user can
+            access those things but nothing else. They can see the tables and their parent databases
+            in the output of <code class="ph codeph">SHOW TABLES</code> and <code class="ph codeph">SHOW DATABASES</code>,
+            <code class="ph codeph">USE</code> the appropriate databases, and perform the relevant actions
+            (<code class="ph codeph">SELECT</code> and/or <code class="ph codeph">INSERT</code>) based on the table
+            privileges. To actually create a table requires the <code class="ph codeph">ALL</code> privilege at
+            the database level, so you might define separate roles for the user that sets up a
+            schema and other users or applications that perform day-to-day operations on the tables.
+          </p>
+<pre class="pre codeblock"><code>
+CREATE ROLE one_database;
+GRANT ROLE one_database TO GROUP admin_group;
+GRANT ALL ON DATABASE db1 TO ROLE one_database;
+
+CREATE ROLE instructor;
+GRANT ROLE instructor TO GROUP trainers;
+GRANT ALL ON TABLE db1.lesson TO ROLE instructor;
+
+# This particular course is all about queries, so the students can SELECT but not INSERT or CREATE/DROP.
+CREATE ROLE student;
+GRANT ROLE student TO GROUP visitors;
+GRANT SELECT ON TABLE db1.training TO ROLE student;</code></pre>
+        </div>
+
+        <div class="example"><h4 class="title sectiontitle">Privileges for Working with External Data Files</h4>
+          
+          <p class="p"> When data is being inserted through the <code class="ph codeph">LOAD DATA</code> statement or is
+            referenced from an HDFS location outside the normal Impala database directories, the
+            user also needs appropriate permissions on the URIs corresponding to those HDFS
+            locations. </p>
+          <p class="p"> In this example: </p>
+          <ul class="ul">
+            <li class="li"> The <code class="ph codeph">external_table</code> role can insert into and query the Impala
+              table, <code class="ph codeph">external_table.sample</code>. </li>
+
+            <li class="li"> The <code class="ph codeph">staging_dir</code> role can specify the HDFS path
+                <span class="ph filepath">/user/impala-user/external_data</span> with the <code class="ph codeph">LOAD
+                DATA</code> statement. When Impala queries or loads data files, it operates on all
+              the files in that directory, not just a single file, so any Impala
+                <code class="ph codeph">LOCATION</code> parameters refer to a directory rather than an individual
+              file. </li>
+          </ul>
+          <pre class="pre codeblock"><code>CREATE ROLE external_table;
+GRANT ROLE external_table TO GROUP impala_users;
+GRANT ALL ON TABLE external_table.sample TO ROLE external_table;
+
+CREATE ROLE staging_dir;
+GRANT ROLE staging TO GROUP impala_users;
+GRANT ALL ON URI 'hdfs://127.0.0.1:8020/user/impala-user/external_data' TO ROLE staging_dir;</code></pre>
+        </div>
+
+        <div class="example"><h4 class="title sectiontitle">Separating Administrator Responsibility from Read and Write Privileges</h4>
+          
+          <p class="p"> To create a database, you need the full privilege on that database while day-to-day
+            operations on tables within that database can be performed with lower levels of
+            privilege on a specific table. Thus, you might set up separate roles for each database
+            or application: an administrative one that could create or drop the database, and a
+            user-level one that can access only the relevant tables. </p>
+          <p class="p"> In this example, the responsibilities are divided between users in 3 different groups: </p>
+          <ul class="ul">
+            <li class="li"> Members of the <code class="ph codeph">supergroup</code> group have the
+                <code class="ph codeph">training_sysadmin</code> role and so can set up a database named
+                <code class="ph codeph">training</code>. </li>
+
+            <li class="li"> Members of the <code class="ph codeph">impala_users</code> group have the
+                <code class="ph codeph">instructor</code> role and so can create, insert into, and query any
+              tables in the <code class="ph codeph">training</code> database, but cannot create or drop the
+              database itself. </li>
+
+            <li class="li"> Members of the <code class="ph codeph">visitor</code> group have the <code class="ph codeph">student</code>
+              role and so can query those tables in the <code class="ph codeph">training</code> database. </li>
+          </ul>
+          <pre class="pre codeblock"><code>CREATE ROLE training_sysadmin;
+GRANT ROLE training_sysadmin TO GROUP supergroup;
+GRANT ALL ON DATABASE training TO ROLE training_sysadmin;
+
+CREATE ROLE instructor;
+GRANT ROLE instructor TO GROUP impala_users;
+GRANT ALL ON TABLE training.course1 TO ROLE instructor;
+
+CREATE ROLE student;
+GRANT ROLE student TO GROUP visitor;
+GRANT SELECT ON TABLE training.course1 TO ROLE student;</code></pre>
+        </div>
+
+      </div>
+
+    </article>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title9" id="authorization__security_schema">
+
+    <h2 class="title topictitle2" id="ariaid-title9">Setting Up Schema Objects for a Secure Impala Deployment</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        In your role definitions, you must specify privileges at the level of individual
+        databases and tables, or all databases or all tables within a database. To simplify the
+        structure of these rules, plan ahead of time how to name your schema objects so that
+        data with different authorization requirements are divided into separate databases.
+      </p>
+
+      <p class="p">
+        If you are adding security on top of an existing Impala deployment, you can rename
+        tables or even move them between databases using the <code class="ph codeph">ALTER TABLE</code>
+        statement.
+      </p>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title10" id="authorization__sec_ex_default">
+
+    <h2 class="title topictitle2" id="ariaid-title10">The DEFAULT Database in a Secure Deployment</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        Because of the extra emphasis on granular access controls in a secure deployment, you
+        should move any important or sensitive information out of the <code class="ph codeph">DEFAULT</code>
+        database into a named database. Sometimes you might need to give privileges on the
+        <code class="ph codeph">DEFAULT</code> database for administrative reasons, for example, as a place
+        you can reliably specify with a <code class="ph codeph">USE</code> statement when preparing to drop a
+        database.
+      </p>
+
+    </div>
+
+  </article>
+  <article class="topic concept nested1" aria-labelledby="ariaid-title11" id="authorization__sec_ranger_col_masking">
+    <h2 class="title topictitle2" id="ariaid-title11">Ranger Column Masking</h2>
+    <div class="body conbody">
+    <p class="p"> Ranger column masking hides sensitive columnar data in Impala query output. For example, you
+        can define a policy that reveals only the first or last four characters of column data.
+        Column masking is enabled by default. The Impala behavior mimics Hive behavior with respect
+        to column masking. For more information, see the <a class="xref" href="https://cwiki.apache.org/confluence/display/RANGER/Row-level+filtering+and+column-masking+using+Apache+Ranger+policies+in+Apache+Hive" target="_blank">Apache Ranger documentation</a>.</p>
+
+      <div class="p">
+        The following table lists all supported, built-in mask types for defining column masking in
+        a policy using the Ranger REST API. <table class="table" id="sec_ranger_col_masking__table_mask_types"><caption></caption><colgroup><col><col><col><col></colgroup><thead class="thead">
+              <tr class="row">
+                <th class="entry cellrowborder colsep-1 rowsep-1" id="sec_ranger_col_masking__table_mask_types__entry__1">Type</th>
+                <th class="entry cellrowborder colsep-1 rowsep-1" id="sec_ranger_col_masking__table_mask_types__entry__2">Name</th>
+                <th class="entry cellrowborder colsep-1 rowsep-1" id="sec_ranger_col_masking__table_mask_types__entry__3">Description</th>
+                <th class="entry cellrowborder colsep-1 rowsep-1" id="sec_ranger_col_masking__table_mask_types__entry__4">Transformer</th>
+              </tr>
+            </thead><tbody class="tbody">
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__1 ">MASK</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__2 ">Redact</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__3 ">Replace lowercase with 'x', uppercase with 'X', digits with '0'</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__4 ">mask({col})</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__1 ">MASK_SHOW_LAST_4</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__2 ">Partial mask: show last 4</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__3 ">Show last 4 characters; replace rest with 'x'</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__4 ">mask_show_last_n({col}, 4, 'x', 'x', 'x', -1, '1')</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__1 ">MASK_SHOW_FIRST_4</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__2 ">Partial mask: show first 4</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__3 ">Show first 4 characters; replace rest with 'x'</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__4 ">mask_show_first_n({col}, 4, 'x', 'x', 'x', -1, '1')</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__1 ">MASK_HASH</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__2 ">Hash</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__3 ">Hash the value</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__4 ">mask_hash({col})</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__1 ">MASK_NULL</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__2 ">Nullify</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__3 ">Replace with NULL</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__4 "> N/A</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__1 ">MASK_NONE</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__2 ">Unmasked (retain original value)</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__3 ">No masking</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__4 "> N/A</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__1 ">MASK_DATE_SHOW_YEAR</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__2 ">Date: show only year</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__3 ">Date: show only year</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__4 ">mask({col}, 'x', 'x', 'x', -1, '1', 1, 0, -1)</td>
+              </tr>
+              <tr class="row">
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__1 ">CUSTOM</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__2 ">Custom</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__3 ">Custom</td>
+                <td class="entry cellrowborder colsep-1 rowsep-1" headers="sec_ranger_col_masking__table_mask_types__entry__4 ">N/A</td>
+              </tr>
+            </tbody></table>
+      </div>
+    </div>
+  </article>
+<article class="topic concept nested1" aria-labelledby="ariaid-title12" id="authorization__lim_on_mask_functions">
+  <h2 class="title topictitle2" id="ariaid-title12">Limitations on Mask Functions</h2>
+    <div class="body conbody">
+      <p class="p">The mask functions in Hive are implemented through GenericUDFs. Even though Impala users
+        can call Hive UDFs, Impala does not yet support Hive GenericUDFs, so you cannot use Hive's
+        mask functions in Impala. However, Impala has builtin mask functions that are implemented
+        through overloads. In Impala, when using mask functions, not all parameter combinations are
+        supported. These mask functions are introduced in Impala 3.4</p>
+      <p class="p">The following list includes all the implemented overloads.</p>
+      <ul class="ul">
+        <li class="li">Overloads used by Ranger default masking policies,</li>
+        <li class="li">Overloads with simple arguments,</li>
+        <li class="li">Overload with all arguments in <code class="ph codeph">int</code> type for full functionality. Char
+          argument needs to be converted to their ASCII value.</li>
+      </ul>
+      <p class="p">To list the available overloads, use the following query:</p>
+      <pre class="pre codeblock"><code>show functions in _impala_builtins like "mask*";</code></pre>
+      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+        <ul class="ul">
+          <li class="li">An error message that states "<em class="ph i">No matching function with signature: mask...</em>"
+            implies that Impala does not contain the corresponding overload.</li>
+        </ul>
+      </div>
+    </div>
+</article>
+</article></main></body></html>

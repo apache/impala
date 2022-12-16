@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2022" />
+<meta name="DC.rights.owner" content="(C) Copyright 2022" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Managing Disk Space for Impala Data" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_admin.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="disk_space" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Managing Disk Space for Impala Data</title>
+</head>
+<body id="disk_space">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">Managing Disk Space for Impala Data</h1>
+
+
+  
+
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      Although Impala typically works with many large files in an HDFS storage system with
+      plenty of capacity, there are times when you might perform some file cleanup to reclaim
+      space, or advise developers on techniques to minimize space consumption and file
+      duplication.
+    </p>
+
+
+    <ul class="ul">
+      <li class="li">
+        <p class="p">
+          Use compact binary file formats where practical. Numeric and time-based data in
+          particular can be stored in more compact form in binary data files. Depending on the
+          file format, various compression and encoding features can reduce file size even
+          further. You can specify the <code class="ph codeph">STORED AS</code> clause as part of the
+          <code class="ph codeph">CREATE TABLE</code> statement, or <code class="ph codeph">ALTER TABLE</code> with the
+          <code class="ph codeph">SET FILEFORMAT</code> clause for an existing table or partition within a
+          partitioned table. See <a class="xref" href="impala_file_formats.html#file_formats">How Impala Works with Hadoop File Formats</a>
+          for details about file formats, especially <a class="xref" href="impala_parquet.html#parquet">Using the Parquet File Format with Impala Tables</a>.
+          See <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a> and
+          <a class="xref" href="impala_alter_table.html#alter_table">ALTER TABLE Statement</a> for syntax details.
+        </p>
+
+      </li>
+
+
+      <li class="li">
+        <p class="p">
+          You manage underlying data files differently depending on whether the corresponding
+          Impala table is defined as an
+          <a class="xref" href="impala_tables.html#internal_tables">internal</a> or
+          <a class="xref" href="impala_tables.html#external_tables">external</a> table:
+        </p>
+
+        <ul class="ul">
+          <li class="li">
+            Use the <code class="ph codeph">DESCRIBE FORMATTED</code> statement to check if a particular table
+            is internal (managed by Impala) or external, and to see the physical location of the
+            data files in HDFS. See <a class="xref" href="impala_describe.html#describe">DESCRIBE Statement</a>
+            for details.
+          </li>
+
+
+          <li class="li">
+            For Impala-managed (<span class="q">"internal"</span>) tables, use <code class="ph codeph">DROP TABLE</code>
+            statements to remove data files. See
+            <a class="xref" href="impala_drop_table.html#drop_table">DROP TABLE Statement</a> for details.
+          </li>
+
+
+          <li class="li">
+            For tables not managed by Impala (<span class="q">"external"</span> tables), use appropriate
+            HDFS-related commands such as <code class="ph codeph">hadoop fs</code>, <code class="ph codeph">hdfs dfs</code>,
+            or <code class="ph codeph">distcp</code>, to create, move, copy, or delete files within HDFS
+            directories that are accessible by the <code class="ph codeph">impala</code> user. Issue a
+            <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code> statement after adding or
+            removing any files from the data directory of an external table. See
+            <a class="xref" href="impala_refresh.html#refresh">REFRESH Statement</a> for details.
+          </li>
+
+
+          <li class="li">
+            Use external tables to reference HDFS data files in their original location. With
+            this technique, you avoid copying the files, and you can map more than one Impala
+            table to the same set of data files. When you drop the Impala table, the data files
+            are left undisturbed. See <a class="xref" href="impala_tables.html#external_tables">External Tables</a> for
+            details.
+          </li>
+
+
+          <li class="li">
+            Use the <code class="ph codeph">LOAD DATA</code> statement to move HDFS files into the data
+            directory for an Impala table from inside Impala, without the need to specify the
+            HDFS path of the destination directory. This technique works for both internal and
+            external tables. See <a class="xref" href="impala_load_data.html#load_data">LOAD DATA Statement</a> for details.
+          </li>
+
+        </ul>
+
+      </li>
+
+
+      <li class="li">
+        <p class="p">
+          Make sure that the HDFS trashcan is configured correctly. When you remove files from
+          HDFS, the space might not be reclaimed for use by other files until sometime later,
+          when the trashcan is emptied. See <a class="xref" href="impala_drop_table.html#drop_table">DROP TABLE Statement</a> for
+          details. See <a class="xref" href="impala_prereqs.html#prereqs_account">User Account Requirements</a> for permissions needed
+          for the HDFS trashcan to operate correctly.
+        </p>
+
+      </li>
+
+
+      <li class="li">
+        <p class="p">
+          Drop all tables in a database before dropping the database itself. See
+          <a class="xref" href="impala_drop_database.html#drop_database">DROP DATABASE Statement</a> for details.
+        </p>
+
+      </li>
+
+
+      <li class="li">
+        <p class="p">
+          Clean up temporary files after failed <code class="ph codeph">INSERT</code> statements. If an
+          <code class="ph codeph">INSERT</code> statement encounters an error, and you see a directory named
+          <span class="ph filepath">.impala_insert_staging</span> or
+          <span class="ph filepath">_impala_insert_staging</span> left behind in the data directory for the
+          table, it might contain temporary data files taking up space in HDFS. You might be
+          able to salvage these data files, for example if they are complete but could not be
+          moved into place due to a permission error. Or, you might delete those files through
+          commands such as <code class="ph codeph">hadoop fs</code> or <code class="ph codeph">hdfs dfs</code>, to reclaim
+          space before re-trying the <code class="ph codeph">INSERT</code>. Issue <code class="ph codeph">DESCRIBE FORMATTED
+          <var class="keyword varname">table_name</var></code> to see the HDFS path where you can check for
+          temporary files.
+        </p>
+
+      </li>
+
+
+      <li class="li">
+        <p class="p">
+          If you use the Amazon Simple Storage Service (S3) as a place to offload data to reduce
+          the volume of local storage, Impala 2.2.0 and higher can query the data directly from
+          S3. See <a class="xref" href="impala_s3.html#s3">Using Impala with Amazon S3 Object Store</a> for details.
+        </p>
+
+      </li>
+
+    </ul>
+
+
+    <div class="section" id="disk_space__section_vrg_fjb_3jb"><h2 class="title sectiontitle">Configuring Scratch Space for Spilling to Disk</h2>
+
+      Impala uses intermediate files during large
+      sort, join, aggregation, or analytic function operations The files are
+      removed when the operation finishes. You can specify locations of the
+      intermediate files by starting the <span class="keyword cmdname">impalad</span> daemon with
+      the
+          <code class="ph codeph">‑‑scratch_dirs="<var class="keyword varname">path_to_directory</var>"</code>
+      configuration option. By default, intermediate files are stored in the
+      directory <span class="ph filepath">/tmp/impala-scratch</span>.<div class="p" id="disk_space__order_by_scratch_dir">
+        <ul class="ul">
+          <li class="li">
+            You can specify a single directory or a comma-separated list of directories.
+          </li>
+
+
+          <li class="li">
+            You can specify an optional a capacity quota per scratch directory using the colon
+            (:) as the delimiter.
+            <p class="p">
+              The capacity quota of <code class="ph codeph">-1</code> or <code class="ph codeph">0</code> is the same as no
+              quota for the directory.
+            </p>
+
+          </li>
+
+
+          <li class="li">
+            The scratch directories must be on the local filesystem, not in HDFS.
+          </li>
+
+
+          <li class="li">
+            You might specify different directory paths for different hosts, depending on the
+            capacity and speed of the available storage devices.
+          </li>
+
+        </ul>
+
+      </div>
+
+
+      <p class="p">
+        If there is less than 1 GB free on the filesystem where that directory resides, Impala
+        still runs, but writes a warning message to its log.
+      </p>
+
+
+      <p class="p">
+        Impala successfully starts (with a warning written to the log) if it cannot create or
+        read and write files in one of the scratch directories.
+      </p>
+
+
+      <div class="p">
+        The following are examples for specifying scratch directories.
+        
+<div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="disk_space__table_a4d_myg_3jb" class="table" frame="border" border="1" rules="all"><colgroup><col /><col /></colgroup><thead class="thead" style="text-align:left;">
+              <tr class="row">
+                <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d66592e320">
+                  Config option
+                </th>
+
+                <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d66592e323">
+                  Description
+                </th>
+
+              </tr>
+
+            </thead>
+<tbody class="tbody">
+              <tr class="row">
+                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d66592e320 ">
+                  <code class="ph codeph">--scratch_dirs=/dir1,/dir2</code>
+                </td>
+
+                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d66592e323 ">
+                  Use /dir1 and /dir2 as scratch directories with no capacity quota.
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d66592e320 ">
+                  <code class="ph codeph">--scratch_dirs=/dir1,/dir2:25G</code>
+                </td>
+
+                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d66592e323 ">
+                  Use /dir1 and /dir2 as scratch directories with no capacity quota on /dir1 and
+                  the 25GB quota on /dir2.
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d66592e320 ">
+                  <code class="ph codeph">--scratch_dirs=/dir1:5MB,/dir2</code>
+                </td>
+
+                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d66592e323 ">
+                  Use /dir1 and /dir2 as scratch directories with the capacity quota of 5MB on
+                  /dir1 and no quota on /dir2.
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d66592e320 ">
+                  <code class="ph codeph">--scratch_dirs=/dir1:-1,/dir2:0</code>
+                </td>
+
+                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d66592e323 ">
+                  Use /dir1 and /dir2 as scratch directories with no capacity quota.
+                </td>
+
+              </tr>
+
+            </tbody>
+</table>
+</div>
+
+      </div>
+
+
+      <p class="p">
+        Allocation from a scratch directory will fail if the specified limit for the directory
+        is exceeded.
+      </p>
+
+
+      <p class="p">
+        If Impala encounters an error reading or writing files in a scratch directory during a
+        query, Impala logs the error, and the query fails.
+      </p>
+
+
+    </div>
+
+    <div class="section"><h2 class="title sectiontitle">Priority Based Scratch Directory Selection</h2>
+      
+      <p class="p">The location of the intermediate files are configured by starting the impalad daemon with
+        the flag ‑‑scratch_dirs="path_to_directory". Currently this startup flag uses the configured
+        scratch directories in a round robin fashion. Automatic selection of scratch directories in
+        a round robin fashion may not always be ideal in every situation since these directories
+        could come from different classes of storage system volumes having different performance
+        characteristics (SSD vs HDD, local storage vs network attached storage, etc.). To optimize
+        your workload, you have an option to configure the priority of the scratch directories based
+        on your storage system configuration.</p>
+
+      <p class="p">The scratch directories will be selected for spilling based on how you configure the
+        priorities of the directories and if you provide the same priority for multiple directories
+        then the directories will be selected in a round robin fashion.</p>
+
+      <div class="p">The valid formats for specifying the priority directories are as shown here:
+        <pre class="pre codeblock"><code>
+          &lt;dir-path&gt;:&lt;limit&gt;:&lt;priority&gt;
+          &lt;dir-path&gt;::&lt;priority&gt;
+</code></pre></div>
+
+        <p class="p">Example:</p>
+
+      <div class="p">
+        <pre class="pre codeblock"><code>
+        /dir1:200GB:0
+        /dir1::0
+</code></pre>
+      </div>
+
+      <div class="p">The following formats use the default priority:
+        <pre class="pre codeblock"><code>
+        /dir1
+        /dir1:200GB
+        /dir1:200GB:
+</code></pre>
+      </div>
+
+      <p class="p">In the example below, dir1 will be used as a spill victim until it is full and then dir2, dir3,
+        and dir4 will be used in a round robin fashion.</p>
+
+      <div class="p">
+        <pre class="pre codeblock"><code>‑‑scratch_dirs="/dir1:200GB:0, /dir2:1024GB:1, /dir3:1024GB:1, /dir4:1024GB:1"
+</code></pre>
+      </div>
+
+    </div>
+
+    <div class="section"><h2 class="title sectiontitle">Increasing Scratch Capacity</h2>
+      
+      <p class="p"> You can compress the data spilled to disk to increase the effective scratch capacity. You
+        typically more than double capacity using compression and reduce spilling to disk. Use the
+        --disk_spill_compression_codec and –-disk_spill_punch_holes startup options. The
+        --disk_spill_compression_codec takes any value supported by the COMPRESSION_CODEC query
+        option. The value is not case-sensitive. A value of <code class="ph codeph">ZSTD</code> or
+          <code class="ph codeph">LZ4</code> is recommended (default is NONE).</p>
+
+      <p class="p">For example:</p>
+
+<pre class="pre codeblock"><code>--disk_spill_compression_codec=LZ4
+--disk_spill_punch_holes=true
+</code></pre>
+      <p class="p">
+        If you set <code class="ph codeph">--disk_spill_compression_codec</code> to a value other than <code class="ph codeph">NONE</code>, you must set <code class="ph codeph">--disk_spill_punch_holes</code> to true.
+      </p>
+
+      <p class="p">
+        The hole punching feature supported by many filesystems is used to reclaim space in scratch files during execution
+        of a query that spills to disk. This results in lower scratch space requirements in many cases, especially when
+        combined with disk spill compression. When this option is not enabled, scratch space is still recycled by a query,
+        but less effectively in many cases.
+      </p>
+
+      <p class="p"> You can specify a compression level for <code class="ph codeph">ZSTD</code> only. For example: </p>
+
+<pre class="pre codeblock"><code>--disk_spill_compression_codec=ZSTD:10
+--disk_spill_punch_holes=true
+</code></pre>
+      <p class="p"> Compression levels from 1 up to 22 (default 3) are supported for <code class="ph codeph">ZSTD</code>.
+        The lower the compression level, the faster the speed at the cost of compression ratio.</p>
+
+    </div>
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_admin.html">Impala Administration</a></div>
+</div>
+</div></body>
+</html>

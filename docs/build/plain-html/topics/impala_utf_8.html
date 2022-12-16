@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2022" />
+<meta name="DC.rights.owner" content="(C) Copyright 2022" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="UTF-8 Support" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_langref.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="utf_8" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>UTF-8 Support</title>
+</head>
+<body id="utf_8">
+
+ <h1 class="title topictitle1" id="ariaid-title1">UTF-8 Support</h1>
+
+ 
+ <div class="body conbody">
+  <p class="p">Impala has traditionally offered a single-byte binary character set for STRING data type and
+   the character data is encoded in ASCII character set. Prior to this release, Impala was
+   incompatible with Hive in some functions applying on non-ASCII strings. E.g. length() in Impala
+   used to return the length of bytes of the string, while length() in Hive returns the length of
+   UTF-8 characters of the string. UTF-8 characters (code points) are assembled in variant-length
+   bytes (1~4 bytes), so the results differ when there are non-ASCII characters in the string. This
+   release provides a UTF-8 aware behavior for Impala STRING type to get consistent behavior with
+   Hive on UTF-8 strings using a query option.</p>
+
+  <p class="p">UTF-8 support allows you to read and write UTF-8 from standard formats like Parquet and ORC,
+   thus improving interoperability with other engines that also support those standard formats.</p>
+
+ </div>
+
+ <div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref.html">Impala SQL Language Reference</a></div>
+</div>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="turning_ON">
+  <h2 class="title topictitle2" id="ariaid-title2">Turning ON the UTF-8 behavior</h2>
+
+  <div class="body conbody">
+   <p class="p">You can use the new query option, UTF8_MODE, to turn on/off the UTF-8 aware behavior. The
+    query option can be set globally, or at per session level. Only queries with UTF8_MODE=true will
+    have UTF-8 aware behaviors.</p>
+
+   <div class="p">
+    <div class="note note"><span class="notetitle">Note:</span> 
+          <ul class="ul" id="turning_ON__ul_vs2_qrx_p5b">
+            <li class="li">If the query option UTF8_MODE is turned on globally, existing queries that depend on
+              the original binary behavior need to explicitly set UTF8_MODE=false.</li>
+
+            <li class="li">Impala Daemons should be deployed on nodes using the same Glibc version since
+              different Glibc version supports different Unicode standard version and also ensure
+              that the en_US.UTF-8 locale is installed in the nodes. Not using the same Glibc
+              version might result in inconsistent UTF-8 behavior when UTF8_MODE is set to
+              true.</li>
+
+          </ul>
+
+        </div>
+</div>
+
+  </div>
+
+ </div>
+
+ <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="list_string_functions">
+  <h2 class="title topictitle2" id="ariaid-title3">List of STRING Functions</h2>
+
+  <div class="body conbody">
+   <p class="p">The new query option introduced will turn on the UTF-8 aware behavior of the following string
+    functions:</p>
+
+   <ul class="ul">
+    <li class="li">LENGTH(STRING a)<ul class="ul" id="list_string_functions__ul_jgr_x1l_gtb">
+      <li class="li">returns the number of UTF-8 characters instead of bytes</li>
+
+     </ul>
+</li>
+
+    <li class="li">SUBSTR(STRING a, INT start [, INT len])</li>
+
+    <li class="li">SUBSTRING(STRING a, INT start [, INT len])()<ul class="ul" id="list_string_functions__ul_tkh_x1l_gtb">
+      <li class="li">the substring start position and length is counted by UTF-8 characters instead of
+       bytes</li>
+
+     </ul>
+</li>
+
+    <li class="li">REVERSE(STRING a)<ul class="ul" id="list_string_functions__ul_o1d_jbl_gtb">
+      <li class="li">the unit of the operation is a UTF-8 character, ie. it won't reverse bytes inside a UTF-8
+       character.<div class="p">
+        <div class="note note"><span class="notetitle">Note:</span> The results of reverse("最快的SQL引擎") used to be "��敼�LQS��竿倜�" and now
+         "擎引LQS的快最".</div>
+</div>
+</li>
+
+     </ul>
+</li>
+
+    <li class="li">INSTR(STRING str, STRING substr[, BIGINT position[, BIGINT occurrence]])</li>
+
+    <li class="li">LOCATE(STRING substr, STRING str[, INT pos])<ul class="ul" id="list_string_functions__ul_y1p_sbl_gtb">
+      <li class="li">These functions have an optional position argument. The return values are also positions
+       in the string. In UTF-8 mode, these positions are counted by UTF-8 characters instead of
+       bytes.</li>
+
+     </ul>
+</li>
+
+    <li class="li">mask functions<ul class="ul" id="list_string_functions__ul_qmg_5bl_gtb">
+      <li class="li">The unit of the operation is a UTF-8 character, ie. they won't mask the string
+       byte-to-byte.</li>
+
+     </ul>
+</li>
+
+    <li class="li">upper/lower/initcap<ul class="ul" id="list_string_functions__ul_x3c_wbl_gtb">
+      <li class="li">These functions will recognize non-ascii characters and transform them based on the
+       current locale used by the Impala process.</li>
+
+     </ul>
+</li>
+
+   </ul>
+
+  </div>
+
+ </div>
+
+ <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="limitations">
+  <h2 class="title topictitle2" id="ariaid-title4">Limitations</h2>
+
+  <div class="body conbody">
+   <ul class="ul" id="limitations__ul_dhh_dcl_gtb">
+    <li class="li">Use the UTF8_MODE option only when needed since the performance of UTF_8 is not optimized
+     yet. It is only an experimental feature.</li>
+
+    <li class="li">UTF-8 support for CHAR and VARCHAR types is not implemented yet. So VARCHAR(N) will still
+     return N bytes instead of N UTF-8 characters.</li>
+
+   </ul>
+
+  </div>
+
+ </div>
+
+</body>
+</html>
