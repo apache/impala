@@ -44,6 +44,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -6284,11 +6285,11 @@ public class CatalogOpExecutor {
       Reference<Boolean> dbWasAdded = new Reference<Boolean>(false);
       // Thrift representation of the result of the invalidate/refresh operation.
       TCatalogObject updatedThriftTable = null;
+      TableName tblName = TableName.fromThrift(req.getTable_name());
+      Table tbl = catalog_.getTable(tblName.getDb(), tblName.getTbl());
       if (req.isIs_refresh()) {
-        TableName tblName = TableName.fromThrift(req.getTable_name());
         // Quick check to see if the table exists in the catalog without triggering
         // a table load.
-        Table tbl = catalog_.getTable(tblName.getDb(), tblName.getTbl());
         if (tbl != null) {
           // If the table is not loaded, no need to perform refresh after the initial
           // metadata load.
@@ -6347,6 +6348,11 @@ public class CatalogOpExecutor {
             req.getTable_name().getTable_name());
       }
 
+      if (BackendConfig.INSTANCE.enableReloadEvents()) {
+        // fire event for refresh event
+        fireReloadEventHelper(req, updatedThriftTable, tblName, tbl);
+      }
+
       // Return the TCatalogObject in the result to indicate this request can be
       // processed as a direct DDL operation.
       if (tblWasRemoved.getRef()) {
@@ -6383,6 +6389,52 @@ public class CatalogOpExecutor {
     }
     resp.getResult().setStatus(new TStatus(TErrorCode.OK, new ArrayList<String>()));
     return resp;
+  }
+
+  /**
+   * Helper class for refresh event.
+   * This class invokes metastore shim's fireReloadEvent to fire event to HMS
+   * @param req - request object for TResetMetadataRequest.
+   * @param updatedThriftTable - updated thrift table after refresh query
+   * @param tblName
+   * @param tbl
+   */
+  private void fireReloadEventHelper(TResetMetadataRequest req,
+      TCatalogObject updatedThriftTable, TableName tblName, Table tbl) {
+    List<String> partVals = null;
+    if (req.isSetPartition_spec()) {
+      partVals = req.getPartition_spec().stream().
+          map(partSpec -> partSpec.getValue()).collect(Collectors.toList());
+    }
+    try {
+      // Get new catalog version for table refresh/invalidate.
+      long newCatalogVersion = updatedThriftTable.getCatalog_version();
+      Map<String, String> tableParams = new HashMap<>();
+      tableParams.put(MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(),
+          catalog_.getCatalogServiceId());
+      tableParams.put(MetastoreEventPropertyKey.CATALOG_VERSION.getKey(),
+          String.valueOf(newCatalogVersion));
+      MetastoreShim.fireReloadEventHelper(catalog_.getMetaStoreClient(),
+          req.isIs_refresh(), partVals, tblName.getDb(), tblName.getTbl(),
+          tableParams);
+      if (req.isIs_refresh()) {
+        if (catalog_.tryLock(tbl, true, 600000)) {
+          catalog_.addVersionsForInflightEvents(false, tbl, newCatalogVersion);
+        } else {
+          LOG.warn(String.format("Couldn't obtain a version lock for the table: %s. " +
+              "Self events may go undetected in that case",
+              tbl.getName()));
+        }
+      }
+    } catch (TException e) {
+      LOG.error(String.format(HMS_RPC_ERROR_FORMAT_STR,
+          "fireReloadEvent") + e.getMessage());
+    } finally {
+      if (tbl.isWriteLockedByCurrentThread()) {
+        tbl.releaseWriteLock();
+        catalog_.getLock().writeLock().unlock();
+      }
+    }
   }
 
   /**

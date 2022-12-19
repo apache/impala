@@ -356,6 +356,15 @@ public class BackendConfig {
     backendCfg_.enable_sync_to_latest_event_on_ddls = flag;
   }
 
+  public boolean enableReloadEvents() {
+    return backendCfg_.enable_reload_events;
+  }
+
+  @VisibleForTesting
+  public void setEnableReloadEvents(boolean flag) {
+    backendCfg_.enable_reload_events = flag;
+  }
+
   public boolean pullTableTypesAndComments() {
     return backendCfg_.pull_table_types_and_comments;
   }

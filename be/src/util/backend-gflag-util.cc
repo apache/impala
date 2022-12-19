@@ -101,6 +101,7 @@ DECLARE_bool(hms_event_incremental_refresh_transactional_table);
 DECLARE_bool(auto_check_compaction);
 DECLARE_bool(enable_sync_to_latest_event_on_ddls);
 DECLARE_bool(pull_table_types_and_comments);
+DECLARE_bool(enable_reload_events);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -335,6 +336,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_use_hms_column_order_for_hbase_tables(
       FLAGS_use_hms_column_order_for_hbase_tables);
   cfg.__set_ignored_dir_prefix_list(FLAGS_ignored_dir_prefix_list);
+  cfg.__set_enable_reload_events(FLAGS_enable_reload_events);
   return Status::OK();
 }
 

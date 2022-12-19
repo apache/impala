@@ -226,6 +226,45 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     self.__run_self_events_test(unique_database, True)
     self.__run_self_events_test(unique_database, False)
 
+  @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=1"
+                                                  " --enable_reload_events=true")
+  def test_refresh_invalidate_events(self, unique_database):
+    """Test is to verify Impala-11808, refresh/invalidate commands should generate a
+    Reload event in HMS and CatalogD's event processor should process this event.
+    """
+    test_reload_table = "test_reload_table"
+    self.client.execute(
+      "create table {}.{} (i int) partitioned by (year int) "
+        .format(unique_database, test_reload_table))
+    self.client.execute(
+      "insert into {}.{} partition (year=2022) values (1),(2),(3)"
+        .format(unique_database, test_reload_table))
+    self.client.execute(
+      "insert into {}.{} partition (year=2023) values (1),(2),(3)"
+        .format(unique_database, test_reload_table))
+    EventProcessorUtils.wait_for_event_processing(self)
+
+    def check_self_events(query):
+      tbls_refreshed_before, partitions_refreshed_before, \
+          events_skipped_before = self.__get_self_event_metrics()
+      last_event_id = EventProcessorUtils.get_current_notification_id(self.hive_client)
+      self.client.execute(query)
+      # Check if there is a reload event fired after refresh query.
+      events = EventProcessorUtils.get_next_notification(self.hive_client, last_event_id)
+      assert len(events) == 1
+      last_event = events[0]
+      assert last_event.dbName == unique_database
+      assert last_event.tableName == test_reload_table
+      assert last_event.eventType == "RELOAD"
+      EventProcessorUtils.wait_for_event_processing(self)
+      tbls_refreshed_after, partitions_refreshed_after, \
+          events_skipped_after = self.__get_self_event_metrics()
+      assert events_skipped_after > events_skipped_before
+
+    check_self_events("refresh {}.{} partition(year=2022)"
+        .format(unique_database, test_reload_table))
+    check_self_events("refresh {}.{}".format(unique_database, test_reload_table))
+
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=1")
   def test_event_batching(self, unique_database):
     """Runs queries which generate multiple ALTER_PARTITION events which must be

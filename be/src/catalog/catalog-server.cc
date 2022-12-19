@@ -124,6 +124,14 @@ DEFINE_bool(enable_sync_to_latest_event_on_ddls, false, "This configuration is "
     "(if enabled). If this config is enabled, then the flag invalidate_hms_cache_on_ddls "
     "should be disabled");
 
+DEFINE_bool(enable_reload_events, false, "This configuration is used to fire a "
+    "refresh/invalidate table event to the HMS such that other event processors "
+    "(such as other Impala catalogds) that poll HMS notification logs can process "
+    "this event. The default value is false, so impala will not fire this "
+    "event. If enabled, impala will fire this event and other catalogD will process it."
+    "This config only affects the firing of the reload event. Processing of reload "
+    "event will always happen");
+
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_subscriber_port);
 DECLARE_int32(state_store_port);

@@ -82,6 +82,7 @@ import org.apache.hadoop.hive.metastore.messaging.MessageEncoder;
 import org.apache.hadoop.hive.metastore.messaging.MessageFactory;
 import org.apache.hadoop.hive.metastore.messaging.MessageSerializer;
 import org.apache.hadoop.hive.metastore.messaging.json.JSONDropDatabaseMessage;
+import org.apache.hadoop.hive.metastore.messaging.ReloadMessage;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 import org.apache.hadoop.hive.ql.metadata.formatting.TextMetaDataTable;
 import org.apache.impala.analysis.TableName;
@@ -498,6 +499,70 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
       return Collections.EMPTY_LIST;
     }
     return response.getEventIds();
+  }
+
+  /**
+   *  Fires a reload event to HMS notification log. In Hive-3 the relaod event
+   *  in HMS corresponds to refresh table or invalidate metadata of table in impala.
+   *
+   * @param msClient Metastore client,
+   * @param isRefresh if this flag is set to true then it is a refresh query, else it
+   *                  is an invalidate metadata query.
+   * @param partVals The partition list corresponding to
+   *                                 the table, used by Apache Hive 3
+   * @param dbName
+   * @param tableName
+   * @return a list of eventIds for the reload events
+   */
+  @VisibleForTesting
+  public static List<Long> fireReloadEventHelper(MetaStoreClient msClient,
+      boolean isRefresh, List<String> partVals, String dbName, String tableName,
+      Map<String, String> selfEventParams) throws TException {
+    Preconditions.checkNotNull(msClient);
+    Preconditions.checkNotNull(dbName);
+    Preconditions.checkNotNull(tableName);
+    FireEventRequestData data = new FireEventRequestData();
+    data.setRefreshEvent(isRefresh);
+    FireEventRequest rqst = new FireEventRequest(true, data);
+    rqst.setDbName(dbName);
+    rqst.setTableName(tableName);
+    rqst.setPartitionVals(partVals);
+    rqst.setTblParams(selfEventParams);
+    FireEventResponse response = msClient.getHiveClient().fireListenerEvent(rqst);
+    if (!response.isSetEventIds()) {
+      LOG.error("FireEventResponse does not have event ids set for table {}.{}. This "
+              + "may cause the table to unnecessarily be refreshed when the " +
+              "refresh/invalidate event is received.", dbName, tableName);
+      return Collections.EMPTY_LIST;
+    }
+    return response.getEventIds();
+  }
+
+  /**
+   *  This method extracts the table, partition, and isRefresh fields from the
+   *  notification event and returns them in a map.
+   *
+   * @param event Metastore notification event,
+   * @return a Map of fields required for the reload event.
+   */
+  public static Map<String, Object> getFieldsFromReloadEvent(NotificationEvent event)
+      throws MetastoreNotificationException{
+    ReloadMessage reloadMessage =
+        MetastoreEventsProcessor.getMessageDeserializer()
+            .getReloadMessage(event.getMessage());
+    Map<String, Object> updatedFields = new HashMap<>();
+    try {
+      org.apache.hadoop.hive.metastore.api.Table msTbl = Preconditions.checkNotNull(
+          reloadMessage.getTableObj());
+      Partition reloadPartition = reloadMessage.getPtnObj();
+      boolean isRefresh = reloadMessage.isRefreshEvent();
+      updatedFields.put("table", msTbl);
+      updatedFields.put("partition", reloadPartition);
+      updatedFields.put("isRefresh", isRefresh);
+    } catch (Exception e) {
+      throw new MetastoreNotificationException(e);
+    }
+    return updatedFields;
   }
 
   /**

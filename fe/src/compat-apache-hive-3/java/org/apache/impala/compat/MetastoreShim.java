@@ -426,6 +426,24 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
   }
 
   /**
+   *   CDP Hive-3 only function.
+   */
+  @VisibleForTesting
+  public static List<Long> fireReloadEventHelper(MetaStoreClient msClient,
+      boolean isRefresh, List<String> partVals, String dbName, String tableName,
+      Map<String, String> selfEventParams) throws TException {
+    throw new UnsupportedOperationException("Reload event is not supported.");
+  }
+
+  /**
+   *   CDP Hive-3 only function.
+   */
+  public static Map<String, Object> getFieldsFromReloadEvent(NotificationEvent event)
+      throws MetastoreNotificationException {
+    throw new UnsupportedOperationException("Reload event is not supported.");
+  }
+
+  /**
    * Use thrift API directly instead of HiveMetastoreClient#getNextNotification because
    * the HMS client can throw an IllegalStateException when there is a gap between the
    * eventIds returned.

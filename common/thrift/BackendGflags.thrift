@@ -229,4 +229,6 @@ struct TBackendGflags {
   102: required bool use_hms_column_order_for_hbase_tables
 
   103: required string ignored_dir_prefix_list
+
+  104: required bool enable_reload_events
 }
