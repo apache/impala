@@ -731,6 +731,17 @@ bool DataCache::Partition::InsertIntoCache(const Slice& key, CacheFile* cache_fi
     }
   }
 
+  // IMPALA-10971: These metrics need to be incremented prior to the Insert(), because
+  // the Insert() can fail and instantly evict the entry. When that happens,
+  // the total bytes and num entries are decremented. Without this corresponding
+  // increment, the counts will be incorrect.
+  // Trace replays do not keep metrics
+  if (LIKELY(!trace_replay_)) {
+    ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_TOTAL_BYTES->Increment(charge_len);
+    ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_NUM_ENTRIES->Increment(1);
+    ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_NUM_WRITES->Increment(1);
+  }
+
   // Insert the new entry into the cache.
   CacheEntry entry(cache_file, insertion_offset, buffer_len, checksum);
   memcpy(meta_cache_->MutableValue(&pending_handle), &entry, sizeof(CacheEntry));
@@ -739,15 +750,10 @@ bool DataCache::Partition::InsertIntoCache(const Slice& key, CacheFile* cache_fi
   if (UNLIKELY(handle.get() == nullptr)){
     // Trace replays do not keep metrics
     if (LIKELY(!trace_replay_)) {
+      // EvictedEntry() already ran and decremented the other counters.
       ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_INSTANT_EVICTIONS->Increment(1);
     }
     return false;
-  }
-  // Trace replays do not keep metrics
-  if (LIKELY(!trace_replay_)) {
-    ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_TOTAL_BYTES->Increment(charge_len);
-    ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_NUM_ENTRIES->Increment(1);
-    ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_NUM_WRITES->Increment(1);
   }
   return true;
 }

@@ -177,3 +177,38 @@ class TestDataCache(CustomClusterTestSuite):
       start_args=CACHE_START_ARGS, cluster_size=1)
   def test_data_cache_disablement_lirs(self, vector):
     self.__test_data_cache_disablement(vector)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=get_impalad_args("LIRS", high_write_concurrency=False),
+      start_args="--data_cache_dir=/tmp --data_cache_size=9MB",
+      cluster_size=1)
+  def test_data_cache_lirs_instant_evictions(self, vector):
+    # The setup for this test is intricate. For Allocate() to succeed, the request
+    # needs to be smaller than the protected size (95% of the cache). For Insert() to
+    # fail, the request needs to be larger than the unprotected size (5% of the cache).
+    # So, for an 8MB cache store to fail, the cache needs to be > 8.4MB (8MB / 0.95)
+    # and less than 160MB (8MB / 0.05). This sets it to 9MB, which should result in
+    # 8MB cache inserts to be instantly evicted.
+    QUERY = "select count(*) from tpch.lineitem"
+    self.execute_query(QUERY)
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-miss-bytes') > 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-miss-count') > 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-total-bytes') >= 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-entries') >= 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-writes') >= 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-instant-evictions') > 0
+
+    # Run the query multiple times and verify that none of the counters go negative
+    instant_evictions_before = \
+        self.get_metric('impala-server.io-mgr.remote-data-cache-instant-evictions')
+    for i in range(10):
+      self.execute_query(QUERY)
+    instant_evictions_after = \
+        self.get_metric('impala-server.io-mgr.remote-data-cache-instant-evictions')
+    assert instant_evictions_after - instant_evictions_before > 0
+
+    # All the counters remain positive
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-entries') >= 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-writes') >= 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-total-bytes') >= 0
