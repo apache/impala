@@ -19,7 +19,6 @@ package org.apache.impala.catalog;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -46,7 +45,6 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.ForeignKeysRequest;
-import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PrimaryKeysRequest;
@@ -60,6 +58,7 @@ import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
@@ -239,6 +238,11 @@ public class HdfsTable extends Table implements FeFsTable {
   // Declared as protected to allow third party extension visibility.
   protected final Map<Long, HdfsPartition> partitionMap_ = new HashMap<>();
 
+  // The data and delete files of the table, for Iceberg tables only.
+  private GroupedContentFiles icebergFiles_;
+  // Whether the data and delete files of The Iceberg tables can be outside the location.
+  private boolean canDataBeOutsideOfTableLocation_;
+
   // Map of partition name to HdfsPartition object. Used for speeding up
   // table metadata loading. It is only populated if this table object is stored in
   // catalog server.
@@ -329,10 +333,19 @@ public class HdfsTable extends Table implements FeFsTable {
   // to determine if we can skip the table from the topic update.
   private long lastVersionSeenByTopicUpdate_ = -1;
 
+  public void setIcebergFiles(GroupedContentFiles icebergFiles) {
+    icebergFiles_ = icebergFiles;
+  }
+
+  public void setCanDataBeOutsideOfTableLocation(
+      boolean canDataBeOutsideOfTableLocation) {
+    canDataBeOutsideOfTableLocation_ = canDataBeOutsideOfTableLocation;
+  }
+
   // Represents a set of storage-related statistics aggregated at the table or partition
   // level.
   public final static class FileMetadataStats {
-    // Nuber of files in a table/partition.
+    // Number of files in a table/partition.
     public long numFiles;
     // Number of blocks in a table/partition.
     public long numBlocks;
@@ -382,6 +395,8 @@ public class HdfsTable extends Table implements FeFsTable {
     super(msTbl, db, name, owner);
     partitionLocationCompressor_ =
         new HdfsPartitionLocationCompressor(numClusteringCols_);
+    icebergFiles_ = new GroupedContentFiles();
+    canDataBeOutsideOfTableLocation_ = false;
   }
 
   @Override // FeFsTable
@@ -778,7 +793,8 @@ public class HdfsTable extends Table implements FeFsTable {
     // have refreshed the top-level table properties without refreshing the files.
     new ParallelFileMetadataLoader(getFileSystem(), partBuilders, validWriteIds_,
         validTxnList, Utils.shouldRecursivelyListPartitions(this),
-        getHostIndex(), debugActions, logPrefix).load();
+        getHostIndex(), debugActions, logPrefix, icebergFiles_,
+        canDataBeOutsideOfTableLocation_).load();
 
     // TODO(todd): would be good to log a summary of the loading process:
     // - how many block locations did we reuse/load individually/load via batch
@@ -1213,7 +1229,7 @@ public class HdfsTable extends Table implements FeFsTable {
    */
   public void load(boolean reuseMetadata, IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl,
-      boolean loadParitionFileMetadata, boolean loadTableSchema,
+      boolean loadPartitionFileMetadata, boolean loadTableSchema,
       boolean refreshUpdatedPartitions, Set<String> partitionsToUpdate,
       @Nullable String debugAction, @Nullable Map<String, Long> partitionToEventId,
       String reason) throws TableLoadingException {
@@ -1247,10 +1263,10 @@ public class HdfsTable extends Table implements FeFsTable {
         if (reuseMetadata) {
           // Incrementally update this table's partitions and file metadata
           Preconditions.checkState(
-              partitionsToUpdate == null || loadParitionFileMetadata);
+              partitionsToUpdate == null || loadPartitionFileMetadata);
           storageMetadataLoadTime_ += updateMdFromHmsTable(msTbl);
           if (msTbl.getPartitionKeysSize() == 0) {
-            if (loadParitionFileMetadata) {
+            if (loadPartitionFileMetadata) {
               storageMetadataLoadTime_ += updateUnpartitionedTableFileMd(client,
                   debugAction);
             } else {  // Update the single partition stats in case table stats changes.
@@ -1258,7 +1274,7 @@ public class HdfsTable extends Table implements FeFsTable {
             }
           } else {
             storageMetadataLoadTime_ += updatePartitionsFromHms(
-                client, partitionsToUpdate, loadParitionFileMetadata,
+                client, partitionsToUpdate, loadPartitionFileMetadata,
                 refreshUpdatedPartitions, partitionToEventId, debugAction);
           }
           LOG.info("Incrementally loaded table metadata for: " + getFullName());
@@ -1294,6 +1310,12 @@ public class HdfsTable extends Table implements FeFsTable {
       }
       updateTableLoadingTime();
     }
+  }
+
+  public void load(IMetaStoreClient client,
+      org.apache.hadoop.hive.metastore.api.Table msTbl, String reason)
+      throws TableLoadingException {
+    load(false, client, msTbl, true, true, false, null, null, null, reason);
   }
 
   /**

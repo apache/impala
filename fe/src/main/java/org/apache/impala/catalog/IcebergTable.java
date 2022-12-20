@@ -323,7 +323,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
   }
 
   /**
-   * Loads the metadata of a Iceberg table.
+   * Loads the metadata of an Iceberg table.
    * <p>
    * Schema and partitioning schemes are loaded directly from Iceberg whereas column stats
    * are loaded from HMS. The function also updates the table schema in HMS in order to
@@ -353,10 +353,12 @@ public class IcebergTable extends Table implements FeIcebergTable {
         icebergParquetRowGroupSize_ = Utils.getIcebergParquetRowGroupSize(msTbl);
         icebergParquetPlainPageSize_ = Utils.getIcebergParquetPlainPageSize(msTbl);
         icebergParquetDictPageSize_ = Utils.getIcebergParquetDictPageSize(msTbl);
-        hdfsTable_
-            .load(false, msClient, msTable_, true, true, false, null, null,null, reason);
-        GroupedContentFiles icebergFiles = IcebergUtil
-            .getIcebergFiles(this, new ArrayList<>(), /*timeTravelSpec=*/null);
+        GroupedContentFiles icebergFiles = IcebergUtil.getIcebergFiles(this,
+            new ArrayList<>(), /*timeTravelSpec=*/null);
+        hdfsTable_.setIcebergFiles(icebergFiles);
+        hdfsTable_.setCanDataBeOutsideOfTableLocation(
+            !Utils.requiresDataFilesInTableLocation(this));
+        hdfsTable_.load(msClient, msTable_, reason);
         fileStore_ = Utils.loadAllPartition(this, icebergFiles);
         partitionStats_ = Utils.loadPartitionStats(this, icebergFiles);
         setIcebergTableStats();

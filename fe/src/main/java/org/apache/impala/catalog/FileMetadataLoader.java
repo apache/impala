@@ -55,9 +55,9 @@ public class FileMetadataLoader {
   private final static Logger LOG = LoggerFactory.getLogger(FileMetadataLoader.class);
   private static final Configuration CONF = new Configuration();
 
-  private final Path partDir_;
-  private final boolean recursive_;
-  private final ImmutableMap<String, FileDescriptor> oldFdsByRelPath_;
+  protected final Path partDir_;
+  protected final boolean recursive_;
+  protected final ImmutableMap<String, FileDescriptor> oldFdsByPath_;
   private final ListMap<TNetworkAddress> hostIndex_;
   @Nullable
   private final ValidWriteIdList writeIds_;
@@ -66,13 +66,13 @@ public class FileMetadataLoader {
   @Nullable
   private final HdfsFileFormat fileFormat_;
 
-  private boolean forceRefreshLocations = false;
+  protected boolean forceRefreshLocations = false;
 
   private List<FileDescriptor> loadedFds_;
   private List<FileDescriptor> loadedInsertDeltaFds_;
   private List<FileDescriptor> loadedDeleteDeltaFds_;
-  private LoadStats loadStats_;
-  private String debugAction_;
+  protected LoadStats loadStats_;
+  protected String debugAction_;
 
   /**
    * @param partDir the dir for which to fetch file metadata
@@ -97,7 +97,7 @@ public class FileMetadataLoader {
     partDir_ = Preconditions.checkNotNull(partDir);
     recursive_ = recursive;
     hostIndex_ = Preconditions.checkNotNull(hostIndex);
-    oldFdsByRelPath_ = Maps.uniqueIndex(oldFds, FileDescriptor::getPath);
+    oldFdsByPath_ = Maps.uniqueIndex(oldFds, FileDescriptor::getPath);
     writeIds_ = writeIds;
     validTxnList_ = validTxnList;
     fileFormat_ = fileFormat;
@@ -174,45 +174,30 @@ public class FileMetadataLoader {
     // assume that most _can_ be reused, in which case it's faster to _not_ prefetch
     // the locations.
     boolean listWithLocations = FileSystemUtil.supportsStorageIds(fs) &&
-        (oldFdsByRelPath_.isEmpty() || forceRefreshLocations);
+        (oldFdsByPath_.isEmpty() || forceRefreshLocations);
 
     String msg = String.format("%s file metadata%s from path %s",
-        oldFdsByRelPath_.isEmpty() ? "Loading" : "Refreshing",
+        oldFdsByPath_.isEmpty() ? "Loading" : "Refreshing",
         listWithLocations ? " with eager location-fetching" : "", partDir_);
     LOG.trace(msg);
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(msg)) {
-      RemoteIterator<? extends FileStatus> fileStatuses;
-      if (listWithLocations) {
-        fileStatuses = FileSystemUtil
-            .listFiles(fs, partDir_, recursive_, debugAction_);
-      } else {
-        fileStatuses = FileSystemUtil
-            .listStatus(fs, partDir_, recursive_, debugAction_);
+      List<FileStatus> fileStatuses = getFileStatuses(fs, listWithLocations);
 
-        // TODO(todd): we could look at the result of listing without locations, and if
-        // we see that a substantial number of the files have changed, it may be better
-        // to go back and re-list with locations vs doing an RPC per file.
-      }
       loadedFds_ = new ArrayList<>();
       if (fileStatuses == null) return;
 
-      Reference<Long> numUnknownDiskIds = new Reference<Long>(Long.valueOf(0));
-
-      List<FileStatus> stats = new ArrayList<>();
-      while (fileStatuses.hasNext()) {
-        stats.add(fileStatuses.next());
-      }
+      Reference<Long> numUnknownDiskIds = new Reference<>(0L);
 
       if (writeIds_ != null) {
-        stats = AcidUtils.filterFilesForAcidState(stats, partDir_, validTxnList_,
-            writeIds_, loadStats_);
+        fileStatuses = AcidUtils.filterFilesForAcidState(fileStatuses, partDir_,
+            validTxnList_, writeIds_, loadStats_);
       }
 
       if (fileFormat_ == HdfsFileFormat.HUDI_PARQUET) {
-        stats = HudiUtil.filterFilesForHudiROPath(stats);
+        fileStatuses = HudiUtil.filterFilesForHudiROPath(fileStatuses);
       }
 
-      for (FileStatus fileStatus : stats) {
+      for (FileStatus fileStatus : fileStatuses) {
         if (fileStatus.isDirectory()) {
           continue;
         }
@@ -221,16 +206,10 @@ public class FileMetadataLoader {
           ++loadStats_.hiddenFiles;
           continue;
         }
-        String relPath = FileSystemUtil.relativizePath(fileStatus.getPath(), partDir_);
-        FileDescriptor fd = oldFdsByRelPath_.get(relPath);
-        if (listWithLocations || forceRefreshLocations || fd == null ||
-            fd.isChanged(fileStatus)) {
-          fd = createFd(fs, fileStatus, relPath, numUnknownDiskIds);
-          ++loadStats_.loadedFiles;
-        } else {
-          ++loadStats_.skippedFiles;
-        }
-        loadedFds_.add(Preconditions.checkNotNull(fd));;
+
+        FileDescriptor fd = getFileDescriptor(fs, listWithLocations, numUnknownDiskIds,
+            fileStatus);
+        loadedFds_.add(Preconditions.checkNotNull(fd));
       }
       if (writeIds_ != null) {
         loadedInsertDeltaFds_ = new ArrayList<>();
@@ -251,24 +230,73 @@ public class FileMetadataLoader {
   }
 
   /**
+   * Return fd created by the given fileStatus or from the cache(oldFdsByPath_).
+   */
+  protected FileDescriptor getFileDescriptor(FileSystem fs, boolean listWithLocations,
+      Reference<Long> numUnknownDiskIds, FileStatus fileStatus) throws IOException {
+    String relPath = FileSystemUtil.relativizePath(fileStatus.getPath(), partDir_);
+    FileDescriptor fd = oldFdsByPath_.get(relPath);
+    if (listWithLocations || forceRefreshLocations || fd == null ||
+        fd.isChanged(fileStatus)) {
+      fd = createFd(fs, fileStatus, relPath, numUnknownDiskIds);
+      ++loadStats_.loadedFiles;
+    } else {
+      ++loadStats_.skippedFiles;
+    }
+    return fd;
+  }
+
+  /**
+   * Return located file status list when listWithLocations is true.
+   */
+  protected List<FileStatus> getFileStatuses(FileSystem fs, boolean listWithLocations)
+      throws IOException {
+    RemoteIterator<? extends FileStatus> fileStatuses;
+    if (listWithLocations) {
+      fileStatuses = FileSystemUtil
+          .listFiles(fs, partDir_, recursive_, debugAction_);
+    } else {
+      fileStatuses = FileSystemUtil
+          .listStatus(fs, partDir_, recursive_, debugAction_);
+      // TODO(todd): we could look at the result of listing without locations, and if
+      // we see that a substantial number of the files have changed, it may be better
+      // to go back and re-list with locations vs doing an RPC per file.
+    }
+    if (fileStatuses == null) return null;
+    List<FileStatus> stats = new ArrayList<>();
+    while (fileStatuses.hasNext()) {
+      stats.add(fileStatuses.next());
+    }
+    return stats;
+  }
+
+  /**
    * Create a FileDescriptor for the given FileStatus. If the FS supports block locations,
    * and FileStatus is a LocatedFileStatus (i.e. the location was prefetched) this uses
    * the already-loaded information; otherwise, this may have to remotely look up the
    * locations.
+   * 'absPath' is null except for the Iceberg tables, because datafiles of the
+   * Iceberg tables may not be in the table location.
    */
-  private FileDescriptor createFd(FileSystem fs, FileStatus fileStatus,
-      String relPath, Reference<Long> numUnknownDiskIds) throws IOException {
+  protected FileDescriptor createFd(FileSystem fs, FileStatus fileStatus,
+      String relPath, Reference<Long> numUnknownDiskIds, String absPath)
+      throws IOException {
     if (!FileSystemUtil.supportsStorageIds(fs)) {
-      return FileDescriptor.createWithNoBlocks(fileStatus, relPath, null);
+      return FileDescriptor.createWithNoBlocks(fileStatus, relPath, absPath);
     }
     BlockLocation[] locations;
     if (fileStatus instanceof LocatedFileStatus) {
-      locations = ((LocatedFileStatus)fileStatus).getBlockLocations();
+      locations = ((LocatedFileStatus) fileStatus).getBlockLocations();
     } else {
       locations = fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
     }
     return FileDescriptor.create(fileStatus, relPath, locations, hostIndex_,
-        HdfsShim.isErasureCoded(fileStatus), numUnknownDiskIds);
+        HdfsShim.isErasureCoded(fileStatus), numUnknownDiskIds, absPath);
+  }
+
+  private FileDescriptor createFd(FileSystem fs, FileStatus fileStatus,
+      String relPath, Reference<Long> numUnknownDiskIds) throws IOException {
+    return createFd(fs, fileStatus, relPath, numUnknownDiskIds, null);
   }
 
   /**

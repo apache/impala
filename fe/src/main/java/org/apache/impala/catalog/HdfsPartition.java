@@ -210,13 +210,6 @@ public class HdfsPartition extends CatalogObjectImpl
           fbFileBlockOffsets, isEc, absPath));
     }
 
-    public static FileDescriptor create(FileStatus fileStatus, String relPath,
-        BlockLocation[] blockLocations, ListMap<TNetworkAddress> hostIndex, boolean isEc,
-        Reference<Long> numUnknownDiskIds) throws IOException {
-      return create(fileStatus, relPath, blockLocations, hostIndex, isEc,
-          numUnknownDiskIds, null);
-    }
-
     /**
      * Creates the file descriptor of a file represented by 'fileStatus' that
      * resides in a filesystem that doesn't support the BlockLocation API (e.g. S3).
@@ -227,7 +220,6 @@ public class HdfsPartition extends CatalogObjectImpl
       return new FileDescriptor(
           createFbFileDesc(fbb, fileStatus, relPath, null, false, absPath));
     }
-
     /**
      * Serializes the metadata of a file descriptor represented by 'fileStatus' into a
      * FlatBuffer using 'fbb' and returns the associated FbFileDesc object.
@@ -235,18 +227,18 @@ public class HdfsPartition extends CatalogObjectImpl
      * in the underlying buffer. Can be null if there are no blocks.
      */
     private static FbFileDesc createFbFileDesc(FlatBufferBuilder fbb,
-        FileStatus fileStatus, String relPath, int[] fbFileBlockOffets, boolean isEc,
+        FileStatus fileStatus, String relPath, int[] fbFileBlockOffsets, boolean isEc,
         String absPath) {
       int relPathOffset = fbb.createString(relPath == null ? StringUtils.EMPTY : relPath);
       // A negative block vector offset is used when no block offsets are specified.
       int blockVectorOffset = -1;
-      if (fbFileBlockOffets != null) {
-        blockVectorOffset = FbFileDesc.createFileBlocksVector(fbb, fbFileBlockOffets);
+      if (fbFileBlockOffsets != null) {
+        blockVectorOffset = FbFileDesc.createFileBlocksVector(fbb, fbFileBlockOffsets);
       }
       int absPathOffset = -1;
       if (StringUtils.isNotEmpty(absPath)) absPathOffset = fbb.createString(absPath);
       FbFileDesc.startFbFileDesc(fbb);
-      // TODO(todd) rename to RelativePathin the FBS
+      // TODO(todd) rename to RelativePath in the FBS
       FbFileDesc.addRelativePath(fbb, relPathOffset);
       FbFileDesc.addLength(fbb, fileStatus.getLen());
       FbFileDesc.addLastModificationTime(fbb, fileStatus.getModificationTime());
@@ -261,7 +253,7 @@ public class HdfsPartition extends CatalogObjectImpl
       ByteBuffer bb = fbb.dataBuffer().slice();
       ByteBuffer compressedBb = ByteBuffer.allocate(bb.capacity());
       compressedBb.put(bb);
-      return FbFileDesc.getRootAsFbFileDesc((ByteBuffer)compressedBb.flip());
+      return FbFileDesc.getRootAsFbFileDesc((ByteBuffer) compressedBb.flip());
     }
 
     public String getRelativePath() { return fbFileDescriptor_.relativePath(); }

@@ -22,7 +22,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import org.apache.iceberg.ContentFile;
 import org.apache.iceberg.DataFile;
@@ -41,6 +40,8 @@ public class GroupedContentFiles {
   public List<DataFile> dataFilesWithDeletes = new ArrayList<>();
   public Set<DeleteFile> deleteFiles = new HashSet<>();
 
+  public GroupedContentFiles() { }
+
   public GroupedContentFiles(CloseableIterable<FileScanTask> fileScanTasks) {
     for (FileScanTask scanTask : fileScanTasks) {
       if (scanTask.deletes().isEmpty()) {
@@ -52,7 +53,11 @@ public class GroupedContentFiles {
     }
   }
 
-  public Iterable<ContentFile> getAllContentFiles() {
+  public Iterable<ContentFile<?>> getAllContentFiles() {
     return Iterables.concat(dataFilesWithoutDeletes, dataFilesWithDeletes, deleteFiles);
+  }
+
+  public boolean isEmpty() {
+    return Iterables.isEmpty(getAllContentFiles());
   }
 }

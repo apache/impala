@@ -333,6 +333,12 @@ public interface FeIcebergTable extends FeFsTable {
    * Utility functions
    */
   public static abstract class Utils {
+
+    // We need 'FileStatus#modification_time' to know whether the file is changed,
+    // meanwhile this property cannot be obtained from the Iceberg metadata. But Iceberg
+    // files are immutable, so we can use a special default value.
+    private static final int DEFAULT_MODIFICATION_TIME = 1;
+
     /**
      * Returns true if FeIcebergTable file format is columnar: parquet or orc
      */
@@ -627,20 +633,28 @@ public interface FeIcebergTable extends FeFsTable {
     /**
      * Get FileDescriptor by data file location
      */
-    public static HdfsPartition.FileDescriptor getFileDescriptor(Path fileLoc,
-        Path tableLoc, FeIcebergTable table) throws IOException {
-      FileSystem fs = FileSystemUtil.getFileSystemForPath(tableLoc);
-      FileStatus fileStatus = fs.getFileStatus(fileLoc);
-      return getFileDescriptor(fs, tableLoc, fileStatus, table);
+    public static HdfsPartition.FileDescriptor getFileDescriptor(
+        ContentFile<?> contentFile, FeIcebergTable table) throws IOException {
+      Path fileLoc = FileSystemUtil.createFullyQualifiedPath(
+          new Path(contentFile.path().toString()));
+      FileSystem fsForPath = FileSystemUtil.getFileSystemForPath(fileLoc);
+      FileStatus fileStatus;
+      if (FileSystemUtil.supportsStorageIds(fsForPath)) {
+        fileStatus = createLocatedFileStatus(fileLoc, fsForPath);
+      } else {
+        // For OSS service (e.g. S3A, COS, OSS, etc), we create FileStatus ourselves.
+        fileStatus = createFileStatus(contentFile, fileLoc);
+      }
+      return getFileDescriptor(fsForPath, fileStatus, table);
     }
 
     private static HdfsPartition.FileDescriptor getFileDescriptor(FileSystem fs,
-        Path tableLoc, FileStatus fileStatus, FeIcebergTable table)
-        throws IOException {
+        FileStatus fileStatus, FeIcebergTable table) throws IOException {
       Reference<Long> numUnknownDiskIds = new Reference<>(0L);
 
       String relPath = null;
       String absPath = null;
+      Path tableLoc = new Path(table.getIcebergTableLocation());
       URI relUri = tableLoc.toUri().relativize(fileStatus.getPath().toUri());
       if (relUri.isAbsolute() || relUri.getPath().startsWith(Path.SEPARATOR)) {
         if (Utils.requiresDataFilesInTableLocation(table)) {
@@ -659,7 +673,7 @@ public interface FeIcebergTable extends FeFsTable {
 
       BlockLocation[] locations;
       if (fileStatus instanceof LocatedFileStatus) {
-        locations = ((LocatedFileStatus)fileStatus).getBlockLocations();
+        locations = ((LocatedFileStatus) fileStatus).getBlockLocations();
       } else {
         locations = fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
       }
@@ -677,7 +691,7 @@ public interface FeIcebergTable extends FeFsTable {
      */
     public static IcebergContentFileStore loadAllPartition(
         IcebergTable table, GroupedContentFiles icebergFiles)
-        throws IOException, TableLoadingException {
+        throws IOException {
       Map<String, HdfsPartition.FileDescriptor> hdfsFileDescMap = new HashMap<>();
       Collection<HdfsPartition> partitions =
           ((HdfsTable)table.getFeFsTable()).partitionMap_.values();
@@ -708,8 +722,7 @@ public interface FeIcebergTable extends FeFsTable {
     }
 
     private static Pair<String, HdfsPartition.FileDescriptor> getPathHashAndFd(
-        ContentFile contentFile,
-        IcebergTable table,
+        ContentFile<?> contentFile, IcebergTable table,
         Map<String, HdfsPartition.FileDescriptor> hdfsFileDescMap) throws IOException {
       String pathHash = IcebergUtil.getFilePathHash(contentFile);
       HdfsPartition.FileDescriptor fd = getOrCreateIcebergFd(
@@ -719,7 +732,7 @@ public interface FeIcebergTable extends FeFsTable {
 
     private static FileDescriptor getOrCreateIcebergFd(IcebergTable table,
         Map<String, HdfsPartition.FileDescriptor> hdfsFileDescMap,
-        ContentFile contentFile) throws IllegalArgumentException, IOException {
+        ContentFile<?> contentFile) throws IllegalArgumentException, IOException {
       Path path = new Path(contentFile.path().toString());
       HdfsPartition.FileDescriptor iceFd = null;
       if (hdfsFileDescMap.containsKey(path.toUri().getPath())) {
@@ -727,19 +740,16 @@ public interface FeIcebergTable extends FeFsTable {
             path.toUri().getPath());
         iceFd = fsFd.cloneWithFileMetadata(
             IcebergUtil.createIcebergMetadata(table, contentFile));
-        return iceFd;
       } else {
         if (Utils.requiresDataFilesInTableLocation(table)) {
           LOG.warn("Iceberg file '{}' cannot be found in the HDFS recursive"
-           + "file listing results.", path.toString());
+           + "file listing results.", path);
         }
-        HdfsPartition.FileDescriptor fileDesc = getFileDescriptor(
-            new Path(contentFile.path().toString()),
-            new Path(table.getIcebergTableLocation()), table);
+        HdfsPartition.FileDescriptor fileDesc = getFileDescriptor(contentFile, table);
         iceFd = fileDesc.cloneWithFileMetadata(
             IcebergUtil.createIcebergMetadata(table, contentFile));
-        return iceFd;
       }
+      return iceFd;
     }
 
     /**
@@ -749,8 +759,7 @@ public interface FeIcebergTable extends FeFsTable {
      * TODO(IMPALA-11516): Return better partition stats for V2 tables.
      */
     public static Map<String, TIcebergPartitionStats> loadPartitionStats(
-        IcebergTable table, GroupedContentFiles icebergFiles)
-        throws TableLoadingException {
+        IcebergTable table, GroupedContentFiles icebergFiles) {
       Map<String, TIcebergPartitionStats> nameToStats = new HashMap<>();
       for (ContentFile<?> contentFile : icebergFiles.getAllContentFiles()) {
         String name = getPartitionKey(table, contentFile);
@@ -917,7 +926,9 @@ public interface FeIcebergTable extends FeFsTable {
     }
 
     public static boolean requiresDataFilesInTableLocation(FeIcebergTable icebergTable) {
-      Map<String, String> properties = icebergTable.getIcebergApiTable().properties();
+      Table icebergApiTable = icebergTable.getIcebergApiTable();
+      Preconditions.checkNotNull(icebergApiTable);
+      Map<String, String> properties = icebergApiTable.properties();
       return !(PropertyUtil.propertyAsBoolean(properties,
           TableProperties.OBJECT_STORE_ENABLED,
           TableProperties.OBJECT_STORE_ENABLED_DEFAULT)
@@ -927,6 +938,20 @@ public interface FeIcebergTable extends FeFsTable {
           || StringUtils.isNotEmpty(properties.get(TableProperties.OBJECT_STORE_PATH))
           || StringUtils
           .isNotEmpty(properties.get(TableProperties.WRITE_FOLDER_STORAGE_LOCATION)));
+    }
+
+    public static FileStatus createLocatedFileStatus(Path path, FileSystem fs)
+        throws IOException {
+      FileStatus fileStatus = fs.getFileStatus(path);
+      Preconditions.checkState(fileStatus.isFile());
+      BlockLocation[] blockLocations = fs.getFileBlockLocations(fileStatus, 0L,
+          fileStatus.getLen());
+      return new LocatedFileStatus(fileStatus, blockLocations);
+    }
+
+    public static FileStatus createFileStatus(ContentFile<?> contentFile, Path path) {
+      return new FileStatus(contentFile.fileSizeInBytes(), false, 0, 0,
+          DEFAULT_MODIFICATION_TIME, path);
     }
   }
 }

@@ -31,7 +31,6 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.apache.curator.shaded.com.google.common.collect.Lists;
-import org.apache.hadoop.fs.Path;
 import org.apache.iceberg.ContentFile;
 import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileContent;
@@ -424,10 +423,7 @@ public class IcebergScanPlanner {
       }
       cachehit = false;
       try {
-        fileDesc = FeIcebergTable.Utils.getFileDescriptor(
-            new Path(cf.path().toString()),
-            new Path(getIceTable().getIcebergTableLocation()),
-            getIceTable());
+        fileDesc = FeIcebergTable.Utils.getFileDescriptor(cf, getIceTable());
       } catch (IOException ex) {
         throw new ImpalaRuntimeException(
             "Cannot load file descriptor for " + cf.path(), ex);

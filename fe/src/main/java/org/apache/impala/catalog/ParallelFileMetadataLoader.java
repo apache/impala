@@ -20,7 +20,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -33,8 +32,9 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
-import org.apache.impala.catalog.FeFsTable.Utils;
+import org.apache.impala.catalog.HdfsPartition.Builder;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.service.BackendConfig;
@@ -74,10 +74,19 @@ public class ParallelFileMetadataLoader {
   private final FileSystem fs_;
 
   public ParallelFileMetadataLoader(FileSystem fs,
-      Collection<HdfsPartition.Builder> partBuilders,
+      Collection<Builder> partBuilders,
       ValidWriteIdList writeIdList, ValidTxnList validTxnList, boolean isRecursive,
-      @Nullable ListMap<TNetworkAddress> hostIndex, String debugAction, String logPrefix)
-      throws CatalogException {
+      @Nullable ListMap<TNetworkAddress> hostIndex, String debugAction,
+      String logPrefix) {
+    this(fs, partBuilders, writeIdList, validTxnList, isRecursive, hostIndex, debugAction,
+        logPrefix, new GroupedContentFiles(), false);
+  }
+
+  public ParallelFileMetadataLoader(FileSystem fs,
+      Collection<Builder> partBuilders,
+      ValidWriteIdList writeIdList, ValidTxnList validTxnList, boolean isRecursive,
+      @Nullable ListMap<TNetworkAddress> hostIndex, String debugAction, String logPrefix,
+      GroupedContentFiles icebergFiles, boolean canDataBeOutsideOfTableLocation) {
     if (writeIdList != null || validTxnList != null) {
       // make sure that both either both writeIdList and validTxnList are set or both
       // of them are not.
@@ -95,9 +104,16 @@ public class ParallelFileMetadataLoader {
     loaders_ = Maps.newHashMap();
     for (Map.Entry<Path, List<HdfsPartition.Builder>> e : partsByPath_.entrySet()) {
       List<FileDescriptor> oldFds = e.getValue().get(0).getFileDescriptors();
-      FileMetadataLoader loader = new FileMetadataLoader(e.getKey(),
-          isRecursive, oldFds, hostIndex, validTxnList, writeIdList,
-          e.getValue().get(0).getFileFormat());
+      FileMetadataLoader loader;
+      HdfsFileFormat format = e.getValue().get(0).getFileFormat();
+      if (format.equals(HdfsFileFormat.ICEBERG)) {
+        loader = new IcebergFileMetadataLoader(e.getKey(), isRecursive, oldFds, hostIndex,
+            validTxnList, writeIdList, Preconditions.checkNotNull(icebergFiles),
+            canDataBeOutsideOfTableLocation);
+      } else {
+        loader = new FileMetadataLoader(e.getKey(), isRecursive, oldFds, hostIndex,
+            validTxnList, writeIdList, format);
+      }
       // If there is a cached partition mapped to this path, we recompute the block
       // locations even if the underlying files have not changed.
       // This is done to keep the cached block metadata up to date.
