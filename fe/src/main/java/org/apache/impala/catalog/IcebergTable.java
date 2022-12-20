@@ -136,10 +136,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
   public static final int V2_FILE_PATH_FIELD_ID = 2147483546;
   public static final int V2_POS_FIELD_ID = 2147483545;
 
-  // Iceberg catalog type dependend on table properties
+  // Iceberg catalog type dependent on table properties
   private TIcebergCatalog icebergCatalog_;
 
-  // Iceberg file format dependend on table properties
+  // Iceberg file format dependent on table properties
   private TIcebergFileFormat icebergFileFormat_;
 
   // Iceberg parquet compression codec dependent on table properties
@@ -500,7 +500,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
     return desc;
   }
 
-  private THdfsTable transfromToTHdfsTable(boolean updatePartitionFlag) {
+  public THdfsTable transfromToTHdfsTable(boolean updatePartitionFlag) {
     THdfsTable hdfsTable = hdfsTable_.getTHdfsTable(ThriftObjectType.FULL, null);
     if (updatePartitionFlag) {
       // Iceberg table only has one THdfsPartition, we set this partition

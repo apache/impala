@@ -55,6 +55,9 @@ public class TimeTravelSpec extends StmtNode {
   // A time string represents the asOfMicros_ for the query option TIMEZONE
   private String timeString_;
 
+  // Flag to show that analysis has been done
+  private boolean analyzed_;
+
   public Kind getKind() { return kind_; }
 
   public long getAsOfVersion() { return asOfVersion_; }
@@ -82,15 +85,30 @@ public class TimeTravelSpec extends StmtNode {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    if (analyzed_) return;
     switch (kind_) {
       case TIME_AS_OF: analyzeTimeBased(analyzer); break;
       case VERSION_AS_OF: analyzeVersionBased(analyzer); break;
     }
+    analyzed_ = true;
   }
 
   private void analyzeTimeBased(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkNotNull(asOfExpr_);
-    asOfExpr_.analyze(analyzer);
+    try {
+      asOfExpr_.analyze(analyzer);
+    } catch (AnalysisException e) {
+      if (e.getMessage().contains("Could not resolve column/field reference")) {
+        // If the AS_OF expr is not a simple constant it will need table information
+        // that is not yet available as the analysis of the table is not yet
+        // complete. If this happens we know it is not a constant expr, so construct
+        // a better error message.
+        throw new AnalysisException(
+            "FOR SYSTEM_TIME AS OF <expression> must be a constant expression: "
+            + toSql());
+      }
+      throw e;
+    }
     if (!asOfExpr_.isConstant()) {
       throw new AnalysisException(
           "FOR SYSTEM_TIME AS OF <expression> must be a constant expression: " + toSql());
@@ -118,7 +136,6 @@ public class TimeTravelSpec extends StmtNode {
       throw new AnalysisException(
           "Invalid TIMESTAMP expression: " + ie.getMessage(), ie);
     }
-
   }
 
   private void analyzeVersionBased(Analyzer analyzer) throws AnalysisException {

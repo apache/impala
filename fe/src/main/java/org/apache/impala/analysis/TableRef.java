@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.impala.analysis.TimeTravelSpec.Kind;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsTable;
@@ -275,7 +274,7 @@ public class TableRef extends StmtNode {
   }
 
   /**
-   * Creates and returns a empty TupleDescriptor registered with the analyzer
+   * Creates and returns an empty TupleDescriptor registered with the analyzer
    * based on the resolvedPath_.
    * This method is called from the analyzer when registering this table reference.
    */
@@ -482,15 +481,9 @@ public class TableRef extends StmtNode {
   }
 
   protected void analyzeTimeTravel(Analyzer analyzer) throws AnalysisException {
+    // We are analyzing the time travel spec before we know the table type, so we
+    // cannot check if the table supports time travel.
     if (timeTravelSpec_ != null) {
-      if (!(getTable() instanceof FeIcebergTable)) {
-        throw new AnalysisException(String.format(
-            "FOR %s AS OF clause is only supported for Iceberg tables. " +
-            "%s is not an Iceberg table.",
-            timeTravelSpec_.getKind() == Kind.TIME_AS_OF ? "SYSTEM_TIME" :
-                                                           "SYSTEM_VERSION",
-            getTable().getFullName()));
-      }
       timeTravelSpec_.analyze(analyzer);
     }
   }
@@ -860,11 +853,11 @@ public class TableRef extends StmtNode {
     other.timeTravelSpec_ = timeTravelSpec_;
     // Clear properties. Don't clear aliases_ since it's still used in resolving slots
     // in the query block of 'other'.
+    // Don't clear timeTravelSpec_ as it is still relevant.
     onClause_ = null;
     usingColNames_ = null;
     joinOp_ = null;
     joinHints_ = new ArrayList<>();
     tableHints_ = new ArrayList<>();
-    timeTravelSpec_ = null;
   }
 }

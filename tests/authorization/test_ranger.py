@@ -33,6 +33,7 @@ from tests.common.test_dimensions import (create_client_protocol_dimension,
 from tests.util.hdfs_util import NAMENODE
 from tests.util.calculation_util import get_random_id
 from tests.util.filesystem_utils import WAREHOUSE_PREFIX, WAREHOUSE
+from tests.util.iceberg_util import get_snapshots
 
 ADMIN = "admin"
 RANGER_AUTH = ("admin", "admin")
@@ -1816,6 +1817,121 @@ class TestRanger(CustomClusterTestSuite):
     finally:
       for i in range(policy_cnt):
         TestRanger._remove_policy(unique_name + str(i))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_iceberg_time_travel_with_masking(self, unique_name):
+    """When we do a time travel query on an iceberg table we will use the schema from
+    the time of the snapshot. Make sure this works when column masking is being used."""
+    user = getuser()
+    admin_client = self.create_impala_client()
+    short_table_name = "ice_1"
+    unique_database = unique_name + "_db"
+    tbl_name = unique_database + "." + short_table_name
+
+    try:
+      admin_client.execute("drop database if exists {0} cascade"
+                           .format(unique_database), user=ADMIN)
+      admin_client.execute("create database {0}".format(unique_database), user=ADMIN)
+      admin_client.execute("create table {0} (a int, b string, c int) stored as iceberg"
+                           .format(tbl_name), user=ADMIN)
+      admin_client.execute("insert into {0} values (1, 'one', 1)".format(tbl_name),
+                           user=ADMIN)
+      admin_client.execute("alter table {0} drop column a".format(tbl_name), user=ADMIN)
+      admin_client.execute("insert into {0} values ('two', 2)".format(tbl_name),
+                           user=ADMIN)
+      admin_client.execute("grant select on database {0} to user {1} with "
+                           "grant option".format(unique_database, user),
+                           user=ADMIN)
+      admin_client.execute("grant insert on database {0} to user {1} with "
+                           "grant option".format(unique_database, user),
+                           user=ADMIN)
+
+      snapshots = get_snapshots(admin_client, tbl_name, expected_result_size=2)
+      # Create two versions of a simple query based on the two snapshot ids.
+      query = "select * from {0} FOR SYSTEM_VERSION AS OF {1}"
+      # The first query is for the data after the first insert.
+      first_time_travel_query = query.format(tbl_name, snapshots[0].get_snapshot_id())
+      # The expected results of the first query.
+      first_query_columns = ['A', 'B', 'C']
+      first_results_unmasked = ['1\tone\t1']
+      first_results_masked_b = ['1\tNULL\t1']  # Column 'B' is masked to NULL.
+      first_results_masked_c = ['1\tone\tNULL']  # Column 'C' is masked to NULL.
+
+      # Second query is for the data after the second insert, when the column has gone.
+      second_time_travel_query = query.format(tbl_name, snapshots[1].get_snapshot_id())
+      # The expected results of the second query, depending on masking.
+      second_query_columns = ['B', 'C']
+      second_results_unmasked = ['one\t1', 'two\t2']
+      second_results_masked_b = ['NULL\t1', 'NULL\t2']  # Column 'B' masked to NULL.
+      second_results_masked_c = ['one\tNULL', 'two\tNULL']  # Column 'C' masked to NULL.
+
+      # Run queries without column masking.
+      results = self.client.execute(first_time_travel_query)
+      assert results.column_labels == first_query_columns
+      assert results.data == first_results_unmasked
+
+      results = self.client.execute(second_time_travel_query)
+      assert results.column_labels == second_query_columns
+      assert len(results.data) == len(second_results_unmasked)
+      for row in second_results_unmasked:
+        assert row in results.data
+
+      try:
+        # Mask column C to null.
+        TestRanger._add_column_masking_policy(
+          unique_name, user, unique_database, short_table_name, "C", "MASK_NULL")
+        admin_client.execute("refresh authorization", user=ADMIN)
+
+        # Run the time travel queries again, time travel should work, but column
+        # 'C' is masked.
+        results = self.client.execute(first_time_travel_query)
+        assert results.column_labels == first_query_columns
+        assert results.data == first_results_masked_c
+
+        results = self.client.execute(second_time_travel_query)
+        assert results.column_labels == second_query_columns
+        assert len(results.data) == len(second_results_masked_c)
+        for row in second_results_masked_c:
+          assert row in results.data
+      finally:
+        # Remove the masking policy.
+        TestRanger._remove_policy(unique_name)
+        admin_client.execute("refresh authorization", user=ADMIN)
+
+      # Run the queries again without masking as we are here.
+      results = self.client.execute(first_time_travel_query)
+      assert results.column_labels == first_query_columns
+      assert results.data == first_results_unmasked
+
+      results = self.client.execute(second_time_travel_query)
+      assert results.column_labels == second_query_columns
+      assert len(results.data) == len(second_results_unmasked)
+      for row in second_results_unmasked:
+        assert row in results.data
+
+      try:
+        # Mask column B to null.
+        TestRanger._add_column_masking_policy(
+          unique_name, user, unique_database, short_table_name, "B", "MASK_NULL")
+        admin_client.execute("refresh authorization", user=ADMIN)
+
+        # Run the time travel queries again, time travel should work, but column
+        # 'B' is masked.
+        results = self.client.execute(first_time_travel_query)
+        assert results.column_labels == first_query_columns
+        assert results.data == first_results_masked_b
+
+        results = self.client.execute(second_time_travel_query)
+        assert results.column_labels == second_query_columns
+        for row in second_results_masked_b:
+          assert row in results.data
+      finally:
+        TestRanger._remove_policy(unique_name)
+    finally:
+      admin_client.execute("drop database if exists {0} cascade".format(unique_database),
+                           user=ADMIN)
 
   @pytest.mark.execute_serially
   @SkipIfFS.hive

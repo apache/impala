@@ -300,6 +300,8 @@ public interface FeIcebergTable extends FeFsTable {
     return false;
   }
 
+  THdfsTable transfromToTHdfsTable(boolean updatePartitionFlag);
+
   /**
    * Returns the current snapshot id of the Iceberg API table if it exists, otherwise
    * returns -1.

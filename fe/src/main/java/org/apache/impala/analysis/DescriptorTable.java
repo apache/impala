@@ -27,6 +27,7 @@ import java.util.Set;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.IcebergTimeTravelTable;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
@@ -193,7 +194,7 @@ public class DescriptorTable {
         // Verify table level consistency in the same query by checking that references to
         // the same Table refer to the same table instance.
         FeTable checkTable = referencedTables.get(tblName);
-        Preconditions.checkState(checkTable == null || table == checkTable);
+        Preconditions.checkState(checkTable == null || isSameTableRef(table, checkTable));
         if (tableId == null) {
           tableId = nextTableId_++;
           tableIdMap.put(table, tableId);
@@ -218,6 +219,20 @@ public class DescriptorTable {
           tbl.toThriftDescriptor(tableIdMap.get(tbl), referencedPartitions));
     }
     return result;
+  }
+
+  /**
+   * @return true if the two tables are the same.
+   * For Iceberg Time Travel tables we compare the underlying base table.
+   */
+  private boolean isSameTableRef(FeTable first, FeTable second) {
+    if (first instanceof IcebergTimeTravelTable) {
+      first = ((IcebergTimeTravelTable) first).getBase();
+    }
+    if (second instanceof IcebergTimeTravelTable) {
+      second = ((IcebergTimeTravelTable) second).getBase();
+    }
+    return first == second;
   }
 
   public TDescriptorTableSerialized toSerializedThrift() throws ImpalaException {

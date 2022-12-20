@@ -27,6 +27,7 @@ import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.thrift.TColumnStats;
 import org.apache.impala.thrift.TCompressionCodec;
+import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergPartitionStats;
@@ -176,4 +177,10 @@ public class IcebergPositionDeleteTable extends VirtualTable implements FeIceber
   public int getDefaultPartitionSpecId() {
     return -1;
   }
+
+  @Override
+  public THdfsTable transfromToTHdfsTable(boolean updatePartitionFlag) {
+    throw new IllegalStateException("not implemented here");
+  }
+
 }

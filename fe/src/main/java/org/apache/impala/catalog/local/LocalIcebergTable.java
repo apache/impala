@@ -257,6 +257,11 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     return desc;
   }
 
+  @Override
+  public THdfsTable transfromToTHdfsTable(boolean updatePartitionFlag) {
+    return this.transfromToTHdfsTable();
+  }
+
   private THdfsTable transfromToTHdfsTable() {
     Map<Long, THdfsPartition> idToPartition = new HashMap<>();
     // LocalFsTable transformed from iceberg table only has one partition

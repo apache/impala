@@ -5001,7 +5001,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         iceT);
     TblsAnalyzeOk("select * from $TBL for system_time as of now() + interval 3 days",
         iceT);
-    TblsAnalyzeOk("select * from $TBL for system_version as of 123456", iceT);
+    // Use a legal snapshot id '93996984692289973' from the testdata.
+    TblsAnalyzeOk("select * from $TBL for system_version as of 93996984692289973", iceT);
 
     TblsAnalysisError("select * from $TBL for system_time as of 42", iceT,
         "FOR SYSTEM_TIME AS OF <expression> must be a timestamp type");

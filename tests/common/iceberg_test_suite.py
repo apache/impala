@@ -18,17 +18,10 @@
 import datetime
 
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.util.iceberg_util import parse_timestamp, get_snapshots
 
 
 class IcebergTestSuite(ImpalaTestSuite):
-
-  @classmethod
-  def quote(cls, s):
-    return "'{0}'".format(s)
-
-  @classmethod
-  def cast_ts(cls, ts):
-    return "CAST({0} as timestamp)".format(cls.quote(ts))
 
   @classmethod
   def execute_query_ts(cls, impalad_client, query):
@@ -41,26 +34,21 @@ class IcebergTestSuite(ImpalaTestSuite):
     """Executes DESCRIBE HISTORY <tbl> FROM through the given client. Verifies if the
        result snapshots are newer than the provided timestamp and checks the expected
        number of results."""
-    query = "DESCRIBE HISTORY {0} FROM {1};".format(tbl_name, cls.cast_ts(ts))
-    data = impalad_client.execute(query)
-    assert len(data.data) == expected_result_size
-    for i in range(len(data.data)):
-      result_ts_dt = cls.parse_timestamp(data.data[i].split('\t')[0])
-      assert result_ts_dt >= ts
+    snapshots = get_snapshots(impalad_client, tbl_name, ts_start=ts,
+        expected_result_size=expected_result_size)
+    for snapshot in snapshots:
+      assert snapshot.get_creation_time() >= ts
 
-  @classmethod
-  def parse_timestamp(cls, ts_string):
-    """The client can receive the timestamp in two formats, if the timestamp has
-    fractional seconds "yyyy-MM-dd HH:mm:ss.SSSSSSSSS" pattern is used, otherwise
-    "yyyy-MM-dd HH:mm:ss". Additionally, Python's datetime library cannot handle
-    nanoseconds, therefore in that case the timestamp has to be trimmed."""
-    if len(ts_string.split('.')) > 1:
-      return datetime.datetime.strptime(ts_string[:-3], '%Y-%m-%d %H:%M:%S.%f')
-    else:
-      return datetime.datetime.strptime(ts_string, '%Y-%m-%d %H:%M:%S')
+  def expect_results_between(cls, impalad_client, tbl_name, ts_start, ts_end,
+      expected_result_size):
+    snapshots = get_snapshots(impalad_client, tbl_name, ts_start=ts_start,
+        ts_end=ts_end, expected_result_size=expected_result_size)
+    for snapshot in snapshots:
+      assert snapshot.get_creation_time() >= ts_start
+      assert snapshot.get_creation_time() <= ts_end
 
   @classmethod
   def impala_now(cls, impalad_client):
     now_data = impalad_client.execute("select now()")
-    now_data_ts_dt = cls.parse_timestamp(now_data.data[0])
+    now_data_ts_dt = parse_timestamp(now_data.data[0])
     return now_data_ts_dt

@@ -254,6 +254,12 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
   }
 
   @Override
+  public THdfsTable transfromToTHdfsTable(boolean updatePartitionFlag) {
+    throw new IllegalStateException("not implemented here");
+  }
+
+
+  @Override
   public long snapshotId() {
     return -1;
   }

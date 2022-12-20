@@ -38,8 +38,10 @@ from tests.common.file_utils import (
 from tests.shell.util import run_impala_shell_cmd
 from tests.util.filesystem_utils import get_fs_path, IS_HDFS
 from tests.util.get_parquet_metadata import get_parquet_metadata
+from tests.util.iceberg_util import cast_ts, quote, parse_timestamp
 
 LOG = logging.getLogger(__name__)
+
 
 class TestIcebergTable(IcebergTestSuite):
   """Tests related to Iceberg tables."""
@@ -63,7 +65,7 @@ class TestIcebergTable(IcebergTestSuite):
   def test_alter_iceberg_tables(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-alter', vector, use_db=unique_database)
 
-  def test_expire_snapshots(self, vector, unique_database):
+  def test_expire_snapshots(self, unique_database):
     tbl_name = unique_database + ".expire_snapshots"
 
     # We are setting the TIMEZONE query option in this test, so let's create a local
@@ -85,17 +87,17 @@ class TestIcebergTable(IcebergTestSuite):
       self.expect_num_snapshots_from(impalad_client, tbl_name, ts_0, 4)
       # Expire the oldest snapshot and test that the oldest one was expired
       expire_q = "alter table {0} execute expire_snapshots({1})"
-      impalad_client.execute(expire_q.format(tbl_name, self.cast_ts(ts_1)))
+      impalad_client.execute(expire_q.format(tbl_name, cast_ts(ts_1)))
       self.expect_num_snapshots_from(impalad_client, tbl_name, ts_0, 3)
       self.expect_num_snapshots_from(impalad_client, tbl_name, ts_1, 3)
 
       # Expire with a timestamp in which the interval does not touch existing snapshot
-      impalad_client.execute(expire_q.format(tbl_name, self.cast_ts(ts_1)))
+      impalad_client.execute(expire_q.format(tbl_name, cast_ts(ts_1)))
       self.expect_num_snapshots_from(impalad_client, tbl_name, ts_0, 3)
 
       # Expire all, but retain 1
       impalad_client.execute(expire_q.format(tbl_name,
-          self.cast_ts(datetime.datetime.now())))
+          cast_ts(datetime.datetime.now())))
       self.expect_num_snapshots_from(impalad_client, tbl_name, ts_2, 1)
 
       # Change number of retained snapshots, then expire all
@@ -104,7 +106,7 @@ class TestIcebergTable(IcebergTestSuite):
       impalad_client.execute(insert_q)
       impalad_client.execute(insert_q)
       impalad_client.execute(expire_q.format(tbl_name,
-          self.cast_ts(datetime.datetime.now())))
+          cast_ts(datetime.datetime.now())))
       self.expect_num_snapshots_from(impalad_client, tbl_name, ts_0, 2)
 
       # Check that timezone is interpreted in local timezone controlled by query option
@@ -115,7 +117,7 @@ class TestIcebergTable(IcebergTestSuite):
       impalad_client.execute("SET TIMEZONE='Europe/Budapest'")
       impalad_client.execute(insert_q)
       impalad_client.execute("SET TIMEZONE='Asia/Tokyo'")
-      impalad_client.execute(expire_q.format(tbl_name, self.cast_ts(ts_tokyo)))
+      impalad_client.execute(expire_q.format(tbl_name, cast_ts(ts_tokyo)))
       self.expect_num_snapshots_from(impalad_client, tbl_name, ts_tokyo, 1)
 
   def test_truncate_iceberg_tables(self, vector, unique_database):
@@ -225,8 +227,8 @@ class TestIcebergTable(IcebergTestSuite):
     tbl_name = unique_database + ".iceberg_multi_snapshots"
     self.client.execute("""create table {0} (i int) stored as iceberg
         tblproperties('iceberg.catalog'='hadoop.tables')""".format(tbl_name))
-    result = self.client.execute("INSERT INTO {0} VALUES (1)".format(tbl_name))
-    result = self.client.execute("INSERT INTO {0} VALUES (2)".format(tbl_name))
+    self.client.execute("INSERT INTO {0} VALUES (1)".format(tbl_name))
+    self.client.execute("INSERT INTO {0} VALUES (2)".format(tbl_name))
     result = self.client.execute("DESCRIBE HISTORY {0}".format(tbl_name))
     assert(len(result.data) == 2)
     first_snapshot = result.data[0].split("\t")
@@ -240,16 +242,16 @@ class TestIcebergTable(IcebergTestSuite):
     # Check "is_current_ancestor" column.
     assert(first_snapshot[3] == "TRUE" and second_snapshot[3] == "TRUE")
 
-  def test_describe_history_params(self, vector, unique_database):
+  def test_describe_history_params(self, unique_database):
     tbl_name = unique_database + ".describe_history"
 
     def expect_results_between(ts_start, ts_end, expected_result_size):
       query = "DESCRIBE HISTORY {0} BETWEEN {1} AND {2};".format(
-        tbl_name, self.cast_ts(ts_start), self.cast_ts(ts_end))
+        tbl_name, cast_ts(ts_start), cast_ts(ts_end))
       data = impalad_client.execute(query)
       assert len(data.data) == expected_result_size
       for i in range(len(data.data)):
-        result_ts_dt = self.parse_timestamp(data.data[i].split('\t')[0])
+        result_ts_dt = parse_timestamp(data.data[i].split('\t')[0])
         assert result_ts_dt >= ts_start and result_ts_dt <= ts_end
 
     # We are setting the TIMEZONE query option in this test, so let's create a local
@@ -296,14 +298,18 @@ class TestIcebergTable(IcebergTestSuite):
       # Interpreting Budapest time in Tokyo time points to the past.
       self.expect_num_snapshots_from(impalad_client, tbl_name, now_budapest, 4)
 
-  def test_time_travel(self, vector, unique_database):
+  def test_time_travel(self, unique_database):
     tbl_name = unique_database + ".time_travel"
 
-    def expect_results(query, expected_results):
+    def expect_results(query, expected_results, expected_cols):
       data = impalad_client.execute(query)
       assert len(data.data) == len(expected_results)
       for r in expected_results:
         assert r in data.data
+      expected_col_labels = expected_cols['labels']
+      expected_col_types = expected_cols['types']
+      assert data.column_labels == expected_col_labels
+      assert data.column_types == expected_col_types
 
     def expect_for_count_star(query, expected):
       data = impalad_client.execute(query)
@@ -312,32 +318,26 @@ class TestIcebergTable(IcebergTestSuite):
       assert "NumRowGroups" not in data.runtime_profile
       assert "NumFileMetadataRead" not in data.runtime_profile
 
-    def expect_results_t(ts, expected_results):
+    def expect_results_t(ts, expected_results, expected_cols):
       expect_results(
           "select * from {0} for system_time as of {1}".format(tbl_name, ts),
-          expected_results)
+          expected_results, expected_cols)
 
     def expect_for_count_star_t(ts, expected):
       expect_for_count_star(
           "select count(*) from {0} for system_time as of {1}".format(tbl_name, ts),
           expected)
 
-    def expect_results_v(snapshot_id, expected_results):
+    def expect_results_v(snapshot_id, expected_results, expected_cols):
       expect_results(
           "select * from {0} for system_version as of {1}".format(tbl_name, snapshot_id),
-          expected_results)
+          expected_results, expected_cols)
 
     def expect_for_count_star_v(snapshot_id, expected):
       expect_for_count_star(
           "select count(*) from {0} for system_version as of {1}".format(
               tbl_name, snapshot_id),
           expected)
-
-    def quote(s):
-      return "'{0}'".format(s)
-
-    def cast_ts(ts):
-        return "CAST({0} as timestamp)".format(quote(ts))
 
     def get_snapshots():
       data = impalad_client.execute("describe history {0}".format(tbl_name))
@@ -365,60 +365,100 @@ class TestIcebergTable(IcebergTestSuite):
       time.sleep(5)
       ts_4 = self.execute_query_ts(impalad_client, "insert into {0} values (100)"
           .format(tbl_name))
+      ts_no_ss = self.execute_query_ts(impalad_client,
+          "alter table {0} add column {1} bigint"
+          .format(tbl_name, "j"))
+      ts_5 = self.execute_query_ts(impalad_client, "insert into {0} (i,j) values (3, 103)"
+                                   .format(tbl_name))
+
+      # Descriptions of the different schemas we expect to see as Time Travel queries
+      # use the schema from the specified time or snapshot.
+      #
+      # When the schema is just the 'J' column.
+      j_cols = {
+        'labels': ['J'],
+        'types': ['BIGINT']
+      }
+      # When the schema is just the 'I' column.
+      i_cols = {
+        'labels': ['I'],
+        'types': ['INT']
+      }
+      # When the schema is the 'I' and 'J' columns.
+      ij_cols = {
+        'labels': ['I', 'J'],
+        'types': ['INT', 'BIGINT']
+      }
+
       # Query table as of timestamps.
-      expect_results_t("now()", ['100'])
-      expect_results_t(self.quote(ts_1), ['1'])
-      expect_results_t(self.quote(ts_2), ['1', '2'])
-      expect_results_t(self.quote(ts_3), [])
-      expect_results_t(self.cast_ts(ts_3) + " + interval 1 seconds", [])
-      expect_results_t(self.quote(ts_4), ['100'])
-      expect_results_t(self.cast_ts(ts_4) + " - interval 5 seconds", [])
+      expect_results_t("now()", ['100\tNULL', '3\t103'], ij_cols)
+      expect_results_t(quote(ts_1), ['1'], i_cols)
+      expect_results_t(quote(ts_2), ['1', '2'], i_cols)
+      expect_results_t(quote(ts_3), [], i_cols)
+      expect_results_t(cast_ts(ts_3) + " + interval 1 seconds", [], i_cols)
+      expect_results_t(quote(ts_4), ['100'], i_cols)
+      expect_results_t(cast_ts(ts_4) + " - interval 5 seconds", [], i_cols)
+      # There is no new snapshot created by the schema change between ts_4 and ts_no_ss.
+      # So at ts_no_ss we see the schema as of ts_4
+      expect_results_t(quote(ts_no_ss), ['100'], i_cols)
+      expect_results_t(quote(ts_5), ['100\tNULL', '3\t103'], ij_cols)
       # Future queries return the current snapshot.
-      expect_results_t(self.cast_ts(ts_4) + " + interval 1 hours", ['100'])
+      expect_results_t(cast_ts(ts_5) + " + interval 1 hours", ['100\tNULL', '3\t103'],
+                       ij_cols)
+
       # Query table as of snapshot IDs.
       snapshots = get_snapshots()
-      expect_results_v(snapshots[0], ['1'])
-      expect_results_v(snapshots[1], ['1', '2'])
-      expect_results_v(snapshots[2], [])
-      expect_results_v(snapshots[3], ['100'])
+      expect_results_v(snapshots[0], ['1'], i_cols)
+      expect_results_v(snapshots[1], ['1', '2'], i_cols)
+      expect_results_v(snapshots[2], [], i_cols)
+      expect_results_v(snapshots[3], ['100'], i_cols)
+      expect_results_v(snapshots[4], ['100\tNULL', '3\t103'], ij_cols)
 
       # Test of plain count star optimization
       # 'NumRowGroups' and 'NumFileMetadataRead' should not appear in profile
-      expect_for_count_star_t("now()", '1')
+      expect_for_count_star_t("now()", '2')
       expect_for_count_star_t(quote(ts_1), '1')
       expect_for_count_star_t(quote(ts_2), '2')
       expect_for_count_star_t(quote(ts_3), '0')
       expect_for_count_star_t(cast_ts(ts_3) + " + interval 1 seconds", '0')
       expect_for_count_star_t(quote(ts_4), '1')
       expect_for_count_star_t(cast_ts(ts_4) + " - interval 5 seconds", '0')
-      expect_for_count_star_t(cast_ts(ts_4) + " + interval 1 hours", '1')
+      expect_for_count_star_t(cast_ts(ts_5), '2')
+      expect_for_count_star_t(cast_ts(ts_5) + " + interval 1 hours", '2')
       expect_for_count_star_v(snapshots[0], '1')
       expect_for_count_star_v(snapshots[1], '2')
       expect_for_count_star_v(snapshots[2], '0')
       expect_for_count_star_v(snapshots[3], '1')
+      expect_for_count_star_v(snapshots[4], '2')
 
       # SELECT diff
       expect_results("""SELECT * FROM {tbl} FOR SYSTEM_TIME AS OF '{ts_new}'
                         MINUS
                         SELECT * FROM {tbl} FOR SYSTEM_TIME AS OF '{ts_old}'""".format(
                      tbl=tbl_name, ts_new=ts_2, ts_old=ts_1),
-                     ['2'])
+                     ['2'], i_cols)
       expect_results("""SELECT * FROM {tbl} FOR SYSTEM_VERSION AS OF {v_new}
                         MINUS
                         SELECT * FROM {tbl} FOR SYSTEM_VERSION AS OF {v_old}""".format(
                      tbl=tbl_name, v_new=snapshots[1], v_old=snapshots[0]),
-                     ['2'])
-      # Mix SYSTEM_TIME ans SYSTEM_VERSION
+                     ['2'], i_cols)
+      # Mix SYSTEM_TIME and SYSTEM_VERSION
       expect_results("""SELECT * FROM {tbl} FOR SYSTEM_VERSION AS OF {v_new}
                         MINUS
                         SELECT * FROM {tbl} FOR SYSTEM_TIME AS OF '{ts_old}'""".format(
                      tbl=tbl_name, v_new=snapshots[1], ts_old=ts_1),
-                     ['2'])
+                     ['2'], i_cols)
       expect_results("""SELECT * FROM {tbl} FOR SYSTEM_TIME AS OF '{ts_new}'
                         MINUS
                         SELECT * FROM {tbl} FOR SYSTEM_VERSION AS OF {v_old}""".format(
                      tbl=tbl_name, ts_new=ts_2, v_old=snapshots[0]),
-                     ['2'])
+                     ['2'], i_cols)
+      expect_results("""SELECT * FROM {tbl} FOR SYSTEM_TIME AS OF '{ts_new}'
+                        MINUS
+                        SELECT *, NULL FROM {tbl} FOR SYSTEM_TIME
+                        AS OF '{ts_old}'""".format(
+                     tbl=tbl_name, ts_new=ts_5, ts_old=ts_4),
+                     ['3\t103'], ij_cols)
 
       # Query old snapshot
       try:
@@ -435,22 +475,38 @@ class TestIcebergTable(IcebergTestSuite):
       except Exception as e:
         assert "Cannot find snapshot with ID 42" in str(e)
 
+      # Go back to one column
+      impalad_client.execute("alter table {0} drop column i".format(tbl_name))
+
+      # Test that deleted column is not selectable.
+      try:
+        impalad_client.execute("SELECT i FROM {0}".format(tbl_name))
+        assert False  # Exception must be thrown
+      except Exception as e:
+        assert "Could not resolve column/field reference: 'i'" in str(e)
+
+      # Back at ts_2 the deleted 'I' column is there
+      expect_results("SELECT * FROM {0} FOR SYSTEM_TIME AS OF '{1}'".
+                     format(tbl_name, ts_2), ['1', '2'], i_cols)
+      expect_results("SELECT i FROM {0} FOR SYSTEM_TIME AS OF '{1}'".
+                     format(tbl_name, ts_2), ['1', '2'], i_cols)
+
       # Check that timezone is interpreted in local timezone controlled by query option
       # TIMEZONE
       impalad_client.execute("truncate table {0}".format(tbl_name))
       impalad_client.execute("insert into {0} values (1111)".format(tbl_name))
       impalad_client.execute("SET TIMEZONE='Europe/Budapest'")
       now_budapest = impala_now()
-      expect_results_t(self.quote(now_budapest), ['1111'])
+      expect_results_t(quote(now_budapest), ['1111'], j_cols)
 
       # Let's switch to Tokyo time. Tokyo time is always greater than Budapest time.
       impalad_client.execute("SET TIMEZONE='Asia/Tokyo'")
       now_tokyo = impala_now()
-      expect_results_t(self.quote(now_tokyo), ['1111'])
+      expect_results_t(quote(now_tokyo), ['1111'], j_cols)
       try:
         # Interpreting Budapest time in Tokyo time points to the past when the table
         # didn't exist.
-        expect_results_t(self.quote(now_budapest), [])
+        expect_results_t(quote(now_budapest), [], j_cols)
         assert False
       except Exception as e:
         assert "Cannot find a snapshot older than" in str(e)
@@ -905,6 +961,7 @@ class TestIcebergTable(IcebergTestSuite):
   @SkipIf.hardcoded_uris
   def test_avro_file_format(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-avro', vector, unique_database)
+
 
 class TestIcebergV2Table(IcebergTestSuite):
   """Tests related to Iceberg V2 tables."""

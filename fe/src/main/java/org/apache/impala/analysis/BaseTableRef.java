@@ -62,11 +62,11 @@ public class BaseTableRef extends TableRef {
     if (isAnalyzed_) return;
     analyzer.registerAuthAndAuditEvent(resolvedPath_.getRootTable(), priv_,
         requireGrantOption_);
+    analyzeTimeTravel(analyzer);
     desc_ = analyzer.registerTableRef(this);
     isAnalyzed_ = true;
-    analyzer.checkTableCapability(getTable(), Analyzer.OperationType.ANY);
+    Analyzer.checkTableCapability(getTable(), Analyzer.OperationType.ANY);
     analyzeTableSample(analyzer);
-    analyzeTimeTravel(analyzer);
     analyzeHints(analyzer);
     analyzeJoin(analyzer);
     analyzeSkipHeaderLineCount();

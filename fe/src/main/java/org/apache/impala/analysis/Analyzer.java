@@ -51,10 +51,12 @@ import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeIncompleteTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.IcebergTimeTravelTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.MaterializedViewHdfsTable;
 import org.apache.impala.catalog.StructField;
@@ -851,7 +853,8 @@ public class Analyzer {
     List<String> rawPath = tableRef.getPath();
     Path resolvedPath = null;
     try {
-      resolvedPath = resolvePathWithMasking(rawPath, PathType.TABLE_REF);
+      resolvedPath =
+          resolvePathWithMasking(rawPath, PathType.TABLE_REF, tableRef.timeTravelSpec_);
     } catch (AnalysisException e) {
       // Register privilege requests to prefer reporting an authorization error over
       // an analysis error. We should not accidentally reveal the non-existence of a
@@ -1171,7 +1174,12 @@ public class Analyzer {
    */
   public Path resolvePathWithMasking(List<String> rawPath, PathType pathType)
       throws AnalysisException, TableLoadingException {
-    Path resolvedPath = resolvePath(rawPath, pathType);
+    return this.resolvePathWithMasking(rawPath, pathType, null);
+  }
+
+  public Path resolvePathWithMasking(List<String> rawPath, PathType pathType,
+      TimeTravelSpec timeTravelSpec) throws AnalysisException, TableLoadingException {
+    Path resolvedPath = resolvePath(rawPath, pathType, timeTravelSpec);
     // Skip normal resolution cases that don't relate to nested types.
     if (pathType == PathType.TABLE_REF) {
       if (resolvedPath.destTable() != null || !resolvedPath.isRootedAtTuple()) {
@@ -1209,7 +1217,7 @@ public class Analyzer {
         tableMaskingView.getUnMaskedTableRef() instanceof BaseTableRef);
     // Resolve rawPath inside the table masking view to point to the real table.
     Path maskedPath = tableMaskingView.inlineViewAnalyzer_.resolvePath(
-        rawPath, pathType);
+        rawPath, pathType, timeTravelSpec);
     maskedPath.setPathBeforeMasking(resolvedPath);
     return maskedPath;
   }
@@ -1239,6 +1247,11 @@ public class Analyzer {
    */
   public Path resolvePath(List<String> rawPath, PathType pathType)
       throws AnalysisException, TableLoadingException {
+    return this.resolvePath(rawPath, pathType, null);
+  }
+
+  public Path resolvePath(List<String> rawPath, PathType pathType,
+      TimeTravelSpec timeTravelSpec) throws AnalysisException, TableLoadingException {
     // We only allow correlated references in predicates of a subquery.
     boolean resolveInAncestors = false;
     if (pathType == PathType.TABLE_REF || pathType == PathType.ANY) {
@@ -1249,11 +1262,12 @@ public class Analyzer {
     // Convert all path elements to lower case.
     List<String> lcRawPath = Lists.newArrayListWithCapacity(rawPath.size());
     for (String s: rawPath) lcRawPath.add(s.toLowerCase());
-    return resolvePath(lcRawPath, pathType, resolveInAncestors);
+    return resolvePath(lcRawPath, pathType, resolveInAncestors, timeTravelSpec);
   }
 
   private Path resolvePath(List<String> rawPath, PathType pathType,
-      boolean resolveInAncestors) throws AnalysisException, TableLoadingException {
+      boolean resolveInAncestors, TimeTravelSpec timeTravelSpec)
+      throws AnalysisException, TableLoadingException {
     // List of all candidate paths with different roots. Paths in this list are initially
     // unresolved and may be illegal with respect to the pathType.
     List<Path> candidates = getTupleDescPaths(rawPath);
@@ -1287,6 +1301,23 @@ public class Analyzer {
           // Ignore to allow path resolution to continue.
         }
         if (tbl != null) {
+          if (timeTravelSpec != null) {
+            if (!(tbl instanceof FeIcebergTable)) {
+              throw new AnalysisException(String.format(
+                  "FOR %s AS OF clause is only supported for Iceberg tables. "
+                      + "%s is not an Iceberg table.",
+                  timeTravelSpec.getKind() == TimeTravelSpec.Kind.TIME_AS_OF ?
+                      "SYSTEM_TIME" :
+                      "SYSTEM_VERSION",
+                  tbl.getFullName()));
+            }
+            timeTravelSpec.analyze(this);
+
+            FeIcebergTable rootTable = (FeIcebergTable) tbl;
+            IcebergTimeTravelTable timeTravelTable =
+                new IcebergTimeTravelTable(rootTable, timeTravelSpec);
+            tbl = timeTravelTable;
+          }
           candidates.add(new Path(tbl, rawPath.subList(tblNameIdx + 1, rawPath.size())));
         }
       }
@@ -1296,7 +1327,7 @@ public class Analyzer {
     Path result = resolvePaths(rawPath, candidates, pathType, errors);
     if (result == null && resolveInAncestors && hasAncestors()) {
       LOG.trace("Resolve in ancestors");
-      result = getParentAnalyzer().resolvePath(rawPath, pathType, true);
+      result = getParentAnalyzer().resolvePath(rawPath, pathType, true, timeTravelSpec);
     }
     if (result == null) {
       Preconditions.checkState(!errors.isEmpty());
@@ -1336,7 +1367,7 @@ public class Analyzer {
   /**
    * Resolves the given paths and checks them for legality and ambiguity. Returns the
    * single legal path resolution if it exists, null otherwise.
-   * Populates 'errors' with a a prioritized list of error messages starting with the
+   * Populates 'errors' with a prioritized list of error messages starting with the
    * most relevant one. The list contains at least one error message if null is returned.
    */
   private Path resolvePaths(List<String> rawPath, List<Path> paths, PathType pathType,
