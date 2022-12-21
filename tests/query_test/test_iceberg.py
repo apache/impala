@@ -786,6 +786,7 @@ class TestIcebergTable(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-multiple-storage-locations-table',
                        vector, unique_database)
 
+  @SkipIf.hardcoded_uris
   def test_mixed_file_format(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-mixed-file-format', vector,
                       unique_database)
@@ -901,6 +902,7 @@ class TestIcebergTable(IcebergTestSuite):
   def test_virtual_columns(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-virtual-columns', vector, unique_database)
 
+  @SkipIf.hardcoded_uris
   def test_avro_file_format(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-avro', vector, unique_database)
 

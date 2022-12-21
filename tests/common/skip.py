@@ -104,7 +104,7 @@ class SkipIf:
   sfs_unsupported = pytest.mark.skipif(not (IS_HDFS or IS_S3 or IS_ABFS or IS_ADLS
       or IS_GCS), reason="Hive support for sfs+ is limited, HIVE-26757")
   hardcoded_uris = pytest.mark.skipif(not IS_HDFS,
-      reason="Iceberg delete files hardcode the full URI in parquet files")
+      reason="Iceberg hardcodes the full URI in parquet delete files and metadata files")
   not_ec = pytest.mark.skipif(not IS_EC, reason="Erasure Coding needed")
   no_secondary_fs = pytest.mark.skipif(not SECONDARY_FILESYSTEM,
       reason="Secondary filesystem needed")
