@@ -1031,7 +1031,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   @Override
   public int hashCode() {
     if (id_ == null) {
-      throw new UnsupportedOperationException("Expr.hashCode() is not implemented");
+      throw new UnsupportedOperationException(
+          "Expr.hashCode() is not implemented in " + this.getClass().getName());
     } else {
       return id_.asInt();
     }

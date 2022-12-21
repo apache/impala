@@ -1151,3 +1151,12 @@ INT, TIMESTAMP
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 3
 ====
+---- QUERY
+# IMPALA-11811 query that generates unregistered predicates.
+select i.id from  iceberg_partitioned i, iceberg_partitioned j
+where i.action in ('view') and j.id=1 and j.id=i.id;
+---- RESULTS
+1
+---- TYPES
+int
+====

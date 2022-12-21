@@ -463,15 +463,18 @@ public class IcebergScanPlanner {
   private void extractIcebergConjuncts() throws ImpalaException {
     boolean isPartitionColumnIncluded = false;
     Map<SlotId, SlotDescriptor> idToSlotDesc = new HashMap<>();
-    Set<Expr> identityConjuncts = new HashSet<>();
+    // Track identity conjuncts by their index in conjuncts_.
+    // The array values are initialized to false.
+    boolean[] identityConjunctIndex = new boolean[conjuncts_.size()];
     for (SlotDescriptor slotDesc : tblRef_.getDesc().getSlots()) {
       idToSlotDesc.put(slotDesc.getId(), slotDesc);
     }
-    for (Expr expr : conjuncts_) {
+    for (int i = 0; i < conjuncts_.size(); i++) {
+      Expr expr = conjuncts_.get(i);
       if (isPartitionColumnIncluded(expr, idToSlotDesc)) {
         isPartitionColumnIncluded = true;
         if (isIdentityPartitionIncluded(expr, idToSlotDesc)) {
-          identityConjuncts.add(expr);
+          identityConjunctIndex[i] = true;
         }
       }
     }
@@ -480,9 +483,10 @@ public class IcebergScanPlanner {
       nonIdentityConjuncts_ = conjuncts_;
       return;
     }
-    for (Expr expr : conjuncts_) {
+    for (int i = 0; i < conjuncts_.size(); i++) {
+      Expr expr = conjuncts_.get(i);
       if (tryConvertIcebergPredicate(expr)) {
-        if (!identityConjuncts.contains(expr)) {
+        if (!identityConjunctIndex[i]) {
           nonIdentityConjuncts_.add(expr);
         }
       } else {
