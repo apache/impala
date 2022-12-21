@@ -118,7 +118,7 @@ stored as iceberg;
 ---- QUERY
 load data inpath '/tmp/$DATABASE/mismatching_schema/' overwrite into table test_iceberg_load_schema_mismatch;
 ---- CATCH
-AnalysisException: Target table 'test_load_a61184e9.test_iceberg_load_schema_mismatch' has fewer columns (1) than the SELECT / VALUES clause returns (4)
+row_regex:.*AnalysisException: Target table .* has fewer columns \(1\) than the SELECT / VALUES clause returns \(4\).*
 ====
 ---- QUERY
 # Test 9: Partitioned Iceberg table

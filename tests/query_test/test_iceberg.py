@@ -790,7 +790,6 @@ class TestIcebergTable(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-mixed-file-format', vector,
                       unique_database)
 
-  @SkipIfLocal.hdfs_client
   def test_load(self, vector, unique_database):
     """Test LOAD DATA INPATH for Iceberg tables, the first part of this method inits the
     target directory, copies existing test data to HDFS. The second part runs the test
@@ -800,36 +799,36 @@ class TestIcebergTable(IcebergTestSuite):
     SRC_DIR = os.path.join(os.environ['IMPALA_HOME'],
         "testdata/data/iceberg_test/iceberg_mixed_file_format_test/data/{0}")
     DST_DIR = "/tmp/" + unique_database + "/parquet/"
-    self.hdfs_client.make_dir(DST_DIR, permission=777)
+    self.filesystem_client.make_dir(DST_DIR, permission=777)
     file_parq1 = "00000-0-data-gfurnstahl_20220906113044_157fc172-f5d3-4c70-8653-" \
         "fff150b6136a-job_16619542960420_0002-1-00001.parquet"
     file_parq2 = "00000-0-data-gfurnstahl_20220906114830_907f72c7-36ac-4135-8315-" \
         "27ff880faff0-job_16619542960420_0004-1-00001.parquet"
-    self.hdfs_client.copy_from_local(SRC_DIR.format(file_parq1), DST_DIR)
-    self.hdfs_client.copy_from_local(SRC_DIR.format(file_parq2), DST_DIR)
+    self.filesystem_client.copy_from_local(SRC_DIR.format(file_parq1), DST_DIR)
+    self.filesystem_client.copy_from_local(SRC_DIR.format(file_parq2), DST_DIR)
     DST_DIR = "/tmp/" + unique_database + "/orc/"
-    self.hdfs_client.make_dir(DST_DIR, permission=777)
+    self.filesystem_client.make_dir(DST_DIR, permission=777)
     file_orc1 = "00000-0-data-gfurnstahl_20220906113255_8d49367d-e338-4996-ade5-" \
         "ee500a19c1d1-job_16619542960420_0003-1-00001.orc"
     file_orc2 = "00000-0-data-gfurnstahl_20220906114900_9c1b7b46-5643-428f-a007-" \
         "519c5500ed04-job_16619542960420_0004-1-00001.orc"
-    self.hdfs_client.copy_from_local(SRC_DIR.format(file_orc1), DST_DIR)
-    self.hdfs_client.copy_from_local(SRC_DIR.format(file_orc2), DST_DIR)
+    self.filesystem_client.copy_from_local(SRC_DIR.format(file_orc1), DST_DIR)
+    self.filesystem_client.copy_from_local(SRC_DIR.format(file_orc2), DST_DIR)
     # Test 7 init: overwrite
     DST_DIR = "/tmp/" + unique_database + "/overwrite/"
-    self.hdfs_client.make_dir(DST_DIR, permission=777)
-    self.hdfs_client.copy_from_local(SRC_DIR.format(file_parq1), DST_DIR)
+    self.filesystem_client.make_dir(DST_DIR, permission=777)
+    self.filesystem_client.copy_from_local(SRC_DIR.format(file_parq1), DST_DIR)
     # Test 8 init: mismatching parquet schema format
     SRC_DIR = os.path.join(os.environ['IMPALA_HOME'], "testdata/data/iceberg_test/"
         "iceberg_partitioned/data/event_time_hour=2020-01-01-08/action=view/{0}")
     DST_DIR = "/tmp/" + unique_database + "/mismatching_schema/"
-    self.hdfs_client.make_dir(DST_DIR, permission=777)
+    self.filesystem_client.make_dir(DST_DIR, permission=777)
     file = "00001-1-b975a171-0911-47c2-90c8-300f23c28772-00000.parquet"
-    self.hdfs_client.copy_from_local(SRC_DIR.format(file), DST_DIR)
+    self.filesystem_client.copy_from_local(SRC_DIR.format(file), DST_DIR)
     # Test 9 init: partitioned
     DST_DIR = "/tmp/" + unique_database + "/partitioned/"
-    self.hdfs_client.make_dir(DST_DIR, permission=777)
-    self.hdfs_client.copy_from_local(SRC_DIR.format(file), DST_DIR)
+    self.filesystem_client.make_dir(DST_DIR, permission=777)
+    self.filesystem_client.copy_from_local(SRC_DIR.format(file), DST_DIR)
 
     # Init test table
     create_iceberg_table_from_directory(self.client, unique_database,
@@ -838,7 +837,7 @@ class TestIcebergTable(IcebergTestSuite):
     # Execute tests
     self.run_test_case('QueryTest/iceberg-load', vector, use_db=unique_database)
     # Clean up temporary directory
-    self.hdfs_client.delete_file_dir("/tmp/{0}".format(unique_database), True)
+    self.filesystem_client.delete_file_dir("/tmp/{0}".format(unique_database), True)
 
   def test_table_sampling(self, vector):
     self.run_test_case('QueryTest/iceberg-tablesample', vector,
