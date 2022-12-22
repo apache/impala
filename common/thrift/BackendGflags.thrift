@@ -237,13 +237,15 @@ struct TBackendGflags {
 
   103: required string ignored_dir_prefix_list
 
-  104: required bool enable_reload_events
+  104: required bool enable_kudu_impala_hms_check
 
-  105: required TGeospatialLibrary geospatial_library
+  105: required bool enable_reload_events
 
-  106: required double query_cpu_count_divisor
+  106: required TGeospatialLibrary geospatial_library
 
-  107: required bool processing_cost_use_equal_expr_weight
+  107: required double query_cpu_count_divisor
 
-  108: required i64 min_processing_per_thread
+  108: required bool processing_cost_use_equal_expr_weight
+
+  109: required i64 min_processing_per_thread
 }

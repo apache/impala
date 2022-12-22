@@ -32,6 +32,7 @@ import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.KuduPartitionParam;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TKuduPartitionByHashParam;
@@ -59,6 +60,10 @@ import com.google.common.collect.Lists;
  * Representation of a Kudu table in the catalog cache.
  */
 public class KuduTable extends Table implements FeKuduTable {
+
+  // Boolean config to enable the check which compares Kudu's and Impala's HMS instances.
+  private static boolean ENABLE_KUDU_IMPALA_HMS_CHECK =
+      BackendConfig.INSTANCE.getBackendCfg().enable_kudu_impala_hms_check;
 
   // Alias to the string key that identifies the storage handler for Kudu tables.
   public static final String KEY_STORAGE_HANDLER =
@@ -262,7 +267,8 @@ public class KuduTable extends Table implements FeKuduTable {
       throw new ImpalaRuntimeException(
           String.format("Error parsing URI: %s", e.getMessage()));
     }
-    if (hmsHosts != null && kuduHmsHosts != null && hmsHosts.equals(kuduHmsHosts)) {
+    if (hmsHosts != null && kuduHmsHosts != null &&
+        (hmsHosts.equals(kuduHmsHosts) || !ENABLE_KUDU_IMPALA_HMS_CHECK)) {
       return true;
     }
     throw new ImpalaRuntimeException(

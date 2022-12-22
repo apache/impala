@@ -82,6 +82,8 @@ DEFINE_bool(enable_shell_based_groups_mapping_support, false,
 DEFINE_string(kudu_master_hosts, "", "Specifies the default Kudu master(s). The given "
     "value should be a comma separated list of hostnames or IP addresses; ports are "
     "optional.");
+DEFINE_bool(enable_kudu_impala_hms_check, true, "By default this flag is true. If "
+    "enabled checks that Kudu and Impala are using the same HMS instance(s).");
 
 Frontend::Frontend() {
   JniMethodDescriptor methods[] = {

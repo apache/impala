@@ -50,6 +50,7 @@ DECLARE_string(authorized_proxy_group_config);
 DECLARE_bool(enable_shell_based_groups_mapping_support);
 DECLARE_string(catalog_topic_mode);
 DECLARE_string(kudu_master_hosts);
+DECLARE_bool(enable_kudu_impala_hms_check);
 DECLARE_string(reserved_words_version);
 DECLARE_double(max_filter_error_rate);
 DECLARE_int64(min_buffer_size);
@@ -265,6 +266,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
     FLAGS_local_catalog_cache_expiration_s);
   cfg.__set_server_name(FLAGS_server_name);
   cfg.__set_kudu_master_hosts(FLAGS_kudu_master_hosts);
+  cfg.__set_enable_kudu_impala_hms_check(FLAGS_enable_kudu_impala_hms_check);
   cfg.__set_read_size(FLAGS_read_size);
   cfg.__set_num_metadata_loading_threads(FLAGS_num_metadata_loading_threads);
   cfg.__set_max_hdfs_partitions_parallel_load(FLAGS_max_hdfs_partitions_parallel_load);
