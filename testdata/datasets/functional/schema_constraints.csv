@@ -361,3 +361,6 @@ table_name:alltypestiny_negative, constraint:restrict_to, table_format:orc/def/b
 
 table_name:insert_only_minor_compacted, constraint:restrict_to, table_format:parquet/none/none
 table_name:insert_only_major_and_minor_compacted, constraint:restrict_to, table_format:parquet/none/none
+
+# The table is used in large scale metadata test. File format doesn't matter so restrict to text only
+table_name:widetable_2000_cols_partitioned, constraint:restrict_to, table_format:text/none/none

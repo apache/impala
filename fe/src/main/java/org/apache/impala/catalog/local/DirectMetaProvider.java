@@ -236,7 +236,7 @@ class DirectMetaProvider implements MetaProvider {
     List<Partition> parts;
     try (MetaStoreClient c = msClientPool_.getClient()) {
       parts = MetaStoreUtil.fetchPartitionsByName(
-          c.getHiveClient(), partNames, tableImpl.dbName_, tableImpl.tableName_);
+          c.getHiveClient(), partNames, tableImpl.msTable_);
     }
 
     // HMS may return fewer partition objects than requested, and the

@@ -43,6 +43,7 @@ ADMISSIOND_ARGS = 'admissiond_args'
 KUDU_ARGS = 'kudu_args'
 # Additional args passed to the start-impala-cluster script.
 START_ARGS = 'start_args'
+JVM_ARGS = 'jvm_args'
 HIVE_CONF_DIR = 'hive_conf_dir'
 CLUSTER_SIZE = "cluster_size"
 # Default query options passed to the impala daemon command line. Handled separately from
@@ -105,7 +106,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
   @staticmethod
   def with_args(impalad_args=None, statestored_args=None, catalogd_args=None,
-      start_args=None, default_query_options=None,
+      start_args=None, default_query_options=None, jvm_args=None,
       impala_log_dir=None, hive_conf_dir=None, cluster_size=None,
       num_exclusive_coordinators=None, kudu_args=None, statestored_timeout_s=None,
       impalad_timeout_s=None, expect_cores=None, reset_ranger=False):
@@ -119,6 +120,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         func.func_dict[CATALOGD_ARGS] = catalogd_args
       if start_args is not None:
         func.func_dict[START_ARGS] = start_args.split()
+      if jvm_args is not None:
+        func.func_dict[JVM_ARGS] = jvm_args
       if hive_conf_dir is not None:
         func.func_dict[HIVE_CONF_DIR] = hive_conf_dir
       if kudu_args is not None:
@@ -144,7 +147,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
   def setup_method(self, method):
     cluster_args = list()
-    for arg in [IMPALAD_ARGS, STATESTORED_ARGS, CATALOGD_ARGS, ADMISSIOND_ARGS]:
+    for arg in [IMPALAD_ARGS, STATESTORED_ARGS, CATALOGD_ARGS, ADMISSIOND_ARGS, JVM_ARGS]:
       if arg in method.func_dict:
         cluster_args.append("--%s=%s " % (arg, method.func_dict[arg]))
     if START_ARGS in method.func_dict:

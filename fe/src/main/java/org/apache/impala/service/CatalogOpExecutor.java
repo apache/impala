@@ -174,7 +174,6 @@ import org.apache.impala.thrift.TAlterTableSetTblPropertiesParams;
 import org.apache.impala.thrift.TAlterTableType;
 import org.apache.impala.thrift.TAlterTableUnSetTblPropertiesParams;
 import org.apache.impala.thrift.TAlterTableUpdateStatsParams;
-import org.apache.impala.thrift.TBucketInfo;
 import org.apache.impala.thrift.TBucketType;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -4127,7 +4126,8 @@ public class CatalogOpExecutor {
     if (allHmsPartitionsToAdd.isEmpty()) return null;
 
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-      Map<String, Long> partitionToEventId = Maps.newHashMap();
+      Map<String, Long> partitionToEventId = catalog_.isEventProcessingActive() ?
+          Maps.newHashMap() : null;
       List<Partition> addedHmsPartitions = addHmsPartitionsInTransaction(msClient,
           tbl, allHmsPartitionsToAdd, partitionToEventId, ifNotExists);
       // Handle HDFS cache. This is done in a separate round bacause we have to apply
@@ -4142,7 +4142,7 @@ public class CatalogOpExecutor {
         List<Partition> difference = computeDifference(allHmsPartitionsToAdd,
             addedHmsPartitions);
         addedHmsPartitions.addAll(
-            getPartitionsFromHms(msTbl, msClient, tableName, difference));
+            getPartitionsFromHms(msTbl, msClient, difference));
       }
       addHdfsPartitions(msClient, tbl, addedHmsPartitions, partitionToEventId);
     }
@@ -4720,16 +4720,21 @@ public class CatalogOpExecutor {
    */
   private List<Partition> addHmsPartitions(MetaStoreClient msClient,
       Table tbl, List<Partition> allHmsPartitionsToAdd,
-      Map<String, Long> partitionToEventId, boolean ifNotExists)
+      @Nullable Map<String, Long> partitionToEventId, boolean ifNotExists)
       throws ImpalaRuntimeException, CatalogException {
     long eventId = getCurrentEventId(msClient);
     List<Partition> addedHmsPartitions = Lists
         .newArrayListWithCapacity(allHmsPartitionsToAdd.size());
+    long numDone = 0;
     for (List<Partition> hmsSublist :
         Lists.partition(allHmsPartitionsToAdd, MAX_PARTITION_UPDATES_PER_RPC)) {
       try {
-        List<Partition> addedPartitions = msClient.getHiveClient()
-            .add_partitions(hmsSublist, ifNotExists, true);
+        List<Partition> addedPartitions = MetaStoreUtil.addPartitions(
+            msClient.getHiveClient(), tbl.getMetaStoreTable(),
+            hmsSublist, ifNotExists, true);
+        numDone += hmsSublist.size();
+        LOG.info("Added {}/{} partitions in HMS for table {}", numDone,
+            allHmsPartitionsToAdd.size(), tbl.getFullName());
         org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable();
         List<NotificationEvent> events = getNextMetastoreEventsIfEnabled(eventId,
                 event -> AddPartitionEvent.ADD_PARTITION_EVENT_TYPE
@@ -4748,6 +4753,7 @@ public class CatalogOpExecutor {
           // add_partitions call above.
           addedHmsPartitions.addAll(addedPartitions);
         } else {
+          Preconditions.checkNotNull(partitionToEventId);
           addedHmsPartitions.addAll(partitionToEventSubMap.keySet());
           // we cannot keep a mapping of Partition to event ids because the
           // partition objects are changed later in the cachePartitions code path.
@@ -4815,8 +4821,7 @@ public class CatalogOpExecutor {
    */
   private List<Partition> getPartitionsFromHms(
       org.apache.hadoop.hive.metastore.api.Table msTbl, MetaStoreClient msClient,
-      TableName tableName, List<Partition> hmsPartitions)
-      throws ImpalaException {
+      List<Partition> hmsPartitions) throws ImpalaException {
     List<String> partitionCols = Lists.newArrayList();
     for (FieldSchema fs: msTbl.getPartitionKeys()) partitionCols.add(fs.getName());
 
@@ -4827,8 +4832,8 @@ public class CatalogOpExecutor {
       partitionNames.add(partName);
     }
     try {
-      return msClient.getHiveClient().getPartitionsByNames(tableName.getDb(),
-          tableName.getTbl(), partitionNames);
+      return MetaStoreUtil.fetchPartitionsByName(msClient.getHiveClient(),
+          partitionNames, msTbl);
     } catch (TException e) {
       throw new ImpalaRuntimeException("Metadata inconsistency has occured. Please run "
           + "'invalidate metadata <tablename>' to resolve the problem.", e);
@@ -5693,7 +5698,8 @@ public class CatalogOpExecutor {
     }
 
     // Add partitions to metastore.
-    Map<String, Long> partitionToEventId = Maps.newHashMap();
+    Map<String, Long> partitionToEventId = catalog_.isEventProcessingActive() ?
+        Maps.newHashMap() : null;
     String annotation = String.format("Recovering %d partitions for %s",
         hmsPartitions.size(), tbl.getFullName());
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation);
@@ -5703,6 +5709,7 @@ public class CatalogOpExecutor {
       addHdfsPartitions(msClient, tbl, addedPartitions, partitionToEventId);
       // Handle HDFS cache.
       if (cachePoolName != null) {
+        int numDone = 0;
         for (List<Partition> hmsSublist :
             Lists.partition(addedPartitions, MAX_PARTITION_UPDATES_PER_RPC)) {
           for (Partition partition: hmsSublist) {
@@ -5713,6 +5720,9 @@ public class CatalogOpExecutor {
           // Update the partition metadata to include the cache directive id.
           MetastoreShim.alterPartitions(msClient.getHiveClient(), tableName.getDb(),
               tableName.getTbl(), hmsSublist);
+          numDone += hmsSublist.size();
+          LOG.info("Updated cache directive id for {}/{} partitions for table {}",
+              numDone, addedPartitions.size(), tableName);
         }
       }
     } catch (TException e) {
@@ -5784,7 +5794,7 @@ public class CatalogOpExecutor {
     partition.setDbName(tableName.getDb());
     partition.setTableName(tableName.getTbl());
     partition.setValues(partitionSpecValues);
-    StorageDescriptor sd = msTbl.getSd().deepCopy();
+    StorageDescriptor sd = MetaStoreUtil.shallowCopyStorageDescriptor(msTbl.getSd());
     sd.setLocation(location);
     partition.setSd(sd);
     return partition;
@@ -6131,6 +6141,7 @@ public class CatalogOpExecutor {
 
     String dbName = tbl.getDb().getName();
     String tableName = tbl.getName();
+    int numDone = 0;
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       // Apply the updates in batches of 'MAX_PARTITION_UPDATES_PER_RPC'.
       for (List<Partition> msPartitionsSubList : Iterables.partition(
@@ -6144,6 +6155,9 @@ public class CatalogOpExecutor {
             MetastoreShim.alterPartitions(msClient.getHiveClient(), dbName, tableName,
                 msPartitionsSubList);
           }
+          numDone += msPartitionsSubList.size();
+          LOG.info("HMS alterPartitions done on {}/{} partitions of table {}", numDone,
+              msPartitionToBuilders.size(), tbl.getFullName());
           // Mark the corresponding HdfsPartition objects as dirty
           for (Partition msPartition : msPartitionsSubList) {
             HdfsPartition.Builder partBuilder = msPartitionToBuilders.get(msPartition);
@@ -6497,9 +6511,7 @@ public class CatalogOpExecutor {
               partition.setDbName(tblName.getDb());
               partition.setTableName(tblName.getTbl());
               partition.setValues(MetaStoreUtil.getPartValsFromName(msTbl, partName));
-              partition.setParameters(new HashMap<String, String>());
-              partition.setSd(msTbl.getSd().deepCopy());
-              partition.getSd().setSerdeInfo(msTbl.getSd().getSerdeInfo().deepCopy());
+              partition.setSd(MetaStoreUtil.shallowCopyStorageDescriptor(msTbl.getSd()));
               partition.getSd().setLocation(msTbl.getSd().getLocation() + "/" + partName);
               addCatalogServiceIdentifiers(msTbl, partition);
               MetastoreShim.updatePartitionStatsFast(partition, msTbl, warehouse);

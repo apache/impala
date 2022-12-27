@@ -17,16 +17,11 @@
 
 package org.apache.impala.util;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import java.util.Collection;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.Warehouse;
@@ -35,7 +30,6 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Partition;
-import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.catalog.CatalogException;
@@ -156,16 +150,17 @@ public class MetaStoreUtil {
    * generally mean the connection is broken or has timed out. The HiveClient supports
    * configuring retires at the connection level so it can be enabled independently.
    */
-  public static List<org.apache.hadoop.hive.metastore.api.Partition> fetchAllPartitions(
-      IMetaStoreClient client, String dbName, String tblName, int numRetries)
-      throws MetaException, TException {
+  public static List<Partition> fetchAllPartitions(IMetaStoreClient client, Table msTbl,
+      int numRetries) throws TException {
+    String dbName = msTbl.getDbName();
+    String tblName = msTbl.getTableName();
     Preconditions.checkArgument(numRetries >= 0);
     int retryAttempt = 0;
     while (true) {
       try {
         // First, get all partition names that currently exist.
         List<String> partNames = client.listPartitionNames(dbName, tblName, (short) -1);
-        return MetaStoreUtil.fetchPartitionsByName(client, partNames, dbName, tblName);
+        return MetaStoreUtil.fetchPartitionsByName(client, partNames, msTbl);
       } catch (MetaException e) {
         // Only retry for MetaExceptions, since TExceptions could indicate a broken
         // connection which we can't recover from by retrying.
@@ -184,29 +179,78 @@ public class MetaStoreUtil {
   /**
    * Given a List of partition names, fetches the matching Partitions from the HMS
    * in batches. Each batch will contain at most 'maxPartsPerRpc' partitions.
-   * Returns a List containing all fetched Partitions.
-   * Will throw a MetaException if any partitions in 'partNames' do not exist.
+   * The partition-level schema will be replaced with the table's to reduce memory
+   * footprint (IMPALA-11812).
+   * @return a List containing all fetched Partitions.
+   * @throws MetaException if any partitions in 'partNames' do not exist.
+   * @throws TException for RPC failures.
    */
-  public static List<Partition> fetchPartitionsByName(
-      IMetaStoreClient client, List<String> partNames, String dbName, String tblName)
-      throws MetaException, TException {
-    if (LOG.isTraceEnabled()) {
-      LOG.trace(String.format("Fetching %d partitions for: %s.%s using partition " +
-          "batch size: %d", partNames.size(), dbName, tblName, maxPartitionsPerRpc_));
-    }
+  public static List<Partition> fetchPartitionsByName(IMetaStoreClient client,
+      List<String> partNames, Table msTbl) throws TException {
+    LOG.info("Fetching {} partitions for: {}.{} using partition batch size: {}",
+        partNames.size(), msTbl.getDbName(), msTbl.getTableName(),
+        maxPartitionsPerRpc_);
 
     List<org.apache.hadoop.hive.metastore.api.Partition> fetchedPartitions =
         Lists.newArrayList();
     // Fetch the partitions in batches.
+    int numDone = 0;
     for (int i = 0; i < partNames.size(); i += maxPartitionsPerRpc_) {
       // Get a subset of partition names to fetch.
       List<String> partsToFetch =
           partNames.subList(i, Math.min(i + maxPartitionsPerRpc_, partNames.size()));
       // Fetch these partitions from the metastore.
-      fetchedPartitions.addAll(
-          client.getPartitionsByNames(dbName, tblName, partsToFetch));
+      List<Partition> partitions = client.getPartitionsByNames(
+          msTbl.getDbName(), msTbl.getTableName(), partsToFetch);
+      replaceSchemaFromTable(partitions, msTbl);
+      fetchedPartitions.addAll(partitions);
+      numDone += partitions.size();
+      LOG.info("Fetched {}/{} partitions for table {}.{}", numDone, partNames.size(),
+          msTbl.getDbName(), msTbl.getTableName());
     }
     return fetchedPartitions;
+  }
+
+  /**
+   * A wrapper for HMS add_partitions API to replace the partition-level schema with
+   * table's to save memory.
+   * @return a List containing all added Partitions.
+   */
+  public static List<Partition> addPartitions(IMetaStoreClient client, Table tbl,
+      List<Partition> partitions, boolean ifNotExists, boolean needResults)
+      throws TException {
+    List<Partition> addedPartitions = client.add_partitions(partitions,
+        ifNotExists, needResults);
+    replaceSchemaFromTable(addedPartitions, tbl);
+    return addedPartitions;
+  }
+
+  /**
+   * Replace the column list in the given partitions with the table level schema to save
+   * memory for wide tables (IMPALA-11812). Note that Impala never use the partition
+   * level schema.
+   */
+  public static void replaceSchemaFromTable(List<Partition> partitions, Table msTbl) {
+    for (Partition p : partitions) {
+      p.getSd().setCols(msTbl.getSd().getCols());
+    }
+  }
+
+  /**
+   * Shallow copy the given StorageDescriptor.
+   */
+  public static StorageDescriptor shallowCopyStorageDescriptor(StorageDescriptor other) {
+    return new StorageDescriptor(
+        other.getCols(),
+        other.getLocation(),
+        other.getInputFormat(),
+        other.getOutputFormat(),
+        other.isCompressed(),
+        other.getNumBuckets(),
+        other.getSerdeInfo(),
+        other.getBucketCols(),
+        other.getSortCols(),
+        other.getParameters());
   }
 
   /**

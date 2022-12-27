@@ -74,6 +74,7 @@ import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.AcidUtils;
+import org.apache.impala.util.MetaStoreUtil;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
 
@@ -1873,6 +1874,7 @@ public class MetastoreEvents {
         // it is possible that the added partitions is empty in certain cases. See
         // IMPALA-8847 for example
         msTbl_ = addPartitionMessage_.getTableObj();
+        MetaStoreUtil.replaceSchemaFromTable(addedPartitions_, msTbl_);
         partitionKeyVals_ = new ArrayList<>(addedPartitions_.size());
         for (Partition part : addedPartitions_) {
           partitionKeyVals_.add(getTPartitionSpecFromHmsPartition(msTbl_, part));

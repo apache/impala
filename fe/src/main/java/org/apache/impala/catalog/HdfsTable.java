@@ -1269,7 +1269,7 @@ public class HdfsTable extends Table implements FeFsTable {
           // Load all partitions from Hive Metastore, including file metadata.
           List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions =
               MetaStoreUtil.fetchAllPartitions(
-                  client, db_.getName(), name_, NUM_PARTITION_FETCH_RETRIES);
+                  client, msTbl, NUM_PARTITION_FETCH_RETRIES);
           LOG.info("Fetched partition metadata from the Metastore: " + getFullName());
           storageMetadataLoadTime_ = loadAllPartitions(client, msPartitions, msTbl);
           allPartitionsLdContext.stop();
@@ -1574,11 +1574,11 @@ public class HdfsTable extends Table implements FeFsTable {
       if (partitionsToUpdate != null) {
         partitionList = MetaStoreUtil
             .fetchPartitionsByName(client, Lists.newArrayList(partitionsToUpdate),
-                db_.getName(), name_);
+                msTable_);
       } else {
         partitionList =
             MetaStoreUtil.fetchAllPartitions(
-                client_, db_.getName(), name_, NUM_PARTITION_FETCH_RETRIES);
+                client_, msTable_, NUM_PARTITION_FETCH_RETRIES);
       }
       LOG.debug("Time taken to fetch all partitions of table {}: {} msec", getFullName(),
           sw.stop().elapsed(TimeUnit.MILLISECONDS));
@@ -1838,6 +1838,8 @@ public class HdfsTable extends Table implements FeFsTable {
     }
     addVirtualColumns();
     isSchemaLoaded_ = true;
+    LOG.info("Loaded {} columns from HMS. Actual columns: {}",
+        nonPartFieldSchemas_.size() + numClusteringCols_, colsByPos_.size());
   }
 
   /**
@@ -1858,7 +1860,7 @@ public class HdfsTable extends Table implements FeFsTable {
     // Load partition metadata from Hive Metastore.
     List<Partition> msPartitions = new ArrayList<>(
         MetaStoreUtil.fetchPartitionsByName(
-            client, Lists.newArrayList(partitionNames), db_.getName(), name_));
+            client, Lists.newArrayList(partitionNames), msTable_));
     return loadPartitionsFromMetastore(msPartitions, inprogressPartBuilders,
         partitionToEventId, client);
   }
@@ -2756,8 +2758,7 @@ public class HdfsTable extends Table implements FeFsTable {
     List<Partition> hmsPartitions;
     Map<Partition, HdfsPartition> hmsPartToHdfsPart = new HashMap<>();
     try {
-      hmsPartitions = client.getPartitionsByNames(getDb().getName(),
-          getName(), partNames);
+      hmsPartitions = MetaStoreUtil.fetchPartitionsByName(client, partNames, msTable_);
       for (Partition partition : hmsPartitions) {
         List<LiteralExpr> partExprs = getTypeCompatiblePartValues(partition.getValues());
         HdfsPartition hdfsPartition = getPartition(partExprs);

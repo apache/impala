@@ -2388,6 +2388,17 @@ select * from functional.{table_name};
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+widetable_2000_cols_partitioned
+---- PARTITION_COLUMNS
+p int
+---- COLUMNS
+`${IMPALA_HOME}/testdata/common/widetable.py --get_columns -n 2000
+---- ROW_FORMAT
+delimited fields terminated by ',' escaped by '\\'
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 avro_decimal_tbl
 ---- COLUMNS
 name STRING
