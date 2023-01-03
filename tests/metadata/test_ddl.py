@@ -907,6 +907,7 @@ class TestDdlStatements(TestDdlBase):
     comment = self._get_column_comment(table, 'j')
     assert "comment4" == comment
 
+  @UniqueDatabase.parametrize(sync_ddl=True)
   def test_describe_materialized_view(self, vector, unique_database):
     vector.get_value('exec_option')['abort_on_error'] = False
     self.run_test_case('QueryTest/describe-materialized-view', vector,
