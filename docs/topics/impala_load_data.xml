@@ -258,6 +258,9 @@ Returned 1 row(s) in 0.62s</codeblock>
     <p conref="../shared/impala_common.xml#common/hbase_blurb"/>
     <p conref="../shared/impala_common.xml#common/hbase_no_load_data"/>
 
+    <p conref="../shared/impala_common.xml#common/iceberg_blurb"/>
+    <p conref="../shared/impala_common.xml#common/iceberg_load_data"/>
+
     <p conref="../shared/impala_common.xml#common/related_info"/>
     <p>
       The <codeph>LOAD DATA</codeph> statement is an alternative to the

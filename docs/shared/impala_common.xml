@@ -3364,6 +3364,15 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
         <b>HBase considerations:</b> This data type cannot be used with HBase tables.
       </p>
 
+      <p id="iceberg_blurb">
+        <b>Iceberg considerations:</b>
+      </p>
+
+      <p id="iceberg_load_data">
+        See <xref href="../topics/impala_iceberg.xml#iceberg_load"/> for details about
+        <codeph>LOAD DATA</codeph> with Iceberg.
+      </p>
+
       <p id="internals_blurb">
         <b>Internal details:</b>
       </p>

@@ -442,6 +442,24 @@ INSERT INTO ice_p VALUES (1, 2);
     </conbody>
   </concept>
 
+  <concept id="iceberg_load">
+    <title>Loading data into Iceberg tables</title>
+    <conbody>
+      <p>
+        <codeph>LOAD DATA</codeph> statement can be used to load a single file or directory into
+        an existing Iceberg table. This operation is executed differently compared to HMS tables, the
+        data is being inserted into the table via sequentially executed statements, which has
+        some limitations:
+        <ul>
+          <li>Only Parquet or ORC files can be loaded.</li>
+          <li><codeph>PARTITION</codeph> clause is not supported, but the partition transformations
+          are respected.</li>
+          <li>The loaded files will be re-written as Parquet files.</li>
+        </ul>
+      </p>
+    </conbody>
+  </concept>
+
   <concept id="iceberg_time_travel">
     <title>Time travel for Iceberg tables</title>
     <conbody>
