@@ -185,9 +185,9 @@ class ExecEnv {
   int64_t admit_mem_limit() const { return admit_mem_limit_; }
   int64_t admission_slots() const { return admission_slots_; }
 
-  const NetworkAddressPB& admission_service_address() const {
-    return admission_service_address_;
-  }
+  /// Gets the resolved IP address and port where the admission control service is
+  /// running, if enabled.
+  Status GetAdmissionServiceAddress(NetworkAddressPB& address) const;
 
   /// Returns true if the admission control service is enabled.
   bool AdmissionServiceEnabled() const;
@@ -295,10 +295,6 @@ class ExecEnv {
   /// The number of slots limits the number of queries that can run concurrently on
   /// this backend. Queries take up multiple slots only when mt_dop > 1.
   int64_t admission_slots_;
-
-  /// If the admission control service is enabled, the resolved IP address and port where
-  /// the service is running.
-  NetworkAddressPB admission_service_address_;
 
   /// Initialize ExecEnv based on Hadoop config from frontend.
   Status InitHadoopConfig();

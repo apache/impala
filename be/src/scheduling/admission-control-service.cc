@@ -116,9 +116,12 @@ void AdmissionControlService::Join() {
 
 Status AdmissionControlService::GetProxy(
     unique_ptr<AdmissionControlServiceProxy>* proxy) {
+  NetworkAddressPB admission_service_address;
+  RETURN_IF_ERROR(ExecEnv::GetInstance()->GetAdmissionServiceAddress(
+      admission_service_address));
   // Create a AdmissionControlService proxy to the destination.
   RETURN_IF_ERROR(ExecEnv::GetInstance()->rpc_mgr()->GetProxy(
-      ExecEnv::GetInstance()->admission_service_address(), FLAGS_admission_service_host,
+      admission_service_address, FLAGS_admission_service_host,
       proxy));
   return Status::OK();
 }

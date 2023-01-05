@@ -273,15 +273,6 @@ ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
         FLAGS_metrics_webserver_port, metrics_.get(), Webserver::AuthMode::NONE));
   }
 
-  if (AdmissionServiceEnabled()) {
-    IpAddr ip;
-    ABORT_IF_ERROR(HostnameToIpAddr(FLAGS_admission_service_host, &ip));
-    // TODO: get BackendId of admissiond in global admission control mode.
-    // Use admissiond's IP address as unique ID for UDS now.
-    admission_service_address_ = MakeNetworkAddressPB(
-        ip, FLAGS_admission_service_port, UdsAddressUniqueIdPB::IP_ADDRESS);
-  }
-
   exec_env_ = this;
 }
 
@@ -634,6 +625,19 @@ Status ExecEnv::GetKuduClient(const vector<string>& master_addresses,
 
 bool ExecEnv::AdmissionServiceEnabled() const {
   return !FLAGS_admission_service_host.empty();
+}
+
+Status ExecEnv::GetAdmissionServiceAddress(
+    NetworkAddressPB& admission_service_address) const {
+  if (AdmissionServiceEnabled()) {
+    IpAddr ip;
+    RETURN_IF_ERROR(HostnameToIpAddr(FLAGS_admission_service_host, &ip));
+    // TODO: get BackendId of admissiond in global admission control mode.
+    // Use admissiond's IP address as unique ID for UDS now.
+    admission_service_address = MakeNetworkAddressPB(
+        ip, FLAGS_admission_service_port, UdsAddressUniqueIdPB::IP_ADDRESS);
+  }
+  return Status::OK();
 }
 
 } // namespace impala

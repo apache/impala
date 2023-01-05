@@ -2826,7 +2826,7 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
     if (!get_proxy_status.ok()) {
       LOG(ERROR) << "Admission heartbeat thread was unabe to get an "
                     "AdmissionControlService proxy:"
-                 << get_proxy_status;
+                 << get_proxy_status.GetDetail();
       continue;
     }
 
