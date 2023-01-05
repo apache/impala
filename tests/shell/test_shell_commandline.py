@@ -374,7 +374,7 @@ class TestImpalaShell(ImpalaTestSuite):
 
   def test_runtime_profile(self, vector):
     if vector.get_value('strict_hs2_protocol'):
-      pytest.skip("Runtime profile not support in strict hs2 mode.")
+      pytest.skip("Runtime profile is not supported in strict hs2 mode.")
     # test summary is in both the profile printed by the
     # -p option and the one printed by the profile command
     args = ['-p', '-q', 'select 1; profile;']
@@ -384,6 +384,61 @@ class TestImpalaShell(ImpalaTestSuite):
     # We expect two query profiles.
     assert len(re.findall(regex, result_set.stdout)) == 2, \
         "Could not detect two profiles, stdout: %s" % result_set.stdout
+
+  def test_runtime_profile_referenced_tables(self, vector, unique_database):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Runtime profile is not supported in strict hs2 mode.")
+    db = unique_database
+    base_args = ['-p', '-q']
+
+    statements = ['select id from %s.shell_profile_test' % db,
+                  'alter table %s.shell_profile_test add column b int' % db,
+                  'insert into %s.shell_profile_test(id) values (1)' % db,
+                  'truncate table %s.shell_profile_test' % db,
+                  'drop table %s.shell_profile_test' % db]
+
+    args = base_args + ['create table %s.shell_profile_test (id int)' % db]
+    create = run_impala_shell_cmd(vector, args)
+    assert "Referenced Tables: \n" in create.stdout
+
+    for statement in statements:
+      args = base_args + [statement]
+      result = run_impala_shell_cmd(vector, args)
+      assert "Referenced Tables: %s.shell_profile_test" % unique_database in result.stdout
+
+  def test_runtime_profile_multiple_referenced_tables(self, vector, unique_database):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Runtime profile is not supported in strict hs2 mode.")
+
+    def get_referenced_tables(profile):
+      return re.findall(r'Referenced Tables: (.*)', profile)[0].split(', ')
+
+    db = unique_database
+    base_args = ['-p', '-q']
+
+    for i in range(0, 2):
+      args = base_args + ['create table %s.shell_profile_test%d (id int)' % (db, i)]
+      run_impala_shell_cmd(vector, args)
+
+    args = base_args + ["select * from {db}.shell_profile_test0 t0 inner join "
+                        "{db}.shell_profile_test1 t1 on t0.id = t1.id".format(db=db)]
+    result = run_impala_shell_cmd(vector, args)
+    referenced_tables = get_referenced_tables(result.stdout)
+
+    assert len(referenced_tables) == 2
+    for i in range(0, 2):
+      assert "{db}.shell_profile_test{index}".format(db=db, index=i) in referenced_tables
+
+    args = base_args + ["select * from {db}.shell_profile_test0 t0 inner join "
+                        "{db}.shell_profile_test1 t1 on t0.id = t1.id inner join "
+                        "{db}.shell_profile_test1 t11 on t0.id = t11.id".format(db=db)]
+
+    result = run_impala_shell_cmd(vector, args)
+    referenced_tables = get_referenced_tables(result.stdout)
+
+    assert len(referenced_tables) == 2
+    for i in range(0, 2):
+      assert "{db}.shell_profile_test{index}".format(db=db, index=i) in referenced_tables
 
   def test_summary(self, vector):
     if vector.get_value('strict_hs2_protocol'):

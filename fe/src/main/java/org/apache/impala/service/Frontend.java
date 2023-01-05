@@ -2054,6 +2054,13 @@ public class Frontend {
     //TODO (IMPALA-8788): should load table write ids in transaction context.
     StmtTableCache stmtTableCache = metadataLoader.loadTables(stmt);
 
+    // Add referenced tables to frontend profile
+    FrontendProfile.getCurrent().addInfoString("Referenced Tables",
+        stmtTableCache.tables.keySet()
+            .stream()
+            .map(TableName::toString)
+            .collect(Collectors.joining(", ")));
+
     // Analyze and authorize stmt
     AnalysisContext analysisCtx = new AnalysisContext(queryCtx, authzFactory_, timeline);
     AnalysisResult analysisResult = analysisCtx.analyzeAndAuthorize(stmt, stmtTableCache,

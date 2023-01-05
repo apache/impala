@@ -288,6 +288,7 @@ class TestObservability(ImpalaTestSuite):
     else:
       load_event_regexes = [
         r'Frontend:',
+        r'Referenced Tables:',
         r'CatalogFetch.ColumnStats.Hits',
         r'CatalogFetch.ColumnStats.Misses',
         r'CatalogFetch.ColumnStats.Requests',
