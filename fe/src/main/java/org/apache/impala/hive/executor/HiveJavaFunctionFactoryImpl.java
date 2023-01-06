@@ -16,7 +16,6 @@
 // under the License.
 
 package org.apache.impala.hive.executor;
-
 import org.apache.hadoop.hive.metastore.api.Function;
 import org.apache.hadoop.hive.metastore.api.FunctionType;
 import org.apache.hadoop.hive.metastore.api.ResourceType;
@@ -24,28 +23,29 @@ import org.apache.hadoop.hive.metastore.api.ResourceUri;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Type;
-
 import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-
 import java.util.ArrayList;
 import java.util.List;
-
 /**
  * Factory class to create the HiveJavaFunction instance.
  */
 public class HiveJavaFunctionFactoryImpl implements HiveJavaFunctionFactory {
+  private final String localLibPath_;
+  public HiveJavaFunctionFactoryImpl(String localLibPath) {
+    localLibPath_ = localLibPath;
+  }
+
   /**
    * The local path contains a directory on the local file system to which the
    * jar file on hdfs can be copied.
    */
-  public HiveJavaFunction create(String localLibPath, Function hiveFn,
-      Type retType, Type[] paramTypes) throws CatalogException {
+  public HiveJavaFunction create(Function hiveFn, Type retType, Type[] paramTypes)
+      throws CatalogException {
     checkValidFunction(hiveFn);
     String jarUri = hiveFn.getResourceUris().get(0).getUri();
     String fnName = hiveFn.getDbName() + "." + hiveFn.getFunctionName();
-    try (HiveUdfLoader javaClass
-        = HiveUdfLoader.createWithLocalPath(localLibPath, hiveFn)) {
+    try (HiveUdfLoader javaClass =
+             HiveUdfLoader.createWithLocalPath(localLibPath_, hiveFn)) {
       switch (javaClass.getUDFClassType()) {
         case UDF:
           return new HiveLegacyJavaFunction(javaClass.getUDFClass(), hiveFn, retType,
@@ -61,20 +61,15 @@ public class HiveJavaFunctionFactoryImpl implements HiveJavaFunctionFactory {
     }
   }
 
-  public HiveJavaFunction create(String localLibPath,
-      ScalarFunction fn) throws CatalogException {
+  public HiveJavaFunction create(ScalarFunction fn) throws CatalogException {
     if (fn.hasVarArgs()) {
       throw new CatalogException("Variable arguments not supported in Hive UDFs.");
     }
-    return create(localLibPath, HiveJavaFunction.toHiveFunction((ScalarFunction) fn),
-        fn.getReturnType(), fn.getArgs());
+    return create(HiveJavaFunction.toHiveFunction(fn), fn.getReturnType(), fn.getArgs());
   }
-
-  public HiveJavaFunction create(String localLibPath, Function hiveFn)
-      throws CatalogException {
-    return create(localLibPath, hiveFn, null, null);
+  public HiveJavaFunction create(Function hiveFn) throws CatalogException {
+    return create(hiveFn, null, null);
   }
-
   /**
    * Checks if the Hive function 'fn' is Impala compatible. A function is Impala
    * compatible iff
@@ -87,7 +82,7 @@ public class HiveJavaFunctionFactoryImpl implements HiveJavaFunctionFactory {
    * Returns true if compatible and false otherwise. In case of incompatible
    * functions 'incompatMsg' has the reason for the incompatibility.
    * */
-   private void checkValidFunction(Function fn) throws CatalogException {
+  private void checkValidFunction(Function fn) throws CatalogException {
     String errorPrefix = "Skipping load of incompatible function: " +
         fn.getFunctionName() + ". ";
     if (fn.getFunctionType() != FunctionType.JAVA) {
@@ -109,10 +104,9 @@ public class HiveJavaFunctionFactoryImpl implements HiveJavaFunctionFactory {
           + "Jars for dependencies. (" + Joiner.on(",").join(resourceUris) + ") ");
     }
     if (fn.getResourceUris().get(0).getResourceType() != ResourceType.JAR) {
-      throw new CatalogException(errorPrefix + "Function binary type: " +
-        fn.getResourceUris().get(0).getResourceType().name()
-        + " is not supported. Only " + ResourceType.JAR.name()
-        + " type is supported.");
+      throw new CatalogException(errorPrefix + "Function binary type: "
+          + fn.getResourceUris().get(0).getResourceType().name()
+          + " is not supported. Only " + ResourceType.JAR.name() + " type is supported.");
     }
   }
 }

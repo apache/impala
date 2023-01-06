@@ -17,48 +17,22 @@
 
 package org.apache.impala.hive.executor;
 
-import org.apache.commons.lang.exception.ExceptionUtils;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.Function;
-import org.apache.hadoop.hive.metastore.api.FunctionType;
-import org.apache.hadoop.hive.metastore.api.PrincipalType;
-import org.apache.hadoop.hive.metastore.api.ResourceType;
-import org.apache.hadoop.hive.metastore.api.ResourceUri;
-import org.apache.hadoop.hive.ql.exec.FunctionUtils.UDFClassType;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
-import org.apache.impala.analysis.FunctionName;
-import org.apache.impala.analysis.HdfsUri;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.ScalarFunction;
-import org.apache.impala.catalog.PrimitiveType;
-import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
-import org.apache.impala.common.AnalysisException;
-import org.apache.impala.common.FileSystemUtil;
-import org.apache.impala.service.BackendConfig;
-import org.apache.impala.thrift.TFunction;
-import org.apache.impala.thrift.TFunctionBinaryType;
 
-import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.UUID;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 import org.apache.log4j.Logger;
 
@@ -111,7 +85,8 @@ public class HiveGenericJavaFunction implements HiveJavaFunction {
    * handle it.
    */
   @Override
-  public List<ScalarFunction> extract() throws CatalogException {
+  public List<ScalarFunction> extract(HiveLegacyFunctionExtractor extractor)
+      throws CatalogException {
     // Return blank list because extraction cannot be done.
     return new ArrayList<>();
   }

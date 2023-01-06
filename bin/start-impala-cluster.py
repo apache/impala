@@ -141,6 +141,10 @@ parser.add_option("--enable_admission_service", dest="enable_admission_service",
 parser.add_option("--enable_external_fe_support", dest="enable_external_fe_support",
                   action="store_true", default=False,
                   help="If true, impalads will start with the external_fe_port defined.")
+parser.add_option("--geospatial_library", dest="geospatial_library",
+                  action="store", default="HIVE_ESRI",
+                  help="Sets which implementation of geospatial libraries should be "
+                  "initialized")
 
 # For testing: list of comma-separated delays, in milliseconds, that delay impalad catalog
 # replica initialization. The ith delay is applied to the ith impalad.
@@ -422,6 +426,10 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
     if options.enable_admission_service:
       args = "{args} -admission_service_host={host}".format(
           args=args, host=admissiond_host)
+
+    if "geospatial_library" not in args:
+      args = "{args} -geospatial_library={geospatial_library}".format(
+          args=args, geospatial_library=options.geospatial_library)
 
     # Appended at the end so they can override previous args.
     if i < len(per_impalad_args):

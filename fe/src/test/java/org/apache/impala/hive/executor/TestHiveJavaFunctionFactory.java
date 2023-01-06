@@ -27,9 +27,9 @@ import java.util.List;
 
 public class TestHiveJavaFunctionFactory implements HiveJavaFunctionFactory {
   public static class TestHiveJavaFunction implements HiveJavaFunction {
-
     @Override
-    public List<ScalarFunction> extract() throws CatalogException {
+    public List<ScalarFunction> extract(HiveLegacyFunctionExtractor extractor)
+        throws CatalogException {
       return new ArrayList<>();
     }
 
@@ -38,18 +38,16 @@ public class TestHiveJavaFunctionFactory implements HiveJavaFunctionFactory {
     }
   }
 
-  public HiveJavaFunction create(String localLibPath, Function hiveFn,
-      Type retType, Type[] paramTypes) throws CatalogException {
-    return new TestHiveJavaFunction();
-  }
-
-  public HiveJavaFunction create(String localLibPath,
-      ScalarFunction fn) throws CatalogException {
-    return new TestHiveJavaFunction();
-  }
-
-  public HiveJavaFunction create(String localLibPath, Function hiveFn)
+  public HiveJavaFunction create(Function hiveFn, Type retType, Type[] paramTypes)
       throws CatalogException {
+    return new TestHiveJavaFunction();
+  }
+
+  public HiveJavaFunction create(ScalarFunction fn) throws CatalogException {
+    return new TestHiveJavaFunction();
+  }
+
+  public HiveJavaFunction create(Function hiveFn) throws CatalogException {
     return new TestHiveJavaFunction();
   }
 }

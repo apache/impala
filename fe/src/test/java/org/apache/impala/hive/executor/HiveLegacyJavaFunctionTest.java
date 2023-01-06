@@ -144,11 +144,12 @@ public class HiveLegacyJavaFunctionTest {
   public void testExtractFailNoEvaluateMethods() {
     ExpectedFunctions expectedFuncs = new ExpectedFunctions();
     Class<?> udfClass = DummyUDF.class;
+    String expectedFunctionName = (udfClass.getSimpleName() + FN).toLowerCase();
     try {
       testScalar(udfClass, expectedFuncs);
     } catch (CatalogException e) {
       Assert.assertTrue(e.getMessage().contains(
-          "No compatible function signatures found."));
+          "No compatible signatures found for function: " + expectedFunctionName));
       return;
     }
     Assert.fail("Extraction should not have succeeded.");

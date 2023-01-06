@@ -17,27 +17,22 @@
 
 package org.apache.impala.hive.executor;
 
-import org.apache.hadoop.hive.serde2.io.DoubleWritable;
+import org.apache.hadoop.io.BytesWritable;
+import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.PrimitiveType;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.common.ImpalaException;
 
-import org.apache.impala.util.UnsafeUtil;
-
-@SuppressWarnings("restriction")
-public class ImpalaDoubleWritable extends DoubleWritable {
-  // Ptr (to native heap) where the value should be read from and written to.
-  private final long ptr_;
-
-  public ImpalaDoubleWritable(long ptr) {
-    ptr_ = ptr;
-  }
-
+public class BinaryToBinaryHiveLegacyFunctionExtractor
+    extends HiveLegacyFunctionExtractor {
   @Override
-  public double get() { return UnsafeUtil.UNSAFE.getDouble(ptr_); }
-
-  @Override
-  public void set(double v) { UnsafeUtil.UNSAFE.putDouble(ptr_, v); }
-
-  @Override
-  public String toString() {
-    return Double.toString(get());
+  protected ScalarType resolveType(
+      Class<?> type, java.util.function.Function<JavaUdfDataType, String> errorHandler)
+      throws ImpalaException {
+    if (type == BytesWritable.class) {
+      return ScalarType.createType(PrimitiveType.BINARY);
+    } else {
+      return super.resolveType(type, errorHandler);
+    }
   }
 }

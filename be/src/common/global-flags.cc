@@ -375,6 +375,17 @@ DEFINE_bool(pull_table_types_and_comments, false,
     "catalogd-only flag. Required if users want GET_TABLES requests return correct table "
     "types or comments.");
 
+// TGeospatialLibrary's values are mapped here as constants
+static const string geo_lib_none = "NONE";
+static const string geo_lib_hive_esri = "HIVE_ESRI";
+
+static const string geo_lib_help_msg =
+    "Specifies which implementation of "
+    "geospatial functions should be included as builtins. Possible values: [\""
+    + geo_lib_none + "\", \"" + geo_lib_hive_esri + "\"]";
+
+DEFINE_string(geospatial_library, geo_lib_none, geo_lib_help_msg.c_str());
+
 // ++========================++
 // || Startup flag graveyard ||
 // ++========================++

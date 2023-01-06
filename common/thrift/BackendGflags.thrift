@@ -23,6 +23,13 @@ enum TReservedWordsVersion {
   IMPALA_3_0 = 1
 }
 
+
+// Options for Geospatial function library support
+enum TGeospatialLibrary{
+  NONE,
+  HIVE_ESRI
+}
+
 // Used to pass gflags from backend to frontend, JniCatalog and JniFrontend
 // Attributes without comments correspond to gflags
 struct TBackendGflags {
@@ -231,4 +238,6 @@ struct TBackendGflags {
   103: required string ignored_dir_prefix_list
 
   104: required bool enable_reload_events
+
+  105: required TGeospatialLibrary geospatial_library
 }

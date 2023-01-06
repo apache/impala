@@ -15,29 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.hive.executor;
+package org.apache.impala.compat;
 
-import org.apache.hadoop.hive.serde2.io.DoubleWritable;
+import org.apache.impala.catalog.Db;
 
-import org.apache.impala.util.UnsafeUtil;
+public class HiveEsriGeospatialBuiltins {
+  /**
+   * Apache Hive 3 does not include geospatial functions
+   */
+  public static void initBuiltins(Db db) {
 
-@SuppressWarnings("restriction")
-public class ImpalaDoubleWritable extends DoubleWritable {
-  // Ptr (to native heap) where the value should be read from and written to.
-  private final long ptr_;
-
-  public ImpalaDoubleWritable(long ptr) {
-    ptr_ = ptr;
-  }
-
-  @Override
-  public double get() { return UnsafeUtil.UNSAFE.getDouble(ptr_); }
-
-  @Override
-  public void set(double v) { UnsafeUtil.UNSAFE.putDouble(ptr_, v); }
-
-  @Override
-  public String toString() {
-    return Double.toString(get());
   }
 }

@@ -15,10 +15,16 @@
 # specific language governing permissions and limitations
 # under the License.
 
-add_custom_target(validate_java_pom_versions ALL
-  COMMAND $ENV{IMPALA_HOME}/bin/validate-java-pom-versions.sh
-)
+from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfApacheHive
 
-add_custom_target(java ALL DEPENDS gen-deps function-registry geospatial-udf-wrappers validate_java_pom_versions
-  COMMAND $ENV{IMPALA_HOME}/bin/mvn-quiet.sh -B install -DskipTests
-)
+
+class TestGeospatialFuctions(ImpalaTestSuite):
+  """Tests the geospatial builtin functions"""
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @SkipIfApacheHive.feature_not_supported
+  def test_esri_geospatial_functions(self, vector):
+    self.run_test_case('QueryTest/geospatial-esri', vector)

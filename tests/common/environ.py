@@ -81,6 +81,8 @@ else:
   MANAGED_WAREHOUSE_DIR = 'test-warehouse'
 EXTERNAL_WAREHOUSE_DIR = 'test-warehouse'
 
+IS_APACHE_HIVE = os.environ.get("USE_APACHE_HIVE", False) == 'true'
+
 # Resolve any symlinks in the path.
 impalad_basedir = \
     os.path.realpath(os.path.join(IMPALA_HOME, 'be/build', build_type_dir)).rstrip('/')

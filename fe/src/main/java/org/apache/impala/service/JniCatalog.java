@@ -155,7 +155,8 @@ public class JniCatalog {
     authzManager_ = authzFactory.newAuthorizationManager(catalog_);
     catalog_.setAuthzManager(authzManager_);
     catalogOpExecutor_ = new CatalogOpExecutor(catalog_, authzConfig, authzManager_,
-        new HiveJavaFunctionFactoryImpl());
+        new HiveJavaFunctionFactoryImpl(
+            BackendConfig.INSTANCE.getBackendCfg().local_library_path));
     MetastoreEventFactory eventFactory =
         new EventFactoryForSyncToLatestEvent(catalogOpExecutor_);
     catalog_.setEventFactoryForSyncToLatestEvent(eventFactory);

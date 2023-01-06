@@ -112,6 +112,7 @@ the same dependencies
                 <include>org/apache/hive/common/HiveVersionAnnotation.class</include>
                 <include>org/apache/hadoop/hive/ql/ErrorMsg.class</include>
                 <include>com/google/**</include>
+                <include>com/esri/**</include>
                 <!-- IMPALA-10261: Some versions of Hive shade guava, so include
                  the shaded path as well -->
                 <include>org/apache/hive/com/google/**</include>

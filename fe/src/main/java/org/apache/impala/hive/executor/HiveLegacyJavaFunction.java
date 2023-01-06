@@ -19,14 +19,10 @@ package org.apache.impala.hive.executor;
 
 import org.apache.hadoop.hive.metastore.api.Function;
 import org.apache.hadoop.hive.ql.exec.UDF;
-import org.apache.impala.analysis.FunctionName;
-import org.apache.impala.analysis.HdfsUri;
 import org.apache.impala.catalog.CatalogException;
-import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
-import org.apache.impala.thrift.TFunctionBinaryType;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -38,7 +34,8 @@ import java.util.Set;
 
 import com.google.common.base.Joiner;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * HiveLegacyJavaFunction generates the instance of the UDF object given
@@ -48,7 +45,7 @@ import org.apache.log4j.Logger;
  * Java reflection.
  */
 public class HiveLegacyJavaFunction implements HiveJavaFunction {
-  private static final Logger LOG = Logger.getLogger(HiveLegacyJavaFunction.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HiveLegacyJavaFunction.class);
 
   // By convention, the function in the class must be called evaluate()
   private static final String UDF_FUNCTION_NAME = "evaluate";
@@ -136,31 +133,30 @@ public class HiveLegacyJavaFunction implements HiveJavaFunction {
    * class referred to by the given Java function. This method copies the UDF Jar
    * referenced in the function definition to a temporary file in localLibraryPath_ and
    * loads it into the jvm. Then we scan all the methods in the class using reflection and
-   * extract those methods and create corresponding Impala functions. Currently Impala
+   * extract those methods and create corresponding Impala functions. Currently, Impala
    * supports only "JAR" files for symbols and also a single Jar containing all the
    * dependent classes rather than a set of Jar files.
    */
   @Override
-  public List<ScalarFunction> extract() throws CatalogException {
+  public List<ScalarFunction> extract(HiveLegacyFunctionExtractor extractor)
+      throws CatalogException {
     Set<String> addedSignatures = new HashSet<>();
     List<ScalarFunction> result = new ArrayList<>();
-    String jarUri = hiveFn_.getResourceUris().get(0).getUri();
     // Load each method in the UDF class and create the corresponding Impala Function
     // object.
     try {
       for (Method m: UDF_.getClass().getMethods()) {
         if (m.getName().equals(UDF_FUNCTION_NAME)) {
-          ScalarFunction fn = fromHiveFunction(hiveFn_.getDbName(),
-              hiveFn_.getFunctionName(), hiveFn_.getClassName(),
-              m.getParameterTypes(), m.getReturnType(), jarUri);
+          ScalarFunction fn = extractor.extract(hiveFn_, m);
           if (fn != null) {
             if (!addedSignatures.contains(fn.signatureString())) {
               result.add(fn);
               addedSignatures.add(fn.signatureString());
             }
           } else {
-            LOG.warn("Ignoring incompatible method: " + m.toString() + " during load of "
-                + "Hive UDF:" + hiveFn_.getFunctionName() + " from " + UDF_.getClass());
+            LOG.warn(
+                "Ignoring incompatible method: {} during load of Hive UDF: {} from {}", m,
+                hiveFn_.getFunctionName(), UDF_.getClass());
           }
         }
       }
@@ -173,7 +169,8 @@ public class HiveLegacyJavaFunction implements HiveJavaFunction {
           ":  " + t);
     }
     if (result.isEmpty()) {
-      throw new CatalogException("No compatible function signatures found.");
+      throw new CatalogException(
+          "No compatible signatures found for function: " + hiveFn_.getFunctionName());
     }
     return result;
   }
@@ -236,48 +233,5 @@ public class HiveLegacyJavaFunction implements HiveJavaFunction {
       .append("UDF contains: \n    ")
       .append(Joiner.on("\n    ").join(signatures));
     return sb.toString();
-  }
-
-  /**
-   * Creates a Function object based on following inputs.
-   * @param dbName Name of fn's database
-   * @param fnName Name of the function
-   * @param fnClass Function symbol name
-   * @param fnArgs List of Class objects corresponding to the args of evaluate method
-   * @param fnRetType Class corresponding to the return type of the evaluate method
-   * @param hdfsUri URI of the jar holding the udf class.
-   * @return Function object corresponding to the hive udf if the parameters are
-   *         compatible, null otherwise.
-   */
-  private ScalarFunction fromHiveFunction(String dbName, String fnName, String fnClass,
-      Class<?>[] fnArgs, Class<?> fnRetType, String hdfsUri) {
-    // Check if the return type and the method arguments are supported.
-    // Currently we only support certain primitive types.
-    JavaUdfDataType javaRetType = JavaUdfDataType.getType(fnRetType);
-    if (javaRetType == JavaUdfDataType.INVALID_TYPE) {
-      LOG.debug("Processing " + fnClass + ", return type " + fnRetType +
-          " not supported.");
-      return null;
-    }
-    List<Type> fnArgsList = new ArrayList<>();
-    for (Class<?> argClass: fnArgs) {
-      JavaUdfDataType javaUdfType = JavaUdfDataType.getType(argClass);
-      if (javaUdfType == JavaUdfDataType.INVALID_TYPE) {
-        LOG.debug("Processing " + fnClass + ", param type " + argClass +
-            " not supported.");
-        return null;
-      }
-      fnArgsList.add(ScalarType.createType(
-          PrimitiveType.fromThrift(javaUdfType.getPrimitiveType())));
-    }
-    ScalarType retType = ScalarType.createType(
-        PrimitiveType.fromThrift(javaRetType.getPrimitiveType()));
-    ScalarFunction fn = new ScalarFunction(new FunctionName(dbName, fnName), fnArgsList,
-        retType, new HdfsUri(hdfsUri), fnClass, null, null);
-    // We do not support varargs for Java UDFs, and neither does Hive.
-    fn.setHasVarArgs(false);
-    fn.setBinaryType(TFunctionBinaryType.JAVA);
-    fn.setIsPersistent(true);
-    return fn;
   }
 }

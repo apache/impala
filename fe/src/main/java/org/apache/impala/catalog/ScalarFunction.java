@@ -48,8 +48,8 @@ public class ScalarFunction extends Function {
     super(fnName, argTypes, retType, hasVarArgs);
   }
 
-  public ScalarFunction(FunctionName fnName, Type argTypes[], Type retType,
-      boolean hasVarArgs) {
+  public ScalarFunction(
+      FunctionName fnName, Type[] argTypes, Type retType, boolean hasVarArgs) {
     super(fnName, argTypes, retType, hasVarArgs);
   }
 

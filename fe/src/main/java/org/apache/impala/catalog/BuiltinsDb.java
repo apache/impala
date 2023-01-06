@@ -33,11 +33,13 @@ import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.LikePredicate;
 import org.apache.impala.builtins.ScalarBuiltins;
-import org.apache.impala.catalog.AggregateFunction;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.base.Preconditions;
+import org.apache.impala.compat.HiveEsriGeospatialBuiltins;
+import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TGeospatialLibrary;
 
 public class BuiltinsDb extends Db {
   // Size in bytes of AvgState used for integer, floating point, and timestamp avg().
@@ -111,6 +113,11 @@ public class BuiltinsDb extends Db {
     IsNullPredicate.initBuiltins(this);
     LikePredicate.initBuiltins(this);
     ScalarBuiltins.initBuiltins(this);
+
+    if (BackendConfig.INSTANCE.getGeospatialLibrary().equals(
+            TGeospatialLibrary.HIVE_ESRI)) {
+      HiveEsriGeospatialBuiltins.initBuiltins(this);
+    }
   }
 
   private static final String BUILTINS_DB_COMMENT = "System database for Impala builtin functions";

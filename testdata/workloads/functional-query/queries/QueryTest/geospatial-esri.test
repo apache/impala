@@ -1,0 +1,2718 @@
+=====
+---- QUERY
+select ST_Area(ST_BinEnvelope(1.0, ST_Bin(1.0, ST_Point(0, 0))));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_AsText(ST_BinEnvelope(1.0, ST_Bin(1.0, ST_Point(0, 0))));
+---- TYPES
+STRING
+---- RESULTS
+'POLYGON ((-0.5 -0.5, 0.5 -0.5, 0.5 0.5, -0.5 0.5, -0.5 -0.5))'
+=====
+---- QUERY
+select ST_GeometryType(ST_Point(0, 0));
+---- RESULTS
+'ST_POINT'
+====
+---- QUERY
+select ST_GeometryType(ST_Point('point (10.02 20.01)'));
+---- RESULTS
+'ST_POINT'
+====
+---- QUERY
+select ST_GeometryType(ST_Point('point z (10.02 20.01 2)'));
+---- RESULTS
+'ST_POINT'
+====
+---- QUERY
+select ST_GeometryType(ST_MultiPoint('multipoint ((1 2))'));
+---- RESULTS
+'ST_MULTIPOINT'
+====
+---- QUERY
+select ST_GeometryType(ST_Linestring(10,10, 20,20));
+---- RESULTS
+'ST_LINESTRING'
+====
+---- QUERY
+select ST_GeometryType(ST_Linestring('linestring (10 10, 20 20)'));
+---- RESULTS
+'ST_LINESTRING'
+====
+---- QUERY
+select ST_GeometryType(ST_Linestring('linestring z (10 10 2, 20 20 4)'));
+---- RESULTS
+'ST_LINESTRING'
+====
+---- QUERY
+select ST_GeometryType(ST_GeomFromText('polygon ((0 0, 0 10, 10 0, 0 0))'));
+---- RESULTS
+'ST_POLYGON'
+====
+---- QUERY
+select ST_GeometryType(ST_Polygon('polygon ((0 0, 0 10, 10 0, 0 0))'));
+---- RESULTS
+'ST_POLYGON'
+====
+---- QUERY
+select ST_GeometryType(ST_Polygon(1,1, 1,4, 4,1));
+---- RESULTS
+'ST_POLYGON'
+====
+---- QUERY
+select ST_GeometryType(ST_Polygon(1,1, 4,1, 1,4));
+---- RESULTS
+'ST_POLYGON'
+====
+---- QUERY
+select ST_GeometryType(ST_Polygon(1,1, 1,4, 4,1, 1,1));
+---- RESULTS
+'ST_POLYGON'
+====
+---- QUERY
+select ST_GeometryType(ST_Polygon(1,1, 4,1, 1,4, 1,1));
+---- RESULTS
+'ST_POLYGON'
+====
+---- QUERY
+select ST_GeometryType(ST_GeomFromGeoJson('{"type":"Point", "coordinates":[1.2, 2.4]}'));
+---- RESULTS
+'ST_POINT'
+====
+---- QUERY
+select ST_X(ST_GeomFromGeoJson('{"type":"Point", "coordinates":[1.2, 2.4]}'));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.2
+====
+---- QUERY
+select ST_Y(ST_GeomFromGeoJson('{"type":"Point", "coordinates":[1.2, 2.4]}'));
+---- TYPES
+DOUBLE
+---- RESULTS
+2.4
+====
+---- QUERY
+select ST_MinY(ST_GeomFromGeoJson('{"type":"LineString", "coordinates":[[1,2], [3,4]]}'));
+---- TYPES
+DOUBLE
+---- RESULTS
+2.0
+====
+---- QUERY
+select ST_GeometryType(ST_GeomFromGeoJson(ST_AsGeoJson(ST_Point(1.2, 2.4))));
+---- RESULTS
+'ST_POINT'
+====
+---- QUERY
+select ST_GeometryType(ST_GeomFromGeoJson(ST_AsGeoJson(ST_LineString(1,2, 3,4))));
+---- RESULTS
+'ST_LINESTRING'
+====
+---- QUERY
+select ST_NumPoints(ST_Polygon(1.5,2.5, 3.0,2.2, 2.2,1.1));
+---- RESULTS
+4
+====
+---- QUERY
+select ST_NumPoints(ST_Polygon(1.5,2.5, 3.0,2.2, 2.2,1.1, 1.5, 2.5));
+---- RESULTS
+4
+====
+---- QUERY
+select ST_NumPoints(ST_Polygon(0.1,2.2, 3.0,2.2, 2.2,1.1, 0.1, 2.2));
+---- RESULTS
+4
+====
+---- QUERY
+select ST_NumPoints(ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- RESULTS
+5
+====
+---- QUERY
+select ST_NumPoints(ST_Polygon(1,1, 1,4, 4,4, 4,1, 1,1));
+---- RESULTS
+5
+====
+---- QUERY
+select ST_IsEmpty(ST_Point(0,0));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsSimple(ST_Point(0,0));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_IsSimple(ST_LineString(1.5,2.5, 3.0,2.2));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_IsSimple(ST_LineString(0.,0., 1.,1., 0.,1., 1.,0.));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsSimple(ST_LineString(0.,0., 1.,1., 2.,2., 2.,0., 1.,1., 0.,2.));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsSimple(ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_IsSimple(ST_LineString(10,10, 20,20, 20,30, 10,30, 10,20, 20,10));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsSimple(ST_LineString(0.,0., 1.,0., 1.,1., 0.,2., 2.,2., 1.,1., 2.,0.));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsSimple(ST_MultiPoint(0,0, 2,2));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Dimension(ST_Point(0,0));
+---- RESULTS
+0
+====
+---- QUERY
+select ST_Dimension(ST_LineString(1.5,2.5, 3.0,2.2));
+---- RESULTS
+1
+====
+---- QUERY
+select ST_Dimension(ST_Polygon(1.5,2.5, 3.0,2.2, 2.2,1.1));
+---- RESULTS
+2
+====
+---- QUERY
+select ST_Dimension(ST_Polygon(1.5,2.5, 3.0,2.2, 2.2,1.1, 1.5,2.5));
+---- RESULTS
+2
+====
+---- QUERY
+select ST_Dimension(ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
+---- RESULTS
+2
+====
+---- QUERY
+select ST_Dimension(ST_MultiPoint(0,0, 2,2));
+---- RESULTS
+0
+====
+---- QUERY
+select ST_X(ST_Point(1,2));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_Y(ST_Point(1,2));
+---- TYPES
+DOUBLE
+---- RESULTS
+2.0
+====
+---- QUERY
+select ST_MinX(ST_Point(1,2));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_MinY(ST_Point(1,2));
+---- TYPES
+DOUBLE
+---- RESULTS
+2.0
+====
+---- QUERY
+select ST_MaxX(ST_Point(1,2));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_MaxY(ST_Point(1,2));
+---- TYPES
+DOUBLE
+---- RESULTS
+2.0
+====
+---- QUERY
+select ST_MinX(ST_LineString(1.5,2.5, 3.0,2.2));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.5
+====
+---- QUERY
+select ST_MinY(ST_LineString(1.5,2.5, 3.0,2.2));
+---- TYPES
+DOUBLE
+---- RESULTS
+2.2
+====
+---- QUERY
+select ST_MaxX(ST_LineString(1.5,2.5, 3.0,2.2));
+---- TYPES
+DOUBLE
+---- RESULTS
+3.0
+====
+---- QUERY
+select ST_MaxY(ST_LineString(1.5,2.5, 3.0,2.2));
+---- TYPES
+DOUBLE
+---- RESULTS
+2.5
+====
+---- QUERY
+select ST_MinX(ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_MinY(ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_MaxX(ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
+---- TYPES
+DOUBLE
+---- RESULTS
+4.0
+====
+---- QUERY
+select ST_MaxY(ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
+---- TYPES
+DOUBLE
+---- RESULTS
+4.0
+====
+---- QUERY
+select ST_MaxX(ST_MultiPoint(0,0, 2,2));
+---- TYPES
+DOUBLE
+---- RESULTS
+2.0
+====
+---- QUERY
+select ST_MaxY(ST_MultiPoint(0,0, 2,2));
+---- TYPES
+DOUBLE
+---- RESULTS
+2.0
+====
+---- QUERY
+select ST_MinX(ST_MultiPoint(0,0, 2,2));
+---- TYPES
+DOUBLE
+---- RESULTS
+0.0
+====
+---- QUERY
+select ST_MinY(ST_MultiPoint(0,0, 2,2));
+---- TYPES
+DOUBLE
+---- RESULTS
+0.0
+====
+---- QUERY
+select ST_Length(ST_LineString(1.5,2.5, 3.0,2.2));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.5297058540778354
+====
+---- QUERY
+select ST_Length(ST_LineString(0.0,0.0, 3.0,4.0));
+---- TYPES
+DOUBLE
+---- RESULTS
+5.0
+====
+---- QUERY
+select ST_Length(ST_SetSRID(ST_LineString(0.0,0.0, 3.0,4.0), 0));
+---- TYPES
+DOUBLE
+---- RESULTS
+5.0
+====
+---- QUERY
+select ST_Area(ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+DOUBLE
+---- RESULTS
+9.0
+====
+---- QUERY
+select ST_Area(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0), (1 1, 1 5, 5 1, 1 1))'));
+---- TYPES
+DOUBLE
+---- RESULTS
+24.0
+====
+---- QUERY
+select ST_GeodesicLengthWGS84(ST_GeomFromText('MultiLineString((0 80, 0.03 80.04))', 4326));
+---- TYPES
+DOUBLE
+---- RESULTS
+4503.988488226892
+====
+---- QUERY
+select ST_GeodesicLengthWGS84(ST_GeomFromText('LineString(0 0, 0.03 0.04)', 4326));
+---- TYPES
+DOUBLE
+---- RESULTS
+5542.156362735362
+====
+---- QUERY
+select ST_GeodesicLengthWGS84(ST_GeomFromText('MultiLineString((0 0, 0.03 0.04))', 4326));
+---- TYPES
+DOUBLE
+---- RESULTS
+5542.156362735362
+====
+---- QUERY
+select ST_GeodesicLengthWGS84(ST_GeomFromText('MultiLineString((0 80, 0.03 80.04))', 4326));
+---- TYPES
+DOUBLE
+---- RESULTS
+4503.988488226892
+====
+---- QUERY
+select ST_IsClosed(ST_LineString(0.,0., 3.,4.));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsClosed(ST_LineString(0.,0., 3.,4., 0.,4., 0.,0.));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_IsClosed(ST_MultiLineString('multilinestring ((0 0, 3 4, 2 2), (6 2, 7 8))'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsClosed(ST_MultiLineString('multilinestring ((0 0, 3 4, 2 2, 0 0), (6 2, 7 8))'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsClosed(ST_MultiLineString('multilinestring ((0 0, 3 4, 2 2, 0 0), (6 2, 7 5, 6 8, 6 2))'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Is3D(ST_Point(0., 3.));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Is3D(ST_PointZ(0., 3., 1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Is3D(ST_Point('pointzm (0. 3. 1. 2.)'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Is3D(ST_LineString(0.,0., 3.,4., 0.,4., 0.,0.));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Is3D(ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Is3D(ST_GeomFromText('linestring z (10 10 2, 20 20 4)'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Z(ST_PointZ(0., 3., 1));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_Z(ST_Point('pointzm (0. 3. 1. 2.)'));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_Z(ST_GeomFromText('linestring z (10 10 2, 20 20 4)'));
+---- RESULTS
+NULL
+====
+---- QUERY
+select ST_MinZ(ST_PointZ(0., 3., 1));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_MinZ(ST_GeomFromText('linestring z (10 10 2, 20 20 4)'));
+---- TYPES
+DOUBLE
+---- RESULTS
+2.0
+====
+---- QUERY
+select ST_MinZ(ST_MultiPoint('multipoint z((0 0 1), (2 2 3))'));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_MinZ(ST_GeomFromText('polygon z ((0 0 2, 8 0 4, 0 8 3, 0 0 2))'));
+---- TYPES
+DOUBLE
+---- RESULTS
+2.0
+====
+---- QUERY
+select ST_MaxZ(ST_PointZ(0., 3., 1));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_MaxZ(ST_GeomFromText('linestring z (10 10 2, 20 20 4)'));
+---- TYPES
+DOUBLE
+---- RESULTS
+4.0
+====
+---- QUERY
+select ST_MaxZ(ST_GeomFromText('polygon z ((0 0 2, 8 0 4, 0 8 3, 0 0 2))'));
+---- TYPES
+DOUBLE
+---- RESULTS
+4.0
+====
+---- QUERY
+select ST_MaxZ(ST_MultiPoint('multipoint z((0 0 1), (2 2 3))'));
+---- TYPES
+DOUBLE
+---- RESULTS
+3.0
+====
+---- QUERY
+select ST_IsMeasured(ST_Point(0., 3.));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsMeasured(ST_Point('point m(0. 3. 1)'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_IsMeasured(ST_Point('pointzm (0. 3. 1. 2.)'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_IsMeasured(ST_LineString(0.,0., 3.,4., 0.,4., 0.,0.));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsMeasured(ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsMeasured(ST_GeomFromText('linestring m (10 10 2, 20 20 4)'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_M(ST_Point('point m(0. 3. 1)'));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_M(ST_Point('pointzm (0. 3. 1. 2.)'));
+---- TYPES
+DOUBLE
+---- RESULTS
+2.0
+====
+---- QUERY
+select ST_M(ST_GeomFromText('linestring m (10 10 2, 20 20 4)'));
+---- RESULTS
+NULL
+====
+---- QUERY
+select ST_MinM(ST_Point('point m(0. 3. 1)'));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_MinM(ST_GeomFromText('linestring m (10 10 2, 20 20 4)'));
+---- TYPES
+DOUBLE
+---- RESULTS
+2.0
+====
+---- QUERY
+select ST_MinM(ST_GeomFromText('polygon m ((0 0 5, 8 0 4, 0 8 3, 0 0 5))'));
+---- TYPES
+DOUBLE
+---- RESULTS
+3.0
+====
+---- QUERY
+select ST_MinM(ST_MultiPoint('multipoint m((0 0 1), (2 2 3))'));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_MaxM(ST_Point('point m(0. 3. 1)'));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_MaxM(ST_GeomFromText('linestring m (10 10 2, 20 20 4)'));
+---- TYPES
+DOUBLE
+---- RESULTS
+4.0
+====
+---- QUERY
+select ST_MaxM(ST_GeomFromText('polygon m ((0 0 5, 8 0 4, 0 8 3, 0 0 5))'));
+---- TYPES
+DOUBLE
+---- RESULTS
+5.0
+====
+---- QUERY
+select ST_MaxM(ST_MultiPoint('multipoint m((0 0 1), (2 2 3))'));
+---- TYPES
+DOUBLE
+---- RESULTS
+3.0
+====
+---- QUERY
+select ST_CoordDim(ST_Point(0., 3.));
+---- RESULTS
+2
+====
+---- QUERY
+select ST_CoordDim(ST_PointZ(0., 3., 1));
+---- RESULTS
+3
+====
+---- QUERY
+select ST_CoordDim(ST_Point('point m(0. 3. 1)'));
+---- RESULTS
+3
+====
+---- QUERY
+select ST_CoordDim(ST_Point('pointzm (0. 3. 1. 2.)'));
+---- RESULTS
+4
+====
+---- QUERY
+select ST_CoordDim(ST_LineString(0.,0., 3.,4., 0.,4., 0.,0.));
+---- RESULTS
+2
+====
+---- QUERY
+select ST_CoordDim(ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
+---- RESULTS
+2
+====
+---- QUERY
+select ST_CoordDim(ST_GeomFromText('linestring z (10 10 2, 20 20 4)'));
+---- RESULTS
+3
+====
+---- QUERY
+select ST_CoordDim(ST_GeomFromText('linestring m (10 10 2, 20 20 4)'));
+---- RESULTS
+3
+====
+---- QUERY
+select ST_NumPoints(ST_Point('point empty'));
+---- RESULTS
+0
+====
+---- QUERY
+select ST_NumPoints(ST_Point(0., 3.));
+---- RESULTS
+1
+====
+---- QUERY
+select ST_NumPoints(ST_PointZ(0., 3., 1));
+---- RESULTS
+1
+====
+---- QUERY
+select ST_NumPoints(ST_LineString(0.,0., 3.,4.));
+---- RESULTS
+2
+====
+---- QUERY
+select ST_NumPoints(ST_LineString(0.,0., 3.,4., 0.,4., 0.,0.));
+---- RESULTS
+4
+====
+---- QUERY
+select ST_NumPoints(ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- RESULTS
+5
+====
+---- QUERY
+select ST_NumPoints(ST_Polygon(1,1, 1,4, 4,4, 4,1, 1,1));
+---- RESULTS
+5
+====
+---- QUERY
+select ST_NumPoints(ST_GeomFromText('multilinestring ((2 4, 10 10), (20 20, 7 8))'));
+---- RESULTS
+4
+====
+---- QUERY
+select ST_NumPoints(ST_GeomFromText('multipoint ((10 40), (40 30), (20 20), (30 10))', 0));
+---- RESULTS
+4
+====
+---- QUERY
+select ST_Contains(ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1), ST_Point(2, 3));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Contains(ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1), ST_Point(8, 8));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Within(ST_Point(2, 3), ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Within(ST_Point(8, 8), ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Touches(ST_Point(1, 3), ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Touches(ST_Point(8, 8), ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Overlaps(st_linestring(0,2, 2,3), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Overlaps(st_linestring(2,0, 2,3), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Overlaps(st_linestring(8,7, 7,8), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Overlaps(ST_Polygon(1,1, 1,4, 4,4, 4,1), st_linestring(2,0, 2,3));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Overlaps(st_polygon(2,0, 2,3, 3,0), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Overlaps(st_polygon(2,0, 2,1, 3,1), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Overlaps(st_linestring(2,0, 2,3), ST_linestring(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Overlaps(st_linestring(8,7, 7,8), ST_linestring(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Overlaps(st_linestring(0,0, 1,2, 1,5), ST_linestring(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Overlaps(st_point(1,1), ST_Point(1,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Overlaps(st_point(2,0), ST_Point(1,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Touches(st_polygon(2,0, 2,1, 3,1), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Crosses(st_linestring(0,2, 2,3), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Crosses(st_linestring(2,0, 2,3), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Crosses(st_linestring(8,7, 7,8), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Crosses(ST_Polygon(1,1, 1,4, 4,4, 4,1), st_linestring(2,0, 2,3));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Crosses(st_polygon(2,0, 2,3, 3,0), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Crosses(st_polygon(2,0, 2,1, 3,1), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Crosses(st_linestring(2,0, 2,3), ST_linestring(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Crosses(st_linestring(8,7, 7,8), ST_linestring(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Crosses(st_linestring(0,0, 1,2, 1,5), ST_linestring(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Crosses(st_point(1,1), ST_Point(1,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Crosses(st_point(2,0), ST_Point(1,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Crosses(ST_Linestring(0,0, 1,1), ST_Linestring(1,0, 0,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Crosses(ST_Linestring(1,0, 1,2), ST_Linestring(0,1, 2,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Crosses(ST_Linestring(0,0, 0,1), ST_Linestring(0,0, 1,0));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Crosses(ST_Linestring(0,0, 0,2), ST_Linestring(0,1, 1,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(st_linestring('linestring(0 0, 0 1)'), ST_linestring('linestring(0 0, 1 0)'), '*0*******');
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(st_linestring('linestring(0 0, 0 1)'), ST_linestring('linestring(0 0, 1 0)'), '***0*****');
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(st_linestring('linestring(0 0, 0 1)'), ST_linestring('linestring(0 0, 1 0)'), '****0****');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(st_linestring('linestring(0 0, 0 1)'), ST_linestring('linestring(0 0, 1 0)'), 'FF*F0****');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(st_linestring('linestring(0 0, 0 2)'), ST_linestring('linestring(0 1, 1 1)'), '*0*******');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(st_linestring('linestring(0 0, 0 2)'), ST_linestring('linestring(0 1, 1 1)'), 'F0*FF****');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(st_linestring('linestring(0 0, 0 2)'), ST_linestring('linestring(0 1, 1 1)'), '***0*****');
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(st_linestring('linestring(0 0, 0 1)'), ST_linestring('linestring(0 0, 1 0)'), 'T********');
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(st_linestring('linestring(0 0, 0 2)'), ST_linestring('linestring(0 1, 1 1)'), 'T********');
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Equals(st_point(1,1), ST_Point(1,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Equals(st_point(2,0), ST_Point(1,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Equals(st_linestring(0,0, 1,2), ST_linestring(0,0, 1,2));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Equals(st_linestring(0,0, 1,2), ST_linestring(1,2, 0,0));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Equals(st_linestring(0,0, 1,2, 1,5), ST_linestring(1,1, 1,4, 4,4));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Equals(st_polygon(2,0, 2,1, 3,1), ST_Polygon(2,0, 2,1, 3,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Equals(st_polygon(2,0, 2,1, 3,1), ST_Polygon(3,1, 2,0, 2,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Equals(st_polygon(2,0, 8,1, 3,1), ST_Polygon(3,1, 2,0, 2,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Intersects(st_linestring(0,2, 2,3), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Intersects(st_linestring(2,0, 2,3), ST_Polygon(1,1, 4,1, 4,4, 1,4));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Intersects(ST_LineString(8,7, 7,8), ST_Polygon(1,1, 4,1, 4,4, 1,4));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Intersects(ST_Polygon(1,1, 1,4, 4,4, 4,1), st_linestring(2,0, 2,3));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Intersects(st_polygon(2,0, 2,3, 3,0), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Intersects(st_polygon(2,0, 2,1, 3,1), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Intersects(st_linestring(2,0, 2,3), ST_linestring(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Intersects(st_linestring(8,7, 7,8), ST_linestring(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Intersects(st_linestring(0,0, 1,2, 1,5), ST_linestring(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Intersects(st_linestring(0,0, 1,1), ST_linestring(0,1, 1,0));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Intersects(ST_Linestring(1,0, 1,2), ST_Linestring(0,1, 2,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Intersects(st_linestring(0,0, 0,1), ST_linestring(0,0, 1,0));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Intersects(st_linestring(0,0, 0,2), ST_linestring(0,1, 1,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Intersects(st_point(1,1), ST_Point(1,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Intersects(st_point(2,0), ST_Point(1,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Touches(st_polygon(2,0, 2,1, 3,1), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Intersects(st_polygon(2,0, 2,1, 3,1), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Disjoint(st_polygon(2,0, 2,1, 3,1), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Disjoint(st_point(1,1), ST_Point(1,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Disjoint(st_point(2,0), ST_Point(1,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_EnvIntersects(ST_LineString(0,0, 1,1), ST_LineString(1,3, 2,2));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_EnvIntersects(ST_LineString(0,0, 2,2), ST_LineString(1,0, 3,2));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_EnvIntersects(st_linestring(0,2, 2,3), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_EnvIntersects(st_linestring(2,0, 2,3), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_EnvIntersects(st_linestring(8,7, 7,8), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_EnvIntersects(ST_Polygon(1,1, 1,4, 4,4, 4,1), st_linestring(2,0, 2,3));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_EnvIntersects(st_polygon(2,0, 2,3, 3,0), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_EnvIntersects(st_polygon(2,0, 2,1, 3,1), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_EnvIntersects(st_linestring(2,0, 2,3), ST_linestring(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_EnvIntersects(st_linestring(8,7, 7,8), ST_linestring(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_EnvIntersects(st_linestring(0,0, 1,2, 1,5), ST_linestring(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_EnvIntersects(st_linestring(0,0, 1,1), ST_linestring(0,1, 1,0));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_EnvIntersects(st_point(1,1), ST_Point(1,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_EnvIntersects(st_point(2,0), ST_Point(1,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Equals(ST_Envelope(ST_LineString(0,0, 2,2)), ST_Polygon(0,0, 2,0, 2,2, 0,2));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select st_AsText(ST_Envelope(ST_Polygon(1,1, 4,1, 4,4, 1,4)));
+---- RESULTS
+'POLYGON ((1 1, 4 1, 4 4, 1 4, 1 1))'
+====
+---- QUERY
+select st_AsText(ST_Envelope(st_polygon(2,0, 2,3, 3,0)));
+---- RESULTS
+'POLYGON ((2 0, 3 0, 3 3, 2 3, 2 0))'
+====
+---- QUERY
+select ST_Relate(st_point(2,0), ST_Point(1,1), "TFFF0FFF2");
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(st_point(2,0), ST_Point(1,1), "****T****");
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(st_point(1,1), ST_Point(1,1), "TFFF0FFF2");
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(st_point(1,1), ST_Point(1,1), "****T****");
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(st_point(1,1), ST_Point(1,1), "T********");
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(st_polygon(2,0, 2,1, 3,1), ST_Polygon(1,1, 1,4, 4,4, 4,1), "T********");
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(st_polygon(2,0, 2,1, 3,1), ST_Polygon(1,1, 1,4, 4,4, 4,1), "****T****");
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(st_polygon(2,0, 2,1, 3,1), ST_Polygon(1,1, 1,4, 4,4, 4,1), "F***1****");
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(st_polygon(2,0, 2,3, 3,1), ST_Polygon(1,1, 1,4, 4,4, 4,1), "2***0****");
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(st_GeomFromText('polygon((2 0, 2 1, 3 1))'), St_GeomFromText('polygon((1 1, 1 4, 4 4, 4 1))'), "F***1****");
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(st_GeomFromText('polygon((2 0, 2 3, 3 1))'), St_GeomFromText('Polygon((1 1, 1 4, 4 4, 4 1))'), "2***0****");
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(st_GeomFromText('polygon((2 0, 2 1, 3 1, 2 0))'), St_GeomFromText('polygon((1 1, 1 4, 4 4, 4 1, 1 1))'), "FF*F1****");
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(st_GeomFromText('polygon((2 0, 2 1, 3 1, 2 0))'), St_GeomFromText('polygon((1 1, 1 4, 4 4, 4 1, 1 1))'), "FF*F2****");
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(st_linestring(0,0, 3,3), ST_linestring(1,1, 4,4), "T********");
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(st_linestring(0,0, 3,3), ST_linestring(1,1, 4,4), "*T*******");
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(st_linestring(0,0, 3,3), ST_linestring(1,1, 4,4), "***T*****");
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(st_linestring(0,0, 3,3), ST_linestring(1,1, 4,4), "****T****");
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(st_linestring(2,0, 2,3), ST_linestring(1,1, 1,4, 4,4, 4,1), "T********");
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(st_linestring(2,0, 2,3), ST_linestring(1,1, 1,4, 4,4, 4,1), "*T*******");
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(st_linestring(2,0, 2,3), ST_linestring(1,1, 1,4, 4,4, 4,1), "***T*****");
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(st_linestring(2,0, 2,3), ST_linestring(1,1, 1,4, 4,4, 4,1), "****T****");
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(st_linestring(2,0, 2,3), ST_linestring(1,1, 1,4, 4,4, 4,1), "**T******");
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(st_linestring(2,0, 2,3), ST_linestring(1,1, 1,4, 4,4, 4,1), "*****T***");
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(st_linestring(2,0, 2,3), ST_linestring(1,1, 1,4, 4,4, 4,1), "******T**");
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(st_linestring(2,0, 2,3), ST_linestring(1,1, 1,4, 4,4, 4,1), "*******T*");
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(st_linestring(2,0, 2,3), ST_linestring(1,1, 1,4, 4,4, 4,1), "********T");
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0))'), ST_Polygon('polygon ((1 1, 1 5, 5 1, 1 1))'), '2********');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0))'), ST_Polygon('polygon ((1 1, 1 5, 5 1, 1 1))'), '*F*******');
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0))'), ST_Polygon('polygon ((1 1, 1 5, 5 1, 1 1))'), '*1*******');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0))'), ST_Polygon('polygon ((1 1, 1 5, 5 1, 1 1))'), '**2******');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0))'), ST_Polygon('polygon ((1 1, 1 5, 5 1, 1 1))'), '***F*****');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0))'), ST_Polygon('polygon ((1 1, 1 5, 5 1, 1 1))'), '****F****');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0))'), ST_Polygon('polygon ((1 1, 1 5, 5 1, 1 1))'), '*****1***');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0))'), ST_Polygon('polygon ((1 1, 1 5, 5 1, 1 1))'), '******F**');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0))'), ST_Polygon('polygon ((1 1, 1 5, 5 1, 1 1))'), '*******F*');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0))'), ST_Polygon('polygon ((1 1, 1 5, 5 1, 1 1))'), '********2');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0))'), ST_Polygon('polygon ((1 1, 1 5, 5 1, 1 1))'), '2F2FF1FF2');
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0))'), ST_Polygon('polygon ((1 1, 1 5, 5 1, 1 1))'), '212FF1FF2');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_LineString('linestring(0 2, 2 3)'), ST_Polygon('polygon((1 1, 4 1, 4 4, 1 4, 1 1))'), '**1******');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_LineString('linestring(0 2, 2 3)'), ST_Polygon('polygon((1 1, 4 1, 4 4, 1 4, 1 1))'), '**2******');
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(ST_LineString('linestring(0 2, 2 3)'), ST_Polygon('polygon((1 1, 4 1, 4 4, 1 4, 1 1))'), '******1**');
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(ST_LineString('linestring(0 2, 2 3)'), ST_Polygon('polygon((1 1, 4 1, 4 4, 1 4, 1 1))'), '******2**');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon((1 1, 4 1, 4 4, 1 4, 1 1))'), ST_LineString('linestring(0 2, 2 3)'), '**1******');
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon((1 1, 4 1, 4 4, 1 4, 1 1))'), ST_LineString('linestring(0 2, 2 3)'), '**2******');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon((1 1, 4 1, 4 4, 1 4, 1 1))'), ST_LineString('linestring(0 2, 2 3)'), '******1**');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon((1 1, 4 1, 4 4, 1 4, 1 1))'), ST_LineString('linestring(0 2, 2 3)'), '******2**');
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon((1 0, 3 0, 1 2, 1 0))'), ST_Polygon('polygon((0 1, 2 1, 0 3, 0 1))'), '212111212');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon((3 0, 3 3, 0 3, 3 0))'), ST_Polygon('polygon((2 2, 5 2, 2 5, 2 2))'), '212101212');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon((2 0, 2 2, 0 2, 2 0))'), ST_Polygon('polygon((1 1, 3 1, 1 3, 1 1))'), '212101212');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon((0 0, 2 0, 0 2, 0 0))'), ST_Polygon('polygon((0 0, 1 0, 0 1, 0 0))'), '212F11FF2');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon((0 0, 3 0, 0 3, 0 0))'), ST_Polygon('polygon((1 1, 2 1, 1 2, 1 1))'), '212F11FF2');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon((0 0, 2 0, 0 2, 0 0))'), ST_Polygon('polygon((1 1, 1 0, 0 1, 1 1))'), '212F01FF2');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon((0 0, 1 0, 0 1, 0 0))'), ST_Polygon('polygon((0 0, 1 0, 0 1, 0 0))'), '2FFF1FFF2');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Relate(ST_Polygon('polygon((0 0, 3 0, 0 3, 0 0))'), ST_Polygon('polygon((2 2, 2 0, 3 0, 3 3, 0 3, 0 2, 2 2))'), '212111212');
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Distance(ST_Point(0.0,0.0), ST_Point(3.0,4.0));
+---- TYPES
+DOUBLE
+---- RESULTS
+5.0
+====
+---- QUERY
+select ST_Distance(ST_LineString(0,0, 1,1), ST_LineString(2,1, 3,0));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_Area(ST_Buffer(ST_GeomFromText('polygon ((0 0, 3 0, 3 2, 5 2, 5 5, 2 5, 2 3, 0 3, 0 0))'), -1));
+---- TYPES
+DOUBLE
+---- RESULTS
+2.0
+====
+---- QUERY
+select ST_GeometryType(ST_Buffer(ST_GeomFromText('polygon ((0 0, 3 0, 3 2, 5 2, 5 5, 2 5, 2 3, 0 3, 0 0))'), -1));
+---- RESULTS
+'ST_MULTIPOLYGON'
+====
+---- QUERY
+select ST_GeometryType(ST_Buffer(ST_GeomFromText('point (0 0)'), 1));
+---- RESULTS
+'ST_POLYGON'
+====
+---- QUERY
+select ST_Area(ST_Buffer(ST_GeomFromText('point (0 0)'), 1));
+---- TYPES
+DOUBLE
+---- RESULTS
+3.13935020305
+====
+---- QUERY
+select ST_IsEmpty(ST_Intersection(st_linestring(0,2, 2,3), ST_Polygon(1,1, 1,4, 4,4, 4,1)));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsEmpty(ST_Intersection(st_linestring(2,0, 2,3), ST_Polygon(1,1, 1,4, 4,4, 4,1)));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsEmpty(ST_Intersection(st_linestring(8,7, 7,8), ST_Polygon(1,1, 1,4, 4,4, 4,1)));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_IsEmpty(ST_Intersection(ST_Polygon(1,1, 1,4, 4,4, 4,1), st_linestring(2,0, 2,3)));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsEmpty(ST_Intersection(st_polygon(2,0, 2,3, 3,0), ST_Polygon(1,1, 1,4, 4,4, 4,1)));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsEmpty(ST_Intersection(st_linestring(2,0, 2,3), ST_linestring(1,1, 1,4, 4,4, 4,1)));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_IsEmpty(ST_Intersection(st_linestring(8,7, 7,8), ST_linestring(1,1, 1,4, 4,4, 4,1)));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_IsEmpty(ST_Intersection(st_linestring(0,0, 1,2, 1,5), ST_linestring(1,1, 1,4, 4,4, 4,1)));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsEmpty(ST_Intersection(st_linestring(0,0, 1,1), ST_linestring(2,2, 4,4)));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_IsEmpty(ST_Intersection(ST_LineString(0,2, 0,4), ST_Point(3,3)));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_IsEmpty(ST_Intersection(st_point(1,1), ST_Point(1,1)));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsEmpty(ST_Intersection(ST_Point(2,0), ST_Point(1,1)));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Dimension(ST_Intersection(st_linestring(0,2, 2,3), ST_Polygon(1,1, 1,4, 4,4, 4,1)));
+---- RESULTS
+1
+====
+---- QUERY
+select ST_Dimension(ST_Intersection(st_linestring(2,0, 2,3), ST_Polygon(1,1, 1,4, 4,4, 4,1)));
+---- RESULTS
+1
+====
+---- QUERY
+select ST_Dimension(ST_Intersection(ST_Polygon(1,1, 1,4, 4,4, 4,1), st_linestring(2,0, 2,3)));
+---- RESULTS
+1
+====
+---- QUERY
+select ST_Dimension(ST_Intersection(st_polygon(2,0, 2,3, 3,0), ST_Polygon(1,1, 1,4, 4,4, 4,1)));
+---- RESULTS
+2
+====
+---- QUERY
+select ST_Dimension(ST_Intersection(st_point(1,1), ST_Point(1,1)));
+---- RESULTS
+0
+====
+---- QUERY
+select ST_Equals(ST_Intersection(ST_Polygon(1,0, 3,0, 1,2), ST_Polygon(0,1, 2,1, 0,3)), ST_Polygon(1,1, 2,1, 1,2));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+SELECT ST_AsText(ST_SymmetricDiff(ST_Point('point(0 0)'), ST_Point('point(2 2)')));
+---- RESULTS
+'MULTIPOINT ((0 0), (2 2))'
+====
+---- QUERY
+SELECT ST_AsText(ST_SymmetricDiff(ST_MultiPoint('multipoint((0 0))'), ST_MultiPoint('multipoint((2 2))')));
+---- RESULTS
+'MULTIPOINT ((0 0), (2 2))'
+====
+---- QUERY
+SELECT ST_Equals(ST_SymmetricDiff(ST_LineString('linestring(0 2, 2 2)'), ST_LineString('linestring(1 2, 3 2)')), ST_GeomFromText('multilinestring((0 2, 1 2), (2 2, 3 2))'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+SELECT ST_Equals(ST_SymmetricDiff(ST_Polygon('polygon((0 0, 2 0, 2 2, 0 2, 0 0))'), ST_Polygon('polygon((1 1, 3 1, 3 3, 1 3, 1 1))')), ST_MultiPolygon('multipolygon(((0 0, 2 0, 2 1, 1 1, 1 2, 0 2, 0 0)), ((3 1, 3 3, 1 3, 1 2, 2 2, 2 1, 3 1)))'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Equals(ST_Boundary(ST_LineString(0,1, 1,0)), ST_MultiPoint('multipoint((1 0),(0 1))'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_GeometryType(ST_Boundary(ST_Polygon(1,1, 4,1, 1,4)));
+---- RESULTS
+'ST_LINESTRING'
+====
+---- QUERY
+select ST_Equals(ST_Boundary(ST_Polygon(1,1, 4,1, 1,4)), ST_LineString(1,1, 4,1, 1,4, 1,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_GeometryType(ST_Boundary(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0), (1 1, 1 5, 5 1, 1 1))')));
+---- RESULTS
+'ST_MULTILINESTRING'
+====
+---- QUERY
+select ST_Equals(ST_Boundary(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0), (1 1, 1 5, 5 1, 1 1))')), ST_MultiLineString('multilinestring((0 0, 8 0, 0 8, 0 0), (1 1, 1 5, 5 1, 1 1))'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Equals(ST_ExteriorRing(ST_Polygon(1,1, 1,4, 4,1)), ST_LineString(1,1, 4,1, 1,4, 1,1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Equals(ST_ExteriorRing(ST_Polygon('polygon ((1 1, 4 1, 1 4))')), ST_LineString('linestring(1 1, 4 1, 1 4, 1 1)'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_GeometryType(ST_ExteriorRing(ST_Polygon('polygon ((1 1, 4 1, 1 4))')));
+---- RESULTS
+'ST_LINESTRING'
+====
+---- QUERY
+select ST_Equals(ST_ExteriorRing(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0), (1 1, 1 5, 5 1, 1 1))')), ST_LineString('linestring (0 0, 8 0, 0 8, 0 0)'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_GeometryType(ST_ExteriorRing(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0), (1 1, 1 5, 5 1, 1 1))')));
+---- RESULTS
+'ST_LINESTRING'
+====
+---- QUERY
+select ST_NumGeometries(ST_GeomFromText('multipoint (10 40, 40 30, 20 20, 30 10)', 0));
+---- RESULTS
+4
+====
+---- QUERY
+select ST_NumGeometries(ST_GeomFromText('multipoint ((10 40), (40 30))', 0));
+---- RESULTS
+2
+====
+---- QUERY
+select ST_NumGeometries(ST_GeomFromText('multilinestring ((2 4, 10 10), (20 20, 7 8))', 0));
+---- RESULTS
+2
+====
+---- QUERY
+select ST_NumGeometries(ST_GeomFromText('multilinestring ((2 4, 10 10, 20 20, 7 8))', 0));
+---- RESULTS
+1
+====
+---- QUERY
+select ST_NumGeometries(ST_GeomFromText('multipolygon (((3 3, 4 6, 5 3, 3 3)),((8 24, 1 28, 9 25, 8 24)), ((13 33, 7 36, 1 40, 10 43, 13 33)))'));
+---- RESULTS
+3
+====
+---- QUERY
+select ST_NumGeometries(ST_GeomFromText('multipolygon (((3 3, 4 6, 5 3, 3 3)))'));
+---- RESULTS
+1
+====
+---- QUERY
+select ST_NumGeometries(ST_GeomFromText('multipolygon (((0 0, 9 0, 9 9, 0 9, 0 0),(1 2, 1 7, 5 7, 1 2), (2 1, 7 5, 7 1, 2 1)))'));
+---- RESULTS
+1
+====
+---- QUERY
+select ST_GeometryType(ST_GeometryN(ST_GeomFromText('multipoint (10 40, 40 30, 20 20, 30 10)'), 3));
+---- RESULTS
+'ST_POINT'
+====
+---- QUERY
+select ST_Equals(ST_GeometryN(ST_GeomFromText('multipoint (10 40, 40 30, 20 20, 30 10)'), 3), ST_GeomFromText('point (20 20)'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_GeometryType(ST_GeometryN(ST_GeomFromText('multilinestring ((2 4, 10 10), (20 20, 7 8))'), 2));
+---- RESULTS
+'ST_LINESTRING'
+====
+---- QUERY
+select ST_Equals(ST_GeometryN(ST_GeomFromText('multilinestring ((2 4, 10 10), (20 20, 7 8))'), 2), ST_GeomFromText('linestring (20 20, 7 8)'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_GeometryType(ST_InteriorRingN(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0), (1 1, 1 5, 5 1, 1 1))'), 1));
+---- RESULTS
+'ST_LINESTRING'
+====
+---- QUERY
+select ST_Equals(ST_InteriorRingN(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0), (1 1, 1 5, 5 1, 1 1))'), 1), ST_LineString('linestring(1 1, 5 1, 1 5, 1 1)'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_GeometryType(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromText('point (10.02 20.01)'))));
+---- RESULTS
+'ST_POINT'
+====
+---- QUERY
+select ST_Equals(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromText('point (10.02 20.01)'))),ST_GeomFromText('point (10.02 20.01)'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_GeometryType(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromText('linestring (10 10, 20 20)'))));
+---- RESULTS
+'ST_LINESTRING'
+====
+---- QUERY
+select ST_Equals(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromText('linestring (10 10, 20 20)'))), ST_GeomFromText('linestring (10 10, 20 20)'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_GeometryType(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromText('polygon ((0 0, 0 10, 10 10, 0 0))'))));
+---- RESULTS
+'ST_POLYGON'
+====
+---- QUERY
+select ST_Equals(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromText('polygon ((0 0, 0 10, 10 10, 0 0))'))), ST_GeomFromText('polygon ((0 0, 0 10, 10 10, 0 0))'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_GeometryType(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromText('MULTIPOINT ((10 40), (40 30), (20 20), (30 10))'))));
+---- RESULTS
+'ST_MULTIPOINT'
+====
+---- QUERY
+select ST_GeometryType(ST_PointFromWKB(ST_AsBinary(ST_GeomFromText('point (10 10)'))));
+---- RESULTS
+'ST_POINT'
+====
+---- QUERY
+select ST_Equals(ST_PointFromWKB(ST_AsBinary(ST_GeomFromText('point (10 10)'))), ST_GeomFromText('point (10 10)'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_GeometryType(ST_LineFromWKB(ST_AsBinary(ST_GeomFromText('linestring (10 10, 20 20)'))));
+---- RESULTS
+'ST_LINESTRING'
+====
+---- QUERY
+select ST_Equals(ST_LineFromWKB(ST_AsBinary(ST_GeomFromText('linestring (10 10, 20 20)'))), ST_GeomFromText('linestring (10 10, 20 20)'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_GeometryType(ST_PolyFromWKB(ST_AsBinary(ST_GeomFromText('polygon ((0 0, 1 0, 0 1, 0 0))'))));
+---- RESULTS
+'ST_POLYGON'
+====
+---- QUERY
+select ST_Equals(ST_PolyFromWKB(ST_AsBinary(ST_GeomFromText('polygon ((0 0, 1 0, 0 1, 0 0))'))), ST_GeomFromText('polygon ((0 0, 1 0, 0 1, 0 0))'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_GeometryType(ST_MPointFromWKB(ST_AsBinary(ST_GeomFromText('multipoint ((10 10), (20 20))'))));
+---- RESULTS
+'ST_MULTIPOINT'
+====
+---- QUERY
+select ST_Equals(ST_MPointFromWKB(ST_AsBinary(ST_GeomFromText('multipoint ((10 10), (20 20))'))), ST_GeomFromText('multipoint ((10 10), (20 20))'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_GeometryType(ST_MLineFromWKB(ST_AsBinary(ST_GeomFromText('multilinestring ((1 2, 2 1),(10 10, 20 20))'))));
+---- RESULTS
+'ST_MULTILINESTRING'
+====
+---- QUERY
+select ST_Equals(ST_MLineFromWKB(ST_AsBinary(ST_GeomFromText('multilinestring ((1 2, 2 1),(10 10, 20 20))'))), ST_GeomFromText('multilinestring ((1 2, 2 1),(10 10, 20 20))'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_GeometryType(ST_MPolyFromWKB(ST_AsBinary(ST_GeomFromText('multipolygon (((0 0, 1 0, 0 1, 0 0)), ((2 2, 1 2, 2 1, 2 2)))'))));
+---- RESULTS
+'ST_MULTIPOLYGON'
+====
+---- QUERY
+select ST_Equals(ST_MPolyFromWKB(ST_AsBinary(ST_GeomFromText('multipolygon (((0 0, 1 0, 0 1, 0 0)), ((2 2, 1 2, 2 1, 2 2)))'))), ST_GeomFromText('multipolygon (((0 0, 1 0, 0 1)), ((2 2, 1 2, 2 1)))'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+=====
+---- QUERY
+select ST_Length(ST_Linestring(1,1, 1,2, 2,2, 2,1)), ST_Length(ST_Linestring(1,1, 1,4, 4,4, 4,1)), ST_Length(ST_Linestring(1,1, 1,7, 7,7, 7,1));
+---- TYPES
+DOUBLE, DOUBLE, DOUBLE
+---- RESULTS
+3.0,9.0,18.0
+====
+---- QUERY
+select ST_Area(ST_Polygon(1,1, 1,2, 2,2, 2,1)), ST_Area(ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+DOUBLE, DOUBLE
+---- RESULTS
+1.0,9.0
+====
+---- QUERY
+select ST_Contains(ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1), ST_Point(2, 3)), ST_Contains(ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1), ST_Point(8, 8));
+---- TYPES
+BOOLEAN, BOOLEAN
+---- RESULTS
+true,false
+====
+---- QUERY
+select ST_CoordDim(ST_Point(0., 3.)), ST_CoordDim(ST_PointZ(0., 3., 1));
+---- TYPES
+INT, INT
+---- RESULTS
+2,3
+====
+---- QUERY
+select ST_Crosses(st_linestring(2,0, 2,3), ST_Polygon(1,1, 1,4, 4,4, 4,1)), ST_Crosses(st_linestring(8,7, 7,8), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN, BOOLEAN
+---- RESULTS
+true,false
+====
+---- QUERY
+select ST_Dimension(ST_Point(0,0)), ST_Dimension(ST_LineString(1.5,2.5, 3.0,2.2));
+---- TYPES
+INT, INT
+---- RESULTS
+0,1
+====
+---- QUERY
+select ST_Disjoint(st_point(1,1), ST_Point(1,1)), ST_Disjoint(st_point(2,0), ST_Point(1,1));
+---- TYPES
+BOOLEAN, BOOLEAN
+---- RESULTS
+false,true
+====
+---- QUERY
+select ST_EnvIntersects(st_point(1,1), ST_Point(1,1)), ST_EnvIntersects(st_point(2,0), ST_Point(1,1));
+---- TYPES
+BOOLEAN, BOOLEAN
+---- RESULTS
+true,false
+====
+---- QUERY
+select ST_Equals(st_point(1,1), ST_Point(1,1)), ST_Equals(st_point(2,0), ST_Point(1,1));
+---- TYPES
+BOOLEAN, BOOLEAN
+---- RESULTS
+true,false
+====
+---- QUERY
+select ST_Intersects(st_point(1,1), ST_Point(1,1)), ST_Intersects(st_point(2,0), ST_Point(1,1));
+---- TYPES
+BOOLEAN, BOOLEAN
+---- RESULTS
+true,false
+====
+---- QUERY
+select ST_Is3D(ST_Point(0., 3.)), ST_Is3D(ST_PointZ(0., 3., 1));
+---- TYPES
+BOOLEAN, BOOLEAN
+---- RESULTS
+false,true
+====
+---- QUERY
+select ST_Overlaps(st_polygon(2,0, 2,3, 3,0), ST_Polygon(1,1, 1,4, 4,4, 4,1)), ST_Overlaps(st_polygon(2,0, 2,1, 3,1), ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN, BOOLEAN
+---- RESULTS
+true,false
+====
+---- QUERY
+select ST_Touches(ST_Point(1, 3), ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1)), ST_Touches(ST_Point(8, 8), ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
+---- TYPES
+BOOLEAN, BOOLEAN
+---- RESULTS
+true,false
+====
+---- QUERY
+select ST_Within(ST_Point(2, 3), ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1)), ST_Within(ST_Point(8, 8), ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
+---- TYPES
+BOOLEAN, BOOLEAN
+---- RESULTS
+true,false
+====
+---- QUERY
+SELECT ST_Intersects(ST_GeomFromGeoJson('{"type": "LineString", "coordinates": [[2.5,2.5], [8.0,0.0]]}'), ST_GeomFromGeoJson('{"type": "LineString", "coordinates": [[1.5,1.5], [0.0,7.0]]}'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+SELECT ST_Intersects(ST_GeomFromJson('{"paths":[[[2.5,2.5],[8,0]]],"spatialReference":{"wkid":4326}}'), ST_GeomFromJson('{"paths":[[[1.5,1.5],[0,7]]],"spatialReference":{"wkid":4326}}'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+=====
+---- QUERY
+select ST_AsJson(ST_Polygon(1.5,2.5, 3.0,2.2, 2.2,1.1));
+---- RESULTS
+'{"rings":[[[1.5,2.5],[3,2.2],[2.2,1.1],[1.5,2.5]]]}'
+====
+---- QUERY
+select ST_AsJson(ST_Polygon(1.5,2.5, 3.0,2.2, 2.2,1.1, 1.5, 2.5));
+---- RESULTS
+'{"rings":[[[1.5,2.5],[3,2.2],[2.2,1.1],[1.5,2.5]]]}'
+====
+---- QUERY
+select ST_AsJson(ST_Polygon(0.1,2.2, 3.0,2.2, 2.2,1.1, 0.1, 2.2));
+---- RESULTS
+'{"rings":[[[0.1,2.2],[3,2.2],[2.2,1.1],[0.1,2.2]]]}'
+====
+---- QUERY
+select ST_AsJson(ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- RESULTS
+'{"rings":[[[1,1],[1,4],[4,4],[4,1],[1,1]]]}'
+====
+---- QUERY
+select ST_AsText(ST_Polygon(1,1, 1,4, 4,1));
+---- RESULTS
+'POLYGON ((1 1, 4 1, 1 4, 1 1))'
+====
+---- QUERY
+select ST_AsText(ST_Polygon(1,1, 4,1, 1,4));
+---- RESULTS
+'POLYGON ((1 1, 4 1, 1 4, 1 1))'
+====
+---- QUERY
+select ST_AsText(ST_Polygon(1,1, 1,4, 4,1, 1,1));
+---- RESULTS
+'POLYGON ((1 1, 4 1, 1 4, 1 1))'
+====
+---- QUERY
+select ST_AsText(ST_Polygon(1,1, 4,1, 1,4, 1,1));
+---- RESULTS
+'POLYGON ((1 1, 4 1, 1 4, 1 1))'
+====
+---- QUERY
+select st_AsText(ST_Envelope(ST_LineString(0,0, 2,2)));
+---- RESULTS
+'POLYGON ((0 0, 2 0, 2 2, 0 2, 0 0))'
+====
+---- QUERY
+select st_AsText(ST_Envelope(ST_Polygon(1,1, 4,1, 4,4, 1,4)));
+---- RESULTS
+'POLYGON ((1 1, 4 1, 4 4, 1 4, 1 1))'
+====
+---- QUERY
+select st_AsText(ST_Envelope(st_polygon(2,0, 2,3, 3,0)));
+---- RESULTS
+'POLYGON ((2 0, 3 0, 3 3, 2 3, 2 0))'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_Point(1,1), ST_Point(1,1)));
+---- RESULTS
+'POINT (1 1)'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_LineString(0,2, 0,4), ST_Point(0,3)));
+---- RESULTS
+'POINT (0 3)'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_GeomFromText('linestring(0 2, 0 0, 2 0)'), ST_GeomFromText('linestring(0 3, 0 1, 1 0, 3 0)')));
+---- RESULTS
+'MULTILINESTRING ((1 0, 2 0), (0 2, 0 1))'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_LineString(0,2, 0,4), ST_LineString(0,2, 0,4)));
+---- RESULTS
+'LINESTRING (0 2, 0 4)'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_LineString(0,2, 0,4), ST_LineString(0,3, 0,5)));
+---- RESULTS
+'LINESTRING (0 3, 0 4)'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_LineString(0,2, 0,5), ST_LineString(1,3, 0,3, 0,4, 1,4)));
+---- RESULTS
+'LINESTRING (0 3, 0 4)'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_LineString(0,2, 2,3), ST_Polygon(1,1, 4,1, 4,4, 1,4)));
+---- RESULTS
+'LINESTRING (1 2.5, 2 3)'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_Polygon(1,1, 1,4, 4,4, 4,1), ST_LineString(1,1, 1,4)));
+---- RESULTS
+'LINESTRING (1 1, 1 4)'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_Polygon(1,1, 1,4, 4,4, 4,1), ST_LineString(1,3, 1,4, 0,4)));
+---- RESULTS
+'LINESTRING (1 3, 1 4)'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_Polygon(2,0, 2,3, 3,0), ST_Polygon(1,1, 4,1, 4,4, 1,4)));
+---- RESULTS
+'POLYGON ((2 1, 2.6666666666666665 1, 2 3, 2 1))'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_Polygon(1,0, 3,0, 1,2), ST_Polygon(0,1, 2,1, 0,3)));
+---- RESULTS
+'POLYGON ((1 1, 2 1, 1 2, 1 1))'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_Polygon('polygon((1 0, 3 0, 1 2, 1 0))'), ST_Polygon('polygon((0 1, 2 1, 0 3, 0 1))')));
+---- RESULTS
+'POLYGON ((1 1, 2 1, 1 2, 1 1))'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_Polygon('polygon((3 0, 3 3, 0 3, 3 0))'), ST_Polygon('polygon((2 2, 5 2, 2 5, 2 2))')));
+---- RESULTS
+'POLYGON ((2 2, 3 2, 3 3, 2 3, 2 2))'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_Polygon('polygon((2 0, 2 2, 0 2, 2 0))'), ST_Polygon('polygon((1 1, 3 1, 1 3, 1 1))')));
+---- RESULTS
+'POLYGON ((1 1, 2 1, 2 2, 1 2, 1 1))'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_Polygon('polygon((0 0, 2 0, 0 2, 0 0))'), ST_Polygon('polygon((0 0, 1 0, 0 1, 0 0))')));
+---- RESULTS
+'POLYGON ((0 0, 1 0, 0 1, 0 0))'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_Polygon('polygon((0 0, 3 0, 0 3, 0 0))'), ST_Polygon('polygon((1 1, 2 1, 1 2, 1 1))')));
+---- RESULTS
+'POLYGON ((1 1, 2 1, 1 2, 1 1))'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_Polygon('polygon((0 0, 2 0, 0 2, 0 0))'), ST_Polygon('polygon((1 1, 1 0, 0 1, 1 1))')));
+---- RESULTS
+'POLYGON ((1 0, 1 1, 0 1, 1 0))'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_Polygon('polygon((0 0, 1 0, 0 1, 0 0))'), ST_Polygon('polygon((0 0, 1 0, 0 1, 0 0))')));
+---- RESULTS
+'POLYGON ((0 0, 1 0, 0 1, 0 0))'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_Polygon('polygon((0 0, 3 0, 0 3, 0 0))'), ST_Polygon('polygon((2 2, 2 0, 3 0, 3 3, 0 3, 0 2, 2 2))')));
+---- RESULTS
+'MULTIPOLYGON (((2 0, 3 0, 2 1, 2 0)), ((0 2, 1 2, 0 3, 0 2)))'
+====
+---- QUERY
+select ST_AsText(ST_Centroid(ST_Point(2, 3)));
+---- RESULTS
+'POINT (2 3)'
+====
+---- QUERY
+select ST_AsText(ST_Centroid(ST_GeomFromText('multipoint ((0 0), (1 1), (1 -1), (6 0))')));
+---- RESULTS
+'POINT (2 0)'
+====
+---- QUERY
+select ST_AsText(ST_Centroid(ST_GeomFromText('linestring (0 0, 6 0)')));
+---- RESULTS
+'POINT (3 0)'
+====
+---- QUERY
+select ST_AsText(ST_Centroid(ST_GeomFromText('polygon ((0 0, 0 8, 8 8, 8 0, 0 0))')));
+---- RESULTS
+'POINT (4 4)'
+====
+---- QUERY
+select ST_AsText(ST_Centroid(ST_GeomFromText('polygon ((1 1, 5 1, 3 4))')));
+---- RESULTS
+'POINT (3 2)'
+====
+---- QUERY
+select ST_Area(ST_Buffer(ST_GeomFromText('point (0 0)'), 1));
+---- TYPES
+DOUBLE
+---- RESULTS
+3.139350203046865
+====
+---- QUERY
+select ST_AsText(ST_Buffer(ST_GeomFromText('polygon ((0 0, 3 0, 3 2, 5 2, 5 5, 2 5, 2 3, 0 3, 0 0))'), -1));
+---- RESULTS
+'MULTIPOLYGON (((3 3, 4 3, 4 4, 3 4, 3 3)), ((1 1, 2 1, 2 2, 1 2, 1 1)))'
+====
+---- QUERY
+select ST_AsText(ST_Centroid(ST_GeomFromText('polygon ((0 0, 3 6, 6 0, 0 0))')));
+---- RESULTS
+'POINT (3 2)'
+====
+---- QUERY
+select ST_AsText(ST_Centroid(ST_GeomFromText('polygon ((0 0, 0 8, 8 0, 0 0))')));
+---- RESULTS
+'POINT (2.6666666666666665 2.6666666666666665)'
+====
+---- QUERY
+SELECT ST_AsText(ST_Difference(ST_MultiPoint(1, 1, 1.5, 1.5, 2, 2), ST_Point(1.5, 1.5)));
+---- RESULTS
+'MULTIPOINT ((1 1), (2 2))'
+====
+---- QUERY
+SELECT ST_AsText(ST_Difference(ST_Polygon(0, 0, 0, 10, 10, 10, 10, 0), ST_Polygon(0, 0, 0, 5, 5, 5, 5, 0)));
+---- RESULTS
+'POLYGON ((5 0, 10 0, 10 10, 0 10, 0 5, 5 5, 5 0))'
+====
+---- QUERY
+SELECT ST_AsText(ST_SymmetricDiff(ST_Point('point(0 0)'), ST_Point('point(2 2)')));
+---- RESULTS
+'MULTIPOINT ((0 0), (2 2))'
+====
+---- QUERY
+SELECT ST_AsText(ST_SymmetricDiff(ST_MultiPoint('multipoint((0 0))'), ST_MultiPoint('multipoint((2 2))')));
+---- RESULTS
+'MULTIPOINT ((0 0), (2 2))'
+====
+---- QUERY
+SELECT ST_AsText(ST_SymmetricDiff(ST_LineString('linestring(0 2, 2 2)'), ST_LineString('linestring(1 2, 3 2)')));
+---- RESULTS
+'MULTILINESTRING ((0 2, 1 2), (2 2, 3 2))'
+====
+---- QUERY
+SELECT ST_AsText(ST_SymmetricDiff(ST_Polygon('polygon((0 0, 2 0, 2 2, 0 2, 0 0))'), ST_Polygon('polygon((1 1, 3 1, 3 3, 1 3, 1 1))')));
+---- RESULTS
+'MULTIPOLYGON (((0 0, 2 0, 2 1, 1 1, 1 2, 0 2, 0 0)), ((2 1, 3 1, 3 3, 1 3, 1 2, 2 2, 2 1)))'
+====
+---- QUERY
+select ST_AsText(ST_GeomFromText('MultiLineString((0 80, 0.03 80.04))', 4326));
+---- RESULTS
+'MULTILINESTRING ((0 80, 0.03 80.04))'
+====
+---- QUERY
+select ST_AsJson(ST_Intersection(ST_Linestring(0,0, 1,1), ST_Linestring(2,2, 3,3)));
+---- RESULTS
+'{"rings":[]}'
+====
+---- QUERY
+select ST_AsJson(ST_GeomFromJson('{"x":0.0,"y":0.0}'));
+---- RESULTS
+'{"x":0,"y":0}'
+====
+---- QUERY
+select ST_AsText(ST_GeomFromGeoJson('{"type":"Point", "coordinates":[1.2, 2.4]}'));
+---- RESULTS
+'POINT (1.2 2.4)'
+====
+---- QUERY
+select ST_AsJson(ST_GeomFromGeoJson('{"type":"Point", "coordinates":[1.2, 2.4]}'));
+---- RESULTS
+'{"x":1.2,"y":2.4,"spatialReference":{"wkid":4326}}'
+====
+---- QUERY
+select ST_AsText(ST_GeomFromGeoJson('{"type":"LineString", "coordinates":[[1,2], [3,4]]}'));
+---- RESULTS
+'LINESTRING (1 2, 3 4)'
+====
+---- QUERY
+select ST_AsJson(ST_GeomFromJson('{"x":1.2,"y":2.4,"spatialReference":{"wkid":4326}}'));
+---- RESULTS
+'{"x":1.2,"y":2.4,"spatialReference":{"wkid":4326}}'
+====
+---- QUERY
+select ST_AsJson(ST_GeomFromJson('{"x":1.2,"y":2.4,"spatialReference":{"wkid": 0}}'));
+---- RESULTS
+'{"x":1.2,"y":2.4}'
+====
+---- QUERY
+select ST_AsGeoJson(ST_GeomFromJson('{"x":1.2,"y":2.4,"spatialReference":{"wkid":4326}}'));
+---- RESULTS
+'{"type":"Point","coordinates":[1.2,2.4],"crs":{"type":"name","properties":{"name":"EPSG:4326"}}}'
+====
+---- QUERY
+select ST_AsGeoJson(ST_GeomFromJson('{"x":1.2,"y":2.4,"spatialReference":{"wkid": 0}}'));
+---- RESULTS
+'{"type":"Point","coordinates":[1.2,2.4],"crs":null}'
+====
+---- QUERY
+select ST_AsText(ST_GeomFromGeoJson(ST_AsGeoJson(ST_Point(1.2, 2.4))));
+---- RESULTS
+'POINT (1.2 2.4)'
+====
+---- QUERY
+select ST_AsText(ST_GeomFromGeoJson(ST_AsGeoJson(ST_LineString(1,2, 3,4))));
+---- RESULTS
+'LINESTRING (1 2, 3 4)'
+====
+---- QUERY
+select ST_AsText(ST_Boundary(ST_LineString(0,1, 1,0)));
+---- RESULTS
+'MULTIPOINT ((0 1), (1 0))'
+====
+---- QUERY
+select ST_AsText(ST_Boundary(ST_Polygon(1,1, 4,1, 1,4)));
+---- RESULTS
+'LINESTRING (1 1, 4 1, 1 4, 1 1)'
+====
+---- QUERY
+select ST_AsText(ST_Boundary(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0), (1 1, 1 5, 5 1, 1 1))')));
+---- RESULTS
+'MULTILINESTRING ((0 0, 8 0, 0 8, 0 0), (1 1, 1 5, 5 1, 1 1))'
+====
+---- QUERY
+select ST_AsJson(ST_PointN(ST_GeomFromText('multipoint ((10 40), (40 30), (20 20), (30 10))', 0), 0));
+---- RESULTS
+'{"x":10,"y":40}'
+====
+---- QUERY
+select ST_AsJson(ST_PointN(ST_GeomFromText('multipoint ((10 40), (40 30), (20 20), (30 10))', 0), 1));
+---- RESULTS
+'{"x":10,"y":40}'
+====
+---- QUERY
+select ST_AsJson(ST_PointN(ST_GeomFromText('multipoint ((10 40), (40 30), (20 20), (30 10))', 0), 2));
+---- RESULTS
+'{"x":40,"y":30}'
+====
+---- QUERY
+select ST_AsJson(ST_PointN(ST_GeomFromText('multipoint ((10 40), (40 30), (20 20), (30 10))', 0), 4));
+---- RESULTS
+'{"x":30,"y":10}'
+====
+---- QUERY
+select ST_AsJson(ST_PointN(ST_GeomFromText('linestring (10.02 20.01, 10.32 23.98, 11.92 25.64)'), 0));
+---- RESULTS
+'{"x":10.02,"y":20.01}'
+====
+---- QUERY
+select ST_AsJson(ST_PointN(ST_GeomFromText('linestring (10.02 20.01, 10.32 23.98, 11.92 25.64)'), 1));
+---- RESULTS
+'{"x":10.02,"y":20.01}'
+====
+---- QUERY
+select ST_AsJson(ST_PointN(ST_GeomFromText('linestring (10.02 20.01, 10.32 23.98, 11.92 25.64)'), 2));
+---- RESULTS
+'{"x":10.32,"y":23.98}'
+====
+---- QUERY
+select ST_AsJson(ST_PointN(ST_GeomFromText('linestring (10.02 20.01, 10.32 23.98, 11.92 25.64)'), 3));
+---- RESULTS
+'{"x":11.92,"y":25.64}'
+====
+---- QUERY
+select ST_AsText(ST_ExteriorRing(ST_Polygon(1,1, 1,4, 4,1)));
+---- RESULTS
+'LINESTRING (1 1, 4 1, 1 4, 1 1)'
+====
+---- QUERY
+select ST_AsText(ST_ExteriorRing(ST_Polygon('polygon ((1 1, 4 1, 1 4))')));
+---- RESULTS
+'LINESTRING (1 1, 4 1, 1 4, 1 1)'
+====
+---- QUERY
+select ST_AsText(ST_ExteriorRing(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0), (1 1, 1 5, 5 1, 1 1))')));
+---- RESULTS
+'LINESTRING (0 0, 8 0, 0 8, 0 0)'
+====
+---- QUERY
+select ST_AsText(ST_GeometryN(ST_GeomFromText('multipoint (10 40, 40 30, 20 20, 30 10)'), 3));
+---- RESULTS
+'POINT (20 20)'
+====
+---- QUERY
+select ST_AsText(ST_GeometryN(ST_GeomFromText('multilinestring ((2 4, 10 10), (20 20, 7 8))'), 2));
+---- RESULTS
+'LINESTRING (20 20, 7 8)'
+====
+---- QUERY
+select ST_AsJson(ST_GeometryN(ST_GeomFromText('multilinestring ((2 4, 10 10), (20 20, 7 8))'), 2));
+---- RESULTS
+'{"paths":[[[20,20],[7,8]]]}'
+====
+---- QUERY
+select ST_AsText(ST_GeometryN(ST_GeomFromText('multipolygon (((3 3, 4 6, 5 3, 3 3)),((8 24, 1 28, 9 25, 8 24)), ((13 33, 7 36, 1 40, 10 43, 13 33)))'), 1));
+---- RESULTS
+'POLYGON ((3 3, 5 3, 4 6, 3 3))'
+====
+---- QUERY
+select ST_AsText(ST_InteriorRingN(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0), (1 1, 1 5, 5 1, 1 1))'), 1));
+---- RESULTS
+'LINESTRING (1 1, 1 5, 5 1, 1 1)'
+=====
+---- QUERY
+select ST_GeodesicLengthWGS84(ST_SetSRID(ST_LineString(0,80, 0.03, 80.04), 4326));
+---- TYPES
+DOUBLE
+---- RESULTS
+4503.988488226892
+====
+---- QUERY
+select ST_GeodesicLengthWGS84(ST_SetSRID(ST_GeomFromText('MultiLineString((0 80, 0.03 80.04))'), 4326));
+---- TYPES
+DOUBLE
+---- RESULTS
+4503.988488226892
+====
+---- QUERY
+select ST_GeodesicLengthWGS84(ST_SetSRID(ST_LineString(179.98,-80, -179.98, -80.03), 4326));
+---- TYPES
+DOUBLE
+---- RESULTS
+3438.190416575652
+====
+---- QUERY
+select ST_GeodesicLengthWGS84(ST_SetSRID(ST_LineString(179.98,80, -179.98, 80.03), 4326));
+---- TYPES
+DOUBLE
+---- RESULTS
+3438.190416575652
+====
+---- QUERY
+select ST_GeodesicLengthWGS84(ST_SetSRID(ST_LineString(179.98,-0.01, -179.98, 0.02), 4326));
+---- TYPES
+DOUBLE
+---- RESULTS
+5552.589421311623
+====
+---- QUERY
+select ST_AsText(ST_SetSRID(ST_GeomFromText('MultiLineString((0 80, 0.03 80.04))'), 4326));
+---- RESULTS
+'MULTILINESTRING ((0 80, 0.03 80.04))'
+====

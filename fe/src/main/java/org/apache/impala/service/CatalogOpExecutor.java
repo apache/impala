@@ -2207,11 +2207,9 @@ public class CatalogOpExecutor {
     }
     boolean isPersistentJavaFn =
         (fn.getBinaryType() == TFunctionBinaryType.JAVA) && fn.isPersistent();
-    HiveJavaFunction hiveJavaFunction = (fn.getBinaryType() == TFunctionBinaryType.JAVA)
-        ? hiveJavaFuncFactory_.create(
-            BackendConfig.INSTANCE.getBackendCfg().local_library_path,
-            (ScalarFunction) fn)
-        : null;
+    HiveJavaFunction hiveJavaFunction = (fn.getBinaryType() == TFunctionBinaryType.JAVA) ?
+        hiveJavaFuncFactory_.create((ScalarFunction) fn) :
+        null;
     Db db = catalog_.getDb(fn.dbName());
     if (db == null) {
       throw new CatalogException("Database: " + fn.dbName() + " does not exist.");

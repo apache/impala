@@ -25,7 +25,8 @@ from functools import partial
 
 from tests.common.environ import (ImpalaTestClusterProperties,
                                   IS_DOCKERIZED_TEST_CLUSTER, IS_BUGGY_EL6_KERNEL,
-                                  HIVE_MAJOR_VERSION, IS_REDHAT_6_DERIVATIVE)
+                                  HIVE_MAJOR_VERSION, IS_REDHAT_6_DERIVATIVE,
+                                  IS_APACHE_HIVE)
 from tests.common.kudu_test_suite import get_kudu_master_flag
 from tests.util.filesystem_utils import (
     IS_ABFS,
@@ -250,3 +251,8 @@ class SkipIfCatalogV2:
 class SkipIfOS:
   redhat6 = pytest.mark.skipif(IS_REDHAT_6_DERIVATIVE,
                                reason="Flaky on redhat or centos 6")
+
+
+class SkipIfApacheHive():
+  feature_not_supported = pytest.mark.skipif(IS_APACHE_HIVE,
+      reason="Apache Hive does not support this feature")

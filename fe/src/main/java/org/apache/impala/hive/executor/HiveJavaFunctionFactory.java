@@ -30,12 +30,10 @@ public interface HiveJavaFunctionFactory {
    * The local path contains a directory on the local file system to which the
    * jar file on hdfs can be copied.
    */
-  public HiveJavaFunction create(String localLibPath, Function hiveFn,
-      Type retType, Type[] paramTypes) throws CatalogException;
-
-  public HiveJavaFunction create(String localLibPath,
-      ScalarFunction fn) throws CatalogException;
-
-  public HiveJavaFunction create(String localLibPath, Function hiveFn)
+  public HiveJavaFunction create(Function hiveFn, Type retType, Type[] paramTypes)
       throws CatalogException;
+
+  public HiveJavaFunction create(ScalarFunction fn) throws CatalogException;
+
+  public HiveJavaFunction create(Function hiveFn) throws CatalogException;
 }

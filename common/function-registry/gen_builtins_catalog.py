@@ -20,9 +20,7 @@
 # This script generates the FE calls to populate the builtins.
 # To add a builtin, add an entry to impala_functions.py.
 
-import sys
 import os
-from string import Template
 import impala_functions
 
 java_registry_preamble = '\
@@ -65,6 +63,7 @@ FE_PATH = os.path.expandvars(
 #   - fn_name, ret_type, args, symbol, sql_names
 meta_data_entries = []
 
+
 # Read in the function and add it to the meta_data_entries map
 def add_function(fn_meta_data, user_visible):
   assert 4 <= len(fn_meta_data) <= 6, \
@@ -80,6 +79,7 @@ def add_function(fn_meta_data, user_visible):
     entry["close"] = fn_meta_data[5]
   entry["user_visible"] = user_visible
   meta_data_entries.append(entry)
+
 
 def generate_fe_entry(entry, name):
   java_output = ""
@@ -109,6 +109,7 @@ def generate_fe_entry(entry, name):
     java_output += ", Type." + arg
   return java_output
 
+
 # Generates the FE builtins init file that registers all the builtins.
 def generate_fe_registry_init(filename):
   java_registry_file = open(filename, "w")
@@ -123,14 +124,15 @@ def generate_fe_registry_init(filename):
   java_registry_file.write(java_registry_epilogue)
   java_registry_file.close()
 
-# Read the function metadata inputs
-for function in impala_functions.visible_functions:
-  add_function(function, True)
-for function in impala_functions.invisible_functions:
-  add_function(function, False)
 
-if not os.path.exists(FE_PATH):
-  os.makedirs(FE_PATH)
+if __name__ == "__main__":
+  # Read the function metadata inputs
+  for function in impala_functions.visible_functions:
+    add_function(function, True)
+  for function in impala_functions.invisible_functions:
+    add_function(function, False)
 
-generate_fe_registry_init(FE_PATH + "ScalarBuiltins.java")
+  if not os.path.exists(FE_PATH):
+    os.makedirs(FE_PATH)
 
+  generate_fe_registry_init(FE_PATH + "ScalarBuiltins.java")
