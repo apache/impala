@@ -34,12 +34,14 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.ContentFile;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DeleteFile;
@@ -56,6 +58,7 @@ import org.apache.iceberg.TableScan;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.expressions.Expression;
+import org.apache.iceberg.hadoop.HadoopFileIO;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.mr.Catalogs;
 import org.apache.iceberg.transforms.PartitionSpecVisitor;
@@ -79,6 +82,7 @@ import org.apache.impala.catalog.iceberg.IcebergCatalogs;
 import org.apache.impala.catalog.iceberg.IcebergHadoopCatalog;
 import org.apache.impala.catalog.iceberg.IcebergHadoopTables;
 import org.apache.impala.catalog.iceberg.IcebergHiveCatalog;
+import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.fb.FbFileMetadata;
@@ -1032,5 +1036,33 @@ public class IcebergUtil {
   public static boolean isPartitionColumn(IcebergColumn column,
       IcebergPartitionSpec spec) {
     return getPartitionTransformType(column, spec) != TIcebergPartitionTransformType.VOID;
+  }
+
+  /**
+   * Compose Iceberg catalog properties from Hadoop Configuration.
+   */
+  public static Map<String, String> composeCatalogProperties() {
+    Configuration conf = FileSystemUtil.getConfiguration();
+    Map<String, String> props = new HashMap<>();
+    List<String> configKeys = new ArrayList<>(Arrays.asList(
+        CatalogProperties.FILE_IO_IMPL, CatalogProperties.IO_MANIFEST_CACHE_ENABLED,
+        CatalogProperties.IO_MANIFEST_CACHE_EXPIRATION_INTERVAL_MS,
+        CatalogProperties.IO_MANIFEST_CACHE_MAX_TOTAL_BYTES,
+        CatalogProperties.IO_MANIFEST_CACHE_MAX_CONTENT_LENGTH));
+
+    for (String key : configKeys) {
+      String val = conf.get("iceberg." + key);
+      if (val != null) {
+        props.put(key, val);
+      }
+    }
+
+    if (!props.containsKey(CatalogProperties.FILE_IO_IMPL)) {
+      // Manifest caching only enabled if "io-impl" is specified. Default to HadoopFileIO
+      // if non-existent.
+      props.put(CatalogProperties.FILE_IO_IMPL, HadoopFileIO.class.getName());
+    }
+
+    return props;
   }
 }

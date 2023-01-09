@@ -118,6 +118,13 @@ CONFIG = {
    'fs.oss.endpoint': '${OSS_ACCESS_ENDPOINT}',
    'fs.oss.impl': 'org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem',
    'fs.AbstractFileSystem.oss.impl': 'org.apache.hadoop.fs.aliyun.oss.OSS',
+
+   # Manifest caching configuration for Iceberg.
+   'iceberg.io-impl': 'org.apache.iceberg.hadoop.HadoopFileIO',
+   'iceberg.io.manifest.cache-enabled': 'true',
+   'iceberg.io.manifest.cache.expiration-interval-ms': '60000',
+   'iceberg.io.manifest.cache.max-total-bytes': '104857600',
+   'iceberg.io.manifest.cache.max-content-length': '8388608',
 }
 
 if target_filesystem == 's3':

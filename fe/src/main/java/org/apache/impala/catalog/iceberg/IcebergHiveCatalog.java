@@ -51,11 +51,13 @@ public class IcebergHiveCatalog implements IcebergCatalog {
   private HiveCatalog hiveCatalog_;
 
   private IcebergHiveCatalog() {
+    setContextClassLoader();
     HiveConf conf = new HiveConf(IcebergHiveCatalog.class);
     conf.setBoolean(ConfigProperties.ENGINE_HIVE_ENABLED, true);
     hiveCatalog_ = new HiveCatalog();
     hiveCatalog_.setConf(conf);
-    hiveCatalog_.initialize("ImpalaHiveCatalog", new HashMap<>());
+    Map<String, String> properties = IcebergUtil.composeCatalogProperties();
+    hiveCatalog_.initialize("ImpalaHiveCatalog", properties);
   }
 
   @Override

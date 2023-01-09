@@ -17,16 +17,16 @@
 
 package org.apache.impala.catalog.iceberg;
 
+import java.io.UncheckedIOException;
 import java.lang.NullPointerException;
-import java.util.HashMap;
 import java.util.Map;
+
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchTableException;
-import org.apache.iceberg.exceptions.RuntimeIOException;
 import org.apache.iceberg.hadoop.HadoopCatalog;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
@@ -47,8 +47,9 @@ public class IcebergHadoopCatalog implements IcebergCatalog {
   private HadoopCatalog hadoopCatalog;
 
   public IcebergHadoopCatalog(String catalogLocation) {
+    setContextClassLoader();
     hadoopCatalog = new HadoopCatalog();
-    Map<String, String> props = new HashMap<>();
+    Map<String, String> props = IcebergUtil.composeCatalogProperties();
     props.put(CatalogProperties.WAREHOUSE_LOCATION, catalogLocation);
     hadoopCatalog.setConf(FileSystemUtil.getConfiguration());
     hadoopCatalog.initialize("", props);
@@ -86,7 +87,7 @@ public class IcebergHadoopCatalog implements IcebergCatalog {
         return hadoopCatalog.loadTable(tableId);
       } catch (NoSuchTableException e) {
         throw new TableLoadingException(e.getMessage());
-      } catch (NullPointerException | RuntimeIOException e) {
+      } catch (NullPointerException | UncheckedIOException e) {
         if (attempt == MAX_ATTEMPTS - 1) {
           // Throw exception on last attempt.
           throw new TableLoadingException(String.format(

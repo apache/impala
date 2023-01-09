@@ -72,4 +72,18 @@ public interface IcebergCatalog {
    * For HadoopCatalog, Iceberg implement 'renameTable' method with Exception threw
    */
   void renameTable(FeIcebergTable feTable, TableIdentifier newTableId);
+
+  /**
+   * Some of the implemetation methods might be running on native threads as they might
+   * be invoked via JNI. In that case the context class loader for those threads are
+   * null. 'Catalogs' uses JNDI to load the catalog implementations, e.g. HadoopCatalog
+   * or HiveCatalog. JNDI uses the context class loader, but as it is null it falls back
+   * to the bootstrap class loader that doesn't have the Iceberg classes on its classpath.
+   * To avoid ClassNotFoundException we set the context class loader to the class loader
+   * that loaded this class.
+   */
+  default void setContextClassLoader() {
+    if (Thread.currentThread().getContextClassLoader() != null) return;
+    Thread.currentThread().setContextClassLoader(this.getClass().getClassLoader());
+  }
 }
