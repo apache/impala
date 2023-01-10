@@ -870,18 +870,26 @@ void ClientRequestState::ExecLoadIcebergDataRequestImpl(TLoadDataResp response) 
   RETURN_VOID_IF_ERROR(child_query_executor_->ExecAsync(move(child_queries)));
   vector<ChildQuery*>* completed_queries = new vector<ChildQuery*>();
   Status query_status = child_query_executor_->WaitForAll(completed_queries);
-  hdfsFS fs = hdfsConnect("default", 0);
   if (query_status.ok()) {
-    if (hdfsDelete(fs, response.create_location.c_str(), 1)) {
-      Status hdfs_ret("Failed to remove staging data under '" + response.create_location
+    const char* path = response.create_location.c_str();
+    hdfsFS hdfs_conn;
+    Status hdfs_ret = HdfsFsCache::instance()->GetConnection(path, &hdfs_conn);
+    if (!hdfs_ret.ok() || hdfsDelete(hdfs_conn, path, 1)) {
+      hdfs_ret = Status("Failed to remove staging data under '" + response.create_location
           + "' after query failure: " + query_status.msg().msg());
       lock_guard<mutex> l(lock_);
       RETURN_VOID_IF_ERROR(UpdateQueryStatus(hdfs_ret));
     }
   } else {
-    for (string path : response.loaded_files) {
-      if (hdfsMove(fs, path.c_str(), fs, load_data_req.source_path.c_str())) {
-        Status hdfs_ret("Failed to revert data movement, some files might still be in '"
+    const char* dst_path = load_data_req.source_path.c_str();
+    hdfsFS hdfs_dst_conn;
+    Status hdfs_ret = HdfsFsCache::instance()->GetConnection(dst_path, &hdfs_dst_conn);
+    for (string src_path : response.loaded_files) {
+      hdfsFS hdfs_src_conn;
+      hdfs_ret = Status(HdfsFsCache::instance()->GetConnection(dst_path, &hdfs_src_conn));
+      if (!hdfs_ret.ok() || hdfsMove(hdfs_src_conn, src_path.c_str(), hdfs_dst_conn,
+          dst_path)) {
+        hdfs_ret = Status("Failed to revert data movement, some files might still be in '"
             + response.create_location + "' after query failure: "
             + query_status.msg().msg());
         lock_guard<mutex> l(lock_);

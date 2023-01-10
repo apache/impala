@@ -24,6 +24,7 @@
 #include "service/child-query.h"
 #include "service/impala-server.h"
 #include "service/query-result-set.h"
+#include "runtime/hdfs-fs-cache.h"
 #include "util/condition-variable.h"
 #include "util/runtime-profile.h"
 #include "gen-cpp/Frontend_types.h"
