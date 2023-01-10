@@ -498,9 +498,11 @@ DESCRIBE HISTORY ice_t BETWEEN '2022-01-04 10:00:00' AND '2022-01-05 10:00:00';
 </codeblock>
       </p>
 
-      <p>
-        Please note that during time travel, Impala uses the current table schema to query an older
-        snapshot of the table which might have had a different schema in the past.
+      <p rev="4.3.0 IMPALA-10893">
+        Please note that time travel queries are executed using the old schema of the table
+        from the point specified by the time travel parameters.
+        Prior to Impala 4.3.0 the current table schema is used to query an older
+        snapshot of the table, which might have had a different schema in the past.
       </p>
 
     </conbody>
