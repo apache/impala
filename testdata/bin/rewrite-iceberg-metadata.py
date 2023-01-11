@@ -32,31 +32,55 @@ if len(args) < 2:
 
 prefix = args[0]
 
+# Easier to cache it instead of trying to resolve the manifest files paths
+file_size_cache = {}
+
+
+def generate_new_path(prefix, file_path):
+  """ Hive generates metadata with absolute paths.
+  This method relativizes the path and applies a new prefix."""
+  start_directory = "/test-warehouse"
+  start = file_path.find(start_directory)
+  if start == -1:
+    raise RuntimeError("{} is not found in file path:{}".format(
+      start_directory, file_path))
+  return prefix + file_path[start:]
+
 
 def add_prefix_to_snapshot(snapshot):
   if 'manifest-list' in snapshot:
-    snapshot['manifest-list'] = prefix + snapshot['manifest-list']
+    snapshot['manifest-list'] = generate_new_path(prefix, snapshot['manifest-list'])
   if 'manifests' in snapshot:
-    snapshot['manifests'] = map(lambda m: prefix + m, snapshot['manifests'])
+    snapshot['manifests'] = map(lambda m: generate_new_path(prefix, m),
+                                snapshot['manifests'])
   return snapshot
 
 
 def add_prefix_to_mlog(metadata_log):
-  metadata_log['metadata-file'] = prefix + metadata_log['metadata-file']
+  metadata_log['metadata-file'] = generate_new_path(prefix, metadata_log['metadata-file'])
   return metadata_log
 
 
 def add_prefix_to_snapshot_entry(entry):
   if 'manifest_path' in entry:
-    entry['manifest_path'] = prefix + entry['manifest_path']
+    entry['manifest_path'] = generate_new_path(prefix, entry['manifest_path'])
   if 'data_file' in entry:
-    entry['data_file']['file_path'] = prefix + entry['data_file']['file_path']
+    entry['data_file']['file_path'] = generate_new_path(prefix,
+                                      entry['data_file']['file_path'])
+  return entry
+
+
+def fix_manifest_length(entry):
+  if 'manifest_path' in entry and 'manifest_length' in entry:
+    filename = entry['manifest_path'].split('/')[-1]
+    if filename in file_size_cache:
+      entry['manifest_length'] = file_size_cache[filename]
   return entry
 
 
 for arg in args[1:]:
   # Update metadata.json
-  for mfile in glob.glob(os.path.join(arg, 'v*.metadata.json')):
+  for mfile in glob.glob(os.path.join(arg, '*.metadata.json')):
     with open(mfile, 'r') as f:
       metadata = json.load(f)
 
@@ -70,7 +94,7 @@ for arg in args[1:]:
       continue
 
     # metadata: required
-    metadata['location'] = prefix + metadata['location']
+    metadata['location'] = generate_new_path(prefix, metadata['location'])
 
     # snapshots: optional
     if 'snapshots' in metadata:
@@ -81,7 +105,7 @@ for arg in args[1:]:
       metadata['metadata-log'] = map(add_prefix_to_mlog, metadata['metadata-log'])
 
     with open(mfile + '.tmp', 'w') as f:
-      json.dump(metadata, f)
+      json.dump(metadata, f, indent=2)
     os.rename(mfile + '.tmp', mfile)
 
   for afile in glob.glob(os.path.join(arg, '*.avro')):
@@ -95,3 +119,17 @@ for arg in args[1:]:
         for line in lines:
           writer.append(line)
     os.rename(afile + '.tmp', afile)
+    filename = afile.split('/')[-1]
+    file_size_cache[filename] = os.path.getsize(afile)
+
+  for snapfile in glob.glob(os.path.join(arg, 'snap*.avro')):
+    with open(snapfile, 'rb') as f:
+      with DataFileReader(f, DatumReader()) as reader:
+        schema = reader.datum_reader.writers_schema
+        lines = map(fix_manifest_length, reader)
+
+    with open(snapfile + '.tmp', 'wb') as f:
+      with DataFileWriter(f, DatumWriter(), schema) as writer:
+        for line in lines:
+          writer.append(line)
+    os.rename(snapfile + '.tmp', snapfile)
