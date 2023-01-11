@@ -1220,7 +1220,8 @@ Status LlvmCodeGen::StoreCache(CodeGenCacheKey& cache_key) {
   Status store_status = ExecEnv::GetInstance()->codegen_cache()->Store(
       cache_key, this, state_->query_options().codegen_cache_mode);
   LOG(INFO) << DebugCacheEntryString(cache_key, false /*is_lookup*/,
-      CodeGenCacheModeAnalyzer::is_debug(state_->query_options().codegen_cache_mode));
+      CodeGenCacheModeAnalyzer::is_debug(state_->query_options().codegen_cache_mode),
+      store_status.ok());
   return store_status;
 }
 
@@ -1341,8 +1342,6 @@ Status LlvmCodeGen::FinalizeModule() {
   if (codegen_cache_enabled) {
     SCOPED_TIMER(codegen_cache_save_timer_);
     store_cache_status = StoreCache(cache_key);
-    LOG(INFO) << DebugCacheEntryString(cache_key, false /*is_lookup*/,
-        CodeGenCacheModeAnalyzer::is_debug(state_->query_options().codegen_cache_mode));
   }
   // If the codegen is stored to the cache successfully, the cache will be responsible to
   // track the memory consumption instead.
@@ -1986,8 +1985,8 @@ string LlvmCodeGen::DiagnosticHandler::GetErrorString() {
   return "";
 }
 
-string LlvmCodeGen::DebugCacheEntryString(
-    CodeGenCacheKey& key, bool is_lookup, bool debug_mode, bool success) const {
+string LlvmCodeGen::DebugCacheEntryString(CodeGenCacheKey& key, bool is_lookup,
+    bool debug_mode, bool success) const {
   stringstream out;
   if (is_lookup) {
     out << "Look up codegen cache ";
@@ -2004,9 +2003,8 @@ string LlvmCodeGen::DebugCacheEntryString(
     }
   }
   out << "CodeGen Cache Key hash_code=" << key.hash_code();
-  out << " query_id=" << PrintId(state_->query_id()) << "\n";
   if (UNLIKELY(debug_mode)) {
-    out << "Fragment Plan: " << apache::thrift::ThriftDebugString(state_->fragment())
+    out << "\nFragment Plan: " << apache::thrift::ThriftDebugString(state_->fragment())
         << "\n";
     out << "CodeGen Functions: \n";
     for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {

@@ -190,8 +190,8 @@ class LlvmCodeGen {
   /// Turns on/off optimization passes
   void EnableOptimizations(bool enable);
 
-  std::string DebugCacheEntryString(
-      CodeGenCacheKey& key, bool is_lookup, bool debug_mode, bool success = true) const;
+  std::string DebugCacheEntryString(CodeGenCacheKey& key, bool is_lookup, bool debug_mode,
+      bool success) const;
 
   /// For debugging. Returns the IR that was generated.  If full_module, the
   /// entire module is dumped, including what was loaded from precompiled IR.
