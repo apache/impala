@@ -831,6 +831,16 @@ sed --in-place "s|$SEARCH_STR|$REPLACE_STR|g" $TMP_JSON
 SCHEMA=`java -jar $AVRO_TOOLS getschema $SOURCE_FILE`
 java -jar $AVRO_TOOLS fromjson $TMP_JSON --schema "$SCHEMA" > $DST_AVRO
 
+These updates the manifest files and their length probably change. Snapshot files store the
+length of the manifest files, so it need to be changed as well. If it only stores one manifest:
+
+avro_iceberg_convert.sh FILE "\"manifest_length.*$" "\"manifest_length\" : SIZE,"
+mv FILE_mod FILE
+
+If a snapshot has multiple manifest files, then you need to change manually the previously generated
+*_json files and transform it back using avro tools, the last step of avro_iceberg_convert.sh, or
+use testdata/bin/rewrite-iceberg-metadata.py
+
 iceberg_v2_partitioned_position_deletes:
 iceberg_v2_partitioned_position_deletes_orc:
 Created similarly to iceberg_v2_no_deletes.
