@@ -46,6 +46,7 @@ import org.apache.impala.service.FeSupport;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TIcebergContentFileStore;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TMetadataOpcode;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -283,9 +284,11 @@ public class LocalCatalogTest {
     ListMap<TNetworkAddress> catalogdHostIndexes = new ListMap<>();
     catalogdHostIndexes.populate(tblInfo.getNetwork_addresses());
     IcebergContentFileStore catalogFileStore = IcebergContentFileStore.fromThrift(
-            tblInfo.getIceberg_table().getContent_files(),
-            null, null);
-    for (FileDescriptor localFd : fileStore.getDataFiles()) {
+        tblInfo.getIceberg_table().getContent_files(),
+        null, null);
+    TIcebergContentFileStore icebergContentFileStore = catalogFileStore.toThrift();
+    assertEquals(tblInfo.getIceberg_table().getContent_files(), icebergContentFileStore);
+    for (FileDescriptor localFd : fileStore.getAllDataFiles()) {
       String path = localFd.getAbsolutePath(t.getLocation());
       // For this test table the manifest files contain data paths without FS-scheme, so
       // they are loaded to the file content store without them.

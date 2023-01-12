@@ -19,7 +19,6 @@ package org.apache.impala.catalog;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Ints;
 
@@ -63,6 +62,7 @@ import org.apache.impala.analysis.TimeTravelSpec;
 import org.apache.impala.analysis.TimeTravelSpec.Kind;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
@@ -671,44 +671,50 @@ public interface FeIcebergTable extends FeFsTable {
 
     /**
      * Returns the FileDescriptors loaded by the internal HdfsTable. To avoid returning
-     * the metadata files the resulset is limited to the files that are tracked by
+     * the metadata files the resultset is limited to the files that are tracked by
      * Iceberg. Both the HdfsBaseDir and the DataFile path can contain the scheme in their
      * path, using org.apache.hadoop.fs.Path to normalize the paths.
      */
     public static IcebergContentFileStore loadAllPartition(
-        IcebergTable table, Pair<List<DataFile>, Set<DeleteFile>> icebergFiles)
+        IcebergTable table, GroupedContentFiles icebergFiles)
         throws IOException, TableLoadingException {
       Map<String, HdfsPartition.FileDescriptor> hdfsFileDescMap = new HashMap<>();
       Collection<HdfsPartition> partitions =
           ((HdfsTable)table.getFeFsTable()).partitionMap_.values();
       for (HdfsPartition partition : partitions) {
         for (FileDescriptor fileDesc : partition.getFileDescriptors()) {
-            Path path = new Path(fileDesc.getAbsolutePath(table.getHdfsBaseDir()));
-            hdfsFileDescMap.put(path.toUri().getPath(), fileDesc);
+          Path path = new Path(fileDesc.getAbsolutePath(table.getHdfsBaseDir()));
+          hdfsFileDescMap.put(path.toUri().getPath(), fileDesc);
         }
       }
       IcebergContentFileStore fileStore = new IcebergContentFileStore();
-      for (ContentFile contentFile : Iterables.concat(icebergFiles.first,
-                                                      icebergFiles.second)) {
-        addContentFileToFileStore(contentFile, fileStore, table, hdfsFileDescMap);
+      Pair<String, HdfsPartition.FileDescriptor> pathHashAndFd;
+      for (DataFile dataFile : icebergFiles.dataFilesWithoutDeletes) {
+        pathHashAndFd = getPathHashAndFd(dataFile, table, hdfsFileDescMap);
+        fileStore.addDataFileWithoutDeletes(pathHashAndFd.first, pathHashAndFd.second);
+      }
+      for (DataFile dataFile : icebergFiles.dataFilesWithDeletes) {
+        pathHashAndFd = getPathHashAndFd(dataFile, table, hdfsFileDescMap);
+        fileStore.addDataFileWithDeletes(pathHashAndFd.first, pathHashAndFd.second);
+      }
+      for (DeleteFile deleteFile : icebergFiles.deleteFiles) {
+        Preconditions.checkState(
+            deleteFile.content().equals(FileContent.EQUALITY_DELETES) ||
+            deleteFile.content().equals(FileContent.POSITION_DELETES));
+        pathHashAndFd = getPathHashAndFd(deleteFile, table, hdfsFileDescMap);
+        fileStore.addDeleteFileDescriptor(pathHashAndFd.first, pathHashAndFd.second);
       }
       return fileStore;
     }
 
-    private static void addContentFileToFileStore(ContentFile contentFile,
-        IcebergContentFileStore fileStore, IcebergTable table,
+    private static Pair<String, HdfsPartition.FileDescriptor> getPathHashAndFd(
+        ContentFile contentFile,
+        IcebergTable table,
         Map<String, HdfsPartition.FileDescriptor> hdfsFileDescMap) throws IOException {
       String pathHash = IcebergUtil.getFilePathHash(contentFile);
       HdfsPartition.FileDescriptor fd = getOrCreateIcebergFd(
           table, hdfsFileDescMap, contentFile);
-      if (contentFile.content().equals(FileContent.DATA)) {
-        fileStore.addDataFileDescriptor(pathHash, fd);
-      } else {
-        Preconditions.checkState(
-            contentFile.content().equals(FileContent.EQUALITY_DELETES) ||
-            contentFile.content().equals(FileContent.POSITION_DELETES));
-        fileStore.addDeleteFileDescriptor(pathHash, fd);
-      }
+      return new Pair<>(pathHash, fd);
     }
 
     private static FileDescriptor getOrCreateIcebergFd(IcebergTable table,
@@ -743,12 +749,10 @@ public interface FeIcebergTable extends FeFsTable {
      * TODO(IMPALA-11516): Return better partition stats for V2 tables.
      */
     public static Map<String, TIcebergPartitionStats> loadPartitionStats(
-        IcebergTable table, Pair<List<DataFile>, Set<DeleteFile>> icebergFiles)
+        IcebergTable table, GroupedContentFiles icebergFiles)
         throws TableLoadingException {
-      List<DataFile> dataFileList = icebergFiles.first;
-      Set<DeleteFile> deleteFileList = icebergFiles.second;
       Map<String, TIcebergPartitionStats> nameToStats = new HashMap<>();
-      for (ContentFile<?> contentFile : Iterables.concat(dataFileList, deleteFileList)) {
+      for (ContentFile<?> contentFile : icebergFiles.getAllContentFiles()) {
         String name = getPartitionKey(table, contentFile);
         nameToStats.put(name, mergePartitionStats(nameToStats, contentFile, name));
       }

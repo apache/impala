@@ -139,23 +139,12 @@ public class IcebergScanPlanner {
     analyzer_.materializeSlots(conjuncts_);
 
     if (!needIcebergForPlanning()) {
-      return planWithoutIceberg();
+      setFileDescriptorsBasedOnFileStore();
+      return createIcebergScanPlanImpl();
     }
 
     filterFileDescriptors();
-
-    PlanNode ret;
-    if (deleteFiles_.isEmpty()) {
-      // If there are no delete files we can just create a single SCAN node.
-      Preconditions.checkState(dataFilesWithDeletes_.isEmpty());
-      ret = new IcebergScanNode(ctx_.getNextNodeId(), tblRef_, conjuncts_,
-          aggInfo_, dataFilesWithoutDeletes_, nonIdentityConjuncts_);
-      ret.init(analyzer_);
-    } else {
-      // Let's create a bit more complex plan in the presence of delete files.
-      ret = createComplexIcebergScanPlan();
-    }
-    return ret;
+    return createIcebergScanPlanImpl();
   }
 
   /**
@@ -163,28 +152,30 @@ public class IcebergScanPlanner {
    * true:
    *  - we don't push down predicates
    *  - no time travel
-   *  - no delete files
-   * TODO: we should still avoid calling planFiles() if there are delete files. To do that
-   * we either need to track which delete files have corresponding data files so we
-   * can create the UNION ALL node. Or, if we have an optimized, Iceberg-specific
-   * ANTI-JOIN operator, then it wouldn't hurt too much to transfer all rows through it.
    */
   private boolean needIcebergForPlanning() {
     return
         !icebergPredicates_.isEmpty() ||
-        tblRef_.getTimeTravelSpec() != null ||
-        !getIceTable().getContentFileStore().getDeleteFiles().isEmpty();
+        tblRef_.getTimeTravelSpec() != null;
   }
 
-  private PlanNode planWithoutIceberg() throws ImpalaException {
-    PlanNode ret = new IcebergScanNode(ctx_.getNextNodeId(), tblRef_, conjuncts_,
-        aggInfo_, getIceTable().getContentFileStore().getDataFiles(),
-        nonIdentityConjuncts_);
-    ret.init(analyzer_);
-    return ret;
+  private void setFileDescriptorsBasedOnFileStore() {
+    IcebergContentFileStore fileStore = getIceTable().getContentFileStore();
+    dataFilesWithoutDeletes_ = fileStore.getDataFilesWithoutDeletes();
+    dataFilesWithDeletes_ = fileStore.getDataFilesWithDeletes();
+    deleteFiles_ = new HashSet<>(fileStore.getDeleteFiles());
+    updateDeleteStatistics();
   }
 
-  private PlanNode createComplexIcebergScanPlan() throws ImpalaException {
+  private PlanNode createIcebergScanPlanImpl() throws ImpalaException {
+    if (deleteFiles_.isEmpty()) {
+      // If there are no delete files we can just create a single SCAN node.
+      Preconditions.checkState(dataFilesWithDeletes_.isEmpty());
+      PlanNode ret = new IcebergScanNode(ctx_.getNextNodeId(), tblRef_, conjuncts_,
+          aggInfo_, dataFilesWithoutDeletes_, nonIdentityConjuncts_);
+      ret.init(analyzer_);
+      return ret;
+    }
     PlanNode joinNode = createPositionJoinNode();
     if (dataFilesWithoutDeletes_.isEmpty()) {
       // All data files has corresponding delete files, so we just return an ANTI JOIN
@@ -211,6 +202,9 @@ public class IcebergScanPlanner {
   }
 
   private PlanNode createPositionJoinNode() throws ImpalaException {
+    Preconditions.checkState(deletesRecordCount_ != 0);
+    Preconditions.checkState(dataFilesWithDeletesSumPaths_ != 0);
+    Preconditions.checkState(dataFilesWithDeletesMaxPath_ != 0);
     // The followings just create separate scan nodes for data files and position delete
     // files, plus adds a LEFT ANTI HASH JOIN above them.
     PlanNodeId dataScanNodeId = ctx_.getNextNodeId();
@@ -338,7 +332,6 @@ public class IcebergScanPlanner {
         if (fileScanTask.deletes().isEmpty()) {
           dataFilesWithoutDeletes_.add(fileDesc.first);
         } else {
-          updateDataFilesWithDeletesStatistics(fileScanTask.file());
           dataFilesWithDeletes_.add(fileDesc.first);
           for (DeleteFile delFile : fileScanTask.deletes()) {
             // TODO(IMPALA-11388): Add support for equality deletes.
@@ -350,10 +343,7 @@ public class IcebergScanPlanner {
             }
             Pair<FileDescriptor, Boolean> delFileDesc = getFileDescriptor(delFile);
             if (!delFileDesc.second) ++dataFilesCacheMisses;
-            if (deleteFiles_.add(delFileDesc.first)) {
-              // New delete file added to 'deleteFiles_'.
-              updateDeleteFilesStatistics(delFile);
-            }
+            deleteFiles_.add(delFileDesc.first);
           }
         }
       }
@@ -368,22 +358,33 @@ public class IcebergScanPlanner {
           "Failed to load data files for Iceberg table: %s", getIceTable().getFullName()),
           e);
     }
+    updateDeleteStatistics();
   }
 
-  private void updateDataFilesWithDeletesStatistics(ContentFile cf) {
-    long pathSize = cf.path().toString().length();
+  private void updateDeleteStatistics() {
+    for (FileDescriptor fd : dataFilesWithDeletes_) {
+      updateDataFilesWithDeletesStatistics(fd);
+    }
+    for (FileDescriptor fd : deleteFiles_) {
+      updateDeleteFilesStatistics(fd);
+    }
+  }
+
+  private void updateDataFilesWithDeletesStatistics(FileDescriptor fd) {
+    String path = fd.getAbsolutePath(getIceTable().getLocation());
+    long pathSize = path.length();
     dataFilesWithDeletesSumPaths_ += pathSize;
     if (pathSize > dataFilesWithDeletesMaxPath_) {
       dataFilesWithDeletesMaxPath_ = pathSize;
     }
   }
 
-  private void updateDeleteFilesStatistics(DeleteFile delFile) {
-    deletesRecordCount_ += getRecordCount(delFile);
+  private void updateDeleteFilesStatistics(FileDescriptor fd) {
+    deletesRecordCount_ += getRecordCount(fd);
   }
 
-  private long getRecordCount(DeleteFile delFile) {
-    long recordCount = delFile.recordCount();
+  private long getRecordCount(FileDescriptor fd) {
+    long recordCount = fd.getFbFileMetadata().icebergMetadata().recordCount();
     // 'record_count' is a required field for Iceberg data files, but let's still
     // prepare for the case when a compute engine doesn't fill it.
     if (recordCount == -1) return 1000;

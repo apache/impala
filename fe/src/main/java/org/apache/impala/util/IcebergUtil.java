@@ -73,6 +73,7 @@ import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.catalog.iceberg.IcebergCatalog;
 import org.apache.impala.catalog.iceberg.IcebergCatalogs;
 import org.apache.impala.catalog.iceberg.IcebergHadoopCatalog;
@@ -551,21 +552,15 @@ public class IcebergUtil {
   /**
    * Returns lists of data and delete files in the Iceberg table.
    */
-  public static Pair<List<DataFile>, Set<DeleteFile>> getIcebergFiles(
+  public static GroupedContentFiles getIcebergFiles(
       FeIcebergTable table, List<Expression> predicates, TimeTravelSpec timeTravelSpec)
         throws TableLoadingException {
-    List<DataFile> dataFiles = new ArrayList<>();
-    Set<DeleteFile> deleteFiles = new HashSet<>();
     try (CloseableIterable<FileScanTask> fileScanTasks = planFiles(
         table, predicates, timeTravelSpec)) {
-      for (FileScanTask scanTask : fileScanTasks) {
-        dataFiles.add(scanTask.file());
-        deleteFiles.addAll(scanTask.deletes());
-      }
+      return new GroupedContentFiles(fileScanTasks);
     } catch (IOException e) {
       throw new TableLoadingException("Error during reading Iceberg manifest files.", e);
     }
-    return new Pair<>(dataFiles, deleteFiles);
   }
 
   private static TableScan createScanAsOf(FeIcebergTable table,

@@ -603,11 +603,12 @@ struct TIcebergPartitionStats {
 
 // Contains maps from 128-bit Murmur3 hash of file path to its file descriptor
 struct TIcebergContentFileStore {
-  1: optional map<string, THdfsFileDesc> path_hash_to_data_file
-  2: optional map<string, THdfsFileDesc> path_hash_to_delete_file
-  3: optional bool has_avro
-  4: optional bool has_orc
-  5: optional bool has_parquet
+  1: optional map<string, THdfsFileDesc> path_hash_to_data_file_without_deletes
+  2: optional map<string, THdfsFileDesc> path_hash_to_data_file_with_deletes
+  3: optional map<string, THdfsFileDesc> path_hash_to_delete_file
+  4: optional bool has_avro
+  5: optional bool has_orc
+  6: optional bool has_parquet
 }
 
 struct TIcebergTable {
