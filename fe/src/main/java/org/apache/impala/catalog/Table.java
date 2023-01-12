@@ -188,6 +188,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
   // Table property key to determined if HMS translated a managed table to external table
   public static final String TBL_PROP_EXTERNAL_TABLE_PURGE = "external.table.purge";
+  public static final String TBL_PROP_EXTERNAL_TABLE_PURGE_DEFAULT = "TRUE";
 
   // this field represents the last event id in metastore upto which this table is
   // synced. It is used if the flag sync_to_latest_event_on_ddls is set to true.

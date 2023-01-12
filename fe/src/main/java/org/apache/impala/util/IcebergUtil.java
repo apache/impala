@@ -239,10 +239,14 @@ public class IcebergUtil {
    */
   public static boolean isHiveCatalog(
       org.apache.hadoop.hive.metastore.api.Table msTable) {
-    TIcebergCatalog tCat = getTIcebergCatalog(msTable);
+    return isHiveCatalog(msTable.getParameters());
+  }
+
+  public static boolean isHiveCatalog(Map<String, String> props) {
+    TIcebergCatalog tCat = getTIcebergCatalog(props);
     if (tCat == TIcebergCatalog.HIVE_CATALOG) return true;
     if (tCat == TIcebergCatalog.CATALOGS) {
-      String catName = msTable.getParameters().get(IcebergTable.ICEBERG_CATALOG);
+      String catName = props.get(IcebergTable.ICEBERG_CATALOG);
       tCat = IcebergCatalogs.getInstance().getUnderlyingCatalogType(catName);
       return tCat == TIcebergCatalog.HIVE_CATALOG;
     }
@@ -255,8 +259,11 @@ public class IcebergUtil {
    */
   public static TIcebergCatalog getTIcebergCatalog(
       org.apache.hadoop.hive.metastore.api.Table msTable) {
-    return getTIcebergCatalog(
-        msTable.getParameters().get(IcebergTable.ICEBERG_CATALOG));
+    return getTIcebergCatalog(msTable.getParameters());
+  }
+
+  public static TIcebergCatalog getTIcebergCatalog(Map<String, String> props) {
+    return getTIcebergCatalog(props.get(IcebergTable.ICEBERG_CATALOG));
   }
 
   /**

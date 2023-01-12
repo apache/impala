@@ -37,9 +37,7 @@ import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TBucketInfo;
-import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.TCreateTableParams;
-import org.apache.impala.thrift.THdfsCompression;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
@@ -60,7 +58,6 @@ import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.primitives.Ints;
-import com.google.common.primitives.Longs;
 
 /**
  * Represents a CREATE TABLE statement.
@@ -767,6 +764,14 @@ public class CreateTableStmt extends StatementBase {
       break;
       default: throw new AnalysisException(String.format(
           "Unknown Iceberg catalog type: %s", catalog));
+    }
+    // HMS will override 'external.table.purge' to 'TRUE' When 'iceberg.catalog' is not
+    // the Hive Catalog for managed tables.
+    if (!isExternal() && !IcebergUtil.isHiveCatalog(getTblProperties())
+        && "false".equalsIgnoreCase(getTblProperties().get(
+            Table.TBL_PROP_EXTERNAL_TABLE_PURGE))) {
+      analyzer_.addWarning("The table property 'external.table.purge' will be set "
+          + "to 'TRUE' on newly created managed Iceberg tables.");
     }
   }
 

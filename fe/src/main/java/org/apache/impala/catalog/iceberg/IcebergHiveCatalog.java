@@ -17,6 +17,9 @@
 
 package org.apache.impala.catalog.iceberg;
 
+import static org.apache.impala.catalog.Table.TBL_PROP_EXTERNAL_TABLE_PURGE;
+import static org.apache.impala.catalog.Table.TBL_PROP_EXTERNAL_TABLE_PURGE_DEFAULT;
+
 import java.util.Map;
 import java.util.HashMap;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -24,12 +27,10 @@ import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.hadoop.ConfigProperties;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
-import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.util.IcebergUtil;
 
@@ -48,7 +49,7 @@ public class IcebergHiveCatalog implements IcebergCatalog {
     return instance_;
   }
 
-  private HiveCatalog hiveCatalog_;
+  private final HiveCatalog hiveCatalog_;
 
   private IcebergHiveCatalog() {
     setContextClassLoader();
@@ -67,7 +68,8 @@ public class IcebergHiveCatalog implements IcebergCatalog {
       PartitionSpec spec,
       String location,
       Map<String, String> properties) {
-    properties.put("external.table.purge", "TRUE");
+    properties.put(TBL_PROP_EXTERNAL_TABLE_PURGE, properties.getOrDefault(
+        TBL_PROP_EXTERNAL_TABLE_PURGE, TBL_PROP_EXTERNAL_TABLE_PURGE_DEFAULT));
     return hiveCatalog_.createTable(identifier, schema, spec, location, properties);
   }
 

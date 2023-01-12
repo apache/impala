@@ -439,6 +439,9 @@ create table ice_part_hadoop_tbl (
 ====
 ---- QUERY
 describe formatted ice_part_hadoop_tbl;
+---- RESULTS: VERIFY_IS_NOT_IN
+'Num Buckets:        ','0                   ','NULL'
+'Bucket Columns:     ','[]                  ','NULL'
 ---- RESULTS: VERIFY_IS_SUBSET
 '','NULL','NULL'
 '# Partition Transform Information','NULL','NULL'
@@ -450,9 +453,7 @@ describe formatted ice_part_hadoop_tbl;
 'col_truncate','TRUNCATE[2]','NULL'
 'col_bucket','BUCKET[2]','NULL'
 'col_identity','IDENTITY','NULL'
----- RESULTS: VERIFY_IS_NOT_IN
-'Num Buckets:        ','0                   ','NULL'
-'Bucket Columns:     ','[]                  ','NULL'
+'','external.table.purge','TRUE                '
 ---- TYPES
 string, string, string
 ====
@@ -482,6 +483,9 @@ create table ice_part_hadoop_catalog (
 ====
 ---- QUERY
 describe formatted ice_part_hadoop_catalog;
+---- RESULTS: VERIFY_IS_NOT_IN
+'Num Buckets:        ','0                   ','NULL'
+'Bucket Columns:     ','[]                  ','NULL'
 ---- RESULTS: VERIFY_IS_SUBSET
 '','NULL','NULL'
 '# Partition Transform Information','NULL','NULL'
@@ -493,9 +497,7 @@ describe formatted ice_part_hadoop_catalog;
 'col_truncate','TRUNCATE[2]','NULL'
 'col_bucket','BUCKET[2]','NULL'
 'col_identity','IDENTITY','NULL'
----- RESULTS: VERIFY_IS_NOT_IN
-'Num Buckets:        ','0                   ','NULL'
-'Bucket Columns:     ','[]                  ','NULL'
+'','external.table.purge','TRUE                '
 ---- TYPES
 string, string, string
 ====
@@ -522,6 +524,9 @@ create table ice_part_catalogs (
 ====
 ---- QUERY
 describe formatted ice_part_catalogs;
+---- RESULTS: VERIFY_IS_NOT_IN
+'Num Buckets:        ','0                   ','NULL'
+'Bucket Columns:     ','[]                  ','NULL'
 ---- RESULTS: VERIFY_IS_SUBSET
 '','NULL','NULL'
 '# Partition Transform Information','NULL','NULL'
@@ -533,9 +538,7 @@ describe formatted ice_part_catalogs;
 'col_truncate','TRUNCATE[2]','NULL'
 'col_bucket','BUCKET[2]','NULL'
 'col_identity','IDENTITY','NULL'
----- RESULTS: VERIFY_IS_NOT_IN
-'Num Buckets:        ','0                   ','NULL'
-'Bucket Columns:     ','[]                  ','NULL'
+'','external.table.purge','TRUE                '
 ---- TYPES
 string, string, string
 ====
@@ -551,6 +554,8 @@ describe formatted ice_non_partition;
 '# col_name            ','transform_type      ','NULL'
 'Num Buckets:        ','0                   ','NULL'
 'Bucket Columns:     ','[]                  ','NULL'
+---- RESULTS: VERIFY_IS_SUBSET
+'','external.table.purge','TRUE                '
 ---- TYPES
 string, string, string
 ====
@@ -564,6 +569,50 @@ create table iceberg_stored_by (i int, s string, ts timestamp, d date) stored by
 describe formatted iceberg_stored_by;
 ---- RESULTS: VERIFY_IS_SUBSET
 '','table_type          ','ICEBERG             '
+---- TYPES
+string, string, string
+====
+---- QUERY
+create table ice_tbl (i int) stored as iceberg tblproperties('external.table.purge'='FALSE');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe formatted ice_tbl;
+---- RESULTS: VERIFY_IS_SUBSET
+'','external.table.purge','FALSE               '
+---- TYPES
+string, string, string
+====
+---- QUERY
+create table ice_hive_cat_tbl (i int) stored as iceberg tblproperties(
+  'iceberg.catalog' = 'ice_hive_cat',
+  'external.table.purge' = 'FALSE'
+);
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe formatted ice_hive_cat_tbl;
+---- RESULTS: VERIFY_IS_SUBSET
+'','external.table.purge','FALSE               '
+---- TYPES
+string, string, string
+====
+---- QUERY
+create table ice_hadoop_tbl (i int) stored as iceberg tblproperties(
+  'iceberg.catalog' = 'hadoop.tables',
+  'external.table.purge' = 'FALSE'
+);
+---- ERRORS
+The table property 'external.table.purge' will be set to 'TRUE' on newly created managed Iceberg tables.
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe formatted ice_hadoop_tbl;
+---- RESULTS: VERIFY_IS_SUBSET
+'','external.table.purge','TRUE                '
 ---- TYPES
 string, string, string
 ====
