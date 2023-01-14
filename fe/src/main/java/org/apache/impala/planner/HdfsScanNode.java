@@ -1653,8 +1653,9 @@ public class HdfsScanNode extends ScanNode {
       hasCorruptTableStats_ = true;
     }
 
-    // Use hint value if table no stats or stats is corrupt
-    return numRows >= 0 && !hasCorruptTableStats_ ? numRows :tableNumRowsHint_;
+    // Use hint value if table no stats or stats is corrupt and hint is set
+    return (numRows >= 0 && !hasCorruptTableStats_) || tableNumRowsHint_ == -1L ?
+        numRows :tableNumRowsHint_;
   }
 
   /**
