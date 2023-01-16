@@ -910,7 +910,7 @@ public class AnalyticPlanner {
       if (!(lhs instanceof SlotRef)) continue;
 
       List<Expr> lhsSourceExprs = ((SlotRef) lhs).getDesc().getSourceExprs();
-      if (lhsSourceExprs.size() > 1 ||
+      if (lhsSourceExprs.size() != 1 ||
             !(lhsSourceExprs.get(0) instanceof AnalyticExpr)) {
         continue;
       }

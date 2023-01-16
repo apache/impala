@@ -891,3 +891,35 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=1 size=38B
    row-size=24B cardinality=unavailable
 ====
+# Regression test for IMPALA-11843. Several conjuncts to consider pushing down.
+select id, rn from (
+  select id,
+    row_number() over (order by id desc) rn,
+    max(id) over () max_id
+  from functional.alltypesagg) t
+where id = max_id and rn < 10
+---- PLAN
+PLAN-ROOT SINK
+|
+04:SELECT
+|  predicates: id = max(id), id = max(id), row_number() < 10
+|  row-size=16B cardinality=1.10K
+|
+03:ANALYTIC
+|  functions: row_number()
+|  order by: id DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=16B cardinality=11.00K
+|
+02:ANALYTIC
+|  functions: max(id)
+|  row-size=8B cardinality=11.00K
+|
+01:SORT
+|  order by: id DESC
+|  row-size=4B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=4B cardinality=11.00K
+====

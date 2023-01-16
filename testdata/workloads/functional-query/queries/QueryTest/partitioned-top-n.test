@@ -120,3 +120,15 @@ where rnk < 10
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+select id, rn from (
+  select id,
+    row_number() over (order by id desc) rn,
+    max(id) over () max_id
+  from functional.alltypesagg) t
+where id = max_id and rn < 10
+---- RESULTS
+9999,1
+---- TYPES
+INT,BIGINT
+====
