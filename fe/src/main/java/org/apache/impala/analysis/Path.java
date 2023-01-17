@@ -133,6 +133,7 @@ public class Path {
 
   // Registered table alias that this path is rooted at, if any.
   // Null if the path is rooted at a catalog table/view.
+  // Note that this is also set for STAR path of "v.*" when "v" is a catalog table/view.
   private final TupleDescriptor rootDesc_;
 
   // Catalog table that this resolved path is rooted at, if any.
@@ -144,7 +145,9 @@ public class Path {
   private final Path rootPath_;
 
   // List of matched types and field positions set during resolution. The matched
-  // types/positions describe the physical path through the schema tree.
+  // types/positions describe the physical path through the schema tree of a catalog
+  // table/view. Empty if the path corresponds to a catalog table/view, e.g. when it's a
+  // TABLE_REF or when it's a STAR on a table/view.
   private final List<Type> matchedTypes_ = new ArrayList<>();
   private final List<Integer> matchedPositions_ = new ArrayList<>();
 

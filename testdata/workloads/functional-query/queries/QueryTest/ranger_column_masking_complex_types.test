@@ -45,7 +45,7 @@ select id, nested_struct.a from complextypestbl
 BIGINT,INT
 ====
 ---- QUERY
-# Test resolving nested columns in expending star expression.
+# Test resolving nested columns in expanding star expression.
 select id, nested_struct.* from complextypestbl
 ---- RESULTS
 100,1
@@ -58,6 +58,116 @@ select id, nested_struct.* from complextypestbl
 800,-1
 ---- TYPES
 BIGINT,INT
+====
+---- QUERY
+# Test resolving nested columns in expanding star expression.
+select nested_struct.* from complextypestbl
+---- RESULTS
+1
+NULL
+NULL
+NULL
+NULL
+NULL
+7
+-1
+---- TYPES
+INT
+====
+---- QUERY
+# Test resolving nested columns in expanding star expression.
+set EXPAND_COMPLEX_TYPES=1;
+select nested_struct.* from complextypestbl
+---- CATCH
+AnalysisException: Struct containing a collection type is not allowed in the select list.
+====
+---- QUERY
+# Test resolving explicit STAR path on a nested struct column inside array
+select id, nested_arr.item.*
+from functional_parquet.complextypestbl t,
+  t.nested_struct.c.d arr,
+  arr.item nested_arr;
+---- RESULTS
+100,10,'aaa'
+100,-10,'bbb'
+100,11,'c'
+200,NULL,'NULL'
+200,10,'aaa'
+200,NULL,'NULL'
+200,-10,'bbb'
+200,NULL,'NULL'
+200,11,'c'
+200,NULL,'NULL'
+700,NULL,'NULL'
+800,-1,'nonnullable'
+---- TYPES
+BIGINT,INT,STRING
+====
+---- QUERY
+# Test resolving explicit STAR path on a nested struct column inside array
+select nested_arr.item.*
+from functional_parquet.complextypestbl t,
+  t.nested_struct.c.d arr,
+  arr.item nested_arr;
+---- RESULTS
+10,'aaa'
+-10,'bbb'
+11,'c'
+NULL,'NULL'
+10,'aaa'
+NULL,'NULL'
+-10,'bbb'
+NULL,'NULL'
+11,'c'
+NULL,'NULL'
+NULL,'NULL'
+-1,'nonnullable'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Test resolving implicit STAR path on a nested struct column inside array
+select id, nested_arr.*
+from functional_parquet.complextypestbl t,
+  t.nested_struct.c.d arr,
+  arr.item nested_arr;
+---- RESULTS
+100,10,'aaa'
+100,-10,'bbb'
+100,11,'c'
+200,NULL,'NULL'
+200,10,'aaa'
+200,NULL,'NULL'
+200,-10,'bbb'
+200,NULL,'NULL'
+200,11,'c'
+200,NULL,'NULL'
+700,NULL,'NULL'
+800,-1,'nonnullable'
+---- TYPES
+BIGINT,INT,STRING
+====
+---- QUERY
+# Test resolving explicit STAR path on a nested struct column inside array
+select nested_arr.*
+from functional_parquet.complextypestbl t,
+  t.nested_struct.c.d arr,
+  arr.item nested_arr;
+---- RESULTS
+10,'aaa'
+-10,'bbb'
+11,'c'
+NULL,'NULL'
+10,'aaa'
+NULL,'NULL'
+-10,'bbb'
+NULL,'NULL'
+11,'c'
+NULL,'NULL'
+NULL,'NULL'
+-1,'nonnullable'
+---- TYPES
+INT,STRING
 ====
 ---- QUERY
 # Test resolving nested column in function.

@@ -1190,9 +1190,11 @@ public class Analyzer {
         return resolvedPath;
       }
     } else if (pathType == PathType.STAR) {
-      if (!resolvedPath.destType().isStructType() || !resolvedPath.isRootedAtTuple()) {
-        return resolvedPath;
-      }
+      // For "v.*", return directly if "v" is a table/view.
+      // If it's a struct column, we need to further resolve it if it's now resolved on a
+      // table masking view.
+      if (resolvedPath.getMatchedTypes().isEmpty()) return resolvedPath;
+      Preconditions.checkState(resolvedPath.destType().isStructType());
     }
     // In this case, resolvedPath is resolved on a nested column. Check if it's resolved
     // on a table masking view. The root TableRef(table/view) could be at a parent query
