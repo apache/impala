@@ -121,26 +121,29 @@ public class CollectionTableRef extends TableRef {
           "supported on collections from views.");
     }
 
+    if (isRelative() && sourceView != null && !inSelectList_) {
+      // The collection is a column from a view. This means that we must reuse the
+      // existing tuple desc created by the view. This is not needed when the
+      // collection is in a select list, as the slot refs in the select list are
+      // substituted in SelectStmt.resolveInlineViewRefs()
+      // TODO: currently we cannot use the same array twice (e.g. self join) in this
+      //       case
+      SlotDescriptor parentSlotDesc = analyzer.getSlotDescriptor(
+          resolvedPath_.getFullyQualifiedRawPath());
+      collectionExpr_ = new SlotRef(parentSlotDesc);
+      collectionExpr_ =
+        collectionExpr_.trySubstitute(sourceView.getBaseTblSmap(), analyzer, true);
+      desc_ = ((SlotRef) collectionExpr_).getDesc().getItemTupleDesc();
+      // The tuple desc was hidden as it belonged to a collection in select list in
+      // a view. Set hidden to false, as now it is in the from clause.
+      Preconditions.checkState(desc_.isHidden());
+      desc_.setHidden(false);
+
+      analyzer.addCollectionTableRef(getUniqueAlias(), this, desc_);
+    }
+
     if (isRelative() && (!analyzer.hasWithClause() || inSelectList_)) {
-      if (sourceView != null && !inSelectList_) {
-        // The collection is a column from a view. This means that we must reuse the
-        // existing tuple desc created by the view. This is not needed when the
-        // collection is in a select list, as the slot refs in the select list are
-        // substituted in SelectStmt.resolveInlineViewRefs()
-        // TODO: currently we cannot use the same array twice (e.g. self join) in this
-        //       case
-        SlotDescriptor parentSlotDesc = analyzer.getSlotDescriptor(
-            resolvedPath_.getFullyQualifiedRawPath());
-        collectionExpr_ = new SlotRef(parentSlotDesc);
-        collectionExpr_ =
-            collectionExpr_.trySubstitute(sourceView.getBaseTblSmap(), analyzer, true);
-        desc_ = ((SlotRef) collectionExpr_).getDesc().getItemTupleDesc();
-        // The tuple desc was hidden as it belonged to a collection in select list in
-        // a view. Set hidden to false, as now it is in the from clause.
-        Preconditions.checkState(desc_.isHidden());
-        desc_.setHidden(false);
-        analyzer.addCollectionTableRef(getUniqueAlias(), this, desc_);
-      } else {
+      if (sourceView == null || inSelectList_) {
         SlotDescriptor parentSlotDesc = analyzer.registerSlotRef(resolvedPath_);
         parentSlotDesc.setItemTupleDesc(desc_);
         collectionExpr_ = new SlotRef(parentSlotDesc);
