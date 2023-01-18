@@ -25,12 +25,15 @@ add_custom_target(shell_pypi_package DEPENDS shell_tarball
 
 # A separate package target is needed because without OFFICIAL the file name is
 # non-deterministic. Uses a custom target to synchronize for multiple dependents.
+# Derive version from IMPALA_VERSION (drops everything after '-' because PEP 440 requires
+# '+' but setup.py doesn't treat it consistently when generating the file name).
+string(REGEX REPLACE "-.*" "" PKG_VERSION $ENV{IMPALA_VERSION})
 set(SHELL_TEST_PKG
-  "${CMAKE_SOURCE_DIR}/shell/build/dist/impala_shell-install-test.tar.gz")
+  "${CMAKE_SOURCE_DIR}/shell/build/dist/impala_shell-${PKG_VERSION}.tar.gz")
 get_filename_component(SHELL_TEST_PKG_DIR "${SHELL_TEST_PKG}" DIRECTORY)
 # Generates SHELL_TEST_PKG
 add_custom_target(shell_pypi_test_package DEPENDS shell_tarball
-  COMMAND env BUILD_VERSION=install-test OFFICIAL=true DIST_DIR="${SHELL_TEST_PKG_DIR}"
+  COMMAND env BUILD_VERSION=${PKG_VERSION} OFFICIAL=true DIST_DIR="${SHELL_TEST_PKG_DIR}"
     "${CMAKE_SOURCE_DIR}/shell/packaging/make_python_package.sh"
 )
 
