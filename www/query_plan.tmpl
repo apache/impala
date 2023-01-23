@@ -115,13 +115,20 @@ function build(node, parent, edges, states, colour_idx, max_node_time) {
     edges.push({ start: node["label"], end: parent,
                  style: { label: label_val }});
   }
-  // Add an inter-fragment edge. We use a red dashed line to show that rows are crossing
-  // the fragment boundary.
+  // Add an inter-fragment edges
   if (node["data_stream_target"]) {
+    // Use a red dashed line to show a streaming data boundary
     edges.push({ "start": node["label"],
                  "end": node["data_stream_target"],
                  "style": { label: "" + node["output_card"].toLocaleString(),
-                            style: "stroke: #f66; stroke-dasharray: 5, 5;"}});
+                            style: "fill:none; stroke: #c00000; stroke-dasharray: 5, 5;"}});
+  } else if (node["join_build_target"]) {
+    // Use a green dashed line to show a join build boundary
+    edges.push({ "start": node["label"],
+                 "end": node["join_build_target"],
+                 "style": { label: "" + node["output_card"].toLocaleString(),
+                            style: "fill: none; stroke: #00c000; stroke-dasharray: 5, 5;"}
+});
   }
   max_node_time = Math.max(node["max_time_val"], max_node_time)
   for (var i = 0; i < node["children"].length; ++i) {

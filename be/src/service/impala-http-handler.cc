@@ -820,6 +820,10 @@ void PlanToJson(const vector<TPlanFragment>& fragments, const TExecSummary& summ
         Value target(label_map[sink.stream_sink.dest_node_id].c_str(),
             document->GetAllocator());
         plan_fragment.AddMember("data_stream_target", target, document->GetAllocator());
+      } else if (sink.__isset.join_build_sink) {
+        Value target(label_map[sink.join_build_sink.dest_node_id].c_str(),
+            document->GetAllocator());
+        plan_fragment.AddMember("join_build_target", target, document->GetAllocator());
       }
     }
     nodes.PushBack(plan_fragment, document->GetAllocator());
