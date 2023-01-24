@@ -84,7 +84,8 @@ class ThriftSerializer {
       obj->write(protocol_.get());
     } catch (std::exception& e) {
       std::stringstream msg;
-      msg << "Couldn't serialize thrift object:\n" << e.what();
+      msg << "Couldn't serialize thrift object beyond "
+          << mem_buffer_->getBufferSize() << " bytes:\n" << e.what();
       return Status(msg.str());
     }
     mem_buffer_->getBuffer(buffer, len);
@@ -98,7 +99,8 @@ class ThriftSerializer {
       obj->write(protocol_.get());
     } catch (std::exception& e) {
       std::stringstream msg;
-      msg << "Couldn't serialize thrift object:\n" << e.what();
+      msg << "Couldn't serialize thrift object beyond "
+          << mem_buffer_->getBufferSize() << " bytes:\n" << e.what();
       return Status(msg.str());
     }
     *result = mem_buffer_->getBufferAsString();
