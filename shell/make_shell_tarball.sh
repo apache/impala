@@ -63,13 +63,15 @@ TARBALL_ROOT=${BUILD_DIR}/impala-shell-${VERSION}
 
 THRIFT_GEN_PY_DIR="${SHELL_HOME}/gen-py"
 
-echo "Deleting all files in ${TARBALL_ROOT}/{gen-py,lib,ext-py*}"
+echo "Deleting all files in ${TARBALL_ROOT}/{gen-py,lib,ext-py*,legacy}"
 rm -rf ${TARBALL_ROOT}/lib/* 2>&1 > /dev/null
 rm -rf ${TARBALL_ROOT}/gen-py/* 2>&1 > /dev/null
 rm -rf ${TARBALL_ROOT}/ext-py*/* 2>&1 > /dev/null
+rm -rf ${TARBALL_ROOT}/legacy/* 2>&1 > /dev/null
 mkdir -p ${TARBALL_ROOT}/lib
 mkdir -p ${TARBALL_ROOT}/ext-py2
 mkdir -p ${TARBALL_ROOT}/ext-py3
+mkdir -p ${TARBALL_ROOT}/legacy
 
 rm -f ${THRIFT_GEN_PY_DIR}/impala_build_version.py
 cat > ${THRIFT_GEN_PY_DIR}/impala_build_version.py <<EOF
@@ -157,6 +159,8 @@ cp ${SHELL_HOME}/impala-shell ${TARBALL_ROOT}
 cp ${SHELL_HOME}/impala_shell.py ${TARBALL_ROOT}
 cp ${SHELL_HOME}/compatibility.py ${TARBALL_ROOT}
 cp ${SHELL_HOME}/thrift_printer.py ${TARBALL_ROOT}
+
+cp ${SHELL_HOME}/pkg_resources.py ${TARBALL_ROOT}/legacy
 
 pushd ${BUILD_DIR} > /dev/null
 echo "Making tarball in ${BUILD_DIR}"

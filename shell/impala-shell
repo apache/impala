@@ -59,5 +59,9 @@ for EGG in $(ls ${SHELL_HOME}/ext-py${PYTHON_VERSION}/*.egg); do
    EGG_PATH="${EGG}:${EGG_PATH}"
 done
 
-PYTHONPATH="${EGG_PATH}${SHELL_HOME}/gen-py:${SHELL_HOME}/lib:${PYTHONPATH}" \
+LEGACY=
+if [ ${PYTHON_VERSION} -eq 2 ]; then
+  LEGACY=":${SHELL_HOME}/legacy"
+fi
+PYTHONPATH="${EGG_PATH}${SHELL_HOME}/gen-py:${SHELL_HOME}/lib:${PYTHONPATH}${LEGACY}" \
   PYTHONIOENCODING='utf-8' exec ${PYTHON_EXE} ${SHELL_HOME}/impala_shell.py "$@"
