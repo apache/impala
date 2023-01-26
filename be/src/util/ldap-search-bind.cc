@@ -47,7 +47,7 @@ const string GROUP_SEARCH_LOGIN_NAME_PATTERN = "{1}";
 const string GROUP_SEARCH_USER_DN_PATTERN = "{0}";
 // Default ldap filters
 const string DEFAULT_USER_FILTER = "(&(objectClass=user)(sAMAccountName={0}))";
-const string DEFAULT_GROUP_FILTER = "(&(objectClass=group)(member={0})";
+const string DEFAULT_GROUP_FILTER = "(&(objectClass=group)(member={0}))";
 
 Status LdapSearchBind::ValidateFlags() {
   RETURN_IF_ERROR(ImpalaLdap::ValidateFlags());
