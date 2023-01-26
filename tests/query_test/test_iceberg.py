@@ -885,6 +885,14 @@ class TestIcebergTable(IcebergTestSuite):
     DST_DIR = "/tmp/" + unique_database + "/partitioned/"
     self.filesystem_client.make_dir(DST_DIR, permission=777)
     self.filesystem_client.copy_from_local(SRC_DIR.format(file), DST_DIR)
+    # Test 10 init: hidden files
+    DST_DIR = "/tmp/" + unique_database + "/hidden/"
+    self.filesystem_client.make_dir(DST_DIR, permission=777)
+    self.filesystem_client.create_file(DST_DIR + "_hidden.1", "Test data 123")
+    self.filesystem_client.create_file(DST_DIR + "_hidden_2.1", "Test data 123")
+    self.filesystem_client.create_file(DST_DIR + ".hidden_3", "Test data 123")
+    self.filesystem_client.create_file(DST_DIR + ".hidden_4.1", "Test data 123")
+    self.filesystem_client.copy_from_local(SRC_DIR.format(file), DST_DIR)
 
     # Init test table
     create_iceberg_table_from_directory(self.client, unique_database,

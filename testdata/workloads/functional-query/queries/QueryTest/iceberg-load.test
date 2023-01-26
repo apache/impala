@@ -122,7 +122,6 @@ row_regex:.*AnalysisException: Target table .* has fewer columns \(1\) than the 
 ====
 ---- QUERY
 # Test 9: Partitioned Iceberg table
----- QUERY
 create table test_iceberg_load_partitioned like functional_parquet.iceberg_partitioned
 stored as iceberg;
 ====
@@ -137,6 +136,21 @@ STRING
 select count(*) from test_iceberg_load_partitioned;
 ---- RESULTS
 1
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Test 10: hidden files should be skipped and the one data file should be loaded
+load data inpath '/tmp/$DATABASE/hidden/' into table test_iceberg_load_partitioned;
+---- RESULTS
+'Loaded 1 file(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+select count(*) from test_iceberg_load_partitioned;
+---- RESULTS
+2
 ---- TYPES
 BIGINT
 ====

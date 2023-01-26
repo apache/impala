@@ -255,7 +255,8 @@ public class LoadDataStmt extends StatementBase {
             sourcePath, true, "");
         while (fileStatuses.hasNext()) {
           FileStatus fileStatus = fileStatuses.next();
-          if (fileStatus.isFile()) {
+          String fileName = fileStatus.getPath().getName();
+          if (fileStatus.isFile() && !FileSystemUtil.isHiddenFile(fileName)) {
             filePathForLike = fileStatus.getPath();
             break;
           }
