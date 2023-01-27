@@ -73,10 +73,10 @@ under the License.
     </ul>
 
     <p rev="2.2.0">
-      Impala tables can also represent data that is stored in HBase, or in the Amazon S3 filesystem (<keyword keyref="impala22_full"/> or higher),
-      or on Isilon storage devices (<keyword keyref="impala223_full"/> or higher).  See <xref href="impala_hbase.xml#impala_hbase"/>,
-      <xref href="impala_s3.xml#s3"/>, and <xref href="impala_isilon.xml#impala_isilon"/>
-      for details about those special kinds of tables.
+      Impala tables can also represent data that is stored in HBase, in the Amazon S3 filesystem (<keyword keyref="impala22_full"/> or higher),
+      on Isilon storage devices (<keyword keyref="impala223_full"/> or higher), or in Apache Ozone (<keyword keyref="impala42_full"/> or higher).
+      See <xref href="impala_hbase.xml#impala_hbase"/>, <xref href="impala_s3.xml#s3"/>, <xref href="impala_isilon.xml#impala_isilon"/>, and
+      <xref href="impala_ozone.xml#impala_ozone"/> for details about those special kinds of tables.
     </p>
 
     <p conref="../shared/impala_common.xml#common/ignore_file_extensions"/>

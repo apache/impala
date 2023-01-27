@@ -335,6 +335,7 @@ under the License.
   <topicref href="topics/impala_s3.xml"/>
   <topicref rev="2.9.0" href="topics/impala_adls.xml"/>
   <topicref href="topics/impala_isilon.xml"/>
+  <topicref rev="4.2.0" href="topics/impala_ozone.xml"/>
   <topicref href="topics/impala_logging.xml"/>
   <topicref href="topics/impala_client.xml">
     <topicref href="topics/impala_impala_shell.xml">

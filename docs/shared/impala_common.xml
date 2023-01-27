@@ -3348,6 +3348,17 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
 <codeblock>isi hdfs settings modify --default-block-size=256MB</codeblock>
       </p>
 
+      <p id="ozone_blurb" rev="4.2.0">
+        <b>Ozone considerations:</b>
+      </p>
+
+      <p id="ozone_block_size_caveat" rev="4.2.0">
+        Because Apache Ozone storage buckets use a global value for the block size rather than
+        a configurable value for each file, the <codeph>PARQUET_FILE_SIZE</codeph> query option
+        has no effect when Impala inserts data into a table or partition residing on Ozone
+        storage.
+      </p>
+
       <p id="hbase_blurb">
         <b>HBase considerations:</b>
       </p>

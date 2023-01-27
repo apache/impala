@@ -93,6 +93,9 @@ INSERT OVERWRITE parquet_table SELECT * FROM text_table;
     <p conref="../shared/impala_common.xml#common/isilon_blurb"/>
     <p conref="../shared/impala_common.xml#common/isilon_block_size_caveat"/>
 
+    <p conref="../shared/impala_common.xml#common/ozone_blurb"/>
+    <p conref="../shared/impala_common.xml#common/ozone_block_size_caveat"/>
+
     <p conref="../shared/impala_common.xml#common/related_info"/>
 
     <p>

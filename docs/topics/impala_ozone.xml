@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="4.2.0" id="impala_ozone">
+
+  <title>Using Impala with Apache Ozone Storage</title>
+
+  <titlealts audience="PDF">
+    <navtitle>Ozone Storage</navtitle>
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Ozone"/>
+      <data name="Category" value="Disk Storage"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="hidden">Ozone</indexterm>
+      You can use Impala to query data files that reside on Apache Ozone distributed storage,
+      rather than in HDFS. The combination of the Impala query engine and Apache Ozone storage
+      is certified on <keyword keyref="impala42"/> or higher.
+    </p>
+
+    <p>
+      For more information on Ozone, see <xref keyref="upstream_ozone_site"/>.
+    </p>
+
+    <p>
+      The typical use case for Impala and Ozone together is to use Ozone for the default
+      filesystem, replacing HDFS entirely. In this configuration, when you create a database,
+      table, or partition, the data always resides on Ozone storage and you do not need to
+      specify any special <codeph>LOCATION</codeph> attribute. If you do specify a
+      <codeph>LOCATION</codeph> attribute, its value refers to a path within the Ozone
+      filesystem. For example:
+    </p>
+
+<codeblock>-- If the default filesystem is Ozone, all Impala data resides there
+-- and all Impala databases and tables are located there.
+CREATE TABLE t1 (x INT, s STRING);
+
+-- You can specify LOCATION for database, table, or partition,
+-- using values from the Ozone filesystem.
+CREATE DATABASE d1 LOCATION '/some/path/on/ozone/server/d1.db';
+CREATE TABLE d1.t2 (a TINYINT, b BOOLEAN);
+</codeblock>
+
+    <p>
+      Impala can write to, delete, and rename data files and database, table, and partition
+      directories on Ozone storage. Therefore, Impala statements such as <codeph>CREATE
+      TABLE</codeph>, <codeph>DROP TABLE</codeph>, <codeph>CREATE DATABASE</codeph>,
+      <codeph>DROP DATABASE</codeph>, <codeph>ALTER TABLE</codeph>, and <codeph>INSERT</codeph>
+      work the same with Ozone storage as with HDFS.
+    </p>
+
+    <p>
+      Ozone supports multiple protocols: <codeph>ofs</codeph>, <codeph>o3fs</codeph>, and
+      <codeph>s3a</codeph>. Impala supports reading <codeph>ofs</codeph> and <codeph>o3fs</codeph>.
+      Impala can also read <codeph>s3a</codeph> (see <xref href="impala_s3.xml#s3"/>). However
+      <codeph>ofs</codeph> is their newer protocol, and the only one Impala supports as a default
+      filesystem. We recommend using it for <xref href="impala_ddl.xml#ddl"/> to avoid access
+      limitations, and for <xref href="impala_dml.xml#dml"/> and
+      <xref href="impala_select.xml#select"/> for performance.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/ozone_block_size_caveat"/>
+
+    <p>
+      Impala's spill-to-disk feature may be configured to use Ozone storage by specifying a full
+      URI (e.g. <codeph>ofs://host:port/volume/bucket/key</codeph>) for the spill location. See
+      <xref href="impala_disk_space.xml#disk_space"/> for details on configuring remote
+      spill-to-disk.
+    </p>
+
+<!-- <p outputclass="toc inpage"/> -->
+
+  </conbody>
+
+</concept>
