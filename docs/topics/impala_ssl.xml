@@ -199,9 +199,13 @@ under the License.
 </codeblock>
 
       <p>
-        By default, the cipher list is empty, and Impala uses the default cipher list for the
-        underlying platform. See the output of <cmdname>man ciphers</cmdname> for the full set
+        See the output of <cmdname>man ciphers</cmdname> for the full set
         of keywords and notation allowed in the argument string.
+        Since <keyword keyref="impala42"/> the default value of <codeph>--ssl_cipher_list</codeph>
+        is a set of ciphers based on Mozilla's intermediate compatibility recommendations
+        from https://wiki.mozilla.org/Security/Server_Side_TLS.
+        Prior to <keyword keyref="impala42"/> the default was unset, and Impala used the default
+        cipher list for the underlying platform.
       </p>
 
     </conbody>
