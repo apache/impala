@@ -329,7 +329,7 @@ function start_cluster {
   if [[ "${TARGET_FILESYSTEM}" = "ozone" ]]; then
     local replication=''
     echo "Creating Ozone volume/bucket"
-    if [ -n "${OZONE_ERASURECODE_POLICY}" ]; then
+    if [ -n "${OZONE_ERASURECODE_POLICY:-}" ]; then
       replication="--type EC --replication ${OZONE_ERASURECODE_POLICY}"
       echo "with erasure coding ${OZONE_ERASURECODE_POLICY}"
     fi
