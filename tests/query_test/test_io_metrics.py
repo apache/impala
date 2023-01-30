@@ -47,8 +47,7 @@ class TestIOMetrics(ImpalaTestSuite):
     def append_metric(metric, expect_nonzero):
       (expect_nonzero_metrics if expect_nonzero else expect_zero_metrics).append(metric)
 
-    # IMPALA-11697: these come from getReadStatistics, which is only implemented for HDFS
-    append_metric("impala-server.io-mgr.erasure-coded-bytes-read", IS_HDFS and IS_EC)
+    append_metric("impala-server.io-mgr.erasure-coded-bytes-read", IS_EC)
     append_metric("impala-server.io-mgr.short-circuit-bytes-read",
         IS_HDFS and not IS_DOCKERIZED_TEST_CLUSTER)
     append_metric("impala-server.io-mgr.local-bytes-read",

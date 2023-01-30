@@ -238,6 +238,10 @@ Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_
       bool is_first_read = (num_remote_bytes_ == 0);
       // Collect and accumulate statistics
       GetHdfsStatistics(hdfs_file, log_slow_read);
+      if (scan_range_->is_erasure_coded()) {
+        scan_range_->reader_->bytes_read_ec_.Add(current_bytes_read);
+      }
+
       if (FLAGS_fs_trace_remote_reads && expected_local_ &&
           num_remote_bytes_ > 0 && is_first_read) {
         // Only log the first unexpected remote read for scan range
@@ -404,9 +408,6 @@ void HdfsFileReader::GetHdfsStatistics(hdfsFile hdfs_file, bool log_stats) {
       scan_range_->reader_->bytes_read_short_circuit_.Add(
           stats->totalShortCircuitBytesRead);
       scan_range_->reader_->bytes_read_dn_cache_.Add(stats->totalZeroCopyBytesRead);
-      if (scan_range_->is_erasure_coded()) {
-        scan_range_->reader_->bytes_read_ec_.Add(stats->totalBytesRead);
-      }
       if (stats->totalLocalBytesRead != stats->totalBytesRead) {
         num_remote_bytes_ += stats->totalBytesRead - stats->totalLocalBytesRead;
       }

@@ -400,7 +400,7 @@ class RequestContext {
   /// Total number of bytes read from date node cache, updated at end of each range scan
   AtomicInt64 bytes_read_dn_cache_{0};
 
-  /// Total number of erasure-coded bytes read, updated at end of each range scan
+  /// Total number of erasure-coded bytes read
   AtomicInt64 bytes_read_ec_{0};
 
   /// Total number of bytes from remote reads that were expected to be local.

@@ -218,6 +218,9 @@ struct THdfsFileSplit {
   // last modified time of the file
   7: required i64 mtime
 
+  // Whether the HDFS file is stored with erasure coding.
+  8: optional bool is_erasure_coded
+
   // Hash of the partition's path. This must be hashed with a hash algorithm that is
   // consistent across different processes and machines. This is currently using
   // Java's String.hashCode(), which is consistent. For testing purposes, this can use
@@ -227,9 +230,6 @@ struct THdfsFileSplit {
   // The absolute path of the file, it's used only when data files are outside of
   // the Iceberg table location (IMPALA-11507).
   10: optional string absolute_path
-
-  // Whether the HDFS file is stored with erasure coding.
-  11: optional bool is_erasure_coded
 }
 
 // Key range for single THBaseScanNode. Corresponds to HBaseKeyRangePB and should be kept
