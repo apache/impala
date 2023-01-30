@@ -31,6 +31,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
 /**
  * {@link QueryEventHookManager} manages the registration and execution of
  * {@link QueryEventHook}s. Each manager instance may manage its own hooks,
@@ -117,7 +119,8 @@ public class QueryEventHookManager {
   private QueryEventHookManager(int nHookExecutorThreads, String[] hookClasses)
       throws InternalException {
 
-    this.hookExecutor_ = Executors.newFixedThreadPool(nHookExecutorThreads);
+    this.hookExecutor_ = Executors.newFixedThreadPool(nHookExecutorThreads,
+        new ThreadFactoryBuilder().setNameFormat("QueryEventHookExecutor-%d").build());
     Runtime.getRuntime().addShutdownHook(new Thread(() -> this.cleanUp()));
 
     final List<QueryEventHook> hooks = new ArrayList<>(hookClasses.length);

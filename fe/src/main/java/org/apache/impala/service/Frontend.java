@@ -28,6 +28,7 @@ import com.google.common.collect.Sets;
 import com.google.common.math.IntMath;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -400,13 +401,11 @@ public class Frontend {
   // Privileges in which the user should have any of them to see a database or table,
   private final EnumSet<Privilege> minPrivilegeSetForShowStmts_;
   /**
-   * Authorization checker. Initialized and periodically loaded by a task
-   * running on the {@link #policyReader_} thread.
+   * Authorization checker. Initialized on creation, then it is kept up to date
+   * via calls to updateCatalogCache().
    */
   private final AtomicReference<AuthorizationChecker> authzChecker_ =
       new AtomicReference<>();
-  private final ScheduledExecutorService policyReader_ =
-      Executors.newScheduledThreadPool(1);
 
   private final ImpaladTableUsageTracker impaladTableUsageTracker_;
 
@@ -455,7 +454,9 @@ public class Frontend {
         checkAuthorizationPool_ = MoreExecutors.newDirectExecutorService();
       } else {
         LOG.info("Using a thread pool of size {} for authorization", numThreads);
-        checkAuthorizationPool_ = Executors.newFixedThreadPool(numThreads);
+        checkAuthorizationPool_ = Executors.newFixedThreadPool(numThreads,
+            new ThreadFactoryBuilder()
+                .setNameFormat("AuthorizationCheckerThread-%d").build());
       }
     } else {
       authzChecker_.set(authzFactory.newAuthorizationChecker());
