@@ -58,6 +58,9 @@ message HdfsFileSplitPB {
   // The absolute path of the file, it's used only when data files are outside of
   // the Iceberg table location (IMPALA-11507).
   optional string absolute_path = 10;
+
+  // Whether this file is encrypted.
+  optional bool is_encrypted = 11;
 }
 
 // Key range for single THBaseScanNode. Corresponds to THBaseKeyRange and should be kept

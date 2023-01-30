@@ -76,6 +76,9 @@ class ImpaladMetricKeys {
   /// Total number of cached bytes read by the io mgr
   static const char* IO_MGR_CACHED_BYTES_READ;
 
+  /// Total number of encrypted bytes read by the io mgr
+  static const char* IO_MGR_ENCRYPTED_BYTES_READ;
+
   /// Total number of erasure-coded bytes read by the io mgr
   static const char* IO_MGR_ERASURE_CODED_BYTES_READ;
 
@@ -261,6 +264,7 @@ class ImpaladMetrics {
   static IntCounter* IO_MGR_BYTES_READ;
   static IntCounter* IO_MGR_LOCAL_BYTES_READ;
   static IntCounter* IO_MGR_CACHED_BYTES_READ;
+  static IntCounter* IO_MGR_ENCRYPTED_BYTES_READ;
   static IntCounter* IO_MGR_ERASURE_CODED_BYTES_READ;
   static IntCounter* IO_MGR_REMOTE_DATA_CACHE_HIT_BYTES;
   static IntCounter* IO_MGR_REMOTE_DATA_CACHE_HIT_COUNT;

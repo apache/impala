@@ -33,7 +33,6 @@ import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Reference;
-import org.apache.impala.compat.HdfsShim;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.HudiUtil;
@@ -291,7 +290,8 @@ public class FileMetadataLoader {
       locations = fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
     }
     return FileDescriptor.create(fileStatus, relPath, locations, hostIndex_,
-        HdfsShim.isErasureCoded(fileStatus), numUnknownDiskIds, absPath);
+        fileStatus.isEncrypted(), fileStatus.isErasureCoded(), numUnknownDiskIds,
+        absPath);
   }
 
   private FileDescriptor createFd(FileSystem fs, FileStatus fileStatus,

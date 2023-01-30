@@ -191,8 +191,9 @@ public class HdfsPartition extends CatalogObjectImpl
      *                          for which no disk ID could be determined
      */
     public static FileDescriptor create(FileStatus fileStatus, String relPath,
-        BlockLocation[] blockLocations, ListMap<TNetworkAddress> hostIndex, boolean isEc,
-        Reference<Long> numUnknownDiskIds, String absPath) throws IOException {
+        BlockLocation[] blockLocations, ListMap<TNetworkAddress> hostIndex,
+        boolean isEncrypted, boolean isEc, Reference<Long> numUnknownDiskIds,
+        String absPath) throws IOException {
       FlatBufferBuilder fbb = new FlatBufferBuilder(1);
       int[] fbFileBlockOffsets = new int[blockLocations.length];
       int blockIdx = 0;
@@ -207,7 +208,7 @@ public class HdfsPartition extends CatalogObjectImpl
         }
       }
       return new FileDescriptor(createFbFileDesc(fbb, fileStatus, relPath,
-          fbFileBlockOffsets, isEc, absPath));
+          fbFileBlockOffsets, isEncrypted, isEc, absPath));
     }
 
     /**
@@ -218,7 +219,7 @@ public class HdfsPartition extends CatalogObjectImpl
         FileStatus fileStatus, String relPath, String absPath) {
       FlatBufferBuilder fbb = new FlatBufferBuilder(1);
       return new FileDescriptor(
-          createFbFileDesc(fbb, fileStatus, relPath, null, false, absPath));
+          createFbFileDesc(fbb, fileStatus, relPath, null, false, false, absPath));
     }
     /**
      * Serializes the metadata of a file descriptor represented by 'fileStatus' into a
@@ -227,8 +228,8 @@ public class HdfsPartition extends CatalogObjectImpl
      * in the underlying buffer. Can be null if there are no blocks.
      */
     private static FbFileDesc createFbFileDesc(FlatBufferBuilder fbb,
-        FileStatus fileStatus, String relPath, int[] fbFileBlockOffsets, boolean isEc,
-        String absPath) {
+        FileStatus fileStatus, String relPath, int[] fbFileBlockOffsets,
+        boolean isEncrypted, boolean isEc, String absPath) {
       int relPathOffset = fbb.createString(relPath == null ? StringUtils.EMPTY : relPath);
       // A negative block vector offset is used when no block offsets are specified.
       int blockVectorOffset = -1;
@@ -242,6 +243,7 @@ public class HdfsPartition extends CatalogObjectImpl
       FbFileDesc.addRelativePath(fbb, relPathOffset);
       FbFileDesc.addLength(fbb, fileStatus.getLen());
       FbFileDesc.addLastModificationTime(fbb, fileStatus.getModificationTime());
+      FbFileDesc.addIsEncrypted(fbb, isEncrypted);
       FbFileDesc.addIsEc(fbb, isEc);
       HdfsCompression comp = HdfsCompression.fromFileName(fileStatus.getPath().getName());
       FbFileDesc.addCompression(fbb, comp.toFb());
@@ -288,6 +290,7 @@ public class HdfsPartition extends CatalogObjectImpl
 
     public long getModificationTime() { return fbFileDescriptor_.lastModificationTime(); }
     public int getNumFileBlocks() { return fbFileDescriptor_.fileBlocksLength(); }
+    public boolean getIsEncrypted() {return fbFileDescriptor_.isEncrypted(); }
     public boolean getIsEc() {return fbFileDescriptor_.isEc(); }
 
     public FbFileBlock getFbFileBlock(int idx) {

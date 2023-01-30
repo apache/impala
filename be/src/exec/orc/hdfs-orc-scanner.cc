@@ -156,7 +156,8 @@ Status HdfsOrcScanner::ScanRangeInputStream::readRandom(
   int cache_options = split_range->cache_options() & ~BufferOpts::USE_HDFS_CACHE;
   ScanRange* range = scanner_->scan_node_->AllocateScanRange(
       ScanRange::FileInfo{scanner_->filename(), metadata_range->fs(),
-          split_range->mtime(), split_range->is_erasure_coded()},
+          split_range->mtime(), split_range->is_encrypted(),
+          split_range->is_erasure_coded()},
       length, offset, partition_id, split_range->disk_id(), expected_local,
       BufferOpts::ReadInto(reinterpret_cast<uint8_t*>(buf), length, cache_options));
   unique_ptr<BufferDescriptor> io_buffer;
@@ -258,7 +259,7 @@ Status HdfsOrcScanner::StartColumnReading(const orc::StripeInformation& stripe) 
     }
     ScanRange* scan_range = scan_node_->AllocateScanRange(
         ScanRange::FileInfo{filename(), metadata_range_->fs(), split_range->mtime(),
-            split_range->is_erasure_coded()},
+            split_range->is_encrypted(), split_range->is_erasure_coded()},
         range.length_, range.offset_, partition_id, split_range->disk_id(),
         col_range_local, BufferOpts(split_range->cache_options()));
     RETURN_IF_ERROR(

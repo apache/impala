@@ -1427,6 +1427,7 @@ public class HdfsScanNode extends ScanNode {
             fileDesc.getFileCompression().toThrift(), fileDesc.getModificationTime(),
             partition.getLocation().hashCode());
         hdfsFileSplit.setAbsolute_path(fileDesc.getAbsolutePath());
+        hdfsFileSplit.setIs_encrypted(fileDesc.getIsEncrypted());
         hdfsFileSplit.setIs_erasure_coded(fileDesc.getIsEc());
         scanRange.setHdfs_file_split(hdfsFileSplit);
         if (fileDesc.getFbFileMetadata() != null) {

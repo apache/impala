@@ -20,7 +20,7 @@ import pytest
 from tests.common.environ import IS_DOCKERIZED_TEST_CLUSTER
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.test_dimensions import create_single_exec_option_dimension
-from tests.util.filesystem_utils import IS_EC, IS_HDFS
+from tests.util.filesystem_utils import IS_EC, IS_HDFS, IS_ENCRYPTED
 
 
 class TestIOMetrics(ImpalaTestSuite):
@@ -47,6 +47,7 @@ class TestIOMetrics(ImpalaTestSuite):
     def append_metric(metric, expect_nonzero):
       (expect_nonzero_metrics if expect_nonzero else expect_zero_metrics).append(metric)
 
+    append_metric("impala-server.io-mgr.encrypted-bytes-read", IS_ENCRYPTED)
     append_metric("impala-server.io-mgr.erasure-coded-bytes-read", IS_EC)
     append_metric("impala-server.io-mgr.short-circuit-bytes-read",
         IS_HDFS and not IS_DOCKERIZED_TEST_CLUSTER)

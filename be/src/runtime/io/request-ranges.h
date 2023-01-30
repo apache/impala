@@ -146,6 +146,7 @@ class RequestRange : public InternalQueue<RequestRange>::Node {
   int64_t offset() const { return offset_; }
   int64_t len() const { return len_; }
   int disk_id() const { return disk_id_; }
+  bool is_encrypted() const { return is_encrypted_; }
   bool is_erasure_coded() const { return is_erasure_coded_; }
   RequestType::type request_type() const { return request_type_; }
 
@@ -171,6 +172,9 @@ class RequestRange : public InternalQueue<RequestRange>::Node {
 
   /// Id of disk queue containing byte range.
   int disk_id_;
+
+  /// Whether file is encrypted.
+  bool is_encrypted_;
 
   /// Whether file is erasure coded.
   bool is_erasure_coded_;
@@ -272,6 +276,7 @@ class ScanRange : public RequestRange {
     const char *filename;
     hdfsFS fs = nullptr;
     int64_t mtime = ScanRange::INVALID_MTIME;
+    bool is_encrypted = false;
     bool is_erasure_coded = false;
   };
 
@@ -283,7 +288,7 @@ class ScanRange : public RequestRange {
 
   /// Get file info for the current scan range.
   FileInfo GetFileInfo() const {
-    return FileInfo{file_.c_str(), fs_, mtime_, is_erasure_coded_};
+    return FileInfo{file_.c_str(), fs_, mtime_, is_encrypted_, is_erasure_coded_};
   }
 
   /// Resets this scan range object with the scan range description. The scan range

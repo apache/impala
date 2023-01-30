@@ -490,6 +490,16 @@
     "key": "impala-server.io-mgr.cached-bytes-read"
   },
   {
+    "description": "Total number of encrypted bytes read by the IO manager.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Encrypted Bytes Read",
+    "units": "BYTES",
+    "kind": "COUNTER",
+    "key": "impala-server.io-mgr.encrypted-bytes-read"
+  },
+  {
     "description": "Total number of erasure-coded bytes read by the IO manager.",
     "contexts": [
       "IMPALAD"

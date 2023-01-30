@@ -72,7 +72,8 @@ struct HdfsFileDesc {
       file_format(THdfsFileFormat::TEXT) {}
 
   io::ScanRange::FileInfo GetFileInfo() const {
-    return io::ScanRange::FileInfo{filename.c_str(), fs, mtime, is_erasure_coded};
+    return io::ScanRange::FileInfo{
+        filename.c_str(), fs, mtime, is_encrypted, is_erasure_coded};
   }
 
   /// Connection to the filesystem containing the file.
@@ -96,6 +97,9 @@ struct HdfsFileDesc {
 
   /// Extra file metadata, e.g. Iceberg-related file-level info.
   const ::org::apache::impala::fb::FbFileMetadata* file_metadata;
+
+  /// Whether file is encrypted.
+  bool is_encrypted = false;
 
   /// Whether file is erasure coded.
   bool is_erasure_coded = false;
@@ -789,6 +793,7 @@ class HdfsScanNodeBase : public ScanNode {
   RuntimeProfile::Counter* bytes_read_local_ = nullptr;
   RuntimeProfile::Counter* bytes_read_short_circuit_ = nullptr;
   RuntimeProfile::Counter* bytes_read_dn_cache_ = nullptr;
+  RuntimeProfile::Counter* bytes_read_encrypted_ = nullptr;
   RuntimeProfile::Counter* bytes_read_ec_ = nullptr;
   RuntimeProfile::Counter* num_remote_ranges_ = nullptr;
   RuntimeProfile::Counter* unexpected_remote_bytes_ = nullptr;

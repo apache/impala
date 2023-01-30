@@ -238,6 +238,9 @@ Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_
       bool is_first_read = (num_remote_bytes_ == 0);
       // Collect and accumulate statistics
       GetHdfsStatistics(hdfs_file, log_slow_read);
+      if (scan_range_->is_encrypted()) {
+        scan_range_->reader_->bytes_read_encrypted_.Add(current_bytes_read);
+      }
       if (scan_range_->is_erasure_coded()) {
         scan_range_->reader_->bytes_read_ec_.Add(current_bytes_read);
       }

@@ -67,7 +67,6 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.Reference;
-import org.apache.impala.compat.HdfsShim;
 import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCompressionCodec;
@@ -679,8 +678,8 @@ public interface FeIcebergTable extends FeFsTable {
       }
 
       return HdfsPartition.FileDescriptor.create(fileStatus, relPath, locations,
-          table.getHostIndex(), HdfsShim.isErasureCoded(fileStatus), numUnknownDiskIds,
-          absPath);
+          table.getHostIndex(), fileStatus.isEncrypted(), fileStatus.isErasureCoded(),
+          numUnknownDiskIds, absPath);
     }
 
     /**

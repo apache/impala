@@ -158,6 +158,7 @@ class RequestContext {
   int64_t bytes_read_local() const { return bytes_read_local_.Load(); }
   int64_t bytes_read_short_circuit() const { return bytes_read_short_circuit_.Load(); }
   int64_t bytes_read_dn_cache() const { return bytes_read_dn_cache_.Load(); }
+  int64_t bytes_read_encrypted() const { return bytes_read_encrypted_.Load(); }
   int64_t bytes_read_ec() const { return bytes_read_ec_.Load(); }
   int num_remote_ranges() const { return num_remote_ranges_.Load(); }
   int64_t unexpected_remote_bytes() const { return unexpected_remote_bytes_.Load(); }
@@ -399,6 +400,9 @@ class RequestContext {
 
   /// Total number of bytes read from date node cache, updated at end of each range scan
   AtomicInt64 bytes_read_dn_cache_{0};
+
+  /// Total number of encrypted bytes read
+  AtomicInt64 bytes_read_encrypted_{0};
 
   /// Total number of erasure-coded bytes read
   AtomicInt64 bytes_read_ec_{0};

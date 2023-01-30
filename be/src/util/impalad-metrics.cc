@@ -59,6 +59,8 @@ const char* ImpaladMetricKeys::IO_MGR_SHORT_CIRCUIT_BYTES_READ =
     "impala-server.io-mgr.short-circuit-bytes-read";
 const char* ImpaladMetricKeys::IO_MGR_CACHED_BYTES_READ =
     "impala-server.io-mgr.cached-bytes-read";
+const char* ImpaladMetricKeys::IO_MGR_ENCRYPTED_BYTES_READ =
+    "impala-server.io-mgr.encrypted-bytes-read";
 const char* ImpaladMetricKeys::IO_MGR_ERASURE_CODED_BYTES_READ =
     "impala-server.io-mgr.erasure-coded-bytes-read";
 const char* ImpaladMetricKeys::IO_MGR_REMOTE_DATA_CACHE_HIT_BYTES =
@@ -169,6 +171,7 @@ IntCounter* ImpaladMetrics::IO_MGR_BYTES_READ = nullptr;
 IntCounter* ImpaladMetrics::IO_MGR_LOCAL_BYTES_READ = nullptr;
 IntCounter* ImpaladMetrics::IO_MGR_SHORT_CIRCUIT_BYTES_READ = nullptr;
 IntCounter* ImpaladMetrics::IO_MGR_CACHED_BYTES_READ = nullptr;
+IntCounter* ImpaladMetrics::IO_MGR_ENCRYPTED_BYTES_READ = nullptr;
 IntCounter* ImpaladMetrics::IO_MGR_ERASURE_CODED_BYTES_READ = nullptr;
 IntCounter* ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_HIT_BYTES = nullptr;
 IntCounter* ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_HIT_COUNT = nullptr;
@@ -344,6 +347,8 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
       ImpaladMetricKeys::IO_MGR_LOCAL_BYTES_READ, 0);
   IO_MGR_CACHED_BYTES_READ = IO_MGR_METRICS->AddCounter(
       ImpaladMetricKeys::IO_MGR_CACHED_BYTES_READ, 0);
+  IO_MGR_ENCRYPTED_BYTES_READ = IO_MGR_METRICS->AddCounter(
+      ImpaladMetricKeys::IO_MGR_ENCRYPTED_BYTES_READ, 0);
   IO_MGR_ERASURE_CODED_BYTES_READ = IO_MGR_METRICS->AddCounter(
       ImpaladMetricKeys::IO_MGR_ERASURE_CODED_BYTES_READ, 0);
   IO_MGR_SHORT_CIRCUIT_BYTES_READ = IO_MGR_METRICS->AddCounter(

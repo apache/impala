@@ -111,6 +111,8 @@ PROFILE_DEFINE_COUNTER(BytesReadShortCircuit, STABLE_LOW, TUnit::BYTES,
     "The total number of bytes read via short circuit read");
 PROFILE_DEFINE_COUNTER(BytesReadDataNodeCache, STABLE_HIGH, TUnit::BYTES,
     "The total number of bytes read from data node cache");
+PROFILE_DEFINE_COUNTER(BytesReadEncrypted, STABLE_LOW, TUnit::BYTES,
+    "The total number of bytes read from encrypted data");
 PROFILE_DEFINE_COUNTER(BytesReadErasureCoded, STABLE_LOW, TUnit::BYTES,
     "The total number of bytes read from erasure-coded data");
 PROFILE_DEFINE_COUNTER(RemoteScanRanges, STABLE_HIGH, TUnit::UNIT,
@@ -301,6 +303,7 @@ Status HdfsScanPlanNode::ProcessScanRangesAndInitSharedState(FragmentState* stat
         file_desc->file_length = split.file_length();
         file_desc->mtime = split.mtime();
         file_desc->file_compression = CompressionTypePBToThrift(split.file_compression());
+        file_desc->is_encrypted = split.is_encrypted();
         file_desc->is_erasure_coded = split.is_erasure_coded();
         file_desc->file_metadata = file_metadata;
         if (file_metadata) {
@@ -629,6 +632,7 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
   bytes_read_short_circuit_ =
       PROFILE_BytesReadShortCircuit.Instantiate(runtime_profile());
   bytes_read_dn_cache_ = PROFILE_BytesReadDataNodeCache.Instantiate(runtime_profile());
+  bytes_read_encrypted_ = PROFILE_BytesReadEncrypted.Instantiate(runtime_profile());
   bytes_read_ec_ = PROFILE_BytesReadErasureCoded.Instantiate(runtime_profile());
   num_remote_ranges_ = PROFILE_RemoteScanRanges.Instantiate(runtime_profile());
   unexpected_remote_bytes_ =
@@ -1236,6 +1240,7 @@ void HdfsScanNodeBase::StopAndFinalizeCounters() {
     bytes_read_local_->Set(reader_context_->bytes_read_local());
     bytes_read_short_circuit_->Set(reader_context_->bytes_read_short_circuit());
     bytes_read_dn_cache_->Set(reader_context_->bytes_read_dn_cache());
+    bytes_read_encrypted_->Set(reader_context_->bytes_read_encrypted());
     bytes_read_ec_->Set(reader_context_->bytes_read_ec());
     num_remote_ranges_->Set(reader_context_->num_remote_ranges());
     unexpected_remote_bytes_->Set(reader_context_->unexpected_remote_bytes());
@@ -1261,6 +1266,8 @@ void HdfsScanNodeBase::StopAndFinalizeCounters() {
         bytes_read_short_circuit_->value());
     ImpaladMetrics::IO_MGR_CACHED_BYTES_READ->Increment(
         bytes_read_dn_cache_->value());
+    ImpaladMetrics::IO_MGR_ENCRYPTED_BYTES_READ->Increment(
+        bytes_read_encrypted_->value());
     ImpaladMetrics::IO_MGR_ERASURE_CODED_BYTES_READ->Increment(
         bytes_read_ec_->value());
   }
