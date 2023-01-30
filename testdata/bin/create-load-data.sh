@@ -136,10 +136,10 @@ elif [ $SKIP_SNAPSHOT_LOAD -eq 0 ]; then
     if [[ "${TARGET_FILESYSTEM}" == "isilon" || "${TARGET_FILESYSTEM}" == "s3" || \
           "${TARGET_FILESYSTEM}" == "local" || "${TARGET_FILESYSTEM}" == "gs" || \
           "${TARGET_FILESYSTEM}" == "cosn" || "${TARGET_FILESYSTEM}" == "oss" || \
-          "${TARGET_FILESYSTEM}" == "obs" ]] ; then
+          "${TARGET_FILESYSTEM}" == "obs" || "${TARGET_FILESYSTEM}" == "ozone" ]] ; then
       echo "ERROR in $0 at line $LINENO: A schema change has been detected in the"
-      echo "metadata, but it cannot be loaded on isilon, s3, gcs, cos, oss or local"
-      echo "and the target file system is ${TARGET_FILESYSTEM}.  Exiting."
+      echo "metadata, but it cannot be loaded on isilon, s3, gcs, cos, oss, obs, ozone,"
+      echo "or local and the target file system is ${TARGET_FILESYSTEM}.  Exiting."
       # Generate an explicit JUnitXML symptom report here for easier triaging
       ${IMPALA_HOME}/bin/generate_junitxml.py --phase=dataload \
           --step=check-schema-diff.sh --error "${SCHEMA_MISMATCH_ERROR}"
