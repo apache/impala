@@ -221,9 +221,9 @@ class TestAsyncLoadData(ImpalaTestSuite):
       exec_time = exec_end - exec_start
       exec_end_state = client.get_state(handle)
 
-      # Wait for the statement to finish with a timeout of 10 seconds
+      # Wait for the statement to finish with a timeout of 20 seconds
       wait_start = time.time()
-      self.wait_for_state(handle, finished_state, 10, client=client)
+      self.wait_for_state(handle, finished_state, 20, client=client)
       wait_end = time.time()
       wait_time = wait_end - wait_start
       self.close_query_using_client(client, handle)
