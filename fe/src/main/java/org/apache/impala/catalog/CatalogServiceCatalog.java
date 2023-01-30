@@ -138,6 +138,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 /**
  * Specialized Catalog that implements the CatalogService specific Catalog
@@ -265,7 +266,9 @@ public class CatalogServiceCatalog extends Catalog {
 
   // Periodically polls HDFS to get the latest set of known cache pools.
   private final ScheduledExecutorService cachePoolReader_ =
-      Executors.newScheduledThreadPool(1);
+    Executors.newScheduledThreadPool(1,
+        new ThreadFactoryBuilder().setDaemon(true)
+            .setNameFormat("HDFSCachePoolReader").build());
 
   // Log of deleted catalog objects.
   private final CatalogDeltaLog deleteLog_;

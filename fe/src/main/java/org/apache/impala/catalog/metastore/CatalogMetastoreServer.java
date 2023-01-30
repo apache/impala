@@ -28,6 +28,7 @@ import java.util.Set;
 import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
@@ -109,7 +110,9 @@ public class CatalogMetastoreServer extends ThriftHiveMetastore implements
 
   // Logs Catalogd HMS cache metrics at a fixed frequency.
   private final ScheduledExecutorService metricsLoggerService_ =
-      Executors.newScheduledThreadPool(1);
+    Executors.newScheduledThreadPool(1,
+        new ThreadFactoryBuilder().setDaemon(true)
+            .setNameFormat("MetricsLoggerService").build());
 
   // the server is started in a daemon thread so that instantiating this is not
   // a blocking call.
