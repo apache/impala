@@ -159,6 +159,11 @@ if hive_major_version >= 3:
    # (the default value is 5 mins which is way too long). Setting it to 2 seconds.
    'hive.compactor.wait.timeout': '2000',
 
+   # No need to automatically compute stats after compactions. It might cause failures
+   # if we trigger compaction on temp tables in tests. The stats computation is async and
+   # will fail if the temp tables are removed. See an example in IMPALA-11756.
+   'hive.compactor.gather.stats': 'false',
+
    # Since HIVE-22589, Hive uses Julian Calendar for writing dates before 1582-10-15,
    # whereas Impala uses proleptic Gregorian Calendar. This affects the results Impala
    # gets when querying tables written by Hive.
