@@ -36,7 +36,6 @@ import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.log4j.Logger;
 
 import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 /**
 * Class that manages scheduling the loading of table metadata from the Hive Metastore and
@@ -149,9 +148,7 @@ public class TableLoadingMgr {
   // (no work will be rejected, but memory consumption is unbounded). If this thread
   // dies it will be automatically restarted.
   // The tables to process are read from the resfreshThreadWork_ queue.
-  ExecutorService asyncRefreshThread_ = Executors.newSingleThreadExecutor(
-      new ThreadFactoryBuilder().setDaemon(true)
-          .setNameFormat("TableAsyncRefreshThread").build());
+  ExecutorService asyncRefreshThread_ = Executors.newSingleThreadExecutor();
 
   // Tables for the async refresh thread to process. Synchronization must be handled
   // externally.
@@ -165,9 +162,7 @@ public class TableLoadingMgr {
     catalog_ = catalog;
     tblLoader_ = new TableLoader(catalog_);
     numLoadingThreads_ = numLoadingThreads;
-    tblLoadingPool_ = Executors.newFixedThreadPool(numLoadingThreads_,
-        new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("TableLoadingThread-%d").build());
+    tblLoadingPool_ = Executors.newFixedThreadPool(numLoadingThreads_);
 
     // Start the background table loading submitter threads.
     startTableLoadingSubmitterThreads();
@@ -270,9 +265,7 @@ public class TableLoadingMgr {
    */
   private void startTableLoadingSubmitterThreads() {
     ExecutorService submitterLoadingPool =
-      Executors.newFixedThreadPool(numLoadingThreads_,
-          new ThreadFactoryBuilder().setDaemon(true)
-              .setNameFormat("TableLoadingSubmitterThread-%d").build());
+        Executors.newFixedThreadPool(numLoadingThreads_);
     try {
       for (int i = 0; i < numLoadingThreads_; ++i) {
         submitterLoadingPool.execute(new Runnable() {

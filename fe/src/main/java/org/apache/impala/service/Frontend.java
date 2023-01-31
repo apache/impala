@@ -27,7 +27,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -395,6 +394,8 @@ public class Frontend {
    */
   private final AtomicReference<AuthorizationChecker> authzChecker_ =
       new AtomicReference<>();
+  private final ScheduledExecutorService policyReader_ =
+      Executors.newScheduledThreadPool(1);
 
   private final ImpaladTableUsageTracker impaladTableUsageTracker_;
 
@@ -443,9 +444,7 @@ public class Frontend {
         checkAuthorizationPool_ = MoreExecutors.newDirectExecutorService();
       } else {
         LOG.info("Using a thread pool of size {} for authorization", numThreads);
-        checkAuthorizationPool_ = Executors.newFixedThreadPool(numThreads,
-            new ThreadFactoryBuilder().setDaemon(true)
-                .setNameFormat("AuthorizationCheckerThread-%d").build());
+        checkAuthorizationPool_ = Executors.newFixedThreadPool(numThreads);
       }
     } else {
       authzChecker_.set(authzFactory.newAuthorizationChecker());
