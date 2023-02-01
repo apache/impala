@@ -163,6 +163,9 @@ DEFINE_int32(external_fe_port, 0, "port on which External Frontend requests are 
     "If 0 or less, the External Frontend server is not started. Careful consideration "
     "must be taken when enabling due to the fact that this port is currently always "
     "unauthenticated.");
+DEFINE_bool(enable_external_fe_http, false,
+    "if true enables http transport for external_fe_port otherwise binary transport is "
+    "used");
 
 DEFINE_int32(fe_service_threads, 64,
     "number of threads available to serve client requests");
@@ -3031,17 +3034,26 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
           new RpcEventHandler("external_frontend", exec_env_->metrics()));
       external_fe_processor->setEventHandler(event_handler);
 
+      ThriftServer::TransportType external_fe_port_transport =
+          ThriftServer::TransportType::BINARY;
+      if (FLAGS_enable_external_fe_http) {
+        LOG(INFO) << "External FE endpoint is using HTTP for transport";
+        external_fe_port_transport = ThriftServer::TransportType::HTTP;
+      }
+
       ThriftServerBuilder builder(EXTERNAL_FRONTEND_SERVER_NAME, external_fe_processor,
           external_fe_port);
       ThriftServer* server;
       RETURN_IF_ERROR(
-          builder.auth_provider(
-              AuthManager::GetInstance()->GetExternalFrontendAuthProvider())
-          .metrics(exec_env_->metrics())
-          .max_concurrent_connections(FLAGS_fe_service_threads)
-          .queue_timeout_ms(FLAGS_accepted_client_cnxn_timeout)
-          .idle_poll_period_ms(FLAGS_idle_client_poll_period_s * MILLIS_PER_SEC)
-          .Build(&server));
+          builder
+              .auth_provider(
+                  AuthManager::GetInstance()->GetExternalFrontendAuthProvider())
+              .transport_type(external_fe_port_transport)
+              .metrics(exec_env_->metrics())
+              .max_concurrent_connections(FLAGS_fe_service_threads)
+              .queue_timeout_ms(FLAGS_accepted_client_cnxn_timeout)
+              .idle_poll_period_ms(FLAGS_idle_client_poll_period_s * MILLIS_PER_SEC)
+              .Build(&server));
       external_fe_server_.reset(server);
       external_fe_server_->SetConnectionHandler(this);
     }

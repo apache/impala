@@ -63,6 +63,12 @@ class CustomClusterRunner {
         impaladArgs, catalogdArgs, statestoredArgs, new HashMap<String, String>(), "");
   }
 
+  public static int StartImpalaCluster(String impaladArgs, String catalogdArgs,
+      String statestoredArgs, String startArgs) throws IOException, InterruptedException {
+    return StartImpalaCluster(impaladArgs, catalogdArgs, statestoredArgs,
+        new HashMap<String, String>(), startArgs);
+  }
+
   /**
    * Starts Impala, setting environment variables in 'env', and passing 'impalad_args',
    * 'catalogd_args', 'statestored_args', and 'startArgs' to start-impala-cluster.py.
