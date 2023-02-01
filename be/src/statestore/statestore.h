@@ -155,7 +155,9 @@ class Statestore : public CacheLineAligned {
       const std::vector<TTopicRegistration>& topic_registrations,
       RegistrationId* registration_id) WARN_UNUSED_RESULT;
 
-  void RegisterWebpages(Webserver* webserver);
+  /// Registers webpages for the input webserver. If metrics_only is set then only
+  /// '/healthz' page is registered.
+  void RegisterWebpages(Webserver* webserver, bool metrics_only);
 
   /// The main processing loop. Runs infinitely.
   void MainLoop();

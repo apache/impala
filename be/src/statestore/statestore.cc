@@ -491,12 +491,15 @@ Status Statestore::Init(int32_t state_store_port) {
   return Status::OK();
 }
 
-void Statestore::RegisterWebpages(Webserver* webserver) {
+void Statestore::RegisterWebpages(Webserver* webserver, bool metrics_only) {
   Webserver::RawUrlCallback healthz_callback =
       [this](const auto& req, auto* data, auto* response) {
         return this->HealthzHandler(req, data, response);
       };
   webserver->RegisterUrlCallback("/healthz", healthz_callback);
+
+  if (metrics_only) return;
+
   Webserver::UrlCallback topics_callback =
       bind<void>(mem_fn(&Statestore::TopicsHandler), this, _1, _2);
   webserver->RegisterUrlCallback("/topics", "statestore_topics.tmpl",

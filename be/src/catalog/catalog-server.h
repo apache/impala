@@ -68,7 +68,9 @@ class CatalogServer {
   /// Returns OK unless some error occurred in which case the status is returned.
   Status Start();
 
-  void RegisterWebpages(Webserver* webserver);
+  /// Registers webpages for the input webserver. If metrics_only is set then only
+  /// '/healthz' page is registered.
+  void RegisterWebpages(Webserver* webserver, bool metrics_only);
 
   /// Returns the Thrift API interface that proxies requests onto the local CatalogService.
   const std::shared_ptr<CatalogServiceIf>& thrift_iface() const {

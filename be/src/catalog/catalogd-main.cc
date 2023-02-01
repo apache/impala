@@ -36,6 +36,7 @@
 #include "util/openssl-util.h"
 
 DECLARE_int32(catalog_service_port);
+DECLARE_int32(metrics_webserver_port);
 DECLARE_int32(webserver_port);
 DECLARE_int32(state_store_subscriber_port);
 DECLARE_string(ssl_server_certificate);
@@ -43,7 +44,6 @@ DECLARE_string(ssl_private_key);
 DECLARE_string(ssl_private_key_password_cmd);
 DECLARE_string(ssl_cipher_list);
 DECLARE_string(ssl_minimum_version);
-
 #include "common/names.h"
 
 using namespace impala;
@@ -61,7 +61,10 @@ int CatalogdMain(int argc, char** argv) {
 
   CatalogServer catalog_server(daemon_env.metrics());
   ABORT_IF_ERROR(catalog_server.Start());
-  catalog_server.RegisterWebpages(daemon_env.webserver());
+  catalog_server.RegisterWebpages(daemon_env.webserver(), false);
+  if (FLAGS_metrics_webserver_port > 0) {
+    catalog_server.RegisterWebpages(daemon_env.metrics_webserver(), true);
+  }
   std::shared_ptr<TProcessor> processor(
       new CatalogServiceProcessor(catalog_server.thrift_iface()));
   std::shared_ptr<TProcessorEventHandler> event_handler(

@@ -347,12 +347,15 @@ Status CatalogServer::Start() {
   return Status::OK();
 }
 
-void CatalogServer::RegisterWebpages(Webserver* webserver) {
+void CatalogServer::RegisterWebpages(Webserver* webserver, bool metrics_only) {
   Webserver::RawUrlCallback healthz_callback =
       [this](const auto& req, auto* data, auto* response) {
         return this->HealthzHandler(req, data, response);
       };
   webserver->RegisterUrlCallback(CATALOG_SERVICE_HEALTH_WEB_PAGE, healthz_callback);
+
+  if (metrics_only) return;
+
   webserver->RegisterUrlCallback(CATALOG_WEB_PAGE, CATALOG_TEMPLATE,
       [this](const auto& args, auto* doc) { this->CatalogUrlCallback(args, doc); }, true);
   webserver->RegisterUrlCallback(CATALOG_OBJECT_WEB_PAGE, CATALOG_OBJECT_TEMPLATE,

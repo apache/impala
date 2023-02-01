@@ -34,6 +34,7 @@
 #include "util/metrics.h"
 #include "util/webserver.h"
 
+DECLARE_int32(metrics_webserver_port);
 DECLARE_int32(state_store_port);
 DECLARE_int32(webserver_port);
 
@@ -51,7 +52,10 @@ int StatestoredMain(int argc, char** argv) {
 
   Statestore statestore(daemon_env.metrics());
   ABORT_IF_ERROR(statestore.Init(FLAGS_state_store_port));
-  statestore.RegisterWebpages(daemon_env.webserver());
+  statestore.RegisterWebpages(daemon_env.webserver(), false);
+  if (FLAGS_metrics_webserver_port > 0) {
+    statestore.RegisterWebpages(daemon_env.metrics_webserver(), true);
+  }
   statestore.MainLoop();
 
   return 0;
