@@ -17,21 +17,4 @@
 
 package org.apache.impala.hive.executor;
 
-import org.apache.hadoop.io.Text;
-
-/**
- * Impala writable type that implements the Text interface. The data marshalling is
- * handled by {@link JavaUdfDataType#loadStringValueFromNativeHeap(long)}.
- */
-public class ImpalaTextWritable extends Text implements Reloadable {
-  private final long ptr_;
-
-  public ImpalaTextWritable(long ptr) { this.ptr_ = ptr; }
-
-  @Override
-  public void reload() {
-    byte[] bytes = JavaUdfDataType.loadStringValueFromNativeHeap(ptr_);
-    super.set(bytes);
-  }
-
-}
+public interface Reloadable { void reload(); }

@@ -57,7 +57,6 @@ import org.apache.hadoop.hive.ql.udf.UDFUnbase64;
 import org.apache.hadoop.hive.ql.udf.UDFUnhex;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFBRound;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFUpper;
-import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.impala.catalog.PrimitiveType;
@@ -158,21 +157,30 @@ public class UdfExecutorTest {
   Writable createDouble(double v) { return createObject(PrimitiveType.DOUBLE, v); }
 
   Writable createBytes(String v) {
-    long ptr = allocate(16);
-    UnsafeUtil.UNSAFE.putInt(ptr + 8, 0);
-    ImpalaBytesWritable tw = new ImpalaBytesWritable(ptr);
-    byte[] array = v.getBytes();
-    tw.set(array, 0, array.length);
-    return tw;
+    long ptr = allocateStringValue(v);
+    ImpalaBytesWritable bytesWritable = new ImpalaBytesWritable(ptr);
+    bytesWritable.reload();
+    return bytesWritable;
   }
 
   Writable createText(String v) {
-    long ptr = allocate(16);
-    UnsafeUtil.UNSAFE.putInt(ptr + 8, 0);
-    ImpalaTextWritable tw = new ImpalaTextWritable(ptr);
-    byte[] array = v.getBytes();
-    tw.set(array, 0, array.length);
-    return tw;
+    long ptr = allocateStringValue(v);
+    ImpalaTextWritable textWritable = new ImpalaTextWritable(ptr);
+    textWritable.reload();
+    return textWritable;
+  }
+
+  private long allocateStringValue(String v) {
+    // Allocate StringValue: sizeof(StringValue) = 8 (pointer) + 4 (length)
+    long ptr = allocate(12);
+    // Setting length
+    UnsafeUtil.UNSAFE.putInt(ptr + 8, v.length());
+    // Allocate buffer for v
+    long stringPtr = allocate(v.length());
+    // Setting string pointer
+    UnsafeUtil.UNSAFE.putLong(ptr, stringPtr);
+    UnsafeUtil.Copy(stringPtr, v.getBytes(), 0, v.length());
+    return ptr;
   }
 
   // Returns the primitive type for w
@@ -402,17 +410,16 @@ public class UdfExecutorTest {
         } else {
           Preconditions.checkState(false);
         }
-        ImpalaStringWritable sw = new ImpalaStringWritable(r);
-        if (Arrays.equals(expectedBytes, sw.getBytes())) break;
+        byte[] bytes = JavaUdfDataType.loadStringValueFromNativeHeap(r);
+        if (Arrays.equals(expectedBytes, bytes)) break;
 
         errMsgs.add("Expected string: " + Bytes.toString(expectedBytes));
-        errMsgs.add("Actual string:   " + Bytes.toString(sw.getBytes()));
+        errMsgs.add("Actual string:   " + Bytes.toString(bytes));
         errMsgs.add("Expected bytes:  " + Arrays.toString(expectedBytes));
-        errMsgs.add("Actual bytes:    " + Arrays.toString(sw.getBytes()));
+        errMsgs.add("Actual bytes:    " + Arrays.toString(bytes));
         break;
       }
-      default:
-        Preconditions.checkArgument(false);
+      default: Preconditions.checkArgument(false);
     }
   }
 

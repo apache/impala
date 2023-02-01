@@ -88,4 +88,16 @@ symbol='org.apache.impala.ReplaceStringUdf';
 create function import_nearby_classes(string) returns string
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.ImportsNearbyClassesUdf';
+
+create function increment(binary) returns binary
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.BufferAlteringUdf';
+
+create function increment(string) returns string
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.BufferAlteringUdf';
+
+create function copy_and_increment(binary, binary) returns binary
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.BufferAlteringUdf';
 ====

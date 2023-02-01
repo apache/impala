@@ -17,46 +17,18 @@
 
 package org.apache.impala.hive.executor;
 
-import sun.misc.Unsafe;
-
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.util.ArrayList;
-import java.util.List;
 
-import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDF.DeferredJavaObject;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDF.DeferredObject;
-import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
-import org.apache.hadoop.io.BooleanWritable;
-import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.FloatWritable;
-import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.Writable;
-import org.apache.impala.catalog.Type;
-import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
-import org.apache.impala.common.JniUtil;
 import org.apache.impala.thrift.THiveUdfExecutorCtorParams;
-import org.apache.impala.thrift.TPrimitiveType;
 import org.apache.impala.util.UnsafeUtil;
 import org.apache.log4j.Logger;
-import org.apache.thrift.protocol.TBinaryProtocol;
 
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * Wrapper object to run hive GenericUDFs. This class works with UdfCallExpr in the
@@ -98,17 +70,20 @@ public class HiveUdfExecutorGeneric extends HiveUdfExecutor {
   }
 
   /**
-   * Evalutes the UDF with 'args' as the input to the UDF.
+   * Evaluates the UDF with 'args' as the input to the UDF.
    */
   @Override
   protected Object evaluateDerived(JavaUdfDataType[] argTypes,
       long inputNullsPtr, Object[] inputObjectArgs) throws ImpalaRuntimeException {
     try {
       for (int i = 0; i < runtimeDeferredParameters_.length; ++i) {
-        runtimeDeferredParameters_[i] =
-            (UnsafeUtil.UNSAFE.getByte(inputNullsPtr + i) == 0)
-                ? deferredParameters_[i]
-                : deferredNullParameter_;
+        if (UnsafeUtil.UNSAFE.getByte(inputNullsPtr + i) == 0) {
+          runtimeDeferredParameters_[i] = deferredParameters_[i];
+          // argument 'i' is unused in DeferredJavaObject and in DeferredWritable as well
+          runtimeDeferredParameters_[i].prepare(0);
+        } else {
+          runtimeDeferredParameters_[i] = deferredNullParameter_;
+        }
       }
       return genericUDF_.evaluate(runtimeDeferredParameters_);
     } catch (HiveException e) {
@@ -140,8 +115,29 @@ public class HiveUdfExecutorGeneric extends HiveUdfExecutor {
   private DeferredObject[] createDeferredObjects() {
     DeferredObject[] deferredObjects = new DeferredObject[getNumParams()];
     for (int i = 0; i < deferredObjects.length; ++i) {
-      deferredObjects[i] = new DeferredJavaObject(getInputObject(i));
+      Object inputObject = getInputObject(i);
+      if (inputObject instanceof Reloadable) {
+        deferredObjects[i] = new DeferredWritable<>((Reloadable) inputObject);
+      } else {
+        deferredObjects[i] = new DeferredJavaObject(inputObject);
+      }
     }
     return deferredObjects;
+  }
+
+  private static class DeferredWritable<T extends Reloadable> implements DeferredObject {
+    private final T writable;
+
+    public DeferredWritable(T writable) { this.writable = writable; }
+
+    @Override
+    public void prepare(int ignored) throws HiveException {
+      writable.reload();
+    }
+
+    @Override
+    public Object get() throws HiveException {
+      return writable;
+    }
   }
 }

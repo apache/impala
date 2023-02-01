@@ -64,7 +64,6 @@ public class HiveEsriGeospatialBuiltins {
     addLegacyUDFs(db);
     addGenericUDFs(db);
     addVarargsUDFs(db);
-    addWorkaroundForStSetSrid(db);
   }
 
   private static void addLegacyUDFs(Db db) {
@@ -84,7 +83,7 @@ public class HiveEsriGeospatialBuiltins {
         new ST_NumInteriorRing(), new ST_NumPoints(), new ST_Point(),
         new ST_PointFromWKB(), new ST_PointN(), new ST_PointZ(), new ST_PolyFromWKB(),
         new ST_Relate(), new ST_SRID(), new ST_StartPoint(), new ST_SymmetricDiff(),
-        new ST_X(), new ST_Y(), new ST_Z());
+        new ST_X(), new ST_Y(), new ST_Z(), new ST_SetSRID());
 
     for (UDF udf : legacyUDFs) {
       for (Function fn : extractFromLegacyHiveBuiltin(udf, db.getName())) {
@@ -206,39 +205,5 @@ public class HiveEsriGeospatialBuiltins {
           return createScalarFunction(genericUDF, returnType, arguments);
         })
         .collect(Collectors.toList());
-  }
-
-  /*
-    TODO: IMPALA-11854: A workaround must be applied for ST_SetSRID UDF because the
-    GeometryUtils.setWKID method assumes that the incoming geomref's buffer can
-    be modified through the array returned by ImpalaBytesWritable.getBytes.
-   */
-  private static void addWorkaroundForStSetSrid(Db db) {
-    db.addBuiltin(
-        createScalarFunction(ST_SetSRID_Wrapper.class, ST_SetSRID.class.getSimpleName(),
-            Type.BINARY, new Type[] {Type.BINARY, Type.INT}));
-  }
-
-  public static class ST_SetSRID_Wrapper extends ST_SetSRID {
-    private static final Logger LOG = LoggerFactory.getLogger(ST_SetSRID_Wrapper.class);
-
-    @Override
-    public BytesWritable evaluate(BytesWritable geomref, IntWritable wkwrap) {
-      if (geomref != null && geomref.getLength() != 0) {
-        if (wkwrap != null) {
-          int wkid = wkwrap.get();
-          if (GeometryUtils.getWKID(geomref) != wkid) {
-            ByteBuffer bb = ByteBuffer.allocate(geomref.getLength());
-            bb.putInt(wkid);
-            bb.put(Arrays.copyOfRange(geomref.getBytes(), 4, geomref.getLength()));
-            return new BytesWritable(bb.array());
-          }
-        }
-        return geomref;
-      } else {
-        LogUtils.Log_ArgumentsNull(LOG);
-        return null;
-      }
-    }
   }
 }

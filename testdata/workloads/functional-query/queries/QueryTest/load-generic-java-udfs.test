@@ -139,4 +139,12 @@ symbol='org.apache.impala.TestGenericUdfWithJavaReturnTypes';
 create function generic_add_java_ret_type(string, string, string) returns string
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestGenericUdfWithJavaReturnTypes';
+
+create function increment(binary) returns binary
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.GenericBufferAlteringUdf';
+
+create function increment(string) returns string
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.GenericBufferAlteringUdf';
 ====

@@ -21,36 +21,18 @@ import org.apache.hadoop.io.BytesWritable;
 
 /**
  * Impala writable type that implements the BytesWritable interface. The data
- * marshalling is handled by the underlying {@link ImpalaStringWritable} object.
+ * marshalling is handled by {@link JavaUdfDataType#loadStringValueFromNativeHeap(long)}.
  */
-public class ImpalaBytesWritable extends BytesWritable {
-  private final ImpalaStringWritable string_;
+public class ImpalaBytesWritable extends BytesWritable implements Reloadable {
+  private final long ptr_;
 
-  public ImpalaBytesWritable(long ptr) {
-    string_ = new ImpalaStringWritable(ptr);
+  public ImpalaBytesWritable(long ptr) { this.ptr_ = ptr; }
+
+  @Override
+  public void reload() {
+    byte[] bytes = JavaUdfDataType.loadStringValueFromNativeHeap(ptr_);
+    super.setCapacity(bytes.length);
+    super.set(bytes, 0, bytes.length);
   }
 
-  @Override
-  public byte[] copyBytes() {
-    byte[] src = getBytes();
-    return src.clone();
-  }
-
-  @Override
-  public byte[] get() { return getBytes(); }
-  @Override
-  public byte[] getBytes() { return string_.getBytes(); }
-  @Override
-  public int getCapacity() { return string_.getCapacity(); }
-  @Override
-  public int getLength() { return string_.getLength(); }
-
-  public ImpalaStringWritable getStringWritable() { return string_; }
-
-  @Override
-  public void set(byte[] v, int offset, int len) { string_.set(v, offset, len); }
-  @Override
-  public void setCapacity(int newCap) { string_.setCapacity(newCap); }
-  @Override
-  public void setSize(int size) { string_.setSize(size); }
 }

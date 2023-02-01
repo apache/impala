@@ -115,7 +115,7 @@ public abstract class HiveUdfExecutor {
   }
 
   /**
-   * Evalutes the UDF with 'args' as the input to the UDF. This is exposed
+   * Evaluates the UDF with 'args' as the input to the UDF. This is exposed
    * for testing and not the version of evaluate() the backend uses.
    */
   public long evaluateForTesting(Object... args) throws ImpalaRuntimeException {
@@ -234,8 +234,7 @@ public abstract class HiveUdfExecutor {
     }
     UnsafeUtil.Copy(outBufferStringPtr_, bytes, 0, bytes.length);
     UnsafeUtil.UNSAFE.putInt(
-        outputBufferPtr_ + ImpalaStringWritable.STRING_VALUE_LEN_OFFSET,
-        bytes.length);
+        outputBufferPtr_ + JavaUdfDataType.STRING_VALUE_LEN_OFFSET, bytes.length);
   }
 
   // Preallocate the input objects that will be passed to the underlying UDF.
