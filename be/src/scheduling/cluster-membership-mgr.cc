@@ -50,6 +50,21 @@ ExecutorGroup* FindOrInsertExecutorGroup(const ExecutorGroupDescPB& group,
   DCHECK(inserted);
   return &it->second;
 }
+
+/// Removes the executor 'be_desc' from the group 'group' if it exists and removes
+/// the group from the cluster if the group become empty after the executor removed.
+void RemoveExecutorAndGroup(const BackendDescriptorPB& be_desc,
+    const ExecutorGroupDescPB& group,
+    ClusterMembershipMgr::ExecutorGroups* executor_groups) {
+  auto it = executor_groups->find(group.name());
+  DCHECK(it != executor_groups->end());
+  DCHECK_EQ(group.name(), it->second.name());
+  it->second.RemoveExecutor(be_desc);
+  if (it->second.NumExecutors() == 0) {
+    VLOG(1) << "Removing empty group " << group.DebugString();
+    executor_groups->erase(it);
+  }
+}
 }
 
 namespace impala {
@@ -243,8 +258,7 @@ void ClusterMembershipMgr::UpdateMembership(
           for (const auto& group : be_desc.executor_groups()) {
             VLOG(1) << "Removing backend " << item.key << " from group "
                     << group.DebugString() << " (deleted)";
-            FindOrInsertExecutorGroup(
-                group, new_executor_groups)->RemoveExecutor(be_desc);
+            RemoveExecutorAndGroup(be_desc, group, new_executor_groups);
           }
         }
         new_backend_map->erase(item.key);
@@ -310,8 +324,7 @@ void ClusterMembershipMgr::UpdateMembership(
           for (const auto& group : be_desc.executor_groups()) {
             VLOG(1) << "Removing backend " << item.key << " from group "
                     << group.DebugString() << " (quiescing)";
-            FindOrInsertExecutorGroup(group, new_executor_groups)
-                ->RemoveExecutor(be_desc);
+            RemoveExecutorAndGroup(be_desc, group, new_executor_groups);
           }
         }
       }
@@ -355,8 +368,7 @@ void ClusterMembershipMgr::UpdateMembership(
     for (const auto& group : local_be_desc->executor_groups()) {
       if (local_be_desc->is_quiescing()) {
         VLOG(1) << "Removing local backend from group " << group.DebugString();
-        FindOrInsertExecutorGroup(
-            group, new_executor_groups)->RemoveExecutor(*local_be_desc);
+        RemoveExecutorAndGroup(*local_be_desc, group, new_executor_groups);
       } else if (local_be_desc->is_executor()) {
         VLOG(1) << "Adding local backend to group " << group.DebugString();
         FindOrInsertExecutorGroup(
@@ -445,7 +457,7 @@ void ClusterMembershipMgr::BlacklistExecutor(
   for (const auto& group : be_desc.executor_groups()) {
     VLOG(1) << "Removing backend " << be_desc.address() << " from group "
             << group.DebugString() << " (blacklisted)";
-    FindOrInsertExecutorGroup(group, new_executor_groups)->RemoveExecutor(be_desc);
+    RemoveExecutorAndGroup(be_desc, group, new_executor_groups);
   }
 
   ExecutorBlacklist* new_blacklist = &(new_state->executor_blacklist);

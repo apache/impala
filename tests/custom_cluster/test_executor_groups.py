@@ -84,6 +84,30 @@ class TestExecutorGroups(CustomClusterTestSuite):
                                add_executors=True,
                                expected_num_impalads=self.num_impalads)
 
+  def _add_executors(self, name_suffix, min_size, num_executors=0,
+                    extra_args=None, resource_pool=DEFAULT_RESOURCE_POOL,
+                    expected_num_impalads=0):
+    """Adds given number of executors to the cluster. 'min_size' specifies the minimum
+    size for the group to be considered healthy. 'num_executors' specifies the number of
+    executors to start. If 'name_suffix' is empty, no executor group is specified for
+    the new backends and they will end up in the default group."""
+    if num_executors == 0:
+      return
+    name = self._group_name(resource_pool, name_suffix)
+    LOG.info("Adding %s executors to group %s with minimum size %s" %
+             (num_executors, name, min_size))
+    cluster_args = []
+    if len(name_suffix) > 0:
+      cluster_args.append("--impalad_args=-executor_groups=%s:%s" % (name, min_size))
+    if extra_args:
+      cluster_args.append("--impalad_args=%s" % extra_args)
+    self._start_impala_cluster(options=cluster_args,
+                               cluster_size=num_executors,
+                               num_coordinators=0,
+                               add_executors=True,
+                               expected_num_impalads=expected_num_impalads)
+    self.num_impalads += num_executors
+
   def _restart_coordinators(self, num_coordinators, extra_args=None):
     """Restarts the coordinator spawned in setup_method and enables the caller to start
     more than one coordinator by specifying 'num_coordinators'"""
@@ -215,6 +239,26 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # Run query and observe success
     self.execute_query_expect_success(client, TEST_QUERY)
     self._wait_for_num_executor_groups(1, only_healthy=True)
+
+  @pytest.mark.execute_serially
+  def test_executor_group_min_size_update(self):
+    """Tests that we can update an executor group's min size without restarting
+    coordinators."""
+    # Start cluster and group
+    self._add_executor_group("group1", min_size=1, num_executors=1)
+    self._wait_for_num_executor_groups(1, only_healthy=True)
+    client = self.client
+    # Kill the executor
+    executor = self.cluster.impalads[1]
+    executor.kill()
+    self.coordinator.service.wait_for_metric_value("cluster-membership.backends.total", 1,
+                                                   timeout=20)
+    assert self._get_num_executor_groups(only_healthy=True) == 0
+    # Add a new executor to group1 with group min size 2
+    self._add_executors("group1", min_size=2, num_executors=2, expected_num_impalads=3)
+    assert self._get_num_executor_groups(only_healthy=True) == 1
+    # Run query and observe success
+    self.execute_query_expect_success(client, TEST_QUERY)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="-default_pool_max_requests=1")

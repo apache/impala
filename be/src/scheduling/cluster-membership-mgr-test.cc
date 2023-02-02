@@ -63,9 +63,14 @@ class ClusterMembershipMgrTest : public testing::Test {
  protected:
   ClusterMembershipMgrTest() {}
 
-  /// Returns the size of the default executor group of the current membership in 'cmm'.
+  /// Returns the size of the default executor group of the current membership in 'cmm'
+  /// if the default executor group exists, otherwise returns 0.
   int GetDefaultGroupSize(const ClusterMembershipMgr& cmm) const {
     const string& group_name = ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME;
+    if (cmm.GetSnapshot()->executor_groups.find(group_name)
+        == cmm.GetSnapshot()->executor_groups.end()) {
+      return 0;
+    }
     return cmm.GetSnapshot()->executor_groups.find(group_name)->second.NumExecutors();
   }
 
