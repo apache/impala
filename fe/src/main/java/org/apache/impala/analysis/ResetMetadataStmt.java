@@ -122,6 +122,8 @@ public class ResetMetadataStmt extends StatementBase {
 
   public TableName getTableName() { return tableName_; }
 
+  public PartitionSpec getPartitionSpec() { return partitionSpec_; }
+
   @VisibleForTesting
   protected Action getAction() { return action_; }
 

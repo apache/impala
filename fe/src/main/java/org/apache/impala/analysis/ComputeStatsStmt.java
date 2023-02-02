@@ -1021,6 +1021,18 @@ public class ComputeStatsStmt extends StatementBase {
     return false;
   }
 
+  public PartitionSet getPartitionSet() {
+    return partitionSet_;
+  }
+
+  public TableName getTableName() {
+    return tableName_;
+  }
+
+  public boolean isIncremental() {
+    return isIncremental_;
+  }
+
   @Override
   public String toSql(ToSqlOptions options) {
     if (!isIncremental_) {

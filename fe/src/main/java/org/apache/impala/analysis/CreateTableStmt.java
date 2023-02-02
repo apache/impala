@@ -91,7 +91,7 @@ public class CreateTableStmt extends StatementBase {
   /**
    * Copy c'tor.
    */
-  CreateTableStmt(CreateTableStmt other) {
+  public CreateTableStmt(CreateTableStmt other) {
     this(other.tableDef_);
     owner_ = other.owner_;
   }
@@ -129,7 +129,7 @@ public class CreateTableStmt extends StatementBase {
   public List<String> getSortColumns() { return tableDef_.getSortColumns(); }
   public TSortingOrder getSortingOrder() { return tableDef_.getSortingOrder(); }
   public String getComment() { return tableDef_.getComment(); }
-  Map<String, String> getTblProperties() { return tableDef_.getTblProperties(); }
+  public Map<String, String> getTblProperties() { return tableDef_.getTblProperties(); }
   private HdfsCachingOp getCachingOp() { return tableDef_.getCachingOp(); }
   public HdfsUri getLocation() { return tableDef_.getLocation(); }
   Map<String, String> getSerdeProperties() { return tableDef_.getSerdeProperties(); }

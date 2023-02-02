@@ -90,7 +90,7 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
   }
 
   // Returns optArg[key], first validating that it is set.
-  protected String checkAndGetOptArg(OptArg key)
+  public String checkAndGetOptArg(OptArg key)
       throws AnalysisException {
     if (!optArgs_.containsKey(key)) {
       throw new AnalysisException("Argument '" + key + "' must be set.");
@@ -186,6 +186,13 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
     }
   }
 
+  public FunctionName getFunctionName() {
+    return fnName_;
+  }
+
+  public HdfsUri getLocation() {
+    return location_;
+  }
   /**
    * Creates a concrete function.
    */
