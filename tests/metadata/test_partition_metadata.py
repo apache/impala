@@ -19,13 +19,8 @@ import pytest
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS, SkipIfLocal
 from tests.common.test_dimensions import (create_single_exec_option_dimension,
-    create_uncompressed_text_dimension)
+    create_uncompressed_text_dimension, FILE_FORMAT_TO_STORED_AS_MAP)
 from tests.util.filesystem_utils import WAREHOUSE, FILESYSTEM_PREFIX
-
-# Map from the test dimension file_format string to the SQL "STORED AS"
-# argument.
-STORED_AS_ARGS = { 'text': 'textfile', 'parquet': 'parquet', 'avro': 'avro',
-    'seq': 'sequencefile' }
 
 # Tests specific to partition metadata.
 # TODO: Split up the DDL tests and move some of the partition-specific tests
@@ -59,7 +54,7 @@ class TestPartitionMetadata(ImpalaTestSuite):
     # Create the table
     self.client.execute(
         "create table %s (i int) partitioned by(j int) stored as %s location '%s'"
-        % (FQ_TBL_NAME, STORED_AS_ARGS[file_format], TBL_LOCATION))
+        % (FQ_TBL_NAME, FILE_FORMAT_TO_STORED_AS_MAP[file_format], TBL_LOCATION))
 
     # Point both partitions to the same location.
     self.client.execute("alter table %s add partition (j=1) location '%s/p'"

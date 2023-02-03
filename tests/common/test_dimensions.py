@@ -27,6 +27,21 @@ from tests.util.filesystem_utils import (
 
 WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 
+# Map from the test dimension file_format string to the SQL "STORED AS" or "STORED BY"
+# argument.
+FILE_FORMAT_TO_STORED_AS_MAP = {
+  'text': 'TEXTFILE',
+  'seq': 'SEQUENCEFILE',
+  'rc': 'RCFILE',
+  'orc': 'ORC',
+  'parquet': 'PARQUET',
+  'hudiparquet': 'HUDIPARQUET',
+  'avro': 'AVRO',
+  'hbase': "'org.apache.hadoop.hive.hbase.HBaseStorageHandler'",
+  'kudu': "KUDU",
+  'iceberg': "ICEBERG"
+}
+
 # Describes the configuration used to execute a single tests. Contains both the details
 # of what specific table format to target along with the exec options (num_nodes, etc)
 # to use when running the query.

@@ -1382,7 +1382,15 @@ public class HdfsScanNode extends ScanNode {
     boolean fileDescMissingDiskIds = false;
     long fileMaxScanRangeBytes = 0;
     FileSystemUtil.FsType fsType = partition.getFsType();
-    for (int i = 0; i < fileDesc.getNumFileBlocks(); ++i) {
+    int i = 0;
+    if (isPartitionKeyScan_ && (partition.getFileFormat().isParquetBased()
+        || partition.getFileFormat() == HdfsFileFormat.ORC)) {
+      // IMPALA-8834 introduced the optimization for partition key scan by generating
+      // one scan range for each HDFS file. With Parquet and ORC, we start with the last
+      // block is to get a scan range that contains a file footer for short-circuiting.
+      i = fileDesc.getNumFileBlocks() - 1;
+    }
+    for (; i < fileDesc.getNumFileBlocks(); ++i) {
       FbFileBlock block = fileDesc.getFbFileBlock(i);
       int replicaHostCount = FileBlock.getNumReplicaHosts(block);
       if (replicaHostCount == 0) {
