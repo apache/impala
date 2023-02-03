@@ -84,7 +84,7 @@ AnalysisException: Struct containing a collection type is not allowed in the sel
 ---- QUERY
 # Test resolving explicit STAR path on a nested struct column inside array
 select id, nested_arr.item.*
-from functional_parquet.complextypestbl t,
+from complextypestbl t,
   t.nested_struct.c.d arr,
   arr.item nested_arr;
 ---- RESULTS
@@ -106,7 +106,7 @@ BIGINT,INT,STRING
 ---- QUERY
 # Test resolving explicit STAR path on a nested struct column inside array
 select nested_arr.item.*
-from functional_parquet.complextypestbl t,
+from complextypestbl t,
   t.nested_struct.c.d arr,
   arr.item nested_arr;
 ---- RESULTS
@@ -128,7 +128,7 @@ INT,STRING
 ---- QUERY
 # Test resolving implicit STAR path on a nested struct column inside array
 select id, nested_arr.*
-from functional_parquet.complextypestbl t,
+from complextypestbl t,
   t.nested_struct.c.d arr,
   arr.item nested_arr;
 ---- RESULTS
@@ -150,7 +150,7 @@ BIGINT,INT,STRING
 ---- QUERY
 # Test resolving explicit STAR path on a nested struct column inside array
 select nested_arr.*
-from functional_parquet.complextypestbl t,
+from complextypestbl t,
   t.nested_struct.c.d arr,
   arr.item nested_arr;
 ---- RESULTS
