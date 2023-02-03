@@ -343,6 +343,112 @@ under the License.
       <p> Compression levels from 1 up to 22 (default 3) are supported for <codeph>ZSTD</codeph>.
         The lower the compression level, the faster the speed at the cost of compression ratio.</p>
     </section>
+    <section>
+      <title>Configure Impala Daemon to spill to S3</title>
+      <p>Impala occasionally needs to use persistent storage for writing intermediate files during
+        large sorts, joins, aggregations, or analytic function operations. If your workload results
+        in large volumes of intermediate data being written, it is recommended to configure the
+        heavy spilling queries to use a remote storage location rather than the local one. The
+        advantage of using remote storage for scratch space is that it is elastic and can handle any
+        amount of spilling.</p>
+      <p><b>Before you begin</b></p>
+      <p>Identify the URL for an S3 bucket to which you want your new Impala to write the temporary
+        data. If you use the S3 bucket that is associated with the environment, navigate to the S3
+        bucket and copy the URL. If you want to use an external S3 bucket, you must first configure
+        your environment to use the external S3 bucket with the correct read/write permissions.</p>
+      <p><b>Configuring the Start-up Option in Impala daemon</b></p>
+      <p>You can use the Impalad start option scratch_dirs to specify the locations of the
+        intermediate files. The format of the option is <codeph>scratch_dirs= remote_dir, local_buffer_dir(,
+          local_dir…).</codeph></p>
+      <p>With the option specified above:</p>
+      <ul>
+        <li>You can specify only one remote directory. When you configure a remote directory, you
+          must specify a local buffer directory as the buffer. However you can use multiple local
+          directories with the remote directory. If you specify multiple local directories, the
+          first local directory would be used as the local buffer directory.</li>
+        <li>If you configure both remote and local directories, the remote directory is only used
+          when the local directories are fully utilized.</li>
+        <li>The size of a remote intermediate file could affect the query performance, and the value
+          can be set by <codeph>>remote_tmp_file_size</codeph> in the start-up option. The default
+          size of a remote intermediate file is 16MB while the maximum is 256MB.</li>
+      </ul>
+      <p><b>Examples</b></p>
+      <ul>
+        <li>A remote scratch dir with one local buffer dir, file size 64MB.
+          <codeblock>‑‑scratch_dirs="s3a://remote_dir, /local_buffer_dir" ‑‑remote_tmp_file_size=64M</codeblock></li>
+        <li>A remote scratch dir with one local buffer dir, and one local dir.
+          <codeblock>‑‑scratch_dirs="s3a://remote_dir, /local_buffer_dir, /local_dir"</codeblock></li>
+        <li>A remote scratch dir with one local buffer dir, and multiple local dirs.
+          <codeblock>‑‑scratch_dirs="s3a://remote_dir, /local_buffer_dir, /local_dir_1, /local_dir_2"</codeblock></li>
+      </ul>
+    </section>
+    <section>
+      <title>Configure Impala Daemon to spill to HDFS</title>
+      <p>Impala occasionally needs to use persistent storage for writing intermediate files during
+        large sorts, joins, aggregations, or analytic function operations. If your workload results
+        in large volumes of intermediate data being written, it is recommended to configure the
+        heavy spilling queries to use a remote storage location rather than the local one. The
+        advantage of using remote storage for scratch space is that it is elastic and can handle any
+        amount of spilling.</p>
+      <p><b>Before you begin</b></p>
+      <ul>
+        <li>Identify the HDFS scratch directory where you want your new Impala to write the
+          temporary data.</li>
+        <li>Identify the port number of the HDFS scratch directory.</li>
+        <li>Configure Impala to write temporary data to disk during query processing.</li>
+      </ul>
+      <p><b>Configuring the Start-up Option in Impala daemon</b></p>
+      <p>You can use the Impalad start option “scratch_dirs” to specify the locations of the
+        intermediate files.</p>
+      <p>Use the following format for this start up option:</p>
+      <codeblock>‑‑scratch_dirs=”hdfs://ip_address:port_num(:max_bytes)(:priority), /local_buffer_dir” ‑‑remote_tmp_file_size=xM</codeblock>
+      <ul>
+        <li>Where <codeph>“hdfs://ip_address:port_num/path(:max_bytes)(:priority)”</codeph> is the remote
+          directory.</li>
+        <li><codeph>port_num</codeph> is required for the HDFS scratch directory.</li>
+        <li><codeph>max_bytes</codeph> and <codeph>priority</codeph> are optional.</li>
+      </ul>
+      <p>Using the above format:</p>
+      <ul>
+        <li>You can specify only one remote directory.</li>
+        <li>When you configure a remote directory, you must specify a local buffer directory as the
+          buffer. However you can use multiple local directories with the remote directory. If you
+          specify multiple local directories, the first local directory would be used as the local
+          buffer directory.</li>
+        <li>If you configure both remote and local directories, the remote directory is only used
+          when the local directories are fully utilized.</li>
+        <li>The size of a remote intermediate file could affect the query performance, and the value
+          can be set by “remote_tmp_file_size” in the start-up option. The default size of a remote
+          intermediate file is 16MB while the maximum is 512MB.</li>
+      </ul>
+      <p><b>Examples</b></p>
+      <ul>
+        <li>A hdfs scratch dir with one local buffer dir, file size 64MB. The space of hdfs scratch
+          dir is limited to 300G.
+          <codeblock>‑‑scratch_dirs="hdfs://ip_address:port_num/path:300G, /local_buffer_dir" ‑‑remote_tmp_file_size=64M</codeblock></li>
+        <li>A hdfs scratch dir with one local buffer dir, and one local dir. The space of hdfs
+          scratch dir is limited to 300G.
+          <codeblock>‑‑scratch_dirs="hdfs://ip_address:port_num/path:300G, /local_buffer_dir, /local_dir"</codeblock></li>
+        <li>A hdfs scratch dir with one local buffer dir, and multiple local dirs. The space of hdfs
+          scratch dir is unlimited.
+          <codeblock>‑‑scratch_dirs="hdfs://ip_address:port_num/path, /local_buffer_dir, /local_dir_1, /local_dir_2"</codeblock></li>
+      </ul>
+      <p>Even though max_bytes is optional it is highly recommended to configure for spilling to
+        HDFS because the HDFS cluster space is limited.</p>
+    </section>
+    <section>
+      <title>Configure Impala Daemon to spill to Ozone</title>
+      <p><b>Before you begin</b></p>
+      <ul>
+        <li>Identify the Ozone scratch directory where you want your new Impala to write the
+          temporary data.</li>
+        <li>Identify the port number of the Ozone scratch directory.</li>
+      </ul>
+      <p><b>Configuring the Start-up Option in Impala daemon</b></p>
+      <p>You can use the Impalad start option “scratch_dirs” to specify the locations of the
+        intermediate files.</p>
+      <codeblock>‑‑scratch_dirs=”ofs://ip_address:port_num(:max_bytes)(:priority), /local_buffer_dir” ‑‑remote_tmp_file_size=xM</codeblock>
+    </section>
   </conbody>
 
 </concept>
