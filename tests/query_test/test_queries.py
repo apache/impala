@@ -26,7 +26,9 @@ from tests.common.skip import SkipIfEC, SkipIfCatalogV2, SkipIfNotHdfsMinicluste
 from tests.common.test_dimensions import (
    create_uncompressed_text_dimension, create_exec_option_dimension_from_dict,
    create_client_protocol_dimension, hs2_parquet_constraint,
-   extend_exec_option_dimension)
+   extend_exec_option_dimension, FILE_FORMAT_TO_STORED_AS_MAP)
+from tests.util.filesystem_utils import get_fs_path
+from subprocess import check_call
 
 class TestQueries(ImpalaTestSuite):
 
@@ -328,6 +330,47 @@ class TestPartitionKeyScans(ImpalaTestSuite):
 
   def test_partition_key_scans_with_joins(self, vector):
     self.run_test_case('QueryTest/partition-key-scans-with-joins', vector)
+
+
+class TestPartitionKeyScansWithMultipleBlocks(ImpalaTestSuite):
+  """Tests for queries that exercise partition key scan optimisation with data files
+  that contain multiple blocks."""
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestPartitionKeyScansWithMultipleBlocks, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format not in ('kudu', 'hbase'))
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  def _build_alltypes_multiblocks_table(self, vector, unique_database):
+    file_format = vector.get_value('table_format').file_format
+    db_suffix = vector.get_value('table_format').db_suffix()
+    src_tbl_name = 'functional' + db_suffix + '.alltypes'
+    src_tbl_loc = self._get_table_location(src_tbl_name, vector)
+    source_file = src_tbl_loc + '/year=2010/month=12/*'
+    tbl_loc = get_fs_path("/test-warehouse/%s.db/alltypes_multiblocks"
+        % (unique_database))
+    file_path = tbl_loc + "/year=2010/month=12"
+
+    check_call(['hdfs', 'dfs', '-mkdir', '-p', file_path])
+    self.client.execute("""create table if not exists %s.alltypes_multiblocks
+        like functional.alltypes stored as %s location '%s';"""
+        % (unique_database, FILE_FORMAT_TO_STORED_AS_MAP[file_format], tbl_loc))
+
+    # set block size to 1024 so the target file occupies multiple blocks
+    check_call(['hdfs', 'dfs', '-Ddfs.block.size=1024', '-cp', '-f', '-d',
+        source_file, file_path])
+    self.client.execute("alter table %s.alltypes_multiblocks recover partitions"
+        % (unique_database))
+
+  def test_partition_key_scans_with_multiple_blocks_table(self, vector, unique_database):
+    self._build_alltypes_multiblocks_table(vector, unique_database)
+    result = self.execute_query_expect_success(self.client,
+          "SELECT max(year) FROM %s.alltypes_multiblocks" % (unique_database))
+    assert int(result.get_data()) == 2010
 
 class TestTopNReclaimQuery(ImpalaTestSuite):
   """Test class to validate that TopN periodically reclaims tuple pool memory
