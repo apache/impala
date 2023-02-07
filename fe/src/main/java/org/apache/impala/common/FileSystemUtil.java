@@ -241,6 +241,12 @@ public class FileSystemUtil {
     } else if (isOzoneFileSystem(p)) {
       try {
         FileSystem fs = p.getFileSystem(CONF);
+        if (!fs.getFileStatus(p).isErasureCoded()) {
+          // Ozone will return the replication factor (ONE, THREE, etc) for Ratis
+          // replication. We avoid returning that for consistency.
+          return NO_ERASURE_CODE_LABEL;
+        }
+
         if (fs instanceof BasicRootedOzoneFileSystem) {
           BasicRootedOzoneFileSystem ofs = (BasicRootedOzoneFileSystem) fs;
           Preconditions.checkState(
