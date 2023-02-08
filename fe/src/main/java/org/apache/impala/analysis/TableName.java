@@ -31,27 +31,36 @@ import org.apache.impala.util.CatalogBlacklistUtils;
 
 /**
  * Represents a table/view name that optionally includes its database (a fully qualified
- * table name). Analysis of this table name checks for validity of the database and
- * table name according to the Metastore's policy (see @MetaStoreUtils).
- * According to that definition, we can still use "invalid" table names for tables/views
- * that are not stored in the Metastore, e.g., for Inline Views or WITH-clause views.
+ * table name) or a virtual table which requires fully qualified name. Analysis of this
+ * table name checks for validity of the database and table name according to the
+ * Metastore's policy (see @MetaStoreUtils). According to that definition, we can still
+ * use "invalid" table names for tables/views that are not stored in the Metastore, e.g.,
+ * for Inline Views or WITH-clause views. Virtual tables are metadata tables of the "real"
+ * tables, currently only supported for Iceberg tables.
  */
 public class TableName {
   private final String db_;
   private final String tbl_;
+  private final String vTbl_;
 
   public TableName(String db, String tbl) {
+    this(db, tbl, null);
+  }
+
+  public TableName(String db, String tbl, String vTbl) {
     super();
     Preconditions.checkArgument(db == null || !db.isEmpty());
     this.db_ = db;
     Preconditions.checkNotNull(tbl);
     this.tbl_ = tbl;
+    Preconditions.checkArgument(vTbl == null || !vTbl.isEmpty());
+    this.vTbl_ = vTbl;
   }
 
   /**
-   * Parse the given full name (in format <db>.<tbl>) and return a TableName object.
-   * Return null for any failures. Note that we keep table names in lower case so the
-   * string will be converted to lower case first.
+   * Parse the given full name (in format <db>.<tbl>.<vTbl>) and return a TableName
+   * object. Return null for any failures. Note that we keep table names in lower case so
+   * the string will be converted to lower case first.
    */
   public static TableName parse(String fullName) {
     // Avoid "db1." and ".tbl1" being treated as the same. We resolve ".tbl1" as
@@ -66,11 +75,16 @@ public class TableName {
     if (parts.size() == 2) {
       return new TableName(parts.get(0), parts.get(1));
     }
+    if (parts.size() == 3) {
+      // Only fully qualified names are supported for vtables
+      return new TableName(parts.get(0), parts.get(1), parts.get(2));
+    }
     return null;
   }
 
   public String getDb() { return db_; }
   public String getTbl() { return tbl_; }
+  public String getVTbl() { return vTbl_; }
   public boolean isEmpty() { return tbl_.isEmpty(); }
 
   /**
@@ -99,20 +113,30 @@ public class TableName {
   public String toSql() {
     // Enclose the database and/or table name in quotes if Hive cannot parse them
     // without quotes. This is needed for view compatibility between Impala and Hive.
+    StringBuilder result = new StringBuilder();
     if (db_ == null) {
-      return ToSqlUtils.getIdentSql(tbl_);
+      result.append(ToSqlUtils.getIdentSql(tbl_));
     } else {
-      return ToSqlUtils.getIdentSql(db_) + "." + ToSqlUtils.getIdentSql(tbl_);
+      result.append(ToSqlUtils.getIdentSql(db_) + "." + ToSqlUtils.getIdentSql(tbl_));
+      if (vTbl_ != null && !vTbl_.isEmpty()) {
+        result.append("." + ToSqlUtils.getIdentSql(vTbl_));
+      }
     }
+    return result.toString();
   }
 
   @Override
   public String toString() {
+    StringBuilder result = new StringBuilder();
     if (db_ == null) {
-      return tbl_;
+      result.append(tbl_);
     } else {
-      return db_ + "." + tbl_;
+      result.append(db_ + "." + tbl_);
+      if (vTbl_ != null && !vTbl_.isEmpty()) {
+        result.append( "." + vTbl_);
+      }
     }
+    return result.toString();
   }
 
   public List<String> toPath() {

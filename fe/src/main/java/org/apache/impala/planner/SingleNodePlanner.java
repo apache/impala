@@ -38,6 +38,7 @@ import org.apache.impala.analysis.CollectionTableRef;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprId;
 import org.apache.impala.analysis.ExprSubstitutionMap;
+import org.apache.impala.analysis.IcebergMetadataTableRef;
 import org.apache.impala.analysis.InlineViewRef;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.MultiAggregateInfo;
@@ -2211,6 +2212,10 @@ public class SingleNodePlanner {
       Preconditions.checkState(ctx_.hasSubplan());
       result = new SingularRowSrcNode(ctx_.getNextNodeId(), ctx_.getSubplan());
       result.init(analyzer);
+    } else if (tblRef instanceof IcebergMetadataTableRef) {
+      throw new NotImplementedException(String.format("'%s' refers to a metadata table "
+          + "which is currently not supported.", String.join(".",
+          tblRef.getPath())));
     } else {
       throw new NotImplementedException(
           "Planning not implemented for table ref class: " + tblRef.getClass());

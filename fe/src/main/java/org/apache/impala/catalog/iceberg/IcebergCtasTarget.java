@@ -116,12 +116,12 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
       // In genIcebergSchema() we did our best to assign correct field ids to columns,
       // but to be sure, let's use Iceberg's API function to assign field ids.
       iceSchema_ = TypeUtil.assignIncreasingFreshIds(iceSchema_);
+      for (Column col : IcebergSchemaConverter.convertToImpalaSchema(iceSchema_)) {
+        addColumn((IcebergColumn)col);
+      }
     } catch (ImpalaRuntimeException ex) {
       throw new CatalogException(
         "Exception caught during generating Iceberg schema:", ex);
-    }
-    for (Column col : IcebergSchemaConverter.convertToImpalaSchema(iceSchema_)) {
-      addColumn((IcebergColumn)col);
     }
   }
 

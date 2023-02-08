@@ -1,0 +1,132 @@
+====
+---- QUERY
+# List of all metadata tables in current version
+select * from functional_parquet.iceberg_alltypes_part_orc.entries
+---- CATCH
+NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.entries' refers to a metadata table which is currently not supported.
+---- TYPES
+STRING
+====
+---- QUERY
+# 'Files' is a keyword and need to be escaped
+select * from functional_parquet.iceberg_alltypes_part_orc.`files`
+---- CATCH
+NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.files' refers to a metadata table which is currently not supported.
+---- TYPES
+STRING
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part_orc.data_files
+---- CATCH
+NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.data_files' refers to a metadata table which is currently not supported.
+---- TYPES
+STRING
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part_orc.delete_files
+---- CATCH
+NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.delete_files' refers to a metadata table which is currently not supported.
+---- TYPES
+STRING
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part_orc.history
+---- CATCH
+NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.history' refers to a metadata table which is currently not supported.
+---- TYPES
+STRING
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part_orc.snapshots
+---- CATCH
+NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.snapshots' refers to a metadata table which is currently not supported.
+---- TYPES
+STRING
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part_orc.manifests
+---- CATCH
+NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.manifests' refers to a metadata table which is currently not supported.
+---- TYPES
+STRING
+====
+---- QUERY
+# 'Partitions' is a keyword and need to be escaped
+select * from functional_parquet.iceberg_alltypes_part_orc.`partitions`
+---- CATCH
+NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.partitions' refers to a metadata table which is currently not supported.
+---- TYPES
+STRING
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part_orc.all_data_files
+---- CATCH
+NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.all_data_files' refers to a metadata table which is currently not supported.
+---- TYPES
+STRING
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part_orc.all_files
+---- CATCH
+NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.all_files' refers to a metadata table which is currently not supported.
+---- TYPES
+STRING
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part_orc.all_manifests
+---- CATCH
+NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.all_manifests' refers to a metadata table which is currently not supported.
+---- TYPES
+STRING
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part_orc.all_entries
+---- CATCH
+NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.all_entries' refers to a metadata table which is currently not supported.
+---- TYPES
+STRING
+====
+---- QUERY
+# Select list with column name
+select snapshot_id from functional_parquet.iceberg_alltypes_part_orc.history
+---- CATCH
+NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.history' refers to a metadata table which is currently not supported.
+---- TYPES
+STRING
+====
+---- QUERY
+# Joining tables
+select *
+from functional_parquet.iceberg_alltypes_part_orc.history q
+  join functional_parquet.iceberg_alltypes_part_orc.snapshots z
+  on z.snapshot_id = q.snapshot_id
+---- CATCH
+NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.history' refers to a metadata table which is currently not supported.
+---- TYPES
+STRING
+====
+---- QUERY
+# Inline query
+select x.snapshot_id
+from (select * from functional_parquet.iceberg_alltypes_part_orc.history) x;
+---- CATCH
+NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.history' refers to a metadata table which is currently not supported.
+---- TYPES
+STRING
+====
+---- QUERY
+# Complext type
+select *, a.partition_summaries.pos from functional_parquet.iceberg_alltypes_part_orc.manifests a, a.partition_summaries
+---- CATCH
+NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.manifests' refers to a metadata table which is currently not supported.
+---- TYPES
+STRING
+====
+---- QUERY
+# Using complex type 'map' column without a join
+select summary from functional_parquet.iceberg_alltypes_part_orc.snapshots;
+---- CATCH
+NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.snapshots' refers to a metadata table which is currently not supported.
+---- TYPES
+STRING
+====

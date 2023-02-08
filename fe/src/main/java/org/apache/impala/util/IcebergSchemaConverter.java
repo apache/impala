@@ -31,7 +31,6 @@ import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
-import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TColumn;
@@ -56,7 +55,7 @@ public class IcebergSchemaConverter {
    * Transform iceberg type to impala type
    */
   public static Type toImpalaType(org.apache.iceberg.types.Type t)
-      throws TableLoadingException {
+      throws ImpalaRuntimeException {
     switch (t.typeId()) {
       case BOOLEAN:
         return Type.BOOLEAN;
@@ -101,7 +100,7 @@ public class IcebergSchemaConverter {
         return new StructType(structFields);
       }
       default:
-        throw new TableLoadingException(String.format(
+        throw new ImpalaRuntimeException(String.format(
             "Iceberg type '%s' is not supported in Impala", t.typeId()));
     }
   }
@@ -110,7 +109,7 @@ public class IcebergSchemaConverter {
    * Converts Iceberg schema to a Hive schema.
    */
   public static List<FieldSchema> convertToHiveSchema(Schema schema)
-      throws TableLoadingException {
+      throws ImpalaRuntimeException {
     List<FieldSchema> ret = new ArrayList<>();
     for (Types.NestedField column : schema.columns()) {
       Type colType = toImpalaType(column.type());
@@ -125,7 +124,7 @@ public class IcebergSchemaConverter {
    * Converts Iceberg schema to an Impala schema.
    */
   public static List<Column> convertToImpalaSchema(Schema schema)
-      throws TableLoadingException {
+      throws ImpalaRuntimeException {
     List<Column> ret = new ArrayList<>();
     int pos = 0;
     for (Types.NestedField column : schema.columns()) {

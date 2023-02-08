@@ -25,6 +25,7 @@ import java.util.List;
 
 import org.apache.impala.analysis.TableRef.ZippingUnnestType;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.util.AcidUtils;
 
@@ -83,6 +84,9 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
     boolean hasJoiningUnnest = false;
     for (int i = 0; i < tableRefs_.size(); ++i) {
       TableRef tblRef = tableRefs_.get(i);
+      if (IcebergMetadataTable.isIcebergMetadataTable(tblRef.getPath())) {
+        analyzer.addMetadataVirtualTable(tblRef.getPath());
+      }
       tblRef = analyzer.resolveTableRef(tblRef);
       tableRefs_.set(i, Preconditions.checkNotNull(tblRef));
       tblRef.setLeftTblRef(leftTblRef);

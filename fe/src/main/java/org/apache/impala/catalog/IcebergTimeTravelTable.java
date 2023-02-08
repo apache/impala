@@ -34,6 +34,7 @@ import org.apache.impala.analysis.TableName;
 import org.apache.impala.analysis.TimeTravelSpec;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumnDescriptor;
 import org.apache.impala.thrift.TCompressionCodec;
@@ -119,7 +120,7 @@ public class IcebergTimeTravelTable
       for (Column col : IcebergSchemaConverter.convertToImpalaSchema(icebergSchema)) {
         addColumn(col);
       }
-    } catch (TableLoadingException e) {
+    } catch (ImpalaRuntimeException e) {
       throw new AnalysisException("Could not create iceberg schema.", e);
     }
   }

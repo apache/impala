@@ -29,6 +29,7 @@ import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.VirtualColumn;
+import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.thrift.TVirtualColumnType;
 import org.apache.impala.util.AcidUtils;
 
@@ -336,6 +337,9 @@ public class Path {
    * a.b -> [<sessionDb>.a, a.b]
    * a.b.c -> [<sessionDb>.a, a.b]
    * a.b.c... -> [<sessionDb>.a, a.b]
+   *
+   * Notes on Iceberg tables:
+   * a.b.c -> translates to metadata table querying
    */
   public static List<TableName> getCandidateTables(List<String> path, String sessionDb) {
     Preconditions.checkArgument(path != null && !path.isEmpty());
@@ -344,7 +348,11 @@ public class Path {
     for (int tblNameIdx = 0; tblNameIdx < end; ++tblNameIdx) {
       String dbName = (tblNameIdx == 0) ? sessionDb : path.get(0);
       String tblName = path.get(tblNameIdx);
-      result.add(new TableName(dbName, tblName));
+      String vTblName = null;
+      if (IcebergMetadataTable.isIcebergMetadataTable(path)) {
+        vTblName = path.get(2);
+      }
+      result.add(new TableName(dbName, tblName, vTblName));
     }
     return result;
   }

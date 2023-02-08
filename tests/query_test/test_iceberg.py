@@ -1136,3 +1136,7 @@ class TestIcebergV2Table(IcebergTestSuite):
   def test_table_sampling_v2(self, vector):
     self.run_test_case('QueryTest/iceberg-tablesample-v2', vector,
         use_db="functional_parquet")
+
+  def test_metadata_tables(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-metadata-tables', vector,
+        use_db="functional_parquet")

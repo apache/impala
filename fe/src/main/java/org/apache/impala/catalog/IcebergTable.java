@@ -33,6 +33,7 @@ import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.IcebergPartitionTransform;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
@@ -405,10 +406,15 @@ public class IcebergTable extends Table implements FeIcebergTable {
    */
   private void loadSchema() throws TableLoadingException {
     clearColumns();
-    msTable_.getSd().setCols(IcebergSchemaConverter.convertToHiveSchema(
-        getIcebergSchema()));
-    for (Column col : IcebergSchemaConverter.convertToImpalaSchema(getIcebergSchema())) {
-      addColumn(col);
+    try {
+      msTable_.getSd().setCols(IcebergSchemaConverter.convertToHiveSchema(
+          getIcebergSchema()));
+      for (Column col : IcebergSchemaConverter.convertToImpalaSchema(
+          getIcebergSchema())) {
+        addColumn(col);
+      }
+    } catch (ImpalaRuntimeException e) {
+      throw new TableLoadingException(e.getMessage(), e);
     }
   }
 
