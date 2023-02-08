@@ -153,6 +153,7 @@ public class TableLoader {
         MetastoreEventsProcessor.syncToLatestEventId(catalog_, table,
             catalog_.getEventFactoryForSyncToLatestEvent(), metrics_);
       }
+      table.setLastRefreshEventId(latestEventId);
     } catch (TableLoadingException e) {
       table = IncompleteTable.createFailedMetadataLoadTable(db, tblName, e);
     } catch (NoSuchObjectException e) {

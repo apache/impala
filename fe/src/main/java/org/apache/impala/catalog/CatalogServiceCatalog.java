@@ -2567,6 +2567,13 @@ public class CatalogServiceCatalog extends Catalog {
       }
       tbl.setCatalogVersion(newCatalogVersion);
       LOG.info(String.format("Refreshed table metadata: %s", tbl.getFullName()));
+      // Set the last refresh event id as current HMS event id since all the metadata
+      // until the current HMS event id is refreshed at this point.
+      if (currentHmsEventId > eventId) {
+        tbl.setLastRefreshEventId(currentHmsEventId);
+      } else {
+        tbl.setLastRefreshEventId(eventId);
+      }
       return tbl.toTCatalogObject(resultType);
     } finally {
       context.stop();
@@ -3837,4 +3844,18 @@ public class CatalogServiceCatalog extends Catalog {
     return syncToLatestEventFactory_;
   }
 
+  public boolean isPartitionLoadedAfterEvent(String dbName, String tableName,
+      Partition msPartition, long eventId) {
+    try {
+      HdfsPartition hdfsPartition = getHdfsPartition(dbName, tableName, msPartition);
+      if (hdfsPartition.getLastRefreshEventId() > eventId) {
+        return true;
+      }
+    } catch (CatalogException ex) {
+      LOG.warn("Encountered an exception while the partition's last refresh event id: "
+          + dbName + "." + tableName + ". Ignoring further processing and try to " +
+          "reload the partition.", ex);
+    }
+    return false;
+  }
 }

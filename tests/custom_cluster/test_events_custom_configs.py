@@ -18,6 +18,9 @@ from __future__ import print_function
 import logging
 import pytest
 
+
+from hive_metastore.ttypes import FireEventRequest
+from hive_metastore.ttypes import FireEventRequestData
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS
@@ -227,8 +230,10 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     self.__run_self_events_test(unique_database, True)
     self.__run_self_events_test(unique_database, False)
 
-  @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=1"
-                                                  " --enable_reload_events=true")
+  @CustomClusterTestSuite.with_args(
+      catalogd_args="--hms_event_polling_interval_s=5"
+                    " --enable_reload_events=true"
+                    " --enable_sync_to_latest_event_on_ddls=true")
   def test_refresh_invalidate_events(self, unique_database):
     """Test is to verify Impala-11808, refresh/invalidate commands should generate a
     Reload event in HMS and CatalogD's event processor should process this event.
@@ -265,6 +270,31 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     check_self_events("refresh {}.{} partition(year=2022)"
         .format(unique_database, test_reload_table))
     check_self_events("refresh {}.{}".format(unique_database, test_reload_table))
+    EventProcessorUtils.wait_for_event_processing(self)
+
+    # Test to verify if older events are being skipped in event processor
+    data = FireEventRequestData()
+    data.refreshEvent = True
+    req = FireEventRequest(True, data)
+    req.dbName = unique_database
+    req.tableName = test_reload_table
+    # table level reload events
+    tbl_events_skipped_before = EventProcessorUtils.get_num_skipped_events()
+    for i in range(10):
+      self.hive_client.fire_listener_event(req)
+    EventProcessorUtils.wait_for_event_processing(self)
+    tbl_events_skipped_after = EventProcessorUtils.get_num_skipped_events()
+    assert tbl_events_skipped_after > tbl_events_skipped_before
+    # partition level reload events
+    EventProcessorUtils.wait_for_event_processing(self)
+    part_events_skipped_before = EventProcessorUtils.get_num_skipped_events()
+    req.partitionVals = ["2022"]
+    for i in range(10):
+      self.hive_client.fire_listener_event(req)
+    EventProcessorUtils.wait_for_event_processing(self)
+    part_events_skipped_after = EventProcessorUtils.get_num_skipped_events()
+    assert part_events_skipped_after > part_events_skipped_before
+
 
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=1")
   def test_commit_compaction_events(self, unique_database):

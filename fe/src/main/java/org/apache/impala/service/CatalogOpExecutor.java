@@ -6435,8 +6435,8 @@ public class CatalogOpExecutor {
       }
 
       if (BackendConfig.INSTANCE.enableReloadEvents()) {
-        // fire event for refresh event
-        fireReloadEventHelper(req, updatedThriftTable, tblName, tbl);
+        // fire event for refresh event and update the last refresh event id
+        fireReloadEventAndUpdateRefreshEventId(req, updatedThriftTable, tblName, tbl);
       }
 
       // Return the TCatalogObject in the result to indicate this request can be
@@ -6480,12 +6480,13 @@ public class CatalogOpExecutor {
   /**
    * Helper class for refresh event.
    * This class invokes metastore shim's fireReloadEvent to fire event to HMS
+   * and update the last refresh event id in the cache
    * @param req - request object for TResetMetadataRequest.
    * @param updatedThriftTable - updated thrift table after refresh query
    * @param tblName
    * @param tbl
    */
-  private void fireReloadEventHelper(TResetMetadataRequest req,
+  private void fireReloadEventAndUpdateRefreshEventId(TResetMetadataRequest req,
       TCatalogObject updatedThriftTable, TableName tblName, Table tbl) {
     List<String> partVals = null;
     if (req.isSetPartition_spec()) {
@@ -6500,19 +6501,30 @@ public class CatalogOpExecutor {
           catalog_.getCatalogServiceId());
       tableParams.put(MetastoreEventPropertyKey.CATALOG_VERSION.getKey(),
           String.valueOf(newCatalogVersion));
-      MetastoreShim.fireReloadEventHelper(catalog_.getMetaStoreClient(),
-          req.isIs_refresh(), partVals, tblName.getDb(), tblName.getTbl(),
-          tableParams);
+      List<Long> eventIds = MetastoreShim.fireReloadEventHelper(
+          catalog_.getMetaStoreClient(), req.isIs_refresh(), partVals, tblName.getDb(),
+          tblName.getTbl(), tableParams);
       if (req.isIs_refresh()) {
         if (catalog_.tryLock(tbl, true, 600000)) {
           catalog_.addVersionsForInflightEvents(false, tbl, newCatalogVersion);
+          if (!eventIds.isEmpty()) {
+            if (req.isSetPartition_spec()) {
+              HdfsPartition partition = ((HdfsTable) tbl)
+                  .getPartitionFromThriftPartitionSpec(req.getPartition_spec());
+              HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
+              partBuilder.setLastRefreshEventId(eventIds.get(0));
+              ((HdfsTable) tbl).updatePartition(partBuilder);
+            } else {
+              tbl.setLastRefreshEventId(eventIds.get(0));
+            }
+          }
         } else {
           LOG.warn(String.format("Couldn't obtain a version lock for the table: %s. " +
               "Self events may go undetected in that case",
               tbl.getName()));
         }
       }
-    } catch (TException e) {
+    } catch (TException | CatalogException e) {
       LOG.error(String.format(HMS_RPC_ERROR_FORMAT_STR,
           "fireReloadEvent") + e.getMessage());
     } finally {

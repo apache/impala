@@ -2876,6 +2876,13 @@ public class HdfsTable extends Table implements FeFsTable {
     FsPermissionCache permissionCache = new FsPermissionCache();
     Map<HdfsPartition.Builder, HdfsPartition> partBuilderToPartitions = new HashMap<>();
     Set<HdfsPartition.Builder> partBuildersFileMetadataRefresh = new HashSet<>();
+    long latestEventId = -1L;
+    try {
+      latestEventId = client.getCurrentNotificationEventId().getEventId();
+    } catch (TException exception) {
+      LOG.warn(String.format("Unable to fetch latest event id from HMS: %s",
+          exception.getMessage()));
+    }
     for (Map.Entry<Partition, HdfsPartition> entry : hmsPartsToHdfsParts.entrySet()) {
       Partition hmsPartition = entry.getKey();
       HdfsPartition oldPartition = entry.getValue();
@@ -2887,6 +2894,7 @@ public class HdfsTable extends Table implements FeFsTable {
       if (oldPartition != null) {
         partBuilder.setFileDescriptors(oldPartition);
       }
+      partBuilder.setLastRefreshEventId(latestEventId);
       switch (fileMetadataLoadOpts) {
         case FORCE_LOAD:
           partBuildersFileMetadataRefresh.add(partBuilder);

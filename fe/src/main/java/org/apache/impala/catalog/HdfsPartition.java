@@ -746,6 +746,10 @@ public class HdfsPartition extends CatalogObjectImpl
   // -1 means there is no previous compaction event or compaction is not supported
   private final long lastCompactionId_;
 
+  // The last refresh event id of the partition
+  // -1 means there is no previous refresh event happened
+  private final long lastRefreshEventId_;
+
   /**
    * Constructor.  Needed for third party extensions that want to use their own builder
    * to construct the object.
@@ -765,7 +769,8 @@ public class HdfsPartition extends CatalogObjectImpl
         encodedInsertFileDescriptors, encodedDeleteFileDescriptors, location,
         isMarkedCached, accessLevel, hmsParameters, cachedMsPartitionDescriptor,
         partitionStats, hasIncrementalStats, numRows, writeId,
-        inFlightEvents, /*createEventId=*/-1L, /*lastCompactionId*/-1L);
+        inFlightEvents, /*createEventId=*/-1L, /*lastCompactionId*/-1L,
+        /*lastRefreshEventId*/-1L);
   }
 
   protected HdfsPartition(HdfsTable table, long id, long prevId, String partName,
@@ -777,7 +782,8 @@ public class HdfsPartition extends CatalogObjectImpl
       boolean isMarkedCached, TAccessLevel accessLevel, Map<String, String> hmsParameters,
       CachedHmsPartitionDescriptor cachedMsPartitionDescriptor,
       byte[] partitionStats, boolean hasIncrementalStats, long numRows, long writeId,
-      InFlightEvents inFlightEvents, long createEventId, long lastCompactionId) {
+      InFlightEvents inFlightEvents, long createEventId, long lastCompactionId,
+      long lastRefreshEventId) {
     table_ = table;
     id_ = id;
     prevId_ = prevId;
@@ -798,6 +804,7 @@ public class HdfsPartition extends CatalogObjectImpl
     inFlightEvents_ = inFlightEvents;
     createEventId_ = createEventId;
     lastCompactionId_ = lastCompactionId;
+    lastRefreshEventId_ = lastRefreshEventId;
     if (partName == null && id_ != CatalogObjectsConstants.PROTOTYPE_PARTITION_ID) {
       partName_ = FeCatalogUtils.getPartitionName(this);
     } else {
@@ -806,6 +813,8 @@ public class HdfsPartition extends CatalogObjectImpl
   }
 
   public long getCreateEventId() { return createEventId_; }
+
+  public long getLastRefreshEventId() { return lastRefreshEventId_; }
 
   @Override // FeFsPartition
   public HdfsStorageDescriptor getInputFormatDescriptor() {
@@ -1251,6 +1260,7 @@ public class HdfsPartition extends CatalogObjectImpl
     // is not active.
     private long createEventId_ = -1L;
     private long lastCompactionId_ = -1L;
+    private long lastRefreshEventId_ = -1L;
     private InFlightEvents inFlightEvents_ = new InFlightEvents();
 
     @Nullable
@@ -1318,7 +1328,7 @@ public class HdfsPartition extends CatalogObjectImpl
           encodedDeleteFileDescriptors_, location_, isMarkedCached_, accessLevel_,
           hmsParameters_, cachedMsPartitionDescriptor_, partitionStats_,
           hasIncrementalStats_, numRows_, writeId_, inFlightEvents_, createEventId_,
-          lastCompactionId_);
+          lastCompactionId_, lastRefreshEventId_);
     }
 
     public Builder setId(long id) {
@@ -1328,6 +1338,11 @@ public class HdfsPartition extends CatalogObjectImpl
 
     public Builder setCreateEventId(long eventId) {
       createEventId_ = eventId;
+      return this;
+    }
+
+    public Builder setLastRefreshEventId(long eventId) {
+      lastRefreshEventId_ = eventId;
       return this;
     }
 

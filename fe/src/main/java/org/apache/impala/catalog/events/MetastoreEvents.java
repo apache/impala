@@ -2456,6 +2456,9 @@ public class MetastoreEvents {
 
     // if isRefresh_ is set to true then it is refresh query, else it is invalidate query
     private boolean isRefresh_;
+
+    private org.apache.impala.catalog.Table tbl_;
+
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
      */
@@ -2471,6 +2474,7 @@ public class MetastoreEvents {
             updatedFields.get("table"));
         reloadPartition_ = (Partition)updatedFields.get("partition");
         isRefresh_ = (boolean)updatedFields.get("isRefresh");
+        tbl_ = catalog_.getTable(dbName_, tblName_);
       } catch (Exception e) {
         throw new MetastoreNotificationException(debugString("Unable to "
                 + "parse reload message"), e);
@@ -2494,7 +2498,7 @@ public class MetastoreEvents {
 
     @Override
     public void process() throws MetastoreNotificationException {
-      if (isSelfEvent()) {
+      if (isSelfEvent() || isOlderEvent()) {
         metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
             .inc(getNumberOfEvents());
         infoLog("Incremented events skipped counter to {}",
@@ -2512,6 +2516,19 @@ public class MetastoreEvents {
       } else {
         processTableInvalidate();
       }
+    }
+
+    private boolean isOlderEvent() {
+      if (tbl_ instanceof IncompleteTable) {
+        return false;
+      }
+      // Always check the lastRefreshEventId on the table first for table level refresh
+      if (tbl_.getLastRefreshEventId() > getEventId() || (reloadPartition_ != null &&
+          catalog_.isPartitionLoadedAfterEvent(dbName_, tblName_, reloadPartition_,
+              getEventId()))) {
+        return true;
+      }
+      return false;
     }
 
     /**
