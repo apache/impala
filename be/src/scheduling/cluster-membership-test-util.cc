@@ -46,7 +46,8 @@ string HostIdxToIpAddr(int host_idx) {
 }
 
 BackendDescriptorPB MakeBackendDescriptor(
-    int idx, const ExecutorGroupDescPB& group_desc, int port_offset) {
+    int idx, const ExecutorGroupDescPB& group_desc, int port_offset,
+    int64_t admit_mem_limit) {
   BackendDescriptorPB be_desc;
   UUIDToUniqueIdPB(boost::uuids::random_generator()(), be_desc.mutable_backend_id());
   be_desc.mutable_address()->set_hostname(HostIdxToHostname(idx));
@@ -58,23 +59,25 @@ BackendDescriptorPB MakeBackendDescriptor(
   be_desc.set_is_coordinator(true);
   be_desc.set_is_executor(true);
   be_desc.set_is_quiescing(false);
+  be_desc.set_admit_mem_limit(admit_mem_limit);
   *be_desc.add_executor_groups() = group_desc;
   return be_desc;
 }
 
 BackendDescriptorPB MakeBackendDescriptor(
-    int idx, const ExecutorGroup& group, int port_offset) {
+    int idx, const ExecutorGroup& group, int port_offset, int64_t admit_mem_limit) {
   ExecutorGroupDescPB group_desc;
   group_desc.set_name(group.name());
   group_desc.set_min_size(group.min_size());
-  return MakeBackendDescriptor(idx, group_desc, port_offset);
+  return MakeBackendDescriptor(idx, group_desc, port_offset, admit_mem_limit);
 }
 
-BackendDescriptorPB MakeBackendDescriptor(int idx, int port_offset) {
+BackendDescriptorPB MakeBackendDescriptor(int idx, int port_offset,
+    int64_t admit_mem_limit) {
   ExecutorGroupDescPB group_desc;
   group_desc.set_name(ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME);
   group_desc.set_min_size(1);
-  return MakeBackendDescriptor(idx, group_desc, port_offset);
+  return MakeBackendDescriptor(idx, group_desc, port_offset, admit_mem_limit);
 }
 
 }  // end namespace test

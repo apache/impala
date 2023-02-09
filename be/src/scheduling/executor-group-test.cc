@@ -30,8 +30,14 @@ using namespace impala::test;
 /// Test adding multiple backends on different hosts.
 TEST(ExecutorGroupTest, AddExecutors) {
   ExecutorGroup group1("group1");
-  group1.AddExecutor(MakeBackendDescriptor(1, group1));
-  group1.AddExecutor(MakeBackendDescriptor(2, group1));
+  ASSERT_EQ(0, group1.GetPerExecutorMemLimitForAdmission());
+  int64_t mem_limit_admission1 = 100L * MEGABYTE;
+  group1.AddExecutor(MakeBackendDescriptor(1, group1, /* port_offset=*/0,
+      mem_limit_admission1));
+  int64_t mem_limit_admission2 = 120L * MEGABYTE;
+  group1.AddExecutor(MakeBackendDescriptor(2, group1, /* port_offset=*/0,
+      mem_limit_admission2));
+  ASSERT_EQ(mem_limit_admission1, group1.GetPerExecutorMemLimitForAdmission());
   ASSERT_EQ(2, group1.NumExecutors());
   IpAddr backend_ip;
   ASSERT_TRUE(group1.LookUpExecutorIp("host_1", &backend_ip));
@@ -43,8 +49,13 @@ TEST(ExecutorGroupTest, AddExecutors) {
 /// Test adding multiple backends on the same host.
 TEST(ExecutorGroupTest, MultipleExecutorsOnSameHost) {
   ExecutorGroup group1("group1");
-  group1.AddExecutor(MakeBackendDescriptor(1, group1, /* port_offset=*/0));
-  group1.AddExecutor(MakeBackendDescriptor(1, group1, /* port_offset=*/1));
+  int64_t mem_limit_admission1 = 120L * MEGABYTE;
+  group1.AddExecutor(MakeBackendDescriptor(1, group1, /* port_offset=*/0,
+      mem_limit_admission1));
+  int64_t mem_limit_admission2 = 100L * MEGABYTE;
+  group1.AddExecutor(MakeBackendDescriptor(1, group1, /* port_offset=*/1,
+      mem_limit_admission2));
+  ASSERT_EQ(mem_limit_admission2, group1.GetPerExecutorMemLimitForAdmission());
   IpAddr backend_ip;
   ASSERT_TRUE(group1.LookUpExecutorIp("host_1", &backend_ip));
   EXPECT_EQ("10.0.0.1", backend_ip);
@@ -55,9 +66,17 @@ TEST(ExecutorGroupTest, MultipleExecutorsOnSameHost) {
 /// Test removing a backend.
 TEST(ExecutorGroupTest, RemoveExecutor) {
   ExecutorGroup group1("group1");
-  group1.AddExecutor(MakeBackendDescriptor(1, group1));
-  group1.AddExecutor(MakeBackendDescriptor(2, group1));
-  group1.RemoveExecutor(MakeBackendDescriptor(2, group1));
+  int64_t mem_limit_admission1 = 120L * MEGABYTE;
+  const BackendDescriptorPB& executor1 = MakeBackendDescriptor(1, group1,
+      /* port_offset=*/0, mem_limit_admission1);
+  group1.AddExecutor(executor1);
+  int64_t mem_limit_admission2 = 100L * MEGABYTE;
+  const BackendDescriptorPB& executor2 = MakeBackendDescriptor(2, group1,
+      /* port_offset=*/0, mem_limit_admission2);
+  group1.AddExecutor(executor2);
+  ASSERT_EQ(mem_limit_admission2, group1.GetPerExecutorMemLimitForAdmission());
+  group1.RemoveExecutor(executor2);
+  ASSERT_EQ(mem_limit_admission1, group1.GetPerExecutorMemLimitForAdmission());
   IpAddr backend_ip;
   ASSERT_TRUE(group1.LookUpExecutorIp("host_1", &backend_ip));
   EXPECT_EQ("10.0.0.1", backend_ip);
@@ -67,14 +86,24 @@ TEST(ExecutorGroupTest, RemoveExecutor) {
 /// Test removing one of multiple backends on the same host (IMPALA-3944).
 TEST(ExecutorGroupTest, RemoveExecutorOnSameHost) {
   ExecutorGroup group1("group1");
-  group1.AddExecutor(MakeBackendDescriptor(1, group1, /* port_offset=*/0));
-  group1.AddExecutor(MakeBackendDescriptor(1, group1, /* port_offset=*/1));
-  group1.RemoveExecutor(MakeBackendDescriptor(1, group1, /* port_offset=*/1));
+  int64_t mem_limit_admission1 = 100L * MEGABYTE;
+  const BackendDescriptorPB& executor1 = MakeBackendDescriptor(1, group1,
+      /* port_offset=*/0, mem_limit_admission1);
+  group1.AddExecutor(executor1);
+  int64_t mem_limit_admission2 = 120L * MEGABYTE;
+  const BackendDescriptorPB& executor2 = MakeBackendDescriptor(1, group1,
+      /* port_offset=*/1, mem_limit_admission2);
+  group1.AddExecutor(executor2);
+  ASSERT_EQ(mem_limit_admission1, group1.GetPerExecutorMemLimitForAdmission());
+  group1.RemoveExecutor(executor2);
+  ASSERT_EQ(mem_limit_admission1, group1.GetPerExecutorMemLimitForAdmission());
   IpAddr backend_ip;
   ASSERT_TRUE(group1.LookUpExecutorIp("host_1", &backend_ip));
   EXPECT_EQ("10.0.0.1", backend_ip);
   const ExecutorGroup::Executors& backend_list = group1.GetExecutorsForHost("10.0.0.1");
   EXPECT_EQ(1, backend_list.size());
+  group1.RemoveExecutor(executor1);
+  ASSERT_EQ(0, group1.GetPerExecutorMemLimitForAdmission());
 }
 
 /// Test that exercises the size-based group health check.

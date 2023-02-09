@@ -60,6 +60,15 @@ DEFINE_int64_hidden(admission_control_stale_topic_threshold_ms, 5 * 1000,
     "capture most cases where the Impala daemon is disconnected from the statestore "
     "or topic updates are seriously delayed.");
 
+DEFINE_bool(clamp_query_mem_limit_backend_mem_limit, true, "Caps query memory limit to "
+    "memory limit for admission on the backends. The coordinator memory limit is capped "
+    "to the coordinator backend's memory limit, while executor memory limit is capped to "
+    "the effective or minimum memory limit for admission on executor backends. If the "
+    "flag is not set, a query requesting more than backend's memory limit for admission "
+    "gets rejected during admission. However, if this flag is set, such a query gets "
+    "admitted with backend's memory limit and could succeed if the memory request was "
+    "over estimated and could fail if query really needs more memory." );
+
 DECLARE_bool(is_coordinator);
 DECLARE_bool(is_executor);
 
@@ -1095,12 +1104,15 @@ bool AdmissionController::RejectForSchedule(
       max_thread_reservation =
           make_pair(&e.first, be_state.exec_params->thread_reservation());
     }
-    if (be_state.exec_params->is_coord_backend()) {
-      coord_admit_mem_limit.first = &e.first;
-      coord_admit_mem_limit.second = be_state.be_desc.admit_mem_limit();
-    } else if (be_state.be_desc.admit_mem_limit() < min_executor_admit_mem_limit.second) {
-      min_executor_admit_mem_limit.first = &e.first;
-      min_executor_admit_mem_limit.second = be_state.be_desc.admit_mem_limit();
+    if (!FLAGS_clamp_query_mem_limit_backend_mem_limit) {
+      if (be_state.exec_params->is_coord_backend()) {
+        coord_admit_mem_limit.first = &e.first;
+        coord_admit_mem_limit.second = be_state.be_desc.admit_mem_limit();
+      } else if (be_state.be_desc.admit_mem_limit() <
+            min_executor_admit_mem_limit.second) {
+        min_executor_admit_mem_limit.first = &e.first;
+        min_executor_admit_mem_limit.second = be_state.be_desc.admit_mem_limit();
+      }
     }
   }
 
@@ -1156,27 +1168,29 @@ bool AdmissionController::RejectForSchedule(
           PrintBytes(cluster_mem_to_admit), PrintBytes(max_mem));
       return true;
     }
-    int64_t executor_mem_to_admit = state.per_backend_mem_to_admit();
-    VLOG_ROW << "Checking executor mem with executor_mem_to_admit = "
-             << executor_mem_to_admit
-             << " and min_admit_mem_limit.second = "
-             << min_executor_admit_mem_limit.second;
-    if (executor_mem_to_admit > min_executor_admit_mem_limit.second) {
-      *rejection_reason =
-          Substitute(REASON_REQ_OVER_NODE_MEM, PrintBytes(executor_mem_to_admit),
-              PrintBytes(min_executor_admit_mem_limit.second),
-              NetworkAddressPBToString(*min_executor_admit_mem_limit.first));
-      return true;
-    }
-    int64_t coord_mem_to_admit = state.coord_backend_mem_to_admit();
-    VLOG_ROW << "Checking coordinator mem with coord_mem_to_admit = "
-             << coord_mem_to_admit
-             << " and coord_admit_mem_limit.second = " << coord_admit_mem_limit.second;
-    if (coord_mem_to_admit > coord_admit_mem_limit.second) {
-      *rejection_reason = Substitute(REASON_REQ_OVER_NODE_MEM,
-          PrintBytes(coord_mem_to_admit), PrintBytes(coord_admit_mem_limit.second),
-          NetworkAddressPBToString(*coord_admit_mem_limit.first));
-      return true;
+    if (!FLAGS_clamp_query_mem_limit_backend_mem_limit) {
+      int64_t executor_mem_to_admit = state.per_backend_mem_to_admit();
+      VLOG_ROW << "Checking executor mem with executor_mem_to_admit = "
+               << executor_mem_to_admit
+               << " and min_admit_mem_limit.second = "
+               << min_executor_admit_mem_limit.second;
+      if (executor_mem_to_admit > min_executor_admit_mem_limit.second) {
+        *rejection_reason =
+            Substitute(REASON_REQ_OVER_NODE_MEM, PrintBytes(executor_mem_to_admit),
+                PrintBytes(min_executor_admit_mem_limit.second),
+                NetworkAddressPBToString(*min_executor_admit_mem_limit.first));
+        return true;
+      }
+      int64_t coord_mem_to_admit = state.coord_backend_mem_to_admit();
+      VLOG_ROW << "Checking coordinator mem with coord_mem_to_admit = "
+               << coord_mem_to_admit
+               << " and coord_admit_mem_limit.second = " << coord_admit_mem_limit.second;
+      if (coord_mem_to_admit > coord_admit_mem_limit.second) {
+        *rejection_reason = Substitute(REASON_REQ_OVER_NODE_MEM,
+            PrintBytes(coord_mem_to_admit), PrintBytes(coord_admit_mem_limit.second),
+            NetworkAddressPBToString(*coord_admit_mem_limit.first));
+        return true;
+      }
     }
   }
   return false;
@@ -1899,10 +1913,22 @@ bool AdmissionController::FindGroupToAdmitOrReject(
     return true;
   }
 
+  // Get Coordinator Backend for the given admission request
+  const AdmissionRequest& request = queue_node->admission_request;
+  auto it = membership_snapshot->current_backends.find(PrintId(request.coord_id));
+  if (it == membership_snapshot->current_backends.end()) {
+    queue_node->not_admitted_reason = REASON_COORDINATOR_NOT_FOUND;
+    LOG(WARNING) << queue_node->not_admitted_reason;
+    return true;
+  }
+  const BackendDescriptorPB& coord_desc = it->second;
+
   for (GroupScheduleState& group_state : queue_node->group_states) {
     const ExecutorGroup& executor_group = group_state.executor_group;
     ScheduleState* state = group_state.state.get();
-    state->UpdateMemoryRequirements(pool_config);
+    state->UpdateMemoryRequirements(pool_config,
+        coord_desc.admit_mem_limit(),
+        executor_group.GetPerExecutorMemLimitForAdmission());
 
     const string& group_name = executor_group.name();
     int64_t group_size = executor_group.NumExecutors();

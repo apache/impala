@@ -489,7 +489,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=1,
-          pool_max_mem=10 * PROC_MEM_TEST_LIMIT, proc_mem_limit=PROC_MEM_TEST_LIMIT),
+      pool_max_mem=10 * PROC_MEM_TEST_LIMIT, proc_mem_limit=PROC_MEM_TEST_LIMIT)
+      + " -clamp_query_mem_limit_backend_mem_limit=false",
       num_exclusive_coordinators=1)
   def test_mem_limit_dedicated_coordinator(self, vector):
     """Regression test for IMPALA-8469: coordinator fragment should be admitted on
@@ -509,6 +510,32 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       assert ("Rejected query from pool default-pool: request memory needed "
               "1.10 GB is greater than memory available for admission 1.00 GB" in
               str(ex)), str(ex)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=1,
+      pool_max_mem=10 * PROC_MEM_TEST_LIMIT, proc_mem_limit=PROC_MEM_TEST_LIMIT)
+      + " -clamp_query_mem_limit_backend_mem_limit=true",
+      num_exclusive_coordinators=1,
+      cluster_size=2)
+  def test_clamp_query_mem_limit_backend_mem_limit_flag(self, vector):
+    """If a query requests more memory than backend's memory limit for admission, the
+    query gets admitted with the max memory for admission on backend."""
+    query = "select * from functional.alltypesagg limit 10"
+    exec_options = vector.get_value('exec_option')
+    # Requested mem_limit is more than the memory limit for admission on backends.
+    # mem_limit will be clamped to the mem limit for admission on backends.
+    exec_options['mem_limit'] = int(self.PROC_MEM_TEST_LIMIT * 1.1)
+    result = self.execute_query_expect_success(self.client, query, exec_options)
+    assert "Cluster Memory Admitted: 2.00 GB" in str(result.runtime_profile), \
+           str(result.runtime_profile)
+    # Request mem_limit more than memory limit for admission on executors. Executor's
+    # memory limit will be clamped to the mem limit for admission on executor.
+    exec_options['mem_limit'] = 0
+    exec_options['mem_limit_executors'] = int(self.PROC_MEM_TEST_LIMIT * 1.1)
+    result = self.execute_query_expect_success(self.client, query, exec_options)
+    assert "Cluster Memory Admitted: 1.10 GB" in str(result.runtime_profile), \
+           str(result.runtime_profile)
 
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   @pytest.mark.execute_serially
@@ -695,8 +722,9 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
   @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(max_requests=2, max_queued=1,
       pool_max_mem=10 * PROC_MEM_TEST_LIMIT,
-      queue_wait_timeout_ms=2 * STATESTORE_RPC_FREQUENCY_MS),
-      start_args="--per_impalad_args=-mem_limit=3G;-mem_limit=3G;-mem_limit=2G",
+      queue_wait_timeout_ms=2 * STATESTORE_RPC_FREQUENCY_MS)
+      + " -clamp_query_mem_limit_backend_mem_limit=false",
+      start_args="--per_impalad_args=-mem_limit=3G;-mem_limit=3G;-mem_limit=2G;",
       statestored_args=_STATESTORED_ARGS)
   def test_heterogeneous_proc_mem_limit(self, vector):
     """ Test to ensure that the admission controller takes into account the actual proc
@@ -720,14 +748,12 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     exec_options['num_nodes'] = "1"
     self.execute_query_expect_success(self.client, query, exec_options)
     # Exercise rejection checks in admission controller.
-    try:
-      exec_options = copy(vector.get_value('exec_option'))
-      exec_options['mem_limit'] = "3G"
-      self.execute_query(query, exec_options)
-    except ImpalaBeeswaxException as e:
-      assert re.search("Rejected query from pool \S+: request memory needed 3.00 GB"
-          " is greater than memory available for admission 2.00 GB of \S+", str(e)), \
-          str(e)
+    exec_options = copy(vector.get_value('exec_option'))
+    exec_options['mem_limit'] = "3G"
+    ex = self.execute_query_expect_failure(self.client, query, exec_options)
+    assert ("Rejected query from pool default-pool: request memory needed "
+            "3.00 GB is greater than memory available for admission 2.00 GB" in
+            str(ex)), str(ex)
     # Exercise queuing checks in admission controller.
     try:
       # Wait for previous queries to finish to avoid flakiness.

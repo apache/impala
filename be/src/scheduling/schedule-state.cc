@@ -25,6 +25,8 @@
 
 #include "common/names.h"
 
+DECLARE_bool(clamp_query_mem_limit_backend_mem_limit);
+
 DEFINE_bool_hidden(use_dedicated_coordinator_estimates, true,
     "Hidden option to fall back to legacy memory estimation logic for dedicated"
     " coordinators wherein the same per backend estimate is used for both coordinators "
@@ -191,7 +193,7 @@ void ScheduleState::Validate() const {
     DCHECK_GT(fragment_state.instance_states.size(), 0) << fragment_state.fragment;
   }
 
-  // Check that all backends have instances, except possibly the coordaintor backend.
+  // Check that all backends have instances, except possibly the coordinator backend.
   for (const auto& elem : per_backend_schedule_states_) {
     const BackendExecParamsPB* be_params = elem.second.exec_params;
     DCHECK(!be_params->instance_params().empty() || be_params->is_coord_backend());
@@ -256,13 +258,14 @@ bool ScheduleState::UseDedicatedCoordEstimates() const {
   return false;
 }
 
-void ScheduleState::UpdateMemoryRequirements(const TPoolConfig& pool_cfg) {
+void ScheduleState::UpdateMemoryRequirements(const TPoolConfig& pool_cfg,
+    int64_t coord_mem_limit_admission, int64_t executor_mem_limit_admission) {
   // If the min_query_mem_limit and max_query_mem_limit are not set in the pool config
   // then it falls back to traditional(old) behavior, which means that, it sets the
   // mem_limit if it is set in the query options, else sets it to -1 (no limit).
-  bool mimic_old_behaviour =
+  const bool mimic_old_behaviour =
       pool_cfg.min_query_mem_limit == 0 && pool_cfg.max_query_mem_limit == 0;
-  bool use_dedicated_coord_estimates = UseDedicatedCoordEstimates();
+  const bool use_dedicated_coord_estimates = UseDedicatedCoordEstimates();
 
   int64_t per_backend_mem_to_admit = 0;
   int64_t coord_backend_mem_to_admit = 0;
@@ -312,30 +315,33 @@ void ScheduleState::UpdateMemoryRequirements(const TPoolConfig& pool_cfg) {
     }
   }
 
-  // Cap the memory estimate at the amount of physical memory available. The user's
-  // provided value or the estimate from planning can each be unreasonable.
-  per_backend_mem_to_admit = min(per_backend_mem_to_admit, MemInfo::physical_mem());
-  coord_backend_mem_to_admit = min(coord_backend_mem_to_admit, MemInfo::physical_mem());
+  // Enforce the MEM_LIMIT_EXECUTORS query option if MEM_LIMIT is not specified.
+  const bool is_mem_limit_executors_set = query_options().__isset.mem_limit_executors
+      && query_options().mem_limit_executors > 0;
+  if (!is_mem_limit_set && is_mem_limit_executors_set) {
+    per_backend_mem_to_admit = query_options().mem_limit_executors;
+  }
 
+  // Cap the memory estimate at the backend's memory limit for admission. The user's
+  // provided value or the estimate from planning can each be unreasonable.
+  if (FLAGS_clamp_query_mem_limit_backend_mem_limit) {
+    per_backend_mem_to_admit =
+        min(per_backend_mem_to_admit, executor_mem_limit_admission);
+    coord_backend_mem_to_admit =
+        min(coord_backend_mem_to_admit, coord_mem_limit_admission);
+  }
   // If the query is only scheduled to run on the coordinator.
   if (per_backend_schedule_states_.size() == 1 && RequiresCoordinatorFragment()) {
     per_backend_mem_to_admit = 0;
   }
 
   int64_t per_backend_mem_limit;
-  if (mimic_old_behaviour && !is_mem_limit_set) {
+  if (mimic_old_behaviour && !is_mem_limit_set && !is_mem_limit_executors_set) {
     per_backend_mem_limit = -1;
     query_schedule_pb_->set_coord_backend_mem_limit(-1);
   } else {
     per_backend_mem_limit = per_backend_mem_to_admit;
     query_schedule_pb_->set_coord_backend_mem_limit(coord_backend_mem_to_admit);
-  }
-
-  // Finally, enforce the MEM_LIMIT_EXECUTORS query option if MEM_LIMIT is not specified.
-  if (!is_mem_limit_set && query_options().__isset.mem_limit_executors
-      && query_options().mem_limit_executors > 0) {
-    per_backend_mem_to_admit = query_options().mem_limit_executors;
-    per_backend_mem_limit = per_backend_mem_to_admit;
   }
 
   query_schedule_pb_->set_coord_backend_mem_to_admit(coord_backend_mem_to_admit);

@@ -24,6 +24,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/test-env.h"
+#include "scheduling/cluster-membership-test-util.h"
 #include "scheduling/schedule-state.h"
 #include "service/impala-server.h"
 #include "testutil/gtest-util.h"
@@ -33,8 +34,10 @@
 // Access the flags that are defined in RequestPoolService.
 DECLARE_string(fair_scheduler_allocation_path);
 DECLARE_string(llama_site_path);
+DECLARE_bool(clamp_query_mem_limit_backend_mem_limit);
 
 namespace impala {
+using namespace impala::test;
 
 static const string IMPALA_HOME(getenv("IMPALA_HOME"));
 
@@ -50,9 +53,6 @@ static const string HOST_0 = "host0:25000";
 static const string HOST_1 = "host1:25000";
 static const string HOST_2 = "host2:25000";
 
-static const int64_t MEGABYTE = 1024L * 1024L;
-static const int64_t GIGABYTE = 1024L * MEGABYTE;
-
 // The default version of the heavy memory query list.
 static std::vector<THeavyMemoryQuery> empty_heavy_memory_query_list;
 
@@ -63,6 +63,8 @@ static std::vector<THeavyMemoryQuery> empty_heavy_memory_query_list;
 /// taking the admission_ctrl_lock_ lock.
 class AdmissionControllerTest : public testing::Test {
  protected:
+  typedef std::pair<ExecutorGroup, BackendDescriptorPB> ExecutorGroupCoordinatorPair;
+
   boost::scoped_ptr<TestEnv> test_env_;
 
   // Pool for objects to be destroyed during test teardown.
@@ -104,7 +106,10 @@ class AdmissionControllerTest : public testing::Test {
         pool_.Add(new ScheduleState(*query_id, *request, *query_options, profile, true));
     schedule_state->set_executor_group(executor_group);
     SetHostsInScheduleState(*schedule_state, num_hosts, is_dedicated_coord);
-    schedule_state->UpdateMemoryRequirements(config);
+    ExecutorGroupCoordinatorPair group = MakeExecutorConfig(*schedule_state);
+    schedule_state->UpdateMemoryRequirements(config,
+        group.second.admit_mem_limit(),
+        group.first.GetPerExecutorMemLimitForAdmission());
     return schedule_state;
   }
 
@@ -116,6 +121,27 @@ class AdmissionControllerTest : public testing::Test {
         per_host_mem_estimate, per_host_mem_estimate, false, executor_group);
   }
 
+  /// Create ExecutorGroup and BackendDescriptor for Coordinator for the given
+  /// ScheduleState.
+  ExecutorGroupCoordinatorPair MakeExecutorConfig(const ScheduleState& schedule_state) {
+    BackendDescriptorPB coord_desc;
+    ExecutorGroup exec_group(schedule_state.executor_group());
+    const PerBackendScheduleStates& per_backend_schedule_states =
+        schedule_state.per_backend_schedule_states();
+    bool has_coord_backend = false;
+    for (const auto& itr : per_backend_schedule_states) {
+      if (itr.second.exec_params->is_coord_backend()) {
+        coord_desc = itr.second.be_desc;
+        has_coord_backend = true;
+      }
+      if (itr.second.be_desc.is_executor()) {
+        exec_group.AddExecutor(itr.second.be_desc);
+      }
+    }
+    DCHECK(has_coord_backend) << "Query schedule must have a coordinator backend";
+    return std::make_pair(exec_group, coord_desc);
+  }
+
   /// Replace the per-backend hosts in the schedule with one having 'count' hosts.
   /// Note: no FInstanceExecParams are added so
   /// ScheduleState::UseDedicatedCoordEstimates() would consider this schedule as not
@@ -123,7 +149,7 @@ class AdmissionControllerTest : public testing::Test {
   /// if a dedicated coordinator backend exists.
   void SetHostsInScheduleState(ScheduleState& schedule_state, const int count,
       bool is_dedicated_coord, int64_t min_mem_reservation_bytes = 0,
-      int64_t admit_mem_limit = 200L * MEGABYTE, int slots_to_use = 1,
+      int64_t admit_mem_limit = 4096L * MEGABYTE, int slots_to_use = 1,
       int slots_available = 8) {
     schedule_state.ClearBackendScheduleStates();
     for (int i = 0; i < count; ++i) {
@@ -137,6 +163,7 @@ class AdmissionControllerTest : public testing::Test {
       backend_schedule_state.be_desc.set_admit_mem_limit(admit_mem_limit);
       backend_schedule_state.be_desc.set_admission_slots(slots_available);
       backend_schedule_state.be_desc.set_is_executor(true);
+      backend_schedule_state.be_desc.set_ip_address(test::HostIdxToIpAddr(i));
       *backend_schedule_state.be_desc.mutable_address() = host_addr;
       if (i == 0) {
         // Add first element as the coordinator.
@@ -324,7 +351,10 @@ TEST_F(AdmissionControllerTest, Simple) {
 
   // Create a ScheduleState to run on QUEUE_C.
   ScheduleState* schedule_state = MakeScheduleState(QUEUE_C, config_c, 1, 64L * MEGABYTE);
-  schedule_state->UpdateMemoryRequirements(config_c);
+  ExecutorGroupCoordinatorPair group = MakeExecutorConfig(*schedule_state);
+  schedule_state->UpdateMemoryRequirements(config_c,
+      group.second.admit_mem_limit(),
+      group.first.GetPerExecutorMemLimitForAdmission());
 
   // Check that the AdmissionController initially has no data about other hosts.
   ASSERT_EQ(0, admission_controller->host_stats_.size());
@@ -779,7 +809,10 @@ TEST_F(AdmissionControllerTest, DedicatedCoordScheduleState) {
   // For query only running on the coordinator, the per_backend_mem_to_admit should be 0.
   ScheduleState* schedule_state = MakeScheduleState(
       "default", 0, pool_config, 1, PER_EXEC_MEM_ESTIMATE, COORD_MEM_ESTIMATE, true);
-  schedule_state->UpdateMemoryRequirements(pool_config);
+  ExecutorGroupCoordinatorPair group = MakeExecutorConfig(*schedule_state);
+  schedule_state->UpdateMemoryRequirements(pool_config,
+      group.second.admit_mem_limit(),
+      group.first.GetPerExecutorMemLimitForAdmission());
   ASSERT_EQ(0, schedule_state->per_backend_mem_to_admit());
   ASSERT_EQ(COORD_MEM_ESTIMATE, schedule_state->coord_backend_mem_to_admit());
 
@@ -789,7 +822,10 @@ TEST_F(AdmissionControllerTest, DedicatedCoordScheduleState) {
       "default", 0, pool_config, 2, PER_EXEC_MEM_ESTIMATE, COORD_MEM_ESTIMATE, true);
   ASSERT_EQ(COORD_MEM_ESTIMATE, schedule_state->GetDedicatedCoordMemoryEstimate());
   ASSERT_EQ(PER_EXEC_MEM_ESTIMATE, schedule_state->GetPerExecutorMemoryEstimate());
-  schedule_state->UpdateMemoryRequirements(pool_config);
+  ExecutorGroupCoordinatorPair group1 = MakeExecutorConfig(*schedule_state);
+  schedule_state->UpdateMemoryRequirements(pool_config,
+      group1.second.admit_mem_limit(),
+      group1.first.GetPerExecutorMemLimitForAdmission());
   ASSERT_EQ(PER_EXEC_MEM_ESTIMATE, schedule_state->per_backend_mem_to_admit());
   ASSERT_EQ(COORD_MEM_ESTIMATE, schedule_state->coord_backend_mem_to_admit());
   ASSERT_EQ(-1, schedule_state->per_backend_mem_limit());
@@ -803,7 +839,10 @@ TEST_F(AdmissionControllerTest, DedicatedCoordScheduleState) {
       "default", 0, pool_config, 2, PER_EXEC_MEM_ESTIMATE, COORD_MEM_ESTIMATE, true);
   ASSERT_OK(request_pool_service->GetPoolConfig("default", &pool_config));
   pool_config.__set_min_query_mem_limit(700 * MEGABYTE);
-  schedule_state->UpdateMemoryRequirements(pool_config);
+  ExecutorGroupCoordinatorPair group2 = MakeExecutorConfig(*schedule_state);
+  schedule_state->UpdateMemoryRequirements(pool_config,
+      group2.second.admit_mem_limit(),
+      group2.first.GetPerExecutorMemLimitForAdmission());
   ASSERT_EQ(700 * MEGABYTE, schedule_state->per_backend_mem_to_admit());
   ASSERT_EQ(COORD_MEM_ESTIMATE, schedule_state->coord_backend_mem_to_admit());
   ASSERT_EQ(700 * MEGABYTE, schedule_state->per_backend_mem_limit());
@@ -818,7 +857,10 @@ TEST_F(AdmissionControllerTest, DedicatedCoordScheduleState) {
       ReservationUtil::GetMinMemLimitFromReservation(coord_min_reservation);
   pool_config.__set_min_query_mem_limit(700 * MEGABYTE);
   schedule_state->set_coord_min_reservation(200 * MEGABYTE);
-  schedule_state->UpdateMemoryRequirements(pool_config);
+  ExecutorGroupCoordinatorPair group3 = MakeExecutorConfig(*schedule_state);
+  schedule_state->UpdateMemoryRequirements(pool_config,
+      group3.second.admit_mem_limit(),
+      group3.first.GetPerExecutorMemLimitForAdmission());
   ASSERT_EQ(700 * MEGABYTE, schedule_state->per_backend_mem_to_admit());
   ASSERT_EQ(min_coord_mem_limit_required, schedule_state->coord_backend_mem_to_admit());
   ASSERT_EQ(700 * MEGABYTE, schedule_state->per_backend_mem_limit());
@@ -828,7 +870,10 @@ TEST_F(AdmissionControllerTest, DedicatedCoordScheduleState) {
   ASSERT_OK(request_pool_service->GetPoolConfig("default", &pool_config));
   schedule_state = MakeScheduleState("default", GIGABYTE, pool_config, 2,
       PER_EXEC_MEM_ESTIMATE, COORD_MEM_ESTIMATE, true);
-  schedule_state->UpdateMemoryRequirements(pool_config);
+  ExecutorGroupCoordinatorPair group4 = MakeExecutorConfig(*schedule_state);
+  schedule_state->UpdateMemoryRequirements(pool_config,
+      group4.second.admit_mem_limit(),
+      group4.first.GetPerExecutorMemLimitForAdmission());
   ASSERT_EQ(GIGABYTE, schedule_state->per_backend_mem_to_admit());
   ASSERT_EQ(GIGABYTE, schedule_state->coord_backend_mem_to_admit());
   ASSERT_EQ(GIGABYTE, schedule_state->per_backend_mem_limit());
@@ -840,7 +885,10 @@ TEST_F(AdmissionControllerTest, DedicatedCoordScheduleState) {
       PER_EXEC_MEM_ESTIMATE, COORD_MEM_ESTIMATE, true);
   ASSERT_OK(request_pool_service->GetPoolConfig("default", &pool_config));
   pool_config.__set_max_query_mem_limit(700 * MEGABYTE);
-  schedule_state->UpdateMemoryRequirements(pool_config);
+  ExecutorGroupCoordinatorPair group5 = MakeExecutorConfig(*schedule_state);
+  schedule_state->UpdateMemoryRequirements(pool_config,
+      group5.second.admit_mem_limit(),
+      group5.first.GetPerExecutorMemLimitForAdmission());
   ASSERT_EQ(700 * MEGABYTE, schedule_state->per_backend_mem_to_admit());
   ASSERT_EQ(700 * MEGABYTE, schedule_state->coord_backend_mem_to_admit());
   ASSERT_EQ(700 * MEGABYTE, schedule_state->per_backend_mem_limit());
@@ -876,6 +924,7 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
   coord_exec_params.be_desc.set_admission_slots(8);
   coord_exec_params.be_desc.set_is_executor(false);
   coord_exec_params.be_desc.set_is_coordinator(true);
+  coord_exec_params.be_desc.set_ip_address(test::HostIdxToIpAddr(1));
   // Add executor backend.
   const string exec_host_name = Substitute("host$0", 2);
   NetworkAddressPB exec_addr = MakeNetworkAddressPB(exec_host_name, 25000);
@@ -887,12 +936,16 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
   backend_schedule_state.be_desc.set_admit_mem_limit(GIGABYTE);
   backend_schedule_state.be_desc.set_admission_slots(8);
   backend_schedule_state.be_desc.set_is_executor(true);
+  backend_schedule_state.be_desc.set_ip_address(test::HostIdxToIpAddr(2));
   string not_admitted_reason;
   bool coordinator_resource_limited = false;
   // Test 1: coord's admit_mem_limit < executor's admit_mem_limit. Query should not
   // be rejected because query fits on both executor and coordinator. It should be
   // queued if there is not enough capacity.
-  schedule_state->UpdateMemoryRequirements(pool_config);
+  ExecutorGroupCoordinatorPair group = MakeExecutorConfig(*schedule_state);
+  schedule_state->UpdateMemoryRequirements(pool_config,
+      group.second.admit_mem_limit(),
+      group.first.GetPerExecutorMemLimitForAdmission());
   ASSERT_FALSE(admission_controller->RejectForSchedule(
       *schedule_state, pool_config, &not_admitted_reason));
   ASSERT_TRUE(admission_controller->HasAvailableMemResources(
@@ -931,6 +984,7 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
   // Test 2: coord's admit_mem_limit < executor's admit_mem_limit. Query rejected because
   // coord's admit_mem_limit is less than mem_to_admit on the coord.
   // Re-using previous ScheduleState object.
+  FLAGS_clamp_query_mem_limit_backend_mem_limit = false;
   coord_exec_params.be_desc.set_admit_mem_limit(100 * MEGABYTE);
   ASSERT_TRUE(admission_controller->RejectForSchedule(
       *schedule_state, pool_config, &not_admitted_reason));
@@ -945,6 +999,7 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
   ASSERT_TRUE(coordinator_resource_limited);
   coordinator_resource_limited = false;
   not_admitted_reason.clear();
+  FLAGS_clamp_query_mem_limit_backend_mem_limit = true;
 
   // Test 3: Check HasAvailableSlots by simulating slots being in use.
   ASSERT_TRUE(admission_controller->HasAvailableSlots(
@@ -977,7 +1032,10 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
   schedule_state = MakeScheduleState(
       "default", 0, pool_config, 2, PER_EXEC_MEM_ESTIMATE, COORD_MEM_ESTIMATE, true);
   pool_config.__set_min_query_mem_limit(MEGABYTE); // to auto set mem_limit(s).
-  schedule_state->UpdateMemoryRequirements(pool_config);
+  ExecutorGroupCoordinatorPair group1 = MakeExecutorConfig(*schedule_state);
+  schedule_state->UpdateMemoryRequirements(pool_config,
+      group1.second.admit_mem_limit(),
+      group1.first.GetPerExecutorMemLimitForAdmission());
   schedule_state->set_largest_min_reservation(600 * MEGABYTE);
   schedule_state->set_coord_min_reservation(50 * MEGABYTE);
   ASSERT_TRUE(AdmissionController::CanAccommodateMaxInitialReservation(
@@ -1071,7 +1129,10 @@ TEST_F(AdmissionControllerTest, TopNQueryCheck) {
       long per_host_mem_estimate = (rand() % 10 + 1) * MEGABYTE;
       ScheduleState* schedule_state =
           MakeScheduleState(pool_name, pool_config, 1, per_host_mem_estimate);
-      schedule_state->UpdateMemoryRequirements(pool_config);
+      ExecutorGroupCoordinatorPair group = MakeExecutorConfig(*schedule_state);
+      schedule_state->UpdateMemoryRequirements(pool_config,
+          group.second.admit_mem_limit(),
+          group.first.GetPerExecutorMemLimitForAdmission());
       // Admit the query to the pool.
       string not_admitted_reason;
       bool coordinator_resource_limited = false;

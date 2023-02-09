@@ -29,7 +29,8 @@ static const uint32_t NUM_HASH_RING_REPLICAS = 25;
 ExecutorGroup::ExecutorGroup(string name) : ExecutorGroup(name, 1) {}
 
 ExecutorGroup::ExecutorGroup(string name, int64_t min_size)
-  : name_(name), min_size_(min_size), executor_ip_hash_ring_(NUM_HASH_RING_REPLICAS) {
+  : name_(name), min_size_(min_size), executor_ip_hash_ring_(NUM_HASH_RING_REPLICAS),
+    per_executor_admit_mem_limit_(0) {
   DCHECK_GT(min_size_, 0);
 }
 
@@ -96,6 +97,15 @@ void ExecutorGroup::AddExecutor(const BackendDescriptorPB& be_desc) {
   }
   be_descs.push_back(be_desc);
   executor_ip_map_[be_desc.address().hostname()] = be_desc.ip_address();
+
+  DCHECK(be_desc.admit_mem_limit() > 0) << "Admit memory limit must be set for backends";
+  if (per_executor_admit_mem_limit_ > 0) {
+    per_executor_admit_mem_limit_ =
+        std::min(be_desc.admit_mem_limit(), per_executor_admit_mem_limit_);
+  } else if (per_executor_admit_mem_limit_ == 0) {
+    per_executor_admit_mem_limit_ = be_desc.admit_mem_limit();
+  }
+
   if (be_desc.ip_address() == "127.0.0.1") {
     // Include localhost as an alias for filesystems that don't translate it.
     LOG(INFO) << "Adding executor localhost alias for "
@@ -125,6 +135,9 @@ void ExecutorGroup::RemoveExecutor(const BackendDescriptorPB& be_desc) {
     return;
   }
   be_descs.erase(remove_it);
+  if (per_executor_admit_mem_limit_ == be_desc.admit_mem_limit()) {
+    CalculatePerExecutorMemLimitForAdmission();
+  }
   if (be_descs.empty()) {
     executor_map_.erase(be_descs_it);
     executor_ip_map_.erase(be_desc.address().hostname());
@@ -191,6 +204,22 @@ bool ExecutorGroup::CheckConsistencyOrWarn(const BackendDescriptorPB& be_desc) c
   // If the backend does not mention the group we consider it consistent to allow backends
   // to be added to unrelated groups, e.g. for the coordinator-only scheuduling.
   return true;
+}
+
+void ExecutorGroup::CalculatePerExecutorMemLimitForAdmission() {
+  per_executor_admit_mem_limit_ = numeric_limits<int64_t>::max();
+  int num_executors = 0;
+  for (const auto& executor_list: executor_map_) {
+    const Executors& be_descs = executor_list.second;
+    num_executors += be_descs.size();
+    for (const auto& be_desc: be_descs) {
+      per_executor_admit_mem_limit_ = std::min(per_executor_admit_mem_limit_,
+          be_desc.admit_mem_limit());
+    }
+  }
+  if (num_executors == 0) {
+    per_executor_admit_mem_limit_ = 0;
+  }
 }
 
 }  // end ns impala

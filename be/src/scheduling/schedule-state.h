@@ -287,8 +287,11 @@ class ScheduleState {
   /// Populates or updates the per host query memory limit and the amount of memory to be
   /// admitted based on the pool configuration passed to it. Must be called at least once
   /// before making any calls to per_backend_mem_to_admit(), per_backend_mem_limit() and
-  /// GetClusterMemoryToAdmit().
-  void UpdateMemoryRequirements(const TPoolConfig& pool_cfg);
+  /// GetClusterMemoryToAdmit(). If 'clamp_query_mem_limit_backend_mem_limit' is set, the
+  /// input 'coord_mem_limit_admission' and 'executor_mem_limit_admission' are used for
+  /// capping query memory limit on coordinator and executor backends, respectively.
+  void UpdateMemoryRequirements(const TPoolConfig& pool_cfg,
+      int64_t coord_mem_limit_admission, int64_t executor_mem_limit_admission);
 
   const std::string& executor_group() const { return executor_group_; }
 

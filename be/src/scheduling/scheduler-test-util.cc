@@ -102,6 +102,7 @@ ClusterMembershipMgr::BeDescSharedPtr BuildBackendDescriptor(const Host& host) {
   be_desc->set_is_coordinator(host.is_coordinator);
   be_desc->set_is_executor(host.is_executor);
   be_desc->set_is_quiescing(false);
+  be_desc->set_admit_mem_limit(GIGABYTE);
   ExecutorGroupDescPB* exec_desc = be_desc->add_executor_groups();
   exec_desc->set_name(ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME);
   exec_desc->set_min_size(1);

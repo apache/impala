@@ -112,6 +112,11 @@ class ExecutorGroup {
   /// Returns false otherwise.
   bool IsHealthy() const;
 
+  /// Return effective memory limit for admission for executors in this group.
+  int64_t GetPerExecutorMemLimitForAdmission() const {
+      return per_executor_admit_mem_limit_;
+  }
+
   const string& name() const { return name_; }
   int64_t min_size() const { return min_size_; }
 
@@ -120,6 +125,9 @@ class ExecutorGroup {
   /// size. Returns true if a group is found and its min size matches, or if no group is
   /// found. Returns false and logs a warning otherwise.
   bool CheckConsistencyOrWarn(const BackendDescriptorPB& be_desc) const;
+
+  /// Calculates minimum memory limit for admission across all backends.
+  void CalculatePerExecutorMemLimitForAdmission();
 
   const std::string name_;
 
@@ -140,6 +148,10 @@ class ExecutorGroup {
   /// All executors are kept in a hash ring to allow a consistent mapping from filenames
   /// to executors.
   HashRing executor_ip_hash_ring_;
+
+  /// The minimum memory limit in bytes for admission across all backends. Used by
+  /// admission controller to bound the per backend memory limit for a given query.
+  int64_t per_executor_admit_mem_limit_;
 };
 
 }  // end ns impala
