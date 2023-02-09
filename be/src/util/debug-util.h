@@ -51,12 +51,11 @@ class TupleRow;
 // Forward declaration to avoid including descriptors.h.
 typedef std::vector<int> SchemaPath;
 
-// Converts a value for which operator<< is defined to a std::string.
+// Used to convert Thrift objects to strings. Thrift defines a 'to_string()' function for
+// each type.
 template<class T>
 std::string PrintValue(const T& value) {
-  std::stringstream s;
-  s << value;
-  return s.str();
+  return to_string(value);
 }
 
 std::string PrintTuple(const Tuple* t, const TupleDescriptor& d);
