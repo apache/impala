@@ -1286,4 +1286,13 @@ public class PlannerTest extends PlannerTestBase {
   public void testOrcStatsAgg() {
     runPlannerTestFile("orc-stats-agg");
   }
+
+  /**
+   * Test EXPLAIN_LEVEL=VERBOSE is displayed properly with MT_DOP>0
+   */
+  @Test
+  public void testExplainVerboseMtDop() {
+    runPlannerTestFile("explain-verbose-mt_dop", "tpcds_parquet",
+        ImmutableSet.of(PlannerTestOption.INCLUDE_RESOURCE_HEADER));
+  }
 }
