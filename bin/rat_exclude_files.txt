@@ -37,7 +37,7 @@ be/src/thirdparty/fast_double_parser/*
 be/src/kudu/gutil
 www/highlight/*
 www/DataTables*/*
-www/datatables-1.10.18.*
+www/datatables-*.*
 www/bootstrap/css/bootstrap*
 www/bootstrap/js/bootstrap*
 www/favicon.ico
