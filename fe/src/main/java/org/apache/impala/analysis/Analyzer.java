@@ -231,8 +231,12 @@ public class Analyzer {
   // if an exception was encountered.
   private String mvAuthExceptionMsg_ = null;
 
-  // Total records num of the Iceberg table.
-  private long totalRecordsNum_;
+  // Total records num V1 is calculated by all DataFiles of the Iceberg V1 table.
+  private long totalRecordsNumV1_;
+
+  // Total records num V2 is calculated by all DataFiles without corresponding DeleteFiles
+  // to be applied of the Iceberg V2 table.
+  private long totalRecordsNumV2_;
 
   // Required Operation type: Read, write, any(read or write).
   public enum OperationType {
@@ -992,18 +996,28 @@ public class Analyzer {
     return mvAuthExceptionMsg_;
   }
 
-  public void setTotalRecordsNum(long totalRecordsNum) {
-    totalRecordsNum_ = totalRecordsNum;
+  public void setTotalRecordsNumV1(long totalRecordsNumV1) {
+    totalRecordsNumV1_ = totalRecordsNumV1;
   }
 
-  public long getTotalRecordsNum() { return totalRecordsNum_; }
+  public long getTotalRecordsNumV1() { return totalRecordsNumV1_; }
+
+  public void setTotalRecordsNumV2(long totalRecordsNumV2) {
+    totalRecordsNumV2_ = totalRecordsNumV2;
+  }
+
+  public long getTotalRecordsNumV2() {
+    return totalRecordsNumV2_;
+  }
 
   /**
    * Check if 'count(*)' FunctionCallExpr can be rewritten as LiteralExpr. When
    * totalRecordsNum_ is 0, no optimization 'count(*)' is still very fast, so return true
    * only if totalRecordsNum_ is greater than 0.
    */
-  public boolean canRewriteCountStarToConst() { return totalRecordsNum_ > 0; }
+  public boolean canRewriteCountStarForV1() { return totalRecordsNumV1_ > 0; }
+
+  public boolean canRewriteCountStartForV2() { return totalRecordsNumV2_ > 0; }
 
   /**
    * Register conjuncts that are outer joined by a full outer join. For a given

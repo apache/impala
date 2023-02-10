@@ -176,11 +176,16 @@ public class IcebergScanPlanner {
       return ret;
     }
     PlanNode joinNode = createPositionJoinNode();
-    if (dataFilesWithoutDeletes_.isEmpty()) {
-      // All data files has corresponding delete files, so we just return an ANTI JOIN
-      // between all data files and all delete files.
-      return joinNode;
-    }
+
+    // If the count star query can be optimized for Iceberg V2 table, the number of rows
+    // of all DataFiles without corresponding DeleteFiles can be calculated by Iceberg
+    // meta files, it's added using ArithmeticExpr.
+    if (ctx_.getQueryCtx().isOptimize_count_star_for_iceberg_v2()) return joinNode;
+
+    // All data files has corresponding delete files, so we just return an ANTI JOIN
+    // between all data files and all delete files.
+    if (dataFilesWithoutDeletes_.isEmpty()) return joinNode;
+
     // If there are data files without corresponding delete files to be applied, we
     // can just create a SCAN node for these and do a UNION ALL with the ANTI JOIN.
     IcebergScanNode dataScanNode = new IcebergScanNode(

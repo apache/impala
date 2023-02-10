@@ -63,6 +63,7 @@ import org.apache.impala.analysis.TimeTravelSpec.Kind;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
@@ -862,22 +863,13 @@ public interface FeIcebergTable extends FeFsTable {
      * the record count cannot be retrieved from the table summary.
      * If 'travelSpec' is null then the current snapshot is being used.
      */
-    public static long getRecordCount(Table icebergTable,
-        TimeTravelSpec travelSpec) {
+    public static long getRecordCountV1(Table icebergTable, TimeTravelSpec travelSpec) {
       Map<String, String> summary = getSnapshotSummary(icebergTable, travelSpec);
       if (summary == null) return -1;
 
       String totalRecordsStr = summary.get(SnapshotSummary.TOTAL_RECORDS_PROP);
       if (Strings.isNullOrEmpty(totalRecordsStr)) return -1;
-
       try {
-        // We cannot tell the record count from the summary if there are deleted rows.
-        String totalDeleteFilesStr = summary.get(SnapshotSummary.TOTAL_DELETE_FILES_PROP);
-        if (!Strings.isNullOrEmpty(totalDeleteFilesStr)) {
-          long totalDeleteFiles = Long.parseLong(totalDeleteFilesStr);
-          if (totalDeleteFiles > 0) return -1;
-        }
-
         return Long.parseLong(totalRecordsStr);
       } catch (NumberFormatException ex) {
         LOG.warn("Failed to get {} from iceberg table summary. Table name: {}, " +
@@ -885,8 +877,43 @@ public interface FeIcebergTable extends FeFsTable {
             SnapshotSummary.TOTAL_RECORDS_PROP, icebergTable.name(),
             icebergTable.location(), totalRecordsStr, ex);
       }
-
       return -1;
+    }
+
+    /**
+     * Return the record count that is calculated by all DataFiles without deletes.
+     */
+    public static long getRecordCountV2(FeIcebergTable table, TimeTravelSpec travelSpec)
+        throws AnalysisException {
+      if (travelSpec == null) {
+        return table.getContentFileStore()
+            .getDataFilesWithoutDeletes().stream()
+            .mapToLong(file -> file.getFbFileMetadata().icebergMetadata().recordCount())
+            .sum();
+      }
+      try {
+        return IcebergUtil.getIcebergFiles(table, Lists.newArrayList(), travelSpec)
+            .dataFilesWithoutDeletes.stream()
+            .mapToLong(ContentFile::recordCount)
+            .sum();
+      } catch (TableLoadingException e) {
+        throw new AnalysisException("Failed to get record count of Iceberg V2 table: "
+            + table.getFullName() ,e);
+      }
+    }
+
+    /**
+     * Return true if the Iceberg has DeleteFiles.
+     */
+    public static boolean hasDeleteFiles(Table icebergTable, TimeTravelSpec travelSpec) {
+      Map<String, String> summary = getSnapshotSummary(icebergTable, travelSpec);
+      if (summary == null) return false;
+      String totalDeleteFilesStr = summary.get(SnapshotSummary.TOTAL_DELETE_FILES_PROP);
+      if (!Strings.isNullOrEmpty(totalDeleteFilesStr)) {
+        long totalDeleteFiles = Long.parseLong(totalDeleteFilesStr);
+        return totalDeleteFiles > 0;
+      }
+      return false;
     }
 
     /**

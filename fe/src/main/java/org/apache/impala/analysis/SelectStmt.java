@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
+import org.apache.iceberg.Table;
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.ArrayType;
@@ -1424,7 +1425,7 @@ public class SelectStmt extends QueryStmt {
 
 
   /**
-   * Set totalRecordsNum_ in analyzer_ for the plain count(*) queries of Iceberg tables.
+   * Set totalRecordsNumVx_ in analyzer_ for the plain count(*) queries of Iceberg tables.
    * Queries that can be rewritten need to meet the following requirements:
    *  - stmt does not have WHERE clause
    *  - stmt does not have GROUP BY clause
@@ -1433,9 +1434,8 @@ public class SelectStmt extends QueryStmt {
    *  - tableRef doesn't have sampling param
    *  - table is the Iceberg table
    *  - SelectList must contains 'count(*)' or 'count(constant)'
-   *  - SelectList can contain other agg functions, e.g. min, sum, etc
    *  - SelectList can contain constant
-   *
+   *  - only for V1: SelectList can contain other agg functions, e.g. min, sum, etc
    * e.g. 'SELECT count(*) FROM iceberg_tbl' would be rewritten as 'SELECT constant'.
    */
   public void optimizePlainCountStarQuery() throws AnalysisException {
@@ -1459,28 +1459,45 @@ public class SelectStmt extends QueryStmt {
     }
     if (!(table instanceof FeIcebergTable)) return;
 
+    analyzer_.checkStmtExprLimit();
+    Table iceTable = ((FeIcebergTable) table).getIcebergApiTable();
+    if (Utils.hasDeleteFiles(iceTable, tableRef.getTimeTravelSpec())) {
+      optimizePlainCountStarQueryV2(tableRef, (FeIcebergTable)table);
+    } else {
+      optimizePlainCountStarQueryV1(tableRef, iceTable);
+    }
+  }
+
+  private void optimizePlainCountStarQueryV2(TableRef tableRef, FeIcebergTable table)
+      throws AnalysisException {
+    for (SelectListItem selectItem : getSelectList().getItems()) {
+      Expr expr = selectItem.getExpr();
+      if (expr == null) return;
+      if (expr.isConstant()) continue;
+      if (!FunctionCallExpr.isCountStarFunctionCallExpr(expr)) return;
+    }
+    long num = Utils.getRecordCountV2(table, tableRef.getTimeTravelSpec());
+    if (num > 0) {
+      analyzer_.getQueryCtx().setOptimize_count_star_for_iceberg_v2(true);
+      analyzer_.setTotalRecordsNumV2(num);
+    }
+  }
+
+  private void optimizePlainCountStarQueryV1(TableRef tableRef, Table iceTable) {
     boolean hasCountStarFunc = false;
     boolean hasAggFunc = false;
-    analyzer_.checkStmtExprLimit();
-    for (SelectListItem selectItem : this.getSelectList().getItems()) {
+    for (SelectListItem selectItem : getSelectList().getItems()) {
       Expr expr = selectItem.getExpr();
-      if (expr == null) continue;
+      if (expr == null) return;
       if (expr.isConstant()) continue;
-      if (FunctionCallExpr.isCountStarFunctionCallExpr(expr)) {
-        hasCountStarFunc = true;
-      } else if (expr.isAggregate()) {
-        hasAggFunc = true;
-      } else {
-        return;
-      }
+      if (FunctionCallExpr.isCountStarFunctionCallExpr(expr)) { hasCountStarFunc = true; }
+      else if (expr.isAggregate()) { hasAggFunc = true; }
+      else return;
     }
     if (!hasCountStarFunc) return;
-
-    long num = Utils.getRecordCount(
-        ((FeIcebergTable) table).getIcebergApiTable(), tableRef.getTimeTravelSpec());
+    long num = Utils.getRecordCountV1(iceTable, tableRef.getTimeTravelSpec());
     if (num <= 0) return;
-    analyzer_.setTotalRecordsNum(num);
-
+    analyzer_.setTotalRecordsNumV1(num);
     if (hasAggFunc) return;
     // When all select items are 'count(*)' or constant, 'select count(*) from ice_tbl;'
     // would need to be rewritten as 'select const;'

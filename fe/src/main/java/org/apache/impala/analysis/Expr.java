@@ -418,6 +418,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   // True after analysis successfully completed. Protected by accessors isAnalyzed() and
   // analysisDone().
   private boolean isAnalyzed_ = false;
+  private boolean isRewritten_ = false;
+
 
   // True if this has already been counted towards the number of statement expressions
   private boolean isCountedForNumStmtExprs_ = false;
@@ -443,6 +445,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     isAuxExpr_ = other.isAuxExpr_;
     type_ = other.type_;
     isAnalyzed_ = other.isAnalyzed_;
+    isRewritten_ = other.isRewritten_;
     isOnClauseConjunct_ = other.isOnClauseConjunct_;
     printSqlInParens_ = other.printSqlInParens_;
     selectivity_ = other.selectivity_;
@@ -460,6 +463,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   public boolean isAnalyzed() { return isAnalyzed_; }
+  public boolean isRewritten() { return isRewritten_; }
+  public void setRewritten(boolean isRewritten) { isRewritten_ = isRewritten; }
   public ExprId getId() { return id_; }
   protected void setId(ExprId id) { id_ = id; }
   public Type getType() { return type_; }

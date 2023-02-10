@@ -987,6 +987,12 @@ class TestIcebergV2Table(IcebergTestSuite):
   # dockerised environment the namenode is accessible on a different hostname/port.
   @SkipIfDockerizedCluster.internal_hostname
   @SkipIf.hardcoded_uris
+  def test_plain_count_star_optimization(self, vector):
+      self.run_test_case('QueryTest/iceberg-v2-plain-count-star-optimization',
+                         vector)
+
+  @SkipIfDockerizedCluster.internal_hostname
+  @SkipIf.hardcoded_uris
   def test_read_position_deletes(self, vector):
     self.run_test_case('QueryTest/iceberg-v2-read-position-deletes', vector)
 

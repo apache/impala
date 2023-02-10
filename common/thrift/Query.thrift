@@ -792,6 +792,9 @@ struct TQueryCtx {
 
   // True if the query is transactional for Kudu table.
   29: required bool is_kudu_transactional = false
+
+  // True if the query can be optimized for Iceberg V2 table.
+  30: required bool optimize_count_star_for_iceberg_v2 = false
 }
 
 

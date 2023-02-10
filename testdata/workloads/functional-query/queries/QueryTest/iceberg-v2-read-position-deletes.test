@@ -74,11 +74,24 @@ SHOW TABLE STATS iceberg_v2_delete_positional
 BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ====
 ---- QUERY
+SELECT count(*) from iceberg_v2_delete_positional for system_version as of 6816997371555012807
+---- RESULTS
+3
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
 SELECT count(*) from iceberg_v2_delete_positional;
 ---- RESULTS
 2
 ---- TYPES
 bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 COMPUTE STATS iceberg_v2_positional_delete_all_rows
@@ -113,11 +126,24 @@ SHOW TABLE STATS iceberg_v2_positional_delete_all_rows
 BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ====
 ---- QUERY
-SELECT count(*) from iceberg_v2_positional_delete_all_rows;
+SELECT count(*) from iceberg_v2_positional_delete_all_rows for system_version as of 8593920101374128463
+---- RESULTS
+3
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+SELECT count(*) from iceberg_v2_positional_delete_all_rows
 ---- RESULTS
 0
 ---- TYPES
 bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 COMPUTE STATS iceberg_v2_positional_not_all_data_files_have_delete_files
@@ -152,11 +178,46 @@ SHOW TABLE STATS iceberg_v2_positional_not_all_data_files_have_delete_files
 BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ====
 ---- QUERY
+SHOW FILES IN iceberg_v2_positional_not_all_data_files_have_delete_files;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_positional_not_all_data_files_have_delete_files/data/00000-0-data.*.parquet','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_positional_not_all_data_files_have_delete_files/data/00000-0-data.*.parquet','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_positional_not_all_data_files_have_delete_files/data/00000-0-data.*.parquet','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_positional_not_all_data_files_have_delete_files/data/00000-0-data.*.parquet','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_positional_not_all_data_files_have_delete_files/data/00000-0-delete.*.parquet','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_positional_not_all_data_files_have_delete_files/data/00000-0-delete.*.parquet','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+SELECT count(*) from iceberg_v2_positional_not_all_data_files_have_delete_files for system_version as of 7490459762454857930
+---- RESULTS
+10
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+SELECT count(*) from iceberg_v2_positional_not_all_data_files_have_delete_files for system_version as of 752781918366351945
+---- RESULTS
+9
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
 SELECT count(*) from iceberg_v2_positional_not_all_data_files_have_delete_files
 ---- RESULTS
 6
 ---- TYPES
 bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 COMPUTE STATS iceberg_v2_positional_update_all_rows
@@ -191,11 +252,33 @@ SHOW TABLE STATS iceberg_v2_positional_update_all_rows
 BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ====
 ---- QUERY
+SHOW FILES IN iceberg_v2_positional_update_all_rows;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_positional_update_all_rows/data/00000-0-data.*.parquet','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_positional_update_all_rows/data/00000-0-data.*.parquet','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_positional_update_all_rows/data/00000-0-delete.*.parquet','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+SELECT count(*) from iceberg_v2_positional_update_all_rows for system_version as of 3877007445826010687
+---- RESULTS
+3
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
 SELECT count(*) from iceberg_v2_positional_update_all_rows
 ---- RESULTS
 3
 ---- TYPES
 bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 COMPUTE STATS iceberg_v2_partitioned_position_deletes
@@ -230,11 +313,24 @@ SHOW TABLE STATS iceberg_v2_partitioned_position_deletes
 BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ====
 ---- QUERY
+SELECT count(*) from iceberg_v2_partitioned_position_deletes for system_version as of 2057976186205897384
+---- RESULTS
+20
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
 SELECT count(*) from iceberg_v2_partitioned_position_deletes
 ---- RESULTS
 10
 ---- TYPES
 bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 6
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 SELECT count(*) from iceberg_v2_no_deletes where i = 2;
