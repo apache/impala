@@ -389,6 +389,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       for (int i = children_.size() - 1; i >= 1; --i) {
         PlanNode child = getChild(i);
         if (fragment_ != child.fragment_) {
+          if (detailLevel == TExplainLevel.VERBOSE) continue;
           // we're crossing a fragment boundary
           expBuilder.append(
               child.fragment_.getExplainString(
