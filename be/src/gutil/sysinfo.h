@@ -65,8 +65,5 @@ extern double CyclesPerSecond(void);
 // Exposed for testing.
 extern int ParseMaxCpuIndex(const char* str);
 
-// Return current platform is aarch64 or not
-extern bool IsAarch64();
-
 } // namespace base
 #endif   /* #ifndef _SYSINFO_H_ */

@@ -27,6 +27,12 @@
 
 namespace impala {
 
+#ifdef __aarch64__
+#define IS_AARCH64 true
+#else
+#define IS_AARCH64 false
+#endif
+
 /// CpuInfo is an interface to query for cpu information at runtime.  The caller can
 /// ask for the sizes of the caches and what hardware features are supported.
 /// On Linux, this information is pulled from a couple of sys files (/proc/cpuinfo and

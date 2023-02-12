@@ -27,7 +27,6 @@
 
 #include "runtime/multi-precision.h"
 #include "testutil/gtest-util.h"
-#include "gutil/sysinfo.h"
 #include "util/arithmetic-util.h"
 #include "util/bit-util.h"
 #include "util/cpu-info.h"
@@ -135,7 +134,7 @@ TEST(BitUtil, TrailingBits) {
 void TestByteSwapSimd_Unit(const int64_t CpuFlag) {
   void (*bswap_fptr)(const uint8_t* src, uint8_t* dst) = NULL;
   int buf_size = 0;
-  if (base::IsAarch64() || CpuFlag == CpuInfo::SSSE3) {
+  if (IS_AARCH64 || CpuFlag == CpuInfo::SSSE3) {
     buf_size = 16;
     bswap_fptr = SimdByteSwap::ByteSwap128;
   } else {
@@ -180,7 +179,7 @@ void TestByteSwapSimd(const int64_t CpuFlag, const int buf_size) {
   std::iota(src_buf, src_buf + buf_size, 0);
 
   int start_size = 0;
-  if (base::IsAarch64() || CpuFlag == CpuInfo::SSSE3) {
+  if (IS_AARCH64 || CpuFlag == CpuInfo::SSSE3) {
     start_size = 16;
   } else if (CpuFlag == CpuInfo::AVX2) {
     start_size = 32;
@@ -189,7 +188,7 @@ void TestByteSwapSimd(const int64_t CpuFlag, const int buf_size) {
   for (int i = start_size; i < buf_size; ++i) {
     // Initialize dst buffer and swap i bytes.
     memset(dst_buf, 0, buf_size);
-    if (base::IsAarch64() || CpuFlag == CpuInfo::SSSE3) {
+    if (IS_AARCH64 || CpuFlag == CpuInfo::SSSE3) {
       SimdByteSwap::ByteSwapSimd<16>(src_buf, i, dst_buf);
     } else if (CpuFlag == CpuInfo::AVX2) {
       SimdByteSwap::ByteSwapSimd<32>(src_buf, i, dst_buf);

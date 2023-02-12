@@ -21,7 +21,6 @@
 
 #include "common/logging.h"
 #include "common/compiler-util.h"
-#include "gutil/sysinfo.h"
 #include "util/cpu-info.h"
 #include "util/sse-util.h"
 
@@ -39,7 +38,7 @@ class HashUtil {
   /// The resulting hashes are correlated.
   /// TODO: update this to also use SSE4_crc32_u64 and SSE4_crc32_u16 where appropriate.
   static uint32_t CrcHash(const void* data, int32_t bytes, uint32_t hash) {
-    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2) || base::IsAarch64());
+    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2) || IS_AARCH64);
     uint32_t words = bytes / sizeof(uint32_t);
     bytes = bytes % sizeof(uint32_t);
 
@@ -63,7 +62,7 @@ class HashUtil {
 
   /// CrcHash() specialized for 1-byte data
   static inline uint32_t CrcHash1(const void* v, uint32_t hash) {
-    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2) || base::IsAarch64());
+    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2) || IS_AARCH64);
     const uint8_t* s = reinterpret_cast<const uint8_t*>(v);
     hash = SSE4_crc32_u8(hash, *s);
     hash = (hash << 16) | (hash >> 16);
@@ -72,7 +71,7 @@ class HashUtil {
 
   /// CrcHash() specialized for 2-byte data
   static inline uint32_t CrcHash2(const void* v, uint32_t hash) {
-    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2) || base::IsAarch64());
+    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2) || IS_AARCH64);
     const uint16_t* s = reinterpret_cast<const uint16_t*>(v);
     hash = SSE4_crc32_u16(hash, *s);
     hash = (hash << 16) | (hash >> 16);
@@ -81,7 +80,7 @@ class HashUtil {
 
   /// CrcHash() specialized for 4-byte data
   static inline uint32_t CrcHash4(const void* v, uint32_t hash) {
-    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2) || base::IsAarch64());
+    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2) || IS_AARCH64);
     const uint32_t* p = reinterpret_cast<const uint32_t*>(v);
     hash = SSE4_crc32_u32(hash, *p);
     hash = (hash << 16) | (hash >> 16);
@@ -90,7 +89,7 @@ class HashUtil {
 
   /// CrcHash() specialized for 8-byte data
   static inline uint32_t CrcHash8(const void* v, uint32_t hash) {
-    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2) || base::IsAarch64());
+    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2) || IS_AARCH64);
     const uint64_t* p = reinterpret_cast<const uint64_t*>(v);
     hash = SSE4_crc32_u64(hash, *p);
     hash = (hash << 16) | (hash >> 16);
@@ -99,7 +98,7 @@ class HashUtil {
 
   /// CrcHash() specialized for 12-byte data
   static inline uint32_t CrcHash12(const void* v, uint32_t hash) {
-    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2) || base::IsAarch64());
+    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2) || IS_AARCH64);
     const uint64_t* p = reinterpret_cast<const uint64_t*>(v);
     hash = SSE4_crc32_u64(hash, *p);
     ++p;
@@ -110,7 +109,7 @@ class HashUtil {
 
   /// CrcHash() specialized for 16-byte data
   static inline uint32_t CrcHash16(const void* v, uint32_t hash) {
-    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2) || base::IsAarch64());
+    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2) || IS_AARCH64);
     const uint64_t* p = reinterpret_cast<const uint64_t*>(v);
     hash = SSE4_crc32_u64(hash, *p);
     ++p;
@@ -202,7 +201,7 @@ class HashUtil {
   /// Seed values for different steps of the query execution should use different seeds
   /// to prevent accidental key collisions. (See IMPALA-219 for more details).
   static uint32_t Hash(const void* data, int32_t bytes, uint32_t seed) {
-    if (base::IsAarch64() || LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
+    if (IS_AARCH64 || LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
       return CrcHash(data, bytes, seed);
     } else {
       return MurmurHash2_64(data, bytes, seed);

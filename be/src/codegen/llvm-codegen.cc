@@ -1769,7 +1769,7 @@ void LlvmCodeGen::ClearHashFns() {
 //   ret i32 %12
 // }
 llvm::Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
-  if (base::IsAarch64() || IsCPUFeatureEnabled(CpuInfo::SSE4_2)) {
+  if (IS_AARCH64 || IsCPUFeatureEnabled(CpuInfo::SSE4_2)) {
     if (num_bytes == -1) {
       // -1 indicates variable length, just return the generic loop based
       // hash fn.
