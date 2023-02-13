@@ -28,7 +28,7 @@ from tests.common.test_dimensions import (
     create_uncompressed_text_dimension)
 from tests.common.skip import SkipIfLocal
 from tests.common.test_vector import ImpalaTestDimension
-from tests.util.filesystem_utils import get_fs_path, WAREHOUSE
+from tests.util.filesystem_utils import get_fs_path, WAREHOUSE, IS_HDFS
 
 TEST_TBL_PART = "test_load"
 TEST_TBL_NOPART = "test_load_nopart"
@@ -222,8 +222,10 @@ class TestAsyncLoadData(ImpalaTestSuite):
       exec_end_state = client.get_state(handle)
 
       # Wait for the statement to finish with a timeout of 20 seconds
+      # (30 seconds without shortcircuit reads)
+      wait_time = 20 if IS_HDFS else 30
       wait_start = time.time()
-      self.wait_for_state(handle, finished_state, 20, client=client)
+      self.wait_for_state(handle, finished_state, wait_time, client=client)
       wait_end = time.time()
       wait_time = wait_end - wait_start
       self.close_query_using_client(client, handle)

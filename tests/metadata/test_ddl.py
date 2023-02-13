@@ -1110,8 +1110,10 @@ class TestAsyncDDLTiming(TestDdlBase):
       assert client.get_state(handle) == pending_state
 
       # Wait for the statement to finish with a timeout of 20 seconds
+      # (30 seconds without shortcircuit reads)
+      wait_time = 20 if IS_HDFS else 30
       wait_start = time.time()
-      self.wait_for_state(handle, finished_state, 20, client=client)
+      self.wait_for_state(handle, finished_state, wait_time, client=client)
       wait_end = time.time()
       wait_time = wait_end - wait_start
       self.close_query_using_client(client, handle)
