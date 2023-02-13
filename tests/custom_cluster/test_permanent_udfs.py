@@ -464,7 +464,7 @@ class TestUdfPersistence(CustomClusterTestSuite):
     result = self.execute_query_expect_failure(self.client,
         self.CREATE_JAVA_UDF_TEMPLATE.format(db=self.JAVA_FN_TEST_DB, function="badudf",
         location=self.JAVA_UDF_JAR, symbol="org.apache.impala.IncompatibleUdfTest"))
-    assert "No compatible function signatures" in str(result)
+    assert "No compatible signatures" in str(result)
     self.verify_function_count(
         "SHOW FUNCTIONS IN %s like 'badudf*'" % self.JAVA_FN_TEST_DB, 0)
     result = self.__describe_udf_in_hive('badudf', db=self.JAVA_FN_TEST_DB)
