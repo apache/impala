@@ -1056,7 +1056,7 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsing) {
   // directories.
   auto& dirs2 = GetTmpDirs(
       CreateTmpFileMgr("/tmp/tmp-file-mgr-test1:foo,/tmp/tmp-file-mgr-test2:?,"
-                       "/tmp/tmp-file-mgr-test3:1.2.3.4,/tmp/tmp-file-mgr-test4: ,"
+                       "/tmp/tmp-file-mgr-test3:1.2.3.4,/tmp/tmp-file-mgr-test4:a,"
                        "/tmp/tmp-file-mgr-test5:5pb,/tmp/tmp-file-mgr-test6:10%,"
                        "/tmp/tmp-file-mgr-test1:100"));
   EXPECT_EQ(1, dirs2.size());
@@ -1111,10 +1111,10 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsingRemotePath) {
     EXPECT_EQ(full_hdfs_path, dirs3->path());
     EXPECT_EQ(1024, dirs3->bytes_limit());
 
-    // Multiple local paths with one remote path.
+    // Multiple local paths with one remote path. Trims spaces.
     auto tmp_mgr_4 = CreateTmpFileMgr(hdfs_path
-        + ",/tmp/local-buffer-dir1,"
-          "/tmp/local-buffer-dir2,/tmp/local-buffer-dir3");
+        + " , /tmp/local-buffer-dir1, "
+          "/tmp/local-buffer-dir2 ,/tmp/local-buffer-dir3");
     auto& dirs4_local = GetTmpDirs(tmp_mgr_4);
     auto& dirs4_remote = GetTmpRemoteDir(tmp_mgr_4);
     EXPECT_NE(nullptr, dirs4_remote);
@@ -1123,8 +1123,8 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsingRemotePath) {
     EXPECT_EQ("/tmp/local-buffer-dir2/impala-scratch", dirs4_local[0]->path());
     EXPECT_EQ("/tmp/local-buffer-dir3/impala-scratch", dirs4_local[1]->path());
 
-    // Fails the parsing due to no port number for the HDFS path.
-    auto tmp_mgr_5 = CreateTmpFileMgr("hdfs://localhost/tmp,/tmp/local-buffer-dir");
+    // Fails to parse HDFS URI due to no path element.
+    auto tmp_mgr_5 = CreateTmpFileMgr("hdfs://localhost,/tmp/local-buffer-dir");
     auto& dirs5_local = GetTmpDirs(tmp_mgr_5);
     auto& dirs5_remote = GetTmpRemoteDir(tmp_mgr_5);
     EXPECT_EQ(1, dirs5_local.size());
@@ -1136,33 +1136,27 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsingRemotePath) {
 
     // Parse successfully, but the parsed HDFS path is unable to connect.
     // These cases would fail the initialization of TmpFileMgr.
-    auto& dirs7 = GetTmpRemoteDir(
-        CreateTmpFileMgr("hdfs://localhost:1/tmp::1,/tmp/local-buffer-dir", false));
-    EXPECT_EQ(nullptr, dirs7);
-
-    auto& dirs8 = GetTmpRemoteDir(
-        CreateTmpFileMgr("hdfs://localhost:/tmp::,/tmp/local-buffer-dir", false));
-    EXPECT_EQ(nullptr, dirs8);
-
-    auto& dirs9 = GetTmpRemoteDir(
-        CreateTmpFileMgr("hdfs://localhost/tmp::1,/tmp/local-buffer-dir", false));
-    EXPECT_EQ(nullptr, dirs9);
-
-    auto& dirs10 = GetTmpRemoteDir(
-        CreateTmpFileMgr("hdfs://localhost/tmp:1,/tmp/local-buffer-dir", false));
-    EXPECT_EQ(nullptr, dirs10);
+    for (const string& unreachable_path : {
+      "hdfs://localhost:1/tmp::1", "hdfs://localhost:/tmp::", "hdfs://localhost/tmp::1",
+      "hdfs://localhost/tmp:1", "hdfs://localhost/tmp", "hdfs://localhost/:1",
+      "hdfs://localhost:1 ", "hdfs://localhost/ "
+    }) {
+      auto& dirs = GetTmpRemoteDir(
+          CreateTmpFileMgr(unreachable_path + ",/tmp/local-buffer-dir", false));
+      EXPECT_EQ(nullptr, dirs) << unreachable_path;
+    }
 
     // Multiple remote paths, should support only one.
-    auto& dirs11 = GetTmpRemoteDir(CreateTmpFileMgr(Substitute(
+    auto& dirs6 = GetTmpRemoteDir(CreateTmpFileMgr(Substitute(
         "$0,hdfs://localhost:20501/tmp,/tmp/local-buffer-dir", hdfs_path)));
-    EXPECT_NE(nullptr, dirs11);
-    EXPECT_EQ(full_hdfs_path, dirs11->path());
+    EXPECT_NE(nullptr, dirs6);
+    EXPECT_EQ(full_hdfs_path, dirs6->path());
 
     // The order of the buffer and the remote dir should not affect the result.
-    auto& dirs12 = GetTmpRemoteDir(CreateTmpFileMgr(Substitute(
+    auto& dirs7 = GetTmpRemoteDir(CreateTmpFileMgr(Substitute(
         "/tmp/local-buffer-dir,$0,hdfs://localhost:20501/tmp", hdfs_path)));
-    EXPECT_NE(nullptr, dirs12);
-    EXPECT_EQ(full_hdfs_path, dirs12->path());
+    EXPECT_NE(nullptr, dirs7);
+    EXPECT_EQ(full_hdfs_path, dirs7->path());
   }
 
   // Successful cases for parsing S3 paths.
@@ -1385,7 +1379,7 @@ TEST_F(TmpFileMgrTest, TestDirectoryPriorityParsing) {
   // directories.
   auto& dirs2 = GetTmpDirs(
       CreateTmpFileMgr("/tmp/tmp-file-mgr-test1::foo,/tmp/tmp-file-mgr-test2::?,"
-                       "/tmp/tmp-file-mgr-test3::1.2.3.4,/tmp/tmp-file-mgr-test4:: ,"
+                       "/tmp/tmp-file-mgr-test3::1.2.3.4,/tmp/tmp-file-mgr-test4::a,"
                        "/tmp/tmp-file-mgr-test5::p0,/tmp/tmp-file-mgr-test6::10%,"
                        "/tmp/tmp-file-mgr-test1:100:-1"));
   EXPECT_EQ(1, dirs2.size());
@@ -2233,6 +2227,28 @@ TEST_F(TmpFileMgrTest, TestBatchReadingSetMaxBytes) {
       EXPECT_EQ(cur_max_bytes, buffer_size);
     }
     metrics_.reset(new MetricGroup("tmp-file-mgr-test"));
+  }
+}
+
+TEST_F(TmpFileMgrTest, TestHdfsScratchParsing) {
+  struct parsed { string path; int64_t bytes_limit; int priority; };
+  constexpr int64_t dbytes = numeric_limits<int64_t>::max();
+  constexpr int dpriority = numeric_limits<int>::max();
+  for (auto& valid : map<string, parsed>{
+    { "hdfs://10.0.0.1:8020", parsed{"hdfs://10.0.0.1:8020", dbytes, dpriority} },
+    { "hdfs://10.0.0.1:8020:1024:", parsed{"hdfs://10.0.0.1:8020", 1024, dpriority} },
+    { "hdfs://10.0.0.1/", parsed{"hdfs://10.0.0.1", dbytes, dpriority} },
+    { "hdfs://10.0.0.1/:1k", parsed{"hdfs://10.0.0.1", 1024, dpriority} },
+    { "hdfs://localhost/tmp::", parsed{"hdfs://localhost/tmp", dbytes, dpriority} },
+    { "hdfs://localhost/tmp/:10k:1", parsed{"hdfs://localhost/tmp", 10240, 1} },
+    { "ofs://ozone1/tmp:10k:1", parsed{"ofs://ozone1/tmp", 10240, 1} },
+    { "ofs://ozone1/tmp::1", parsed{"ofs://ozone1/tmp", dbytes, 1} },
+  }) {
+    TmpDirHdfs fs(valid.first);
+    EXPECT_OK(fs.Parse());
+    EXPECT_EQ(path(valid.second.path) / "impala-scratch", fs.path());
+    EXPECT_EQ(valid.second.bytes_limit, fs.bytes_limit());
+    EXPECT_EQ(valid.second.priority, fs.priority());
   }
 }
 

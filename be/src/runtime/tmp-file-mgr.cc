@@ -287,7 +287,7 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
   // warning - we don't want to abort process startup because of misconfigured scratch,
   // since queries will generally still be runnable.
   for (const string& tmp_dir_spec : tmp_dir_specifiers) {
-    string tmp_dir_spec_trimmed(boost::algorithm::trim_left_copy(tmp_dir_spec));
+    string tmp_dir_spec_trimmed(boost::algorithm::trim_copy(tmp_dir_spec));
     std::unique_ptr<TmpDir> tmp_dir;
 
     if (IsHdfsPath(tmp_dir_spec_trimmed.c_str(), false)
@@ -811,15 +811,23 @@ Status TmpDirS3::VerifyAndCreate(MetricGroup* metrics, vector<bool>* is_tmp_dir_
 }
 
 Status TmpDirHdfs::ParsePathTokens(vector<string>& toks) {
-  // We enforce the HDFS scratch path to have the port number, and the format after split
-  // by colon is {scheme, path, port_num, [bytes_limit, [priority]]}. Coalesce the URI.
+  // HDFS scratch path can include an optional port number; URI without path and port
+  // number is ambiguous so in that case we error. Format after split by colon is
+  // {scheme, path, port_num?, [bytes_limit, [priority]]}. Coalesce the URI from tokens.
   split(toks, raw_path_, is_any_of(":"), token_compress_off);
-  if (toks.size() < 3) {
+  // Only called on paths starting with `hdfs://` or `ofs://`.
+  DCHECK(toks.size() >= 2);
+  if (toks[1].rfind("/") > 1) {
+    // Contains a slash after the scheme, so port number was omitted.
+    toks[0] = Substitute("$0:$1", toks[0], toks[1]);
+    toks.erase(toks.begin()+1);
+  } else if (toks.size() < 3) {
     return Status(
-        Substitute("The scratch path should have the port number: '$0'", raw_path_));
+        Substitute("The scratch URI must have a path or port number: '$0'", raw_path_));
+  } else {
+    toks[0] = Substitute("$0:$1:$2", toks[0], toks[1], toks[2]);
+    toks.erase(toks.begin()+1, toks.begin()+3);
   }
-  toks[0] = Substitute("$0:$1:$2", toks[0], toks[1], toks[2]);
-  toks.erase(toks.begin()+1, toks.begin()+3);
   return Status::OK();
 }
 
