@@ -86,11 +86,8 @@ EasyCurl::EasyCurl()
   curl_ = curl_easy_init();
   CHECK(curl_) << "Could not init curl";
 
-  // Set the error buffer to enhance error messages with more details, when
-  // available.
+  // Ensure the curl error buffer is large enough.
   static_assert(kErrBufSize >= CURL_ERROR_SIZE, "kErrBufSize is too small");
-  const auto code = curl_easy_setopt(curl_, CURLOPT_ERRORBUFFER, errbuf_);
-  CHECK_EQ(CURLE_OK, code);
 }
 
 EasyCurl::~EasyCurl() {
@@ -115,12 +112,27 @@ Status EasyCurl::DoRequest(const string& url,
                            const vector<string>& headers) {
   CHECK_NOTNULL(dst)->clear();
 
+  // Reset all options to default values to ensure settings do not leak
+  // across calls.
+  curl_easy_reset(curl_);
+
+  // Set the error buffer to enhance error messages with more details, when
+  // available.
+  CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_ERRORBUFFER, errbuf_));
+
   // Mark the error buffer as cleared.
   errbuf_[0] = 0;
 
-  if (!verify_peer_) {
+  if (verify_peer_) {
+    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYHOST, 2));
+    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYPEER, 1));
+  } else {
     CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYHOST, 0));
     CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYPEER, 0));
+  }
+
+  if (!ca_certificates_.empty()) {
+    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_CAINFO, ca_certificates_.c_str()));
   }
 
   switch (auth_type_) {

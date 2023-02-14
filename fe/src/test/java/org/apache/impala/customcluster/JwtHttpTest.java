@@ -18,9 +18,11 @@
 package org.apache.impala.customcluster;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,16 +34,24 @@ import java.util.Map;
 
 import org.apache.hive.service.rpc.thrift.*;
 import org.apache.impala.testutil.WebClient;
+import org.apache.impala.testutil.X509CertChain;
 import org.apache.thrift.transport.THttpClient;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.junit.After;
 import org.junit.Test;
+
+import static org.hamcrest.core.IsCollectionContaining.hasItem;
+import static org.hamcrest.core.StringContains.containsString;
 
 /**
  * Tests that hiveserver2 operations over the http interface work as expected when
  * JWT authentication is being used.
  */
 public class JwtHttpTest {
+  private static final String CA_CERT = "cacert.pem";
+  private static final String SERVER_CERT = "server-cert.pem";
+  private static final String SERVER_KEY = "server-key.pem";
+
   WebClient client_ = new WebClient();
 
   /* Since we don't have Java version of JWT library, we use pre-calculated JWT token.
@@ -62,18 +72,28 @@ public class JwtHttpTest {
    */
   boolean createJWKSForWebServer_ = false;
 
-  public void setUp(String extraArgs) throws Exception {
+  private void setUp(String extraArgs) throws Exception {
     int ret = CustomClusterRunner.StartImpalaCluster(extraArgs);
     assertEquals(ret, 0);
   }
 
-  public void setUp(String impaladArgs, String catalogdArgs, String statestoredArgs)
+  /**
+   * Helper method to start a JWT auth enabled Impala cluster.
+   *
+   * @param impaladArgs startup flags to send to the impala coordinator/executors
+   * @param catalogdArgs startup flags to send to the impala catalog
+   * @param statestoredArgs startup flags to send to the statestore
+   * @param expectedRetCode expected exit code for the start impala cluster command,
+   *                        if the cluster is expected to start successfully, set to 0
+   */
+  private void setUp(String impaladArgs, String catalogdArgs,
+      String statestoredArgs, int expectedRetCode)
       throws Exception {
     if (createJWKSForWebServer_) createTempJWKSInWebServerRootDir("jwks_rs256.json");
 
     int ret = CustomClusterRunner.StartImpalaCluster(
         impaladArgs, catalogdArgs, statestoredArgs);
-    assertEquals(ret, 0);
+    assertEquals(expectedRetCode, ret);
   }
 
   @After
@@ -117,7 +137,7 @@ public class JwtHttpTest {
 
   /**
    * Executes 'query' and fetches the results. Expects there to be exactly one string
-   * returned, which be be equal to 'expectedResult'.
+   * returned, which will be equal to 'expectedResult'.
    */
   static TOperationHandle execAndFetch(TCLIService.Iface client,
       TSessionHandle sessionHandle, String query, String expectedResult)
@@ -275,7 +295,7 @@ public class JwtHttpTest {
             + "--jwt_validate_signature=true --jwks_url=%s "
             + "--jwks_update_frequency_s=1 --jwt_allow_without_tls=true",
         jwksHttpUrl);
-    setUp(impaladJwtArgs, "", statestoreWebserverArgs);
+    setUp(impaladJwtArgs, "", statestoreWebserverArgs, 0);
 
     THttpClient transport = new THttpClient("http://localhost:28000");
     Map<String, String> headers = new HashMap<String, String>();
@@ -322,20 +342,22 @@ public class JwtHttpTest {
    * Web server when downloading JWKS.
    */
   @Test
-  public void testJwtAuthWithJwksHttpsUrl() throws Exception {
+  public void testJwtAuthWithInsecureJwksHttpsUrl() throws Exception {
     createJWKSForWebServer_ = true;
-    String certDir = new File(System.getenv("IMPALA_HOME"), "be/src/testutil").getPath();
+    String certDir = setupServerAndRootCerts("testJwtAuthWithInsecureJwksHttpsUrl",
+        "testJwtAuthWithInsecureJwksHttpsUrl Root", "localhostlocalhost");
     String statestoreWebserverArgs =
-        String.format("--webserver_certificate_file=%s/server-cert.pem "
-                + "--webserver_private_key_file=%s/server-key.pem "
-                + "--webserver_interface=localhost --webserver_port=25010 "
-                + "--hostname=localhost ",
-            certDir, certDir);
+        String.format("--webserver_certificate_file=%s "
+            + "--webserver_private_key_file=%s "
+            + "--webserver_interface=localhost --webserver_port=25010 "
+            + "--hostname=localhost ",
+            Paths.get(certDir, SERVER_CERT), Paths.get(certDir, SERVER_KEY));
     String jwksHttpUrl = "https://localhost:25010/www/temp_jwks.json";
     String impaladJwtArgs = String.format("--jwt_token_auth=true "
-            + "--jwt_validate_signature=true --jwks_url=%s --jwt_allow_without_tls=true ",
+        + "--jwt_validate_signature=true --jwks_url=%s "
+        + "--jwt_allow_without_tls=true --jwks_verify_server_certificate=false ",
         jwksHttpUrl);
-    setUp(impaladJwtArgs, "", statestoreWebserverArgs);
+    setUp(impaladJwtArgs, "", statestoreWebserverArgs, 0);
 
     THttpClient transport = new THttpClient("http://localhost:28000");
     Map<String, String> headers = new HashMap<String, String>();
@@ -358,5 +380,148 @@ public class JwtHttpTest {
         client, openResp.getSessionHandle(), "select logged_in_user()", "impala");
     // Two more successful authentications - for the Exec() and the Fetch().
     verifyJwtAuthMetrics(3, 0);
+  }
+
+  /**
+   * Tests that the Impala coordinator fails to start because the TLS certificate
+   * returned by the JWKS server is not trusted.
+   *
+   * In this test, the TLS certificate has the correct CN but its issuing CA certificate
+   * is not trusted.
+   */
+  @Test
+  public void testJwtAuthWithUntrustedJwksHttpsUrl() throws Exception {
+    createJWKSForWebServer_ = true;
+    String certDir = setupServerAndRootCerts("testJwtAuthWithUntrustedJwksHttpsUrl",
+        "testJwtAuthWithUntrustedJwksHttpsUrl Root", "localhost");
+    Path logDir = Files.createTempDirectory("testJwtAuthWithUntrustedJwksHttpsUrl");
+    String statestoreWebserverArgs =
+        String.format("--webserver_certificate_file=%s "
+            + "--webserver_private_key_file=%s "
+            + "--webserver_interface=localhost --webserver_port=25010 "
+            + "--hostname=localhost ",
+            Paths.get(certDir, SERVER_CERT), Paths.get(certDir, SERVER_KEY));
+    String jwksHttpUrl = "https://localhost:25010/www/temp_jwks.json";
+    String impaladJwtArgs = String.format("--jwt_token_auth=true "
+        + "--jwt_validate_signature=true --jwks_url=%s "
+        + "--jwt_allow_without_tls=true --log_dir=%s ",
+        jwksHttpUrl, logDir.toAbsolutePath());
+    String expectedErrString = String.format("Impalad services did not start correctly, "
+        + "exiting.  Error: Error downloading JWKS from '%s': Network error: curl "
+        + "error: SSL peer certificate or SSH remote key was not OK: SSL certificate "
+        + "problem: unable to get local issuer certificate", jwksHttpUrl);
+
+    // cluster start will fail because the TLS cert returned by the
+    // JWKS server is not trusted
+    setUp(impaladJwtArgs, "", statestoreWebserverArgs, 1);
+
+    // check in the impalad logs that the server startup failed for the expected reason
+    List<String> logLines = Files.readAllLines(logDir.resolve("impalad.ERROR"));
+
+    assertThat(String.format("Impalad startup failed but not for the expected reason. "
+        + "See logs in the '%s' folder for details.", logDir), logLines,
+        hasItem(containsString(expectedErrString)));
+  }
+
+  /**
+   * Tests that the Impala coordinator fails to start because the TLS certificate
+   * returned by the JWKS server is not valid.
+   *
+   * In this test, the TLS certificate has an incorrect CN which means the certificate is
+   * not valid even though its issuing CA certificate is trusted.
+   */
+  @Test
+  public void testJwtAuthWithTrustedJwksHttpsUrlInvalidCN() throws Exception {
+    createJWKSForWebServer_ = true;
+    String certCN = "notvalid";
+    String certDir = setupServerAndRootCerts(
+        "testJwtAuthWithTrustedJwksHttpsUrlInvalidCN",
+        "testJwtAuthWithTrustedJwksHttpsUrlInvalidCN Root", certCN);
+    Path logDir = Files.createTempDirectory(
+        "testJwtAuthWithTrustedJwksHttpsUrlInvalidCN");
+    String statestoreWebserverArgs =
+        String.format("--webserver_certificate_file=%s "
+            + "--webserver_private_key_file=%s "
+            + "--webserver_interface=localhost --webserver_port=25010 "
+            + "--hostname=localhost ",
+            Paths.get(certDir, SERVER_CERT), Paths.get(certDir, SERVER_KEY));
+    String jwksHttpUrl = "https://localhost:25010/www/temp_jwks.json";
+    String impaladJwtArgs = String.format("--jwt_token_auth=true "
+        + "--jwt_validate_signature=true --jwks_url=%s "
+        + "--jwt_allow_without_tls=true --log_dir=%s --jwks_ca_certificate=%s ",
+        jwksHttpUrl, logDir.toAbsolutePath(), Paths.get(certDir, CA_CERT));
+    String expectedErrString = String.format("Impalad services did not start correctly, "
+        + "exiting.  Error: Error downloading JWKS from '%s': Network error: curl "
+        + "error: SSL peer certificate or SSH remote key was not OK: SSL: "
+        + "certificate subject name '%s' does not match target host name '%s'",
+        jwksHttpUrl, certCN, "localhost");
+
+    // cluster start will fail because the TLS cert returned by the
+    // JWKS server is not trusted
+    setUp(impaladJwtArgs, "", statestoreWebserverArgs, 1);
+
+    // check in the impalad logs that the server startup failed for the expected reason
+    List<String> logLines = Files.readAllLines(logDir.resolve("impalad.ERROR"));
+    assertThat(String.format("Impalad startup failed but not for the expected reason. "
+        + "See logs in the '%s' folder for details.", logDir), logLines,
+        hasItem(containsString(expectedErrString)));
+  }
+
+  /**
+   * Tests that the Impala coordinator successfully starts since the TLS certificate
+   * returned by the JWKS server is trusted.
+   */
+  @Test
+  public void testJwtAuthWithTrustedJwksHttpsUrl() throws Exception {
+    createJWKSForWebServer_ = true;
+    String certDir = setupServerAndRootCerts("testJwtAuthWithTrustedJwksHttpsUrl",
+        "testJwtAuthWithTrustedJwksHttpsUrl Root", "localhost");
+    String statestoreWebserverArgs =
+        String.format("--webserver_certificate_file=%s "
+            + "--webserver_private_key_file=%s "
+            + "--webserver_interface=localhost --webserver_port=25010 "
+            + "--hostname=localhost ",
+            Paths.get(certDir, SERVER_CERT), Paths.get(certDir, SERVER_KEY));
+    String jwksHttpUrl = "https://localhost:25010/www/temp_jwks.json";
+    String impaladJwtArgs = String.format("--jwt_token_auth=true "
+        + "--jwt_validate_signature=true --jwks_url=%s "
+        + "--jwt_allow_without_tls=true --jwks_ca_certificate=%s ",
+        jwksHttpUrl, Paths.get(certDir, CA_CERT));
+
+    // cluster start will succeed because the TLS cert returned by the
+    // JWKS server is trusted.
+    setUp(impaladJwtArgs, "", statestoreWebserverArgs, 0);
+  }
+
+  /**
+   * Generates new CA root certificate and server certificate/private key.  All three are
+   * written to a new, unique temporary folder.
+   *
+   * @param testName used as a prefix for the temp folder name
+   * @param rootCaCertCN CN of the generated self-signed root cert
+   * @param rootLeafCertCN CN of the leaf cert that is signed by the root cert
+   *
+   * @return path to the temporary folder
+   */
+  private String setupServerAndRootCerts(String testName, String rootCaCertCN,
+      String rootLeafCertCN) throws Exception {
+    Path certDir = Files.createTempDirectory(testName);
+    Path rootCACert = certDir.resolve(Paths.get(CA_CERT));
+    Path serverCert = certDir.resolve(Paths.get(SERVER_CERT));
+    Path serverKey = certDir.resolve(Paths.get(SERVER_KEY));
+    FileWriter rootCACertWriter = new FileWriter(rootCACert.toFile());
+    FileWriter serverCertWriter = new FileWriter(serverCert.toFile());
+    FileWriter serverKeyWriter = new FileWriter(serverKey.toFile());
+
+    X509CertChain certChain = new X509CertChain(rootCaCertCN, rootLeafCertCN);
+
+    certChain.writeLeafCertAsPem(serverCertWriter);
+    certChain.writeLeafPrivateKeyAsPem(serverKeyWriter);
+    certChain.writeRootCertAsPem(rootCACertWriter);
+    rootCACertWriter.close();
+    serverCertWriter.close();
+    serverKeyWriter.close();
+
+    return certDir.toString();
   }
 }

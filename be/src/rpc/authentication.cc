@@ -166,6 +166,18 @@ DEFINE_string(jwks_file_path, "",
     "File path of the pre-installed JSON Web Key Set (JWKS) for JWT verification");
 // This specifies the URL for JWKS to be downloaded.
 DEFINE_string(jwks_url, "", "URL of the JSON Web Key Set (JWKS) for JWT verification");
+// Enables retrieving the JWKS URL without verifying the presented TLS certificate
+// from the server.
+DEFINE_bool(jwks_verify_server_certificate, true,
+    "Specifies if the TLS certificate of the JWKS server is verified when retrieving "
+    "the JWKS from the specified JWKS URL.  A certificate is considered valid if a "
+    "trust chain can be established for it, and if the certificate has a common name or "
+    "SAN that matches the server's hostname. This should only be set to false for "
+    "development / testing.");
+// Enables defining a custom pem bundle file containing root certificates to trust.
+DEFINE_string(jwks_ca_certificate, "", "File path of a pem bundle of root ca "
+    "certificates that will be trusted when retrieving the JWKS from the "
+    "specified JWKS URL.");
 DEFINE_int32(jwks_update_frequency_s, 60,
     "(Advanced) The time in seconds to wait between downloading JWKS from the specified "
     "URL.");
