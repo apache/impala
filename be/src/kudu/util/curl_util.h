@@ -88,6 +88,12 @@ class EasyCurl {
     verify_peer_ = verify;
   }
 
+ // Sets a file path for a PEM bundle of certificates to trust when making a request over
+ // HTTPS.  Can be either CA certificates or the actual server certificate.
+  void set_ca_certificates(const std::string& ca_certificates) {
+    ca_certificates_ = ca_certificates;
+  }
+
   void set_return_headers(bool v) {
     return_headers_ = v;
   }
@@ -175,6 +181,10 @@ class EasyCurl {
 
   // Whether to verify the server certificate.
   bool verify_peer_ = true;
+
+  // File path to a pem encoded bundle of certs to trust when calling to a server
+  // over https
+  std::string ca_certificates_;
 
   // Whether to return the HTTP headers with the response.
   bool return_headers_ = false;
