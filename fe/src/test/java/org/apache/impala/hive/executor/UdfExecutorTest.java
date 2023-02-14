@@ -203,7 +203,8 @@ public class UdfExecutorTest {
   // Validate the argument's type. To mimic the behavior of the BE, only primitive types
   // are allowed.
   void validateArgType(Object w) {
-    if (w instanceof String ||
+    if (w == null ||
+        w instanceof String ||
         w instanceof Text ||
         w instanceof ImpalaBytesWritable ||
         w instanceof ImpalaIntWritable ||
@@ -225,16 +226,17 @@ public class UdfExecutorTest {
    *                 jar file.
    * @param udfClassPath: fully qualified class path for the UDF.
    * @param retType: the return type of the UDF
-   * @param args: the input parameters of the UDF
+   * @param originalArgs: input parameters used to deduce the type of the argument
+   * @param args: the input parameters of the UDF (can be null)
    */
   UdfExecutor createUdfExecutor(String jarFile, String udfClassPath, Type retType,
-      Object... args) throws ImpalaException, TException {
+      Object[] originalArgs, Object[] args) throws ImpalaException, TException {
     int inputBufferSize = 0;
     ArrayList<Integer> inputByteOffsets = Lists.newArrayList();
     ArrayList<Type> argTypes = Lists.newArrayList();
-    for (int i = 0; i < args.length; ++i) {
-      Preconditions.checkNotNull(args[i]);
-      Type argType = getType(args[i]);
+    for (Object originalArg: originalArgs) {
+      Preconditions.checkNotNull(originalArg);
+      Type argType = getType(originalArg);
       inputByteOffsets.add(new Integer(inputBufferSize));
       inputBufferSize += argType.getSlotSize();
       argTypes.add(argType);
@@ -247,7 +249,8 @@ public class UdfExecutorTest {
 
     long inputNullsPtr = allocate(argTypes.size());
     for (int i = 0; i < argTypes.size(); ++i) {
-      UnsafeUtil.UNSAFE.putByte(inputNullsPtr + i, (byte)0);
+      boolean isNull = args[i] == null;
+      UnsafeUtil.UNSAFE.putByte(inputNullsPtr + i, (byte)(isNull ? 1 : 0));
     }
     long inputBufferPtr = allocate(inputBufferSize);
     long outputNullPtr = allocate(1);
@@ -260,16 +263,19 @@ public class UdfExecutorTest {
   }
 
   // Runs the hive udf contained in c. Validates that c.evaluate(args) == expectedValue,
-  // if the "validate" argument is true. Arguments and return value cannot be NULL.
+  // if the "validate" argument is true.
+  // NULLs can be passed in 'args', but 'originalArgs' must contain non-NULL types
+  // to be able to deduce the signature of the UDF.
   void TestUdfImpl(String jarFile, Class<?> c, Object expectedValue,
-      Type expectedType, boolean validate, Object... args)
+      Type expectedType, boolean validate, Object[] originalArgs, Object[] args)
     throws ImpalaException, MalformedURLException, TException {
-    UdfExecutor e = createUdfExecutor(jarFile, c.getName(), expectedType, args);
+    UdfExecutor e = createUdfExecutor(
+        jarFile, c.getName(), expectedType, originalArgs, args);
     Method method = e.getMethod();
     Object[] inputArgs = new Object[args.length];
     for (int i = 0; i < args.length; ++i) {
       validateArgType(args[i]);
-      if (args[i] instanceof String) {
+      if (args[i] != null && args[i] instanceof String) {
         // For authoring the test, we'll just pass string and make the proper
         // object here.
         if (method != null && method.getParameterTypes()[i] == Text.class) {
@@ -287,96 +293,9 @@ public class UdfExecutorTest {
     for (int i = 0; i < 10; ++i) {
       long r = e.evaluateForTesting(inputArgs);
       if (!validate) continue;
-      List<String> errMsgs = Lists.newArrayList();
-      switch (expectedType.getPrimitiveType()) {
-        case BOOLEAN: {
-          boolean expected = ((ImpalaBooleanWritable)expectedValue).get();
-          boolean actual = UnsafeUtil.UNSAFE.getByte(r) != 0;
-          if (expected != actual) {
-            errMsgs.add("Expected bool: " + expected);
-            errMsgs.add("Actual bool:   " + actual);
-          }
-          break;
-        }
-        case TINYINT: {
-          int expected = ((ImpalaTinyIntWritable)expectedValue).get();
-          int actual = UnsafeUtil.UNSAFE.getByte(r);
-          if (expected != actual) {
-            errMsgs.add("Expected tinyint: " + expected);
-            errMsgs.add("Actual tinyint:   " + actual);
-          }
-          break;
-        }
-        case SMALLINT: {
-          int expected = ((ImpalaSmallIntWritable)expectedValue).get();
-          int actual = UnsafeUtil.UNSAFE.getShort(r);
-          if (expected != actual) {
-            errMsgs.add("Expected smallint: " + expected);
-            errMsgs.add("Actual smallint:   " + actual);
-          }
-          break;
-        }
-        case INT: {
-          int expected = ((ImpalaIntWritable)expectedValue).get();
-          int actual = UnsafeUtil.UNSAFE.getInt(r);
-          if (expected != actual) {
-            errMsgs.add("Expected int: " + expected);
-            errMsgs.add("Actual int:   " + actual);
-          }
-          break;
-        }
-        case BIGINT: {
-          long expected = ((ImpalaBigIntWritable)expectedValue).get();
-          long actual = UnsafeUtil.UNSAFE.getLong(r);
-          if (expected != actual) {
-            errMsgs.add("Expected bigint: " + expected);
-            errMsgs.add("Actual bigint:   " + actual);
-          }
-          break;
-        }
-        case FLOAT: {
-          float expected = ((ImpalaFloatWritable)expectedValue).get();
-          float actual = UnsafeUtil.UNSAFE.getFloat(r);
-          if (expected != actual) {
-            errMsgs.add("Expected float: " + expected);
-            errMsgs.add("Actual float:   " + actual);
-          }
-          break;
-        }
-        case DOUBLE:
-          double expected = ((ImpalaDoubleWritable)expectedValue).get();
-          double actual = UnsafeUtil.UNSAFE.getDouble(r);
-          if (expected != actual) {
-            errMsgs.add("Expected double: " + expected);
-            errMsgs.add("Actual double:   " + actual);
-          }
-          break;
-        case STRING:
-        case BINARY: {
-          byte[] expectedBytes = null;
-          if (expectedValue instanceof ImpalaBytesWritable) {
-            expectedBytes = ((ImpalaBytesWritable)expectedValue).getBytes();
-          } else if (expectedValue instanceof ImpalaTextWritable) {
-            expectedBytes = ((ImpalaTextWritable)expectedValue).getBytes();
-          } else if (expectedValue instanceof String) {
-            expectedBytes = ((String)expectedValue).getBytes();
-          } else {
-            Preconditions.checkState(false);
-          }
-          ImpalaStringWritable sw = new ImpalaStringWritable(r);
-          if (Arrays.equals(expectedBytes, sw.getBytes())) break;
-
-          errMsgs.add("Expected string: " + Bytes.toString(expectedBytes));
-          errMsgs.add("Actual string:   " + Bytes.toString(sw.getBytes()));
-          errMsgs.add("Expected bytes:  " + Arrays.toString(expectedBytes));
-          errMsgs.add("Actual bytes:    " + Arrays.toString(sw.getBytes()));
-          break;
-        }
-        default:
-          Preconditions.checkArgument(false);
-      }
-
       // Check if there was a mismatch and print a detailed error log.
+      List<String> errMsgs = Lists.newArrayList();
+      ValidateReturnPtr(r, expectedValue, expectedType, errMsgs);
       if (!errMsgs.isEmpty()) {
         errMsgs.add("Eval iteration:  " + i);
         errMsgs.add("Return type:     " + expectedType.toSql());
@@ -391,24 +310,139 @@ public class UdfExecutorTest {
     }
   }
 
+  // Interprets result pointer 'r' as expectedType and compares it to expectedValue.
+  // If there is a mismatch, errMsgs will contain info about the error. Emtpy errMsgs
+  // means that 'r' points to the expected result.
+  void ValidateReturnPtr(
+      long r, Object expectedValue, Type expectedType, List<String> errMsgs) {
+    if (expectedValue == null) {
+      if (r != 0) {
+        errMsgs.add("Expected NULL but got non-NULL result.");
+      }
+      return;
+    } else {
+      if (r == 0) {
+        errMsgs.add("Expected non-NULL but got NULL result.");
+        return;
+      }
+    }
+
+    switch (expectedType.getPrimitiveType()) {
+      case BOOLEAN: {
+        boolean expected = ((ImpalaBooleanWritable)expectedValue).get();
+        boolean actual = UnsafeUtil.UNSAFE.getByte(r) != 0;
+        if (expected != actual) {
+          errMsgs.add("Expected bool: " + expected);
+          errMsgs.add("Actual bool:   " + actual);
+        }
+        break;
+      }
+      case TINYINT: {
+        int expected = ((ImpalaTinyIntWritable)expectedValue).get();
+        int actual = UnsafeUtil.UNSAFE.getByte(r);
+        if (expected != actual) {
+          errMsgs.add("Expected tinyint: " + expected);
+          errMsgs.add("Actual tinyint:   " + actual);
+        }
+        break;
+      }
+      case SMALLINT: {
+        int expected = ((ImpalaSmallIntWritable)expectedValue).get();
+        int actual = UnsafeUtil.UNSAFE.getShort(r);
+        if (expected != actual) {
+          errMsgs.add("Expected smallint: " + expected);
+          errMsgs.add("Actual smallint:   " + actual);
+        }
+        break;
+      }
+      case INT: {
+        int expected = ((ImpalaIntWritable)expectedValue).get();
+        int actual = UnsafeUtil.UNSAFE.getInt(r);
+        if (expected != actual) {
+          errMsgs.add("Expected int: " + expected);
+          errMsgs.add("Actual int:   " + actual);
+        }
+        break;
+      }
+      case BIGINT: {
+        long expected = ((ImpalaBigIntWritable)expectedValue).get();
+        long actual = UnsafeUtil.UNSAFE.getLong(r);
+        if (expected != actual) {
+          errMsgs.add("Expected bigint: " + expected);
+          errMsgs.add("Actual bigint:   " + actual);
+        }
+        break;
+      }
+      case FLOAT: {
+        float expected = ((ImpalaFloatWritable)expectedValue).get();
+        float actual = UnsafeUtil.UNSAFE.getFloat(r);
+        if (expected != actual) {
+          errMsgs.add("Expected float: " + expected);
+          errMsgs.add("Actual float:   " + actual);
+        }
+        break;
+      }
+      case DOUBLE:
+        double expected = ((ImpalaDoubleWritable)expectedValue).get();
+        double actual = UnsafeUtil.UNSAFE.getDouble(r);
+        if (expected != actual) {
+          errMsgs.add("Expected double: " + expected);
+          errMsgs.add("Actual double:   " + actual);
+        }
+        break;
+      case STRING:
+      case BINARY: {
+        byte[] expectedBytes = null;
+        if (expectedValue instanceof ImpalaBytesWritable) {
+          expectedBytes = ((ImpalaBytesWritable)expectedValue).getBytes();
+        } else if (expectedValue instanceof ImpalaTextWritable) {
+          expectedBytes = ((ImpalaTextWritable)expectedValue).getBytes();
+        } else if (expectedValue instanceof String) {
+          expectedBytes = ((String)expectedValue).getBytes();
+        } else {
+          Preconditions.checkState(false);
+        }
+        ImpalaStringWritable sw = new ImpalaStringWritable(r);
+        if (Arrays.equals(expectedBytes, sw.getBytes())) break;
+
+        errMsgs.add("Expected string: " + Bytes.toString(expectedBytes));
+        errMsgs.add("Actual string:   " + Bytes.toString(sw.getBytes()));
+        errMsgs.add("Expected bytes:  " + Arrays.toString(expectedBytes));
+        errMsgs.add("Actual bytes:    " + Arrays.toString(sw.getBytes()));
+        break;
+      }
+      default:
+        Preconditions.checkArgument(false);
+    }
+  }
+
   void TestUdf(String jar, Class<?> c, Writable expectedValue, Object... args)
       throws MalformedURLException, ImpalaException, TException {
-    TestUdfImpl(jar, c, expectedValue, getType(expectedValue), true, args);
+    TestUdfImpl(jar, c, expectedValue, getType(expectedValue), true, args, args);
   }
 
   void TestUdf(String jar, Class<?> c, String expectedValue, Object... args)
       throws MalformedURLException, ImpalaException, TException {
-    TestUdfImpl(jar, c, expectedValue, getType(expectedValue), true, args);
+    TestUdfImpl(jar, c, expectedValue, getType(expectedValue), true, args, args);
+  }
+
+  void TestUdfWithNulls(String jar, Class<?> c, Writable originalExpectedValue,
+      boolean expectNull, Object[] originalArgs, Object[] args)
+      throws MalformedURLException, ImpalaException, TException {
+    TestUdfImpl(jar, c, expectNull ? null : originalExpectedValue,
+        getType(originalExpectedValue), true, originalArgs, args);
   }
 
   void TestHiveUdf(Class<?> c, Writable expectedValue, Object... args)
       throws MalformedURLException, ImpalaException, TException {
-    TestUdfImpl(HIVE_BUILTIN_JAR, c, expectedValue, getType(expectedValue), true, args);
+    TestUdfImpl(
+        HIVE_BUILTIN_JAR, c, expectedValue, getType(expectedValue), true, args, args);
   }
 
   void TestHiveUdfNoValidate(Class<?> c, Writable expectedValue, Object... args)
       throws MalformedURLException, ImpalaException, TException {
-    TestUdfImpl(HIVE_BUILTIN_JAR, c, expectedValue, getType(expectedValue), false, args);
+    TestUdfImpl(
+        HIVE_BUILTIN_JAR, c, expectedValue, getType(expectedValue), false, args, args);
   }
 
   @Test
@@ -485,6 +519,11 @@ public class UdfExecutorTest {
     // both Writable and primitive Java return types.
     TestUdf(null, TestGenericUdf.class, expectedValue, args);
     TestUdf(null, TestGenericUdfWithJavaReturnTypes.class, expectedValue, args);
+    // Test that calling with NULLs leads to returning NULL.
+    Object[] nullArgs = new Object[args.length];
+    TestUdfWithNulls(null, TestGenericUdf.class, expectedValue, true, args, nullArgs);
+    TestUdfWithNulls(null, TestGenericUdfWithJavaReturnTypes.class,
+        expectedValue, true, args, nullArgs);
   }
 
   @Test

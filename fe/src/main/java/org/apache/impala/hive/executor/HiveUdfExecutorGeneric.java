@@ -70,11 +70,13 @@ public class HiveUdfExecutorGeneric extends HiveUdfExecutor {
   private GenericUDF genericUDF_;
 
   // Hive Generic UDFs expect a DeferredObject for each parameter passed in. However,
-  // if the ith parameter is NULL, then Hive expects the deferredObject[i] value to
-  // contain null. The deferredParameters array is populated at initialization time. The
-  // runtimeDeferredObjects is passed into the Hive Generic UDF code at runtime and
-  // the runDeferredParameters[i] value will either contain deferredParameters[i] or NULL.
+  // if the ith parameter is NULL, then Hive expects the deferredObject[i].get() to
+  // return null. The deferredParameters array is populated at initialization time. The
+  // runtimeDeferredParameters_ is passed into the Hive Generic UDF code at runtime and
+  // the runtimeDeferredParameters_[i] value will either contain deferredParameters_[i]
+  // or a shared empty DeferredObject deferredNullParameter_.
   private DeferredObject[] deferredParameters_;
+  private DeferredObject deferredNullParameter_;
   private DeferredObject[] runtimeDeferredParameters_;
 
   /**
@@ -87,6 +89,7 @@ public class HiveUdfExecutorGeneric extends HiveUdfExecutor {
         JavaUdfDataType.getTypes(hiveJavaFn.getParameterTypes()));
     genericUDF_ = hiveJavaFn.getGenericUDFInstance();
     deferredParameters_ = createDeferredObjects();
+    deferredNullParameter_ = new DeferredJavaObject(null);
     runtimeDeferredParameters_ = new DeferredObject[getNumParams()];
   }
 
@@ -105,7 +108,7 @@ public class HiveUdfExecutorGeneric extends HiveUdfExecutor {
         runtimeDeferredParameters_[i] =
             (UnsafeUtil.UNSAFE.getByte(inputNullsPtr + i) == 0)
                 ? deferredParameters_[i]
-                : null;
+                : deferredNullParameter_;
       }
       return genericUDF_.evaluate(runtimeDeferredParameters_);
     } catch (HiveException e) {

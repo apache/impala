@@ -103,32 +103,14 @@ int, int, int
 10,20,30
 ====
 ---- QUERY
-# IMPALA-1392: Hive UDFs that throw exceptions should return NULL
 select throws_exception();
----- TYPES
-boolean
----- RESULTS
-NULL
-====
----- QUERY
-set abort_java_udf_on_exception=true;
-select throws_exception() from functional.alltypestiny;
 ---- CATCH
 Test exception
 ====
 ---- QUERY
 select throws_exception() from functional.alltypestiny;
----- TYPES
-boolean
----- RESULTS
-NULL
-NULL
-NULL
-NULL
-NULL
-NULL
-NULL
-NULL
+---- CATCH
+Test exception
 ====
 ---- QUERY
 select hive_add(cast(1 as int), cast(2 as int));

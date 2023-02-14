@@ -336,13 +336,23 @@ class TestUdfExecution(TestUdfBase):
       self.run_test_case('QueryTest/udf-no-expr-rewrite', vector, use_db=unique_database)
 
   def test_java_udfs(self, vector, unique_database):
+    vector = copy(vector)
+    vector.get_value('exec_option')['abort_java_udf_on_exception'] = True
     self.run_test_case('QueryTest/load-java-udfs', vector, use_db=unique_database)
     self.run_test_case('QueryTest/load-java-udfs-fail', vector, use_db=unique_database)
     self.run_test_case('QueryTest/java-udf', vector, use_db=unique_database)
+    vector.get_value('exec_option')['abort_java_udf_on_exception'] = False
+    self.run_test_case('QueryTest/java-udf-no-abort-on-exception', vector,
+        use_db=unique_database)
 
   def test_generic_java_udfs(self, vector, unique_database):
+    vector = copy(vector)
+    vector.get_value('exec_option')['abort_java_udf_on_exception'] = True
     self.run_test_case('QueryTest/load-generic-java-udfs', vector, use_db=unique_database)
     self.run_test_case('QueryTest/generic-java-udf', vector, use_db=unique_database)
+    vector.get_value('exec_option')['abort_java_udf_on_exception'] = False
+    self.run_test_case('QueryTest/generic-java-udf-no-abort-on-exception', vector,
+        use_db=unique_database)
 
   def test_udf_errors(self, vector, unique_database):
     # Only run with codegen disabled to force interpretation path to be taken.
