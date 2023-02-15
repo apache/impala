@@ -168,8 +168,7 @@ under the License.
       sort, join, aggregation, or analytic function operations The files are
       removed when the operation finishes. You can specify locations of the
       intermediate files by starting the <cmdname>impalad</cmdname> daemon with
-      the
-          <codeph>&#8209;&#8209;scratch_dirs="<varname>path_to_directory</varname>"</codeph>
+      the <codeph>--scratch_dirs="<varname>path_to_directory</varname>"</codeph>
       configuration option. By default, intermediate files are stored in the
       directory <filepath>/tmp/impala-scratch</filepath>.<p
         id="order_by_scratch_dir">
@@ -279,7 +278,7 @@ under the License.
     <section>
       <title>Priority Based Scratch Directory Selection</title>
       <p>The location of the intermediate files are configured by starting the impalad daemon with
-        the flag ‑‑scratch_dirs="path_to_directory". Currently this startup flag uses the configured
+        the flag <codeph>--scratch_dirs="path_to_directory"</codeph>. Currently this startup flag uses the configured
         scratch directories in a round robin fashion. Automatic selection of scratch directories in
         a round robin fashion may not always be ideal in every situation since these directories
         could come from different classes of storage system volumes having different performance
@@ -290,28 +289,25 @@ under the License.
         priorities of the directories and if you provide the same priority for multiple directories
         then the directories will be selected in a round robin fashion.</p>
       <p>The valid formats for specifying the priority directories are as shown here:
-        <codeblock>
-          &lt;dir-path>:&lt;limit>:&lt;priority>
-          &lt;dir-path>::&lt;priority>
+        <codeblock><varname>dir-path</varname>:<varname>limit</varname>:<varname>priority</varname>
+<varname>dir-path</varname>::<varname>priority</varname>
 </codeblock></p>
         <p>Example:</p>
       <p>
-        <codeblock>
-        /dir1:200GB:0
-        /dir1::0
+        <codeblock>/dir1:200GB:0
+/dir1::0
 </codeblock>
       </p>
       <p>The following formats use the default priority:
-        <codeblock>
-        /dir1
-        /dir1:200GB
-        /dir1:200GB:
+        <codeblock>/dir1
+/dir1:200GB
+/dir1:200GB:
 </codeblock>
       </p>
       <p>In the example below, dir1 will be used as a spill victim until it is full and then dir2, dir3,
         and dir4 will be used in a round robin fashion.</p>
       <p>
-        <codeblock>‑‑scratch_dirs="/dir1:200GB:0, /dir2:1024GB:1, /dir3:1024GB:1, /dir4:1024GB:1"
+        <codeblock>--scratch_dirs="/dir1:200GB:0, /dir2:1024GB:1, /dir3:1024GB:1, /dir4:1024GB:1"
 </codeblock>
       </p>
     </section>
@@ -349,8 +345,8 @@ under the License.
         large sorts, joins, aggregations, or analytic function operations. If your workload results
         in large volumes of intermediate data being written, it is recommended to configure the
         heavy spilling queries to use a remote storage location rather than the local one. The
-        advantage of using remote storage for scratch space is that it is elastic and can handle any
-        amount of spilling.</p>
+        advantage of using remote storage for scratch space is that it is elastic and can handle
+        any amount of spilling.</p>
       <p><b>Before you begin</b></p>
       <p>Identify the URL for an S3 bucket to which you want your new Impala to write the temporary
         data. If you use the S3 bucket that is associated with the environment, navigate to the S3
@@ -358,8 +354,10 @@ under the License.
         your environment to use the external S3 bucket with the correct read/write permissions.</p>
       <p><b>Configuring the Start-up Option in Impala daemon</b></p>
       <p>You can use the Impalad start option scratch_dirs to specify the locations of the
-        intermediate files. The format of the option is <codeph>scratch_dirs= remote_dir, local_buffer_dir(,
-          local_dir…).</codeph></p>
+        intermediate files. The format of the option is:</p>
+      <codeblock>--scratch_dirs="<varname>remote_dir</varname>, <varname>local_buffer_dir</varname> (,<varname>local_dir</varname>…)"</codeblock>
+      <p>where <varname>local_buffer_dir</varname> and <varname>local_dir</varname> conform to the
+        earlier descriptions for scratch directories.</p>
       <p>With the option specified above:</p>
       <ul>
         <li>You can specify only one remote directory. When you configure a remote directory, you
@@ -368,18 +366,20 @@ under the License.
           first local directory would be used as the local buffer directory.</li>
         <li>If you configure both remote and local directories, the remote directory is only used
           when the local directories are fully utilized.</li>
-        <li>The size of a remote intermediate file could affect the query performance, and the value
-          can be set by <codeph>>remote_tmp_file_size</codeph> in the start-up option. The default
-          size of a remote intermediate file is 16MB while the maximum is 256MB.</li>
+        <li>The size of a remote intermediate file could affect the query performance, and the
+          value can be set by <codeph>--remote_tmp_file_size=<varname>size</varname></codeph> in
+          the start-up option. The default size of a remote intermediate file is 16MB while the
+          maximum is 512MB.</li>
       </ul>
       <p><b>Examples</b></p>
       <ul>
-        <li>A remote scratch dir with one local buffer dir, file size 64MB.
-          <codeblock>‑‑scratch_dirs="s3a://remote_dir, /local_buffer_dir" ‑‑remote_tmp_file_size=64M</codeblock></li>
-        <li>A remote scratch dir with one local buffer dir, and one local dir.
-          <codeblock>‑‑scratch_dirs="s3a://remote_dir, /local_buffer_dir, /local_dir"</codeblock></li>
-        <li>A remote scratch dir with one local buffer dir, and multiple local dirs.
-          <codeblock>‑‑scratch_dirs="s3a://remote_dir, /local_buffer_dir, /local_dir_1, /local_dir_2"</codeblock></li>
+        <li>A remote scratch dir with a local buffer dir, file size 64MB.
+          <codeblock>--scratch_dirs=s3a://remote_dir,/local_buffer_dir --remote_tmp_file_size=64M</codeblock></li>
+        <li>A remote scratch dir with a local buffer dir limited to 256MB, and one local dir
+          limited to 10GB.
+          <codeblock>--scratch_dirs=s3a://remote_dir,/local_buffer_dir:256M,/local_dir:10G</codeblock></li>
+        <li>A remote scratch dir with a local buffer dir, and multiple prioritized local dirs.
+          <codeblock>--scratch_dirs=s3a://remote_dir,/local_buffer_dir,/local_dir_1:5G:1,/local_dir_2:5G:2</codeblock></li>
       </ul>
     </section>
     <section>
@@ -388,52 +388,55 @@ under the License.
         large sorts, joins, aggregations, or analytic function operations. If your workload results
         in large volumes of intermediate data being written, it is recommended to configure the
         heavy spilling queries to use a remote storage location rather than the local one. The
-        advantage of using remote storage for scratch space is that it is elastic and can handle any
-        amount of spilling.</p>
+        advantage of using remote storage for scratch space is that it is elastic and can handle
+        any amount of spilling.</p>
       <p><b>Before you begin</b></p>
       <ul>
         <li>Identify the HDFS scratch directory where you want your new Impala to write the
           temporary data.</li>
-        <li>Identify the port number of the HDFS scratch directory.</li>
+        <li>Identify the IP address, host name, or service identifier of HDFS.</li>
+        <li>Identify the port number of the HDFS NameNode (if not-default).</li>
         <li>Configure Impala to write temporary data to disk during query processing.</li>
       </ul>
       <p><b>Configuring the Start-up Option in Impala daemon</b></p>
-      <p>You can use the Impalad start option “scratch_dirs” to specify the locations of the
-        intermediate files.</p>
+      <p>You can use the Impalad start option <codeph>scratch_dirs</codeph> to specify the
+        locations of the intermediate files.</p>
       <p>Use the following format for this start up option:</p>
-      <codeblock>‑‑scratch_dirs=”hdfs://ip_address:port_num(:max_bytes)(:priority), /local_buffer_dir” ‑‑remote_tmp_file_size=xM</codeblock>
+      <codeblock>--scratch_dirs="hdfs://<varname>authority</varname>/<varname>path</varname>(:<varname>max_bytes</varname>), <varname>local_buffer_dir</varname> (,<varname>local_dir</varname>…)"</codeblock>
       <ul>
-        <li>Where <codeph>“hdfs://ip_address:port_num/path(:max_bytes)(:priority)”</codeph> is the remote
-          directory.</li>
-        <li><codeph>port_num</codeph> is required for the HDFS scratch directory.</li>
-        <li><codeph>max_bytes</codeph> and <codeph>priority</codeph> are optional.</li>
+        <li>Where <codeph>hdfs://<varname>authority</varname>/<varname>path</varname></codeph> is
+          the remote directory.</li>
+        <li><varname>authority</varname> may include <codeph>ip_address</codeph> or
+          <codeph>hostname</codeph> and <codeph>port</codeph>, or <codeph>service_id</codeph>.</li>
+        <li><varname>max_bytes</varname> is optional.</li>
       </ul>
       <p>Using the above format:</p>
       <ul>
-        <li>You can specify only one remote directory.</li>
-        <li>When you configure a remote directory, you must specify a local buffer directory as the
-          buffer. However you can use multiple local directories with the remote directory. If you
-          specify multiple local directories, the first local directory would be used as the local
-          buffer directory.</li>
+        <li>You can specify only one remote directory. When you configure a remote directory, you
+          must specify a local buffer directory as the buffer. However you can use multiple local
+          directories with the remote directory. If you specify multiple local directories, the
+          first local directory would be used as the local buffer directory.</li>
         <li>If you configure both remote and local directories, the remote directory is only used
           when the local directories are fully utilized.</li>
-        <li>The size of a remote intermediate file could affect the query performance, and the value
-          can be set by “remote_tmp_file_size” in the start-up option. The default size of a remote
-          intermediate file is 16MB while the maximum is 512MB.</li>
+        <li>The size of a remote intermediate file could affect the query performance, and the
+          value can be set by <codeph>--remote_tmp_file_size=<varname>size</varname></codeph> in
+          the start-up option. The default size of a remote intermediate file is 16MB while the
+          maximum is 512MB.</li>
       </ul>
       <p><b>Examples</b></p>
       <ul>
-        <li>A hdfs scratch dir with one local buffer dir, file size 64MB. The space of hdfs scratch
+        <li>A HDFS scratch dir with one local buffer dir, file size 64MB. The space of HDFS scratch
           dir is limited to 300G.
-          <codeblock>‑‑scratch_dirs="hdfs://ip_address:port_num/path:300G, /local_buffer_dir" ‑‑remote_tmp_file_size=64M</codeblock></li>
-        <li>A hdfs scratch dir with one local buffer dir, and one local dir. The space of hdfs
-          scratch dir is limited to 300G.
-          <codeblock>‑‑scratch_dirs="hdfs://ip_address:port_num/path:300G, /local_buffer_dir, /local_dir"</codeblock></li>
-        <li>A hdfs scratch dir with one local buffer dir, and multiple local dirs. The space of hdfs
-          scratch dir is unlimited.
-          <codeblock>‑‑scratch_dirs="hdfs://ip_address:port_num/path, /local_buffer_dir, /local_dir_1, /local_dir_2"</codeblock></li>
+          <codeblock>--scratch_dirs=hdfs://10.0.0.49:20500/tmp:300G,/local_buffer_dir --remote_tmp_file_size=64M</codeblock></li>
+        <li>A HDFS scratch dir with one local buffer dir limited to 512MB, and one local dir
+          limited to 10GB. The space of HDFS scratch dir is limited to 300G. The HDFS NameNode uses
+          its default port (8020).
+          <codeblock>--scratch_dirs=hdfs://hdfsnn/tmp:300G,/local_buffer_dir:512M,/local_dir:10G</codeblock></li>
+        <li>A HDFS scratch dir with one local buffer dir, and multiple prioritized local dirs. The
+          space of HDFS scratch dir is unlimited. The HDFS service identifier is <codeph>hdfs1</codeph>.
+          <codeblock>--scratch_dirs=hdfs://hdfs1/tmp,/local_buffer_dir,/local_dir_1:5G:1,/local_dir_2:5G:2</codeblock></li>
       </ul>
-      <p>Even though max_bytes is optional it is highly recommended to configure for spilling to
+      <p>Even though max_bytes is optional, it is highly recommended to configure for spilling to
         HDFS because the HDFS cluster space is limited.</p>
     </section>
     <section>
@@ -442,12 +445,48 @@ under the License.
       <ul>
         <li>Identify the Ozone scratch directory where you want your new Impala to write the
           temporary data.</li>
-        <li>Identify the port number of the Ozone scratch directory.</li>
+        <li>Identify the IP address, host name, or service identifier of Ozone.</li>
+        <li>Identify the port number of the Ozone Manager (if not-default).</li>
       </ul>
       <p><b>Configuring the Start-up Option in Impala daemon</b></p>
-      <p>You can use the Impalad start option “scratch_dirs” to specify the locations of the
+      <p>You can use the Impalad start option <codeph>scratch_dirs</codeph> to specify the locations of the
         intermediate files.</p>
-      <codeblock>‑‑scratch_dirs=”ofs://ip_address:port_num(:max_bytes)(:priority), /local_buffer_dir” ‑‑remote_tmp_file_size=xM</codeblock>
+      <codeblock>--scratch_dirs="ofs://<varname>authority</varname>/<varname>path</varname>(:<varname>max_bytes</varname>), <varname>local_buffer_dir</varname> (,<varname>local_dir</varname>…)"</codeblock>
+      <ul>
+        <li>Where <codeph>ofs://<varname>authority</varname>/<varname>path</varname></codeph> is
+          the remote directory.</li>
+        <li><codeph>authority</codeph> may include <codeph>ip_address</codeph> or
+          <codeph>hostname</codeph> and <codeph>port</codeph>, or <codeph>service_id</codeph>.</li>
+        <li><codeph>max_bytes</codeph> is optional.</li>
+      </ul>
+      <p>Using the above format:</p>
+      <ul>
+        <li>You can specify only one remote directory. When you configure a remote directory, you
+          must specify a local buffer directory as the buffer. However you can use multiple local
+          directories with the remote directory. If you specify multiple local directories, the
+          first local directory would be used as the local buffer directory.</li>
+        <li>If you configure both remote and local directories, the remote directory is only used
+          when the local directories are fully utilized.</li>
+        <li>The size of a remote intermediate file could affect the query performance, and the
+          value can be set by <codeph>--remote_tmp_file_size=<varname>size</varname></codeph> in
+          the start-up option. The default size of a remote intermediate file is 16MB while the
+          maximum is 512MB.</li>
+      </ul>
+      <p><b>Examples</b></p>
+      <ul>
+        <li>An Ozone scratch dir with one local buffer dir, file size 64MB. The space of Ozone
+          scratch dir is limited to 300G.
+          <codeblock>--scratch_dirs=ofs://10.0.0.49:29000/tmp:300G,/local_buffer_dir --remote_tmp_file_size=64M</codeblock></li>
+        <li>An Ozone scratch dir with one local buffer dir limited to 512MB, and one local dir
+          limited to 10GB. The space of Ozone scratch dir is limited to 300G. The Ozone Manager
+          uses its default port (9862).
+          <codeblock>--scratch_dirs=ofs://ozonemgr/tmp:300G,/local_buffer_dir:512M,/local_dir:10G</codeblock></li>
+        <li>An Ozone scratch dir with one local buffer dir, and multiple prioritized local dirs. The
+          space of Ozone scratch dir is unlimited. The Ozone service identifier is <codeph>ozone1</codeph>.
+          <codeblock>--scratch_dirs=ofs://ozone1/tmp,/local_buffer_dir,/local_dir_1:5G:1,/local_dir_2:5G:2</codeblock></li>
+      </ul>
+      <p>Even though max_bytes is optional, it is highly recommended to configure for spilling to
+        Ozone because the Ozone cluster space is limited.</p>
     </section>
   </conbody>
 
