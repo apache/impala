@@ -1203,7 +1203,9 @@ public class HdfsScanNode extends ScanNode {
       long partitionNumRows = partition.getNumRows();
 
       analyzer.getDescTbl().addReferencedPartition(tbl_, partition.getId());
-      fileFormats_.add(partition.getFileFormat());
+      if (partition.getFileFormat() != HdfsFileFormat.ICEBERG) {
+        fileFormats_.add(partition.getFileFormat());
+      }
       if (!partition.getFileFormat().isParquetBased()) {
         allParquet = false;
       }
@@ -1387,7 +1389,7 @@ public class HdfsScanNode extends ScanNode {
         || partition.getFileFormat() == HdfsFileFormat.ORC)) {
       // IMPALA-8834 introduced the optimization for partition key scan by generating
       // one scan range for each HDFS file. With Parquet and ORC, we start with the last
-      // block is to get a scan range that contains a file footer for short-circuiting.
+      // block to get a scan range that contains a file footer for short-circuiting.
       i = fileDesc.getNumFileBlocks() - 1;
     }
     for (; i < fileDesc.getNumFileBlocks(); ++i) {
@@ -1973,6 +1975,9 @@ public class HdfsScanNode extends ScanNode {
       if (isPartitionKeyScan_) {
         output.append(detailPrefix + "partition key scan\n");
       }
+
+      String derivedExplain = getDerivedExplainString(detailPrefix, detailLevel);
+      if (!derivedExplain.isEmpty()) output.append(derivedExplain);
     }
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
       output.append(getStatsExplainString(detailPrefix)).append("\n");
@@ -2014,6 +2019,14 @@ public class HdfsScanNode extends ScanNode {
           .append("\n");
     }
     return output.toString();
+  }
+
+  // Overriding this function can be used to add extra information to the explain string
+  // of the HDFS Scan node from the derived classes (e.g. IcebergScanNode). Each new line
+  // in the output should be appended to 'explainLevel' to have the correct indentation.
+  protected String getDerivedExplainString(
+      String indentPrefix, TExplainLevel detailLevel) {
+    return "";
   }
 
   // Helper method that prints min max original conjuncts by tuple descriptor.

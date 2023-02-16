@@ -78,6 +78,7 @@ table_name:iceberg_alltypes_part, constraint:restrict_to, table_format:parquet/n
 table_name:iceberg_alltypes_part_orc, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_legacy_partition_schema_evolution, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_legacy_partition_schema_evolution_orc, constraint:restrict_to, table_format:parquet/none/none
+table_name:iceberg_partition_evolution, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_timestamp_part, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_timestamptz_part, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_uppercase_col, constraint:restrict_to, table_format:parquet/none/none

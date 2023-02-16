@@ -39,6 +39,7 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.expressions.Expression;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.expressions.Expression.Operation;
+import org.apache.iceberg.expressions.True;
 import org.apache.iceberg.expressions.UnboundPredicate;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.types.Types;
@@ -106,8 +107,14 @@ public class IcebergScanPlanner {
   private List<Expr> conjuncts_;
   private MultiAggregateInfo aggInfo_;
 
-  // Exprs in icebergConjuncts_ converted to Expression.
+  // Iceberg compatible expressions that are pushed down to Iceberg for query planning.
   private final List<Expression> icebergPredicates_ = new ArrayList<>();
+  // The Impala representation of the expressions in 'icebergPredicates_'
+  private final List<Expr> impalaIcebergPredicates_ = new ArrayList<>();
+  // Indicates whether we have to push down 'impalaIcebergPredicates' to Impala's scan
+  // node or has Iceberg already done the partition pruning and no further rows could be
+  // skipped using these filters.
+  private boolean canSkipPushingDownIcebergPredicates_ = false;
 
   private List<FileDescriptor> dataFilesWithoutDeletes_ = new ArrayList<>();
   private List<FileDescriptor> dataFilesWithDeletes_ = new ArrayList<>();
@@ -135,14 +142,15 @@ public class IcebergScanPlanner {
   }
 
   public PlanNode createIcebergScanPlan() throws ImpalaException {
-    analyzer_.materializeSlots(conjuncts_);
-
     if (!needIcebergForPlanning()) {
+      analyzer_.materializeSlots(conjuncts_);
       setFileDescriptorsBasedOnFileStore();
       return createIcebergScanPlanImpl();
     }
 
     filterFileDescriptors();
+    filterConjuncts();
+    analyzer_.materializeSlots(conjuncts_);
     return createIcebergScanPlanImpl();
   }
 
@@ -180,7 +188,8 @@ public class IcebergScanPlanner {
       // If there are no delete files we can just create a single SCAN node.
       Preconditions.checkState(dataFilesWithDeletes_.isEmpty());
       PlanNode ret = new IcebergScanNode(ctx_.getNextNodeId(), tblRef_, conjuncts_,
-          aggInfo_, dataFilesWithoutDeletes_, nonIdentityConjuncts_);
+          aggInfo_, dataFilesWithoutDeletes_, nonIdentityConjuncts_,
+          getSkippedConjuncts());
       ret.init(analyzer_);
       return ret;
     }
@@ -199,7 +208,7 @@ public class IcebergScanPlanner {
     // can just create a SCAN node for these and do a UNION ALL with the ANTI JOIN.
     IcebergScanNode dataScanNode = new IcebergScanNode(
         ctx_.getNextNodeId(), tblRef_, conjuncts_, aggInfo_, dataFilesWithoutDeletes_,
-        nonIdentityConjuncts_);
+        nonIdentityConjuncts_, getSkippedConjuncts());
     dataScanNode.init(analyzer_);
     List<Expr> outputExprs = tblRef_.getDesc().getSlots().stream().map(
         entry -> new SlotRef(entry)).collect(Collectors.toList());
@@ -233,12 +242,16 @@ public class IcebergScanPlanner {
     addDeletePositionSlots(deleteDeltaRef);
     IcebergScanNode dataScanNode = new IcebergScanNode(
         dataScanNodeId, tblRef_, conjuncts_, aggInfo_, dataFilesWithDeletes_,
-        nonIdentityConjuncts_);
+        nonIdentityConjuncts_, getSkippedConjuncts());
     dataScanNode.init(analyzer_);
     IcebergScanNode deleteScanNode = new IcebergScanNode(
-        deleteScanNodeId, deleteDeltaRef, /*conjuncts=*/Collections.emptyList(),
-        aggInfo_, Lists.newArrayList(deleteFiles_),
-        /*nonIdentityConjuncts=*/Collections.emptyList());
+        deleteScanNodeId,
+        deleteDeltaRef,
+        Collections.emptyList(), /*conjuncts*/
+        aggInfo_,
+        Lists.newArrayList(deleteFiles_),
+        Collections.emptyList(), /*nonIdentityConjuncts*/
+        Collections.emptyList()); /*skippedConjuncts*/
     deleteScanNode.init(analyzer_);
 
     // Now let's create the JOIN node
@@ -336,10 +349,15 @@ public class IcebergScanPlanner {
   private void filterFileDescriptors() throws ImpalaException {
     TimeTravelSpec timeTravelSpec = tblRef_.getTimeTravelSpec();
 
+    canSkipPushingDownIcebergPredicates_ = true;
     try (CloseableIterable<FileScanTask> fileScanTasks = IcebergUtil.planFiles(
-        getIceTable(), icebergPredicates_, timeTravelSpec)) {
+        getIceTable(), new ArrayList<Expression>(icebergPredicates_), timeTravelSpec)) {
       long dataFilesCacheMisses = 0;
       for (FileScanTask fileScanTask : fileScanTasks) {
+        Expression residualExpr = fileScanTask.residual();
+        if (residualExpr != null && !(residualExpr instanceof True)) {
+          canSkipPushingDownIcebergPredicates_ = false;
+        }
         Pair<FileDescriptor, Boolean> fileDesc = getFileDescriptor(fileScanTask.file());
         if (!fileDesc.second) ++dataFilesCacheMisses;
         if (fileScanTask.deletes().isEmpty()) {
@@ -360,7 +378,6 @@ public class IcebergScanPlanner {
           }
         }
       }
-
       if (dataFilesCacheMisses > 0) {
         Preconditions.checkState(timeTravelSpec != null);
         LOG.info("File descriptors had to be loaded on demand during time travel: " +
@@ -372,6 +389,17 @@ public class IcebergScanPlanner {
           e);
     }
     updateDeleteStatistics();
+  }
+
+  private void filterConjuncts() {
+    if (canSkipPushingDownIcebergPredicates_) {
+      conjuncts_.removeAll(impalaIcebergPredicates_);
+    }
+  }
+
+  private List<Expr> getSkippedConjuncts() {
+    if (!canSkipPushingDownIcebergPredicates_) return Collections.emptyList();
+    return impalaIcebergPredicates_;
   }
 
   private void updateDeleteStatistics() {
@@ -584,6 +612,7 @@ public class IcebergScanPlanner {
     Expression predicate = convertIcebergPredicate(expr);
     if (predicate != null) {
       icebergPredicates_.add(predicate);
+      impalaIcebergPredicates_.add(expr);
       LOG.debug("Push down the predicate: " + predicate + " to iceberg");
       return true;
     }

@@ -1265,6 +1265,15 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   /**
+   * Checks exercising predicate pushdown with Iceberg tables.
+   */
+  @Test
+  public void testIcebergPredicates() {
+    runPlannerTestFile("iceberg-predicates", "functional_parquet",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
+  /**
    * Check that Iceberg V2 table scans work as expected.
    */
   @Test

@@ -36,9 +36,9 @@ import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.Type;
-import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.fb.FbIcebergDataFileFormat;
+import org.apache.impala.thrift.TExplainLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,15 +52,20 @@ public class IcebergScanNode extends HdfsScanNode {
   private final static Logger LOG = LoggerFactory.getLogger(IcebergScanNode.class);
 
   private List<FileDescriptor> fileDescs_;
+
   // Conjuncts on columns not involved in IDENTITY-partitioning. Subset of 'conjuncts_',
   // but this does not include conjuncts on IDENTITY-partitioned columns, because such
   // conjuncts have already been pushed to Iceberg to filter out partitions/files, so
   // they don't have further selectivity on the surviving files.
   private List<Expr> nonIdentityConjuncts_;
 
+  // Conjuncts that will be skipped from pushing down to the scan node because Iceberg
+  // already applied them and they won't filter any further rows.
+  private List<Expr> skippedConjuncts_;
+
   public IcebergScanNode(PlanNodeId id, TableRef tblRef, List<Expr> conjuncts,
       MultiAggregateInfo aggInfo, List<FileDescriptor> fileDescs,
-      List<Expr> nonIdentityConjuncts)
+      List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts)
       throws ImpalaRuntimeException {
     super(id, tblRef.getDesc(), conjuncts,
         getIcebergPartition(((FeIcebergTable)tblRef.getTable()).getFeFsTable()), tblRef,
@@ -90,6 +95,7 @@ public class IcebergScanNode extends HdfsScanNode {
     if (hasParquet) fileFormats_.add(HdfsFileFormat.PARQUET);
     if (hasOrc) fileFormats_.add(HdfsFileFormat.ORC);
     if (hasAvro) fileFormats_.add(HdfsFileFormat.AVRO);
+    this.skippedConjuncts_ = skippedConjuncts;
   }
 
   /**
@@ -215,5 +221,15 @@ public class IcebergScanNode extends HdfsScanNode {
     Map<SampledPartitionMetadata, List<FileDescriptor>> result = new HashMap<>();
     result.put(sampledPartitionMetadata, sampleFiles);
     return result;
+  }
+
+  @Override
+  protected String getDerivedExplainString(
+      String indentPrefix, TExplainLevel detailLevel) {
+    if (!skippedConjuncts_.isEmpty()) {
+      return indentPrefix + String.format("skipped Iceberg predicates: %s\n",
+          Expr.getExplainString(skippedConjuncts_, detailLevel));
+    }
+    return "";
   }
 }

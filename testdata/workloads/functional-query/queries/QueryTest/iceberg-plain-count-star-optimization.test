@@ -144,6 +144,7 @@ explain select 123, count(*), 321 from ice_tbl;
 'SMALLINT)'
 ====
 ---- QUERY
+# Filtering by a partition column results in Iceberg doing the filtering instead of Impala.
 select
   count(*)
 from
@@ -153,8 +154,8 @@ where
 ---- RESULTS
 4
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 2
-aggregation(SUM, NumFileMetadataRead): 0
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 2
 ====
 ---- QUERY
 select

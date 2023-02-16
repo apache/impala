@@ -47,6 +47,22 @@ STRING, STRING, STRING, STRING
 ---- QUERY
 # Start testing predicate push-down for int column
 # The IN predicate matches all row group
+# Note, the filter on a non-partition col is needed in the below tests because without it Iceberg
+# could do the filtering for us and predicate pushdown to the scanners wouldn't be needed.
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_i in (0, 1, 2) and col_bi > 0;
+---- RESULTS
+9
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# Filtering only on a partition column is done by Iceberg and in Impala we can get the results
+# simply using file metadata.
 select
   count(1)
 from
@@ -56,17 +72,18 @@ where
 ---- RESULTS
 9
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 3
 ====
 ---- QUERY
-# The IN predicate matches two row group
+# The IN predicate matches two row groups
 # InList: constant expr
 select
   count(1)
 from
   ice_pred_pd1
 where
-  col_i in (ceil(-0.1), 1 * 2);
+  col_i in (ceil(-0.1), 1 * 2) and col_bi > 0;
 ---- RESULTS
 6
 ---- RUNTIME_PROFILE
@@ -79,7 +96,7 @@ select
 from
   ice_pred_pd1
 where
-  col_i in (0);
+  col_i in (0) and col_bi > 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
@@ -92,7 +109,7 @@ select
 from
   ice_pred_pd1
 where
-  col_i in (-1, 3);
+  col_i in (-1, 3) and col_bi > 0;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
@@ -422,11 +439,25 @@ select
 from
   ice_pred_pd1
 where
-  col_i not in (0, 1) and col_i >= 0;
+  col_i not in (0, 1) and col_i >= 0 and col_bi > 0;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# NOT_IN could be answered using file metadata if only partition cols are included
+select
+  count(1)
+from
+  ice_pred_pd1
+where
+  col_i not in (0, 1) and col_i >= 0;
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 1
 ====
 ---- QUERY
 # NOT_IN does not work because col_dt is not the partition column
