@@ -261,12 +261,17 @@ aggregation(SUM, ProbeRows): 7300
 SET RUNTIME_FILTER_MODE=GLOBAL;
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 with l as (select l_orderkey from tpch_parquet.lineitem UNION ALL
-           select l_orderkey from tpch_parquet.lineitem UNION ALL
-           select l_orderkey from tpch_parquet.lineitem UNION ALL
-           select l_orderkey from tpch_parquet.lineitem)
+           select l_orderkey + (6000000 * 1) from tpch_parquet.lineitem UNION ALL
+           select l_orderkey + (6000000 * 2) from tpch_parquet.lineitem UNION ALL
+           select l_orderkey + (6000000 * 3) from tpch_parquet.lineitem UNION ALL
+           select l_orderkey + (6000000 * 4) from tpch_parquet.lineitem UNION ALL
+           select l_orderkey + (6000000 * 5) from tpch_parquet.lineitem UNION ALL
+           select l_orderkey + (6000000 * 6) from tpch_parquet.lineitem UNION ALL
+           select l_orderkey + (6000000 * 7) from tpch_parquet.lineitem UNION ALL
+           select l_orderkey + (6000000 * 8) from tpch_parquet.lineitem)
 select STRAIGHT_JOIN count(*) from
     (select l_orderkey from tpch_parquet.lineitem a LIMIT 1) a
-    join (select l_orderkey from l UNION ALL select l_orderkey from l) b
+    join (select l_orderkey from l UNION ALL select l_orderkey + 100000000 from l) b
     on a.l_orderkey = -b.l_orderkey
 ---- RESULTS
 0

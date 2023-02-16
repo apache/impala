@@ -214,8 +214,12 @@ public final class RuntimeFilterGenerator {
     // for the filter. A value of -1 means no estimate is available, and default filter
     // parameters should be used.
     private long ndvEstimate_ = -1;
+    // NDV of the build side key expression.
+    private long buildKeyNdv_ = -1;
     // Size of the filter (in Bytes). Should be greater than zero for bloom filters.
     private long filterSizeBytes_ = 0;
+    // Size of the filter (in Bytes) before applying min/max filter sizes.
+    private long originalFilterSizeBytes_ = 0;
     // If true, the filter is produced by a broadcast join and there is at least one
     // destination scan node which is in the same fragment as the join; set in
     // DistributedPlanner.createHashJoinFragment().
@@ -658,7 +662,18 @@ public final class RuntimeFilterGenerator {
 
     public void setIsBroadcast(boolean isBroadcast) { isBroadcastJoin_ = isBroadcast; }
 
-    public void computeNdvEstimate() { ndvEstimate_ = src_.getChild(1).getCardinality(); }
+    public void computeNdvEstimate() {
+      ndvEstimate_ = src_.getChild(1).getCardinality();
+      buildKeyNdv_ = srcExpr_.getNumDistinctValues();
+
+      // Build side selectiveness is calculated into the cardinality but not into
+      // buildKeyNdv_. This can lead to overestimating NDV compared to how the Join node
+      // estimates build side NDV (JoinNode.getGenericJoinCardinalityInternal()).
+      if (buildKeyNdv_ >= 0) {
+        ndvEstimate_ =
+            ndvEstimate_ >= 0 ? Math.min(buildKeyNdv_, ndvEstimate_) : buildKeyNdv_;
+      }
+    }
 
     public void computeHasLocalTargets() {
       Preconditions.checkNotNull(src_.getFragment());
@@ -696,7 +711,8 @@ public final class RuntimeFilterGenerator {
       }
       double targetFpp = filterSizeLimits.targetFpp;
       int logFilterSize = FeSupport.GetMinLogSpaceForBloomFilter(ndvEstimate_, targetFpp);
-      filterSizeBytes_ = 1L << logFilterSize;
+      originalFilterSizeBytes_ = 1L << logFilterSize;
+      filterSizeBytes_ = originalFilterSizeBytes_;
       filterSizeBytes_ = Math.max(filterSizeBytes_, filterSizeLimits.minVal);
       filterSizeBytes_ = Math.min(filterSizeBytes_, filterSizeLimits.maxVal);
     }
@@ -718,7 +734,12 @@ public final class RuntimeFilterGenerator {
           .append("SrcExpr: " + getSrcExpr().debugString() +  " ")
           .append("Target(s): ")
           .append(Joiner.on(", ").join(targets_) + " ")
-          .append("Selectivity: " + getSelectivity()).toString();
+          .append("Selectivity: " + getSelectivity() + " ")
+          .append("Build key NDV: " + buildKeyNdv_ + " ")
+          .append("NDV estimate " + ndvEstimate_ + " ")
+          .append("Filter size (bytes): " + filterSizeBytes_ + " ")
+          .append("Original filter size (bytes): " + originalFilterSizeBytes_ + " ")
+          .toString();
     }
   }
 
@@ -754,14 +775,22 @@ public final class RuntimeFilterGenerator {
     int numBloomFilters = 0;
     for (RuntimeFilter filter : filters) {
       if (filter.getType() == TRuntimeFilterType.BLOOM) {
-        if (numBloomFilters >= maxNumBloomFilters) continue;
+        if (numBloomFilters >= maxNumBloomFilters) {
+          if (LOG.isTraceEnabled()) {
+            LOG.trace("Skip runtime filter (already reached max runtime filter count): "
+                + filter.debugString());
+          }
+          continue;
+        }
         ++numBloomFilters;
       }
       DistributionMode distMode = filter.src_.getDistributionMode();
       filter.setIsBroadcast(distMode == DistributionMode.BROADCAST);
       if (filter.getType() == TRuntimeFilterType.IN_LIST
           && distMode == DistributionMode.PARTITIONED) {
-        LOG.trace("Skip IN-list filter on partitioned join: {}", filter.debugString());
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("Skip IN-list filter on partitioned join: {}", filter.debugString());
+        }
         continue;
       }
       filter.computeHasLocalTargets();
