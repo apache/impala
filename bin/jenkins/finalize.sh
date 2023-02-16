@@ -67,7 +67,7 @@ if [[ $(find $LOGS_DIR -path "*minidumps*" -name "*dmp") ]]; then
   for minidump in $(find $LOGS_DIR -path "*minidumps*" -name "*dmp"); do
     # Since this is experimental, use it inside an if so that any error code doesn't
     # abort this script.
-    if ! bin/resolve_minidumps.py --minidump_file ${minidump} \
+    if ! "${IMPALA_HOME}"/bin/resolve_minidumps.py --minidump_file ${minidump} \
         --output_file ${minidump}_dumpedv2 ; then
       echo "bin/resolve_minidumps.py failed!"
     else
