@@ -27,6 +27,7 @@ from hive_metastore.ttypes import TruncateTableRequest
 from hive_metastore.ttypes import Table
 from hive_metastore.ttypes import StorageDescriptor
 from hive_metastore.ttypes import SerDeInfo
+from hive_metastore.ttypes import WriteNotificationLogBatchRequest
 
 from tests.util.event_processor_utils import EventProcessorUtils
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
@@ -983,12 +984,12 @@ class TestMetastoreService(CustomClusterTestSuite):
                       "--hms_port=5899 "
                       "--fallback_to_hms_on_errors=true "
     )
-    def test_compaction_apis(self):
+    def test_hms_apis(self):
         """
-        The test verifies if the following HMS compaction apis are
-        reachable from impala (so that MetastoreServiceHandler in impala
-        can talk to HMS through these APIs):
+        The test verifies if the following HMS apis are reachable from impala (so that
+        MetastoreServiceHandler in impala can talk to HMS through these APIs):
         1.  find_next_compact2
+        2.  add_write_notification_log_in_batch
         """
         catalog_hms_client = None
         tbl_name = ImpalaTestSuite.get_random_name(
@@ -997,6 +998,7 @@ class TestMetastoreService(CustomClusterTestSuite):
             catalog_hms_client, hive_transport = \
                 ImpalaTestSuite.create_hive_client(5899)
             assert catalog_hms_client is not None
+            # Test 1: verify find_next_compact2 api in HMS
             # create managed table
             self.run_stmt_in_hive("create transactional table default.{0} (c1 int)"
               .format(tbl_name))
@@ -1007,6 +1009,13 @@ class TestMetastoreService(CustomClusterTestSuite):
             compactRequest.workerVersion = "4.0.0"
             optionalCi = catalog_hms_client.find_next_compact2(compactRequest)
             # If the above call is successful then find_next_compact2 api is reachable.
+            # Test 2: verify add_write_notification_log_in_batch api in HMS
+            rqstList = list()
+            logBatchRequest = \
+                WriteNotificationLogBatchRequest("hive", "default", tbl_name, rqstList)
+            catalog_hms_client.add_write_notification_log_in_batch(logBatchRequest)
+            # If the above call is successful then HMS api
+            # add_write_notification_log_in_batch is reachable.
             catalog_hms_client.drop_table("default", tbl_name, True)
         finally:
             if catalog_hms_client is not None:

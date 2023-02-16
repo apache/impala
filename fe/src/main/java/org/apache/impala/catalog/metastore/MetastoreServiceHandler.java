@@ -273,7 +273,9 @@ import org.apache.hadoop.hive.metastore.api.WMGetTriggersForResourePlanResponse;
 import org.apache.hadoop.hive.metastore.api.WMValidateResourcePlanRequest;
 import org.apache.hadoop.hive.metastore.api.WMValidateResourcePlanResponse;
 import org.apache.hadoop.hive.metastore.api.WriteEventInfo;
+import org.apache.hadoop.hive.metastore.api.WriteNotificationLogBatchRequest;
 import org.apache.hadoop.hive.metastore.api.WriteNotificationLogRequest;
+import org.apache.hadoop.hive.metastore.api.WriteNotificationLogBatchResponse;
 import org.apache.hadoop.hive.metastore.api.WriteNotificationLogResponse;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf.ConfVars;
@@ -2405,6 +2407,15 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       throws MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       return client.getHiveClient().getThriftClient().find_next_compact2(rqst);
+    }
+  }
+
+  @Override
+  public WriteNotificationLogBatchResponse add_write_notification_log_in_batch(
+      WriteNotificationLogBatchRequest batchRequest) throws TException {
+    try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
+      return client.getHiveClient().getThriftClient()
+          .add_write_notification_log_in_batch(batchRequest);
     }
   }
 
