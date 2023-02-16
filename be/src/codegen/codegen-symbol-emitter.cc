@@ -74,7 +74,10 @@ void CodegenSymbolEmitter::NotifyObjectEmitted(const llvm::object::ObjectFile& o
     ProcessSymbol(&dwarf_ctx, pair.first, pair.second, &perf_map_entries, asm_file);
   }
 
-  if (asm_file.is_open()) asm_file.close();
+  if (asm_file.is_open()) {
+    asm_file.close();
+    LOG(INFO) << "Saved disassembly to " << asm_path_;
+  }
 
   ofstream perf_map_file;
   if (emit_perf_map_) {

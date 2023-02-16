@@ -1262,6 +1262,7 @@ Status LlvmCodeGen::FinalizeModule() {
     } else {
       f << GetIR(true);
       f.close();
+      LOG(INFO) << "Saved unoptimized IR to " << path;
     }
   }
 
@@ -1328,6 +1329,7 @@ Status LlvmCodeGen::FinalizeModule() {
     } else {
       f << GetIR(true);
       f.close();
+      LOG(INFO) << "Saved optimized IR to " << path;
     }
   }
 
