@@ -266,7 +266,8 @@ TraceReplayer::TraceReplayer(string trace_configuration)
 TraceReplayer::~TraceReplayer() {}
 
 Status TraceReplayer::Init() {
-  data_cache_.reset(new DataCache(trace_configuration_, /* trace_replay */ true));
+  data_cache_.reset(new DataCache(trace_configuration_, /* num_async_write_threads */ 0,
+      /* trace_replay */ true));
   RETURN_IF_ERROR(data_cache_->Init());
   initialized_ = true;
   return Status::OK();

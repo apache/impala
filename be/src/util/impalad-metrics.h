@@ -114,6 +114,20 @@ class ImpaladMetricKeys {
   /// Total number of entries evicted immediately from the remote data cache.
   static const char* IO_MGR_REMOTE_DATA_CACHE_INSTANT_EVICTIONS;
 
+  /// Total number of bytes async writes outstanding in the remote data cache.
+  static const char* IO_MGR_REMOTE_DATA_CACHE_ASYNC_WRITES_OUTSTANDING_BYTES;
+
+  /// Total number of async writes submitted in the remote data cache.
+  static const char* IO_MGR_REMOTE_DATA_CACHE_NUM_ASYNC_WRITES_SUBMITTED;
+
+  /// Total number of bytes not inserted in the remote data cache due to async writes
+  /// buffer size limit.
+  static const char* IO_MGR_REMOTE_DATA_CACHE_ASYNC_WRITES_DROPPED_BYTES;
+
+  /// Total number of entries not inserted in the remote data cache due to async writes
+  /// buffer size limit.
+  static const char* IO_MGR_REMOTE_DATA_CACHE_ASYNC_WRITES_DROPPED_ENTRIES;
+
   /// Total number of bytes written to disk by the io mgr (for spilling)
   static const char* IO_MGR_BYTES_WRITTEN;
 
@@ -274,6 +288,10 @@ class ImpaladMetrics {
   static IntCounter* IO_MGR_REMOTE_DATA_CACHE_DROPPED_BYTES;
   static IntCounter* IO_MGR_REMOTE_DATA_CACHE_DROPPED_ENTRIES;
   static IntCounter* IO_MGR_REMOTE_DATA_CACHE_INSTANT_EVICTIONS;
+  static IntCounter* IO_MGR_REMOTE_DATA_CACHE_ASYNC_WRITES_OUTSTANDING_BYTES;
+  static IntCounter* IO_MGR_REMOTE_DATA_CACHE_NUM_ASYNC_WRITES_SUBMITTED;
+  static IntCounter* IO_MGR_REMOTE_DATA_CACHE_ASYNC_WRITES_DROPPED_BYTES;
+  static IntCounter* IO_MGR_REMOTE_DATA_CACHE_ASYNC_WRITES_DROPPED_ENTRIES;
   static IntCounter* IO_MGR_SHORT_CIRCUIT_BYTES_READ;
   static IntCounter* IO_MGR_BYTES_WRITTEN;
   static IntCounter* IO_MGR_CACHED_FILE_HANDLES_REOPENED;

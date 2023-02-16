@@ -65,6 +65,8 @@ fi
 : ${DATA_CACHE_SIZE:=}
 # Data cache eviction policy
 : ${DATA_CACHE_EVICTION_POLICY:=}
+# Number of data cache async write threads.
+: ${DATA_CACHE_NUM_ASYNC_WRITE_THREADS:=}
 if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
   # TODO: Remove abort_on_config_error flag from here and create-load-data.sh once
   # checkConfiguration() accepts the local filesystem (see IMPALA-1850).
@@ -82,6 +84,10 @@ if [[ -n "${DATA_CACHE_DIR}" && -n "${DATA_CACHE_SIZE}" ]]; then
    if [[ -n "${DATA_CACHE_EVICTION_POLICY}" ]]; then
        TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} "`
            `"--data_cache_eviction_policy=${DATA_CACHE_EVICTION_POLICY}"
+   fi
+   if [[ -n "${DATA_CACHE_NUM_ASYNC_WRITE_THREADS}" ]]; then
+       TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} "`
+           `"--data_cache_num_async_write_threads=${DATA_CACHE_NUM_ASYNC_WRITE_THREADS}"
    fi
    # Force use of data cache for HDFS. Data cache is only enabled for remote reads.
    if [[ "${TARGET_FILESYSTEM}" == "hdfs" ]]; then

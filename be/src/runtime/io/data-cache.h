@@ -123,10 +123,10 @@ class DataCache {
   /// an optimized mode that skips all file operations and only does the metadata
   /// operations. This is used to replay the access trace and compare different cache
   /// configurations. See data-cache-trace.h
-  explicit DataCache(const std::string config, bool trace_replay = false)
-    : config_(config), trace_replay_(trace_replay) { }
+  explicit DataCache(const std::string config, int32_t num_async_write_threads = 0,
+      bool trace_replay = false);
 
-  ~DataCache() { ReleaseResources(); }
+  ~DataCache();
 
   /// Parses the configuration string, initializes all partitions in the cache by
   /// checking for storage space available and creates a backing file for caching.
@@ -200,6 +200,7 @@ class DataCache {
   class CacheFile;
   struct CacheKey;
   class CacheEntry;
+  class StoreTask;
 
   /// An implementation of a cache partition. Each partition maintains its own set of
   /// cache keys in a LRU cache.
@@ -390,6 +391,9 @@ class DataCache {
   /// The configuration string for the data cache.
   const std::string config_;
 
+  /// The capacity in bytes of one partition.
+  int64_t per_partition_capacity_;
+
   /// Set to true if this is only doing trace replay. Trace replay does only metadata
   /// operations, and no filesystem operations are required.
   bool trace_replay_;
@@ -405,6 +409,35 @@ class DataCache {
   /// Thread function called by threads in 'file_deleter_pool_' for deleting old files
   /// in partitions_[partition_idx].
   void DeleteOldFiles(uint32_t thread_id, int partition_idx);
+
+  /// Create a new store task and copy the data to a temporary buffer, then submit it to
+  /// the asynchronous write thread pool for handling. May abort due to buffer size limit.
+  /// Return true if success.
+  bool SubmitStoreTask(const std::string& filename, int64_t mtime, int64_t offset,
+      const uint8_t* buffer, int64_t buffer_len);
+
+  /// Called by StoreTask's d'tor, decrease the current_buffer_size_ by task's buffer_len.
+  void CompleteStoreTask(const StoreTask& task);
+
+  /// Thread pool for storing cache asynchronously, it is initialized only if
+  /// 'data_cache_num_async_write_threads' has been set above 0, and creates a
+  /// corresponding number of worker threads.
+  int32_t num_async_write_threads_;
+  using StoreTaskHandle = std::unique_ptr<const StoreTask>;
+  std::unique_ptr<ThreadPool<StoreTaskHandle>> storer_pool_;
+
+  /// Thread function called by threads in 'storer_pool_' for handling store task.
+  void HandleStoreTask(uint32_t thread_id, const StoreTaskHandle& task);
+
+  /// Limit of the total buffer size used by asynchronous store tasks, when the current
+  /// buffer size reaches the limit, the subsequent store task will be abandoned.
+  int64_t store_buffer_capacity_;
+
+  /// Total buffer size currently used by all asynchronous store tasks.
+  AtomicInt64 current_buffer_size_{0};
+
+  /// Call the corresponding cache partition for storing.
+  bool StoreInternal(const CacheKey& key, const uint8_t* buffer, int64_t buffer_len);
 
 };
 

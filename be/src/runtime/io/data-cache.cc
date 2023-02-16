@@ -116,12 +116,20 @@ DEFINE_string(data_cache_eviction_policy, "LRU",
     "(Advanced) The cache eviction policy to use for the data cache. "
     "Either 'LRU' (default) or 'LIRS' (experimental)");
 
+DEFINE_string(data_cache_async_write_buffer_limit, "1GB",
+    "(Experimental) Limit of the total buffer size used by asynchronous store tasks.");
+
 namespace impala {
 namespace io {
 
 static const int64_t PAGE_SIZE = 1L << 12;
 const char* DataCache::Partition::CACHE_FILE_PREFIX = "impala-cache-file-";
 const int MAX_FILE_DELETER_QUEUE_SIZE = 500;
+
+// This large value for the queue size is harmless because the total size of the entries
+// on the queue are bound by --data_cache_async_write_bufer_limit.
+const int MAX_STORE_TASK_QUEUE_SIZE = 1 << 20;
+
 static const char* PARTITION_PATH_METRIC_KEY_TEMPLATE =
     "impala-server.io-mgr.remote-data-cache-partition-$0.path";
 static const char* PARTITION_READ_LATENCY_METRIC_KEY_TEMPLATE =
@@ -376,6 +384,32 @@ struct DataCache::CacheKey {
   static constexpr int OFFSETOF_OFFSET = OFFSETOF_MTIME + sizeof(int64_t);
   static constexpr int OFFSETOF_FILENAME = OFFSETOF_OFFSET + sizeof(int64_t);
   faststring key_;
+};
+
+/// The class to abstract store behavior, holds a temporary buffer copied from the source
+/// buffer until store complete.
+class DataCache::StoreTask {
+ public:
+  explicit StoreTask(const std::string& filename, int64_t mtime, int64_t offset,
+      uint8_t* buffer, int64_t buffer_len, DataCache* cache)
+    : key_(filename, mtime, offset),
+      buffer_(buffer),
+      buffer_len_(buffer_len),
+      cache_(cache) { }
+
+  ~StoreTask() { cache_->CompleteStoreTask(*this); }
+
+  const CacheKey& key() const { return key_; }
+  const uint8_t* buffer() const { return buffer_.get(); }
+  int64_t buffer_len() const { return buffer_len_; }
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(StoreTask);
+
+  CacheKey key_;
+  std::unique_ptr<uint8_t[]> buffer_;
+  int64_t buffer_len_;
+  DataCache* cache_;
 };
 
 static Cache::EvictionPolicy GetCacheEvictionPolicy(const std::string& policy_string) {
@@ -742,9 +776,6 @@ bool DataCache::Partition::Store(const CacheKey& cache_key, const uint8_t* buffe
     // Limit the write concurrency to avoid blocking the caller (which could be calling
     // from the critical path of an IO read) when the cache becomes IO bound due to either
     // limited memory for page cache or the cache is undersized which leads to eviction.
-    //
-    // TODO: defer the writes to another thread which writes asynchronously. Need to bound
-    // the extra memory consumption for holding the temporary buffer though.
     const bool exceed_concurrency =
         pending_insert_set_.size() >= data_cache_write_concurrency_;
     if (exceed_concurrency ||
@@ -840,6 +871,14 @@ bool DataCache::Partition::VerifyChecksum(const string& ops_name, const CacheEnt
   return true;
 }
 
+DataCache::DataCache(const std::string config, int32_t num_async_write_threads,
+    bool trace_replay)
+  : config_(config),
+    trace_replay_(trace_replay),
+    num_async_write_threads_(num_async_write_threads) { }
+
+DataCache::~DataCache() { ReleaseResources(); }
+
 Status DataCache::Init() {
   // Verifies all the configured flags are sane.
   if (FLAGS_data_cache_file_max_size_bytes < PAGE_SIZE) {
@@ -861,12 +900,12 @@ Status DataCache::Init() {
 
   // Parse the capacity string to make sure it's well-formed.
   bool is_percent;
-  int64_t capacity = ParseUtil::ParseMemSpec(all_cache_configs[1], &is_percent, 0);
+  per_partition_capacity_ = ParseUtil::ParseMemSpec(all_cache_configs[1], &is_percent, 0);
   if (is_percent) {
     return Status(Substitute("Malformed data cache capacity configuration $0",
         all_cache_configs[1]));
   }
-  if (capacity < PAGE_SIZE) {
+  if (per_partition_capacity_ < PAGE_SIZE) {
     return Status(Substitute("Configured data cache capacity $0 is too small",
         all_cache_configs[1]));
   }
@@ -882,9 +921,9 @@ Status DataCache::Init() {
   int32_t partition_idx = 0;
   for (const string& dir_path : cache_dirs) {
     LOG(INFO) << "Adding partition " << dir_path << " with capacity "
-              << PrettyPrinter::PrintBytes(capacity);
+              << PrettyPrinter::PrintBytes(per_partition_capacity_);
     std::unique_ptr<Partition> partition =
-        make_unique<Partition>(partition_idx, dir_path, capacity,
+        make_unique<Partition>(partition_idx, dir_path, per_partition_capacity_,
             max_opened_files_per_partition, trace_replay_);
     RETURN_IF_ERROR(partition->Init());
     partitions_.emplace_back(move(partition));
@@ -897,16 +936,46 @@ Status DataCache::Init() {
     // will enqueue a request (i.e. a partition index) when it notices the number of files
     // in a partition exceeds the per-partition limit. The files in a partition will be
     // closed in the order they are created until it's within the per-partition limit.
-    file_deleter_pool_.reset(new ThreadPool<int>("impala-server",
+    file_deleter_pool_.reset(new ThreadPool<int>("data-cache",
         "data-cache-file-deleter", 1, MAX_FILE_DELETER_QUEUE_SIZE,
         bind<void>(&DataCache::DeleteOldFiles, this, _1, _2)));
     RETURN_IF_ERROR(file_deleter_pool_->Init());
+  }
+
+  /// If --data_cache_num_async_write_threads has been set above 0, the store behavior
+  /// will be asynchronous. A task queue and thread pool will be started for that.
+  if (num_async_write_threads_ > 0) {
+    if (UNLIKELY(trace_replay_)) {
+      return Status("Data cache does not support asynchronous writes when doing trace "
+          "replay. Please set 'data_cache_num_async_write_threads' to 0.");
+    }
+    // Parse the buffer limit string to make sure it's well-formed.
+    bool is_percent;
+    int64_t buffer_limit = ParseUtil::ParseMemSpec(
+        FLAGS_data_cache_async_write_buffer_limit, &is_percent, 0);
+    if (is_percent) {
+      return Status(Substitute("Malformed data cache write buffer limit configuration $0",
+          FLAGS_data_cache_async_write_buffer_limit));
+    }
+    if (!TestInfo::is_be_test() && buffer_limit < (1 << 23 /* 8MB */)) {
+      return Status(Substitute("Configured data cache write buffer limit $0 is too small "
+          "(less than 8MB)", FLAGS_data_cache_async_write_buffer_limit));
+    }
+    store_buffer_capacity_ = buffer_limit;
+    storer_pool_.reset(new ThreadPool<StoreTaskHandle>("data-cache", "data-cache-storer",
+        num_async_write_threads_, MAX_STORE_TASK_QUEUE_SIZE,
+        bind<void>(&DataCache::HandleStoreTask, this, _1, _2)));
+    RETURN_IF_ERROR(storer_pool_->Init());
   }
 
   return Status::OK();
 }
 
 void DataCache::ReleaseResources() {
+  if (storer_pool_) {
+    storer_pool_->Shutdown();
+    storer_pool_->Join();
+  }
   if (file_deleter_pool_) file_deleter_pool_->Shutdown();
   for (auto& partition : partitions_) partition->ReleaseResources();
 }
@@ -945,19 +1014,14 @@ bool DataCache::Store(const string& filename, int64_t mtime, int64_t offset,
     return false;
   }
 
+  // If the storer thread pool is available, data will be stored asynchronously.
+  if (num_async_write_threads_ > 0) {
+    return SubmitStoreTask(filename, mtime, offset, buffer, buffer_len);
+  }
+
   // Construct a cache key. The cache key is also hashed to compute the partition index.
   const CacheKey key(filename, mtime, offset);
-  int idx = key.Hash() % partitions_.size();
-  bool start_reclaim;
-  bool stored = partitions_[idx]->Store(key, buffer, buffer_len, &start_reclaim);
-  if (VLOG_IS_ON(3)) {
-    stringstream ss;
-    ss << std::hex << reinterpret_cast<int64_t>(buffer);
-    LOG(INFO) << Substitute("Storing $0 mtime: $1 offset: $2 bytes_to_read: $3 "
-        "buffer: 0x$4 stored: $5", filename, mtime, offset, buffer_len, ss.str(), stored);
-  }
-  if (start_reclaim) file_deleter_pool_->Offer(idx);
-  return stored;
+  return StoreInternal(key, buffer, buffer_len);
 }
 
 Status DataCache::CloseFilesAndVerifySizes() {
@@ -970,6 +1034,72 @@ Status DataCache::CloseFilesAndVerifySizes() {
 void DataCache::DeleteOldFiles(uint32_t thread_id, int partition_idx) {
   DCHECK_LT(partition_idx, partitions_.size());
   partitions_[partition_idx]->DeleteOldFiles();
+}
+
+bool DataCache::SubmitStoreTask(const std::string& filename, int64_t mtime,
+    int64_t offset, const uint8_t* buffer, int64_t buffer_len) {
+  const int64_t charge_len = BitUtil::RoundUp(buffer_len, PAGE_SIZE);
+  if (UNLIKELY(charge_len > per_partition_capacity_)) return false;
+
+  // Tries to increase the current_buffer_size_ by buffer_len before allocate buffer.
+  // If new size exceeds store_buffer_capacity_, return false and current_buffer_size_ is
+  // not changed.
+  while (true) {
+    int64_t current_size = current_buffer_size_.Load();
+    int64_t new_size = current_size + buffer_len;
+    if (UNLIKELY(new_size > store_buffer_capacity_)) {
+      VLOG(2) << Substitute("Failed to create store task due to buffer size limitation, "
+          "current buffer size: $0 size limitation: $1 require: $2",
+          current_size, store_buffer_capacity_, buffer_len);
+      ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_ASYNC_WRITES_DROPPED_BYTES->
+          Increment(buffer_len);
+      ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_ASYNC_WRITES_DROPPED_ENTRIES->Increment(1);
+      return false;
+    }
+    if (LIKELY(current_buffer_size_.CompareAndSwap(current_size, new_size))) {
+      ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_ASYNC_WRITES_OUTSTANDING_BYTES->SetValue(
+          current_buffer_size_.Load());
+      break;
+    }
+  }
+
+  DCHECK(buffer != nullptr);
+  // TODO: Should we use buffer pool instead of piecemeal memory allocate?
+  uint8_t* task_buffer = new uint8_t[buffer_len];
+  memcpy(task_buffer, buffer, buffer_len);
+
+  const StoreTask* task =
+      new StoreTask(filename, mtime, offset, task_buffer, buffer_len, this);
+  storer_pool_->Offer(StoreTaskHandle(task));
+  ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_NUM_ASYNC_WRITES_SUBMITTED->Increment(1);
+  return true;
+}
+
+void DataCache::CompleteStoreTask(const StoreTask& task) {
+  current_buffer_size_.Add(-task.buffer_len());
+  DCHECK_GE(current_buffer_size_.Load(), 0);
+  ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_ASYNC_WRITES_OUTSTANDING_BYTES->SetValue(
+      current_buffer_size_.Load());
+}
+
+void DataCache::HandleStoreTask(uint32_t thread_id, const StoreTaskHandle& task) {
+    StoreInternal(task->key(), task->buffer(), task->buffer_len());
+}
+
+bool DataCache::StoreInternal(const CacheKey& key, const uint8_t* buffer,
+    int64_t buffer_len) {
+  int idx = key.Hash() % partitions_.size();
+  bool start_reclaim;
+  bool stored = partitions_[idx]->Store(key, buffer, buffer_len, &start_reclaim);
+  if (VLOG_IS_ON(3)) {
+    stringstream ss;
+    ss << std::hex << reinterpret_cast<int64_t>(buffer);
+    LOG(INFO) << Substitute("Storing $0 mtime: $1 offset: $2 bytes_to_read: $3 "
+        "buffer: 0x$4 stored: $5", key.filename().ToString(), key.mtime(), key.offset(),
+        buffer_len, ss.str(), stored);
+  }
+  if (start_reclaim) file_deleter_pool_->Offer(idx);
+  return stored;
 }
 
 void DataCache::Partition::Trace(

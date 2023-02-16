@@ -74,6 +74,12 @@ DEFINE_string(data_cache, "", "The configuration string for IO data cache. "
     "a capacity quota per directory. For example /data/0,/data/1:1TB means the cache "
     "may use up to 2TB, with 1TB max in /data/0 and /data/1 respectively. Please note "
     "that each Impala daemon on a host must have a unique caching directory.");
+DEFINE_int32(data_cache_num_async_write_threads, 0,
+    "(Experimental) Number of data cache async write threads. Write threads will write "
+    "the cache asynchronously after IO thread read data, so IO thread will return more "
+    "quickly. The extra memory for temporary buffers is limited by "
+    "--data_cache_async_write_buffer_limit. If this's 0, then write will be "
+    "synchronous.");
 
 // Rotational disks should have 1 thread per disk to minimize seeks.  Non-rotational
 // don't have this penalty and benefit from multiple concurrent IO requests.
@@ -682,7 +688,8 @@ Status DiskIoMgr::Init() {
   DCHECK_EQ(ret, 0);
 
   if (!FLAGS_data_cache.empty()) {
-    remote_data_cache_.reset(new DataCache(FLAGS_data_cache));
+    remote_data_cache_.reset(
+        new DataCache(FLAGS_data_cache, FLAGS_data_cache_num_async_write_threads));
     RETURN_IF_ERROR(remote_data_cache_->Init());
   }
   return Status::OK();

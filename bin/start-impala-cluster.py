@@ -132,6 +132,10 @@ parser.add_option("--data_cache_size", dest="data_cache_size", default=0,
 parser.add_option("--data_cache_eviction_policy", dest="data_cache_eviction_policy",
                   default="LRU", help="This specifies the cache eviction policy to use "
                   "for the data cache")
+parser.add_option("--data_cache_num_async_write_threads",
+                  dest="data_cache_num_async_write_threads", default=0,
+                  help="This specifies the number of asynchronous write threads for the "
+                  "data cache, with 0 set means synchronous writes.")
 parser.add_option("--data_cache_enable_tracing", dest="data_cache_enable_tracing",
                   action="store_true", default=False,
                   help="If the data cache is enabled, this enables tracing accesses.")
@@ -408,6 +412,10 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
       # Add the eviction policy
       args = "-data_cache_eviction_policy={policy} {args}".format(
           policy=options.data_cache_eviction_policy, args=args)
+
+      # Add the number of async write threads.
+      args = "-data_cache_num_async_write_threads={num_threads} {args}".format(
+          num_threads=options.data_cache_num_async_write_threads, args=args)
 
       # Add access tracing arguments if requested
       if options.data_cache_enable_tracing:
