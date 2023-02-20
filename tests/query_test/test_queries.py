@@ -22,11 +22,12 @@ import re
 from copy import deepcopy
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfEC, SkipIfCatalogV2, SkipIfNotHdfsMinicluster
+from tests.common.skip import (
+    SkipIfEC, SkipIfCatalogV2, SkipIfNotHdfsMinicluster, SkipIfFS)
 from tests.common.test_dimensions import (
-   create_uncompressed_text_dimension, create_exec_option_dimension_from_dict,
-   create_client_protocol_dimension, hs2_parquet_constraint,
-   extend_exec_option_dimension, FILE_FORMAT_TO_STORED_AS_MAP)
+    create_uncompressed_text_dimension, create_exec_option_dimension_from_dict,
+    create_client_protocol_dimension, hs2_parquet_constraint,
+    extend_exec_option_dimension, FILE_FORMAT_TO_STORED_AS_MAP)
 from tests.util.filesystem_utils import get_fs_path
 from subprocess import check_call
 
@@ -363,6 +364,7 @@ class TestPartitionKeyScansWithMultipleBlocks(ImpalaTestSuite):
     self.client.execute("alter table %s.alltypes_multiblocks recover partitions"
         % (unique_database))
 
+  @SkipIfFS.hdfs_small_block
   def test_partition_key_scans_with_multiple_blocks_table(self, vector, unique_database):
     self._build_alltypes_multiblocks_table(vector, unique_database)
     result = self.execute_query_expect_success(self.client,
