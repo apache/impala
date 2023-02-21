@@ -492,15 +492,18 @@ class TestWebPage(ImpalaTestSuite):
     # chars + "..."
     expected_result = "select \"{0}...".format("x " * 121)
     check_if_contains = False
-    self.execute_query(query)
-    response_json = self.__run_query_and_get_debug_page(query, self.QUERIES_URL)
+    response_json = self.__run_query_and_get_debug_page(
+      query, self.QUERIES_URL, expected_state=self.client.QUERY_STATES["FINISHED"])
     # Search the json for the expected value.
-    for json_part in response_json['completed_queries']:
+    # The query can be in in_filght_queries even though it is in FINISHED state.
+    for json_part in itertools.chain(
+      response_json['completed_queries'], response_json['in_flight_queries']):
       if expected_result in json_part['stmt']:
         check_if_contains = True
         break
+
     assert check_if_contains, "No matching statement found in the jsons at {}: {}".format(
-        datetime.now(), response_json)
+        datetime.now(), json.dumps(response_json, sort_keys=True, indent=4))
 
   def __run_query_and_get_debug_page(self, query, page_url, query_options=None,
                                      expected_state=None):
