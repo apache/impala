@@ -418,6 +418,10 @@ class DiskIoMgr : public CacheLineAligned {
   /// is something invalid about the scan range.
   Status ValidateScanRange(ScanRange* range) WARN_UNUSED_RESULT;
 
+  /// Try to dump the data of remote data cache to disk, so it could be loaded when
+  /// impalad restart.
+  Status DumpDataCache();
+
   DataCache* remote_data_cache() { return remote_data_cache_.get(); }
 
  private:

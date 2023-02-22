@@ -16,6 +16,9 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from signal import SIGRTMIN
+from time import sleep
+
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
@@ -31,7 +34,7 @@ class TestDataCache(CustomClusterTestSuite):
   on the scheduler's behavior and number of HDFS blocks.
   """
   @classmethod
-  def get_workload(self):
+  def get_workload(cls):
     return 'functional-query'
 
   @classmethod
@@ -41,14 +44,20 @@ class TestDataCache(CustomClusterTestSuite):
     super(TestDataCache, cls).setup_class()
 
   def get_impalad_args(eviction_policy, high_write_concurrency=True,
-                       force_single_shard=True):
+                       force_single_shard=True, keep_across_restarts=False):
     impalad_args = ["--always_use_data_cache=true"]
     if (high_write_concurrency):
       impalad_args.append("--data_cache_write_concurrency=64")
     if (force_single_shard):
       impalad_args.append("--cache_force_single_shard")
+    if (keep_across_restarts):
+      impalad_args.append("--data_cache_keep_across_restarts=true")
+      impalad_args.append("--shutdown_grace_period_s=1")
     impalad_args.append("--data_cache_eviction_policy={0}".format(eviction_policy))
     return " ".join(impalad_args)
+
+  def get_data_cache_metric(self, suffix):
+    return self.get_metric('impala-server.io-mgr.remote-data-cache-' + suffix)
 
   CACHE_START_ARGS = "--data_cache_dir=/tmp --data_cache_size=500MB"
 
@@ -58,19 +67,17 @@ class TestDataCache(CustomClusterTestSuite):
     a single node to make it easier to verify the runtime profile. Also enables higher
     write concurrency and uses a single shard to avoid non-determinism.
     """
-    opened_file_handles_metric = 'impala-server.io.mgr.cached-file-handles-miss-count'
     self.run_test_case('QueryTest/data-cache', vector, unique_database)
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-dropped-bytes') >= 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-dropped-entries') >= 0
-    assert \
-        self.get_metric('impala-server.io-mgr.remote-data-cache-instant-evictions') >= 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-hit-bytes') > 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-hit-count') > 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-miss-bytes') > 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-miss-count') > 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-total-bytes') > 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-entries') > 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-writes') > 0
+    assert self.get_data_cache_metric('dropped-bytes') >= 0
+    assert self.get_data_cache_metric('dropped-entries') >= 0
+    assert self.get_data_cache_metric('instant-evictions') >= 0
+    assert self.get_data_cache_metric('hit-bytes') > 0
+    assert self.get_data_cache_metric('hit-count') > 0
+    assert self.get_data_cache_metric('miss-bytes') > 0
+    assert self.get_data_cache_metric('miss-count') > 0
+    assert self.get_data_cache_metric('total-bytes') > 0
+    assert self.get_data_cache_metric('num-entries') > 0
+    assert self.get_data_cache_metric('num-writes') > 0
 
     # Expect all cache hits results in no opened files.
     opened_file_handles_metric = 'impala-server.io.mgr.cached-file-handles-miss-count'
@@ -107,18 +114,18 @@ class TestDataCache(CustomClusterTestSuite):
     QUERY = "select * from tpch_parquet.lineitem"
     # Do a first run to warm up the cache. Expect no hits.
     self.execute_query(QUERY)
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-hit-bytes') == 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-hit-count') == 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-miss-bytes') > 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-miss-count') > 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-total-bytes') > 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-entries') > 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-writes') > 0
+    assert self.get_data_cache_metric('hit-bytes') == 0
+    assert self.get_data_cache_metric('hit-count') == 0
+    assert self.get_data_cache_metric('miss-bytes') > 0
+    assert self.get_data_cache_metric('miss-count') > 0
+    assert self.get_data_cache_metric('total-bytes') > 0
+    assert self.get_data_cache_metric('num-entries') > 0
+    assert self.get_data_cache_metric('num-writes') > 0
 
     # Do a second run. Expect some hits.
     self.execute_query(QUERY)
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-hit-bytes') > 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-hit-count') > 0
+    assert self.get_data_cache_metric('hit-bytes') > 0
+    assert self.get_data_cache_metric('hit-count') > 0
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -138,13 +145,13 @@ class TestDataCache(CustomClusterTestSuite):
 
   def __test_data_cache_disablement(self, vector):
     # Verifies that the cache metrics are all zero.
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-hit-bytes') == 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-hit-count') == 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-miss-bytes') == 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-miss-count') == 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-total-bytes') == 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-entries') == 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-writes') == 0
+    assert self.get_data_cache_metric('hit-bytes') == 0
+    assert self.get_data_cache_metric('hit-count') == 0
+    assert self.get_data_cache_metric('miss-bytes') == 0
+    assert self.get_data_cache_metric('miss-count') == 0
+    assert self.get_data_cache_metric('total-bytes') == 0
+    assert self.get_data_cache_metric('num-entries') == 0
+    assert self.get_data_cache_metric('num-writes') == 0
 
     # Runs a query with the cache disabled and then enabled against multiple file formats.
     # Verifies that the metrics stay at zero when the cache is disabled.
@@ -153,16 +160,11 @@ class TestDataCache(CustomClusterTestSuite):
       for file_format in ['text_gzip', 'parquet', 'avro', 'seq', 'rc']:
         QUERY = "select * from functional_{0}.alltypes".format(file_format)
         self.execute_query(QUERY, vector.get_value('exec_option'))
-        assert disable_cache ==\
-            (self.get_metric('impala-server.io-mgr.remote-data-cache-miss-bytes') == 0)
-        assert disable_cache ==\
-            (self.get_metric('impala-server.io-mgr.remote-data-cache-miss-count') == 0)
-        assert disable_cache ==\
-            (self.get_metric('impala-server.io-mgr.remote-data-cache-total-bytes') == 0)
-        assert disable_cache ==\
-            (self.get_metric('impala-server.io-mgr.remote-data-cache-num-entries') == 0)
-        assert disable_cache ==\
-            (self.get_metric('impala-server.io-mgr.remote-data-cache-num-writes') == 0)
+        assert disable_cache == (self.get_data_cache_metric('miss-bytes') == 0)
+        assert disable_cache == (self.get_data_cache_metric('miss-count') == 0)
+        assert disable_cache == (self.get_data_cache_metric('total-bytes') == 0)
+        assert disable_cache == (self.get_data_cache_metric('num-entries') == 0)
+        assert disable_cache == (self.get_data_cache_metric('num-writes') == 0)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -192,23 +194,128 @@ class TestDataCache(CustomClusterTestSuite):
     # 8MB cache inserts to be instantly evicted.
     QUERY = "select count(*) from tpch.lineitem"
     self.execute_query(QUERY)
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-miss-bytes') > 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-miss-count') > 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-total-bytes') >= 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-entries') >= 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-writes') >= 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-instant-evictions') > 0
+    assert self.get_data_cache_metric('miss-bytes') > 0
+    assert self.get_data_cache_metric('miss-count') > 0
+    assert self.get_data_cache_metric('total-bytes') >= 0
+    assert self.get_data_cache_metric('num-entries') >= 0
+    assert self.get_data_cache_metric('num-writes') >= 0
+    assert self.get_data_cache_metric('instant-evictions') > 0
 
     # Run the query multiple times and verify that none of the counters go negative
     instant_evictions_before = \
-        self.get_metric('impala-server.io-mgr.remote-data-cache-instant-evictions')
+        self.get_data_cache_metric('instant-evictions')
     for i in range(10):
       self.execute_query(QUERY)
     instant_evictions_after = \
-        self.get_metric('impala-server.io-mgr.remote-data-cache-instant-evictions')
+        self.get_data_cache_metric('instant-evictions')
     assert instant_evictions_after - instant_evictions_before > 0
 
     # All the counters remain positive
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-entries') >= 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-writes') >= 0
-    assert self.get_metric('impala-server.io-mgr.remote-data-cache-total-bytes') >= 0
+    assert self.get_data_cache_metric('num-entries') >= 0
+    assert self.get_data_cache_metric('num-writes') >= 0
+    assert self.get_data_cache_metric('total-bytes') >= 0
+
+  def __test_data_cache_keep_across_restarts(self, vector, test_reduce_size=False):
+    QUERY = "select * from tpch_parquet.lineitem"
+    # Execute a query, record the total bytes and the number of entries of cache before
+    # cache dump.
+    self.execute_query(QUERY)
+    assert self.get_data_cache_metric('hit-bytes') == 0
+    assert self.get_data_cache_metric('hit-count') == 0
+    total_bytes = self.get_data_cache_metric('total-bytes')
+    num_entries = self.get_data_cache_metric('num-entries')
+
+    # Do graceful restart and, if necessary, reduce the cache size by 1/5.
+    impalad = self.cluster.impalads[0]
+    impalad.kill_and_wait_for_exit(SIGRTMIN)
+    new_size = 4 * total_bytes // 5
+    if test_reduce_size:
+      impalad.modify_argument('-data_cache', '/tmp/impala-datacache-0:' + str(new_size))
+    impalad.start()
+    impalad.service.wait_for_num_known_live_backends(1)
+
+    # After the restart, we expect the cache to have the same total bytes
+    # and number of entries as before the restart, and if the cache size is reduced,
+    # the metrics should be reduced accordingly.
+    if test_reduce_size:
+      assert self.get_data_cache_metric('total-bytes') <= new_size
+      assert self.get_data_cache_metric('num-entries') < num_entries
+    else:
+      assert self.get_data_cache_metric('total-bytes') == total_bytes
+      assert self.get_data_cache_metric('num-entries') == num_entries
+
+    # Reconnect to the service and execute the query, expecting some cache hits.
+    self.client.connect()
+    self.execute_query(QUERY)
+    assert self.get_data_cache_metric('hit-bytes') > 0
+    assert self.get_data_cache_metric('hit-count') > 0
+    if test_reduce_size:
+      assert self.get_data_cache_metric('miss-bytes') > 0
+      assert self.get_data_cache_metric('miss-count') > 0
+    else:
+      assert self.get_data_cache_metric('miss-bytes') == 0
+      assert self.get_data_cache_metric('miss-count') == 0
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=get_impalad_args("LRU", keep_across_restarts=True),
+      start_args=CACHE_START_ARGS, cluster_size=1)
+  def test_data_cache_keep_across_restarts_lru(self, vector):
+    self.__test_data_cache_keep_across_restarts(vector)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=get_impalad_args("LIRS", keep_across_restarts=True),
+      start_args=CACHE_START_ARGS, cluster_size=1)
+  def test_data_cache_keep_across_restarts_lirs(self, vector):
+    self.__test_data_cache_keep_across_restarts(vector)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=get_impalad_args("LRU", keep_across_restarts=True),
+      start_args=CACHE_START_ARGS, cluster_size=1)
+  def test_data_cache_reduce_size_restarts_lru(self, vector):
+    self.__test_data_cache_keep_across_restarts(vector, test_reduce_size=True)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=get_impalad_args("LIRS", keep_across_restarts=True),
+      start_args=CACHE_START_ARGS, cluster_size=1)
+  def test_data_cache_reduce_size_restarts_lirs(self, vector):
+    self.__test_data_cache_keep_across_restarts(vector, test_reduce_size=True)
+
+  def __test_data_cache_readonly(self, vector):
+    QUERY = "select * from tpch_parquet.lineitem"
+    # Execute the query asynchronously, wait a short while, and do gracefully shutdown
+    # immediately to test the race between cache writes and setting cache read-only.
+    handle = self.execute_query_async(QUERY)
+    sleep(1)
+    impalad = self.cluster.impalads[0]
+    impalad.kill(SIGRTMIN)
+    self.client.fetch(QUERY, handle)
+    self.client.close_query(handle)
+    impalad.wait_for_exit()
+    impalad.start()
+    impalad.service.wait_for_num_known_live_backends(1)
+
+    # We hope that in this case, the cache is still properly dumped and loaded,
+    # and then the same query is executed to expect some cache hits.
+    self.assert_impalad_log_contains('INFO', 'Partition 0 load successfully.')
+    self.client.connect()
+    self.execute_query(QUERY)
+    assert self.get_data_cache_metric('hit-bytes') > 0
+    assert self.get_data_cache_metric('hit-count') > 0
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=get_impalad_args("LRU", keep_across_restarts=True),
+      start_args=CACHE_START_ARGS, cluster_size=1)
+  def test_data_cache_readonly_lru(self, vector):
+    self.__test_data_cache_readonly(vector)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=get_impalad_args("LIRS", keep_across_restarts=True),
+      start_args=CACHE_START_ARGS, cluster_size=1)
+  def test_data_cache_readonly_lirs(self, vector):
+    self.__test_data_cache_readonly(vector)

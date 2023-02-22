@@ -93,6 +93,7 @@ class RLCacheShard : public CacheShard {
   void Release(HandleBase* handle) override;
   void Erase(const Slice& key, uint32_t hash) override;
   size_t Invalidate(const Cache::InvalidationControl& ctl) override;
+  vector<HandleBase*> Dump() override;
 
  private:
   void RL_Remove(RLHandle* e);
@@ -417,6 +418,19 @@ size_t RLCacheShard<policy>::Invalidate(const Cache::InvalidationControl& ctl) {
     to_remove_head = next;
   }
   return invalid_entry_count;
+}
+
+template<Cache::EvictionPolicy policy>
+vector<HandleBase*> RLCacheShard<policy>::Dump() {
+  std::lock_guard<decltype(mutex_)> l(mutex_);
+  vector<HandleBase*> handles;
+  RLHandle* h = rl_.next;
+  while (h != &rl_) {
+    h->refs.fetch_add(1, std::memory_order_relaxed);
+    handles.push_back(h);
+    h = h->next;
+  }
+  return handles;
 }
 
 }  // end anonymous namespace

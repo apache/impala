@@ -205,6 +205,7 @@ class CacheShard {
   virtual void Release(HandleBase* handle) = 0;
   virtual void Erase(const Slice& key, uint32_t hash) = 0;
   virtual size_t Invalidate(const Cache::InvalidationControl& ctl) = 0;
+  virtual vector<HandleBase*> Dump() = 0;
 };
 
 // Function to build a cache shard using the given eviction algorithm.
@@ -271,6 +272,10 @@ class ShardedCache : public Cache {
     shards_[Shard(hash)]->Erase(key, hash);
   }
 
+  Slice Key(const UniqueHandle& handle) const override {
+    return reinterpret_cast<HandleBase*>(handle.get())->key();
+  }
+
   Slice Value(const UniqueHandle& handle) const override {
     return reinterpret_cast<HandleBase*>(handle.get())->value();
   }
@@ -302,6 +307,17 @@ class ShardedCache : public Cache {
       invalidated_count += shard->Invalidate(ctl);
     }
     return invalidated_count;
+  }
+
+  vector<UniqueHandle> Dump() override {
+    vector<UniqueHandle> handles;
+    for (auto& shard : shards_) {
+      for (HandleBase* handle : shard->Dump()) {
+        handles.emplace_back(
+            reinterpret_cast<Cache::Handle*>(handle), Cache::HandleDeleter(this));
+      }
+    }
+    return handles;
   }
 
  protected:

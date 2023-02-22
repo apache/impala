@@ -428,6 +428,19 @@ class Process(object):
     self.kill(signal)
     self.wait_for_exit()
 
+  def modify_argument(self, argument, new_value):
+    """Modify the 'argument' in start args with new_value.
+    If no 'argument' in start args, add it.
+    If new_value is None, add or remove 'argument'."""
+    for i in range(1, len(self.cmd)):
+      if self.cmd[i].split('=')[0] == argument:
+        if new_value is None:
+          del self.cmd[i]
+        else:
+          self.cmd[i] = (argument + '=' + new_value)
+        return
+    self.cmd.append(argument if new_value is None else (argument + '=' + new_value))
+
 
 # Base class for all Impala processes
 class BaseImpalaProcess(Process):

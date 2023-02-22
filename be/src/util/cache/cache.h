@@ -183,6 +183,10 @@ class Cache {
   // to it have been released.
   virtual void Erase(const Slice& key) = 0;
 
+  // Return the key encapsulated in a raw handle returned by a successful
+  // Lookup().
+  virtual Slice Key(const UniqueHandle& handle) const = 0;
+
   // Return the value encapsulated in a raw handle returned by a successful
   // Lookup().
   virtual Slice Value(const UniqueHandle& handle) const = 0;
@@ -278,6 +282,10 @@ class Cache {
   //       contention with the concurrent request for the cache's contents.
   //       See the in-line documentation for IterationFunc for more details.
   virtual size_t Invalidate(const InvalidationControl& ctl) = 0;
+
+  // Walk through all valid entries in the cache and push their handles into the return
+  // vector.
+  virtual std::vector<UniqueHandle> Dump() = 0;
 
   // Functor to define a criterion on a cache entry's validity. Upon call
   // of Cache::Invalidate() method, if the functor returns 'false' for the

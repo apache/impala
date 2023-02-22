@@ -81,6 +81,13 @@ DEFINE_int32(data_cache_num_async_write_threads, 0,
     "--data_cache_async_write_buffer_limit. If this's 0, then write will be "
     "synchronous.");
 
+DEFINE_bool(data_cache_keep_across_restarts, false,
+    "(Experimental) If this is true, the data cache metadata is dumped to the same "
+    "directory as the cached files on disk when the process gracefully shutdowns. The "
+    "metadata will be reloaded the next time the process starts, so that the previous "
+    "cached data can be reused as if the process had never shutdown. If loading fails, "
+    "it will proceed with regular initialization.");
+
 // Rotational disks should have 1 thread per disk to minimize seeks.  Non-rotational
 // don't have this penalty and benefit from multiple concurrent IO requests.
 static const int THREADS_PER_ROTATIONAL_DISK = 1;
@@ -729,6 +736,13 @@ Status DiskIoMgr::AllocateBuffersForRange(
     BufferPool::ClientHandle* bp_client, ScanRange* range, int64_t max_bytes) {
   return range->AllocateBuffersForRange(bp_client, max_bytes,
       min_buffer_size_, max_buffer_size_);
+}
+
+Status DiskIoMgr::DumpDataCache() {
+  if (FLAGS_data_cache_keep_across_restarts && remote_data_cache_) {
+    return remote_data_cache_->Dump();
+  }
+  return Status::Expected("No cache dump is required.");
 }
 
 vector<int64_t> DiskIoMgr::ChooseBufferSizes(int64_t scan_range_len, int64_t max_bytes) {

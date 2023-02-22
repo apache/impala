@@ -78,6 +78,7 @@
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "runtime/tmp-file-mgr.h"
+#include "runtime/io/disk-io-mgr.h"
 #include "scheduling/admission-control-service.h"
 #include "scheduling/admission-controller.h"
 #include "service/cancellation-work.h"
@@ -3246,6 +3247,9 @@ Status ImpalaServer::StartShutdown(
     }
     curr_deadline = shutdown_deadline_.Load();
   }
+
+  // Dump the data cache before shutdown.
+  discard_result(ExecEnv::GetInstance()->disk_io_mgr()->DumpDataCache());
 
   while (shutting_down_.Load() == 0) {
     if (!shutting_down_.CompareAndSwap(0, now)) continue;

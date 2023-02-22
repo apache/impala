@@ -72,6 +72,7 @@ DECLARE_int32(max_data_cache_trace_file_size);
 DECLARE_int32(data_cache_trace_percentage);
 DECLARE_int32(data_cache_num_async_write_threads);
 DECLARE_string(data_cache_async_write_buffer_limit);
+DECLARE_bool(data_cache_keep_across_restarts);
 
 namespace impala {
 namespace io {
@@ -120,9 +121,13 @@ class DataCacheBaseTest : public testing::Test {
   //                             per thread; If false, the prefix for filenames is empty
   // 'expect_misses'           : If true, expect there will be cache misses when reading
   //                             from the cache
+  // 'test_readonly'           : Only for testing read-only, if true, set data cache
+  //                             read-only after create all threads, and check number of
+  //                             writes later
   //
   void MultiThreadedReadWrite(DataCache* cache, int64_t max_start_offset,
-      bool use_per_thread_filename, bool expect_misses, double* write_time_ms) {
+      bool use_per_thread_filename, bool expect_misses, double* write_time_ms,
+      bool test_readonly = false) {
     // Barrier to synchronize all threads so no thread will start probing the cache until
     // all insertions are done.
     CountingBarrier barrier(NUM_THREADS);
@@ -140,6 +145,14 @@ class DataCacheBaseTest : public testing::Test {
              &barrier, &num_misses[i], &write_times_us[i]), &thread));
       threads.emplace_back(std::move(thread));
     }
+
+    int64_t num_writes = 0;
+    if (test_readonly) {
+      // Set read-only before the writes are complete, and record the total write count of
+      // the cache after read-only set.
+      num_writes = cache->SetDataCacheReadOnly();
+    }
+
     int cache_misses = 0;
     int64_t avg_write_time_us = 0;
     for (int i = 0; i < NUM_THREADS; ++i) {
@@ -152,6 +165,13 @@ class DataCacheBaseTest : public testing::Test {
       ASSERT_GT(cache_misses, 0);
     } else {
       ASSERT_EQ(0, cache_misses);
+    }
+
+    if (test_readonly) {
+      // Revoke read-only and check the total write count, which should not have increased
+      // due to read-only.
+      ASSERT_EQ(num_writes, cache->RevokeDataCacheReadOnly());
+      return;
     }
 
     // Verify the backing files don't exceed size limits.
@@ -867,6 +887,116 @@ TEST_P(DataCacheTest, OutOfWriteBufferLimit) {
     }
   }
   EXPECT_LT(count, NUM_CACHE_ENTRIES_NO_EVICT);
+}
+
+TEST_P(DataCacheTest, SetReadOnly) {
+  const int64_t cache_size = DEFAULT_CACHE_SIZE;
+  DataCache cache(Substitute("$0:$1", data_cache_dirs()[0], std::to_string(cache_size)));
+  ASSERT_OK(cache.Init());
+
+  int64_t max_start_offset = NUM_CACHE_ENTRIES_NO_EVICT;
+  bool use_per_thread_filename = false;
+  // Set read-only for the first multi-threaded read-write test, which should expect there
+  // will be cache misses when reading from the cache.
+  bool expect_misses = true;
+  bool test_readonly = true;
+  double wait_time_ms = 0;
+  MultiThreadedReadWrite(&cache, max_start_offset, use_per_thread_filename,
+      expect_misses, &wait_time_ms, test_readonly);
+  LOG(INFO) << "SetReadOnly, "
+          << FLAGS_data_cache_eviction_policy << ", "
+          << (FLAGS_data_cache_num_async_write_threads > 0 ? "Async" : "Sync")
+          << ", write_time_ms: " << wait_time_ms;
+
+  // For the second test, do not set read-only, and no cache misses should occur.
+  expect_misses = false;
+  test_readonly = false;
+  MultiThreadedReadWrite(&cache, max_start_offset, use_per_thread_filename,
+      expect_misses, &wait_time_ms, test_readonly);
+  LOG(INFO) << "SetReadOnly, "
+        << FLAGS_data_cache_eviction_policy << ", "
+        << (FLAGS_data_cache_num_async_write_threads > 0 ? "Async" : "Sync")
+        << ", write_time_ms: " << wait_time_ms;
+}
+
+TEST_P(DataCacheTest, DumpAndLoad) {
+  FLAGS_data_cache_keep_across_restarts = true;
+
+  const int64_t cache_size = DEFAULT_CACHE_SIZE;
+  unique_ptr<DataCache> cache = make_unique<DataCache>(Substitute("$0:$1",
+      data_cache_dirs()[0], std::to_string(cache_size)));
+  ASSERT_OK(cache->Init());
+
+  int64_t max_start_offset = NUM_CACHE_ENTRIES_NO_EVICT;
+  for (int64_t offset = 0; offset < max_start_offset; ++offset) {
+    ASSERT_TRUE(cache->Store(FNAME, MTIME, offset, test_buffer() + offset,
+        TEMP_BUFFER_SIZE));
+  }
+  WaitForAsyncWrite(*cache);
+
+  // After completing the normal write, dump the cached data and then create a new data
+  // cache to load the dump file to initialize.
+  ASSERT_OK(cache->Dump());
+  cache.reset(new DataCache(Substitute("$0:$1", data_cache_dirs()[0],
+      std::to_string(cache_size))));
+  ASSERT_OK(cache->Init());
+
+  // There is no need to write again, just lookup all entries written before the dump one
+  // by one, should all hit the cache.
+  uint8_t buffer[TEMP_BUFFER_SIZE];
+  for (int64_t offset = 0; offset < max_start_offset; ++offset) {
+    memset(buffer, 0, TEMP_BUFFER_SIZE);
+    int64_t bytes_read =
+        cache->Lookup(FNAME, MTIME, offset, TEMP_BUFFER_SIZE, buffer);
+    ASSERT_EQ(TEMP_BUFFER_SIZE, bytes_read);
+    ASSERT_EQ(0, memcmp(buffer, test_buffer() + offset, TEMP_BUFFER_SIZE));
+  }
+}
+
+TEST_P(DataCacheTest, ChangeConfBeforeLoad) {
+  FLAGS_data_cache_keep_across_restarts = true;
+
+  const int64_t cache_size = DEFAULT_CACHE_SIZE;
+  unique_ptr<DataCache> cache = make_unique<DataCache>(Substitute("$0:$1",
+      data_cache_dirs()[0], std::to_string(cache_size)));
+  ASSERT_OK(cache->Init());
+
+  int64_t max_start_offset = NUM_CACHE_ENTRIES_NO_EVICT;
+  for (int64_t offset = 0; offset < max_start_offset; ++offset) {
+    ASSERT_TRUE(cache->Store(FNAME, MTIME, offset, test_buffer() + offset,
+        TEMP_BUFFER_SIZE));
+  }
+  WaitForAsyncWrite(*cache);
+
+  // After completing the normal write, dump the cached data and change some configs, then
+  // create a new data cache to load the dump file to initialize.
+  ASSERT_OK(cache->Dump());
+  const int64_t new_cache_size = DEFAULT_CACHE_SIZE / 2;
+  FLAGS_data_cache_eviction_policy =
+      FLAGS_data_cache_eviction_policy == "LRU" ? "LIRS" : "LRU";
+  cache.reset(new DataCache(Substitute("$0:$1", data_cache_dirs()[0],
+      std::to_string(new_cache_size))));
+  ASSERT_OK(cache->Init());
+
+  // Since we have reduced the data cache size and the previous writes have already
+  // reached the capacity limit, some data must have been discarded during the load
+  // process due to the new capacity limit. Therefore, there should be some misses.
+  int num_misses = 0;
+  uint8_t buffer[TEMP_BUFFER_SIZE];
+  for (int64_t offset = 0; offset < max_start_offset; ++offset) {
+    memset(buffer, 0, TEMP_BUFFER_SIZE);
+    int64_t bytes_read =
+        cache->Lookup(FNAME, MTIME, offset, TEMP_BUFFER_SIZE, buffer);
+    if (bytes_read == TEMP_BUFFER_SIZE) {
+      ASSERT_EQ(0, memcmp(buffer, test_buffer() + offset, TEMP_BUFFER_SIZE));
+    } else {
+      ASSERT_EQ(bytes_read, 0);
+      ++num_misses;
+    }
+  }
+
+  EXPECT_GT(num_misses, 0);
+  EXPECT_LT(num_misses, NUM_CACHE_ENTRIES_NO_EVICT);
 }
 
 } // namespace io

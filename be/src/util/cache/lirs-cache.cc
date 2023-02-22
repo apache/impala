@@ -330,6 +330,7 @@ class LIRSCacheShard : public CacheShard {
   void Release(HandleBase* handle) override;
   void Erase(const Slice& key, uint32_t hash) override;
   size_t Invalidate(const Cache::InvalidationControl& ctl) override;
+  vector<HandleBase*> Dump() override;
 
  private:
 
@@ -1095,6 +1096,39 @@ size_t LIRSCacheShard::Invalidate(const Cache::InvalidationControl& ctl) {
   DCHECK(initialized_);
   DCHECK(false) << "Invalidate() is not implemented for LIRS";
   return 0;
+}
+
+vector<HandleBase*> LIRSCacheShard::Dump() {
+  DCHECK(initialized_);
+  std::lock_guard<MutexType> l(mutex_);
+
+  // For LIRS cache we only collect resident entries (i.e. PROTECTED/UNPROTECTED entries),
+  // and ignore entries that are not resident (i.e. TOMBSTONE entries).
+  vector<HandleBase*> handles;
+
+  for (LIRSHandle& h : recency_list_) {
+    // First walk through 'recency_list_', only collecting PROTECTED entries, ignoring
+    // the UNPROTECTED/TOMBSTONE entries. UNPROTECTED entries will be collected later from
+    // the unprotected_tombstone_list_.
+    if (h.state() == PROTECTED) {
+      h.get_reference();
+      handles.push_back(&h);
+    }
+  }
+
+  if (unprotected_list_front_ != nullptr) {
+    DCHECK(unprotected_list_front_->unprotected_tombstone_list_hook_.is_linked());
+    // From 'unprotected_list_front_' to the end of 'unprotected_tombstone_list_' are all
+    // UNPROTECTED entries, collecting them all.
+    auto iter = unprotected_tombstone_list_.iterator_to(*unprotected_list_front_);
+    while (iter != unprotected_tombstone_list_.end()) {
+      iter->get_reference();
+      handles.push_back(&*iter);
+      ++iter;
+    }
+  }
+
+  return handles;
 }
 
 }  // end anonymous namespace

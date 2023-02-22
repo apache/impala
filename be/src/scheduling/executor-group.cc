@@ -96,6 +96,21 @@ void ExecutorGroup::AddExecutor(const BackendDescriptorPB& be_desc) {
     executor_ip_hash_ring_.AddNode(be_desc.ip_address());
   }
   be_descs.push_back(be_desc);
+
+  // When computing ScanRange assignment, if there are multiple backends on a host, a
+  // round-robin approach is taken. That is, which backend a ScanRange assigned to the
+  // host will eventually be assigned to depends on the order of these backends in the
+  // vector, and the corresponding code is located in
+  // Scheduler::AssignmentCtx::SelectExecutorOnHost(). Since backend's remote data cache
+  // have data dump-load ability, so it is better to keep the order of backends before and
+  // after restarting consistent (here using port sorting), to ensure that ScanRange
+  // assignments do not change after certain backends or even entire clusters restart, to
+  // improve data cache hit rate.
+  auto cmp = [](const BackendDescriptorPB& a, const BackendDescriptorPB& b) {
+    return a.address().port() < b.address().port();
+  };
+  std::sort(be_descs.begin(), be_descs.end(), cmp);
+
   executor_ip_map_[be_desc.address().hostname()] = be_desc.ip_address();
 
   DCHECK(be_desc.admit_mem_limit() > 0) << "Admit memory limit must be set for backends";
