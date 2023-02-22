@@ -137,10 +137,12 @@ bool ExecutorBlacklist::IsBlacklisted(
     const Entry& entry = entry_it->second;
     if (entry.state == State::BLACKLISTED) {
       if (cause != nullptr) *cause = entry.cause;
-      int64_t elapsed_ms = MonotonicMillis() - entry.blacklist_time_ms;
-      int64_t total_timeout_ms =
-          GetBlacklistTimeoutMs() * entry.num_consecutive_blacklistings;
-      *time_remaining_ms = total_timeout_ms - elapsed_ms;
+      if (time_remaining_ms != nullptr) {
+        int64_t elapsed_ms = MonotonicMillis() - entry.blacklist_time_ms;
+        int64_t total_timeout_ms =
+            GetBlacklistTimeoutMs() * entry.num_consecutive_blacklistings;
+        *time_remaining_ms = total_timeout_ms - elapsed_ms;
+      }
       return true;
     }
   }

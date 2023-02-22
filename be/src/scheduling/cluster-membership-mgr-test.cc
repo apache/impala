@@ -353,6 +353,25 @@ TEST_F(ClusterMembershipMgrTest, TwoInstances) {
   ASSERT_EQ(1, GetDefaultGroupSize(cmm2));
 }
 
+TEST_F(ClusterMembershipMgrTest, IsBlacklisted) {
+  const int NUM_BACKENDS = 2;
+  for (int i = 0; i < NUM_BACKENDS; ++i) CreateBackend();
+  EXPECT_EQ(NUM_BACKENDS, backends_.size());
+  EXPECT_EQ(backends_.size(), offline_.size());
+
+  while (!offline_.empty()) CreateCMM(offline_.front());
+  EXPECT_EQ(0, offline_.size());
+  EXPECT_EQ(NUM_BACKENDS, starting_.size());
+
+  while (!starting_.empty()) StartBackend(starting_.front());
+  EXPECT_EQ(0, starting_.size());
+  EXPECT_EQ(NUM_BACKENDS, running_.size());
+
+  backends_[0]->cmm->BlacklistExecutor(backends_[1]->desc->backend_id(), Status("error"));
+  ClusterMembershipMgr::SnapshotPtr snapshot = backends_[0]->cmm->GetSnapshot();
+  EXPECT_TRUE(snapshot->executor_blacklist.IsBlacklisted(*(backends_[1]->desc)));
+}
+
 // This test verifies the interaction between the ExecutorBlacklist and
 // ClusterMembershipMgr.
 TEST_F(ClusterMembershipMgrTest, ExecutorBlacklist) {
