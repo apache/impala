@@ -2714,7 +2714,7 @@ SELECT
   'grouping value' g
 FROM
   lineitem
-GROUP BY 2
+GROUP BY 3
 ---- LABELS
 AGG1,AGG2,G
 ---- RESULTS
