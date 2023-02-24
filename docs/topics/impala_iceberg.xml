@@ -606,4 +606,64 @@ ALTER TABLE ice_tbl EXECUTE expire_snapshots(now() - interval 5 days);
       </p>
     </conbody>
   </concept>
+
+  <concept id="iceberg_manifest_caching">
+    <title>Iceberg manifest caching</title>
+    <conbody>
+      <p>
+        Starting from version 1.1.0, Apache Iceberg provides a mechanism to cache the
+        contents of Iceberg manifest files in memory. This manifest caching feature helps
+        to reduce repeated reads of small Iceberg manifest files from remote storage by
+        Coordinators and Catalogd. This feature can be enabled for Impala Coordinators and
+        Catalogd by setting properties in Hadoop's core-site.xml as in the following:
+        <codeblock>
+iceberg.io-impl=org.apache.iceberg.hadoop.HadoopFileIO;
+iceberg.io.manifest.cache-enabled=true;
+iceberg.io.manifest.cache.max-total-bytes=104857600;
+iceberg.io.manifest.cache.expiration-interval-ms=3600000;
+iceberg.io.manifest.cache.max-content-length=8388608;
+        </codeblock>
+      </p>
+      <p>
+        The description of each property is as follows:
+        <ul>
+          <li>
+            <codeph>iceberg.io-impl</codeph>: custom FileIO implementation to use in a
+            catalog. Must be set to enable manifest caching. Impala defaults to
+            HadoopFileIO. It is recommended to not change this to other than HadoopFileIO.
+          </li>
+          <li>
+            <codeph>iceberg.io.manifest.cache-enabled</codeph>: enable/disable the
+            manifest caching feature.
+          </li>
+          <li>
+            <codeph>iceberg.io.manifest.cache.max-total-bytes</codeph>: maximum total
+            amount of bytes to cache in the manifest cache. Must be a positive value.
+          </li>
+          <li>
+            <codeph>iceberg.io.manifest.cache.expiration-interval-ms</codeph>: maximum
+            duration for which an entry stays in the manifest cache. Must be a
+            non-negative value. Setting zero means cache entries expire only if it gets
+            evicted due to memory pressure from
+            <codeph>iceberg.io.manifest.cache.max-total-bytes</codeph>.
+          </li>
+          <li>
+            <codeph>iceberg.io.manifest.cache.max-content-length</codeph>: maximum length
+            of a manifest file to be considered for caching in bytes. Manifest files with
+            a length exceeding this property value will not be cached. Must be set with a
+            positive value and lower than
+            <codeph>iceberg.io.manifest.cache.max-total-bytes</codeph>.
+          </li>
+        </ul>
+      </p>
+      <p>
+        Manifest caching only works for tables that are loaded with either of
+        HadoopCatalogs or HiveCatalogs. Individual HadoopCatalog and HiveCatalog will have
+        separate manifest caches with the same configuration. By default, only 8 catalogs
+        can have their manifest cache active in memory. This number can be raised by
+        setting a higher value in the java system property
+        <codeph>iceberg.io.manifest.cache.fileio-max</codeph>.
+      </p>
+    </conbody>
+  </concept>
 </concept>
