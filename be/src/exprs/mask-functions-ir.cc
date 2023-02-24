@@ -23,6 +23,7 @@
 #include <openssl/err.h>
 #include <openssl/sha.h>
 
+#include "codegen/impala-ir.h"
 #include "exprs/anyval-util.h"
 #include "exprs/math-functions.h"
 #include "exprs/string-functions.h"
@@ -213,9 +214,9 @@ static int GetUtf8CodePointCount(FunctionContext* ctx, const StringVal& val) {
 
 /// Mask the given string except the first 'un_mask_char_count' chars. Ported from
 /// org.apache.hadoop.hive.ql.udf.generic.GenericUDFMaskShowFirstN.
-static inline StringVal MaskShowFirstNImpl(FunctionContext* ctx, const StringVal& val,
-    int un_mask_char_count, int masked_upper_char, int masked_lower_char,
-    int masked_digit_char, int masked_other_char) {
+IR_ALWAYS_INLINE static inline StringVal MaskShowFirstNImpl(FunctionContext* ctx,
+    const StringVal& val, int un_mask_char_count, int masked_upper_char,
+    int masked_lower_char, int masked_digit_char, int masked_other_char) {
   // To be consistent with Hive, negative char_count is treated as 0.
   if (un_mask_char_count < 0) un_mask_char_count = 0;
   if (val.is_null || val.len == 0 || un_mask_char_count >= val.len) return val;
@@ -229,9 +230,9 @@ static inline StringVal MaskShowFirstNImpl(FunctionContext* ctx, const StringVal
 
 /// Mask the given string except the last 'un_mask_char_count' chars. Ported from
 /// org.apache.hadoop.hive.ql.udf.generic.GenericUDFMaskShowLastN.
-static inline StringVal MaskShowLastNImpl(FunctionContext* ctx, const StringVal& val,
-    int un_mask_char_count, int masked_upper_char, int masked_lower_char,
-    int masked_digit_char, int masked_other_char) {
+IR_ALWAYS_INLINE static inline StringVal MaskShowLastNImpl(FunctionContext* ctx,
+    const StringVal& val, int un_mask_char_count, int masked_upper_char,
+    int masked_lower_char, int masked_digit_char, int masked_other_char) {
   // To be consistent with Hive, negative char_count is treated as 0.
   if (un_mask_char_count < 0) un_mask_char_count = 0;
   if (val.is_null || val.len == 0 || un_mask_char_count >= val.len) return val;
@@ -247,9 +248,9 @@ static inline StringVal MaskShowLastNImpl(FunctionContext* ctx, const StringVal&
 
 /// Mask the first 'mask_char_count' chars of the given string. Ported from
 /// org.apache.hadoop.hive.ql.udf.generic.GenericUDFMaskFirstN.
-static inline StringVal MaskFirstNImpl(FunctionContext* ctx, const StringVal& val,
-    int mask_char_count, int masked_upper_char, int masked_lower_char,
-    int masked_digit_char, int masked_other_char) {
+IR_ALWAYS_INLINE static inline StringVal MaskFirstNImpl(FunctionContext* ctx,
+    const StringVal& val, int mask_char_count, int masked_upper_char,
+    int masked_lower_char, int masked_digit_char, int masked_other_char) {
   if (mask_char_count <= 0 || val.is_null || val.len == 0) return val;
   if (mask_char_count > val.len) mask_char_count = val.len;
   if (!ctx->impl()->GetConstFnAttr(FunctionContextImpl::UTF8_MODE)) {
@@ -262,9 +263,9 @@ static inline StringVal MaskFirstNImpl(FunctionContext* ctx, const StringVal& va
 
 /// Mask the last 'mask_char_count' chars of the given string. Ported from
 /// org.apache.hadoop.hive.ql.udf.generic.GenericUDFMaskLastN.
-static inline StringVal MaskLastNImpl(FunctionContext* ctx, const StringVal& val,
-    int mask_char_count, int masked_upper_char, int masked_lower_char,
-    int masked_digit_char, int masked_other_char) {
+IR_ALWAYS_INLINE static inline StringVal MaskLastNImpl(FunctionContext* ctx,
+    const StringVal& val, int mask_char_count, int masked_upper_char,
+    int masked_lower_char, int masked_digit_char, int masked_other_char) {
   if (mask_char_count <= 0 || val.is_null || val.len == 0) return val;
   if (mask_char_count > val.len) mask_char_count = val.len;
   if (!ctx->impl()->GetConstFnAttr(FunctionContextImpl::UTF8_MODE)) {
@@ -279,9 +280,9 @@ static inline StringVal MaskLastNImpl(FunctionContext* ctx, const StringVal& val
 
 /// Mask the whole given string. Ported from
 /// org.apache.hadoop.hive.ql.udf.generic.GenericUDFMask.
-static inline StringVal MaskImpl(FunctionContext* ctx, const StringVal& val,
-    int masked_upper_char, int masked_lower_char, int masked_digit_char,
-    int masked_other_char) {
+IR_ALWAYS_INLINE static inline StringVal MaskImpl(FunctionContext* ctx,
+    const StringVal& val, int masked_upper_char, int masked_lower_char,
+    int masked_digit_char, int masked_other_char) {
   if (val.is_null || val.len == 0) return val;
   if (!ctx->impl()->GetConstFnAttr(FunctionContextImpl::UTF8_MODE)) {
     return MaskSubStr(ctx, val, 0, val.len, masked_upper_char,
@@ -410,8 +411,8 @@ static DateVal MaskImpl(FunctionContext* ctx, const DateVal& val, int day_value,
 /// Gets the first character of 'str'. Returns 'default_value' if 'str' is empty.
 /// In UTF-8 mode, the first code point is returned.
 /// Otherwise, the first char is returned.
-static inline uint32_t GetFirstChar(FunctionContext* ctx, const StringVal& str,
-    uint32_t default_value) {
+IR_ALWAYS_INLINE static inline uint32_t GetFirstChar(FunctionContext* ctx,
+    const StringVal& str, uint32_t default_value) {
   // To be consistent with Hive, empty string is converted to default value. String with
   // length > 1 will only use its first char.
   if (str.len == 0) return default_value;
@@ -453,9 +454,12 @@ StringVal MaskFunctions::MaskShowFirstN(FunctionContext* ctx, const StringVal& v
   return MaskShowFirstNImpl(ctx, val, un_mask_char_count, MASKED_UPPERCASE,
       MASKED_LOWERCASE, MASKED_DIGIT, MASKED_OTHER_CHAR);
 }
-StringVal MaskFunctions::MaskShowFirstN(FunctionContext* ctx, const StringVal& val,
-    const IntVal& char_count, const StringVal& upper_char, const StringVal& lower_char,
-    const StringVal& digit_char, const StringVal& other_char) {
+// Marked as IR_ALWAYS_INLINE since this is called in another overload.
+// This way the overload can also replace GetConstFnAttr() calls in codegen.
+IR_ALWAYS_INLINE StringVal MaskFunctions::MaskShowFirstN(FunctionContext* ctx,
+    const StringVal& val, const IntVal& char_count, const StringVal& upper_char,
+    const StringVal& lower_char, const StringVal& digit_char,
+    const StringVal& other_char) {
   return MaskShowFirstNImpl(ctx, val, char_count.val,
       GetFirstChar(ctx, upper_char, MASKED_UPPERCASE),
       GetFirstChar(ctx, lower_char, MASKED_LOWERCASE),
@@ -540,9 +544,12 @@ StringVal MaskFunctions::MaskShowLastN(FunctionContext* ctx, const StringVal& va
   return MaskShowLastNImpl(ctx, val, un_mask_char_count, MASKED_UPPERCASE,
       MASKED_LOWERCASE, MASKED_DIGIT, MASKED_OTHER_CHAR);
 }
-StringVal MaskFunctions::MaskShowLastN(FunctionContext* ctx, const StringVal& val,
-    const IntVal& char_count, const StringVal& upper_char, const StringVal& lower_char,
-    const StringVal& digit_char, const StringVal& other_char) {
+// Marked as IR_ALWAYS_INLINE since this is called in another overload.
+// This way the overload can also replace GetConstFnAttr() calls in codegen.
+IR_ALWAYS_INLINE StringVal MaskFunctions::MaskShowLastN(FunctionContext* ctx,
+    const StringVal& val, const IntVal& char_count, const StringVal& upper_char,
+    const StringVal& lower_char, const StringVal& digit_char,
+    const StringVal& other_char) {
   return MaskShowLastNImpl(ctx, val, char_count.val,
       GetFirstChar(ctx, upper_char, MASKED_UPPERCASE),
       GetFirstChar(ctx, lower_char, MASKED_LOWERCASE),
@@ -617,9 +624,12 @@ StringVal MaskFunctions::MaskFirstN(FunctionContext* ctx, const StringVal& val,
   return MaskFirstNImpl(ctx, val, char_count.val, MASKED_UPPERCASE, MASKED_LOWERCASE,
       MASKED_DIGIT, MASKED_OTHER_CHAR);
 }
-StringVal MaskFunctions::MaskFirstN(FunctionContext* ctx, const StringVal& val,
-    const IntVal& char_count, const StringVal& upper_char, const StringVal& lower_char,
-    const StringVal& digit_char, const StringVal& other_char) {
+// Marked as IR_ALWAYS_INLINE since this is called in another overload.
+// This way the overload can also replace GetConstFnAttr() calls in codegen.
+IR_ALWAYS_INLINE StringVal MaskFunctions::MaskFirstN(FunctionContext* ctx,
+    const StringVal& val, const IntVal& char_count, const StringVal& upper_char,
+    const StringVal& lower_char, const StringVal& digit_char,
+    const StringVal& other_char) {
   return MaskFirstNImpl(ctx, val, char_count.val,
       GetFirstChar(ctx, upper_char, MASKED_UPPERCASE),
       GetFirstChar(ctx, lower_char, MASKED_LOWERCASE),
@@ -694,9 +704,12 @@ StringVal MaskFunctions::MaskLastN(FunctionContext* ctx, const StringVal& val,
   return MaskLastNImpl(ctx, val, char_count.val, MASKED_UPPERCASE, MASKED_LOWERCASE,
       MASKED_DIGIT, MASKED_OTHER_CHAR);
 }
-StringVal MaskFunctions::MaskLastN(FunctionContext* ctx, const StringVal& val,
-    const IntVal& char_count, const StringVal& upper_char, const StringVal& lower_char,
-    const StringVal& digit_char, const StringVal& other_char) {
+// Marked as IR_ALWAYS_INLINE since this is called in another overload.
+// This way the overload can also replace GetConstFnAttr() calls in codegen.
+IR_ALWAYS_INLINE StringVal MaskFunctions::MaskLastN(FunctionContext* ctx,
+    const StringVal& val, const IntVal& char_count, const StringVal& upper_char,
+    const StringVal& lower_char, const StringVal& digit_char,
+    const StringVal& other_char) {
   return MaskLastNImpl(ctx, val, char_count.val,
       GetFirstChar(ctx, upper_char, MASKED_UPPERCASE),
       GetFirstChar(ctx, lower_char, MASKED_LOWERCASE),
@@ -766,7 +779,9 @@ StringVal MaskFunctions::Mask(FunctionContext* ctx, const StringVal& val) {
   return MaskImpl(ctx, val, MASKED_UPPERCASE, MASKED_LOWERCASE, MASKED_DIGIT,
       MASKED_OTHER_CHAR);
 }
-StringVal MaskFunctions::Mask(FunctionContext* ctx, const StringVal& val,
+// Marked as IR_ALWAYS_INLINE since this is called in other overloads.
+// This way the overloads can also replace GetConstFnAttr() calls in codegen.
+IR_ALWAYS_INLINE StringVal MaskFunctions::Mask(FunctionContext* ctx, const StringVal& val,
     const StringVal& upper_char, const StringVal& lower_char,
     const StringVal& digit_char, const StringVal& other_char) {
   return MaskImpl(ctx, val,

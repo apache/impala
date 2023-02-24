@@ -57,7 +57,9 @@ uint64_t StringFunctions::re2_mem_limit_ = 8 << 20;
 //  - 1-indexed positions
 //  - supported negative positions (count from the end of the string)
 //  - [optional] len.  No len indicates longest substr possible
-StringVal StringFunctions::Substring(FunctionContext* context,
+// Marks as IR_ALWAYS_INLINE since this is called in other overloads.
+// So the overloads can also replace GetConstFnAttr() calls in codegen.
+IR_ALWAYS_INLINE StringVal StringFunctions::Substring(FunctionContext* context,
     const StringVal& str, const BigIntVal& pos, const BigIntVal& len) {
   if (str.is_null || pos.is_null || len.is_null) return StringVal::null();
   if (context->impl()->GetConstFnAttr(FunctionContextImpl::UTF8_MODE)) {
@@ -257,7 +259,7 @@ StringVal StringFunctions::Rpad(FunctionContext* context, const StringVal& str,
 
 IntVal StringFunctions::Length(FunctionContext* context, const StringVal& str) {
   if (str.is_null) return IntVal::null();
-  if (context->impl()->GetConstFnAttr(FunctionContextImpl::UTF8_MODE, 0)) {
+  if (context->impl()->GetConstFnAttr(FunctionContextImpl::UTF8_MODE)) {
     return Utf8Length(context, str);
   }
   return IntVal(str.len);
@@ -288,7 +290,10 @@ IntVal StringFunctions::Utf8Length(FunctionContext* context, const StringVal& st
   return IntVal(CountUtf8Chars(str.ptr, str.len));
 }
 
-StringVal StringFunctions::Lower(FunctionContext* context, const StringVal& str) {
+// Marks as IR_ALWAYS_INLINE since this is called in MaskFunctions::MaskHash().
+// So the caller can also replace GetConstFnAttr() calls in codegen.
+IR_ALWAYS_INLINE StringVal StringFunctions::Lower(FunctionContext* context,
+    const StringVal& str) {
   if (str.is_null) return StringVal::null();
   if (context->impl()->GetConstFnAttr(FunctionContextImpl::UTF8_MODE)) {
     return LowerUtf8(context, str);
@@ -879,8 +884,10 @@ IntVal StringFunctions::Ascii(FunctionContext* context, const StringVal& str) {
   return IntVal((str.len == 0) ? 0 : static_cast<int32_t>(str.ptr[0]));
 }
 
-IntVal StringFunctions::Instr(FunctionContext* context, const StringVal& str,
-    const StringVal& substr, const BigIntVal& start_position,
+// Marks as IR_ALWAYS_INLINE since this is called in other overloads.
+// So the overloads can also replace GetConstFnAttr() calls in codegen.
+IR_ALWAYS_INLINE IntVal StringFunctions::Instr(FunctionContext* context,
+    const StringVal& str, const StringVal& substr, const BigIntVal& start_position,
     const BigIntVal& occurrence) {
   if (str.is_null || substr.is_null || start_position.is_null || occurrence.is_null) {
     return IntVal::null();

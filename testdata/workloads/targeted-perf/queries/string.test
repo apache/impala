@@ -56,3 +56,63 @@ WHERE lower(l_comment) =     'egular courts above the'
 ---- TYPES
 BIGINT
 ====
+---- QUERY: PERF_STRING-Q8
+-- Make sure utf8 string functions are inlined in jitted codes so the checks for
+-- utf8 mode are replaced with constants
+SELECT count(*) FROM lineitem
+WHERE instr(l_comment, 'egular courts above the') > 0
+---- RESULTS
+28
+---- TYPES
+BIGINT
+====
+---- QUERY: PERF_STRING-Q9
+-- Make sure utf8 string functions are inlined in jitted codes so the checks for
+-- utf8 mode are replaced with constants
+SELECT count(*) FROM lineitem
+WHERE mask(l_comment) is null
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY: PERF_STRING-Q10
+-- Make sure utf8 string functions are inlined in jitted codes so the checks for
+-- utf8 mode are replaced with constants
+SELECT count(*) FROM lineitem
+WHERE mask_first_n(l_comment) is null
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY: PERF_STRING-Q11
+-- Make sure utf8 string functions are inlined in jitted codes so the checks for
+-- utf8 mode are replaced with constants
+SELECT count(*) FROM lineitem
+WHERE mask_show_first_n(l_comment) is null
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY: PERF_STRING-Q12
+-- Make sure utf8 string functions are inlined in jitted codes so the checks for
+-- utf8 mode are replaced with constants
+SELECT count(*) FROM lineitem
+WHERE mask_last_n(l_comment) is null
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY: PERF_STRING-Q13
+-- Make sure utf8 string functions are inlined in jitted codes so the checks for
+-- utf8 mode are replaced with constants
+SELECT count(*) FROM lineitem
+WHERE mask_show_last_n(l_comment) is null
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
