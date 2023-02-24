@@ -36,6 +36,7 @@ import org.apache.hive.service.rpc.thrift.*;
 import org.apache.impala.testutil.WebClient;
 import org.apache.impala.testutil.X509CertChain;
 import org.apache.thrift.transport.THttpClient;
+import org.hamcrest.Matcher;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.junit.After;
 import org.junit.Test;
@@ -51,6 +52,7 @@ public class JwtHttpTest {
   private static final String CA_CERT = "cacert.pem";
   private static final String SERVER_CERT = "server-cert.pem";
   private static final String SERVER_KEY = "server-key.pem";
+  private static final String JWKS_FILE_NAME = "jwks_rs256.json";
 
   WebClient client_ = new WebClient();
 
@@ -89,10 +91,31 @@ public class JwtHttpTest {
   private void setUp(String impaladArgs, String catalogdArgs,
       String statestoredArgs, int expectedRetCode)
       throws Exception {
-    if (createJWKSForWebServer_) createTempJWKSInWebServerRootDir("jwks_rs256.json");
+    if (createJWKSForWebServer_) createTempJWKSInWebServerRootDir(JWKS_FILE_NAME);
 
     int ret = CustomClusterRunner.StartImpalaCluster(
         impaladArgs, catalogdArgs, statestoredArgs);
+    assertEquals(expectedRetCode, ret);
+  }
+
+  /**
+   * Helper method to start a JWT auth enabled Impala cluster that has only a single
+   * coordinator daemon process.
+   *
+   * @param impaladArgs startup flags to send to the impala coordinator/executors
+   * @param catalogdArgs startup flags to send to the impala catalog
+   * @param statestoredArgs startup flags to send to the statestore
+   * @param expectedRetCode expected exit code for the start impala cluster command,
+   *                        if the cluster is expected to start successfully, set to 0
+   */
+  private void setUpWithSingleCoordinator(String impaladArgs, String catalogdArgs,
+      String statestoredArgs, int expectedRetCode)
+      throws Exception {
+    if (createJWKSForWebServer_) createTempJWKSInWebServerRootDir(JWKS_FILE_NAME);
+
+    int ret = CustomClusterRunner.StartImpalaCluster(
+      impaladArgs, catalogdArgs, statestoredArgs, new HashMap<String, String>(),
+      "--num_coordinators=1");
     assertEquals(expectedRetCode, ret);
   }
 
@@ -178,7 +201,8 @@ public class JwtHttpTest {
   public void testJwtAuth() throws Exception {
     createJWKSForWebServer_ = false;
     String jwksFilename =
-        new File(System.getenv("IMPALA_HOME"), "testdata/jwt/jwks_rs256.json").getPath();
+        new File(System.getenv("IMPALA_HOME"),
+        String.format("testdata/jwt/%s", JWKS_FILE_NAME)).getPath();
     setUp(String.format(
         "--jwt_token_auth=true --jwt_validate_signature=true --jwks_file_path=%s "
             + "--jwt_allow_without_tls=true",
@@ -404,7 +428,7 @@ public class JwtHttpTest {
     String jwksHttpUrl = "https://localhost:25010/www/temp_jwks.json";
     String impaladJwtArgs = String.format("--jwt_token_auth=true "
         + "--jwt_validate_signature=true --jwks_url=%s "
-        + "--jwt_allow_without_tls=true --log_dir=%s ",
+        + "--jwt_allow_without_tls=true --log_dir=%s --logbuflevel=-1 ",
         jwksHttpUrl, logDir.toAbsolutePath());
     String expectedErrString = String.format("Impalad services did not start correctly, "
         + "exiting.  Error: Error downloading JWKS from '%s': Network error: curl "
@@ -413,14 +437,9 @@ public class JwtHttpTest {
 
     // cluster start will fail because the TLS cert returned by the
     // JWKS server is not trusted
-    setUp(impaladJwtArgs, "", statestoreWebserverArgs, 1);
+    setUpWithSingleCoordinator(impaladJwtArgs, "", statestoreWebserverArgs, 1);
 
-    // check in the impalad logs that the server startup failed for the expected reason
-    List<String> logLines = Files.readAllLines(logDir.resolve("impalad.ERROR"));
-
-    assertThat(String.format("Impalad startup failed but not for the expected reason. "
-        + "See logs in the '%s' folder for details.", logDir), logLines,
-        hasItem(containsString(expectedErrString)));
+    checkCoordinatorLogs(expectedErrString, logDir);
   }
 
   /**
@@ -448,8 +467,9 @@ public class JwtHttpTest {
     String jwksHttpUrl = "https://localhost:25010/www/temp_jwks.json";
     String impaladJwtArgs = String.format("--jwt_token_auth=true "
         + "--jwt_validate_signature=true --jwks_url=%s "
-        + "--jwt_allow_without_tls=true --log_dir=%s --jwks_ca_certificate=%s ",
-        jwksHttpUrl, logDir.toAbsolutePath(), Paths.get(certDir, CA_CERT));
+        + "--jwt_allow_without_tls=true --log_dir=%s --jwks_ca_certificate=%s "
+        + "--logbuflevel=-1 ", jwksHttpUrl, logDir.toAbsolutePath(),
+        Paths.get(certDir, CA_CERT));
     String expectedErrString = String.format("Impalad services did not start correctly, "
         + "exiting.  Error: Error downloading JWKS from '%s': Network error: curl "
         + "error: SSL peer certificate or SSH remote key was not OK: SSL: "
@@ -458,13 +478,9 @@ public class JwtHttpTest {
 
     // cluster start will fail because the TLS cert returned by the
     // JWKS server is not trusted
-    setUp(impaladJwtArgs, "", statestoreWebserverArgs, 1);
+    setUpWithSingleCoordinator(impaladJwtArgs, "", statestoreWebserverArgs, 1);
 
-    // check in the impalad logs that the server startup failed for the expected reason
-    List<String> logLines = Files.readAllLines(logDir.resolve("impalad.ERROR"));
-    assertThat(String.format("Impalad startup failed but not for the expected reason. "
-        + "See logs in the '%s' folder for details.", logDir), logLines,
-        hasItem(containsString(expectedErrString)));
+    checkCoordinatorLogs(expectedErrString, logDir);
   }
 
   /**
@@ -523,5 +539,36 @@ public class JwtHttpTest {
     serverKeyWriter.close();
 
     return certDir.toString();
+  }
+
+  /**
+   * Asserts that the specified string is present in the impalad.ERROR file within the
+   * specified log directory.
+   *
+   * @param expectedString The impalad.ERROR file is searched for this string.  If it is
+   *                       not found, the test fails.
+   * @param logDir         Location of the directory where log files are stored.
+   */
+  private void checkCoordinatorLogs(String expectedString, Path logDir)
+      throws IOException, InterruptedException {
+    // check in the impalad logs that the server startup failed for the expected reason
+    List<String> logLines = null;
+    Matcher<Iterable<? super String>> m = hasItem(containsString(expectedString));
+
+    // writing logs to disk may take some time, try a few times to search for the
+    // expected error in the log
+    for (int i=0; i<10; i++) {
+      logLines = Files.readAllLines(logDir.resolve("impalad.ERROR"));
+      if (m.matches(logLines)) {
+        break;
+      }
+      Thread.sleep(250);
+    }
+
+    // runs the matcher one more time to ensure a descriptive failure message is
+    // generated if the assert fails
+    assertThat(String.format("Impalad startup failed but not for the expected reason. "
+        + "See logs in the '%s' folder for details.", logDir), logLines,
+        hasItem(containsString(expectedString)));
   }
 }
