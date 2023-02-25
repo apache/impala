@@ -90,6 +90,8 @@ OS_MAPPING = [
   OsMapping("suselinux11", "ec2-package-sles-11", None),
   OsMapping("suselinux12", "ec2-package-sles-12", "sles12"),
   OsMapping("suse12", "ec2-package-sles-12", "sles12"),
+  OsMapping("suselinux15", "ec2-package-sles-15", "sles15"),
+  OsMapping("suse15", "ec2-package-sles-15", "sles15"),
   OsMapping("ubuntu12.04", "ec2-package-ubuntu-12-04", None),
   OsMapping("ubuntu14.04", "ec2-package-ubuntu-14-04", None),
   OsMapping("ubuntu15.04", "ec2-package-ubuntu-14-04", None),
