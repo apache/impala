@@ -60,14 +60,14 @@ class TableFormatInfo(object):
 
   def __validate(self):
     if self.file_format not in TableFormatInfo.KNOWN_FILE_FORMATS:
-      raise ValueError, 'Unknown file format: %s' % self.file_format
+      raise ValueError('Unknown file format: %s' % self.file_format)
     if self.compression_codec not in TableFormatInfo.KNOWN_COMPRESSION_CODECS:
-      raise ValueError, 'Unknown compression codec: %s' % self.compression_codec
+      raise ValueError('Unknown compression codec: %s' % self.compression_codec)
     if self.compression_type not in TableFormatInfo.KNOWN_COMPRESSION_TYPES:
-      raise ValueError, 'Unknown compression type: %s' % self.compression_type
+      raise ValueError('Unknown compression type: %s' % self.compression_type)
     if (self.compression_codec == 'none' or self.compression_type == 'none') and\
         self.compression_codec != self.compression_type:
-      raise ValueError, 'Invalid combination of compression codec/type: %s' % str(self)
+      raise ValueError('Invalid combination of compression codec/type: %s' % str(self))
 
   @staticmethod
   def create_from_string(dataset, table_format_string):
@@ -79,11 +79,11 @@ class TableFormatInfo(object):
     or 'none' if the table is uncompressed.
     """
     if table_format_string is None:
-      raise ValueError, 'Table format string cannot be None'
+      raise ValueError('Table format string cannot be None')
 
     format_parts = table_format_string.strip().split('/')
     if len(format_parts) not in range(2, 4):
-      raise ValueError, 'Invalid table format %s' % table_format_string
+      raise ValueError('Invalid table format %s' % table_format_string)
 
     file_format, compression_codec = format_parts[:2]
     if len(format_parts) == 3:
@@ -288,7 +288,7 @@ def load_table_info_dimension(workload_name, exploration_strategy, file_formats=
       WORKLOAD_DIR, workload_name, '%s_%s.csv' % (workload_name, exploration_strategy))
 
   if not os.path.isfile(test_vector_file):
-    raise RuntimeError, 'Vector file not found: ' + test_vector_file
+    raise RuntimeError('Vector file not found: ' + test_vector_file)
 
   vector_values = []
 

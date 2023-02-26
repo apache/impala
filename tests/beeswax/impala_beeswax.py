@@ -136,7 +136,7 @@ class ImpalaBeeswaxClient(object):
 
   def set_query_options(self, query_option_dict):
     if query_option_dict is None:
-      raise ValueError, 'Cannot pass None value for query options'
+      raise ValueError('Cannot pass None value for query options')
     self.clear_query_options()
     for name, value in query_option_dict.iteritems():
       self.set_query_option(name, value)

@@ -130,7 +130,7 @@ def parse_table_constraints(constraints_file):
           schema_exclude[table_name.lower()] +=\
               map(parse_table_format_constraint, table_formats.split(','))
         else:
-          raise ValueError, 'Unknown constraint type: %s' % constraint_type
+          raise ValueError('Unknown constraint type: %s' % constraint_type)
   return schema_include, schema_exclude, schema_only
 
 def parse_table_format_constraint(table_format_constraint):
@@ -178,11 +178,11 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
     # with what looks like a subsection.
     header = text[:match.start()]
     if re.match(r'^%s' % SUBSECTION_DELIMITER, header):
-      raise RuntimeError, dedent("""
+      raise RuntimeError(dedent("""
           Header must not start with '%s'. Everything before the first line matching '%s'
           is considered header information and will be ignored. However a header must not
           start with '%s' to prevent test cases from accidentally being ignored.""" %
-          (SUBSECTION_DELIMITER, SECTION_DELIMITER, SUBSECTION_DELIMITER))
+          (SUBSECTION_DELIMITER, SECTION_DELIMITER, SUBSECTION_DELIMITER)))
     text = text[match.start():]
 
   # Split the test file up into sections. For each section, parse all subsections.
@@ -215,7 +215,7 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
           print('Unknown section \'%s\'' % subsection_name)
           continue
         else:
-          raise RuntimeError, 'Unknown subsection: %s' % subsection_name
+          raise RuntimeError('Unknown subsection: %s' % subsection_name)
 
       if subsection_name == 'QUERY' and subsection_comment:
         parsed_sections['QUERY_NAME'] = subsection_comment
@@ -229,7 +229,7 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
           elif comment.startswith('VERIFY'):
             parsed_sections['VERIFIER'] = comment
           else:
-            raise RuntimeError, 'Unknown subsection comment: %s' % comment
+            raise RuntimeError('Unknown subsection comment: %s' % comment)
 
       if subsection_name == 'CATCH':
         parsed_sections['CATCH'] = list()
@@ -238,7 +238,7 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
         elif subsection_comment == 'ANY_OF':
           parsed_sections['CATCH'].extend(lines_content)
         else:
-          raise RuntimeError, 'Unknown subsection comment: %s' % subsection_comment
+          raise RuntimeError('Unknown subsection comment: %s' % subsection_comment)
         for exception_str in parsed_sections['CATCH']:
           assert exception_str.strip(), "Empty exception string."
         continue
@@ -251,8 +251,8 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
       # not supported.
       if subsection_name == 'DML_RESULTS':
         if subsection_comment is None or subsection_comment == '':
-          raise RuntimeError, 'DML_RESULTS requires that the table is specified ' \
-              'in the comment.'
+          raise RuntimeError('DML_RESULTS requires that the table is specified ' \
+              'in the comment.')
         parsed_sections['DML_RESULTS_TABLE'] = subsection_comment
         parsed_sections['VERIFIER'] = 'VERIFY_IS_EQUAL_SORTED'
 

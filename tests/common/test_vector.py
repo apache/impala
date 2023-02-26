@@ -129,7 +129,7 @@ class ImpalaTestMatrix(object):
     elif exploration_strategy in ['core', 'pairwise']:
       return self.__generate_pairwise_combinations()
     else:
-      raise ValueError, 'Unknown exploration strategy: %s' % exploration_strategy
+      raise ValueError('Unknown exploration strategy: %s' % exploration_strategy)
 
   def __generate_exhaustive_combinations(self):
     return [ImpalaTestVector(vec) for vec in product(*self.__extract_vector_values())

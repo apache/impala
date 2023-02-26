@@ -1101,7 +1101,7 @@ class ImpalaTestSuite(BaseTestSuite):
       for workload_strategy in workload_strategies:
         workload_strategy = workload_strategy.split(':')
         if len(workload_strategy) != 2:
-          raise ValueError, 'Invalid workload:strategy format: %s' % workload_strategy
+          raise ValueError('Invalid workload:strategy format: %s' % workload_strategy)
         if cls.get_workload() == workload_strategy[0]:
           return workload_strategy[1]
     return default_strategy

@@ -139,12 +139,12 @@ class ResultRow(object):
     if isinstance(key, basestring):
       for col in self.columns:
         if col.column_label == key.lower(): return col.value
-      raise IndexError, 'No column with label: ' + key
+      raise IndexError('No column with label: ' + key)
     elif isinstance(key, int):
       # If the key (column position) does not exist this will throw an IndexError when
       # indexing into the self.columns
       return str(self.columns[key])
-    raise TypeError, 'Unsupported indexing key type: ' + type(key)
+    raise TypeError('Unsupported indexing key type: ' + type(key))
 
   def __eq__(self, other):
     if not isinstance(other, self.__class__):

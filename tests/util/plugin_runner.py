@@ -72,7 +72,7 @@ class PluginRunner(object):
     # If the user's entered a plugin that does not exist, raise an error.
     if len(plugins_not_found):
       msg = "Plugin(s) not found: %s" % (','.join(list(plugins_not_found)))
-      raise RuntimeError, msg
+      raise RuntimeError(msg)
 
   def __get_plugin_info(self, plugin_info):
     info = plugin_info.split(':')
