@@ -62,7 +62,7 @@ class TextTableDataGenerator(object):
           val_generator = col_val_generators[col_idx]
           for idx in xrange(val_buffer_size):
             val = next(val_generator)
-            val_buffer[idx] = "\N" if val is None else val
+            val_buffer[idx] = r"\N" if val is None else val
       for col_idx, col in enumerate(cols):
         if col_idx > 0:
           # Postgres doesn't seem to have an option to specify that the last column value

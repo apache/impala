@@ -790,7 +790,7 @@ class TestSuiteRunner(object):
     # io-file-mgr-test expects a real-ish file system at /tmp;
     # we mount a temporary directory into the container to appease it.
     tmpdir = tempfile.mkdtemp(prefix=test_with_docker.name + "-" + self.name)
-    os.chmod(tmpdir, 01777)
+    os.chmod(tmpdir, 0o1777)
     # Container names are sometimes used as hostnames, and DNS names shouldn't
     # have underscores.
     container_name = test_with_docker.name + "-" + self.name.replace("_", "-")

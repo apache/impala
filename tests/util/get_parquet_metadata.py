@@ -41,7 +41,7 @@ def julian_day_to_date(julian_day):
   arbitrarily and can be validated with an online converter like
   http://aa.usno.navy.mil/jdconverter?ID=AA&jd=2457755
   """
-  return date(2017, 01, 01) + timedelta(julian_day - 2457755)
+  return date(2017, 1, 1) + timedelta(julian_day - 2457755)
 
 
 def nanos_to_time(nanos):

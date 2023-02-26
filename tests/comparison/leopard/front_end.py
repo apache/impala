@@ -309,7 +309,7 @@ def front_page():
       'index.template',
       assets=ASSETS,
       reports=sorted(
-          app.reports.items(), key=lambda (k, report): report.run_date, reverse=True),
+          app.reports.items(), key=lambda k, report: report.run_date, reverse=True),
       schedule_items=schedule_items)
 
 if __name__ == '__main__':

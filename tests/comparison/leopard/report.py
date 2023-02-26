@@ -49,23 +49,23 @@ class Report(object):
 
   def classify_error(self, error):
     d = {
-      ur'LINE \d+:': 'Postgres_error',
-      ur'Permission denied': 'permission_denied',
-      ur'^AnalysisException': 'AnalysisException',
-      ur'^Column \d+ in row \d+ does not match': 'mismatch',
-      ur'^Could not connect': 'could_not_connect',
-      ur'^IllegalStateException': 'IllegalStateException',
-      ur'^Invalid query handle: ': 'invalid_query_handle',
-      ur'^Invalid or unknown query handle: ': 'invalid_query_handle',
-      ur'^Known issue:': 'known_issue',
-      ur'^Operation is in ERROR_STATE': 'error_state',
-      ur'^Query timed out after \d+ seconds': 'timeout',
-      ur'^Row counts do not match': 'row_counts',
-      ur'^Too much data': 'too_much_data',
-      ur'^Unknown expr node type: \d+': 'unkown_node',
-      ur'^Year is out of valid range': 'year_range',
-      ur'^[A-Za-z]+ out of range': 'out_of_range',
-      ur'^division by zero': 'division_by_zero'}
+      r'LINE \d+:': 'Postgres_error',
+      r'Permission denied': 'permission_denied',
+      r'^AnalysisException': 'AnalysisException',
+      r'^Column \d+ in row \d+ does not match': 'mismatch',
+      r'^Could not connect': 'could_not_connect',
+      r'^IllegalStateException': 'IllegalStateException',
+      r'^Invalid query handle: ': 'invalid_query_handle',
+      r'^Invalid or unknown query handle: ': 'invalid_query_handle',
+      r'^Known issue:': 'known_issue',
+      r'^Operation is in ERROR_STATE': 'error_state',
+      r'^Query timed out after \d+ seconds': 'timeout',
+      r'^Row counts do not match': 'row_counts',
+      r'^Too much data': 'too_much_data',
+      r'^Unknown expr node type: \d+': 'unkown_node',
+      r'^Year is out of valid range': 'year_range',
+      r'^[A-Za-z]+ out of range': 'out_of_range',
+      r'^division by zero': 'division_by_zero'}
 
     for r in d:
       if re.search(r, error):
@@ -94,7 +94,7 @@ class Report(object):
     stack = query_result['formatted_stack']
     if stack:
       for line in stack.split('\n'):
-        match = re.search(ur'(impala::.*) \(', line)
+        match = re.search(r'(impala::.*) \(', line)
         if match:
           return match.group(1)
     else:
@@ -106,10 +106,10 @@ class Report(object):
 
     def clean_frame(frame):
       #remove memory address from each frame
-      reg = re.match(ur'#\d+ *0x[0123456789abcdef]* in (.*)', frame)
+      reg = re.match(r'#\d+ *0x[0123456789abcdef]* in (.*)', frame)
       if reg: return reg.group(1)
       # this is for matching lines like "#7  SLL_Next (this=0x9046780, src=0x90467c8...
-      reg = re.match(ur'#\d+ *(\S.*)', frame)
+      reg = re.match(r'#\d+ *(\S.*)', frame)
       if reg: return reg.group(1)
       return frame
 

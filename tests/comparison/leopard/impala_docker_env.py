@@ -302,6 +302,7 @@ class ImpalaDockerEnv(object):
     # data as a volume to bypass AUFS. See also the README for Leopard.
     LOG.info('Warming testdata cluster external volume')
     self.start_new_container()
+    volume_map = None
     with settings(
         warn_only=True,
         host_string=self.host,
@@ -325,8 +326,6 @@ class ImpalaDockerEnv(object):
       volume_map = {
           HOST_TESTDATA_EXTERNAL_VOLUME_PATH: DOCKER_TESTDATA_VOLUME_PATH,
       }
-    else:
-      volume_map = None
 
     self.start_new_container(volume_map=volume_map)
     LOG.info('Container Started')

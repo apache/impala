@@ -35,7 +35,7 @@ from tests.common.test_dimensions import create_client_protocol_dimension
 from tests.shell.util import run_impala_shell_cmd, run_impala_shell_cmd_no_expect, \
     ImpalaShell, create_impala_shell_executable_dimension
 
-REQUIRED_MIN_OPENSSL_VERSION = 0x10001000L
+REQUIRED_MIN_OPENSSL_VERSION = 0x10001000
 # Python supports TLSv1.2 from 2.7.9 officially but on Red Hat/CentOS Python2.7.5
 # with newer python-libs (eg python-libs-2.7.5-77) supports TLSv1.2 already
 if IS_REDHAT_DERIVATIVE:
