@@ -120,7 +120,7 @@ class BaseImpalaService(object):
       value = None
       try:
         value = self.get_metric_value(metric_name)
-      except Exception, e:
+      except Exception as e:
         LOG.error(e)
 
       # if allow_greater is True we wait until the metric value becomes >= the expected
@@ -359,7 +359,7 @@ class ImpaladService(BaseImpalaService):
       try:
         value = self.get_num_known_live_backends(timeout=1, interval=interval,
             include_shutting_down=include_shutting_down)
-      except Exception, e:
+      except Exception as e:
         LOG.error(e)
       if value == expected_value:
         LOG.info("num_known_live_backends has reached value: %s" % value)
@@ -461,7 +461,7 @@ class ImpaladService(BaseImpalaService):
       transport.open()
       transport.close()
       return True
-    except Exception, e:
+    except Exception as e:
       LOG.info(e)
       return False
 

@@ -149,7 +149,7 @@ class TestCompactCatalogUpdates(CustomClusterTestSuite):
           err = self.execute_query_expect_failure(client, "select * from %s" % view)
           assert "Could not resolve table reference" in str(err)
           break
-        except Exception, e:
+        except Exception as e:
           assert attempt < NUM_ATTEMPTS - 1, str(e)
         time.sleep(1)
 

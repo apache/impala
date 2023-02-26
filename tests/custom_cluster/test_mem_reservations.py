@@ -87,7 +87,7 @@ class TestMemReservations(CustomClusterTestSuite):
             result = client.execute(self.query)
             assert result.success
             assert len(result.data) == 1
-        except Exception, e:
+        except Exception as e:
           self.error = str(e)
         finally:
           client.close()

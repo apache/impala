@@ -740,7 +740,7 @@ class TestImpalaShell(ImpalaTestSuite):
       query_file_handle = open(query_file, 'r')
       query = query_file_handle.read()
       query_file_handle.close()
-    except Exception, e:
+    except Exception as e:
       assert query_file_handle is not None, "Exception %s: Could not find query file" % e
     result = run_impala_shell_cmd(vector, args, expect_success=True, stdin_input=query)
     output = result.stdout
@@ -942,7 +942,7 @@ class TestImpalaShell(ImpalaTestSuite):
           try:
             connection, client_address = sock.accept()
             break
-          except IOError, e:
+          except IOError as e:
             if e.errno != errno.EINTR:
               raise
         data = connection.recv(1024)

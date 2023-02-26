@@ -846,7 +846,7 @@ if __name__ == "__main__":
     # Check for the cluster to be ready.
     impala_cluster.wait_until_ready(expected_cluster_size,
         expected_cluster_size - expected_catalog_delays)
-  except Exception, e:
+  except Exception as e:
     LOG.exception("Error starting cluster")
     sys.exit(1)
 

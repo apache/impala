@@ -138,7 +138,7 @@ def wget_and_unpack_package(download_path, file_name, destination, wget_no_clobb
         cmd.append("--no-clobber")
       check_output(cmd)
       break
-    except Exception, e:
+    except Exception as e:
       if attempt == NUM_ATTEMPTS:
         raise
       logging.error("Download failed; retrying after sleep: " + str(e))

@@ -172,7 +172,7 @@ class TestDecimalOverflowExprs(ImpalaTestSuite):
       try:
         self.execute_query_using_client(self.client, query_1, vector)
         assert False, "Query was expected to fail"
-      except ImpalaBeeswaxException, e:
+      except ImpalaBeeswaxException as e:
         assert "Decimal expression overflowed" in str(e)
 
       result = self.execute_query_expect_success(self.client,
@@ -187,7 +187,7 @@ class TestDecimalOverflowExprs(ImpalaTestSuite):
     try:
       self.execute_query_using_client(self.client, query_1, vector)
       assert False, "Query was expected to fail"
-    except ImpalaBeeswaxException, e:
+    except ImpalaBeeswaxException as e:
       assert "Decimal expression overflowed" in str(e)
 
     result = self.execute_query_expect_success(self.client,
@@ -215,7 +215,7 @@ class TestDecimalOverflowExprs(ImpalaTestSuite):
     try:
       self.execute_query_using_client(self.client, query_2, vector)
       assert False, "Query was expected to fail"
-    except ImpalaBeeswaxException, e:
+    except ImpalaBeeswaxException as e:
       assert "Decimal expression overflowed" in str(e)
 
     result = self.execute_query_expect_success(self.client,

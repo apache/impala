@@ -160,7 +160,7 @@ class ImpalaBeeswaxClient(object):
       protocol = TBinaryProtocol.TBinaryProtocolAccelerated(self.transport)
       self.imp_service = ImpalaService.Client(protocol)
       self.connected = True
-    except Exception, e:
+    except Exception as e:
       raise ImpalaBeeswaxException(self.__build_error_message(e), e)
 
   def close_connection(self):
@@ -518,12 +518,12 @@ class ImpalaBeeswaxClient(object):
       raise ImpalaBeeswaxException("Not connected", None)
     try:
       return rpc()
-    except BeeswaxService.BeeswaxException, b:
+    except BeeswaxService.BeeswaxException as b:
       raise ImpalaBeeswaxException(self.__build_error_message(b), b)
-    except TTransportException, e:
+    except TTransportException as e:
       self.connected = False
       raise ImpalaBeeswaxException(self.__build_error_message(e), e)
-    except TApplicationException, t:
+    except TApplicationException as t:
       raise ImpalaBeeswaxException(self.__build_error_message(t), t)
-    except Exception, u:
+    except Exception as u:
       raise ImpalaBeeswaxException(self.__build_error_message(u), u)

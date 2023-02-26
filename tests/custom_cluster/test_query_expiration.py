@@ -127,7 +127,7 @@ class TestQueryExpiration(CustomClusterTestSuite):
     for handle in handles:
       try:
         client.close_query(handle)
-      except Exception, e:
+      except Exception as e:
         # We fetched from some cancelled handles above, which unregistered the queries.
         assert 'Invalid or unknown query handle' in str(e)
 
@@ -172,7 +172,7 @@ class TestQueryExpiration(CustomClusterTestSuite):
     try:
       client.fetch(query, handle)
       assert False
-    except Exception, e:
+    except Exception as e:
       assert re.search(exception_regex, str(e))
 
   def __expect_client_state(self, client, handle, expected_state, timeout=0.1):
@@ -222,7 +222,7 @@ class TestQueryExpiration(CustomClusterTestSuite):
         try:
           result = self.client.execute("SELECT SLEEP(2500)")
           assert "Expected to hit time limit"
-        except Exception, e:
+        except Exception as e:
           self.exception = e
 
     class NonExpiringTimeLimitThread(threading.Thread):

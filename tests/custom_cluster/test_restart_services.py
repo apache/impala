@@ -62,7 +62,7 @@ class TestRestart(CustomClusterTestSuite):
       try:
         cursor.execute("describe database functional")
         return
-      except HiveServer2Error, e:
+      except HiveServer2Error as e:
         assert "AnalysisException: Database does not exist: functional" in e.message,\
                "Unexpected exception: " + e.message
         sleep(1)
@@ -178,7 +178,7 @@ class TestRestart(CustomClusterTestSuite):
       try:
         query = "alter table join_aa add columns (age" + str(i) + " int)"
         self.execute_query_async(query)
-      except Exception, e:
+      except Exception as e:
         LOG.info(str(e))
       if i == 5:
         self.cluster.catalogd.restart()
@@ -204,7 +204,7 @@ class TestRestart(CustomClusterTestSuite):
       try:
         query = "alter table join_aa add columns (age" + str(i) + " int)"
         self.execute_query_async(query, query_options)
-      except Exception, e:
+      except Exception as e:
         LOG.info(str(e))
       if i == 5:
         self.cluster.catalogd.restart()
@@ -256,7 +256,7 @@ class TestRestart(CustomClusterTestSuite):
       try:
         query = "alter table join_aa add columns (age" + str(i) + " int)"
         self.execute_query_async(query)
-      except Exception, e:
+      except Exception as e:
         LOG.info(str(e))
       if i == 5:
         self.cluster.catalogd.restart()
@@ -666,7 +666,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     def expect_beeswax_shutdown_error(fn):
       try:
         fn()
-      except ImpalaBeeswaxException, e:
+      except ImpalaBeeswaxException as e:
         assert SHUTDOWN_ERROR_PREFIX in str(e)
     expect_beeswax_shutdown_error(lambda: self.client.execute("select 1"))
     expect_beeswax_shutdown_error(lambda: self.client.execute_async("select 1"))
@@ -741,7 +741,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     try:
       self.client.fetch(query, handle)
       assert False, "Expected query to fail"
-    except Exception, e:
+    except Exception as e:
       assert 'Failed due to unreachable impalad(s)' in str(e)
 
   @pytest.mark.execute_serially

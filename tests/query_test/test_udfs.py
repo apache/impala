@@ -375,13 +375,13 @@ class TestUdfExecution(TestUdfBase):
     try:
       self.run_test_case('QueryTest/udf-mem-limit', vector, use_db=unique_database)
       assert False, "Query was expected to fail"
-    except ImpalaBeeswaxException, e:
+    except ImpalaBeeswaxException as e:
       self._check_mem_limit_exception(e)
 
     try:
       self.run_test_case('QueryTest/uda-mem-limit', vector, use_db=unique_database)
       assert False, "Query was expected to fail"
-    except ImpalaBeeswaxException, e:
+    except ImpalaBeeswaxException as e:
       self._check_mem_limit_exception(e)
 
     # It takes a long time for Impala to free up memory after this test, especially if
@@ -513,7 +513,7 @@ class TestUdfTargeted(TestUdfBase):
       self.execute_query_using_client(
           client, "select `{0}`.`pi_missing_jar`()".format(unique_database), vector)
       assert False, "Query expected to fail"
-    except ImpalaBeeswaxException, e:
+    except ImpalaBeeswaxException as e:
       assert "Failed to get file info" in str(e)
 
   def test_libs_with_same_filenames(self, vector, unique_database):

@@ -64,7 +64,7 @@ class TestHdfsPermissions(ImpalaTestSuite):
     try:
       self.client.execute('insert into table %s select 1' % TEST_TBL)
       assert False, 'Expected INSERT INTO read-only table to fail'
-    except Exception, e:
+    except Exception as e:
       assert re.search('does not have WRITE access to HDFS location: .*/read_only_tbl',
                        str(e))
     # Should still be able to query this table without any errors.
@@ -85,7 +85,7 @@ class TestHdfsPermissions(ImpalaTestSuite):
           'insert into table functional_seq.alltypes '
           'partition(year, month) select * from functional.alltypes limit 0')
       assert False, 'Expected INSERT INTO read-only partition to fail'
-    except Exception, e:
+    except Exception as e:
       assert re.search(
           'does not have WRITE access to HDFS location: .*/alltypes_seq',
           str(e))

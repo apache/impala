@@ -85,7 +85,7 @@ class TestPartitioning(ImpalaTestSuite):
     # INSERT into a boolean column is disabled in Impala due to this Hive bug.
     try:
       self.execute_query("insert into %s partition(bool_col=true) select 1" % full_name)
-    except ImpalaBeeswaxException, e:
+    except ImpalaBeeswaxException as e:
       assert 'AnalysisException: INSERT into table with BOOLEAN partition column (%s) '\
           'is not supported: %s' % ('b', full_name) in str(e)
 

@@ -48,7 +48,7 @@ class TestCoordinators(CustomClusterTestSuite):
     beeswax_client = None
     try:
       beeswax_client = worker.service.create_beeswax_client()
-    except Exception, e:
+    except Exception as e:
       LOG.info("Caught exception {0}".format(e))
     finally:
       assert beeswax_client is None
@@ -56,7 +56,7 @@ class TestCoordinators(CustomClusterTestSuite):
     hs2_client = None
     try:
       hs2_client = worker.service.create_hs2_client()
-    except Exception, e:
+    except Exception as e:
       LOG.info("Caught exception {0}".format(e))
     finally:
       assert hs2_client is None

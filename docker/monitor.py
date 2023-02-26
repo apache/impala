@@ -163,7 +163,7 @@ class ContainerMonitor(object):
     try:
       statcontents = file(os.path.join(dirname, stat)).read()
       return statcontents.replace("\n", " ").strip()
-    except IOError, e:
+    except IOError as e:
       # Ignore errors; cgroup can disappear on us.
       logging.warning("Ignoring exception reading cgroup. " +
                       "This can happen if container just exited. " + str(e))

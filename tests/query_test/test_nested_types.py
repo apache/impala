@@ -619,12 +619,12 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
       expected_err = "has an incompatible Parquet schema"
       try:
         self.execute_query("select item from %s.col1.item" % full_name, qopts)
-      except Exception, e:
+      except Exception as e:
         assert expected_err in str(e)
       try:
         self.execute_query("select cnt from %s t, (select count(*) cnt from t.col1) v"\
           % full_name, qopts)
-      except Exception, e:
+      except Exception as e:
         assert expected_err in str(e)
 
   # $ parquet-tools schema UnannotatedListOfPrimitives.parquet
@@ -851,7 +851,7 @@ class TestMaxNestingDepth(ImpalaTestSuite):
     try:
       self.client.execute("explain select 1 from %s.above_max_depth" % unique_database)
       assert False, "Expected table loading to fail."
-    except ImpalaBeeswaxException, e:
+    except ImpalaBeeswaxException as e:
       assert "Type exceeds the maximum nesting depth" in str(e)
 
 

@@ -570,7 +570,7 @@ class TestDdlStatements(TestDdlBase):
             result = self.execute_query_expect_success(
                 client, "describe formatted %s" % view_name)
             exp_line = [l for l in result.data if 'View Expanded' in l][0]
-          except ImpalaBeeswaxException, e:
+          except ImpalaBeeswaxException as e:
             # In non-SYNC_DDL tests, it's OK to get a "missing view" type error
             # until the metadata propagates.
             exp_line = "Exception: %s" % e

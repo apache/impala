@@ -339,7 +339,7 @@ def transform_port(rcg_name, rcg_config_dict, rcg_config_name):
                         (rcg_config_name, rcg_name,))
     try:
         val_int = int(val)
-    except ValueError, e:
+    except ValueError as e:
         raise Exception("Could not convert %s config (%s) for rcg %s into integer" %
                         (rcg_config_name, val, rcg_name))
 

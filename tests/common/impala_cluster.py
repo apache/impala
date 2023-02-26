@@ -597,10 +597,10 @@ def find_user_processes(binaries):
       binary_name = os.path.basename(cmdline[0])
       if binary_name in binaries:
         yield binary_name, process
-    except KeyError, e:
+    except KeyError as e:
       if "uid not found" not in str(e):
         raise
-    except psutil.NoSuchProcess, e:
+    except psutil.NoSuchProcess as e:
       # Ignore the case when a process no longer exists.
       pass
 

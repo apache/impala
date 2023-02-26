@@ -112,7 +112,7 @@ class TestQueryMemLimit(ImpalaTestSuite):
     try:
       self.execute_query(query, exec_options, table_format=table_format)
       assert should_succeed, "Query was expected to fail"
-    except ImpalaBeeswaxException, e:
+    except ImpalaBeeswaxException as e:
       assert not should_succeed, "Query should not have failed: %s" % e
 
 

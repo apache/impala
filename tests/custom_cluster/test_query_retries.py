@@ -403,7 +403,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     try:
       self.client.fetch(self._shuffle_heavy_query, handle)
       assert False
-    except ImpalaBeeswaxException, e:
+    except ImpalaBeeswaxException as e:
       assert "Admission for query exceeded timeout 60000ms in pool default-pool." \
           in str(e)
       assert "Queued reason: Waiting for executors to start. Only DDL queries and " \
@@ -467,7 +467,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     try:
       self.client.fetch(self._shuffle_heavy_query, handle)
       assert False
-    except ImpalaBeeswaxException, e:
+    except ImpalaBeeswaxException as e:
       assert "Max retry limit was hit. Query was retried 1 time(s)." in str(e)
 
     # Assert that the killed impalad shows up in the list of blacklisted executors from
@@ -724,7 +724,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     try:
       self.client.fetch(query, handle)
       assert False
-    except Exception, e:
+    except Exception as e:
         assert "Cancelled" in str(e)
     self.__validate_memz()
 
@@ -874,7 +874,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     try:
       self.client.fetch(query, handle)
       assert False
-    except Exception, e:
+    except Exception as e:
         assert "expired due to client inactivity" in str(e)
 
     # Assert that the impalad metrics show one expired query.
@@ -907,7 +907,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     # error.
     try:
       client.fetch(query, handle)
-    except Exception, e:
+    except Exception as e:
       assert "Client session expired" in str(e)
 
     # Assert that the impalad metrics show one expired session.

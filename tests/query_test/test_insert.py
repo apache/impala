@@ -124,7 +124,7 @@ class TestInsertQueries(ImpalaTestSuite):
     try:
       self.client.execute("select s from {0}".format(table_name))
       assert False, "Expected query to fail"
-    except Exception, e:
+    except Exception as e:
       assert "Memory limit exceeded" in str(e)
 
 

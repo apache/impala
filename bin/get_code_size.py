@@ -29,7 +29,7 @@ def get_bin_size_data(file):
   data = ""
   try:
     data = subprocess.check_output(["size", "-B", "-t", file], stderr=subprocess.STDOUT)
-  except Exception, e:
+  except Exception as e:
     data = e.output
 
   res = re.split(r'\s+', data.split("\n")[-2])

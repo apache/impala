@@ -323,13 +323,13 @@ class ImpalaTestSuite(BaseTestSuite):
     cls.hs2_client = None
     try:
       cls.hs2_client = cls.create_impala_client(protocol='hs2')
-    except Exception, e:
+    except Exception as e:
       # HS2 connection can fail for benign reasons, e.g. running with unsupported auth.
       LOG.info("HS2 connection setup failed, continuing...: {0}".format(e))
     cls.hs2_http_client = None
     try:
       cls.hs2_http_client = cls.create_impala_client(protocol='hs2-http')
-    except Exception, e:
+    except Exception as e:
       # HS2 HTTP connection can fail for benign reasons, e.g. running with unsupported
       # auth.
       LOG.info("HS2 HTTP connection setup failed, continuing...: {0}".format(e))
@@ -882,7 +882,7 @@ class ImpalaTestSuite(BaseTestSuite):
     result = None
     try:
       result = cls.__execute_query(impalad_client, query, query_options, user)
-    except Exception, e:
+    except Exception as e:
       return e
 
     assert not result.success, "No failure encountered for query %s" % query
@@ -1201,7 +1201,7 @@ class ImpalaTestSuite(BaseTestSuite):
         self.client.execute("describe `{db_name}`.`{table_name}`".format(
                             db_name=db_name, table_name=table_name))
         return
-      except Exception, ex:
+      except Exception as ex:
         print str(ex)
         time.sleep(0.2)
         continue

@@ -85,7 +85,7 @@ class TestBeeswax(ImpalaTestSuite):
     try:
       fn()
       assert False, "Expected invalid handle"
-    except ImpalaBeeswaxException, e:
+    except ImpalaBeeswaxException as e:
       assert "Query id" in str(e) and "not found" in str(e), str(e)
 
   def _assert_profile_access_denied(self, fn):
@@ -94,5 +94,5 @@ class TestBeeswax(ImpalaTestSuite):
     try:
       fn()
       assert False, "Expected invalid handle"
-    except ImpalaBeeswaxException, e:
+    except ImpalaBeeswaxException as e:
       assert "is not authorized to access the runtime profile" in str(e), str(e)

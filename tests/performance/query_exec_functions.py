@@ -47,7 +47,7 @@ def get_hs2_hive_cursor(hiveserver, user=None, use_kerberos=False,
 
     cursor = conn.cursor(configuration=execOptions)
     LOG.info("Connected to {0}:{1}".format(host, port))
-  except Exception, e:
+  except Exception as e:
     LOG.error("Error Connecting: {0}".format(str(e)))
   return cursor
 
@@ -102,7 +102,7 @@ def get_hs2_impala_cursor(impalad, use_kerberos=False, database=None):
         auth_mechanism="GSSAPI" if use_kerberos else "NOSASL")
     cursor = conn.cursor()
     LOG.info("Connected to {0}:{1}".format(host, port))
-  except Exception, e:
+  except Exception as e:
     LOG.error("Error connecting: {0}".format(str(e)))
   return cursor
 
@@ -165,7 +165,7 @@ def establish_beeswax_connection(query_config):
     # Set the exec options.
     client.set_query_options(query_config.exec_options)
     LOG.info("Connected to %s" % query_config.impalad)
-  except Exception, e:
+  except Exception as e:
     LOG.error("Error connecting: {0}".format(str(e)))
   return client
 
@@ -195,7 +195,7 @@ def execute_using_impala_beeswax(query, query_config):
   result = None
   try:
     result = client.execute(query.query_str)
-  except Exception, e:
+  except Exception as e:
     LOG.error(e)
     exec_result.query_error = str(e)
   finally:
@@ -284,7 +284,7 @@ def run_query_capture_results(cmd, query, exit_on_error):
   start_time = datetime.now()
   try:
     rc, stdout, stderr = exec_process(cmd)
-  except Exception, e:
+  except Exception as e:
     LOG.error('Error while executing query command: %s' % e)
     exec_result.query_error = str(e)
     # TODO: Should probably save the start time and query string for failed queries.

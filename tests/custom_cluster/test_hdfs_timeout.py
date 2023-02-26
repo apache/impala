@@ -71,7 +71,7 @@ class TestHdfsTimeouts(CustomClusterTestSuite):
       result = self.execute_query("select count(*) from functional.alltypes",
           vector=vector)
       end_time = time.time()
-    except Exception, e:
+    except Exception as e:
       ex = e
     finally:
       end_time = time.time()

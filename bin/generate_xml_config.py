@@ -84,7 +84,7 @@ def dump_config(d, source_path, out):
       if isinstance(v, int):
         v = str(v)
       v_new = _substitute_env_vars(v)
-    except KeyError, e:
+    except KeyError as e:
       raise Exception("failed environment variable substitution for value {k}: {e}"
                       .format(k=k, e=e))
     print >>out, """\

@@ -274,7 +274,7 @@ class TestHS2FaultInjection(CustomClusterTestSuite):
     query_handle = None
     try:
       query_handle = self.custom_hs2_http_client.execute_query('select 1', {})
-    except Exception, e:
+    except Exception as e:
       assert str(e) == 'HTTP code 502: Injected Fault'
     assert query_handle is None
     output = capsys.readouterr()[1].splitlines()
@@ -293,7 +293,7 @@ class TestHS2FaultInjection(CustomClusterTestSuite):
     try:
       for rows in rows_fetched:
         num_rows += 1
-    except Exception, e:
+    except Exception as e:
       assert str(e) == 'HTTP code 502: Injected Fault'
     assert num_rows is None
     self.close_query(query_handle)
@@ -315,7 +315,7 @@ class TestHS2FaultInjection(CustomClusterTestSuite):
     (num_rows, num_row_errors) = None, None
     try:
       (num_rows, num_row_errors) = self.custom_hs2_http_client.close_dml(query_handle)
-    except Exception, e:
+    except Exception as e:
       assert str(e) == 'HTTP code 502: Injected Fault'
     assert num_rows is None
     assert num_row_errors is None
