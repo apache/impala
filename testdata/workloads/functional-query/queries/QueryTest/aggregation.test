@@ -2038,3 +2038,632 @@ select s_store_sk, covar_pop(s_number_employees, s_floor_space) over (partition 
 ---- TYPES
 int,double
 ====
+---- QUERY
+# regression function examples
+select regr_slope(ps_availqty, ps_supplycost),
+ regr_intercept(ps_availqty, ps_supplycost), regr_r2(ps_availqty, ps_supplycost)
+  from tpch.partsupp;
+---- RESULTS
+0.003223046670647307,5001.613715742804,1.035868858574101e-07
+---- TYPES
+double, double, double
+====
+---- QUERY
+# Behavior of regression functions on null table
+select regr_slope(d, e), regr_intercept(d, e), regr_r2(d, e) from functional.nulltable;
+---- RESULTS
+NULL,NULL,NULL
+---- TYPES
+double, double, double
+====
+---- QUERY
+# Behavior of regression functions on empty table
+select regr_slope(f2, f2), regr_intercept(f2, f2), regr_r2(f2, f2) from functional.emptytable;
+---- RESULTS
+NULL,NULL,NULL
+---- TYPES
+double, double, double
+====
+---- QUERY
+# regr_slope() on different datatypes
+select regr_slope(tinyint_col, tinyint_col), regr_slope(smallint_col, smallint_col),
+ regr_slope(int_col, int_col), regr_slope(bigint_col, bigint_col), regr_slope(float_col, float_col),
+ regr_slope(double_col, double_col), regr_slope(timestamp_col, timestamp_col) from functional.alltypes;
+---- RESULTS
+1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
+---- TYPES
+double, double, double, double, double, double, double
+====
+---- QUERY
+# regr_intercept() on different datatypes
+select regr_intercept(tinyint_col, tinyint_col), regr_intercept(smallint_col, smallint_col),
+ regr_intercept(int_col, int_col), regr_intercept(bigint_col, bigint_col), regr_intercept(float_col, float_col),
+ regr_intercept(double_col, double_col), regr_intercept(timestamp_col, timestamp_col) from functional.alltypes;
+---- RESULTS
+0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+---- TYPES
+double, double, double, double, double, double, double
+====
+---- QUERY
+# regr_r2() on different datatypes
+select regr_r2(tinyint_col, tinyint_col), regr_r2(smallint_col, smallint_col),
+ regr_r2(int_col, int_col), regr_r2(bigint_col, bigint_col), regr_r2(float_col, float_col),
+ regr_r2(double_col, double_col), regr_r2(timestamp_col, timestamp_col) from functional.alltypes;
+---- RESULTS
+1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
+---- TYPES
+double, double, double, double, double, double, double
+====
+---- QUERY
+# regr_slope(), regr_intercept(), regr_r2() on timestamp columns
+select regr_slope(utctime, localtime), regr_intercept(utctime, localtime),
+ regr_r2(utctime, localtime) from functional.alltimezones;
+---- RESULTS
+0.9995840247725529, 593958.8067555428, 0.9999916154327646
+---- TYPES
+double, double, double
+====
+---- QUERY
+# Since group by id will result in a single row, this test shows that regr_slope() returns null in case of a single row.
+select id, regr_slope(int_col, int_col) from functional.alltypestiny group by id;
+---- RESULTS
+2,NULL
+4,NULL
+0,NULL
+6,NULL
+1,NULL
+7,NULL
+3,NULL
+5,NULL
+---- TYPES
+int,double
+====
+---- QUERY
+# Since group by id will result in a single row, this test shows that regr_intercept() returns null in
+# case of a single row.
+select id, regr_intercept(int_col, int_col) from functional.alltypestiny group by id;
+---- RESULTS
+2,NULL
+4,NULL
+0,NULL
+6,NULL
+1,NULL
+7,NULL
+3,NULL
+5,NULL
+---- TYPES
+int,double
+====
+---- QUERY
+# Since group by id will result in a single row, this test shows that regr_r2() returns null in case of a
+# single row.
+select id, regr_r2(int_col, int_col) from functional.alltypestiny group by id;
+---- RESULTS
+2,NULL
+4,NULL
+0,NULL
+6,NULL
+1,NULL
+7,NULL
+3,NULL
+5,NULL
+---- TYPES
+int,double
+====
+---- QUERY
+# regr_slope(), regr_intercept(), regr_r2() on decimal datatype
+select regr_slope(d3, d4), regr_intercept(d3, d4), regr_r2(d3, d4) from functional.decimal_tbl;
+---- RESULTS
+NULL,NULL,NULL
+---- TYPES
+double, double, double
+====
+---- QUERY
+select year, regr_slope(double_col, double_col) from functional.alltypes group by year;
+---- RESULTS
+2009,1.0
+2010,1.0
+---- TYPES
+int,double
+====
+---- QUERY
+select year, regr_intercept(double_col, double_col) from functional.alltypes group by year;
+---- RESULTS
+2009,0.0
+2010,0.0
+---- TYPES
+int,double
+====
+---- QUERY
+select year, regr_r2(double_col, double_col) from functional.alltypes group by year;
+---- RESULTS
+2009,1.0
+2010,1.0
+---- TYPES
+int,double
+====
+---- QUERY
+select regr_slope(double_col, -double_col), regr_intercept(double_col, -double_col),
+ regr_r2(double_col, -double_col) from functional.alltypes;
+---- RESULTS
+-1.0, 0.0, 1.0
+---- TYPES
+double, double, double
+====
+---- QUERY
+select regr_slope(double_col, double_col), regr_intercept(double_col, double_col),
+ regr_r2(double_col, double_col) from functional.alltypes;
+---- RESULTS
+1.0, 0.0, 1.0
+---- TYPES
+double, double, double
+====
+---- QUERY
+select regr_slope(ss_sold_time_sk, ss_quantity), regr_intercept(ss_sold_time_sk, ss_quantity)/10000,
+ regr_r2(ss_sold_time_sk, ss_quantity) from tpcds.store_sales;
+---- RESULTS
+0.0602719636627,5.1709905412,1.87116649337e-08
+---- TYPES
+double, double, double
+====
+---- QUERY
+select s_store_sk, regr_slope(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk)
+ from tpcds.store;
+---- RESULTS
+5,NULL
+8,4.80120606296e-06
+12,-1.37354292706e-06
+1,NULL
+2,-0.000255754475703
+3,-2.01036006341e-06
+4,-5.05103424244e-06
+6,-4.3565531677e-06
+7,1.21229193717e-06
+9,4.44553019714e-07
+10,3.9044206462e-06
+11,6.00483790103e-06
+---- TYPES
+int, double
+====
+---- QUERY
+select s_store_sk, regr_intercept(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk)
+ from tpcds.store;
+---- RESULTS
+5,NULL
+8, 244.41078639
+12, 296.416240104
+1,NULL
+2, 1587.90537084399
+3, 251.125599973
+4, 268.395215604
+6, 264.570040249
+7, 234.323507488
+9, 244.099933952
+10, 223.133569068
+11, 210.405303328
+---- TYPES
+int, double
+====
+---- QUERY
+select s_store_sk, regr_r2(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk)
+ from tpcds.store;
+---- RESULTS
+5,NULL
+8, 1.0
+12, 0.107747035307
+1,NULL
+2, 1.0
+3, 0.261613627698
+4, 0.776635209834
+6, 0.728906876949
+7, 0.00680634729367
+9, 0.000795425636424
+10, 0.0499353300472
+11, 0.1061202068
+---- TYPES
+int, double
+====
+---- QUERY
+select id, double_col, regr_slope(double_col, int_col) over (partition by month order by id) from functional.alltypes
+ order by id limit 10;
+---- RESULTS
+0,0.0,NULL
+1,10.1,10.1
+2,20.2,10.1
+3,30.3,10.1
+4,40.4,10.1
+5,50.5,10.1
+6,60.6,10.1
+7,70.7,10.1
+8,80.8,10.1
+9,90.9,10.1
+---- TYPES
+int,double,double
+====
+---- QUERY
+select id, double_col, regr_intercept(double_col, int_col) over (partition by month order by id) from functional.alltypes
+ order by id limit 10;
+---- RESULTS
+0, 0.0,NULL
+1, 10.1, 0.0
+2, 20.2, 0.0
+3, 30.3, 1.7763568394e-15
+4, 40.4, 0.0
+5, 50.5, 0.0
+6, 60.6, 3.5527136788e-15
+7, 70.7, -7.1054273576e-15
+8, 80.8, -7.1054273576e-15
+9, 90.9, -7.1054273576e-15
+---- TYPES
+int,double,double
+====
+---- QUERY
+select id, double_col, regr_r2(double_col, int_col) over (partition by month order by id) from functional.alltypes
+ order by id limit 10;
+---- RESULTS
+0,0.0,NULL
+1,10.1,1.0
+2,20.2,1.0
+3,30.3,1.0
+4,40.4,1.0
+5,50.5,1.0
+6,60.6,1.0
+7,70.7,1.0
+8,80.8,1.0
+9,90.9,1.0
+---- TYPES
+int,double,double
+====
+---- QUERY
+# Regression functions when one column is filled with null
+select regr_slope(null_int, rand()), regr_slope(rand(), null_int), regr_intercept(null_int, rand()),
+ regr_intercept(rand(), null_int), regr_r2(null_int, rand()), regr_r2(rand(), null_int)
+  from functional.nullrows;
+---- RESULTS
+NULL,NULL,NULL,NULL,NULL,NULL
+---- TYPES
+double, double, double, double, double, double
+====
+---- QUERY
+# Regression functions supporting join
+select regr_slope(A.double_col, B.double_col), regr_intercept(A.double_col, B.double_col),
+ regr_r2(A.double_col, B.double_col) from functional.alltypes A, functional.alltypes B where A.id=B.id;
+---- RESULTS
+1.0, 0.0, 1.0
+---- TYPES
+double, double, double
+====
+---- QUERY
+# Tests functioning of RegrSlopeRemoveState()
+select s_store_sk, regr_slope(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between 5 preceding and 2 following) from tpcds.store;
+---- RESULTS
+5,-1.37354292706e-06
+8,-1.37354292706e-06
+12,-1.37354292706e-06
+1,-2.01036006341e-06
+2,-5.05103424244e-06
+3,-4.3565531677e-06
+4,1.21229193717e-06
+6,4.44553019714e-07
+7,3.9044206462e-06
+9,6.59936024162e-06
+10,4.13595759719e-06
+11,-2.68509660433e-06
+---- TYPES
+int,double
+====
+---- QUERY
+# Tests functioning of RegrSlopeRemoveState() for regr_intercept()
+select s_store_sk, regr_intercept(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between 5 preceding and 2 following) from tpcds.store;
+---- RESULTS
+5, 296.416240104
+8, 296.416240104
+12, 296.416240104
+1, 251.125599973
+2, 268.395215604
+3, 264.570040249
+4, 234.323507488
+6, 244.099933952
+7, 223.133569068
+9, 205.13592892
+10, 226.988621372
+11, 290.843308372
+---- TYPES
+int,double
+====
+---- QUERY
+# Tests functioning of CorrRemoveState() for regr_r2()
+select s_store_sk, regr_r2(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between 5 preceding and 2 following) from tpcds.store;
+---- RESULTS
+5, 0.107747035307
+8, 0.107747035307
+12, 0.107747035307
+1, 0.261613627698
+2, 0.776635209834
+3, 0.728906876949
+4, 0.00680634729367
+6, 0.000795425636424
+7, 0.0499353300472
+9, 0.0868111803219
+10, 0.0132688514648
+11, 0.00476393800297
+---- TYPES
+int,double
+====
+---- QUERY
+# Mathematical operations on double can lead to variance becoming negative by a very small amount (around +1e-13),
+# to avoid that a check is added (state->xvar < 0.0 || state->yvar <= 0.0), without which the below test will
+# result in nan for certain cases.
+# Testcase when dependednt variable becomes negative:
+select s_store_sk, regr_r2(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between 1 preceding and 1 following) from tpcds.store;
+---- RESULTS
+5, 1.0
+8, 0.107747035307
+12, 1.0
+1, 1.0
+2, 0.261613627698
+3, 0.687656618674
+4, 0.782782611877
+6, 0.541316438509
+7, 0.0272991489992
+9, 0.942195083603
+10, 1.0
+11,NULL
+---- TYPES
+int,double
+====
+---- QUERY
+# regr_slope() when window size is 2
+select s_store_sk, regr_slope(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between 1 preceding and current row) from tpcds.store;
+---- RESULTS
+5,NULL
+8,4.80120606296e-06
+12,-9.00681309118e-06
+1,NULL
+2,-0.000255754475703
+3,0.0
+4,-1.00924694479e-05
+6,-3.48934955352e-05
+7,-0.000953195306915
+9,1.32728364256e-05
+10,1.00081893097e-05
+11,NULL
+---- TYPES
+int,double
+====
+---- QUERY
+# regr_intercept() when window size is 2
+select s_store_sk, regr_intercept(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between 1 preceding and current row) from tpcds.store;
+---- RESULTS
+5,NULL
+8, 244.41078638954104
+12, 341.01161935181347
+1,NULL
+2, 1587.9053708439897
+3, 236.0
+4, 312.2784702956196
+6, 543.9564370568922
+7, 8832.752449571763
+9, 178.14330273093714
+10, 200.98275763037407
+11,NULL
+---- TYPES
+int,double
+====
+---- QUERY
+# regr_r2() when window size is 2
+select s_store_sk, regr_r2(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between 1 preceding and current row) from tpcds.store;
+---- RESULTS
+5,NULL
+8, 1.0
+12, 1.0
+1,NULL
+2, 1.0
+3, 1.0
+4, 1.0
+6, 1.0
+7, 1.0
+9, 1.0
+10, 1.0
+11,NULL
+---- TYPES
+int,double
+====
+---- QUERY
+select s_store_sk, regr_slope(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between current row and 1 following) from tpcds.store;
+---- RESULTS
+5,4.80120606296e-06
+8,-9.00681309118e-06
+12,NULL
+1,-0.000255754475703
+2,0.0
+3,-1.00924694479e-05
+4,-3.48934955352e-05
+6,-0.000953195306915
+7,1.32728364256e-05
+9,1.00081893097e-05
+10,NULL
+11,NULL
+---- TYPES
+int,double
+====
+---- QUERY
+select s_store_sk, regr_intercept(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between current row and 1 following) from tpcds.store;
+---- RESULTS
+5, 244.41078639
+8, 341.011619352
+12,NULL
+1, 1587.90537084399
+2, 236.0
+3, 312.278470296
+4, 543.956437057
+6, 8832.752449571763
+7, 178.143302731
+9, 200.98275763
+10,NULL
+11,NULL
+---- TYPES
+int,double
+====
+---- QUERY
+select s_store_sk, regr_r2(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between current row and 1 following) from tpcds.store;
+---- RESULTS
+5, 1.0
+8, 1.0
+12,NULL
+1, 1.0
+2, 1.0
+3, 1.0
+4, 1.0
+6, 1.0
+7, 1.0
+9, 1.0
+10,NULL
+11,NULL
+---- TYPES
+int,double
+====
+---- QUERY
+select s_store_sk, regr_slope(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between current row and unbounded following) from tpcds.store;
+---- RESULTS
+12,NULL
+8,-9.00681309118e-06
+5,-1.37354292706e-06
+11,NULL
+10,NULL
+9,1.00081893097e-05
+7,1.05678876878e-05
+6,5.25458148115e-06
+4,-2.68509660433e-06
+3,4.13595759719e-06
+2,6.59936024162e-06
+1,6.00483790103e-06
+---- TYPES
+int,double
+====
+---- QUERY
+select s_store_sk, regr_intercept(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between current row and unbounded following) from tpcds.store;
+---- RESULTS
+12,NULL
+8, 341.011619352
+5, 296.416240104
+11,NULL
+10,NULL
+9, 200.98275763
+7, 197.748657023
+6, 231.216488956
+4, 290.843308372
+3, 226.988621372
+2, 205.13592892
+1, 210.405303328
+---- TYPES
+int,double
+====
+---- QUERY
+select s_store_sk, regr_r2(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between current row and unbounded following) from tpcds.store;
+---- RESULTS
+12,NULL
+8, 1.0
+5, 0.107747035307
+11,NULL
+10,NULL
+9, 1.0
+7, 0.932586749287
+6, 0.0314560278457
+4, 0.00476393800297
+3, 0.0132688514648
+2, 0.0868111803219
+1, 0.1061202068
+---- TYPES
+int,double
+====
+---- QUERY
+select s_store_sk, regr_slope(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between unbounded preceding and current row) from tpcds.store;
+---- RESULTS
+5,NULL
+8,4.80120606296e-06
+12,-1.37354292706e-06
+1,NULL
+2,-0.000255754475703
+3,-2.01036006341e-06
+4,-5.05103424244e-06
+6,-4.3565531677e-06
+7,1.21229193717e-06
+9,4.44553019714e-07
+10,3.9044206462e-06
+11,6.00483790103e-06
+---- TYPES
+int,double
+====
+---- QUERY
+select s_store_sk, regr_intercept(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between unbounded preceding and current row) from tpcds.store;
+---- RESULTS
+5,NULL
+8, 244.41078639
+12, 296.416240104
+1,NULL
+2, 1587.90537084399
+3, 251.125599973
+4, 268.395215604
+6, 264.570040249
+7, 234.323507488
+9, 244.099933952
+10, 223.133569068
+11, 210.405303328
+---- TYPES
+int,double
+====
+---- QUERY
+select s_store_sk, regr_r2(s_number_employees, s_floor_space) over (partition by s_city order by s_store_sk
+ rows between unbounded preceding and current row) from tpcds.store;
+---- RESULTS
+5,NULL
+8, 1.0
+12, 0.10774703530702502
+1,NULL
+2, 1.0
+3, 0.26161362769774743
+4, 0.7766352098335481
+6, 0.7289068769493157
+7, 0.006806347293667032
+9, 7.954256364237451E-4
+10, 0.049935330047174945
+11, 0.10612020680026239
+---- TYPES
+int,double
+====
+---- QUERY
+# Testcase when independent variable becomes negative:
+select s_store_sk, regr_r2(s_floor_space, s_number_employees) over (partition by s_city order by
+ s_store_sk rows between 1 preceding and 1 following) from tpcds.store;
+---- RESULTS
+5, 1.0
+8, 0.107747035307
+12, 1.0
+1, 1.0
+2, 0.261613627698
+3, 0.687656618674
+4, 0.782782611877
+6, 0.541316438509
+7, 0.0272991489992
+9, 0.942195083603
+10, 1.0
+11,NULL
+---- TYPES
+int, double
+====

@@ -288,6 +288,202 @@ void AggregateFunctions::CountMerge(FunctionContext*, const BigIntVal& src,
   dst->val += src.val;
 }
 
+// Implementation of regr_slope() and regr_intercept():
+// RegrSlopeState is used for implementing regr_slope() and regr_intercept().
+// regr_slope() and regr_intercept() take two arguments of numeric type and return the
+// regression slope of the line and the y-intercept of the regression line respectively.
+// The linear regression functions fit an ordinary-least-squares regression line to a set
+// of number pairs. They can be used both as aggregate and analytic functions.
+// Here's a link which contains description of all the regression functions:
+// https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/REGR_-Linear-Regression-Functions.html#GUID-A675B68F-2A88-4843-BE2C-FCDE9C65F9A9
+
+// regr_slope() formula used:
+// regr_slope(y, x) = covar_pop(x, y) / var_pop(x)
+// regr_intercept() formula used:
+// regr_intercept(y,x) = avg(y) - regr_slope(y, x) * avg(x)
+// where y and x are the dependent and independent variables respectively.
+struct RegrSlopeState {
+  int64_t count;
+  double yavg; // average of y elements
+  double xavg; // average of x elements
+  double xvar; // count times the variance of x elements
+  double covar; // count times the covariance
+};
+
+void AggregateFunctions::RegrSlopeInit(FunctionContext* ctx, StringVal* dst) {
+  dst->is_null = false;
+  dst->len = sizeof(RegrSlopeState);
+  AllocBuffer(ctx, dst, dst->len);
+  if (UNLIKELY(dst->is_null)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return;
+  }
+  *(reinterpret_cast<RegrSlopeState*>(dst->ptr)) = {};
+}
+
+static inline void RegrSlopeUpdateState(double y, double x, RegrSlopeState* state) {
+  double deltaY = y - state->yavg;
+  double deltaX = x - state->xavg;
+  ++state->count;
+  // my_n = my_(n - 1) + [y_n - my_(n - 1)] / n
+  state->yavg += deltaY / state->count;
+  // mx_n = mx_(n - 1) + [x_n - mx_(n - 1)] / n
+  state->xavg += deltaX / state->count;
+  if (state->count > 1) {
+    // c_n = c_(n - 1) + (y_n - my_n) * (x_n - mx_(n - 1)) OR
+    // c_n = c_(n - 1) + (y_n - my_(n - 1)) * (x_n - mx_n)
+    // The apparent asymmetry in the equations is due to the fact that,
+    // y_n - my_n = (n - 1) * (y_n - my_(n - 1)) / n, so both update terms are equal to
+    // (n - 1) * (y_n - my_(n - 1)) * (x_n - mx_(n - 1)) / n
+    state->covar += deltaY * (x - state->xavg);
+    // vx_n = vx_(n - 1) + (x_n - mx_(n - 1)) * (x_n - mx_n)
+    state->xvar += deltaX * (x - state->xavg);
+  }
+}
+
+static inline void RegrSlopeRemoveState(double y, double x, RegrSlopeState* state) {
+  if (state->count <= 1) {
+    *(reinterpret_cast<RegrSlopeState*>(sizeof(RegrSlopeState))) = {};
+  } else {
+    double deltaY = y - state->yavg;
+    double deltaX = x - state->xavg;
+    --state->count;
+    // my_(n - 1) = my_n - (y_n - my_n) / (n - 1)
+    state->yavg -= deltaY / state->count;
+    // mx_(n - 1) = mx_n - (x_n - mx_n) / (n - 1)
+    state->xavg -= deltaX / state->count;
+    // c_(n - 1) = c_n - (y_n - mx_n) * (x_n - mx_(n -1))
+    state->covar -= deltaY * (x - state->xavg);
+    // vx_(n - 1) = vx_n - (x_n - mx_n) * (x_n - mx_(n - 1))
+    state->xvar -= deltaX * (x - state->xavg);
+  }
+}
+
+void AggregateFunctions::RegrSlopeUpdate(FunctionContext* ctx,
+    const DoubleVal& src1, const DoubleVal& src2, StringVal* dst) {
+  if (src1.is_null || src2.is_null) return;
+  DCHECK(dst->ptr != nullptr);
+  DCHECK_EQ(sizeof(RegrSlopeState), dst->len);
+  RegrSlopeState* state = reinterpret_cast<RegrSlopeState*>(dst->ptr);
+  RegrSlopeUpdateState(src1.val, src2.val, state);
+}
+
+void AggregateFunctions::RegrSlopeRemove(FunctionContext* ctx,
+    const DoubleVal& src1, const DoubleVal& src2, StringVal* dst) {
+  // Remove doesn't need to explicitly check the number of calls to Update() or Remove()
+  // because Finalize() returns NULL if count is 0. In other words, it's not needed to
+  // check if num_removes() >= num_updates() as it's accounted for in Finalize().
+  if (src1.is_null || src2.is_null) return;
+  DCHECK(dst->ptr != nullptr);
+  DCHECK_EQ(sizeof(RegrSlopeState), dst->len);
+  RegrSlopeState* state = reinterpret_cast<RegrSlopeState*>(dst->ptr);
+  RegrSlopeRemoveState(src1.val, src2.val, state);
+}
+
+void AggregateFunctions::TimestampRegrSlopeUpdate(FunctionContext* ctx,
+    const TimestampVal& src1, const TimestampVal& src2, StringVal* dst) {
+  if (src1.is_null || src2.is_null) return;
+  RegrSlopeState* state = reinterpret_cast<RegrSlopeState*>(dst->ptr);
+  const TimestampValue& tm_src1 = TimestampValue::FromTimestampVal(src1);
+  const TimestampValue& tm_src2 = TimestampValue::FromTimestampVal(src2);
+  double val1, val2;
+  if (tm_src1.ToSubsecondUnixTime(UTCPTR, &val1) &&
+      tm_src2.ToSubsecondUnixTime(UTCPTR, &val2)) {
+    RegrSlopeUpdateState(val1, val2, state);
+  }
+}
+
+void AggregateFunctions::TimestampRegrSlopeRemove(FunctionContext* ctx,
+    const TimestampVal& src1, const TimestampVal& src2, StringVal* dst) {
+  // Remove doesn't need to explicitly check the number of calls to Update() or Remove()
+  // because Finalize() returns NULL if count is 0. In other words, it's not needed to
+  // check if num_removes() >= num_updates() as it's accounted for in Finalize().
+  if (src1.is_null || src2.is_null) return;
+  RegrSlopeState* state = reinterpret_cast<RegrSlopeState*>(dst->ptr);
+  const TimestampValue& tm_src1 = TimestampValue::FromTimestampVal(src1);
+  const TimestampValue& tm_src2 = TimestampValue::FromTimestampVal(src2);
+  double val1, val2;
+  if (tm_src1.ToSubsecondUnixTime(UTCPTR, &val1) &&
+      tm_src2.ToSubsecondUnixTime(UTCPTR, &val2)) {
+    RegrSlopeRemoveState(val1, val2, state);
+  }
+}
+
+void AggregateFunctions::RegrSlopeMerge(FunctionContext* ctx,
+    const StringVal& src, StringVal* dst) {
+  const RegrSlopeState* src_state = reinterpret_cast<RegrSlopeState*>(src.ptr);
+  DCHECK(dst->ptr != nullptr);
+  DCHECK_EQ(sizeof(RegrSlopeState), dst->len);
+  RegrSlopeState* dst_state = reinterpret_cast<RegrSlopeState*>(dst->ptr);
+  if (src.ptr != nullptr) {
+    int64_t nA = dst_state->count;
+    if (nA == 0) {
+      *dst_state = *src_state;
+      return;
+    }
+    double yavgA = dst_state->yavg;
+    double xavgA = dst_state->xavg;
+
+    dst_state->count += src_state->count;
+    dst_state->yavg = (yavgA * nA + src_state->yavg * src_state->count) /
+        dst_state->count;
+    dst_state->xavg = (xavgA * nA + src_state->xavg * src_state->count) /
+        dst_state->count;
+    // vx_(A,B) = vx_A + vx_B + (mx_A - mx_B) * (mx_A - mx_B) * n_A * n_B / (n_A + n_B)
+    dst_state->xvar +=
+        src_state->xvar + (xavgA - src_state->xavg) * (xavgA - src_state->xavg) * nA
+            * src_state->count / dst_state->count;
+    // c_(A,B) = c_A + c_B + (my_A - my_B) * (mx_A - mx_B) * n_A * n_B / (n_A + n_B)
+    dst_state->covar += src_state->covar
+        + (yavgA - src_state->yavg) * (xavgA - src_state->xavg) * ((double)(nA *
+              src_state->count)) / (dst_state->count);
+  }
+}
+
+DoubleVal AggregateFunctions::RegrSlopeGetValue(FunctionContext* ctx,
+    const StringVal& src) {
+  const RegrSlopeState* state = reinterpret_cast<RegrSlopeState*>(src.ptr);
+  // Calculating Regression slope:
+  // xvar becomes negative in certain cases due to floating point rounding error.
+  // Since these values are very small, they can be ignored and rounded to 0.
+  DCHECK(state->xvar >= FLOATING_POINT_ERROR_THRESHOLD);
+  if (state->count < 2 || state->xvar <= 0.0) {
+    return DoubleVal::null();
+  }
+  return DoubleVal(state->covar / state->xvar);
+}
+
+DoubleVal AggregateFunctions::RegrSlopeFinalize(FunctionContext* ctx,
+    const StringVal& src) {
+  DoubleVal r = src.is_null ? DoubleVal::null() :
+                              RegrSlopeGetValue(ctx, src);
+  ctx->Free(src.ptr);
+  return r;
+}
+
+DoubleVal AggregateFunctions::RegrInterceptGetValue(FunctionContext* ctx,
+    const StringVal& src) {
+  RegrSlopeState* state = reinterpret_cast<RegrSlopeState*>(src.ptr);
+  // Calculating Regression Intercept
+  // xvar becomes negative in certain cases due to floating point rounding error.
+  // Since these values are very small, they can be ignored and rounded to 0.
+  DCHECK(state->xvar >= FLOATING_POINT_ERROR_THRESHOLD);
+  if (state->count < 2 || state->xvar <= 0.0) {
+    return DoubleVal::null();
+  }
+  double regrSlope = state->covar / state->xvar;
+  double regrIntercept = state->yavg - (regrSlope * state->xavg);
+  return DoubleVal(regrIntercept);
+}
+
+DoubleVal AggregateFunctions::RegrInterceptFinalize(FunctionContext* ctx,
+    const StringVal& src) {
+  DoubleVal r = src.is_null ? DoubleVal::null() :
+                              RegrInterceptGetValue(ctx, src);
+  ctx->Free(src.ptr);
+  return r;
+}
+
 // Implementation of CORR() function which takes two arguments of numeric type
 // and returns the Pearson's correlation coefficient between them using the Welford's
 // online algorithm. This is calculated using a stable one-pass algorithm, based on
@@ -311,8 +507,12 @@ struct CorrState {
 void AggregateFunctions::CorrInit(FunctionContext* ctx, StringVal* dst) {
   dst->is_null = false;
   dst->len = sizeof(CorrState);
-  dst->ptr = ctx->Allocate(dst->len);
-  memset(dst->ptr, 0, dst->len);
+  AllocBuffer(ctx, dst, dst->len);
+  if (UNLIKELY(dst->is_null)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return;
+  }
+  *(reinterpret_cast<CorrState*>(dst->ptr)) = {};
 }
 
 static inline void CorrUpdateState(double x, double y, CorrState* state) {
@@ -341,7 +541,7 @@ static inline void CorrRemoveState(double x, double y, CorrState* state) {
   double deltaX = x - state->xavg;
   double deltaY = y - state->yavg;
   if (state->count <= 1) {
-    memset(state, 0, sizeof(CorrState));
+    *(reinterpret_cast<CorrState*>(sizeof(CorrState))) = {};
   } else {
     --state->count;
     // mx_(n - 1) = mx_n - (x_n - mx_n) / (n - 1)
@@ -450,8 +650,8 @@ DoubleVal AggregateFunctions::CorrGetValue(FunctionContext* ctx, const StringVal
   // Calculating Pearson's correlation coefficient
   // xvar and yvar become negative in certain cases due to floating point rounding error.
   // Since these values are very small, they can be ignored and rounded to 0.
-  DCHECK(state->xvar >= -1E-8);
-  DCHECK(state->yvar >= -1E-8);
+  DCHECK(state->xvar >= FLOATING_POINT_ERROR_THRESHOLD);
+  DCHECK(state->yvar >= FLOATING_POINT_ERROR_THRESHOLD);
   if (state->count == 0 || state->count == 1 || state->xvar <= 0.0 ||
       state->yvar <= 0.0) {
     return DoubleVal::null();
@@ -473,6 +673,60 @@ DoubleVal AggregateFunctions::CorrFinalize(FunctionContext* ctx, const StringVal
   return r;
 }
 
+// Implementation of regr_r2():
+// CorrState is reused for implementing regr_r2.
+// regr_r2() takes two arguments of numeric type and returns the coefficient of
+// determination (also called R-squared or goodness of fit) for the regression.
+// regr_r2() formula used:
+// regr_2(y, x) = NULL if var_pop(x) = 0, else
+//                1 if var_pop(y) = 0 (and var_pop(x) != 0), else
+//                power(corr(y, x),2) if (var_pop(y) != 0 and var_pop(x) != 0)
+// where y and x are the dependent and independent variables
+// respectively. Note that variances can't be negative.
+DoubleVal AggregateFunctions::Regr_r2GetValue(FunctionContext* ctx,
+    const StringVal& src) {
+  const CorrState* state = reinterpret_cast<CorrState*>(src.ptr);
+  // Calculating Regression R2:
+  // In this function we use 'dependent_var' and 'independent_var' instead of 'y_var' and
+  // 'x_var'. This is to avoid confusion, because for regr_r2() the dependent variable is
+  // the first parameter and the independent variable is the second parameter, but
+  // CorrUpdate(), which we use to produce the intermediate values, has the opposite
+  // order. Our aggregate function framework passes the variables in order to
+  // CorrUpdate(), so in CorrUpdate() 'x' corresponds to the dependent variable of
+  // regr_r2() and 'y' to the independent variable of regr_r2().
+  double dependent_var = state->xvar;
+  double independent_var = state->yvar;
+
+  // dependent_var and independent_var become negative in certain cases due to floating
+  // point rounding error.
+  // Since these values are very small, they can be ignored and rounded to 0.
+  DCHECK(dependent_var >= FLOATING_POINT_ERROR_THRESHOLD);
+  DCHECK(independent_var >= FLOATING_POINT_ERROR_THRESHOLD);
+  if (state->count < 2 || (independent_var / state->count) <= 0.0 ||
+      (dependent_var / state->count) < 0.0) {
+    return DoubleVal::null();
+  } else if ((dependent_var / state->count) == 0.0) {
+    return 1;
+  } else {
+    double stddev_prod_squared = dependent_var * independent_var;
+    // Mathematically 'stddev_prod_squared' can only be 0 if either 'dependent_var'
+    // or 'independent_var' is 0, which we have handled earlier. However, if both
+    // 'dependent_var' and 'independent_var' are very small, the result may become
+    // 0 because of floating point underflow. In this case we return NULL, i.e. treat
+    // it as if 'dependent_var' was 0.
+    if (stddev_prod_squared == 0.0) return DoubleVal::null();
+    return state->covar * state->covar / stddev_prod_squared;
+  }
+}
+
+DoubleVal AggregateFunctions::Regr_r2Finalize(FunctionContext* ctx,
+    const StringVal& src) {
+  DoubleVal r = src.is_null ? DoubleVal::null() :
+                              Regr_r2GetValue(ctx, src);
+  ctx->Free(src.ptr);
+  return r;
+}
+
 // Implementation of COVAR_SAMP() and COVAR_POP() which calculates sample and
 // population covariance between two columns of numeric types respectively using
 // the Welford's online algorithm.
@@ -490,8 +744,12 @@ struct CovarState {
 void AggregateFunctions::CovarInit(FunctionContext* ctx, StringVal* dst) {
   dst->is_null = false;
   dst->len = sizeof(CovarState);
-  dst->ptr = ctx->Allocate(dst->len);
-  memset(dst->ptr, 0, dst->len);
+  AllocBuffer(ctx, dst, dst->len);
+  if (UNLIKELY(dst->is_null)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return;
+  }
+  *(reinterpret_cast<CovarState*>(dst->ptr)) = {};
 }
 
 static inline void CovarUpdateState(double x, double y, CovarState* state) {
