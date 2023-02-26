@@ -32,6 +32,7 @@
 #   Creates a new Impala_Kudu service called "new_service" using /data/impala/
 #   for its scratch directories.
 
+from __future__ import print_function
 import argparse
 import hashlib
 import os
@@ -134,11 +135,11 @@ def find_dependencies(args, cluster):
             if not found:
                 raise Exception("Could not find dependency service (type %s, name %s)" %
                                 (service_type, arg))
-            print "Found explicit dependency service %s" % (found.name)
+            print("Found explicit dependency service %s" % (found.name))
             deps.append(found)
         else:
             if not required:
-                print "Skipping optional dependency of type %s" % (service_type,)
+                print("Skipping optional dependency of type %s" % (service_type,))
                 continue
             if len(candidates) > 1:
                 raise Exception("Found %d possible implicit dependency services of type %s" %
@@ -148,7 +149,7 @@ def find_dependencies(args, cluster):
                                 (service_type,))
             else:
                 found = candidates.values()[0]
-                print "Found implicit dependency service %s" % (found.name,)
+                print("Found implicit dependency service %s" % (found.name,))
                 deps.append(found)
     return deps
 
@@ -157,7 +158,7 @@ def check_new_service_does_not_exist(api, cluster, new_name):
         if service.displayName == new_name:
             raise Exception("New service name %s already in use" % (new_name,))
 
-    print "New service name %s is not in use" % (new_name,)
+    print("New service name %s is not in use" % (new_name,))
 
 def find_template_service(api, cluster, based_on):
     template_service = None
@@ -166,7 +167,7 @@ def find_template_service(api, cluster, based_on):
             if service.type != "IMPALA":
                 raise Exception("Based-on service %s is of wrong type %s" %
                                 (based_on, service.type))
-            print "Found based-on service: %s" % (based_on,)
+            print("Found based-on service: %s" % (based_on,))
             template_service = service
 
     if based_on and not template_service:
@@ -177,10 +178,10 @@ def find_template_service(api, cluster, based_on):
 def find_master_host(api, cm_hostname, master_hostname):
     for h in api.get_all_hosts():
         if master_hostname and h.hostname == master_hostname:
-            print "Found master host %s" % (master_hostname,)
+            print("Found master host %s" % (master_hostname,))
             return h
         elif not master_hostname and h.hostname == cm_hostname:
-            print "Found implicit master host on CM host %s" % (cm_hostname,)
+            print("Found implicit master host on CM host %s" % (cm_hostname,))
             return h
 
     if master_hostname:
@@ -225,11 +226,11 @@ def get_best_parcel(api, cluster):
         parcel = None
 
     if parcel:
-        print "Chose best parcel %s-%s (stage %s)" % (parcel.product,
+        print("Chose best parcel %s-%s (stage %s)" % (parcel.product,
                                                       parcel.version,
-                                                      parcel.stage)
+                                                      parcel.stage))
     else:
-        print "Found no candidate parcels"
+        print("Found no candidate parcels")
 
     return parcel
 
@@ -238,9 +239,9 @@ def ensure_parcel_repo_added(api):
     config = cm.get_config(view='summary')
     parcel_urls = config.get("REMOTE_PARCEL_REPO_URLS", "").split(",")
     if IMPALA_KUDU_PARCEL_URL in parcel_urls:
-        print "Impala_Kudu parcel URL already present"
+        print("Impala_Kudu parcel URL already present")
     else:
-        print "Adding Impala_Kudu parcel URL"
+        print("Adding Impala_Kudu parcel URL")
         parcel_urls.append(IMPALA_KUDU_PARCEL_URL)
         config["REMOTE_PARCEL_REPO_URLS"] = ",".join(parcel_urls)
         cm.update_config(config)
@@ -252,8 +253,8 @@ def wait_for_parcel_stage(cluster, parcel, stage):
             return
         if new_parcel.state.errors:
             raise Exception(str(new_parcel.state.errors))
-        print "progress: %s / %s" % (new_parcel.state.progress,
-                                     new_parcel.state.totalProgress)
+        print("progress: %s / %s" % (new_parcel.state.progress,
+                                     new_parcel.state.totalProgress))
         time.sleep(1)
     else:
         raise Exception("Parcel %s-%s did not reach stage %s in %d seconds" %
@@ -262,33 +263,33 @@ def wait_for_parcel_stage(cluster, parcel, stage):
 def ensure_parcel_activated(cluster, parcel):
     parcel_stage = parcel.stage
     if parcel_stage == "AVAILABLE_REMOTELY":
-        print "Downloading parcel: %s-%s " % (parcel.product, parcel.version)
+        print("Downloading parcel: %s-%s " % (parcel.product, parcel.version))
         parcel.start_download()
         wait_for_parcel_stage(cluster, parcel, "DOWNLOADED")
-        print "Downloaded parcel: %s-%s " % (parcel.product, parcel.version)
+        print("Downloaded parcel: %s-%s " % (parcel.product, parcel.version))
         parcel_stage = "DOWNLOADED"
     if parcel_stage == "DOWNLOADED":
-        print "Distributing parcel: %s-%s " % (parcel.product, parcel.version)
+        print("Distributing parcel: %s-%s " % (parcel.product, parcel.version))
         parcel.start_distribution()
         wait_for_parcel_stage(cluster, parcel, "DISTRIBUTED")
-        print "Distributed parcel: %s-%s " % (parcel.product, parcel.version)
+        print("Distributed parcel: %s-%s " % (parcel.product, parcel.version))
         parcel_stage = "DISTRIBUTED"
     if parcel_stage == "DISTRIBUTED":
-        print "Activating parcel: %s-%s " % (parcel.product, parcel.version)
+        print("Activating parcel: %s-%s " % (parcel.product, parcel.version))
         parcel.activate()
         wait_for_parcel_stage(cluster, parcel, "ACTIVATED")
-        print "Activated parcel: %s-%s " % (parcel.product, parcel.version)
+        print("Activated parcel: %s-%s " % (parcel.product, parcel.version))
         parcel_stage = "ACTIVATED"
 
-    print "Parcel %s-%s is activated" % (parcel.product, parcel.version)
+    print("Parcel %s-%s is activated" % (parcel.product, parcel.version))
 
 def print_configs(entity_name, config_dict):
     for attr, value in config_dict.iteritems():
-        print "Set %s config %s=\'%s\'" % (entity_name, attr, value)
+        print("Set %s config %s=\'%s\'" % (entity_name, attr, value))
 
 def create_new_service(api, cluster, new_name, deps, scratch_dirs, master_host):
     new_service = cluster.create_service(new_name, "IMPALA")
-    print "Created new service %s" % (new_name,)
+    print("Created new service %s" % (new_name,))
 
     service_config = {}
     for d in deps:
@@ -312,13 +313,13 @@ def create_new_service(api, cluster, new_name, deps, scratch_dirs, master_host):
                 md5.update(h.hostId)
                 new_role_name = "%s-%s-%s" % (new_name, rcg.roleType, md5.hexdigest())
                 new_service.create_role(new_role_name, rcg.roleType, h.hostId)
-                print "Created new role %s" % (new_role_name,)
+                print("Created new role %s" % (new_role_name,))
         else:
             md5 = hashlib.md5()
             md5.update(master_host.hostId)
             new_role_name = "%s-%s-%s" % (new_name, rcg.roleType, md5.hexdigest())
             new_service.create_role(new_role_name, rcg.roleType, master_host.hostId)
-            print "Created new role %s" % (new_role_name,)
+            print("Created new role %s" % (new_role_name,))
 
 def transform_path(rcg_name, rcg_config_dict, rcg_config_name):
     # TODO: Do a better job with paths where the role type is embedded.
@@ -379,7 +380,7 @@ def transform_rcg_config(rcg):
 
 def clone_existing_service(cluster, new_name, template_service):
     new_service = cluster.create_service(new_name, "IMPALA")
-    print "Created new service %s" % (new_name,)
+    print("Created new service %s" % (new_name,))
 
     service_config, _ = template_service.get_config()
     service_config["impala_service_env_safety_valve"] = "IMPALA_KUDU=1"
@@ -395,7 +396,7 @@ def clone_existing_service(cluster, new_name, template_service):
             new_rcg = new_service.create_role_config_group(new_rcg_name,
                                                            new_rcg_name,
                                                            old_rcg.roleType)
-            print "Created new rcg %s" % (new_rcg_name,)
+            print("Created new rcg %s" % (new_rcg_name,))
         else:
             new_rcg = new_service.get_role_config_group("%s-%s-BASE" % (new_name,
                                                                         old_rcg.roleType))
@@ -414,7 +415,7 @@ def clone_existing_service(cluster, new_name, template_service):
             new_role = new_service.create_role(new_role_name,
                                                new_rcg.roleType,
                                                old_role.hostRef.hostId)
-            print "Created new role %s" % (new_role_name,)
+            print("Created new role %s" % (new_role_name,))
             new_role_names.append(new_role.name)
         new_rcg.move_roles(new_role_names)
 
@@ -448,7 +449,8 @@ def main():
             parcel = get_best_parcel(api, cluster)
             if parcel:
                 break
-            print "Could not find parcel in attempt %d, will sleep and retry" % (attempt,)
+            print("Could not find parcel in attempt %d, will sleep and retry" %
+                  (attempt,))
             time.sleep(1)
         else:
             raise Exception("No parcel showed up in %d seconds" % (MAX_PARCEL_REPO_WAIT_SECS,))

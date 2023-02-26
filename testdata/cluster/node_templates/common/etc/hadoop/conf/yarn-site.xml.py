@@ -17,6 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import print_function
 import os
 import sys
 
@@ -39,7 +40,7 @@ def _get_yarn_nm_ram_mb():
   # - leave at least 20G for other services
   # - don't need more than 48G
   ret = min(max(available_ram_gb * 1024 - 20 * 1024, 4096), 48 * 1024)
-  print >>sys.stderr, "Configuring Yarn NM to use {0}MB RAM".format(ret)
+  print("Configuring Yarn NM to use {0}MB RAM".format(ret), file=sys.stderr)
   return ret
 
 

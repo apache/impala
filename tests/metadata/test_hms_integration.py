@@ -23,7 +23,7 @@
 # TODO: For each test, verify all the metadata available via Hive and
 # Impala, in all the possible ways of validating that metadata.
 
-
+from __future__ import print_function
 import pytest
 import random
 import string
@@ -735,7 +735,7 @@ class TestHmsIntegration(ImpalaTestSuite):
                             '(x int, y int) stored as parquet') as table_name:
         self.client.execute('invalidate metadata')
         self.client.execute('invalidate metadata %s' % table_name)
-        print self.impala_table_stats(table_name)
+        print(self.impala_table_stats(table_name))
         assert 'PARQUET' == self.impala_table_stats(table_name)[()]['format']
         self.run_stmt_in_hive(
             'alter table %s set fileformat avro' % table_name)

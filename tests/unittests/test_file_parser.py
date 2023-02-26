@@ -17,6 +17,7 @@
 
 # Unit tests for the test file parser
 
+from __future__ import print_function
 from tests.common.base_test_suite import BaseTestSuite
 from tests.util.test_file_parser import parse_test_file_text
 
@@ -66,7 +67,7 @@ class TestTestFileParser(BaseTestSuite):
   def test_valid_parse(self):
     results = parse_test_file_text(test_text, VALID_SECTIONS)
     assert len(results) == 3
-    print results[0]
+    print(results[0])
     expected_results = {'QUERY': '# comment\nSELECT blah from Foo\ns\n',
                         'TYPES': 'string\n', 'RESULTS': "'Hi'\n",
                         'LINEAGE': "test_lineage_str > 'foo' AND 'bar'\nmulti_line\n"}
@@ -106,6 +107,6 @@ class TestTestFileParser(BaseTestSuite):
                         "#---- QUERY: TEST_WORKLOAD_Q2\n"
                         "#SELECT int_col from Bar\n"
                         "#---- RESULTS\n#231\n#---- TYPES\n#int\n"}
-    print expected_results
-    print results[1]
+    print(expected_results)
+    print(results[1])
     assert results[1] == expected_results

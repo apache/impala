@@ -22,6 +22,7 @@
 # command line, will generate data files in the specified directory and a
 # print a SQL load statement to incorporate into dataload SQL script generation.
 
+from __future__ import print_function
 from shutil import rmtree
 from optparse import OptionParser
 from contextlib import contextmanager

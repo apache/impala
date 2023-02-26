@@ -24,6 +24,7 @@
 #       --role_name=statestored --max_output_size=50000000 --end_time=1463033495000 \
 #       --output_file_path=/tmp/minidump_package.tar.gz
 
+from __future__ import print_function
 import os
 import re
 import sys
@@ -162,7 +163,7 @@ def get_config_parameter_value(conf_dir, role_name, config_parameter_name):
         if m:
           config_parameter_value = m.group(1)
   except IOError as e:
-    print >> sys.stderr, 'Error: Unable to open "{0}".'.format(file_path)
+    print('Error: Unable to open "{0}".'.format(file_path), file=sys.stderr)
     sys.exit(1)
   return config_parameter_value
 
@@ -179,7 +180,7 @@ def get_minidump_dir(conf_dir, role_name):
   result = os.path.join(minidump_path, role_name)
   if not os.path.isdir(result):
     msg = 'Error: minidump directory does not exist.'
-    print >> sys.stderr, msg
+    print(msg, file=sys.stderr)
     sys.exit(1)
   return result
 
@@ -202,11 +203,11 @@ def main():
   options, args = parser.parse_args()
   if not options.conf_dir:
     msg = 'Error: conf_dir is not specified.'
-    print >> sys.stderr, msg
+    print(msg, file=sys.stderr)
     sys.exit(1)
   if not options.output_file_path:
     msg = 'Error: output_file_path is not specified.'
-    print >> sys.stderr, msg
+    print(msg, file=sys.stderr)
     sys.exit(1)
 
   minidump_dir = get_minidump_dir(options.conf_dir, options.role_name)
@@ -216,7 +217,7 @@ def main():
       end_time=options.end_time,
       output_file_path=options.output_file_path)
   status, msg = file_archiver.make_tarball()
-  print >> sys.stderr, msg
+  print(msg, file=sys.stderr)
   sys.exit(status)
 
 if __name__ == '__main__':

@@ -17,6 +17,7 @@
 
 # Validates all aggregate functions across all datatypes
 #
+from __future__ import print_function
 import pytest
 
 from testdata.common import widetable
@@ -150,7 +151,8 @@ class TestAggregation(ImpalaTestSuite):
       # NDV is inherently approximate. Compare with some tolerance.
       err = abs(result_lut[key] - int(actual_string))
       rel_err =  err / float(result_lut[key])
-      print key, result_lut[key], actual_string,abs(result_lut[key] - int(actual_string))
+      print(key, result_lut[key], actual_string,
+            abs(result_lut[key] - int(actual_string)))
       assert err <= 1 or rel_err < 0.05
     elif data_type in ('float', 'double') and agg_func != 'count':
       # Compare with a margin of error.

@@ -21,6 +21,7 @@
 # TODO: Re-factor tests into multiple classes.
 # TODO: Add a test that cancels queries while a retry is running
 
+from __future__ import print_function
 import pytest
 import re
 import shutil
@@ -1183,7 +1184,7 @@ class TestQueryRetriesFaultyDisk(CustomClusterTestSuite):
       dir_path = tempfile.mkdtemp()
       self.created_dirs.append(dir_path)
       result.append(dir_path)
-      print "Generated dir" + dir_path
+      print("Generated dir" + dir_path)
     return result
 
   def __validate_web_ui_state(self):

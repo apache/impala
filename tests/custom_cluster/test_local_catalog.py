@@ -17,6 +17,7 @@
 
 # Test behaviors specific to --use_local_catalog being enabled.
 
+from __future__ import print_function
 import pytest
 import Queue
 import random
@@ -272,7 +273,7 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
           q = random.choice(queries)
           attempt += 1
           try:
-            print 'Attempt', attempt, 'client', str(client)
+            print('Attempt', attempt, 'client', str(client))
             ret = self.execute_query_unchecked(client, q)
           except Exception as e:
             if 'InconsistentMetadataFetchException' in str(e):

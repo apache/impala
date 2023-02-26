@@ -17,6 +17,7 @@
 #
 # The base class that should be used for almost all Impala tests
 
+from __future__ import print_function
 import glob
 import grp
 import json
@@ -1202,7 +1203,7 @@ class ImpalaTestSuite(BaseTestSuite):
                             db_name=db_name, table_name=table_name))
         return
       except Exception as ex:
-        print str(ex)
+        print(str(ex))
         time.sleep(0.2)
         continue
     raise Exception("Table {0}.{1} didn't show up after {2}s", db_name, table_name,

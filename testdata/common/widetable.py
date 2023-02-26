@@ -22,6 +22,7 @@
 # generate a CSV data file and prints a SQL load statement to incorporate
 # into dataload SQL script generation.
 
+from __future__ import print_function
 from datetime import datetime, timedelta
 import itertools
 import optparse
@@ -119,7 +120,7 @@ if __name__ == "__main__":
 
   if options.get_columns:
     # Output column descriptors
-    print '\n'.join(get_columns(options.num_columns))
+    print('\n'.join(get_columns(options.num_columns)))
 
   if options.create_data:
     # Generate data locally, and output the SQL load command for use in dataload

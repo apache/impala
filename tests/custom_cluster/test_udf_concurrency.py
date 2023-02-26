@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import print_function
 import os
 import pytest
 import random
@@ -82,7 +83,7 @@ class TestUdfConcurrency(CustomClusterTestSuite):
     try:
       setup_client.execute(setup_query)
     except Exception as e:
-      print "Unable to create initial function: {0}".format(setup_query)
+      print("Unable to create initial function: {0}".format(setup_query))
       raise
 
     errors = []
@@ -126,7 +127,7 @@ class TestUdfConcurrency(CustomClusterTestSuite):
     # join all threads.
     for t in runner_threads: t.join()
 
-    for e in errors: print e
+    for e in errors: print(e)
 
     # Checks that no impalad has crashed.
     assert cluster.num_responsive_coordinators() == exp_num_coordinators
@@ -167,13 +168,13 @@ class TestUdfConcurrency(CustomClusterTestSuite):
       s = create_fn_to_use.format(unique_database, udf_tgt_path)
       setup_client.execute(s)
     except Exception as e:
-      print e
+      print(e)
       assert False
     for i in range(0, num_drops):
       try:
         setup_client.execute(create_fn_to_drop.format(unique_database, i, udf_tgt_path))
       except Exception as e:
-        print e
+        print(e)
         assert False
 
     errors = []
@@ -208,5 +209,5 @@ class TestUdfConcurrency(CustomClusterTestSuite):
     for t in runner_threads: t.join()
 
     # Check for any errors.
-    for e in errors: print e
+    for e in errors: print(e)
     assert len(errors) == 0

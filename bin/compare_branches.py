@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Future imports must happen at the beginning of the file
+from __future__ import print_function
+
 HELP = '''
 Compares two specified branches, using the Gerrit Change-Id as the
 primary identifier. Ignored commits can be added via a JSON
@@ -171,7 +174,7 @@ def cherrypick(cherry_pick_hashes, full_target_branch_name, partial_ok):
 
   Note that this function does not push to the remote.
   """
-  print "Cherrypicking %d changes." % (len(cherry_pick_hashes),)
+  print("Cherrypicking %d changes." % (len(cherry_pick_hashes),))
 
   if len(cherry_pick_hashes) == 0:
     return
@@ -181,8 +184,8 @@ def cherrypick(cherry_pick_hashes, full_target_branch_name, partial_ok):
   target_branch_sha = subprocess.check_output(
       ['git', 'rev-parse', full_target_branch_name]).strip()
   if head_sha != target_branch_sha:
-    print "Cannot cherrypick because %s (%s) and HEAD (%s) are divergent." % (
-        full_target_branch_name, target_branch_sha, head_sha)
+    print("Cannot cherrypick because %s (%s) and HEAD (%s) are divergent." % (
+        full_target_branch_name, target_branch_sha, head_sha))
     sys.exit(1)
 
   cherry_pick_hashes.reverse()
@@ -192,7 +195,7 @@ def cherrypick(cherry_pick_hashes, full_target_branch_name, partial_ok):
     if ret != 0:
       if partial_ok and i > 0:
         subprocess.check_call(['git', 'cherry-pick', '--abort'])
-        print "Failed to cherry-pick %s; stopping picks." % (cherry_pick_hash,)
+        print("Failed to cherry-pick %s; stopping picks." % (cherry_pick_hash,))
         return
       else:
         raise Exception("Failed to cherry-pick: %s" % (cherry_pick_hash,))
@@ -238,10 +241,10 @@ def main():
   commits_ignored = []  # Track commits actually ignored for debug logging
 
   cherry_pick_hashes = []
-  print '-' * 80
-  print 'Commits in {0} but not in {1}:'.format(
-      full_source_branch_name, full_target_branch_name)
-  print '-' * 80
+  print('-' * 80)
+  print('Commits in {0} but not in {1}:'.format(
+      full_source_branch_name, full_target_branch_name))
+  print('-' * 80)
   jira_keys = []
   jira_key_pat = re.compile(r'(IMPALA-\d+)')
   skip_commits_matching = options.skip_commits_matching.format(
@@ -267,17 +270,17 @@ def main():
       logging.debug("NOT ignoring commit {0} since not in ignored commits ({1},{2})"
                    .format(commit_hash, options.source_branch, options.target_branch))
     if not change_in_target and not ignore_by_config and not ignore_by_commit_message:
-      print u'{0} {1} ({2}) - {3}'\
-          .format(commit_hash, msg.decode('utf8'), date, author.decode('utf8'))\
-          .encode('utf8')
+      print(u'{0} {1} ({2}) - {3}'
+          .format(commit_hash, msg.decode('utf8'), date, author.decode('utf8'))
+          .encode('utf8'))
       cherry_pick_hashes.append(commit_hash)
       jira_keys += jira_key_pat.findall(msg)
 
-  print '-' * 80
+  print('-' * 80)
 
-  print "Jira keys referenced (Note: not all commit messages will reference a jira key):"
-  print ','.join(jira_keys)
-  print '-' * 80
+  print("Jira keys referenced (Note: not all commit messages will reference a jira key):")
+  print(','.join(jira_keys))
+  print('-' * 80)
 
   logging.debug("Commits actually ignored (change was not in target): {0}"
                .format(pformat(commits_ignored)))

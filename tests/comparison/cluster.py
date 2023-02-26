@@ -16,6 +16,7 @@
 # under the License.
 
 """This module provides utilities for interacting with a cluster."""
+from __future__ import print_function
 
 # This should be moved into the test/util folder eventually. The problem is this
 # module depends on db_connection which use some query generator classes.

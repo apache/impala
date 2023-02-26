@@ -21,6 +21,7 @@
 # to execute the get_database("default") Thrift RPC until the call succeeds,
 # or a timeout is reached.
 
+from __future__ import print_function
 import os
 import time
 from optparse import OptionParser
@@ -56,19 +57,19 @@ while time.time() - now < TIMEOUT_SECONDS:
     hive_transport.open()
     resp = hive_client.get_database("default")
     if resp is not None:
-      print "Metastore service is up at %s." % options.metastore_hostport
+      print("Metastore service is up at %s." % options.metastore_hostport)
       exit(0)
   except Exception as e:
     if "SASL" in e.message:  # Bail out on SASL failures
-      print "SASL failure when attempting connection:"
+      print("SASL failure when attempting connection:")
       raise
     if "GSS" in e.message:   # Other GSSAPI failures
-      print "GSS failure when attempting connection:"
+      print("GSS failure when attempting connection:")
       raise
-    print "Waiting for the Metastore at %s..." % options.metastore_hostport
+    print("Waiting for the Metastore at %s..." % options.metastore_hostport)
   finally:
     hive_transport.close()
     time.sleep(0.5)
 
-print "Metastore service failed to start within %s seconds." % TIMEOUT_SECONDS
+print("Metastore service failed to start within %s seconds." % TIMEOUT_SECONDS)
 exit(1)

@@ -31,6 +31,7 @@
 
 # Importing the whole module instead of doing selective import seems to help find linker
 # errors.
+from __future__ import print_function
 import cx_Oracle
 
 # Host on which Oracle Database lies.
@@ -56,7 +57,7 @@ def main():
     finally:
       cursor.close()
     assert rows == EXPECTED_RESULT
-  print 'success'
+  print('success')
 
 
 if '__main__' == __name__:

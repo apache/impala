@@ -94,6 +94,7 @@
 # This should be used sparingly, because these commands are executed
 # serially.
 #
+from __future__ import print_function
 import collections
 import csv
 import glob
@@ -140,7 +141,7 @@ parser.add_option("--hdfs_namenode", dest="hdfs_namenode", default="localhost:20
 (options, args) = parser.parse_args()
 
 if options.workload is None:
-  print "A workload name must be specified."
+  print("A workload name must be specified.")
   parser.print_help()
   sys.exit(1)
 
@@ -604,7 +605,7 @@ def eval_section(section_str):
   # features (e.g. "for i in {1..n}")
   p = subprocess.Popen(['/bin/bash', '-c', cmd], stdout=subprocess.PIPE)
   stdout, stderr = p.communicate()
-  if stderr: print stderr
+  if stderr: print(stderr)
   assert p.returncode == 0
   return stdout.strip()
 
@@ -638,30 +639,31 @@ def generate_statements(output_name, test_vectors, sections,
       table_name = section['BASE_TABLE_NAME'].strip()
 
       if table_names and (table_name.lower() not in table_names):
-        print 'Skipping table: %s.%s, table is not in specified table list' % (db, table_name)
+        print('Skipping table: %s.%s, table is not in specified table list' %
+              (db, table_name))
         continue
 
       # Check Hive version requirement, if present.
       if section['HIVE_MAJOR_VERSION'] and \
          section['HIVE_MAJOR_VERSION'].strip() != \
          os.environ['IMPALA_HIVE_MAJOR_VERSION'].strip():
-        print "Skipping table '{0}.{1}': wrong Hive major version".format(db, table_name)
+        print("Skipping table '{0}.{1}': wrong Hive major version".format(db, table_name))
         continue
 
       if table_format in schema_only_constraints and \
          table_name.lower() not in schema_only_constraints[table_format]:
-        print ('Skipping table: %s.%s, \'only\' constraint for format did not '
-              'include this table.') % (db, table_name)
+        print(('Skipping table: %s.%s, \'only\' constraint for format did not '
+              'include this table.') % (db, table_name))
         continue
 
       if schema_include_constraints[table_name.lower()] and \
          table_format not in schema_include_constraints[table_name.lower()]:
-        print 'Skipping \'%s.%s\' due to include constraint match.' % (db, table_name)
+        print('Skipping \'%s.%s\' due to include constraint match.' % (db, table_name))
         continue
 
       if schema_exclude_constraints[table_name.lower()] and\
          table_format in schema_exclude_constraints[table_name.lower()]:
-        print 'Skipping \'%s.%s\' due to exclude constraint match.' % (db, table_name)
+        print('Skipping \'%s.%s\' due to exclude constraint match.' % (db, table_name))
         continue
 
       alter = section.get('ALTER')
@@ -752,7 +754,7 @@ def generate_statements(output_name, test_vectors, sections,
       # TODO: Currently, Kudu does not support partitioned tables via Impala.
       # If a CREATE_KUDU section was provided, assume it handles the partition columns
       if file_format == 'kudu' and partition_columns != '' and not create_kudu:
-        print "Ignore partitions on Kudu table: %s.%s" % (db_name, table_name)
+        print("Ignore partitions on Kudu table: %s.%s" % (db_name, table_name))
         continue
 
       # If a CREATE section is provided, use that. Otherwise a COLUMNS section
@@ -817,15 +819,15 @@ def generate_statements(output_name, test_vectors, sections,
       # and skip loading the data. Otherwise, the data is generated using either an
       # INSERT INTO statement or a LOAD statement.
       if not force_reload and hdfs_location in existing_tables:
-        print 'HDFS path:', data_path, 'contains data. Data loading can be skipped.'
+        print('HDFS path:', data_path, 'contains data. Data loading can be skipped.')
       else:
-        print 'HDFS path:', data_path, 'does not exist or is empty. Data will be loaded.'
+        print('HDFS path:', data_path, 'does not exist or is empty. Data will be loaded.')
         if not db_suffix:
           if load:
             hive_output.load_base.append(build_load_statement(load, db_name,
                                                               db_suffix, table_name))
           else:
-            print 'Empty base table load for %s. Skipping load generation' % table_name
+            print('Empty base table load for %s. Skipping load generation' % table_name)
         elif file_format in ['kudu', 'parquet', 'iceberg']:
           if insert_hive:
             hive_output.load.append(build_insert(insert_hive, db_name, db_suffix,
@@ -835,8 +837,8 @@ def generate_statements(output_name, test_vectors, sections,
                 file_format, codec, compression_type, table_name, data_path,
                 for_impala=True))
           else:
-            print 'Empty parquet/kudu load for table %s. Skipping insert generation' \
-              % table_name
+            print('Empty parquet/kudu load for table %s. Skipping insert generation'
+              % table_name)
         else:
           if insert_hive:
             insert = insert_hive
@@ -844,7 +846,7 @@ def generate_statements(output_name, test_vectors, sections,
             hive_output.load.append(build_insert(insert, db_name, db_suffix, file_format,
                 codec, compression_type, table_name, data_path, create_hive=create_hive))
           else:
-            print 'Empty insert for table %s. Skipping insert generation' % table_name
+            print('Empty insert for table %s. Skipping insert generation' % table_name)
 
     impala_create.write_to_file("create-%s-impala-generated-%s-%s-%s.sql" %
         (output_name, file_format, codec, compression_type))
@@ -879,8 +881,8 @@ def parse_schema_template_file(file_name):
 if __name__ == "__main__":
   if options.table_formats is None:
     if options.exploration_strategy not in KNOWN_EXPLORATION_STRATEGIES:
-      print 'Invalid exploration strategy:', options.exploration_strategy
-      print 'Valid values:', ', '.join(KNOWN_EXPLORATION_STRATEGIES)
+      print('Invalid exploration strategy:', options.exploration_strategy)
+      print('Valid values:', ', '.join(KNOWN_EXPLORATION_STRATEGIES))
       sys.exit(1)
 
     test_vectors = [vector.value for vector in\
@@ -896,7 +898,7 @@ if __name__ == "__main__":
   convert_orc_to_full_acid = options.workload == 'functional-query'
 
   target_dataset = test_vectors[0].dataset
-  print 'Target Dataset: ' + target_dataset
+  print('Target Dataset: ' + target_dataset)
   dataset_load_dir = os.path.join(SQL_OUTPUT_DIR, target_dataset)
   # If the directory containing the sql files does not exist, create it. Else nuke all the
   # files corresponding to the current workload.
@@ -918,7 +920,7 @@ if __name__ == "__main__":
                                       '%s_schema_template.sql' % target_dataset)
 
   if not os.path.isfile(schema_template_file):
-    print 'Schema file not found: ' + schema_template_file
+    print('Schema file not found: ' + schema_template_file)
     sys.exit(1)
 
   constraints_file = os.path.join(DATASET_DIR, target_dataset, 'schema_constraints.csv')

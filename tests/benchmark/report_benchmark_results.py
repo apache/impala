@@ -29,6 +29,7 @@
 # if necessary (2.5).
 
 from __future__ import division
+from __future__ import print_function
 import difflib
 import json
 import logging
@@ -1150,5 +1151,5 @@ if __name__ == "__main__":
     if ref_grouped:
       ref_impala_version = get_impala_version(ref_grouped)
 
-  print build_summary_header(current_impala_version, ref_impala_version)
-  print report
+  print(build_summary_header(current_impala_version, ref_impala_version))
+  print(report)

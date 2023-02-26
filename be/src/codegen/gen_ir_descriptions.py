@@ -19,6 +19,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import print_function
 from string import Template
 import os
 import shutil
@@ -338,7 +339,7 @@ def move_if_different(src_file, dest_file):
   if not os.path.isfile(dest_file) or not filecmp.cmp(src_file, dest_file):
     shutil.move(src_file, dest_file)
   else:
-    print 'Retaining existing file: %s' % (dest_file)
+    print('Retaining existing file: %s' % (dest_file))
 
 BE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'be/generated-sources/impala-ir/')
 IR_FUNCTIONS_FILE = 'impala-ir-functions.h'
@@ -352,7 +353,7 @@ if not os.path.exists(BE_PATH):
   os.makedirs(BE_PATH)
 
 if __name__ == "__main__":
-  print "Generating IR description files"
+  print("Generating IR description files")
   enums_file = open(TMP_IR_FUNCTIONS_PATH, 'w')
   enums_file.write(enums_preamble)
 

@@ -18,6 +18,7 @@
 
 # This file contains library functions to decode and access Impala query profiles.
 
+from __future__ import print_function
 import base64
 import datetime
 import zlib
@@ -30,7 +31,7 @@ def decode_profile_line(line):
   space_separated = line.split(" ")
   if len(space_separated) == 3:
     ts = int(space_separated[0])
-    print datetime.datetime.fromtimestamp(ts / 1000.0).isoformat(), space_separated[1]
+    print(datetime.datetime.fromtimestamp(ts / 1000.0).isoformat(), space_separated[1])
     base64_encoded = space_separated[2]
   elif len(space_separated) == 1:
     base64_encoded = space_separated[0]

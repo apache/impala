@@ -17,6 +17,7 @@
 
 # Validates limit on scan nodes
 
+from __future__ import print_function
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_vector import ImpalaTestDimension
@@ -79,5 +80,5 @@ class TestLimitBase(ImpalaTestSuite):
     except ImpalaBeeswaxException as e:
       assert not should_succeed, 'Query was not expected to fail: %s' % e
       if (expected_error not in str(e)):
-        print str(e)
+        print(str(e))
       assert expected_error in str(e)

@@ -39,6 +39,7 @@
 # 2018-04-13T15:06:34.144000 e44af7f93edb8cd6:1b1f801600000000 TRuntimeProfileTree(nodes=[TRuntimeProf...
 
 
+from __future__ import print_function
 from impala_py_lib import profiles
 import sys
 
@@ -47,9 +48,9 @@ if len(sys.argv) == 1 or sys.argv[1] == "-":
 elif len(sys.argv) == 2:
   input_data = file(sys.argv[1])
 else:
-  print >> sys.stderr, "Usage: %s [file]" % (sys.argv[0],)
+  print("Usage: %s [file]" % (sys.argv[0],), file=sys.stderr)
   sys.exit(1)
 
 for line in input_data:
   tree = profiles.decode_profile_line(line)
-  print tree
+  print(tree)

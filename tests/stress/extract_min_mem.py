@@ -33,6 +33,7 @@
 #
 #   ./tests/stress/extract_min_mem.py mem_usage_scaling_runtime_info.json
 #
+from __future__ import print_function
 import json
 import sys
 
@@ -46,4 +47,4 @@ with open(sys.argv[1]) as f:
                    runtime_info['required_mem_mb_with_spilling']))
 
 results.sort()
-print ', '.join(["'Q{0}': {1}".format(num, mem) for num, mem in results])
+print(', '.join(["'Q{0}': {1}".format(num, mem) for num, mem in results]))

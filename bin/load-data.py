@@ -20,6 +20,7 @@
 # This script is used to load the proper datasets for the specified workloads. It loads
 # all data via Hive except for parquet data which needs to be loaded via Impala.
 # Most ddl commands are executed by Impala.
+from __future__ import print_function
 import collections
 import getpass
 import logging
@@ -102,7 +103,7 @@ HIVE_CMD = os.path.join(os.environ['HIVE_HOME'], 'bin/beeline')
 hive_auth = "auth=none"
 if options.use_kerberos:
   if not options.principal:
-    print "--principal is required when --use_kerberos is specified"
+    print("--principal is required when --use_kerberos is specified")
     exit(1)
   hive_auth = "principal=" + options.principal
 

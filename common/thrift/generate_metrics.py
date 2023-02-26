@@ -17,6 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import print_function
 import sys
 import os
 import re
@@ -129,13 +130,13 @@ def metric_to_mdl(m):
   """Returns the metric in the mdl format, or None if the metric isn't supported."""
   # TODO: Stamp out metrics with arguments, e.g. output each rpc call_duration metric.
   if '$0' in m['key']:
-    print >>sys.stderr, "Skipping metrics with unbound argument, key=%s" % m['key']
+    print("Skipping metrics with unbound argument, key=%s" % m['key'], file=sys.stderr)
     return None
 
   # TODO: Stamp out individual metrics for other metric types.
   SUPPORTED_METRIC_KINDS = ['COUNTER', 'GAUGE']
   if m['kind'] not in SUPPORTED_METRIC_KINDS:
-    print >>sys.stderr, "Skipping %s metric %s" % (m['kind'], m['key'])
+    print("Skipping %s metric %s" % (m['kind'], m['key']), file=sys.stderr)
     return None
 
   return dict(

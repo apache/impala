@@ -21,6 +21,7 @@
 # tests can run with the normal exploration strategy and the overall test runtime doesn't
 # explode.
 
+from __future__ import print_function
 import os
 import pytest
 import random
@@ -410,10 +411,10 @@ class TestHdfsScannerSkew(ImpalaTestSuite):
           ratio = float(a) / float(b)
         else:
           ratio = float(b) / float(a)
-        print "Intra-node bytes read ratio:", ratio
+        print("Intra-node bytes read ratio:", ratio)
         if ratio < SKEW_THRESHOLD:
           count_skew += 1
-          print "Profile of skewed execution: ", profile
+          print("Profile of skewed execution: ", profile)
       return count_skew
 
     tbl_name = unique_database + ".lineitem_skew"

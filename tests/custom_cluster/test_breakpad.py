@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import print_function
 import glob
 import os
 import psutil
@@ -89,7 +90,7 @@ class TestBreakpadBase(CustomClusterTestSuite):
         # For every process in the list we might see the original Impala process plus a
         # forked off child that is writing the minidump. We need to catch both.
         for pid in process.get_pids():
-          print "Checking pid %s" % pid
+          print("Checking pid %s" % pid)
           psutil_process = psutil.Process(pid)
           psutil_process.wait(timeout)
       except psutil.NoSuchProcess:

@@ -17,6 +17,7 @@
 #
 # Basic object model of an Impala cluster (set of Impala processes).
 
+from __future__ import print_function
 import json
 import logging
 import os
@@ -158,7 +159,7 @@ class ImpalaCluster(object):
         result = client.execute("select 1")
         assert result.success
         ++n
-      except Exception as e: print e
+      except Exception as e: print(e)
       finally:
         client.close()
     return n

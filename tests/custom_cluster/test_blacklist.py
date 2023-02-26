@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import print_function
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 import pytest
@@ -226,7 +227,7 @@ class TestBlacklistFaultyDisk(CustomClusterTestSuite):
       dir_path = tempfile.mkdtemp()
       self.created_dirs.append(dir_path)
       result.append(dir_path)
-      print "Generated dir" + dir_path
+      print("Generated dir" + dir_path)
     return result
 
   def setup_method(self, method):

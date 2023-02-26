@@ -22,6 +22,7 @@
 # This script generates be/src/common/version.h which contains the build version based
 # on the git hash.
 
+from __future__ import print_function
 import os
 from subprocess import call
 
@@ -46,15 +47,15 @@ version_file_exists = os.path.isfile(VERSION_FILE_NAME)
 # If we have a version file and cannot obtain a git hash, skip generating a new
 # version file.
 if version_file_exists and not can_obtain_git_hash:
-  print "Cannot obtain git hash, using existing version file."
+  print("Cannot obtain git hash, using existing version file.")
 else:
   # Remove existing version files only if they exist.
   # TODO: Might be useful to make a common utility function remove_if_clean.
   if version_file_exists:
-    print 'Removing existing file: %s' % (VERSION_FILE_NAME)
+    print('Removing existing file: %s' % (VERSION_FILE_NAME))
     os.remove(VERSION_FILE_NAME)
   if os.path.isfile(VERSION_CC_FILE_NAME):
-    print 'Removing existing file: %s' % (VERSION_CC_FILE_NAME)
+    print('Removing existing file: %s' % (VERSION_CC_FILE_NAME))
     os.remove(VERSION_CC_FILE_NAME)
 
   # SAVE_VERSION_SCRIPT will generate a dummy version.info file if we cannot obtain the
@@ -74,7 +75,7 @@ try:
 finally:
   version_file.close()
 
-print '\n'.join([version, git_hash, build_time])
+print('\n'.join([version, git_hash, build_time]))
 
 file_contents = """
 //

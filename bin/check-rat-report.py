@@ -33,6 +33,7 @@
 # time, and the RAT JAR is not included in the Impala repo; it must be downloaded
 # separately.
 
+from __future__ import print_function
 import fnmatch
 import re
 import sys
@@ -74,5 +75,5 @@ for r in resources:
 if not all_ok:
   sys.exit(1)
 
-print 'OK'
+print('OK')
 sys.exit(0)

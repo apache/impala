@@ -22,6 +22,7 @@
 # executing the remaining tests in parallel. To run only some of
 # these, use --skip-serial, --skip-stress, or --skip-parallel.
 # All additional command line options are passed to py.test.
+from __future__ import print_function
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_service import ImpaladService
 from tests.conftest import configure_logging
@@ -226,16 +227,16 @@ def build_ignore_dir_arg_list(valid_dirs):
 def print_metrics(substring):
   """Prints metrics with the given substring in the name"""
   for impalad in ImpalaCluster.get_e2e_test_cluster().impalads:
-    print ">" * 80
+    print(">" * 80)
     port = impalad.get_webserver_port()
     cert = impalad._get_webserver_certificate_file()
-    print "connections metrics for impalad at port {0}:".format(port)
+    print("connections metrics for impalad at port {0}:".format(port))
     debug_info = json.loads(ImpaladService(impalad.hostname, webserver_port=port,
         webserver_certificate_file=cert).read_debug_webpage('metrics?json'))
     for metric in debug_info['metric_group']['metrics']:
       if substring in metric['name']:
-        print json.dumps(metric, indent=1)
-    print "<" * 80
+        print(json.dumps(metric, indent=1))
+    print("<" * 80)
 
 
 def detect_and_remove_flag(flag):
@@ -265,7 +266,7 @@ if __name__ == "__main__":
 
   def run(args):
     """Helper to print out arguments of test_executor before invoking."""
-    print "Running TestExecutor with args: %s" % (args,)
+    print("Running TestExecutor with args: %s" % (args,))
     test_executor.run_tests(args)
 
   os.chdir(TEST_DIR)

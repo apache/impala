@@ -22,6 +22,7 @@
    results.
 
 '''
+from __future__ import print_function
 # TODO: IMPALA-4600: refactor this module
 
 from copy import deepcopy

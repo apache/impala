@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import print_function
 from collections import defaultdict
 import json
 import logging
@@ -155,7 +156,7 @@ class KillableThreadedServer(TServer):
     except TTransport.TTransportException as tx:
       pass
     except Exception as x:
-      print x
+      print(x)
 
     itrans.close()
     otrans.close()

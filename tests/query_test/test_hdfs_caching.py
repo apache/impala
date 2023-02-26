@@ -17,6 +17,7 @@
 
 # Validates limit on scan nodes
 
+from __future__ import print_function
 import pytest
 import re
 import time
@@ -87,7 +88,7 @@ class TestHdfsCaching(ImpalaTestSuite):
     elif num_metrics_increased != 1:
       # Test failed, print the metrics
       for i in range(0, len(cached_bytes_before)):
-        print "%d %d" % (cached_bytes_before[i], cached_bytes_after[i])
+        print("%d %d" % (cached_bytes_before[i], cached_bytes_after[i]))
       assert(False)
 
   def test_cache_cancellation(self, vector):

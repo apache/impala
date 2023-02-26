@@ -69,6 +69,7 @@
 #   --start_minicluster   start a new Hadoop minicluster
 #   --ninja               use ninja, rather than Make, as the build tool
 
+from __future__ import print_function
 from optparse import OptionParser
 from tempfile import mkdtemp
 
@@ -208,7 +209,7 @@ def backup_workloads():
   temp_dir = mkdtemp()
   sh.cp(os.path.join(IMPALA_HOME, "testdata", "workloads"),
         temp_dir, R=True, _out=sys.stdout, _err=sys.stderr)
-  print "Backed up workloads to {0}".format(temp_dir)
+  print("Backed up workloads to {0}".format(temp_dir))
   return temp_dir
 
 

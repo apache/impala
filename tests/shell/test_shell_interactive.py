@@ -18,6 +18,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import print_function
 import httplib
 import logging
 import os
@@ -896,14 +897,14 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       os.chdir("%s/tests/shell/" % os.environ['IMPALA_HOME'])
       result = run_impala_shell_interactive(vector,
         "sOuRcE shell_case_sensitive.cmds; SeLeCt 'second command'")
-      print result.stderr
+      print(result.stderr)
 
       assert "Query: uSe FUNCTIONAL" in result.stderr
       assert "Query: ShOw TABLES" in result.stderr
       assert "alltypes" in result.stdout
       # This is from shell_case_sensitive2.cmds, the result of sourcing a file
       # from a sourced file.
-      print result.stderr
+      print(result.stderr)
       assert "SeLeCt 'second command'" in result.stderr
     finally:
       os.chdir(cwd)

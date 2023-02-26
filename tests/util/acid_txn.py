@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import print_function
 from tests.util.thrift_util import create_transport
 from hive_metastore import ThriftHiveMetastore
 from hive_metastore.ttypes import (AbortTxnRequest, AllocateTableWriteIdsRequest,
@@ -148,4 +149,4 @@ class AcidTxn(object):
         try:
           self.commit_txn(txn)
         except Exception as e:
-          print str(e)
+          print(str(e))

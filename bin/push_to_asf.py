@@ -35,6 +35,7 @@
 # TODO: Improve console output: replace 'print' with format strings
 #       and use sys.stderr/sys.stdout.
 
+from __future__ import print_function
 import logging
 import optparse
 import os
@@ -87,10 +88,10 @@ def confirm_prompt(prompt):
   if the user confirms.
   """
   while True:
-    print prompt, "[Y/n]:",
+    print(prompt, "[Y/n]:", end=' ')
 
     if not os.isatty(sys.stdout.fileno()):
-      print "Not running interactively. Assuming 'N'."
+      print("Not running interactively. Assuming 'N'.")
       return False
 
     r = raw_input().strip().lower()
@@ -115,14 +116,14 @@ def check_apache_remote():
         ['git', 'config', '--local', '--get',
             'remote.' + OPTIONS.apache_remote + '.url']).strip()
   except subprocess.CalledProcessError:
-    print >>sys.stderr, "No remote named " + OPTIONS.apache_remote + \
-        ". Please set one up, for example with: "
-    print >>sys.stderr, "  git remote add apache", APACHE_REPO
+    print("No remote named " + OPTIONS.apache_remote
+        + ". Please set one up, for example with: ", file=sys.stderr)
+    print("  git remote add apache", APACHE_REPO, file=sys.stderr)
     sys.exit(1)
   if url != APACHE_REPO:
-    print >>sys.stderr, "Unexpected URL for remote " + OPTIONS.apache_remote + "."
-    print >>sys.stderr, "  Got:     ", url
-    print >>sys.stderr, "  Expected:", APACHE_REPO
+    print("Unexpected URL for remote " + OPTIONS.apache_remote + ".", file=sys.stderr)
+    print("  Got:     ", url, file=sys.stderr)
+    print("  Expected:", APACHE_REPO, file=sys.stderr)
     sys.exit(1)
 
 
@@ -135,15 +136,15 @@ def check_gerrit_remote():
     url = check_output(['git', 'config', '--local', '--get',
                         'remote.' + OPTIONS.gerrit_remote + '.url']).strip()
   except subprocess.CalledProcessError:
-    print >>sys.stderr, "No remote named " + OPTIONS.gerrit_remote + \
-        ". Please set one up following "
-    print >>sys.stderr, "the contributor guide."
+    print("No remote named " + OPTIONS.gerrit_remote
+        + ". Please set one up following ", file=sys.stderr)
+    print("the contributor guide.", file=sys.stderr)
     sys.exit(1)
 
   if not GERRIT_URL_RE.match(url):
-    print >>sys.stderr, "Unexpected URL for remote " + OPTIONS.gerrit_remote
-    print >>sys.stderr, "  Got:     ", url
-    print >>sys.stderr, "  Expected to find host '%s' in the URL" % GERRIT_HOST
+    print("Unexpected URL for remote " + OPTIONS.gerrit_remote, file=sys.stderr)
+    print("  Got:     ", url, file=sys.stderr)
+    print("  Expected URL to match '%s'" % GERRIT_URL_RE, file=sys.stderr)
     sys.exit(1)
 
 
@@ -211,40 +212,40 @@ def do_update(branch, gerrit_sha, apache_sha):
   # must have gotten committed to Apache outside of gerrit, and we'd need some
   # manual intervention.
   if not is_fast_forward(apache_sha, gerrit_sha):
-    print >>sys.stderr, "Cannot update branch '%s' from gerrit:" % branch
-    print >>sys.stderr, "Apache revision %s is not an ancestor of gerrit revision %s" % (
-      apache_sha[:8], gerrit_sha[:8])
-    print >>sys.stderr,\
-        "Something must have been committed to Apache and bypassed gerrit."
-    print >>sys.stderr, "Manual intervention is required."
+    print("Cannot update branch '%s' from gerrit:" % branch, file=sys.stderr)
+    print("Apache revision %s is not an ancestor of gerrit revision %s" % (
+      apache_sha[:8], gerrit_sha[:8]), file=sys.stderr)
+    print("Something must have been committed to Apache and bypassed gerrit.",
+          file=sys.stderr)
+    print("Manual intervention is required.", file=sys.stderr)
     sys.exit(1)
 
   # List the commits that are going to be pushed to the ASF, so that the committer
   # can verify and "sign off".
   commits = rev_list("%s..%s" % (apache_sha, gerrit_sha))
   commits.reverse()  # Display from oldest to newest.
-  print "-" * 60
-  print Colors.GREEN + ("%d commit(s) need to be pushed from Gerrit to ASF:" %\
-      len(commits)) + Colors.RESET
+  print("-" * 60)
+  print(Colors.GREEN + ("%d commit(s) need to be pushed from Gerrit to ASF:" %
+      len(commits)) + Colors.RESET)
   push_sha = None
   for sha in commits:
     oneline = describe_commit(sha)
-    print "  ", oneline
+    print("  ", oneline)
     committer = get_committer_email(sha)
     if committer != get_my_email():
-      print Colors.RED + "   !!! Committed by someone else (%s) !!!" %\
-          committer, Colors.RESET
+      print(Colors.RED + "   !!! Committed by someone else (%s) !!!" %
+          committer, Colors.RESET)
       if not confirm_prompt(Colors.RED +\
           "   !!! Are you sure you want to push on behalf of another committer?" +\
           Colors.RESET):
         # Even if they don't want to push this commit, we could still push any
         # earlier commits that the user _did_ author.
         if push_sha is not None:
-          print "... will still update to prior commit %s..." % push_sha
+          print("... will still update to prior commit %s..." % push_sha)
         break
     push_sha = sha
   if push_sha is None:
-    print "Nothing to push"
+    print("Nothing to push")
     return
 
   # Everything has been confirmed. Do the actual push
@@ -252,11 +253,11 @@ def do_update(branch, gerrit_sha, apache_sha):
   if OPTIONS.dry_run:
     cmd.append('--dry-run')
   cmd.append('%s:refs/heads/%s' % (push_sha, branch))
-  print Colors.GREEN + "Running: " + Colors.RESET + " ".join(cmd)
+  print(Colors.GREEN + "Running: " + Colors.RESET + " ".join(cmd))
   subprocess.check_call(cmd)
-  print Colors.GREEN + "Successfully updated %s to %s" % (branch, gerrit_sha) +\
-      Colors.RESET
-  print
+  print(Colors.GREEN + "Successfully updated %s to %s" % (branch, gerrit_sha)
+      + Colors.RESET)
+  print()
 
 
 def main():
@@ -295,14 +296,14 @@ def main():
   apache_branches = get_branches(OPTIONS.apache_remote)
   for branch, apache_sha in sorted(apache_branches.iteritems()):
     gerrit_sha = rev_parse("remotes/" + OPTIONS.gerrit_remote + "/" + branch)
-    print "Branch '%s':\t" % branch,
+    print("Branch '%s':\t" % branch, end='')
     if gerrit_sha is None:
-      print Colors.YELLOW, "found on Apache but not in gerrit", Colors.RESET
+      print(Colors.YELLOW, "found on Apache but not in gerrit", Colors.RESET)
       continue
     if gerrit_sha == apache_sha:
-      print Colors.GREEN, "up to date", Colors.RESET
+      print(Colors.GREEN, "up to date", Colors.RESET)
       continue
-    print Colors.YELLOW, "needs update", Colors.RESET
+    print(Colors.YELLOW, "needs update", Colors.RESET)
     do_update(branch, gerrit_sha, apache_sha)
 
 

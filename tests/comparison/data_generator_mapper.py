@@ -20,6 +20,7 @@
 '''This is a mapper for use with hadoop streaming. See data_generator.DatabasePopulator
    for more information on how this file is used.
 '''
+from __future__ import print_function
 
 import os
 import random

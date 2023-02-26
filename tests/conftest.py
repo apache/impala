@@ -17,6 +17,7 @@
 
 # py.test configuration module
 #
+from __future__ import print_function
 from impala.dbapi import connect as impala_connect
 from kudu import connect as kudu_connect
 from random import choice, sample

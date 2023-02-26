@@ -17,6 +17,7 @@
 
 # This module is used for common utilities related to parsing test files
 
+from __future__ import print_function
 import codecs
 import collections
 import logging
@@ -210,8 +211,8 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
 
       if subsection_name not in valid_section_names:
         if skip_unknown_sections or not subsection_name:
-          print sub_section
-          print 'Unknown section \'%s\'' % subsection_name
+          print(sub_section)
+          print('Unknown section \'%s\'' % subsection_name)
           continue
         else:
           raise RuntimeError, 'Unknown subsection: %s' % subsection_name

@@ -40,6 +40,7 @@
 # The pairwise generation is done using the Python 'AllPairs' module. This module can be
 # downloaded from http://pypi.python.org/pypi/AllPairs/2.0.1
 #
+from __future__ import print_function
 import collections
 import csv
 import math
@@ -56,7 +57,7 @@ parser.add_option("-w", "--workload", dest="workload",
 (options, args) = parser.parse_args()
 
 if options.workload is None:
-  print "A workload name must be specified."
+  print("A workload name must be specified.")
   parser.print_help()
   sys.exit(1)
 
@@ -115,12 +116,12 @@ def read_dimension_file(file_name):
          continue
       values = line.split(':')
       if len(values) != 2:
-        print 'Invalid dimension file format. Expected format is <dimension name>: val1,'\
-              ' val2, ... Found: ' + line
+        print('Invalid dimension file format. Expected format is <dimension name>: val1,'
+              ' val2, ... Found: ' + line)
         sys.exit(1)
       if not values[0] in KNOWN_DIMENSION_NAMES:
-        print 'Unknown dimension name: ' + values[0]
-        print 'Valid dimension names: ' + ', '.join(KNOWN_DIMENSION_NAMES)
+        print('Unknown dimension name: ' + values[0])
+        print('Valid dimension names: ' + ', '.join(KNOWN_DIMENSION_NAMES))
         sys.exit(1)
       dimension_map[values[0]] = [val.strip() for val in values[1].split(',')]
   return dimension_map
@@ -132,7 +133,7 @@ def write_vectors_to_csv(output_dir, output_file, matrix):
     output_text += '\n' + ', '.join(row)
 
   output_path = os.path.join(output_dir, output_file)
-  print 'Writing test vectors to: ' + output_path
+  print('Writing test vectors to: ' + output_path)
   with open(output_path, 'wb') as output_file:
     output_file.write(output_text)
     output_file.write('\n')
@@ -140,10 +141,10 @@ def write_vectors_to_csv(output_dir, output_file, matrix):
 dimension_file = os.path.join(WORKLOAD_DIR, options.workload,
                               '%s_dimensions.csv' % options.workload)
 if not os.path.isfile(dimension_file):
-  print 'Dimension file not found: ' + dimension_file
+  print('Dimension file not found: ' + dimension_file)
   sys.exit(1)
 
-print 'Reading dimension file: ' + dimension_file
+print('Reading dimension file: ' + dimension_file)
 vector_map = read_dimension_file(dimension_file)
 vectors = []
 

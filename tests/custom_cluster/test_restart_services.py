@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import print_function
 import logging
 import os
 import pytest
@@ -515,7 +516,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
   def test_shutdown_executor_with_delay(self):
     """Regression test for IMPALA-7931 that adds delays to status reporting and
     to fetching of results to trigger races that previously resulted in query failures."""
-    print self.exploration_strategy
+    print(self.exploration_strategy)
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip()
     self.do_test_shutdown_executor(fetch_delay_s=5)

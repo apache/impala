@@ -21,6 +21,7 @@ A script for generating arbitrary junit XML reports while building Impala.
 These files will be consumed by jenkins.impala.io to generate reports for
 easier triaging of build and setup errors.
 """
+from __future__ import print_function
 import argparse
 import codecs
 import errno

@@ -16,6 +16,7 @@
 # under the License.
 #
 
+from __future__ import print_function
 import json
 import logging
 import os
@@ -128,7 +129,7 @@ class TestClientSsl(CustomClusterTestSuite):
     p.send_cmd("profile")
     result = p.get_result()
 
-    print result.stderr
+    print(result.stderr)
     assert "Query Status: Cancelled" in result.stdout
     assert impalad.wait_for_num_in_flight_queries(0)
 
