@@ -1538,41 +1538,43 @@ static void PrettyPrintTimeSeries(const string& label, const int64_t* samples, i
   stream << endl;
 }
 
-void RuntimeProfile::PrettyPrintSubclassCounters(
-    ostream* s, const string& prefix, Verbosity verbosity) const {
+void RuntimeProfile::PrettyPrintTimeline(ostream* s, const string& prefix) const {
   ostream& stream = *s;
-  {
-    // Print all the event timers as the following:
-    // <EventKey> Timeline: 2s719ms
-    //     - Event 1: 6.522us (6.522us)
-    //     - Event 2: 2s288ms (2s288ms)
-    //     - Event 3: 2s410ms (121.138ms)
-    // The times in parentheses are the time elapsed since the last event.
-    vector<EventSequence::Event> events;
-    lock_guard<SpinLock> l(event_sequence_lock_);
-    for (const auto& event_sequence : event_sequence_map_) {
-      // If the stopwatch has never been started (e.g. because this sequence came from
-      // Thrift), look for the last element to tell us the total runtime. For
-      // currently-updating sequences, it's better to use the stopwatch value because that
-      // updates continuously.
-      int64_t last = event_sequence.second->ElapsedTime();
-      event_sequence.second->GetEvents(&events);
-      if (last == 0 && events.size() > 0) last = events.back().second;
-      stream << prefix << "  " << event_sequence.first << ": "
-             << PrettyPrinter::Print(last, TUnit::TIME_NS)
-             << endl;
+  // Print all the event timers as the following:
+  // <EventKey> Timeline: 2s719ms
+  //     - Event 1: 6.522us (6.522us)
+  //     - Event 2: 2s288ms (2s288ms)
+  //     - Event 3: 2s410ms (121.138ms)
+  // The times in parentheses are the time elapsed since the last event.
+  vector<EventSequence::Event> events;
+  lock_guard<SpinLock> l(event_sequence_lock_);
+  for (const auto& event_sequence : event_sequence_map_) {
+    // If the stopwatch has never been started (e.g. because this sequence came from
+    // Thrift), look for the last element to tell us the total runtime. For
+    // currently-updating sequences, it's better to use the stopwatch value because that
+    // updates continuously.
+    int64_t last = event_sequence.second->ElapsedTime();
+    event_sequence.second->GetEvents(&events);
+    if (last == 0 && events.size() > 0) last = events.back().second;
+    stream << prefix << event_sequence.first << ": "
+           << PrettyPrinter::Print(last, TUnit::TIME_NS)
+           << endl;
 
-      int64_t prev = 0L;
-      event_sequence.second->GetEvents(&events);
-      for (const EventSequence::Event& event: events) {
-        stream << prefix << "     - " << event.first << ": "
-               << PrettyPrinter::Print(event.second, TUnit::TIME_NS) << " ("
-               << PrettyPrinter::Print(event.second - prev, TUnit::TIME_NS) << ")"
-               << endl;
-        prev = event.second;
-      }
+    int64_t prev = 0L;
+    event_sequence.second->GetEvents(&events);
+    for (const EventSequence::Event& event: events) {
+      stream << prefix << "   - " << event.first << ": "
+             << PrettyPrinter::Print(event.second, TUnit::TIME_NS) << " ("
+             << PrettyPrinter::Print(event.second - prev, TUnit::TIME_NS) << ")"
+             << endl;
+      prev = event.second;
     }
   }
+}
+
+void RuntimeProfile::PrettyPrintSubclassCounters(
+    ostream* s, const string& prefix, Verbosity verbosity) const {
+  PrettyPrintTimeline(s, prefix + "  ");
 
   {
     // Print time series counters.
@@ -1844,6 +1846,13 @@ void RuntimeProfile::ExecSummaryToThrift(TRuntimeProfileTree* tree) const {
 void RuntimeProfile::GetExecSummary(TExecSummary* t_exec_summary) const {
   lock_guard<SpinLock> l(t_exec_summary_lock_);
   *t_exec_summary = t_exec_summary_;
+}
+
+void RuntimeProfile::GetTimeline(string* output) const {
+  DCHECK(output != nullptr);
+  stringstream stream;
+  PrettyPrintTimeline(&stream, "");
+  *output = stream.str();
 }
 
 void RuntimeProfile::SetPlanNodeId(int node_id) {

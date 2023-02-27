@@ -32,7 +32,8 @@ LocalAdmissionControlClient::LocalAdmissionControlClient(const TUniqueId& query_
 Status LocalAdmissionControlClient::SubmitForAdmission(
     const AdmissionController::AdmissionRequest& request,
     RuntimeProfile::EventSequence* query_events,
-    std::unique_ptr<QuerySchedulePB>* schedule_result) {
+    std::unique_ptr<QuerySchedulePB>* schedule_result,
+    int64_t* wait_start_time_ms, int64_t* wait_end_time_ms) {
   ScopedEvent completedEvent(
       query_events, AdmissionControlClient::QUERY_EVENT_COMPLETED_ADMISSION);
   query_events->MarkEvent(QUERY_EVENT_SUBMIT_FOR_ADMISSION);
@@ -43,7 +44,8 @@ Status LocalAdmissionControlClient::SubmitForAdmission(
     query_events->MarkEvent(QUERY_EVENT_QUEUED);
     DCHECK(status.ok());
     status = ExecEnv::GetInstance()->admission_controller()->WaitOnQueued(
-        request.query_id, schedule_result);
+        request.query_id, schedule_result, /*timeout_ms*/ 0, /*wait_timed_out*/ nullptr,
+        wait_start_time_ms, wait_end_time_ms);
   }
   return status;
 }

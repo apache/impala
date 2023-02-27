@@ -378,7 +378,8 @@ class AdmissionController {
   /// function returns due to the timeout 'wait_timed_out' will be true.
   Status WaitOnQueued(const UniqueIdPB& query_id,
       std::unique_ptr<QuerySchedulePB>* schedule_result, int64_t timeout_ms = 0,
-      bool* wait_timed_out = nullptr);
+      bool* wait_timed_out = nullptr, int64_t* wait_start_time_ms = nullptr,
+      int64_t* wait_end_time_ms = nullptr);
 
   /// Updates the pool statistics when a query completes (either successfully,
   /// is cancelled or failed). This should be called for all requests that have

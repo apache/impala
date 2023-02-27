@@ -1344,8 +1344,10 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
 
 Status AdmissionController::WaitOnQueued(const UniqueIdPB& query_id,
     unique_ptr<QuerySchedulePB>* schedule_result, int64_t timeout_ms,
-    bool* wait_timed_out) {
+    bool* wait_timed_out, int64_t* wait_start_time_ms, int64_t* wait_end_time_ms) {
   if (wait_timed_out != nullptr) *wait_timed_out = false;
+  if (wait_start_time_ms != nullptr) *wait_start_time_ms = 0;
+  if (wait_end_time_ms != nullptr) *wait_end_time_ms = 0;
 
   QueueNode* queue_node;
   {
@@ -1358,6 +1360,8 @@ Status AdmissionController::WaitOnQueued(const UniqueIdPB& query_id,
     queue_node = &it->second;
   }
 
+  if (wait_start_time_ms != nullptr) *wait_start_time_ms = queue_node->wait_start_ms;
+
   int64_t queue_wait_timeout_ms = GetQueueTimeoutForPoolMs(queue_node->pool_cfg);
 
   // Block in Get() up to the time out, waiting for the promise to be set when the query
@@ -1366,7 +1370,8 @@ Status AdmissionController::WaitOnQueued(const UniqueIdPB& query_id,
   queue_node->admit_outcome->Get(
       (timeout_ms > 0 ? min(queue_wait_timeout_ms, timeout_ms) : queue_wait_timeout_ms),
       &get_timed_out);
-  int64_t wait_time_ms = MonotonicMillis() - queue_node->wait_start_ms;
+  int64_t wait_end_ms = MonotonicMillis();
+  int64_t wait_time_ms = wait_end_ms - queue_node->wait_start_ms;
 
   queue_node->profile->AddInfoString(PROFILE_INFO_KEY_INITIAL_QUEUE_REASON,
       Substitute(PROFILE_INFO_VAL_INITIAL_QUEUE_REASON, wait_time_ms,
@@ -1377,6 +1382,8 @@ Status AdmissionController::WaitOnQueued(const UniqueIdPB& query_id,
     // No admission decision has been made yet, so just return.
     return Status::OK();
   }
+
+  if (wait_end_time_ms != nullptr) *wait_end_time_ms = wait_end_ms;
 
   const auto queue_node_deleter = MakeScopeExitTrigger([&]() {
     lock_guard<mutex> lock(queue_nodes_lock_);

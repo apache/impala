@@ -28,37 +28,53 @@ command line parameter.</p>
 
 <table class='table table-hover table-border'>
   <tr>
-    <th>User</th>
-    <th>Default Db</th>
-    <th>Statement</th>
-    <th>Query Type</th>
-    <th>Start Time</th>
-    <th>Duration</th>
-    <th>Scan Progress</th>
-    <th>State</th>
-    <th>Last Event</th>
-    <th># rows fetched</th>
-    <th>Resource Pool</th>
-    <th>Details</th>
-    <th>Action</th>
+    <th title="{{tips_query_id}}">Query ID</th>
+    <th title="{{tips_action_cancel}}">Action</th>
+    <th title="{{tips_user}}">User</th>
+    <th title="{{tips_default_db}}">Default Db</th>
+    <th title="{{tips_query_type}}">Query Type</th>
+    <th title="{{tips_start_time}}">Start Time</th>
+    <th>
+      <span title="{{tips_duration}}">Duration</span>
+      <hr style="margin-top:0px;margin-bottom:0px;"/>
+      <span title="{{tips_queued_duration}}">Queued&nbsp;Duration</span>
+    </th>
+    <th>
+      <span title="{{tips_mem_usage}}">Mem&nbsp;Usage</span>
+      <hr style="margin-top:0px;margin-bottom:0px;"/>
+      <span title="{{tips_mem_estimate}}">Mem&nbsp;Estimate</span>
+    </th>
+    <th title="{{tips_scan_progress}}">Scan Progress</th>
+    <th>
+      <span title="{{tips_bytes_read}}">Bytes&nbsp;Read</span>
+      <hr style="margin-top:0px;margin-bottom:0px;"/>
+      <span title="{{tips_bytes_sent}}">Bytes&nbsp;Sent</span>
+    </th>
+    <th title="{{tips_state}}">State</th>
+    <th title="{{tips_last_event}}">Last Event</th>
+    <th title="{{tips_rows_fetched}}"># rows fetched</th>
+    <th title="{{tips_resource_pool}}">Resource Pool</th>
+    <th title="{{tips_statement}}">Statement</th>
   </tr>
 {{! filter to get just executing queries from in_flight_queries}}
 {{#in_flight_queries}}
 {{?executing}}
   <tr>
+    <td style="min-width:150px;word-break:break-all;"><a href='{{ __common__.host-url }}/query_plan?query_id={{query_id}}'>{{query_id}}</a></td>
+    <td><a href='{{ __common__.host-url }}/cancel_query?query_id={{query_id}}'>Cancel</a></td>
     <td>{{effective_user}}</td>
     <td>{{default_db}}</td>
-    <td><samp>{{stmt}}</samp></td>
     <td><samp>{{stmt_type}}</samp></td>
     <td>{{start_time}}</td>
-    <td>{{duration}}</td>
+    <td>{{duration}}<hr style="margin-top:0px;margin-bottom:0px;"/>{{queued_duration}}</td>
+    <td>{{mem_usage}}<hr style="margin-top:0px;margin-bottom:0px;"/>{{mem_est}}</td>
     <td>{{progress}}</td>
+    <td>{{bytes_read}}<hr style="margin-top:0px;margin-bottom:0px;"/>{{bytes_sent}}</td>
     <td><samp>{{state}}</samp></td>
     <td><samp>{{last_event}}</samp></td>
     <td>{{rows_fetched}}</td>
     <td>{{resource_pool}}</td>
-    <td><a href='{{ __common__.host-url }}/query_plan?query_id={{query_id}}'>Details</a></td>
-    <td><a href='{{ __common__.host-url }}/cancel_query?query_id={{query_id}}'>Cancel</a></td>
+    <td><samp>{{stmt}}</samp></td>
   </tr>
 {{/executing}}
 {{/in_flight_queries}}
@@ -71,39 +87,55 @@ command line parameter.</p>
 
 <table class='table table-hover table-border'>
   <tr>
-    <th>User</th>
-    <th>Default Db</th>
-    <th>Statement</th>
-    <th>Query Type</th>
-    <th>Start Time</th>
-    <th>Waiting Time</th>
-    <th>Duration</th>
-    <th>Scan Progress</th>
-    <th>State</th>
-    <th>Last Event</th>
-    <th># rows fetched</th>
-    <th>Resource Pool</th>
-    <th>Details</th>
-    <th>Action</th>
+    <th title="{{tips_query_id}}">Query ID</th>
+    <th title="{{tips_action_close}}">Action</th>
+    <th title="{{tips_user}}">User</th>
+    <th title="{{tips_default_db}}">Default Db</th>
+    <th title="{{tips_query_type}}">Query Type</th>
+    <th title="{{tips_start_time}}">Start Time</th>
+    <th title="{{tips_waiting_time}}">Waiting Time</th>
+    <th>
+      <span title="{{tips_duration}}">Duration</span>
+      <hr style="margin-top:0px;margin-bottom:0px;"/>
+      <span title="{{tips_queued_duration}}">Queued&nbsp;Duration</span>
+    </th>
+    <th>
+      <span title="{{tips_mem_usage}}">Mem&nbsp;Usage</span>
+      <hr style="margin-top:0px;margin-bottom:0px;"/>
+      <span title="{{tips_mem_estimate}}">Mem&nbsp;Estimate</span>
+    </th>
+    <th title="{{tips_scan_progress}}">Scan Progress</th>
+    <th>
+      <span title="{{tips_bytes_read}}">Bytes&nbsp;Read</span>
+      <hr style="margin-top:0px;margin-bottom:0px;"/>
+      <span title="{{tips_bytes_sent}}">Bytes&nbsp;Sent</span>
+    </th>
+    <th title="{{tips_state}}">State</th>
+    <th title="{{tips_last_event}}">Last Event</th>
+    <th title="{{tips_rows_fetched}}"># rows fetched</th>
+    <th title="{{tips_resource_pool}}">Resource Pool</th>
+    <th title="{{tips_statement}}">Statement</th>
   </tr>
 {{! filter to get just waiting queries from in_flight_queries}}
 {{#in_flight_queries}}
 {{?waiting}}
   <tr>
+    <td style="min-width:150px;word-break:break-all;"><a href='{{ __common__.host-url }}/query_plan?query_id={{query_id}}'>{{query_id}}</a></td>
+    <td><a href='{{ __common__.host-url }}/cancel_query?query_id={{query_id}}'>Close</a></td>
     <td>{{effective_user}}</td>
     <td>{{default_db}}</td>
-    <td><samp>{{stmt}}</samp></td>
     <td><samp>{{stmt_type}}</samp></td>
     <td>{{start_time}}</td>
     <td>{{waiting_time}}</td>
-    <td>{{duration}}</td>
+    <td>{{duration}}<hr style="margin-top:0px;margin-bottom:0px;"/>{{queued_duration}}</td>
+    <td>{{mem_usage}}<hr style="margin-top:0px;margin-bottom:0px;"/>{{mem_est}}</td>
     <td>{{progress}}</td>
+    <td>{{bytes_read}}<hr style="margin-top:0px;margin-bottom:0px;"/>{{bytes_sent}}</td>
     <td><samp>{{state}}</samp></td>
     <td><samp>{{last_event}}</samp></td>
     <td>{{rows_fetched}}</td>
     <td>{{resource_pool}}</td>
-    <td><a href='{{ __common__.host-url }}/query_plan?query_id={{query_id}}'>Details</a></td>
-    <td><a href='{{ __common__.host-url }}/cancel_query?query_id={{query_id}}'>Close</a></td>
+    <td><samp>{{stmt}}</samp></td>
   </tr>
 {{/waiting}}
 {{/in_flight_queries}}
@@ -113,33 +145,49 @@ command line parameter.</p>
 
 <table class='table table-hover table-border'>
   <tr>
-    <th>User</th>
-    <th>Default Db</th>
-    <th>Statement</th>
-    <th>Query Type</th>
-    <th>Start Time</th>
-    <th>End Time</th>
-    <th>Duration</th>
-    <th>Scan Progress</th>
-    <th>State</th>
-    <th># rows fetched</th>
-    <th>Resource Pool</th>
-    <th>Details</th>
+    <th title="{{tips_query_id}}">Query ID</th>
+    <th title="{{tips_user}}">User</th>
+    <th title="{{tips_default_db}}">Default Db</th>
+    <th title="{{tips_query_type}}">Query Type</th>
+    <th title="{{tips_start_time}}">Start Time</th>
+    <th title="{{tips_end_time}}">End Time</th>
+    <th>
+      <span title="{{tips_duration}}">Duration</span>
+      <hr style="margin-top:0px;margin-bottom:0px;"/>
+      <span title="{{tips_queued_duration}}">Queued&nbsp;Duration</span>
+    </th>
+    <th>
+      <span title="{{tips_mem_usage}}">Mem&nbsp;Usage</span>
+      <hr style="margin-top:0px;margin-bottom:0px;"/>
+      <span title="{{tips_mem_estimate}}">Mem&nbsp;Estimate</span>
+    </th>
+    <th title="{{tips_scan_progress}}">Scan Progress</th>
+    <th>
+      <span title="{{tips_bytes_read}}">Bytes&nbsp;Read</span>
+      <hr style="margin-top:0px;margin-bottom:0px;"/>
+      <span title="{{tips_bytes_sent}}">Bytes&nbsp;Sent</span>
+    </th>
+    <th title="{{tips_state}}">State</th>
+    <th title="{{tips_rows_fetched}}"># rows fetched</th>
+    <th title="{{tips_resource_pool}}">Resource Pool</th>
+    <th title="{{tips_statement}}">Statement</th>
   </tr>
 {{#completed_queries}}
   <tr>
+    <td style="min-width:150px;word-break:break-all;"><a href='{{ __common__.host-url }}/query_plan?query_id={{query_id}}'>{{query_id}}</a></td>
     <td>{{effective_user}}</td>
     <td>{{default_db}}</td>
-    <td><samp>{{stmt}}</samp></td>
     <td><samp>{{stmt_type}}</samp></td>
     <td>{{start_time}}</td>
     <td>{{end_time}}</td>
-    <td>{{duration}}</td>
+    <td>{{duration}}<hr style="margin-top:0px;margin-bottom:0px;"/>{{queued_duration}}</td>
+    <td>{{mem_usage}}<hr style="margin-top:0px;margin-bottom:0px;"/>{{mem_est}}</td>
     <td>{{progress}}</td>
+    <td>{{bytes_read}}<hr style="margin-top:0px;margin-bottom:0px;"/>{{bytes_sent}}</td>
     <td><samp>{{state}}</samp></td>
     <td>{{rows_fetched}}</td>
     <td>{{resource_pool}}</td>
-    <td><a href='{{ __common__.host-url }}/query_plan?query_id={{query_id}}'>Details</a></td>
+    <td><samp>{{stmt}}</samp></td>
   </tr>
 {{/completed_queries}}
 </table>

@@ -2369,13 +2369,27 @@ void ImpalaServer::QueryStateRecord::Init(const ClientRequestState& query_handle
   default_db = query_handle.default_db();
   start_time_us = query_handle.start_time_us();
   end_time_us = query_handle.end_time_us();
-  has_coord = false;
+  wait_time_ms = query_handle.wait_time_ms();
+  query_handle.summary_profile()->GetTimeline(&timeline);
 
   Coordinator* coord = query_handle.GetCoordinator();
   if (coord != nullptr) {
     num_complete_fragments = coord->progress().num_complete();
     total_fragments = coord->progress().total();
+    auto utilization = coord->ComputeQueryResourceUtilization();
+    total_peak_mem_usage = utilization.total_peak_mem_usage;
+    cluster_mem_est = query_handle.schedule()->cluster_mem_est();
+    bytes_read = utilization.bytes_read;
+    bytes_sent = utilization.exchange_bytes_sent + utilization.scan_bytes_sent;
     has_coord = true;
+  } else {
+    num_complete_fragments = 0;
+    total_fragments = 0;
+    total_peak_mem_usage = 0;
+    cluster_mem_est = 0;
+    bytes_read = 0;
+    bytes_sent = 0;
+    has_coord = false;
   }
   beeswax_query_state = query_handle.BeeswaxQueryState();
   ClientRequestState::RetryState retry_state = query_handle.retry_state();

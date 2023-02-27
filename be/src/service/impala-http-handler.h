@@ -75,6 +75,9 @@ class ImpalaHttpHandler {
   void HadoopVarzHandler(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 
+  /// Add description strings for the query record table header tooltips.
+  void AddQueryRecordTips(rapidjson::Document* document);
+
   /// Returns two sorted lists of queries, one in-flight and one completed, as well as a
   /// list of active backends and their plan-fragment count.
   //
@@ -202,7 +205,7 @@ class ImpalaHttpHandler {
   /// Helper method to render a single QueryStateRecord as a Json object Used by
   /// QueryStateHandler().
   void QueryStateToJson(const ImpalaServer::QueryStateRecord& record,
-      rapidjson::Value* value, rapidjson::Document* document);
+      rapidjson::Value* value, rapidjson::Document* document, bool inflight);
 
   /// Json callback for /backends, which prints a table of known backends.
   /// "backends" : [

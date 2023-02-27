@@ -28,6 +28,8 @@ under the License.
   </label>  Last updated: <span id="last-updated"></span>
 </div>
 
+<h3>Timeline</h3>
+<pre id="timeline">{{timeline}}</pre>
 <h3>Exec Summary</h3>
 <pre id="summary">{{summary}}</pre>
 
@@ -45,6 +47,8 @@ function refresh() {
     }
     var blob = xhr.response;
     json = JSON.parse(blob);
+    refresh_record(json.record_json);
+    document.getElementById("timeline").textContent = json["timeline"].trim();
     document.getElementById("summary").textContent = json["summary"].trim();
     document.getElementById("status").textContent = json["status"];
     document.getElementById("last-updated").textContent = new Date();

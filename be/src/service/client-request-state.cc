@@ -587,7 +587,7 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
       {query_id_pb, ExecEnv::GetInstance()->backend_id(),
           exec_request_->query_exec_request, exec_request_->query_options,
           summary_profile_, blacklisted_executor_addresses_},
-      query_events_, &schedule_);
+      query_events_, &schedule_, &wait_start_time_ms_, &wait_end_time_ms_);
   {
     lock_guard<mutex> l(lock_);
     if (!UpdateQueryStatus(admit_status).ok()) return;

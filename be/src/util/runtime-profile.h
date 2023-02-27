@@ -727,6 +727,9 @@ class RuntimeProfile : public RuntimeProfileBase {
   /// Get a copy of exec_summary to t_exec_summary
   void GetExecSummary(TExecSummary* t_exec_summary) const;
 
+  /// Print all the event timers as timeline into output.
+  void GetTimeline(std::string* output) const;
+
  protected:
   virtual int GetNumInputProfiles() const override { return 1; }
 
@@ -745,6 +748,8 @@ class RuntimeProfile : public RuntimeProfileBase {
   /// Print info strings from this subclass.
   void PrettyPrintInfoStrings(
       std::ostream* s, const std::string& prefix, Verbosity verbosity) const override;
+
+  void PrettyPrintTimeline(std::ostream* s, const string& prefix) const;
 
   /// Print any additional counters from this subclass.
   void PrettyPrintSubclassCounters(

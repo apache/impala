@@ -352,6 +352,18 @@ class ClientRequestState {
   /// Returns the max size of the result_cache_ in number of rows.
   int64_t result_cache_max_size() const { return result_cache_max_size_; }
 
+  /// Returns duration of the query is waiting in the queue.
+  int64_t wait_time_ms() const {
+    // wait_start_time_ms_ is zero iff the query is not require queuing.
+    if (wait_start_time_ms_ == 0) return 0;
+    // wait_end_time_ms_ might still be zero if the query is not yet dequeue.
+    // Use the current Unix time in that case. Note that the duration can be
+    // negative if a system clock reset happened after the query was initiated.
+    int64_t wait_end_time_ms = wait_end_time_ms_ > 0LL ?
+        wait_end_time_ms_ : MonotonicMillis();
+    return wait_end_time_ms - wait_start_time_ms_;
+  }
+
   /// Sets the RetryState to RETRYING. Updates the runtime profile with the retry status
   /// and cause. Must be called while 'lock_' is held. Sets the query_status_. Future
   /// calls to UpdateQueryStatus will not have any effect. This is necessary to prevent
@@ -659,6 +671,11 @@ class ClientRequestState {
   /// Timeout, in microseconds, when waiting for rows to become available. Derived from
   /// the query option FETCH_ROWS_TIMEOUT_MS.
   const int64_t fetch_rows_timeout_us_;
+
+  /// Start/end time of the query queuing, in Unix milliseconds.
+  /// Initialized to 0, indicating that queries do not need to be queued.
+  int64_t wait_start_time_ms_ = 0;
+  int64_t wait_end_time_ms_ = 0;
 
   /// If this ClientRequestState was created as a retry of a previously failed query, the
   /// original_id_ is set to the query id of the original query that failed. The

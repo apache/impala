@@ -347,6 +347,7 @@ void ScheduleState::UpdateMemoryRequirements(const TPoolConfig& pool_cfg,
   query_schedule_pb_->set_coord_backend_mem_to_admit(coord_backend_mem_to_admit);
   query_schedule_pb_->set_per_backend_mem_limit(per_backend_mem_limit);
   query_schedule_pb_->set_per_backend_mem_to_admit(per_backend_mem_to_admit);
+  query_schedule_pb_->set_cluster_mem_est(GetClusterMemoryToAdmit());
 }
 
 void ScheduleState::set_executor_group(string executor_group) {

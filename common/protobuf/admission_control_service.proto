@@ -151,6 +151,9 @@ message QuerySchedulePB {
   // Set by the admission controller with a value that is only valid if it was admitted
   // successfully.
   optional int64 coord_backend_mem_to_admit = 8;
+
+  /// The cluster wide estimated memory usage of this query.
+  optional int64 cluster_mem_est = 9;
 }
 
 message AdmitQueryRequestPB {
@@ -186,6 +189,12 @@ message GetQueryStatusResponsePB {
 
   // Idx of the TRuntimeProfileTree sidecar.
   optional int32 summary_profile_sidecar_idx = 3;
+
+  // Start time of the query queuing, in Unix milliseconds.
+  optional int64 wait_start_time_ms = 4;
+
+  // End time of the query queuing, in Unix milliseconds.
+  optional int64 wait_end_time_ms = 5;
 }
 
 message ReleaseQueryRequestPB {

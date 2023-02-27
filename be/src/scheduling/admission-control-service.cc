@@ -167,10 +167,14 @@ void AdmissionControlService::GetQueryStatus(const GetQueryStatusRequestPB* req,
     if (admission_state->submitted) {
       if (!admission_state->admission_done) {
         bool timed_out;
+        int64_t wait_start_time_ms, wait_end_time_ms;
         admission_state->admit_status =
             AdmissiondEnv::GetInstance()->admission_controller()->WaitOnQueued(
                 req->query_id(), &admission_state->schedule,
-                FLAGS_admission_status_wait_time_ms, &timed_out);
+                FLAGS_admission_status_wait_time_ms, &timed_out,
+                &wait_start_time_ms, &wait_end_time_ms);
+        resp->set_wait_start_time_ms(wait_start_time_ms);
+        resp->set_wait_end_time_ms(wait_end_time_ms);
         if (!timed_out) {
           admission_state->admission_done = true;
           if (admission_state->admit_status.ok()) {

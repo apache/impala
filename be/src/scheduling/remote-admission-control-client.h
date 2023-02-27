@@ -53,7 +53,8 @@ class RemoteAdmissionControlClient : public AdmissionControlClient {
 
   virtual Status SubmitForAdmission(const AdmissionController::AdmissionRequest& request,
       RuntimeProfile::EventSequence* query_events,
-      std::unique_ptr<QuerySchedulePB>* schedule_result) override;
+      std::unique_ptr<QuerySchedulePB>* schedule_result,
+      int64_t* wait_start_time_ms, int64_t* wait_end_time_ms) override;
   virtual void ReleaseQuery(int64_t peak_mem_consumption) override;
   virtual void ReleaseQueryBackends(
       const std::vector<NetworkAddressPB>& host_addr) override;

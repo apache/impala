@@ -952,6 +952,26 @@ class ImpalaServer : public ImpalaServiceIf,
     /// ClientRequestState.
     int64_t start_time_us, end_time_us;
 
+    /// The request waited time in ms for queued.
+    int64_t wait_time_ms;
+
+    /// Total peak memory usage by this query at all backends.
+    int64_t total_peak_mem_usage;
+
+    /// The cluster wide estimated memory usage of this query.
+    int64_t cluster_mem_est;
+
+    /// Total bytes read by this query at all backends.
+    int64_t bytes_read;
+
+    /// The total number of bytes sent (across the network) by this query in exchange
+    /// nodes. Does not include remote reads, data written to disk, or data sent to the
+    /// client.
+    int64_t bytes_sent;
+
+    // Query timeline from summary profile.
+    std::string timeline;
+
     /// Summary of execution for this query.
     TExecSummary exec_summary;
 

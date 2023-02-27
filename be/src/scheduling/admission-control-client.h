@@ -45,7 +45,8 @@ class AdmissionControlClient {
   // Called to schedule and admit the query. Blocks until an admission decision is made.
   virtual Status SubmitForAdmission(const AdmissionController::AdmissionRequest& request,
       RuntimeProfile::EventSequence* query_events,
-      std::unique_ptr<QuerySchedulePB>* schedule_result) = 0;
+      std::unique_ptr<QuerySchedulePB>* schedule_result,
+      int64_t* wait_start_time_ms, int64_t* wait_end_time_ms) = 0;
 
   // Called when the query has completed to release all of its resources.
   virtual void ReleaseQuery(int64_t peak_mem_consumption) = 0;

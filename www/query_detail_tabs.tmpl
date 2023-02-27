@@ -18,7 +18,75 @@ under the License.
 -->
 
 <h3>Query <tt>{{query_id}}</tt></h3>
+{{#record_json}}
+<h4><em>User:</em> <span id="user">{{effective_user}}</span></h4>
+<h4><em>State:</em> <span id="state">{{state}}</span></h4>
+{{/record_json}}
 {{?status}}<h4><em>Status:</em> <span id="status">{{status}}</span></h4>{{/status}}
+
+{{#record_json}}
+<table id='record' class='table table-hover table-border'>
+  <tr>
+    {{#executing}}
+    <th title="{{tips_action_cancel}}">Action</th>
+    {{/executing}}
+    {{#waiting}}
+    <th title="{{tips_action_close}}">Action</th>
+    {{/waiting}}
+    <th title="{{tips_default_db}}">Default Db</th>
+    <th title="{{tips_query_type}}">Query Type</th>
+    <th title="{{tips_start_time}}">Start Time</th>
+    {{#waiting}}
+    <th title="{{tips_waiting_time}}">Waiting Time</th>
+    {{/waiting}}
+    {{#not_inflight}}
+    <th title="{{tips_end_time}}">End Time</th>
+    {{/not_inflight}}
+    <th title="{{tips_duration}}">Duration</th>
+    <th title="{{tips_queued_duration}}">Queued Duration</th>
+    <th title="{{tips_mem_usage}}">Mem Usage</th>
+    <th title="{{tips_mem_estimate}}">Mem Estimate</th>
+    <th title="{{tips_scan_progress}}">Scan Progress</th>
+    <th title="{{tips_bytes_read}}">Bytes Read</th>
+    <th title="{{tips_bytes_sent}}">Bytes Sent</th>
+    {{#inflight}}
+    <th title="{{tips_last_event}}">Last Event</th>
+    {{/inflight}}
+    <th title="{{tips_rows_fetched}}"># rows fetched</th>
+    <th title="{{tips_resource_pool}}">Resource Pool</th>
+  </tr>
+
+  <tr>
+    {{#executing}}
+    <td><a href='{{ __common__.host-url }}/cancel_query?query_id={{query_id}}'>Cancel</a></td>
+    {{/executing}}
+    {{#waiting}}
+    <td><a href='{{ __common__.host-url }}/cancel_query?query_id={{query_id}}'>Close</a></td>
+    {{/waiting}}
+    <td>{{default_db}}</td>
+    <td><samp>{{stmt_type}}</samp></td>
+    <td>{{start_time}}</td>
+    {{#waiting}}
+    <td>{{waiting_time}}</td>
+    {{/waiting}}
+    {{#not_inflight}}
+    <td>{{end_time}}</td>
+    {{/not_inflight}}
+    <td>{{duration}}</td>
+    <td>{{queued_duration}}</td>
+    <td>{{mem_usage}}</td>
+    <td>{{mem_est}}</td>
+    <td>{{progress}}</td>
+    <td>{{bytes_read}}</td>
+    <td>{{bytes_sent}}</td>
+    {{#inflight}}
+    <td><samp>{{last_event}}</samp></td>
+    {{/inflight}}
+    <td>{{rows_fetched}}</td>
+    <td>{{resource_pool}}</td>
+  </tr>
+</table>
+{{/record_json}}
 
 <ul class="nav nav-tabs">
   <li class="nav-item" role="presentation"><a class="nav-link" id="plan-tab" href="{{ __common__.host-url }}/query_plan?query_id={{query_id}}">Plan</a></li>
@@ -31,3 +99,112 @@ under the License.
   <li class="nav-item" role="presentation"><a class="nav-link" id="backends-tab" href="{{ __common__.host-url }}/query_backends?query_id={{query_id}}">Backends</a></li>
   <li class="nav-item" role="presentation"><a class="nav-link" id="finstances-tab" href="{{ __common__.host-url }}/query_finstances?query_id={{query_id}}">Fragment Instances</a></li>
 </ul>
+
+<script>
+if (typeof index == "undefined") {
+  var index = {};
+
+  // For inflight (executing or waiting) query
+  index.action = 0;
+  index.default_db = 1;
+  index.stmt_type = 2;
+  index.start_time = 3;
+
+  // For not inflight query
+  index.end_time = 3;
+
+  // For executing query
+  index.executing = {
+    duration        : 4,
+    queued_duration : 5,
+    mem_usage       : 6,
+    mem_est         : 7,
+    progress        : 8,
+    bytes_read      : 9,
+    bytes_sent      : 10,
+    last_event      : 11,
+    rows_fetched    : 12
+  };
+
+  // For waiting query
+  index.waiting = {
+    waiting_time    : 4,
+    duration        : 5,
+    queued_duration : 6,
+    mem_usage       : 7,
+    mem_est         : 8,
+    progress        : 9,
+    bytes_read      : 10,
+    bytes_sent      : 11,
+    last_event      : 12,
+    rows_fetched    : 13
+  };
+}
+
+function update_executing_record(data_row, record_json) {
+  for (name in index.executing) {
+    data_row.cells[index.executing[name]].textContent = record_json[name];
+  }
+}
+
+function refresh_record(record_json) {
+  document.getElementById("state").textContent = record_json["state"];
+  record = document.getElementById("record");
+  header_row = record.rows[0];
+  data_row = record.rows[1];
+
+  // Query is finished
+  if (header_row.cells[index.action].textContent != "Action") {
+    return;
+  }
+
+  // Query is executing
+  if (record_json["executing"]) {
+    update_executing_record(data_row, record_json);
+    return;
+  }
+
+  // Query is waiting
+  if (record_json["waiting"]) {
+    // Executing -> Waiting
+    if (header_row.cells[index.waiting.waiting_time].textContent != "Waiting Time") {
+      update_executing_record(data_row, record_json);
+      // Add column 'Waiting Time' before 'Duration'.
+      header_row.insertCell(index.executing.duration).outerHTML = "<th title=\"{{tips_waiting_time}}\">Waiting Time</th>";
+      data_row.insertCell(index.executing.duration);
+      // Update action tooltips.
+      header_row.cells[index.action].outerHTML = "<th title=\"{{tips_action_close}}\">Action</th>";
+      // Rename action 'Cancel' to 'Close'.
+      data_row.cells[index.action].childNodes[0].textContent = "Close";
+    }
+    // Update 'Waiting Time'.
+    data_row.cells[index.waiting.waiting_time].textContent = record_json["waiting_time"];
+    return;
+  }
+
+  // Query is going to finished
+  // Executing -> Finished
+  if (header_row.cells[index.waiting.waiting_time].textContent != "Waiting Time") {
+    update_executing_record(data_row, record_json);
+    // Delete column 'Last Event'.
+    header_row.deleteCell(index.executing.last_event);
+    data_row.deleteCell(index.executing.last_event);
+    // Add column 'End Time' before 'Duration'.
+    header_row.insertCell(index.executing.duration).outerHTML = "<th title=\"{{tips_end_time}}\">End Time</th>";
+    data_row.insertCell(index.executing.duration);
+  // Waiting -> Finished
+  } else {
+    // Delete column 'Last Event'.
+    header_row.deleteCell(index.waiting.last_event);
+    data_row.deleteCell(index.waiting.last_event);
+    // Rename column 'Waiting Time' to 'End Time'.
+    header_row.cells[index.waiting.waiting_time].outerHTML = "<th title=\"{{tips_end_time}}\">End Time</th>";
+  }
+  // Delete column 'Action'.
+  header_row.deleteCell(index.action);
+  data_row.deleteCell(index.action);
+  // Update 'End Time'.
+  data_row.cells[index.end_time].textContent = record_json["end_time"];
+  return;
+}
+</script>

@@ -212,6 +212,10 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
     /// peak value from any backend.
     int64_t peak_per_host_mem_consumption = 0;
 
+    /// Total peak memory usage for this query at all backend.
+    /// Note that it is the sum of peaks, not the peak of the sum.
+    int64_t total_peak_mem_usage = 0;
+
     /// Total bytes read across all scan nodes.
     int64_t bytes_read = 0;
 
@@ -234,6 +238,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
     void Merge(const ResourceUtilization& other) {
       peak_per_host_mem_consumption =
           std::max(peak_per_host_mem_consumption, other.peak_per_host_mem_consumption);
+      total_peak_mem_usage += other.peak_per_host_mem_consumption;
       bytes_read += other.bytes_read;
       exchange_bytes_sent += other.exchange_bytes_sent;
       scan_bytes_sent += other.scan_bytes_sent;
