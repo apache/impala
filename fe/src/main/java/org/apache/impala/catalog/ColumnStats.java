@@ -417,7 +417,7 @@ public class ColumnStats {
 
   /*
    * From the source 'longStats', set the low and high value for 'type' (one of the
-   * integer types).
+   * integer types). Does not handle TIMESTAMP columns.
    */
   protected void setLowAndHighValue(PrimitiveType type, LongColumnStatsData longStats) {
     if (!longStats.isSetLowValue()) {
@@ -437,6 +437,10 @@ public class ColumnStats {
           break;
         case BIGINT:
           lowValue_.setLong_val(value.longValue());
+          break;
+        case TIMESTAMP:
+          Preconditions.checkState(
+              false, "TIMESTAMP columns are not supported by setLowAndHighValue()");
           break;
         default:
           Preconditions.checkState(
@@ -461,6 +465,10 @@ public class ColumnStats {
           break;
         case BIGINT:
           highValue_.setLong_val(value.longValue());
+          break;
+        case TIMESTAMP:
+          Preconditions.checkState(
+              false, "TIMESTAMP columns are not supported by setLowAndHighValue()");
           break;
         default:
           Preconditions.checkState(
@@ -575,7 +583,10 @@ public class ColumnStats {
           LongColumnStatsData longStats = statsData.getLongStats();
           numDistinctValues_ = longStats.getNumDVs();
           numNulls_ = longStats.getNumNulls();
-          setLowAndHighValue(colType.getPrimitiveType(), longStats);
+          if (colType.getPrimitiveType() != PrimitiveType.TIMESTAMP) {
+            // Low/high value handling is not yet implemented for timestamps.
+            setLowAndHighValue(colType.getPrimitiveType(), longStats);
+          }
         }
         break;
       case DATE:
