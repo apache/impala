@@ -863,7 +863,6 @@ public class SingleNodePlanner {
             // If the collection is within a (possibly nested) struct, add the tuple in
             // which the top level struct is located.
             SlotDescriptor desc = collectionExpr.getDesc();
-            List<TupleDescriptor> enclosingTupleDescs = desc.getEnclosingTupleDescs();
             TupleDescriptor topTuple = desc.getTopEnclosingTupleDesc();
             requiredTids.add(topTuple.getId());
           } else {
@@ -1900,6 +1899,14 @@ public class SingleNodePlanner {
     }
   }
 
+  private PlanNode createIcebergMetadataScanNode(TableRef tblRef, Analyzer analyzer)
+      throws ImpalaException {
+    IcebergMetadataScanNode icebergMetadataScanNode =
+        new IcebergMetadataScanNode(ctx_.getNextNodeId(), tblRef.getDesc());
+    icebergMetadataScanNode.init(analyzer);
+    return icebergMetadataScanNode;
+  }
+
   /**
    * Returns all applicable conjuncts for join between two plan trees 'materializing' the
    * given left-hand and right-hand side table ref ids. The conjuncts either come from
@@ -2213,9 +2220,7 @@ public class SingleNodePlanner {
       result = new SingularRowSrcNode(ctx_.getNextNodeId(), ctx_.getSubplan());
       result.init(analyzer);
     } else if (tblRef instanceof IcebergMetadataTableRef) {
-      throw new NotImplementedException(String.format("'%s' refers to a metadata table "
-          + "which is currently not supported.", String.join(".",
-          tblRef.getPath())));
+      result = createIcebergMetadataScanNode(tblRef, analyzer);
     } else {
       throw new NotImplementedException(
           "Planning not implemented for table ref class: " + tblRef.getClass());

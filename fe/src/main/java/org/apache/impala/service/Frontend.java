@@ -124,6 +124,7 @@ import org.apache.impala.catalog.ImpaladTableUsageTracker;
 import org.apache.impala.catalog.MaterializedViewHdfsTable;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
@@ -290,9 +291,8 @@ public class Frontend {
       protected long estimated_memory_per_host_ = -1;
 
       // The processing cores required to execute the query.
-      // Certain queries such as EXPLAIN that do not populate
-      // TExecRequest.query_exec_request. Therefore, cores requirement will be set here
-      // through setCoresRequired().
+      // Certain queries such as EXPLAIN do not populate TExecRequest.query_exec_request.
+      // Therefore, cores requirement will be set here through setCoresRequired().
       protected int cores_required_ = -1;
 
       // The initial length of content in explain buffer to help return the buffer
@@ -2468,6 +2468,14 @@ public class Frontend {
         // Return the EXPLAIN request
         createExplainRequest(planCtx.getExplainString(), result);
         return result;
+      }
+
+      // Blocking query execution for queries that contain IcebergMetadataTables
+      for (FeTable table : stmtTableCache.tables.values()) {
+        if (table instanceof IcebergMetadataTable) {
+          throw new NotImplementedException(String.format("'%s' refers to a metadata "
+              + "table which is currently not supported.", table.getFullName()));
+        }
       }
 
       result.setQuery_exec_request(queryExecRequest);

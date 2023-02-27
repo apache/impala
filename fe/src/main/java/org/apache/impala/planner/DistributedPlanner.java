@@ -147,6 +147,9 @@ public class DistributedPlanner {
           ctx_.getNextFragmentId(), root, DataPartition.UNPARTITIONED);
     } else if (root instanceof CardinalityCheckNode) {
       result = createCardinalityCheckNodeFragment((CardinalityCheckNode) root, childFragments);
+    } else if (root instanceof IcebergMetadataScanNode) {
+      result = createIcebergMetadataScanFragment(root);
+      fragments.add(result);
     } else {
       throw new InternalException("Cannot create plan fragment for this node type: "
           + root.getExplainString(ctx_.getQueryOptions()));
@@ -323,6 +326,13 @@ public class DistributedPlanner {
    */
   private PlanFragment createScanFragment(PlanNode node) {
     return new PlanFragment(ctx_.getNextFragmentId(), node, DataPartition.RANDOM);
+  }
+
+  /**
+   * Create an Iceberg Metadata scan fragment.
+   */
+  private PlanFragment createIcebergMetadataScanFragment(PlanNode node) {
+    return new PlanFragment(ctx_.getNextFragmentId(), node, DataPartition.UNPARTITIONED);
   }
 
   /**

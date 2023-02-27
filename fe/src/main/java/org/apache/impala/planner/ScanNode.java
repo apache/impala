@@ -310,10 +310,6 @@ abstract public class ScanNode extends PlanNode {
 
   @Override
   protected String getDisplayLabelDetail() {
-    FeTable table = desc_.getTable();
-    List<String> path = new ArrayList<>();
-    path.add(table.getDb().getName());
-    path.add(table.getName());
     Preconditions.checkNotNull(desc_.getPath());
     if (desc_.hasExplicitAlias()) {
       return desc_.getPath().toString() + " " + desc_.getAlias();
@@ -391,7 +387,7 @@ abstract public class ScanNode extends PlanNode {
   /**
    * Estimate per-row cost as 1 per 1KB row size.
    * <p>
-   * This reflect deserialization/copy cost per row.
+   * This reflects deserialization/copy cost per row.
    */
   private float rowMaterializationCost() { return getAvgRowSize() / 1024; }
 
