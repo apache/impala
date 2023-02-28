@@ -147,19 +147,28 @@ public class JniUtil {
     private final long startTime;
     private final String methodName;
     private final String shortDescription;
+    private final boolean silentStartAndFinish;
 
-    public OperationLog(String methodName, String shortDescription) {
+    public OperationLog(
+        String methodName, String shortDescription, boolean silentStartAndFinish) {
       this.startTime = System.currentTimeMillis();
       this.methodName = methodName;
       this.shortDescription = shortDescription;
+      this.silentStartAndFinish = silentStartAndFinish;
     }
 
-    public void logStart() { LOG.info("{} request: {}", methodName, shortDescription); }
+    public void logStart() {
+      if (!silentStartAndFinish) {
+        LOG.info("{} request: {}", methodName, shortDescription);
+      }
+    }
 
     public void logFinish() {
-      long duration = getDurationFromStart();
-      LOG.info("Finished {} request: {}. Time spent: {}", methodName, shortDescription,
-          PrintUtils.printTimeMs(duration));
+      if (!silentStartAndFinish) {
+        long duration = getDurationFromStart();
+        LOG.info("Finished {} request: {}. Time spent: {}", methodName, shortDescription,
+            PrintUtils.printTimeMs(duration));
+      }
     }
 
     public void logError() {
@@ -195,10 +204,21 @@ public class JniUtil {
     }
   }
 
-  public static OperationLog logOperation(String methodName, String shortDescription) {
-    OperationLog operationLog = new OperationLog(methodName, shortDescription);
+  private static OperationLog logOperationInternal(
+      String methodName, String shortDescription, boolean silentStartAndFinish) {
+    OperationLog operationLog =
+        new OperationLog(methodName, shortDescription, silentStartAndFinish);
     operationLog.logStart();
     return operationLog;
+  }
+
+  public static OperationLog logOperation(String methodName, String shortDescription) {
+    return logOperationInternal(methodName, shortDescription, false);
+  }
+
+  public static OperationLog logOperationSilentStartAndFinish(
+      String methodName, String shortDescription) {
+    return logOperationInternal(methodName, shortDescription, true);
   }
 
   /**

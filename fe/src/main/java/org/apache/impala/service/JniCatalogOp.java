@@ -49,12 +49,10 @@ public class JniCatalogOp {
    */
   public static <RESULT, PARAMETER extends TBase<?, ?>> RESULT execOp(String methodName,
       String shortDescription, JniCatalogOpCallable<Pair<RESULT, Long>> operand,
-      PARAMETER requestParameter, Runnable finalClause)
+      PARAMETER requestParameter, Runnable finalClause, OperationLog operationLog)
       throws ImpalaException, TException {
     Preconditions.checkNotNull(operand);
     Preconditions.checkNotNull(finalClause);
-
-    OperationLog operationLog = JniUtil.logOperation(methodName, shortDescription);
 
     try (ThreadNameAnnotator ignored = new ThreadNameAnnotator(shortDescription)) {
       Pair<RESULT, Long> result = operand.call();
@@ -79,16 +77,36 @@ public class JniCatalogOp {
   public static <RESULT, PARAMETER extends TBase<?, ?>> RESULT execOp(String methodName,
       String shortDescription, JniCatalogOpCallable<Pair<RESULT, Long>> operand,
       PARAMETER parameter) throws ImpalaException, TException {
-    return execOp(methodName, shortDescription, operand, parameter, () -> {});
+    OperationLog operationLog = JniUtil.logOperation(methodName, shortDescription);
+    return execOp(
+        methodName, shortDescription, operand, parameter, () -> {}, operationLog);
+  }
+
+  public static byte[] execAndSerialize(String methodName, String shortDescription,
+      JniCatalogOpCallable<TBase<?, ?>> operand, TSerializer serializer,
+      Runnable finalClause, OperationLog operationLog)
+      throws ImpalaException, TException {
+    return execOp(methodName, shortDescription, () -> {
+      TBase<?, ?> response = operand.call();
+      byte[] result = serializer.serialize(response);
+      return Pair.create(result, (long) result.length);
+    }, null, finalClause, operationLog);
   }
 
   public static byte[] execAndSerialize(String methodName, String shortDescription,
       JniCatalogOpCallable<TBase<?, ?>> operand, TSerializer serializer,
       Runnable finalClause) throws ImpalaException, TException {
-    return execOp(methodName, shortDescription, () -> {
-      TBase<?, ?> response = operand.call();
-      byte[] result = serializer.serialize(response);
-      return Pair.create(result, (long) result.length);
-    }, null, finalClause);
+    OperationLog operationLog = JniUtil.logOperation(methodName, shortDescription);
+    return execAndSerialize(
+        methodName, shortDescription, operand, serializer, finalClause, operationLog);
+  }
+
+  public static byte[] execAndSerializeSilentStartAndFinish(String methodName,
+      String shortDescription, JniCatalogOpCallable<TBase<?, ?>> operand,
+      TSerializer serializer, Runnable finalClause) throws ImpalaException, TException {
+    OperationLog operationLog =
+        JniUtil.logOperationSilentStartAndFinish(methodName, shortDescription);
+    return execAndSerialize(
+        methodName, shortDescription, operand, serializer, finalClause, operationLog);
   }
 }

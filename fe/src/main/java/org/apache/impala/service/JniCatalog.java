@@ -231,6 +231,14 @@ public class JniCatalog {
         methodName, shortDescription, operand, serializer, finalClause);
   }
 
+  private byte[] execAndSerializeSilentStartAndFinish(String methodName,
+      String shortDescription, JniCatalogOpCallable<TBase<?, ?>> operand)
+      throws ImpalaException, TException {
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    return JniCatalogOp.execAndSerializeSilentStartAndFinish(
+        methodName, shortDescription, operand, serializer, () -> {});
+  }
+
   private byte[] execAndSerialize(String methodName, String shortDescription,
       JniCatalogOpCallable<TBase<?, ?>> operand) throws ImpalaException, TException {
     return execAndSerialize(methodName, shortDescription, operand, () -> {});
@@ -505,11 +513,12 @@ public class JniCatalog {
   public byte[] getCatalogServerMetrics() throws ImpalaException, TException {
     TGetCatalogServerMetricsResponse response = new TGetCatalogServerMetricsResponse();
     String shortDesc = "Get catalog server metrics";
-    return execAndSerialize("getCatalogServerMetrics", shortDesc, () -> {
-      response.setCatalog_partial_fetch_rpc_queue_len(
-          catalog_.getPartialFetchRpcQueueLength());
-      response.setEvent_metrics(catalog_.getEventProcessorMetrics());
-      return response;
-    });
+    return execAndSerializeSilentStartAndFinish(
+        "getCatalogServerMetrics", shortDesc, () -> {
+          response.setCatalog_partial_fetch_rpc_queue_len(
+              catalog_.getPartialFetchRpcQueueLength());
+          response.setEvent_metrics(catalog_.getEventProcessorMetrics());
+          return response;
+        });
   }
 }
