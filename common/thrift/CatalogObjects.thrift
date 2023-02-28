@@ -227,6 +227,8 @@ struct TColumnStats {
 
 // Intermediate state for the computation of per-column stats. Impala can aggregate these
 // structures together to produce final stats for a column.
+// Fields should be optional for backward compatibility since this is stored in HMS
+// partition properties.
 struct TIntermediateColumnStats {
   // One byte for each bucket of the NDV HLL computation
   1: optional binary intermediate_ndv
@@ -247,8 +249,8 @@ struct TIntermediateColumnStats {
   6: optional i64 num_rows
 
   // The number of true and false value, of the column
-  7: required i64 num_trues
-  8: required i64 num_falses
+  7: optional i64 num_trues
+  8: optional i64 num_falses
 
   // The low and the high value
   9: optional Data.TColumnValue low_value
