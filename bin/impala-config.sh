@@ -196,6 +196,10 @@ unset IMPALA_THRIFT_JAVA_URL
 export IMPALA_THRIFT_PY_VERSION=0.16.0-p3
 unset IMPALA_THRIFT_PY_URL
 
+# Find system python versions for testing
+export IMPALA_SYSTEM_PYTHON2=$(command -v python2)
+export IMPALA_SYSTEM_PYTHON3=$(command -v python3)
+
 if [[ $OSTYPE == "darwin"* ]]; then
   IMPALA_CYRUS_SASL_VERSION=2.1.26
   unset IMPALA_CYRUS_SASL_URL
@@ -982,6 +986,8 @@ echo "IMPALA_ICEBERG_VERSION  = $IMPALA_ICEBERG_VERSION"
 echo "IMPALA_COS_VERSION      = $IMPALA_COS_VERSION"
 echo "IMPALA_OSS_VERSION      = $IMPALA_OSS_VERSION"
 echo "IMPALA_OBS_VERSION      = $IMPALA_OBS_VERSION"
+echo "IMPALA_SYSTEM_PYTHON2   = $IMPALA_SYSTEM_PYTHON2"
+echo "IMPALA_SYSTEM_PYTHON3   = $IMPALA_SYSTEM_PYTHON3"
 
 # Kerberos things.  If the cluster exists and is kerberized, source
 # the required environment.  This is required for any hadoop tool to

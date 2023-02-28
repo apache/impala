@@ -337,16 +337,17 @@ def get_dev_impala_shell_executable():
 
 def create_impala_shell_executable_dimension(dev_only=False):
   _, include_pypi = get_dev_impala_shell_executable()
+  dimensions = []
+  if os.getenv("IMPALA_SYSTEM_PYTHON2"):
+    dimensions.append('dev')
+  if os.getenv("IMPALA_SYSTEM_PYTHON3"):
+    dimensions.append('dev3')
   if include_pypi and not dev_only:
-    if 'DISABLE_PYTHON3_TEST' in os.environ:
-      return ImpalaTestDimension('impala_shell', 'dev', 'python2')
-    else:
-      return ImpalaTestDimension('impala_shell', 'dev', 'dev3', 'python2', 'python3')
-  else:
-    if 'DISABLE_PYTHON3_TEST' in os.environ:
-      return ImpalaTestDimension('impala_shell', 'dev')
-    else:
-      return ImpalaTestDimension('impala_shell', 'dev', 'dev3')
+    if os.getenv("IMPALA_SYSTEM_PYTHON2"):
+      dimensions.append('python2')
+    if os.getenv("IMPALA_SYSTEM_PYTHON3"):
+      dimensions.append('python3')
+  return ImpalaTestDimension('impala_shell', *dimensions)
 
 
 def get_impala_shell_executable(vector):

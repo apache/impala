@@ -118,25 +118,31 @@ for MODULE in ${SHELL_HOME}/ext-py/*; do
     continue;
   fi
   pushd ${MODULE} > /dev/null 2>&1
-  echo "Cleaning up old build artifacts."
-  rm -rf dist 2>&1 > /dev/null
-  rm -rf build 2>&1 > /dev/null
-  echo "Creating an egg for ${MODULE}"
-  if [[ "$MODULE" == *"/bitarray"* ]]; then
-    # Need to use setuptools to build egg for bitarray module
-    python -c "import setuptools; exec(open('setup.py').read())" -q bdist_egg
-  else
-    python setup.py -q bdist_egg clean
-  fi
-  cp dist/*.egg ${TARBALL_ROOT}/ext-py2
-  if [ -z "${DISABLE_PYTHON3_TEST:-}" ]; then
+  if [ ! -z "${IMPALA_SYSTEM_PYTHON2:-}" ]; then
+    echo "Cleaning up old build artifacts."
     rm -rf dist 2>&1 > /dev/null
     rm -rf build 2>&1 > /dev/null
+    echo "Creating a Python 2 egg for ${MODULE}"
     if [[ "$MODULE" == *"/bitarray"* ]]; then
       # Need to use setuptools to build egg for bitarray module
-      python3 -c "import setuptools; exec(open('setup.py').read())" -q bdist_egg
+      ${IMPALA_SYSTEM_PYTHON2} -c "import setuptools; exec(open('setup.py').read())" \
+          -q bdist_egg
     else
-      python3 setup.py -q bdist_egg clean
+      ${IMPALA_SYSTEM_PYTHON2} setup.py -q bdist_egg clean
+    fi
+    cp dist/*.egg ${TARBALL_ROOT}/ext-py2
+  fi
+  if [ ! -z "${IMPALA_SYSTEM_PYTHON3:-}" ]; then
+    echo "Cleaning up old build artifacts."
+    rm -rf dist 2>&1 > /dev/null
+    rm -rf build 2>&1 > /dev/null
+    echo "Creating a Python 3 egg for ${MODULE}"
+    if [[ "$MODULE" == *"/bitarray"* ]]; then
+      # Need to use setuptools to build egg for bitarray module
+      ${IMPALA_SYSTEM_PYTHON3} -c "import setuptools; exec(open('setup.py').read())" \
+          -q bdist_egg
+    else
+      ${IMPALA_SYSTEM_PYTHON3} setup.py -q bdist_egg clean
     fi
     cp dist/*.egg ${TARBALL_ROOT}/ext-py3
   fi
