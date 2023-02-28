@@ -35,8 +35,20 @@ class RunShellCommand {
    */
   public static String Run(String[] cmd, boolean shouldSucceed, String expectedOut,
       String expectedErr) throws Exception {
+    // run the command with the env variables inherited from the current process
+    return Run(cmd, null, shouldSucceed, expectedOut, expectedErr);
+  }
+
+  /**
+   * Run a shell command 'cmd' with custom 'env' variables.
+   * If 'shouldSucceed' is true, the command is expected to
+   * succeed, otherwise it is expected to fail. Returns the output (stdout) of the
+   * command.
+   */
+  public static String Run(String[] cmd, String[] env, boolean shouldSucceed,
+                           String expectedOut, String expectedErr) throws Exception {
     Runtime rt = Runtime.getRuntime();
-    Process process = rt.exec(cmd);
+    Process process = rt.exec(cmd, env);
     // Collect stderr.
     BufferedReader input = new BufferedReader(
         new InputStreamReader(process.getErrorStream()));

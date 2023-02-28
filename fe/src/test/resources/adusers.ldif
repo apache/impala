@@ -1,0 +1,59 @@
+version: 1
+dn: dc=myorg,dc=com
+objectClass: domain
+objectClass: top
+dc: myorg
+
+dn: ou=Users,dc=myorg,dc=com
+objectClass: organizationalUnit
+objectClass: top
+ou: Users
+
+dn: ou=Users2,dc=myorg,dc=com
+objectClass: organizationalUnit
+objectClass: top
+ou: Users
+
+dn: ou=Groups,dc=myorg,dc=com
+objectClass: organizationalUnit
+objectClass: top
+ou: Groups
+
+dn: cn=Test1Ldap,ou=Users,dc=myorg,dc=com
+objectClass: user
+objectClass: top
+cn: Test1Ldap
+uid: ldaptest1
+sAMAccountName: Test1Ldap
+userPassword: 12345
+
+dn: cn=Test2Ldap,ou=Users2,dc=myorg,dc=com
+objectClass: user
+objectClass: top
+cn: Test2Ldap
+uid: ldaptest2
+sAMAccountName: Test2Ldap
+userPassword: abcde
+
+dn: cn=Test3Ldap,ou=Users,dc=myorg,dc=com
+objectClass: user
+objectClass: top
+cn: Test3Ldap
+uid: ldaptest3
+sAMAccountName: Test3Ldap
+userPassword: 67890
+
+dn: cn=Test4Ldap,ou=Users2,dc=myorg,dc=com
+objectClass: user
+objectClass: top
+cn: Test4Ldap
+uid: ldaptest4
+sAMAccountName: Test4Ldap
+userPassword: fghij
+
+dn: cn=group1,ou=Groups,dc=myorg,dc=com
+objectClass: top
+objectClass: group
+cn: group1
+member: cn=Test1Ldap,ou=Users,dc=myorg,dc=com
+member: cn=Test2Ldap,ou=Users2,dc=myorg,dc=com

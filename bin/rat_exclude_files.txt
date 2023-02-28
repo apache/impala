@@ -128,6 +128,8 @@ be/src/kudu/util/testdata/*.txt
 be/src/testutil/*.pem
 *.json
 fe/src/test/resources/*.xml
+fe/src/test/resources/adschema.ldif
+fe/src/test/resources/adusers.ldif
 fe/src/test/resources/hbase-jaas-client.conf.template
 fe/src/test/resources/hbase-jaas-server.conf.template
 fe/src/test/resources/users.ldif

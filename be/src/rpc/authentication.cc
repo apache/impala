@@ -194,6 +194,13 @@ DEFINE_bool_hidden(jwt_allow_without_tls, false,
     "When this configuration is set to true, Impala allows JWT authentication on "
     "unsecure channel. This should be only enabled for testing, or development for which "
     "TLS is handled by proxy.");
+DEFINE_bool(enable_group_filter_check_for_authenticated_kerberos_user, false,
+    "If this configuration is set to true, Impala checks the provided "
+    "LDAP group filter, if any, with the authenticated Kerberos user. "
+    "This should be only enabled if both Kerberos and LDAP authentication are enabled "
+    "and the users in KDC and LDAP are synchronized (e.g. when the KDC and the LDAP "
+    "is the same Active Directory server). "
+    "The default value is false, which provides backwards-compatible behavior.");
 
 namespace impala {
 
@@ -268,27 +275,34 @@ static int SaslLogCallback(void* context, int level, const char* message) {
   return SASL_OK;
 }
 
-// Calls into the LDAP utils to check the provided user/pass.
+// Calls into the LDAP utils to check the provided group filters
+bool DoLdapCheckFilters(const char* user) {
+  ImpalaLdap* ldap = AuthManager::GetInstance()->GetLdap();
+  ImpalaServer* server = ExecEnv::GetInstance()->impala_server();
+  if (server == nullptr) {
+    LOG(FATAL) << "Invalid config: SASL LDAP is only supported for client connections "
+               << "to an impalad.";
+  }
+  // If the user is an authorized proxy user, we do not yet know the effective user as
+  // it may be set by 'impala.doas.user', in which case we defer checking LDAP filters
+  // until OpenSession(). Otherwise, we prefer to check the filters as easly as
+  // possible, so check them here.
+  if (server->IsAuthorizedProxyUser(user)) {
+    return true;
+  }
+  return ldap->LdapCheckFilters(user);
+}
+
+// Calls into the LDAP utils to check the provided user/pass,
+// and the provided group filters.
 bool DoLdapCheck(const char* user, const char* pass, unsigned passlen) {
   ImpalaLdap* ldap = AuthManager::GetInstance()->GetLdap();
   bool success = ldap->LdapCheckPass(user, pass, passlen);
-
-  if (success) {
-    ImpalaServer* server = ExecEnv::GetInstance()->impala_server();
-    if (server == nullptr) {
-      LOG(FATAL) << "Invalid config: SASL LDAP is only supported for client connections "
-                 << "to an impalad.";
-    }
-    // If the user is an authorized proxy user, we do not yet know the effective user as
-    // it may be set by 'impala.doas.user', in which case we defer checking LDAP filters
-    // until OpenSession(). Otherwise, we prefer to check the filters as easly as
-    // possible, so check them here.
-    if (!server->IsAuthorizedProxyUser(user)) {
-      success = ldap->LdapCheckFilters(user);
-    }
+  if (!success) {
+    return false;
   }
 
-  return success;
+  return DoLdapCheckFilters(user);
 }
 
 // Wrapper around the function we use to check passwords with LDAP which has the function
@@ -480,8 +494,66 @@ int SaslAuthorizeInternal(sasl_conn_t* conn, void* context,
   return SASL_BADAUTH;
 }
 
+// Takes a Kerberos principal (either user/hostname@realm or user@realm)
+// and returns the username part.
+string GetShortUsernameFromKerberosPrincipal(const string& principal) {
+  size_t end_idx = min(principal.find("/"), principal.find("@"));
+  string short_user(
+      end_idx == string::npos || end_idx == 0 ?
+      principal : principal.substr(0, end_idx));
+  return short_user;
+}
+
+// If Kerberos and LDAP authentications are enabled and
+// enable_group_filter_check_for_authenticated_kerberos_user flag is set,
+// then this callback checks if the authenticated user passes LDAP group
+// filters.
+//
+// conn: Sasl connection - Ignored
+// context: Ignored, always NULL
+// requested_user: The identity/username to authorize
+// rlen: Length of above
+// auth_identity: "The identity associated with the secret"
+// alen: Length of above
+// def_realm: Default user realm
+// urlen: Length of above
+// propctx: Auxiliary properties - Ignored
+// Return: SASL_OK
+static int SaslKerberosAuthorizeExternal(sasl_conn_t* conn, void* context,
+    const char* requested_user, unsigned rlen,
+    const char* auth_identity, unsigned alen,
+    const char* def_realm, unsigned urlen,
+    struct propctx* propctx) {
+  if (FLAGS_enable_ldap_auth &&
+      FLAGS_enable_group_filter_check_for_authenticated_kerberos_user) {
+    DCHECK(IsKerberosEnabled());
+
+    string username = string(requested_user, rlen);
+    string short_user =
+        GetShortUsernameFromKerberosPrincipal(username);
+
+    LOG(INFO) << "Checking LDAP group filters for "
+              << "username \"" << short_user << "\" "
+              << "parsed from user principal \""
+              << username << "\".";
+
+    bool success = DoLdapCheckFilters(short_user.c_str());
+    if (!success) {
+      LOG(WARNING) << "Got authenticated principal but the "
+                   << "user \"" << short_user << "\" "
+                   << "didn't pass the group filters.";
+      return SASL_BADAUTH;
+    }
+  }
+
+  LOG(INFO) << "Successfully authenticated client user \""
+            << string(requested_user, rlen) << "\"";
+  return SASL_OK;
+}
+
 // This callback could be used to authorize or restrict access to certain
-// users.  Currently it is used to log a message that we successfully
+// users when authenticating with LDAP.
+// Currently it is used to log a message that we successfully
 // authenticated with a user on an external connection.
 //
 // conn: Sasl connection - Ignored
@@ -494,7 +566,7 @@ int SaslAuthorizeInternal(sasl_conn_t* conn, void* context,
 // urlen: Length of above
 // propctx: Auxiliary properties - Ignored
 // Return: SASL_OK
-static int SaslAuthorizeExternal(sasl_conn_t* conn, void* context,
+static int SaslLdapAuthorizeExternal(sasl_conn_t* conn, void* context,
     const char* requested_user, unsigned rlen,
     const char* auth_identity, unsigned alen,
     const char* def_realm, unsigned urlen,
@@ -670,6 +742,27 @@ bool NegotiateAuth(ThriftServer::ConnectionContext* connection_context,
                     << TNetworkAddressToString(connection_context->network_address)
                     << ": " << spnego_status.ToString();
       } else {
+        if (FLAGS_enable_ldap_auth &&
+            FLAGS_enable_group_filter_check_for_authenticated_kerberos_user) {
+
+          string short_user = GetShortUsernameFromKerberosPrincipal(username);
+
+          LOG(INFO) << "Checking LDAP group filters for "
+                    << "username \"" << short_user << "\" "
+                    << "parsed from user principal \""
+                    << username << "\".";
+
+          bool success = DoLdapCheckFilters(short_user.c_str());
+          if (!success) {
+            LOG(WARNING) << "Got authenticated principal for SPNEGO-authenticated "
+                        << "connection from "
+                        << TNetworkAddressToString(connection_context->network_address)
+                        << " but the authenticated user \"" << short_user << "\" "
+                        << "didn't pass the group filters.";
+            return false;
+          }
+        }
+
         // Authentication was successful, so set the username on the connection.
         connection_context->username = username;
         // Create a cookie to return.
@@ -915,7 +1008,7 @@ Status InitAuth(const string& appname) {
       KERB_EXT_CALLBACKS[0].context = ((void *)"Kerberos (external)");
 
       KERB_EXT_CALLBACKS[1].id = SASL_CB_PROXY_POLICY;
-      KERB_EXT_CALLBACKS[1].proc = (int (*)())&SaslAuthorizeExternal;
+      KERB_EXT_CALLBACKS[1].proc = (int (*)())&SaslKerberosAuthorizeExternal;
       KERB_EXT_CALLBACKS[1].context = NULL;
 
       KERB_EXT_CALLBACKS[2].id = SASL_CB_LIST_END;
@@ -930,7 +1023,7 @@ Status InitAuth(const string& appname) {
       LDAP_EXT_CALLBACKS[0].context = ((void *)"LDAP");
 
       LDAP_EXT_CALLBACKS[1].id = SASL_CB_PROXY_POLICY;
-      LDAP_EXT_CALLBACKS[1].proc = (int (*)())&SaslAuthorizeExternal;
+      LDAP_EXT_CALLBACKS[1].proc = (int (*)())&SaslLdapAuthorizeExternal;
       LDAP_EXT_CALLBACKS[1].context = NULL;
 
       // This last callback is where we take the password and turn around and

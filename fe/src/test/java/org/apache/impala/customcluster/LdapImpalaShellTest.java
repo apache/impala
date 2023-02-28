@@ -22,6 +22,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import com.google.common.collect.Range;
+
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.directory.server.annotations.CreateLdapServer;
@@ -55,9 +57,13 @@ public class LdapImpalaShellTest {
     String ldapArgs = String.format("--enable_ldap_auth --ldap_uri='%s' "
             + "--ldap_passwords_in_clear_ok %s",
         uri, extraArgs);
-    int ret = CustomClusterRunner.StartImpalaCluster(ldapArgs);
+    int ret = startImpalaCluster(ldapArgs);
     assertEquals(ret, 0);
     verifyMetrics(zero, zero, zero, zero);
+  }
+
+  protected int startImpalaCluster(String args) throws IOException, InterruptedException {
+    return CustomClusterRunner.StartImpalaCluster(args);
   }
 
   /**
@@ -65,7 +71,7 @@ public class LdapImpalaShellTest {
    * transport tests. Python version shipped with CentOS6 is known to
    * have an older version of python resulting in test failures.
    */
-  private boolean pythonSupportsSSLContext() throws Exception {
+  protected boolean pythonSupportsSSLContext() throws Exception {
     // Runs the following command:
     // python -c "import ssl; print hasattr(ssl, 'create_default_context')"
     String[] cmd = {

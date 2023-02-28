@@ -18,9 +18,11 @@
 #include "testutil/gtest-util.h"
 #include "common/init.h"
 #include "common/logging.h"
+#include "kudu/security/test/mini_kdc.h"
 #include "rpc/authentication.h"
 #include "rpc/thrift-server.h"
 #include "util/auth-util.h"
+#include "util/kudu-status-util.h"
 #include "util/network-util.h"
 #include "util/openssl-util.h"
 #include "util/thread.h"
@@ -35,6 +37,11 @@ DECLARE_string(ssl_client_ca_certificate);
 DECLARE_string(ssl_server_certificate);
 DECLARE_string(ssl_private_key);
 DECLARE_string(internal_principals_whitelist);
+DECLARE_bool(allow_custom_ldap_filters_with_kerberos_auth);
+DECLARE_bool(ldap_search_bind_authentication);
+DECLARE_string(ldap_user_search_basedn);
+DECLARE_string(ldap_user_filter);
+DECLARE_string(ldap_group_filter);
 
 // These are here so that we can grab them early in main() - the kerberos
 // init can clobber KRB5_KTNAME in PrincipalSubstitution.
@@ -211,6 +218,66 @@ TEST(Auth, BadPrincipalFormat) {
   EXPECT_ERROR(sa.InitKerberos(""), 2);
   EXPECT_ERROR(sa.InitKerberos("service_name@some.realm"), 2);
   EXPECT_ERROR(sa.InitKerberos("service_name/localhost"), 2);
+}
+
+// Set up ldap and kerberos flags and
+// 1. check if there is an error when specifying custom search filters,
+// 2. and the error does not occur when the
+//    allow_custom_ldap_filters_with_kerberos_auth flag is turned on.
+TEST(Auth, LdapKerbAuthCustomFiltersNotAllowed) {
+  AuthProvider* ap = NULL;
+  SecureAuthProvider* sa = NULL;
+
+  // Initialize the mini kdc.
+  kudu::MiniKdc kdc(kudu::MiniKdcOptions{});
+  KUDU_ASSERT_OK(kdc.Start());
+  kdc.SetKrb5Environment();
+  string kt_path;
+  KUDU_ASSERT_OK(kdc.CreateServiceKeytab("HTTP/127.0.0.1", &kt_path));
+  CHECK_ERR(setenv("KRB5_KTNAME", kt_path.c_str(), 1));
+  KUDU_ASSERT_OK(kdc.CreateUserPrincipal("alice"));
+  KUDU_ASSERT_OK(kdc.Kinit("alice"));
+
+  // Set up a fake impala server with Kerberos enabled.
+  gflags::FlagSaver saver;
+
+  FLAGS_principal = "HTTP/127.0.0.1@KRBTEST.COM";
+  FLAGS_keytab_file = kt_path;
+  FLAGS_enable_ldap_auth = true;
+  FLAGS_ldap_uri = "ldaps://bogus.com";
+  FLAGS_skip_external_kerberos_auth = false; // external Kerberos auth enabled
+  FLAGS_skip_internal_kerberos_auth = true; // internal Kerberos auth disabled (no auth)
+  FLAGS_ldap_user_search_basedn = "dc=kbrtest,dc=com";
+  FLAGS_ldap_search_bind_authentication = true;
+  FLAGS_ldap_user_filter = "(&(objectClass=user)(sAMAccountName={0}))";
+
+  // Initialization based on above "command line" args should fail
+  // due to the custom ldap search filters specified.
+  ASSERT_ERROR_MSG(AuthManager::GetInstance()->Init(),
+      "LDAP user and group filters may not be used "
+      "if Kerberos auth is turned on for external connections.");
+
+  // Initialization based on above "command line" args should not fail
+  // if the use of custom ldap filters is enabled with Kerberos auth.
+  FLAGS_allow_custom_ldap_filters_with_kerberos_auth = true;
+  ASSERT_OK(AuthManager::GetInstance()->Init());
+
+  // External auth provider is sasl, ldap, and kerberos
+  ap = AuthManager::GetInstance()->GetExternalAuthProvider();
+  ASSERT_TRUE(ap->is_secure());
+  sa = dynamic_cast<SecureAuthProvider*>(ap);
+  ASSERT_TRUE(sa->has_ldap());
+  ASSERT_EQ(FLAGS_principal, sa->principal());
+
+  ap = AuthManager::GetInstance()->GetExternalHttpAuthProvider();
+  ASSERT_TRUE(ap->is_secure());
+  sa = dynamic_cast<SecureAuthProvider*>(ap);
+  ASSERT_TRUE(sa->has_ldap());
+  ASSERT_EQ(FLAGS_principal, sa->principal());
+
+  // Internal auth provider is not secure (NoAuthProvider)
+  ap = AuthManager::GetInstance()->GetInternalAuthProvider();
+  ASSERT_FALSE(ap->is_secure());
 }
 
 }

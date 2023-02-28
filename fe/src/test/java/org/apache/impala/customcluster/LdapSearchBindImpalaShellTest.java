@@ -17,24 +17,77 @@
 
 package org.apache.impala.customcluster;
 
+import static org.apache.impala.customcluster.LdapKerberosImpalaShellTestBase.flagsToArgs;
+import static org.apache.impala.customcluster.LdapKerberosImpalaShellTestBase.mergeFlags;
 import static org.apache.impala.testutil.LdapUtil.*;
 
+import com.google.common.collect.ImmutableMap;
 import org.apache.directory.server.core.annotations.CreateDS;
 import org.apache.directory.server.core.annotations.CreatePartition;
+import org.junit.ClassRule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+
+import java.io.IOException;
 
 /**
  * Impala shell connectivity tests with Search Bind LDAP authentication.
+ *
+ * The test suite is parameterized, all tests are executed with both Kerberos
+ * authentication disabled and with Kerberos authentication enabled to validate
+ * that LDAP search bind authentication is not broken even if Kerberos authentication
+ * is enabled.
  */
 @CreateDS(name = "myDS",
     partitions = { @CreatePartition(name = "test", suffix = "dc=myorg,dc=com") })
+@RunWith(Parameterized.class)
 public class LdapSearchBindImpalaShellTest extends LdapImpalaShellTest {
+
+  @ClassRule
+  public static KerberosKdcEnvironment kerberosKdcEnvironment =
+          new KerberosKdcEnvironment(new TemporaryFolder());
+
+  private final boolean kerberosAuthenticationEnabled;
+
+  @Parameterized.Parameters(name = "kerberosAuthenticationEnabled={0}")
+  public static Boolean[] kerberosAuthenticationEnabled() {
+    return new Boolean[] {Boolean.FALSE, Boolean.TRUE};
+  }
+
+  public LdapSearchBindImpalaShellTest(boolean isKerberosAuthenticationEnabled) {
+    this.kerberosAuthenticationEnabled = isKerberosAuthenticationEnabled;
+  }
+
+
+  @Override
+  protected int startImpalaCluster(String args) throws IOException, InterruptedException {
+    if (kerberosAuthenticationEnabled) {
+      return kerberosKdcEnvironment.startImpalaClusterWithArgs(args);
+    } else {
+      return super.startImpalaCluster(args);
+    }
+  }
+
   @Override
   public void setUp(String extraArgs) throws Exception {
     String searchBindArgs = String.format("--ldap_search_bind_authentication=true "
-            + "--ldap_bind_dn=%s --ldap_bind_password_cmd='echo -n %s' %s",
-        TEST_USER_DN_1, TEST_PASSWORD_1, extraArgs);
+                    + "--ldap_bind_dn=%s --ldap_bind_password_cmd='echo -n %s' %s %s",
+            TEST_USER_DN_1, TEST_PASSWORD_1, getKerberosArgs(), extraArgs);
     super.setUp(searchBindArgs);
+  }
+
+  private String getKerberosArgs() throws IOException {
+    return kerberosAuthenticationEnabled ?
+            flagsToArgs(mergeFlags(
+                    kerberosKdcEnvironment.getKerberosAuthFlags(),
+                    ImmutableMap.of(
+                            "allow_custom_ldap_filters_with_kerberos_auth", "true"
+                    )
+            ))
+            :
+            "";  // empty if Kerberos authentication is disabled
   }
 
   /**

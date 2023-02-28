@@ -50,6 +50,9 @@ DEFINE_string(ldap_bind_password_cmd, "",
     "A Unix command whose output returns the password to use with --ldap_bind_dn. The "
     "output of the command will be truncated to 1024 bytes and trimmed of trailing "
     "whitespace.");
+DEFINE_bool(allow_custom_ldap_filters_with_kerberos_auth, false,
+    "If set, will allow custom LDAP user and group filters even if Kerberos "
+    "authentication is enabled. Disabled by default.");
 TAG_FLAG(ldap_bind_password_cmd, sensitive);
 
 DECLARE_string(ldap_ca_certificate);
@@ -111,7 +114,8 @@ Status ImpalaLdap::ValidateFlags() {
   }
 
   if ((!FLAGS_ldap_user_filter.empty() || !FLAGS_ldap_group_filter.empty())
-      && (!FLAGS_principal.empty() && !FLAGS_skip_external_kerberos_auth)) {
+      && (!FLAGS_principal.empty() && !FLAGS_skip_external_kerberos_auth
+          && !FLAGS_allow_custom_ldap_filters_with_kerberos_auth)) {
     return Status("LDAP user and group filters may not be used if Kerberos auth is "
                   "turned on for external connections.");
   }
