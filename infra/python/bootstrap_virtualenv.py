@@ -42,7 +42,10 @@ import subprocess
 import sys
 import tarfile
 import tempfile
-import urllib
+try:
+  from urllib.request import pathname2url
+except ImportError:
+  from urllib import pathname2url
 from bootstrap_toolchain import ToolchainPackage
 
 LOG = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
@@ -124,7 +127,7 @@ def exec_cmd(args, **kwargs):
      'args' and 'kwargs' use the same format as subprocess.Popen().
   '''
   process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-      **kwargs)
+      universal_newlines=True, **kwargs)
   output = process.communicate()[0]
   if process.returncode != 0:
     raise Exception("Command returned non-zero status\nCommand: %s\nOutput: %s"
@@ -189,7 +192,7 @@ def exec_pip_install(args, cc="no-cc-available", env=None):
     third_party_pkg_install_cmd.append("--no-index")
 
   third_party_pkg_install_cmd.extend(["--find-links",
-      "file://%s" % urllib.pathname2url(os.path.abspath(DEPS_DIR))])
+      "file://%s" % pathname2url(os.path.abspath(DEPS_DIR))])
   third_party_pkg_install_cmd.extend(args)
   exec_cmd(third_party_pkg_install_cmd, env=env)
 

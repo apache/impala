@@ -107,7 +107,8 @@ def check_output(cmd_args):
      a non-zero return code. Similar to subprocess.check_output() which is only provided
      in python 2.7.
   """
-  process = subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+  process = subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+      universal_newlines=True)
   stdout, _ = process.communicate()
   if process.wait() != 0:
     raise Exception("Command with args '%s' failed with exit code %s:\n%s"
@@ -422,7 +423,8 @@ def check_output(cmd_args):
      a non-zero return code. Similar to subprocess.check_output() which is only provided
      in python 2.7.
   """
-  process = subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+  process = subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+      universal_newlines=True)
   stdout, _ = process.communicate()
   if process.wait() != 0:
     raise Exception("Command with args '%s' failed with exit code %s:\n%s"

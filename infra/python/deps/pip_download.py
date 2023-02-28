@@ -51,7 +51,7 @@ def check_digest(filename, algorithm, expected_digest):
     print('Hash algorithm {0} is not supported by hashlib'.format(algorithm))
     return False
   h = hashlib.new(algorithm)
-  h.update(open(filename).read())
+  h.update(open(filename, mode='rb').read())
   actual_digest = h.hexdigest()
   return actual_digest == expected_digest
 
@@ -89,7 +89,8 @@ def get_package_info(pkg_name, pkg_version):
   # We parse the page with regex instead of an html parser because that requires
   # downloading an extra package before running this script. Since the HTML is guaranteed
   # to be formatted according to PEP 503, this is acceptable.
-  pkg_info = subprocess.check_output(["wget", "-q", "-O", "-", url])
+  pkg_info = subprocess.check_output(
+      ["wget", "-q", "-O", "-", url], universal_newlines=True)
   regex = r'<a .*?href=\".*?packages/(.*?)#(.*?)=(.*?)\".*?>(.*?)<\/a>'
   for match in re.finditer(regex, pkg_info):
     path = match.group(1)
