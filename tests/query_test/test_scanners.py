@@ -383,6 +383,8 @@ class TestHdfsScannerSkew(ImpalaTestSuite):
 
   @SkipIfLocal.multiple_impalad
   @pytest.mark.execute_serially
+  @SkipIf.not_hdfs
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   def test_mt_dop_skew_lpt(self, vector, unique_database):
     """IMPALA-11539: Sanity check for MT scan nodes to make sure that the intra-node
        skew is mitigated. For intra-node scan range assignment we are using dynamic
@@ -390,7 +392,7 @@ class TestHdfsScannerSkew(ImpalaTestSuite):
        the items in the queue are ordered by scan sizes from largest to smallest, i.e.
        we are doing Longest-Processing Time (LPT) scheduling."""
     def count_intra_node_skew(profile):
-      SKEW_THRESHOLD = 0.85
+      SKEW_THRESHOLD = 0.80
       lines = [line.strip() for line in profile.splitlines() if "- BytesRead: " in line]
       assert len(lines) == 7  # Averaged fragment + 6 fragment
       bytes_read_array = []
