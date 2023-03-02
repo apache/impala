@@ -23,6 +23,7 @@
 
 '''
 
+from __future__ import absolute_import, division, print_function
 import base64
 import pickle
 import StringIO
@@ -107,7 +108,7 @@ def estimate_rows_per_reducer(table_data_generator, mb_per_reducer):
   bytes_per_row = estimate_bytes_per_row(table_data_generator, 1)
   if bytes_per_row >= bytes_per_reducer:
     return 1
-  rows_per_reducer = bytes_per_reducer / bytes_per_row
+  rows_per_reducer = bytes_per_reducer // bytes_per_row
   bytes_per_row = estimate_bytes_per_row(table_data_generator,
       max(int(rows_per_reducer * 0.001), 1))
-  return max(bytes_per_reducer / bytes_per_row, 1)
+  return max(bytes_per_reducer // bytes_per_row, 1)

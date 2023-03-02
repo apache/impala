@@ -39,7 +39,7 @@
 # 2018-04-13T15:06:34.144000 e44af7f93edb8cd6:1b1f801600000000 TRuntimeProfileTree(nodes=[TRuntimeProf...
 
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 from impala_py_lib import profiles
 import sys
 

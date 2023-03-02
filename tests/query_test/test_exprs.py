@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import absolute_import, division, print_function
 import pytest
 import re
 from random import randint
@@ -110,7 +111,7 @@ class TestExprLimits(ImpalaTestSuite):
 
     # CASE expr
     case_query = "select case "
-    for i in xrange(0, self.EXPR_CHILDREN_LIMIT/2):
+    for i in xrange(0, self.EXPR_CHILDREN_LIMIT // 2):
       case_query += " when true then 1"
     case_query += " end"
     self.__exec_query(case_query)

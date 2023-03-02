@@ -16,6 +16,7 @@
 # under the License.
 #
 # Utilities for supporting different filesystems.
+from __future__ import absolute_import, division, print_function
 import os
 
 # FILESYSTEM_PREFIX is the path prefix that should be used in queries.  When running

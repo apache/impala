@@ -17,6 +17,7 @@
 #
 # Client tests for Impala's HiveServer2 interface
 
+from __future__ import absolute_import, division, print_function
 from getpass import getuser
 from contextlib import contextmanager
 import json

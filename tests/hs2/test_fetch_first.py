@@ -20,6 +20,7 @@
 # via the 'impala.resultset.cache.size' confOverlay option. FETCH_FIRST will
 # succeed as long all previously fetched rows fit into the bounded result cache.
 
+from __future__ import absolute_import, division, print_function
 import pytest
 
 from ImpalaService import ImpalaHiveServer2Service

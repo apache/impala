@@ -21,7 +21,7 @@
 # tests can run with the normal exploration strategy and the overall test runtime doesn't
 # explode.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import os
 import pytest
 import random

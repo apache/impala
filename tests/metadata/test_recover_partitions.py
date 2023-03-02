@@ -17,6 +17,7 @@
 #
 # Impala tests for ALTER TABLE RECOVER PARTITIONS statement
 
+from __future__ import absolute_import, division, print_function
 import os
 from six.moves import urllib
 from tests.common.impala_test_suite import ImpalaTestSuite

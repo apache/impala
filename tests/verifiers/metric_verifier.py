@@ -17,6 +17,7 @@
 #
 # Verifier for common impalad metrics
 
+from __future__ import absolute_import, division, print_function
 import logging
 from time import time, sleep
 

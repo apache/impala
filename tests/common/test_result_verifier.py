@@ -17,6 +17,7 @@
 
 # This modules contians utility functions used to help verify query test results.
 
+from __future__ import absolute_import, division, print_function
 import logging
 import math
 import re

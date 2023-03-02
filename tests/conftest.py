@@ -17,7 +17,7 @@
 
 # py.test configuration module
 #
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 from impala.dbapi import connect as impala_connect
 from kudu import connect as kudu_connect
 from random import choice, sample
@@ -32,7 +32,7 @@ import sys
 import tests.common
 from impala_py_lib.helpers import find_all_files, is_core_dump
 from tests.common.environ import build_flavor_timeout
-from common.test_result_verifier import QueryTestResult
+from tests.common.test_result_verifier import QueryTestResult
 from tests.common.patterns import is_valid_impala_identifier
 from tests.comparison.db_connection import ImpalaConnection
 from tests.util.filesystem_utils import FILESYSTEM, ISILON_WEBHDFS_PORT, WAREHOUSE

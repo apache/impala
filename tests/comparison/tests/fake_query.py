@@ -32,6 +32,7 @@
 # gain confidence, we can modify them to be more testable, and we can remove items from
 # here.
 
+from __future__ import absolute_import, division, print_function
 from tests.comparison.common import Column, Table
 from tests.comparison.funcs import AnalyticFirstValue
 from tests.comparison.query import Query, SelectClause, SelectItem

@@ -17,6 +17,7 @@
 #
 # Tests for local and remote disk scheduling.
 
+from __future__ import absolute_import, division, print_function
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.network import get_external_ip
 from tests.common.skip import SkipIfNotHdfsMinicluster

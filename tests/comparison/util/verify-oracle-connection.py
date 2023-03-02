@@ -31,7 +31,7 @@
 
 # Importing the whole module instead of doing selective import seems to help find linker
 # errors.
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import cx_Oracle
 
 # Host on which Oracle Database lies.

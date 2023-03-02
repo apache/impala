@@ -17,7 +17,7 @@
 
 # Test behaviors specific to --use_local_catalog being enabled.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import pytest
 import Queue
 import random

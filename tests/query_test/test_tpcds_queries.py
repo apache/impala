@@ -17,6 +17,7 @@
 
 # Functional tests running the TPC-DS workload
 #
+from __future__ import absolute_import, division, print_function
 import pytest
 
 from tests.common.impala_test_suite import ImpalaTestSuite

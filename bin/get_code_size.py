@@ -19,7 +19,7 @@
 
 # This tool walks the build directory (release by default) and will print the text, data,
 # and bss section sizes of the archives.
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import fnmatch
 import os
 import re

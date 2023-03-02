@@ -15,12 +15,13 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import absolute_import, division, print_function
 import re
 import sys
 
 from collections import defaultdict
 
-from common import ValExpr, ValExprList
+from tests.comparison.common import ValExpr, ValExprList
 
 module_contents = dict()
 

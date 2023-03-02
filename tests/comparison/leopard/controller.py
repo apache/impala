@@ -17,9 +17,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import absolute_import, division, print_function
 from time import sleep, localtime, strftime
 from tests.comparison.query_profile import DefaultProfile, ImpalaNestedTypesProfile
-from schedule_item import ScheduleItem
+from tests.comparison.leopard.schedule_item import ScheduleItem
 from threading import Thread
 import os
 import pickle

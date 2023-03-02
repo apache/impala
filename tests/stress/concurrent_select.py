@@ -55,7 +55,7 @@
 #  8) Verify the result set hash of successful queries if there are no DML queries in the
 #     current run.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 import logging
 import os
@@ -968,7 +968,7 @@ def populate_runtime_info(query, impala, converted_args, timeout_secs=maxint):
         return
     reports = reports_by_outcome[leading_outcome]
     reports.sort(key=lambda r: r.runtime_secs)
-    return reports[len(reports) / 2]
+    return reports[len(reports) // 2]
 
   if not any((old_required_mem_mb_with_spilling, old_required_mem_mb_without_spilling)):
     mem_estimate = estimate_query_mem_mb_usage(query, runner.impalad_conn)
@@ -1001,7 +1001,7 @@ def populate_runtime_info(query, impala, converted_args, timeout_secs=maxint):
       mem_limit = old_required_mem_mb_without_spilling
       old_required_mem_mb_without_spilling = None
     else:
-      mem_limit = (lower_bound + upper_bound) / 2
+      mem_limit = (lower_bound + upper_bound) // 2
     LOG.info("Next mem_limit: {0}".format(mem_limit))
     should_break = mem_limit / float(upper_bound) > 1 - mem_limit_eq_threshold_percent \
         or upper_bound - mem_limit < mem_limit_eq_threshold_mb
@@ -1038,7 +1038,7 @@ def populate_runtime_info(query, impala, converted_args, timeout_secs=maxint):
       mem_limit = old_required_mem_mb_with_spilling
       old_required_mem_mb_with_spilling = None
     else:
-      mem_limit = (lower_bound + upper_bound) / 2
+      mem_limit = (lower_bound + upper_bound) // 2
     LOG.info("Next mem_limit: {0}".format(mem_limit))
     should_break = mem_limit / float(upper_bound) > 1 - mem_limit_eq_threshold_percent \
         or upper_bound - mem_limit < mem_limit_eq_threshold_mb

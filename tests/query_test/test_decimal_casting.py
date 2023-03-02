@@ -17,6 +17,7 @@
 #
 # Validates that casting to Decimal works.
 #
+from __future__ import absolute_import, division, print_function
 import pytest
 from decimal import Decimal, getcontext, ROUND_DOWN, ROUND_HALF_UP
 from allpairspy import AllPairs as all_pairs

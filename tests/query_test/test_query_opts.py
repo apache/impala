@@ -20,6 +20,7 @@
 #       to make it easier to handle startup failures (right now it waits 60sec to
 #       timeout).
 
+from __future__ import absolute_import, division, print_function
 from TCLIService import TCLIService
 
 from tests.common.impala_test_suite import ImpalaTestSuite

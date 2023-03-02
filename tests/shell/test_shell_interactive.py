@@ -18,7 +18,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import httplib
 import logging
 import os
@@ -44,9 +44,9 @@ from tests.common.skip import SkipIfLocal
 from tests.common.test_dimensions import (
   create_client_protocol_dimension, create_client_protocol_strict_dimension,
   create_uncompressed_text_dimension, create_single_exec_option_dimension)
-from util import (assert_var_substitution, ImpalaShell, get_impalad_port, get_shell_cmd,
-                  get_open_sessions_metric, spawn_shell, get_unused_port,
-                  create_impala_shell_executable_dimension, get_impala_shell_executable)
+from tests.shell.util import (assert_var_substitution, ImpalaShell, get_impalad_port,
+  get_shell_cmd, get_open_sessions_metric, spawn_shell, get_unused_port,
+  create_impala_shell_executable_dimension, get_impala_shell_executable)
 import SimpleHTTPServer
 import SocketServer
 

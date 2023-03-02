@@ -17,6 +17,7 @@
 
 # Fixture parametrizations should go here, not in conftest.py.
 
+from __future__ import absolute_import, division, print_function
 import pytest
 
 from tests.common.patterns import is_valid_impala_identifier

@@ -22,7 +22,7 @@
 # executing the remaining tests in parallel. To run only some of
 # these, use --skip-serial, --skip-stress, or --skip-parallel.
 # All additional command line options are passed to py.test.
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_service import ImpaladService
 from tests.conftest import configure_logging

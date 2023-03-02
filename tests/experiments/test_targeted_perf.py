@@ -20,6 +20,7 @@
 # Additionally, we don't get any 'extra' coverage from them, so they're
 # not an essential part of functional verification.
 
+from __future__ import absolute_import, division, print_function
 from tests.common.impala_test_suite import ImpalaTestSuite
 
 class TestTargetedPerf(ImpalaTestSuite):

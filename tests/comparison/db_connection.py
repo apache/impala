@@ -21,7 +21,7 @@
    connection.
 
 '''
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import hashlib
 import impala.dbapi
 import re

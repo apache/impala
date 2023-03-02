@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import absolute_import, division, print_function
 import pytest
 import re
 
@@ -118,9 +119,9 @@ class TestHashJoinTimer(ImpalaTestSuite):
     join_node_name = "03:%s" % (join_type)
     for line in exec_summary:
       if line['operator'] == join_node_name:
-        avg_time_ms = line['avg_time'] / self.NANOS_PER_MILLI
+        avg_time_ms = line['avg_time'] // self.NANOS_PER_MILLI
         self.__verify_join_time(avg_time_ms, "ExecSummary Avg")
-        max_time_ms = line['max_time'] / self.NANOS_PER_MILLI
+        max_time_ms = line['max_time'] // self.NANOS_PER_MILLI
         self.__verify_join_time(max_time_ms, "ExecSummary Max")
         check_execsummary_count += 1
     assert (check_execsummary_count == 1), \

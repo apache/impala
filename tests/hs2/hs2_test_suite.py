@@ -17,6 +17,7 @@
 #
 # Superclass of all HS2 tests containing commonly used functions.
 
+from __future__ import absolute_import, division, print_function
 from getpass import getuser
 from TCLIService import TCLIService
 from ImpalaService import ImpalaHiveServer2Service
@@ -286,7 +287,7 @@ class HS2TestSuite(ImpalaTestSuite):
         for col_type in HS2TestSuite.HS2_V6_COLUMN_TYPES:
           typed_col = getattr(c, col_type)
           if typed_col != None:
-            indicator = ord(typed_col.nulls[i / 8])
+            indicator = ord(typed_col.nulls[i // 8])
             if indicator & (1 << (i % 8)):
               row.append("NULL")
             else:

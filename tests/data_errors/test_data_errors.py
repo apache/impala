@@ -19,6 +19,7 @@
 #
 # Tests Impala properly handles errors when reading and writing data.
 
+from __future__ import absolute_import, division, print_function
 import pytest
 import subprocess
 

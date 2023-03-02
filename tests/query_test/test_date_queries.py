@@ -17,6 +17,7 @@
 
 # Targeted tests for date type.
 
+from __future__ import absolute_import, division, print_function
 import pytest
 from tests.common.file_utils import create_table_and_copy_files
 from tests.common.impala_test_suite import ImpalaTestSuite

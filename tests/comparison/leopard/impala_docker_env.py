@@ -17,7 +17,7 @@
 
 '''This module generates a docker environment for a job'''
 
-from __future__ import division
+from __future__ import absolute_import, division, print_function
 try:
   from fabric.api import sudo, run, settings
 except ImportError as e:

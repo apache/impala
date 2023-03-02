@@ -19,7 +19,7 @@
 
 # Utility code for creating cgroups for the Impala development environment.
 # May be used as a library or as a command-line utility for manual testing.
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import os
 import sys
 import errno

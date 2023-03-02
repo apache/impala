@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import absolute_import, division, print_function
 from datetime import datetime, timedelta
 from decimal import Decimal as PyDecimal
 from random import randint, random, uniform

@@ -22,7 +22,7 @@
 # TODO: Consider combining this with wait-for-metastore.py. A TCLIService client
 # can perhaps also talk to the metastore.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import os
 import time
 import getpass

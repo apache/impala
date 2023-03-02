@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import absolute_import, division, print_function
 import getpass
 import itertools
 import pytest
@@ -622,7 +623,7 @@ class TestDdlStatements(TestDdlBase):
          "location '{1}/{0}'".format(fq_tbl_name, WAREHOUSE))
 
     # Add some partitions (first batch of two)
-    for i in xrange(num_parts / 5):
+    for i in xrange(num_parts // 5):
       start = time.time()
       self.client.execute(
           "alter table {0} add partition(j={1}, s='{1}')".format(fq_tbl_name, i))
@@ -644,7 +645,7 @@ class TestDdlStatements(TestDdlBase):
         .format(fq_tbl_name, WAREHOUSE))
 
     # Add some more partitions
-    for i in xrange(num_parts / 5, num_parts):
+    for i in xrange(num_parts // 5, num_parts):
       start = time.time()
       self.client.execute(
           "alter table {0} add partition(j={1},s='{1}')".format(fq_tbl_name, i))

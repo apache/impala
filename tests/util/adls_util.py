@@ -20,6 +20,7 @@
 # This file uses the azure-data-lake-store-python client and provides simple
 # functions to the Impala test suite to access Azure Data Lake Store.
 
+from __future__ import absolute_import, division, print_function
 from azure.datalake.store import core, lib, multithread, exceptions
 from tests.util.filesystem_base import BaseFilesystem
 from tests.util.filesystem_utils import ADLS_CLIENT_ID, ADLS_TENANT_ID, ADLS_CLIENT_SECRET

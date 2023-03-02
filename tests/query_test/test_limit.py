@@ -17,7 +17,7 @@
 
 # Validates limit on scan nodes
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_vector import ImpalaTestDimension

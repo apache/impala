@@ -18,6 +18,7 @@
 # Tests query cancellation using the ImpalaService.Cancel API
 #
 
+from __future__ import absolute_import, division, print_function
 import pytest
 import threading
 from time import sleep

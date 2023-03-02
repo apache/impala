@@ -20,6 +20,7 @@
 # are simple enough that it is better to implement them ourselves to avoid extra
 # dependencies.
 
+from __future__ import absolute_import, division, print_function
 import math
 import random
 import string
@@ -38,9 +39,9 @@ def calculate_median(values):
   sorted_values = sorted(values)
   length = len(sorted_values)
   if length % 2 == 0:
-    return (sorted_values[length / 2] + sorted_values[length / 2 - 1]) / 2
+    return (sorted_values[length // 2] + sorted_values[length // 2 - 1]) / 2
   else:
-    return sorted_values[length / 2]
+    return sorted_values[length // 2]
 
 def calculate_geomean(values):
   """ Calculates the geometric mean of the given collection of numerics """

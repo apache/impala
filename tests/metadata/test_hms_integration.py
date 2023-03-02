@@ -23,7 +23,7 @@
 # TODO: For each test, verify all the metadata available via Hive and
 # Impala, in all the possible ways of validating that metadata.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import pytest
 import random
 import string

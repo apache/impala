@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 from kudu.schema import (
     BOOL,
     DOUBLE,

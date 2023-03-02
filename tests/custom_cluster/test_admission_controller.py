@@ -17,6 +17,7 @@
 
 # Tests admission control
 
+from __future__ import absolute_import, division, print_function
 import itertools
 import logging
 import os
@@ -75,7 +76,7 @@ STATESTORE_RPC_FREQUENCY_MS = 100
 # the time the next query is submitted. Otherwise the different impalads will see stale
 # state for some admission decisions.
 SUBMISSION_DELAY_MS = \
-    [0, STATESTORE_RPC_FREQUENCY_MS / 2, STATESTORE_RPC_FREQUENCY_MS * 3 / 2]
+    [0, STATESTORE_RPC_FREQUENCY_MS // 2, STATESTORE_RPC_FREQUENCY_MS * 3 // 2]
 
 # Whether we will submit queries to all available impalads (in a round-robin fashion)
 ROUND_ROBIN_SUBMISSION = [True, False]
@@ -2263,7 +2264,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     # of running requests is very high so that requests are only queued/rejected due to
     # the mem limit.
     num_impalads = len(self.cluster.impalads)
-    query_mem_limit = (proc_limit / MAX_NUM_CONCURRENT_QUERIES / num_impalads) - 1
+    query_mem_limit = (proc_limit // MAX_NUM_CONCURRENT_QUERIES // num_impalads) - 1
     self.run_admission_test(vector,
         {'request_pool': self.pool_name, 'mem_limit': query_mem_limit})
 

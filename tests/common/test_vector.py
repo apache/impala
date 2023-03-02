@@ -56,6 +56,7 @@
 #
 # Additional examples of usage can be found within the test suites.
 
+from __future__ import absolute_import, division, print_function
 from itertools import product
 
 # A list of test dimension values.

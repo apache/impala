@@ -18,6 +18,7 @@
 # Generates random decimal numbers and verifies that mathematical
 # operations return correct results under decimal_v2.
 
+from __future__ import absolute_import, division, print_function
 import decimal
 import math
 import pytest
@@ -263,7 +264,7 @@ class TestDecimalFuzz(ImpalaTestSuite):
 
     range_size = max_range_int - min_range_int
     dist_from_min = val_int - min_range_int
-    return (num_buckets * dist_from_min) / range_size + 1
+    return (num_buckets * dist_from_min) // range_size + 1
 
   def execute_one_width_bucket(self):
     val, val_prec, val_scale = self.get_decimal()

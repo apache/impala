@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import absolute_import, division, print_function
 from collections import defaultdict
 from datetime import datetime
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException

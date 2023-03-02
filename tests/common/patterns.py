@@ -18,6 +18,7 @@
 # Common patterns that ought to be the same throughout the framework should be placed
 # here.
 
+from __future__ import absolute_import, division, print_function
 import re
 
 # http://www.cloudera.com/content/www/en-us/documentation/enterprise/latest/topics/impala_identifiers.html

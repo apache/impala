@@ -17,7 +17,7 @@
 
 # Unit tests for the test file parser
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 from tests.common.base_test_suite import BaseTestSuite
 from tests.util.test_file_parser import parse_test_file_text
 

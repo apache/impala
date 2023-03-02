@@ -16,6 +16,7 @@
 # under the License.
 
 # The base class that should be used for tests.
+from __future__ import absolute_import, division, print_function
 import logging
 
 from tests.common.test_vector import ImpalaTestMatrix

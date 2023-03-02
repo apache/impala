@@ -22,7 +22,7 @@
 # generate a CSV data file and prints a SQL load statement to incorporate
 # into dataload SQL script generation.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 from datetime import datetime, timedelta
 import itertools
 import optparse
@@ -51,7 +51,7 @@ def get_columns(num_cols):
   iter = itertools.cycle(templates)
   # Produces [bool_col1, tinyint_col1, ..., bool_col2, tinyint_col2, ...]
   # The final list has 'num_cols' elements.
-  return  [iter.next() % (i / len(templates) + 1) for i in xrange(num_cols)]
+  return [iter.next() % (i // len(templates) + 1) for i in xrange(num_cols)]
 
 # Data generators for different types. Each generator yields an infinite number of
 # value strings suitable for writing to a CSV file.

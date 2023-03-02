@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import division
+from __future__ import absolute_import, division, print_function
 from os.path import join as join_path
 from tests.comparison.query_generator import QueryGenerator
 from time import time
@@ -36,7 +36,7 @@ from tests.comparison.leopard.controller import (
 from tests.comparison.discrepancy_searcher import QueryResultComparator
 from tests.comparison.query_profile import DefaultProfile, ImpalaNestedTypesProfile
 from threading import Thread
-from impala_docker_env import ImpalaDockerEnv
+from tests.comparison.leopard.impala_docker_env import ImpalaDockerEnv
 
 import logging
 import os

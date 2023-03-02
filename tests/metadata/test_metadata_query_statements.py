@@ -17,6 +17,7 @@
 
 # Impala tests for queries that query metadata and set session settings
 
+from __future__ import absolute_import, division, print_function
 import pytest
 import re
 

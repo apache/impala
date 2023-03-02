@@ -69,7 +69,7 @@
 #   --start_minicluster   start a new Hadoop minicluster
 #   --ninja               use ninja, rather than Make, as the build tool
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 from optparse import OptionParser
 from tempfile import mkdtemp
 

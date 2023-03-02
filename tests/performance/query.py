@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import absolute_import, division, print_function
 from tests.util.test_file_parser import QueryTestSectionReader
 
 # TODO: This interface needs to be more robust; At the moment, it has two users with

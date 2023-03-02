@@ -19,6 +19,7 @@
 #
 # Utility for computing table statistics of tables in the Hive Metastore
 
+from __future__ import absolute_import, division, print_function
 from contextlib import contextmanager
 from optparse import OptionParser
 import logging

@@ -17,6 +17,7 @@
 #
 # Tests for the behavior of startup_filesystem_check_directories
 
+from __future__ import absolute_import, division, print_function
 import logging
 import pytest
 import os

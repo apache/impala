@@ -22,7 +22,7 @@
 # Kudu tables are created in the specified 'target-db' using the existing HDFS tables
 # from 'source-db'.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import logging
 import os
 import sqlparse

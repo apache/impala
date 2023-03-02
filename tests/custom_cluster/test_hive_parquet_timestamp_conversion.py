@@ -17,6 +17,7 @@
 #
 # Tests for IMPALA-1658
 
+from __future__ import absolute_import, division, print_function
 import os
 import pytest
 from subprocess import check_call

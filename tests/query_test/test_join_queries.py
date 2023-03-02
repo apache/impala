@@ -17,6 +17,7 @@
 
 # Targeted tests for Impala joins
 #
+from __future__ import absolute_import, division, print_function
 import pytest
 from copy import deepcopy
 

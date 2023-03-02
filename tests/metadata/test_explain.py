@@ -17,6 +17,7 @@
 
 # Functional tests running EXPLAIN statements.
 #
+from __future__ import absolute_import, division, print_function
 import re
 
 from tests.common.impala_test_suite import ImpalaTestSuite

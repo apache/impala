@@ -18,6 +18,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import absolute_import, division, print_function
 import errno
 import getpass
 import os
@@ -38,9 +39,9 @@ from tests.common.test_dimensions import (
   create_client_protocol_dimension, create_client_protocol_strict_dimension,
   create_uncompressed_text_dimension, create_single_exec_option_dimension)
 from time import sleep, time
-from util import (get_impalad_host_port, assert_var_substitution, run_impala_shell_cmd,
-                  ImpalaShell, build_shell_env, wait_for_query_state,
-                  create_impala_shell_executable_dimension, get_impala_shell_executable)
+from tests.shell.util import (get_impalad_host_port, assert_var_substitution,
+  run_impala_shell_cmd, ImpalaShell, build_shell_env, wait_for_query_state,
+  create_impala_shell_executable_dimension, get_impala_shell_executable)
 from contextlib import closing
 
 

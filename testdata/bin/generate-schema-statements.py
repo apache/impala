@@ -94,7 +94,7 @@
 # This should be used sparingly, because these commands are executed
 # serially.
 #
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import collections
 import csv
 import glob

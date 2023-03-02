@@ -20,6 +20,7 @@
 # annotate the class or test routine with the marker.
 #
 
+from __future__ import absolute_import, division, print_function
 import pytest
 from functools import partial
 

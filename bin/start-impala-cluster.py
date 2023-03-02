@@ -20,6 +20,7 @@
 # Starts up an Impala cluster (ImpalaD + State Store) with the specified number of
 # ImpalaD instances. Each ImpalaD runs on a different port allowing this to be run
 # on a single machine.
+from __future__ import absolute_import, division, print_function
 import getpass
 import itertools
 import json
@@ -473,7 +474,7 @@ def compute_impalad_mem_limit(cluster_size):
   # memory choice here to max out at 12GB. This should be sufficient for tests.
   #
   # Beware that ASAN builds use more memory than regular builds.
-  physical_mem_gb = psutil.virtual_memory().total / 1024 / 1024 / 1024
+  physical_mem_gb = psutil.virtual_memory().total // 1024 // 1024 // 1024
   available_mem = int(os.getenv("IMPALA_CLUSTER_MAX_MEM_GB", str(physical_mem_gb)))
   mem_limit = int(0.7 * available_mem * 1024 * 1024 * 1024 / cluster_size)
   return min(12 * 1024 * 1024 * 1024, mem_limit)

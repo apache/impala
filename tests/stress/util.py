@@ -19,7 +19,7 @@
 
 # Utility functions used by the stress test that don't fit in the other modules.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 import sys
 import threading

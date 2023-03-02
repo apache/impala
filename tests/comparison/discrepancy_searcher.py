@@ -22,9 +22,9 @@
    results.
 
 '''
-from __future__ import print_function
-# TODO: IMPALA-4600: refactor this module
 
+# TODO: IMPALA-4600: refactor this module
+from __future__ import absolute_import, division, print_function
 from copy import deepcopy
 from decimal import Decimal
 from itertools import izip
@@ -455,8 +455,8 @@ class QueryExecutor(object):
       log_file.flush()
       cursor.execute(query_sql)
       col_count = len(cursor.description)
-      batch_size = max(10000 / col_count, 1)
-      row_limit = self.TOO_MUCH_DATA / col_count
+      batch_size = max(10000 // col_count, 1)
+      row_limit = self.TOO_MUCH_DATA // col_count
       data_set = list()
       current_thread().data_set = data_set
       current_thread().cursor_description = cursor.description

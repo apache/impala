@@ -17,6 +17,7 @@
 #
 # Utility functions related to executing shell commands.
 
+from __future__ import absolute_import, division, print_function
 import logging
 import os
 import shlex

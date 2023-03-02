@@ -18,12 +18,13 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import absolute_import, division, print_function
 from shell.impala_client import ImpalaBeeswaxClient, ImpalaHS2Client
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
   create_client_protocol_dimension, create_client_protocol_no_strict_dimension,
   create_uncompressed_text_dimension, create_single_exec_option_dimension)
-from util import get_impalad_host_port
+from tests.shell.util import get_impalad_host_port
 
 
 class TestShellClient(ImpalaTestSuite):
@@ -76,7 +77,7 @@ class TestShellClient(ImpalaTestSuite):
       client.connect()
       handle = client.execute_query(
           "select * from functional.alltypes limit {0}".format(num_rows), query_options)
-      self.__fetch_rows(client.fetch(handle), num_rows / fetch_size, num_rows)
+      self.__fetch_rows(client.fetch(handle), num_rows // fetch_size, num_rows)
     finally:
       if handle is not None: client.close_query(handle)
       client.close_connection()
@@ -85,7 +86,7 @@ class TestShellClient(ImpalaTestSuite):
     """Fetches all rows using the given fetch_batches generator. Asserts that num_batches
     batches are produced by the generator and that num_rows are returned."""
     num_batches_count = 0
-    rows_per_batch = num_rows / num_batches
+    rows_per_batch = num_rows // num_batches
     for fetch_batch in fetch_batches:
       assert len(fetch_batch) == rows_per_batch
       num_batches_count += 1

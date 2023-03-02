@@ -17,6 +17,7 @@
 #
 # Verifier for memtracker usage values (Total, Peak, etc).
 
+from __future__ import absolute_import, division, print_function
 import re
 
 SIZE_FACTORS = {"b": 1, "kb": 1 << 10, "mb": 1 << 20, "gb": 1 << 30}

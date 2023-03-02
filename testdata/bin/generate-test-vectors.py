@@ -40,7 +40,7 @@
 # The pairwise generation is done using the Python 'AllPairs' module. This module can be
 # downloaded from http://pypi.python.org/pypi/AllPairs/2.0.1
 #
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import collections
 import csv
 import math

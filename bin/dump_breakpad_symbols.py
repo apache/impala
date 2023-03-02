@@ -53,6 +53,7 @@
 #   $IMPALA_TOOLCHAIN_PACKAGES_HOME/breakpad-*/bin/minidump_stackwalk \
 #   /tmp/impala-minidumps/impalad/03c0ee26-bfd1-cf3e-43fa49ca-1a6aae25.dmp /tmp/syms
 
+from __future__ import absolute_import, division, print_function
 import errno
 import logging
 import glob

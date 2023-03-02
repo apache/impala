@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import absolute_import, division, print_function
 try:
   import fabric.decorators
   from fabric.context_managers import hide, settings

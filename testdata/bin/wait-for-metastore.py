@@ -21,7 +21,7 @@
 # to execute the get_database("default") Thrift RPC until the call succeeds,
 # or a timeout is reached.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import os
 import time
 from optparse import OptionParser

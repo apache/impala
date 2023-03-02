@@ -17,6 +17,7 @@
 
 # Functional tests for LOAD DATA statements.
 
+from __future__ import absolute_import, division, print_function
 import time
 from beeswaxd.BeeswaxService import QueryState
 from copy import deepcopy

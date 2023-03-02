@@ -19,7 +19,7 @@
 # A collection of useful Python GDB modules and commands for
 # debugging Impala core dumps.
 #
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import gdb
 from collections import defaultdict
 

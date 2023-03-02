@@ -17,6 +17,7 @@
 #
 # Targeted tests to validate per-query memory limit.
 
+from __future__ import absolute_import, division, print_function
 import pytest
 import re
 import sys
@@ -46,8 +47,8 @@ class TestQueryMemLimit(ImpalaTestSuite):
   # A mem_limit is expressed in bytes, with values <= 0 signifying no cap.
   # These values are either really small, unlimited, or have a really large cap.
   MAXINT_BYTES = str(sys.maxint)
-  MAXINT_MB = str(sys.maxint/(1024*1024))
-  MAXINT_GB = str(sys.maxint/(1024*1024*1024))
+  MAXINT_MB = str(sys.maxint // (1024 * 1024))
+  MAXINT_GB = str(sys.maxint // (1024 * 1024 * 1024))
   # We expect the tests with MAXINT_* using valid units [bmg] to succeed.
   PASS_REGEX = re.compile("(%s|%s|%s)[bmg]?$" % (MAXINT_BYTES, MAXINT_MB, MAXINT_GB),
                           re.I)

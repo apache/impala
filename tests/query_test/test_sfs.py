@@ -18,6 +18,7 @@
 # This test suite validates the functionality that allows users to create an external
 # table associated with a single file.
 
+from __future__ import absolute_import, division, print_function
 from tests.common.file_utils import copy_files_to_hdfs_dir
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIf

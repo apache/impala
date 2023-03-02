@@ -17,6 +17,7 @@
 #
 # Client tests for Query Event Hooks
 
+from __future__ import absolute_import, division, print_function
 import os
 import pytest
 import tempfile

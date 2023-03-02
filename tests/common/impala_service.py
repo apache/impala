@@ -19,6 +19,7 @@
 # programatically interact with the services and perform operations such as querying
 # the debug webpage, getting metric values, or creating client connections.
 
+from __future__ import absolute_import, division, print_function
 from collections import defaultdict
 import json
 import logging

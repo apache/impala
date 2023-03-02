@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import absolute_import, division, print_function
 from tests.comparison.db_types import Boolean
 from tests.comparison.funcs import And, Equals, Or
 from tests.comparison.query_generator import QueryGenerator

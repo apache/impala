@@ -20,6 +20,7 @@
 # differences based on DB API2 libraries (like Impyla vs. psycopg2). Putting the
 # handling in a single place will make it easier to track what workarounds exist.
 
+from __future__ import absolute_import, division, print_function
 from tests.comparison import db_connection
 
 

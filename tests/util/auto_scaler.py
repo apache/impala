@@ -17,6 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import absolute_import, division, print_function
 import argparse
 import time
 import logging
@@ -56,7 +57,7 @@ class AutoScaler(object):
       self.start_batch_size = start_batch_size
     # Maximum number of executor groups. We only have 10 TCP ports free on our
     # miniclusters and we need one for the dedicated coordinator.
-    self.max_groups = 9 / self.group_size
+    self.max_groups = 9 // self.group_size
     # max_groups can further bound the maximum number of groups we are going to start,
     # but we won't start more than possible.
     if max_groups > 0 and max_groups < self.max_groups:

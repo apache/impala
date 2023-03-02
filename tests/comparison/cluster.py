@@ -16,11 +16,11 @@
 # under the License.
 
 """This module provides utilities for interacting with a cluster."""
-from __future__ import print_function
 
 # This should be moved into the test/util folder eventually. The problem is this
 # module depends on db_connection which use some query generator classes.
 
+from __future__ import absolute_import, division, print_function
 import hdfs
 import logging
 import os
@@ -46,7 +46,7 @@ from xml.etree.ElementTree import parse as parse_xml
 from zipfile import ZipFile
 
 
-from db_connection import HiveConnection, ImpalaConnection
+from tests.comparison.db_connection import HiveConnection, ImpalaConnection
 from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.errors import Timeout
 from tests.util.shell_util import shell as local_shell
@@ -795,7 +795,7 @@ class Impalad(object):
     if not pid:
       raise Exception("Impalad at %s is not running" % self.label)
     mem_kb = self.shell("ps --no-header -o rss -p %s" % pid)
-    return int(mem_kb) / 1024
+    return int(mem_kb) // 1024
 
   def _read_web_page(self, relative_url, params={}, timeout_secs=DEFAULT_TIMEOUT):
     if "json" not in params:
@@ -874,7 +874,7 @@ class MiniClusterImpalad(Impalad):
       return int(pid)
 
   def find_process_mem_mb_limit(self):
-    return long(self.get_metric("mem-tracker.process.limit")["value"]) / 1024 ** 2
+    return long(self.get_metric("mem-tracker.process.limit")["value"]) // 1024 ** 2
 
   def find_core_dump_dir(self):
     raise NotImplementedError()
@@ -916,7 +916,7 @@ class CmImpalad(Impalad):
       return int(pid)
 
   def find_process_mem_mb_limit(self):
-    return self._get_cm_config("impalad_memory_limit", value_type=int) / 1024 ** 2
+    return self._get_cm_config("impalad_memory_limit", value_type=int) // 1024 ** 2
 
   def find_core_dump_dir(self):
     return self._get_cm_config("core_dump_dir")

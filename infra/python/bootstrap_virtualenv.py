@@ -32,7 +32,7 @@
 # This module can be run with python >= 2.7. It makes no guarantees about usage on
 # python < 2.7.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import glob
 import logging
 import optparse

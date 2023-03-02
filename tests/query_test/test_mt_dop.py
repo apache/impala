@@ -17,6 +17,7 @@
 
 # Tests queries with the MT_DOP query option.
 
+from __future__ import absolute_import, division, print_function
 import pytest
 import logging
 

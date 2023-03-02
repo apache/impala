@@ -17,7 +17,7 @@
 #
 # The base class that should be used for almost all Impala tests
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import glob
 import grp
 import json

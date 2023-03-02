@@ -17,6 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import absolute_import, division, print_function
 import logging
 import os
 import pickle
@@ -29,8 +30,8 @@ except ImportError as e:
   raise Exception(
       "Please run impala-pip install -r $IMPALA_HOME/infra/python/deps/extended-test-"
       "requirements.txt:\n{0}".format(str(e)))
-from schedule_item import ScheduleItem
-from controller import PATH_TO_REPORTS, PATH_TO_SCHEDULE
+from tests.comparison.leopard.schedule_item import ScheduleItem
+from tests.comparison.leopard.controller import PATH_TO_REPORTS, PATH_TO_SCHEDULE
 from threading import Thread
 from tests.comparison.query_profile import DefaultProfile
 from tests.comparison.db_types import (

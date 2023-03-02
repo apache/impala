@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import math
 import os
 import pytest
@@ -259,7 +259,7 @@ class TestLargeCompressedFile(ImpalaTestSuite):
     # Number of nested structures described above.
     num_chunks = int(math.ceil(file_size / self.CHUNK_SIZE))
     # Number of compressed snappy blocks per chunk.
-    num_blocks_per_chunk = self.CHUNK_SIZE / (compressed_size + 4)
+    num_blocks_per_chunk = self.CHUNK_SIZE // (compressed_size + 4)
     # Total uncompressed size of a nested structure.
     total_chunk_size = num_blocks_per_chunk * payload_size
 

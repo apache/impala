@@ -25,6 +25,7 @@
 #   client.connect()
 #   result = client.execute(query_string)
 #   where result is an object of the class ImpalaBeeswaxResult.
+from __future__ import absolute_import, division, print_function
 import logging
 import time
 import shlex
@@ -282,7 +283,7 @@ class ImpalaBeeswaxClient(object):
             setattr(max_stats, attr, max(getattr(max_stats, attr), val))
 
       if len(node.exec_stats) > 0:
-        avg_time = agg_stats.latency_ns / len(node.exec_stats)
+        avg_time = agg_stats.latency_ns // len(node.exec_stats)
       else:
         avg_time = 0
 

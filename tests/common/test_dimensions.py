@@ -17,6 +17,7 @@
 
 # Common test dimensions and associated utility functions.
 
+from __future__ import absolute_import, division, print_function
 import copy
 import os
 from itertools import product

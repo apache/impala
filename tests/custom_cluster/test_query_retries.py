@@ -21,7 +21,7 @@
 # TODO: Re-factor tests into multiple classes.
 # TODO: Add a test that cancels queries while a retry is running
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import pytest
 import re
 import shutil

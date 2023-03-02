@@ -17,6 +17,7 @@
 #
 # Test Catalog behavior when --compact_catalog_topic is false.
 
+from __future__ import absolute_import, division, print_function
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite

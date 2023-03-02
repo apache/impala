@@ -20,7 +20,7 @@
 # It can be used by other tests (e.g. LdapImpylaHttpTest.java) that start a cluster with
 # an LDAP server to validate Impyla's functionality.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import argparse
 import logging
 

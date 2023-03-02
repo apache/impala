@@ -17,6 +17,7 @@
 
 # This module contains tests for some of the tests/util code.
 
+from __future__ import absolute_import, division, print_function
 from tests.util.filesystem_utils import prepend_with_fs
 from tests.util.parse_util import get_bytes_summary_stats_counter
 

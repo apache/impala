@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import logging
 import os
 import pytest
@@ -612,7 +612,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
         self.client, SHUTDOWN_EXEC3.format(HIGH_DEADLINE))
     grace, deadline, _, _ = parse_shutdown_result(result)
     assert grace == "{0}s000ms".format(self.EXEC_SHUTDOWN_GRACE_PERIOD_S)
-    assert deadline == "{0}m{1}s".format(HIGH_DEADLINE / 60, HIGH_DEADLINE % 60)
+    assert deadline == "{0}m{1}s".format(HIGH_DEADLINE // 60, HIGH_DEADLINE % 60)
 
     result = self.execute_query_expect_success(
         self.client, SHUTDOWN_EXEC3.format(VERY_HIGH_DEADLINE))
@@ -660,7 +660,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     result = self.execute_query_expect_success(self.client, SHUTDOWN)
     grace, deadline, registered, _ = parse_shutdown_result(result)
     assert grace == "{0}s000ms".format(self.COORD_SHUTDOWN_GRACE_PERIOD_S)
-    assert deadline == "{0}m".format(self.COORD_SHUTDOWN_DEADLINE_S / 60), "4"
+    assert deadline == "{0}m".format(self.COORD_SHUTDOWN_DEADLINE_S // 60), "4"
     assert registered == "3"
 
     # Expect that the beeswax shutdown error occurs when calling fn()

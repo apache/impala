@@ -19,6 +19,7 @@
 # modifies the metadata via Hive and checks that the modification
 # succeeded by querying Impala, or vice versa.
 
+from __future__ import absolute_import, division, print_function
 import logging
 import requests
 import time
