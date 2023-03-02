@@ -10,6 +10,27 @@ and timestamp_col between '2009-01-01' and '2009-02-01';
 BIGINT, BIGINT
 ====
 ---- QUERY
+# Same query as above with time-of-day parts. Regression test for IMPALA-11960.
+select count(*), sum(int_col) from alltypes_date_partition
+where date_col = cast(timestamp_col as date)
+and timestamp_col > '2009-01-01 01:00:00' and timestamp_col < '2009-02-01 01:00:00';
+---- RESULTS
+155,620
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+# Same as above but using >= instead of > and using a lower bound that matches with
+# a row. Regression test for IMPALA-11960.
+select count(*), sum(int_col) from alltypes_date_partition
+where date_col = cast(timestamp_col as date)
+and timestamp_col >= '2009-01-01 00:08:00.280' and timestamp_col < '2009-02-01 01:00:00';
+---- RESULTS
+156,628
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
 # Mix of various predicates some of which are eligible for propagation
 with dp_view as
 (select * from alltypes_date_partition

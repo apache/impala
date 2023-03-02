@@ -172,6 +172,15 @@ public class ConstantPredicateHandler {
 
   private Expr rewriteWithOp(BinaryPredicate pred, BinaryPredicate.Operator newOp,
     Analyzer analyzer) {
+    // Allow equality to avoid problems with truncating the time-of-day part of
+    // timestamps (IMPALA-11960).
+    // TODO: the original (stricter) op could be kept if the upper bound is a
+    //       TimestampLiteral without time component, e.g ts_col < "2000-01-01"
+    if (newOp == BinaryPredicate.Operator.LT) {
+      newOp = BinaryPredicate.Operator.LE;
+    } else if (newOp == BinaryPredicate.Operator.GT) {
+      newOp = BinaryPredicate.Operator.GE;
+    }
     if (pred.getOp() == newOp) return pred;
     BinaryPredicate newPred = new BinaryPredicate(newOp, pred.getChild(0),
         pred.getChild(1));
