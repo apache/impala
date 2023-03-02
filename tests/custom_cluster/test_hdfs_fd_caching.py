@@ -125,8 +125,7 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--max_cached_file_handles=16"
-                   " --unused_file_handle_timeout_sec=18446744073709551600"
-                   " --cache_ozone_file_handles=true",
+                   " --unused_file_handle_timeout_sec=18446744073709551600",
       catalogd_args="--load_catalog_in_background=false")
   def test_caching_enabled(self, vector):
     """
@@ -146,8 +145,7 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args="--max_cached_file_handles=16 --unused_file_handle_timeout_sec=5"
-                   " --cache_ozone_file_handles=true",
+      impalad_args="--max_cached_file_handles=16 --unused_file_handle_timeout_sec=5",
       catalogd_args="--load_catalog_in_background=false")
   def test_caching_with_eviction(self, vector):
     """Test of the HDFS file handle cache with unused file handle eviction enabled"""
@@ -162,7 +160,7 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args="--max_cached_file_handles=0 --cache_ozone_file_handles=true",
+      impalad_args="--max_cached_file_handles=0",
       catalogd_args="--load_catalog_in_background=false")
   def test_caching_disabled_by_param(self, vector):
     """Test that the HDFS file handle cache is disabled when the parameter is zero"""
@@ -173,7 +171,8 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--cache_remote_file_handles=false --cache_s3_file_handles=false "
-                   "--cache_abfs_file_handles=false --hostname=" + get_external_ip(),
+                   "--cache_abfs_file_handles=false --cache_ozone_file_handles=false "
+                   "--hostname=" + get_external_ip(),
       catalogd_args="--load_catalog_in_background=false")
   def test_remote_caching_disabled_by_param(self, vector):
     """Test that the file handle cache is disabled for remote files when disabled"""
@@ -183,8 +182,7 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args="--max_cached_file_handles=0 --cache_ozone_file_handles=true "
-                   "--hostname=" + get_external_ip(),
+      impalad_args="--max_cached_file_handles=0 --hostname=" + get_external_ip(),
       catalogd_args="--load_catalog_in_background=false")
   def test_remote_caching_disabled_by_global_param(self, vector):
     """Test that the file handle cache is disabled for remote files when all caching is
@@ -196,7 +194,7 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--max_cached_file_handles=16 --unused_file_handle_timeout_sec=5 "
-                   "--always_use_data_cache=true --cache_ozone_file_handles=true",
+                   "--always_use_data_cache=true",
       start_args="--data_cache_dir=/tmp --data_cache_size=500MB",
       catalogd_args="--load_catalog_in_background=false")
   def test_no_fd_caching_on_cached_data(self, vector):

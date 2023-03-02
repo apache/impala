@@ -199,7 +199,7 @@ DEFINE_bool(cache_s3_file_handles, true, "Enable the file handle cache for "
 DEFINE_bool(cache_abfs_file_handles, true, "Enable the file handle cache for "
     "ABFS files.");
 
-DEFINE_bool(cache_ozone_file_handles, false, "Enable the file handle cache for Ozone "
+DEFINE_bool(cache_ozone_file_handles, true, "Enable the file handle cache for Ozone "
     "files.");
 
 DECLARE_int64(min_buffer_size);
