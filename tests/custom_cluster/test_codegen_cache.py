@@ -40,76 +40,88 @@ class TestCodegenCache(CustomClusterTestSuite):
     super(TestCodegenCache, cls).setup_class()
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(cluster_size=1)
+  @CustomClusterTestSuite.with_args(cluster_size=1,
+          impalad_args="--codegen_cache_capacity=1GB")
   def test_codegen_cache(self, vector):
     self._test_codegen_cache(vector,
             ("select * from (select * from functional.alltypes "
              + "limit 1000000) t1 where int_col > 10 limit 10"))
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(cluster_size=1)
+  @CustomClusterTestSuite.with_args(cluster_size=1,
+          impalad_args="--codegen_cache_capacity=1GB")
   def test_codegen_cache_int_col(self, vector):
     self._test_codegen_cache(vector,
       "select * from functional.alltypes where int_col > 0")
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(cluster_size=1)
+  @CustomClusterTestSuite.with_args(cluster_size=1,
+          impalad_args="--codegen_cache_capacity=1GB")
   def test_codegen_cache_tinyint_col(self, vector):
     self._test_codegen_cache(vector,
       "select * from functional.alltypes where tinyint_col > 0")
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(cluster_size=1)
+  @CustomClusterTestSuite.with_args(cluster_size=1,
+          impalad_args="--codegen_cache_capacity=1GB")
   def test_codegen_cache_bool_col(self, vector):
     self._test_codegen_cache(vector,
       "select * from functional.alltypes where bool_col > 0")
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(cluster_size=1)
+  @CustomClusterTestSuite.with_args(cluster_size=1,
+          impalad_args="--codegen_cache_capacity=1GB")
   def test_codegen_cache_bigint_col(self, vector):
     self._test_codegen_cache(vector,
       "select * from functional.alltypes where bigint_col > 0")
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(cluster_size=1)
+  @CustomClusterTestSuite.with_args(cluster_size=1,
+          impalad_args="--codegen_cache_capacity=1GB")
   def test_codegen_cache_float_col(self, vector):
     self._test_codegen_cache(vector,
       "select * from functional.alltypes where float_col > 0")
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(cluster_size=1)
+  @CustomClusterTestSuite.with_args(cluster_size=1,
+          impalad_args="--codegen_cache_capacity=1GB")
   def test_codegen_cache_double_col(self, vector):
     self._test_codegen_cache(vector,
       "select * from functional.alltypes where double_col > 0")
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(cluster_size=1)
+  @CustomClusterTestSuite.with_args(cluster_size=1,
+          impalad_args="--codegen_cache_capacity=1GB")
   def test_codegen_cache_date_string_col(self, vector):
     self._test_codegen_cache(vector,
       "select * from functional.alltypes where date_string_col != ''")
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(cluster_size=1)
+  @CustomClusterTestSuite.with_args(cluster_size=1,
+          impalad_args="--codegen_cache_capacity=1GB")
   def test_codegen_cache_string_col(self, vector):
     self._test_codegen_cache(vector,
       "select * from functional.alltypes where string_col != ''")
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(cluster_size=1)
+  @CustomClusterTestSuite.with_args(cluster_size=1,
+          impalad_args="--codegen_cache_capacity=1GB")
   def test_codegen_cache_poly_func_string_col(self, vector):
     self._test_codegen_cache(vector,
       ("select * from functional.alltypes where "
       + "CHAR_LENGTH(string_col) > 0"))
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(cluster_size=1)
+  @CustomClusterTestSuite.with_args(cluster_size=1,
+          impalad_args="--codegen_cache_capacity=1GB")
   def test_codegen_cache_poly_func_date_string_col(self, vector):
     self._test_codegen_cache(vector,
       ("select * from functional.alltypes where "
       + "CHAR_LENGTH(date_string_col) > 0"))
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(cluster_size=1)
+  @CustomClusterTestSuite.with_args(cluster_size=1,
+          impalad_args="--codegen_cache_capacity=1GB")
   # Test native uda is missed in the codegen cache, as it is disabled.
   def test_codegen_cache_uda_miss(self, vector):
     database = "test_codegen_cache_uda_miss"
@@ -118,7 +130,8 @@ class TestCodegenCache(CustomClusterTestSuite):
       "select test_count(int_col) from functional.alltypestiny", False)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(cluster_size=1)
+  @CustomClusterTestSuite.with_args(cluster_size=1,
+          impalad_args="--codegen_cache_capacity=1GB")
   # Test native udf is missed in the codegen cache, as it is disabled.
   def test_codegen_cache_udf_miss(self, vector):
     database = "test_codegen_cache_udf_miss"
@@ -193,7 +206,8 @@ class TestCodegenCache(CustomClusterTestSuite):
       assert result is not None
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(cluster_size=3)
+  @CustomClusterTestSuite.with_args(cluster_size=3,
+          impalad_args="--codegen_cache_capacity=1GB")
   def test_codegen_cache_udf_crash(self, vector):
       # The testcase would crash if we don't disable the native udf for codegen cache.
       database = "test_codegen_cache_udf_crash"
@@ -234,7 +248,8 @@ class TestCodegenCache(CustomClusterTestSuite):
       assert result is not None
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(cluster_size=1)
+  @CustomClusterTestSuite.with_args(cluster_size=1,
+          impalad_args="--codegen_cache_capacity=1GB")
   def test_codegen_cache_timezone_crash(self, vector):
       # The testcase tests whether it would crash using the broken builtin function
       # from_utc_timestamp from the codegen cache.
