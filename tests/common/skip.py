@@ -115,8 +115,6 @@ class SkipIf:
   is_buggy_el6_kernel = pytest.mark.skipif(
       IS_BUGGY_EL6_KERNEL, reason="Kernel is affected by KUDU-1508")
 
-  ozone_ec_incomplete = pytest.mark.skipif(IS_OZONE and IS_EC, reason="HDDS-7603")
-
 class SkipIfLocal:
   # These are skipped due to product limitations.
   hdfs_blocks = pytest.mark.skipif(IS_LOCAL,
