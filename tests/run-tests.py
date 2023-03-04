@@ -166,7 +166,7 @@ def build_test_args(base_name, valid_dirs=VALID_TEST_DIRS):
 
   ignored_dirs = build_ignore_dir_arg_list(valid_dirs=valid_dirs)
   logging_args = []
-  for arg, log in LOGGING_ARGS.iteritems():
+  for arg, log in LOGGING_ARGS.items():
     logging_args.extend([arg, os.path.join(RESULT_DIR, log.format(base_name))])
 
   if valid_dirs != ['verifiers']:

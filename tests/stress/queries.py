@@ -117,7 +117,7 @@ def load_tpc_queries(workload):
   LOG.info("Loading %s queries", workload)
   queries = []
   for query_name, query_sql in test_file_parser.load_tpc_queries(workload,
-      include_stress_queries=True).iteritems():
+      include_stress_queries=True).items():
     query = Query()
     query.name = query_name
     query.sql = query_sql

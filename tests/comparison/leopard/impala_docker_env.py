@@ -141,7 +141,7 @@ class ImpalaDockerEnv(object):
           volume_ops = ' '.join(
               ['-v {host_path}:{container_path}'.format(host_path=host_path,
                                                         container_path=container_path)
-               for host_path, container_path in volume_map.iteritems()])
+               for host_path, container_path in volume_map.items()])
         start_command += (
             'docker run -d -t {volume_ops} -p {postgres_port}:5432 -p {ssh_port}:22 '
             '-p {impala_port}:21050 {docker_image_name} /bin/docker-boot-daemon').format(

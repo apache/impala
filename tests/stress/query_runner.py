@@ -188,10 +188,10 @@ class QueryRunner(object):
     if run_set_up and query.set_up_sql:
       LOG.debug("Running set up query:\n%s", query.set_up_sql)
       cursor.execute(query.set_up_sql)
-    for query_option, value in self.common_query_options.iteritems():
+    for query_option, value in self.common_query_options.items():
       cursor.execute(
           "SET {query_option}={value}".format(query_option=query_option, value=value))
-    for query_option, value in query.options.iteritems():
+    for query_option, value in query.options.items():
       cursor.execute(
           "SET {query_option}={value}".format(query_option=query_option, value=value))
     # Set a time limit if it is the expected method of cancellation, or as an additional
@@ -383,7 +383,7 @@ class QueryRunner(object):
 
   def get_metric_vals(self):
     """Get the current values of the all metrics as a list of (k, v) pairs."""
-    return [(k, v.value) for k, v in self._metrics.iteritems()]
+    return [(k, v.value) for k, v in self._metrics.items()]
 
   def increment_metric(self, name):
     """Increment the current value of the metric called 'name'."""

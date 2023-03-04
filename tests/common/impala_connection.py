@@ -94,7 +94,7 @@ class ImpalaConnection(object):
     """Replaces existing configuration with the given dictionary"""
     assert config_option_dict is not None, "config_option_dict cannot be None"
     self.clear_configuration()
-    for name, value in config_option_dict.iteritems():
+    for name, value in config_option_dict.items():
       self.set_configuration_option(name, value)
 
   @abc.abstractmethod

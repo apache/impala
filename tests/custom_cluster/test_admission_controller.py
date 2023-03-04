@@ -1852,8 +1852,9 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       curr[impalad] = init[impalad]
 
     while True:
-      LOG.debug("wait_for_statestore_updates: curr=%s, init=%s, d=%s", curr.values(),
-          init.values(), [curr[i] - init[i] for i in self.impalads])
+      LOG.debug("wait_for_statestore_updates: curr=%s, init=%s, d=%s",
+          list(curr.values()), list(init.values()),
+          [curr[i] - init[i] for i in self.impalads])
       if all([curr[i] - init[i] >= heartbeats for i in self.impalads]): break
       for impalad in self.impalads:
         curr[impalad] = impalad.service.get_metric_value(

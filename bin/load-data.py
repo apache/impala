@@ -483,7 +483,7 @@ def main():
   total_time = 0.0
   thread_pool.close()
   thread_pool.join()
-  for workload, load_time in loading_time_map.iteritems():
+  for workload, load_time in loading_time_map.items():
     total_time += load_time
     LOG.info('Data loading for workload \'%s\' completed in: %.2fs'\
         % (workload, load_time))

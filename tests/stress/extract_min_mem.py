@@ -40,7 +40,7 @@ import sys
 results = []
 with open(sys.argv[1]) as f:
   data = json.load(f)
-  for query_data in data['db_names']['tpch_parquet'].itervalues():
+  for query_data in data['db_names']['tpch_parquet'].values():
     runtime_info = query_data['[]']
     # Build up list of query numbers and minimum memory.
     results.append((int(runtime_info['name'][1:]),

@@ -752,7 +752,7 @@ class QueryGenerator(object):
         # A root_func was chosen and it's children are in one or more of the
         # null_args_by_func_allowed pools. A pool will be chosen, then a child function.
         null_arg_counts_by_pool = dict((pool_category, len(pool)) for pool_category, pool
-                                       in null_args_by_func_allowed.iteritems())
+                                       in null_args_by_func_allowed.items())
         # There is a special case that would lead to a dead end. If there is only one
         # distinct place holder across all the pools and an analytic is still needed,
         # then that place holder cannot be replaced by an aggregate since aggregates
@@ -788,7 +788,7 @@ class QueryGenerator(object):
 
       if parent_func:
         # Remove the place holder from all of the other pools.
-        for pool_category, pool in null_args_by_func_allowed.iteritems():
+        for pool_category, pool in null_args_by_func_allowed.items():
           for null_arg_idx, (func, arg_idx) in enumerate(pool):
             if func is parent_func and arg_idx == parent_arg_idx:
               del pool[null_arg_idx]
@@ -849,7 +849,7 @@ class QueryGenerator(object):
             continue
           null_args.append((chosen_func, idx))
 
-      if not any(null_args_by_func_allowed.itervalues()):
+      if not any(null_args_by_func_allowed.values()):
         # Some analytic functions take no arguments. Ex: ROW_NUM()
         break
 
@@ -1253,7 +1253,7 @@ class QueryGenerator(object):
 
     root_predicate, relational_predicates = self._create_boolean_func_tree(
       require_relational_func=True,
-      relational_col_types=table_exprs_by_col_types.keys(),
+      relational_col_types=list(table_exprs_by_col_types.keys()),
       allowed_signatures=join_signatures)
 
     for predicate in relational_predicates:
@@ -1440,7 +1440,7 @@ class QueryGenerator(object):
           # Prefer to replace Boolean leaves to get a more realistic expression.
           return_type = Boolean
         else:
-          return_type = choice(null_args_by_type.keys())
+          return_type = choice(list(null_args_by_type.keys()))
         # Rather than track if this is a child of a relational function, in which case
         # the arg type needs to be preserved, just always assume that this is a child of
         # a relational function.

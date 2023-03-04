@@ -593,7 +593,7 @@ class DockerMiniClusterOperations(object):
     # List all running containers on the network and kill those with the impalad name
     # prefix to make sure that no running container are left over from previous clusters.
     container_name_prefix = self.__gen_container_name__("impalad")
-    for container_id, info in self.__get_network_info__()["Containers"].iteritems():
+    for container_id, info in self.__get_network_info__()["Containers"].items():
       container_name = info["Name"]
       if container_name.startswith(container_name_prefix):
         LOG.info("Stopping container {0}".format(container_name))
@@ -665,7 +665,7 @@ class DockerMiniClusterOperations(object):
       port_args = ["-P"]
     else:
       port_args = ["-p{dst}:{src}".format(src=src, dst=dst)
-                   for src, dst in port_map.iteritems()]
+                   for src, dst in port_map.items()]
     # Impersonate the current user for operations against the minicluster. This is
     # necessary because the user name inside the container is "root".
     # TODO: pass in the actual options

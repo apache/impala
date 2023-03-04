@@ -162,7 +162,7 @@ class ValExpr(object):
     if self.is_func:
       for arg in self.args:
         if isinstance(arg, ValExpr):
-          for col, count in arg.count_col_refs().iteritems():
+          for col, count in arg.count_col_refs().items():
             col_ref_counts[col] += count
     elif self.is_col:
       col_ref_counts[self] += 1
@@ -631,7 +631,7 @@ class TableExprList(list):
   def joinable_cols_by_type(self):
     cols_by_type = defaultdict(ValExprList)
     for table_expr in self:
-      for type_, cols in table_expr.joinable_cols_by_type.iteritems():
+      for type_, cols in table_expr.joinable_cols_by_type.items():
         cols_by_type[type_].extend(cols)
     return cols_by_type
 
@@ -639,7 +639,7 @@ class TableExprList(list):
   def cols_by_type(self):
     cols_by_type = defaultdict(ValExprList)
     for table_expr in self:
-      for type_, cols in table_expr.cols_by_type.iteritems():
+      for type_, cols in table_expr.cols_by_type.items():
         cols_by_type[type_].extend(cols)
     return cols_by_type
 

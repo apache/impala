@@ -604,7 +604,7 @@ class TestKuduPartitioning(KuduTestSuite):
 
     query = "INSERT INTO %s SELECT id FROM functional.alltypes" % table_full_name
     exec_options = dict((k, str(v)) for k, v
-        in vector.get_value('exec_option').iteritems())
+        in vector.get_value('exec_option').items())
     cursor.execute(query, configuration=exec_options)
 
     profile = cursor.get_profile()
@@ -1357,7 +1357,7 @@ class TestKuduMemLimits(KuduTestSuite):
     """Tests that the queries specified in this test suite run under the given
     memory limits."""
     exec_options = dict((k, str(v)) for k, v
-                        in vector.get_value('exec_option').iteritems())
+                        in vector.get_value('exec_option').items())
     exec_options['mem_limit'] = "{0}m".format(mem_limit)
     # IMPALA-9856: We disable query result spooling so that this test can run queries
     # with low mem_limit.

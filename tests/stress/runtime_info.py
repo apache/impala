@@ -83,9 +83,9 @@ def load_runtime_info(path, impala=None):
         store.get("host_names") != sorted([i.host_name for i in impala.impalads])
     ):
       return queries_by_db_and_sql
-    for db_name, queries_by_sql in store["db_names"].iteritems():
-      for sql, queries_by_options in queries_by_sql.iteritems():
-        for options, json_query in queries_by_options.iteritems():
+    for db_name, queries_by_sql in store["db_names"].items():
+      for sql, queries_by_options in queries_by_sql.items():
+        for options, json_query in queries_by_options.items():
           query = Query()
           query.__dict__.update(json_query)
           query.sql = sql
@@ -123,11 +123,11 @@ def print_runtime_info_comparison(old_runtime_info, new_runtime_info):
       "Old Runtime wout/Spilling",
       "New Runtime wout/Spilling",
       "Diff %"]))
-  for db_name, old_queries in old_runtime_info.iteritems():
+  for db_name, old_queries in old_runtime_info.items():
     new_queries = new_runtime_info.get(db_name)
     if not new_queries:
       continue
-    for sql, old_query in old_queries.iteritems():
+    for sql, old_query in old_queries.items():
       new_query = new_queries.get(sql)
       if not new_query:
         continue

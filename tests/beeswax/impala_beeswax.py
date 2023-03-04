@@ -128,7 +128,7 @@ class ImpalaBeeswaxClient(object):
     self.query_states = QueryState._NAMES_TO_VALUES
 
   def __options_to_string_list(self):
-    return ["%s=%s" % (k,v) for (k,v) in self.__query_options.iteritems()]
+    return ["%s=%s" % (k, v) for (k, v) in self.__query_options.items()]
 
   def get_query_options(self):
     return self.__query_options
@@ -140,7 +140,7 @@ class ImpalaBeeswaxClient(object):
     if query_option_dict is None:
       raise ValueError('Cannot pass None value for query options')
     self.clear_query_options()
-    for name, value in query_option_dict.iteritems():
+    for name, value in query_option_dict.items():
       self.set_query_option(name, value)
 
   def get_query_option(self, name):
@@ -483,7 +483,7 @@ class ImpalaBeeswaxClient(object):
     result = self.close_dml(handle)
     # The insert was successful
     num_rows = sum(map(int, result.rows_modified.values()))
-    data = ["%s: %s" % row for row in result.rows_modified.iteritems()]
+    data = ["%s: %s" % row for row in result.rows_modified.items()]
     exec_result = ImpalaBeeswaxResult(query_id=handle.id, success=True, data=data)
     exec_result.summary = "Inserted %d rows" % (num_rows,)
     return exec_result

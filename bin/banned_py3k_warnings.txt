@@ -7,3 +7,6 @@ zip-builtin-not-iterating
 filter-builtin-not-iterating
 reduce-builtin
 deprecated-itertools-function
+dict-iter-method
+dict-keys-not-iterating
+dict-values-not-iterating

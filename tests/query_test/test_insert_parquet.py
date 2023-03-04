@@ -425,7 +425,7 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
   def _check_only_one_member_var_is_set(obj, var_name):
     """Checks that 'var_name' is the only member of 'obj' that is not None. Useful to
     check Thrift unions."""
-    keys = [k for k, v in vars(obj).iteritems() if v is not None]
+    keys = [k for k, v in vars(obj).items() if v is not None]
     assert keys == [var_name]
 
   def _check_no_logical_type(self, schemas, column_name):

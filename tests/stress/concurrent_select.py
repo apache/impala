@@ -200,7 +200,7 @@ def print_crash_info_if_exists(impala, start_time):
     LOG.error(
         "Aborting after %s failed attempts to check if impalads crashed", max_attempts)
     raise e
-  for message in crashed_impalads.itervalues():
+  for message in crashed_impalads.values():
     print(message, file=sys.stderr)
   return crashed_impalads
 
@@ -393,8 +393,9 @@ class StressRunner(object):
           # First randomly determine a query type, then choose a random query of that
           # type.
           if (
-              QueryType.SELECT in queries_by_type and
-              (len(queries_by_type.keys()) == 1 or random() < self._select_probability)
+              QueryType.SELECT in queries_by_type
+              and (len(list(queries_by_type.keys())) == 1
+                   or random() < self._select_probability)
           ):
             result = choice(queries_by_type[QueryType.SELECT])
           else:

@@ -198,7 +198,7 @@ class TestCancellation(ImpalaTestSuite):
                for _ in range(5)), 'Query failed to cancel'
     # Get profile and check for formatting errors
     profile = client.get_runtime_profile(handle, TRuntimeProfileFormat.THRIFT)
-    for (k, v) in profile.nodes[1].info_strings.iteritems():
+    for (k, v) in profile.nodes[1].info_strings.items():
       # Ensure that whitespace gets removed from values.
       assert v == v.rstrip(), \
         "Profile value contains surrounding whitespace: %s %s" % (k, v)

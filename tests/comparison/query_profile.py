@@ -296,9 +296,9 @@ class DefaultProfile(object):
       weights = self.weights(*weight_args)
     else:
       weights = weight_args[0]
-    total_weight = sum(weights.itervalues())
+    total_weight = sum(weights.values())
     numeric_choice = randint(1, total_weight)
-    for choice_, weight in weights.iteritems():
+    for choice_, weight in weights.items():
       if weight <= 0:
         continue
       if numeric_choice <= weight:
@@ -312,7 +312,7 @@ class DefaultProfile(object):
     else:
       weights = weights[0]
     return self._choose_from_weights(dict((choice_, weight) for choice_, weight
-                                     in weights.iteritems() if filter_fn(choice_)))
+                                     in weights.items() if filter_fn(choice_)))
 
   def _decide_from_probability(self, *keys):
     return random() < self.probability(*keys)
@@ -341,7 +341,7 @@ class DefaultProfile(object):
     return self._choose_from_bounds('MAX_NESTED_EXPR_COUNT')
 
   def allowed_analytic_designs(self):
-    return [design for design, is_enabled in self._flags['ANALYTIC_DESIGNS'].iteritems()
+    return [design for design, is_enabled in self._flags['ANALYTIC_DESIGNS'].items()
             if is_enabled]
 
   def use_partition_by_clause_in_analytic(self):
@@ -386,14 +386,14 @@ class DefaultProfile(object):
 
   def choose_subquery_predicate_category(self, func_name, allow_correlated):
     weights = self.weights('SUBQUERY_PREDICATE')
-    func_names = set(name for name, _, _ in weights.iterkeys())
+    func_names = set(name for name, _, _ in weights.keys())
     if func_name not in func_names:
       func_name = 'Scalar'
     allow_agg = self.weights('SELECT_ITEM_CATEGORY').get('AGG', 0)
     if allow_correlated and self.bounds('TABLE_COUNT')[1] == 0:
       allow_correlated = False
     weights = dict(((name, use_agg, use_correlated), weight)
-                   for (name, use_agg, use_correlated), weight in weights.iteritems()
+                   for (name, use_agg, use_correlated), weight in weights.items()
                    if name == func_name and
                    (allow_agg or use_agg == 'NON_AGG') and
                    weight)
@@ -563,7 +563,7 @@ class DefaultProfile(object):
       if not func_weights:
         raise Exception('All functions disallowed based on signature types')
       distinct_signature_lengths = set(signature_length_by_func.values())
-      for func, weight in func_weights.iteritems():
+      for func, weight in func_weights.items():
         signature_length = signature_length_by_func[func]
         func_weights[func] = reduce(
             lambda x, y: x * y,
@@ -591,7 +591,7 @@ class DefaultProfile(object):
         signature_weights[idx] = signature_weight
         signature_lengths[idx] = signature_length
     distinct_signature_lengths = set(signature_lengths.values())
-    for idx, weight in signature_weights.iteritems():
+    for idx, weight in signature_weights.items():
       signature_length = signature_lengths[idx]
       signature_weights[idx] = reduce(
           lambda x, y: x * y,

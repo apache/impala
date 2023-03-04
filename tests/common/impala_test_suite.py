@@ -408,7 +408,7 @@ class ImpalaTestSuite(BaseTestSuite):
     # Populate the default query option if it's empty.
     if not self.default_query_options:
       query_options = impalad_client.get_default_configuration()
-      for key, value in query_options.iteritems():
+      for key, value in query_options.items():
         self.default_query_options[key.upper()] = value
     # Restore all the changed query options.
     for query_option in query_options_changed:
@@ -512,12 +512,12 @@ class ImpalaTestSuite(BaseTestSuite):
       raise AssertionError("Query contains $DATABASE but no use_db specified")
 
     if extra:
-      for k, v in extra.iteritems():
+      for k, v in extra.items():
         if k in repl:
           raise RuntimeError("Key {0} is reserved".format(k))
         repl[k] = v
 
-    for k, v in repl.iteritems():
+    for k, v in repl.items():
       s = s.replace(k, v)
     return s
 

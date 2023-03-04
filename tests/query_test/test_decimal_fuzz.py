@@ -46,10 +46,10 @@ class TestDecimalFuzz(ImpalaTestSuite):
     cls.iterations = 10000
 
   def weighted_choice(self, options):
-    total_weight = sum(options.itervalues())
+    total_weight = sum(options.values())
     numeric_choice = random.uniform(0, total_weight)
     last_choice = None
-    for choice, weight in options.iteritems():
+    for choice, weight in options.items():
       if numeric_choice <= weight:
         return choice
       numeric_choice -= weight

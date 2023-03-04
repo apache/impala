@@ -336,7 +336,7 @@ def build_table_template(file_format, columns, partition_columns, row_format, tb
     external = ""
 
   all_tblproperties = []
-  for key, value in tblproperties.iteritems():
+  for key, value in tblproperties.items():
     all_tblproperties.append("'{0}' = '{1}'".format(key, value))
 
   # If there are no properties to set avoid the TBLPROPERTIES clause altogether.

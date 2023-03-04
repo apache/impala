@@ -282,7 +282,7 @@ class ImpalaCluster(object):
       args = container_info["Args"]
       executable = os.path.basename(args[0])
       port_map = {}
-      for k, v in container_info["NetworkSettings"]["Ports"].iteritems():
+      for k, v in container_info["NetworkSettings"]["Ports"].items():
         # Key looks like "25000/tcp"..
         port = int(k.split("/")[0])
         # Value looks like { "HostPort": "25002", "HostIp": "" }.
@@ -626,7 +626,7 @@ def run_daemon(daemon_binary, args, build_type="latest", env_vars={}, output_fil
   # achieve the same thing but it doesn't work on some platforms for some reasons.
   sys_cmd = ("{set_cmds} {cmd} {redirect} &".format(
       set_cmds=''.join(["export {0}={1};".format(k, pipes.quote(v))
-                         for k, v in env_vars.iteritems()]),
+                         for k, v in env_vars.items()]),
       cmd=' '.join([pipes.quote(tok) for tok in cmd]),
       redirect=redirect))
   os.system(sys_cmd)
