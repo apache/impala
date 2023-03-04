@@ -75,10 +75,10 @@ while time.time() - now < TIMEOUT_SECONDS:
       print("HiveServer2 service is up at %s." % options.hs2_hostport)
       exit(0)
   except Exception as e:
-    if "SASL" in e.message:  # Bail out on SASL failures
+    if "SASL" in str(e):  # Bail out on SASL failures
       print("SASL failure when attempting connection:")
       raise
-    if "GSS" in e.message:   # Other GSSAPI failures
+    if "GSS" in str(e):   # Other GSSAPI failures
       print("GSS failure when attempting connection:")
       raise
     print("Waiting for HiveServer2 at %s..." % options.hs2_hostport)

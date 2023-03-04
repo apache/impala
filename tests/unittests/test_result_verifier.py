@@ -50,13 +50,13 @@ class TestResultVerifier(ImpalaTestSuite):
       res.rows[0]['does_not_exist']
       assert False, 'Expected error due to column alias not existing'
     except IndexError as e:
-      assert "No column with label: does_not_exist" in e.message
+      assert "No column with label: does_not_exist" in str(e)
 
     try:
       res.rows[0][2]
       assert False, 'Expected error due to column position not existing'
     except IndexError as e:
-      assert 'list index out of range' in e.message
+      assert 'list index out of range' in str(e)
 
   def test_compute_aggregation(self, vector):
     profile = '''

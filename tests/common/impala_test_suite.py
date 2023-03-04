@@ -18,7 +18,7 @@
 # The base class that should be used for almost all Impala tests
 
 from __future__ import absolute_import, division, print_function
-from builtins import range
+from builtins import range, round
 import glob
 import grp
 import json
@@ -1041,7 +1041,7 @@ class ImpalaTestSuite(BaseTestSuite):
         # is specified; explicitly make sure there's nothing to
         # read to avoid hanging, especially when running interactively
         # with py.test.
-        stdin=file("/dev/null"),
+        stdin=open("/dev/null"),
         env=env)
     (stdout, stderr) = call.communicate()
     call.wait()

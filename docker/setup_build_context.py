@@ -194,7 +194,7 @@ if args.utility_context:
 else:
   # Impala Coordinator dependencies.
   num_jars_on_classpath = 0
-  dep_classpath = file(os.path.join(IMPALA_HOME, "fe/target/build-classpath.txt")).read()
+  dep_classpath = open(os.path.join(IMPALA_HOME, "fe/target/build-classpath.txt")).read()
   for jar in dep_classpath.split(":"):
     num_jars_on_classpath += 1
     assert os.path.exists(jar), "missing jar from classpath: {0}".format(jar)
@@ -216,7 +216,7 @@ else:
   assert num_frontend_jars == 1
 
   # Impala Executor dependencies.
-  dep_classpath = file(os.path.join(IMPALA_HOME,
+  dep_classpath = open(os.path.join(IMPALA_HOME,
       "java/executor-deps/target/build-executor-deps-classpath.txt")).read()
   for jar in dep_classpath.split(":"):
     assert os.path.exists(jar), "missing jar from classpath: {0}".format(jar)

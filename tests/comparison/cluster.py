@@ -21,7 +21,7 @@
 # module depends on db_connection which use some query generator classes.
 
 from __future__ import absolute_import, division, print_function
-from builtins import range, zip
+from builtins import int, range, zip
 import hdfs
 import logging
 import os
@@ -37,7 +37,7 @@ from getpass import getuser
 from multiprocessing.pool import ThreadPool
 from random import choice
 from StringIO import StringIO
-from sys import maxint
+from sys import maxsize
 from tempfile import mkdtemp
 from threading import Lock
 from time import mktime, strptime
@@ -629,7 +629,7 @@ class Impala(Service):
       impalads = self.impalads
     promise = self._thread_pool.map_async(func, impalads)
     # Python doesn't handle ctrl-c well unless a timeout is provided.
-    results = promise.get(maxint)
+    results = promise.get(maxsize)
     if as_dict:
       results = dict(zip(impalads, results))
     return results
@@ -874,7 +874,7 @@ class MiniClusterImpalad(Impalad):
       return int(pid)
 
   def find_process_mem_mb_limit(self):
-    return long(self.get_metric("mem-tracker.process.limit")["value"]) // 1024 ** 2
+    return int(self.get_metric("mem-tracker.process.limit")["value"]) // 1024 ** 2
 
   def find_core_dump_dir(self):
     raise NotImplementedError()

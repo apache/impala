@@ -18,7 +18,7 @@
 # Tests admission control
 
 from __future__ import absolute_import, division, print_function
-from builtins import range
+from builtins import int, range, round
 import itertools
 import logging
 import os
@@ -504,7 +504,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       self.execute_query_expect_success(self.client, query, exec_options)
 
       # A bit too much memory to run on coordinator.
-      exec_options['mem_limit'] = long(self.PROC_MEM_TEST_LIMIT * 1.1)
+      exec_options['mem_limit'] = int(self.PROC_MEM_TEST_LIMIT * 1.1)
       ex = self.execute_query_expect_failure(self.client, query, exec_options)
       assert ("Rejected query from pool default-pool: request memory needed "
               "1.10 GB is greater than memory available for admission 1.00 GB" in
@@ -2218,7 +2218,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     # should be fine. This exercises the code that does the per-pool memory
     # accounting (see MemTracker::GetPoolMemReserved()) without actually being throttled.
     self.run_admission_test(vector, {'request_pool': self.pool_name,
-      'mem_limit': sys.maxint})
+      'mem_limit': sys.maxsize})
 
   @pytest.mark.execute_serially
   @SkipIfOS.redhat6

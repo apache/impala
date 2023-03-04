@@ -16,7 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-from builtins import range
+from builtins import range, int
 from copy import copy
 import itertools
 import logging
@@ -175,7 +175,7 @@ class TestScannersFuzzing(ImpalaTestSuite):
     rng = random.Random()
     random_seed = os.environ.get("SCANNER_FUZZ_SEED") or time.time()
     LOG.info("Using random seed %d", random_seed)
-    rng.seed(long(random_seed))
+    rng.seed(int(random_seed))
 
     tmp_table_dir = tempfile.mkdtemp(prefix="tmp-scanner-fuzz-%s" % fuzz_table,
         dir=os.path.join(os.environ['IMPALA_HOME'], "testdata"))

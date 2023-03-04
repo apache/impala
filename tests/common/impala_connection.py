@@ -21,6 +21,7 @@
 
 from __future__ import absolute_import, division, print_function
 import abc
+import codecs
 import logging
 import re
 
@@ -386,8 +387,8 @@ class ImpylaHS2Connection(ImpalaConnection):
     """Return the string representation of the query id."""
     guid_bytes = \
         operation_handle.get_handle()._last_operation.handle.operationId.guid
-    return "{0}:{1}".format(guid_bytes[7::-1].encode('hex_codec'),
-                            guid_bytes[16:7:-1].encode('hex_codec'))
+    return "{0}:{1}".format(codecs.encode(guid_bytes[7::-1], 'hex_codec'),
+                            codecs.encode(guid_bytes[16:7:-1], 'hex_codec'))
 
   def get_state(self, operation_handle):
     LOG.info("-- getting state for operation: {0}".format(operation_handle))

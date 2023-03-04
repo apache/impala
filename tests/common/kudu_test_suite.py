@@ -111,7 +111,7 @@ class KuduTestSuite(ImpalaTestSuite):
 
   @classmethod
   def random_table_name(cls):
-    return "".join(choice(string.lowercase) for _ in range(10))
+    return "".join(choice(string.ascii_lowercase) for _ in range(10))
 
   @classmethod
   def to_kudu_table_name(cls, db_name, tbl_name):

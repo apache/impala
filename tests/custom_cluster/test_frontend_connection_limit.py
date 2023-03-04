@@ -47,7 +47,7 @@ class TestFrontendConnectionLimit(CustomClusterTestSuite):
       client.execute(query)
     except Exception as e:
       client.close()
-      raise ImpalaBeeswaxException(e.message)
+      raise ImpalaBeeswaxException(str(e))
     client.close()
 
   @pytest.mark.execute_serially

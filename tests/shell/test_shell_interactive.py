@@ -626,7 +626,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       self._expect_with_cmd(child_proc, "select 'hi'", vector, ('hi'))
       child_proc.sendline('exit;')
       child_proc.expect(pexpect.EOF)
-      history_contents = file(new_hist.name).read()
+      history_contents = open(new_hist.name).read()
       assert "select 'hi'" in history_contents
 
   def test_rerun(self, vector, tmp_history_file):

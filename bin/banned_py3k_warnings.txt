@@ -10,3 +10,10 @@ deprecated-itertools-function
 dict-iter-method
 dict-keys-not-iterating
 dict-values-not-iterating
+file-builtin
+long-builtin
+invalid-str-codec
+round-builtin
+deprecated-string-function
+sys-max-int
+exception-message-attribute

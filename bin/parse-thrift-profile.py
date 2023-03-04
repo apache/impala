@@ -46,7 +46,7 @@ import sys
 if len(sys.argv) == 1 or sys.argv[1] == "-":
   input_data = sys.stdin
 elif len(sys.argv) == 2:
-  input_data = file(sys.argv[1])
+  input_data = open(sys.argv[1])
 else:
   print("Usage: %s [file]" % (sys.argv[0],), file=sys.stderr)
   sys.exit(1)

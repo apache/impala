@@ -22,7 +22,7 @@ import re
 from datetime import datetime
 from impala.dbapi import connect
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient, ImpalaBeeswaxResult
-from sys import maxint
+from sys import maxsize
 from tests.performance.query import HiveQueryResult, ImpalaQueryResult
 from tests.util.shell_util import exec_process
 from time import time
@@ -44,7 +44,7 @@ def get_hs2_hive_cursor(hiveserver, user=None, use_kerberos=False,
         user=user,
         database=database,
         auth_mechanism="GSSAPI" if use_kerberos else "PLAIN",
-        timeout=maxint)
+        timeout=maxsize)
 
     cursor = conn.cursor(configuration=execOptions)
     LOG.info("Connected to {0}:{1}".format(host, port))

@@ -17,6 +17,7 @@
 
 # Impala tests for DDL statements
 from __future__ import absolute_import, division, print_function
+from builtins import int
 import time
 
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -110,15 +111,15 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
 
       if expect_changed_ddl_time:
         # check that the new ddlTime is strictly greater than the old one.
-        assert long(afterDdlTime) > long(beforeDdlTime)
+        assert int(afterDdlTime) > int(beforeDdlTime)
       else:
-        assert long(afterDdlTime) == long(beforeDdlTime)
+        assert int(afterDdlTime) == int(beforeDdlTime)
 
       if expect_changed_stats_time:
         # check that the new statsTime is strictly greater than the old one.
-        assert long(afterStatsTime) > long(beforeStatsTime)
+        assert int(afterStatsTime) > int(beforeStatsTime)
       else:
-        assert long(afterStatsTime) == long(beforeStatsTime)
+        assert int(afterStatsTime) == int(beforeStatsTime)
 
     def _update_name(self, new_tbl_name):
       """"

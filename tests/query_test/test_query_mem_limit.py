@@ -46,9 +46,9 @@ class TestQueryMemLimit(ImpalaTestSuite):
   # dynamically, even if it is a rough approximation.
   # A mem_limit is expressed in bytes, with values <= 0 signifying no cap.
   # These values are either really small, unlimited, or have a really large cap.
-  MAXINT_BYTES = str(sys.maxint)
-  MAXINT_MB = str(sys.maxint // (1024 * 1024))
-  MAXINT_GB = str(sys.maxint // (1024 * 1024 * 1024))
+  MAXINT_BYTES = str(sys.maxsize)
+  MAXINT_MB = str(sys.maxsize // (1024 * 1024))
+  MAXINT_GB = str(sys.maxsize // (1024 * 1024 * 1024))
   # We expect the tests with MAXINT_* using valid units [bmg] to succeed.
   PASS_REGEX = re.compile("(%s|%s|%s)[bmg]?$" % (MAXINT_BYTES, MAXINT_MB, MAXINT_GB),
                           re.I)

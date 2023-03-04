@@ -88,7 +88,7 @@ class TestTestFileParser(BaseTestSuite):
                                      skip_unknown_sections=False)
       assert 0, 'Expected error due to invalid section'
     except RuntimeError as re:
-      assert re.message == "Unknown subsection: TYPES"
+      assert str(re) == "Unknown subsection: TYPES"
 
   def test_parse_query_name(self):
     results = parse_test_file_text(test_text, VALID_SECTIONS, False)

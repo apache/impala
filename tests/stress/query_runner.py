@@ -18,13 +18,14 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import round
 import logging
 from multiprocessing import Value
 import os
 import re
 from textwrap import dedent
 from time import sleep, time
-from sys import maxint
+from sys import maxsize
 
 from tests.stress.queries import QueryType
 from tests.stress.util import create_and_start_daemon_thread, increment
@@ -103,7 +104,7 @@ class QueryRunner(object):
     self.impalad_conn = self.impalad.impala.connect(impalad=self.impalad)
 
   def run_query(self, query, mem_limit_mb, run_set_up=False,
-                timeout_secs=maxint, cancel_mech=None, retain_profile=False):
+                timeout_secs=maxsize, cancel_mech=None, retain_profile=False):
     """Run a query and return an execution report. If 'run_set_up' is True, set up sql
     will be executed before the main query. This should be the case during the binary
     search phase of the stress test. 'cancel_mech' is optionally a CancelMechanism
@@ -472,7 +473,7 @@ def _add_row_to_hash(row, curr_hash):
     curr_hash += _hash_val(idx, val)
     # Modulo the result to keep it "small" otherwise the math ops can be slow
     # since python does infinite precision math.
-    curr_hash %= maxint
+    curr_hash %= maxsize
   return curr_hash
 
 

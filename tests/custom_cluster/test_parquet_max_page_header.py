@@ -91,9 +91,9 @@ class TestParquetMaxPageHeader(CustomClusterTestSuite):
     """Creates a file in HDFS containing two MAX_STRING_LENGTH lines."""
     file_name = os.path.join(dir, file)
     # Create two 10MB long strings.
-    random_text1 = "".join([random.choice(string.letters)
+    random_text1 = "".join([random.choice(string.ascii_letters)
         for i in range(self.MAX_STRING_LENGTH)])
-    random_text2 = "".join([random.choice(string.letters)
+    random_text2 = "".join([random.choice(string.ascii_letters)
         for i in range(self.MAX_STRING_LENGTH)])
     put = subprocess.Popen(["hdfs", "dfs", "-put", "-d", "-f", "-", file_name],
         stdin=subprocess.PIPE, bufsize=-1)

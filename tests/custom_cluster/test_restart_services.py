@@ -65,8 +65,8 @@ class TestRestart(CustomClusterTestSuite):
         cursor.execute("describe database functional")
         return
       except HiveServer2Error as e:
-        assert "AnalysisException: Database does not exist: functional" in e.message,\
-               "Unexpected exception: " + e.message
+        assert "AnalysisException: Database does not exist: functional" in str(e),\
+               "Unexpected exception: " + str(e)
         sleep(1)
     assert False, "Coordinator never received non-empty metadata from the restarted " \
            "statestore after {0} seconds".format(wait_time_s)

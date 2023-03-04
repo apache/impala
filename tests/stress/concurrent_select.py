@@ -71,7 +71,7 @@ from copy import copy
 from datetime import datetime
 from multiprocessing import Lock, Process, Queue, Value
 from random import choice, random, randrange, shuffle
-from sys import exit, maxint
+from sys import exit, maxsize
 from tempfile import gettempdir
 from textwrap import dedent
 from threading import current_thread
@@ -596,7 +596,7 @@ class StressRunner(object):
         else:
           # Let the query run as long as necessary - it is nearly impossible to pick a
           # good value that won't have false positives under load - see IMPALA-8222.
-          timeout = maxint
+          timeout = maxsize
         report = query_runner.run_query(query, mem_limit, timeout_secs=timeout,
             cancel_mech=cancel_mech)
         LOG.debug("Got execution report for query")
@@ -858,7 +858,7 @@ def populate_runtime_info_for_random_queries(impala, candidate_queries, converte
   return queries
 
 
-def populate_runtime_info(query, impala, converted_args, timeout_secs=maxint):
+def populate_runtime_info(query, impala, converted_args, timeout_secs=maxsize):
   """Runs the given query by itself repeatedly until the minimum memory is determined
   with and without spilling. Potentially all fields in the Query class (except
   'sql') will be populated by this method. 'required_mem_mb_without_spilling' and
@@ -997,7 +997,7 @@ def populate_runtime_info(query, impala, converted_args, timeout_secs=maxint):
 
   LOG.info("Finding minimum memory required to avoid spilling")
   lower_bound = max(limit_exceeded_mem, spill_mem)
-  upper_bound = min(non_spill_mem or maxint, impala.min_impalad_mem_mb)
+  upper_bound = min(non_spill_mem or maxsize, impala.min_impalad_mem_mb)
   while True:
     if old_required_mem_mb_without_spilling:
       mem_limit = old_required_mem_mb_without_spilling
@@ -1034,7 +1034,7 @@ def populate_runtime_info(query, impala, converted_args, timeout_secs=maxint):
   LOG.info("Finding absolute minimum memory required")
   lower_bound = limit_exceeded_mem
   upper_bound = min(
-      spill_mem or maxint, non_spill_mem or maxint, impala.min_impalad_mem_mb)
+      spill_mem or maxsize, non_spill_mem or maxsize, impala.min_impalad_mem_mb)
   while True:
     if old_required_mem_mb_with_spilling:
       mem_limit = old_required_mem_mb_with_spilling
