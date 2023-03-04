@@ -22,6 +22,7 @@
 
 from __future__ import absolute_import, division, print_function
 from builtins import int, range, zip
+from future.utils import with_metaclass
 import hdfs
 import logging
 import os
@@ -34,17 +35,20 @@ from collections import defaultdict
 from collections import OrderedDict
 from contextlib import contextmanager
 from getpass import getuser
+from io import BytesIO
 from multiprocessing.pool import ThreadPool
 from random import choice
-from StringIO import StringIO
 from sys import maxsize
 from tempfile import mkdtemp
 from threading import Lock
 from time import mktime, strptime
-from urlparse import urlparse
 from xml.etree.ElementTree import parse as parse_xml
 from zipfile import ZipFile
 
+try:
+  from urllib.parse import urlparse
+except ImportError:
+  from urlparse import urlparse
 
 from tests.comparison.db_connection import HiveConnection, ImpalaConnection
 from tests.common.environ import HIVE_MAJOR_VERSION
@@ -65,13 +69,11 @@ CM_CLEAR_PORT = 7180
 CM_TLS_PORT = 7183
 
 
-class Cluster(object):
+class Cluster(with_metaclass(ABCMeta, object)):
   """This is a base class for clusters. Cluster classes provide various methods for
      interacting with a cluster. Ideally the various cluster implementations provide
      the same set of methods so any cluster implementation can be chosen at runtime.
   """
-
-  __metaclass__ = ABCMeta
 
   def __init__(self):
     self._hadoop_configs = None
@@ -323,7 +325,7 @@ class CmCluster(Cluster):
 
   def _init_local_hadoop_conf_dir(self):
     self._local_hadoop_conf_dir = mkdtemp()
-    data = StringIO(self.cm.get("/clusters/%s/services/%s/clientConfig"
+    data = BytesIO(self.cm.get("/clusters/%s/services/%s/clientConfig"
       % (self.cm_cluster.name, self._find_service("HIVE").name)))
     zip_file = ZipFile(data)
     for name in zip_file.namelist():
@@ -655,9 +657,7 @@ class CmImpala(Impala):
       raise Exception("Failed to restart Impala: %s" % command.resultMessage)
 
 
-class Impalad(object):
-
-  __metaclass__ = ABCMeta
+class Impalad(with_metaclass(ABCMeta, object)):
 
   def __init__(self):
     self.impala = None

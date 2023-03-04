@@ -29,7 +29,10 @@ import threading
 import time
 import uuid
 
-from urllib2 import urlopen
+try:
+  from urllib.request import urlopen
+except ImportError:
+  from urllib2 import urlopen
 
 from ImpalaService import ImpalaHiveServer2Service
 from tests.common.environ import ImpalaTestClusterProperties

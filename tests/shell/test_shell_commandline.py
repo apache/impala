@@ -80,7 +80,7 @@ def empty_table(unique_database, request):
   Returns:
     fq_table_name (str): the fully qualified name of the table: : dbname.table_name
   """
-  table_name = request.node.function.func_name
+  table_name = request.node.function.__name__
   fq_table_name = '.'.join([unique_database, table_name])
   stmt = "CREATE TABLE %s (i integer, s string)" % fq_table_name
   request.instance.execute_query_expect_success(request.instance.client, stmt,

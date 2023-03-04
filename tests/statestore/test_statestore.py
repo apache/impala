@@ -25,8 +25,12 @@ import socket
 import threading
 import traceback
 import time
-import urllib2
 import uuid
+
+try:
+  from urllib.request import urlopen
+except ImportError:
+  from urllib2 import urlopen
 
 from Types.ttypes import TNetworkAddress
 from thrift.protocol import TBinaryProtocol
@@ -63,7 +67,7 @@ LOG = logging.getLogger('test_statestore')
 #    Test that topic deletions take effect correctly.
 
 def get_statestore_subscribers(host='localhost', port=25010):
-  response = urllib2.urlopen("http://{0}:{1}/subscribers?json".format(host, port))
+  response = urlopen("http://{0}:{1}/subscribers?json".format(host, port))
   page = response.read()
   return json.loads(page)
 

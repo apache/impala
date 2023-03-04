@@ -22,6 +22,7 @@
 from __future__ import absolute_import, division, print_function
 import abc
 import codecs
+from future.utils import with_metaclass
 import logging
 import re
 
@@ -77,8 +78,7 @@ class OperationHandle(object):
 
 
 # Represents an Impala connection.
-class ImpalaConnection(object):
-  __metaclass__ = abc.ABCMeta
+class ImpalaConnection(with_metaclass(abc.ABCMeta, object)):
 
   def __enter__(self):
     return self

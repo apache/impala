@@ -64,7 +64,7 @@ import re
 import signal
 import sys
 import threading
-from Queue import Empty   # Must be before Queue below
+from queue import Empty   # Must be before Queue below
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace, SUPPRESS
 from collections import defaultdict
 from copy import copy
@@ -196,10 +196,11 @@ def print_crash_info_if_exists(impala, start_time):
       LOG.info(
           "Timeout checking if impalads crashed: %s."
           % e + (" Will retry." if remaining_attempts else ""))
-  else:
-    LOG.error(
-        "Aborting after %s failed attempts to check if impalads crashed", max_attempts)
-    raise e
+      if not remaining_attempts:
+        LOG.error(
+            "Aborting after %s failed attempts to check if impalads crashed",
+            max_attempts)
+        raise e
   for message in crashed_impalads.values():
     print(message, file=sys.stderr)
   return crashed_impalads

@@ -19,7 +19,8 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-import httplib
+import http.client
+import http.server
 import logging
 import os
 import pexpect
@@ -27,6 +28,7 @@ import pytest
 import re
 import signal
 import socket
+import socketserver
 import sys
 import threading
 from time import sleep
@@ -47,8 +49,6 @@ from tests.common.test_dimensions import (
 from tests.shell.util import (assert_var_substitution, ImpalaShell, get_impalad_port,
   get_shell_cmd, get_open_sessions_metric, spawn_shell, get_unused_port,
   create_impala_shell_executable_dimension, get_impala_shell_executable)
-import SimpleHTTPServer
-import SocketServer
 
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 
@@ -79,32 +79,30 @@ def tmp_history_file(request):
   return tmp.name
 
 
-class RequestHandler503(SimpleHTTPServer.SimpleHTTPRequestHandler):
+class RequestHandler503(http.server.SimpleHTTPRequestHandler):
   """A custom http handler that checks for duplicate 'Host' headers from the most
   recent http request, and always returns a 503 http code."""
 
   def __init__(self, request, client_address, server):
-    SimpleHTTPServer.SimpleHTTPRequestHandler.__init__(self, request, client_address,
-                                                       server)
+    http.server.SimpleHTTPRequestHandler.__init__(self, request, client_address,
+                                                   server)
 
   def should_send_body_text(self):
     # in RequestHandler503 we do not send any body text
     return False
 
   def do_POST(self):
-    # The unfortunately named self.headers here is an instance of mimetools.Message that
-    # contains the request headers.
-    request_headers = self.headers.headers
-
-    # Ensure that only one 'Host' header is contained in the request before responding.
-    host_hdr_count = sum([header.startswith('Host:') for header in request_headers])
-    assert host_hdr_count == 1, "duplicate 'Host:' headers in %s" % request_headers
+    # Ensure that a 'Host' header is contained in the request before responding.
+    assert "Host" in self.headers
 
     # Respond with 503.
-    self.send_response(code=httplib.SERVICE_UNAVAILABLE, message="Service Unavailable")
+    self.send_response(code=http.client.SERVICE_UNAVAILABLE,
+                       message="Service Unavailable")
+    # The Python 3 version of SimpleHTTPRequestHandler requires this to be called
+    # explicitly
+    self.end_headers()
     if self.should_send_body_text():
-      # Optionally send ody text with 503 message.
-      self.end_headers()
+      # Optionally send body text with 503 message.
       self.wfile.write("EXTRA")
 
 
@@ -123,7 +121,7 @@ class TestHTTPServer503(object):
   def __init__(self, clazz):
     self.HOST = "localhost"
     self.PORT = get_unused_port()
-    self.httpd = SocketServer.TCPServer((self.HOST, self.PORT), clazz)
+    self.httpd = socketserver.TCPServer((self.HOST, self.PORT), clazz)
 
     self.http_server_thread = threading.Thread(target=self.httpd.serve_forever)
     self.http_server_thread.start()

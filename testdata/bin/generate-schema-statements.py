@@ -95,6 +95,7 @@
 # serially.
 #
 from __future__ import absolute_import, division, print_function
+from builtins import object
 import collections
 import csv
 import glob
@@ -592,7 +593,7 @@ class Statements(object):
     with open(filename, 'w') as f:
       f.write('\n\n'.join(output))
 
-  def __nonzero__(self):
+  def __bool__(self):
     return bool(self.create or self.load or self.load_base)
 
 def eval_section(section_str):

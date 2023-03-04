@@ -17,3 +17,10 @@ round-builtin
 deprecated-string-function
 sys-max-int
 exception-message-attribute
+bad-python3-import
+eq-without-hash
+metaclass-assignment
+next-method-called
+nonzero-method
+comprehension-escape
+exception-escape

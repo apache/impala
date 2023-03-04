@@ -54,6 +54,9 @@ class RoundFloat():
     """Compares this objects's value to a numeral after rounding it."""
     return round(self.value, self.num_digits) == round(numeral, self.num_digits)
 
+  def __hash__(self):
+    return hash(round(self.value, self.num_digits))
+
 
 class TimeStamp():
   """Class to construct timestamps with a default format specifier."""
@@ -68,6 +71,9 @@ class TimeStamp():
     """Compares this objects's value to another timetuple."""
     return self.timetuple == other_timetuple
 
+  def __hash__(self):
+    return hash(self.timetuple)
+
 
 class Date():
   """Class to compare dates specified as year-month-day to dates specified as days since
@@ -78,6 +84,9 @@ class Date():
 
   def __eq__(self, other_days_since_eopch):
     return self.days_since_epoch == other_days_since_eopch
+
+  def __hash__(self):
+    return hash(self.days_since_epoch)
 
 
 ColumnStats = namedtuple('ColumnStats', ['name', 'min', 'max', 'null_count'])

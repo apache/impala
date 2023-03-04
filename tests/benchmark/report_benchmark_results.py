@@ -238,12 +238,15 @@ def all_query_results(grouped):
 
 
 def get_commit_date(commit_sha):
-  import urllib2
+  try:
+    from urllib.request import Request, urlopen
+  except ImportError:
+    from urllib2 import Request, urlopen
 
   url = 'https://api.github.com/repos/apache/impala/commits/' + commit_sha
   try:
-    request = urllib2.Request(url)
-    response = urllib2.urlopen(request).read()
+    request = Request(url)
+    response = urlopen(request).read()
     data = json.loads(response.decode('utf8'))
     return data['commit']['committer']['date'][:10]
   except:
@@ -251,7 +254,7 @@ def get_commit_date(commit_sha):
 
 def get_impala_version(grouped):
   """Figure out Impala version by looking at query profile."""
-  first_result = all_query_results(grouped).next()
+  first_result = next(all_query_results(grouped))
   profile = first_result['result_list'][0]['runtime_profile']
   match = re.search('Impala Version:\s(.*)\s\(build\s(.*)\)', profile)
   version = match.group(1)
@@ -915,7 +918,7 @@ class ExecSummaryComparison(object):
     table.align = 'l'
     table.float_format = '.2'
     table_contains_at_least_one_row = False
-    for row in [row for row in self.rows if is_significant(row)]:
+    for row in [r for r in self.rows if is_significant(r)]:
       table_row = [row[OPERATOR],
           '{0:.2%}'.format(row[PERCENT_OF_QUERY]),
           '{0:.2%}'.format(row[RSTD]),

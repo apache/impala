@@ -28,7 +28,7 @@ import logging
 import _strptime  # noqa: F401
 import sys
 import time
-from Queue import Queue
+from queue import Queue
 from threading import current_thread, Event, Thread
 
 from tests.common.impala_cluster import ImpalaCluster
@@ -78,17 +78,17 @@ class ConcurrentWorkload(object):
           logging.exception("Caught error, stopping")
     logging.info("%s exiting" % current_thread().name)
 
-  def compute_query_rate(self, queue, stop_ev):
+  def compute_query_rate(self, queue_obj, stop_ev):
     """Computes the query throughput rate in queries per second averaged over the last 5
     seconds. This method only returns when 'stop_ev' is set by the caller."""
     AVG_WINDOW_S = 5
     times = []
     while not stop_ev.is_set():
       # Don't block to check for stop_ev
-      if queue.empty():
+      if queue_obj.empty():
         time.sleep(0.1)
         continue
-      queue.get()
+      queue_obj.get()
       now = time.time()
       times.append(now)
       # Keep only timestamps within the averaging window
@@ -118,7 +118,7 @@ class ConcurrentWorkload(object):
       self.stop()
     assert self.stop_ev.is_set(), "Stop event expected to be set but it isn't"
 
-  def _print_query_rate(self, queue, stop_ev):
+  def _print_query_rate(self, queue_obj, stop_ev):
     """Prints the query throughput rate until 'stop_ev' is set by the caller."""
     PERIOD_S = 1
 

@@ -20,7 +20,7 @@
 from __future__ import absolute_import, division, print_function
 from builtins import range
 import pytest
-import Queue
+import queue
 import random
 import re
 import threading
@@ -261,7 +261,7 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
     inconsistent_seen = [0]
     inconsistent_seen_lock = threading.Lock()
     # Tracks query failures for all other reasons.
-    failed_queries = Queue.Queue()
+    failed_queries = queue.Queue()
     try:
       client1 = self.cluster.impalads[0].service.create_beeswax_client()
       client2 = self.cluster.impalads[1].service.create_beeswax_client()
@@ -378,7 +378,7 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
       replans_seen_lock = threading.Lock()
 
       # Queue to propagate exceptions from failed queries, if any.
-      failed_queries = Queue.Queue()
+      failed_queries = queue.Queue()
 
       def stress_thread(client):
         while replans_seen[0] == 0:

@@ -16,7 +16,8 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-from builtins import range
+from builtins import object, range
+from future.utils import with_metaclass
 from abc import ABCMeta, abstractproperty
 from copy import deepcopy
 from logging import getLogger
@@ -47,12 +48,10 @@ class StatementExecutionMode(object):
   ) = range(5)
 
 
-class AbstractStatement(object):
+class AbstractStatement(with_metaclass(ABCMeta, object)):
   """
   Abstract query representation
   """
-
-  __metaclass__ = ABCMeta
 
   def __init__(self):
     # reference to statement's parent. For example the right side of a UNION clause
@@ -236,9 +235,9 @@ class SelectItemSubList(object):
   def __len__(self):
     return sum(1 for _ in self)
 
-  def __nonzero__(self):
+  def __bool__(self):
     try:
-      iter(self).next()
+      next(iter(self))
       return True
     except StopIteration:
       return False
@@ -260,7 +259,7 @@ class SelectItemSubList(object):
       items = list()
       while start < stop:
         try:
-          idx, item = self_iter.next()
+          idx, item = next(self_iter)
         except StopIteration:
           break
         if idx < start:
@@ -298,7 +297,7 @@ class SelectItemSubList(object):
       filtered_idx = 0
       while start < stop:
         try:
-          idx, item = self_iter.next()
+          idx, item = next(self_iter)
         except StopIteration:
           break
         if not self.filter(item):

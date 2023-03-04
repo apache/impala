@@ -27,7 +27,7 @@ from __future__ import absolute_import, division, print_function
 from base import range
 import base64
 import pickle
-import StringIO
+from io import BytesIO
 
 from tests.comparison.db_types import Decimal
 from tests.comparison.random_val_generator import RandomValGenerator
@@ -94,7 +94,7 @@ def estimate_bytes_per_row(table_data_generator, row_count):
   original_row_count = table_data_generator.row_count
   original_output_file = table_data_generator.output_file
   table_data_generator.row_count = row_count
-  table_data_generator.output_file = StringIO.StringIO()
+  table_data_generator.output_file = BytesIO()
   table_data_generator.populate_output_file()
   table_data_generator.output_file.flush()
   bytes_per_row = len(table_data_generator.output_file.getvalue()) / float(row_count)

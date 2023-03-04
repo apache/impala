@@ -23,6 +23,7 @@
 '''
 from __future__ import absolute_import, division, print_function
 from builtins import filter, map, range, zip
+from future.utils import with_metaclass
 import hashlib
 import impala.dbapi
 import re
@@ -572,9 +573,7 @@ class DbCursor(object):
     return ()
 
 
-class DbConnection(object):
-
-  __metaclass__ = ABCMeta
+class DbConnection(with_metaclass(ABCMeta, object)):
 
   LOCK = Lock()
 

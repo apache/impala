@@ -451,6 +451,9 @@ class ArrayColumn(CollectionColumn):
       return True
     return self.name == other.name and self.owner.identifier == other.owner.identifier
 
+  def __hash__(self):
+    return hash((self.name, self.owner.identifier))
+
   def __deepcopy__(self, memo):
     other = ArrayColumn(
         owner=self.owner,
@@ -479,6 +482,9 @@ class MapColumn(CollectionColumn):
     if self is other:
       return True
     return self.name == other.name and self.owner.identifier == other.owner.identifier
+
+  def __hash__(self):
+    return hash((self.name, self.owner.identifier))
 
   def __deepcopy__(self, memo):
     other = MapColumn(

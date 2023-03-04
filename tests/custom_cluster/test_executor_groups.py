@@ -44,10 +44,10 @@ class TestExecutorGroups(CustomClusterTestSuite):
 
   def setup_method(self, method):
     # Always start the base cluster with the coordinator in its own executor group.
-    existing_args = method.func_dict.get("impalad_args", "")
-    method.func_dict["impalad_args"] = "%s -executor_groups=coordinator" % existing_args
-    method.func_dict["cluster_size"] = 1
-    method.func_dict["num_exclusive_coordinators"] = 1
+    existing_args = method.__dict__.get("impalad_args", "")
+    method.__dict__["impalad_args"] = "%s -executor_groups=coordinator" % existing_args
+    method.__dict__["cluster_size"] = 1
+    method.__dict__["num_exclusive_coordinators"] = 1
     self.num_groups = 1
     self.num_impalads = 1
     super(TestExecutorGroups, self).setup_method(method)

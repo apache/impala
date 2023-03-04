@@ -230,7 +230,7 @@ def pytest_generate_tests(metafunc):
 
     if len(vectors) == 0:
       LOG.warning("No test vectors generated for test '%s'. Check constraints and "
-          "input vectors" % metafunc.function.func_name)
+          "input vectors" % metafunc.function.__name__)
 
     vector_names = list(map(str, vectors))
     # In the case this is a test result update or sanity run, select a single test vector

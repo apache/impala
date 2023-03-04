@@ -72,9 +72,9 @@ class SshClient(paramiko.SSHClient):
         raise
       except Exception as e:
         LOG.warn("Error connecting to %s" % host_name, exc_info=True)
-    else:
-      LOG.error("Failed to ssh to %s" % host_name)
-      raise e
+        if retry >= retries - 1:
+          LOG.error("Failed to ssh to %s" % host_name)
+          raise e
 
     self.get_transport().set_keepalive(10)
 

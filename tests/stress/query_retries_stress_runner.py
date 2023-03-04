@@ -34,7 +34,7 @@ import subprocess
 import sys
 import threading
 import traceback
-import Queue
+import queue
 
 from argparse import ArgumentParser
 from argparse import RawDescriptionHelpFormatter
@@ -113,7 +113,7 @@ def run_concurrent_workloads(concurrency, coordinator, database, queries):
 
   # The exception queue is used to pass errors from the workload threads back to the main
   # thread.
-  exception_queue = Queue.Queue()
+  exception_queue = queue.Queue()
 
   # The main method for the workload runner threads.
   def __run_workload(stream_id):

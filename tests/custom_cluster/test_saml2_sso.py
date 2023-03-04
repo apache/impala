@@ -22,17 +22,23 @@ import datetime
 import os
 import pytest
 import uuid
-import urllib2
-import urlparse
 import xml.etree.ElementTree as ET
 import zlib
+
+try:
+  from urllib.parse import parse_qs, urlparse
+  from urllib.request import HTTPErrorProcessor, build_opener, Request
+except ImportError:
+  from urllib2 import HTTPErrorProcessor, build_opener, Request
+  from urlparse import parse_qs, urlparse
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.test_vector import ImpalaTestVector
 from tests.common.test_dimensions import create_client_protocol_dimension
 from tests.shell.util import run_impala_shell_cmd
 
-class NoRedirection(urllib2.HTTPErrorProcessor):
+
+class NoRedirection(HTTPErrorProcessor):
   """Allows inspecting http redirection responses. """
   def http_response(self, request, response):
     return response
@@ -150,8 +156,8 @@ class TestClientSaml(CustomClusterTestSuite):
   def _request_resource(self):
     """ Initial POST request to hs2-http port, response should be redirected
         to IDP and contain the authnrequest. """
-    opener = urllib2.build_opener(NoRedirection)
-    req = urllib2.Request("http://localhost:%s" % TestClientSaml.HOST_PORT, " ")
+    opener = build_opener(NoRedirection)
+    req = Request("http://localhost:%s" % TestClientSaml.HOST_PORT, " ")
     req.add_header('X-Hive-Token-Response-Port', TestClientSaml.CLIENT_PORT)
     response = opener.open(req)
     relay_state, client_id, saml_req_xml = \
@@ -161,11 +167,11 @@ class TestClientSaml(CustomClusterTestSuite):
 
   def _parse_redirection_response(self, response):
     assert response.getcode() == 302
-    client_id = response.info().getheader("X-Hive-Client-Identifier")
+    client_id = response.info().get("X-Hive-Client-Identifier", None)
     assert client_id is not None
-    new_url = response.info().getheader("location")
+    new_url = response.info()["location"]
     assert new_url.startswith(TestClientSaml.IDP_URL)
-    query = urlparse.parse_qs(urlparse.urlparse(new_url).query.encode('ASCII'))
+    query = parse_qs(urlparse(new_url).query.encode('ASCII'))
     relay_state = query["RelayState"][0]
     assert relay_state is not None
     saml_req = query["SAMLRequest"][0]
@@ -181,15 +187,15 @@ class TestClientSaml(CustomClusterTestSuite):
   def _request_resource_with_bearer(self, client_id, bearer_token):
     """ Send POST request to hs2-http port again, this time with bearer tokan.
         The response should contain a security cookie if the validation succeeded """
-    req = urllib2.Request("http://localhost:%s" % TestClientSaml.HOST_PORT, " ")
+    req = Request("http://localhost:%s" % TestClientSaml.HOST_PORT, " ")
     req.add_header('X-Hive-Client-Identifier', client_id)
     req.add_header('Authorization', "Bearer " + bearer_token)
-    opener = urllib2.build_opener(NoRedirection)
+    opener = build_opener(NoRedirection)
     response = opener.open(req)
     # saml2_ee_test_mode=true leads to returning 401 unauthorized - otherwise the
     # call would hang if there is no Thrift message.
     assert response.getcode() == 401
-    cookies = response.info().getheader('Set-Cookie')
+    cookies = response.info()['Set-Cookie']
     assert cookies.startswith("impala.auth=")
 
   def _send_authn_response(self, request_id, relay_state,
@@ -201,8 +207,8 @@ class TestClientSaml(CustomClusterTestSuite):
     authn_resp = self._generate_authn_response(request_id, attributes_xml)
     encoded_authn_resp = base64.urlsafe_b64encode(authn_resp)
     body = "SAMLResponse=%s&RelayState=%s" % (encoded_authn_resp, relay_state)
-    opener = urllib2.build_opener(NoRedirection)
-    req = urllib2.Request(TestClientSaml.SP_CALLBACK_URL, body)
+    opener = build_opener(NoRedirection)
+    req = Request(TestClientSaml.SP_CALLBACK_URL, body)
     response = opener.open(req)
     bearer_token = self._parse_xhtml_form(response, expect_success)
     return bearer_token

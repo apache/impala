@@ -54,6 +54,9 @@ class Query(object):
             self.workload_name == other.workload_name and
             self.db == other.db)
 
+  def __hash__(self):
+    return hash((self.query_str, self.name, self.scale_factor, self.test_vector, self.db))
+
   def _build_query(self):
     """Populates db, query_str, table_format_str"""
     self.db = QueryTestSectionReader.get_db_name(self.test_vector, self.scale_factor)

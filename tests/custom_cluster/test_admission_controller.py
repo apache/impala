@@ -1538,11 +1538,11 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')
 
-    if 'start_args' not in method.func_dict:
-      method.func_dict['start_args'] = list()
-    method.func_dict["start_args"].append("--enable_admission_service")
-    if "impalad_args" in method.func_dict:
-      method.func_dict["admissiond_args"] = method.func_dict["impalad_args"]
+    if 'start_args' not in method.__dict__:
+      method.__dict__['start_args'] = list()
+    method.__dict__["start_args"].append("--enable_admission_service")
+    if "impalad_args" in method.__dict__:
+      method.__dict__["admissiond_args"] = method.__dict__["impalad_args"]
     super(TestAdmissionController, self).setup_method(method)
 
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
@@ -2284,9 +2284,9 @@ class TestAdmissionControllerStressWithACService(TestAdmissionControllerStress):
   def setup_method(self, method):
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')
-    if 'start_args' not in method.func_dict:
-      method.func_dict['start_args'] = list()
-    method.func_dict["start_args"].append("--enable_admission_service")
-    if "impalad_args" in method.func_dict:
-      method.func_dict["admissiond_args"] = method.func_dict["impalad_args"]
+    if 'start_args' not in method.__dict__:
+      method.__dict__['start_args'] = list()
+    method.__dict__["start_args"].append("--enable_admission_service")
+    if "impalad_args" in method.__dict__:
+      method.__dict__["admissiond_args"] = method.__dict__["impalad_args"]
     super(TestAdmissionControllerStress, self).setup_method(method)

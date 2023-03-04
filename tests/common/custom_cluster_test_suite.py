@@ -115,67 +115,67 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     method's func_dict"""
     def decorate(func):
       if impalad_args is not None:
-        func.func_dict[IMPALAD_ARGS] = impalad_args
-      func.func_dict[STATESTORED_ARGS] = statestored_args
+        func.__dict__[IMPALAD_ARGS] = impalad_args
+      func.__dict__[STATESTORED_ARGS] = statestored_args
       if catalogd_args is not None:
-        func.func_dict[CATALOGD_ARGS] = catalogd_args
+        func.__dict__[CATALOGD_ARGS] = catalogd_args
       if start_args is not None:
-        func.func_dict[START_ARGS] = start_args.split()
+        func.__dict__[START_ARGS] = start_args.split()
       if jvm_args is not None:
-        func.func_dict[JVM_ARGS] = jvm_args
+        func.__dict__[JVM_ARGS] = jvm_args
       if hive_conf_dir is not None:
-        func.func_dict[HIVE_CONF_DIR] = hive_conf_dir
+        func.__dict__[HIVE_CONF_DIR] = hive_conf_dir
       if kudu_args is not None:
-        func.func_dict[KUDU_ARGS] = kudu_args
+        func.__dict__[KUDU_ARGS] = kudu_args
       if default_query_options is not None:
-        func.func_dict[DEFAULT_QUERY_OPTIONS] = default_query_options
+        func.__dict__[DEFAULT_QUERY_OPTIONS] = default_query_options
       if impala_log_dir is not None:
-        func.func_dict[IMPALA_LOG_DIR] = impala_log_dir
+        func.__dict__[IMPALA_LOG_DIR] = impala_log_dir
       if cluster_size is not None:
-        func.func_dict[CLUSTER_SIZE] = cluster_size
+        func.__dict__[CLUSTER_SIZE] = cluster_size
       if num_exclusive_coordinators is not None:
-        func.func_dict[NUM_EXCLUSIVE_COORDINATORS] = num_exclusive_coordinators
+        func.__dict__[NUM_EXCLUSIVE_COORDINATORS] = num_exclusive_coordinators
       if statestored_timeout_s is not None:
-        func.func_dict[STATESTORED_TIMEOUT_S] = statestored_timeout_s
+        func.__dict__[STATESTORED_TIMEOUT_S] = statestored_timeout_s
       if impalad_timeout_s is not None:
-        func.func_dict[IMPALAD_TIMEOUT_S] = impalad_timeout_s
+        func.__dict__[IMPALAD_TIMEOUT_S] = impalad_timeout_s
       if expect_cores is not None:
-        func.func_dict[EXPECT_CORES] = expect_cores
+        func.__dict__[EXPECT_CORES] = expect_cores
       if reset_ranger is not False:
-        func.func_dict[RESET_RANGER] = True
+        func.__dict__[RESET_RANGER] = True
       return func
     return decorate
 
   def setup_method(self, method):
     cluster_args = list()
     for arg in [IMPALAD_ARGS, STATESTORED_ARGS, CATALOGD_ARGS, ADMISSIOND_ARGS, JVM_ARGS]:
-      if arg in method.func_dict:
-        cluster_args.append("--%s=%s " % (arg, method.func_dict[arg]))
-    if START_ARGS in method.func_dict:
-      cluster_args.extend(method.func_dict[START_ARGS])
+      if arg in method.__dict__:
+        cluster_args.append("--%s=%s " % (arg, method.__dict__[arg]))
+    if START_ARGS in method.__dict__:
+      cluster_args.extend(method.__dict__[START_ARGS])
 
-    if HIVE_CONF_DIR in method.func_dict:
-      self._start_hive_service(method.func_dict[HIVE_CONF_DIR])
+    if HIVE_CONF_DIR in method.__dict__:
+      self._start_hive_service(method.__dict__[HIVE_CONF_DIR])
       # Should let Impala adopt the same hive-site.xml. The only way is to add it in the
       # beginning of the CLASSPATH. Because there's already a hive-site.xml in the
       # default CLASSPATH (see bin/set-classpath.sh).
       cluster_args.append(
-        '--env_vars=CUSTOM_CLASSPATH=%s ' % method.func_dict[HIVE_CONF_DIR])
+        '--env_vars=CUSTOM_CLASSPATH=%s ' % method.__dict__[HIVE_CONF_DIR])
 
-    if KUDU_ARGS in method.func_dict:
-      self._restart_kudu_service(method.func_dict[KUDU_ARGS])
+    if KUDU_ARGS in method.__dict__:
+      self._restart_kudu_service(method.__dict__[KUDU_ARGS])
 
-    if RESET_RANGER in method.func_dict:
+    if RESET_RANGER in method.__dict__:
       self._reset_ranger_policy_repository()
 
     cluster_size = DEFAULT_CLUSTER_SIZE
-    if CLUSTER_SIZE in method.func_dict:
-      cluster_size = method.func_dict[CLUSTER_SIZE]
+    if CLUSTER_SIZE in method.__dict__:
+      cluster_size = method.__dict__[CLUSTER_SIZE]
 
     use_exclusive_coordinators = False
     num_coordinators = cluster_size
-    if NUM_EXCLUSIVE_COORDINATORS in method.func_dict:
-      num_coordinators = method.func_dict[NUM_EXCLUSIVE_COORDINATORS]
+    if NUM_EXCLUSIVE_COORDINATORS in method.__dict__:
+      num_coordinators = method.__dict__[NUM_EXCLUSIVE_COORDINATORS]
       use_exclusive_coordinators = True
 
     # Start a clean new cluster before each test
@@ -183,17 +183,17 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       "cluster_size": cluster_size,
       "num_coordinators": num_coordinators,
       "expected_num_impalads": cluster_size,
-      "default_query_options": method.func_dict.get(DEFAULT_QUERY_OPTIONS),
+      "default_query_options": method.__dict__.get(DEFAULT_QUERY_OPTIONS),
       "use_exclusive_coordinators": use_exclusive_coordinators
     }
-    if IMPALA_LOG_DIR in method.func_dict:
-      kwargs["impala_log_dir"] = method.func_dict[IMPALA_LOG_DIR]
-    if STATESTORED_TIMEOUT_S in method.func_dict:
-      kwargs["statestored_timeout_s"] = method.func_dict[STATESTORED_TIMEOUT_S]
-    if IMPALAD_TIMEOUT_S in method.func_dict:
-      kwargs["impalad_timeout_s"] = method.func_dict[IMPALAD_TIMEOUT_S]
+    if IMPALA_LOG_DIR in method.__dict__:
+      kwargs["impala_log_dir"] = method.__dict__[IMPALA_LOG_DIR]
+    if STATESTORED_TIMEOUT_S in method.__dict__:
+      kwargs["statestored_timeout_s"] = method.__dict__[STATESTORED_TIMEOUT_S]
+    if IMPALAD_TIMEOUT_S in method.__dict__:
+      kwargs["impalad_timeout_s"] = method.__dict__[IMPALAD_TIMEOUT_S]
 
-    if method.func_dict.get(EXPECT_CORES, False):
+    if method.__dict__.get(EXPECT_CORES, False):
       # Make a note of any core files that already exist
       possible_cores = find_all_files('*core*')
       self.pre_test_cores = set([f for f in possible_cores if is_core_dump(f)])
@@ -209,10 +209,10 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       super(CustomClusterTestSuite, self).setup_class()
 
   def teardown_method(self, method):
-    if HIVE_CONF_DIR in method.func_dict:
+    if HIVE_CONF_DIR in method.__dict__:
       self._start_hive_service(None)  # Restart Hive Service using default configs
 
-    if method.func_dict.get(EXPECT_CORES, False):
+    if method.__dict__.get(EXPECT_CORES, False):
       # The core dumps expected to be generated by this test should be cleaned up
       possible_cores = find_all_files('*core*')
       post_test_cores = set([f for f in possible_cores if is_core_dump(f)])

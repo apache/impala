@@ -52,7 +52,7 @@ def get_columns(num_cols):
   iter = itertools.cycle(templates)
   # Produces [bool_col1, tinyint_col1, ..., bool_col2, tinyint_col2, ...]
   # The final list has 'num_cols' elements.
-  return [iter.next() % (i // len(templates) + 1) for i in range(num_cols)]
+  return [next(iter) % (i // len(templates) + 1) for i in range(num_cols)]
 
 # Data generators for different types. Each generator yields an infinite number of
 # value strings suitable for writing to a CSV file.
@@ -83,7 +83,7 @@ def quote(iter_fn):
   def new_iter_fn():
     iter = iter_fn()
     while True:
-      yield "'%s'" % iter.next()
+      yield "'%s'" % next(iter)
   return new_iter_fn
 
 def get_data(num_cols, num_rows, delimiter=',', quote_strings=False):
@@ -101,12 +101,12 @@ def get_data(num_cols, num_rows, delimiter=',', quote_strings=False):
     ]
   # Create a generator instance for each column, cycling through the different types
   iter = itertools.cycle(generators)
-  column_generators = [iter.next()() for i in range(num_cols)]
+  column_generators = [next(iter)() for i in range(num_cols)]
 
   # Populate each row using column_generators
   rows = []
   for i in range(num_rows):
-    vals = [gen.next() for gen in column_generators]
+    vals = [next(gen) for gen in column_generators]
     rows.append(delimiter.join(vals))
   return rows
 

@@ -65,6 +65,11 @@ class QueryTestResult(object):
       return False
     return self.column_types == other.column_types and self.rows == other.rows
 
+  def __hash__(self):
+    # This is not intended to be hashed. If that is happening, then something is wrong.
+    # The regexes in ResultRow make it difficult to implement this correctly.
+    assert False
+
   def __ne__(self, other):
     return not self.__eq__(other)
 
@@ -158,6 +163,11 @@ class ResultRow(object):
       return other.regex.match(self.row_string)
     return self.columns == other.columns
 
+  def __hash__(self):
+    # This is not intended to be hashed. If that is happening, then something is wrong.
+    # The regexes make it difficult to implement this correctly.
+    assert False
+
   def __ne__(self, other):
     return not self.__eq__(other)
 
@@ -224,6 +234,11 @@ class ResultColumn(object):
       return str(self.value).lower() == str(other.value).lower()
     else:
       return self.value == other.value
+
+  def __hash__(self):
+    # This is not intended to be hashed. If that is happening, then something is wrong.
+    # The regexes make it difficult to implement this correctly.
+    assert False
 
   def __ne__(self, other):
     return not self.__eq__(other)

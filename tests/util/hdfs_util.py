@@ -19,7 +19,7 @@
 
 from __future__ import absolute_import, division, print_function
 import getpass
-import httplib
+import http.client
 import os.path
 import re
 import requests
@@ -130,7 +130,7 @@ class PyWebHdfsClientWithChmod(PyWebHdfsClient):
     '775'"""
     uri = self._create_uri(path, "SETPERMISSION", permission=permission)
     response = requests.put(uri, allow_redirects=True)
-    if not response.status_code == httplib.OK:
+    if not response.status_code == http.client.OK:
       _raise_pywebhdfs_exception(response.status_code, response.text)
     return True
 
@@ -138,21 +138,21 @@ class PyWebHdfsClientWithChmod(PyWebHdfsClient):
     """Sets the owner and the group of 'path to 'user' / 'group'"""
     uri = self._create_uri(path, "SETOWNER", owner=user, group=group)
     response = requests.put(uri, allow_redirects=True)
-    if not response.status_code == httplib.OK:
+    if not response.status_code == http.client.OK:
       _raise_pywebhdfs_exception(response.status_code, response.text)
     return True
 
   def setacl(self, path, acls):
     uri = self._create_uri(path, "SETACL", aclspec=acls)
     response = requests.put(uri, allow_redirects=True)
-    if not response.status_code == httplib.OK:
+    if not response.status_code == http.client.OK:
       _raise_pywebhdfs_exception(response.status_code, response.text)
     return True
 
   def getacl(self, path):
     uri = self._create_uri(path, "GETACLSTATUS")
     response = requests.get(uri, allow_redirects=True)
-    if not response.status_code == httplib.OK:
+    if not response.status_code == http.client.OK:
       _raise_pywebhdfs_exception(response.status_code, response.text)
     return response.json()
 

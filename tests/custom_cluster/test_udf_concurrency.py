@@ -128,7 +128,7 @@ class TestUdfConcurrency(CustomClusterTestSuite):
     # join all threads.
     for t in runner_threads: t.join()
 
-    for e in errors: print(e)
+    for err in errors: print(err)
 
     # Checks that no impalad has crashed.
     assert cluster.num_responsive_coordinators() == exp_num_coordinators
@@ -210,5 +210,5 @@ class TestUdfConcurrency(CustomClusterTestSuite):
     for t in runner_threads: t.join()
 
     # Check for any errors.
-    for e in errors: print(e)
+    for err in errors: print(err)
     assert len(errors) == 0
