@@ -18,6 +18,7 @@
 # This module is used for common utilities related to parsing test files
 
 from __future__ import absolute_import, division, print_function
+from builtins import map
 import codecs
 import collections
 import logging
@@ -125,10 +126,10 @@ def parse_table_constraints(constraints_file):
             schema_only[f].append(table_name.lower())
         elif constraint_type == 'restrict_to':
           schema_include[table_name.lower()] +=\
-              map(parse_table_format_constraint, table_formats.split(','))
+              list(map(parse_table_format_constraint, table_formats.split(',')))
         elif constraint_type == 'exclude':
           schema_exclude[table_name.lower()] +=\
-              map(parse_table_format_constraint, table_formats.split(','))
+              list(map(parse_table_format_constraint, table_formats.split(',')))
         else:
           raise ValueError('Unknown constraint type: %s' % constraint_type)
   return schema_include, schema_exclude, schema_only
@@ -377,7 +378,10 @@ def load_tpc_queries(workload, include_stress_queries=False, query_name_filters=
     file_name_pattern = re.compile(r"(.*)")
     query_name_pattern = re.compile(r"(.*)")
 
-  query_name_filters = map(str.strip, query_name_filters) if query_name_filters else []
+  if query_name_filters:
+    query_name_filters = list(map(str.strip, query_name_filters))
+  else:
+    query_name_filters = []
   filter_regex = re.compile(r'|'.join(['^%s$' % n for n in query_name_filters]), re.I)
 
   for query_file in os.listdir(query_dir):

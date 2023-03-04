@@ -20,6 +20,7 @@
 # vector. It treats a workload an the unit of parallelism.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import logging
 
 from collections import defaultdict
@@ -78,7 +79,7 @@ class Scheduler(object):
 
     Each workload thread is analogus to a client name, and is identified by a unique ID,
     the workload that's being run and the table formats it's being run on."""
-    for thread_num in xrange(self.num_clients):
+    for thread_num in range(self.num_clients):
       thread = Thread(target=self._run_queries, args=[thread_num],
           name=self._thread_name % thread_num)
       thread.daemon = True
@@ -98,7 +99,7 @@ class Scheduler(object):
 
     # each thread gets its own copy of query_executors
     query_executors = deepcopy(sorted(self.query_executors, key=lambda x: x.query.name))
-    for j in xrange(self.iterations):
+    for j in range(self.iterations):
       # Randomize the order of execution for each iteration if specified.
       if self.shuffle: shuffle(query_executors)
       results = defaultdict(list)
@@ -106,7 +107,7 @@ class Scheduler(object):
       for query_executor in query_executors:
         query_name = query_executor.query.name
         LOG.info("Running Query: %s" % query_name)
-        for i in xrange(self.query_iterations):
+        for i in range(self.query_iterations):
           if self._exit.isSet():
             LOG.error("Another thread failed, exiting.")
             exit(1)

@@ -18,6 +18,7 @@
 # Tests for query expiration.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import pytest
 import re
 import threading
@@ -246,14 +247,14 @@ class TestQueryExpiration(CustomClusterTestSuite):
     num_expired = impalad.service.get_metric_value('impala-server.num-queries-expired')
     non_expiring_threads = \
         [NonExpiringQueryThread(impalad.service.create_beeswax_client())
-         for _ in xrange(5)]
+         for _ in range(5)]
     expiring_threads = [ExpiringQueryThread(impalad.service.create_beeswax_client())
-                        for _ in xrange(5)]
+                        for _ in range(5)]
     time_limit_threads = [TimeLimitThread(impalad.service.create_beeswax_client())
-                        for _ in xrange(5)]
+                        for _ in range(5)]
     non_expiring_time_limit_threads = [
         NonExpiringTimeLimitThread(impalad.service.create_beeswax_client())
-        for _ in xrange(5)]
+        for _ in range(5)]
     all_threads = non_expiring_threads + expiring_threads + time_limit_threads +\
         non_expiring_time_limit_threads
     for t in all_threads:

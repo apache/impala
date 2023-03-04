@@ -21,6 +21,7 @@
 # ImpalaD instances. Each ImpalaD runs on a different port allowing this to be run
 # on a single machine.
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import getpass
 import itertools
 import json
@@ -548,7 +549,7 @@ class MiniClusterOperations(object):
         cluster_size, num_coordinators, use_exclusive_coordinators, remap_ports=True,
         start_idx=start_idx)
     assert cluster_size == len(impalad_arg_lists)
-    for i in xrange(start_idx, start_idx + cluster_size):
+    for i in range(start_idx, start_idx + cluster_size):
       service_name = impalad_service_name(i)
       LOG.info("Starting Impala Daemon logging to {log_dir}/{service_name}.INFO".format(
           log_dir=options.log_dir, service_name=service_name))
@@ -624,7 +625,7 @@ class DockerMiniClusterOperations(object):
         use_exclusive_coordinators, remap_ports=False, admissiond_host="admissiond")
     assert cluster_size == len(impalad_arg_lists)
     mem_limit = compute_impalad_mem_limit(cluster_size)
-    for i in xrange(cluster_size):
+    for i in range(cluster_size):
       chosen_ports = choose_impalad_ports(i)
       port_map = {DEFAULT_BEESWAX_PORT: chosen_ports['beeswax_port'],
                   DEFAULT_HS2_PORT: chosen_ports['hs2_port'],

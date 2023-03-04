@@ -18,6 +18,7 @@
 # Tests for IMPALA-2273
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import os
 import pytest
 import random
@@ -91,9 +92,9 @@ class TestParquetMaxPageHeader(CustomClusterTestSuite):
     file_name = os.path.join(dir, file)
     # Create two 10MB long strings.
     random_text1 = "".join([random.choice(string.letters)
-        for i in xrange(self.MAX_STRING_LENGTH)])
+        for i in range(self.MAX_STRING_LENGTH)])
     random_text2 = "".join([random.choice(string.letters)
-        for i in xrange(self.MAX_STRING_LENGTH)])
+        for i in range(self.MAX_STRING_LENGTH)])
     put = subprocess.Popen(["hdfs", "dfs", "-put", "-d", "-f", "-", file_name],
         stdin=subprocess.PIPE, bufsize=-1)
     put.stdin.write(random_text1 + "\n")

@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import map, range
 import pytest
 import random
 import time
@@ -62,7 +63,7 @@ class TestAcidInsertsBasic(TestAcidStress):
     run_max = -1
     i_list = []
     for line in result.data:
-      [run, i] = map(int, (line.split('\t')))
+      [run, i] = list(map(int, (line.split('\t'))))
       run_max = max(run_max, run)
       i_list.append(i)
     assert expected_result["run"] <= run_max  # shouldn't see data overwritten in the past
@@ -72,17 +73,18 @@ class TestAcidInsertsBasic(TestAcidStress):
       expected_result["i"] = 0
       return
     assert i_list[-1] >= expected_result["i"]
-    assert i_list == range(i_list[-1] + 1)  # 'i' should have all values from 0 to max_i
+    # 'i' should have all values from 0 to max_i
+    assert i_list == list(range(i_list[-1] + 1))
     expected_result["i"] = i_list[-1]
 
   def _hive_role_write_inserts(self, tbl_name, partitioned):
     """INSERT INTO/OVERWRITE a table several times from Hive."""
     part_expr = "partition (p=1)" if partitioned else ""
-    for run in xrange(0, NUM_OVERWRITES):
+    for run in range(0, NUM_OVERWRITES):
       OVERWRITE_SQL = """insert overwrite table %s %s values (%i, %i)
           """ % (tbl_name, part_expr, run, 0)
       self.run_stmt_in_hive(OVERWRITE_SQL)
-      for i in xrange(1, NUM_INSERTS_PER_OVERWRITE + 1):
+      for i in range(1, NUM_INSERTS_PER_OVERWRITE + 1):
         INSERT_SQL = """insert into table %s %s values (%i, %i)
             """ % (tbl_name, part_expr, run, i)
         self.run_stmt_in_hive(INSERT_SQL)
@@ -92,11 +94,11 @@ class TestAcidInsertsBasic(TestAcidStress):
     try:
       impalad_client = ImpalaTestSuite.create_impala_client()
       part_expr = "partition (p=1)" if partitioned else ""
-      for run in xrange(0, NUM_OVERWRITES + 1):
+      for run in range(0, NUM_OVERWRITES + 1):
         OVERWRITE_SQL = """insert overwrite table %s %s values (%i, %i)
             """ % (tbl_name, part_expr, run, 0)
         impalad_client.execute(OVERWRITE_SQL)
-        for i in xrange(1, NUM_INSERTS_PER_OVERWRITE + 1):
+        for i in range(1, NUM_INSERTS_PER_OVERWRITE + 1):
           INSERT_SQL = """insert into table %s %s values (%i, %i)
               """ % (tbl_name, part_expr, run, i)
           impalad_client.execute(INSERT_SQL)
@@ -261,11 +263,12 @@ class TestConcurrentAcidInserts(TestAcidStress):
     def verify_result_set(result):
       wid_to_run = dict()
       for line in result.data:
-        [wid, i] = map(int, (line.split('\t')))
+        [wid, i] = list(map(int, (line.split('\t'))))
         wid_to_run.setdefault(wid, []).append(i)
       for wid, run in wid_to_run.items():
         sorted_run = sorted(run)
-        assert sorted_run == range(sorted_run[0], sorted_run[-1] + 1), "wid: %d" % wid
+        assert sorted_run == list(range(sorted_run[0], sorted_run[-1] + 1)), \
+          "wid: %d" % wid
 
     target_impalad = cid % ImpalaTestSuite.get_impalad_cluster_size()
     impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
@@ -299,10 +302,10 @@ class TestConcurrentAcidInserts(TestAcidStress):
     num_checkers = 3
 
     writers = [Task(self._impala_role_concurrent_writer, tbl_name, i, counter)
-               for i in xrange(0, num_writers)]
+               for i in range(0, num_writers)]
     checkers = [Task(self._impala_role_concurrent_checker, tbl_name, i, counter,
                      num_writers)
-                for i in xrange(0, num_checkers)]
+                for i in range(0, num_checkers)]
     run_tasks(writers + checkers)
 
 
@@ -369,9 +372,9 @@ class TestFailingAcidInserts(TestAcidStress):
     num_checkers = 3
 
     writers = [Task(self._impala_role_insert, tbl_name, partitioned, i, counter)
-               for i in xrange(0, num_writers)]
+               for i in range(0, num_writers)]
     checkers = [Task(self._impala_role_checker, tbl_name, i, counter, num_writers)
-                for i in xrange(0, num_checkers)]
+                for i in range(0, num_checkers)]
     run_tasks(writers + checkers)
 
   @SkipIfFS.stress_insert_timeouts

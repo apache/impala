@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import pytest
 import threading
 
@@ -140,9 +141,9 @@ class TestConcurrentDdls(CustomClusterTestSuite):
     # Run DDLs with invalidate metadata in parallel
     NUM_ITERS = 16
     worker = [None] * (NUM_ITERS + 1)
-    for i in xrange(1, NUM_ITERS + 1):
+    for i in range(1, NUM_ITERS + 1):
       worker[i] = pool.apply_async(run_ddls, (i,))
-    for i in xrange(1, NUM_ITERS + 1):
+    for i in range(1, NUM_ITERS + 1):
       try:
         worker[i].get(timeout=100)
       except TimeoutError:
@@ -185,7 +186,7 @@ class TestConcurrentDdls(CustomClusterTestSuite):
 
     NUM_ITERS = 20
     pool = ThreadPool(processes=2)
-    for i in xrange(NUM_ITERS):
+    for i in range(NUM_ITERS):
       # Run two INVALIDATE METADATA commands in parallel
       r1 = pool.apply_async(run_invalidate_metadata)
       r2 = pool.apply_async(run_invalidate_metadata)

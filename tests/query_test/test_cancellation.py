@@ -19,6 +19,7 @@
 #
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import pytest
 import threading
 from time import sleep
@@ -74,7 +75,7 @@ JOIN_BEFORE_CLOSE = [False, True]
 
 # Extra dimensions to test order by without limit
 SORT_QUERY = 'select * from lineitem order by l_orderkey'
-SORT_CANCEL_DELAY = range(6, 10)
+SORT_CANCEL_DELAY = list(range(6, 10))
 SORT_BUFFER_POOL_LIMIT = ['0', '300m'] # Test spilling and non-spilling sorts.
 
 # Test with and without multithreading
@@ -153,7 +154,7 @@ class TestCancellation(ImpalaTestSuite):
     wait_action = vector.get_value('wait_action')
     fail_rpc_action = vector.get_value('fail_rpc_action')
 
-    debug_action = "|".join(filter(None, [wait_action, fail_rpc_action]))
+    debug_action = "|".join([_f for _f in [wait_action, fail_rpc_action] if _f])
     vector.get_value('exec_option')['debug_action'] = debug_action
 
     vector.get_value('exec_option')['buffer_pool_limit'] =\
@@ -162,7 +163,7 @@ class TestCancellation(ImpalaTestSuite):
     vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
 
     # Execute the query multiple times, cancelling it each time.
-    for i in xrange(NUM_CANCELATION_ITERATIONS):
+    for i in range(NUM_CANCELATION_ITERATIONS):
       cancel_query_and_validate_state(self.client, query,
           vector.get_value('exec_option'), vector.get_value('table_format'),
           vector.get_value('cancel_delay'), vector.get_value('join_before_close'))

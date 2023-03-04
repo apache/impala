@@ -427,7 +427,7 @@ def main():
     def log_file_list(header, file_list):
       if (len(file_list) == 0): return
       LOG.debug(header)
-      map(LOG.debug, map(os.path.basename, file_list))
+      list(map(LOG.debug, list(map(os.path.basename, file_list))))
       LOG.debug("\n")
 
     log_file_list("Impala Create Files:", impala_create_files)

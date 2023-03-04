@@ -19,6 +19,7 @@
 # Tests statestore with non-default startup options
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import logging
 import os
 import pytest
@@ -79,7 +80,7 @@ class TestCustomStatestore(CustomClusterTestSuite):
     exceeded."""
     # With a statestore_max_subscribers of 3, we should hit the registration error
     # pretty quick.
-    for x in xrange(20):
+    for x in range(20):
       response = self.__register_subscriber()
       if response.status.status_code == TErrorCode.OK:
         self.registration_id = response.registration_id

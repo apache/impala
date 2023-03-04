@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 from copy import copy
 import itertools
 import logging
@@ -322,7 +323,7 @@ class TestScannersFuzzing(ImpalaTestSuite):
       data = bytearray(f.read())
 
     num_corruptions = rng.randint(0, int(math.log(len(data))))
-    for _ in xrange(num_corruptions):
+    for _ in range(num_corruptions):
       flip_offset = rng.randint(0, len(data) - 1)
       flip_val = rng.randint(0, 255)
       LOG.info("corrupt file: Flip byte in {0} at {1} from {2} to {3}".format(

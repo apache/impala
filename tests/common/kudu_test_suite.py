@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import os
 import pytest
 import requests
@@ -110,7 +111,7 @@ class KuduTestSuite(ImpalaTestSuite):
 
   @classmethod
   def random_table_name(cls):
-    return "".join(choice(string.lowercase) for _ in xrange(10))
+    return "".join(choice(string.lowercase) for _ in range(10))
 
   @classmethod
   def to_kudu_table_name(cls, db_name, tbl_name):
@@ -144,7 +145,7 @@ class KuduTestSuite(ImpalaTestSuite):
     if not col_names:
       if len(col_types) > 26:
         raise Exception("Too many columns for default naming")
-      col_names = [chr(97 + i) for i in xrange(len(col_types))]
+      col_names = [chr(97 + i) for i in range(len(col_types))]
     schema_builder = SchemaBuilder()
     for i, t in enumerate(col_types):
       column_spec = schema_builder.add_column(col_names[i], type_=t)

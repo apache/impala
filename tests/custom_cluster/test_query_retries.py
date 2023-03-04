@@ -22,6 +22,7 @@
 # TODO: Add a test that cancels queries while a retry is running
 
 from __future__ import absolute_import, division, print_function
+from builtins import map, range
 import pytest
 import re
 import shutil
@@ -205,14 +206,14 @@ class TestQueryRetries(CustomClusterTestSuite):
     # Launch a set of concurrent queries.
     num_concurrent_queries = 3
     handles = []
-    for _ in xrange(num_concurrent_queries):
+    for _ in range(num_concurrent_queries):
       handle = self.execute_query_async(self._shuffle_heavy_query,
           query_options={'retry_failed_queries': 'true'})
       handles.append(handle)
 
     # Wait for each query to start running.
     running_state = self.client.QUERY_STATES['RUNNING']
-    map(lambda handle: self.wait_for_state(handle, running_state, 60), handles)
+    list(map(lambda handle: self.wait_for_state(handle, running_state, 60), handles))
 
     # Kill a random impalad.
     killed_impalad = self.__kill_random_impalad()
@@ -1180,7 +1181,7 @@ class TestQueryRetriesFaultyDisk(CustomClusterTestSuite):
 
   def __generate_scratch_dir(self, num):
     result = []
-    for i in xrange(num):
+    for i in range(num):
       dir_path = tempfile.mkdtemp()
       self.created_dirs.append(dir_path)
       result.append(dir_path)

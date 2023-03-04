@@ -26,6 +26,7 @@
 #   result = client.execute(query_string)
 #   where result is an object of the class ImpalaBeeswaxResult.
 from __future__ import absolute_import, division, print_function
+from builtins import filter, map, range
 import logging
 import time
 import shlex
@@ -336,7 +337,7 @@ class ImpalaBeeswaxClient(object):
       idx = \
         self.__build_summary_table(
             summary, idx, False, indent_level, False, first_child_output)
-      for child_idx in xrange(1, node.num_children):
+      for child_idx in range(1, node.num_children):
         # All other children are indented (we only have 0, 1 or 2 children for every exec
         # node at the moment)
         idx = self.__build_summary_table(
@@ -498,7 +499,7 @@ class ImpalaBeeswaxClient(object):
       return tokens[0].lower()
     # Because the WITH clause may precede INSERT or SELECT queries,
     # just checking the first token is insufficient.
-    if filter(self.INSERT_REGEX.match, tokens):
+    if list(filter(self.INSERT_REGEX.match, tokens)):
       return "insert"
     return tokens[0].lower()
 

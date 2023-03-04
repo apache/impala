@@ -18,6 +18,7 @@
 # Validates all aggregate functions across all datatypes
 #
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import pytest
 
 from testdata.common import widetable
@@ -279,7 +280,7 @@ class TestAggregationQueries(ImpalaTestSuite):
     ]
 
     # For each possible integer value, genereate one query and test it out.
-    for i in xrange(1, 11):
+    for i in range(1, 11):
       ndv_stmt = """
         select ndv(bool_col, {0}), ndv(tinyint_col, {0}),
                ndv(smallint_col, {0}), ndv(int_col, {0}),
@@ -299,7 +300,7 @@ class TestAggregationQueries(ImpalaTestSuite):
       # Verify that each ndv() value (one per column for a total of 11) is identical
       # to the corresponding known value. Since NDV() invokes Hash64() hash function
       # with a fixed seed value, ndv() result is deterministic.
-      for j in xrange(0, 11):
+      for j in range(0, 11):
         assert(ndv_results[i - 1][j] == int(ndv_vals[j]))
 
   def test_grouping_sets(self, vector):
@@ -393,7 +394,7 @@ class TestAggregationQueriesRunOnce(ImpalaTestSuite):
       assert len(sampled_ndv_vals) == len(ndv_vals)
       # Low NDV columns. We expect a reasonaby accurate estimate regardless of the
       # sampling percent.
-      for i in xrange(0, 14):
+      for i in range(0, 14):
         self.appx_equals(int(sampled_ndv_vals[i]), int(ndv_vals[i]), 0.1)
       # High NDV columns. We expect the estimate to have high variance and error.
       # Since we give NDV() and SAMPLED_NDV() the same input data, i.e., we are not
@@ -401,7 +402,7 @@ class TestAggregationQueriesRunOnce(ImpalaTestSuite):
       # be bigger than NDV() proportional to the sampling percent.
       # For example, the column 'id' is a PK so we expect the result of SAMPLED_NDV()
       # with a sampling percent of 0.1 to be approximately 10x of the NDV().
-      for i in xrange(14, 16):
+      for i in range(14, 16):
         self.appx_equals(int(sampled_ndv_vals[i]) * sample_perc, int(ndv_vals[i]), 2.0)
 
 

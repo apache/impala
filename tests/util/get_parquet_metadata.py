@@ -16,11 +16,13 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import map
 import os
 import struct
 
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from functools import reduce
 from parquet.ttypes import ColumnIndex, FileMetaData, OffsetIndex, PageHeader, Type
 from subprocess import check_call
 from thrift.protocol import TCompactProtocol
@@ -97,7 +99,7 @@ def decode_decimal(schema, value):
   assert schema.type_length == len(value)
   assert schema.type == Type.FIXED_LEN_BYTE_ARRAY
 
-  numeric = Decimal(reduce(lambda x, y: x * 256 + y, map(ord, value)))
+  numeric = Decimal(reduce(lambda x, y: x * 256 + y, list(map(ord, value))))
 
   # Compute two's complement for negative values.
   if (ord(value[0]) > 127):

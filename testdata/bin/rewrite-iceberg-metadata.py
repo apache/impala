@@ -18,6 +18,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import map
 import glob
 import json
 import os
@@ -52,8 +53,7 @@ def add_prefix_to_snapshot(snapshot):
   if 'manifest-list' in snapshot:
     snapshot['manifest-list'] = generate_new_path(prefix, snapshot['manifest-list'])
   if 'manifests' in snapshot:
-    snapshot['manifests'] = map(lambda m: generate_new_path(prefix, m),
-                                snapshot['manifests'])
+    snapshot['manifests'] = [generate_new_path(prefix, m) for m in snapshot['manifests']]
   return snapshot
 
 
@@ -99,11 +99,11 @@ for arg in args[1:]:
 
     # snapshots: optional
     if 'snapshots' in metadata:
-      metadata['snapshots'] = map(add_prefix_to_snapshot, metadata['snapshots'])
+      metadata['snapshots'] = list(map(add_prefix_to_snapshot, metadata['snapshots']))
 
     # metadata-log: optional
     if 'metadata-log' in metadata:
-      metadata['metadata-log'] = map(add_prefix_to_mlog, metadata['metadata-log'])
+      metadata['metadata-log'] = list(map(add_prefix_to_mlog, metadata['metadata-log']))
 
     with open(mfile + '.tmp', 'w') as f:
       json.dump(metadata, f, indent=2)
@@ -113,7 +113,7 @@ for arg in args[1:]:
     with open(afile, 'rb') as f:
       with DataFileReader(f, DatumReader()) as reader:
         schema = reader.datum_reader.writers_schema
-        lines = map(add_prefix_to_snapshot_entry, reader)
+        lines = list(map(add_prefix_to_snapshot_entry, reader))
 
     with open(afile + '.tmp', 'wb') as f:
       with DataFileWriter(f, DatumWriter(), schema) as writer:
@@ -127,7 +127,7 @@ for arg in args[1:]:
     with open(snapfile, 'rb') as f:
       with DataFileReader(f, DatumReader()) as reader:
         schema = reader.datum_reader.writers_schema
-        lines = map(fix_manifest_length, reader)
+        lines = list(map(fix_manifest_length, reader))
 
     with open(snapfile + '.tmp', 'wb') as f:
       with DataFileWriter(f, DatumWriter(), schema) as writer:

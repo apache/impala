@@ -29,6 +29,7 @@
 # if necessary (2.5).
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import difflib
 import json
 import logging
@@ -914,7 +915,7 @@ class ExecSummaryComparison(object):
     table.align = 'l'
     table.float_format = '.2'
     table_contains_at_least_one_row = False
-    for row in filter(lambda row: is_significant(row), self.rows):
+    for row in [row for row in self.rows if is_significant(row)]:
       table_row = [row[OPERATOR],
           '{0:.2%}'.format(row[PERCENT_OF_QUERY]),
           '{0:.2%}'.format(row[RSTD]),

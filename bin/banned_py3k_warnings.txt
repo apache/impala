@@ -1,2 +1,9 @@
 no-absolute-import
 old-division
+xrange-builtin
+range-builtin-not-iterating
+map-builtin-not-iterating
+zip-builtin-not-iterating
+filter-builtin-not-iterating
+reduce-builtin
+deprecated-itertools-function

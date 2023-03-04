@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import pytest
 import re
 from random import randint
@@ -102,7 +103,7 @@ class TestExprLimits(ImpalaTestSuite):
   def test_expr_child_limit(self, vector):
     # IN predicate
     in_query = "select 1 IN("
-    for i in xrange(0, self.EXPR_CHILDREN_LIMIT - 1):
+    for i in range(0, self.EXPR_CHILDREN_LIMIT - 1):
       in_query += str(i)
       if (i + 1 != self.EXPR_CHILDREN_LIMIT - 1):
         in_query += ","
@@ -111,7 +112,7 @@ class TestExprLimits(ImpalaTestSuite):
 
     # CASE expr
     case_query = "select case "
-    for i in xrange(0, self.EXPR_CHILDREN_LIMIT // 2):
+    for i in range(0, self.EXPR_CHILDREN_LIMIT // 2):
       case_query += " when true then 1"
     case_query += " end"
     self.__exec_query(case_query)
@@ -181,7 +182,7 @@ class TestExprLimits(ImpalaTestSuite):
 
   def __gen_huge_case(self, col_name, fanout, depth, indent):
     toks = ["case\n"]
-    for i in xrange(fanout):
+    for i in range(fanout):
       add = randint(1, 1000000)
       divisor = randint(1, 10000000)
       mod = randint(0, divisor)
@@ -200,16 +201,16 @@ class TestExprLimits(ImpalaTestSuite):
 
   def __gen_deep_infix_expr(self, prefix, repeat_suffix):
     expr = prefix
-    for i in xrange(self.EXPR_DEPTH_LIMIT - 1):
+    for i in range(self.EXPR_DEPTH_LIMIT - 1):
       expr += repeat_suffix
     return expr
 
   def __gen_deep_func_expr(self, open_func, base_arg, close_func):
     expr = ""
-    for i in xrange(self.EXPR_DEPTH_LIMIT - 1):
+    for i in range(self.EXPR_DEPTH_LIMIT - 1):
       expr += open_func
     expr += base_arg
-    for i in xrange(self.EXPR_DEPTH_LIMIT - 1):
+    for i in range(self.EXPR_DEPTH_LIMIT - 1):
       expr += close_func
     return expr
 

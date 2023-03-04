@@ -23,6 +23,7 @@
 # print a SQL load statement to incorporate into dataload SQL script generation.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 from shutil import rmtree
 from optparse import OptionParser
 from contextlib import contextmanager
@@ -35,7 +36,7 @@ parser.add_option("--only_newline", dest="only_newline", default=False, action="
 parser.add_option("--file_len", dest="file_len", type="int")
 
 def generate_testescape_files(table_location, only_newline, file_len):
-  data = ''.join(["1234567890" for _ in xrange(1 + file_len // 10)])
+  data = ''.join(["1234567890" for _ in range(1 + file_len // 10)])
 
   suffix_list = ["\\", ",", "a"]
   if only_newline:

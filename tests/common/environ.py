@@ -96,7 +96,7 @@ kernel_release = os.uname()[2]
 kernel_version_regex = re.compile(r'(\d+)\.(\d+)\.(\d+)\-(\d+).*')
 kernel_version_match = kernel_version_regex.match(kernel_release)
 if kernel_version_match is not None and len(kernel_version_match.groups()) == 4:
-  kernel_version = map(lambda x: int(x), list(kernel_version_match.groups()))
+  kernel_version = [int(x) for x in list(kernel_version_match.groups())]
 IS_BUGGY_EL6_KERNEL = 'el6' in kernel_release and kernel_version < [2, 6, 32, 674]
 
 class ImpalaBuildFlavors:

@@ -18,6 +18,7 @@
 # Client tests for Impala's HiveServer2 interface
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 from getpass import getuser
 from contextlib import contextmanager
 import json
@@ -408,7 +409,7 @@ class TestHS2(HS2TestSuite):
     num_sessions = self.impalad_test_service.get_metric_value(
         "impala-server.num-open-hiveserver2-sessions")
     session_ids = []
-    for _ in xrange(5):
+    for _ in range(5):
       open_session_req = TCLIService.TOpenSessionReq()
       resp = self.hs2_client.OpenSession(open_session_req)
       TestHS2.check_response(resp)
@@ -883,7 +884,7 @@ class TestHS2(HS2TestSuite):
         args=(profile_fetch_exception, query_uuid, op_handle)))
 
       # Start threads that will race to unregister the query.
-      for i in xrange(NUM_UNREGISTER_THREADS):
+      for i in range(NUM_UNREGISTER_THREADS):
         socket, client = self._open_hs2_connection()
         sockets.append(socket)
         threads.append(threading.Thread(target=self._unregister_query,

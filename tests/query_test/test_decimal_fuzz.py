@@ -19,6 +19,7 @@
 # operations return correct results under decimal_v2.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import decimal
 import math
 import pytest
@@ -190,7 +191,7 @@ class TestDecimalFuzz(ImpalaTestSuite):
         return True
       return False
 
-    for num_digits_after_dot in xrange(39):
+    for num_digits_after_dot in range(39):
       # Reduce the number of digits after the dot in the expected_result to different
       # amounts. If it matches the actual result in at least one of the cases, we
       # consider the actual result to be acceptable.
@@ -245,7 +246,7 @@ class TestDecimalFuzz(ImpalaTestSuite):
       assert self.result_equals(expected_result, result)
 
   def test_decimal_ops(self, vector):
-    for _ in xrange(self.iterations):
+    for _ in range(self.iterations):
       self.execute_one_decimal_op()
 
   def width_bucket(self, val, min_range, max_range, num_buckets):
@@ -299,5 +300,5 @@ class TestDecimalFuzz(ImpalaTestSuite):
         raise e
 
   def test_width_bucket(self, vector):
-    for _ in xrange(self.iterations):
+    for _ in range(self.iterations):
       self.execute_one_width_bucket()

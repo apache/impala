@@ -18,6 +18,7 @@
 # Tests for query expiration.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import os
 import pytest
 import re
@@ -74,7 +75,7 @@ class TestScratchDir(CustomClusterTestSuite):
 
   def generate_dirs(self, num, writable=True, non_existing=False):
     result = []
-    for i in xrange(num):
+    for i in range(num):
       dir_path = tempfile.mkdtemp()
       if non_existing:
         shutil.rmtree(dir_path)

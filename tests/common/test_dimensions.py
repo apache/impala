@@ -18,6 +18,7 @@
 # Common test dimensions and associated utility functions.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import copy
 import os
 from itertools import product
@@ -83,7 +84,7 @@ class TableFormatInfo(object):
       raise ValueError('Table format string cannot be None')
 
     format_parts = table_format_string.strip().split('/')
-    if len(format_parts) not in range(2, 4):
+    if len(format_parts) not in list(range(2, 4)):
       raise ValueError('Invalid table format %s' % table_format_string)
 
     file_format, compression_codec = format_parts[:2]

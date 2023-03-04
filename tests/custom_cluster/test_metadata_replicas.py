@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import pytest
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIfFS
@@ -53,7 +54,7 @@ class TestMetadataReplicas(CustomClusterTestSuite):
         # Issue several invalidates to boost the version for the current incarnation of the
         # catalog. As a result, the table we'll add to Hive will get a version that's easier
         # to see is higher than the highest version of the restarted catalogd incarnation.
-        for i in xrange(0, 50):
+        for i in range(0, 50):
           self.client.execute("invalidate metadata functional.alltypes")
         assert self.cluster.catalogd.service.get_catalog_version() >= 50
         # Creates a database and table with Hive and makes it visible to Impala.
@@ -86,7 +87,7 @@ class TestMetadataReplicas(CustomClusterTestSuite):
     c_objects = self.cluster.catalogd.service.get_catalog_objects()
     i_objects = [proc.service.get_catalog_objects() for proc in self.cluster.impalads]
 
-    for idx in xrange(0, len(i_objects)):
+    for idx in range(0, len(i_objects)):
       i_obj = i_objects[idx]
       diff = self.__diff_catalog_objects(c_objects, i_obj)
       assert diff[0] == {},\

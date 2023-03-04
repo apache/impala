@@ -18,6 +18,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.util.concurrent_workload import ConcurrentWorkload
 
@@ -375,7 +376,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
       # a new query to fit (see IMPALA-9073).
       NUM_SAMPLES = 30
       executor_slots_in_use = []
-      for _ in xrange(NUM_SAMPLES):
+      for _ in range(NUM_SAMPLES):
         backends_json = json.loads(
             self.impalad_test_service.read_debug_webpage('backends?json'))
         for backend in backends_json['backends']:

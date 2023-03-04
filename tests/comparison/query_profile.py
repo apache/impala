@@ -16,6 +16,8 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import filter
+from functools import reduce
 from logging import getLogger
 from random import choice, randint, random, shuffle
 
@@ -303,14 +305,14 @@ class DefaultProfile(object):
         return choice_
       numeric_choice -= weight
 
-  def _choose_from_filtered_weights(self, filter, *weights):
+  def _choose_from_filtered_weights(self, filter_fn, *weights):
     '''Convenience method, apply the given filter before choosing a value.'''
     if isinstance(weights[0], str):
       weights = self.weights(*weights)
     else:
       weights = weights[0]
     return self._choose_from_weights(dict((choice_, weight) for choice_, weight
-                                     in weights.iteritems() if filter(choice_)))
+                                     in weights.iteritems() if filter_fn(choice_)))
 
   def _decide_from_probability(self, *keys):
     return random() < self.probability(*keys)
@@ -490,11 +492,11 @@ class DefaultProfile(object):
     '''
     if not signatures:
       raise Exception('At least one signature is required')
-    filtered_signatures = filter(
+    filtered_signatures = list(filter(
         lambda s: s.return_type == Boolean \
             and len(s.args) > 1 \
             and not any(a.is_subquery for a in s.args),
-        signatures)
+        signatures))
     if not filtered_signatures:
       raise Exception(
           'None of the provided signatures corresponded to a relational function')
@@ -717,7 +719,7 @@ class TestFunctionProfile(DefaultProfile):
   def choose_func_signature(self, signatures):
     if not signatures:
       raise Exception('At least one signature is required')
-    preferred_signatures = filter(lambda s: "DistinctFrom" in s.func._NAME, signatures)
+    preferred_signatures = [s for s in signatures if "DistinctFrom" in s.func._NAME]
     if preferred_signatures:
       signatures = preferred_signatures
     return super(TestFunctionProfile, self).choose_func_signature(signatures)

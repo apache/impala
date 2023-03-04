@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import os
 import pytest
 import random
@@ -114,11 +115,11 @@ class TestUdfConcurrency(CustomClusterTestSuite):
 
     # create threads to use native function.
     runner_threads = []
-    for i in xrange(num_uses):
+    for i in range(num_uses):
       runner_threads.append(threading.Thread(target=use_fn_method))
 
     # create threads to drop/create native functions.
-    for i in xrange(num_loads):
+    for i in range(num_loads):
       runner_threads.append(threading.Thread(target=load_fn_method))
 
     # launch all runner threads.

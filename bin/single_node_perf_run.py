@@ -70,6 +70,7 @@
 #   --ninja               use ninja, rather than Make, as the build tool
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 from optparse import OptionParser
 from tempfile import mkdtemp
 

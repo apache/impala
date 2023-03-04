@@ -57,6 +57,7 @@
 
 from __future__ import absolute_import, division, print_function
 
+from builtins import range
 import logging
 import os
 import re
@@ -187,7 +188,7 @@ def print_crash_info_if_exists(impala, start_time):
   that evaluates to True if any impalads are stopped.
   """
   max_attempts = 5
-  for remaining_attempts in xrange(max_attempts - 1, -1, -1):
+  for remaining_attempts in range(max_attempts - 1, -1, -1):
     try:
       crashed_impalads = impala.find_crashed_impalads(start_time)
       break
@@ -388,7 +389,7 @@ class StressRunner(object):
           queries_by_type[query.query_type] = []
         queries_by_type[query.query_type].append(query)
       try:
-        for _ in xrange(self._num_queries_to_run):
+        for _ in range(self._num_queries_to_run):
           # First randomly determine a query type, then choose a random query of that
           # type.
           if (
@@ -918,7 +919,7 @@ def populate_runtime_info(query, impala, converted_args, timeout_secs=maxint):
   def get_report(desired_outcome=None):
     reports_by_outcome = defaultdict(list)
     leading_outcome = None
-    for remaining_samples in xrange(samples - 1, -1, -1):
+    for remaining_samples in range(samples - 1, -1, -1):
       report = runner.run_query(query, mem_limit, run_set_up=True,
           timeout_secs=timeout_secs, retain_profile=True)
       if report.timed_out:
@@ -1438,7 +1439,7 @@ def main():
         impala, file_queries, converted_args))
 
   # Apply tweaks to the query's runtime info as requested by CLI options.
-  for idx in xrange(len(queries) - 1, -1, -1):
+  for idx in range(len(queries) - 1, -1, -1):
     query = queries[idx]
     if query.required_mem_mb_with_spilling:
       query.required_mem_mb_with_spilling += int(

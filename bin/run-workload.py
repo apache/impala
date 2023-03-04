@@ -172,8 +172,8 @@ def prettytable_print(results, failed=False):
 
 def print_result_summary(results):
   """Print failed and successfull queries for a given result list"""
-  failed_results = filter(lambda x: x.success == False, results)
-  successful_results = filter(lambda x: x.success == True, results)
+  failed_results = [x for x in results if not x.success]
+  successful_results = [x for x in results if x.success]
   prettytable_print(successful_results)
   if failed_results: prettytable_print(failed_results, failed=True)
 
@@ -195,7 +195,7 @@ def get_workload_scale_factor():
 def split_and_strip(input_string, delim=","):
   """Convert a string into a list using the given delimiter"""
   if not input_string: return list()
-  return map(str.strip, input_string.split(delim))
+  return list(map(str.strip, input_string.split(delim)))
 
 def create_workload_config():
   """Parse command line inputs.

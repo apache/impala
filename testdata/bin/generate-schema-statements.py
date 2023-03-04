@@ -276,7 +276,7 @@ def parse_table_properties(file_format, table_properties):
       r'(?:(\w+):)?' +
       # Required key=value, capturing the key and value
       r'(.+?)=(.*)')
-  for table_property in filter(None, table_properties.split("\n")):
+  for table_property in [_f for _f in table_properties.split("\n") if _f]:
     m = TABLE_PROPERTY_RE.match(table_property)
     if not m:
       raise Exception("Invalid table property line: {0}", format(table_property))

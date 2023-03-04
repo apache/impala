@@ -18,6 +18,7 @@
 # Validates that casting to Decimal works.
 #
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import pytest
 from decimal import Decimal, getcontext, ROUND_DOWN, ROUND_HALF_UP
 from allpairspy import AllPairs as all_pairs
@@ -39,11 +40,11 @@ class TestDecimalCasting(ImpalaTestSuite):
   DECIMAL_TYPES_MAP = {
       # All possible decimal types.
       # (0 < precision <= 38 && 0 <= scale <= 38 && scale <= precision)
-      'exhaustive' : [(p, s) for p in xrange(1, 39) for s in xrange(0, p + 1)],
+      'exhaustive': [(p, s) for p in range(1, 39) for s in range(0, p + 1)],
       # Core only deals with precision 6,16,26 (different integer types)
-      'core' :  [(p, s) for p in [6,16,26] for s in xrange(0, p + 1)],
+      'core': [(p, s) for p in [6, 16, 26] for s in range(0, p + 1)],
       # mimics test_vectors.py and takes a subset of all decimal types
-      'pairwise' : all_pairs([(p, s) for p in xrange(1, 39) for s in xrange(0, p + 1)])
+      'pairwise': all_pairs([(p, s) for p in range(1, 39) for s in range(0, p + 1)])
   }
   # We can cast for numerics or string types.
   CAST_FROM = ['string', 'number']
@@ -121,7 +122,7 @@ class TestDecimalCasting(ImpalaTestSuite):
     precision, scale = vector.get_value('decimal_type')
     if vector.get_value('cast_from') == 'decimal':
       pytest.skip("Casting between the same decimal type isn't interesting")
-    for i in xrange(self.iterations):
+    for i in range(self.iterations):
       val = self._gen_decimal_val(precision, scale)
       cast = self._normalize_cast_expr(val, precision, vector.get_value('cast_from'))\
           .format(val, precision, scale)
@@ -132,7 +133,7 @@ class TestDecimalCasting(ImpalaTestSuite):
     """Test to verify that we always return NULL when trying to cast a number with greater
     precision that its intended decimal type"""
     precision, scale = vector.get_value('decimal_type')
-    for i in xrange(self.iterations):
+    for i in range(self.iterations):
       # Generate a decimal with a larger precision than the one we're casting to.
       from_precision = randint(precision + 1, 39)
       val = self._gen_decimal_val(from_precision, scale)
@@ -150,7 +151,7 @@ class TestDecimalCasting(ImpalaTestSuite):
 
     if precision == scale:
       pytest.skip("Cannot underflow scale when precision and scale are equal")
-    for i in xrange(self.iterations):
+    for i in range(self.iterations):
       from_scale = randint(scale + 1, precision)
       val = self._gen_decimal_val(precision, from_scale)
       cast = self._normalize_cast_expr(val, precision, cast_from)\

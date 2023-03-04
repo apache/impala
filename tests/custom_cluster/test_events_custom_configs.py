@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import logging
 import pytest
 
@@ -199,7 +200,7 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     removed_metric_val_before = EventProcessorUtils.get_int_metric(removed_metric_name, 0)
     events_skipped_before = EventProcessorUtils.get_int_metric('events-skipped', 0)
     num_iters = 100
-    for iter in xrange(num_iters):
+    for iter in range(num_iters):
       for q in queries:
         try:
           self.execute_query_expect_success(self.create_impala_client(), q)

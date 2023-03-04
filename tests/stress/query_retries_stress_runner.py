@@ -25,6 +25,7 @@
 # the script, it has to be killed manually (e.g. kill [pid]).
 
 from __future__ import absolute_import, division, print_function
+from builtins import map, range
 import logging
 import pipes
 import os
@@ -176,12 +177,12 @@ def run_concurrent_workloads(concurrency, coordinator, database, queries):
   # complete.
   workload_threads = []
   LOG.info("Starting {0} concurrent workloads".format(concurrency))
-  for i in xrange(concurrency):
+  for i in range(concurrency):
     workload_thread = threading.Thread(target=__run_workload, args=[i],
         name="workload_thread_{0}".format(i))
     workload_thread.start()
     workload_threads.append(workload_thread)
-  map(lambda thread: thread.join(), workload_threads)
+  list(map(lambda thread: thread.join(), workload_threads))
 
   # Check if any of the workload runner threads hit an exception, if one did then print
   # the error and exit.
@@ -254,7 +255,7 @@ def run_stress_workload(queries, database, workload, start_delay,
   start_random_impalad_killer(kill_frequency, start_delay, cluster)
 
   # Run the stress test 'iterations' times.
-  for i in xrange(iterations):
+  for i in range(iterations):
     LOG.info("Starting iteration {0} of workload {1}".format(i, workload))
     run_concurrent_workloads(concurrency, impala_coordinator, database,
         queries)

@@ -19,6 +19,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import errno
 import getpass
 import os
@@ -1006,7 +1007,7 @@ class TestImpalaShell(ImpalaTestSuite):
     # This generates a sql file size of ~50K.
     num_cols = 1000
     os.write(sql_file, "select \n")
-    for i in xrange(num_cols):
+    for i in range(num_cols):
       if i < num_cols:
         os.write(sql_file, "col_{0} as a{1},\n".format(i, i))
         os.write(sql_file, "col_{0} as b{1},\n".format(i, i))

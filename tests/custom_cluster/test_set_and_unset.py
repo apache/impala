@@ -171,5 +171,5 @@ class TestSetAndUnset(CustomClusterTestSuite, HS2TestSuite):
     fetch_results_req.operationHandle = execute_statement_resp.operationHandle
     fetch_results_req.maxRows = 100
     fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
-    return zip(fetch_results_resp.results.columns[0].stringVal.values,
-            fetch_results_resp.results.columns[1].stringVal.values)
+    return list(zip(fetch_results_resp.results.columns[0].stringVal.values,
+            fetch_results_resp.results.columns[1].stringVal.values))

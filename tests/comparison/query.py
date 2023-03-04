@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 from abc import ABCMeta, abstractproperty
 from copy import deepcopy
 from logging import getLogger
@@ -43,7 +44,7 @@ class StatementExecutionMode(object):
       DML_SETUP,
       # a DML statement that's actually a test
       DML_TEST,
-  ) = xrange(5)
+  ) = range(5)
 
 
 class AbstractStatement(object):

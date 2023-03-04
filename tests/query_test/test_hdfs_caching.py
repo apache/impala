@@ -18,6 +18,7 @@
 # Validates limit on scan nodes
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import pytest
 import re
 import time
@@ -103,7 +104,7 @@ class TestHdfsCaching(ImpalaTestSuite):
       select * from t1, t2, t3 where t1.x = t2.x and t2.x = t3.x """
 
     # Run this query for some iterations since it is timing dependent.
-    for x in xrange(1, num_iters):
+    for x in range(1, num_iters):
       result = self.execute_query(query_string)
       assert(len(result.data) == 2)
 

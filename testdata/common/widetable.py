@@ -23,6 +23,7 @@
 # into dataload SQL script generation.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 from datetime import datetime, timedelta
 import itertools
 import optparse
@@ -51,7 +52,7 @@ def get_columns(num_cols):
   iter = itertools.cycle(templates)
   # Produces [bool_col1, tinyint_col1, ..., bool_col2, tinyint_col2, ...]
   # The final list has 'num_cols' elements.
-  return [iter.next() % (i // len(templates) + 1) for i in xrange(num_cols)]
+  return [iter.next() % (i // len(templates) + 1) for i in range(num_cols)]
 
 # Data generators for different types. Each generator yields an infinite number of
 # value strings suitable for writing to a CSV file.
@@ -100,11 +101,11 @@ def get_data(num_cols, num_rows, delimiter=',', quote_strings=False):
     ]
   # Create a generator instance for each column, cycling through the different types
   iter = itertools.cycle(generators)
-  column_generators = [iter.next()() for i in xrange(num_cols)]
+  column_generators = [iter.next()() for i in range(num_cols)]
 
   # Populate each row using column_generators
   rows = []
-  for i in xrange(num_rows):
+  for i in range(num_rows):
     vals = [gen.next() for gen in column_generators]
     rows.append(delimiter.join(vals))
   return rows

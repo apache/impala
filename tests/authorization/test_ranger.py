@@ -18,6 +18,7 @@
 # Client tests for SQL statement authorization
 
 from __future__ import absolute_import, division, print_function
+from builtins import map, range
 import os
 import grp
 import json
@@ -1017,7 +1018,7 @@ class TestRanger(CustomClusterTestSuite):
       cols = row.split("\t")
       return cols[0:len(cols) - 1]
 
-    assert map(columns, result.data) == expected
+    assert list(map(columns, result.data)) == expected
 
   def _refresh_authorization(self, client, statement):
     if statement is not None:

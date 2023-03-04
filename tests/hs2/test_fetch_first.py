@@ -21,6 +21,7 @@
 # succeed as long all previously fetched rows fit into the bounded result cache.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import pytest
 
 from ImpalaService import ImpalaHiveServer2Service
@@ -199,7 +200,7 @@ class TestFetchFirst(HS2TestSuite):
       "SELECT * FROM functional.alltypessmall ORDER BY id LIMIT 30"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     HS2TestSuite.check_response(execute_statement_resp)
-    for i in xrange(1, 5):
+    for i in range(1, 5):
       # Fetch 10 rows with the FETCH_NEXT orientation.
       expected_num_rows = 10
       if i == 4:
@@ -220,7 +221,7 @@ class TestFetchFirst(HS2TestSuite):
     execute_statement_req.statement =\
       "SELECT * FROM functional.alltypessmall ORDER BY id LIMIT 30"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    for _ in xrange(1, 5):
+    for _ in range(1, 5):
       self.fetch_until(execute_statement_resp.operationHandle,
                        TCLIService.TFetchOrientation.FETCH_FIRST, 30)
       self.__verify_num_cached_rows(30)
@@ -339,7 +340,7 @@ class TestFetchFirst(HS2TestSuite):
     execute_statement_req.statement =\
       "SELECT * FROM functional.alltypessmall ORDER BY id LIMIT 0"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    for i in xrange(0, 3):
+    for i in range(0, 3):
       # Fetch some rows. Expect to get 0 rows.
       self.fetch_at_most(execute_statement_resp.operationHandle,
                          TCLIService.TFetchOrientation.FETCH_NEXT, i * 10, 0)
@@ -358,7 +359,7 @@ class TestFetchFirst(HS2TestSuite):
     self.fetch_at_most(execute_statement_resp.operationHandle,
                        TCLIService.TFetchOrientation.FETCH_FIRST, 100, 1)
     self.__verify_num_cached_rows(1)
-    for i in xrange(0, 3):
+    for i in range(0, 3):
       # Fetch some rows with FETCH_FIRST. Expect to get 1 row.
       self.fetch_at_most(execute_statement_resp.operationHandle,
                          TCLIService.TFetchOrientation.FETCH_FIRST, i * 10, 1)
@@ -391,7 +392,7 @@ class TestFetchFirst(HS2TestSuite):
     execute_statement_req.statement = "show table stats functional.alltypes"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     HS2TestSuite.check_response(execute_statement_resp)
-    for i in xrange(1, 5):
+    for i in range(1, 5):
       # Fetch 10 rows with the FETCH_NEXT orientation.
       expected_num_rows = 10
       if i == 3:
@@ -414,7 +415,7 @@ class TestFetchFirst(HS2TestSuite):
     execute_statement_req.statement = "show table stats functional.alltypes"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     HS2TestSuite.check_response(execute_statement_resp)
-    for _ in xrange(1, 5):
+    for _ in range(1, 5):
       self.fetch_until(execute_statement_resp.operationHandle,
                        TCLIService.TFetchOrientation.FETCH_FIRST, 30, 25)
     # The results of non-query stmts are not counted as 'cached'.

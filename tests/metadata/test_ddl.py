@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import map, range
 import getpass
 import itertools
 import pytest
@@ -303,10 +304,10 @@ class TestDdlStatements(TestDdlBase):
   def test_create_table_like_file_orc(self, vector, unique_database):
     COMPLEXTYPETBL_PATH = 'test-warehouse/managed/functional_orc_def.db/' \
                           'complextypestbl_orc_def/'
-    base_dir = filter(lambda s: s.startswith('base'),
-      self.filesystem_client.ls(COMPLEXTYPETBL_PATH))[0]
-    bucket_file = filter(lambda s: s.startswith('bucket'),
-      self.filesystem_client.ls(COMPLEXTYPETBL_PATH + base_dir))[0]
+    base_dir = list(filter(lambda s: s.startswith('base'),
+      self.filesystem_client.ls(COMPLEXTYPETBL_PATH)))[0]
+    bucket_file = list(filter(lambda s: s.startswith('bucket'),
+      self.filesystem_client.ls(COMPLEXTYPETBL_PATH + base_dir)))[0]
     vector.get_value('exec_option')['abort_on_error'] = False
     create_table_from_orc(self.client, unique_database,
         'timestamp_with_local_timezone')
@@ -623,7 +624,7 @@ class TestDdlStatements(TestDdlBase):
          "location '{1}/{0}'".format(fq_tbl_name, WAREHOUSE))
 
     # Add some partitions (first batch of two)
-    for i in xrange(num_parts // 5):
+    for i in range(num_parts // 5):
       start = time.time()
       self.client.execute(
           "alter table {0} add partition(j={1}, s='{1}')".format(fq_tbl_name, i))
@@ -645,7 +646,7 @@ class TestDdlStatements(TestDdlBase):
         .format(fq_tbl_name, WAREHOUSE))
 
     # Add some more partitions
-    for i in xrange(num_parts // 5, num_parts):
+    for i in range(num_parts // 5, num_parts):
       start = time.time()
       self.client.execute(
           "alter table {0} add partition(j={1},s='{1}')".format(fq_tbl_name, i))
@@ -676,8 +677,8 @@ class TestDdlStatements(TestDdlBase):
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % fq_tbl_name)
 
-    assert 1 == len(filter(lambda line: line.find("PARQUET") != -1, result.data))
-    assert 2 == len(filter(lambda line: line.find("ORC") != -1, result.data))
+    assert 1 == len([line for line in result.data if line.find("PARQUET") != -1])
+    assert 2 == len([line for line in result.data if line.find("ORC") != -1])
 
   def test_alter_table_create_many_partitions(self, vector, unique_database):
     """
@@ -688,7 +689,7 @@ class TestDdlStatements(TestDdlBase):
         "create table {0}.t(i int) partitioned by (p int)".format(unique_database))
     MAX_PARTITION_UPDATES_PER_RPC = 500
     alter_stmt = "alter table {0}.t add ".format(unique_database) + " ".join(
-        "partition(p=%d)" % (i,) for i in xrange(MAX_PARTITION_UPDATES_PER_RPC + 2))
+        "partition(p=%d)" % (i,) for i in range(MAX_PARTITION_UPDATES_PER_RPC + 2))
     self.client.execute(alter_stmt)
     partitions = self.client.execute("show partitions {0}.t".format(unique_database))
     # Show partitions will contain partition HDFS paths, which we expect to contain
@@ -696,8 +697,8 @@ class TestDdlStatements(TestDdlBase):
     # paths, converts them to integers, and checks that wehave all the ones we
     # expect.
     PARTITION_RE = re.compile("p=([0-9]+)")
-    assert map(int, PARTITION_RE.findall(str(partitions))) == \
-        range(MAX_PARTITION_UPDATES_PER_RPC + 2)
+    assert list(map(int, PARTITION_RE.findall(str(partitions)))) == \
+        list(range(MAX_PARTITION_UPDATES_PER_RPC + 2))
 
   def test_create_alter_tbl_properties(self, vector, unique_database):
     fq_tbl_name = unique_database + ".test_alter_tbl"
@@ -1231,7 +1232,7 @@ class TestLibCache(TestDdlBase):
     """
     self.client.set_configuration(vector.get_value("exec_option"))
     for drop_stmt in drop_stmts: self.client.execute(drop_stmt % ("if exists"))
-    for i in xrange(0, num_iterations):
+    for i in range(0, num_iterations):
       for create_stmt in create_stmts: self.client.execute(create_stmt)
       self.client.execute(select_stmt)
       for drop_stmt in drop_stmts: self.client.execute(drop_stmt % (""))

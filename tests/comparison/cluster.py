@@ -21,6 +21,7 @@
 # module depends on db_connection which use some query generator classes.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range, zip
 import hdfs
 import logging
 import os
@@ -33,7 +34,6 @@ from collections import defaultdict
 from collections import OrderedDict
 from contextlib import contextmanager
 from getpass import getuser
-from itertools import izip
 from multiprocessing.pool import ThreadPool
 from random import choice
 from StringIO import StringIO
@@ -227,7 +227,7 @@ class MiniCluster(Cluster):
     hs2_base_port = 21050
     web_ui_base_port = 25000
     impalads = [MiniClusterImpalad(hs2_base_port + p, web_ui_base_port + p)
-                for p in xrange(self.num_impalads)]
+                for p in range(self.num_impalads)]
     self._impala = Impala(self, impalads)
 
 class MiniHiveCluster(MiniCluster):
@@ -615,7 +615,7 @@ class Impala(Service):
       return dict.fromkeys(stopped_impalads)
     messages = OrderedDict()
     impalads_with_message = dict()
-    for i, message in izip(stopped_impalads, self.for_each_impalad(
+    for i, message in zip(stopped_impalads, self.for_each_impalad(
         lambda i: i.find_last_crash_message(start_time), impalads=stopped_impalads)):
       if message:
         impalads_with_message[i] = "%s crashed:\n%s" % (i.host_name, message)
@@ -631,7 +631,7 @@ class Impala(Service):
     # Python doesn't handle ctrl-c well unless a timeout is provided.
     results = promise.get(maxint)
     if as_dict:
-      results = dict(izip(impalads, results))
+      results = dict(zip(impalads, results))
     return results
 
   def restart(self):

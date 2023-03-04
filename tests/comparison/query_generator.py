@@ -16,9 +16,9 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import filter, range
 from collections import defaultdict
 from copy import deepcopy
-from itertools import ifilter
 from logging import getLogger
 from random import shuffle, choice, randint, randrange
 
@@ -254,7 +254,7 @@ class QueryGenerator(object):
     table_exprs = TableExprList(table_exprs)
     with_clause_inline_views = TableExprList()
     for with_clause_inline_view_idx \
-        in xrange(self.profile.get_with_clause_table_ref_count()):
+        in range(self.profile.get_with_clause_table_ref_count()):
       query = self.generate_statement(table_exprs,
                                       allow_with_clause=self.profile.use_nested_with())
       with_clause_alias_count = getattr(self.root_query, 'with_clause_alias_count', 0) + 1
@@ -933,7 +933,7 @@ class QueryGenerator(object):
     else:
       excluded_designs.append('DETERMINISTIC_ORDER')
 
-    allow_agg = any(ifilter(lambda expr: expr.contains_agg, select_item_exprs))
+    allow_agg = any(filter(lambda expr: expr.contains_agg, select_item_exprs))
     value = self._create_analytic_func_tree(return_type, excluded_designs, allow_agg)
     value = self.populate_func_with_vals(
         value,
@@ -1125,7 +1125,7 @@ class QueryGenerator(object):
     table_expr.alias = self.get_next_id()
     from_clause = FromClause(table_expr)
 
-    for idx in xrange(1, table_count):
+    for idx in range(1, table_count):
       join_clause = self._create_join_clause(from_clause, table_exprs)
       join_clause.table_expr.alias = self.get_next_id()
       from_clause.join_clauses.append(join_clause)
@@ -1294,7 +1294,7 @@ class QueryGenerator(object):
           % (arg_stop_idx, arg_start_idx))
     if null_args is None:
       null_args = list()
-    for idx in xrange(arg_start_idx, arg_stop_idx):
+    for idx in range(arg_start_idx, arg_stop_idx):
       arg = func.args[idx]
       if arg.is_constant and issubclass(arg.type, allowed_types):
         assert arg.val is None
@@ -1422,7 +1422,7 @@ class QueryGenerator(object):
     if not relational_col_types:
       relational_col_types = tuple()
 
-    for _ in xrange(func_count):
+    for _ in range(func_count):
       is_relational = False
 
       if and_or_count > 0:
@@ -1495,12 +1495,12 @@ def generate_queries_for_manual_inspection():
   tables = list()
   data_types = list(TYPES)
   data_types.remove(Float)
-  for table_idx in xrange(NUM_TABLES):
+  for table_idx in range(NUM_TABLES):
     table = Table('table_%s' % table_idx)
     tables.append(table)
     cols = table.cols
     col_idx = 0
-    for _ in xrange(NUM_COLS_EACH_TYPE):
+    for _ in range(NUM_COLS_EACH_TYPE):
       for col_type in data_types:
         col = Column(table, '%s_col_%s' % (col_type.__name__.lower(), col_idx), col_type)
         cols.append(col)
@@ -1512,7 +1512,7 @@ def generate_queries_for_manual_inspection():
   sql_writer = SqlWriter.create(dialect='IMPALA')
   ref_writer = SqlWriter.create(dialect='POSTGRESQL',
       nulls_order_asc=query_profile.nulls_order_asc())
-  for _ in xrange(NUM_QUERIES):
+  for _ in range(NUM_QUERIES):
     query = query_generator.generate_statement(tables)
     print("Test db")
     print(sql_writer.write_query(query) + '\n')

@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 

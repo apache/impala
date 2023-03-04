@@ -18,6 +18,7 @@
 # Impala tests for ALTER TABLE RECOVER PARTITIONS statement
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import os
 from six.moves import urllib
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -177,7 +178,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
         "CREATE TABLE %s (c int) PARTITIONED BY (s string)" % (FQ_TBL_NAME))
 
     # Create 700 partitions externally
-    for i in xrange(1, 700):
+    for i in range(1, 700):
         PART_DIR = "s=part%d/" % i
         FILE_PATH = "test"
         INSERTED_VALUE = "666"
@@ -185,14 +186,14 @@ class TestRecoverPartitions(ImpalaTestSuite):
 
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % FQ_TBL_NAME)
-    for i in xrange(1, 700):
+    for i in range(1, 700):
         PART_DIR = "part%d\t" % i
         assert not self.has_value(PART_DIR, result.data)
     self.execute_query_expect_success(self.client,
         "ALTER TABLE %s RECOVER PARTITIONS" % FQ_TBL_NAME)
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % FQ_TBL_NAME)
-    for i in xrange(1, 700):
+    for i in range(1, 700):
         PART_DIR = "part%d\t" % i
         assert self.has_value(PART_DIR, result.data)
 
@@ -344,7 +345,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
 
     # Running ALTER TABLE RECOVER PARTITIONS multiple times should only produce
     # a single partition when adding a single partition.
-    for i in xrange(3):
+    for i in range(3):
       self.execute_query_expect_success(
         self.client, "ALTER TABLE %s RECOVER PARTITIONS" % FQ_TBL_NAME)
       result = self.execute_query_expect_success(
@@ -392,7 +393,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
 
     # Adds partition directories.
     num_partitions = 10
-    for i in xrange(1, num_partitions):
+    for i in range(1, num_partitions):
         PART_DIR = "i=%d/s=part%d" % (i,i)
         self.filesystem_client.make_dir(TBL_LOCATION + PART_DIR)
 
@@ -410,7 +411,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % FQ_TBL_NAME)
     assert num_partitions - 1 == self.count_partition(result.data)
-    for i in xrange(1, num_partitions):
+    for i in range(1, num_partitions):
         PART_DIR = "part%d\t" % i
         assert self.has_value(PART_DIR, result.data)
 
@@ -457,7 +458,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
 
   def count_value(self, value, lines):
     """Count the number of lines that contain value."""
-    return len(filter(lambda line: line.find(value) != -1, lines))
+    return len([line for line in lines if line.find(value) != -1])
 
   def verify_partitions(self, expected_parts, lines):
     """Check if all partition values are expected"""

@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import pytest
 import threading
 
@@ -84,7 +85,7 @@ class TestMemReservations(CustomClusterTestSuite):
         client = self.coordinator.service.create_beeswax_client()
         try:
           client.set_configuration(CONFIG_MAP)
-          for i in xrange(20):
+          for i in range(20):
             result = client.execute(self.query)
             assert result.success
             assert len(result.data) == 1
@@ -96,7 +97,7 @@ class TestMemReservations(CustomClusterTestSuite):
     # Create two threads to submit COORDINATOR_QUERY to two different coordinators concurrently.
     # They should both succeed.
     threads = [QuerySubmitThread(COORDINATOR_QUERY, self.cluster.impalads[i])
-              for i in xrange(2)]
+              for i in range(2)]
     for t in threads: t.start()
     for t in threads:
       t.join()

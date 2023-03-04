@@ -21,6 +21,7 @@
    loaded.
 '''
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import logging
 import os
 
@@ -105,7 +106,7 @@ def load():
         "external": external}
 
     # Split table creation into multiple queries or "chunks" so less memory is needed.
-    for chunk_idx in xrange(chunks):
+    for chunk_idx in range(chunks):
       sql_params["chunk_idx"] = chunk_idx
 
       # Create the nested data in text format. The \00#'s are nested field terminators,
@@ -144,7 +145,7 @@ def load():
       else:
         impala.execute("INSERT INTO TABLE tmp_orders_string " + tmp_orders_sql)
 
-    for chunk_idx in xrange(chunks):
+    for chunk_idx in range(chunks):
       sql_params["chunk_idx"] = chunk_idx
       tmp_customer_sql = r"""
           SELECT STRAIGHT_JOIN

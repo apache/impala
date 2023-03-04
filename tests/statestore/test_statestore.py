@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 from collections import defaultdict
 import json
 import logging
@@ -115,7 +116,7 @@ class KillableThreadedServer(TServer):
     self.processor = None
 
   def wait_until_up(self, num_tries=10):
-    for i in xrange(num_tries):
+    for i in range(num_tries):
       cnxn = TSocket.TSocket('localhost', self.port)
       try:
         cnxn.open()
@@ -125,7 +126,7 @@ class KillableThreadedServer(TServer):
       time.sleep(0.1)
 
   def wait_until_down(self, num_tries=10):
-    for i in xrange(num_tries):
+    for i in range(num_tries):
       cnxn = TSocket.TSocket('localhost', self.port)
       try:
         cnxn.open()
@@ -349,7 +350,7 @@ class TestStatestore():
                         num_updates=1, clear_topic_entries=False):
     topic_entries = [
       Subscriber.TTopicItem(key=key_template + str(x), value=value_template + str(x))
-      for x in xrange(num_updates)]
+      for x in range(num_updates)]
     return Subscriber.TTopicDelta(topic_name=topic_name,
                                   topic_entries=topic_entries,
                                   is_delta=False,

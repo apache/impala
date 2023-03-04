@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtin import filter, map
 from os import environ
 from tests.util.cluster_controller import ClusterController
 from tests.benchmark.plugins import Plugin
@@ -117,7 +118,7 @@ class VTunePlugin(Plugin):
 
   def _kill_vtune(self, host_dict):
     # This method kills threads that are still hanging around after timeout
-    kill_list = filter(self.__is_not_none_or_empty_str, host_dict.keys())
+    kill_list = list(filter(self.__is_not_none_or_empty_str, host_dict.keys()))
     if kill_list:
       self.cluster_controller.deprecated_run_cmd(self.KILL_CMD, hosts=kill_list)
 

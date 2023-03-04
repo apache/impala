@@ -24,6 +24,7 @@
 # Impala, in all the possible ways of validating that metadata.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import pytest
 import random
 import string
@@ -235,7 +236,7 @@ class TestHmsIntegration(ImpalaTestSuite):
     dictionary that holds the parsed attributes."""
     result = {}
     output_lines = output.split('\n')
-    stat_names = map(string.strip, output_lines[0].split(','))
+    stat_names = list(map(string.strip, output_lines[0].split(',')))
     stat_values = output_lines[3].split(',')
     assert len(stat_names) == len(stat_values)
     for i in range(0, len(stat_names)):
@@ -247,7 +248,7 @@ class TestHmsIntegration(ImpalaTestSuite):
     dictionary that holds the parsed attributes."""
     result = {}
     for line in output.split('\n'):
-      line_elements = map(string.strip, line.split(','))
+      line_elements = list(map(string.strip, line.split(',')))
       if len(line_elements) >= 2:
         result[line_elements[0]] = line_elements[1]
     return result

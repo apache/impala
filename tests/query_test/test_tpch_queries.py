@@ -17,6 +17,7 @@
 
 # Functional tests running the TPCH workload.
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import pytest
 
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -42,7 +43,7 @@ class TestTpchQuery(ImpalaTestSuite):
   def idfn(val):
     return "TPC-H: Q{0}".format(val)
 
-  @pytest.mark.parametrize("query", xrange(1, 23), ids=idfn)
+  @pytest.mark.parametrize("query", range(1, 23), ids=idfn)
   def test_tpch(self, vector, query):
     self.run_test_case('tpch-q{0}'.format(query), vector)
 

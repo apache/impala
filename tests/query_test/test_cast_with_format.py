@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_client_protocol_dimension
 

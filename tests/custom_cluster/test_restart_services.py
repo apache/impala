@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import logging
 import os
 import pytest
@@ -59,7 +60,7 @@ class TestRestart(CustomClusterTestSuite):
     # existing metrics yet so we wait for some time here.
     wait_time_s = build_flavor_timeout(60, slow_build_timeout=100)
     sleep(wait_time_s)
-    for retry in xrange(wait_time_s):
+    for retry in range(wait_time_s):
       try:
         cursor.execute("describe database functional")
         return
@@ -82,7 +83,7 @@ class TestRestart(CustomClusterTestSuite):
       client = self.cluster.impalads[0].service.create_beeswax_client()
       assert client is not None
 
-      for i in xrange(5):
+      for i in range(5):
         self.execute_query_expect_success(client, "select * from functional.alltypes")
         node_to_restart = 1 + (i % 2)
         self.cluster.impalads[node_to_restart].restart()

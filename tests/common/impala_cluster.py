@@ -18,6 +18,7 @@
 # Basic object model of an Impala cluster (set of Impala processes).
 
 from __future__ import absolute_import, division, print_function
+from builtins import map, range
 import json
 import logging
 import os

@@ -18,6 +18,7 @@
 # Superclass of all HS2 tests containing commonly used functions.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 from getpass import getuser
 from TCLIService import TCLIService
 from ImpalaService import ImpalaHiveServer2Service
@@ -281,7 +282,7 @@ class HS2TestSuite(ImpalaTestSuite):
         num_rows = len(typed_col.values)
         break
 
-    for i in xrange(num_rows):
+    for i in range(num_rows):
       row = []
       for c in columns:
         for col_type in HS2TestSuite.HS2_V6_COLUMN_TYPES:

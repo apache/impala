@@ -41,6 +41,7 @@
 # downloaded from http://pypi.python.org/pypi/AllPairs/2.0.1
 #
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import collections
 import csv
 import math

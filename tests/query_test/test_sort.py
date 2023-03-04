@@ -22,12 +22,24 @@ from copy import copy, deepcopy
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfNotHdfsMinicluster
 
+
 def transpose_results(result, map_fn=lambda x: x):
   """Given a query result (list of strings, each string represents a row), return a list
-    of columns, where each column is a list of strings. Optionally, map_fn can be provided
-    to be applied to every value, eg. to convert the strings to their underlying types."""
+     of columns, where each column is a list of strings. Optionally, map_fn can be
+     provided to be applied to every value, eg. to convert the strings to their
+     underlying types."""
+
+  # Split result rows by tab to produce a list of lists. i.e.
+  # [[a1,a2], [b1, b2], [c1, c2]]
   split_result = [row.split('\t') for row in result]
-  return [map(map_fn, list(l)) for l in zip(*split_result)]
+  column_result = []
+  for col in zip(*split_result):
+    # col is the transposed result, i.e. a1, b1, c1
+    # Apply map_fn to all elements
+    column_result.append([map_fn(x) for x in col])
+
+  return column_result
+
 
 class TestQueryFullSort(ImpalaTestSuite):
   """Test class to do functional validation of sorting when data is spilled to disk."""

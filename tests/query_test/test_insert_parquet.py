@@ -18,6 +18,7 @@
 # Targeted Impala insert tests
 
 from __future__ import absolute_import, division, print_function
+from builtins import map, range
 import os
 
 from collections import namedtuple
@@ -633,7 +634,8 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
     num_columns = len(table_stats)
     assert num_columns == len(expected_values)
 
-    for col_idx, stats, expected in zip(range(num_columns), table_stats, expected_values):
+    for col_idx, stats, expected in zip(list(range(num_columns)),
+                                        table_stats, expected_values):
       if col_idx in skip_col_idxs:
         continue
       if not expected:
@@ -931,7 +933,7 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
     """Test that writing a Parquet table with too many columns results in an error."""
     num_cols = 12000
     query = "create table %s.wide stored as parquet as select \n" % unique_database
-    query += ", ".join(map(str, xrange(num_cols)))
+    query += ", ".join(map(str, range(num_cols)))
     query += ";\n"
     result = self.execute_query_expect_failure(self.client, query)
     assert "Minimum required block size must be less than 2GB" in str(result)

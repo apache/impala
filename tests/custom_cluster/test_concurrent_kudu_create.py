@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import pytest
 import threading
 import time
@@ -50,7 +51,7 @@ class TestConcurrentKuduCreate(CustomClusterTestSuite):
     self.execute_query("drop table if exists %s" % table_name)
     NUM_ITERS = 20
     pool = ThreadPool(processes=3)
-    for i in xrange(NUM_ITERS):
+    for i in range(NUM_ITERS):
       # Run several commands by specific time interval to reproduce this bug
       r1 = pool.apply_async(run_create_table_if_not_exists)
       r2 = pool.apply_async(run_create_table_if_not_exists)

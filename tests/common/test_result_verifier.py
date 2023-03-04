@@ -18,6 +18,7 @@
 # This modules contians utility functions used to help verify query test results.
 
 from __future__ import absolute_import, division, print_function
+from builtins import map, range
 import logging
 import math
 import re
@@ -457,7 +458,7 @@ def verify_raw_results(test_section, exec_result, file_format, result_section,
     expected_results_list = re.findall(r'\[(.*?)\]', expected_results, flags=re.DOTALL)
     if not is_raw_string:
       # Needs escaping
-      expected_results_list = map(lambda s: s.replace('\n', '\\n'), expected_results_list)
+      expected_results_list = [s.replace('\n', '\\n') for s in expected_results_list]
   else:
     expected_results_list = split_section_lines(expected_results)
   expected = QueryTestResult(expected_results_list, expected_types,
@@ -503,7 +504,7 @@ def parse_result_rows(exec_result, escape_strings=True):
     cols = row.split('\t')
     assert len(cols) == len(col_types)
     new_cols = list()
-    for i in xrange(len(cols)):
+    for i in range(len(cols)):
       if col_types[i] in ['STRING', 'CHAR', 'VARCHAR', 'BINARY']:
         col = cols[i]
         if isinstance(col, str):
@@ -588,7 +589,7 @@ def compute_aggregation(function, field, runtime_profile):
     if (field_regex_re.search(line)):
       match_list.extend(re.findall(field_regex, line))
 
-  int_match_list = map(int, match_list)
+  int_match_list = list(map(int, match_list))
   result = None
   if function == 'SUM':
     result = sum(int_match_list)
@@ -620,7 +621,7 @@ def verify_runtime_profile(expected, actual, update_section=False):
 
   # Check the expected and actual rows pairwise.
   for line in actual.splitlines():
-    for i in xrange(len(expected_lines)):
+    for i in range(len(expected_lines)):
       if matched[i]: continue
       if expected_regexes[i] is not None:
         match = expected_regexes[i].match(line)
@@ -638,7 +639,7 @@ def verify_runtime_profile(expected, actual, update_section=False):
         break
 
   unmatched_lines = []
-  for i in xrange(len(expected_lines)):
+  for i in range(len(expected_lines)):
     if not matched[i] and unexpected_regexes[i] is None:
       unmatched_lines.append(expected_lines[i])
   assert len(unmatched_lines) == 0, ("Did not find matches for lines in runtime profile:"
@@ -650,7 +651,7 @@ def verify_runtime_profile(expected, actual, update_section=False):
 
   updated_aggregations = []
   # Compute the aggregations and check against values
-  for i in xrange(len(expected_aggregations)):
+  for i in range(len(expected_aggregations)):
     if (expected_aggregations[i] is None): continue
     function, field, op, expected_value = expected_aggregations[i]
     actual_value = compute_aggregation(function, field, actual)

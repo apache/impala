@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import glob
 import os
 import psutil
@@ -75,7 +76,7 @@ class TestBreakpadBase(CustomClusterTestSuite):
   def kill_cluster(self, signal):
     self.cluster.refresh()
     processes = self.cluster.impalads + [self.cluster.catalogd, self.cluster.statestored]
-    processes = filter(None, processes)
+    processes = [_f for _f in processes if _f]
     self.kill_processes(processes, signal)
     signal is SIGUSR1 or self.assert_all_processes_killed()
 
@@ -317,7 +318,7 @@ class TestBreakpadExhaustive(TestBreakpadBase):
     cluster_size = self.get_num_processes('impalad')
     # We trigger several rounds of minidump creation to make sure that all daemons wrote
     # enough files to trigger rotation.
-    for i in xrange(max_minidumps + 1):
+    for i in range(max_minidumps + 1):
       self.kill_cluster(SIGUSR1)
       # Breakpad forks to write its minidump files, sleep briefly to allow the forked
       # processes to start.

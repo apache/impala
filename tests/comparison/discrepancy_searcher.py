@@ -25,9 +25,9 @@
 
 # TODO: IMPALA-4600: refactor this module
 from __future__ import absolute_import, division, print_function
+from builtins import range, zip
 from copy import deepcopy
 from decimal import Decimal
-from itertools import izip
 from logging import getLogger
 from math import isinf, isnan
 from os import getenv, symlink, unlink
@@ -182,8 +182,8 @@ class QueryResultComparator(object):
       data_set.sort(cmp=self.row_sort_cmp)
 
     found_data = False  # Will be set to True if the result contains non-zero/NULL data
-    for ref_row, test_row in izip(ref_data_set, test_data_set):
-      for col_idx, (ref_val, test_val) in enumerate(izip(ref_row, test_row)):
+    for ref_row, test_row in zip(ref_data_set, test_data_set):
+      for col_idx, (ref_val, test_val) in enumerate(zip(ref_row, test_row)):
         if ref_val or test_val:   # Ignores zeros, ex "SELECT COUNT(*) ... WHERE FALSE"
           found_data = True
         if self.vals_are_equal(ref_val, test_val):
@@ -222,7 +222,7 @@ class QueryResultComparator(object):
 
   def row_sort_cmp(self, ref_row, test_row):
     '''Comparison used for sorting. '''
-    for ref_val, test_val in izip(ref_row, test_row):
+    for ref_val, test_val in zip(ref_row, test_row):
       if ref_val is None and test_val is not None:
         return -1
       if ref_val is not None and test_val is None:
@@ -368,7 +368,7 @@ class QueryExecutor(object):
       self._table_or_view_name = query.dml_table.name
 
     query_threads = list()
-    for sql_writer, cursor, log_file in izip(
+    for sql_writer, cursor, log_file in zip(
         self.sql_writers, self.cursors, self.query_logs
     ):
       if self.ENABLE_RANDOM_QUERY_OPTIONS and cursor.db_type == IMPALA:
@@ -387,7 +387,7 @@ class QueryExecutor(object):
       query_threads.append(query_thread)
 
     end_time = time() + self.query_timeout_seconds
-    for query_thread, cursor in izip(query_threads, self.cursors):
+    for query_thread, cursor in zip(query_threads, self.cursors):
       join_time = end_time - time()
       if join_time > 0:
         query_thread.join(join_time)
@@ -481,7 +481,7 @@ class QueryExecutor(object):
   def _create_random_table_name(self):
     char_choices = ascii_lowercase
     chars = list()
-    for idx in xrange(4):   # will result in ~1M combinations
+    for idx in range(4):   # will result in ~1M combinations
       if idx == 1:
         char_choices += '_' + digits
       chars.append(choice(char_choices))
@@ -585,7 +585,7 @@ class FrontendExceptionSearcher(object):
       LOG.error("Error generating explain plan for test db:\n%s" % sql)
       raise e
 
-    for idx in xrange(number_of_test_queries):
+    for idx in range(number_of_test_queries):
       LOG.info("Explaining query #%s" % (idx + 1))
       statement_type = self.query_profile.choose_statement()
       statement_generator = get_generator(statement_type)(self.query_profile)

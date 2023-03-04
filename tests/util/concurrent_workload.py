@@ -20,6 +20,7 @@
 # This class can be used to drive a concurrent workload against a local minicluster
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import argparse
 import logging
 # Needed to work around datetime threading bug:
@@ -103,7 +104,7 @@ class ConcurrentWorkload(object):
   def start(self):
     """Starts worker threads to execute queries."""
     # Start workers
-    for i in xrange(self.num_streams):
+    for i in range(self.num_streams):
       t = Thread(target=self.loop_query, args=(self.query, self.output_q, self.stop_ev))
       self.threads.append(t)
       t.start()

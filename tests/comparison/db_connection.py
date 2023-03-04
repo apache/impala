@@ -22,6 +22,7 @@
 
 '''
 from __future__ import absolute_import, division, print_function
+from builtins import filter, map, range, zip
 import hashlib
 import impala.dbapi
 import re
@@ -29,7 +30,7 @@ import shelve
 from abc import ABCMeta, abstractmethod
 from contextlib import closing
 from decimal import Decimal as PyDecimal
-from itertools import combinations, ifilter, izip
+from itertools import combinations
 from logging import getLogger
 from os import symlink, unlink
 from pyparsing import (
@@ -123,7 +124,7 @@ class DbCursor(object):
                   table_keys=table.primary_key_names))
           mismatch = True
           break
-        for left, right in izip(common_table.cols, table.cols):
+        for left, right in zip(common_table.cols, table.cols):
           if not (left.name == right.name and left.type == right.type):
             LOG.debug('Ignoring table %s. It has different columns %s vs %s.' %
                 (table_name, left, right))
@@ -513,10 +514,10 @@ class DbCursor(object):
       table = self.describe_table(table_name)
     sql_templ = 'SELECT COUNT(*) FROM %s GROUP BY %%s HAVING COUNT(*) > 1' % table.name
     unique_cols = list()
-    for current_depth in xrange(1, depth + 1):
+    for current_depth in range(1, depth + 1):
       for cols in combinations(table.cols, current_depth):   # redundant combos excluded
         cols = set(cols)
-        if any(ifilter(lambda unique_subset: unique_subset < cols, unique_cols)):
+        if any(filter(lambda unique_subset: unique_subset < cols, unique_cols)):
           # cols contains a combo known to be unique
           continue
         col_names = ', '.join(col.name for col in cols)

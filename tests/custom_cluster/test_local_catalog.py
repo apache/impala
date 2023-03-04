@@ -18,6 +18,7 @@
 # Test behaviors specific to --use_local_catalog being enabled.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import pytest
 import Queue
 import random
@@ -144,7 +145,7 @@ class TestCompactCatalogUpdates(CustomClusterTestSuite):
       # catalog pushes a new topic update.
       self.cluster.catalogd.start()
       NUM_ATTEMPTS = 30
-      for attempt in xrange(NUM_ATTEMPTS):
+      for attempt in range(NUM_ATTEMPTS):
         try:
           self.assert_impalad_log_contains('WARNING', 'Detected catalog service restart')
           err = self.execute_query_expect_failure(client, "select * from %s" % view)
@@ -445,7 +446,7 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
     # Prior to fixing IMPALA-7534, this test would fail within 20-30 iterations,
     # so 100 should be quite reliable as a regression test.
     NUM_ITERS = 100
-    for i in t.imap_unordered(do_table, xrange(NUM_ITERS)):
+    for i in t.imap_unordered(do_table, range(NUM_ITERS)):
       pass
 
 class TestObservability(CustomClusterTestSuite):
@@ -493,7 +494,7 @@ class TestObservability(CustomClusterTestSuite):
           "explain select count(*) from functional.alltypes",
           "create table %s (a int)" % test_table_name,
           "drop table %s" % test_table_name]
-      for _ in xrange(0, 10):
+      for _ in range(0, 10):
         for query in queries_to_test:
           ret = self.execute_query_expect_success(client, query)
           assert ret.runtime_profile.count("Frontend:") == 1

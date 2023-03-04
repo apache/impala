@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 import pytest
@@ -223,7 +224,7 @@ class TestBlacklistFaultyDisk(CustomClusterTestSuite):
 
   def __generate_scratch_dir(self, num):
     result = []
-    for i in xrange(num):
+    for i in range(num):
       dir_path = tempfile.mkdtemp()
       self.created_dirs.append(dir_path)
       result.append(dir_path)

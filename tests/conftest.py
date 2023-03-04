@@ -18,6 +18,7 @@
 # py.test configuration module
 #
 from __future__ import absolute_import, division, print_function
+from builtins import map, range
 from impala.dbapi import connect as impala_connect
 from kudu import connect as kudu_connect
 from random import choice, sample
@@ -231,7 +232,7 @@ def pytest_generate_tests(metafunc):
       LOG.warning("No test vectors generated for test '%s'. Check constraints and "
           "input vectors" % metafunc.function.func_name)
 
-    vector_names = map(str, vectors)
+    vector_names = list(map(str, vectors))
     # In the case this is a test result update or sanity run, select a single test vector
     # to run. This is okay for update_results because results are expected to be the same
     # for all test vectors.
@@ -665,7 +666,7 @@ def pytest_collection_modifyitems(items, config, session):
     return
 
   num_items = len(items)
-  this_shard, num_shards = map(int, config.option.shard_tests.split("/"))
+  this_shard, num_shards = list(map(int, config.option.shard_tests.split("/")))
   assert 0 <= this_shard <= num_shards
   if this_shard == num_shards:
     this_shard = 0

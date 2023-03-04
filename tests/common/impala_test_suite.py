@@ -18,6 +18,7 @@
 # The base class that should be used for almost all Impala tests
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import glob
 import grp
 import json
@@ -467,7 +468,7 @@ class ImpalaTestSuite(BaseTestSuite):
     # Parse the /varz endpoint to get the flag information.
     varz = self.get_debug_page(VARZ_URL)
     assert 'flags' in varz.keys()
-    filtered_varz = filter(lambda flag: flag['name'] == var, varz['flags'])
+    filtered_varz = [flag for flag in varz['flags'] if flag['name'] == var]
     assert len(filtered_varz) == 1
     assert 'current' in filtered_varz[0].keys()
     return filtered_varz[0]['current'].strip()

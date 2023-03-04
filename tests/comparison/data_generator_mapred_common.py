@@ -24,6 +24,7 @@
 '''
 
 from __future__ import absolute_import, division, print_function
+from base import range
 import base64
 import pickle
 import StringIO
@@ -55,13 +56,13 @@ class TextTableDataGenerator(object):
     col_val_generators = [self._create_val_generator(c.exact_type) for c in cols]
     val_buffer_size = 1024
     col_val_buffers = [[None] * val_buffer_size for c in cols]
-    for row_idx in xrange(self.row_count):
+    for row_idx in range(self.row_count):
       val_buffer_idx = row_idx % val_buffer_size
       if val_buffer_idx == 0:
         for col_idx, col in enumerate(cols):
           val_buffer = col_val_buffers[col_idx]
           val_generator = col_val_generators[col_idx]
-          for idx in xrange(val_buffer_size):
+          for idx in range(val_buffer_size):
             val = next(val_generator)
             val_buffer[idx] = r"\N" if val is None else val
       for col_idx, col in enumerate(cols):

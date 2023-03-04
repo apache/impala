@@ -18,6 +18,7 @@
 # Tests admission control
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import itertools
 import logging
 import os
@@ -854,7 +855,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     EXPECTED_REASON = \
         "Latest admission queue reason: number of running queries 1 is at or over limit 1"
     NUM_QUERIES = 5
-    profiles = self._execute_and_collect_profiles([STMT for i in xrange(NUM_QUERIES)],
+    profiles = self._execute_and_collect_profiles([STMT for i in range(NUM_QUERIES)],
         TIMEOUT_S)
 
     num_reasons = len([profile for profile in profiles if EXPECTED_REASON in profile])
@@ -891,7 +892,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     NUM_QUERIES = 5
     # IMPALA-9856: Disable query result spooling so that we can run queries with low
     # mem_limit.
-    profiles = self._execute_and_collect_profiles([STMT for i in xrange(NUM_QUERIES)],
+    profiles = self._execute_and_collect_profiles([STMT for i in range(NUM_QUERIES)],
         TIMEOUT_S, {'mem_limit': '9mb', 'spool_query_results': '0'})
 
     num_reasons = len([profile for profile in profiles if EXPECTED_REASON in profile])
@@ -933,7 +934,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     NUM_QUERIES = 5
     # IMPALA-9856: Disable query result spooling so that we can run queries with low
     # mem_limit.
-    profiles = self._execute_and_collect_profiles([STMT for i in xrange(NUM_QUERIES)],
+    profiles = self._execute_and_collect_profiles([STMT for i in range(NUM_QUERIES)],
         TIMEOUT_S, {'mem_limit': '2mb', 'spool_query_results': '0'}, True)
 
     EXPECTED_REASON = """.*Admission for query exceeded timeout 1000ms in pool """\
@@ -967,7 +968,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     NUM_QUERIES = 5
     # IMPALA-9856: Disable query result spooling so that we can run queries with low
     # mem_limit.
-    profiles = self._execute_and_collect_profiles([STMT for i in xrange(NUM_QUERIES)],
+    profiles = self._execute_and_collect_profiles([STMT for i in range(NUM_QUERIES)],
         TIMEOUT_S, {'mem_limit': '2mb', 'spool_query_results': '0'}, True)
 
     EXPECTED_REASON = """.*Admission for query exceeded timeout 1000ms in pool """\
@@ -1001,7 +1002,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       "admission-controller.total-dequeue-failed-coordinator-limited"
     original_metric_value = self.get_ac_process().service.get_metric_value(
         coordinator_limited_metric)
-    profiles = self._execute_and_collect_profiles([STMT for i in xrange(NUM_QUERIES)],
+    profiles = self._execute_and_collect_profiles([STMT for i in range(NUM_QUERIES)],
         TIMEOUT_S, config_options={"mt_dop": 4})
 
     num_reasons = len([profile for profile in profiles if EXPECTED_REASON in profile])
@@ -1403,7 +1404,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     STMT = "select sleep(100)"
     TIMEOUT_S = 60
     NUM_QUERIES = 5
-    profiles = self._execute_and_collect_profiles([STMT for i in xrange(NUM_QUERIES)],
+    profiles = self._execute_and_collect_profiles([STMT for i in range(NUM_QUERIES)],
         TIMEOUT_S, allow_query_failure=True)
     ADMITTED_STALENESS_WARNING = \
         "Warning: admission control information from statestore is stale"
@@ -1795,7 +1796,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     num_submitted queries. See IMPALA-6227 for an example of problems with inconsistent
     metrics where a dequeued query is reflected in dequeued but not admitted."""
     ATTEMPTS = 5
-    for i in xrange(ATTEMPTS):
+    for i in range(ATTEMPTS):
       metrics = self.get_admission_metrics()
       admitted_immediately = num_submitted - metrics['queued'] - metrics['rejected']
       if admitted_immediately + metrics['dequeued'] == metrics['admitted']:
@@ -1891,7 +1892,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
 
     # Request admitted clients to end their queries
     current_executing_queries = []
-    for i in xrange(num_queries):
+    for i in range(num_queries):
       # pop() is thread-safe, it's OK if another thread is appending concurrently.
       thread = self.executing_threads.pop(0)
       LOG.info("Cancelling query %s", thread.query_num)
@@ -2100,7 +2101,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     initial_metrics = self.get_admission_metrics()
     log_metrics("Initial metrics: ", initial_metrics)
 
-    for query_num in xrange(num_queries):
+    for query_num in range(num_queries):
       impalad = self.impalads[query_num % len(self.impalads)]
       query_end_behavior = QUERY_END_BEHAVIORS[query_num % len(QUERY_END_BEHAVIORS)]
       thread = self.SubmitQueryThread(impalad, additional_query_options, vector,

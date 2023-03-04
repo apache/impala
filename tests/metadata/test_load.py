@@ -18,6 +18,7 @@
 # Functional tests for LOAD DATA statements.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import time
 from beeswaxd.BeeswaxService import QueryState
 from copy import deepcopy
@@ -77,18 +78,18 @@ class TestLoadData(ImpalaTestSuite):
     #   - Sub Directories 5-6 have multiple files (4) copied from alltypesaggmultifiles
     #   - Sub Directory 3 also has hidden files, in both supported formats.
     #   - All sub-dirs contain a hidden directory
-    for i in xrange(1, 6):
+    for i in range(1, 6):
       stagingDir = '{0}/{1}'.format(STAGING_PATH, i)
       self.filesystem_client.make_dir(stagingDir, permission=777)
       self.filesystem_client.make_dir('{0}/_hidden_dir'.format(stagingDir),
                                       permission=777)
     # Copy single file partitions from alltypes.
-    for i in xrange(1, 4):
+    for i in range(1, 4):
       self.filesystem_client.copy(ALLTYPES_PATH,
                                "{0}/{1}/100101.txt".format(STAGING_PATH, i))
     # Copy multi file partitions from alltypesaggmultifiles.
     file_names = self.filesystem_client.ls(MULTIAGG_PATH)
-    for i in xrange(4, 6):
+    for i in range(4, 6):
       for file_ in file_names:
         self.filesystem_client.copy(
             "{0}/{1}".format(MULTIAGG_PATH, file_),

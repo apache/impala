@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import pytest
 from hive_metastore.ttypes import Database
 from hive_metastore.ttypes import FieldSchema

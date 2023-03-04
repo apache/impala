@@ -16,8 +16,8 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import filter
 from copy import deepcopy
-from itertools import ifilter
 
 from tests.comparison.common import ValExpr
 from tests.comparison.db_types import (
@@ -419,7 +419,7 @@ def create_func(name, returns=None, accepts=[], signatures=[], base_type=Func):
     for arg_idx, arg in enumerate(signature.args):
       replacement_signature = None
       if arg.is_subquery:
-        if any(ifilter(lambda type_: type_ == Number, arg.type)):
+        if any(filter(lambda type_: type_ == Number, arg.type)):
           raise Exception('Number not accepted in subquery signatures')
       elif arg.type == Number:
         for replacement_type in [Decimal, Int, Float]:

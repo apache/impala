@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import pytest
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
@@ -141,7 +142,7 @@ class TestRPCTimeout(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--backend_client_rpc_timeout_ms=1000"
       " --datastream_sender_timeout_ms=30000 --debug_actions=%s" %
-      "|".join(map(lambda rpc: "%s_DELAY:JITTER@3000@0.1" % rpc, all_rpcs)))
+      "|".join(["%s_DELAY:JITTER@3000@0.1" % rpc for rpc in all_rpcs]))
   def test_random_rpc_timeout(self, vector):
     self.execute_query_verify_metrics(self.TEST_QUERY, None, 10)
 

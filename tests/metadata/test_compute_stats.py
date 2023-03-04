@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import range
 import pytest
 from subprocess import check_call
 
@@ -183,7 +184,7 @@ class TestComputeStats(ImpalaTestSuite):
 
     # Check that the template formulated above exists and row count of the table is
     # not zero, for all scans.
-    for i in xrange(len(explain_result.data)):
+    for i in range(len(explain_result.data)):
       if ("SCAN HDFS" in explain_result.data[i]):
          assert(hdfs_physical_properties_template in explain_result.data[i + 1])
          assert("cardinality=0" not in explain_result.data[i + 2])

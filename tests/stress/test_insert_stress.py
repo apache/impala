@@ -16,6 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from builtins import map, range
 import pytest
 import random
 import time
@@ -64,11 +65,12 @@ class TestInsertStress(ImpalaTestSuite):
     def verify_result_set(result):
       wid_to_run = dict()
       for line in result.data:
-        [wid, i] = map(int, (line.split('\t')))
+        [wid, i] = list(map(int, (line.split('\t'))))
         wid_to_run.setdefault(wid, []).append(i)
       for wid, run in wid_to_run.items():
         sorted_run = sorted(run)
-        assert sorted_run == range(sorted_run[0], sorted_run[-1] + 1), "wid: %d" % wid
+        assert sorted_run == list(range(sorted_run[0], sorted_run[-1] + 1)), \
+          "wid: %d" % wid
 
     target_impalad = cid % ImpalaTestSuite.get_impalad_cluster_size()
     impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
@@ -97,10 +99,10 @@ class TestInsertStress(ImpalaTestSuite):
     inserts = 50
 
     writers = [Task(self._impala_role_concurrent_writer, tbl_name, i, inserts, counter)
-               for i in xrange(0, num_writers)]
+               for i in range(0, num_writers)]
     checkers = [Task(self._impala_role_concurrent_checker, tbl_name, i, counter,
                      num_writers)
-                for i in xrange(0, num_checkers)]
+                for i in range(0, num_checkers)]
     run_tasks(writers + checkers)
 
   @pytest.mark.execute_serially
@@ -124,8 +126,8 @@ class TestInsertStress(ImpalaTestSuite):
     inserts = 30
 
     writers = [Task(self._impala_role_concurrent_writer, tbl_name, i, inserts, counter)
-               for i in xrange(0, num_writers)]
+               for i in range(0, num_writers)]
     checkers = [Task(self._impala_role_concurrent_checker, tbl_name, i, counter,
                      num_writers)
-                for i in xrange(0, num_checkers)]
+                for i in range(0, num_checkers)]
     run_tasks(writers + checkers)
