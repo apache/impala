@@ -187,6 +187,11 @@ void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver, bool metrics_only
       [this](const auto& req, auto* doc) {
         this->QuerySummaryHandler(true, true, req, doc); }, false);
 
+  webserver->RegisterUrlCallback("/query_timeline", "query_timeline.tmpl",
+      [this](const auto& req, auto* doc) {
+        this->QueryProfileHelper(req, doc, TRuntimeProfileFormat::JSON, true);
+        }, false);
+
   webserver->RegisterUrlCallback("/query_plan_text", "query_plan_text.tmpl",
       [this](const auto& req, auto* doc) {
         this->QuerySummaryHandler(false, false, req, doc); }, false);
@@ -318,7 +323,7 @@ void ImpalaHttpHandler::QueryProfileHandler(const Webserver::WebRequest& req,
 }
 
 void ImpalaHttpHandler::QueryProfileHelper(const Webserver::WebRequest& req,
-    Document* document, TRuntimeProfileFormat::type format) {
+    Document* document, TRuntimeProfileFormat::type format, bool internal_profile) {
   TUniqueId unique_id;
   stringstream ss;
   Status status = ParseIdFromRequest(req, &unique_id, "query_id");
@@ -326,10 +331,16 @@ void ImpalaHttpHandler::QueryProfileHelper(const Webserver::WebRequest& req,
     ss << status.GetDetail();
   } else {
     ImpalaServer::RuntimeProfileOutput runtime_profile;
-    runtime_profile.string_output = &ss;
+    if (internal_profile) {
+      Value query_id_val(PrintId(unique_id).c_str(), document->GetAllocator());
+      document->AddMember("query_id", query_id_val, document->GetAllocator());
+      document->AddMember("internal_profile", true, document->GetAllocator());
+    }
+    if (format != TRuntimeProfileFormat::JSON) {
+      runtime_profile.string_output = &ss;
+    }
     runtime_profile.json_output = document;
-    Status status =
-        server_->GetRuntimeProfileOutput(unique_id, "", format, &runtime_profile);
+    status = server_->GetRuntimeProfileOutput(unique_id, "", format, &runtime_profile);
     if (!status.ok()) {
       ss.str(Substitute("Could not obtain runtime profile: $0", status.GetDetail()));
     }
@@ -338,6 +349,16 @@ void ImpalaHttpHandler::QueryProfileHelper(const Webserver::WebRequest& req,
   if (format != TRuntimeProfileFormat::JSON){
     Value profile(ss.str().c_str(), document->GetAllocator());
     document->AddMember("contents", profile, document->GetAllocator());
+  } else if (internal_profile) {
+    if (!status.ok()) {
+      Value error(ss.str().c_str(), document->GetAllocator());
+      document->AddMember("error", error, document->GetAllocator());
+      return;
+    }
+    // Add OK Status like other handlers have. These status lines could be
+    // eliminated if error was handled uniformly in all handlers.
+    Value json_status("OK");
+    document->AddMember("status", json_status, document->GetAllocator());
   }
 }
 

@@ -78,7 +78,7 @@ class TestWebPage(ImpalaTestSuite):
       assert "cmake_build_type" in build_flags
       assert build_flags["cmake_build_type"] in ["debug", "release", "address_sanitizer",
           "tidy", "ubsan", "ubsan_full", "tsan", "tsan_full", "code_coverage_release",
-          "code_coverage_debug"]
+          "code_coverage_debug", "debug_noopt"]
       assert "library_link_type" in build_flags
       assert build_flags["library_link_type"] in ["dynamic", "static"]
 

@@ -832,7 +832,7 @@ Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
     const string& user, TRuntimeProfileFormat::type format,
     RuntimeProfileOutput* profile) {
   DCHECK(profile != nullptr);
-  DCHECK(profile->string_output != nullptr);
+  DCHECK(format == TRuntimeProfileFormat::JSON || profile->string_output != nullptr);
 
   // Search for the query id in the active query map
   {
