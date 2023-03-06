@@ -378,4 +378,10 @@ public class HdfsTableSink extends TableSink {
     }
     return num_instances;
   }
+
+  @Override
+  public void computeRowConsumptionAndProductionToCost() {
+    super.computeRowConsumptionAndProductionToCost();
+    fragment_.setFixedInstanceCount(fragment_.getNumInstances());
+  }
 }

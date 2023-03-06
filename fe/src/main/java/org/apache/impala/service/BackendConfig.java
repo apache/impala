@@ -380,4 +380,14 @@ public class BackendConfig {
   public TGeospatialLibrary getGeospatialLibrary() {
     return backendCfg_.geospatial_library;
   }
+
+  public double getQueryCpuCountDivisor() { return backendCfg_.query_cpu_count_divisor; }
+
+  public boolean isProcessingCostUseEqualExprWeight() {
+    return backendCfg_.processing_cost_use_equal_expr_weight;
+  }
+
+  public long getMinProcessingPerThread() {
+    return backendCfg_.min_processing_per_thread;
+  }
 }

@@ -738,7 +738,7 @@ enum TImpalaQueryOptions {
   ORC_SCHEMA_RESOLUTION = 146;
 
   // Expands complex types in star queries
-  EXPAND_COMPLEX_TYPES = 147
+  EXPAND_COMPLEX_TYPES = 147;
 
   // Specify the database name which stores global udf
   FALLBACK_DB_FOR_FUNCTIONS = 148;
@@ -760,6 +760,14 @@ enum TImpalaQueryOptions {
 
   // Enable immediate admission for trivial queries.
   ENABLE_TRIVIAL_QUERY_FOR_ADMISSION = 152
+
+  // Control whether to consider CPU processing cost during query planning.
+  COMPUTE_PROCESSING_COST = 153;
+
+  // Minimum number of threads of a query fragment per host in processing
+  // cost algorithm. It is recommend to not set it with value more than number of
+  // physical cores in executor node. Valid values are in [1, 128]. Default to 1.
+  PROCESSING_COST_MIN_THREADS = 154;
 }
 
 // The summary of a DML statement.

@@ -740,3 +740,20 @@ class TestTpcdsUnmodified(ImpalaTestSuite):
 
   def test_tpcds_q89(self, vector):
     self.run_test_case('tpcds-q89', vector)
+
+
+class TestTpcdsQueryWithProcessingCost(TestTpcdsQuery):
+  @classmethod
+  def get_workload(cls):
+    return 'tpcds'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestTpcdsQueryWithProcessingCost, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_mandatory_exec_option('mt_dop', 4)
+    cls.ImpalaTestMatrix.add_mandatory_exec_option('compute_processing_cost', 1)
+
+  def test_tpcds_q51a(self, vector):
+    pytest.xfail("IMPALA-11604: Q51a scale to 650 cores and 24.78 GB per-host min "
+        "reservation. Need to revisit ProcessingCost.")
+    self.run_test_case(self.get_workload() + '-q51a', vector)

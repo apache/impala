@@ -83,6 +83,13 @@ struct TPlanFragment {
   // Maximum number of required threads that will be executing concurrently for this plan
   // fragment, i.e. the number of threads that this query needs to execute successfully.
   10: optional i64 thread_reservation
+
+  // The effective number of parallelism for this fragment that dictated by the frontend
+  // planner. If the frontend planner set this to a positive number, the backend scheduler
+  // must make sure that it schedules no more than this many instance fragments. Currently
+  // not enforced on fragments having scan nodes or union nodes or when fragment need to
+  // exceed max_fs_writers query option (see IMPALA-8125).
+  14: optional i32 effective_instance_count
 }
 
 // location information for a single scan range

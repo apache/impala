@@ -420,13 +420,17 @@ class Scheduler {
       std::vector<NetworkAddressPB>* scan_hosts);
 
   /// Return true if 'plan' contains a node of the given type.
-  bool ContainsNode(const TPlan& plan, TPlanNodeType::type type);
+  static bool ContainsNode(const TPlan& plan, TPlanNodeType::type type);
 
   /// Return true if 'plan' contains a node of one of the given types.
-  bool ContainsNode(const TPlan& plan, const std::vector<TPlanNodeType::type>& types);
+  static bool ContainsNode(
+      const TPlan& plan, const std::vector<TPlanNodeType::type>& types);
 
   /// Return true if 'plan' contains a scan node.
-  bool ContainsScanNode(const TPlan& plan);
+  static bool ContainsScanNode(const TPlan& plan);
+
+  /// Return true if 'plan' contains a union node.
+  static bool ContainsUnionNode(const TPlan& plan);
 
   /// Return all ids of nodes in 'plan' of any of the given types.
   std::vector<TPlanNodeId> FindNodes(
@@ -434,6 +438,24 @@ class Scheduler {
 
   /// Return all ids of all scan nodes in 'plan'.
   std::vector<TPlanNodeId> FindScanNodes(const TPlan& plan);
+
+  /// If TPlanFragment.effective_instance_count is positive, verify that resulting
+  /// instance_states size match with effective_instance_count. Fragment with UnionNode or
+  /// ScanNode or one where IsExceedMaxFsWriters equals true is not checked.
+  static void CheckEffectiveInstanceCount(
+      const FragmentScheduleState* fragment_state, const ScheduleState* state);
+
+  /// Check if sink_fragment_state has hdfs_table_sink AND ref_fragment_state scheduled
+  /// to exceed max_fs_writers query option.
+  static inline bool IsExceedMaxFsWriters(
+      const FragmentScheduleState* sink_fragment_state,
+      const FragmentScheduleState* ref_fragment_state, const ScheduleState* state) {
+    return (sink_fragment_state->fragment.output_sink.__isset.table_sink
+        && sink_fragment_state->fragment.output_sink.table_sink.__isset.hdfs_table_sink
+        && state->query_options().max_fs_writers > 0
+        && ref_fragment_state->instance_states.size()
+            > state->query_options().max_fs_writers);
+  }
 
   friend class impala::test::SchedulerWrapper;
   FRIEND_TEST(SimpleAssignmentTest, ComputeAssignmentDeterministicNonCached);

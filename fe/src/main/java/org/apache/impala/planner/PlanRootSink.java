@@ -226,4 +226,10 @@ public class PlanRootSink extends DataSink {
   public void collectExprs(List<Expr> exprs) {
     exprs.addAll(outputExprs_);
   }
+
+  @Override
+  public void computeRowConsumptionAndProductionToCost() {
+    super.computeRowConsumptionAndProductionToCost();
+    fragment_.setFixedInstanceCount(fragment_.getNumInstances());
+  }
 }

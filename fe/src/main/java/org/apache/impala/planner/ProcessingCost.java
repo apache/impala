@@ -20,6 +20,7 @@ package org.apache.impala.planner;
 import com.google.common.base.Preconditions;
 import com.google.common.math.LongMath;
 
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TQueryOptions;
 
 import java.math.RoundingMode;
@@ -96,8 +97,7 @@ public abstract class ProcessingCost implements Cloneable {
   }
 
   public static boolean isComputeCost(TQueryOptions queryOptions) {
-    // TODO: Replace with proper check in IMPALA-11604 part 2.
-    return false;
+    return queryOptions.getMt_dop() > 0 && queryOptions.isCompute_processing_cost();
   }
 
   /**
@@ -207,10 +207,8 @@ public abstract class ProcessingCost implements Cloneable {
   }
 
   private int getNumInstanceMax() {
-    // TODO: replace minProcessingCostPerThread with backend flag.
-    long minProcessingCostPerThread = 10000000L;
     long maxInstance = LongMath.divide(getTotalCost(),
-        minProcessingCostPerThread, RoundingMode.CEILING);
+        BackendConfig.INSTANCE.getMinProcessingPerThread(), RoundingMode.CEILING);
     if (maxInstance > 0) {
       return maxInstance < Integer.MAX_VALUE ? (int) maxInstance : Integer.MAX_VALUE;
     } else {

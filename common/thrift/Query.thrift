@@ -618,6 +618,12 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   153: optional bool enable_trivial_query_for_admission = true;
+
+  // See comment in ImpalaService.thrift
+  154: optional bool compute_processing_cost = false;
+
+  // See comment in ImpalaService.thrift
+  155: optional i32 processing_cost_min_threads = 1;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external
@@ -898,5 +904,10 @@ struct TQueryExecRequest {
 
   // Indicate whether the request is a trivial query. Used by admission control.
   13: optional bool is_trivial_query
+
+  // CPU core count required to run the query. Used by admission control to decide which
+  // executor group to run the query. Non-positive value means no specific CPU core count
+  // is required.
+  14: optional i32 cores_required;
 }
 

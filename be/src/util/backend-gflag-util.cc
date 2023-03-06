@@ -197,7 +197,56 @@ DEFINE_string(ignored_dir_prefix_list, ".,_tmp.,_spark_metadata",
     "Comma separated list to specify the prefix for tmp/staging dirs that catalogd should"
     " skip in loading file metadata.");
 
+DEFINE_double_hidden(query_cpu_count_divisor, 1.0,
+    "(Advance) Divide the CPU requirement of a query to fit the total available CPU in "
+    "the executor group. For example, setting value 2 will fit the query with CPU "
+    "requirement 2X to an executor group with total available CPU X. Note that setting "
+    "with a fractional value less than 1 effectively multiplies the query CPU "
+    "requirement. A valid value is > 0.0. The default value is 1.");
+
+// TODO: Tune the individual expression cost from IMPALA-2805.
+DEFINE_bool_hidden(processing_cost_use_equal_expr_weight, true,
+    "(Advance) If true, all expression evaluations are weighted equally to 1 during the "
+    "plan node's processing cost calculation. If false, expression cost from IMPALA-2805 "
+    "will be used. Default to false.");
+
+// TODO: Benchmark and tune this config with an optimal value.
+DEFINE_int64_hidden(min_processing_per_thread, 10000000,
+    "(Advance) Minimum processing load (in processing cost unit) that a fragment "
+    "instance need to work on before planner consider increasing instance count. Used to "
+    "adjust fragment instance count based on estimated workload rather than the MT_DOP "
+    "setting. Setting this to high number will reduce parallelism of a fragment (more "
+    "workload per fragment), while setting to low number will increase parallelism (less "
+    "workload per fragment). Actual parallelism might still be constrained by the total "
+    "number of cores in selected executor group, MT_DOP, or PROCESSING_COST_MIN_THREAD "
+    "query option. Must be a positive integer. Default to 10M.");
+
+using strings::Substitute;
+
 namespace impala {
+
+// Flag validation
+// ------------------------------------------------------------
+static bool ValidateCpuCountDivisor(const char* flagname, double value) {
+  if (0.0 < value) {
+    return true;
+  }
+  LOG(ERROR) << Substitute(
+      "$0 must be greater than 0.0, value $1 is invalid", flagname, value);
+  return false;
+}
+
+static bool ValidateMinProcessingPerThread(const char* flagname, int64_t value) {
+  if (0 < value) {
+    return true;
+  }
+  LOG(ERROR) << Substitute(
+      "$0 must be a positive integer, value $1 is invalid", flagname, value);
+  return false;
+}
+
+DEFINE_validator(query_cpu_count_divisor, &ValidateCpuCountDivisor);
+DEFINE_validator(min_processing_per_thread, &ValidateMinProcessingPerThread);
 
 Status GetConfigFromCommand(const string& flag_cmd, string& result) {
   result.clear();
@@ -344,6 +393,10 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
     DCHECK_EQ(FLAGS_geospatial_library, to_string(TGeospatialLibrary::HIVE_ESRI));
     cfg.__set_geospatial_library(TGeospatialLibrary::HIVE_ESRI);
   }
+  cfg.__set_query_cpu_count_divisor(FLAGS_query_cpu_count_divisor);
+  cfg.__set_processing_cost_use_equal_expr_weight(
+      FLAGS_processing_cost_use_equal_expr_weight);
+  cfg.__set_min_processing_per_thread(FLAGS_min_processing_per_thread);
   return Status::OK();
 }
 

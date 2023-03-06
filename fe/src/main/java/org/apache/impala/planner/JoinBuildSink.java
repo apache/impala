@@ -163,4 +163,12 @@ public class JoinBuildSink extends DataSink {
   public void collectExprs(List<Expr> exprs) {
     exprs.addAll(buildExprs_);
   }
+
+  @Override
+  public void computeRowConsumptionAndProductionToCost() {
+    super.computeRowConsumptionAndProductionToCost();
+    if (isShared()) {
+      fragment_.setFixedInstanceCount(getNumInstances());
+    }
+  }
 }

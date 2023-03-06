@@ -240,4 +240,10 @@ struct TBackendGflags {
   104: required bool enable_reload_events
 
   105: required TGeospatialLibrary geospatial_library
+
+  106: required double query_cpu_count_divisor
+
+  107: required bool processing_cost_use_equal_expr_weight
+
+  108: required i64 min_processing_per_thread
 }

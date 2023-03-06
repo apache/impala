@@ -111,12 +111,24 @@ public class ExprUtil {
     // TODO: Implement the cost for conjunts once the implemetation for
     // 'Expr' is in place.
     if (exprs == null) return 0;
-    return exprs.size();
+    if (BackendConfig.INSTANCE.isProcessingCostUseEqualExprWeight()) {
+      return exprs.size();
+    } else {
+      float totalCost = 0;
+      for (Expr e : exprs) {
+        totalCost += e.hasCost() ? e.getCost() : 1;
+      }
+      return totalCost;
+    }
   }
 
   public static float computeExprCost(Expr e) {
     if (e == null) return 0;
-    return 1;
+    if (BackendConfig.INSTANCE.isProcessingCostUseEqualExprWeight()) {
+      return 1;
+    } else {
+      return e.hasCost() ? e.getCost() : 1;
+    }
     // TODO Implement a function that can take into consideration of data types,
     // expressions and potentially LLVM translation in BE. The function must also
     // run fast.

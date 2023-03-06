@@ -17,28 +17,39 @@
 
 package org.apache.impala.planner;
 
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.planner.PlanNode.ExecPhaseResourceProfiles;
 import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPartitionType;
 import org.apache.impala.thrift.TPlanFragment;
 import org.apache.impala.thrift.TPlanFragmentTree;
 import org.apache.impala.thrift.TQueryOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+import com.google.common.math.IntMath;
+import com.google.common.math.LongMath;
 
 /**
  * PlanFragments form a tree structure via their ExchangeNodes. A tree of fragments
@@ -77,6 +88,7 @@ import com.google.common.base.Predicates;
  * - toThrift()
  */
 public class PlanFragment extends TreeNode<PlanFragment> {
+  private final static Logger LOG = LoggerFactory.getLogger(PlanFragment.class);
   private final PlanFragmentId fragmentId_;
   private PlanId planId_;
   private CohortId cohortId_;
@@ -128,6 +140,32 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   // A single instance of the filter is shared between all instances of a fragment
   // on a backend.
   private long consumedGlobalRuntimeFiltersMemReservationBytes_ = 0;
+
+  // The root of segment costs tree of this fragment.
+  // Individual element of the tree describe processing cost of subset of plan nodes
+  // that is divided by blocking PlanNode/DataSink boundary. Together, they describe total
+  // processing cost of this fragment. Set in computeCostingSegment().
+  private CostingSegment rootSegment_;
+
+  // Maximum allowed parallelism based on minimum processing load per fragment.
+  // Set in getCostBasedMaxParallelism().
+  private int costBasedMaxParallelism_ = -1;
+
+  // An adjusted number of instance based on ProcessingCost calculation.
+  // A positive value implies that the instance count has been adjusted, either through
+  // traverseEffectiveParallelism() or by fragment member (PlanNode or DataSink) calling
+  // setFixedInstanceCount(). Internally, this must be set through
+  // setAdjustedInstanceCount().
+  private int adjustedInstanceCount_ = -1;
+
+  // Mark if this fragment has a fixed instance count dictated by any of its PlanNode or
+  // DataSink member.
+  private boolean isFixedParallelism_ = false;
+
+  // The original instance count before ProcessingCost based adjustment.
+  // Set in setEffectiveNumInstance() and only set if instance count differ between
+  // the original plan vs the ProcessingCost based plan.
+  private int originalInstanceCount_ = -1;
 
   public long getProducedRuntimeFiltersMemReservationBytes() {
     return producedRuntimeFiltersMemReservationBytes_;
@@ -185,6 +223,89 @@ public class PlanFragment extends TreeNode<PlanFragment> {
         collectPlanNodesHelper(child, predicate, nodes);
       }
     }
+  }
+
+  /**
+   * Compute processing cost of PlanNodes and DataSink of this fragment, and aggregate
+   * them into {@link CostingSegment} rooted at {@link #rootSegment_}.
+   * <p>For example, given the following fragment plan:
+   * <pre>
+   * F03:PLAN FRAGMENT [HASH(i_class)] hosts=3 instances=3
+   * fragment-costs=[34550429, 2159270, 23752870, 1]
+   * 08:TOP-N [LIMIT=100]
+   * |  cost=900
+   * |
+   * 07:ANALYTIC
+   * |  cost=23751970
+   * |
+   * 06:SORT
+   * |  cost=2159270
+   * |
+   * 12:AGGREGATE [FINALIZE]
+   * |  cost=34548320
+   * |
+   * 11:EXCHANGE [HASH(i_class)]
+   *    cost=2109
+   * </pre>
+   * The post-order traversal of {@link #rootSegment_} tree show processing cost detail of
+   * {@code [(2109+34548320), 2159270, (23751970+900), 1]}.
+   * The DataSink with cost 1 is a separate segment since the last PlanNode (TOP-N) is a
+   * blocking node.
+   *
+   * @param queryOptions A query options for this query.
+   */
+  public void computeCostingSegment(TQueryOptions queryOptions) {
+    for (PlanNode node : collectPlanNodes()) {
+      node.computeProcessingCost(queryOptions);
+      node.computeRowConsumptionAndProductionToCost();
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("ProcessingCost Node " + node.getProcessingCost().debugString());
+      }
+    }
+    sink_.computeProcessingCost(queryOptions);
+    sink_.computeRowConsumptionAndProductionToCost();
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("ProcessingCost Sink " + sink_.getProcessingCost().debugString());
+    }
+
+    CostingSegment topSegment = collectCostingSegmentHelper(planRoot_);
+
+    if (isBlockingNode(planRoot_)) {
+      rootSegment_ = new CostingSegment(sink_);
+      rootSegment_.addChild(topSegment);
+    } else {
+      topSegment.setSink(sink_);
+      rootSegment_ = topSegment;
+    }
+  }
+
+  private CostingSegment collectCostingSegmentHelper(PlanNode root) {
+    Preconditions.checkNotNull(root);
+
+    List<CostingSegment> blockingChildSegments = Lists.newArrayList();
+    List<CostingSegment> nonBlockingChildSegments = Lists.newArrayList();
+    for (PlanNode child : root.getChildren()) {
+      if (child.getFragment() != this) continue;
+      CostingSegment childCostingSegment = collectCostingSegmentHelper(child);
+
+      if (isBlockingNode(child)) {
+        blockingChildSegments.add(childCostingSegment);
+      } else {
+        nonBlockingChildSegments.add(childCostingSegment);
+      }
+    }
+
+    CostingSegment thisSegment;
+    if (nonBlockingChildSegments.isEmpty()) {
+      // No child or all children are blocking nodes.
+      thisSegment = new CostingSegment(root);
+    } else {
+      thisSegment = CostingSegment.mergeCostingSegment(nonBlockingChildSegments);
+      thisSegment.appendNode(root);
+    }
+
+    if (!blockingChildSegments.isEmpty()) thisSegment.addChildren(blockingChildSegments);
+    return thisSegment;
   }
 
   /**
@@ -462,6 +583,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     result.setBackend_min_mem_reservation_bytes(
         perBackendResourceProfile_.getMinMemReservationBytes());
     result.setThread_reservation(perInstanceResourceProfile_.getThreadReservation());
+    result.setEffective_instance_count(getAdjustedInstanceCount());
     return result;
   }
 
@@ -496,7 +618,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       prefix = "  ";
       rootPrefix = "  ";
       detailPrefix = prefix + "|  ";
-      str.append(getFragmentHeaderString("", "", queryOptions.getMt_dop()));
+      str.append(getFragmentHeaderString("", "", queryOptions, detailLevel));
       if (sink_ != null && sink_ instanceof DataStreamSink) {
         str.append(
             sink_.getExplainString(rootPrefix, detailPrefix, queryOptions, detailLevel));
@@ -504,7 +626,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     } else if (detailLevel == TExplainLevel.EXTENDED) {
       // Print a fragment prefix displaying the # nodes and # instances
       str.append(
-          getFragmentHeaderString(rootPrefix, detailPrefix, queryOptions.getMt_dop()));
+          getFragmentHeaderString(rootPrefix, detailPrefix, queryOptions, detailLevel));
       rootPrefix = prefix;
     }
 
@@ -530,12 +652,17 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    * Get a header string for a fragment in an explain plan.
    */
   public String getFragmentHeaderString(String firstLinePrefix, String detailPrefix,
-      int mt_dop) {
+      TQueryOptions queryOptions, TExplainLevel explainLevel) {
+    int mt_dop = queryOptions.getMt_dop();
     StringBuilder builder = new StringBuilder();
     builder.append(String.format("%s%s:PLAN FRAGMENT [%s]", firstLinePrefix,
         fragmentId_.toString(), dataPartition_.getExplainString()));
     builder.append(PrintUtils.printNumHosts(" ", getNumNodes()));
     builder.append(PrintUtils.printNumInstances(" ", getNumInstances()));
+    if (ProcessingCost.isComputeCost(queryOptions)
+        && originalInstanceCount_ != getNumInstances()) {
+      builder.append(" (adjusted from " + originalInstanceCount_ + ")");
+    }
     builder.append("\n");
     String perHostPrefix = mt_dop == 0 ?
         "Per-Host Resources: " : "Per-Host Shared Resources: ";
@@ -588,6 +715,25 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       builder.append("Per-Instance Resources: ");
       builder.append(perInstanceExplainString);
       builder.append("\n");
+    }
+    if (ProcessingCost.isComputeCost(queryOptions) && rootSegment_ != null
+        && explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+      // Print processing cost.
+      builder.append(detailPrefix);
+      builder.append("max-parallelism=");
+      if (isFixedParallelism_
+          || ((sink_ instanceof JoinBuildSink) && !((JoinBuildSink) sink_).isShared())) {
+        builder.append(getAdjustedInstanceCount());
+      } else {
+        builder.append(getCostBasedMaxParallelism());
+      }
+      builder.append(" fragment-costs=");
+      builder.append(costingSegmentSummary());
+      builder.append("\n");
+      if (explainLevel.ordinal() >= TExplainLevel.VERBOSE.ordinal()) {
+        builder.append(explainProcessingCosts(detailPrefix, false));
+        builder.append("\n");
+      }
     }
     return builder.toString();
   }
@@ -708,5 +854,293 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     // IMPALA-219: we should use different seeds for different fragment.
     // We add one to prevent having a hash seed of 0.
     return planRoot_.getId().asInt() + 1;
+  }
+
+  /**
+   * Get maximum allowed parallelism based on minimum processing load per fragment.
+   * <p>This is controlled by {@code min_processing_per_thread} flag. Only valid after
+   * {@link #computeCostingSegment(TQueryOptions)} has been called.
+   *
+   * @return maximum allowed parallelism based on minimum processing load per fragment.
+   */
+  protected int getCostBasedMaxParallelism() {
+    if (costBasedMaxParallelism_ >= 0) return costBasedMaxParallelism_;
+
+    ProcessingCost maxCostingSegment = ProcessingCost.zero();
+    List<CostingSegment> allSegments = rootSegment_.getNodesPostOrder();
+    for (CostingSegment costingSegment : allSegments) {
+      maxCostingSegment =
+          ProcessingCost.maxCost(maxCostingSegment, costingSegment.getProcessingCost());
+    }
+
+    long maxParallelism = LongMath.divide(maxCostingSegment.getTotalCost(),
+        BackendConfig.INSTANCE.getMinProcessingPerThread(), RoundingMode.CEILING);
+    // Round up to the nearest multiple of numNodes.
+    // Little over-parallelize is better than under-parallelize.
+    int numNodes = getNumNodes();
+    maxParallelism =
+        LongMath.divide(maxParallelism, numNodes, RoundingMode.CEILING) * numNodes;
+
+    if (maxParallelism <= 0) {
+      costBasedMaxParallelism_ = 1;
+    } else if (maxParallelism <= Integer.MAX_VALUE) {
+      costBasedMaxParallelism_ = (int) maxParallelism;
+    } else {
+      // Floor Integer.MAX_VALUE to the nearest multiple of numNodes.
+      costBasedMaxParallelism_ = Integer.MAX_VALUE - (Integer.MAX_VALUE % numNodes);
+    }
+    return costBasedMaxParallelism_;
+  }
+
+  protected boolean hasBlockingNode() {
+    if (sink_ instanceof JoinBuildSink) return true;
+    for (PlanNode p : collectPlanNodes()) {
+      if (isBlockingNode(p)) return true;
+    }
+    return false;
+  }
+
+  protected boolean hasAdjustedInstanceCount() { return adjustedInstanceCount_ > 0; }
+
+  protected void setFixedInstanceCount(int count) {
+    isFixedParallelism_ = true;
+    setAdjustedInstanceCount(count);
+  }
+
+  private void setAdjustedInstanceCount(int count) {
+    Preconditions.checkState(count > 0,
+        getId() + " adjusted instance count (" + count + ") is not positive number.");
+    boolean isFirstAdjustment = adjustedInstanceCount_ <= 0;
+    adjustedInstanceCount_ = count;
+    if (rootSegment_ != null) {
+      List<CostingSegment> costingSegments = rootSegment_.getNodesPostOrder();
+      for (CostingSegment costingSegment : costingSegments) {
+        // Reset for each segment cost since it might be overriden during
+        // tryLowerParallelism().
+        costingSegment.getProcessingCost().setNumInstanceExpected(
+            this::getAdjustedInstanceCount);
+      }
+    }
+
+    if (isFirstAdjustment) {
+      // Set num instance expected for ProcessingCost attached to PlanNodes and DataSink.
+      for (PlanNode node : collectPlanNodes()) {
+        node.getProcessingCost().setNumInstanceExpected(this::getAdjustedInstanceCount);
+      }
+      sink_.getProcessingCost().setNumInstanceExpected(this::getAdjustedInstanceCount);
+    }
+  }
+
+  protected int getAdjustedInstanceCount() { return adjustedInstanceCount_; }
+
+  protected ProcessingCost getLastCostingSegment() {
+    return rootSegment_.getProcessingCost();
+  }
+
+  private List<Long> costingSegmentSummary() {
+    return rootSegment_.getNodesPostOrder()
+        .stream()
+        .map(s -> ((CostingSegment) s).getProcessingCost().getTotalCost())
+        .collect(Collectors.toList());
+  }
+
+  private String explainProcessingCosts(String linePrefix, boolean fullExplain) {
+    return rootSegment_.getNodesPreOrder()
+        .stream()
+        .map(s
+            -> ((CostingSegment) s)
+                   .getProcessingCost()
+                   .getExplainString(linePrefix, fullExplain))
+        .collect(Collectors.joining("\n"));
+  }
+
+  private String debugProcessingCosts() { return explainProcessingCosts("", true); }
+
+  /**
+   * Validates that properties related to processing cost of this fragment are complete
+   * and valid.
+   */
+  private void validateProcessingCosts() {
+    Preconditions.checkState(hasAdjustedInstanceCount());
+    Preconditions.checkNotNull(rootSegment_);
+    List<CostingSegment> costingSegments = rootSegment_.getNodesPreOrder();
+    for (CostingSegment costingSegment : costingSegments) {
+      ProcessingCost cost = costingSegment.getProcessingCost();
+      Preconditions.checkState(cost.isValid());
+      Preconditions.checkState(
+          cost.getNumInstancesExpected() == getAdjustedInstanceCount());
+    }
+  }
+
+  /**
+   * Traverse down the query tree starting from this fragment and calculate the effective
+   * parallelism of each PlanFragments.
+   *
+   * @param minThreadPerNode Minimum thread per fragment per node based on
+   *                         {@code processing_cost_min_threads} flag.
+   * @param maxThreadPerNode Maximum thread per fragment per node based on
+   *                         TExecutorGroupSet.num_cores_per_executor flag.
+   * @param parentParallelism Number of instance of parent fragment.
+   */
+  protected void traverseEffectiveParallelism(
+      int minThreadPerNode, int maxThreadPerNode, int parentParallelism) {
+    Preconditions.checkNotNull(
+        rootSegment_, "ProcessingCost Fragment %s has not been computed!", getId());
+    int nodeStepCount = getNumInstances() % getNumNodes() == 0 ? getNumNodes() : 1;
+
+    // step 1: Set initial parallelism to the maximum possible.
+    //   Subsequent steps after this will not exceed maximum parallelism sets here.
+    boolean canTryLower =
+        adjustToMaxParallelism(maxThreadPerNode, parentParallelism, nodeStepCount);
+
+    if (canTryLower) {
+      // step 2: Try lower parallelism by comparing output ProcessingCost of the input
+      //   child fragment against this fragment's segment costs.
+      Preconditions.checkState(getChildCount() > 0);
+      Preconditions.checkState(getChild(0).getSink() instanceof DataStreamSink);
+
+      // Check if this fragment parallelism can be lowered.
+      int maxParallelism = getAdjustedInstanceCount();
+      int effectiveParallelism = rootSegment_.tryAdjustParallelism(
+          nodeStepCount, minThreadPerNode, maxParallelism);
+      setAdjustedInstanceCount(effectiveParallelism);
+      if (LOG.isTraceEnabled() && effectiveParallelism != maxParallelism) {
+        logCountAdjustmentTrace(maxParallelism, effectiveParallelism,
+            "Lower parallelism based on load and produce-consume rate ratio.");
+      }
+    }
+    validateProcessingCosts();
+
+    // step 3: Compute the parallelism of join build fragment.
+    //   Child parallelism may be enforced to follow this fragment's parallelism.
+    // TODO: This code assume that probe side of the join always have higher per-instance
+    //   cost than the build side. If this assumption is false and the child is a
+    //   non-shared join build fragment, then this fragment should increase its
+    //   parallelism to match the child fragment parallelism.
+    for (PlanFragment child : getChildren()) {
+      if (child.getSink() instanceof JoinBuildSink) {
+        child.traverseEffectiveParallelism(
+            minThreadPerNode, maxThreadPerNode, getAdjustedInstanceCount());
+      }
+    }
+  }
+
+  /**
+   * Adjust parallelism of this fragment to the maximum allowed.
+   *
+   * @param maxThreadPerNode Maximum thread per fragment per node based on
+   *                         TExecutorGroupSet.num_cores_per_executor flag.
+   * @param parentParallelism Parallelism of parent fragment.
+   * @param nodeStepCount The step count used to increase this fragment's parallelism.
+   *                      Usually equal to number of nodes or just 1.
+   * @return True if it is possible to lower this fragment's parallelism through
+   * ProcessingCost comparison. False if the parallelism should not be changed anymore.
+   */
+  private boolean adjustToMaxParallelism(
+      int maxThreadPerNode, int parentParallelism, int nodeStepCount) {
+    boolean canTryLower = true;
+    // Compute maximum allowed parallelism.
+    int maxParallelism = getNumInstances();
+    if (isFixedParallelism_) {
+      maxParallelism = getAdjustedInstanceCount();
+      canTryLower = false;
+    } else if ((sink_ instanceof JoinBuildSink) && !((JoinBuildSink) sink_).isShared()) {
+      // This is a non-shared (PARTITIONED) join build fragment.
+      // Parallelism of this fragment is equal to its parent parallelism.
+      Preconditions.checkState(parentParallelism > 0);
+      if (LOG.isTraceEnabled() && maxParallelism != parentParallelism) {
+        logCountAdjustmentTrace(maxParallelism, parentParallelism,
+            "Partitioned join build fragment follow parent's parallelism.");
+      }
+      maxParallelism = parentParallelism;
+      canTryLower = false; // no need to compute effective parallelism anymore.
+    } else {
+      // TODO: Fragment with UnionNode but without ScanNode should have its parallelism
+      //   bounded by the maximum parallelism between its exchanging child.
+      //   For now, it wont get here since fragment with UnionNode has fixed parallelism
+      //   (equal to MT_DOP, and previouslyAdjusted == true).
+      maxParallelism = IntMath.saturatedMultiply(maxThreadPerNode, getNumNodes());
+      int costBasedMaxParallelism = Math.max(nodeStepCount, getCostBasedMaxParallelism());
+      if (costBasedMaxParallelism < maxParallelism) {
+        maxParallelism = costBasedMaxParallelism;
+      }
+
+      if (LOG.isTraceEnabled() && maxParallelism != getNumInstances()) {
+        if (maxParallelism == maxThreadPerNode) {
+          logCountAdjustmentTrace(
+              getNumInstances(), maxParallelism, "Follow maxThreadPerNode.");
+        } else {
+          logCountAdjustmentTrace(
+              getNumInstances(), maxParallelism, "Follow minimum work per thread.");
+        }
+      }
+    }
+
+    // Initialize this fragment's parallelism to the maxParallelism.
+    setAdjustedInstanceCount(maxParallelism);
+    return canTryLower;
+  }
+
+  /**
+   * Compute {@link CoreCount} of this fragment and populate it into 'fragmentCoreState'.
+   * @param fragmentCoreState A map holding per-fragment core state.
+   * All successor of this fragment must already have its CoreCount registered into this
+   * map.
+   */
+  protected void computeBlockingAwareCores(
+      Map<PlanFragmentId, Pair<CoreCount, List<CoreCount>>> fragmentCoreState) {
+    Preconditions.checkNotNull(
+        rootSegment_, "ProcessingCost Fragment %s has not been computed!", getId());
+    ImmutableList.Builder<CoreCount> subtreeCoreBuilder =
+        new ImmutableList.Builder<CoreCount>();
+    CoreCount coreReq =
+        rootSegment_.traverseBlockingAwareCores(fragmentCoreState, subtreeCoreBuilder);
+    fragmentCoreState.put(getId(), Pair.create(coreReq, subtreeCoreBuilder.build()));
+  }
+
+  protected CoreCount maxCore(CoreCount core1, CoreCount core2) {
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("At {}, compare {} ({}) vs {} ({})", getId(), core1, core1.total(), core2,
+          core2.total());
+    }
+    return CoreCount.max(core1, core2);
+  }
+
+  /**
+   * Override parallelism of this fragment with adjusted parallelism from CPU costing
+   * algorithm.
+   * <p>Only valid after {@link #traverseEffectiveParallelism(int, int, int)}
+   * called.
+   */
+  protected void setEffectiveNumInstance() {
+    validateProcessingCosts();
+    if (originalInstanceCount_ <= 0) {
+      originalInstanceCount_ = getNumInstances();
+    }
+
+    if (LOG.isTraceEnabled() && originalInstanceCount_ != getAdjustedInstanceCount()) {
+      logCountAdjustmentTrace(originalInstanceCount_, getAdjustedInstanceCount(),
+          "Finalize effective parallelism.");
+    }
+
+    for (PlanNode node : collectPlanNodes()) {
+      node.numInstances_ = getAdjustedInstanceCount();
+    }
+
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("ProcessingCost Fragment {}:\n{}", getId(), debugProcessingCosts());
+    }
+  }
+
+  private void logCountAdjustmentTrace(int oldCount, int newCount, String reason) {
+    LOG.trace("{} adjust instance count from {} to {}. {}", getId(), oldCount, newCount,
+        reason);
+  }
+
+  private static boolean isBlockingNode(PlanNode node) {
+    // Preaggregation node can behave like final aggregation node when it does not
+    // passedthrough any row. From CPU costing perspective, treat both final aggregation
+    // and preaggregation as a blocking node. Otherwise, follow PlanNode.isBlockingNode().
+    return node.isBlockingNode() || node instanceof AggregationNode;
   }
 }

@@ -1060,6 +1060,22 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_stringify_map_keys(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::COMPUTE_PROCESSING_COST: {
+        query_options->__set_compute_processing_cost(IsTrue(value));
+        break;
+      }
+      case TImpalaQueryOptions::PROCESSING_COST_MIN_THREADS: {
+        StringParser::ParseResult result;
+        const int32_t min_num =
+            StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS || min_num < 1 || min_num > 128) {
+          return Status(Substitute("$0 is not valid for processing_cost_min_threads. "
+                                   "Valid values are in [1, 128].",
+              value));
+        }
+        query_options->__set_processing_cost_min_threads(min_num);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

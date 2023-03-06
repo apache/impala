@@ -208,7 +208,10 @@ public class ExchangeNode extends PlanNode {
 
     if (isBroadcastExchange()) {
       processingCost_ = ProcessingCost.broadcastCost(processingCost_,
-          () -> getNumReceivers());
+          ()
+              -> fragment_.hasAdjustedInstanceCount() ?
+              fragment_.getAdjustedInstanceCount() :
+              getNumReceivers());
     }
   }
 

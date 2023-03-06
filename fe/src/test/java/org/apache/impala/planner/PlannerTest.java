@@ -37,7 +37,6 @@ import org.apache.impala.testutil.TestUtils.IgnoreValueFilter;
 import org.apache.impala.thrift.TRuntimeFilterType;
 import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TExplainLevel;
-import org.apache.impala.thrift.TExplainResult;
 import org.apache.impala.thrift.TJoinDistributionMode;
 import org.apache.impala.thrift.TKuduReplicaSelection;
 import org.apache.impala.thrift.TQueryCtx;
@@ -1357,5 +1356,23 @@ public class PlannerTest extends PlannerTestBase {
   public void testExplainVerboseMtDop() {
     runPlannerTestFile("explain-verbose-mt_dop", "tpcds_parquet",
         ImmutableSet.of(PlannerTestOption.INCLUDE_RESOURCE_HEADER));
+  }
+
+  /**
+   * Test that processing cost can adjust effective instance count of fragment.
+   */
+  @Test
+  public void testProcessingCost() {
+    TQueryOptions options = new TQueryOptions();
+    options.setMt_dop(4);
+    options.setCompute_processing_cost(true);
+    options.setMinmax_filter_threshold(0.5);
+    options.setMinmax_filter_sorted_columns(false);
+    options.setMinmax_filter_partition_columns(false);
+    runPlannerTestFile("tpcds-processing-cost", "tpcds_parquet", options,
+        ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
+            PlannerTestOption.INCLUDE_RESOURCE_HEADER,
+            PlannerTestOption.VALIDATE_RESOURCES,
+            PlannerTestOption.VALIDATE_CARDINALITY));
   }
 }

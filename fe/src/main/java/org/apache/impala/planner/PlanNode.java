@@ -424,8 +424,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       PlanFragment childFragment = children_.get(0).fragment_;
       if (fragment_ != childFragment && detailLevel == TExplainLevel.EXTENDED) {
         // we're crossing a fragment boundary - print the fragment header.
-        expBuilder.append(childFragment.getFragmentHeaderString(prefix, prefix,
-            queryOptions.getMt_dop()));
+        expBuilder.append(childFragment.getFragmentHeaderString(
+            prefix, prefix, queryOptions, detailLevel));
       }
       expBuilder.append(
           children_.get(0).getExplainString(prefix, prefix, queryOptions, detailLevel));
@@ -934,6 +934,11 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
         "Processing cost of PlanNode " + getDisplayLabel() + " is invalid!");
     processingCost_.setNumRowToConsume(getInputCardinality());
     processingCost_.setNumRowToProduce(getCardinality());
+    if (isLeafNode()
+        && (!fragment_.hasAdjustedInstanceCount()
+            || fragment_.getAdjustedInstanceCount() < getNumInstances())) {
+      fragment_.setFixedInstanceCount(getNumInstances());
+    }
   }
 
   /**

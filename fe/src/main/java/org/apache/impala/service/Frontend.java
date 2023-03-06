@@ -25,6 +25,7 @@ import com.google.common.base.Predicates;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.math.IntMath;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.IOException;
@@ -139,6 +140,7 @@ import org.apache.impala.hooks.QueryEventHookManager;
 import org.apache.impala.planner.HdfsScanNode;
 import org.apache.impala.planner.PlanFragment;
 import org.apache.impala.planner.Planner;
+import org.apache.impala.planner.ProcessingCost;
 import org.apache.impala.planner.ScanNode;
 import org.apache.impala.thrift.TAlterDbParams;
 import org.apache.impala.thrift.TBackendGflags;
@@ -267,6 +269,12 @@ public class Frontend {
       // TExecRequest.query_exec_request field.
       protected long estimated_memory_per_host_ = -1;
 
+      // The processing cores required to execute the query.
+      // Certain queries such as EXPLAIN that do not populate
+      // TExecRequest.query_exec_request. Therefore, cores requirement will be set here
+      // through setCoresRequired().
+      protected int cores_required_ = -1;
+
       // The initial length of content in explain buffer to help return the buffer
       // to the initial position prior to another auto-scaling compilation.
       protected int initialExplainBufLen_ = -1;
@@ -292,6 +300,9 @@ public class Frontend {
 
       public long getEstimatedMemoryPerHost() { return estimated_memory_per_host_; }
       public void setEstimatedMemoryPerHost(long x) { estimated_memory_per_host_ = x; }
+
+      public int getCoresRequired() { return cores_required_; }
+      public void setCoresRequired(int x) { cores_required_ = x; }
 
       // Capture the current state and initialize before iterative compilations begin.
       public void captureState() {
@@ -1738,6 +1749,8 @@ public class Frontend {
 
     // Compute resource requirements of the final plans.
     TQueryExecRequest result = new TQueryExecRequest();
+    Planner.computeProcessingCost(planRoots, result, planner.getPlannerCtx(),
+        planCtx.compilationState_.getGroupSet().getNum_cores_per_executor());
     Planner.computeResourceReqs(planRoots, queryCtx, result,
         planner.getPlannerCtx(), planner.getAnalysisResult().isQueryStmt());
 
@@ -1773,6 +1786,8 @@ public class Frontend {
     // copy estimated memory per host to planCtx for auto-scaling.
     planCtx.compilationState_.setEstimatedMemoryPerHost(
         result.getPer_host_mem_estimate());
+
+    planCtx.compilationState_.setCoresRequired(result.getCores_required());
 
     return result;
   }
@@ -1900,14 +1915,18 @@ public class Frontend {
           + " does not map to any known executor group set.");
     }
 
-    // Sort 'executorGroupSets' by max_mem_limit field in ascending order. Use
-    // exec_group_name_prefix to break the tie.
+    // Sort 'executorGroupSets' by
+    //   <max_mem_limit, expected_num_executors * num_cores_per_executor>
+    // in ascending order. Use exec_group_name_prefix to break the tie.
     Collections.sort(result, new Comparator<TExecutorGroupSet>() {
       @Override
       public int compare(TExecutorGroupSet e1, TExecutorGroupSet e2) {
         int i = Long.compare(e1.getMax_mem_limit(), e2.getMax_mem_limit());
         if (i == 0) {
-          i = e1.getExec_group_name_prefix().compareTo(e2.getExec_group_name_prefix());
+          i = Long.compare(expectedTotalCores(e1), expectedTotalCores(e2));
+          if (i == 0) {
+            i = e1.getExec_group_name_prefix().compareTo(e2.getExec_group_name_prefix());
+          }
         }
         return i;
       }
@@ -1920,6 +1939,14 @@ public class Frontend {
   // an executor group as input.
   public static boolean canStmtBeAutoScaled(TStmtType type) {
     return type == TStmtType.EXPLAIN || type == TStmtType.QUERY || type == TStmtType.DML;
+  }
+
+  private static int expectedTotalCores(TExecutorGroupSet execGroupSet) {
+    int numExecutors = execGroupSet.getCurr_num_executors() > 0 ?
+        execGroupSet.getCurr_num_executors() :
+        execGroupSet.getExpected_num_executors();
+    return IntMath.saturatedMultiply(
+        numExecutors, execGroupSet.getNum_cores_per_executor());
   }
 
   private TExecRequest getTExecRequest(PlanCtx planCtx, EventSequence timeline)
@@ -1963,7 +1990,6 @@ public class Frontend {
     planCtx.compilationState_.captureState();
 
     TExecutorGroupSet group_set = null;
-    long per_host_mem_estimate = -1;
     String reason = "Unknown";
     int attempt = 0;
     for (int i = 0; i < num_executor_group_sets; i++) {
@@ -2008,20 +2034,34 @@ public class Frontend {
       }
 
       // Find out the per host memory estimated from two possible sources.
-      per_host_mem_estimate = -1;
+      long per_host_mem_estimate = -1;
+      int cores_requirement = -1;
       if (req.query_exec_request != null) {
         // For non-explain queries
         per_host_mem_estimate = req.query_exec_request.per_host_mem_estimate;
+        cores_requirement = req.query_exec_request.getCores_required();
       } else {
         // For explain queries
         per_host_mem_estimate = planCtx.compilationState_.getEstimatedMemoryPerHost();
+        cores_requirement = planCtx.compilationState_.getCoresRequired();
       }
 
       Preconditions.checkState(per_host_mem_estimate >= 0);
+      boolean cpuReqSatisfied = true;
+      int scaled_cores_requirement = -1;
+      if (ProcessingCost.isComputeCost(queryOptions)) {
+        Preconditions.checkState(cores_requirement > 0);
+        scaled_cores_requirement = (int) Math.min(Integer.MAX_VALUE,
+            Math.ceil(
+                cores_requirement / BackendConfig.INSTANCE.getQueryCpuCountDivisor()));
+        cpuReqSatisfied = scaled_cores_requirement <= expectedTotalCores(group_set);
+      }
 
-      if (per_host_mem_estimate <= group_set.getMax_mem_limit()) {
+      if (per_host_mem_estimate <= group_set.getMax_mem_limit() && cpuReqSatisfied) {
         reason = "suitable group found (estimated per-host memory="
-            + PrintUtils.printBytes(per_host_mem_estimate) + ")";
+            + PrintUtils.printBytes(per_host_mem_estimate)
+            + ", estimated cpu cores required=" + cores_requirement
+            + ", scaled cpu cores=" + scaled_cores_requirement + ")";
 
         // Set the group name prefix in both the returned query options and
         // the query context for non default group setup.

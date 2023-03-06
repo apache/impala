@@ -1,6 +1,8 @@
 <?xml version="1.0"?>
 <allocations>
   <queue name="root">
+    <queue name="tiny">
+    </queue>
     <queue name="small">
     </queue>
     <queue name="large">

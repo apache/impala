@@ -740,15 +740,17 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # The path to resources directory which contains the admission control config files.
     RESOURCES_DIR = os.path.join(os.environ['IMPALA_HOME'], "fe", "src", "test",
                                  "resources")
-    # Define two group sets: small and large
-    fs_allocation_path = os.path.join(RESOURCES_DIR, "fair-scheduler-2-groups.xml")
+    # Define three group sets: tiny, small and large
+    fs_allocation_path = os.path.join(RESOURCES_DIR, "fair-scheduler-3-groups.xml")
     # Define the min-query-mem-limit, max-query-mem-limit,
     # max-query-cpu-core-per-node-limit and max-query-cpu-core-coordinator-limit
-    # properties of the two sets:
+    # properties of the three sets:
+    # tiny: [0, 64MB, 4, 4]
     # small: [0, 64MB, 8, 8]
     # large: [64MB+1Byte, 8PB, 64, 64]
-    llama_site_path = os.path.join(RESOURCES_DIR, "llama-site-2-groups.xml")
+    llama_site_path = os.path.join(RESOURCES_DIR, "llama-site-3-groups.xml")
     # Start with a regular admission config with multiple pools and no resource limits.
+    # Only populate executor froup sets small and large.
     self._restart_coordinators(num_coordinators=1,
          extra_args="-vmodule admission-controller=3 "
                     "-expected_executor_group_sets=root.small:2,root.large:3 "
@@ -784,6 +786,81 @@ class TestExecutorGroups(CustomClusterTestSuite):
     assert "The query does not fit any executor group set" in str(result)
 
     self.client.close()
+
+  def _run_with_compute_processing_cost(self, coordinator_test_args, TEST_QUERY,
+      expected_strings_in_profile):
+    # The path to resources directory which contains the admission control config files.
+    RESOURCES_DIR = os.path.join(os.environ['IMPALA_HOME'], "fe", "src", "test",
+                                 "resources")
+    # Define two group sets: tiny, small and large
+    fs_allocation_path = os.path.join(RESOURCES_DIR, "fair-scheduler-3-groups.xml")
+    # Define the min-query-mem-limit, max-query-mem-limit,
+    # max-query-cpu-core-per-node-limit and max-query-cpu-core-coordinator-limit
+    # properties of the three sets:
+    # tiny: [0, 64MB, 4, 4]
+    # small: [0, 64MB, 8, 8]
+    # large: [64MB+1Byte, 8PB, 64, 64]
+    llama_site_path = os.path.join(RESOURCES_DIR, "llama-site-3-groups.xml")
+
+    # extra args template to start coordinator
+    extra_args_template = ("-vmodule admission-controller=3 "
+        "-expected_executor_group_sets=root.tiny:1,root.small:2,root.large:3 "
+        "-fair_scheduler_allocation_path %s "
+        "-llama_site_path %s "
+        "%s ")
+
+    # Start with a regular admission config, multiple pools, no resource limits,
+    # and query_cpu_count_divisor=2.
+    self._restart_coordinators(num_coordinators=1,
+        extra_args=extra_args_template % (fs_allocation_path, llama_site_path,
+          coordinator_test_args))
+
+    # Create fresh client
+    self.create_impala_clients()
+    # Add an exec group with a 2 admission slot and 1 executors.
+    self._add_executor_group("group", 1, admission_control_slots=2,
+                             resource_pool="root.tiny", extra_args="-mem_limit=2g")
+    # Add an exec group with a 2 admission slot and 2 executors.
+    self._add_executor_group("group", 2, admission_control_slots=2,
+                             resource_pool="root.small", extra_args="-mem_limit=2g")
+    # Add another exec group with 2 admission slot and 3 executors.
+    self._add_executor_group("group", 3, admission_control_slots=2,
+                             resource_pool="root.large", extra_args="-mem_limit=2g")
+    assert self._get_num_executor_groups(only_healthy=True) == 3
+    assert self._get_num_executor_groups(only_healthy=True,
+                                         exec_group_set_prefix="root.tiny") == 1
+    assert self._get_num_executor_groups(only_healthy=True,
+                                         exec_group_set_prefix="root.small") == 1
+    assert self._get_num_executor_groups(only_healthy=True,
+                                         exec_group_set_prefix="root.large") == 1
+
+    # assert that 'expected_profile' exist in query profile
+    self.execute_query_expect_success(self.client, 'SET MT_DOP=2;')
+    self.execute_query_expect_success(self.client, 'SET COMPUTE_PROCESSING_COST=1;')
+    result = self.execute_query_expect_success(self.client, TEST_QUERY)
+    for expected_profile in expected_strings_in_profile:
+      assert expected_profile in str(result.runtime_profile)
+    self.client.close()
+
+  @pytest.mark.execute_serially
+  def test_query_cpu_count_divisor(self):
+    # A query with estimated memory per host of 37MB.
+    TEST_QUERY = "select * from tpcds_parquet.store_sales where ss_item_sk = 1 limit 50;"
+
+    # Expect to run the query on the small group by default.
+    coordinator_test_args = ""
+    self._run_with_compute_processing_cost(coordinator_test_args, TEST_QUERY,
+        ["Executor Group: root.small-group", "Effective parallelism: 5"])
+
+    # Expect to run the query on the tiny group
+    coordinator_test_args = "-query_cpu_count_divisor=2 "
+    self._run_with_compute_processing_cost(coordinator_test_args, TEST_QUERY,
+        ["Executor Group: root.tiny-group", "Effective parallelism: 3"])
+
+    # Expect to run the query on the large group
+    coordinator_test_args = "-query_cpu_count_divisor=0.2 "
+    self._run_with_compute_processing_cost(coordinator_test_args, TEST_QUERY,
+        ["Executor Group: root.large-group", "Effective parallelism: 7"])
 
   @pytest.mark.execute_serially
   def test_per_exec_group_set_metrics(self):

@@ -20,6 +20,7 @@ package org.apache.impala.planner;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.impala.analysis.AnalysisContext;
@@ -38,7 +39,7 @@ import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.NotImplementedException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
@@ -59,6 +60,7 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 import static org.apache.impala.analysis.ToSqlOptions.SHOW_IMPLICIT_CASTS;
 
@@ -212,7 +214,6 @@ public class Planner {
             List<String> mentionedColumns = insertStmt.getMentionedColumns();
             Preconditions.checkState(!mentionedColumns.isEmpty());
             List<ColumnLabel> targetColLabels = new ArrayList<>();
-            String tblFullName = targetTable.getFullName();
             for (String column: mentionedColumns) {
               targetColLabels.add(new ColumnLabel(column, targetTable.getTableName()));
             }
@@ -307,6 +308,15 @@ public class Planner {
         str.append(String.format("Dedicated Coordinator Resource Estimate: Memory=%s\n",
             PrintUtils.printBytesRoundedToMb(request.getDedicated_coord_mem_estimate())));
       }
+
+      TQueryOptions queryOptions =
+          request.getQuery_ctx().getClient_request().getQuery_options();
+      if (ProcessingCost.isComputeCost(queryOptions)
+          && explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+        str.append("Effective parallelism: ");
+        str.append(request.getCores_required());
+        str.append("\n");
+      }
       hasHeader = true;
     }
     // Warn if the planner is running in DEBUG mode.
@@ -396,6 +406,96 @@ public class Planner {
       }
     }
     return str.toString();
+  }
+
+  /**
+   * Adjust effective parallelism of each plan fragment of query after considering
+   * processing cost rate and blocking operator.
+   * <p>
+   * Only valid after {@link PlanFragment#computeCostingSegment(TQueryOptions)} has
+   * been called for all plan fragments in the list.
+   */
+  private static void computeEffectiveParallelism(
+      List<PlanFragment> postOrderFragments, int minThreadPerNode, int maxThreadPerNode) {
+    for (PlanFragment fragment : postOrderFragments) {
+      if (!(fragment.getSink() instanceof JoinBuildSink)) {
+        // Only adjust parallelism of non-join build fragment.
+        // Join build fragment will be adjusted later by fragment hosting the join node.
+        fragment.traverseEffectiveParallelism(minThreadPerNode, maxThreadPerNode, -1);
+      }
+    }
+
+    for (PlanFragment fragment : postOrderFragments) {
+      fragment.setEffectiveNumInstance();
+    }
+  }
+
+  /**
+   * This method returns the effective CPU requirement of a query when considering
+   * processing cost rate and blocking operator.
+   * <p>
+   * Only valid after {@link #computeEffectiveParallelism(List, int, int)} has
+   * been called over the plan fragment list.
+   */
+  private static CoreCount computeBlockingAwareCores(
+      List<PlanFragment> postOrderFragments) {
+    // fragmentCoreState is a mapping between a fragment (through its PlanFragmentId) and
+    // its CoreCount. The first element of the pair is the CoreCount of subtree rooted at
+    // that fragment. The second element of the pair is the CoreCount of blocking-child
+    // subtrees under that fragment. The effective CoreCount of a fragment is derived from
+    // the pair through the following formula:
+    //   max(Pair.first, sum(Pair.second))
+    Map<PlanFragmentId, Pair<CoreCount, List<CoreCount>>> fragmentCoreState =
+        Maps.newHashMap();
+
+    for (PlanFragment fragment : postOrderFragments) {
+      fragment.computeBlockingAwareCores(fragmentCoreState);
+    }
+
+    PlanFragment root = postOrderFragments.get(postOrderFragments.size() - 1);
+    Pair<CoreCount, List<CoreCount>> rootCores = fragmentCoreState.get(root.getId());
+
+    return root.maxCore(rootCores.first, CoreCount.sum(rootCores.second));
+  }
+
+  /**
+   * Compute processing cost of each plan fragment in the query plan and adjust each
+   * fragment parallelism according to producer-consumer rate between them.
+   */
+  public static void computeProcessingCost(List<PlanFragment> planRoots,
+      TQueryExecRequest request, PlannerContext planCtx, int numCoresPerExecutor) {
+    TQueryOptions queryOptions = planCtx.getRootAnalyzer().getQueryOptions();
+
+    if (!ProcessingCost.isComputeCost(queryOptions)) {
+      request.setCores_required(-1);
+      return;
+    }
+
+    // TODO: remove dependence on MT_DOP in the future.
+    //   We still depend on MT_DOP here since many aspect of query planning is still
+    //   controlled through MT_DOP.
+    int mtDop = queryOptions.getMt_dop();
+    int numNode = planCtx.getRootAnalyzer().numExecutorsForPlanning();
+    int minThreads = queryOptions.getProcessing_cost_min_threads();
+    int maxThreads = Math.max(minThreads, Math.max(mtDop, numCoresPerExecutor));
+
+    PlanFragment rootFragment = planRoots.get(0);
+    List<PlanFragment> postOrderFragments = rootFragment.getNodesPostOrder();
+    for (PlanFragment fragment : postOrderFragments) {
+      fragment.computeCostingSegment(queryOptions);
+    }
+
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Computing effective parallelism. numNode=" + numNode + " mtDop=" + mtDop
+          + " numCoresPerExecutor=" + numCoresPerExecutor + " minThreads=" + minThreads
+          + " maxThreads=" + maxThreads);
+    }
+
+    computeEffectiveParallelism(postOrderFragments, minThreads, maxThreads);
+    CoreCount effectiveCores = computeBlockingAwareCores(postOrderFragments);
+    request.setCores_required(effectiveCores.total());
+
+    LOG.info("CoreCount=" + effectiveCores);
   }
 
   /**

@@ -2,6 +2,28 @@
 <configuration>
   <!-- Default values -->
   <property>
+    <name>impala.admission-control.pool-queue-timeout-ms.root.tiny</name>
+    <value>100000</value>
+  </property>
+  <property>
+    <name>impala.admission-control.max-query-mem-limit.root.tiny</name>
+   <!-- 64 MB -->
+    <value>67108864</value>
+  </property>
+  <property>
+    <name>impala.admission-control.min-query-mem-limit.root.tiny</name>
+   <!-- 0MB -->
+    <value>0</value>
+  </property>
+  <property>
+    <name>impala.admission-control.max-query-cpu-core-per-node-limit.root.tiny</name>
+    <value>2</value>
+  </property>
+  <property>
+    <name>impala.admission-control.max-query-cpu-core-coordinator-limit.root.tiny</name>
+    <value>2</value>
+  </property>
+  <property>
     <name>llama.am.throttling.maximum.placed.reservations.root.small</name>
     <value>10</value>
   </property>

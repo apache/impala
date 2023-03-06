@@ -264,6 +264,25 @@ void Scheduler::ComputeFragmentExecParams(
   }
 }
 
+void Scheduler::CheckEffectiveInstanceCount(
+    const FragmentScheduleState* fragment_state, const ScheduleState* state) {
+  int effective_instance_count = fragment_state->fragment.effective_instance_count;
+  if (effective_instance_count > 0) {
+    if (ContainsUnionNode(fragment_state->fragment.plan)
+        || ContainsScanNode(fragment_state->fragment.plan)
+        || IsExceedMaxFsWriters(fragment_state, fragment_state, state)) {
+      // TODO: Fragment with UnionNode or ScanNode or one where IsExceedMaxFsWriters
+      // equals true is not checked for now since it require further modification of the
+      // scan-range based scheduling in CreateCollocatedAndScanInstances().
+      return;
+    }
+
+    DCHECK_GE(effective_instance_count, fragment_state->instance_states.size())
+        << fragment_state->fragment.display_name
+        << " scheduled higher than the effective count.";
+  }
+}
+
 void Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_config,
     const TPlanExecInfo& plan_exec_info, FragmentScheduleState* fragment_state,
     ScheduleState* state) {
@@ -338,8 +357,7 @@ void Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_config,
         instance_state.AddScanRanges(entry.first, entry.second);
       }
     }
-  } else if (ContainsNode(fragment.plan, TPlanNodeType::UNION_NODE)
-      || ContainsScanNode(fragment.plan)) {
+  } else if (ContainsUnionNode(fragment.plan) || ContainsScanNode(fragment.plan)) {
     VLOG(3) << "Computing exec params for scan and/or union fragment.";
     // case 2: leaf fragment (i.e. no input fragments) with a single scan node.
     // case 3: union fragment, which may have scan nodes and may have input fragments.
@@ -348,9 +366,11 @@ void Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_config,
     VLOG(3) << "Computing exec params for interior fragment.";
     // case 4: interior (non-leaf) fragment without a scan or union.
     // We assign the same hosts as those of our leftmost input fragment (so that a
-    // merge aggregation fragment runs on the hosts that provide the input data).
+    // merge aggregation fragment runs on the hosts that provide the input data) OR
+    // follow the effective_instance_count specified by planner.
     CreateInputCollocatedInstances(fragment_state, state);
   }
+  CheckEffectiveInstanceCount(fragment_state, state);
 }
 
 // Maybe the easiest way to understand the objective of this algorithm is as a
@@ -381,7 +401,7 @@ void Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_config,
 void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_config,
     FragmentScheduleState* fragment_state, ScheduleState* state) {
   const TPlanFragment& fragment = fragment_state->fragment;
-  bool has_union = ContainsNode(fragment.plan, TPlanNodeType::UNION_NODE);
+  bool has_union = ContainsUnionNode(fragment.plan);
   DCHECK(has_union || ContainsScanNode(fragment.plan));
   // Build a map of hosts to the num instances this fragment should have, before we take
   // into account scan ranges. If this fragment has input fragments, we always run with
@@ -499,10 +519,7 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
       }
     }
   }
-  if (fragment.output_sink.__isset.table_sink
-      && fragment.output_sink.table_sink.__isset.hdfs_table_sink
-      && state->query_options().max_fs_writers > 0
-      && fragment_state->instance_states.size() > state->query_options().max_fs_writers) {
+  if (IsExceedMaxFsWriters(fragment_state, fragment_state, state)) {
     LOG(WARNING) << "Extra table sink instances scheduled, probably due to mismatch of "
                     "cluster state during planning vs scheduling. Expected: "
                  << state->query_options().max_fs_writers
@@ -536,11 +553,14 @@ void Scheduler::CreateInputCollocatedInstances(
       *state->GetFragmentScheduleState(fragment_state->exchange_input_fragments[0]);
   int per_fragment_instance_idx = 0;
 
-  if (fragment.output_sink.__isset.table_sink
-      && fragment.output_sink.table_sink.__isset.hdfs_table_sink
-      && state->query_options().max_fs_writers > 0
-      && input_fragment_state.instance_states.size()
-          > state->query_options().max_fs_writers) {
+  int max_instances = input_fragment_state.instance_states.size();
+  if (IsExceedMaxFsWriters(fragment_state, &input_fragment_state, state)) {
+    max_instances = state->query_options().max_fs_writers;
+  } else if (fragment.effective_instance_count > 0) {
+    max_instances = fragment.effective_instance_count;
+  }
+
+  if (max_instances != input_fragment_state.instance_states.size()) {
     std::unordered_set<std::pair<NetworkAddressPB, NetworkAddressPB>> all_hosts;
     for (const FInstanceScheduleState& input_instance_state :
         input_fragment_state.instance_states) {
@@ -550,7 +570,6 @@ void Scheduler::CreateInputCollocatedInstances(
     // across hosts and ensuring that instances on the same host get consecutive instance
     // indexes.
     int num_hosts = all_hosts.size();
-    int max_instances = state->query_options().max_fs_writers;
     int instances_per_host = max_instances / num_hosts;
     int remainder = max_instances % num_hosts;
     auto host_itr = all_hosts.begin();
@@ -785,6 +804,10 @@ bool Scheduler::ContainsNode(
 
 bool Scheduler::ContainsScanNode(const TPlan& plan) {
   return ContainsNode(plan, SCAN_NODE_TYPES);
+}
+
+bool Scheduler::ContainsUnionNode(const TPlan& plan) {
+  return ContainsNode(plan, TPlanNodeType::UNION_NODE);
 }
 
 std::vector<TPlanNodeId> Scheduler::FindNodes(
