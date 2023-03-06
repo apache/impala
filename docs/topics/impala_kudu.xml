@@ -203,6 +203,97 @@ under the License.
       <p outputclass="toc inpage"/>
 
     </conbody>
+    <concept id="non_unique_primary_key">
+      <title>Non-unique Primary Keys for Kudu Tables</title>
+      <conbody>
+        <p>Kudu now allows a user to create a non-unique primary key for a table when creating a
+          table. The data engine handles this by appending a system generated auto-incrementing
+          column to the non-unique primary key columns. This is done to guarantee the uniqueness of
+          the primary key. This auto-incrementing column is named as 'auto_incrementing_id' with
+          bigint type. The assignment to it during insertion is automatic.</p>
+      </conbody>
+    </concept>
+    <concept id="create">
+      <title>Create a Kudu Table with a non-unique PRIMARY KEY</title>
+      <conbody>
+        <p>The following example shows creating a table with a non-unique PRIMARY KEY.</p>
+<codeblock>
+CREATE TABLE kudu_tbl1
+(
+ id INT NON UNIQUE PRIMARY KEY,
+ name STRING
+)
+PARTITION BY HASH (id) PARTITIONS 3 STORED as KUDU;</codeblock>
+        <p>The effective PRIMARY KEY in the above case will be {id, auto_increment_id}</p>
+        <note>"auto_incrementing_id" column cannot be added, removed or renamed with ALTER TABLE
+          statements.</note>
+      </conbody>
+    </concept>
+    <concept id="verify">
+      <title>Verify the PRIMARY KEY is non-unique</title>
+      <conbody>
+        <p>You can now check the PRIMARY KEY created is non-unique by running the following DESCRIBE
+          command. A new property "key_unique" shows if the primary key is unique. System generated
+          column "auto_incrementing_id" is shown in the output for the table as a non-unique primary
+          key.</p>
+<codeblock>
+  describe kudu_tbl1
+  +----------------------+--------+---------+-------------+------------+----------+---------------+---------------+---------------------+------------+
+  | name                 | type   | comment | primary_key | key_unique | nullable | default_value | encoding      | compression         | block_size |
+  +----------------------+--------+---------+-------------+------------+----------+---------------+---------------+---------------------+------------+
+  | id                   | int    |         | true        | false      | false    |               | AUTO_ENCODING | DEFAULT_COMPRESSION | 0          |
+  | auto_incrementing_id | bigint |         | true        | false      | false    |               | AUTO_ENCODING | DEFAULT_COMPRESSION | 0          |
+  | name                 | string |         | false       |            | true     |               | AUTO_ENCODING | DEFAULT_COMPRESSION | 0          |
+  +----------------------+--------+---------+-------------+------------+----------+---------------+---------------+---------------------+------------+
+  Fetched 3 row(s) in 4.72s
+</codeblock>
+      </conbody>
+    </concept>
+    <concept id="auto_incrementing_col">
+      <title>Query Auto Incrementing Column</title>
+      <conbody>
+        <p>When you query a table using the SELECT statement, it will not display the system
+          generated auto incrementing column unless the column is explicitly specified in the select
+          list.</p>
+      </conbody>
+    </concept>
+    <concept id="no_primary_key">
+      <title>Create a Kudu table without a PRIMARY KEY attribute</title>
+      <conbody>
+        <p>You can create a Kudu table without specifying a PRIMARY KEY or a PARTITION KEY since
+          they are optional, however you cannot create a Kudu table without specifying both PRIMARY
+          KEY and PARTITION KEY. If you do not specify the primary key attribute, the partition key
+          columns can be promoted as a non-unique primary key. This is possible only if those
+          columns are the beginning columns of the table.</p>
+        <p>In the following example, 'a' and 'b' will be promoted as a non-unique primary key,
+          'auto_incrementing_id' column will be added by Kudu engine. 'a', 'b' and
+          'auto_incrementing_id' form the effective unique composite primary key.</p>
+        <example>
+<codeblock>
+CREATE TABLE auto_table
+(
+ a BIGINT,
+ b STRING,
+)
+PARTITION BY HASH(a, b) PARTITIONS 2 STORED AS KUDU;
+</codeblock>
+          <p>The effective primary key in this case would be {a, b, auto_incrementing_id}</p>
+        </example>
+      </conbody>
+    </concept>
+    <concept id="limitations">
+      <title>Limitations</title>
+      <conbody>
+        <ul>
+          <li>UPSERT operation is not supported for Kudu tables with non-unique primary key. If you
+            run an UPSERT statement for a Kudu table with a non-unique primary key it will fail with
+            an error.</li>
+          <li>Since the auto generated key for each row will be assigned after the row’s data is
+            generated and after the row lands in the tablet, you cannot use this column in the
+            partition key.</li>
+        </ul>
+      </conbody>
+    </concept>
 
     <concept id="kudu_primary_key">
 
@@ -210,14 +301,13 @@ under the License.
 
       <conbody>
 
-        <p>
-          Kudu tables introduce the notion of primary keys to Impala for the first time. The
+        <p> Kudu tables introduce the notion of primary keys to Impala for the first time. The
           primary key is made up of one or more columns, whose values are combined and used as a
-          lookup key during queries. The tuple represented by these columns must be unique and cannot contain any
-          <codeph>NULL</codeph> values, and can never be updated once inserted. For a
-          Kudu table, all the partition key columns must come from the set of
-          primary key columns.
-        </p>
+          lookup key during queries. The primary key can be non-unique. The uniqueness of the
+          primary key is guaranteed by appending a system-generated auto-incrementing column to the
+          non-unique primary key columns. The tuple represented by these columns cannot contain any
+          NULL values, and can never be updated once inserted. For a Kudu table, all the partition
+          key columns must come from the set of primary key columns. </p>
 
         <p>
           The primary key has both physical and logical aspects:
@@ -232,14 +322,13 @@ under the License.
             </p>
           </li>
           <li>
-            <p>
-              On the logical side, the uniqueness constraint allows you to avoid duplicate data in a table.
-              For example, if an <codeph>INSERT</codeph> operation fails partway through, only some of the
-              new rows might be present in the table. You can re-run the same <codeph>INSERT</codeph>, and
-              only the missing rows will be added. Or if data in the table is stale, you can run an
-              <codeph>UPSERT</codeph> statement that brings the data up to date, without the possibility
-              of creating duplicate copies of existing rows.
-            </p>
+            <p> You can insert non-unique data using an INSERT statement but the data saved in Kudu
+              table for each row which will be turned to unique by the system generated
+              auto-incrementing column. If the primary key is non-unique, the uniqueness will not
+              cause insertion failure. However, if the primary key is set as non-unique and if an
+              INSERT operation fails part way through, all rows except the rows with writing errors
+              will be added into the table. The duplicated rows will be added with different values
+              for auto-incrementing columns. </p>
           </li>
         </ul>
 
@@ -273,7 +362,7 @@ under the License.
         </p>
 
 <codeblock>
-  PRIMARY KEY
+[NON UNIQUE] PRIMARY KEY
 | [NOT] NULL
 | ENCODING <varname>codec</varname>
 | COMPRESSION <varname>algorithm</varname>
@@ -300,7 +389,9 @@ under the License.
             combination of values for the columns.
           </p>
 
-          <p conref="../shared/impala_common.xml#common/pk_implies_not_null"/>
+          <p>Because all of the primary key columns must have non-null values, specifying a column
+            in the PRIMARY KEY or NON-UNIQUE PRIMARY KEY clause implicitly adds the NOT NULL
+            attribute to that column.</p>
 
           <p>
             The primary key columns must be the first ones specified in the <codeph>CREATE
@@ -330,6 +421,21 @@ CREATE TABLE pk_at_end
   col2 STRING,
   col3 BOOLEAN,
   PRIMARY KEY (col1)
+) PARTITION BY HASH(col1) PARTITIONS 2 STORED AS KUDU;
+
+CREATE TABLE pk_inline
+(
+col1 BIGINT [NON UNIQUE] PRIMARY KEY,
+col2 STRING,
+col3 BOOLEAN
+) PARTITION BY HASH(col1) PARTITIONS 2 STORED AS KUDU;
+
+CREATE TABLE pk_at_end
+(
+col1 BIGINT,
+col2 STRING,
+col3 BOOLEAN,
+[NON UNIQUE] PRIMARY KEY (col1)
 ) PARTITION BY HASH(col1) PARTITIONS 2 STORED AS KUDU;
 </codeblock>
 
@@ -373,11 +479,10 @@ SHOW CREATE TABLE inline_pk_rewritten;
 +------------------------------------------------------------------------------+
 </codeblock>
 
-          <p>
-            The notion of primary key only applies to Kudu tables. Every Kudu table requires a
+          <p> The notion of primary key only applies to Kudu tables. Every Kudu table requires a
             primary key. The primary key consists of one or more columns. You must specify any
-            primary key columns first in the column list.
-          </p>
+            primary key columns first in the column list or specify partition key with the beginning
+            columns of the table. </p>
 
           <p>
             The contents of the primary key columns cannot be changed by an
