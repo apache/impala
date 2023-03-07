@@ -56,7 +56,7 @@ under the License.
 
 <varname>column_list</varname> ::= <varname>column_name</varname> [ , <varname>column_name</varname>, ... ]
 
-COMPUTE INCREMENTAL STATS [<varname>db_name</varname>.]<varname>table_name</varname> [PARTITION (<varname>partition_spec</varname>)]
+COMPUTE INCREMENTAL STATS [<varname>db_name</varname>.]<varname>table_name</varname> [PARTITION (<varname>partition_spec</varname>)] [ ( <varname>column_list</varname> ) ]
 
 <varname>partition_spec</varname> ::= <varname>simple_partition_spec</varname> | <ph rev="IMPALA-1654"><varname>complex_partition_spec</varname></ph>
 
