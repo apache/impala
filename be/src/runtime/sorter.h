@@ -79,7 +79,7 @@ class RowBatch;
 /// input run, and one batch is created to hold deep copied rows (i.e. ptrs + data) from
 /// the output of the merge.
 //
-/// Note that Init() must be called right after the constructor.
+/// Note that Prepare() must be called right after the constructor.
 //
 /// During a merge, one row batch is created for each input run, and one batch is created
 /// for the output of the merge (if is not the final merge). It is assumed that the memory
@@ -151,7 +151,7 @@ class Sorter {
   Status GetNext(RowBatch* batch, bool* eos) WARN_UNUSED_RESULT;
 
   /// Resets all internal state like ExecNode::Reset().
-  /// Init() must have been called, AddBatch()/GetNext()/InputDone()
+  /// Prepare() must have been called, AddBatch()/GetNext()/InputDone()
   /// may or may not have been called.
   void Reset();
 
