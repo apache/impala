@@ -24,6 +24,8 @@ import java.util.Set;
 
 import com.google.common.collect.Sets;
 import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.StructField;
+import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
@@ -319,6 +321,12 @@ public abstract class QueryStmt extends StatementBase {
             orderingExpr.getType().toSql()));
       }
     }
+
+    for (Expr expr: resultExprs_) {
+      Preconditions.checkState(!expr.getType().containsCollection(),
+          "Sorting is not supported if the select list contains collection columns.");
+    }
+
     sortInfo_.createSortTupleInfo(resultExprs_, analyzer);
 
     ExprSubstitutionMap smap = sortInfo_.getOutputSmap();

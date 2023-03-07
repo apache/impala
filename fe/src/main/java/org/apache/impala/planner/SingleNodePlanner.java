@@ -318,10 +318,6 @@ public class SingleNodePlanner {
     }
 
     if (stmt.evaluateOrderBy() && sortHasMaterializedSlots) {
-      for (Expr expr: stmt.getResultExprs()) {
-        Preconditions.checkState(!expr.getType().isCollectionType(),
-            "Sorting is not supported if the select list contains collection columns.");
-      }
       root = createSortNode(ctx_, analyzer, root, stmt.getSortInfo(), stmt.getLimit(),
           stmt.getOffset(), stmt.hasLimit(), disableTopN);
     } else {

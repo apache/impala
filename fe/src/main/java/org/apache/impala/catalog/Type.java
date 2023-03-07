@@ -241,6 +241,22 @@ public abstract class Type {
   }
 
   /**
+   * Returns true if this type
+   *  - is a collection type or
+   *  - contains a collection type (recursively).
+   */
+  public boolean containsCollection() {
+    if (isCollectionType()) return true;
+    if (isStructType()) {
+      for (StructField field : ((StructType) this).getFields()) {
+        Type fieldType = field.getType();
+        if (fieldType.containsCollection()) return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Returns true if Impala supports this type in the metdata. It does not mean we
    * can manipulate data of this type. For tables that contain columns with these
    * types, we can safely skip over them.
