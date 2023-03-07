@@ -39,5 +39,9 @@ cd ..
 
 export CTEST_OUTPUT_ON_FAILURE=1
 
+export TSAN_OPTIONS="disable_coredump=0:unmap_shadow_on_exit=1"
+export ASAN_OPTIONS="disable_coredump=0:unmap_shadow_on_exit=1"
+export UBSAN_OPTIONS="disable_coredump=0:unmap_shadow_on_exit=1"
+
 export PATH="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-${IMPALA_LLVM_VERSION}/bin:${PATH}"
 "${MAKE_CMD:-make}" test ARGS="${BE_TEST_ARGS}"
