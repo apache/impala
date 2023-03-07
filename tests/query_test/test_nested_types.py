@@ -168,7 +168,11 @@ class TestNestedCollectionsInSelectList(ImpalaTestSuite):
         ImpalaTestDimension('mt_dop', 0, 2))
     cls.ImpalaTestMatrix.add_dimension(
         create_exec_option_dimension_from_dict({
-            'disable_codegen': ['False', 'True']}))
+            'disable_codegen': ['False', 'True'],
+            # The below two options are set to prevent the planner from disabling codegen
+            # because of the small data size even when 'disable_codegen' is False.
+            'disable_codegen_rows_threshold': [0],
+            'exec_single_node_rows_threshold': [0]}))
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('orc_schema_resolution', 0, 1))
     cls.ImpalaTestMatrix.add_constraint(orc_schema_resolution_constraint)
@@ -204,7 +208,11 @@ class TestMixedCollectionsAndStructsInSelectList(ImpalaTestSuite):
         ImpalaTestDimension('mt_dop', 0, 2))
     cls.ImpalaTestMatrix.add_dimension(
         create_exec_option_dimension_from_dict({
-            'disable_codegen': ['False', 'True']}))
+            'disable_codegen': ['False', 'True'],
+            # The below two options are set to prevent the planner from disabling codegen
+            # because of the small data size even when 'disable_codegen' is False.
+            'disable_codegen_rows_threshold': [0],
+            'exec_single_node_rows_threshold': [0]}))
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('orc_schema_resolution', 0, 1))
     cls.ImpalaTestMatrix.add_constraint(orc_schema_resolution_constraint)

@@ -3849,6 +3849,28 @@ INSERT OVERWRITE {db_name}{db_suffix}.{table_name} VALUES
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+map_non_varlen
+---- COLUMNS
+id INT
+map_int_int MAP<INT,INT>
+map_char3_char5 MAP<CHAR(3),CHAR(5)>
+---- DEPENDENT_LOAD_HIVE
+INSERT OVERWRITE {db_name}{db_suffix}.{table_name} VALUES
+  (1, map(10, 100, 11, 110, 12, 120), map(cast("aaa" as char(3)), cast("aaaaa" as char(5)))),
+  (2, map(20, 200, 21, 210, 22, 220), map(cast("aab" as char(3)), cast("aaaab" as char(5)))),
+  (3, map(30, 300, 31, 310, 32, 320), map(cast("aac" as char(3)), cast("aaaac" as char(5)))),
+  (4, map(40, 400, 41, 410, 42, 420), map(cast("aad" as char(3)), cast("aaaad" as char(5)))),
+  (5, map(50, 500, 51, 510, 52, 520), map(cast("aae" as char(3)), cast("aaaae" as char(5)))),
+  (6, map(60, 600, 61, 610, 62, 620), map(cast("aaf" as char(3)), cast("aaaaf" as char(5)))),
+  (7, map(70, 700, 71, 710, 72, 720), map(cast("aag" as char(3)), cast("aaaag" as char(5)))),
+  (8, map(80, 800, 81, 810, 82, 820), map(cast("aah" as char(3)), cast("aaaah" as char(5)))),
+  (9, map(90, 900, 91, 910, 92, 920), map(cast("aai" as char(3)), cast("aaaai" as char(5)))),
+  (10, map(100, 1000, 101, 1010, 102, 1020), map(cast("aaj" as char(3)), cast("aaaaj" as char(5))));
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 collection_struct_mix
 ---- COLUMNS
 id INT
@@ -3971,6 +3993,22 @@ DROP VIEW IF EXISTS {db_name}{db_suffix}.{table_name};
 CREATE VIEW {db_name}{db_suffix}.{table_name}
 AS SELECT id, arr_contains_struct, arr_contains_nested_struct, struct_contains_nested_arr FROM {db_name}{db_suffix}.collection_struct_mix;
 ---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+simple_arrays_big
+---- COLUMNS
+int_col INT
+string_col STRING
+int_array ARRAY<INT>
+double_array ARRAY<DOUBLE>
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir -p /test-warehouse/simple_arrays_big_parquet && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/ComplexTypesTbl/simple_arrays_big.parq \
+/test-warehouse/simple_arrays_big_parquet/
+---- DEPENDENT_LOAD_ACID
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM functional_parquet.simple_arrays_big;
 ====
 ---- DATASET
 functional

@@ -20,12 +20,11 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import com.google.common.collect.Sets;
 import org.apache.impala.catalog.FeView;
-import org.apache.impala.catalog.StructField;
-import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
@@ -322,10 +321,7 @@ public abstract class QueryStmt extends StatementBase {
       }
     }
 
-    for (Expr expr: resultExprs_) {
-      Preconditions.checkState(!expr.getType().containsCollection(),
-          "Sorting is not supported if the select list contains collection columns.");
-    }
+    checkForVarLenCollectionSorting(analyzer);
 
     sortInfo_.createSortTupleInfo(resultExprs_, analyzer);
 
@@ -346,6 +342,17 @@ public abstract class QueryStmt extends StatementBase {
     }
 
     substituteResultExprs(smap, analyzer);
+  }
+
+  private void checkForVarLenCollectionSorting(Analyzer analyzer)
+      throws AnalysisException {
+    for (Expr expr: getResultExprs()) {
+      Type exprType = expr.getType();
+      Optional<String> err = SortInfo.checkTypeForVarLenCollection(exprType);
+      if (err.isPresent()) {
+        throw new AnalysisException(err.get());
+      }
+    }
   }
 
   /**

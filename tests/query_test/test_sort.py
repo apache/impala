@@ -23,15 +23,19 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfNotHdfsMinicluster
 
 
+def split_result_rows(result):
+  """Split result rows by tab to produce a list of lists. i.e.
+     [[a1,a2], [b1, b2], [c1, c2]]"""
+  return [row.split('\t') for row in result]
+
+
 def transpose_results(result, map_fn=lambda x: x):
   """Given a query result (list of strings, each string represents a row), return a list
      of columns, where each column is a list of strings. Optionally, map_fn can be
      provided to be applied to every value, eg. to convert the strings to their
      underlying types."""
 
-  # Split result rows by tab to produce a list of lists. i.e.
-  # [[a1,a2], [b1, b2], [c1, c2]]
-  split_result = [row.split('\t') for row in result]
+  split_result = split_result_rows(result)
   column_result = []
   for col in zip(*split_result):
     # col is the transposed result, i.e. a1, b1, c1
@@ -276,3 +280,39 @@ class TestPartialSort(ImpalaTestSuite):
     result = self.execute_query(
         "insert into %s select string_col from functional.alltypessmall" % table_name)
     assert "PARTIAL SORT" in result.runtime_profile, result.runtime_profile
+
+
+class TestArraySort(ImpalaTestSuite):
+  """Tests where there are arrays in the sorting tuple."""
+
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestArraySort, cls).add_test_dimensions()
+
+    # The table we use is a parquet table.
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'parquet')
+
+  def test_simple_arrays(self, vector):
+    """Test arrays that do not contain var-len data."""
+    query = """select string_col, int_array, double_array
+         from functional_parquet.simple_arrays_big order by string_col;"""
+
+    exec_option = copy(vector.get_value('exec_option'))
+    exec_option['disable_outermost_topn'] = 1
+    exec_option['num_nodes'] = 1
+    exec_option['buffer_pool_limit'] = '28m'
+    table_format = vector.get_value('table_format')
+
+    query_result = self.execute_query(query, exec_option, table_format=table_format)
+    assert "SpilledRuns: 2" in query_result.runtime_profile
+
+    # Split result rows (strings) into columns.
+    result = split_result_rows(query_result.data)
+    # Sort the result rows according to the first column.
+    sorted_result = sorted(result, key=lambda row: row[0])
+    assert(result == sorted_result)

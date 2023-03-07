@@ -21,8 +21,15 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
+import org.apache.impala.catalog.ArrayType;
+import org.apache.impala.catalog.MapType;
+import org.apache.impala.catalog.PrimitiveType;
+import org.apache.impala.catalog.StructField;
+import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.planner.PlanNode;
@@ -258,7 +265,8 @@ public class SortInfo {
       }
       dstSlotDesc.setSourceExpr(srcExpr);
       SlotRef dstExpr = new SlotRef(dstSlotDesc);
-      if (dstSlotDesc.getType().isStructType() &&
+      Type dstType = dstSlotDesc.getType();
+      if (dstType.isStructType() &&
           dstSlotDesc.getItemTupleDesc() != null) {
         try {
           dstExpr.reExpandStruct(analyzer);
@@ -267,6 +275,8 @@ public class SortInfo {
           // analysed.
           Preconditions.checkNotNull(null);
         }
+      } else if (dstType.isCollectionType()) {
+        dstSlotDesc.setIsMaterializedRecursively(true);
       }
       outputSmap_.put(srcExpr.clone(), dstExpr);
       materializedExprs_.add(srcExpr);
@@ -320,5 +330,70 @@ public class SortInfo {
     float weight = ExprUtil.computeExprsTotalCost(getSortExprs());
 
     return ProcessingCost.basicCost(label, inputCardinality, weight);
+  }
+
+  // Collections with variable length data as well as any collections within structs are
+  // currently not allowed in the sorting tuple (see IMPALA-12019 and IMPALA-10939). This
+  // function checks whether the given type is allowed in the sorting tuple: returns an
+  // empty 'Optional' if the type is allowed, or an 'Optional' with an error message if it
+  // is not.
+  public static Optional<String> checkTypeForVarLenCollection(Type type) {
+    final String errorMsg = "Sorting is not supported if the select list contains " +
+      "(possibly nested) collections with variable length data types.";
+
+    if (type.isCollectionType()) {
+      if (type instanceof ArrayType) {
+        ArrayType arrayType = (ArrayType) type;
+        return isAllowedCollectionItemForSorting(arrayType.getItemType())
+            ? Optional.empty() : Optional.of(errorMsg);
+      } else {
+        Preconditions.checkState(type instanceof MapType);
+        MapType mapType = (MapType) type;
+
+        if (!isAllowedCollectionItemForSorting(mapType.getKeyType())) {
+          return Optional.of(errorMsg);
+        }
+
+        return isAllowedCollectionItemForSorting(mapType.getValueType())
+            ? Optional.empty() : Optional.of(errorMsg);
+      }
+    } else if (type.isStructType()) {
+      StructType structType = (StructType) type;
+      return checkStructTypeForVarLenCollection(structType);
+    }
+
+    return Optional.empty();
+  }
+
+  // Helper for checkTypeForVarLenCollection(), see more there.
+  private static Optional<String> checkStructTypeForVarLenCollection(
+      StructType structType) {
+    for (StructField field : structType.getFields()) {
+      Type fieldType = field.getType();
+      if (fieldType.isStructType()) {
+        return checkStructTypeForVarLenCollection((StructType) fieldType);
+      } else if (fieldType.isCollectionType()) {
+        // TODO IMPALA-10939: Once we allow sorting collections in structs, test that
+        // collections containing var-len types are handled correctly.
+        String error = "Sorting is not supported if the select list "
+            + "contains collection(s) nested in struct(s).";
+        return Optional.of(error);
+      }
+    }
+
+    return Optional.empty();
+  }
+
+  private static boolean isAllowedCollectionItemForSorting(Type itemType) {
+    if (itemType.isStructType()) {
+      StructType structType = (StructType) itemType;
+      for (StructField field : structType.getFields()) {
+        Type fieldType = field.getType();
+        if (!isAllowedCollectionItemForSorting(fieldType)) return false;
+      }
+      return true;
+    }
+
+    return !itemType.isComplexType() && !itemType.isVarLenStringType();
   }
 }

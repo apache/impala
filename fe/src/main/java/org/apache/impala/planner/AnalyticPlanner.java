@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 import org.apache.impala.analysis.AggregateInfoBase;
 import org.apache.impala.analysis.AnalyticExpr;
@@ -325,21 +326,22 @@ public class AnalyticPlanner {
     for (TupleId tid: input.getTupleIds()) {
       TupleDescriptor tupleDesc = analyzer_.getTupleDesc(tid);
       for (SlotDescriptor inputSlotDesc: tupleDesc.getSlots()) {
-        if (!inputSlotDesc.isMaterialized()) continue;
-        if (inputSlotDesc.getType().isComplexType()) {
-          // Project out collection slots since they won't be used anymore and may cause
-          // troubles like IMPALA-8718. They won't be used since outputs of the analytic
-          // node must be in the select list of the block with the analytic, and we don't
-          // allow collection types to be returned from a select block, and also don't
-          // support any builtin or UDF functions that take collection types as an
-          // argument.
-          if (LOG.isTraceEnabled()) {
-            LOG.trace("Project out collection slot in sort tuple of analytic: slot={}",
-                inputSlotDesc.debugString());
+        if (inputSlotDesc.isMaterialized()) {
+          // Project out collection slots that are not supported in the sorting tuple
+          // (collections containing var-len types).
+          Optional<String> err = SortInfo.checkTypeForVarLenCollection(
+              inputSlotDesc.getType());
+          // An empty 'Optional' result means there is no error so the type can be put
+          // into the sorting tuple.
+          if (!err.isPresent()) {
+            inputSlotRefs.add(new SlotRef(inputSlotDesc));
+          } else {
+            if (LOG.isTraceEnabled()) {
+              LOG.trace("Project out unsupported collection slot in " +
+                  "sort tuple of analytic: slot={}", inputSlotDesc.debugString());
+            }
           }
-          continue;
         }
-        inputSlotRefs.add(new SlotRef(inputSlotDesc));
       }
     }
 

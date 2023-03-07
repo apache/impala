@@ -916,7 +916,7 @@ void SlotDescriptor::CodegenWriteToSlotHelper(
     CodegenStoreStructToNativePtr(read_write_info, main_tuple_llvm_struct_ptr,
         slot, pool_val, insert_before);
   } else {
-    CodegenStoreNonNullAnyVal(read_write_info, slot, pool_val);
+    CodegenStoreNonNullAnyVal(read_write_info, slot, pool_val, this);
 
     // We only need this branch if we are not a struct, because for structs, the last leaf
     // (non-struct) field will add this branch.
@@ -1009,14 +1009,15 @@ CodegenAnyValReadWriteInfo CodegenAnyValToReadWriteInfo(CodegenAnyVal& any_val,
 }
 
 void SlotDescriptor::CodegenStoreNonNullAnyVal(CodegenAnyVal& any_val,
-      llvm::Value* raw_val_ptr, llvm::Value* pool_val) {
+      llvm::Value* raw_val_ptr, llvm::Value* pool_val,
+      const SlotDescriptor* slot_desc) {
   CodegenAnyValReadWriteInfo rwi = CodegenAnyValToReadWriteInfo(any_val, pool_val);
-  CodegenStoreNonNullAnyVal(rwi, raw_val_ptr, pool_val);
+  CodegenStoreNonNullAnyVal(rwi, raw_val_ptr, pool_val, slot_desc);
 }
 
 void SlotDescriptor::CodegenStoreNonNullAnyVal(
     const CodegenAnyValReadWriteInfo& read_write_info, llvm::Value* raw_val_ptr,
-    llvm::Value* pool_val) {
+    llvm::Value* pool_val, const SlotDescriptor* slot_desc) {
   LlvmBuilder* builder = read_write_info.builder();
   const ColumnType& type = read_write_info.type();
   switch (type.type) {
@@ -1024,7 +1025,8 @@ void SlotDescriptor::CodegenStoreNonNullAnyVal(
     case TYPE_VARCHAR:
     case TYPE_ARRAY: // CollectionVal has same memory layout as StringVal.
     case TYPE_MAP: { // CollectionVal has same memory layout as StringVal.
-      CodegenWriteStringOrCollectionToSlot(read_write_info, raw_val_ptr, pool_val);
+      CodegenWriteStringOrCollectionToSlot(read_write_info, raw_val_ptr,
+          pool_val, slot_desc);
       break;
     }
     case TYPE_CHAR:
@@ -1097,7 +1099,7 @@ void SlotDescriptor::CodegenSetToNull(const CodegenAnyValReadWriteInfo& read_wri
 
 void SlotDescriptor::CodegenWriteStringOrCollectionToSlot(
     const CodegenAnyValReadWriteInfo& read_write_info,
-    llvm::Value* slot_ptr, llvm::Value* pool_val) {
+    llvm::Value* slot_ptr, llvm::Value* pool_val, const SlotDescriptor* slot_desc) {
   LlvmCodeGen* codegen = read_write_info.codegen();
   LlvmBuilder* builder = read_write_info.builder();
   const ColumnType& type = read_write_info.type();
@@ -1109,12 +1111,22 @@ void SlotDescriptor::CodegenWriteStringOrCollectionToSlot(
   str_or_coll_value = builder->CreateInsertValue(
       str_or_coll_value, read_write_info.GetPtrAndLen().len, 1);
   if (pool_val != nullptr) {
+    llvm::Value* len = read_write_info.GetPtrAndLen().len;
+    if (type.IsCollectionType()) {
+      DCHECK(slot_desc != nullptr) << "SlotDescriptor needed to calculate the size of "
+          << "the collection for copying.";
+      // For a 'CollectionValue', 'len' is not the byte size of the whole data but the
+      // number of items, so we have to multiply it with the byte size of the item tuple
+      // to get the data size.
+      int item_tuple_byte_size = slot_desc->children_tuple_descriptor()->byte_size();
+      len = builder->CreateMul(len, codegen->GetI32Constant(item_tuple_byte_size));
+    }
+
     // Allocate a 'new_ptr' from 'pool_val' and copy the data from
     // 'read_write_info->ptr'
     llvm::Value* new_ptr = codegen->CodegenMemPoolAllocate(
-        builder, pool_val, read_write_info.GetPtrAndLen().len, "new_ptr");
-    codegen->CodegenMemcpy(builder, new_ptr, read_write_info.GetPtrAndLen().ptr,
-        read_write_info.GetPtrAndLen().len);
+        builder, pool_val, len, "new_ptr");
+    codegen->CodegenMemcpy(builder, new_ptr, read_write_info.GetPtrAndLen().ptr, len);
     str_or_coll_value = builder->CreateInsertValue(str_or_coll_value, new_ptr, 0);
   } else {
     str_or_coll_value = builder->CreateInsertValue(

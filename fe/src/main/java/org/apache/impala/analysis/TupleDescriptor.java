@@ -30,6 +30,7 @@ import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TTupleDescriptor;
 
@@ -247,9 +248,10 @@ public class TupleDescriptor {
   }
 
   public void setParentSlotDesc(SlotDescriptor parent) {
-    Preconditions.checkState(parent.getType().isStructType(),
-        "Parent for a TupleDescriptor should be a STRUCT. Actual type is " +
-        parent.getType() + " Tuple ID: " + getId());
+    Type parentType = parent.getType();
+    Preconditions.checkState(parentType.isStructType() || parentType.isCollectionType(),
+        "Parent for a TupleDescriptor should be a STRUCT or a COLLECTION. " +
+        "Actual type is " + parentType + " Tuple ID: " + getId());
     parentStructSlot_ = parent;
   }
   public SlotDescriptor getParentSlotDesc() { return parentStructSlot_; }

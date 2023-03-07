@@ -222,10 +222,16 @@ class Sorter::Run {
   /// if the run is unpinned.
   Status FinalizePages(vector<Page>* pages);
 
-  /// Collect the non-null var-len (e.g. STRING) slots from 'src' in 'var_len_values' and
-  /// return the total length of all var-len values in 'total_var_len'.
+  void CheckTypeForVarLenCollectionSorting();
+
+  /// Collects the non-null var-len slots (strings and collections) from 'src'. Strings
+  /// are returned in 'string_values' and collections are returned, along with their byte
+  /// size, in 'collection_values'. The total length of all var-len values is returned in
+  /// 'total_var_len'.
   void CollectNonNullVarSlots(
-      Tuple* src, vector<StringValue*>* var_len_values, int* total_var_len);
+      Tuple* src, vector<StringValue*>* string_values,
+      std::vector<CollValueAndSize>* collection_values,
+      int* total_var_len);
 
   enum AddPageMode { KEEP_PREV_PINNED, UNPIN_PREV };
 
@@ -251,21 +257,31 @@ class Sorter::Run {
   /// this function will pin the page at 'page_index' + 1 in 'pages'.
   Status PinNextReadPage(vector<Page>* pages, int page_index);
 
-  /// Copy the StringValues in 'var_values' to 'dest' in order and update the StringValue
-  /// ptrs in 'dest' to point to the copied data.
-  void CopyVarLenData(const vector<StringValue*>& var_values, uint8_t* dest);
+  /// Copy the var len data in 'string_values' and 'collection_values_and_sizes' to 'dest'
+  /// in order and update the pointers to point to the copied data.
+  void CopyVarLenData(const vector<StringValue*>& string_values,
+      const vector<CollValueAndSize>& collection_values_and_sizes, uint8_t* dest);
 
-  /// Copy the StringValues in 'var_values' to 'dest' in order. Update the StringValue
-  /// ptrs in 'dest' to contain a packed offset for the copied data comprising
-  /// page_index and the offset relative to page_start.
-  void CopyVarLenDataConvertOffset(const vector<StringValue*>& var_values, int page_index,
-      const uint8_t* page_start, uint8_t* dest);
+  /// Copy the StringValues in 'var_values' and the CollectionValues referenced in
+  /// 'collection_values_and_sizes' to 'dest' in order. Update the StringValue ptrs in
+  /// 'dest' to contain a packed offset for the copied data comprising page_index and the
+  /// offset relative to page_start.
+  void CopyVarLenDataConvertOffset(const vector<StringValue*>& var_values,
+      const std::vector<CollValueAndSize>& collection_values_and_sizes,
+      int page_index, const uint8_t* page_start, uint8_t* dest);
 
   /// Convert encoded offsets to valid pointers in tuple with layout 'sort_tuple_desc_'.
   /// 'tuple' is modified in-place. Returns true if the pointers refer to the page at
   /// 'var_len_pages_index_' and were successfully converted or false if the var len
   /// data is in the next page, in which case 'tuple' is unmodified.
   bool ConvertOffsetsToPtrs(Tuple* tuple);
+
+  template <class ValueType>
+  bool ConvertValueOffsetsToPtrs(Tuple* tuple, uint8_t* page_start,
+      const vector<SlotDescriptor*>& slots);
+
+  bool ConvertStringValueOffsetsToPtrs(Tuple* tuple, uint8_t* page_start);
+  bool ConvertCollectionValueOffsetsToPtrs(Tuple* tuple, uint8_t* page_start);
 
   int NumOpenPages(const vector<Page>& pages);
 
@@ -289,7 +305,7 @@ class Sorter::Run {
 
   const bool has_var_len_slots_;
 
-  /// True if this is an initial run. False implies this is an sorted intermediate run
+  /// True if this is an initial run. False implies this is a sorted intermediate run
   /// resulting from merging other runs.
   const bool initial_run_;
 

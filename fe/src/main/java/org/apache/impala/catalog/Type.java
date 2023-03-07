@@ -189,7 +189,9 @@ public abstract class Type {
   public boolean isDecimal() { return isScalarType(PrimitiveType.DECIMAL); }
   public boolean isFullySpecifiedDecimal() { return false; }
   public boolean isVarchar() { return isScalarType(PrimitiveType.VARCHAR); }
+  public boolean isString() { return isScalarType(PrimitiveType.STRING); }
   public boolean isBinary() { return isScalarType(PrimitiveType.BINARY); }
+  public boolean isVarLenStringType() { return isVarchar() || isString() || isBinary(); }
   public boolean isWildcardDecimal() { return false; }
   public boolean isWildcardVarchar() { return false; }
   public boolean isWildcardChar() { return false; }

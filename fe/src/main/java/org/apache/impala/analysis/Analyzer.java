@@ -1667,7 +1667,7 @@ public class Analyzer {
         // this is the sorting tuple.
         // TODO: IMPALA-10939: When we enable collections in sorting tuples we need to
         // revisit this. Currently collection SlotDescriptors cannot be created without a
-        // path.
+        // path. Maybe descriptors should have a path even in the sorting tuple.
         if (slotPath == null) {
           createStructTuplesAndSlotDescsWithoutPath(slotPath, structField);
         } else {

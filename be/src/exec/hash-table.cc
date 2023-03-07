@@ -275,7 +275,7 @@ bool HashTableCtx::EvalRow(const TupleRow* row,
     const ColumnType& expr_type = build_exprs_[i]->type();
     DCHECK_LE(expr_type.GetSlotSize(), sizeof(NULL_VALUE));
     val = RawValue::CanonicalValue(val, expr_type);
-    RawValue::Write(val, loc, expr_type, NULL);
+    RawValue::WriteNonNullPrimitive(val, loc, expr_type, NULL);
   }
   return has_null;
 }

@@ -146,6 +146,9 @@ Status Sorter::Run::Init() {
   } else {
     sorter_->spilled_runs_counter_->Add(1);
   }
+
+  CheckTypeForVarLenCollectionSorting();
+
   return Status::OK();
 }
 
@@ -180,6 +183,7 @@ Status Sorter::Run::AddBatchInternal(
   // processed.
   int cur_input_index = start_index;
   vector<StringValue*> string_values;
+  vector<CollValueAndSize> coll_values_and_sizes;
   string_values.reserve(sort_tuple_desc_->string_slots().size());
   while (cur_input_index < batch->num_rows()) {
     // tuples_remaining is the number of tuples to copy/materialize into
@@ -195,7 +199,7 @@ Status Sorter::Run::AddBatchInternal(
       if (INITIAL_RUN) {
         new_tuple->MaterializeExprs<HAS_VAR_LEN_SLOTS, true>(input_row,
             *sort_tuple_desc_, sorter_->sort_tuple_expr_evals_, nullptr,
-            &string_values, &total_var_len);
+            &string_values, &coll_values_and_sizes, &total_var_len);
         if (total_var_len > sorter_->page_len_) {
           int64_t max_row_size = sorter_->state_->query_options().max_row_size;
           return Status(TErrorCode::MAX_ROW_SIZE,
@@ -205,7 +209,8 @@ Status Sorter::Run::AddBatchInternal(
       } else {
         memcpy(new_tuple, input_row->GetTuple(0), sort_tuple_size_);
         if (HAS_VAR_LEN_SLOTS) {
-          CollectNonNullVarSlots(new_tuple, &string_values, &total_var_len);
+          CollectNonNullVarSlots(new_tuple, &string_values,
+              &coll_values_and_sizes, &total_var_len);
         }
       }
 
@@ -225,19 +230,13 @@ Status Sorter::Run::AddBatchInternal(
           }
         }
 
-        // Sorting of tuples containing array values is not implemented. The planner
-        // combined with projection should guarantee that none are in each tuple.
-        for (const SlotDescriptor* coll_slot: sort_tuple_desc_->collection_slots()) {
-          DCHECK(new_tuple->IsNull(coll_slot->null_indicator_offset()));
-        }
-
+        DCHECK_EQ(&var_len_pages_.back(), cur_var_len_page);
         uint8_t* var_data_ptr = cur_var_len_page->AllocateBytes(total_var_len);
         if (INITIAL_RUN) {
-          CopyVarLenData(string_values, var_data_ptr);
+          CopyVarLenData(string_values, coll_values_and_sizes, var_data_ptr);
         } else {
-          DCHECK_EQ(&var_len_pages_.back(), cur_var_len_page);
-          CopyVarLenDataConvertOffset(string_values, var_len_pages_.size() - 1,
-              cur_var_len_page->data(), var_data_ptr);
+          CopyVarLenDataConvertOffset(string_values, coll_values_and_sizes,
+              var_len_pages_.size() - 1, cur_var_len_page->data(), var_data_ptr);
         }
       }
       ++num_tuples_;
@@ -255,6 +254,31 @@ Status Sorter::Run::AddBatchInternal(
     }
   }
   return Status::OK();
+}
+
+bool is_allowed_collection_item_type(const ColumnType& type) {
+  if (type.IsStructType()) {
+    for (const ColumnType& child_type : type.children) {
+      if (!is_allowed_collection_item_type(child_type)) return false;
+    }
+    return true;
+  }
+
+  return !type.IsComplexType() && !type.IsVarLenStringType();
+}
+
+void Sorter::Run::CheckTypeForVarLenCollectionSorting() {
+  // Sorting of tuples containing collection values is only implemented if the items are
+  // fixed length types. The planner combined with projection should guarantee that only
+  // such values are in each tuple.
+  for (const SlotDescriptor* coll_slot: sort_tuple_desc_->collection_slots()) {
+    for (SlotDescriptor* child_slot :
+        coll_slot->children_tuple_descriptor()->slots()) {
+      DCHECK(is_allowed_collection_item_type(child_slot->type()))
+          << "Type not allowed in collection in sorting tuple: "
+          << child_slot->type() << ".";
+    }
+  }
 }
 
 Status Sorter::Run::FinalizeInput() {
@@ -306,6 +330,7 @@ Status Sorter::Run::UnpinAllPages() {
   sorted_var_len_pages.reserve(var_len_pages_.size());
 
   vector<StringValue*> string_values;
+  vector<CollValueAndSize> collection_values_and_sizes;
   int total_var_len;
   string_values.reserve(sort_tuple_desc_->string_slots().size());
   Page* cur_sorted_var_len_page = nullptr;
@@ -331,7 +356,8 @@ Status Sorter::Run::UnpinAllPages() {
       for (int page_offset = 0; page_offset < cur_fixed_page->valid_data_len();
            page_offset += sort_tuple_size_) {
         Tuple* cur_tuple = reinterpret_cast<Tuple*>(cur_fixed_page->data() + page_offset);
-        CollectNonNullVarSlots(cur_tuple, &string_values, &total_var_len);
+        CollectNonNullVarSlots(cur_tuple, &string_values, &collection_values_and_sizes,
+            &total_var_len);
         DCHECK(cur_sorted_var_len_page->is_open());
         if (cur_sorted_var_len_page->BytesRemaining() < total_var_len) {
           bool added;
@@ -342,8 +368,9 @@ Status Sorter::Run::UnpinAllPages() {
         }
         uint8_t* var_data_ptr = cur_sorted_var_len_page->AllocateBytes(total_var_len);
         DCHECK_EQ(&sorted_var_len_pages.back(), cur_sorted_var_len_page);
-        CopyVarLenDataConvertOffset(string_values, sorted_var_len_pages.size() - 1,
-            cur_sorted_var_len_page->data(), var_data_ptr);
+        CopyVarLenDataConvertOffset(string_values, collection_values_and_sizes,
+            sorted_var_len_pages.size() - 1, cur_sorted_var_len_page->data(),
+            var_data_ptr);
       }
     }
     cur_fixed_page->Unpin(sorter_->buffer_pool_client_);
@@ -534,15 +561,29 @@ Status Sorter::Run::PinNextReadPage(vector<Page>* pages, int page_index) {
 }
 
 void Sorter::Run::CollectNonNullVarSlots(Tuple* src,
-    vector<StringValue*>* string_values, int* total_var_len) {
+    vector<StringValue*>* string_values,
+    vector<CollValueAndSize>* collection_values, int* total_var_len) {
   string_values->clear();
+  collection_values->clear();
   *total_var_len = 0;
+
   for (const SlotDescriptor* string_slot: sort_tuple_desc_->string_slots()) {
     if (!src->IsNull(string_slot->null_indicator_offset())) {
       StringValue* string_val =
           reinterpret_cast<StringValue*>(src->GetSlot(string_slot->tuple_offset()));
       string_values->push_back(string_val);
       *total_var_len += string_val->len;
+    }
+  }
+
+  for (const SlotDescriptor* collection_slot: sort_tuple_desc_->collection_slots()) {
+    if (!src->IsNull(collection_slot->null_indicator_offset())) {
+      CollectionValue* collection_value = reinterpret_cast<CollectionValue*>(
+          src->GetSlot(collection_slot->tuple_offset()));
+      int64_t byte_size = collection_value->ByteSize(
+          *collection_slot->children_tuple_descriptor());
+      collection_values->push_back(CollValueAndSize(collection_value, byte_size));
+      *total_var_len += byte_size;
     }
   }
 }
@@ -574,15 +615,34 @@ Status Sorter::Run::AddPage(vector<Page>* page_sequence) {
 }
 
 void Sorter::Run::CopyVarLenData(const vector<StringValue*>& string_values,
-    uint8_t* dest) {
+    const vector<CollValueAndSize>& collection_values_and_sizes, uint8_t* dest) {
   for (StringValue* string_val: string_values) {
     Ubsan::MemCpy(dest, string_val->ptr, string_val->len);
     string_val->ptr = reinterpret_cast<char*>(dest);
     dest += string_val->len;
   }
+
+  // TODO IMPALA-10939: Check embedded varlen types recursively.
+  for (const CollValueAndSize& coll_val_and_size : collection_values_and_sizes) {
+    CollectionValue* coll_val = coll_val_and_size.coll_value;
+    int64_t byte_size = coll_val_and_size.byte_size;
+    Ubsan::MemCpy(dest, coll_val->ptr, byte_size);
+    coll_val->ptr = dest;
+    dest += byte_size;
+  }
+}
+
+uint64_t PackOffset(uint64_t page_index, uint32_t page_offset) {
+  return (page_index << 32) | page_offset;
+}
+
+void UnpackOffset(uint64_t packed_offset, uint32_t* page_index, uint32_t* page_offset) {
+    *page_index = packed_offset >> 32;
+    *page_offset = packed_offset & 0xFFFFFFFF;
 }
 
 void Sorter::Run::CopyVarLenDataConvertOffset(const vector<StringValue*>& string_values,
+    const vector<CollValueAndSize>& collection_values_and_sizes,
     int page_index, const uint8_t* page_start, uint8_t* dest) {
   DCHECK_GE(page_index, 0);
   DCHECK_GE(dest - page_start, 0);
@@ -592,9 +652,22 @@ void Sorter::Run::CopyVarLenDataConvertOffset(const vector<StringValue*>& string
     DCHECK_LE(dest - page_start, sorter_->page_len_);
     DCHECK_LE(dest - page_start, numeric_limits<uint32_t>::max());
     uint32_t page_offset = dest - page_start;
-    uint64_t packed_offset = (static_cast<uint64_t>(page_index) << 32) | page_offset;
+    uint64_t packed_offset = PackOffset(page_index, page_offset);
     string_val->ptr = reinterpret_cast<char*>(packed_offset);
     dest += string_val->len;
+  }
+
+  // TODO IMPALA-10939: Check embedded varlen types recursively.
+  for (const CollValueAndSize&  coll_val_and_size : collection_values_and_sizes) {
+    CollectionValue* coll_value = coll_val_and_size.coll_value;
+    int64_t byte_size = coll_val_and_size.byte_size;
+    memcpy(dest, coll_value->ptr, byte_size);
+    DCHECK_LE(dest - page_start, sorter_->page_len_);
+    DCHECK_LE(dest - page_start, numeric_limits<uint32_t>::max());
+    uint32_t page_offset = dest - page_start;
+    uint64_t packed_offset = PackOffset(page_index, page_offset);
+    coll_value->ptr = reinterpret_cast<uint8_t*>(packed_offset);
+    dest += byte_size;
   }
 }
 
@@ -604,20 +677,46 @@ bool Sorter::Run::ConvertOffsetsToPtrs(Tuple* tuple) {
   uint8_t* page_start =
       var_len_pages_.empty() ? nullptr : var_len_pages_[var_len_pages_index_].data();
 
-  const vector<SlotDescriptor*>& string_slots = sort_tuple_desc_->string_slots();
-  int num_non_null_string_slots = 0;
-  for (auto slot_desc : string_slots) {
-    if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
-    ++num_non_null_string_slots;
+  bool strings_converted = ConvertStringValueOffsetsToPtrs(tuple, page_start);
+  if (!strings_converted) return false;
+  return ConvertCollectionValueOffsetsToPtrs(tuple, page_start);
+}
 
-    DCHECK(slot_desc->type().IsVarLenStringType());
-    StringValue* value = reinterpret_cast<StringValue*>(
+// Helpers for Sorter::Run::ConvertValueOffsetsToPtr() to get the byte size based on the
+// type.
+int64_t GetByteSize(const StringValue& string_value, const SlotDescriptor& slot_desc) {
+  return string_value.len;
+}
+
+int64_t GetByteSize(const CollectionValue& collection_value,
+    const SlotDescriptor& slot_desc) {
+ return collection_value.ByteSize(*slot_desc.children_tuple_descriptor());
+}
+
+template <class ValueType>
+bool Sorter::Run::ConvertValueOffsetsToPtrs(Tuple* tuple, uint8_t* page_start,
+    const vector<SlotDescriptor*>& slots) {
+  static_assert(std::is_same_v<ValueType, StringValue>
+      || std::is_same_v<ValueType, CollectionValue>);
+  int num_non_null_slots = 0;
+  for (auto slot_desc : slots) {
+    if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
+    ++num_non_null_slots;
+
+    if (std::is_same_v<ValueType, StringValue>) {
+      DCHECK(slot_desc->type().IsVarLenStringType());
+    } else {
+      DCHECK(slot_desc->type().IsCollectionType());
+    }
+
+    ValueType* value = reinterpret_cast<ValueType*>(
         tuple->GetSlot(slot_desc->tuple_offset()));
     // packed_offset includes the page index in the upper 32 bits and the page
     // offset in the lower 32 bits. See CopyVarLenDataConvertOffset().
     uint64_t packed_offset = reinterpret_cast<uint64_t>(value->ptr);
-    uint32_t page_index = packed_offset >> 32;
-    uint32_t page_offset = packed_offset & 0xFFFFFFFF;
+    uint32_t page_index;
+    uint32_t page_offset;
+    UnpackOffset(packed_offset, &page_index, &page_offset);
 
     if (page_index > var_len_pages_index_) {
       // We've reached the page boundary for the current var-len page.
@@ -626,24 +725,40 @@ bool Sorter::Run::ConvertOffsetsToPtrs(Tuple* tuple) {
       DCHECK_LE(page_index, var_len_pages_.size());
       DCHECK_EQ(page_index, var_len_pages_index_ + 1);
       DCHECK_EQ(page_offset, 0); // The data is the first thing in the next page.
-      // This must be the first slot with var len data for the tuple. Var len data
-      // for tuple shouldn't be split across blocks.
-      DCHECK_EQ(num_non_null_string_slots, 1);
+                                 // This must be the first slot with var len data for the
+                                 // tuple. Var len data for tuple shouldn't be split
+                                 // across blocks.
+      DCHECK_EQ(num_non_null_slots, 1);
       return false;
     }
 
     DCHECK_EQ(page_index, var_len_pages_index_);
+
+    const int64_t byte_size = GetByteSize(*value, *slot_desc);
+
     if (var_len_pages_.empty()) {
-      DCHECK_EQ(value->len, 0);
+      DCHECK_EQ(byte_size, 0);
     } else {
-      DCHECK_LE(page_offset + value->len, var_len_pages_[page_index].valid_data_len());
+      DCHECK_LE(page_offset + byte_size, var_len_pages_[page_index].valid_data_len());
     }
     // Calculate the address implied by the offset and assign it. May be nullptr for
     // zero-length strings if there are no pages in the run since page_start is nullptr.
     DCHECK(page_start != nullptr || page_offset == 0);
-    value->ptr = reinterpret_cast<char*>(page_start + page_offset);
+    using ptr_type = decltype(value->ptr);
+    value->ptr = reinterpret_cast<ptr_type>(page_start + page_offset);
   }
   return true;
+}
+
+bool Sorter::Run::ConvertStringValueOffsetsToPtrs(Tuple* tuple, uint8_t* page_start) {
+  const vector<SlotDescriptor*>& string_slots = sort_tuple_desc_->string_slots();
+  return ConvertValueOffsetsToPtrs<StringValue>(tuple, page_start, string_slots);
+}
+
+bool Sorter::Run::ConvertCollectionValueOffsetsToPtrs(Tuple* tuple, uint8_t* page_start) {
+  const vector<SlotDescriptor*>& collection_slots = sort_tuple_desc_->collection_slots();
+  return ConvertValueOffsetsToPtrs<CollectionValue>(tuple, page_start, collection_slots);
+
 }
 
 int64_t Sorter::Run::TotalBytes() const {

@@ -192,13 +192,19 @@ class SlotDescriptor {
   ///
   /// If 'pool_val' is non-NULL, var-len data will be copied into 'pool_val'.
   /// 'pool_val' has to be of type MemPool*.
+  ///
+  /// 'slot_desc' is needed when 'pool_val' is non-NULL and the value is a collection. In
+  /// this case the collection is copied and the slot desc is needed to calculate its byte
+  /// size.
   static void CodegenStoreNonNullAnyVal(CodegenAnyVal& any_val,
-      llvm::Value* raw_val_ptr, llvm::Value* pool_val = nullptr);
+      llvm::Value* raw_val_ptr, llvm::Value* pool_val = nullptr,
+      const SlotDescriptor* slot_desc = nullptr);
 
   /// Like the above, but takes a 'CodegenAnyValReadWriteInfo' instead of a
   /// 'CodegenAnyVal'.
   static void CodegenStoreNonNullAnyVal(const CodegenAnyValReadWriteInfo& read_write_info,
-      llvm::Value* raw_val_ptr, llvm::Value* pool_val = nullptr);
+      llvm::Value* raw_val_ptr, llvm::Value* pool_val = nullptr,
+      const SlotDescriptor* slot_desc = nullptr);
 
   /// Like 'CodegenStoreNonNullAnyVal' but stores the value into a new alloca()
   /// allocation. Returns a pointer to the stored value.
@@ -266,11 +272,13 @@ class SlotDescriptor {
       llvm::Value* tuple) const;
 
   /// Codegens writing a string or a collection to the address pointed to by 'slot_ptr'.
-  /// If 'pool_val' is non-NULL, the data will be copied into 'pool_val'.  'pool_val' has
-  /// to be of type MemPool*.
+  /// If 'pool_val' is non-NULL, the data will be copied into 'pool_val'. 'pool_val' has
+  /// to be of type MemPool*. 'slot_desc' is needed when 'pool_val' is non-NULL and the
+  /// value is a collection. In this case the collection is copied and the slot desc is
+  /// needed to calculate its byte size.
   static void CodegenWriteStringOrCollectionToSlot(
       const CodegenAnyValReadWriteInfo& read_write_info,
-      llvm::Value* slot_ptr, llvm::Value* pool_val);
+      llvm::Value* slot_ptr, llvm::Value* pool_val, const SlotDescriptor* slot_desc);
 
   static llvm::Value* CodegenToTimestampValue(
       const CodegenAnyValReadWriteInfo& read_write_info);

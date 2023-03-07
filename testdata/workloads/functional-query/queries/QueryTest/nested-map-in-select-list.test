@@ -35,12 +35,6 @@ select id, int_map, int_map_array from complextypestbl
 bigint,string,string
 ====
 ---- QUERY
-# Sorting is not supported yet for collections: IMPALA-10939
-select id, int_map_array, int_map from complextypestbl order by id
----- CATCH
-IllegalStateException: Sorting is not supported if the select list contains collection columns.
-====
----- QUERY
 # Same collection used twice in a select list.
 select id, int_map, int_map from complextypestbl
 ---- RESULTS

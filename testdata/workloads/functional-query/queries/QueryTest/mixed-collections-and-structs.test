@@ -266,20 +266,6 @@ select id, a.item, a.item.inner_struct, a.item.small from sub,
 INT,STRING,STRING,SMALLINT
 ====
 ---- QUERY
-# Sorting is not supported yet for collections: IMPALA-10939. Test with a struct that
-# contains an array.
-select id, struct_contains_arr from collection_struct_mix order by id
----- CATCH
-IllegalStateException: Sorting is not supported if the select list contains collection columns.
-====
----- QUERY
-# Sorting is not supported yet for collections: IMPALA-10939. Test with a struct that
-# contains a map.
-select id, struct_contains_map from collection_struct_mix order by id;
----- CATCH
-IllegalStateException: Sorting is not supported if the select list contains collection columns.
-====
----- QUERY
 # Zipping unnest an array that contains a struct.
 select unnest(arr_contains_struct) from collection_struct_mix;
 ---- CATCH

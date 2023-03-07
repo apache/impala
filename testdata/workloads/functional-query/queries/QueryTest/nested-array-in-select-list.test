@@ -35,12 +35,6 @@ select id, int_array, int_array_array from complextypestbl
 bigint,string,string
 ====
 ---- QUERY
-# Sorting is not supported yet for arrays: IMPALA-10939
-select id, int_array_array, int_array from complextypestbl order by id
----- CATCH
-IllegalStateException: Sorting is not supported if the select list contains collection columns.
-====
----- QUERY
 # Same collection used twice in a select list.
 select id, int_array, int_array from complextypestbl
 ---- RESULTS

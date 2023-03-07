@@ -22,6 +22,7 @@
 #include "codegen/impala-ir.h"
 #include "common/logging.h"
 #include "gutil/macros.h"
+#include "runtime/collection-value.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
 #include "util/ubsan.h"
@@ -163,35 +164,53 @@ class Tuple {
   /// Callers of CodegenMaterializeExprs must set 'use_mem_pool' to true to generate the
   /// IR function for the case 'pool' is non-NULL and false for the NULL pool case.
   ///
-  /// If 'COLLECT_STRING_VALS' is true, the materialized non-NULL string value slots and
-  /// the total length of the string slots are returned in 'non_null_string_values' and
-  /// 'total_string_lengths'. 'non_null_string_values' and 'total_string_lengths' must be
-  /// non-NULL in this case. 'non_null_string_values' does not need to be empty; its
-  /// original contents will be overwritten.
-  /// TODO: this function does not collect other var-len types such as collections.
-  template <bool COLLECT_STRING_VALS, bool NULL_POOL>
+  /// If 'COLLECT_VAR_LEN_VALS' is true
+  ///  - the materialized non-NULL string value slots and are returned in
+  ///    'non_null_string_values',
+  ///  - the materialized non-NULL collection value slots, along with their byte sizes,
+  ///    are returned in 'non_null_collection_values' and
+  ///  - the total length of the string and collection slots is returned in
+  ///    'total_varlen_lengths'.
+  /// 'non_null_string_values', 'non_null_collection_values' and 'total_varlen_lengths'
+  /// must be non-NULL in this case. 'non_null_string_values' and
+  /// 'non_null_collection_values' do not need to be empty; their original contents will
+  /// be overwritten.
+  template <bool COLLECT_VAR_LEN_VALS, bool NULL_POOL>
   inline void IR_ALWAYS_INLINE MaterializeExprs(TupleRow* row,
       const TupleDescriptor& desc, const std::vector<ScalarExprEvaluator*>& evals,
-      MemPool* pool, std::vector<StringValue*>* non_null_string_values = NULL,
-      int* total_string_lengths = NULL) {
-    DCHECK_EQ(NULL_POOL, pool == NULL);
+      MemPool* pool, std::vector<StringValue*>* non_null_string_values = nullptr,
+      std::vector<CollValueAndSize>* non_null_collection_values = nullptr,
+      int* total_varlen_lengths = nullptr) {
+    DCHECK_EQ(NULL_POOL, pool == nullptr);
     DCHECK_EQ(evals.size(), desc.slots().size());
-    StringValue** non_null_string_values_array = NULL;
+
+    StringValue** non_null_string_values_array = nullptr;
+    CollValueAndSize* non_null_coll_vals_and_sizes_array = nullptr;
     int num_non_null_string_values = 0;
-    if (COLLECT_STRING_VALS) {
-      DCHECK(non_null_string_values != NULL);
-      DCHECK(total_string_lengths != NULL);
-      // string::resize() will zero-initialize any new values, so we resize to the largest
+    int num_non_null_collection_values = 0;
+    if (COLLECT_VAR_LEN_VALS) {
+      DCHECK(non_null_string_values != nullptr);
+      DCHECK(non_null_collection_values != nullptr);
+      DCHECK(total_varlen_lengths != nullptr);
+      // vector::resize() will zero-initialize any new values, so we resize to the largest
       // possible size here, then truncate the vector below once we know the actual size
       // (which preserves already-written values).
       non_null_string_values->resize(desc.string_slots().size());
+      non_null_collection_values->resize(desc.collection_slots().size());
+
       non_null_string_values_array = non_null_string_values->data();
-      *total_string_lengths = 0;
+      non_null_coll_vals_and_sizes_array = non_null_collection_values->data();
+
+      *total_varlen_lengths = 0;
     }
-    MaterializeExprs<COLLECT_STRING_VALS, NULL_POOL>(row, desc,
+    MaterializeExprs<COLLECT_VAR_LEN_VALS, NULL_POOL>(row, desc,
         evals.data(), pool, non_null_string_values_array,
-        total_string_lengths, &num_non_null_string_values);
-    if (COLLECT_STRING_VALS) non_null_string_values->resize(num_non_null_string_values);
+        non_null_coll_vals_and_sizes_array, total_varlen_lengths,
+        &num_non_null_string_values, &num_non_null_collection_values);
+    if (COLLECT_VAR_LEN_VALS) {
+      non_null_string_values->resize(num_non_null_string_values);
+      non_null_collection_values->resize(num_non_null_collection_values);
+    }
   }
 
   /// Copy the var-len string data in this tuple into the provided memory pool and update
@@ -211,7 +230,7 @@ class Tuple {
   static const char* MATERIALIZE_EXPRS_NULL_POOL_SYMBOL;
 
   /// Generates an IR version of MaterializeExprs(), returned in 'fn'. Currently only
-  /// 'collect_string_vals' = false is implemented and some arguments passed to the IR
+  /// 'collect_varlen_vals' = false is implemented and some arguments passed to the IR
   /// function are unused.
   ///
   /// If 'use_mem_pool' is true, any varlen data will be copied into the MemPool specified
@@ -219,7 +238,7 @@ class Tuple {
   /// be copied. There are two different MaterializeExprs symbols to differentiate between
   /// these cases when we replace the function calls during codegen. Please see comment
   /// of MaterializeExprs() for details.
-  static Status CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_vals,
+  static Status CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_varlen_vals,
       const TupleDescriptor& desc, const vector<ScalarExpr*>& slot_materialize_exprs,
       bool use_mem_pool, llvm::Function** fn);
 
@@ -321,13 +340,15 @@ class Tuple {
   void DeepCopyVarlenData(const TupleDescriptor& desc, char** data, int* offset,
       bool convert_ptrs);
 
-  /// Implementation of MaterializedExprs(). This function is replaced during
-  /// codegen. 'num_non_null_string_values' must be initialized by the caller.
-  template <bool COLLECT_STRING_VALS, bool NULL_POOL>
+  /// Implementation of MaterializedExprs(). This function is replaced during codegen.
+  /// 'num_non_null_string_values' and 'num_non_null_collection_values' must be
+  /// initialized by the caller.
+  template <bool COLLECT_VAR_LEN_VALS, bool NULL_POOL>
   void IR_NO_INLINE MaterializeExprs(TupleRow* row, const TupleDescriptor& desc,
       ScalarExprEvaluator* const* evals, MemPool* pool,
-      StringValue** non_null_string_values, int* total_string_lengths,
-      int* num_non_null_string_values);
+      StringValue** non_null_string_values, CollValueAndSize* non_null_collection_values,
+      int* total_varlen_lengths, int* num_non_null_string_values,
+      int* num_non_null_collection_values);
 
   /// Helper for CopyStrings() to allocate 'bytes' of memory. Returns a pointer to the
   /// allocated buffer on success. Otherwise an error was encountered, in which case NULL

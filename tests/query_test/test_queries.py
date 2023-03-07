@@ -105,10 +105,14 @@ class TestQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/limit', vector)
 
   def test_top_n(self, vector):
-    if vector.get_value('table_format').file_format == 'hbase':
+    file_format = vector.get_value('table_format').file_format
+    if file_format == 'hbase':
       pytest.xfail(reason="IMPALA-283 - select count(*) produces inconsistent results")
     # QueryTest/top-n is also run in test_sort with disable_outermost_topn = 1
     self.run_test_case('QueryTest/top-n', vector)
+
+    if file_format in ['parquet', 'orc']:
+      self.run_test_case('QueryTest/top-n-complex', vector)
 
   def test_union(self, vector):
     self.run_test_case('QueryTest/union', vector)
@@ -133,7 +137,8 @@ class TestQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/except', vector)
 
   def test_sort(self, vector):
-    if vector.get_value('table_format').file_format == 'hbase':
+    file_format = vector.get_value('table_format').file_format
+    if file_format == 'hbase':
       pytest.xfail(reason="IMPALA-283 - select count(*) produces inconsistent results")
     vector.get_value('exec_option')['disable_outermost_topn'] = 1
     vector.get_value('exec_option')['analytic_rank_pushdown_threshold'] = 0
@@ -141,9 +146,15 @@ class TestQueries(ImpalaTestSuite):
     # We can get the sort tests for free from the top-n file
     self.run_test_case('QueryTest/top-n', vector)
 
+    if file_format in ['parquet', 'orc']:
+      self.run_test_case('QueryTest/sort-complex', vector)
+      self.run_test_case('QueryTest/top-n-complex', vector)
+
   def test_partitioned_top_n(self, vector):
     """Test partitioned Top-N operator."""
     self.run_test_case('QueryTest/partitioned-top-n', vector)
+    if vector.get_value('table_format').file_format in ['parquet', 'orc']:
+      self.run_test_case('QueryTest/partitioned-top-n-complex', vector)
 
   def test_inline_view(self, vector):
     if vector.get_value('table_format').file_format == 'hbase':
