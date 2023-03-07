@@ -39,6 +39,7 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.PrintUtils;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
 import org.apache.impala.thrift.TExecNodePhase;
@@ -169,6 +170,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // assuming that the initial stats collection is also accurate and no runtime filter
   // is involved.
   protected boolean hasHardEstimates_ = false;
+
+  protected TupleCacheInfo tupleCacheInfo_;
 
   protected PlanNode(PlanNodeId id, List<TupleId> tupleIds, String displayName) {
     this(id, displayName);
@@ -490,10 +493,11 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     return result;
   }
 
-  // Append a flattened version of this plan node, including all children in the same
-  // fragment, to 'container'.
-  private void treeToThriftHelper(TPlan container) {
-    TPlanNode msg = new TPlanNode();
+  /**
+   * Common initialization of TPlanNode used for all different types of PlanNodes.
+   * This is called before calling toThrift().
+   */
+  private void initThrift(TPlanNode msg, ThriftSerializationCtx serialCtx) {
     msg.node_id = id_.asInt();
     msg.limit = limit_;
 
@@ -520,12 +524,29 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       msg.addToRuntime_filters(filter.toThrift());
     }
     msg.setDisable_codegen(disableCodegen_);
-    Preconditions.checkState(nodeResourceProfile_.isValid());
-    msg.resource_profile = nodeResourceProfile_.toThrift();
     msg.pipelines = new ArrayList<>();
-    for (PipelineMembership pipe : pipelines_) {
-      msg.pipelines.add(pipe.toThrift());
+    if (serialCtx.isTupleCache()) {
+      // At the point when TupleCachePlanner runs, the pipelines and resource profile
+      // have not been calculated yet. These should not be in the cache key anyway, so
+      // mask them out.
+      //
+      // resource_profile is a required field, so use a generic struct.
+      msg.resource_profile = ResourceProfile.noReservation(0).toThrift();
+    } else {
+      Preconditions.checkState(nodeResourceProfile_.isValid());
+      msg.resource_profile = nodeResourceProfile_.toThrift();
+      for (PipelineMembership pipe : pipelines_) {
+        msg.pipelines.add(pipe.toThrift());
+      }
     }
+  }
+
+  // Append a flattened version of this plan node, including all children in the same
+  // fragment, to 'container'.
+  private void treeToThriftHelper(TPlan container) {
+    TPlanNode msg = new TPlanNode();
+    ThriftSerializationCtx serialCtx = new ThriftSerializationCtx();
+    initThrift(msg, serialCtx);
     toThrift(msg);
     container.addToNodes(msg);
     // For the purpose of the BE consider cross-fragment children (i.e.
@@ -1199,4 +1220,54 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       child.reduceCardinalityByRuntimeFilter(nodeStack, reductionScale);
     }
   }
+
+  public TupleCacheInfo getTupleCacheInfo() {
+    return tupleCacheInfo_;
+  }
+
+  /**
+   * Compute the tuple cache eligibility and keys via a bottom-up tree traversal.
+   *
+   * In order to be eligible, a node's children need to all be eligible and the node
+   * must explicitly support tuple caching. TODO: The computation of eligibility will
+   * incorporate more information about whether the computation is non-deterministic.
+   *
+   * This computes the cache key by hashing Thrift structures, but it only computes
+   * the key if the node is eligible to avoid overhead.
+   */
+  public void computeTupleCacheInfo() {
+    tupleCacheInfo_ = new TupleCacheInfo();
+    // computing the tuple cache information is a bottom-up tree traversal,
+    // so visit and merge the children before processing this node's contents
+    for (int i = 0; i < getChildCount(); i++) {
+      getChild(i).computeTupleCacheInfo();
+      tupleCacheInfo_.mergeChild(getChild(i).getTupleCacheInfo());
+    }
+
+    if (!isTupleCachingImplemented()) {
+      tupleCacheInfo_.setIneligible(TupleCacheInfo.IneligibilityReason.NOT_IMPLEMENTED);
+    }
+
+    // If we are already ineligible, there is no need to process the Thrift
+    if (!tupleCacheInfo_.isEligible()) {
+      tupleCacheInfo_.finalize();
+      return;
+    }
+
+    // Incorporate this node's information
+    // TODO: This will also calculate eligibility via initThrift/toThrift.
+    // TODO: This will adjust the output of initThrift/toThrift to mask out items.
+    TPlanNode msg = new TPlanNode();
+    ThriftSerializationCtx serialCtx = new ThriftSerializationCtx(tupleCacheInfo_);
+    initThrift(msg, serialCtx);
+    toThrift(msg);
+    tupleCacheInfo_.hashThrift(msg);
+    tupleCacheInfo_.finalize();
+  }
+
+  /**
+   * Whether this node supports tuple caching. All nodes start ineligible and then
+   * need to explicitly enable it.
+   */
+  public boolean isTupleCachingImplemented() { return false; }
 }

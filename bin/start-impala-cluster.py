@@ -173,6 +173,10 @@ parser.add_option("--reduce_disk_io_threads", default="True", type="choice",
                   choices=["true", "True", "false", "False"],
                   help="If true, reduce the number of disk io mgr threads for "
                   "filesystems that are not the TARGET_FILESYSTEM.")
+parser.add_option("--disable_tuple_caching", default=False, action="store_true",
+                  help="If true, sets the tuple caching feature flag "
+                  "(allow_tuple_caching) to false. This defaults to false to enable "
+                  "tuple caching in the development environment")
 
 # For testing: list of comma-separated delays, in milliseconds, that delay impalad catalog
 # replica initialization. The ith delay is applied to the ith impalad.
@@ -617,6 +621,11 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
     if options.jni_frontend_class:
       args = "-jni_frontend_class={jni_frontend_class} {args}".format(
           jni_frontend_class=options.jni_frontend_class, args=args)
+
+    if options.disable_tuple_caching:
+      args = "-allow_tuple_caching=false {args}".format(args=args)
+    else:
+      args = "-allow_tuple_caching=true {args}".format(args=args)
 
     # Appended at the end so they can override previous args.
     if i < len(per_impalad_args):

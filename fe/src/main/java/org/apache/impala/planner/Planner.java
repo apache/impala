@@ -291,13 +291,23 @@ public class Planner {
   public List<PlanFragment> createPlans() throws ImpalaException {
     List<PlanFragment> distrPlan = createPlanFragments();
     Preconditions.checkNotNull(distrPlan);
-    if (!useParallelPlan(ctx_)) {
-      return Collections.singletonList(distrPlan.get(0));
+    if (useParallelPlan(ctx_)) {
+      ParallelPlanner parallelPlanner = new ParallelPlanner(ctx_);
+      distrPlan = parallelPlanner.createPlans(distrPlan.get(0));
+      ctx_.getTimeline().markEvent("Parallel plans created");
+    } else {
+      distrPlan = Collections.singletonList(distrPlan.get(0));
     }
-    ParallelPlanner planner = new ParallelPlanner(ctx_);
-    List<PlanFragment> parallelPlans = planner.createPlans(distrPlan.get(0));
-    ctx_.getTimeline().markEvent("Parallel plans created");
-    return parallelPlans;
+    // TupleCachePlanner comes last, because it needs to compute the eligibility of
+    // various locations in the PlanNode tree. Runtime filters and other modifications
+    // to the tree can change this, so this comes after all those modifications are
+    // complete.
+    if (useTupleCache(ctx_)) {
+      TupleCachePlanner cachePlanner = new TupleCachePlanner(ctx_);
+      distrPlan = cachePlanner.createPlans(distrPlan);
+      ctx_.getTimeline().markEvent("Tuple caching plan created");
+    }
+    return distrPlan;
   }
 
   /**
@@ -312,6 +322,11 @@ public class Planner {
   public static boolean useMTFragment(TQueryOptions queryOptions) {
     Preconditions.checkState(queryOptions.isSetMt_dop());
     return queryOptions.getMt_dop() > 0 || queryOptions.isCompute_processing_cost();
+  }
+
+  // Return true if ENABLE_TUPLE_CACHE=true
+  public static boolean useTupleCache(PlannerContext planCtx) {
+    return planCtx.getQueryOptions().isEnable_tuple_cache();
   }
 
   /**

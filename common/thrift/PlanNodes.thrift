@@ -53,6 +53,7 @@ enum TPlanNodeType {
   MULTI_AGGREGATION_NODE = 17
   ICEBERG_DELETE_NODE = 18
   ICEBERG_METADATA_SCAN_NODE = 19
+  TUPLE_CACHE_NODE = 20
 }
 
 // phases of an execution node
@@ -702,6 +703,12 @@ struct TIcebergMetadataScanNode {
   3: required string metadata_table_name;
 }
 
+struct TTupleCacheNode {
+  // Cache key that includes a hashed representation of the entire subtree below
+  // this point in the plan.
+  1: required string subtree_hash
+}
+
 // See PipelineMembership in the frontend for details.
 struct TPipelineMembership {
   1: required Types.TPlanNodeId pipe_id
@@ -761,6 +768,8 @@ struct TPlanNode {
   26: required ResourceProfile.TBackendResourceProfile resource_profile
 
   27: optional TCardinalityCheckNode cardinality_check_node
+
+  28: optional TTupleCacheNode tuple_cache_node
 }
 
 // A flattened representation of a tree of PlanNodes, obtained by depth-first

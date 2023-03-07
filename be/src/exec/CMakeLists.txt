@@ -104,6 +104,7 @@ add_library(Exec
   table-sink-base.cc
   text-converter.cc
   topn-node.cc
+  tuple-cache-node.cc
   union-node.cc
   unnest-node.cc
 )

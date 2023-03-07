@@ -51,6 +51,7 @@
 #include "exec/streaming-aggregation-node.h"
 #include "exec/subplan-node.h"
 #include "exec/topn-node.h"
+#include "exec/tuple-cache-node.h"
 #include "exec/union-node.h"
 #include "exec/unnest-node.h"
 #include "exprs/expr.h"
@@ -229,6 +230,9 @@ Status PlanNode::CreatePlanNode(
       break;
     case TPlanNodeType::ICEBERG_METADATA_SCAN_NODE:
       *node = pool->Add(new IcebergMetadataScanPlanNode());
+      break;
+    case TPlanNodeType::TUPLE_CACHE_NODE:
+      *node = pool->Add(new TupleCachePlanNode());
       break;
     default:
       map<int, const char*>::const_iterator i =

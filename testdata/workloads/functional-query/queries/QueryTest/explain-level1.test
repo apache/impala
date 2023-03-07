@@ -47,3 +47,18 @@ select year, month from functional.alltypes where year=2009;
 ---- RESULTS: VERIFY_IS_SUBSET
 '04:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]'
 ====
+---- QUERY
+# Tests for no cache key without ENABLE_TUPLE_CACHE
+explain select count(*) from tpch.region
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:.* cache key: [0-9a-f][0-9a-f]*.*
+row_regex:.*\[TPlanNode\(.*\]
+====
+---- QUERY
+# Tests for cache key and no trace with ENABLE_TUPLE_CACHE
+set ENABLE_TUPLE_CACHE=TRUE;
+explain select count(*) from tpch.region
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.* cache key: [0-9a-f][0-9a-f]*.*
+row_regex:.*\[TPlanNode\(.*\]
+====

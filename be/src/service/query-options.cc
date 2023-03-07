@@ -46,6 +46,7 @@ using namespace impala;
 using namespace strings;
 
 DECLARE_int32(idle_session_timeout);
+DECLARE_bool(allow_tuple_caching);
 
 void impala::OverlayQueryOptions(
     const TQueryOptions& src, const QueryOptionsMask& mask, TQueryOptions* dst) {
@@ -1212,6 +1213,15 @@ Status impala::SetQueryOption(const string& key, const string& value,
         RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckExclusiveLowerBound<double>(
             option, value, 0.0, &double_val));
         query_options->__set_query_cpu_count_divisor(double_val);
+        break;
+      }
+      case TImpalaQueryOptions::ENABLE_TUPLE_CACHE: {
+        bool enable_tuple_cache = IsTrue(value);
+        if (enable_tuple_cache && !FLAGS_allow_tuple_caching) {
+          return Status(
+              "Tuple caching is disabled, so enable_tuple_cache cannot be set to true.");
+        }
+        query_options->__set_enable_tuple_cache(enable_tuple_cache);
         break;
       }
       default:

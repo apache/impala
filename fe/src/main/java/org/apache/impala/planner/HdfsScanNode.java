@@ -2606,4 +2606,7 @@ public class HdfsScanNode extends ScanNode {
   }
 
   protected boolean isAllColumnarScanner() { return allColumnarFormat_; }
+
+  @Override
+  public boolean isTupleCachingImplemented() { return true; }
 }

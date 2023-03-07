@@ -916,6 +916,11 @@ enum TImpalaQueryOptions {
   // If this query option is not set, value of backend flag --query_cpu_count_divisor
   // (default to 1.0) will be picked up instead.
   QUERY_CPU_COUNT_DIVISOR = 173
+
+  // Enables intermediate result caching. The frontend will determine eligibility and
+  // potentially insert tuple cache nodes into the plan. This can only be set if the
+  // allow_tuple_caching feature startup flag is set to true.
+  ENABLE_TUPLE_CACHE = 174
 }
 
 // The summary of a DML statement.
