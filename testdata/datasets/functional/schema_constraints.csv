@@ -82,6 +82,7 @@ table_name:iceberg_timestamp_part, constraint:restrict_to, table_format:parquet/
 table_name:iceberg_timestamptz_part, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_uppercase_col, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_v2_delete_positional, constraint:restrict_to, table_format:parquet/none/none
+table_name:iceberg_v2_delete_equality, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_v2_no_deletes, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_v2_no_deletes_orc, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_v2_positional_update_all_rows, constraint:restrict_to, table_format:parquet/none/none

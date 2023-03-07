@@ -1160,3 +1160,13 @@ where i.action in ('view') and j.id=1 and j.id=i.id;
 ---- TYPES
 int
 ====
+---- QUERY
+# We can query a snapshot if it doesn't have equality deletes.
+select * from iceberg_v2_delete_equality for system_version as of 6816997371555012807;
+---- RESULTS
+1,'a'
+2,'b'
+3,'c'
+---- TYPES
+BIGINT,STRING
+====

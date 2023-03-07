@@ -747,6 +747,12 @@ to make these tables correspond to an Iceberg table in a HadoopCatalog instead o
 HiveCatalog.
 The table has a positional delete file.
 
+iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_equality:
+Since Hive/Spark is unable to write equality delete files we've copied the contents of
+'iceberg_v2_delete_positional' and manually edited the metadata to have equality delete
+files in it. Only modified the metadata files, the actual delete files are still
+positional.
+
 iceberg_test/iceberg_migrated_alter_test
 Generated and migrated by Hive
 CREATE TABLE iceberg_migrated_alter_test (int_col int, string_col string, double_col double) stored as parquet;

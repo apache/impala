@@ -158,11 +158,20 @@ public class IcebergScanPlanner {
         tblRef_.getTimeTravelSpec() != null;
   }
 
-  private void setFileDescriptorsBasedOnFileStore() {
+  private void setFileDescriptorsBasedOnFileStore() throws ImpalaException {
     IcebergContentFileStore fileStore = getIceTable().getContentFileStore();
+    if (!fileStore.getEqualityDeleteFiles().isEmpty()) {
+      // TODO(IMPALA-11388): Add support for equality deletes.
+      FileDescriptor firstEqualityDeleteFile = fileStore.getEqualityDeleteFiles().get(0);
+      throw new ImpalaRuntimeException(String.format(
+          "Iceberg table %s has EQUALITY delete file which is currently " +
+          "not supported by Impala, for example: %s",
+          getIceTable().getFullName(),
+          firstEqualityDeleteFile.getAbsolutePath(getIceTable().getLocation())));
+    }
     dataFilesWithoutDeletes_ = fileStore.getDataFilesWithoutDeletes();
     dataFilesWithDeletes_ = fileStore.getDataFilesWithDeletes();
-    deleteFiles_ = new HashSet<>(fileStore.getDeleteFiles());
+    deleteFiles_ = new HashSet<>(fileStore.getPositionDeleteFiles());
     updateDeleteStatistics();
   }
 
@@ -342,7 +351,7 @@ public class IcebergScanPlanner {
             if (delFile.content() == FileContent.EQUALITY_DELETES) {
               throw new ImpalaRuntimeException(String.format(
                   "Iceberg table %s has EQUALITY delete file which is currently " +
-                  "not supported by Impala: %s", getIceTable().getFullName(),
+                  "not supported by Impala, for example: %s", getIceTable().getFullName(),
                   delFile.path()));
             }
             Pair<FileDescriptor, Boolean> delFileDesc = getFileDescriptor(delFile);

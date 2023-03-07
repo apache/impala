@@ -95,7 +95,8 @@ public class IcebergContentFileStore {
   // Separate map-list containers for the different content files.
   private MapListContainer dataFilesWithoutDeletes_ = new MapListContainer();
   private MapListContainer dataFilesWithDeletes_ = new MapListContainer();
-  private MapListContainer deleteFiles_ = new MapListContainer();
+  private MapListContainer positionDeleteFiles_ = new MapListContainer();
+  private MapListContainer equalityDeleteFiles_ = new MapListContainer();
 
   // Caches file descriptors loaded during time-travel queries.
   private final ConcurrentMap<String, FileDescriptor> oldFileDescMap_ =
@@ -120,8 +121,14 @@ public class IcebergContentFileStore {
     }
   }
 
-  public void addDeleteFileDescriptor(String pathHash, FileDescriptor desc) {
-    if (deleteFiles_.add(pathHash, desc)) {
+  public void addPositionDeleteFile(String pathHash, FileDescriptor desc) {
+    if (positionDeleteFiles_.add(pathHash, desc)) {
+      updateFileFormats(desc);
+    }
+  }
+
+  public void addEqualityDeleteFile(String pathHash, FileDescriptor desc) {
+    if (equalityDeleteFiles_.add(pathHash, desc)) {
       updateFileFormats(desc);
     }
   }
@@ -139,7 +146,9 @@ public class IcebergContentFileStore {
   }
 
   public FileDescriptor getDeleteFileDescriptor(String pathHash) {
-    return deleteFiles_.get(pathHash);
+    FileDescriptor ret = positionDeleteFiles_.get(pathHash);
+    if (ret != null) return ret;
+    return equalityDeleteFiles_.get(pathHash);
   }
 
   public FileDescriptor getOldFileDescriptor(String pathHash) {
@@ -154,19 +163,27 @@ public class IcebergContentFileStore {
     return dataFilesWithDeletes_.getList();
   }
 
-  public List<FileDescriptor> getDeleteFiles() { return deleteFiles_.getList(); }
+  public List<FileDescriptor> getPositionDeleteFiles() {
+    return positionDeleteFiles_.getList();
+  }
+
+  public List<FileDescriptor> getEqualityDeleteFiles() {
+    return equalityDeleteFiles_.getList();
+  }
 
   public long getNumFiles() {
     return dataFilesWithoutDeletes_.getNumFiles() +
            dataFilesWithDeletes_.getNumFiles() +
-           deleteFiles_.getNumFiles();
+           positionDeleteFiles_.getNumFiles() +
+           equalityDeleteFiles_.getNumFiles();
   }
 
   public Iterable<FileDescriptor> getAllFiles() {
     return Iterables.concat(
         dataFilesWithoutDeletes_.getList(),
         dataFilesWithDeletes_.getList(),
-        deleteFiles_.getList());
+        positionDeleteFiles_.getList(),
+        equalityDeleteFiles_.getList());
   }
 
   public Iterable<FileDescriptor> getAllDataFiles() {
@@ -194,7 +211,8 @@ public class IcebergContentFileStore {
     TIcebergContentFileStore ret = new TIcebergContentFileStore();
     ret.setPath_hash_to_data_file_without_deletes(dataFilesWithoutDeletes_.toThrift());
     ret.setPath_hash_to_data_file_with_deletes(dataFilesWithDeletes_.toThrift());
-    ret.setPath_hash_to_delete_file(deleteFiles_.toThrift());
+    ret.setPath_hash_to_position_delete_file(positionDeleteFiles_.toThrift());
+    ret.setPath_hash_to_equality_delete_file(equalityDeleteFiles_.toThrift());
     ret.setHas_avro(hasAvro_);
     ret.setHas_orc(hasOrc_);
     ret.setHas_parquet(hasParquet_);
@@ -215,9 +233,14 @@ public class IcebergContentFileStore {
           tFileStore.getPath_hash_to_data_file_with_deletes(),
           networkAddresses, hostIndex);
     }
-    if (tFileStore.isSetPath_hash_to_delete_file()) {
-      ret.deleteFiles_ = MapListContainer.fromThrift(
-          tFileStore.getPath_hash_to_delete_file(),
+    if (tFileStore.isSetPath_hash_to_position_delete_file()) {
+      ret.positionDeleteFiles_ = MapListContainer.fromThrift(
+          tFileStore.getPath_hash_to_position_delete_file(),
+          networkAddresses, hostIndex);
+    }
+    if (tFileStore.isSetPath_hash_to_equality_delete_file()) {
+      ret.equalityDeleteFiles_ = MapListContainer.fromThrift(
+          tFileStore.getPath_hash_to_equality_delete_file(),
           networkAddresses, hostIndex);
     }
     ret.hasAvro_ = tFileStore.isSetHas_avro() ? tFileStore.isHas_avro() : false;

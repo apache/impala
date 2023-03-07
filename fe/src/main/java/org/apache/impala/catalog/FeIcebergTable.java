@@ -712,11 +712,15 @@ public interface FeIcebergTable extends FeFsTable {
         fileStore.addDataFileWithDeletes(pathHashAndFd.first, pathHashAndFd.second);
       }
       for (DeleteFile deleteFile : icebergFiles.deleteFiles) {
-        Preconditions.checkState(
-            deleteFile.content().equals(FileContent.EQUALITY_DELETES) ||
-            deleteFile.content().equals(FileContent.POSITION_DELETES));
         pathHashAndFd = getPathHashAndFd(deleteFile, table, hdfsFileDescMap);
-        fileStore.addDeleteFileDescriptor(pathHashAndFd.first, pathHashAndFd.second);
+        if (deleteFile.content().equals(FileContent.POSITION_DELETES)) {
+          fileStore.addPositionDeleteFile(pathHashAndFd.first, pathHashAndFd.second);
+        } else if (deleteFile.content().equals(FileContent.EQUALITY_DELETES)) {
+          fileStore.addEqualityDeleteFile(pathHashAndFd.first, pathHashAndFd.second);
+        } else {
+          Preconditions.checkState(false,
+              "Delete file with unknown kind: " + deleteFile.path().toString());
+        }
       }
       return fileStore;
     }

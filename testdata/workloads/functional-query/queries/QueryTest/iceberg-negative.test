@@ -662,3 +662,24 @@ select * from functional_parquet.iceberg_alltypes_part for system_time as of '20
 ---- CATCH
 IllegalArgumentException: Cannot find a snapshot older than 2000-01-01 01:02:03
 ====
+---- QUERY
+# Querying a table with equality deletes is not allowed.
+# We don't use time-travel, so we plan the query from cached metadata.
+select * from functional_parquet.iceberg_v2_delete_equality;
+---- CATCH
+ImpalaRuntimeException: Iceberg table functional_parquet.iceberg_v2_delete_equality has EQUALITY delete file which is currently not supported by Impala
+====
+---- QUERY
+# Querying a table with equality deletes is not allowed.
+# Use time-travel based on snapshot id.
+select * from functional_parquet.iceberg_v2_delete_equality for system_version as of 5725822353600261755;
+---- CATCH
+ImpalaRuntimeException: Iceberg table functional_parquet.iceberg_v2_delete_equality has EQUALITY delete file which is currently not supported by Impala
+====
+---- QUERY
+# Querying a table with equality deletes is not allowed.
+# Use time-travel based on timestamp.
+select * from functional_parquet.iceberg_v2_delete_equality for system_time as of now();
+---- CATCH
+ImpalaRuntimeException: Iceberg table functional_parquet.iceberg_v2_delete_equality has EQUALITY delete file which is currently not supported by Impala
+====

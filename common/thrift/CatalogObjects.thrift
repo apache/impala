@@ -617,7 +617,8 @@ struct TIcebergPartitionStats {
 struct TIcebergContentFileStore {
   1: optional map<string, THdfsFileDesc> path_hash_to_data_file_without_deletes
   2: optional map<string, THdfsFileDesc> path_hash_to_data_file_with_deletes
-  3: optional map<string, THdfsFileDesc> path_hash_to_delete_file
+  3: optional map<string, THdfsFileDesc> path_hash_to_position_delete_file
+  7: optional map<string, THdfsFileDesc> path_hash_to_equality_delete_file
   4: optional bool has_avro
   5: optional bool has_orc
   6: optional bool has_parquet
