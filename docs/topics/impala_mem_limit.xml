@@ -209,5 +209,24 @@ for buffer reservations. Memory reservation needed given the current plan: 38.00
 or the pool config (max-query-mem-limit, min-query-mem-limit) for the query to allow the query memory limit to be
 at least 70.00 MB. Note that changing the mem_limit may also change the plan. See the query profile for more
 information about the per-node memory requirements.</codeblock>
- </conbody>
+</conbody>
+<concept id="mem_limit_executors">
+  <title>MEM_LIMIT_EXECUTORS Query Option</title>
+    <conbody>
+      <note>This is a developer-only query option. Setting this query option is not recommended
+        unless specifically advised.</note>
+      <p>The existing <codeph>MEM_LIMIT</codeph> query option applies to all impala coordinators and
+        executors. This means that the same amount of memory gets reserved but coordinators
+        typically just do the job of coordinating the query and thus do not necessarily need all the
+        estimated memory. Blocking the estimated memory on coordinators blocks the memory to be used
+        for other queries.</p>
+      <p>The new <codeph>MEM_LIMIT_EXECUTORS</codeph> query option functions similarly to the
+          <codeph>MEM_LIMIT</codeph> option but sets the query memory limit only on executors. This
+        new option addresses the issue related to <codeph>MEM_LIMIT</codeph> and is recommended in
+        scenarios where the query needs much higher memory on executors compared with
+        coordinators.</p>
+      <p>Note that the <codeph>MEM_LIMIT_EXECUTORS</codeph> option does not work with
+          <codeph>MEM_LIMIT</codeph>. If you set both, only <codeph>MEM_LIMIT</codeph> applies.</p>
+    </conbody>
+</concept>
 </concept>
