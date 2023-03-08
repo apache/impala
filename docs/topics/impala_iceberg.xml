@@ -139,7 +139,7 @@ TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
         <li>
           Alternatively, you can also use custom catalogs to use existing tables. It means you need to define
           your catalog in hive-site.xml.
-          The adventage of this method is that other engines are more likely to be able to interact with this table.
+          The advantage of this method is that other engines are more likely to be able to interact with this table.
           To globally register different catalogs, set the following Hadoop configurations:
           <table rowsep="1" colsep="1" id="iceberg_custom_catalogs">
             <tgroup cols="2">
@@ -238,7 +238,7 @@ CREATE TABLE ice_ctas_part_spec PARTITIONED BY SPEC (truncate(3, s)) STORED AS I
     <conbody>
 
       <p>
-        You can get information about the supported Iceberg data tyeps in
+        You can get information about the supported Iceberg data types in
         <xref href="https://iceberg.apache.org/docs/latest/schemas/" scope="external" format="html">
           the Iceberg spec</xref>.
       </p>
@@ -497,6 +497,16 @@ DESCRIBE HISTORY ice_t FROM now() - interval 5 days;
 DESCRIBE HISTORY ice_t BETWEEN '2022-01-04 10:00:00' AND '2022-01-05 10:00:00';
 </codeblock>
       </p>
+      <p>
+        The output of the <codeph>DESCRIBE HISTORY</codeph> statement is formed
+        of the following columns:
+        <ul>
+          <li><codeph>creation_time</codeph>: the snapshot's creation timestamp.</li>
+          <li><codeph>snapshot_id</codeph>: the snapshot's ID or null.</li>
+          <li><codeph>parent_id</codeph>: the snapshot's parent ID or null.</li>
+          <li><codeph>is_current_ancestor</codeph>: TRUE if the snapshot is a current ancestor of the table.</li>
+        </ul>
+      </p>
 
       <p rev="4.3.0 IMPALA-10893">
         Please note that time travel queries are executed using the old schema of the table
@@ -508,20 +518,35 @@ DESCRIBE HISTORY ice_t BETWEEN '2022-01-04 10:00:00' AND '2022-01-05 10:00:00';
     </conbody>
   </concept>
 
-  <concept id="iceberg_table_cloning">
-    <title>Cloning Iceberg tables (LIKE clause)</title>
+  <concept id="iceberg_execute_rollback">
+    <title>Rolling Iceberg tables back to a previous state</title>
     <conbody>
       <p>
-        Use <codeph>CREATE TABLE ... LIKE ...</codeph> to create an empty Iceberg table
-        based on the definition of another Iceberg table, including any column attributes in
-        the original table:
+        Iceberg table modifications cause new table snapshots to be created;
+        these snapshots represent an earlier version of the table.
+        The <codeph>ALTER TABLE [<varname>db_name</varname>.]<varname>table_name</varname> EXECUTE ROLLBACK</codeph>
+        statement can be used to roll back the table to a previous snapshot.
+      </p>
+
+      <p>
+        For example, to roll the table back to the snapshot id <codeph>123456</codeph> use:
         <codeblock>
-CREATE TABLE new_ice_tbl LIKE orig_ice_tbl;
+ALTER TABLE ice_tbl EXECUTE ROLLBACK(123456);
         </codeblock>
+        To roll the table back to the most recent (newest) snapshot
+        that has a creation timestamp that is older than the timestamp '2022-01-04 10:00:00' use:
+        <codeblock>
+ALTER TABLE ice_tbl EXECUTE ROLLBACK('2022-01-04 10:00:00');
+        </codeblock>
+        The timestamp is evaluated using the Timezone for the current session.
+      </p>
+
+      <p>
+        It is only possible to roll back to a snapshot that is a current ancestor of the table.
       </p>
       <p>
-        Because of the Data Types of Iceberg and Impala do not correspond one by one, Impala
-        can only clone between Iceberg tables.
+        When a table is rolled back to a snapshot, a new snapshot is
+        created with the same snapshot id, but with a new creation timestamp.
       </p>
     </conbody>
   </concept>
@@ -554,6 +579,24 @@ ALTER TABLE ice_tbl EXECUTE expire_snapshots(now() - interval 5 days);
         <codeph>write.metadata.previous-versions-max</codeph> table properties. This
         allows automatic metadata file removal after operations that modify metadata
         such as expiring snapshots or inserting data.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="iceberg_table_cloning">
+    <title>Cloning Iceberg tables (LIKE clause)</title>
+    <conbody>
+      <p>
+        Use <codeph>CREATE TABLE ... LIKE ...</codeph> to create an empty Iceberg table
+        based on the definition of another Iceberg table, including any column attributes in
+        the original table:
+        <codeblock>
+          CREATE TABLE new_ice_tbl LIKE orig_ice_tbl;
+        </codeblock>
+      </p>
+      <p>
+        Because of the Data Types of Iceberg and Impala do not correspond one by one, Impala
+        can only clone between Iceberg tables.
       </p>
     </conbody>
   </concept>
