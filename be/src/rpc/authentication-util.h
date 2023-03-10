@@ -42,10 +42,14 @@ std::string GetDeleteCookie();
 // Takes a comma separated list of ip address/hostname with or without a port, picks the
 // left most on the list (this assumes the list follows the http standard for
 // 'X-Forwarded-For' header where the left-most IP address is the IP address of the
-// originating client), does a reverse DNS lookup on it if its a valid ip address and
-// finally checks if it originates from the 'trusted_domain'. Returns true if the origin
-// is from the trusted domain.
-bool IsTrustedDomain(const std::string& origin, const std::string& trusted_domain);
+// originating client), then checks whether this corresponds to the 'trusted_domain'.
+// If the 'trusted_domain' is 'localhost' and 'strict_localhost' is true, this
+// returns true if the origin is the 127.0.0.1 IP address. If 'strict_localhost' is
+// false or 'trusted_domain' is not 'localhost', then this does a reverse DNS lookup
+// if it's a valid ip address and checks if it originates from the 'trusted_domain'.
+// Returns true if the origin is from the trusted domain.
+bool IsTrustedDomain(const std::string& origin, const std::string& trusted_domain,
+    bool strict_localhost);
 
 // Takes in the base64 encoded token and returns the username and password via the input
 // arguments. Returns an OK status if the token is a valid base64 encoded string of the

@@ -346,11 +346,16 @@ public class LdapHS2Test {
 
   /**
    * Tests if authentication is skipped when connections to the HTTP hiveserver2
-   * endpoint originate from a trusted domain.
+   * endpoint originate from a trusted domain. This is a shared test function
+   * that is used for both the trusted_domain_strict_localhost=true and false
+   * cases.
    */
-  @Test
-  public void testHiveserver2TrustedDomainAuth() throws Exception {
-    setUp("--trusted_domain=localhost --trusted_domain_use_xff_header=true");
+  private void hiveserver2TrustedDomainAuthTestBody(boolean strictLocalhost)
+      throws Exception {
+    String strictLocalhostArgs = "--trusted_domain_strict_localhost=" +
+        String.valueOf(strictLocalhost);
+    setUp("--trusted_domain=localhost --trusted_domain_use_xff_header=true "
+        + strictLocalhostArgs);
     verifyMetrics(0, 0);
     THttpClient transport = new THttpClient("http://localhost:28000");
     Map<String, String> headers = new HashMap<String, String>();
@@ -405,7 +410,10 @@ public class LdapHS2Test {
     // Case 3: Case 1: Authenticate as 'Test1Ldap' with the right password
     // '12345' but with a non trusted address in X-Forwarded-For header
     headers.put("Authorization", "Basic VGVzdDFMZGFwOjEyMzQ1");
-    headers.put("X-Forwarded-For", "127.23.0.1");
+    // Sometimes RDNS resolves 127.* addresses as localhost, so this uses a 126.*
+    // address for non-strict localhost to avoid RDNS issues.
+    String nontrustedIp = strictLocalhost ? "127.0.23.1" : "126.0.23.1";
+    headers.put("X-Forwarded-For", nontrustedIp);
     transport.setCustomHeaders(headers);
     openResp = client.OpenSession(openReq);
     verifyMetrics(1, 0);
@@ -430,7 +438,7 @@ public class LdapHS2Test {
     // Case 5: Case 1: Authenticate as 'Test1Ldap' with the no password
     // and a non trusted address in X-Forwarded-For header
     headers.put("Authorization", "Basic VGVzdDFMZGFwOg==");
-    headers.put("X-Forwarded-For", "127.23.0.1");
+    headers.put("X-Forwarded-For", nontrustedIp);
     transport.setCustomHeaders(headers);
     try {
       openResp = client.OpenSession(openReq);
@@ -450,6 +458,18 @@ public class LdapHS2Test {
     // Account for 1 successful basic auth increment.
     verifyMetrics(4, 1);
     verifyTrustedDomainMetrics(9);
+  }
+
+  @Test
+  public void testHiveserver2TrustedDomainAuthStrict() throws Exception {
+    // Test variant with trusted_domain_strict_localhost=true
+    hiveserver2TrustedDomainAuthTestBody(true);
+  }
+
+  @Test
+  public void testHiveserver2TrustedDomainAuthNonstrict() throws Exception {
+    // Test variant with trusted_domain_strict_localhost=false
+    hiveserver2TrustedDomainAuthTestBody(false);
   }
 
   /**

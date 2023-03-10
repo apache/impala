@@ -156,6 +156,7 @@ DECLARE_string(ssl_cipher_list);
 DECLARE_string(tls_ciphersuites);
 DECLARE_string(trusted_domain);
 DECLARE_bool(trusted_domain_use_xff_header);
+DECLARE_bool(trusted_domain_strict_localhost);
 DECLARE_bool(jwt_token_auth);
 DECLARE_bool(jwt_validate_signature);
 DECLARE_string(jwt_custom_claim_username);
@@ -989,7 +990,10 @@ bool Webserver::GetUsernameFromAuthHeader(struct sq_connection* connection,
 
 bool Webserver::TrustedDomainCheck(const string& origin, struct sq_connection* connection,
     struct sq_request_info* request_info) {
-  if (!IsTrustedDomain(origin, FLAGS_trusted_domain)) return false;
+  if (!IsTrustedDomain(origin, FLAGS_trusted_domain,
+          FLAGS_trusted_domain_strict_localhost)) {
+    return false;
+  }
 
   string err_msg;
   if (!GetUsernameFromAuthHeader(connection, request_info, err_msg)) {

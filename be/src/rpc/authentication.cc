@@ -132,6 +132,12 @@ DEFINE_bool(trusted_domain_use_xff_header, false,
     "domain. Only used if '--trusted_domain' is specified. Warning: Only use this if you "
     "trust the incoming connection to have this set correctly.");
 
+DEFINE_bool(trusted_domain_strict_localhost, true,
+    "If set to true and trusted_domain='localhost', this will not use reverse DNS to "
+    "determine if something is from localhost. It will only match 127.0.0.1. This is "
+    "important for security, because reverse DNS can resolve other non-local addresses "
+    "to localhost.");
+
 // This flag must be used with caution to avoid security risks.
 DEFINE_string(trusted_auth_header, "",
     "If set as non empty string, Impala will look for this header in the HTTP headers. "
@@ -629,7 +635,10 @@ bool GetUsernameFromBasicAuthHeader(
 
 bool TrustedDomainCheck(ThriftServer::ConnectionContext* connection_context,
     const AuthenticationHash& hash, const std::string& origin, string auth_header) {
-  if (!IsTrustedDomain(origin, FLAGS_trusted_domain)) return false;
+  if (!IsTrustedDomain(origin, FLAGS_trusted_domain,
+          FLAGS_trusted_domain_strict_localhost)) {
+    return false;
+  }
 
   if (!GetUsernameFromBasicAuthHeader(connection_context, auth_header)) return false;
   // Create a cookie to return.

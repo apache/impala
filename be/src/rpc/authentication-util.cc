@@ -182,7 +182,8 @@ string GetDeleteCookie() {
   return Substitute("$0=;HttpOnly;Max-Age=0", COOKIE_NAME);
 }
 
-bool IsTrustedDomain(const std::string& origin, const std::string& trusted_domain) {
+bool IsTrustedDomain(const std::string& origin, const std::string& trusted_domain,
+    bool strict_localhost) {
   if (trusted_domain.empty()) return false;
   vector<string> split = Split(origin, delimiter::Limit(",", 1));
   if (split.empty()) return false;
@@ -196,6 +197,10 @@ bool IsTrustedDomain(const std::string& origin, const std::string& trusted_domai
     vector<string> host_n_port = Split(split[0], delimiter::Limit(":", 1));
     host_name = host_n_port[0];
   } else {
+    // If using strict localhost checks, only allow localhost to match 127.0.0.1
+    if (trusted_domain == "localhost" && strict_localhost) {
+      return sock_addr.host() == "127.0.0.1";
+    }
     s = sock_addr.LookupHostname(&host_name);
     if (!s.ok()) {
       LOG(ERROR) << "DNS reverse-lookup failed for " << split[0]

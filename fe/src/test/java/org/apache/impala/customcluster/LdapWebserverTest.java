@@ -251,9 +251,16 @@ public class LdapWebserverTest {
     }
   }
 
-  @Test
-  public void testWebserverTrustedDomain() throws Exception {
-    setUp("--trusted_domain=localhost --trusted_domain_use_xff_header=true", "", "", "");
+  /**
+   * Tests if authentication is skipped when connections to the webserver originate
+   * from a trusted domain. This is a shared test function that is used for both
+   * trusted_domain_strict_localhost=true and false cases.
+   */
+  private void webserverTrustedDomainTestBody(boolean strictLocalhost) throws Exception {
+    String strictLocalhostArgs = "--trusted_domain_strict_localhost=" +
+      String.valueOf(strictLocalhost);
+    setUp("--trusted_domain=localhost --trusted_domain_use_xff_header=true " +
+        strictLocalhostArgs, "", "", "");
 
     // Case 1: Authenticate as 'Test1Ldap' with the right password '12345'
     attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", "127.0.0.1", false);
@@ -265,7 +272,10 @@ public class LdapWebserverTest {
 
     // Case 3: Authenticate as 'Test1Ldap' with the right password
     // '12345' but with a non trusted address in X-Forwarded-For header
-    attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", "127.0.23.1", false);
+    // Sometimes RDNS resolves 127.* addresses as localhost, so this uses a 126.*
+    // address for non-strict localhost to avoid RDNS issues.
+    String nontrustedIp = strictLocalhost ? "127.0.23.1" : "126.0.23.1";
+    attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", nontrustedIp, false);
     verifyTrustedDomainMetrics(Range.closed(2L, 2L));
 
     // Case 4: No auth header, does not work
@@ -279,7 +289,7 @@ public class LdapWebserverTest {
     // Case 5: Authenticate as 'Test1Ldap' with the no password
     // and a non trusted address in X-Forwarded-For header
     try {
-      attemptConnection("Basic VGVzdDFMZGFwOg==", "127.0.23.1", false);
+      attemptConnection("Basic VGVzdDFMZGFwOg==", nontrustedIp, false);
     } catch (IOException e) {
       assertTrue(e.getMessage().contains("Server returned HTTP response code: 401"));
     }
@@ -291,6 +301,18 @@ public class LdapWebserverTest {
         .getMetric("impala.webserver.total-trusted-domain-check-success");
     attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", null, false);
     verifyTrustedDomainMetrics(Range.closed(successMetricBefore, successMetricBefore));
+  }
+
+  @Test
+  public void testWebserverTrustedDomainStrict() throws Exception {
+    // Test variant with trusted_domain_strict_localhost=true
+    webserverTrustedDomainTestBody(true);
+  }
+
+  @Test
+  public void testWebserverTrustedDomainNonstrict() throws Exception {
+    // Test variant with trusted_domain_strict_localhost=false
+    webserverTrustedDomainTestBody(false);
   }
 
   @Test
