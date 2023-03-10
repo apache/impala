@@ -453,54 +453,42 @@ public class ScalarType extends Type {
    * Returns INVALID_TYPE if there is no such type or if any of t1 and t2
    * is INVALID_TYPE.
    *
-   * If strictDecimal is true, only return types that result in no loss of information
-   * when both inputs are decimal.
-   * If strict is true, only return types that result in no loss of information
-   * when at least one of the inputs is not decimal.
+   * 'compatibility' sets the mode of the type compatibility lookup, unsafe
+   * compatibility makes difference in t1 -> t2 and t2-> t1 lookup.
    */
-  public static ScalarType getAssignmentCompatibleType(ScalarType t1,
-      ScalarType t2, boolean strict, boolean strictDecimal) {
+  public static ScalarType getAssignmentCompatibleType(
+      ScalarType t1, ScalarType t2, TypeCompatibility compatibility) {
     if (!t1.isValid() || !t2.isValid()) return INVALID;
     if (t1.equals(t2)) return t1;
     if (t1.isNull()) return t2;
     if (t2.isNull()) return t1;
 
-    if (t1.type_ == PrimitiveType.VARCHAR || t2.type_ == PrimitiveType.VARCHAR) {
-      if (t1.type_ == PrimitiveType.STRING || t2.type_ == PrimitiveType.STRING) {
-        return STRING;
-      }
-      if (t1.isStringType() && t2.isStringType()) {
-        return createVarcharType(Math.max(t1.len_, t2.len_));
-      }
-      return INVALID;
+    PrimitiveType smallerType =
+        (t1.type_.ordinal() < t2.type_.ordinal() ? t1.type_ : t2.type_);
+    PrimitiveType largerType =
+        (t1.type_.ordinal() > t2.type_.ordinal() ? t1.type_ : t2.type_);
+    PrimitiveType result = null;
+
+    if (compatibility.isUnsafe()) {
+      // Unsafe compatibility differentiates t1 -> t2 and t2 -> t1 compatibility
+      result = unsafeCompatibilityMatrix[t1.type_.ordinal()][t2.type_.ordinal()];
+    } else if (compatibility.isStrict()) {
+      result = strictCompatibilityMatrix[smallerType.ordinal()][largerType.ordinal()];
     }
 
-    if (t1.type_ == PrimitiveType.CHAR || t2.type_ == PrimitiveType.CHAR) {
-      Preconditions.checkState(t1.type_ != PrimitiveType.VARCHAR);
-      Preconditions.checkState(t2.type_ != PrimitiveType.VARCHAR);
-      if (t1.type_ == PrimitiveType.STRING || t2.type_ == PrimitiveType.STRING) {
-        return STRING;
-      }
-      if (t1.type_ == PrimitiveType.CHAR && t2.type_ == PrimitiveType.CHAR) {
-        return createCharType(Math.max(t1.len_, t2.len_));
-      }
-      return INVALID;
+    if (result == null) {
+      result = compatibilityMatrix[smallerType.ordinal()][largerType.ordinal()];
     }
 
-    if (t1.isDecimal() || t2.isDecimal()) {
-      // The case of decimal and float/double must be handled carefully. There are two
-      // modes: strict and non-strict. In non-strict mode, we convert to the floating
-      // point type, since it can contain a larger range of values than any decimal (but
-      // has lower precision in some parts of its range), so it is generally better.
-      // In strict mode, we avoid conversion in either direction because there are also
-      // decimal values (e.g. 0.1) that cannot be exactly represented in binary
-      // floating point.
-      // TODO: it might make sense to promote to double in many cases, but this would
-      // require more work elsewhere to avoid breaking things, e.g. inserting decimal
-      // literals into float columns.
-      if (t1.isFloatingPointType()) return strict ? INVALID : t1;
-      if (t2.isFloatingPointType()) return strict ? INVALID : t2;
+    if (result == PrimitiveType.VARCHAR) {
+      return createVarcharType(Math.max(t1.len_, t2.len_));
+    }
 
+    if (result == PrimitiveType.CHAR) {
+      return createCharType(Math.max(t1.len_, t2.len_));
+    }
+
+    if (result == PrimitiveType.DECIMAL) {
       // Allow casts between decimal and numeric types by converting
       // numeric types to the containing decimal type.
       ScalarType t1Decimal = t1.getMinResolutionDecimal();
@@ -517,36 +505,23 @@ public class ScalarType extends Type {
       }
       if (t1Decimal.isSupertypeOf(t2Decimal)) return t1;
       if (t2Decimal.isSupertypeOf(t1Decimal)) return t2;
+
       return TypesUtil.getDecimalAssignmentCompatibleType(
-          t1Decimal, t2Decimal, strictDecimal);
+          t1Decimal, t2Decimal, compatibility.isStrictDecimal());
     }
 
-    PrimitiveType smallerType =
-        (t1.type_.ordinal() < t2.type_.ordinal() ? t1.type_ : t2.type_);
-    PrimitiveType largerType =
-        (t1.type_.ordinal() > t2.type_.ordinal() ? t1.type_ : t2.type_);
-    PrimitiveType result = null;
-    if (strict) {
-      result = strictCompatibilityMatrix[smallerType.ordinal()][largerType.ordinal()];
-    }
-    if (result == null) {
-      result = compatibilityMatrix[smallerType.ordinal()][largerType.ordinal()];
-    }
     Preconditions.checkNotNull(result);
     return createType(result);
   }
 
   /**
-   * Returns true t1 can be implicitly cast to t2, false otherwise.
+   * According to 'compatibility', returns true if t1 can be implicitly cast to t2, false
+   * otherwise.
    *
-   * If strictDecimal is true, only consider casts that result in no loss of information
-   * when casting between decimal types.
-   * If strict is true, only consider casts that result in no loss of information when
-   * casting between any two types other than both decimals.
    */
-  public static boolean isImplicitlyCastable(ScalarType t1, ScalarType t2,
-      boolean strict, boolean strictDecimal) {
-    return getAssignmentCompatibleType(t1, t2, strict, strictDecimal).matchesType(t2);
+  public static boolean isImplicitlyCastable(
+      ScalarType t1, ScalarType t2, TypeCompatibility compatibility) {
+    return getAssignmentCompatibleType(t1, t2, compatibility).matchesType(t2);
   }
 
   /**
@@ -554,6 +529,6 @@ public class ScalarType extends Type {
    * wide as dest.)
    */
   public static boolean isAssignable(ScalarType dest, ScalarType source) {
-    return isImplicitlyCastable(source, dest, false, false);
+    return isImplicitlyCastable(source, dest, TypeCompatibility.DEFAULT);
   }
 }

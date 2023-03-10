@@ -85,7 +85,7 @@ public class HashJoinNode extends JoinNode {
               t0.toSql() + " to " + t1.toSql() + " in join predicate.");
         }
         Type compatibleType = Type.getAssignmentCompatibleType(
-            t0, t1, false, analyzer.isDecimalV2());
+            t0, t1, analyzer.getRegularCompatibilityLevel());
         if (compatibleType.isInvalid()) {
           throw new InternalException(String.format(
               "Unable create a hash join with equi-join predicate %s " +

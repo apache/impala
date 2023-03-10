@@ -339,43 +339,33 @@ public abstract class Type {
    * Implicit casts are always allowed when no loss of information would result (i.e.
    * every value of t1 can be represented exactly by a value of t2). Implicit casts are
    * allowed in certain other cases such as casting numeric types to floating point types
-   * and converting strings to timestamps.
-   *
-   * If strictDecimal is true, only consider casts that result in no loss of information
-   * when casting between decimal types.
-   * If strict is true, only consider casts that result in no loss of information when
-   * casting between any two types other than both decimals.
+   * and converting strings to timestamps. 'compatibility' defines the mode for type
+   * compatibility calculation.
    *
    * TODO: Support casting of non-scalar types.
    */
   public static boolean isImplicitlyCastable(
-      Type t1, Type t2, boolean strict, boolean strictDecimal) {
+      Type t1, Type t2, TypeCompatibility compatibility) {
     if (t1.isScalarType() && t2.isScalarType()) {
       return ScalarType.isImplicitlyCastable(
-          (ScalarType) t1, (ScalarType) t2, strict, strictDecimal);
+          (ScalarType) t1, (ScalarType) t2, compatibility);
     }
     return false;
   }
 
   /**
    * Return type t such that values from both t1 and t2 can be assigned to t without an
-   * explicit cast. If strict, does not consider conversions that would result in loss
-   * of precision (e.g. converting decimal to float). Returns INVALID_TYPE if there is
-   * no such type or if any of t1 and t2 is INVALID_TYPE.
-   *
-   * If strictDecimal is true, only consider casts that result in no loss of information
-   * when casting between decimal types.
-   * If strict is true, only consider casts that result in no loss of information when
-   * casting between any two types other than both decimals.
-   *
+   * explicit cast. 'compatibility' defines the mode for type compatibility calculation
+   * and strictness. Returns INVALID_TYPE if there is no such type or if any of t1 and t2
+   * is INVALID_TYPE.
    *
    * TODO: Support struct types.
    */
   public static Type getAssignmentCompatibleType(
-      Type t1, Type t2, boolean strict, boolean strictDecimal) {
+      Type t1, Type t2, TypeCompatibility compatibility) {
     if (t1.isScalarType() && t2.isScalarType()) {
       return ScalarType.getAssignmentCompatibleType(
-          (ScalarType) t1, (ScalarType) t2, strict, strictDecimal);
+          (ScalarType) t1, (ScalarType) t2, compatibility);
     } else if (t1.isArrayType() && t2.isArrayType()) {
       // Only support exact match for array types.
       if (t1.equals(t2)) return t2;
@@ -683,6 +673,8 @@ public abstract class Type {
    * conservative casting in arithmetic exprs: TINYINT + TINYINT -> BIGINT
    * comparison of many types as double: INT < FLOAT -> comparison as DOUBLE
    * special cases when dealing with dates and timestamps.
+   * Types are looked up in specific order ("smaller" first) in
+   * 'getAssignmentCompatibleType()'.
    */
   protected static PrimitiveType[][] compatibilityMatrix;
 
@@ -692,185 +684,42 @@ public abstract class Type {
    * is valid.
    */
   protected static PrimitiveType[][] strictCompatibilityMatrix;
+  /**
+   * If unsafe mode is enabled, 'unsafeCompatibilityMatrix' is used for lookup, deciding
+   * whether a conversion in the given direction is allowed. This matrix is not
+   * symmetrical, lookups with different orders could yield different results, for
+   * example: STRING, TINYINT would result in TINYINT, but TINYINT, STRING will result in
+   * STRING. This is required for enabling implicit casting from numeric types to string
+   * types and vice-versa.
+   */
+  protected static PrimitiveType[][] unsafeCompatibilityMatrix;
 
   static {
-    compatibilityMatrix = new
-        PrimitiveType[PrimitiveType.values().length][PrimitiveType.values().length];
-    strictCompatibilityMatrix = new
-        PrimitiveType[PrimitiveType.values().length][PrimitiveType.values().length];
+    List<CompatibilityRule> defaultCompatibilityRules = new ArrayList<>();
+    defaultCompatibilityRules.add(new DiagonalCompatibility());
+    defaultCompatibilityRules.add(new BinaryCompatibility());
+    defaultCompatibilityRules.add(new FixedUdaCompatibility());
+    defaultCompatibilityRules.add(new DefaultCompatibility());
+    defaultCompatibilityRules.add(new CheckEmptyCompatibility());
+    compatibilityMatrix = getCompatibilityMatrix(defaultCompatibilityRules);
 
-    for (int i = 0; i < PrimitiveType.values().length; ++i) {
-      // Each type is compatible with itself.
-      compatibilityMatrix[i][i] = PrimitiveType.values()[i];
+    List<CompatibilityRule> strictCompatibilityRules = new ArrayList<>();
+    strictCompatibilityRules.add(new StrictOverrideCompatibility());
+    strictCompatibilityMatrix = getCompatibilityMatrix(strictCompatibilityRules);
 
-      if (i != BINARY.ordinal() && i != STRING.ordinal()) {
-        // BINARY can be only cast to / from STRING.
-        compatibilityMatrix[BINARY.ordinal()][i] = PrimitiveType.INVALID_TYPE;
-        compatibilityMatrix[i][BINARY.ordinal()] = PrimitiveType.INVALID_TYPE;
-      }
+    List<CompatibilityRule> unsafeCompatibilityRules =
+        new ArrayList<>(defaultCompatibilityRules);
+    unsafeCompatibilityRules.add(
+        unsafeCompatibilityRules.size() - 1, new UnsafeCompatibility());
+    unsafeCompatibilityMatrix = getCompatibilityMatrix(unsafeCompatibilityRules);
+  }
 
-      // FIXED_UDA_INTERMEDIATE cannot be cast to/from another type
-      if (i != FIXED_UDA_INTERMEDIATE.ordinal()) {
-        compatibilityMatrix[FIXED_UDA_INTERMEDIATE.ordinal()][i] =
-            PrimitiveType.INVALID_TYPE;
-        compatibilityMatrix[i][FIXED_UDA_INTERMEDIATE.ordinal()] =
-            PrimitiveType.INVALID_TYPE;
-      }
+  public static PrimitiveType[][] getCompatibilityMatrix(List<CompatibilityRule> rules) {
+    PrimitiveType[][] compatibilityMatrix =
+        new PrimitiveType[PrimitiveType.values().length][PrimitiveType.values().length];
+    for (CompatibilityRule rule : rules) {
+      rule.apply(compatibilityMatrix);
     }
-
-    compatibilityMatrix[BOOLEAN.ordinal()][TINYINT.ordinal()] = PrimitiveType.TINYINT;
-    compatibilityMatrix[BOOLEAN.ordinal()][SMALLINT.ordinal()] = PrimitiveType.SMALLINT;
-    compatibilityMatrix[BOOLEAN.ordinal()][INT.ordinal()] = PrimitiveType.INT;
-    compatibilityMatrix[BOOLEAN.ordinal()][BIGINT.ordinal()] = PrimitiveType.BIGINT;
-    compatibilityMatrix[BOOLEAN.ordinal()][FLOAT.ordinal()] = PrimitiveType.FLOAT;
-    compatibilityMatrix[BOOLEAN.ordinal()][DOUBLE.ordinal()] = PrimitiveType.DOUBLE;
-    compatibilityMatrix[BOOLEAN.ordinal()][DATE.ordinal()] = PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[BOOLEAN.ordinal()][DATETIME.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[BOOLEAN.ordinal()][TIMESTAMP.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[BOOLEAN.ordinal()][STRING.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[BOOLEAN.ordinal()][VARCHAR.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[BOOLEAN.ordinal()][CHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
-
-    compatibilityMatrix[TINYINT.ordinal()][SMALLINT.ordinal()] = PrimitiveType.SMALLINT;
-    compatibilityMatrix[TINYINT.ordinal()][INT.ordinal()] = PrimitiveType.INT;
-    compatibilityMatrix[TINYINT.ordinal()][BIGINT.ordinal()] = PrimitiveType.BIGINT;
-    // 8 bit integer fits in mantissa of both float and double.
-    compatibilityMatrix[TINYINT.ordinal()][FLOAT.ordinal()] = PrimitiveType.FLOAT;
-    compatibilityMatrix[TINYINT.ordinal()][DOUBLE.ordinal()] = PrimitiveType.DOUBLE;
-    compatibilityMatrix[TINYINT.ordinal()][DATE.ordinal()] = PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[TINYINT.ordinal()][DATETIME.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[TINYINT.ordinal()][TIMESTAMP.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[TINYINT.ordinal()][STRING.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[TINYINT.ordinal()][VARCHAR.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[TINYINT.ordinal()][CHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
-
-    compatibilityMatrix[SMALLINT.ordinal()][INT.ordinal()] = PrimitiveType.INT;
-    compatibilityMatrix[SMALLINT.ordinal()][BIGINT.ordinal()] = PrimitiveType.BIGINT;
-    // 16 bit integer fits in mantissa of both float and double.
-    compatibilityMatrix[SMALLINT.ordinal()][FLOAT.ordinal()] = PrimitiveType.FLOAT;
-    compatibilityMatrix[SMALLINT.ordinal()][DOUBLE.ordinal()] = PrimitiveType.DOUBLE;
-    compatibilityMatrix[SMALLINT.ordinal()][DATE.ordinal()] = PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[SMALLINT.ordinal()][DATETIME.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[SMALLINT.ordinal()][TIMESTAMP.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[SMALLINT.ordinal()][STRING.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[SMALLINT.ordinal()][VARCHAR.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[SMALLINT.ordinal()][CHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
-
-    compatibilityMatrix[INT.ordinal()][BIGINT.ordinal()] = PrimitiveType.BIGINT;
-    // 32 bit integer fits only mantissa of double.
-    // TODO: arguably we should promote INT + FLOAT to DOUBLE to avoid loss of precision,
-    // but we depend on it remaining FLOAT for some use cases, e.g.
-    // "insert into tbl (float_col) select int_col + float_col from ..."
-    compatibilityMatrix[INT.ordinal()][FLOAT.ordinal()] = PrimitiveType.FLOAT;
-    strictCompatibilityMatrix[INT.ordinal()][FLOAT.ordinal()] = PrimitiveType.DOUBLE;
-    compatibilityMatrix[INT.ordinal()][DOUBLE.ordinal()] = PrimitiveType.DOUBLE;
-    compatibilityMatrix[INT.ordinal()][DATE.ordinal()] = PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[INT.ordinal()][DATETIME.ordinal()] = PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[INT.ordinal()][TIMESTAMP.ordinal()] = PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[INT.ordinal()][STRING.ordinal()] = PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[INT.ordinal()][VARCHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[INT.ordinal()][CHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
-
-    // 64 bit integer does not fit in mantissa of double or float.
-    // TODO: arguably we should always promote BIGINT + FLOAT to double here to keep as
-    // much precision as possible, but we depend on this implicit cast for some use
-    // cases, similarly to INT + FLOAT.
-    compatibilityMatrix[BIGINT.ordinal()][FLOAT.ordinal()] = PrimitiveType.FLOAT;
-    strictCompatibilityMatrix[BIGINT.ordinal()][FLOAT.ordinal()] = PrimitiveType.DOUBLE;
-    // TODO: we're breaking the definition of strict compatibility for BIGINT + DOUBLE,
-    // but this forces function overloading to consider the DOUBLE overload first.
-    compatibilityMatrix[BIGINT.ordinal()][DOUBLE.ordinal()] = PrimitiveType.DOUBLE;
-    compatibilityMatrix[BIGINT.ordinal()][DATE.ordinal()] = PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[BIGINT.ordinal()][DATETIME.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[BIGINT.ordinal()][TIMESTAMP.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[BIGINT.ordinal()][STRING.ordinal()] = PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[BIGINT.ordinal()][VARCHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[BIGINT.ordinal()][CHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
-
-    compatibilityMatrix[FLOAT.ordinal()][DOUBLE.ordinal()] = PrimitiveType.DOUBLE;
-    compatibilityMatrix[FLOAT.ordinal()][DATE.ordinal()] = PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[FLOAT.ordinal()][DATETIME.ordinal()] = PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[FLOAT.ordinal()][TIMESTAMP.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[FLOAT.ordinal()][STRING.ordinal()] = PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[FLOAT.ordinal()][VARCHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[FLOAT.ordinal()][CHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
-
-    compatibilityMatrix[DOUBLE.ordinal()][DATE.ordinal()] = PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[DOUBLE.ordinal()][DATETIME.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[DOUBLE.ordinal()][TIMESTAMP.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[DOUBLE.ordinal()][STRING.ordinal()] = PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[DOUBLE.ordinal()][VARCHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[DOUBLE.ordinal()][CHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
-
-    // We can convert some but not all string values to date.
-    compatibilityMatrix[DATE.ordinal()][STRING.ordinal()] = PrimitiveType.DATE;
-    strictCompatibilityMatrix[DATE.ordinal()][STRING.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[DATE.ordinal()][VARCHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[DATE.ordinal()][CHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
-
-    compatibilityMatrix[DATETIME.ordinal()][TIMESTAMP.ordinal()] =
-        PrimitiveType.TIMESTAMP;
-    compatibilityMatrix[DATETIME.ordinal()][DATE.ordinal()] = PrimitiveType.DATETIME;
-    compatibilityMatrix[DATETIME.ordinal()][STRING.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[DATETIME.ordinal()][VARCHAR.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[DATETIME.ordinal()][CHAR.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-
-    // We can convert some but not all date values to timestamps.
-    compatibilityMatrix[TIMESTAMP.ordinal()][DATE.ordinal()] = PrimitiveType.TIMESTAMP;
-    strictCompatibilityMatrix[TIMESTAMP.ordinal()][DATE.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    // We can convert some but not all string values to timestamps.
-    compatibilityMatrix[TIMESTAMP.ordinal()][STRING.ordinal()] =
-        PrimitiveType.TIMESTAMP;
-    strictCompatibilityMatrix[TIMESTAMP.ordinal()][STRING.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[TIMESTAMP.ordinal()][VARCHAR.ordinal()] =
-        PrimitiveType.INVALID_TYPE;
-    compatibilityMatrix[TIMESTAMP.ordinal()][CHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
-
-    compatibilityMatrix[STRING.ordinal()][VARCHAR.ordinal()] = PrimitiveType.STRING;
-    compatibilityMatrix[STRING.ordinal()][CHAR.ordinal()] = PrimitiveType.STRING;
-    // STRING <->  BINARY conversion is not lossy, but implicit cast is not allowed to
-    // enforce exact type match in function calls.
-    compatibilityMatrix[STRING.ordinal()][BINARY.ordinal()] = PrimitiveType.INVALID_TYPE;
-    strictCompatibilityMatrix[STRING.ordinal()][BINARY.ordinal()]
-        = PrimitiveType.INVALID_TYPE;
-
-    compatibilityMatrix[VARCHAR.ordinal()][CHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
-
-    // Check all of the necessary entries that should be filled.
-    for (int i = 0; i < PrimitiveType.values().length; ++i) {
-      for (int j = i; j < PrimitiveType.values().length; ++j) {
-        PrimitiveType t1 = PrimitiveType.values()[i];
-        PrimitiveType t2 = PrimitiveType.values()[j];
-        // DECIMAL, NULL, and INVALID_TYPE  are handled separately.
-        if (t1 == PrimitiveType.INVALID_TYPE ||
-            t2 == PrimitiveType.INVALID_TYPE) continue;
-        if (t1 == PrimitiveType.NULL_TYPE || t2 == PrimitiveType.NULL_TYPE) continue;
-        if (t1 == PrimitiveType.DECIMAL || t2 == PrimitiveType.DECIMAL) continue;
-        Preconditions.checkNotNull(compatibilityMatrix[i][j]);
-      }
-    }
+    return compatibilityMatrix;
   }
 }

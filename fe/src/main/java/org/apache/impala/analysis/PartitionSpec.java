@@ -117,8 +117,8 @@ public class PartitionSpec extends PartitionSpecBase {
 
       Type colType = c.getType();
       Type literalType = pk.getValue().getType();
-      Type compatibleType = Type.getAssignmentCompatibleType(colType, literalType,
-          false, analyzer.isDecimalV2());
+      Type compatibleType = Type.getAssignmentCompatibleType(
+          colType, literalType, analyzer.getRegularCompatibilityLevel());
       if (!compatibleType.isValid()) {
         throw new AnalysisException(String.format("Value of partition spec (column=%s) "
             + "has incompatible type: '%s'. Expected type: '%s'.",

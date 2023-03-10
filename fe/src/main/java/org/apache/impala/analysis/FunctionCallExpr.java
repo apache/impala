@@ -758,7 +758,7 @@ public class FunctionCallExpr extends Expr {
           "Analytic function requires an OVER clause: " + toSql());
     }
 
-    castForFunctionCall(false, analyzer.isDecimalV2());
+    castForFunctionCall(false, analyzer.getRegularCompatibilityLevel());
     type_ = fn_.getReturnType();
     if (type_.isDecimal() && type_.isWildcardDecimal()) {
       type_ = resolveDecimalReturnType(analyzer);

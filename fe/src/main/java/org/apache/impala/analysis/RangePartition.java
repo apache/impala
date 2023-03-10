@@ -24,10 +24,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
-import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TRangePartition;
 import org.apache.impala.util.ExprUtil;
 import org.apache.impala.util.KuduUtil;
@@ -213,7 +213,7 @@ public class RangePartition extends StmtNode {
 
     org.apache.impala.catalog.Type literalType = literal.getType();
     if (!org.apache.impala.catalog.Type.isImplicitlyCastable(literalType, colType,
-        true, analyzer.isDecimalV2())) {
+            analyzer.getRegularCompatibilityLevel(TypeCompatibility.STRICT))) {
       throw new AnalysisException(String.format("Range partition value %s " +
           "(type: %s) is not type compatible with partitioning column '%s' (type: %s).",
           literal.toSql(), literalType, pkColumn.getColName(), colType.toSql()));

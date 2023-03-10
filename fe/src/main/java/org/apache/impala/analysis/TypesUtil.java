@@ -21,6 +21,7 @@ import java.math.BigDecimal;
 
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
@@ -116,14 +117,14 @@ public class TypesUtil {
       case SUBTRACT:
         // If one of the types is null, use the compatible type without promotion.
         // Otherwise, promote the compatible type to the next higher resolution type,
-        // to ensure that that a <op> b won't overflow/underflow.
+        // to ensure that a <op> b won't overflow/underflow.
         Type compatibleType =
-            ScalarType.getAssignmentCompatibleType(t1, t2, false, false);
+            ScalarType.getAssignmentCompatibleType(t1, t2, TypeCompatibility.DEFAULT);
         Preconditions.checkState(compatibleType.isScalarType());
         type = ((ScalarType) compatibleType).getNextResolutionType();
         break;
       case MOD:
-        type = ScalarType.getAssignmentCompatibleType(t1, t2, false, false);
+        type = ScalarType.getAssignmentCompatibleType(t1, t2, TypeCompatibility.DEFAULT);
         break;
       case DIVIDE:
         type = Type.DOUBLE;

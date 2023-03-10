@@ -26,6 +26,7 @@ import org.apache.impala.catalog.AggregateFunction;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.TreeNode;
@@ -380,8 +381,9 @@ public class AnalyticExpr extends Expr {
           + "a RANGE window with PRECEDING/FOLLOWING: " + toSql());
     }
     Expr rangeExpr = boundary.getExpr();
-    if (!Type.isImplicitlyCastable(
-        rangeExpr.getType(), orderByElements_.get(0).getExpr().getType(), false, true)) {
+    if (!Type.isImplicitlyCastable(rangeExpr.getType(),
+            orderByElements_.get(0).getExpr().getType(),
+            TypeCompatibility.STRICT_DECIMAL)) {
       throw new AnalysisException(
           "The value expression of a PRECEDING/FOLLOWING clause of a RANGE window must "
             + "be implicitly convertable to the ORDER BY expression's type: "

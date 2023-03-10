@@ -535,3 +535,26 @@ class TestInsertNonPartitionedTable(ImpalaTestSuite):
         .format(table_name), exec_options)
     result = self.client.execute("select f0 from {0}".format(table_name))
     assert result.data == ["2"]
+
+
+class TestUnsafeImplicitCasts(ImpalaTestSuite):
+  """Test to check 'allow_unsafe_casts' query-option behaviour on insert statements."""
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestUnsafeImplicitCasts, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        (v.get_value('table_format').file_format == 'parquet'))
+
+  def test_unsafe_insert(self, vector, unique_database):
+    create_stmt = """create table {0}.unsafe_insert(tinyint_col tinyint,
+      smallint_col smallint, int_col int, bigint_col bigint, float_col float,
+      double_col double, decimal_col decimal, timestamp_col timestamp, date_col date,
+      string_col string, varchar_col varchar(100), char_col char(100),
+      bool_col boolean, binary_col binary)""".format(unique_database)
+    self.client.execute(create_stmt)
+    vector.get_value('exec_option')['allow_unsafe_casts'] = "true"
+    self.run_test_case('QueryTest/insert-unsafe', vector, unique_database)

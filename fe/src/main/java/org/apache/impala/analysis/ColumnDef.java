@@ -28,10 +28,10 @@ import java.util.Map;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.compat.MetastoreShim;
-import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.util.ExprUtil;
 import org.apache.impala.util.KuduUtil;
@@ -291,8 +291,9 @@ public class ColumnDef {
         }
       }
 
-      if (!Type.isImplicitlyCastable(defaultValLiteral.getType(), type_,
-          true, analyzer.isDecimalV2())) {
+      TypeCompatibility compatibility =
+          analyzer.getRegularCompatibilityLevel(TypeCompatibility.STRICT);
+      if (!Type.isImplicitlyCastable(defaultValLiteral.getType(), type_, compatibility)) {
         throw new AnalysisException(String.format("Default value %s (type: %s) " +
             "is not compatible with column '%s' (type: %s).", defaultValue_.toSql(),
             defaultValue_.getType().toSql(), colName_, type_.toSql()));

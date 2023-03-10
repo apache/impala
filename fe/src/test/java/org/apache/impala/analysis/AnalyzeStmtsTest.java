@@ -3561,8 +3561,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Regression test for IMPALA-12042: Transitive compatibility is not
     // allowed (boolean -> tinyint -> decimal(4,1))
     AnalysisError("values (true), (123), (111.0)",
-        "Incompatible return types 'DECIMAL(4,1)' and 'BOOLEAN'"
-            + " of exprs '111.0' and 'TRUE'");
+        "Incompatible return types 'BOOLEAN' and 'DECIMAL(4,1)'"
+            + " of exprs 'TRUE' and '111.0'");
   }
 
   @Test

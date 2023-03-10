@@ -141,7 +141,7 @@ public class CompoundPredicate extends Predicate {
         CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
     Preconditions.checkState(fn_ != null);
     Preconditions.checkState(fn_.getReturnType().isBoolean());
-    castForFunctionCall(false, analyzer.isDecimalV2());
+    castForFunctionCall(false, analyzer.getRegularCompatibilityLevel());
 
     computeSelectivity(analyzer);
   }

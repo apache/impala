@@ -32,6 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -66,6 +67,7 @@ import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.VirtualTable;
 import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
@@ -3277,20 +3279,52 @@ public class Analyzer {
   public Type getCompatibleType(Type lastCompatibleType,
       Expr lastCompatibleExpr, Expr expr)
       throws AnalysisException {
+    return getCompatibleType(
+        lastCompatibleType, lastCompatibleExpr, expr, getRegularCompatibilityLevel());
+  }
+
+  public static Type getCompatibleType(Type leftType, Expr leftExpr, Type rightType,
+      Expr rightExpr, TypeCompatibility compatibility) throws AnalysisException {
+    Type compatibleType =
+        Type.getAssignmentCompatibleType(leftType, rightType, compatibility);
+    checkCompatibility(
+        leftType, leftExpr, rightType, rightExpr, compatibleType, compatibility);
+    return compatibleType;
+  }
+
+  public static Type getCompatibleType(Type lastCompatibleType, Expr lastCompatibleExpr,
+      Expr expr, TypeCompatibility compatibility) throws AnalysisException {
     Type newCompatibleType;
     if (lastCompatibleType == null) {
       newCompatibleType = expr.getType();
     } else {
       newCompatibleType = Type.getAssignmentCompatibleType(
-          lastCompatibleType, expr.getType(), false, isDecimalV2());
+          lastCompatibleType, expr.getType(), compatibility);
     }
-    if (!newCompatibleType.isValid()) {
-      throw new AnalysisException(String.format(
-          "Incompatible return types '%s' and '%s' of exprs '%s' and '%s'.",
-          lastCompatibleType.toSql(), expr.getType().toSql(),
-          lastCompatibleExpr.toSql(), expr.toSql()));
-    }
+    checkCompatibility(lastCompatibleType, lastCompatibleExpr, expr.getType(), expr,
+        newCompatibleType, compatibility);
     return newCompatibleType;
+  }
+
+  private static void checkCompatibility(Type leftType, Expr leftExpr, Type rightType,
+      Expr rightExpr, Type compatibleType, TypeCompatibility compatibility)
+      throws AnalysisException {
+    if (compatibility.isUnsafe()) {
+      Optional<Expr> nonConstExpr = leftExpr.getFirstNonConstSourceExpr();
+      if (!nonConstExpr.isPresent()) {
+        nonConstExpr = rightExpr.getFirstNonConstSourceExpr();
+      }
+      if (nonConstExpr.isPresent()) {
+        throw new AnalysisException(String.format(
+            "Unsafe implicit cast is prohibited for non-const expression: %s",
+            nonConstExpr.get().toSql()));
+      }
+    }
+    if (!compatibleType.isValid()) {
+      throw new AnalysisException(
+          String.format("Incompatible return types '%s' and '%s' of exprs '%s' and '%s'.",
+              leftType.toSql(), rightType.toSql(), leftExpr.toSql(), rightExpr.toSql()));
+    }
   }
 
   /**
@@ -3346,6 +3380,10 @@ public class Analyzer {
     if (exprLists == null || exprLists.size() == 0) return null;
     if (exprLists.size() == 1) return exprLists.get(0);
 
+    TypeCompatibility regularCompatibility = this.getRegularCompatibilityLevel();
+    TypeCompatibility permissiveCompatibility = this.getPermissiveCompatibilityLevel();
+    TypeCompatibility compatibilityLevel = regularCompatibility;
+
     // Determine compatible types for exprs, position by position.
     List<Expr> firstList = exprLists.get(0);
     List<Expr> widestExprs = new ArrayList<>(firstList.size());
@@ -3360,22 +3398,37 @@ public class Analyzer {
             firstList.get(i).toSql()));
       }
       widestExprs.add(firstList.get(i));
+
       for (int j = 1; j < exprLists.size(); ++j) {
         Preconditions.checkState(exprLists.get(j).size() == firstList.size());
         Type preType = compatibleType;
-        compatibleType = getCompatibleType(
-            compatibleType, widestExprs.get(i), exprLists.get(j).get(i));
+        Expr expr = exprLists.get(j).get(i);
+
+        try {
+          compatibleType = getCompatibleType(
+              compatibleType, widestExprs.get(i), expr, compatibilityLevel);
+        } catch (AnalysisException e) {
+          compatibilityLevel = permissiveCompatibility;
+          if (permissiveCompatibility.isUnsafe()) {
+            compatibleType = getCompatibleType(
+                compatibleType, widestExprs.get(i), expr, compatibilityLevel);
+          } else {
+            throw e;
+          }
+        }
+
         // compatibleType will be updated if a new wider type is encountered
-        if (preType != compatibleType) widestExprs.set(i, exprLists.get(j).get(i));
+        if (preType != compatibleType) widestExprs.set(i, expr);
       }
       // Now that we've found a compatible type, add implicit casts if necessary.
       for (int j = 0; j < exprLists.size(); ++j) {
         // Checking compatibility with every expression
-        Type commonType = getCompatibleType(compatibleType,
-            widestExprs.get(i), exprLists.get(j).get(i));
+        Expr expr = exprLists.get(j).get(i);
+        Type commonType = getCompatibleType(
+            expr.getType(), expr, compatibleType, widestExprs.get(i), compatibilityLevel);
         Preconditions.checkState(commonType.equals(compatibleType));
-        if (!exprLists.get(j).get(i).getType().equals(compatibleType)) {
-          Expr castExpr = exprLists.get(j).get(i).castTo(compatibleType);
+        if (!expr.getType().equals(compatibleType)) {
+          Expr castExpr = expr.castTo(compatibleType, compatibilityLevel);
           exprLists.get(j).set(i, castExpr);
         }
       }
@@ -3407,6 +3460,40 @@ public class Analyzer {
     return globalState_.queryCtx.client_request.getQuery_options();
   }
   public boolean isDecimalV2() { return getQueryOptions().isDecimal_v2(); }
+
+  /**
+   * This method returns the compatibility level depending on Decimal V2 query option. The
+   * unsafe compatibility level is not considered in this method. IMPALA-10173 introduces
+   * UNSAFE type compatibility just for set operations and insert statements, therefore
+   * any other unaffected parts must use this method to decide the compatibility level.
+   * The method applies a transformation to 'compatibility', returns a compatibility level
+   * that will carry the strict decimal meaning (isStrictDecimal() returns true for it)
+   * considering the Decimal V2 query option.
+   */
+  public TypeCompatibility getRegularCompatibilityLevel(TypeCompatibility compatibility) {
+    TQueryOptions queryOptions = getQueryOptions();
+    if (queryOptions.isDecimal_v2()) {
+      return TypeCompatibility.applyStrictDecimal(compatibility);
+    }
+    return compatibility;
+  }
+
+  public TypeCompatibility getRegularCompatibilityLevel() {
+    return getRegularCompatibilityLevel(TypeCompatibility.DEFAULT);
+  }
+
+  /**
+   * This method returns compatibility level depending on both Decimal V2 and unsafe casts
+   * query option. It allows UNSAFE type compatibility for set operation and insert
+   * statements.
+   */
+  public TypeCompatibility getPermissiveCompatibilityLevel() {
+    TQueryOptions queryOptions = getQueryOptions();
+    if (queryOptions.isAllow_unsafe_casts()) {
+      return TypeCompatibility.UNSAFE;
+    }
+    return getRegularCompatibilityLevel(TypeCompatibility.DEFAULT);
+  }
   public AuthorizationFactory getAuthzFactory() { return globalState_.authzFactory; }
   public AuthorizationConfig getAuthzConfig() {
     return getAuthzFactory().getAuthorizationConfig();

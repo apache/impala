@@ -20,9 +20,11 @@ package org.apache.impala.analysis;
 import java.util.Collections;
 import java.util.List;
 
+import java.util.Optional;
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.rewrite.ExprRewriter;
 
@@ -197,12 +199,11 @@ public abstract class StatementBase extends StmtNode {
    * This is only used when constructing an AnalysisException message to make sure the
    * right expression is blamed in the error message.
    *
-   * If strictDecimal is true, only consider casts that result in no loss of information
-   * when casting between decimal types.
+   * If compatibility is unsafe and the source expression is not constant, compatibility
+   * ignores the unsafe option.
    */
   public static Expr checkTypeCompatibility(String dstTableName, Column dstCol,
-      Expr srcExpr, boolean strictDecimal, Expr widestTypeSrcExpr)
-      throws AnalysisException {
+      Expr srcExpr, Analyzer analyzer, Expr widestTypeSrcExpr) throws AnalysisException {
     Type dstColType = dstCol.getType();
     Type srcExprType = srcExpr.getType();
 
@@ -210,8 +211,25 @@ public abstract class StatementBase extends StmtNode {
     // Trivially compatible, unless the type is complex.
     if (dstColType.equals(srcExprType) && !dstColType.isComplexType()) return srcExpr;
 
-    Type compatType = Type.getAssignmentCompatibleType(
-        dstColType, srcExprType, false, strictDecimal);
+    TypeCompatibility permissiveCompatibility =
+        analyzer.getPermissiveCompatibilityLevel();
+    TypeCompatibility compatibilityLevel = analyzer.getRegularCompatibilityLevel();
+
+    Type compatType =
+        Type.getAssignmentCompatibleType(srcExprType, dstColType, compatibilityLevel);
+
+    if (compatType.isInvalid() && permissiveCompatibility.isUnsafe()) {
+      Optional<Expr> expr = srcExpr.getFirstNonConstSourceExpr();
+      if (expr.isPresent()) {
+        throw new AnalysisException(String.format(
+            "Unsafe implicit cast is prohibited for non-const expression: %s ",
+            expr.get().toSql()));
+      }
+      compatType = Type.getAssignmentCompatibleType(
+          srcExprType, dstColType, permissiveCompatibility);
+      compatibilityLevel = permissiveCompatibility;
+    }
+
     if (!compatType.isValid()) {
       throw new AnalysisException(String.format(
           "Target table '%s' is incompatible with source expressions.\nExpression '%s' " +
@@ -219,13 +237,15 @@ public abstract class StatementBase extends StmtNode {
           dstTableName, srcExpr.toSql(), srcExprType.toSql(), dstCol.getName(),
           dstColType.toSql()));
     }
-    if (!compatType.equals(dstColType) && !compatType.isNull()) {
+
+    if (!compatType.equals(dstColType) && !compatType.isNull()
+        && !permissiveCompatibility.isUnsafe()) {
       throw new AnalysisException(String.format(
           "Possible loss of precision for target table '%s'.\nExpression '%s' (type: "
               + "%s) would need to be cast to %s for column '%s'",
           dstTableName, widestTypeSrcExpr.toSql(), srcExprType.toSql(),
           dstColType.toSql(), dstCol.getName()));
     }
-    return srcExpr.castTo(compatType);
+    return srcExpr.castTo(compatType, compatibilityLevel);
   }
 }

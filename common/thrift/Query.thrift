@@ -638,6 +638,10 @@ struct TQueryOptions {
   // Configures the in-memory sort algorithm used in the sorter.
   // See comment in ImpalaService.thrift
   158: optional i32 max_sort_run_size = 0;
+
+  // See comment in ImpalaService.thrift
+  159: optional bool allow_unsafe_casts = false;
+
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

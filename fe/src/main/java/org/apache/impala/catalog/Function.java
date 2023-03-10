@@ -210,8 +210,10 @@ public class Function extends CatalogObjectImpl {
     switch (mode) {
       case IS_IDENTICAL: return calcIdenticalMatchScore(other);
       case IS_INDISTINGUISHABLE: return calcIndistinguishableMatchScore(other);
-      case IS_SUPERTYPE_OF: return calcSuperTypeOfMatchScore(other, true);
-      case IS_NONSTRICT_SUPERTYPE_OF: return calcSuperTypeOfMatchScore(other, false);
+      case IS_SUPERTYPE_OF:
+        return calcSuperTypeOfMatchScore(other, TypeCompatibility.ALL_STRICT);
+      case IS_NONSTRICT_SUPERTYPE_OF:
+        return calcSuperTypeOfMatchScore(other, TypeCompatibility.DEFAULT);
       default:
         Preconditions.checkState(false);
         return -1;
@@ -241,7 +243,7 @@ public class Function extends CatalogObjectImpl {
    * Otherwise returns the number of arguments whose types are an exact match or a
    * wildcard variant.
    */
-  private int calcSuperTypeOfMatchScore(Function other, boolean strict) {
+  private int calcSuperTypeOfMatchScore(Function other, TypeCompatibility compatibility) {
     if (!other.name_.equals(name_)) return -1;
     if (!this.hasVarArgs_ && other.argTypes_.length != this.argTypes_.length) {
       return -1;
@@ -256,7 +258,7 @@ public class Function extends CatalogObjectImpl {
         continue;
       }
       if (!Type.isImplicitlyCastable(
-          other.argTypes_[i], extendedArgTypes[i], strict, strict)) {
+              other.argTypes_[i], extendedArgTypes[i], compatibility)) {
         return -1;
       }
     }

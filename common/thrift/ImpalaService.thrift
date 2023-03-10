@@ -795,6 +795,10 @@ enum TImpalaQueryOptions {
   // high fragmentation of variable length data.
   MAX_SORT_RUN_SIZE = 157;
 
+  // Allowing implicit casts with loss of precision, adds the capability to use
+  // implicit casts between numeric and string types in set operations and insert
+  // statements.
+  ALLOW_UNSAFE_CASTS = 158;
 }
 
 // The summary of a DML statement.

@@ -146,7 +146,7 @@ public class LikePredicate extends Predicate {
             "invalid regular expression in '" + this.toSql() + "'");
       }
     }
-    castForFunctionCall(false, analyzer.isDecimalV2());
+    castForFunctionCall(false, analyzer.getRegularCompatibilityLevel());
   }
 
   @Override

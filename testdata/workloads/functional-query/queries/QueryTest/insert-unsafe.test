@@ -1,0 +1,213 @@
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) select 1.0 union select int_col from unsafe_insert;
+---- CATCH
+AnalysisException: Unsafe implicit cast is prohibited for non-const expression: int_col
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) select 1 union select int_col from unsafe_insert;
+---- CATCH
+AnalysisException: Unsafe implicit cast is prohibited for non-const expression: int_col
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) select int_col from unsafe_insert union select 1;
+---- CATCH
+AnalysisException: Unsafe implicit cast is prohibited for non-const expression: int_col
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) select 1 union select string_col from unsafe_insert;
+---- CATCH
+AnalysisException: Unsafe implicit cast is prohibited for non-const expression: string_col
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) select 1 union select 2;
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) select 1;
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) values (10.0);
+---- CATCH
+AnalysisException: Target table '$DATABASE.unsafe_insert' is incompatible with source expressions.
+Expression '10.0' (type: DECIMAL(3,1)) is not compatible with column 'string_col' (type: STRING)
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) values (100), (1000), (1000.0);
+---- CATCH
+AnalysisException: Target table '$DATABASE.unsafe_insert' is incompatible with source expressions.
+Expression '100' (type: DECIMAL(6,1)) is not compatible with column 'string_col' (type: STRING)
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) values (cast(100 as TINYINT));
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) values (cast(100 as SMALLINT));
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) values (cast(100 as FLOAT));
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) values (cast(100 as DOUBLE));
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) values (cast(100 as INT));
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) values (cast(100 as BIGINT));
+====
+---- QUERY
+INSERT INTO unsafe_insert(varchar_col) values (cast(100 as TINYINT));
+====
+---- QUERY
+INSERT INTO unsafe_insert(varchar_col) values (cast(100 as SMALLINT));
+====
+---- QUERY
+INSERT INTO unsafe_insert(varchar_col) values (cast(100 as FLOAT));
+====
+---- QUERY
+INSERT INTO unsafe_insert(varchar_col) values (cast(100 as DOUBLE));
+====
+---- QUERY
+INSERT INTO unsafe_insert(varchar_col) values (cast(100 as INT));
+====
+---- QUERY
+INSERT INTO unsafe_insert(varchar_col) values (cast(100 as BIGINT));
+====
+---- QUERY
+INSERT INTO unsafe_insert(char_col) values (cast(100 as TINYINT));
+====
+---- QUERY
+INSERT INTO unsafe_insert(char_col) values (cast(100 as SMALLINT));
+====
+---- QUERY
+INSERT INTO unsafe_insert(char_col) values (cast(100 as FLOAT));
+====
+---- QUERY
+INSERT INTO unsafe_insert(char_col) values (cast(100 as DOUBLE));
+====
+---- QUERY
+INSERT INTO unsafe_insert(char_col) values (cast(100 as INT));
+====
+---- QUERY
+INSERT INTO unsafe_insert(char_col) values (cast(100 as BIGINT));
+====
+---- QUERY
+INSERT INTO unsafe_insert(float_col) values ("100");
+====
+---- QUERY
+INSERT INTO unsafe_insert(bigint_col) values ("100");
+====
+---- QUERY
+INSERT INTO unsafe_insert(smallint_col) values ("100");
+====
+---- QUERY
+INSERT INTO unsafe_insert(tinyint_col) values ("100");
+====
+---- QUERY
+INSERT INTO unsafe_insert(int_col) values ("100");
+====
+---- QUERY
+INSERT INTO unsafe_insert(double_col) values ("100");
+====
+---- QUERY
+INSERT INTO unsafe_insert(float_col) values (cast("100" as VARCHAR(10)));
+====
+---- QUERY
+INSERT INTO unsafe_insert(bigint_col) values (cast("100" as VARCHAR(10)));
+====
+---- QUERY
+INSERT INTO unsafe_insert(smallint_col) values (cast("100" as VARCHAR(10)));
+====
+---- QUERY
+INSERT INTO unsafe_insert(tinyint_col) values (cast("100" as VARCHAR(10)));
+====
+---- QUERY
+INSERT INTO unsafe_insert(int_col) values (cast("100" as VARCHAR(10)));
+====
+---- QUERY
+INSERT INTO unsafe_insert(double_col) values (cast("100" as VARCHAR(10)));
+====
+---- QUERY
+INSERT INTO unsafe_insert(float_col) values (cast("100" as CHAR(10)));
+====
+---- QUERY
+INSERT INTO unsafe_insert(bigint_col) values (cast("100" as CHAR(10)));
+====
+---- QUERY
+INSERT INTO unsafe_insert(smallint_col) values (cast("100" as CHAR(10)));
+====
+---- QUERY
+INSERT INTO unsafe_insert(tinyint_col) values (cast("100" as CHAR(10)));
+====
+---- QUERY
+INSERT INTO unsafe_insert(int_col) values (cast("100" as CHAR(10)));
+====
+---- QUERY
+INSERT INTO unsafe_insert(double_col) values (cast("100" as CHAR(10)));
+====
+---- QUERY
+INSERT INTO unsafe_insert(char_col) values (cast("100" as STRING));
+====
+---- QUERY
+INSERT INTO unsafe_insert(varchar_col) values (cast("100" as STRING));
+====
+---- QUERY
+INSERT INTO unsafe_insert(bigint_col) select string_col from unsafe_insert;
+---- CATCH
+AnalysisException: Unsafe implicit cast is prohibited for non-const expression: string_col
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) select smallint_col from unsafe_insert;
+---- CATCH
+AnalysisException: Unsafe implicit cast is prohibited for non-const expression: smallint_col
+====
+---- QUERY
+INSERT INTO unsafe_insert(tinyint_col) select string_col from unsafe_insert;
+---- CATCH
+AnalysisException: Unsafe implicit cast is prohibited for non-const expression: string_col
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) select tinyint_col from unsafe_insert;
+---- CATCH
+AnalysisException: Unsafe implicit cast is prohibited for non-const expression: tinyint_col
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) select int_col from unsafe_insert;
+---- CATCH
+AnalysisException: Unsafe implicit cast is prohibited for non-const expression: int_col
+====
+---- QUERY
+INSERT INTO unsafe_insert(int_col) select string_col from unsafe_insert;
+---- CATCH
+AnalysisException: Unsafe implicit cast is prohibited for non-const expression: string_col
+====
+---- QUERY
+INSERT INTO unsafe_insert(smallint_col) select string_col from unsafe_insert;
+---- CATCH
+AnalysisException: Unsafe implicit cast is prohibited for non-const expression: string_col
+====
+---- QUERY
+INSERT INTO unsafe_insert(float_col) select string_col from unsafe_insert;
+---- CATCH
+AnalysisException: Unsafe implicit cast is prohibited for non-const expression: string_col
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) select double_col from unsafe_insert;
+---- CATCH
+AnalysisException: Unsafe implicit cast is prohibited for non-const expression: double_col
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) select bigint_col from unsafe_insert;
+---- CATCH
+AnalysisException: Unsafe implicit cast is prohibited for non-const expression: bigint_col
+====
+---- QUERY
+INSERT INTO unsafe_insert(string_col) select float_col from unsafe_insert;
+---- CATCH
+AnalysisException: Unsafe implicit cast is prohibited for non-const expression: float_col
+====
+---- QUERY
+INSERT INTO unsafe_insert(double_col) select string_col from unsafe_insert;
+---- CATCH
+AnalysisException: Unsafe implicit cast is prohibited for non-const expression: string_col
+

@@ -169,7 +169,7 @@ public class TimestampArithmeticExpr extends Expr {
 
     fn_ = getBuiltinFunction(analyzer, funcOpName.toLowerCase(),
          collectChildReturnTypes(), CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
-    castForFunctionCall(false, analyzer.isDecimalV2());
+    castForFunctionCall(false, analyzer.getRegularCompatibilityLevel());
 
     Preconditions.checkNotNull(fn_);
     Preconditions.checkState(fn_.getReturnType().isTimestamp()

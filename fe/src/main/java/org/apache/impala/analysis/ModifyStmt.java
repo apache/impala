@@ -315,7 +315,7 @@ public abstract class ModifyStmt extends DmlStatementBase {
       }
 
       rhsExpr = checkTypeCompatibility(targetTableRef_.getDesc().getTable().getFullName(),
-          c, rhsExpr, analyzer.isDecimalV2(), null /*widestTypeSrcExpr*/);
+          c, rhsExpr, analyzer, null /*widestTypeSrcExpr*/);
       uniqueSlots.add(lhsSlotRef.getSlotId());
       selectList.add(new SelectListItem(rhsExpr, null));
       referencedColumns_.add(colIndexMap.get(c.getName()));

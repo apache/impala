@@ -42,7 +42,9 @@ import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.TestSchemaUtils;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TFunctionBinaryType;
@@ -1315,7 +1317,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         Type.BIGINT, Type.FLOAT, Type.DOUBLE , Type.NULL };
     for (Type type1: numericTypes) {
       for (Type type2: numericTypes) {
-        Type t = Type.getAssignmentCompatibleType(type1, type2, false, false);
+        Type t =
+            Type.getAssignmentCompatibleType(type1, type2, TypeCompatibility.DEFAULT);
         assertTrue(t.isScalarType());
         ScalarType compatibleType = (ScalarType) t;
         Type promotedType = compatibleType.getNextResolutionType();
@@ -1398,10 +1401,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         for (Type type2: types) {
           // Prefer strict matching.
           Type compatibleType = Type.getAssignmentCompatibleType(
-              type1, type2, true, true);
+              type1, type2, TypeCompatibility.ALL_STRICT);
           if (compatibleType.isInvalid()) {
-            compatibleType = Type.getAssignmentCompatibleType(
-                type1, type2, false, false);
+            compatibleType =
+                Type.getAssignmentCompatibleType(type1, type2, TypeCompatibility.DEFAULT);
           }
           typeCastTest(type1, type2, false, null, cmpOp, compatibleType);
           typeCastTest(type1, type2, true, null, cmpOp, compatibleType);
@@ -3356,4 +3359,44 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     Assert.assertEquals(expected_str, select.getResultExprs().get(0).toSqlImpl());
   }
 
+  @Test
+  public void testUnsafeCasts() {
+    AnalysisContext unsafeCtx = createAnalysisCtx();
+    unsafeCtx.getQueryOptions().setAllow_unsafe_casts(true);
+
+    String[] numericTypes = {"tinyint", "smallint", "int", "bigint", "float", "double"};
+    Pair<String, String>[] stringTypes =
+        new Pair[] {Pair.create("string", "alltypesnopart"),
+            Pair.create("varchar", "chars_medium"), Pair.create("char", "chars_medium")};
+
+    for (String numericType : numericTypes) {
+      for (Pair<String, String> stringType : stringTypes) {
+        String numericToStringStatement =
+            String.format("insert into functional.%s(%s_col) values(cast(100 as %s))",
+                stringType.second, stringType.first, numericType);
+        String stringToNumericStatement = String.format(
+            "insert into functional.alltypesnopart(%s_col) values(\"100\")", numericType);
+        String nonConstStatement = String.format(
+            "insert into functional.alltypesnopart(%s_col) select string_col "
+                + "from functional.alltypes",
+            numericType);
+
+        // Constant values are allowed
+        AnalyzesOk(numericToStringStatement, unsafeCtx);
+        AnalyzesOk(stringToNumericStatement, unsafeCtx);
+        // Non-constant values are not allowed
+        AnalysisError(nonConstStatement, unsafeCtx,
+            "Unsafe implicit cast is prohibited for non-const expression: string_col");
+      }
+    }
+
+    // Decimal is not allowed
+    AnalysisError(
+        "insert into functional.alltypesnopart(string_col) values (cast(100 as decimal))",
+        unsafeCtx,
+        "Target table 'functional.alltypesnopart' is incompatible with "
+            + "source expressions.\nExpression 'cast(100 as decimal(9,0))' "
+            + "(type: DECIMAL(9,0)) is not compatible with column "
+            + "'string_col' (type: STRING)");
+  }
 }

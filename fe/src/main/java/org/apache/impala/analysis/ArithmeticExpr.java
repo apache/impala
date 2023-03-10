@@ -23,6 +23,7 @@ import org.apache.impala.catalog.Function.CompareMode;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
@@ -219,7 +220,7 @@ public class ArithmeticExpr extends Expr {
           throw new AnalysisException("Invalid non-integer argument to operation '" +
               op_.toString() + "': " + this.toSql());
         }
-        type_ = Type.getAssignmentCompatibleType(t0, t1, false, false);
+        type_ = Type.getAssignmentCompatibleType(t0, t1, TypeCompatibility.DEFAULT);
         // If both of the children are null, we'll default to the INT version of the
         // operator. This prevents the BE from seeing NULL_TYPE.
         if (type_.isNull()) type_ = Type.INT;
@@ -241,7 +242,7 @@ public class ArithmeticExpr extends Expr {
         fn_ = getBuiltinFunction(analyzer, op_.getName(), collectChildReturnTypes(),
             CompareMode.IS_SUPERTYPE_OF);
         Preconditions.checkNotNull(fn_);
-        castForFunctionCall(false, analyzer.isDecimalV2());
+        castForFunctionCall(false, analyzer.getRegularCompatibilityLevel());
         type_ = fn_.getReturnType();
         return;
       default:

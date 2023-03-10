@@ -1106,6 +1106,9 @@ Status impala::SetQueryOption(const string& key, const string& value,
         RETURN_IF_ERROR(
             QueryOptionValidator<int32_t>::NotEquals(option, int32_t_val, 1));
         query_options->__set_max_sort_run_size(int32_t_val);
+      }
+      case TImpalaQueryOptions::ALLOW_UNSAFE_CASTS: {
+        query_options->__set_allow_unsafe_casts(IsTrue(value));
         break;
       }
       default:

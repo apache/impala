@@ -463,7 +463,10 @@ public class NumericLiteral extends LiteralExpr {
    */
   @Override
   protected Expr uncheckedCastTo(Type targetType) throws SqlCastException {
-    Preconditions.checkState(targetType.isNumericType());
+    Preconditions.checkState(targetType.isNumericType() || targetType.isStringType());
+    if (targetType.isStringType()) {
+      return new CastExpr(targetType, this);
+    }
     if (type_ == targetType) return this;
     try {
       BigDecimal converted = convertValue(value_, targetType);

@@ -235,7 +235,7 @@ public class BinaryPredicate extends Predicate {
     if (!contains(Subquery.class)) {
       // Don't perform any casting for predicates with subqueries here. Any casting
       // required will be performed when the subquery is unnested.
-      castForFunctionCall(true, analyzer.isDecimalV2());
+      castForFunctionCall(true, analyzer.getRegularCompatibilityLevel());
     }
 
     // Determine selectivity

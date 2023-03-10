@@ -167,7 +167,7 @@ public class InPredicate extends Predicate {
       }
       Preconditions.checkNotNull(fn_);
       Preconditions.checkState(fn_.getReturnType().isBoolean());
-      castForFunctionCall(false, analyzer.isDecimalV2());
+      castForFunctionCall(false, analyzer.getRegularCompatibilityLevel());
     }
     computeSelectivity();
   }
