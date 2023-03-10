@@ -198,8 +198,8 @@ export IMPALA_THRIFT_PY_VERSION=0.16.0-p3
 unset IMPALA_THRIFT_PY_URL
 
 # Find system python versions for testing
-export IMPALA_SYSTEM_PYTHON2=$(command -v python2)
-export IMPALA_SYSTEM_PYTHON3=$(command -v python3)
+export IMPALA_SYSTEM_PYTHON2="${IMPALA_SYSTEM_PYTHON2_OVERRIDE-$(command -v python2)}"
+export IMPALA_SYSTEM_PYTHON3="${IMPALA_SYSTEM_PYTHON3_OVERRIDE-$(command -v python3)}"
 
 if [[ $OSTYPE == "darwin"* ]]; then
   IMPALA_CYRUS_SASL_VERSION=2.1.26
