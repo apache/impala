@@ -78,6 +78,12 @@ class TestHS2(HS2TestSuite):
       TestHS2.check_response(session)
       for k, v in configuration.items():
         assert session.configuration[k] == v
+    # simulate hive jdbc's action, see IMPALA-11992
+    hiveconfs = dict([("set:hiveconf:" + k, v) for k, v in configuration.items()])
+    with ScopedSession(self.hs2_client, configuration=hiveconfs) as sessions:
+      TestHS2.check_response(sessions)
+      for k, v in configuration.items():
+        assert sessions.configuration[k] == v
 
   def get_session_options(self, setCmd):
     """Returns dictionary of query options."""
