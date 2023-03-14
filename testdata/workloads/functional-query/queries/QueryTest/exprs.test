@@ -1399,6 +1399,77 @@ and cast('2010-01-01 01:40:00' as timestamp)
 bigint
 ====
 ---- QUERY
+# Regression tests for IMPALA-8054
+select count(*) from functional.alltypes where 10 between float_col and bigint_col;
+---- RESULTS
+6570
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from functional.alltypes where !(10 between null and bigint_col);
+---- RESULTS
+730
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from functional.alltypes where !(5 between float_col and null);
+---- RESULTS
+3650
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from functional.alltypes where 10 between null and null;
+---- RESULTS
+0
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from functional.alltypes where null between null and null;
+---- RESULTS
+0
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from functional.alltypes where 10 not between float_col and bigint_col;
+---- RESULTS
+730
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from functional.alltypes where 10 not between null and bigint_col;
+---- RESULTS
+730
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from functional.alltypes where 5 not between float_col and null;
+---- RESULTS
+3650
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from functional.alltypes where 10 not between null and null;
+---- RESULTS
+0
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from functional.alltypes where null not between null and null;
+---- RESULTS
+0
+---- TYPES
+bigint
+====
+---- QUERY
 # Test pid() function, this should only return one pid. If pid() were not implemented
 # correctly via the global state variable, this could return multiple pids.
 select pid() p from functional.alltypes

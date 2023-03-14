@@ -34,29 +34,37 @@ import org.apache.impala.analysis.Predicate;
  * A NOT BETWEEN X AND Y ==> A < X OR A > Y
  */
 public class BetweenToCompoundRule implements ExprRewriteRule {
-  public static ExprRewriteRule INSTANCE = new BetweenToCompoundRule();
+  public static final ExprRewriteRule INSTANCE = new BetweenToCompoundRule();
 
   @Override
   public Expr apply(Expr expr, Analyzer analyzer) {
     if (!(expr instanceof BetweenPredicate)) return expr;
     BetweenPredicate bp = (BetweenPredicate) expr;
-    Expr result = null;
+    Expr value = bp.getChild(0);
+    // Using a cloned value for the 'upper' binary predicate to avoid being affected by
+    // changes in the 'lower' binary predicate.
+    Expr clonedValue = value.clone();
+    Expr lowerBound = bp.getChild(1);
+    Expr upperBound = bp.getChild(2);
+
+    BinaryPredicate.Operator lowerOperator;
+    BinaryPredicate.Operator upperOperator;
+    CompoundPredicate.Operator compoundOperator;
+
     if (bp.isNotBetween()) {
       // Rewrite into disjunction.
-      Predicate lower = new BinaryPredicate(BinaryPredicate.Operator.LT,
-          bp.getChild(0), bp.getChild(1));
-      Predicate upper = new BinaryPredicate(BinaryPredicate.Operator.GT,
-          bp.getChild(0), bp.getChild(2));
-      result = new CompoundPredicate(CompoundPredicate.Operator.OR, lower, upper);
+      lowerOperator = BinaryPredicate.Operator.LT;
+      upperOperator = BinaryPredicate.Operator.GT;
+      compoundOperator = CompoundPredicate.Operator.OR;
     } else {
       // Rewrite into conjunction.
-      Predicate lower = new BinaryPredicate(BinaryPredicate.Operator.GE,
-          bp.getChild(0), bp.getChild(1));
-      Predicate upper = new BinaryPredicate(BinaryPredicate.Operator.LE,
-          bp.getChild(0), bp.getChild(2));
-      result = new CompoundPredicate(CompoundPredicate.Operator.AND, lower, upper);
+      lowerOperator = BinaryPredicate.Operator.GE;
+      upperOperator = BinaryPredicate.Operator.LE;
+      compoundOperator = CompoundPredicate.Operator.AND;
     }
-    return result;
+    Predicate lower = new BinaryPredicate(lowerOperator, value, lowerBound);
+    Predicate upper = new BinaryPredicate(upperOperator, clonedValue, upperBound);
+    return new CompoundPredicate(compoundOperator, lower, upper);
   }
 
   private BetweenToCompoundRule() {}
