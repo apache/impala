@@ -19,7 +19,7 @@ add_custom_target(shell_tarball DEPENDS gen-deps
   COMMAND "${CMAKE_SOURCE_DIR}/shell/make_shell_tarball.sh"
 )
 
-add_custom_target(shell_pypi_package DEPENDS shell_tarball
+add_custom_target(shell_pypi_package DEPENDS shell_tarball impala_python
   COMMAND "${CMAKE_SOURCE_DIR}/shell/packaging/make_python_package.sh"
 )
 
@@ -32,7 +32,7 @@ set(SHELL_TEST_PKG
   "${CMAKE_SOURCE_DIR}/shell/build/dist/impala_shell-${PKG_VERSION}.tar.gz")
 get_filename_component(SHELL_TEST_PKG_DIR "${SHELL_TEST_PKG}" DIRECTORY)
 # Generates SHELL_TEST_PKG
-add_custom_target(shell_pypi_test_package DEPENDS shell_tarball
+add_custom_target(shell_pypi_test_package DEPENDS shell_tarball impala_python
   COMMAND env BUILD_VERSION=${PKG_VERSION} OFFICIAL=true DIST_DIR="${SHELL_TEST_PKG_DIR}"
     "${CMAKE_SOURCE_DIR}/shell/packaging/make_python_package.sh"
 )
@@ -41,7 +41,7 @@ set(PYTHON2_VENV "${CMAKE_SOURCE_DIR}/shell/build/py2_venv")
 set(PYTHON3_VENV "${CMAKE_SOURCE_DIR}/shell/build/py3_venv")
 
 add_custom_command(OUTPUT "${PYTHON2_VENV}" DEPENDS impala_python
-  COMMAND impala-virtualenv --python python2 "${PYTHON2_VENV}"
+  COMMAND impala-virtualenv --python "$ENV{IMPALA_SYSTEM_PYTHON2}" "${PYTHON2_VENV}"
 )
 
 add_custom_target(shell_python2_install DEPENDS "${PYTHON2_VENV}" shell_pypi_test_package
@@ -49,7 +49,7 @@ add_custom_target(shell_python2_install DEPENDS "${PYTHON2_VENV}" shell_pypi_tes
 )
 
 add_custom_command(OUTPUT "${PYTHON3_VENV}" DEPENDS impala_python
-  COMMAND impala-virtualenv --python python3 "${PYTHON3_VENV}"
+  COMMAND impala-virtualenv --python "$ENV{IMPALA_SYSTEM_PYTHON3}" "${PYTHON3_VENV}"
 )
 
 add_custom_target(shell_python3_install DEPENDS "${PYTHON3_VENV}" shell_pypi_test_package
