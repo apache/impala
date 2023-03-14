@@ -17,6 +17,8 @@
 from __future__ import absolute_import, division, print_function
 import datetime
 
+from tests.util.filesystem_utils import get_fs_path
+
 
 class Snapshot(object):
   """Encapsulate an Iceberg Snapshot"""
@@ -123,9 +125,10 @@ class IcebergCatalogs:
   def get_iceberg_catalog_properties(self):
     """Return a list containing TBLPROPERTIES corresponding to various iceberg catalogs.
      The TBLPROPERTIES can be used to create tables."""
+    ice_cat_location = "/test-warehouse/{0}/hadoop_catalog_test/".format(self.database)
+    ice_cat_location_fs = get_fs_path(ice_cat_location)
     hadoop_catalog = ("'iceberg.catalog'='hadoop.catalog', "
-        + "'iceberg.catalog_location'='/test-warehouse/{0}/hadoop_catalog_test/'".format(
-          self.database))
+                      + "'iceberg.catalog_location'='{0}'".format(ice_cat_location_fs))
     return [
       self.hadoop_tables,
       self.hive_catalog,
