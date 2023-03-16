@@ -159,16 +159,22 @@ public class JniUtil {
     }
 
     public void logStart() {
-      if (!silentStartAndFinish) {
-        LOG.info("{} request: {}", methodName, shortDescription);
+      final String startFormat = "{} request: {}";
+      if (silentStartAndFinish) {
+        LOG.trace(startFormat, methodName, shortDescription);
+      } else {
+        LOG.info(startFormat, methodName, shortDescription);
       }
     }
 
     public void logFinish() {
-      if (!silentStartAndFinish) {
-        long duration = getDurationFromStart();
-        LOG.info("Finished {} request: {}. Time spent: {}", methodName, shortDescription,
-            PrintUtils.printTimeMs(duration));
+      final String finishFormat = "Finished {} request: {}. Time spent: {}";
+      long duration = getDurationFromStart();
+      String durationString = PrintUtils.printTimeMs(duration);
+      if (silentStartAndFinish) {
+        LOG.trace(finishFormat, methodName, shortDescription, durationString);
+      } else {
+        LOG.info(finishFormat, methodName, shortDescription, durationString);
       }
     }
 

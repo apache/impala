@@ -393,7 +393,7 @@ public class JniCatalog {
     String shortDesc = "Getting partial catalog object of "
         + Catalog.toCatalogObjectKey(req.getObject_desc());
 
-    return execAndSerialize("getPartialCatalogObject", shortDesc,
+    return execAndSerializeSilentStartAndFinish("getPartialCatalogObject", shortDesc,
         () -> catalog_.getPartialCatalogObject(req));
   }
 
