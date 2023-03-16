@@ -782,6 +782,25 @@ public class HdfsPartition extends CatalogObjectImpl
       boolean isMarkedCached, TAccessLevel accessLevel, Map<String, String> hmsParameters,
       CachedHmsPartitionDescriptor cachedMsPartitionDescriptor,
       byte[] partitionStats, boolean hasIncrementalStats, long numRows, long writeId,
+      InFlightEvents inFlightEvents, long createEventId, long lastCompactionId) {
+    this(table, partitionIdCounter_.getAndIncrement(), prevId, partName,
+        partitionKeyValues, fileFormatDescriptor, encodedFileDescriptors,
+        encodedInsertFileDescriptors, encodedDeleteFileDescriptors, location,
+        isMarkedCached, accessLevel, hmsParameters, cachedMsPartitionDescriptor,
+        partitionStats, hasIncrementalStats, numRows, writeId,
+        inFlightEvents, /*createEventId=*/-1L, /*lastCompactionId*/-1L,
+        /*lastRefreshEventId*/-1L);
+  }
+
+  protected HdfsPartition(HdfsTable table, long id, long prevId, String partName,
+      List<LiteralExpr> partitionKeyValues, HdfsStorageDescriptor fileFormatDescriptor,
+      @Nonnull ImmutableList<byte[]> encodedFileDescriptors,
+      ImmutableList<byte[]> encodedInsertFileDescriptors,
+      ImmutableList<byte[]> encodedDeleteFileDescriptors,
+      HdfsPartitionLocationCompressor.Location location,
+      boolean isMarkedCached, TAccessLevel accessLevel, Map<String, String> hmsParameters,
+      CachedHmsPartitionDescriptor cachedMsPartitionDescriptor,
+      byte[] partitionStats, boolean hasIncrementalStats, long numRows, long writeId,
       InFlightEvents inFlightEvents, long createEventId, long lastCompactionId,
       long lastRefreshEventId) {
     table_ = table;
