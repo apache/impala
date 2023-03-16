@@ -109,7 +109,7 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
     coord_exec_called_(false),
     // Profile is assigned name w/ id after planning
     profile_(RuntimeProfile::Create(&profile_pool_, "Query")),
-    frontend_profile_(RuntimeProfile::Create(&profile_pool_, "Frontend")),
+    frontend_profile_(RuntimeProfile::Create(&profile_pool_, "Frontend", false)),
     server_profile_(RuntimeProfile::Create(&profile_pool_, "ImpalaServer")),
     summary_profile_(RuntimeProfile::Create(&profile_pool_, "Summary")),
     exec_request_(exec_request),
@@ -198,11 +198,15 @@ void ClientRequestState::SetRemoteSubmitTime(int64_t remote_submit_time) {
   query_events_->Start(remote_submit_time);
 }
 
-void ClientRequestState::SetFrontendProfile(TRuntimeProfileNode profile) {
+void ClientRequestState::SetFrontendProfile(const TExecRequest& exec_request) {
   // Should we defer creating and adding the child until here? probably.
   TRuntimeProfileTree prof_tree;
-  prof_tree.nodes.emplace_back(std::move(profile));
-  frontend_profile_->Update(prof_tree);
+  prof_tree.nodes.emplace_back(std::move(exec_request.profile));
+  for (auto& child : exec_request.profile_children) {
+    prof_tree.nodes.emplace_back(std::move(child));
+  }
+  prof_tree.nodes.at(0).num_children = prof_tree.nodes.size() - 1;
+  frontend_profile_->Update(prof_tree, false);
 }
 
 void ClientRequestState::AddBlacklistedExecutorAddress(const NetworkAddressPB& addr) {

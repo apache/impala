@@ -308,15 +308,6 @@ public class Planner {
         str.append(String.format("Dedicated Coordinator Resource Estimate: Memory=%s\n",
             PrintUtils.printBytesRoundedToMb(request.getDedicated_coord_mem_estimate())));
       }
-
-      TQueryOptions queryOptions =
-          request.getQuery_ctx().getClient_request().getQuery_options();
-      if (ProcessingCost.isComputeCost(queryOptions)
-          && explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
-        str.append("Effective parallelism: ");
-        str.append(request.getCores_required());
-        str.append("\n");
-      }
       hasHeader = true;
     }
     // Warn if the planner is running in DEBUG mode.

@@ -180,7 +180,7 @@ const char* ProfileEntryPrototype::SignificanceDescription(
 }
 
 RuntimeProfileBase::RuntimeProfileBase(ObjectPool* pool, const string& name,
-    Counter* total_time_counter, Counter* inactive_timer)
+    Counter* total_time_counter, Counter* inactive_timer, bool add_default_counters)
   : pool_(pool),
     name_(name),
     total_time_counter_(total_time_counter),
@@ -188,10 +188,12 @@ RuntimeProfileBase::RuntimeProfileBase(ObjectPool* pool, const string& name,
   DCHECK(total_time_counter != nullptr);
   DCHECK(inactive_timer != nullptr);
   set<string>& root_counters = child_counter_map_[ROOT_COUNTER];
-  counter_map_[TOTAL_TIME_COUNTER_NAME] = total_time_counter;
-  root_counters.emplace(TOTAL_TIME_COUNTER_NAME);
-  counter_map_[INACTIVE_TIME_COUNTER_NAME] = inactive_timer;
-  root_counters.emplace(INACTIVE_TIME_COUNTER_NAME);
+  if (add_default_counters) {
+    counter_map_[TOTAL_TIME_COUNTER_NAME] = total_time_counter;
+    root_counters.emplace(TOTAL_TIME_COUNTER_NAME);
+    counter_map_[INACTIVE_TIME_COUNTER_NAME] = inactive_timer;
+    root_counters.emplace(INACTIVE_TIME_COUNTER_NAME);
+  }
 }
 
 RuntimeProfileBase::~RuntimeProfileBase() {}
@@ -236,13 +238,15 @@ void RuntimeProfileBase::UpdateChildCountersLocked(const unique_lock<SpinLock>& 
   }
 }
 
-RuntimeProfile* RuntimeProfile::Create(ObjectPool* pool, const string& name) {
-  return pool->Add(new RuntimeProfile(pool, name));
+RuntimeProfile* RuntimeProfile::Create(
+    ObjectPool* pool, const string& name, bool add_default_counters) {
+  return pool->Add(new RuntimeProfile(pool, name, add_default_counters));
 }
 
-RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name)
-  : RuntimeProfileBase(
-        pool, name, &builtin_counter_total_time_, &builtin_inactive_timer_) {}
+RuntimeProfile::RuntimeProfile(
+    ObjectPool* pool, const string& name, bool add_default_counters)
+  : RuntimeProfileBase(pool, name, &builtin_counter_total_time_, &builtin_inactive_timer_,
+      add_default_counters) {}
 
 RuntimeProfile::~RuntimeProfile() {
   DCHECK(!has_active_periodic_counters_);
@@ -736,15 +740,17 @@ void AggregatedRuntimeProfile::UpdateEventSequencesFromInstances(
   }
 }
 
-void RuntimeProfile::Update(const TRuntimeProfileTree& thrift_profile) {
+void RuntimeProfile::Update(
+    const TRuntimeProfileTree& thrift_profile, bool add_default_counters) {
   int idx = 0;
-  Update(thrift_profile.nodes, &idx);
+  Update(thrift_profile.nodes, &idx, add_default_counters);
   DCHECK_EQ(idx, thrift_profile.nodes.size());
   // Re-compute the total time for the entire profile tree.
   ComputeTimeInProfile();
 }
 
-void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) {
+void RuntimeProfile::Update(
+    const vector<TRuntimeProfileNode>& nodes, int* idx, bool add_default_counters) {
   if (UNLIKELY(nodes.size()) == 0) return;
   DCHECK_LT(*idx, nodes.size());
   const TRuntimeProfileNode& node = nodes[*idx];
@@ -853,14 +859,16 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
     // Update children with matching names; create new ones if they don't match.
     for (int i = 0; i < node.num_children; ++i) {
       const TRuntimeProfileNode& tchild = nodes[*idx];
-      RuntimeProfile* child = dynamic_cast<RuntimeProfile*>(
-          AddOrCreateChild(tchild.name, &insert_pos, [this, tchild] () {
-              RuntimeProfile* child2 = Create(pool_, tchild.name);
-              child2->metadata_ = tchild.node_metadata;
-              return child2;
-            }, tchild.indent));
+      RuntimeProfile* child = dynamic_cast<RuntimeProfile*>(AddOrCreateChild(
+          tchild.name, &insert_pos,
+          [this, tchild, add_default_counters]() {
+            RuntimeProfile* child2 = Create(pool_, tchild.name, add_default_counters);
+            child2->metadata_ = tchild.node_metadata;
+            return child2;
+          },
+          tchild.indent));
       DCHECK(child != nullptr);
-      child->Update(nodes, idx);
+      child->Update(nodes, idx, add_default_counters);
     }
   }
 }

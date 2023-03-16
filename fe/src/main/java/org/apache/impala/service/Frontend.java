@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.math.IntMath;
@@ -36,6 +37,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -49,6 +51,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
@@ -153,6 +156,7 @@ import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TCommentOnParams;
 import org.apache.impala.thrift.TCopyTestCaseReq;
+import org.apache.impala.thrift.TCounter;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDdlExecRequest;
 import org.apache.impala.thrift.TDdlQueryOptions;
@@ -184,12 +188,14 @@ import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
+import org.apache.impala.thrift.TRuntimeProfileNode;
 import org.apache.impala.thrift.TShowFilesParams;
 import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TStmtType;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TTruncateParams;
 import org.apache.impala.thrift.TUniqueId;
+import org.apache.impala.thrift.TUnit;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
 import org.apache.impala.util.AcidUtils;
@@ -235,6 +241,16 @@ public class Frontend {
   // The default pool name to use when ExecutorMembershipSnapshot is in initial state
   // (i.e., ExecutorMembershipSnapshot.numExecutors_ == 0).
   private static final String DEFAULT_POOL_NAME = "default-pool";
+
+  // Labels for various query profile counters.
+  private static final String EXECUTOR_GROUPS_CONSIDERED = "ExecutorGroupsConsidered";
+  private static final String CPU_COUNT_DIVISOR = "CpuCountDivisor";
+  private static final String EFFECTIVE_PARALLELISM = "EffectiveParallelism";
+  private static final String VERDICT = "Verdict";
+  private static final String MEMORY_MAX = "MemoryMax";
+  private static final String MEMORY_ASK = "MemoryAsk";
+  private static final String CPU_MAX = "CpuMax";
+  private static final String CPU_ASK = "CpuAsk";
 
   /**
    * Plan-time context that allows capturing various artifacts created
@@ -1807,6 +1823,7 @@ public class Frontend {
       timeline.markEvent("Planning finished");
       result.setTimeline(timeline.toThrift());
       result.setProfile(FrontendProfile.getCurrent().emitAsThrift());
+      result.setProfile_children(FrontendProfile.getCurrent().emitChildrenAsThrift());
       return result;
     }
   }
@@ -1990,6 +2007,11 @@ public class Frontend {
     // Capture the current state.
     planCtx.compilationState_.captureState();
 
+    if (ProcessingCost.isComputeCost(queryOptions)) {
+      FrontendProfile.getCurrent().setToCounter(CPU_COUNT_DIVISOR, TUnit.DOUBLE_VALUE,
+          Double.doubleToLongBits(BackendConfig.INSTANCE.getQueryCpuCountDivisor()));
+    }
+
     TExecutorGroupSet group_set = null;
     String reason = "Unknown";
     int attempt = 0;
@@ -1997,6 +2019,8 @@ public class Frontend {
       group_set = executorGroupSetsToUse.get(i);
       planCtx.compilationState_.setGroupSet(group_set);
       LOG.info("Consider executor group set: " + group_set);
+      FrontendProfile.getCurrent().addToCounter(
+          EXECUTOR_GROUPS_CONSIDERED, TUnit.UNIT, 1);
 
       String retryMsg = "";
       while (true) {
@@ -2034,6 +2058,17 @@ public class Frontend {
         break;
       }
 
+      // Counters about this group set.
+      String profileName = "Executor group " + (i + 1);
+      if (group_set.isSetExec_group_name_prefix()
+          && !group_set.getExec_group_name_prefix().isEmpty()) {
+        profileName += " (" + group_set.getExec_group_name_prefix() + ")";
+      }
+      TRuntimeProfileNode groupSetProfile = createTRuntimeProfileNode(profileName);
+      addCounter(groupSetProfile,
+          new TCounter(MEMORY_MAX, TUnit.BYTES, group_set.getMax_mem_limit()));
+      FrontendProfile.getCurrent().addChildrenProfile(groupSetProfile);
+
       // Find out the per host memory estimated from two possible sources.
       long per_host_mem_estimate = -1;
       int cores_requirement = -1;
@@ -2048,21 +2083,33 @@ public class Frontend {
       }
 
       Preconditions.checkState(per_host_mem_estimate >= 0);
+      boolean memReqSatisfied = per_host_mem_estimate <= group_set.getMax_mem_limit();
+      addCounter(
+          groupSetProfile, new TCounter(MEMORY_ASK, TUnit.BYTES, per_host_mem_estimate));
+
       boolean cpuReqSatisfied = true;
       int scaled_cores_requirement = -1;
+      int available_cores = -1;
       if (ProcessingCost.isComputeCost(queryOptions)) {
         Preconditions.checkState(cores_requirement > 0);
         scaled_cores_requirement = (int) Math.min(Integer.MAX_VALUE,
             Math.ceil(
                 cores_requirement / BackendConfig.INSTANCE.getQueryCpuCountDivisor()));
-        cpuReqSatisfied = scaled_cores_requirement <= expectedTotalCores(group_set);
+        available_cores = expectedTotalCores(group_set);
+        cpuReqSatisfied = scaled_cores_requirement <= available_cores;
+        addCounter(groupSetProfile, new TCounter(CPU_MAX, TUnit.UNIT, available_cores));
+        addCounter(
+            groupSetProfile, new TCounter(CPU_ASK, TUnit.UNIT, scaled_cores_requirement));
+        addCounter(groupSetProfile,
+            new TCounter(EFFECTIVE_PARALLELISM, TUnit.UNIT, cores_requirement));
       }
 
-      if (per_host_mem_estimate <= group_set.getMax_mem_limit() && cpuReqSatisfied) {
+      if (memReqSatisfied && cpuReqSatisfied) {
         reason = "suitable group found (estimated per-host memory="
             + PrintUtils.printBytes(per_host_mem_estimate)
             + ", estimated cpu cores required=" + cores_requirement
             + ", scaled cpu cores=" + scaled_cores_requirement + ")";
+        addInfoString(groupSetProfile, VERDICT, "Match");
 
         // Set the group name prefix in both the returned query options and
         // the query context for non default group setup.
@@ -2077,12 +2124,36 @@ public class Frontend {
         break;
       }
 
+      List<String> verdicts = Lists.newArrayListWithCapacity(2);
+      List<String> reasons = Lists.newArrayListWithCapacity(2);
+      if (!memReqSatisfied) {
+        String verdict = "not enough per-host memory";
+        verdicts.add(verdict);
+        reasons.add(verdict + " (require=" + per_host_mem_estimate
+            + ", max=" + group_set.getMax_mem_limit() + ")");
+      }
+      if (!cpuReqSatisfied) {
+        String verdict = "not enough cpu cores";
+        verdicts.add(verdict);
+        reasons.add(verdict + " (require=" + scaled_cores_requirement
+            + ", max=" + available_cores + ")");
+      }
+      reason = String.join(", ", reasons);
+      addInfoString(groupSetProfile, VERDICT, String.join(", ", verdicts));
+      group_set = null;
+
       // Restore to the captured state.
       planCtx.compilationState_.restoreState();
     }
 
-    if (reason.equals("Unknown") && group_set.getMax_mem_limit() > 0) {
-      throw new AnalysisException("The query does not fit any executor group sets.");
+    if (group_set == null) {
+      if (reason.equals("Unknown")) {
+        throw new AnalysisException("The query does not fit any executor group sets.");
+      } else {
+        throw new AnalysisException(
+            "The query does not fit largest executor group sets. Reason: " + reason
+            + ".");
+      }
     }
 
     LOG.info("Selected executor group: " + group_set + ", reason: " + reason);
@@ -2091,6 +2162,36 @@ public class Frontend {
     req.setUser_has_profile_access(planCtx.compilationState_.userHasProfileAccess());
 
     return req;
+  }
+
+  private static TRuntimeProfileNode createTRuntimeProfileNode(
+      String childrenProfileName) {
+    return new TRuntimeProfileNode(childrenProfileName,
+        /*num_children=*/0,
+        /*counters=*/new ArrayList<>(),
+        /*metadata=*/-1L,
+        /*indent=*/true,
+        /*info_strings=*/new HashMap<>(),
+        /*info_strings_display_order*/ new ArrayList<>(),
+        /*child_counters_map=*/ImmutableMap.of("", new HashSet<>()));
+  }
+
+  /**
+   * Add counter into node profile.
+   * <p>
+   * Caller must make sure that there is no other counter existing in node profile that
+   * share the same counter name.
+   */
+  private static void addCounter(TRuntimeProfileNode node, TCounter counter) {
+    Preconditions.checkNotNull(node.child_counters_map.get(""));
+    node.addToCounters(counter);
+    node.child_counters_map.get("").add(counter.getName());
+  }
+
+  private static void addInfoString(TRuntimeProfileNode node, String key, String value) {
+    if (node.getInfo_strings().put(key, value) == null) {
+      node.getInfo_strings_display_order().add(key);
+    }
   }
 
   private TExecRequest doCreateExecRequest(PlanCtx planCtx,

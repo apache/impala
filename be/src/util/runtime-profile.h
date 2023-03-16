@@ -313,7 +313,8 @@ class RuntimeProfileBase {
   AtomicInt64 total_time_ns_{0};
 
   RuntimeProfileBase(ObjectPool* pool, const std::string& name,
-      Counter* total_time_counter, Counter* inactive_timer);
+      Counter* total_time_counter, Counter* inactive_timer,
+      bool add_default_counters = true);
 
   ///  Inserts 'child' before the iterator 'insert_pos' in 'children_'.
   /// 'children_lock_' must be held by the caller.
@@ -434,7 +435,10 @@ class RuntimeProfile : public RuntimeProfileBase {
 
   /// Create a runtime profile object with 'name'. The profile, counters and any other
   /// structures owned by the profile are allocated from 'pool'.
-  static RuntimeProfile* Create(ObjectPool* pool, const std::string& name);
+  /// If add_default_counters is false, TotalTime and InactiveTotalTime will be
+  /// hidden in the newly created RuntimeProfile node.
+  static RuntimeProfile* Create(
+      ObjectPool* pool, const std::string& name, bool add_default_counters = true);
 
   ~RuntimeProfile();
 
@@ -479,7 +483,10 @@ class RuntimeProfile : public RuntimeProfileBase {
   /// are updated. Counters that do not already exist are created.
   /// Info strings matched up by key and are updated or added, depending on whether
   /// the key has already been registered.
-  void Update(const TRuntimeProfileTree& thrift_profile);
+  /// If add_default_counters is false, TotalTime and InactiveTotalTime will be
+  /// hidden in any newly created RuntimeProfile node.
+  void Update(
+      const TRuntimeProfileTree& thrift_profile, bool add_default_counters = true);
 
   /// Add a counter with 'name'/'unit'.  Returns a counter object that the caller can
   /// update.  The counter is owned by the RuntimeProfile object.
@@ -781,11 +788,15 @@ class RuntimeProfile : public RuntimeProfileBase {
   mutable SpinLock t_exec_summary_lock_;
 
   /// Constructor used by Create().
-  RuntimeProfile(ObjectPool* pool, const std::string& name);
+  RuntimeProfile(
+      ObjectPool* pool, const std::string& name, bool add_default_counters = true);
 
   /// Update a subtree of profiles from nodes, rooted at *idx.
   /// On return, *idx points to the node immediately following this subtree.
-  void Update(const std::vector<TRuntimeProfileNode>& nodes, int* idx);
+  /// If add_default_counters is false, TotalTime and InactiveTotalTime will be
+  /// hidden in any newly created RuntimeProfile node.
+  void Update(
+      const std::vector<TRuntimeProfileNode>& nodes, int* idx, bool add_default_counters);
 
   /// Send exec_summary to thrift
   void ExecSummaryToThrift(TRuntimeProfileTree* tree) const;

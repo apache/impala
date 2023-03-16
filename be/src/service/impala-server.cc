@@ -1271,7 +1271,7 @@ Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
     (*query_handle)->set_user_profile_access(result.user_has_profile_access);
     (*query_handle)->summary_profile()->AddEventSequence(
         result.timeline.name, result.timeline);
-    (*query_handle)->SetFrontendProfile(result.profile);
+    (*query_handle)->SetFrontendProfile(result);
     if (result.__isset.result_set_metadata) {
       (*query_handle)->set_result_metadata(result.result_set_metadata);
     }

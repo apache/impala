@@ -19,12 +19,15 @@ package org.apache.impala.service;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 
+import com.google.common.collect.Lists;
 import org.apache.impala.thrift.TCounter;
 import org.apache.impala.thrift.TRuntimeProfileNode;
 import org.apache.impala.thrift.TUnit;
@@ -57,6 +60,12 @@ public class FrontendProfile {
    */
   @GuardedBy("this")
   private final Map<String, TCounter> countersByName_ = new HashMap<>();
+
+  /**
+   * Additional profile node to be displayed under {@link #profile_}.
+   */
+  @GuardedBy("this")
+  private Map<String, TRuntimeProfileNode> childrenProfiles_ = new TreeMap<>();
 
   FrontendProfile() {
     profile_ = new TRuntimeProfileNode("Frontend",
@@ -100,14 +109,32 @@ public class FrontendProfile {
   }
 
   /**
-   * Return the profile in Thrift format. This may be called only once, and after it is
-   * called, no further methods may be used on this PlannerProfile object. Any attempts
-   * to do so will result in IllegalStateExceptions.
+   * Return the Frontend profile in Thrift format.
+   * <p>
+   * This may be called only once, and after it is called, no further methods may be used
+   * on this PlannerProfile object except {@link #emitChildrenAsThrift()}. Any attempts to
+   * do so will result in IllegalStateExceptions.
    */
   public synchronized TRuntimeProfileNode emitAsThrift() {
     Preconditions.checkState(profile_ != null, "already emitted profile");
     TRuntimeProfileNode ret = profile_;
     profile_ = null;
+    return ret;
+  }
+
+  /**
+   * Return the Frontend's children profiles in Thrift format.
+   * <p>
+   * {@link #emitAsThrift()} must be called ahead of this method.
+   * This may be called only once, and after it is called, no further methods may be used
+   * on this PlannerProfile object. Any attempts to do so will result in
+   * IllegalStateExceptions.
+   */
+  public synchronized List<TRuntimeProfileNode> emitChildrenAsThrift() {
+    Preconditions.checkState(profile_ == null, "emitAsThrift() must be called first");
+    Preconditions.checkState(childrenProfiles_ != null, "already emitted profile");
+    List<TRuntimeProfileNode> ret = Lists.newArrayList(childrenProfiles_.values());
+    childrenProfiles_ = null;
     return ret;
   }
 
@@ -154,11 +181,17 @@ public class FrontendProfile {
   }
 
   /**
-   * Add 'delta' to the counter with the given name and unit. Counters are created
-   * on-demand.
+   * Add 'child' profile under 'Frontend' profile node in query profile.
    */
-  public synchronized void addToCounter(String name, TUnit unit, long delta) {
+  public synchronized void addChildrenProfile(TRuntimeProfileNode child) {
     Preconditions.checkState(profile_ != null, "already emitted profile");
+    Preconditions.checkState(childrenProfiles_ != null, "already emitted profile");
+    Preconditions.checkNotNull(child.getName());
+    Preconditions.checkArgument(!childrenProfiles_.containsKey(child.getName()));
+    childrenProfiles_.put(child.getName(), child);
+  }
+
+  private TCounter getOrCreateCounter(String name, TUnit unit) {
     TCounter counter = countersByName_.get(Preconditions.checkNotNull(name));
     if (counter == null) {
       // Need to create the counter.
@@ -168,9 +201,28 @@ public class FrontendProfile {
       // Currently we don't support hierarchical counters in the frontend.
       profile_.child_counters_map.get(ROOT_COUNTER_NAME).add(name);
     }
+    return counter;
+  }
+
+  /**
+   * Add 'delta' to the counter with the given name and unit. Counters are created
+   * on-demand.
+   */
+  public synchronized void addToCounter(String name, TUnit unit, long delta) {
+    Preconditions.checkState(profile_ != null, "already emitted profile");
+    TCounter counter = getOrCreateCounter(name, unit);
     counter.value += delta;
   }
 
+  /**
+   * Set 'value' to the counter with the given name. Counters are created
+   * on-demand.
+   */
+  public synchronized void setToCounter(String name, TUnit unit, long value) {
+    Preconditions.checkState(profile_ != null, "already emitted profile");
+    TCounter counter = getOrCreateCounter(name, unit);
+    counter.value = value;
+  }
 
   public static class Scope implements AutoCloseable {
     private final FrontendProfile oldThreadLocalValue_;

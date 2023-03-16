@@ -33,6 +33,9 @@ LOG = logging.getLogger("test_auto_scaling")
 # Non-trivial query that gets scheduled on all executors within a group.
 TEST_QUERY = "select count(*) from functional.alltypes where month + random() < 3"
 
+# A query to test Cpu requirement. Estimated memory per host is 37MB.
+CPU_TEST_QUERY = "select * from tpcds_parquet.store_sales where ss_item_sk = 1 limit 50;"
+
 DEFAULT_RESOURCE_POOL = "default-pool"
 
 
@@ -785,7 +788,8 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # Force to run the large query on the small group should fail
     self.client.set_configuration({'request_pool': 'small'})
     result = self.execute_query_expect_failure(self.client, LARGE_QUERY)
-    assert "The query does not fit any executor group set" in str(result)
+    assert ("The query does not fit largest executor group sets. "
+        "Reason: not enough per-host memory") in str(result)
 
     self.client.close()
 
@@ -845,24 +849,28 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self.client.close()
 
   @pytest.mark.execute_serially
-  def test_query_cpu_count_divisor(self):
-    # A query with estimated memory per host of 37MB.
-    TEST_QUERY = "select * from tpcds_parquet.store_sales where ss_item_sk = 1 limit 50;"
-
+  def test_query_cpu_count_divisor_default(self):
     # Expect to run the query on the small group by default.
     coordinator_test_args = ""
-    self._run_with_compute_processing_cost(coordinator_test_args, TEST_QUERY,
-        ["Executor Group: root.small-group", "Effective parallelism: 5"])
+    self._run_with_compute_processing_cost(coordinator_test_args, CPU_TEST_QUERY,
+        ["Executor Group: root.small-group", "EffectiveParallelism: 5",
+         "ExecutorGroupsConsidered: 2"])
 
+  @pytest.mark.execute_serially
+  def test_query_cpu_count_divisor_two(self):
     # Expect to run the query on the tiny group
     coordinator_test_args = "-query_cpu_count_divisor=2 "
-    self._run_with_compute_processing_cost(coordinator_test_args, TEST_QUERY,
-        ["Executor Group: root.tiny-group", "Effective parallelism: 3"])
+    self._run_with_compute_processing_cost(coordinator_test_args, CPU_TEST_QUERY,
+        ["Executor Group: root.tiny-group", "EffectiveParallelism: 3",
+         "ExecutorGroupsConsidered: 1"])
 
+  @pytest.mark.execute_serially
+  def test_query_cpu_count_divisor_fraction(self):
     # Expect to run the query on the large group
     coordinator_test_args = "-query_cpu_count_divisor=0.2 "
-    self._run_with_compute_processing_cost(coordinator_test_args, TEST_QUERY,
-        ["Executor Group: root.large-group", "Effective parallelism: 7"])
+    self._run_with_compute_processing_cost(coordinator_test_args, CPU_TEST_QUERY,
+        ["Executor Group: root.large-group", "EffectiveParallelism: 7",
+         "ExecutorGroupsConsidered: 3"])
 
   @pytest.mark.execute_serially
   def test_per_exec_group_set_metrics(self):

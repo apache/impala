@@ -89,7 +89,7 @@ class ClientRequestState {
   /// Sets the profile that is produced by the frontend. The frontend creates the
   /// profile during planning and returns it to the backend via TExecRequest,
   /// which then sets the frontend profile.
-  void SetFrontendProfile(TRuntimeProfileNode profile);
+  void SetFrontendProfile(const TExecRequest& exec_request);
 
   /// Sets the coordinator time that the plan request was submitted at so that
   /// the backend timeline starts where the frontend timeline ends

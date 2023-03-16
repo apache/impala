@@ -167,6 +167,11 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   // the original plan vs the ProcessingCost based plan.
   private int originalInstanceCount_ = -1;
 
+  // Information about any cpu comparison that was made (if any) at this fragment.
+  // Set in maxCore().
+  private int thisTreeCpuCore_ = -1;
+  private int subtreeCpuCore_ = -1;
+
   public long getProducedRuntimeFiltersMemReservationBytes() {
     return producedRuntimeFiltersMemReservationBytes_;
   }
@@ -231,7 +236,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    * <p>For example, given the following fragment plan:
    * <pre>
    * F03:PLAN FRAGMENT [HASH(i_class)] hosts=3 instances=3
-   * fragment-costs=[34550429, 2159270, 23752870, 1]
+   * segment-costs=[34550429, 2159270, 23752870, 1]
    * 08:TOP-N [LIMIT=100]
    * |  cost=900
    * |
@@ -727,8 +732,17 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       } else {
         builder.append(getCostBasedMaxParallelism());
       }
-      builder.append(" fragment-costs=");
+      builder.append(" segment-costs=");
       builder.append(costingSegmentSummary());
+      if (thisTreeCpuCore_ > 0 && subtreeCpuCore_ > 0) {
+        builder.append(" cpu-comparison-result=");
+        builder.append(Math.max(thisTreeCpuCore_, subtreeCpuCore_));
+        builder.append(" [max(");
+        builder.append(thisTreeCpuCore_);
+        builder.append(" (self) vs ");
+        builder.append(subtreeCpuCore_);
+        builder.append(" (sum children))]");
+      }
       builder.append("\n");
       if (explainLevel.ordinal() >= TExplainLevel.VERBOSE.ordinal()) {
         builder.append(explainProcessingCosts(detailPrefix, false));
@@ -1098,12 +1112,14 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     fragmentCoreState.put(getId(), Pair.create(coreReq, subtreeCoreBuilder.build()));
   }
 
-  protected CoreCount maxCore(CoreCount core1, CoreCount core2) {
+  protected CoreCount maxCore(CoreCount thisTreeCpuCore, CoreCount subtreeCpuCore) {
+    thisTreeCpuCore_ = thisTreeCpuCore.total();
+    subtreeCpuCore_ = subtreeCpuCore.total();
     if (LOG.isTraceEnabled()) {
-      LOG.trace("At {}, compare {} ({}) vs {} ({})", getId(), core1, core1.total(), core2,
-          core2.total());
+      LOG.trace("At {}, compare {} ({}) vs {} ({})", getId(), thisTreeCpuCore,
+          thisTreeCpuCore.total(), subtreeCpuCore, subtreeCpuCore.total());
     }
-    return CoreCount.max(core1, core2);
+    return CoreCount.max(thisTreeCpuCore, subtreeCpuCore);
   }
 
   /**

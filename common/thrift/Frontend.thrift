@@ -638,6 +638,9 @@ struct TExecRequest {
 
   // Coordinator time when plan was submitted by external frontend
   16: optional i64 remote_submit_time
+
+  // Additional profile nodes to be displayed nested right under 'profile' field.
+  17: optional list<RuntimeProfile.TRuntimeProfileNode> profile_children
 }
 
 // Parameters to FeSupport.cacheJar().
