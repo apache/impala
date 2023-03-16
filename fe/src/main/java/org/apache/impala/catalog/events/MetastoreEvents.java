@@ -2681,8 +2681,7 @@ public class MetastoreEvents {
           msTbl_ = tbl.getMetaStoreTable();
         }
       } catch (Exception ex) {
-        throw new MetastoreNotificationException(debugString("Unable to "
-            + "parse commit compaction message"), ex);
+        warnLog("Unable to parse commit compaction message: {}", ex.getMessage());
       }
     }
 
