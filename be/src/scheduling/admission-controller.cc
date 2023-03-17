@@ -43,7 +43,14 @@
 
 #include "common/names.h"
 
+using std::make_pair;
+using std::pair;
 using namespace strings;
+
+DEFINE_bool(balance_queries_across_executor_groups, false,
+    "If true, balance queries across multiple groups that belonging to the same request "
+    "pool based on available memory and slots in each executor group. If false, "
+    "admission is attempted to groups in alphanumerically sorted order.");
 
 DEFINE_int64(queue_wait_timeout_ms, 60 * 1000, "Maximum amount of time (in "
     "milliseconds) that a request will wait to be admitted before timing out.");
@@ -1844,10 +1851,10 @@ Status AdmissionController::ComputeGroupScheduleStates(
     return Status::OK();
   }
 
-  // We loop over the executor groups in a deterministic order. This means we will fill up
-  // each executor group before considering an unused one. In particular, we will not try
-  // to balance queries across executor groups equally.
-  // TODO(IMPALA-8731): balance queries across executor groups more evenly
+  // We loop over the executor groups in a deterministic order. If
+  // --balance_queries_across_executor_groups set to true, executor groups with more
+  // available memory and slots will be processed first. If the flag set to false, we will
+  // process executor groups in alphanumerically sorted order.
   for (const ExecutorGroup* executor_group : executor_groups) {
     DCHECK(executor_group->IsHealthy()
         || cluster_membership_mgr_->GetEmptyExecutorGroup() == executor_group)
@@ -2534,6 +2541,39 @@ string AdmissionController::MakePoolTopicKey(
       "$0$1$2$3", TOPIC_KEY_POOL_PREFIX, pool_name, TOPIC_KEY_DELIMITER, backend_id);
 }
 
+const pair<int64_t, int64_t> AdmissionController::GetAvailableMemAndSlots(
+    const ExecutorGroup& group) const {
+  int64_t total_mem_limit = 0;
+  int64_t total_slots = 0;
+  int64_t agg_effective_mem_reserved = 0;
+  int64_t agg_slots_in_use = 0;
+  for (const BackendDescriptorPB& be_desc : group.GetAllExecutorDescriptors()) {
+    total_mem_limit += be_desc.admit_mem_limit();
+    total_slots += be_desc.admission_slots();
+    int64_t host_mem_reserved = 0;
+    int64_t host_mem_admit = 0;
+    const string& host = NetworkAddressPBToString(be_desc.address());
+    auto stats = host_stats_.find(host);
+    if (stats != host_stats_.end()) {
+      host_mem_reserved = stats->second.mem_reserved;
+      host_mem_admit += stats->second.mem_admitted;
+      agg_slots_in_use += stats->second.slots_in_use;
+    }
+    for (const auto& remote_entry : remote_per_host_stats_) {
+      auto remote_stats = remote_entry.second.find(host);
+      if (remote_stats != remote_entry.second.end()) {
+        host_mem_admit += remote_stats->second.mem_admitted;
+        agg_slots_in_use += remote_stats->second.slots_in_use;
+      }
+    }
+    agg_effective_mem_reserved += std::max(host_mem_reserved, host_mem_admit);
+  }
+  DCHECK_GE(total_mem_limit, agg_effective_mem_reserved);
+  DCHECK_GE(total_slots, agg_slots_in_use);
+  return make_pair(
+      total_mem_limit - agg_effective_mem_reserved, total_slots - agg_slots_in_use);
+}
+
 vector<const ExecutorGroup*> AdmissionController::GetExecutorGroupsForQuery(
     const ClusterMembershipMgr::ExecutorGroups& all_groups,
     const AdmissionRequest& request) {
@@ -2567,6 +2607,16 @@ vector<const ExecutorGroup*> AdmissionController::GetExecutorGroupsForQuery(
     return a->name() < b->name();
   };
   sort(matching_groups.begin(), matching_groups.end(), cmp);
+  if (FLAGS_balance_queries_across_executor_groups) {
+    // Sort executor groups by available memory and slots in descending order, we
+    // prioritize executor groups that with more available memory, when their available
+    // memory are same we choose the one with more available slots, when their available
+    // memory and slots are same we choose on an alphabetical basis.
+    auto available_resource_cmp = [this](const ExecutorGroup* a, const ExecutorGroup* b) {
+      return GetAvailableMemAndSlots(*a) > GetAvailableMemAndSlots(*b);
+    };
+    sort(matching_groups.begin(), matching_groups.end(), available_resource_cmp);
+  }
   return matching_groups;
 }
 

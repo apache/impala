@@ -972,3 +972,72 @@ class TestExecutorGroups(CustomClusterTestSuite):
     assert self._get_num_executor_groups(exec_group_set_prefix="root.queue2") == 1
     assert self.coordinator.service.get_metric_value(
       "cluster-membership.group-set.backends.total.root.queue2") == 1
+
+  def _setup_two_coordinator_two_exec_group_cluster(self, coordinator_test_args):
+    """Start a cluster with two coordinators and two executor groups that mapped to
+    the same request pool 'root.queue1'."""
+    RESOURCES_DIR = os.path.join(os.environ['IMPALA_HOME'], "fe", "src", "test",
+                                 "resources")
+    fs_allocation_path = os.path.join(RESOURCES_DIR, "fair-scheduler-allocation.xml")
+    llama_site_path = os.path.join(RESOURCES_DIR, "llama-site-empty.xml")
+    # Start with a regular admission config with multiple pools and no resource limits.
+    self._restart_coordinators(num_coordinators=2,
+         extra_args="-fair_scheduler_allocation_path %s "
+                    "-llama_site_path %s %s" %
+                    (fs_allocation_path, llama_site_path, coordinator_test_args))
+    # Add two executor groups with 2 admission slots and 1 executor.
+    self._add_executor_group("group1", min_size=1, admission_control_slots=2,
+                             resource_pool="root.queue1")
+    self._add_executor_group("group2", min_size=1, admission_control_slots=2,
+                             resource_pool="root.queue1")
+    assert self._get_num_executor_groups(only_healthy=True) == 2
+
+  def _execute_query_async_using_client_and_verify_exec_group(self, client, query,
+    config_options, expected_group_str):
+    """Execute 'query' asynchronously using 'client' with given 'config_options'.
+    Assert existence of expected_group_str in query profile."""
+    client.set_configuration(config_options)
+    query_handle = client.execute_async(query)
+    self.wait_for_state(query_handle, client.QUERY_STATES['RUNNING'], 30, client=client)
+    assert expected_group_str in client.get_runtime_profile(query_handle)
+
+  @pytest.mark.execute_serially
+  def test_default_assign_policy_with_multiple_exec_groups_and_coordinators(self):
+    """Tests that the default admission control assign policy is filling up executor
+    groups one by one."""
+    # A long running query that runs on every executor
+    QUERY = "select * from functional_parquet.alltypes \
+             where month < 3 and id + random() < sleep(100);"
+    coordinator_test_args = ""
+    self._setup_two_coordinator_two_exec_group_cluster(coordinator_test_args)
+    # Create fresh clients
+    self.create_impala_clients()
+    second_coord_client = self.create_client_for_nth_impalad(1)
+    # Check that the first two queries both run in 'group1'.
+    self._execute_query_async_using_client_and_verify_exec_group(self.client,
+        QUERY, {'request_pool': 'queue1'}, "Executor Group: root.queue1-group1")
+    self._execute_query_async_using_client_and_verify_exec_group(second_coord_client,
+        QUERY, {'request_pool': 'queue1'}, "Executor Group: root.queue1-group1")
+    self.client.close()
+    second_coord_client.close()
+
+  @pytest.mark.execute_serially
+  def test_load_balancing_with_multiple_exec_groups_and_coordinators(self):
+    """Tests that the admission controller balance queries across multiple
+    executor groups that mapped to the same request pool when setting
+    balance_queries_across_executor_groups true."""
+    # A long running query that runs on every executor
+    QUERY = "select * from functional_parquet.alltypes \
+             where month < 3 and id + random() < sleep(100);"
+    coordinator_test_args = "-balance_queries_across_executor_groups=true"
+    self._setup_two_coordinator_two_exec_group_cluster(coordinator_test_args)
+    # Create fresh clients
+    self.create_impala_clients()
+    second_coord_client = self.create_client_for_nth_impalad(1)
+    # Check that two queries run in two different groups.
+    self._execute_query_async_using_client_and_verify_exec_group(self.client,
+        QUERY, {'request_pool': 'queue1'}, "Executor Group: root.queue1-group1")
+    self._execute_query_async_using_client_and_verify_exec_group(second_coord_client,
+        QUERY, {'request_pool': 'queue1'}, "Executor Group: root.queue1-group2")
+    self.client.close()
+    second_coord_client.close()

@@ -277,8 +277,8 @@ enum class AdmissionOutcome {
 /// FindGroupToAdmitOrReject(). From there we call ComputeGroupScheduleStates() which
 /// calls compute schedules for both executor groups. Then we perform rejection tests and
 /// afterwards call CanAdmitRequest() for each of the schedules. Executor groups are
-/// processed in alphanumerically sorted order, so we attempt admission to group
-/// "default-pool-group-1" first. CanAdmitRequest() calls HasAvailableSlots() to check
+/// processed in a deterministic order, see comments in ComputeGroupScheduleStates() for
+/// details. CanAdmitRequest() calls HasAvailableSlots() to check
 /// whether any of the hosts in the group can fit the new query in their available slots
 /// and since it does fit, admission succeeds. The query is admitted and 'slots_in_use'
 /// is incremented for each host in that group based on the effective parallelism of the
@@ -1129,6 +1129,10 @@ class AdmissionController {
 
   /// Returns the maximum number of requests that can be queued in the pool.
   static int64_t GetMaxQueuedForPool(const TPoolConfig& pool_config);
+
+  /// Returns available memory and slots of the executor group.
+  const std::pair<int64_t, int64_t> GetAvailableMemAndSlots(
+      const ExecutorGroup& group) const;
 
   /// Return all executor groups from 'all_groups' that can be used to run the query. If
   /// the query is a coordinator only query then a reserved empty group is returned
