@@ -20,6 +20,7 @@ package org.apache.impala.common;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.lang.StackTraceElement;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
@@ -328,7 +329,22 @@ public class JniUtil {
       for (ThreadInfo threadInfo: threadBean.dumpAllThreads(true, true)) {
         TJvmThreadInfo tThreadInfo = new TJvmThreadInfo();
         long id = threadInfo.getThreadId();
-        tThreadInfo.setSummary(threadInfo.toString());
+        // The regular ThreadInfo.toString() method limits the depth of the stacktrace.
+        // To get around this, we use the first line of the toString() output (which
+        // contains non-stacktrace information) and then construct our own stacktrace
+        // based on ThreadInfo.getStackTrace() information.
+        StringBuffer customSummary = new StringBuffer();
+        String regularSummary = threadInfo.toString();
+        int firstNewlineIndex = regularSummary.indexOf("\n");
+        // Keep only the first line from the regular summary
+        customSummary.append(regularSummary.substring(0, firstNewlineIndex));
+        customSummary.append("\n");
+        // Append a full stack trace that mimics how jstack displays the stack
+        // (with indentation and "at")
+        for (StackTraceElement ste : threadInfo.getStackTrace()) {
+          customSummary.append("\tat " + ste.toString() + "\n");
+        }
+        tThreadInfo.setSummary(customSummary.toString());
         tThreadInfo.setCpu_time_in_ns(threadBean.getThreadCpuTime(id));
         tThreadInfo.setUser_time_in_ns(threadBean.getThreadUserTime(id));
         tThreadInfo.setBlocked_count(threadInfo.getBlockedCount());
