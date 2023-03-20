@@ -12,7 +12,7 @@ instructions.
 * Open a terminal window and run the following commands to get the Impala
   documentation source files from Git:
     ```
-    git clone https://gitbox.apache.org/repos/asf/impala.git/docs
+    git clone https://gitbox.apache.org/repos/asf/impala.git
     cd <local_directory>
     git checkout master
     ```
