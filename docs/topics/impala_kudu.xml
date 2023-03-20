@@ -210,7 +210,10 @@ under the License.
           table. The data engine handles this by appending a system generated auto-incrementing
           column to the non-unique primary key columns. This is done to guarantee the uniqueness of
           the primary key. This auto-incrementing column is named as 'auto_incrementing_id' with
-          bigint type. The assignment to it during insertion is automatic.</p>
+          bigint type and this column is only system generated and cannot be explicitly created by
+          the user. This auto_incrementing_id column is unique across a partition/tablet i.e. every
+          partition/tablet would have this column starting from one and incrementing monotonically.
+          The assignment to this column during insertion is automatic.</p>
       </conbody>
     </concept>
     <concept id="create">
