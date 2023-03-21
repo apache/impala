@@ -1,5 +1,3 @@
-from __future__ import print_function, unicode_literals
-
 """
   This file is redistributed under the Python Software Foundation License:
   http://docs.python.org/2/license.html
