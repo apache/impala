@@ -20,6 +20,7 @@
 #include <string>
 #include <vector>
 
+#include <glog/logging.h>
 #include <kudu/client/resource_metrics.h>
 #include <kudu/client/row_result.h>
 #include <kudu/client/value.h>
@@ -34,6 +35,7 @@
 #include "gutil/gscoped_ptr.h"
 #include "gutil/strings/substitute.h"
 #include "kudu/util/block_bloom_filter.h"
+#include "kudu/util/logging.h"
 #include "kudu/util/slice.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
@@ -93,7 +95,9 @@ Status KuduScanner::Open() {
 }
 
 void KuduScanner::KeepKuduScannerAlive() {
-  if (scanner_ == nullptr) return;
+  if (scanner_ == nullptr) {
+    return;
+  }
   int64_t now = MonotonicMicros();
   int64_t keepalive_us = FLAGS_kudu_scanner_keep_alive_period_sec * 1e6;
   if (now < last_alive_time_micros_ + keepalive_us) {
@@ -106,7 +110,8 @@ void KuduScanner::KeepKuduScannerAlive() {
   // if the scan is unrecoverable.
   kudu::Status s = scanner_->KeepAlive();
   if (!s.ok()) {
-    VLOG(1) << "Unable to keep the Kudu scanner alive: " << s.ToString();
+    KLOG_EVERY_N_SECS(WARNING, 60) << BuildErrorString(
+        Substitute("$0: unable to keep scanner alive", s.ToString()).c_str());
     return;
   }
   last_alive_time_micros_ = now;
@@ -453,9 +458,9 @@ Status KuduScanner::GetNextScannerBatch() {
   return Status::OK();
 }
 
-string KuduScanner::BuildErrorString(const char* msg) {
-  return Substitute("$0 for node with id '$1' for Kudu table '$2'", msg, scan_node_->id(),
-      scan_node_->table_desc()->table_name());
+string KuduScanner::BuildErrorString(const char* msg) const {
+  return Substitute("$0 for node with id '$1' for Kudu table '$2'",
+      msg, scan_node_->id(), scan_node_->table_desc()->table_name());
 }
 
 }  // namespace impala
