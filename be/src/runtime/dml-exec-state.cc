@@ -500,7 +500,7 @@ createIcebergColumnStats(
 }
 
 string createIcebergDataFileString(
-    const string& partition_name, const string& final_path, int64_t num_rows,
+    const OutputPartition& partition, const string& final_path, int64_t num_rows,
     int64_t file_size, const IcebergFileStats& insert_stats) {
   using namespace org::apache::impala::fb;
   flatbuffers::FlatBufferBuilder fbb;
@@ -510,13 +510,19 @@ string createIcebergDataFileString(
     ice_col_stats_vec.push_back(createIcebergColumnStats(fbb, it->first, it->second));
   }
 
+  vector<flatbuffers::Offset<flatbuffers::String>> raw_partition_fields;
+  for (const string& partition_name : partition.raw_partition_names) {
+    raw_partition_fields.push_back(fbb.CreateString(partition_name));
+  }
+
   flatbuffers::Offset<FbIcebergDataFile> data_file = CreateFbIcebergDataFile(fbb,
       fbb.CreateString(final_path),
       // Currently we can only write Parquet to Iceberg
       FbIcebergDataFileFormat::FbIcebergDataFileFormat_PARQUET,
       num_rows,
       file_size,
-      fbb.CreateString(partition_name),
+      fbb.CreateString(partition.partition_name),
+      fbb.CreateVector(raw_partition_fields),
       fbb.CreateVector(ice_col_stats_vec));
   fbb.Finish(data_file);
   return string(reinterpret_cast<char*>(fbb.GetBufferPointer()), fbb.GetSize());
@@ -527,8 +533,8 @@ string createIcebergDataFileString(
 void DmlExecState::AddCreatedFile(const OutputPartition& partition, bool is_iceberg,
     const IcebergFileStats& insert_stats) {
   lock_guard<mutex> l(lock_);
-  const string& partition_name = partition.partition_name;
-  PartitionStatusMap::iterator entry = per_partition_status_.find(partition_name);
+  PartitionStatusMap::iterator entry =
+      per_partition_status_.find(partition.partition_name);
   DCHECK(entry != per_partition_status_.end());
   DmlFileStatusPb* file = entry->second.add_created_files();
   if (partition.current_file_final_name.empty()) {
@@ -541,7 +547,7 @@ void DmlExecState::AddCreatedFile(const OutputPartition& partition, bool is_iceb
   file->set_size(partition.current_file_bytes);
   if (is_iceberg) {
     file->set_iceberg_data_file_fb(
-        createIcebergDataFileString(partition_name, file->final_path(), file->num_rows(),
+        createIcebergDataFileString(partition, file->final_path(), file->num_rows(),
         file->size(), insert_stats));
   }
 }

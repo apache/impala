@@ -140,6 +140,20 @@ class HdfsTableSink : public DataSink {
       const HdfsPartitionDescriptor& partition_descriptor, const TupleRow* row,
       OutputPartition* output_partition, bool empty_partition) WARN_UNUSED_RESULT;
 
+  /// Constructs the partition name using 'partition_key_expr_evals_'.
+  /// 'url_encoded_partition_name' is the full partition name in URL encoded form. E.g.:
+  /// it's "a=12%2F31%2F11/b=10" if we have 2 partition columns "a" and "b", and "a" has
+  /// the value of "12/31/11" and "b" has the value of 10. Since this is URL encoded,
+  /// can be used for paths.
+  /// 'raw_partition_name' is a vector of partition key-values in a non-encoded format.
+  /// Staying with the above example this would hold ["a=12/31/11", "b=10"].
+  /// 'external_partition_name' is a subset of 'url_encoded_partition_name'.
+  void ConstructPartitionNames(
+      const TupleRow* row,
+      string* url_encoded_partition_name,
+      std::vector<std::string>* raw_partition_names,
+      string* external_partition_name);
+
   /// Add a temporary file to an output partition.  Files are created in a
   /// temporary directory and then moved to the real partition directory by the
   /// coordinator in a finalization step. The temporary file's current location

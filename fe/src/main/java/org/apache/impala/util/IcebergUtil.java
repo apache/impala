@@ -85,6 +85,7 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.fb.FbFileMetadata;
+import org.apache.impala.fb.FbIcebergDataFile;
 import org.apache.impala.fb.FbIcebergDataFileFormat;
 import org.apache.impala.fb.FbIcebergMetadata;
 import org.apache.impala.fb.FbIcebergPartitionTransformValue;
@@ -690,28 +691,28 @@ public class IcebergUtil {
   }
 
   /**
-   * Create a PartitionData object from a partition path and its descriptors.
+   * Create a PartitionData object using partition information from FbIcebergDataFile.
    */
-  public static PartitionData partitionDataFromPath(Types.StructType partitionType,
-      IcebergPartitionSpec spec, String path) throws ImpalaRuntimeException {
-    if (path == null || path.isEmpty()) return null;
+  public static PartitionData partitionDataFromDataFile(Types.StructType partitionType,
+      IcebergPartitionSpec spec, FbIcebergDataFile dataFile)
+      throws ImpalaRuntimeException {
+    if (dataFile == null || dataFile.rawPartitionFieldsLength() == 0) return null;
 
     PartitionData data = new PartitionData(spec.getIcebergPartitionFieldsSize());
-    String[] partitions = path.split("/", -1);
     int path_i = 0;
     for (int i = 0; i < spec.getIcebergPartitionFieldsSize(); ++i) {
       IcebergPartitionField field = spec.getIcebergPartitionFields().get(i);
-      if (field.getTransformType() == TIcebergPartitionTransformType.VOID) {
-        continue;
-      }
-      String[] parts = partitions[path_i].split("=", 2);
+      if (field.getTransformType() == TIcebergPartitionTransformType.VOID) continue;
+
+      Preconditions.checkState(path_i < dataFile.rawPartitionFieldsLength());
+      String[] parts = dataFile.rawPartitionFields(path_i).split("=", 2);
       Preconditions.checkArgument(parts.length == 2 && parts[0] != null &&
           field.getFieldName().equals(parts[0]), "Invalid partition: %s",
-          partitions[path_i]);
+          dataFile.rawPartitionFields(path_i));
       TIcebergPartitionTransformType transformType = field.getTransformType();
       data.set(i, getPartitionValue(
           partitionType.fields().get(i).type(), transformType, parts[1]));
-      path_i += 1;
+      ++path_i;
     }
     return data;
   }
