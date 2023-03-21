@@ -1,0 +1,5 @@
+{"id":1,"name":"Alice","spouse":null,"child":[]}
+{"id":2,"name":"Bob","spouse":{"id":null},"child":[{"id":3,"name":"Charlie"},{"id":4,"name":"David"}]}
+{"id":5,"name":"Emily","spouse":{"spouse":"Emily","id":null},"child":[{"id":6,"name":"Frank","spouse":{"id":7},"child":[{"id":8,"name":"Grace"},{"id":9,"name":"Henry"}]},{"id":10,"name":"Isabel","spouse":{},"child":[{"id":11,"name":"Jack"},{"id":12,"name":"Kate"}]}]}
+{"id":13,"name":"Liam","spouse":{"id":14,"name":"Mia"},"child":[]}
+{"id":15,"name":"Nora","spouse":{"id":16,"name":"Oliver"},"child":[{"id":17,"name":"Peter"},{"id":18,"name":"Quinn"},{"id":19,"name":"Rose"}]}

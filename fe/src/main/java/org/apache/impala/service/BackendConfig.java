@@ -428,4 +428,8 @@ public class BackendConfig {
   public int icebergReloadNewFilesThreshold() {
     return backendCfg_.iceberg_reload_new_files_threshold;
   }
+
+  public boolean isJsonScannerEnabled() {
+    return backendCfg_.enable_json_scanner;
+  }
 }

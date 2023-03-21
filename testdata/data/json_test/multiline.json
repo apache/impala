@@ -1,0 +1,17 @@
+{"Id": 1, "Key": "normal object", "Value": "abcdefg"}
+{"Id": 2, "Key": "multiline string", "Value": "abcd
+efg"}
+{"Id": 3, "Key": "multiline number", "Value": 1234
+567}
+{"Id": 4, "Key": "multiline object1",
+  "Value": "abcdefg"}
+{"Id": 5, "Key": "multiline object2", "Value"
+  :"abcdefg"}
+{"Id": 6, "Key": "multiline object3", "Value":
+  "abcdefg"}
+{
+  "Id": 7,
+  "Key": "multiline object4",
+  "Value": "abcdefg"
+}
+{"Id": 8, "Key": "one line multiple objects", "Value": "obj1"}{"Id": 9, "Key": "one line multiple objects", "Value": "obj2"}

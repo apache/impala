@@ -41,7 +41,8 @@ FILE_FORMAT_TO_STORED_AS_MAP = {
   'avro': 'AVRO',
   'hbase': "'org.apache.hadoop.hive.hbase.HBaseStorageHandler'",
   'kudu': "KUDU",
-  'iceberg': "ICEBERG"
+  'iceberg': "ICEBERG",
+  'json': "JSONFILE",
 }
 
 # Describes the configuration used to execute a single tests. Contains both the details
@@ -49,7 +50,7 @@ FILE_FORMAT_TO_STORED_AS_MAP = {
 # to use when running the query.
 class TableFormatInfo(object):
   KNOWN_FILE_FORMATS = ['text', 'seq', 'rc', 'parquet', 'orc', 'avro', 'hbase',
-                        'kudu', 'iceberg']
+                        'kudu', 'iceberg', 'json']
   KNOWN_COMPRESSION_CODECS = ['none', 'snap', 'gzip', 'bzip', 'def', 'zstd', 'lz4']
   KNOWN_COMPRESSION_TYPES = ['none', 'block', 'record']
 
@@ -119,6 +120,12 @@ def create_uncompressed_text_dimension(workload):
   dataset = get_dataset_from_workload(workload)
   return ImpalaTestDimension('table_format',
       TableFormatInfo.create_from_string(dataset, 'text/none'))
+
+
+def create_uncompressed_json_dimension(workload):
+  dataset = get_dataset_from_workload(workload)
+  return ImpalaTestDimension('table_format',
+      TableFormatInfo.create_from_string(dataset, 'json/none'))
 
 
 def create_parquet_dimension(workload):

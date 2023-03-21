@@ -59,3 +59,8 @@ class TestDisableFeatures(CustomClusterTestSuite):
     self.execute_query_expect_failure(
         self.client,
         "select sum(id) over(order by id) from functional.alltypes having -1")
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--enable_json_scanner=false")
+  def test_disable_json_scanner(self, vector):
+    self.run_test_case('QueryTest/disable-json-scanner', vector)

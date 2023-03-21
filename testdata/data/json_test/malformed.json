@@ -1,0 +1,18 @@
+{"bool_col":true,"int_col":0,"float_col":"abc","string_col":"abc123"}
+{"bool_col":False,"int_col":1,"float_col":0.1,"string_col":abc123}
+{"bool_col":true,"int_col":2,:0.2,"string_col":"abc123"}
+{"bool_col":false,"int_col":3,"float_col":0.3,"string_col""abc123"}
+{"bool_col":true,"int_col":4,"float_col":0.4"string_col":"abc123"}
+{"bool_col":false,"int_col":5,"float_col":0.6e10000,"string_col":"abc123"}
+{"bool_col":true,"int_col":6,"float_col":0.,"string_col":"abc123"}
+{"bool_col":false,"int_col":7,"float_col":0.7e,"string_col":"abc123"}
+{"bool_col":true,"int_col":8,"float_col":0.8,"string_col":"abc123"
+{"float_col":0.9,"int_col":9,"string_col":"abc123","bool_col":false}
+{"bool_col":true,"int_col":-1,"float_col":-1,"string_col":"abc123","int_col":10,"float_col":1.0}
+123.456
+"abc123"
+{ }
+[ ]
+( )
+{"string_col":"abc123"}
+["string_col", "abc123"]

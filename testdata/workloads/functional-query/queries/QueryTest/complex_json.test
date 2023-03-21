@@ -1,0 +1,14 @@
+====
+---- QUERY
+# Testing scanning of complex JSON. JsonParser and HdfsJsonScanner do not support complex
+# types yet, so they will be set as null for now.
+select id, name, spouse, child from complex_json
+---- TYPES
+int, string, string, string
+---- RESULTS
+1,'Alice','NULL','NULL'
+2,'Bob','NULL','NULL'
+5,'Emily','NULL','NULL'
+13,'Liam','NULL','NULL'
+15,'Nora','NULL','NULL'
+====

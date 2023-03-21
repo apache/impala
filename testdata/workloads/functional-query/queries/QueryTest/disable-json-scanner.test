@@ -1,0 +1,7 @@
+====
+---- QUERY
+# Test that running with JSON scanner disabled fails gracefully.
+select * from functional_json.alltypes
+---- CATCH
+JSON scans are disabled by --enable_json_scanner flag.
+====

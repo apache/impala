@@ -38,7 +38,8 @@ class TestTpchQuery(ImpalaTestSuite):
     # TODO: the planner tests are based on text and need this.
     if cls.exploration_strategy() == 'core':
       cls.ImpalaTestMatrix.add_constraint(lambda v:\
-          v.get_value('table_format').file_format in ['text', 'parquet', 'kudu', 'orc'])
+          v.get_value('table_format').file_format in ['text', 'parquet', 'kudu', 'orc',
+                                                      'json'])
 
   def idfn(val):
     return "TPC-H: Q{0}".format(val)

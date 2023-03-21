@@ -154,6 +154,19 @@ class TestHdfsRcFileScanNodeErrors(TestHdfsScanNodeErrors):
     self.run_test_case('DataErrorsTest/hdfs-rcfile-scan-node-errors', vector)
 
 
+@SkipIfFS.qualified_path
+class TestHdfsJsonScanNodeErrors(TestHdfsScanNodeErrors):
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestHdfsJsonScanNodeErrors, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'json')
+
+  def test_hdfs_json_scan_node_errors(self, vector):
+    vector.get_value('exec_option')['abort_on_error'] = 0
+    self.run_test_case('DataErrorsTest/hdfs-json-scan-node-errors', vector)
+
+
 class TestAvroErrors(TestDataErrors):
   @classmethod
   def add_test_dimensions(cls):

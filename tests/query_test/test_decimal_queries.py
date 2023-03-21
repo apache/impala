@@ -48,7 +48,7 @@ class TestDecimalQueries(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(lambda v:\
         (v.get_value('table_format').file_format == 'text' and
          v.get_value('table_format').compression_codec == 'none') or
-         v.get_value('table_format').file_format in ['parquet', 'orc', 'kudu'])
+         v.get_value('table_format').file_format in ['parquet', 'orc', 'kudu', 'json'])
 
     # Run these queries through both beeswax and HS2 to get coverage of decimals returned
     # via both protocols.

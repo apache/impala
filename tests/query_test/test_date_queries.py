@@ -40,9 +40,10 @@ class TestDateQueries(ImpalaTestSuite):
         'batch_size': [0, 1],
         'disable_codegen': ['false', 'true'],
         'disable_codegen_rows_threshold': [0]}))
-    # DATE type is only supported for text, parquet and avro fileformat on HDFS and HBASE.
+    # DATE type is only supported for text, parquet, avro, orc and json fileformat on HDFS
+    # and HBASE.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format in ('text', 'hbase', 'parquet')
+        v.get_value('table_format').file_format in ('text', 'hbase', 'parquet', 'json')
         or (v.get_value('table_format').file_format == 'avro'
             and v.get_value('table_format').compression_codec == 'snap'))
 

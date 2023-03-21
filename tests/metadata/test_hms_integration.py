@@ -121,29 +121,6 @@ class TestHmsIntegrationSanity(ImpalaTestSuite):
     self.client.execute("DESCRIBE {0}.json_tbl"
                         .format(unique_database))
 
-  def test_json_file_unsupported(self, unique_database):
-    """
-    Since JSON file format is not yet supported,this function tests
-    the blocking logic of reading JSON tables.
-    """
-    self.client.execute("create table {0}.json_tbl(id int, name string, age int)"
-                        " stored as jsonfile".format(unique_database))
-    self.run_stmt_in_hive("insert  into {0}.json_tbl values(0,'Alice',10)"
-                          .format(unique_database))
-    self.run_stmt_in_hive("insert  into {0}.json_tbl values(1,'Bob',20)"
-                          .format(unique_database))
-    self.run_stmt_in_hive("insert  into {0}.json_tbl values(2,'Oracle',16)"
-                          .format(unique_database))
-    self.client.execute("refresh {0}.json_tbl".format(unique_database))
-    self.client.execute("show files in {0}.json_tbl".format(unique_database))
-    try:
-      self.client.execute("select * from {0}.json_tbl".format(unique_database))
-    except Exception as e:
-      assert 'Scan of table {0}.json_tbl in format \'JSON\' is not supported.'\
-        .format(unique_database) in str(e)
-    else:
-      assert False
-
   def test_invalidate_metadata(self, unique_name):
     """Verify invalidate metadata on tables under unloaded db won't fail"""
     db = unique_name + "_db"

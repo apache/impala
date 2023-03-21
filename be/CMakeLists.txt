@@ -487,6 +487,7 @@ set (IMPALA_LIBS
   ExecAvro
   ExecAvroIr
   ExecHBase
+  ExecJson
   ExecKudu
   ExecKuduIr
   ExecOrc
@@ -554,6 +555,7 @@ set (UNIFIED_TEST_LIBS
   CommonTests
   ExecTests
   ExecAvroTests
+  ExecJsonTests
   ExecParquetTests
   ExprsTests
   GUtilTests
@@ -585,6 +587,7 @@ if (BUILD_SHARED_LIBS)
     Exec
     ExecAvro
     ExecHBase
+    ExecJson
     ExecKudu
     ExecOrc
     ExecParquet

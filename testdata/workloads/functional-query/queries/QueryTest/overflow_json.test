@@ -1,0 +1,20 @@
+====
+---- QUERY
+# Tests overflow of numeric in JSON. In JSON, numeric can be stored as either number or
+# string types. Due to limitations in RapidJSON, numeric values that overflow will result
+# in a parsing error (kParseErrorNumberTooBig), even when using the
+# kParseNumbersAsStringsFlag. This parsing error is difficult to recover from, so we can
+# only fill it with NULL and report the error. However, for numbers stored as strings,
+# there is no such limitation, and they can be passed to the TextConverter for further
+# processing.
+select tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col from overflow_json
+---- TYPES
+tinyint, smallint, int, bigint, float, double
+---- RESULTS
+1,2,3,4,5.5,6.6
+127,32767,2147483647,9223372036854775807,NULL,NULL
+-128,-32768,-2147483648,-9223372036854775808,NULL,NULL
+1,2,3,4,5.5,6.6
+127,32767,2147483647,9223372036854775807,Infinity,Infinity
+-128,-32768,-2147483648,-9223372036854775808,-Infinity,-Infinity
+====

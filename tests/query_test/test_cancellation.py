@@ -110,8 +110,8 @@ class TestCancellation(ImpalaTestSuite):
 
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('query_type') != 'CTAS' or (\
-            v.get_value('table_format').file_format in ['text', 'parquet', 'kudu'] and\
-            v.get_value('table_format').compression_codec == 'none'))
+            v.get_value('table_format').file_format in ['text', 'parquet', 'kudu', 'json']
+            and v.get_value('table_format').compression_codec == 'none'))
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('exec_option')['batch_size'] == 0)
     # Ignore 'compute stats' queries for the CTAS query type.
@@ -247,6 +247,9 @@ class TestCancellationSerial(TestCancellation):
 
   @pytest.mark.execute_serially
   def test_cancel_insert(self, vector):
+    if vector.get_value('table_format').file_format == 'json':
+      # Insert into json format is not supported yet.
+      pytest.skip()
     self.execute_cancel_test(vector)
     metric_verifier = MetricVerifier(self.impalad_test_service)
     metric_verifier.verify_no_open_files(timeout=10)

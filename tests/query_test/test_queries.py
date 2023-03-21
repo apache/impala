@@ -26,9 +26,9 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (
     SkipIfEC, SkipIfCatalogV2, SkipIfNotHdfsMinicluster, SkipIfFS)
 from tests.common.test_dimensions import (
-    create_uncompressed_text_dimension, create_exec_option_dimension_from_dict,
-    create_client_protocol_dimension, hs2_parquet_constraint,
-    extend_exec_option_dimension, FILE_FORMAT_TO_STORED_AS_MAP)
+    create_uncompressed_text_dimension, create_uncompressed_json_dimension,
+    create_exec_option_dimension_from_dict, create_client_protocol_dimension,
+    hs2_parquet_constraint, extend_exec_option_dimension, FILE_FORMAT_TO_STORED_AS_MAP)
 from tests.util.filesystem_utils import get_fs_path
 from subprocess import check_call
 
@@ -257,6 +257,36 @@ class TestQueriesTextTables(ImpalaTestSuite):
 
   def test_values(self, vector):
     self.run_test_case('QueryTest/values', vector)
+
+
+# Tests in this class are only run against json/none either because that's the only
+# format that is supported, or the tests don't exercise the file format.
+class TestQueriesJsonTables(ImpalaTestSuite):
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestQueriesJsonTables, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_json_dimension(cls.get_workload()))
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  def test_complex(self, vector):
+    vector.get_value('exec_option')['abort_on_error'] = 0
+    self.run_test_case('QueryTest/complex_json', vector)
+
+  def test_multiline(self, vector):
+    vector.get_value('exec_option')['abort_on_error'] = 0
+    self.run_test_case('QueryTest/multiline_json', vector)
+
+  def test_malformed(self, vector):
+    vector.get_value('exec_option')['abort_on_error'] = 0
+    self.run_test_case('QueryTest/malformed_json', vector)
+
+  def test_overflow(self, vector):
+    vector.get_value('exec_option')['abort_on_error'] = 0
+    self.run_test_case('QueryTest/overflow_json', vector)
 
 # Tests in this class are only run against Parquet because the tests don't exercise the
 # file format.

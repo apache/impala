@@ -248,8 +248,8 @@ public enum HdfsFileFormat {
   public boolean isSplittable(HdfsCompression compression) {
     switch (this) {
       case TEXT:
-        return compression == HdfsCompression.NONE;
       case JSON:
+        return compression == HdfsCompression.NONE;
       case RC_FILE:
       case SEQUENCE_FILE:
       case AVRO:

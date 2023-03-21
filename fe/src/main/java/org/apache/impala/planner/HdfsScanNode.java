@@ -467,22 +467,26 @@ public class HdfsScanNode extends ScanNode {
    * a partition that has a format for which we do not support complex types,
    * regardless of whether a complex-typed column is actually referenced
    * in the query.
+   * 2) if we are scanning compressed json file or the json scanner is disabled.
    */
   @Override
   protected void checkForSupportedFileFormats() throws NotImplementedException {
     Preconditions.checkNotNull(desc_);
     Preconditions.checkNotNull(desc_.getTable());
 
-    // Since JSON file format is not yet supported, this block throws an
-    // exception. Once JSON file format will be supported, appropriate changes
-    // can be made under this block.
     for (FeFsPartition part: partitions_) {
-      HdfsFileFormat format = part.getFileFormat();
-      if (format.equals(HdfsFileFormat.JSON)) {
-        throw new NotImplementedException("Scan of table " + desc_.getTableName() +
-                " in format 'JSON' is not supported.");
+      if (!part.getFileFormat().equals(HdfsFileFormat.JSON)) continue;
+      if (!BackendConfig.INSTANCE.isJsonScannerEnabled()) {
+        throw new NotImplementedException(
+            "JSON scans are disabled by --enable_json_scanner flag.");
+      }
+      for (FileDescriptor fd: part.getFileDescriptors()) {
+        if (fd.getFileCompression() == HdfsCompression.NONE) continue;
+        throw new NotImplementedException(
+            "Scanning compressed Json file is not implemented yet: " + fd.getPath());
       }
     }
+
     Column firstComplexTypedCol = null;
     for (Column col: desc_.getTable().getColumns()) {
       if (col.getType().isComplexType()) {

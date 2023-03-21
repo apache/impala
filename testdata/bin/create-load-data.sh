@@ -211,12 +211,14 @@ function load-custom-schemas {
   mkdir -p ${TMP_DIR}/chars_formats_avro_snap \
    ${TMP_DIR}/chars_formats_parquet \
    ${TMP_DIR}/chars_formats_text \
-   ${TMP_DIR}/chars_formats_orc_def
+   ${TMP_DIR}/chars_formats_orc_def \
+   ${TMP_DIR}/chars_formats_json
 
   ln -s ${IMPALA_HOME}/testdata/data/chars-formats.avro ${TMP_DIR}/chars_formats_avro_snap
   ln -s ${IMPALA_HOME}/testdata/data/chars-formats.parquet ${TMP_DIR}/chars_formats_parquet
   ln -s ${IMPALA_HOME}/testdata/data/chars-formats.orc ${TMP_DIR}/chars_formats_orc_def
   ln -s ${IMPALA_HOME}/testdata/data/chars-formats.txt ${TMP_DIR}/chars_formats_text
+  ln -s ${IMPALA_HOME}/testdata/data/chars-formats.json ${TMP_DIR}/chars_formats_json
 
   # File used by CreateTableLikeOrc tests
   ln -s ${IMPALA_HOME}/testdata/data/alltypes_non_acid.orc ${SCHEMA_TMP_DIR}

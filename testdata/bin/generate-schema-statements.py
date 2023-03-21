@@ -206,6 +206,7 @@ FILE_FORMAT_MAP = {
   'hbase': "'org.apache.hadoop.hive.hbase.HBaseStorageHandler'",
   'kudu': "KUDU",
   'iceberg': "ICEBERG",
+  'json': "JSONFILE",
   }
 
 HIVE_TO_AVRO_TYPE_MAP = {
@@ -823,7 +824,8 @@ def generate_statements(output_name, test_vectors, sections,
         print('HDFS path:', data_path, 'contains data. Data loading can be skipped.')
       else:
         print('HDFS path:', data_path, 'does not exist or is empty. Data will be loaded.')
-        if not db_suffix:
+        load_from_json_file = file_format == 'json' and table_name.endswith('_json')
+        if not db_suffix or load_from_json_file:
           if load:
             hive_output.load_base.append(build_load_statement(load, db_name,
                                                               db_suffix, table_name))

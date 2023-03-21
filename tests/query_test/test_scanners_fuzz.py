@@ -77,8 +77,8 @@ class TestScannersFuzzing(ImpalaTestSuite):
     # TODO: enable for more table formats once they consistently pass the fuzz test.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ('avro', 'parquet', 'orc') or
-        (v.get_value('table_format').file_format == 'text' and
-          v.get_value('table_format').compression_codec in ('none')))
+        (v.get_value('table_format').file_format in ('text', 'json')
+          and v.get_value('table_format').compression_codec in ('none')))
 
 
   def test_fuzz_alltypes(self, vector, unique_database):

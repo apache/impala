@@ -7,3 +7,4 @@ file_format: parquet, dataset: functional, compression_codec: none, compression_
 file_format: orc, dataset: functional, compression_codec: def, compression_type: block
 file_format: hbase, dataset: functional, compression_codec: none, compression_type: none
 file_format: kudu, dataset: functional, compression_codec: none, compression_type: none
+file_format: json, dataset: functional, compression_codec: none, compression_type: none

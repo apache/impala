@@ -1,0 +1,25 @@
+====
+---- QUERY
+# Testing scanning of malformed JSON, if there is a data conversion failure, the scanner
+# will report the error and use a NULL value to fill the field. If the JSON format itself
+# is incorrect, rapidjson will stop parsing and report the corresponding error, because
+# parsing errors are difficult to recover from, we just use NULL to fill the remaining
+# fields, jump to next line and continue normal parsing.
+select bool_col, int_col, float_col, string_col from malformed_json
+---- TYPES
+boolean, int, float, string
+---- RESULTS
+true,0,NULL,'abc123'
+NULL,NULL,NULL,'NULL'
+true,2,NULL,'NULL'
+false,3,0.300000011921,'NULL'
+true,4,0.40000000596,'NULL'
+false,5,NULL,'NULL'
+true,6,NULL,'NULL'
+false,7,NULL,'NULL'
+true,8,0.800000011921,'abc123'
+false,9,0.899999976158,'abc123'
+true,10,1.0,'abc123'
+NULL,NULL,NULL,'NULL'
+NULL,NULL,NULL,'abc123'
+====

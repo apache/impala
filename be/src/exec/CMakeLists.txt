@@ -17,6 +17,7 @@
 
 add_subdirectory(avro)
 add_subdirectory(hbase)
+add_subdirectory(json)
 add_subdirectory(kudu)
 add_subdirectory(orc)
 add_subdirectory(parquet)

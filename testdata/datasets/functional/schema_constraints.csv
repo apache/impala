@@ -188,6 +188,14 @@ table_name:widerow, constraint:exclude, table_format:hbase/none/none
 # with no corresponding LOAD statement.
 table_name:nullformat_custom, constraint:exclude, table_format:hbase/none/none
 
+# complex_json has some complex json object, multiline_json has some multiline json object,
+# malformed_json has some malformed json object, overflow_json has some overflowing numerical value,
+# these tables are used in json scan test.
+table_name:complex_json, constraint:restrict_to, table_format:json/none/none
+table_name:multiline_json, constraint:restrict_to, table_format:json/none/none
+table_name:malformed_json, constraint:restrict_to, table_format:json/none/none
+table_name:overflow_json, constraint:restrict_to, table_format:json/none/none
+
 # Decimal can only be tested on formats Impala can write to (text and parquet).
 # TODO: add Avro once Hive or Impala can write Avro decimals
 table_name:decimal_tbl, constraint:restrict_to, table_format:text/none/none
@@ -198,16 +206,20 @@ table_name:decimal_tbl, constraint:restrict_to, table_format:kudu/none/none
 table_name:decimal_tiny, constraint:restrict_to, table_format:kudu/none/none
 table_name:decimal_tbl, constraint:restrict_to, table_format:orc/def/block
 table_name:decimal_tiny, constraint:restrict_to, table_format:orc/def/block
+table_name:decimal_tbl, constraint:restrict_to, table_format:json/none/none
+table_name:decimal_tiny, constraint:restrict_to, table_format:json/none/none
 
 table_name:decimal_rtf_tbl, constraint:restrict_to, table_format:text/none/none
 table_name:decimal_rtf_tbl, constraint:restrict_to, table_format:parquet/none/none
 table_name:decimal_rtf_tbl, constraint:restrict_to, table_format:kudu/none/none
 table_name:decimal_rtf_tbl, constraint:restrict_to, table_format:orc/def/block
+table_name:decimal_rtf_tbl, constraint:restrict_to, table_format:json/none/none
 
 table_name:decimal_rtf_tiny_tbl, constraint:restrict_to, table_format:text/none/none
 table_name:decimal_rtf_tiny_tbl, constraint:restrict_to, table_format:parquet/none/none
 table_name:decimal_rtf_tiny_tbl, constraint:restrict_to, table_format:kudu/none/none
 table_name:decimal_rtf_tiny_tbl, constraint:restrict_to, table_format:orc/def/block
+table_name:decimal_rtf_tiny_tbl, constraint:restrict_to, table_format:json/none/none
 
 table_name:avro_decimal_tbl, constraint:restrict_to, table_format:avro/snap/block
 
@@ -287,6 +299,7 @@ table_name:table_with_header_insert, constraint:restrict_to, table_format:parque
 # IMPALA-7368/IMPALA-7370/IMPALA-8198 adds DATE support for text, hbase, parquet and avro.
 # IMPALA-8801 adds DATE support for ORC.
 # IMPALA-8800 adds DATE support for Kudu.
+# IMPALA-10798 adds DATE support for JSON.
 # Other file-formats will be introduced later.
 table_name:date_tbl, constraint:restrict_to, table_format:parquet/none/none
 table_name:date_tbl, constraint:restrict_to, table_format:avro/snap/block
@@ -298,6 +311,7 @@ table_name:date_tbl, constraint:restrict_to, table_format:text/bzip/block
 table_name:date_tbl, constraint:restrict_to, table_format:text/gzip/block
 table_name:date_tbl, constraint:restrict_to, table_format:text/snap/block
 table_name:date_tbl, constraint:restrict_to, table_format:text/def/block
+table_name:date_tbl, constraint:restrict_to, table_format:json/none/none
 table_name:date_tbl_error, constraint:restrict_to, table_format:text/none/none
 table_name:date_tbl_error, constraint:restrict_to, table_format:text/bzip/block
 table_name:date_tbl_error, constraint:restrict_to, table_format:text/gzip/block

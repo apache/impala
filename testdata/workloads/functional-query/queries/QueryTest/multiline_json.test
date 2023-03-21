@@ -1,0 +1,27 @@
+====
+---- QUERY
+# Testing scanning of multi-line JSON, rapidjson can handle cases where line breaks appear
+# in JSON (except for those that appear in numbers and strings), so in most cases it can
+# scan multi-line JSON. However, line breaks in strings and numbers are treated as invalid
+# values, and the scanner returns null. Additionally, it should be noted that if the line
+# break in the multi-line JSON is near the beginning of the scan range, it may cause the
+# parser to misjudge the starting position of the first complete JSON (because it always
+# starts parsing from the position after the first line break). This usually has no
+# effect (except report a error), but if there happens to be a sub-object immediately
+# after the line break, itwill cause an extra line of data to be scanned. If the line
+# break in the multi-line JSONis also at the beginning of the scan range, it will cause
+# the last line of data from the previous scan range to be incomplete.
+select id, key, value from multiline_json
+---- TYPES
+int, string, string
+---- RESULTS
+1,'normal object','abcdefg'
+2,'multiline string','NULL'
+3,'multiline number','1234'
+4,'multiline object1','abcdefg'
+5,'multiline object2','abcdefg'
+6,'multiline object3','abcdefg'
+7,'multiline object4','abcdefg'
+8,'one line multiple objects','obj1'
+9,'one line multiple objects','obj2'
+====

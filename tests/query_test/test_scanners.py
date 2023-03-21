@@ -1930,6 +1930,8 @@ class TestBinaryType(ImpalaTestSuite):
       lambda v: v.get_value('table_format').file_format != 'kudu')
 
   def test_binary_type(self, vector):
+    if vector.get_value('table_format').file_format == 'json':
+      pytest.skip()
     self.run_test_case('QueryTest/binary-type', vector)
 
 

@@ -35,9 +35,9 @@ class TestStringQueries(ImpalaTestSuite):
     super(TestStringQueries, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
       create_exec_option_dimension(disable_codegen_options=[False, True]))
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format in ['text'] and
-        v.get_value('table_format').compression_codec in ['none'])
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format in ['text', 'json']
+        and v.get_value('table_format').compression_codec in ['none'])
     # Run these queries through both beeswax and HS2 to get coverage of CHAR/VARCHAR
     # returned via both protocols.
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
@@ -80,8 +80,8 @@ class TestCharFormats(ImpalaTestSuite):
         v.get_value('table_format').compression_codec in ['snap']) or
         v.get_value('table_format').file_format in ['parquet'] or
         v.get_value('table_format').file_format in ['orc'] or
-        (v.get_value('table_format').file_format in ['text'] and
-        v.get_value('table_format').compression_codec in ['none']))
+        (v.get_value('table_format').file_format in ['text', 'json']
+         and v.get_value('table_format').compression_codec in ['none']))
     # Run these queries through both beeswax and HS2 to get coverage of CHAR/VARCHAR
     # returned via both protocols.
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())

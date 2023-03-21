@@ -66,7 +66,6 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc,
 
       bool reuse_data = type.IsVarLenStringType() &&
           !(len != 0 && (copy_string || need_escape));
-      if (type.type == TYPE_CHAR) reuse_data &= (buffer_len <= len);
 
       bool base64_decode = false;
       if (auxType->IsBinaryStringSubtype()) {

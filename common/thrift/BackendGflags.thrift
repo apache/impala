@@ -262,4 +262,6 @@ struct TBackendGflags {
   115: required i32 iceberg_reload_new_files_threshold
 
   116: required bool enable_skipping_older_events;
+
+  117: required bool enable_json_scanner
 }
