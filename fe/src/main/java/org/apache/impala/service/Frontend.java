@@ -2059,6 +2059,7 @@ public class Frontend {
       }
 
       // Counters about this group set.
+      int available_cores = expectedTotalCores(group_set);
       String profileName = "Executor group " + (i + 1);
       if (group_set.isSetExec_group_name_prefix()
           && !group_set.getExec_group_name_prefix().isEmpty()) {
@@ -2067,6 +2068,7 @@ public class Frontend {
       TRuntimeProfileNode groupSetProfile = createTRuntimeProfileNode(profileName);
       addCounter(groupSetProfile,
           new TCounter(MEMORY_MAX, TUnit.BYTES, group_set.getMax_mem_limit()));
+      addCounter(groupSetProfile, new TCounter(CPU_MAX, TUnit.UNIT, available_cores));
       FrontendProfile.getCurrent().addChildrenProfile(groupSetProfile);
 
       // Find out the per host memory estimated from two possible sources.
@@ -2089,28 +2091,38 @@ public class Frontend {
 
       boolean cpuReqSatisfied = true;
       int scaled_cores_requirement = -1;
-      int available_cores = -1;
       if (ProcessingCost.isComputeCost(queryOptions)) {
         Preconditions.checkState(cores_requirement > 0);
         scaled_cores_requirement = (int) Math.min(Integer.MAX_VALUE,
             Math.ceil(
                 cores_requirement / BackendConfig.INSTANCE.getQueryCpuCountDivisor()));
-        available_cores = expectedTotalCores(group_set);
         cpuReqSatisfied = scaled_cores_requirement <= available_cores;
-        addCounter(groupSetProfile, new TCounter(CPU_MAX, TUnit.UNIT, available_cores));
         addCounter(
             groupSetProfile, new TCounter(CPU_ASK, TUnit.UNIT, scaled_cores_requirement));
         addCounter(groupSetProfile,
             new TCounter(EFFECTIVE_PARALLELISM, TUnit.UNIT, cores_requirement));
       }
 
-      if (memReqSatisfied && cpuReqSatisfied) {
+      boolean matchFound = false;
+      if (queryOptions.isSetRequest_pool()) {
+        if (!default_executor_group) {
+          Preconditions.checkState(group_set.getExec_group_name_prefix().endsWith(
+              queryOptions.getRequest_pool()));
+        }
+        reason = "query option REQUEST_POOL=" + queryOptions.getRequest_pool()
+            + " is set. Memory and cpu limit checking is skipped.";
+        addInfoString(groupSetProfile, VERDICT, reason);
+        matchFound = true;
+      } else if (memReqSatisfied && cpuReqSatisfied) {
         reason = "suitable group found (estimated per-host memory="
             + PrintUtils.printBytes(per_host_mem_estimate)
             + ", estimated cpu cores required=" + cores_requirement
             + ", scaled cpu cores=" + scaled_cores_requirement + ")";
         addInfoString(groupSetProfile, VERDICT, "Match");
+        matchFound = true;
+      }
 
+      if (matchFound) {
         // Set the group name prefix in both the returned query options and
         // the query context for non default group setup.
         if (!default_executor_group) {
@@ -2120,7 +2132,6 @@ public class Frontend {
             req.query_exec_request.query_ctx.setRequest_pool(namePrefix);
           }
         }
-
         break;
       }
 
