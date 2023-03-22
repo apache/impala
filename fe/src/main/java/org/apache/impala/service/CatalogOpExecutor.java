@@ -6832,6 +6832,11 @@ public class CatalogOpExecutor {
       response.getResult().setVersion(
           catalog_.waitForSyncDdlVersion(response.getResult()));
     }
+
+    if (update.isSetDebug_action()) {
+      DebugUtils.executeDebugAction(update.getDebug_action(),
+          DebugUtils.INSERT_FINISH_DELAY);
+    }
     return response;
   }
 

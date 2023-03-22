@@ -258,6 +258,9 @@ struct TUpdateCatalogRequest {
 
   // Descriptor object about the Iceberg operation.
   10: optional TIcebergOperationParam iceberg_operation
+
+  // Passes the debug actions to catalogd if the query option is set.
+  11: optional string debug_action
 }
 
 // Response from a TUpdateCatalogRequest
