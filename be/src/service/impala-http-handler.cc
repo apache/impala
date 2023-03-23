@@ -105,6 +105,14 @@ ImpalaHttpHandler::ImpalaHttpHandler(ImpalaServer* server,
 void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver, bool metrics_only) {
   DCHECK(webserver != NULL);
 
+  Webserver::RawUrlCallback healthz_callback =
+    [this](const auto& req, auto* data, auto* response) {
+      return this->HealthzHandler(req, data, response);
+    };
+  webserver->RegisterUrlCallback("/healthz", healthz_callback);
+
+  if (metrics_only) return;
+
   if (is_admissiond_) {
     // The admissiond only exposes a subset of endpoints that have info relevant to
     // admission control.
@@ -118,14 +126,6 @@ void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver, bool metrics_only
         MakeCallback(this, &ImpalaHttpHandler::ResetResourcePoolStatsHandler), false);
     return;
   }
-
-  Webserver::RawUrlCallback healthz_callback =
-    [this](const auto& req, auto* data, auto* response) {
-      return this->HealthzHandler(req, data, response);
-    };
-  webserver->RegisterUrlCallback("/healthz", healthz_callback);
-
-  if (metrics_only) return;
 
   webserver->RegisterUrlCallback("/backends", "backends.tmpl",
       MakeCallback(this, &ImpalaHttpHandler::BackendsHandler), true);
@@ -210,7 +210,9 @@ void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver, bool metrics_only
 
 void ImpalaHttpHandler::HealthzHandler(const Webserver::WebRequest& req,
     std::stringstream* data, HttpStatusCode* response) {
-  if (server_->IsHealthy()) {
+  if ((server_ != nullptr && server_->IsHealthy()) ||
+      (is_admissiond_ &&
+       AdmissiondEnv::GetInstance()->admission_control_service()->IsHealthy())) {
     (*data) << "OK";
     *response = HttpStatusCode::Ok;
     return;

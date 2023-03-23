@@ -54,31 +54,49 @@ class CustomClusterRunner {
    */
   public static int StartImpalaCluster(String args, Map<String, String> env,
       String startArgs) throws IOException, InterruptedException {
-    return StartImpalaCluster(args, args, args, env, startArgs);
+    return StartImpalaCluster(args, args, args, "", env, startArgs);
   }
 
   public static int StartImpalaCluster(String impaladArgs, String catalogdArgs,
       String statestoredArgs) throws IOException, InterruptedException {
     return StartImpalaCluster(
-        impaladArgs, catalogdArgs, statestoredArgs, new HashMap<String, String>(), "");
+        impaladArgs, catalogdArgs, statestoredArgs, "", new HashMap<String, String>(),
+        "");
   }
 
   public static int StartImpalaCluster(String impaladArgs, String catalogdArgs,
       String statestoredArgs, String startArgs) throws IOException, InterruptedException {
-    return StartImpalaCluster(impaladArgs, catalogdArgs, statestoredArgs,
+    return StartImpalaCluster(impaladArgs, catalogdArgs, statestoredArgs, "",
         new HashMap<String, String>(), startArgs);
+  }
+
+  public static int StartImpalaCluster(String impaladArgs, String catalogdArgs,
+      String statestoredArgs, Map<String, String> env, String startArgs)
+      throws IOException, InterruptedException {
+    return StartImpalaCluster(impaladArgs, catalogdArgs, statestoredArgs, "",
+        env, startArgs);
   }
 
   /**
    * Starts Impala, setting environment variables in 'env', and passing 'impalad_args',
-   * 'catalogd_args', 'statestored_args', and 'startArgs' to start-impala-cluster.py.
+   * 'catalogd_args', 'statestored_args', 'admissiond_args' and 'startArgs' to
+   * start-impala-cluster.py.
    */
   public static int StartImpalaCluster(String impaladArgs, String catalogdArgs,
-      String statestoredArgs, Map<String, String> env, String startArgs)
+      String statestoredArgs, String admissiondArgs, Map<String, String> env,
+      String startArgs)
       throws IOException, InterruptedException {
-    ProcessBuilder pb = new ProcessBuilder(new String[] {"start-impala-cluster.py",
-        "--impalad_args", impaladArgs, "--catalogd_args", catalogdArgs,
-        "--state_store_args", statestoredArgs, startArgs});
+    ProcessBuilder pb;
+    if (!admissiondArgs.isEmpty()) {
+      pb = new ProcessBuilder(new String[] {"start-impala-cluster.py",
+          "--impalad_args", impaladArgs, "--catalogd_args", catalogdArgs,
+          "--state_store_args", statestoredArgs, "--enable_admission_service", "true",
+          "--admissiond_args", admissiondArgs, startArgs});
+    } else {
+      pb = new ProcessBuilder(new String[] {"start-impala-cluster.py",
+          "--impalad_args", impaladArgs, "--catalogd_args", catalogdArgs,
+          "--state_store_args", statestoredArgs, startArgs});
+    }
     pb.redirectErrorStream(true);
     Map<String, String> origEnv = pb.environment();
     origEnv.putAll(env);

@@ -74,8 +74,13 @@ class AdmissionControlService : public AdmissionControlServiceIf,
   /// appear in 'current_backends'. Called in response to statestore updates.
   void CancelQueriesOnFailedCoordinators(std::unordered_set<UniqueIdPB> current_backends);
 
+  /// Returns whether AdmissionControlService is healthy and is able to accept admission
+  /// related RPCs.
+  bool IsHealthy() { return service_started_.load(); }
+
  private:
   friend class ImpalaHttpHandler;
+  friend class AdmissiondEnv;
 
   struct AdmissionState {
    public:
@@ -154,6 +159,9 @@ class AdmissionControlService : public AdmissionControlServiceIf,
   /// version to 'update_version' if 'update_version' is higher. Returns true if update
   /// was successful.
   bool CheckAndUpdateHeartbeat(const UniqueIdPB& coord_id, int64_t update_version);
+
+  /// Indicates whether the admission control service is ready.
+  std::atomic_bool service_started_{false};
 };
 
 } // namespace impala

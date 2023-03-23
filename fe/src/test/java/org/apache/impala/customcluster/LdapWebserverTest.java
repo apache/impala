@@ -69,7 +69,7 @@ public class LdapWebserverTest {
   WebClient client_ = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
 
   public void setUp(String extraArgs, String startArgs, String catalogdArgs,
-      String stateStoredArgs) throws Exception {
+      String stateStoredArgs, String admissiondArgs) throws Exception {
     String uri =
         String.format("ldap://localhost:%s", serverRule.getLdapServer().getPort());
     String dn = "cn=#UID,ou=Users,dc=myorg,dc=com";
@@ -84,7 +84,7 @@ public class LdapWebserverTest {
     catalogdArgs = catalogdArgs + " " + impalaArgs;
     stateStoredArgs = stateStoredArgs + " " + impalaArgs;
     int ret = CustomClusterRunner.StartImpalaCluster(impalaArgs, catalogdArgs,
-        stateStoredArgs, env, startArgs);
+        stateStoredArgs, admissiondArgs, env, startArgs);
     assertEquals(0, ret);
   }
 
@@ -144,7 +144,7 @@ public class LdapWebserverTest {
 
   @Test
   public void testWebserver() throws Exception {
-    setUp("", "", "", "");
+    setUp("", "", "", "", "");
     // start-impala-cluster contacts the webui to confirm the impalads have started, so
     // there will already be some successful auth attempts.
     verifyMetrics(Range.atLeast(1L), zero, Range.atLeast(1L), zero);
@@ -178,7 +178,7 @@ public class LdapWebserverTest {
             + "--ldap_group_class_key=groupOfUniqueNames "
             + "--ldap_bind_dn=%s --ldap_bind_password_cmd='echo -n %s' ",
         TEST_USER_GROUP, TEST_USER_1, TEST_USER_3, TEST_USER_DN_1, TEST_PASSWORD_1),
-        "", "", "");
+        "", "", "", "");
     // start-impala-cluster contacts the webui to confirm the impalads have started, so
     // there will already be some successful auth attempts.
     verifyMetrics(Range.atLeast(1L), zero, Range.atLeast(1L), zero);
@@ -214,9 +214,10 @@ public class LdapWebserverTest {
   @Test
   public void testMetricsWebserver() throws Exception {
     // Use 'per_impalad_args' to turn the metrics webserver on only for the first impalad.
-    setUp("", "--per_impalad_args=--metrics_webserver_port=25030 ",
+    setUp("", "--per_impalad_args=--metrics_webserver_port=25040 ",
            "--metrics_webserver_port=25021 ",
-           "--metrics_webserver_port=25011 ");
+           "--metrics_webserver_port=25011 ",
+           "--metrics_webserver_port=25031 ");
     // Attempt to access the regular webserver without a username/password, should fail.
     WebClient noUsername = new WebClient();
     String result = noUsername.readContent("/");
@@ -228,9 +229,10 @@ public class LdapWebserverTest {
     assertTrue(result, result.contains("Must authenticate with Basic authentication."));
 
     // Attempt to access the metrics webserver without a username/password.
-    WebClient noUsernameMetrics = new WebClient(25030);
+    WebClient noUsernameMetrics = new WebClient(25040);
     WebClient catalogdMetrics = new WebClient(25021);
     WebClient statestoredMetrics = new WebClient(25011);
+    WebClient admissiondMetrics = new WebClient(25031);
     // Should succeed for the metrics endpoints.
     for (String endpoint :
         new String[] {"/metrics", "/jsonmetrics", "/metrics_prometheus", "/healthz"}) {
@@ -241,6 +243,9 @@ public class LdapWebserverTest {
       assertFalse(
           result, result.contains("Must authenticate with Basic authentication."));
       result = statestoredMetrics.readContent(endpoint);
+      assertFalse(
+          result, result.contains("Must authenticate with Basic authentication."));
+      result = admissiondMetrics.readContent(endpoint);
       assertFalse(
           result, result.contains("Must authenticate with Basic authentication."));
     }
@@ -260,7 +265,7 @@ public class LdapWebserverTest {
     String strictLocalhostArgs = "--trusted_domain_strict_localhost=" +
       String.valueOf(strictLocalhost);
     setUp("--trusted_domain=localhost --trusted_domain_use_xff_header=true " +
-        strictLocalhostArgs, "", "", "");
+        strictLocalhostArgs, "", "", "", "");
 
     // Case 1: Authenticate as 'Test1Ldap' with the right password '12345'
     attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", "127.0.0.1", false);
@@ -317,7 +322,7 @@ public class LdapWebserverTest {
 
   @Test
   public void testWebserverTrustedAuthHeader() throws Exception {
-    setUp("--trusted_auth_header=X-Trusted-Proxy-Auth-Header", "", "", "");
+    setUp("--trusted_auth_header=X-Trusted-Proxy-Auth-Header", "", "", "", "");
 
     // Case 1: Authenticate as 'Test1Ldap' with the right password '12345'.
     attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", null, true);
@@ -357,7 +362,7 @@ public class LdapWebserverTest {
               "--jwt_token_auth=true --jwt_validate_signature=true --jwks_file_path=%s "
                   + "--jwt_allow_without_tls=true",
               jwksFilename),
-        "", "", "");
+        "", "", "", "");
 
     // Case 1: Authenticate with valid JWT Token in HTTP header.
     String jwtToken =
@@ -389,7 +394,7 @@ public class LdapWebserverTest {
    */
   @Test
   public void testDisplaySrcUsernameInQueryCause() throws Exception {
-    setUp("", "", "", "");
+    setUp("", "", "", "", "");
     // Create client
     THttpClient transport = new THttpClient("http://localhost:28000");
     Map<String, String> headers = new HashMap<String, String>();
@@ -439,7 +444,7 @@ public class LdapWebserverTest {
    */
   @Test
   public void testSetGLogLevel() throws Exception {
-    setUp("", "", "", "");
+    setUp("", "", "", "", "");
     // Validate defaults
     JSONObject json = client_.jsonGet("/log_level?json");
     assertEquals("1", json.get("glog_level"));
@@ -514,7 +519,7 @@ public class LdapWebserverTest {
    */
   @Test
   public void testSetJavaLogLevel() throws Exception {
-    setUp("", "", "", "");
+    setUp("", "", "", "", "");
     // Validate defaults
     JSONObject json = client_.jsonGet("/log_level?json");
     assertEquals("org.apache.impala : DEBUG\n", json.get("get_java_loglevel_result"));

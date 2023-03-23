@@ -87,6 +87,10 @@ Status AdmissiondEnv::Init() {
       DaemonEnv::GetInstance()->metrics(), "mem-tracker.process");
 
   http_handler_->RegisterHandlers(DaemonEnv::GetInstance()->webserver());
+  if (DaemonEnv::GetInstance()->metrics_webserver() != nullptr) {
+    http_handler_->RegisterHandlers(
+        DaemonEnv::GetInstance()->metrics_webserver(), /* metrics_only */ true);
+  }
 
   IpAddr ip_address;
   RETURN_IF_ERROR(HostnameToIpAddr(FLAGS_hostname, &ip_address));
@@ -126,6 +130,10 @@ Status AdmissiondEnv::StartServices() {
   LOG(INFO) << "Starting KRPC service.";
   RETURN_IF_ERROR(rpc_mgr_->StartServices());
 
+  // Mark service as started.
+  // Should be called only after the statestore subscriber service and KRPC service
+  // has started.
+  admission_control_svc_->service_started_ = true;
   return Status::OK();
 }
 
