@@ -222,6 +222,12 @@ DEFINE_int64_hidden(min_processing_per_thread, 10000000,
     "number of cores in selected executor group, MT_DOP, or PROCESSING_COST_MIN_THREAD "
     "query option. Must be a positive integer. Default to 10M.");
 
+DEFINE_bool_hidden(skip_resource_checking_on_last_executor_group_set, true,
+    "(Advance) If true, memory and cpu resource checking will be skipped when a query "
+    "is being planned against the last (largest) executor group set. Setting true will "
+    "ensure that query will always get admitted into last executor group set if it does "
+    "not fit in any other group set.");
+
 using strings::Substitute;
 
 namespace impala {
@@ -399,6 +405,8 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_processing_cost_use_equal_expr_weight(
       FLAGS_processing_cost_use_equal_expr_weight);
   cfg.__set_min_processing_per_thread(FLAGS_min_processing_per_thread);
+  cfg.__set_skip_resource_checking_on_last_executor_group_set(
+      FLAGS_skip_resource_checking_on_last_executor_group_set);
   return Status::OK();
 }
 

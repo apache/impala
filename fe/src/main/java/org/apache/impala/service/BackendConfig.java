@@ -390,4 +390,8 @@ public class BackendConfig {
   public long getMinProcessingPerThread() {
     return backendCfg_.min_processing_per_thread;
   }
+
+  public boolean isSkipResourceCheckingOnLastExecutorGroupSet() {
+    return backendCfg_.skip_resource_checking_on_last_executor_group_set;
+  }
 }

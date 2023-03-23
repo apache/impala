@@ -248,4 +248,6 @@ struct TBackendGflags {
   108: required bool processing_cost_use_equal_expr_weight
 
   109: required i64 min_processing_per_thread
+
+  110: required bool skip_resource_checking_on_last_executor_group_set
 }

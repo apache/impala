@@ -2122,6 +2122,13 @@ public class Frontend {
         matchFound = true;
       }
 
+      if (!matchFound && (i >= num_executor_group_sets - 1)
+          && BackendConfig.INSTANCE.isSkipResourceCheckingOnLastExecutorGroupSet()) {
+        reason = "no executor group set fit. Admit to last executor group set.";
+        addInfoString(groupSetProfile, VERDICT, reason);
+        matchFound = true;
+      }
+
       if (matchFound) {
         // Set the group name prefix in both the returned query options and
         // the query context for non default group setup.

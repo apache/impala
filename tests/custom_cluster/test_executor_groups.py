@@ -909,11 +909,34 @@ class TestExecutorGroups(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   def test_query_cpu_count_divisor_fraction(self):
     # Expect to run the query on the large group
-    coordinator_test_args = "-query_cpu_count_divisor=0.2 "
+    coordinator_test_args = "-query_cpu_count_divisor=0.03 "
     self._setup_three_exec_group_cluster(coordinator_test_args)
+    options = copy.deepcopy(CPU_DOP_OPTIONS)
+    options['MT_DOP'] = '1'
+    self._run_query_and_verify_profile(CPU_TEST_QUERY, options,
+        ["Executor Group: root.large-group", "EffectiveParallelism: 4",
+         "ExecutorGroupsConsidered: 3", "CpuAsk: 134",
+         "Verdict: Match"])
+
+    # Expect that a query still admitted to last group even if
+    # its resource requirement exceed the limit on that last executor group.
     self._run_query_and_verify_profile(CPU_TEST_QUERY, CPU_DOP_OPTIONS,
         ["Executor Group: root.large-group", "EffectiveParallelism: 7",
-         "ExecutorGroupsConsidered: 3"])
+         "ExecutorGroupsConsidered: 3", "CpuAsk: 234",
+         "Verdict: no executor group set fit. Admit to last executor group set."])
+    self.client.close()
+
+  @pytest.mark.execute_serially
+  def test_no_skip_resource_checking(self):
+    """This test check that executor group limit is enforced if
+    skip_resource_checking_on_last_executor_group_set=false."""
+    coordinator_test_args = ("-query_cpu_count_divisor=0.03 "
+        "-skip_resource_checking_on_last_executor_group_set=false ")
+    self._setup_three_exec_group_cluster(coordinator_test_args)
+    self.client.set_configuration(CPU_DOP_OPTIONS)
+    result = self.execute_query_expect_failure(self.client, CPU_TEST_QUERY)
+    assert ("AnalysisException: The query does not fit largest executor group sets. "
+        "Reason: not enough cpu cores (require=234, max=192).") in str(result)
     self.client.close()
 
   @pytest.mark.execute_serially
