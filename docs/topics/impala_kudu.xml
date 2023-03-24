@@ -1388,6 +1388,65 @@ kudu.table_name  | impala::some_database.table_name_demo
     </conbody>
 
   </concept>
+  <concept id="multi_rows_transaction">
+    <title>Multi-row Transactions for Kudu Tables</title>
+    <conbody>
+      <p> When you use Impala to query Kudu tables, you can insert multiple rows into a Kudu table
+        in a single transaction. This broader transactional support between Kudu and Impala is
+        available to you at a query level and at a session level.</p></conbody>
+  </concept>
+  <concept id="using_multi_row_transaction">
+    <title>Using Multi-row Transaction Capability</title>
+    <conbody>
+      <p>You can control this multi-row transaction feature by using the following query option. You
+        may set this option at per-query or per-session level. When the option is enabled for a
+        session, Impala will open one Kudu transaction for each INSERT or CTAS statement.</p>
+      <codeblock>set ENABLE_KUDU_TRANSACTION=true</codeblock>
+      <p>The following example shows how to insert three rows into a table in a single
+        transaction.</p>
+      <p><b>Example:</b></p>
+      <p><ol>
+          <li>Create table kudu-test-tbl-1.
+            <codeblock>create table kudu-test-tbl-1 (a int primary key, b string) partition by hash(a) partitions 8 stored as kudu;</codeblock></li>
+          <li>Enable the multi-row transaction feature at the query
+            level.<codeblock>set ENABLE_KUDU_TRANSACTION=true;</codeblock></li>
+          <li>Insert three rows into the newly created table in a single transaction.
+            <codeblock>insert into kudu-test-tbl-1 values (0, 'a'), (1, 'b'), (2, 'c');</codeblock></li>
+          <li>Verify the number of rows of this table.
+            <codeblock>select count(*) from kudu-test-tbl-1;</codeblock></li>
+        </ol></p>
+      <p><b>Note:</b></p>
+      <p>If you insert multiple rows with duplicate keys into a table, the transaction is aborted.
+        To ignore the conflicts with duplicate keys during the transaction, start Impala daemons
+        with the flag <codeph>--kudu_ignore_conflicts_in_transaction=true</codeph>. This flag is set
+        to False by default. Note that this flag takes effect only if the flag
+          <codeph>--kudu_ignore_conflicts</codeph> is set as True. The flag
+          <codeph>--kudu_ignore_conflicts</codeph> is set to True by default.</p>
+      <p>When you enable the option <codeph>ENABLE_KUDU_TRANSACTION</codeph>, each Impala statement
+        is executed with a new opened transaction. If the statement is executed successfully, then
+        the Impala Coordinator commits the transaction. If there is an error returned by Kudu, then
+        Impala aborts the transaction.</p>
+      <p>This applies to the following statements:</p>
+      <p><ul>
+        <li>INSERT</li>
+        <li>CREATE TABLE AS SELECT</li>
+      </ul></p>
+    </conbody>
+  </concept>
+  <concept id="advantages">
+    <title>Advantages of Using This Capability</title>
+    <conbody>
+      <p>You can now easily build and manage Kudu applications, especially when Impala is used to
+        interact with the data in the Kudu table. With multi-row transaction, you can atomically
+        ingest large number of rows into a Kudu table with INSERT-SELECT or CTAS statement.</p></conbody>
+  </concept>
+  <concept id="limitation">
+    <title>Limitation</title>
+    <conbody>
+      <p>INSERT and CTAS statements are supported for Kudu tables in the context of a multi-row
+        transaction, but UPDATE/UPSERT/DELETE statements are not supported in multi-row transaction
+        as of now.</p></conbody>
+  </concept>
 
   <concept id="kudu_consistency">
 
@@ -1395,49 +1454,37 @@ kudu.table_name  | impala::some_database.table_name_demo
 
     <conbody>
 
-      <p>
-        Kudu tables have consistency characteristics such as uniqueness, controlled by the
-        primary key columns, and non-nullable columns. The emphasis for consistency is on
-        preventing duplicate or incomplete data from being stored in a table.
-      </p>
+      <p>Kudu tables have consistency characteristics such as uniqueness, controlled by the primary
+        key columns, and non-nullable columns. The emphasis for consistency is on preventing
+        duplicate or incomplete data from being stored in a table. </p>
 
-      <p>
-        Currently, Kudu does not enforce strong consistency for order of operations, total
-        success or total failure of a multi-row statement, or data that is read while a write
-        operation is in progress. Changes are applied atomically to each row, but not applied
-        as a single unit to all rows affected by a multi-row DML statement. That is, Kudu does
-        not currently have atomic multi-row statements or isolation between statements.
-      </p>
+      <p>Currently, Kudu does not enforce strong consistency for order of operations, or data that
+        is read while a write operation is in progress. If multi-rows transaction is enabled,
+        insertion of multiple rows in one insertion statement will be atomic, i.e. total success or
+        total failure. But if multi-row transaction is not enabled, changes are applied atomically
+        to each row, not applied as a single unit to all rows affected by a multi-row DML statement. </p>
 
-      <p>
-        If some rows are rejected during a DML operation because of a mismatch with duplicate
-        primary key values, <codeph>NOT NULL</codeph> constraints, and so on, the statement
-        succeeds with a warning. Impala still inserts, deletes, or updates the other rows that
-        are not affected by the constraint violation.
-      </p>
+      <p>When multi-row transaction is not enabled and if some rows are rejected during a DML
+        operation because of a mismatch with duplicate primary key values, <codeph>NOT NULL</codeph>
+        constraints, and so on, the statement succeeds with a warning. Impala still inserts,
+        deletes, or updates the other rows that are not affected by the constraint violation. </p>
 
-      <p>
-        Consequently, the number of rows affected by a DML operation on a Kudu table might be
-        different than you expect.
-      </p>
+      <p>Consequently, the number of rows affected by a DML operation on a Kudu table might be
+        different than you expect. </p>
 
-      <p>
-        Because there is no strong consistency guarantee for information being inserted into,
-        deleted from, or updated across multiple tables simultaneously, consider denormalizing
-        the data where practical. That is, if you run separate <codeph>INSERT</codeph>
-        statements to insert related rows into two different tables, one <codeph>INSERT</codeph>
-        might fail while the other succeeds, leaving the data in an inconsistent state. Even if
-        both inserts succeed, a join query might happen during the interval between the
-        completion of the first and second statements, and the query would encounter incomplete
-        inconsistent data. Denormalizing the data into a single wide table can reduce the
-        possibility of inconsistency due to multi-table operations.
-      </p>
+      <p>Because there is no strong consistency guarantee for information being inserted into with
+        separate INSERT statements, deleted from, or updated across multiple tables simultaneously,
+        consider denormalizing the data where practical. That is, if you run separate
+          <codeph>INSERT</codeph> statements to insert related rows into two different tables, one
+          <codeph>INSERT</codeph> might fail while the other succeeds, leaving the data in an
+        inconsistent state. Even if both inserts succeed, a join query might happen during the
+        interval between the completion of the first and second statements, and the query would
+        encounter incomplete inconsistent data. Denormalizing the data into a single wide table can
+        reduce the possibility of inconsistency due to multi-table operations. </p>
 
-      <p>
-        Information about the number of rows affected by a DML operation is reported in
-        <cmdname>impala-shell</cmdname> output, and in the <codeph>PROFILE</codeph> output, but
-        is not currently reported to HiveServer2 clients such as JDBC or ODBC applications.
-      </p>
+      <p>Information about the number of rows affected by a DML operation is reported in
+          <cmdname>impala-shell</cmdname> output, and in the <codeph>PROFILE</codeph> output, but is
+        not currently reported to HiveServer2 clients such as JDBC or ODBC applications. </p>
 
     </conbody>
 
