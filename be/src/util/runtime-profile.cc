@@ -82,6 +82,15 @@ const string RuntimeProfileBase::INACTIVE_TIME_COUNTER_NAME = "InactiveTotalTime
 const string RuntimeProfileBase::SKEW_SUMMARY = "skew(s) found at";
 const string RuntimeProfileBase::SKEW_DETAILS = "Skew details";
 
+const string RuntimeProfile::FRAGMENT_INSTANCE_LIFECYCLE_TIMINGS =
+    "Fragment Instance Lifecycle Timings";
+const string RuntimeProfile::BUFFER_POOL = "Buffer pool";
+const string RuntimeProfile::DEQUEUE = "Dequeue";
+const string RuntimeProfile::ENQUEUE = "Enqueue";
+const string RuntimeProfile::HASH_TABLE = "Hash Table";
+const string RuntimeProfile::PREFIX_FILTER = "Filter ";
+const string RuntimeProfile::PREFIX_GROUPING_AGGREGATOR = "GroupingAggregator ";
+
 constexpr ProfileEntryPrototype::Significance ProfileEntryPrototype::ALLSIGNIFICANCE[];
 
 /// Helper to interpret the bit pattern of 'val' as T, which can either be an int64_t or
@@ -109,6 +118,16 @@ static int64_t BitcastToInt64(T val) {
 static int32_t GetProfileVersion(const TRuntimeProfileTree& tree) {
   // Assume version 1 if not set, because profile_version was only added in v2.
   return tree.__isset.profile_version ? tree.profile_version : 1;
+}
+
+static bool UntimedProfileNode(const string& name) {
+  return name.compare(RuntimeProfile::FRAGMENT_INSTANCE_LIFECYCLE_TIMINGS) == 0
+      || name.compare(RuntimeProfile::BUFFER_POOL) == 0
+      || name.compare(RuntimeProfile::DEQUEUE) == 0
+      || name.compare(RuntimeProfile::ENQUEUE) == 0
+      || name.compare(RuntimeProfile::HASH_TABLE) == 0
+      || name.rfind(RuntimeProfile::PREFIX_FILTER, 0) == 0
+      || name.rfind(RuntimeProfile::PREFIX_GROUPING_AGGREGATOR, 0) == 0;
 }
 
 static RuntimeProfile::Verbosity DefaultVerbosity() {
@@ -354,7 +373,7 @@ void RuntimeProfile::InitFromThrift(const TRuntimeProfileNode& node, ObjectPool*
 }
 
 void AggregatedRuntimeProfile::UpdateAggregatedFromInstance(
-    RuntimeProfile* other, int idx) {
+    RuntimeProfile* other, int idx, bool add_default_counters) {
   {
     lock_guard<SpinLock> l(input_profile_name_lock_);
     DCHECK(!input_profile_names_.empty())
@@ -362,14 +381,14 @@ void AggregatedRuntimeProfile::UpdateAggregatedFromInstance(
     input_profile_names_[idx] = other->name();
   }
 
-  UpdateAggregatedFromInstanceRecursive(other, idx);
+  UpdateAggregatedFromInstanceRecursive(other, idx, add_default_counters);
 
   // Recursively compute times on the whole tree.
   ComputeTimeInProfile();
 }
 
 void AggregatedRuntimeProfile::UpdateAggregatedFromInstanceRecursive(
-    RuntimeProfile* other, int idx) {
+    RuntimeProfile* other, int idx, bool add_default_counters) {
   DCHECK(other != NULL);
   DCHECK_GE(idx, 0);
   DCHECK_LT(idx, num_input_profiles_);
@@ -395,15 +414,19 @@ void AggregatedRuntimeProfile::UpdateAggregatedFromInstanceRecursive(
       DCHECK(other_child != nullptr)
           << other->children_[i].first->name() << " must be a RuntimeProfile";
       bool indent_other_child = other->children_[i].second;
-      AggregatedRuntimeProfile* child = dynamic_cast<AggregatedRuntimeProfile*>(
-          AddOrCreateChild(other_child->name(), &insert_pos, [this, other_child] () {
-              AggregatedRuntimeProfile* child2 = Create(
-                  pool_, other_child->name(), num_input_profiles_, /*is_root=*/false);
-              child2->metadata_ = other_child->metadata();
-              return child2;
-            }, indent_other_child));
+      bool is_timed = add_default_counters && !UntimedProfileNode(other_child->name());
+      AggregatedRuntimeProfile* child =
+          dynamic_cast<AggregatedRuntimeProfile*>(AddOrCreateChild(
+              other_child->name(), &insert_pos,
+              [this, other_child, is_timed]() {
+                AggregatedRuntimeProfile* child2 = Create(pool_, other_child->name(),
+                    num_input_profiles_, /*is_root=*/false, is_timed);
+                child2->metadata_ = other_child->metadata();
+                return child2;
+              },
+              indent_other_child));
       DCHECK(child != nullptr);
-      child->UpdateAggregatedFromInstanceRecursive(other_child, idx);
+      child->UpdateAggregatedFromInstanceRecursive(other_child, idx, is_timed);
     }
   }
 }
@@ -531,7 +554,7 @@ void AggregatedRuntimeProfile::UpdateEventSequencesFromInstance(
 
 // TODO: do we need any special handling of the computed timers? Like local/total time.
 void AggregatedRuntimeProfile::UpdateAggregatedFromInstances(
-    const TRuntimeProfileTree& src, int start_idx) {
+    const TRuntimeProfileTree& src, int start_idx, bool add_default_counters) {
   DCHECK(FLAGS_gen_experimental_profile)
     << "Aggregated profiles should only be used on the coordinator when enabled by flag";
   if (UNLIKELY(src.nodes.size()) == 0) return;
@@ -551,14 +574,15 @@ void AggregatedRuntimeProfile::UpdateAggregatedFromInstances(
   }
 
   int node_idx = 0;
-  UpdateAggregatedFromInstancesRecursive(src, &node_idx, start_idx);
+  UpdateAggregatedFromInstancesRecursive(src, &node_idx, start_idx, add_default_counters);
 
   // Recursively compute times on the whole tree.
   ComputeTimeInProfile();
 }
 
 void AggregatedRuntimeProfile::UpdateAggregatedFromInstancesRecursive(
-    const TRuntimeProfileTree& src, int* node_idx, int start_idx) {
+    const TRuntimeProfileTree& src, int* node_idx, int start_idx,
+    bool add_default_counters) {
   DCHECK_LT(*node_idx, src.nodes.size());
   const TRuntimeProfileNode& node = src.nodes[*node_idx];
   DCHECK(node.__isset.aggregated);
@@ -572,15 +596,19 @@ void AggregatedRuntimeProfile::UpdateAggregatedFromInstancesRecursive(
     // Update children with matching names; create new ones if they don't match.
     for (int i = 0; i < node.num_children; ++i) {
       const TRuntimeProfileNode& tchild = src.nodes[*node_idx];
-      AggregatedRuntimeProfile* child = dynamic_cast<AggregatedRuntimeProfile*>(
-          AddOrCreateChild(tchild.name, &insert_pos, [this, tchild] () {
-              AggregatedRuntimeProfile* child2 =
-                  Create(pool_, tchild.name, num_input_profiles_, /*is_root=*/false);
-              child2->metadata_ = tchild.node_metadata;
-              return child2;
-            }, tchild.indent));
+      bool is_timed = add_default_counters && !UntimedProfileNode(tchild.name);
+      AggregatedRuntimeProfile* child =
+          dynamic_cast<AggregatedRuntimeProfile*>(AddOrCreateChild(
+              tchild.name, &insert_pos,
+              [this, tchild, is_timed]() {
+                AggregatedRuntimeProfile* child2 = Create(
+                    pool_, tchild.name, num_input_profiles_, /*is_root=*/false, is_timed);
+                child2->metadata_ = tchild.node_metadata;
+                return child2;
+              },
+              tchild.indent));
       DCHECK(child != nullptr);
-      child->UpdateAggregatedFromInstancesRecursive(src, node_idx, start_idx);
+      child->UpdateAggregatedFromInstancesRecursive(src, node_idx, start_idx, is_timed);
     }
   }
 }
@@ -859,16 +887,17 @@ void RuntimeProfile::Update(
     // Update children with matching names; create new ones if they don't match.
     for (int i = 0; i < node.num_children; ++i) {
       const TRuntimeProfileNode& tchild = nodes[*idx];
+      bool is_timed = add_default_counters && !UntimedProfileNode(tchild.name);
       RuntimeProfile* child = dynamic_cast<RuntimeProfile*>(AddOrCreateChild(
           tchild.name, &insert_pos,
-          [this, tchild, add_default_counters]() {
-            RuntimeProfile* child2 = Create(pool_, tchild.name, add_default_counters);
+          [this, tchild, is_timed]() {
+            RuntimeProfile* child2 = Create(pool_, tchild.name, is_timed);
             child2->metadata_ = tchild.node_metadata;
             return child2;
           },
           tchild.indent));
       DCHECK(child != nullptr);
-      child->Update(nodes, idx, add_default_counters);
+      child->Update(nodes, idx, is_timed);
     }
   }
 }
@@ -952,11 +981,11 @@ void RuntimeProfile::PrependChild(RuntimeProfileBase* child, bool indent) {
   AddChildLocked(child, indent, children_.begin());
 }
 
-RuntimeProfile* RuntimeProfile::CreateChild(const string& name, bool indent,
-    bool prepend) {
+RuntimeProfile* RuntimeProfile::CreateChild(
+    const string& name, bool indent, bool prepend, bool add_default_counters) {
   lock_guard<SpinLock> l(children_lock_);
   DCHECK(child_map_.find(name) == child_map_.end());
-  RuntimeProfile* child = Create(pool_, name);
+  RuntimeProfile* child = Create(pool_, name, add_default_counters);
   AddChildLocked(child, indent, prepend ? children_.begin() : children_.end());
   return child;
 }
@@ -2592,19 +2621,21 @@ void RuntimeProfile::EventSequence::ToJson(
   *value = event_sequence_json;
 }
 
-AggregatedRuntimeProfile::AggregatedRuntimeProfile(
-    ObjectPool* pool, const string& name, int num_input_profiles, bool is_root)
+AggregatedRuntimeProfile::AggregatedRuntimeProfile(ObjectPool* pool, const string& name,
+    int num_input_profiles, bool is_root, bool add_default_counters)
   : RuntimeProfileBase(pool, name,
-        pool->Add(new AveragedCounter(TUnit::TIME_NS, num_input_profiles)),
-        pool->Add(new AveragedCounter(TUnit::TIME_NS, num_input_profiles))),
+      pool->Add(new AveragedCounter(TUnit::TIME_NS, num_input_profiles)),
+      pool->Add(new AveragedCounter(TUnit::TIME_NS, num_input_profiles)),
+      add_default_counters),
     num_input_profiles_(num_input_profiles) {
   DCHECK_GE(num_input_profiles, 0);
   if (is_root) input_profile_names_.resize(num_input_profiles);
 }
 
-AggregatedRuntimeProfile* AggregatedRuntimeProfile::Create(
-    ObjectPool* pool, const string& name, int num_input_profiles, bool is_root) {
-  return pool->Add(new AggregatedRuntimeProfile(pool, name, num_input_profiles, is_root));
+AggregatedRuntimeProfile* AggregatedRuntimeProfile::Create(ObjectPool* pool,
+    const string& name, int num_input_profiles, bool is_root, bool add_default_counters) {
+  return pool->Add(new AggregatedRuntimeProfile(
+      pool, name, num_input_profiles, is_root, add_default_counters));
 }
 
 void AggregatedRuntimeProfile::InitFromThrift(

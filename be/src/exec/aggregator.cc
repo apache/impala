@@ -98,7 +98,7 @@ Aggregator::Aggregator(ExecNode* exec_node, ObjectPool* pool,
     needs_finalize_(config.needs_finalize_),
     agg_fns_(config.aggregate_functions_),
     conjuncts_(config.conjuncts_),
-    runtime_profile_(RuntimeProfile::Create(pool_, name)) {}
+    runtime_profile_(RuntimeProfile::Create(pool_, name, false)) {}
 
 Aggregator::~Aggregator() {}
 

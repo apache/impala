@@ -155,10 +155,11 @@ Status ScanNode::Prepare(RuntimeState* state) {
     filter_ctxs_.emplace_back();
     FilterContext& filter_ctx = filter_ctxs_.back();
     filter_ctx.filter = state->filter_bank()->RegisterConsumer(filter_desc);
-    string filter_profile_title = Substitute("Filter $0 ($1)", filter_desc.filter_id,
-        PrettyPrinter::Print(filter_ctx.filter->filter_size(), TUnit::BYTES));
+    string filter_profile_title =
+        Substitute("$0$1 ($2)", RuntimeProfile::PREFIX_FILTER, filter_desc.filter_id,
+            PrettyPrinter::Print(filter_ctx.filter->filter_size(), TUnit::BYTES));
     RuntimeProfile* profile =
-        RuntimeProfile::Create(state->obj_pool(), filter_profile_title);
+        RuntimeProfile::Create(state->obj_pool(), filter_profile_title, false);
     runtime_profile_->AddChild(profile);
     filter_ctx.stats = state->obj_pool()->Add(new FilterStats(profile));
   }

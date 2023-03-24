@@ -140,7 +140,7 @@ FragmentState::FragmentState(QueryState* query_state, const TPlanFragment& fragm
     const PlanFragmentCtxPB& fragment_ctx)
   : query_state_(query_state), fragment_(fragment), fragment_ctx_(fragment_ctx) {
   runtime_profile_ = RuntimeProfile::Create(
-      query_state->obj_pool(), Substitute("Fragment $0", fragment_.display_name));
+      query_state->obj_pool(), Substitute("Fragment $0", fragment_.display_name), false);
   query_state_->host_profile()->AddChild(runtime_profile_);
 }
 

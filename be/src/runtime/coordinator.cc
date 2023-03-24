@@ -152,12 +152,12 @@ Status Coordinator::Exec() {
              << " stmt=" << request.query_ctx.client_request.stmt;
   stmt_type_ = request.stmt_type;
 
-  query_profile_ =
-      RuntimeProfile::Create(obj_pool(), "Execution Profile " + PrintId(query_id()));
+  query_profile_ = RuntimeProfile::Create(
+      obj_pool(), "Execution Profile " + PrintId(query_id()), false);
   finalization_timer_ = PROFILE_FinalizationTimer.Instantiate(query_profile_);
   filter_updates_received_ = PROFILE_FiltersReceived.Instantiate(query_profile_);
 
-  host_profiles_ = RuntimeProfile::Create(obj_pool(), "Per Node Profiles");
+  host_profiles_ = RuntimeProfile::Create(obj_pool(), "Per Node Profiles", false);
   query_profile_->AddChild(host_profiles_);
 
   SCOPED_TIMER(query_profile_->total_time_counter());

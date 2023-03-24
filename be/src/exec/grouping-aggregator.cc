@@ -39,6 +39,7 @@
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
 #include "util/runtime-profile-counters.h"
+#include "util/runtime-profile.h"
 #include "util/string-parser.h"
 
 #include "gen-cpp/PlanNodes_types.h"
@@ -134,8 +135,8 @@ static const int STREAMING_HT_MIN_REDUCTION_SIZE =
 GroupingAggregator::GroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
     const GroupingAggregatorConfig& config, int64_t estimated_input_cardinality,
     bool needUnsetLimit)
-  : Aggregator(
-        exec_node, pool, config, Substitute("GroupingAggregator $0", config.agg_idx_)),
+  : Aggregator(exec_node, pool, config,
+      Substitute("$0$1", RuntimeProfile::PREFIX_GROUPING_AGGREGATOR, config.agg_idx_)),
     hash_table_config_(*config.hash_table_config_),
     intermediate_row_desc_(config.intermediate_row_desc_),
     is_streaming_preagg_(config.is_streaming_preagg_),

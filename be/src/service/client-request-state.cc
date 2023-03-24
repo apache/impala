@@ -108,10 +108,10 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
     session_(session),
     coord_exec_called_(false),
     // Profile is assigned name w/ id after planning
-    profile_(RuntimeProfile::Create(&profile_pool_, "Query")),
+    profile_(RuntimeProfile::Create(&profile_pool_, "Query", false)),
     frontend_profile_(RuntimeProfile::Create(&profile_pool_, "Frontend", false)),
-    server_profile_(RuntimeProfile::Create(&profile_pool_, "ImpalaServer")),
-    summary_profile_(RuntimeProfile::Create(&profile_pool_, "Summary")),
+    server_profile_(RuntimeProfile::Create(&profile_pool_, "ImpalaServer", false)),
+    summary_profile_(RuntimeProfile::Create(&profile_pool_, "Summary", false)),
     exec_request_(exec_request),
     frontend_(frontend),
     parent_server_(server),

@@ -501,8 +501,8 @@ Status HashTable::Init(bool* got_memory) {
 unique_ptr<HashTableStatsProfile> HashTable::AddHashTableCounters(
     RuntimeProfile* parent_profile) {
   unique_ptr<HashTableStatsProfile> stats_profile(new HashTableStatsProfile());
-  RuntimeProfile *hashtable_profile = stats_profile->hashtable_profile =
-      parent_profile->CreateChild("Hash Table", true, true);
+  RuntimeProfile* hashtable_profile = stats_profile->hashtable_profile =
+      parent_profile->CreateChild(RuntimeProfile::HASH_TABLE, true, true, false);
   stats_profile->num_hash_probes_ =
       ADD_COUNTER(hashtable_profile, "Probes", TUnit::UNIT);
   stats_profile->num_hash_travels_ =
