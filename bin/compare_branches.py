@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Future imports must happen at the beginning of the file
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 HELP = '''
 Compares two specified branches, using the Gerrit Change-Id as the
@@ -249,7 +249,7 @@ def main():
   jira_key_pat = re.compile(r'(IMPALA-\d+)')
   skip_commits_matching = options.skip_commits_matching.format(
       branch=options.target_branch)
-  for change_id, (commit_hash, msg, author, date, body) in source_commits.iteritems():
+  for change_id, (commit_hash, msg, author, date, body) in source_commits.items():
     change_in_target = change_id in target_commits
     ignore_by_config = commit_hash in ignored_commits[
         (options.source_branch, options.target_branch)]

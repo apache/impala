@@ -33,7 +33,7 @@
 # time, and the RAT JAR is not included in the Impala repo; it must be downloaded
 # separately.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import fnmatch
 import re
 import sys

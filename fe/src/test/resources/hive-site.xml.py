@@ -17,6 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import absolute_import, division, print_function
 import os
 
 hive_major_version = int(os.environ['IMPALA_HIVE_VERSION'][0])

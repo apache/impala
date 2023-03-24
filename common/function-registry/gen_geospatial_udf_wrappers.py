@@ -22,6 +22,7 @@
 # in Impala. A generated class is extending the original UDF and adding wrapper
 # 'evaluate' methods projecting the varargs method as an n parameter method.
 
+from __future__ import absolute_import, division, print_function
 import os
 from gen_builtins_catalog import FE_PATH
 
@@ -141,14 +142,14 @@ package {package};
     return "%s.java" % self.generate_wrapper_name()
 
 
-WRAPPERS = [Wrapper("%s.ST_ConvexHull" % UDF_PACKAGE, BYTE_TYPE, range(2, 9, 1)),
-            Wrapper("%s.ST_LineString" % UDF_PACKAGE, DOUBLE_TYPE, range(2, 15, 2),
+WRAPPERS = [Wrapper("%s.ST_ConvexHull" % UDF_PACKAGE, BYTE_TYPE, list(range(2, 9, 1))),
+            Wrapper("%s.ST_LineString" % UDF_PACKAGE, DOUBLE_TYPE, list(range(2, 15, 2)),
               ARGUMENT_EXCEPTION),
-            Wrapper("%s.ST_MultiPoint" % UDF_PACKAGE, DOUBLE_TYPE, range(2, 15, 2),
+            Wrapper("%s.ST_MultiPoint" % UDF_PACKAGE, DOUBLE_TYPE, list(range(2, 15, 2)),
               ARGUMENT_LENGTH_EXCEPTION),
-            Wrapper("%s.ST_Polygon" % UDF_PACKAGE, DOUBLE_TYPE, range(6, 15, 2),
+            Wrapper("%s.ST_Polygon" % UDF_PACKAGE, DOUBLE_TYPE, list(range(6, 15, 2)),
               ARGUMENT_LENGTH_EXCEPTION),
-            Wrapper("%s.ST_Union" % UDF_PACKAGE, BYTE_TYPE, range(2, 15, 1))]
+            Wrapper("%s.ST_Union" % UDF_PACKAGE, BYTE_TYPE, list(range(2, 15, 1)))]
 
 if __name__ == "__main__":
   if not os.path.exists(FE_PATH):

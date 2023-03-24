@@ -21,6 +21,7 @@
 Some tests that produce JUnitXML include tests that did not run (i.e. status="notrun").
 This script walks through the JUnitXML and removes these elements.
 """
+from __future__ import absolute_import, division, print_function
 from optparse import OptionParser
 from xml.etree import ElementTree as ET
 from xml.dom import minidom

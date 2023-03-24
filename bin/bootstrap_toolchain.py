@@ -53,6 +53,8 @@
 #
 # The script is directly executable, and it takes no parameters:
 #     ./bootstrap_toolchain.py
+
+from __future__ import absolute_import, division, print_function
 import logging
 import glob
 import multiprocessing.pool
@@ -102,20 +104,6 @@ OS_MAPPING = [
 ]
 
 
-def check_output(cmd_args):
-  """Run the command and return the output. Raise an exception if the command returns
-     a non-zero return code. Similar to subprocess.check_output() which is only provided
-     in python 2.7.
-  """
-  process = subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-      universal_newlines=True)
-  stdout, _ = process.communicate()
-  if process.wait() != 0:
-    raise Exception("Command with args '%s' failed with exit code %s:\n%s"
-        % (cmd_args, process.returncode, stdout))
-  return stdout
-
-
 def get_toolchain_compiler():
   """Return the <name>-<version> string for the compiler package to use for the
   toolchain."""
@@ -139,16 +127,16 @@ def wget_and_unpack_package(download_path, file_name, destination, wget_no_clobb
              "--output-document={0}/{1}".format(destination, file_name)]
       if wget_no_clobber:
         cmd.append("--no-clobber")
-      check_output(cmd)
+      subprocess.check_call(cmd)
       break
-    except Exception as e:
+    except subprocess.CalledProcessError as e:
       if attempt == NUM_ATTEMPTS:
         raise
       logging.error("Download failed; retrying after sleep: " + str(e))
       time.sleep(10 + random.random() * 5)  # Sleep between 10 and 15 seconds.
   logging.info("Extracting {0}".format(file_name))
-  check_output(["tar", "xzf", os.path.join(destination, file_name),
-                "--directory={0}".format(destination)])
+  subprocess.check_call(["tar", "xzf", os.path.join(destination, file_name),
+                         "--directory={0}".format(destination)])
   os.unlink(os.path.join(destination, file_name))
 
 
@@ -403,8 +391,9 @@ def get_platform_release_label(release=None):
     if lsb_release_cache:
       release = lsb_release_cache
     else:
-      lsb_release = check_output(["lsb_release", "-irs"])
-      release = "".join(map(lambda x: x.lower(), lsb_release.split()))
+      lsb_release = subprocess.check_output(
+          ["lsb_release", "-irs"], universal_newlines=True)
+      release = "".join([x.lower() for x in lsb_release.split()])
       # Only need to check against the major release if RHEL, CentOS or Suse
       for distro in ['centos', 'rocky', 'almalinux', 'redhatenterprise',
                      'redhatenterpriseserver', 'suse']:
@@ -416,20 +405,6 @@ def get_platform_release_label(release=None):
     if re.search(mapping.lsb_release, release):
       return mapping
   raise Exception("Could not find package label for OS version: {0}.".format(release))
-
-
-def check_output(cmd_args):
-  """Run the command and return the output. Raise an exception if the command returns
-     a non-zero return code. Similar to subprocess.check_output() which is only provided
-     in python 2.7.
-  """
-  process = subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-      universal_newlines=True)
-  stdout, _ = process.communicate()
-  if process.wait() != 0:
-    raise Exception("Command with args '%s' failed with exit code %s:\n%s"
-        % (cmd_args, process.returncode, stdout))
-  return stdout
 
 
 def check_custom_toolchain(toolchain_packages_home, packages):
@@ -470,7 +445,7 @@ def create_directory_from_env_var(env_var):
 
 
 def get_unique_toolchain_downloads(packages):
-  toolchain_packages = map(ToolchainPackage, packages)
+  toolchain_packages = [ToolchainPackage(p) for p in packages]
   unique_pkg_directories = set()
   unique_packages = []
   for p in toolchain_packages:
@@ -489,11 +464,11 @@ def get_toolchain_downloads():
       "llvm", explicit_version=os.environ.get("IMPALA_LLVM_DEBUG_VERSION"))
   gcc_package = ToolchainPackage("gcc")
   toolchain_packages += [llvm_package, llvm_package_asserts, gcc_package]
-  toolchain_packages += map(ToolchainPackage,
+  toolchain_packages += [ToolchainPackage(p) for p in
       ["avro", "binutils", "boost", "breakpad", "bzip2", "calloncehack", "cctz", "cmake",
        "crcutil", "curl", "flatbuffers", "gdb", "gflags", "glog", "gperftools", "gtest",
        "jwt-cpp", "libev", "libunwind", "lz4", "openldap", "orc", "protobuf",
-       "python", "rapidjson", "re2", "snappy", "tpc-h", "tpc-ds", "zlib", "zstd"])
+       "python", "rapidjson", "re2", "snappy", "tpc-h", "tpc-ds", "zlib", "zstd"]]
   python3_package = ToolchainPackage(
       "python", explicit_version=os.environ.get("IMPALA_PYTHON3_VERSION"))
   toolchain_packages += [python3_package]

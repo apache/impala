@@ -20,6 +20,7 @@
 # used by the build system (see be/CMakeLists.txt for usage) and is not intended to be
 # run directly.
 
+from __future__ import absolute_import, division, print_function
 import argparse
 import os
 import stat

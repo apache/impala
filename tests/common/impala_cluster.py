@@ -30,7 +30,7 @@ import time
 from getpass import getuser
 from random import choice
 from signal import SIGKILL
-from subprocess import check_call
+from subprocess import check_call, check_output
 from time import sleep
 
 import tests.common.environ
@@ -40,10 +40,6 @@ from tests.common.impala_service import (
     ImpaladService,
     StateStoredService)
 from tests.util.shell_util import exec_process, exec_process_async
-
-if sys.version_info >= (2, 7):
-  # We use some functions in the docker code that don't exist in Python 2.6.
-  from subprocess import check_output
 
 LOG = logging.getLogger('impala_cluster')
 LOG.setLevel(level=logging.DEBUG)

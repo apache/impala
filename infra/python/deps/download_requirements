@@ -22,7 +22,6 @@ set -euo pipefail
 DIR="$(dirname "$0")"
 
 pushd "$DIR"
-PY26="$(./find_py26.py)"
 # Directly download packages listed in *requirements.txt, but don't install them.
-"$PY26" pip_download.py
+./pip_download.py
 popd

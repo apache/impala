@@ -32,6 +32,7 @@
 #       re.compile(">>> "))
 #   timeline.create("output.html")
 
+from __future__ import absolute_import, division, print_function
 import datetime
 import json
 import logging
@@ -161,7 +162,7 @@ class ContainerMonitor(object):
       # Container may no longer exist.
       return None
     try:
-      statcontents = file(os.path.join(dirname, stat)).read()
+      statcontents = open(os.path.join(dirname, stat)).read()
       return statcontents.replace("\n", " ").strip()
     except IOError as e:
       # Ignore errors; cgroup can disappear on us.
@@ -186,7 +187,7 @@ class ContainerMonitor(object):
     self.min_memory_usage_gb = None
     self.max_memory_usage_gb = None
 
-    with file(self.output_path, "w") as output:
+    with open(self.output_path, "w") as output:
       while self.keep_monitoring:
         # Use a single timestamp for a given round of monitoring.
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
@@ -229,7 +230,7 @@ class Timeline(object):
     """
     interesting_lines = [
         line.strip()
-        for line in file(container.logfile)
+        for line in open(container.logfile)
         if self.interesting_re.search(line)]
     return [(container.name,) + split_timestamp(line) for line in interesting_lines]
 
@@ -273,15 +274,15 @@ class Timeline(object):
         dt = ts - prev_ts
         assert type(dt) == float
         if dt != 0:
-          yield ts, container, (user_cpu - prev_user)/dt/USER_HZ,\
-              (system_cpu - prev_system)/dt/USER_HZ
+          yield ts, container, (user_cpu - prev_user) // dt // USER_HZ,\
+              (system_cpu - prev_system) // dt // USER_HZ
       prev_by_container[container] = ts, user_cpu, system_cpu
 
     # Now update container totals
     for c in self.containers:
       if c.id in prev_by_container:
         _, u, s = prev_by_container[c.id]
-        c.total_user_cpu, c.total_system_cpu = u / USER_HZ, s / USER_HZ
+        c.total_user_cpu, c.total_system_cpu = u // USER_HZ, s // USER_HZ
       if c.id in peak_rss_by_container:
         c.peak_total_rss = peak_rss_by_container[c.id]
 
@@ -321,7 +322,7 @@ class Timeline(object):
     for c in self.containers:
       container_by_id[c.id] = c
 
-    for ts, container_id, user, system in self.parse_metrics(file(self.monitor_file)):
+    for ts, container_id, user, system in self.parse_metrics(open(self.monitor_file)):
       container = container_by_id.get(container_id)
       if not container:
         continue
@@ -337,9 +338,9 @@ class Timeline(object):
       metrics_by_container.setdefault(
           container.name, []).append((ts - min_ts, user, system))
 
-    with file(output, "w") as o:
+    with open(output, "w") as o:
       template_path = os.path.join(os.path.dirname(__file__), "timeline.html.template")
-      shutil.copyfileobj(file(template_path), o)
+      shutil.copyfileobj(open(template_path), o)
       o.write("\n<script>\nvar data = \n")
       json.dump(dict(buildname=self.buildname, timeline=timeline_json,
           metrics=metrics_by_container, max_ts=(max_metric_ts - min_ts)), o, indent=2)

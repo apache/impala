@@ -21,12 +21,13 @@ A script for generating arbitrary junit XML reports while building Impala.
 These files will be consumed by jenkins.impala.io to generate reports for
 easier triaging of build and setup errors.
 """
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import argparse
 import codecs
 import errno
 import os
 import re
+import sys
 import textwrap
 from xml.dom import minidom
 from xml.etree import ElementTree as ET
@@ -167,7 +168,10 @@ class JunitReport(object):
     junit_log_file = os.path.join(junitxml_logdir, filename)
 
     with codecs.open(junit_log_file, encoding="UTF-8", mode='w') as f:
-      f.write(unicode(self))
+      if sys.version_info.major < 3:
+        f.write(unicode(self))
+      else:
+        f.write(str(self))
 
     return junit_log_file
 
@@ -212,7 +216,10 @@ class JunitReport(object):
     else:
       # This is a string passed in on the command line. Make sure to return it as
       # a unicode string.
-      content = unicode(file_or_string, encoding="UTF-8")
+      if sys.version_info.major < 3:
+        content = unicode(file_or_string, encoding="UTF-8")
+      else:
+        content = file_or_string
     return JunitReport.remove_ansi_escape_sequences(content)
 
   def __unicode__(self):
@@ -223,6 +230,10 @@ class JunitReport(object):
     root_node_dom = minidom.parseString(root_node_unicode)
     return root_node_dom.toprettyxml(indent=' ' * 4)
 
+  def __str__(self):
+    if sys.version_info.major < 3:
+      return unicode(self).encode('utf-8')
+    return self.__unicode__()
 
 def get_options():
   """Parse and return command line options."""

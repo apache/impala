@@ -1784,7 +1784,7 @@ warned, it can be very long!",
   "Want to know what version of Impala you're connected to? Run the VERSION command to \
 find out!",
   "You can change the Impala daemon that you're connected to by using the CONNECT \
-command."
+command.",
   "To see how Impala will plan to run your query without actually executing it, use the \
 EXPLAIN command. You can change the level of detail in the EXPLAIN output by setting the \
 EXPLAIN_LEVEL query option.",

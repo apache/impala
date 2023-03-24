@@ -34,7 +34,7 @@ from datetime import datetime
 from getpass import getuser
 from time import sleep, time
 from optparse import OptionParser, SUPPRESS_HELP
-from subprocess import call, check_call
+from subprocess import call, check_call, check_output
 from testdata.common import cgroups
 from tests.common.environ import build_flavor_timeout
 from tests.common.impala_cluster import (ImpalaCluster, DEFAULT_BEESWAX_PORT,
@@ -787,10 +787,6 @@ if __name__ == "__main__":
   if options.docker_network is None:
     cluster_ops = MiniClusterOperations()
   else:
-    if sys.version_info < (2, 7):
-      raise Exception("Docker minicluster only supported on Python 2.7+")
-    # We use some functions in the docker code that don't exist in Python 2.6.
-    from subprocess import check_output
     cluster_ops = DockerMiniClusterOperations(options.docker_network)
 
   # If core-site.xml is missing, it likely means that we are missing config

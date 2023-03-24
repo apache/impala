@@ -19,9 +19,9 @@
 
 # Implement the basic 'pip download' functionality in a way that gives us more control
 # over which archive type is downloaded and what post-download steps are executed.
-# This script requires Python 2.6+.
+# This script requires Python 2.7+.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import hashlib
 import multiprocessing.pool
 import os
