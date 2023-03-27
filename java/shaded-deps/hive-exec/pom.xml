@@ -27,7 +27,7 @@ the same dependencies
   <parent>
     <groupId>org.apache.impala</groupId>
     <artifactId>impala-parent</artifactId>
-    <version>4.1.1-RELEASE</version>
+    <version>4.1.2-RELEASE</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
   <modelVersion>4.0.0</modelVersion>

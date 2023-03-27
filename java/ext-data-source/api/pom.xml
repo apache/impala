@@ -23,7 +23,7 @@
   <parent>
     <groupId>org.apache.impala</groupId>
     <artifactId>impala-data-source</artifactId>
-    <version>4.1.1-RELEASE</version>
+    <version>4.1.2-RELEASE</version>
   </parent>
   <artifactId>impala-data-source-api</artifactId>
   <name>Apache Impala External Data Source API</name>
