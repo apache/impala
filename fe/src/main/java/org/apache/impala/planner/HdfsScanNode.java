@@ -1817,8 +1817,7 @@ public class HdfsScanNode extends ScanNode {
     numNodes_ = (cardinality == 0 || totalNodes == 0) ? 1 : totalNodes;
     numInstances_ = (cardinality == 0 || totalInstances == 0) ? 1 : totalInstances;
     if (LOG.isTraceEnabled()) {
-      LOG.trace("computeNumNodes totalRanges="
-          + (scanRangeSpecs_.getConcrete_rangesSize() + generatedScanRangeCount_)
+      LOG.trace("computeNumNodes totalRanges=" + getEffectiveNumScanRanges()
           + " localRanges=" + numLocalRanges + " remoteRanges=" + numRemoteRanges
           + " localRangeCounts.size=" + localRangeCounts.size()
           + " totalLocalParallelism=" + totalLocalParallelism
@@ -1991,11 +1990,11 @@ public class HdfsScanNode extends ScanNode {
             .append("\n");
       if (numScanRangesNoDiskIds_ > 0) {
         output.append(detailPrefix)
-          .append(String.format("missing disk ids: "
-                + "partitions=%s/%s files=%s/%s scan ranges %s/%s\n",
-            numPartitionsNoDiskIds_, sumValues(numPartitionsPerFs_),
-            numFilesNoDiskIds_, sumValues(totalFilesPerFs_), numScanRangesNoDiskIds_,
-            scanRangeSpecs_.getConcrete_rangesSize() + generatedScanRangeCount_));
+            .append(String.format("missing disk ids: "
+                    + "partitions=%s/%s files=%s/%s scan ranges %s/%s\n",
+                numPartitionsNoDiskIds_, sumValues(numPartitionsPerFs_),
+                numFilesNoDiskIds_, sumValues(totalFilesPerFs_), numScanRangesNoDiskIds_,
+                getEffectiveNumScanRanges()));
       }
       // Groups the min max original conjuncts by tuple descriptor.
       output.append(getMinMaxOriginalConjunctsExplainString(detailPrefix, detailLevel));
@@ -2110,7 +2109,9 @@ public class HdfsScanNode extends ScanNode {
 
   @Override
   public void computeProcessingCost(TQueryOptions queryOptions) {
-    processingCost_ = computeScanProcessingCost(queryOptions);
+    Preconditions.checkNotNull(scanRangeSpecs_);
+    processingCost_ =
+        computeScanProcessingCost(queryOptions, getEffectiveNumScanRanges());
   }
 
   @Override
@@ -2118,8 +2119,7 @@ public class HdfsScanNode extends ScanNode {
     // Update 'useMtScanNode_' before any return cases. It's used in BE.
     useMtScanNode_ = queryOptions.mt_dop > 0;
     Preconditions.checkNotNull(scanRangeSpecs_, "Cost estimation requires scan ranges.");
-    long scanRangeSize =
-        scanRangeSpecs_.getConcrete_rangesSize() + generatedScanRangeCount_;
+    long scanRangeSize = getEffectiveNumScanRanges();
     if (scanRangeSize == 0) {
       nodeResourceProfile_ = ResourceProfile.noReservation(0);
       return;
@@ -2483,6 +2483,17 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkNotNull(scanRangeSpecs_);
     return scanRangeSpecs_.getConcrete_rangesSize()
         + scanRangeSpecs_.getSplit_specsSize();
+  }
+
+  /**
+   * Return the number of scan ranges when considering MAX_SCAN_RANGE_LENGTH option.
+   * computeScanRangeLocations() must be called before calling this.
+   */
+  public long getEffectiveNumScanRanges() {
+    Preconditions.checkNotNull(scanRangeSpecs_);
+    Preconditions.checkState(
+        generatedScanRangeCount_ >= scanRangeSpecs_.getSplit_specsSize());
+    return scanRangeSpecs_.getConcrete_rangesSize() + generatedScanRangeCount_;
   }
 
   /**

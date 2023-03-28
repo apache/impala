@@ -36,6 +36,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TScanRangeSpec;
@@ -45,6 +46,7 @@ import org.apache.impala.util.ExprUtil;
 import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
+import com.google.common.math.LongMath;
 
 /**
  * Representation of the common elements of all scan nodes.
@@ -81,6 +83,11 @@ abstract public class ScanNode extends PlanNode {
 
   // Refer to the comment of 'TableRef.tableNumRowsHint_'
   protected long tableNumRowsHint_ = -1;
+
+  // When in multiple executor group set setup, true value means scan instance count
+  // is limited by MT_DOP. Otherwise, scan parallelism is decided by ProcessingCost.
+  // Set by PlanFragment.computeCostingSegment().
+  protected boolean limitScanParallelism_;
 
   public ScanNode(PlanNodeId id, TupleDescriptor desc, String displayName) {
     super(id, desc.getId().asList(), displayName);
@@ -345,9 +352,40 @@ abstract public class ScanNode extends PlanNode {
     return maxScannerThreads;
   }
 
-  protected ProcessingCost computeScanProcessingCost(TQueryOptions queryOptions) {
-    return ProcessingCost.basicCost(getDisplayLabel(), getInputCardinality(),
-        ExprUtil.computeExprsTotalCost(conjuncts_), rowMaterializationCost());
+  protected ProcessingCost computeScanProcessingCost(
+      TQueryOptions queryOptions, long effectiveScanRangeCount) {
+    ProcessingCost cardinalityBasedCost =
+        ProcessingCost.basicCost(getDisplayLabel(), getInputCardinality(),
+            ExprUtil.computeExprsTotalCost(conjuncts_), rowMaterializationCost());
+
+    long maxScanThreads = effectiveScanRangeCount;
+    if (!limitScanParallelism_ && queryOptions.getNum_scanner_threads() > 0) {
+      maxScanThreads = Math.min(maxScanThreads,
+          LongMath.saturatedMultiply(
+              getNumNodes(), queryOptions.getNum_scanner_threads()));
+    }
+
+    if (getInputCardinality() == 0) {
+      Preconditions.checkState(cardinalityBasedCost.getTotalCost() == 0,
+          "Scan is empty but cost is non-zero.");
+      return cardinalityBasedCost;
+    } else if (maxScanThreads < cardinalityBasedCost.getTotalCost()
+            / BackendConfig.INSTANCE.getMinProcessingPerThread()) {
+      // Input cardinality is unknown or cost is too high compared to maxScanThreads
+      // Return synthetic ProcessingCost based on maxScanThreads.
+      long syntheticCardinality =
+          Math.max(1, Math.min(getInputCardinality(), maxScanThreads));
+      long syntheticPerRowCost = LongMath.saturatedMultiply(
+          (long) Math.ceil((double) BackendConfig.INSTANCE.getMinProcessingPerThread()
+              / syntheticCardinality),
+          maxScanThreads);
+
+      return ProcessingCost.basicCost(
+          getDisplayLabel(), syntheticCardinality, 0, syntheticPerRowCost);
+    }
+
+    // None of the conditions above apply.
+    return cardinalityBasedCost;
   }
 
   /**
@@ -375,4 +413,8 @@ abstract public class ScanNode extends PlanNode {
   public boolean hasStorageLayerConjuncts() { return false; }
 
   public ExprSubstitutionMap getOptimizedAggSmap() { return optimizedAggSmap_; }
+
+  protected void setLimitScanParallelism(boolean isLimitScanParallelism) {
+    limitScanParallelism_ = isLimitScanParallelism;
+  }
 }

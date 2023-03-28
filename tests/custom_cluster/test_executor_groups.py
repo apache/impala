@@ -37,6 +37,10 @@ TEST_QUERY = "select count(*) from functional.alltypes where month + random() < 
 # A query to test CPU requirement. Estimated memory per host is 37MB.
 CPU_TEST_QUERY = "select * from tpcds_parquet.store_sales where ss_item_sk = 1 limit 50;"
 
+# A query with full table scan characteristics.
+GROUPING_TEST_QUERY = ("select ss_item_sk from tpcds_parquet.store_sales"
+    " group by (ss_item_sk) order by ss_item_sk limit 10")
+
 # Default query option to use for testing CPU requirement.
 CPU_DOP_OPTIONS = {'MT_DOP': '2', 'COMPUTE_PROCESSING_COST': 'true'}
 
@@ -755,7 +759,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # max-query-cpu-core-per-node-limit and max-query-cpu-core-coordinator-limit
     # properties of the three sets:
     # tiny: [0, 64MB, 4, 4]
-    # small: [0, 64MB, 8, 8]
+    # small: [0, 70MB, 8, 8]
     # large: [64MB+1Byte, 8PB, 64, 64]
     llama_site_path = os.path.join(RESOURCES_DIR, "llama-site-3-groups.xml")
     # Start with a regular admission config with multiple pools and no resource limits.
@@ -808,7 +812,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # max-query-cpu-core-per-node-limit and max-query-cpu-core-coordinator-limit
     # properties of the three sets:
     # tiny: [0, 64MB, 4, 4]
-    # small: [0, 64MB, 8, 8]
+    # small: [0, 70MB, 8, 8]
     # large: [64MB+1Byte, 8PB, 64, 64]
     llama_site_path = os.path.join(RESOURCES_DIR, "llama-site-3-groups.xml")
 
@@ -894,6 +898,13 @@ class TestExecutorGroups(CustomClusterTestSuite):
          "ExecutorGroupsConsidered: 1"],
         ["EffectiveParallelism:", "CpuAsk:"])
 
+    # Unset REQUEST_POOL.
+    self.execute_query_expect_success(self.client, "SET REQUEST_POOL='';")
+
+    # Test that GROUPING_TEST_QUERY will get assigned to the small group.
+    self._run_query_and_verify_profile(GROUPING_TEST_QUERY, CPU_DOP_OPTIONS,
+        ["Executor Group: root.small-group", "ExecutorGroupsConsidered: 2",
+          "Verdict: Match", "CpuAsk: 4", "CpuAskUnbounded: 1"])
     self.client.close()
 
   @pytest.mark.execute_serially
@@ -937,6 +948,36 @@ class TestExecutorGroups(CustomClusterTestSuite):
     result = self.execute_query_expect_failure(self.client, CPU_TEST_QUERY)
     assert ("AnalysisException: The query does not fit largest executor group sets. "
         "Reason: not enough cpu cores (require=234, max=192).") in str(result)
+    self.client.close()
+
+  @pytest.mark.execute_serially
+  def test_min_processing_per_thread_small(self):
+    """Test processing cost with min_processing_per_thread smaller than default"""
+    coordinator_test_args = "-min_processing_per_thread=500000"
+    self._setup_three_exec_group_cluster(coordinator_test_args)
+
+    # Test that GROUPING_TEST_QUERY will get assigned to the large group.
+    self._run_query_and_verify_profile(GROUPING_TEST_QUERY, CPU_DOP_OPTIONS,
+        ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+          "Verdict: Match", "CpuAsk: 6"],
+        ["CpuAskUnbounded:"])
+
+    # Test that high_scan_cost_query will get assigned to the large group.
+    high_scan_cost_query = ("SELECT ss_item_sk FROM tpcds_parquet.store_sales "
+        "WHERE ss_item_sk < 1000000 GROUP BY ss_item_sk LIMIT 10")
+    options = copy.deepcopy(CPU_DOP_OPTIONS)
+    self._run_query_and_verify_profile(high_scan_cost_query, options,
+        ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+          "Verdict: Match", "CpuAsk: 6"],
+        ["CpuAskUnbounded:"])
+
+    # Test that high_scan_cost_query will get assigned to the small group
+    # if NUM_SCANNER_THREADS is limited to 1.
+    options['NUM_SCANNER_THREADS'] = '1'
+    self._run_query_and_verify_profile(high_scan_cost_query, options,
+        ["Executor Group: root.small-group", "ExecutorGroupsConsidered: 2",
+          "Verdict: Match", "CpuAsk: 4", "CpuAskUnbounded: 4"])
+
     self.client.close()
 
   @pytest.mark.execute_serially

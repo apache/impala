@@ -403,16 +403,17 @@ public class Planner {
    * Adjust effective parallelism of each plan fragment of query after considering
    * processing cost rate and blocking operator.
    * <p>
-   * Only valid after {@link PlanFragment#computeCostingSegment(TQueryOptions)} has
-   * been called for all plan fragments in the list.
+   * Only valid after {@link PlanFragment#computeCostingSegment(TQueryOptions, boolean)}
+   * has been called for all plan fragments in the list.
    */
-  private static void computeEffectiveParallelism(
-      List<PlanFragment> postOrderFragments, int minThreadPerNode, int maxThreadPerNode) {
+  private static void computeEffectiveParallelism(List<PlanFragment> postOrderFragments,
+      int minThreadPerNode, int maxThreadPerNode, boolean limitScanParallelism) {
     for (PlanFragment fragment : postOrderFragments) {
       if (!(fragment.getSink() instanceof JoinBuildSink)) {
         // Only adjust parallelism of non-join build fragment.
         // Join build fragment will be adjusted later by fragment hosting the join node.
-        fragment.traverseEffectiveParallelism(minThreadPerNode, maxThreadPerNode, -1);
+        fragment.traverseEffectiveParallelism(
+            minThreadPerNode, maxThreadPerNode, -1, limitScanParallelism);
       }
     }
 
@@ -425,7 +426,7 @@ public class Planner {
    * This method returns the effective CPU requirement of a query when considering
    * processing cost rate and blocking operator.
    * <p>
-   * Only valid after {@link #computeEffectiveParallelism(List, int, int)} has
+   * Only valid after {@link #computeEffectiveParallelism(List, int, int, boolean)} has
    * been called over the plan fragment list.
    */
   private static CoreCount computeBlockingAwareCores(
@@ -454,7 +455,8 @@ public class Planner {
    * fragment parallelism according to producer-consumer rate between them.
    */
   public static void computeProcessingCost(List<PlanFragment> planRoots,
-      TQueryExecRequest request, PlannerContext planCtx, int numCoresPerExecutor) {
+      TQueryExecRequest request, PlannerContext planCtx, int numCoresPerExecutor,
+      boolean limitScanParallelism) {
     TQueryOptions queryOptions = planCtx.getRootAnalyzer().getQueryOptions();
 
     if (!ProcessingCost.isComputeCost(queryOptions)) {
@@ -473,7 +475,7 @@ public class Planner {
     PlanFragment rootFragment = planRoots.get(0);
     List<PlanFragment> postOrderFragments = rootFragment.getNodesPostOrder();
     for (PlanFragment fragment : postOrderFragments) {
-      fragment.computeCostingSegment(queryOptions);
+      fragment.computeCostingSegment(queryOptions, limitScanParallelism);
     }
 
     if (LOG.isTraceEnabled()) {
@@ -482,7 +484,8 @@ public class Planner {
           + " maxThreads=" + maxThreads);
     }
 
-    computeEffectiveParallelism(postOrderFragments, minThreads, maxThreads);
+    computeEffectiveParallelism(
+        postOrderFragments, minThreads, maxThreads, limitScanParallelism);
     CoreCount effectiveCores = computeBlockingAwareCores(postOrderFragments);
     request.setCores_required(effectiveCores.total());
 

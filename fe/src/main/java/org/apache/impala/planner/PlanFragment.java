@@ -259,10 +259,14 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    *
    * @param queryOptions A query options for this query.
    */
-  public void computeCostingSegment(TQueryOptions queryOptions) {
+  public void computeCostingSegment(
+      TQueryOptions queryOptions, boolean limitScanParallelism) {
     for (PlanNode node : collectPlanNodes()) {
+      if (node instanceof ScanNode) {
+        ((ScanNode) node).setLimitScanParallelism(limitScanParallelism);
+      }
       node.computeProcessingCost(queryOptions);
-      node.computeRowConsumptionAndProductionToCost();
+      node.computeRowConsumptionAndProductionToCost(limitScanParallelism);
       if (LOG.isTraceEnabled()) {
         LOG.trace("ProcessingCost Node " + node.getProcessingCost().debugString());
       }
@@ -873,7 +877,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   /**
    * Get maximum allowed parallelism based on minimum processing load per fragment.
    * <p>This is controlled by {@code min_processing_per_thread} flag. Only valid after
-   * {@link #computeCostingSegment(TQueryOptions)} has been called.
+   * {@link #computeCostingSegment(TQueryOptions, boolean)} has been called.
    *
    * @return maximum allowed parallelism based on minimum processing load per fragment.
    */
@@ -996,17 +1000,18 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    *                         {@code max(PROCESSING_COST_MIN_THREADS, MT_DOP,
    *                         TExecutorGroupSet.num_cores_per_executor)}.
    * @param parentParallelism Number of instance of parent fragment.
+   * @param limitScanParallelism Whether scan nodes parallelism is fixed to MT_DOP or not.
    */
-  protected void traverseEffectiveParallelism(
-      int minThreadPerNode, int maxThreadPerNode, int parentParallelism) {
+  protected void traverseEffectiveParallelism(int minThreadPerNode, int maxThreadPerNode,
+      int parentParallelism, boolean limitScanParallelism) {
     Preconditions.checkNotNull(
         rootSegment_, "ProcessingCost Fragment %s has not been computed!", getId());
     int nodeStepCount = getNumInstances() % getNumNodes() == 0 ? getNumNodes() : 1;
 
     // step 1: Set initial parallelism to the maximum possible.
     //   Subsequent steps after this will not exceed maximum parallelism sets here.
-    boolean canTryLower = adjustToMaxParallelism(
-        minThreadPerNode, maxThreadPerNode, parentParallelism, nodeStepCount);
+    boolean canTryLower = adjustToMaxParallelism(minThreadPerNode, maxThreadPerNode,
+        parentParallelism, nodeStepCount, limitScanParallelism);
 
     if (canTryLower) {
       // step 2: Try lower parallelism by comparing output ProcessingCost of the input
@@ -1035,8 +1040,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     //   parallelism to match the child fragment parallelism.
     for (PlanFragment child : getChildren()) {
       if (child.getSink() instanceof JoinBuildSink) {
-        child.traverseEffectiveParallelism(
-            minThreadPerNode, maxThreadPerNode, getAdjustedInstanceCount());
+        child.traverseEffectiveParallelism(minThreadPerNode, maxThreadPerNode,
+            getAdjustedInstanceCount(), limitScanParallelism);
       }
     }
   }
@@ -1052,11 +1057,12 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    * @param parentParallelism Parallelism of parent fragment.
    * @param nodeStepCount The step count used to increase this fragment's parallelism.
    *                      Usually equal to number of nodes or just 1.
+   * @param limitScanParallelism Whether scan nodes parallelism is fixed to MT_DOP or not.
    * @return True if it is possible to lower this fragment's parallelism through
    * ProcessingCost comparison. False if the parallelism should not be changed anymore.
    */
   private boolean adjustToMaxParallelism(int minThreadPerNode, int maxThreadPerNode,
-      int parentParallelism, int nodeStepCount) {
+      int parentParallelism, int nodeStepCount, boolean limitScanParallelism) {
     boolean canTryLower = true;
     // Compute maximum allowed parallelism.
     int maxParallelism = getNumInstances();
@@ -1078,6 +1084,9 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       //   bounded by the maximum parallelism between its exchanging child.
       //   For now, it wont get here since fragment with UnionNode has fixed parallelism
       //   (equal to MT_DOP, and previouslyAdjusted == true).
+      //   However, a fragment that has leaf node (EmptySetNode, ScanNode, or UnionNode)
+      //   may still reach this code if this is the first planning round over selected
+      //   executor group (see IMPALA-12029).
       maxParallelism = IntMath.saturatedMultiply(maxThreadPerNode, getNumNodes());
       int minParallelism = IntMath.saturatedMultiply(minThreadPerNode, getNumNodes());
       int costBasedMaxParallelism = Math.max(nodeStepCount, getCostBasedMaxParallelism());
@@ -1100,6 +1109,18 @@ public class PlanFragment extends TreeNode<PlanFragment> {
         if (LOG.isTraceEnabled()) {
           logCountAdjustmentTrace(
               getNumInstances(), maxParallelism, "Follow maxThreadPerNode.");
+        }
+      }
+
+      if (!limitScanParallelism) {
+        // If this is the first round of executor group planning, then it is possible for
+        // scan/leaf node to have its parallelism NOT fixed to MT_DOP. In that case
+        // prevent the next step from lowering parallelism.
+        for (PlanNode node : collectPlanNodes()) {
+          if (node.isLeafNode()) {
+            canTryLower = false;
+            break;
+          }
         }
       }
     }
@@ -1139,7 +1160,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   /**
    * Override parallelism of this fragment with adjusted parallelism from CPU costing
    * algorithm.
-   * <p>Only valid after {@link #traverseEffectiveParallelism(int, int, int)}
+   * <p>Only valid after {@link #traverseEffectiveParallelism(int, int, int, boolean)}
    * called.
    */
   protected void setEffectiveNumInstance() {
