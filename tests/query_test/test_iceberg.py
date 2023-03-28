@@ -21,6 +21,7 @@ import datetime
 import logging
 import os
 import pytest
+import pytz
 import random
 
 import re
@@ -292,6 +293,8 @@ class TestIcebergTable(IcebergTestSuite):
       # We are setting the TIMEZONE query option in this test, so let's create a local
       # impala client.
       with self.create_impala_client() as impalad_client:
+        orig_timezone = 'America/Los_Angeles'
+        impalad_client.execute("SET TIMEZONE='" + orig_timezone + "'")
         impalad_client.execute("""
           create table {0} (i int) stored as iceberg
           TBLPROPERTIES ({1})""".format(tbl_name, catalog_properties))
@@ -321,7 +324,7 @@ class TestIcebergTable(IcebergTestSuite):
                           "state")
 
         # Create another snapshot.
-        before_insert = datetime.datetime.now()
+        before_insert = datetime.datetime.now(pytz.timezone(orig_timezone))
         impalad_client.execute("INSERT INTO {0} VALUES ({1})".format(tbl_name, 4))
         snapshots = get_snapshots(impalad_client, tbl_name, expected_result_size=5)
 
