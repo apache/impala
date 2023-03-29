@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Impala 4.1.2 Change Log</title>
+</head>
+<body>
+<h1>Impala 4.1.2 Change Log</h1>
+
+Release Notes - IMPALA - Version Impala 4.1.2
+<h2>        Bug
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11081'>IMPALA-11081</a>] -         Partition key scan optimization may return incorrect results when partition file have more than one block
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11696'>IMPALA-11696</a>] -         Incorrect warnings when creating text/sequence table with row format delimiters
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11707'>IMPALA-11707</a>] -         Wrong results when global runtime IN-list filters are applied
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11744'>IMPALA-11744</a>] -         Table mask view should preserve the original column order in Hive
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11751'>IMPALA-11751</a>] -         Crash in processing partition columns of Avro table with MT_DOP&gt;1
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11753'>IMPALA-11753</a>] -         CatalogD OOMkilled due to natively allocated memory
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11779'>IMPALA-11779</a>] -         Codegen crash due to null slots
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11795'>IMPALA-11795</a>] -         Failed to load table metadata from catalog due to EXCEPTION:Unsupported type encountered in setLowAndHighValue()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11843'>IMPALA-11843</a>] -         IndexOutOfBoundsException in analytic limit pushdown
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11845'>IMPALA-11845</a>] -         Select STAR with table ref is not resolved correctly on column/row masked views
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11857'>IMPALA-11857</a>] -         Join build fragments not displaying correctly in graphical plan
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11953'>IMPALA-11953</a>] -         num_trues and num_falses in TIntermediateColumnStats should be optional
+</li>
+</ul>
+<h2>        Improvement
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11355'>IMPALA-11355</a>] -         Add STRING overloads for functions that consume time of day
+</li>
+</ul>
+</body>
+</html>
