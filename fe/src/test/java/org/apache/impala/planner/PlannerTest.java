@@ -1366,6 +1366,7 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = new TQueryOptions();
     options.setMt_dop(4);
     options.setCompute_processing_cost(true);
+    options.setProcessing_cost_min_threads(2);
     options.setMinmax_filter_threshold(0.5);
     options.setMinmax_filter_sorted_columns(false);
     options.setMinmax_filter_partition_columns(false);

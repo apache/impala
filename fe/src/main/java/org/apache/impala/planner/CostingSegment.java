@@ -164,6 +164,7 @@ public class CostingSegment extends TreeNode<CostingSegment> {
     //   aggregate fragment the same as the aggregate fragment, say the aggregate fragment
     //   produces one row and uses 10 instances.
     int newParallelism = minParallelism;
+    int originalParallelism = cost_.getNumInstancesExpected();
     ProcessingCost producerCost = ProcessingCost.zero();
 
     if (getChildCount() > 0) {
@@ -190,15 +191,19 @@ public class CostingSegment extends TreeNode<CostingSegment> {
     ProcessingCost.tryAdjustConsumerParallelism(
         nodeStepCount, minParallelism, maxParallelism, producerCost, cost_);
     newParallelism = cost_.getNumInstancesExpected();
-    Preconditions.checkState(newParallelism >= minParallelism);
-    Preconditions.checkState(newParallelism <= maxParallelism);
+    Preconditions.checkState(newParallelism >= minParallelism,
+        "originalParallelism=" + originalParallelism + ". newParallelism="
+            + newParallelism + " < minParallelism=" + minParallelism);
+    Preconditions.checkState(newParallelism <= maxParallelism,
+        "originalParallelism=" + originalParallelism + ". newParallelism="
+            + newParallelism + " > maxParallelism=" + maxParallelism);
 
     if (LOG.isTraceEnabled()) {
-      LOG.trace("Adjust ProcessingCost on {}. minParallelism={} maxParallelism={} "
-              + "newParallelism={} consumerCost={} consumerInstCount={} producerCost={} "
-              + "producerInstCount={}",
-          getRootId(), minParallelism, maxParallelism, newParallelism,
-          cost_.getTotalCost(), cost_.getNumInstancesExpected(),
+      LOG.trace("Adjust ProcessingCost on {}. originalParallelism={} minParallelism={} "
+              + "maxParallelism={} newParallelism={} consumerCost={} "
+              + "consumerInstCount={} producerCost={} producerInstCount={}",
+          getRootId(), originalParallelism, minParallelism, maxParallelism,
+          newParallelism, cost_.getTotalCost(), cost_.getNumInstancesExpected(),
           producerCost.getTotalCost(), producerCost.getNumInstancesExpected());
     }
 

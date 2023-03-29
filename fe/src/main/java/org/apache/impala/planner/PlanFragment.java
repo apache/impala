@@ -991,9 +991,10 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    * parallelism of each PlanFragments.
    *
    * @param minThreadPerNode Minimum thread per fragment per node based on
-   *                         {@code processing_cost_min_threads} flag.
+   *                         {@code PROCESSING_COST_MIN_THREADS} query option.
    * @param maxThreadPerNode Maximum thread per fragment per node based on
-   *                         TExecutorGroupSet.num_cores_per_executor flag.
+   *                         {@code max(PROCESSING_COST_MIN_THREADS, MT_DOP,
+   *                         TExecutorGroupSet.num_cores_per_executor)}.
    * @param parentParallelism Number of instance of parent fragment.
    */
   protected void traverseEffectiveParallelism(
@@ -1004,8 +1005,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
 
     // step 1: Set initial parallelism to the maximum possible.
     //   Subsequent steps after this will not exceed maximum parallelism sets here.
-    boolean canTryLower =
-        adjustToMaxParallelism(maxThreadPerNode, parentParallelism, nodeStepCount);
+    boolean canTryLower = adjustToMaxParallelism(
+        minThreadPerNode, maxThreadPerNode, parentParallelism, nodeStepCount);
 
     if (canTryLower) {
       // step 2: Try lower parallelism by comparing output ProcessingCost of the input
@@ -1015,8 +1016,9 @@ public class PlanFragment extends TreeNode<PlanFragment> {
 
       // Check if this fragment parallelism can be lowered.
       int maxParallelism = getAdjustedInstanceCount();
+      int minParallelism = IntMath.saturatedMultiply(minThreadPerNode, getNumNodes());
       int effectiveParallelism = rootSegment_.tryAdjustParallelism(
-          nodeStepCount, minThreadPerNode, maxParallelism);
+          nodeStepCount, minParallelism, maxParallelism);
       setAdjustedInstanceCount(effectiveParallelism);
       if (LOG.isTraceEnabled() && effectiveParallelism != maxParallelism) {
         logCountAdjustmentTrace(maxParallelism, effectiveParallelism,
@@ -1042,16 +1044,19 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   /**
    * Adjust parallelism of this fragment to the maximum allowed.
    *
+   * @param minThreadPerNode Minimum thread per fragment per node based on
+   *                         {@code PROCESSING_COST_MIN_THREADS} query option.
    * @param maxThreadPerNode Maximum thread per fragment per node based on
-   *                         TExecutorGroupSet.num_cores_per_executor flag.
+   *                         {@code max(PROCESSING_COST_MIN_THREADS, MT_DOP,
+   *                         TExecutorGroupSet.num_cores_per_executor)}.
    * @param parentParallelism Parallelism of parent fragment.
    * @param nodeStepCount The step count used to increase this fragment's parallelism.
    *                      Usually equal to number of nodes or just 1.
    * @return True if it is possible to lower this fragment's parallelism through
    * ProcessingCost comparison. False if the parallelism should not be changed anymore.
    */
-  private boolean adjustToMaxParallelism(
-      int maxThreadPerNode, int parentParallelism, int nodeStepCount) {
+  private boolean adjustToMaxParallelism(int minThreadPerNode, int maxThreadPerNode,
+      int parentParallelism, int nodeStepCount) {
     boolean canTryLower = true;
     // Compute maximum allowed parallelism.
     int maxParallelism = getNumInstances();
@@ -1074,18 +1079,27 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       //   For now, it wont get here since fragment with UnionNode has fixed parallelism
       //   (equal to MT_DOP, and previouslyAdjusted == true).
       maxParallelism = IntMath.saturatedMultiply(maxThreadPerNode, getNumNodes());
+      int minParallelism = IntMath.saturatedMultiply(minThreadPerNode, getNumNodes());
       int costBasedMaxParallelism = Math.max(nodeStepCount, getCostBasedMaxParallelism());
       if (costBasedMaxParallelism < maxParallelism) {
-        maxParallelism = costBasedMaxParallelism;
-      }
-
-      if (LOG.isTraceEnabled() && maxParallelism != getNumInstances()) {
-        if (maxParallelism == maxThreadPerNode) {
+        if (costBasedMaxParallelism < minParallelism) {
+          maxParallelism = minParallelism;
+          canTryLower = false;
+          if (LOG.isTraceEnabled()) {
+            logCountAdjustmentTrace(
+                getNumInstances(), maxParallelism, "Follow minThreadPerNode.");
+          }
+        } else {
+          maxParallelism = costBasedMaxParallelism;
+          if (LOG.isTraceEnabled()) {
+            logCountAdjustmentTrace(
+                getNumInstances(), maxParallelism, "Follow minimum work per thread.");
+          }
+        }
+      } else {
+        if (LOG.isTraceEnabled()) {
           logCountAdjustmentTrace(
               getNumInstances(), maxParallelism, "Follow maxThreadPerNode.");
-        } else {
-          logCountAdjustmentTrace(
-              getNumInstances(), maxParallelism, "Follow minimum work per thread.");
         }
       }
     }
