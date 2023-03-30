@@ -819,4 +819,23 @@ string DescriptorTbl::DebugString() const {
   return out.str();
 }
 
+std::ostream& operator<<(std::ostream& out,
+    const TDescriptorTableSerialized& serial_tbl) {
+  out << "TDescriptorTableSerialized(";
+  TDescriptorTable desc_tbl;
+  if (DescriptorTbl::DeserializeThrift(serial_tbl, &desc_tbl).ok()) {
+    out << desc_tbl;
+  } else {
+    const uint8_t* p =
+        reinterpret_cast<const uint8_t*>(serial_tbl.thrift_desc_tbl.data());
+    const uint8_t* const end = p + serial_tbl.thrift_desc_tbl.length();
+    while (p != end) {
+      out << ios::hex << (int)*p++;
+    }
+  }
+  out << ")";
+  return out;
 }
+
+}
+

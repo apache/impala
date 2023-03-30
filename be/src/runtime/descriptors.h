@@ -573,6 +573,11 @@ class DescriptorTbl {
 
   std::string DebugString() const;
 
+  /// Converts a TDescriptorTableSerialized to a TDescriptorTable. Returns
+  /// an error if deserialization fails.
+  static Status DeserializeThrift(const TDescriptorTableSerialized& serial_tbl,
+      TDescriptorTable* desc_tbl) WARN_UNUSED_RESULT;
+
  private:
   // The friend classes use CreateInternal().
   friend class DescriptorTblBuilder;
@@ -589,11 +594,6 @@ class DescriptorTbl {
 
   static Status CreatePartKeyExprs(
       const HdfsTableDescriptor& hdfs_tbl, ObjectPool* pool) WARN_UNUSED_RESULT;
-
-  /// Converts a TDescriptorTableSerialized to a TDescriptorTable. Returns
-  /// an error if deserialization fails.
-  static Status DeserializeThrift(const TDescriptorTableSerialized& serial_tbl,
-      TDescriptorTable* desc_tbl) WARN_UNUSED_RESULT;
 
   /// Creates a TableDescriptor (allocated in 'pool', returned via 'desc')
   /// corresponding to tdesc. Returns error status on failure.

@@ -1172,12 +1172,13 @@ void DumpTExecReq(const TExecRequest& exec_request, const char* dump_type,
   if (FLAGS_dump_exec_request_path.empty()) return;
   int depth = 0;
   std::stringstream tmpstr;
-  string fn(Substitute("$1/TExecRequest-$2.$3", FLAGS_dump_exec_request_path,
+  string fn(Substitute("$0/TExecRequest-$1.$2", FLAGS_dump_exec_request_path,
       dump_type, PrintId(query_id, "-")));
   std::ofstream ofs(fn);
   tmpstr << exec_request;
-  const int len = tmpstr.str().length();
-  const char *p = tmpstr.str().c_str();
+  std::string s = tmpstr.str();
+  const char *p = s.c_str();
+  const int len = s.length();
   for (int i = 0; i < len; ++i) {
     const char ch = p[i];
     ofs << ch;

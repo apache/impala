@@ -112,4 +112,4 @@ struct TDescriptorTable {
 struct TDescriptorTableSerialized {
   // TDescriptorTable serialized
   1: required binary thrift_desc_tbl
-}
+} (cpp.customostream)
