@@ -163,7 +163,7 @@ class TestIcebergTable(IcebergTestSuite):
     assert self.filesystem_client.exists(metadata_location)
     status = self.filesystem_client.delete_file_dir(metadata_location, True)
     assert status, "Delete failed with {0}".format(status)
-    assert not self.hdfs_client.exists(metadata_location)
+    assert not self.filesystem_client.exists(metadata_location)
 
     if do_invalidate:
       # Invalidate so that table loading problems will happen in the catalog.
