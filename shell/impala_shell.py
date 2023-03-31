@@ -25,6 +25,7 @@ from compatibility import _xrange as xrange
 import cmd
 import errno
 import getpass
+import logging
 import os
 import prettytable
 import random
@@ -2172,6 +2173,9 @@ def impala_shell_main():
       raise FatalShellException()
 
   intro = get_intro(options)
+
+  # Suppressing unwanted notifications from Thrift
+  logging.getLogger('thrift').addHandler(logging.NullHandler())
 
   with ImpalaShell(options, query_options) as shell:
     while shell.is_alive:
