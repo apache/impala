@@ -774,6 +774,15 @@ enum TImpalaQueryOptions {
   // cost algorithm. It is recommend to not set it with value more than number of
   // physical cores in executor node. Valid values are in [1, 128]. Default to 1.
   PROCESSING_COST_MIN_THREADS = 154;
+
+  // When calculating estimated join cardinality of 2 or more conjuncts
+  // e.g t1.a1 = t2.a2 AND t1.b1 = t2.b2, this selectivity correlation factor
+  // provides more control over the join cardinality estimation. The range is a
+  // double value between 0 to 1 inclusive. The default value of 0 preserves the
+  // existing behavior of using the minimum cardinality of the conjucts. Setting
+  // this to a value between 0 to 1 computes the combined selectivity by
+  // taking the product of the selectivities and dividing by this factor.
+  JOIN_SELECTIVITY_CORRELATION_FACTOR = 155;
 }
 
 // The summary of a DML statement.

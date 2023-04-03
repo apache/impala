@@ -624,6 +624,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   155: optional i32 processing_cost_min_threads = 1;
+
+  // See comment in ImpalaService.thrift
+  156: optional double join_selectivity_correlation_factor = 0.0;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

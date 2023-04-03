@@ -810,3 +810,225 @@ PLAN-ROOT SINK
    predicates: o.o_clerk < 'foo'
    row-size=47B cardinality=150.00K
 ====
+# IMPALA-12006 (1) Top join is outer join whose
+# child is inner join that produces duplicates on
+# the join key.
+# Actual runtime join cardinalities:
+# 05: HASH JOIN [LEFT OUTER JOIN] 2.01M
+# 04: HASH JOIN [INNER JOIN]  1.34K
+select * from
+tpch.orders a left outer join
+ (select a.o_clerk from tpch.orders a inner join
+  (select o_clerk, max(cast(o_orderdate as DATE)) max_date
+    from tpch.orders where o_orderdate < DATE '1998-01-01'
+    group by o_clerk) t1
+   on a.o_clerk = t1.o_clerk AND a.o_orderdate = max_date) t2
+on a.o_clerk = t2.o_clerk
+---- PLAN
+PLAN-ROOT SINK
+|
+05:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.o_clerk = a.o_clerk
+|  row-size=251B cardinality=911.67M
+|
+|--04:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.o_orderdate = max(CAST(o_orderdate AS DATE)), a.o_clerk = o_clerk
+|  |  runtime filters: RF000 <- max(CAST(o_orderdate AS DATE)), RF001 <- o_clerk
+|  |  row-size=80B cardinality=611.43K
+|  |
+|  |--03:AGGREGATE [FINALIZE]
+|  |  |  output: max(CAST(o_orderdate AS DATE))
+|  |  |  group by: o_clerk
+|  |  |  row-size=31B cardinality=1.01K
+|  |  |
+|  |  02:SCAN HDFS [tpch.orders]
+|  |     HDFS partitions=1/1 files=1 size=162.56MB
+|  |     predicates: o_orderdate < DATE '1998-01-01'
+|  |     row-size=49B cardinality=150.00K
+|  |
+|  01:SCAN HDFS [tpch.orders a]
+|     HDFS partitions=1/1 files=1 size=162.56MB
+|     runtime filters: RF000 -> a.o_orderdate, RF001 -> a.o_clerk
+|     row-size=49B cardinality=1.50M
+|
+00:SCAN HDFS [tpch.orders a]
+   HDFS partitions=1/1 files=1 size=162.56MB
+   row-size=171B cardinality=1.50M
+====
+# IMPALA-12006 (2) Same as above but with the
+# join_selectivity_correlation_factor set to 1.0.
+# See (1) for actual runtime join cardinalities.
+select * from
+tpch.orders a left outer join
+ (select a.o_clerk from tpch.orders a inner join
+  (select o_clerk, max(cast(o_orderdate as DATE)) max_date
+    from tpch.orders where o_orderdate < DATE '1998-01-01'
+    group by o_clerk) t1
+   on a.o_clerk = t1.o_clerk AND a.o_orderdate = max_date) t2
+on a.o_clerk = t2.o_clerk
+---- QUERYOPTIONS
+join_selectivity_correlation_factor=1.0
+---- PLAN
+PLAN-ROOT SINK
+|
+05:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.o_clerk = a.o_clerk
+|  row-size=251B cardinality=1.50M
+|
+|--04:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.o_orderdate = max(CAST(o_orderdate AS DATE)), a.o_clerk = o_clerk
+|  |  runtime filters: RF000 <- max(CAST(o_orderdate AS DATE)), RF001 <- o_clerk
+|  |  row-size=80B cardinality=607
+|  |
+|  |--03:AGGREGATE [FINALIZE]
+|  |  |  output: max(CAST(o_orderdate AS DATE))
+|  |  |  group by: o_clerk
+|  |  |  row-size=31B cardinality=1.01K
+|  |  |
+|  |  02:SCAN HDFS [tpch.orders]
+|  |     HDFS partitions=1/1 files=1 size=162.56MB
+|  |     predicates: o_orderdate < DATE '1998-01-01'
+|  |     row-size=49B cardinality=150.00K
+|  |
+|  01:SCAN HDFS [tpch.orders a]
+|     HDFS partitions=1/1 files=1 size=162.56MB
+|     runtime filters: RF000 -> a.o_orderdate, RF001 -> a.o_clerk
+|     row-size=49B cardinality=1.50M
+|
+00:SCAN HDFS [tpch.orders a]
+   HDFS partitions=1/1 files=1 size=162.56MB
+   row-size=171B cardinality=1.50M
+====
+# IMPALA-12006 (3) Fractional join_selectivity_correlation_factor
+# See (1) for actual runtime join cardinalitites.
+select * from
+tpch.orders a left outer join
+ (select a.o_clerk from tpch.orders a inner join
+  (select o_clerk, max(cast(o_orderdate as DATE)) max_date
+    from tpch.orders where o_orderdate < DATE '1998-01-01'
+    group by o_clerk) t1
+   on a.o_clerk = t1.o_clerk AND a.o_orderdate = max_date) t2
+on a.o_clerk = t2.o_clerk
+---- QUERYOPTIONS
+join_selectivity_correlation_factor=0.25
+---- PLAN
+PLAN-ROOT SINK
+|
+05:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.o_clerk = a.o_clerk
+|  row-size=251B cardinality=3.62M
+|
+|--04:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.o_orderdate = max(CAST(o_orderdate AS DATE)), a.o_clerk = o_clerk
+|  |  runtime filters: RF000 <- max(CAST(o_orderdate AS DATE)), RF001 <- o_clerk
+|  |  row-size=80B cardinality=2.43K
+|  |
+|  |--03:AGGREGATE [FINALIZE]
+|  |  |  output: max(CAST(o_orderdate AS DATE))
+|  |  |  group by: o_clerk
+|  |  |  row-size=31B cardinality=1.01K
+|  |  |
+|  |  02:SCAN HDFS [tpch.orders]
+|  |     HDFS partitions=1/1 files=1 size=162.56MB
+|  |     predicates: o_orderdate < DATE '1998-01-01'
+|  |     row-size=49B cardinality=150.00K
+|  |
+|  01:SCAN HDFS [tpch.orders a]
+|     HDFS partitions=1/1 files=1 size=162.56MB
+|     runtime filters: RF000 -> a.o_orderdate, RF001 -> a.o_clerk
+|     row-size=49B cardinality=1.50M
+|
+00:SCAN HDFS [tpch.orders a]
+   HDFS partitions=1/1 files=1 size=162.56MB
+   row-size=171B cardinality=1.50M
+====
+# IMPALA-12006 (4) Similar to above but join is only on
+# the aggregate expressions, not on the base column.
+# Actual runtime cardinalities:
+# 05: HASH JOIN [LEFT OUTER JOIN] 172.52M
+# 04: HASH JOIN [INNER JOIN] 114.67K
+select * from
+tpch.orders a left outer join
+ (select a.o_clerk from tpch.orders a inner join
+  (select o_clerk, max(cast(o_orderdate as DATE)) max_date,
+    min(o_orderpriority) as min_priority
+    from tpch.orders where o_orderdate < DATE '1998-01-01'
+    group by o_clerk) t1
+   on a.o_orderdate = max_date and a.o_orderpriority = min_priority) t2
+on a.o_clerk = t2.o_clerk
+---- PLAN
+PLAN-ROOT SINK
+|
+05:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.o_clerk = a.o_clerk
+|  row-size=283B cardinality=911.67M
+|
+|--04:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.o_orderdate = max(CAST(o_orderdate AS DATE)), a.o_orderpriority = min(o_orderpriority)
+|  |  runtime filters: RF000 <- max(CAST(o_orderdate AS DATE)), RF001 <- min(o_orderpriority)
+|  |  row-size=112B cardinality=611.43K
+|  |
+|  |--03:AGGREGATE [FINALIZE]
+|  |  |  output: max(CAST(o_orderdate AS DATE)), min(o_orderpriority)
+|  |  |  group by: o_clerk
+|  |  |  row-size=43B cardinality=1.01K
+|  |  |
+|  |  02:SCAN HDFS [tpch.orders]
+|  |     HDFS partitions=1/1 files=1 size=162.56MB
+|  |     predicates: o_orderdate < DATE '1998-01-01'
+|  |     row-size=69B cardinality=150.00K
+|  |
+|  01:SCAN HDFS [tpch.orders a]
+|     HDFS partitions=1/1 files=1 size=162.56MB
+|     runtime filters: RF000 -> a.o_orderdate, RF001 -> a.o_orderpriority
+|     row-size=69B cardinality=1.50M
+|
+00:SCAN HDFS [tpch.orders a]
+   HDFS partitions=1/1 files=1 size=162.56MB
+   row-size=171B cardinality=1.50M
+====
+# IMPALA-12006 (5) Similar to (4) above but with
+# join_selectivity_correlation_factor set to 1.0.
+# See (4) for actual runtime join cardinalities.
+select * from
+tpch.orders a left outer join
+ (select a.o_clerk from tpch.orders a inner join
+  (select o_clerk, max(cast(o_orderdate as DATE)) max_date,
+    min(o_orderpriority) as min_priority
+    from tpch.orders where o_orderdate < DATE '1998-01-01'
+    group by o_clerk) t1
+   on a.o_orderdate = max_date and a.o_orderpriority = min_priority) t2
+on a.o_clerk = t2.o_clerk
+---- QUERYOPTIONS
+join_selectivity_correlation_factor=1.0
+---- PLAN
+PLAN-ROOT SINK
+|
+05:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.o_clerk = a.o_clerk
+|  row-size=283B cardinality=182.33M
+|
+|--04:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.o_orderdate = max(CAST(o_orderdate AS DATE)), a.o_orderpriority = min(o_orderpriority)
+|  |  runtime filters: RF000 <- max(CAST(o_orderdate AS DATE)), RF001 <- min(o_orderpriority)
+|  |  row-size=112B cardinality=122.28K
+|  |
+|  |--03:AGGREGATE [FINALIZE]
+|  |  |  output: max(CAST(o_orderdate AS DATE)), min(o_orderpriority)
+|  |  |  group by: o_clerk
+|  |  |  row-size=43B cardinality=1.01K
+|  |  |
+|  |  02:SCAN HDFS [tpch.orders]
+|  |     HDFS partitions=1/1 files=1 size=162.56MB
+|  |     predicates: o_orderdate < DATE '1998-01-01'
+|  |     row-size=69B cardinality=150.00K
+|  |
+|  01:SCAN HDFS [tpch.orders a]
+|     HDFS partitions=1/1 files=1 size=162.56MB
+|     runtime filters: RF000 -> a.o_orderdate, RF001 -> a.o_orderpriority
+|     row-size=69B cardinality=1.50M
+|
+00:SCAN HDFS [tpch.orders a]
+   HDFS partitions=1/1 files=1 size=162.56MB
+   row-size=171B cardinality=1.50M
+====
