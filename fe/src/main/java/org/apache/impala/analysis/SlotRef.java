@@ -232,13 +232,22 @@ public class SlotRef extends Expr {
         }
         FeFsTable feTable = (FeFsTable) rootTable;
         for (HdfsFileFormat format : feTable.getFileFormats()) {
-          if (format != HdfsFileFormat.ORC && format != HdfsFileFormat.PARQUET) {
+          if (!formatSupportsQueryingStruct(format)) {
             throw new AnalysisException("Querying STRUCT is only supported for ORC and "
                 + "Parquet file formats.");
           }
         }
       }
     }
+  }
+
+  // Returns true if the given HdfsFileFormat supports querying STRUCT types. Iceberg
+  // tables also have ICEBERG as HdfsFileFormat. We can return TRUE in case of Iceberg
+  // because the data file formats in the Iceberg table will be also tested separately.
+  private static boolean formatSupportsQueryingStruct(HdfsFileFormat format) {
+    return format == HdfsFileFormat.PARQUET ||
+           format == HdfsFileFormat.ORC ||
+           format == HdfsFileFormat.ICEBERG;
   }
 
   // Assumes this 'SlotRef' is a struct and that desc_.itemTupleDesc_ has already been

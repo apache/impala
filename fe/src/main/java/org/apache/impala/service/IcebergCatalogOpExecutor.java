@@ -28,10 +28,12 @@ import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.DeleteFiles;
 import org.apache.iceberg.ExpireSnapshots;
+import org.apache.iceberg.FileMetadata;
 import org.apache.iceberg.ManageSnapshots;
 import org.apache.iceberg.Metrics;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.ReplacePartitions;
+import org.apache.iceberg.RowDelta;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.SnapshotManager;
 import org.apache.iceberg.Table;
@@ -322,6 +324,44 @@ public class IcebergCatalogOpExecutor {
       replace.validateNoConflictingData();
       replace.validateNoConflictingDeletes();
       replace.commit();
+    }
+  }
+
+  public static void execute(FeIcebergTable feIcebergTable, Transaction txn,
+      TIcebergOperationParam icebergOp) throws ImpalaRuntimeException {
+    switch (icebergOp.operation) {
+      case INSERT: appendFiles(feIcebergTable, txn, icebergOp); break;
+      case DELETE: deleteRows(feIcebergTable, txn, icebergOp); break;
+      default: throw new ImpalaRuntimeException(
+          "Unknown Iceberg operation: " + icebergOp.operation);
+    }
+  }
+
+  public static void deleteRows(FeIcebergTable feIcebergTable, Transaction txn,
+      TIcebergOperationParam icebergOp) throws ImpalaRuntimeException {
+    org.apache.iceberg.Table nativeIcebergTable = feIcebergTable.getIcebergApiTable();
+    List<ByteBuffer> deleteFilesFb = icebergOp.getIceberg_delete_files_fb();
+    RowDelta rowDelta = txn.newRowDelta();
+    for (ByteBuffer buf : deleteFilesFb) {
+      FbIcebergDataFile deleteFile = FbIcebergDataFile.getRootAsFbIcebergDataFile(buf);
+
+      PartitionSpec partSpec = nativeIcebergTable.specs().get(icebergOp.getSpec_id());
+      Metrics metrics = buildDataFileMetrics(deleteFile);
+      FileMetadata.Builder builder = FileMetadata.deleteFileBuilder(partSpec)
+          .ofPositionDeletes()
+          .withMetrics(metrics)
+          .withPath(deleteFile.path())
+          .withFormat(IcebergUtil.fbFileFormatToIcebergFileFormat(deleteFile.format()))
+          .withRecordCount(deleteFile.recordCount())
+          .withFileSizeInBytes(deleteFile.fileSizeInBytes());
+      rowDelta.addDeletes(builder.build());
+    }
+    try {
+      rowDelta.validateFromSnapshot(icebergOp.getInitial_snapshot_id());
+      rowDelta.validateNoConflictingDataFiles();
+      rowDelta.commit();
+    } catch (ValidationException e) {
+      throw new ImpalaRuntimeException(e.getMessage(), e);
     }
   }
 

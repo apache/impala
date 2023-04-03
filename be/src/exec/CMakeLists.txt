@@ -76,6 +76,7 @@ add_library(Exec
   hdfs-table-sink.cc
   hdfs-table-writer.cc
   hdfs-text-table-writer.cc
+  iceberg-delete-sink.cc
   incr-stats-util.cc
   join-builder.cc
   nested-loop-join-builder.cc
@@ -93,6 +94,7 @@ add_library(Exec
   sort-node.cc
   streaming-aggregation-node.cc
   subplan-node.cc
+  table-sink-base.cc
   text-converter.cc
   topn-node.cc
   union-node.cc

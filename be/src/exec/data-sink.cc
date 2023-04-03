@@ -24,6 +24,7 @@
 #include "exec/exec-node.h"
 #include "exec/hbase/hbase-table-sink.h"
 #include "exec/hdfs-table-sink.h"
+#include "exec/iceberg-delete-sink.h"
 #include "exec/kudu/kudu-table-sink.h"
 #include "exec/kudu/kudu-util.h"
 #include "exec/blocking-plan-root-sink.h"
@@ -83,7 +84,12 @@ Status DataSinkConfig::CreateConfig(const TDataSink& thrift_sink,
       if (!thrift_sink.__isset.table_sink) return Status("Missing table sink.");
       switch (thrift_sink.table_sink.type) {
         case TTableSinkType::HDFS:
-          *data_sink = pool->Add(new HdfsTableSinkConfig());
+          if (thrift_sink.table_sink.action == TSinkAction::INSERT) {
+            *data_sink = pool->Add(new HdfsTableSinkConfig());
+          } else if (thrift_sink.table_sink.action == TSinkAction::DELETE) {
+            // Currently only Iceberg tables support DELETE operations for FS tables.
+            *data_sink = pool->Add(new IcebergDeleteSinkConfig());
+          }
           break;
         case TTableSinkType::KUDU:
           RETURN_IF_ERROR(CheckKuduAvailability());

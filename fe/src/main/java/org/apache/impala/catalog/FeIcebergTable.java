@@ -42,6 +42,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.ContentFile;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DeleteFile;
@@ -78,6 +79,7 @@ import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergPartitionStats;
+import org.apache.impala.thrift.TIcebergPartitionTransformType;
 import org.apache.impala.thrift.TIcebergTable;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TResultSet;
@@ -174,6 +176,10 @@ public interface FeIcebergTable extends FeFsTable {
    *  Return the ID used for getting the default partititon spec.
    */
   int getDefaultPartitionSpecId();
+
+  default int getFormatVersion() {
+    return ((BaseTable)getIcebergApiTable()).operations().current().formatVersion();
+  }
 
   /**
    * @return the Iceberg schema.
@@ -287,6 +293,22 @@ public interface FeIcebergTable extends FeFsTable {
     return getFeFsTable().getHostIndex();
   }
 
+  /**
+   * @return true if there's at least one partition spec that has at least one non-VOID
+   * partition field.
+   */
+  default boolean isPartitioned() {
+    for (IcebergPartitionSpec spec : getPartitionSpecs()) {
+      if (spec.getIcebergPartitionFieldsSize() == 0) continue;
+      for (IcebergPartitionField partField : spec.getIcebergPartitionFields()) {
+        if (partField.getTransformType() != TIcebergPartitionTransformType.VOID) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   @Override /* FeTable */
   default boolean isComputedPartitionColumn(Column col) {
     Preconditions.checkState(col instanceof IcebergColumn);
@@ -311,6 +333,23 @@ public interface FeIcebergTable extends FeFsTable {
       return getIcebergApiTable().currentSnapshot().snapshotId();
     }
     return -1;
+  }
+
+  default TIcebergFileFormat getWriteFileFormat() {
+    return IcebergUtil.getIcebergFileFormat(
+        getIcebergApiTable().properties().getOrDefault(
+            TableProperties.DEFAULT_FILE_FORMAT,
+            TableProperties.DEFAULT_FILE_FORMAT_DEFAULT));
+  }
+
+  default TIcebergFileFormat getDeleteFileFormat() {
+    String deleteFormat =
+        getIcebergApiTable().properties().get(TableProperties.DELETE_DEFAULT_FILE_FORMAT);
+    if (deleteFormat != null) {
+      return IcebergUtil.getIcebergFileFormat(deleteFormat);
+    }
+    // If delete file format is not specified, use  write format.
+    return getWriteFileFormat();
   }
 
   /**

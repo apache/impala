@@ -259,6 +259,7 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc, ObjectPo
     iceberg_table_location_ = tdesc.icebergTable.table_location;
     const TIcebergPartitionSpec& spec = tdesc.icebergTable.partition_spec[
         tdesc.icebergTable.default_partition_spec_id];
+    DCHECK_EQ(spec.spec_id, tdesc.icebergTable.default_partition_spec_id);
     for (const TIcebergPartitionField& spec_field : spec.partition_fields) {
       if (spec_field.transform.transform_type == TIcebergPartitionTransformType::VOID) {
         continue;

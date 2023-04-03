@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.Pair;
@@ -128,6 +129,17 @@ public abstract class TableSink extends DataSink {
     Preconditions.checkNotNull(partitionKeyExprs);
     Preconditions.checkNotNull(referencedColumns);
     Preconditions.checkNotNull(sortProperties.first);
+    if (table instanceof FeIcebergTable) {
+      if (sinkAction == Op.INSERT) {
+        return new HdfsTableSink(table, partitionKeyExprs,outputExprs, overwrite,
+            inputIsClustered, sortProperties, writeId, maxTableSinks, isResultSink);
+      } else if (sinkAction == Op.DELETE) {
+        return new IcebergDeleteSink((FeIcebergTable)table, outputExprs, maxTableSinks);
+      } else {
+        // We don't support any other sink actions yet.
+        Preconditions.checkState(false);
+      }
+    }
     if (table instanceof FeFsTable) {
       // Hdfs only supports inserts.
       Preconditions.checkState(sinkAction == Op.INSERT);

@@ -19,7 +19,7 @@
 #ifndef IMPALA_EXEC_HDFS_PARQUET_TABLE_WRITER_H
 #define IMPALA_EXEC_HDFS_PARQUET_TABLE_WRITER_H
 
-#include "exec/data-sink.h"
+#include "exec/table-sink-base.h"
 
 #include <hdfs.h>
 #include <map>
@@ -53,7 +53,7 @@ class TupleRow;
 
 class HdfsParquetTableWriter : public HdfsTableWriter {
  public:
-  HdfsParquetTableWriter(HdfsTableSink* parent, RuntimeState* state,
+  HdfsParquetTableWriter(TableSinkBase* parent, RuntimeState* state,
       OutputPartition* output_partition, const HdfsPartitionDescriptor* part_desc,
       const HdfsTableDescriptor* table_desc);
 

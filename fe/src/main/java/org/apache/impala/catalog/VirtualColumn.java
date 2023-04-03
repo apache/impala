@@ -39,11 +39,10 @@ public class VirtualColumn extends Column {
       Type.BIGINT, TVirtualColumnType.FILE_POSITION);
 
   public static VirtualColumn getVirtualColumn(TVirtualColumnType virtColType) {
-    if (virtColType == TVirtualColumnType.INPUT_FILE_NAME) {
-      return INPUT_FILE_NAME;
-    }
-    if (virtColType == TVirtualColumnType.FILE_POSITION) {
-      return FILE_POSITION;
+    switch (virtColType) {
+      case INPUT_FILE_NAME: return INPUT_FILE_NAME;
+      case FILE_POSITION: return FILE_POSITION;
+      default: break;
     }
     return null;
   }

@@ -119,7 +119,8 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
     AnalyzesOk("update functional_kudu.dimtbl set name = substr('hallo', 3)");
     // Only Kudu tables can be updated
     AnalysisError("update functional.alltypes set intcol = 99",
-        "Impala does not support modifying a non-Kudu table: functional.alltypes");
+        "Impala only supports modifying Kudu and Iceberg tables, but the following "+
+        "table is neither: functional.alltypes");
     // Non existing column in update
     AnalysisError("update functional_kudu.dimtbl set links='10'",
         "Could not resolve column/field reference: 'links'");
@@ -201,10 +202,12 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
     AnalysisError(
         "update a set b.name =" +
             " 'Oskar' FROM functional.testtbl a join functional_kudu.testtbl b",
-        "Impala does not support modifying a non-Kudu table: functional.testtbl");
+        "Impala only supports modifying Kudu and Iceberg tables, but the following " +
+        "table is neither: functional.testtbl");
     AnalysisError(
         "delete a FROM functional.testtbl a join functional_kudu.testtbl b",
-        "Impala does not support modifying a non-Kudu table: functional.testtbl");
+        "Impala only supports modifying Kudu and Iceberg tables, but the " +
+        "following table is neither: functional.testtbl");
   }
 
   @Test

@@ -74,6 +74,7 @@ import org.apache.impala.analysis.CreateDataSrcStmt;
 import org.apache.impala.analysis.CreateDropRoleStmt;
 import org.apache.impala.analysis.CreateUdaStmt;
 import org.apache.impala.analysis.CreateUdfStmt;
+import org.apache.impala.analysis.DeleteStmt;
 import org.apache.impala.analysis.DescribeTableStmt;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.DropDataSrcStmt;
@@ -119,6 +120,7 @@ import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
+import org.apache.impala.catalog.IcebergPositionDeleteTable;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.ImpaladTableUsageTracker;
 import org.apache.impala.catalog.MaterializedViewHdfsTable;
@@ -166,6 +168,8 @@ import org.apache.impala.thrift.TDdlType;
 import org.apache.impala.thrift.TDescribeHistoryParams;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TDescribeResult;
+import org.apache.impala.thrift.TIcebergDmlFinalizeParams;
+import org.apache.impala.thrift.TIcebergOperation;
 import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TExecutorGroupSet;
 import org.apache.impala.thrift.TExplainResult;
@@ -2478,6 +2482,10 @@ public class Frontend {
             analysisResult.isUpdateStmt() || analysisResult.isDeleteStmt());
         result.stmt_type = TStmtType.DML;
         result.query_exec_request.stmt_type = TStmtType.DML;
+        if (analysisResult.isDeleteStmt()) {
+          addFinalizationParamsForDelete(queryCtx, queryExecRequest,
+              analysisResult.getDeleteStmt());
+        }
       }
       return result;
     } catch (Exception e) {
@@ -2540,13 +2548,59 @@ public class Frontend {
         targetTable, insertStmt.getWriteId(), insertStmt.isOverwrite());
   }
 
+  private static void addFinalizationParamsForDelete(
+    TQueryCtx queryCtx, TQueryExecRequest queryExecRequest, DeleteStmt deleteStmt) {
+      FeTable targetTable = deleteStmt.getTargetTable();
+      if (!(targetTable instanceof FeIcebergTable)) return;
+      Preconditions.checkState(targetTable instanceof IcebergPositionDeleteTable);
+      targetTable = ((IcebergPositionDeleteTable)targetTable).getBaseTable();
+      TFinalizeParams finalizeParams = addFinalizationParamsForDml(
+          queryCtx, targetTable, false);
+      TIcebergDmlFinalizeParams iceFinalizeParams = new TIcebergDmlFinalizeParams();
+      iceFinalizeParams.operation = TIcebergOperation.DELETE;
+      FeIcebergTable iceTable = (FeIcebergTable)targetTable;
+      iceFinalizeParams.setSpec_id(iceTable.getDefaultPartitionSpecId());
+      iceFinalizeParams.setInitial_snapshot_id(iceTable.snapshotId());
+      finalizeParams.setIceberg_params(iceFinalizeParams);
+      queryExecRequest.setFinalize_params(finalizeParams);
+  }
+
   // This is public to allow external frontends to utilize this method to fill in the
   // finalization parameters for externally generated INSERTs.
   public static void addFinalizationParamsForInsert(
       TQueryCtx queryCtx, TQueryExecRequest queryExecRequest, FeTable targetTable,
-          long writeId, boolean isOverwrite) {
+      long writeId, boolean isOverwrite) {
+    TFinalizeParams finalizeParams = addFinalizationParamsForDml(
+        queryCtx, targetTable, isOverwrite);
     if (targetTable instanceof FeFsTable) {
-      TFinalizeParams finalizeParams = new TFinalizeParams();
+      if (writeId != -1) {
+        Preconditions.checkState(queryCtx.isSetTransaction_id());
+        finalizeParams.setTransaction_id(queryCtx.getTransaction_id());
+        finalizeParams.setWrite_id(writeId);
+      } else if (targetTable instanceof FeIcebergTable) {
+        FeIcebergTable iceTable = (FeIcebergTable)targetTable;
+        TIcebergDmlFinalizeParams iceFinalizeParams = new TIcebergDmlFinalizeParams();
+        iceFinalizeParams.operation = TIcebergOperation.INSERT;
+        iceFinalizeParams.setSpec_id(iceTable.getDefaultPartitionSpecId());
+        iceFinalizeParams.setInitial_snapshot_id(iceTable.snapshotId());
+        finalizeParams.setIceberg_params(iceFinalizeParams);
+      } else {
+        // TODO: Currently this flag only controls the removal of the query-level staging
+        // directory. HdfsTableSink (that creates the staging dir) calculates the path
+        // independently. So it'd be better to either remove this option, or make it used
+        // everywhere where the staging directory is referenced.
+        FeFsTable hdfsTable = (FeFsTable) targetTable;
+        finalizeParams.setStaging_dir(
+            hdfsTable.getHdfsBaseDir() + "/_impala_insert_staging");
+      }
+      queryExecRequest.setFinalize_params(finalizeParams);
+    }
+  }
+
+  private static TFinalizeParams addFinalizationParamsForDml(TQueryCtx queryCtx,
+      FeTable targetTable, boolean isOverwrite) {
+    TFinalizeParams finalizeParams = new TFinalizeParams();
+    if (targetTable instanceof FeFsTable) {
       finalizeParams.setIs_overwrite(isOverwrite);
       finalizeParams.setTable_name(targetTable.getTableName().getTbl());
       finalizeParams.setTable_id(DescriptorTable.TABLE_SINK_ID);
@@ -2554,24 +2608,8 @@ public class Frontend {
       finalizeParams.setTable_db(db == null ? queryCtx.session.database : db);
       FeFsTable hdfsTable = (FeFsTable) targetTable;
       finalizeParams.setHdfs_base_dir(hdfsTable.getHdfsBaseDir());
-      if (writeId != -1) {
-        Preconditions.checkState(queryCtx.isSetTransaction_id());
-        finalizeParams.setTransaction_id(queryCtx.getTransaction_id());
-        finalizeParams.setWrite_id(writeId);
-      } else if (targetTable instanceof FeIcebergTable) {
-        FeIcebergTable iceTable = (FeIcebergTable)targetTable;
-        finalizeParams.setSpec_id(iceTable.getDefaultPartitionSpecId());
-        finalizeParams.setInitial_snapshot_id(iceTable.snapshotId());
-      } else {
-        // TODO: Currently this flag only controls the removal of the query-level staging
-        // directory. HdfsTableSink (that creates the staging dir) calculates the path
-        // independently. So it'd be better to either remove this option, or make it used
-        // everywhere where the staging directory is referenced.
-        finalizeParams.setStaging_dir(
-            hdfsTable.getHdfsBaseDir() + "/_impala_insert_staging");
-      }
-      queryExecRequest.setFinalize_params(finalizeParams);
     }
+    return finalizeParams;
   }
 
   /**

@@ -103,6 +103,9 @@ struct THdfsTableSink {
   11: optional map<string, i64> parquet_bloom_filter_col_info;
 }
 
+struct TIcebergDeleteSink {
+}
+
 // Structure to encapsulate specific options that are passed down to the KuduTableSink
 struct TKuduTableSink {
   // The position in this vector is equal to the position in the output expressions of the
@@ -151,6 +154,7 @@ struct TTableSink {
   3: required TSinkAction action
   4: optional THdfsTableSink hdfs_table_sink
   5: optional TKuduTableSink kudu_table_sink
+  6: optional TIcebergDeleteSink iceberg_delete_sink
 }
 
 struct TDataSink {

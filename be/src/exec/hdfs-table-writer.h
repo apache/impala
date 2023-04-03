@@ -29,7 +29,7 @@ namespace impala {
 
 class HdfsPartitionDescriptor;
 class HdfsTableDescriptor;
-class HdfsTableSink;
+class TableSinkBase;
 struct OutputPartition;
 class RowBatch;
 class RuntimeState;
@@ -61,7 +61,7 @@ class HdfsTableWriter {
   /// output_partition -- Information on the output partition file.
   /// partition -- the descriptor for the partition being written
   /// table_desc -- the descriptor for the table being written.
-  HdfsTableWriter(HdfsTableSink* parent,
+  HdfsTableWriter(TableSinkBase* parent,
                   RuntimeState* state, OutputPartition* output_partition,
                   const HdfsPartitionDescriptor* partition_desc,
                   const HdfsTableDescriptor* table_desc);
@@ -132,7 +132,7 @@ class HdfsTableWriter {
   }
 
   /// Parent table sink object
-  HdfsTableSink* parent_;
+  TableSinkBase* parent_;
 
   /// Runtime state.
   RuntimeState* state_;

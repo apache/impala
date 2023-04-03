@@ -203,13 +203,19 @@ struct TDdlExecResponse {
   6: optional string table_location
 }
 
+
 // Parameters for the Iceberg operation.
 struct TIcebergOperationParam {
+  5: required Types.TIcebergOperation operation
+
   // Iceberg partition spec used by this operation
   1: optional i32 spec_id;
 
   // Iceberg data files to append to the table, encoded in FlatBuffers.
-  2: required list<binary> iceberg_data_files_fb;
+  2: optional list<binary> iceberg_data_files_fb;
+
+  // Iceberg delete files to append to the table, encoded in FlatBuffers.
+  6: optional list<binary> iceberg_delete_files_fb;
 
   // Is overwrite operation
   3: required bool is_overwrite = false;

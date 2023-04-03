@@ -486,10 +486,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
               new IcebergPartitionTransform(field.getTransform().getTransform_type(),
                   transformParam)));
         }
-        ret.add(new IcebergPartitionSpec(param.getPartition_id(),
+        ret.add(new IcebergPartitionSpec(param.getSpec_id(),
             fields));
       } else {
-        ret.add(new IcebergPartitionSpec(param.getPartition_id(), null));
+        ret.add(new IcebergPartitionSpec(param.getSpec_id(), null));
       }
     }
     return ret;

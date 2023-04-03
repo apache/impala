@@ -853,7 +853,7 @@ Status Coordinator::FinalizeHdfsDml() {
   DCHECK(has_called_wait_.Load());
   DCHECK(finalize_params() != nullptr);
   bool is_hive_acid = finalize_params()->__isset.write_id;
-  bool is_iceberg_table = finalize_params()->__isset.spec_id;
+  bool is_iceberg_table = finalize_params()->__isset.iceberg_params;
 
   VLOG_QUERY << "Finalizing query: " << PrintId(query_id());
   SCOPED_TIMER(finalization_timer_);

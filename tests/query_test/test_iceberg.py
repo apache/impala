@@ -1138,6 +1138,63 @@ class TestIcebergV2Table(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-tablesample-v2', vector,
         use_db="functional_parquet")
 
-  def test_metadata_tables(self, vector, unique_database):
+  def test_metadata_tables(self, vector):
     self.run_test_case('QueryTest/iceberg-metadata-tables', vector,
         use_db="functional_parquet")
+
+  def test_delete(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-delete', vector,
+        unique_database)
+
+  @SkipIfFS.hive
+  def test_delete_hive_read(self, vector, unique_database):
+    ice_delete = unique_database + ".ice_delete"
+    self.execute_query("""CREATE TABLE {} (i int, s string)
+        STORED BY ICEBERG
+        TBLPROPERTIES('format-version'='2')""".format(ice_delete))
+    self.execute_query("INSERT INTO {} VALUES (1, 'one')".format(ice_delete))
+    self.execute_query("INSERT INTO {} VALUES (2, 'two')".format(ice_delete))
+    self.execute_query("INSERT INTO {} VALUES (3, 'three')".format(ice_delete))
+    self.execute_query("DELETE FROM {} WHERE i = 2".format(ice_delete))
+
+    # Hive needs table property 'format-version' explicitly set
+    self.run_stmt_in_hive("ALTER TABLE {} SET TBLPROPERTIES('format-version'='2')".format(
+        ice_delete))
+    hive_output = self.run_stmt_in_hive("SELECT * FROM {} ORDER BY i".format(ice_delete))
+    expected_output = "ice_delete.i,ice_delete.s\n1,one\n3,three\n"
+    assert hive_output == expected_output
+
+    ice_lineitem = unique_database + ".linteitem_ice"
+    self.execute_query("""CREATE TABLE {}
+        STORED BY ICEBERG
+        TBLPROPERTIES('format-version'='2')
+        AS SELECT * FROM tpch_parquet.lineitem""".format(ice_lineitem))
+    self.execute_query("DELETE FROM {} WHERE l_orderkey % 5 = 0".format(ice_lineitem))
+    impala_result = self.execute_query("SELECT count(*) FROM {}".format(ice_lineitem))
+    assert impala_result.data[0] == "4799964"
+    # Hive needs table property 'format-version' explicitly set
+    self.run_stmt_in_hive("ALTER TABLE {} SET TBLPROPERTIES('format-version'='2')".format(
+        ice_lineitem))
+    hive_output = self.run_stmt_in_hive("SELECT count(*) FROM {}".format(ice_lineitem))
+    assert hive_output == "_c0\n4799964\n"
+
+  @SkipIfFS.hive
+  def test_delete_complextypes_mixed_files(self, vector, unique_database):
+    ice_t = unique_database + ".ice_complex_delete"
+    self.run_stmt_in_hive("""create table {}
+        stored by iceberg stored as orc as
+        select * from functional_parquet.complextypestbl;""".format(ice_t))
+    # Hive needs table property 'format-version' explicitly set
+    self.run_stmt_in_hive("ALTER TABLE {} SET TBLPROPERTIES('format-version'='2')".format(
+        ice_t))
+    self.run_stmt_in_hive("""alter table {}
+        set tblproperties ('write.format.default'='parquet')""".format(ice_t))
+    self.run_stmt_in_hive("""insert into {}
+      select * from functional_parquet.complextypestbl""".format(ice_t))
+
+    vector.get_value('exec_option')['expand_complex_types'] = True
+    self.run_test_case('QueryTest/iceberg-delete-complex', vector,
+        unique_database)
+    hive_output = self.run_stmt_in_hive("SELECT id FROM {} ORDER BY id".format(ice_t))
+    # Test that Hive sees the same rows deleted.
+    assert hive_output == "id\n4\n5\n6\n7\n8\n"

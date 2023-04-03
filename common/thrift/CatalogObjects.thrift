@@ -603,7 +603,7 @@ struct TIcebergPartitionField {
 }
 
 struct TIcebergPartitionSpec {
-  1: required i32 partition_id
+  1: required i32 spec_id
   2: optional list<TIcebergPartitionField> partition_fields
 }
 

@@ -311,10 +311,10 @@ public class HdfsScanNode extends ScanNode {
   private final Map<TupleDescriptor, List<Expr>> statsOriginalConjuncts_ =
       new LinkedHashMap<>();
 
-  // Tuple that is used to materialize statistics when scanning Parquet files. For each
-  // column it can contain 0, 1, or 2 slots, depending on whether the column needs to be
-  // evaluated against the min and/or the max value of the corresponding
-  // parquet::Statistics.
+  // Tuple that is used to materialize statistics when scanning Parquet or ORC files.
+  // For each column it can contain 0, 1, or 2 slots, depending on whether the column
+  // needs to be evaluated against the min and/or the max value of the corresponding
+  // file statistics.
   private TupleDescriptor statsTuple_;
 
   // The list of overlap predicate descs. See TOverlapPredicateDesc in PlanNodes.thrift.
@@ -738,6 +738,7 @@ public class HdfsScanNode extends ScanNode {
    */
   private void computeStatsTupleAndConjuncts(Analyzer analyzer) throws ImpalaException{
     Preconditions.checkNotNull(desc_.getPath());
+    if (statsTuple_ != null) return;
     String tupleName = desc_.getPath().toString() + " statistics";
     DescriptorTable descTbl = analyzer.getDescTbl();
     statsTuple_ = descTbl.createTupleDescriptor(tupleName);

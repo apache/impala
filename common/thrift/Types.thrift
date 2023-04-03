@@ -111,6 +111,11 @@ enum TStmtType {
   TESTCASE = 7
 }
 
+enum TIcebergOperation {
+  INSERT = 0,
+  DELETE = 1
+}
+
 // Level of verboseness for "explain" output.
 enum TExplainLevel {
   MINIMAL = 0

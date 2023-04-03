@@ -6842,7 +6842,7 @@ public class CatalogOpExecutor {
       if (table instanceof FeIcebergTable && update.isSetIceberg_operation()) {
         FeIcebergTable iceTbl = (FeIcebergTable)table;
         org.apache.iceberg.Transaction iceTxn = IcebergUtil.getIcebergTransaction(iceTbl);
-        IcebergCatalogOpExecutor.appendFiles(iceTbl, iceTxn,
+        IcebergCatalogOpExecutor.execute(iceTbl, iceTxn,
             update.getIceberg_operation());
         if (isIcebergHmsIntegrationEnabled(iceTbl.getMetaStoreTable())) {
           // Add catalog service id and the 'newCatalogVersion' to the table parameters.

@@ -36,13 +36,13 @@ import org.apache.impala.thrift.TIcebergPartitionSpec;
  * )
  */
 public class IcebergPartitionSpec extends StmtNode {
-  // Partition id from iceberg PartitionSpec
-  private int partitionId_;
+  // Partition spec id from iceberg PartitionSpec
+  private int specId_;
 
   private List<IcebergPartitionField> icebergPartitionFields_;
 
   public IcebergPartitionSpec(int partitionId, List<IcebergPartitionField> fields) {
-    partitionId_ = partitionId;
+    specId_ = partitionId;
     icebergPartitionFields_ = fields;
   }
 
@@ -94,7 +94,7 @@ public class IcebergPartitionSpec extends StmtNode {
 
   public TIcebergPartitionSpec toThrift() {
     TIcebergPartitionSpec result = new TIcebergPartitionSpec();
-    result.setPartition_id(partitionId_);
+    result.setSpec_id(specId_);
     if (!hasPartitionFields()) return result;
     for (IcebergPartitionField field : icebergPartitionFields_) {
       result.addToPartition_fields(field.toThrift());

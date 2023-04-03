@@ -1282,6 +1282,16 @@ public class PlannerTest extends PlannerTestBase {
         ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
+
+  /**
+   * Check that Iceberg V2 DELETE statements work as expected.
+   */
+  @Test
+  public void testIcebergV2Delete() {
+    runPlannerTestFile("iceberg-v2-delete", "functional_parquet",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
   /**
    * Check that Iceberg metadata table scan plans are as expected.
    */

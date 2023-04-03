@@ -27,6 +27,7 @@ import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.ColumnLineageGraph;
+import org.apache.impala.analysis.DeleteStmt;
 import org.apache.impala.analysis.ColumnLineageGraph.ColumnLabel;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
@@ -36,6 +37,7 @@ import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.SortInfo;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.catalog.FeHBaseTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.ImpalaException;
@@ -50,6 +52,7 @@ import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryExecRequest;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TRuntimeFilterMode;
+import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.KuduUtil;
@@ -175,8 +178,14 @@ public class Planner {
             ctx_.getAnalysisResult().getUpdateStmt().createDataSink(resultExprs));
       } else if (ctx_.isDelete()) {
         // Set up delete sink for root fragment
-        rootFragment.setSink(
-            ctx_.getAnalysisResult().getDeleteStmt().createDataSink(resultExprs));
+        DeleteStmt deleteStmt = ctx_.getAnalysisResult().getDeleteStmt();
+        if (deleteStmt.getTargetTable() instanceof FeIcebergTable) {
+          createPreDeleteSort(deleteStmt, rootFragment, ctx_.getRootAnalyzer());
+          SortNode sortNode = (SortNode)rootFragment.getPlanRoot();
+          resultExprs = Expr.substituteList(resultExprs,
+              sortNode.getSortInfo().getOutputSmap(), ctx_.getRootAnalyzer(), true);
+        }
+        rootFragment.setSink(deleteStmt.createDataSink(resultExprs));
       } else if (ctx_.isQuery()) {
         rootFragment.setSink(
             ctx_.getAnalysisResult().getQueryStmt().createDataSink(resultExprs));
@@ -891,6 +900,27 @@ public class Planner {
       node = SortNode.createTotalSortNode(
           ctx_.getNextNodeId(), inputFragment.getPlanRoot(), sortInfo, 0);
     }
+    node.init(analyzer);
+
+    inputFragment.setPlanRoot(node);
+  }
+
+  public void createPreDeleteSort(DeleteStmt deleteStmt, PlanFragment inputFragment,
+      Analyzer analyzer) throws ImpalaException {
+    List<Expr> orderingExprs = new ArrayList<>();
+
+    orderingExprs.addAll(deleteStmt.getResultExprs());
+
+    // Build sortinfo to sort by the ordering exprs.
+    List<Boolean> isAscOrder = Collections.nCopies(orderingExprs.size(), true);
+    List<Boolean> nullsFirstParams = Collections.nCopies(orderingExprs.size(), false);
+    SortInfo sortInfo = new SortInfo(orderingExprs, isAscOrder, nullsFirstParams,
+        TSortingOrder.LEXICAL);
+    sortInfo.createSortTupleInfo(deleteStmt.getResultExprs(), analyzer);
+    sortInfo.getSortTupleDescriptor().materializeSlots();
+
+    PlanNode node = SortNode.createTotalSortNode(
+        ctx_.getNextNodeId(), inputFragment.getPlanRoot(), sortInfo, 0);
     node.init(analyzer);
 
     inputFragment.setPlanRoot(node);

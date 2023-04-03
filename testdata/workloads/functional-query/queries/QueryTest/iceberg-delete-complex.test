@@ -1,0 +1,106 @@
+====
+---- QUERY
+SELECT * FROM ice_complex_delete;
+---- RESULTS
+1,'[1,2,3]','[[1,2],[3,4]]','{"k1":1,"k2":100}','[{"k1":1}]','{"a":1,"b":[1],"c":{"d":[[{"e":10,"f":"aaa"},{"e":-10,"f":"bbb"}],[{"e":11,"f":"c"}]]},"g":{"foo":{"h":{"i":[1.1]}}}}'
+1,'[1,2,3]','[[1,2],[3,4]]','{"k1":1,"k2":100}','[{"k1":1}]','{"a":1,"b":[1],"c":{"d":[[{"e":10,"f":"aaa"},{"e":-10,"f":"bbb"}],[{"e":11,"f":"c"}]]},"g":{"foo":{"h":{"i":[1.1]}}}}'
+2,'[null,1,2,null,3,null]','[[null,1,2,null],[3,null,4],[],null]','{"k1":2,"k2":null}','[{"k1":1,"k3":null},null,{}]','{"a":null,"b":[null],"c":{"d":[[{"e":null,"f":null},{"e":10,"f":"aaa"},{"e":null,"f":null},{"e":-10,"f":"bbb"},{"e":null,"f":null}],[{"e":11,"f":"c"},null],[],null]},"g":{"g1":{"h":{"i":[2.2,null]}},"g2":{"h":{"i":[]}},"g3":null,"g4":{"h":{"i":null}},"g5":{"h":null}}}'
+2,'[null,1,2,null,3,null]','[[null,1,2,null],[3,null,4],[],null]','{"k1":2,"k2":null}','[{"k1":1,"k3":null},null,{}]','{"a":null,"b":[null],"c":{"d":[[{"e":null,"f":null},{"e":10,"f":"aaa"},{"e":null,"f":null},{"e":-10,"f":"bbb"},{"e":null,"f":null}],[{"e":11,"f":"c"},null],[],null]},"g":{"g1":{"h":{"i":[2.2,null]}},"g2":{"h":{"i":[]}},"g3":null,"g4":{"h":{"i":null}},"g5":{"h":null}}}'
+3,'[]','[null]','{}','[null,null]','{"a":null,"b":null,"c":{"d":[]},"g":{}}'
+3,'[]','[null]','{}','[null,null]','{"a":null,"b":null,"c":{"d":[]},"g":{}}'
+4,'NULL','[]','{}','[]','{"a":null,"b":null,"c":{"d":null},"g":null}'
+4,'NULL','[]','{}','[]','{"a":null,"b":null,"c":{"d":null},"g":null}'
+5,'NULL','NULL','{}','NULL','{"a":null,"b":null,"c":null,"g":{"foo":{"h":{"i":[2.2,3.3]}}}}'
+5,'NULL','NULL','{}','NULL','{"a":null,"b":null,"c":null,"g":{"foo":{"h":{"i":[2.2,3.3]}}}}'
+6,'NULL','NULL','NULL','NULL','NULL'
+6,'NULL','NULL','NULL','NULL','NULL'
+7,'NULL','[null,[5,6]]','{"k1":null,"k3":null}','NULL','{"a":7,"b":[2,3,null],"c":{"d":[[],[null],null]},"g":null}'
+7,'NULL','[null,[5,6]]','{"k1":null,"k3":null}','NULL','{"a":7,"b":[2,3,null],"c":{"d":[[],[null],null]},"g":null}'
+8,'[-1]','[[-1,-2],[]]','{"k1":-1}','[{},{"k1":1},{},{}]','{"a":-1,"b":[-1],"c":{"d":[[{"e":-1,"f":"nonnullable"}]]},"g":{}}'
+8,'[-1]','[[-1,-2],[]]','{"k1":-1}','[{},{"k1":1},{},{}]','{"a":-1,"b":[-1],"c":{"d":[[{"e":-1,"f":"nonnullable"}]]},"g":{}}'
+---- TYPES
+BIGINT, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+SELECT id, INPUT__FILE__NAME FROM ice_complex_delete WHERE id % 2 = 0 AND INPUT__FILE__NAME LIKE '%orc';
+---- RESULTS
+2,regex:'$NAMENODE/.*.orc'
+4,regex:'$NAMENODE/.*.orc'
+6,regex:'$NAMENODE/.*.orc'
+8,regex:'$NAMENODE/.*.orc'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
+DELETE FROM ice_complex_delete WHERE id % 2 = 0 AND INPUT__FILE__NAME LIKE '%orc';
+SELECT *, INPUT__FILE__NAME FROM ice_complex_delete;
+---- RESULTS
+1,'[1,2,3]','[[1,2],[3,4]]','{"k1":1,"k2":100}','[{"k1":1}]','{"a":1,"b":[1],"c":{"d":[[{"e":10,"f":"aaa"},{"e":-10,"f":"bbb"}],[{"e":11,"f":"c"}]]},"g":{"foo":{"h":{"i":[1.1]}}}}',regex:'$NAMENODE/.*.parquet'
+1,'[1,2,3]','[[1,2],[3,4]]','{"k1":1,"k2":100}','[{"k1":1}]','{"a":1,"b":[1],"c":{"d":[[{"e":10,"f":"aaa"},{"e":-10,"f":"bbb"}],[{"e":11,"f":"c"}]]},"g":{"foo":{"h":{"i":[1.1]}}}}',regex:'$NAMENODE/.*.orc'
+2,'[null,1,2,null,3,null]','[[null,1,2,null],[3,null,4],[],null]','{"k1":2,"k2":null}','[{"k1":1,"k3":null},null,{}]','{"a":null,"b":[null],"c":{"d":[[{"e":null,"f":null},{"e":10,"f":"aaa"},{"e":null,"f":null},{"e":-10,"f":"bbb"},{"e":null,"f":null}],[{"e":11,"f":"c"},null],[],null]},"g":{"g1":{"h":{"i":[2.2,null]}},"g2":{"h":{"i":[]}},"g3":null,"g4":{"h":{"i":null}},"g5":{"h":null}}}',regex:'$NAMENODE/.*.parquet'
+3,'[]','[null]','{}','[null,null]','{"a":null,"b":null,"c":{"d":[]},"g":{}}',regex:'$NAMENODE/.*.parquet'
+3,'[]','[null]','{}','[null,null]','{"a":null,"b":null,"c":{"d":[]},"g":{}}',regex:'$NAMENODE/.*.orc'
+4,'NULL','[]','{}','[]','{"a":null,"b":null,"c":{"d":null},"g":null}',regex:'$NAMENODE/.*.parquet'
+5,'NULL','NULL','{}','NULL','{"a":null,"b":null,"c":null,"g":{"foo":{"h":{"i":[2.2,3.3]}}}}',regex:'$NAMENODE/.*.parquet'
+5,'NULL','NULL','{}','NULL','{"a":null,"b":null,"c":null,"g":{"foo":{"h":{"i":[2.2,3.3]}}}}',regex:'$NAMENODE/.*.orc'
+6,'NULL','NULL','NULL','NULL','NULL',regex:'$NAMENODE/.*.parquet'
+7,'NULL','[null,[5,6]]','{"k1":null,"k3":null}','NULL','{"a":7,"b":[2,3,null],"c":{"d":[[],[null],null]},"g":null}',regex:'$NAMENODE/.*.parquet'
+7,'NULL','[null,[5,6]]','{"k1":null,"k3":null}','NULL','{"a":7,"b":[2,3,null],"c":{"d":[[],[null],null]},"g":null}',regex:'$NAMENODE/.*.orc'
+8,'[-1]','[[-1,-2],[]]','{"k1":-1}','[{},{"k1":1},{},{}]','{"a":-1,"b":[-1],"c":{"d":[[{"e":-1,"f":"nonnullable"}]]},"g":{}}',regex:'$NAMENODE/.*.parquet'
+---- TYPES
+BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+SELECT id, INPUT__FILE__NAME FROM ice_complex_delete WHERE id % 2 = 1 AND INPUT__FILE__NAME LIKE '%parquet';
+---- RESULTS
+1,regex:'$NAMENODE/.*.parquet'
+3,regex:'$NAMENODE/.*.parquet'
+5,regex:'$NAMENODE/.*.parquet'
+7,regex:'$NAMENODE/.*.parquet'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
+DELETE FROM ice_complex_delete WHERE id % 2 = 1 AND INPUT__FILE__NAME LIKE '%parquet';
+SELECT *, INPUT__FILE__NAME FROM ice_complex_delete;
+---- RESULTS
+1,'[1,2,3]','[[1,2],[3,4]]','{"k1":1,"k2":100}','[{"k1":1}]','{"a":1,"b":[1],"c":{"d":[[{"e":10,"f":"aaa"},{"e":-10,"f":"bbb"}],[{"e":11,"f":"c"}]]},"g":{"foo":{"h":{"i":[1.1]}}}}',regex:'$NAMENODE/.*.orc'
+2,'[null,1,2,null,3,null]','[[null,1,2,null],[3,null,4],[],null]','{"k1":2,"k2":null}','[{"k1":1,"k3":null},null,{}]','{"a":null,"b":[null],"c":{"d":[[{"e":null,"f":null},{"e":10,"f":"aaa"},{"e":null,"f":null},{"e":-10,"f":"bbb"},{"e":null,"f":null}],[{"e":11,"f":"c"},null],[],null]},"g":{"g1":{"h":{"i":[2.2,null]}},"g2":{"h":{"i":[]}},"g3":null,"g4":{"h":{"i":null}},"g5":{"h":null}}}',regex:'$NAMENODE/.*.parquet'
+3,'[]','[null]','{}','[null,null]','{"a":null,"b":null,"c":{"d":[]},"g":{}}',regex:'$NAMENODE/.*.orc'
+4,'NULL','[]','{}','[]','{"a":null,"b":null,"c":{"d":null},"g":null}',regex:'$NAMENODE/.*.parquet'
+5,'NULL','NULL','{}','NULL','{"a":null,"b":null,"c":null,"g":{"foo":{"h":{"i":[2.2,3.3]}}}}',regex:'$NAMENODE/.*.orc'
+6,'NULL','NULL','NULL','NULL','NULL',regex:'$NAMENODE/.*.parquet'
+7,'NULL','[null,[5,6]]','{"k1":null,"k3":null}','NULL','{"a":7,"b":[2,3,null],"c":{"d":[[],[null],null]},"g":null}',regex:'$NAMENODE/.*.orc'
+8,'[-1]','[[-1,-2],[]]','{"k1":-1}','[{},{"k1":1},{},{}]','{"a":-1,"b":[-1],"c":{"d":[[{"e":-1,"f":"nonnullable"}]]},"g":{}}',regex:'$NAMENODE/.*.parquet'
+---- TYPES
+BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+DELETE FROM ice_complex_delete WHERE id < 4;
+SELECT *, INPUT__FILE__NAME FROM ice_complex_delete;
+---- RESULTS
+4,'NULL','[]','{}','[]','{"a":null,"b":null,"c":{"d":null},"g":null}',regex:'$NAMENODE/.*.parquet'
+5,'NULL','NULL','{}','NULL','{"a":null,"b":null,"c":null,"g":{"foo":{"h":{"i":[2.2,3.3]}}}}',regex:'$NAMENODE/.*.orc'
+6,'NULL','NULL','NULL','NULL','NULL',regex:'$NAMENODE/.*.parquet'
+7,'NULL','[null,[5,6]]','{"k1":null,"k3":null}','NULL','{"a":7,"b":[2,3,null],"c":{"d":[[],[null],null]},"g":null}',regex:'$NAMENODE/.*.orc'
+8,'[-1]','[[-1,-2],[]]','{"k1":-1}','[{},{"k1":1},{},{}]','{"a":-1,"b":[-1],"c":{"d":[[{"e":-1,"f":"nonnullable"}]]},"g":{}}',regex:'$NAMENODE/.*.parquet'
+---- TYPES
+BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select id, unnest(int_array), input__file__name from ice_complex_delete;
+---- RESULTS
+8,-1,regex:'.*.parquet'
+---- TYPES
+BIGINT, INT, STRING
+====
+---- QUERY
+select id, unnest(int_array_array), input__file__name from ice_complex_delete;
+---- RESULTS
+7,'NULL',regex:'.*.orc'
+7,'[5,6]',regex:'.*.orc'
+8,'[-1,-2]',regex:'.*.parquet'
+8,'[]',regex:'.*.parquet'
+---- TYPES
+BIGINT, STRING, STRING
+====

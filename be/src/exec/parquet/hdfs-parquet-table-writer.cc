@@ -136,8 +136,9 @@ class HdfsParquetTableWriter::BaseColumnWriter {
       row_group_stats_base_(nullptr),
       table_sink_mem_tracker_(parent_->parent_->mem_tracker()),
       column_name_(std::move(column_name)) {
-    static_assert(std::is_same<decltype(parent_->parent_), HdfsTableSink*>::value,
-        "'table_sink_mem_tracker_' must point to the mem tracker of an HdfsTableSink");
+    static_assert(std::is_base_of_v<TableSinkBase,
+                                    std::remove_reference_t<decltype(*parent_->parent_)>>,
+        "'table_sink_mem_tracker_' must point to the mem tracker of a TableSinkBase");
     def_levels_ = parent_->state_->obj_pool()->Add(
         new RleEncoder(parent_->reusable_col_mem_pool_->Allocate(DEFAULT_DATA_PAGE_SIZE),
                        DEFAULT_DATA_PAGE_SIZE, 1));
@@ -1231,7 +1232,8 @@ void HdfsParquetTableWriter::BaseColumnWriter::NewPage() {
   page_stats_base_->Reset();
 }
 
-HdfsParquetTableWriter::HdfsParquetTableWriter(HdfsTableSink* parent, RuntimeState* state,
+HdfsParquetTableWriter::
+HdfsParquetTableWriter(TableSinkBase* parent, RuntimeState* state,
     OutputPartition* output, const HdfsPartitionDescriptor* part_desc,
     const HdfsTableDescriptor* table_desc)
   : HdfsTableWriter(parent, state, output, part_desc, table_desc),

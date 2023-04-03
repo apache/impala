@@ -683,3 +683,55 @@ select * from functional_parquet.iceberg_v2_delete_equality for system_time as o
 ---- CATCH
 ImpalaRuntimeException: Iceberg table functional_parquet.iceberg_v2_delete_equality has EQUALITY delete file which is currently not supported by Impala
 ====
+---- QUERY
+create table ice_delete (i int, s string)
+stored by iceberg
+tblproperties ('format-version'='1');
+====
+---- QUERY
+# Cannot DELETE from Iceberg V1 table
+delete from ice_delete where i = 1;
+---- CATCH
+AnalysisException: Iceberg V1 table do not support DELETE/UPDATE operations: $DATABASE.ice_delete
+====
+---- QUERY
+# For deleting every row, users must use TRUNCATE.
+alter table ice_delete set tblproperties ('format-version'='2');
+delete from ice_delete;
+---- CATCH
+AnalysisException: For deleting every row, please use TRUNCATE.
+====
+---- QUERY
+delete from ice_delete where true;
+---- CATCH
+AnalysisException: For deleting every row, please use TRUNCATE.
+====
+---- QUERY
+# Cannot delete from Iceberg table if the write format is not Parquet (and there is no delete format)
+alter table ice_delete set tblproperties ('write.format.default'='ORC');
+delete from ice_delete where i = 1;
+---- CATCH
+AnalysisException: Impala can only write delete files in PARQUET, but the given table uses a different file format: $DATABASE.ice_delete
+====
+---- QUERY
+# Cannot delete from Iceberg table is delete format is not Parquet
+alter table ice_delete set tblproperties ('write.format.default'='PARQUET', 'write.delete.format.default'='ORC');
+delete from ice_delete where i = 1;
+---- CATCH
+AnalysisException: Impala can only write delete files in PARQUET, but the given table uses a different file format: $DATABASE.ice_delete
+====
+---- QUERY
+# Cannot delete from Iceberg table is write mode is not 'merge-on-read'
+alter table ice_delete set tblproperties ('write.delete.format.default'='PARQUET', 'write.delete.mode'='copy-on-write');
+delete from ice_delete where i = 1;
+---- CATCH
+AnalysisException: Unsupported delete mode: 'copy-on-write' for Iceberg table: $DATABASE.ice_delete
+====
+---- QUERY
+# Cannot delete from partitioned Iceberg table.
+alter table ice_delete set tblproperties ('write.delete.mode'='merge-on-read');
+alter table ice_delete set partition spec (bucket(5, i));
+delete from ice_delete;
+---- CATCH
+AnalysisException: Cannot execute DELETE/UPDATE statement on partitioned Iceberg table: $DATABASE.ice_delete
+====

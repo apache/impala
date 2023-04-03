@@ -1,0 +1,117 @@
+====
+---- QUERY
+CREATE TABLE ice_delete (i int, s string)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+====
+---- QUERY
+# Delete from empty table is no-op.
+DELETE FROM ice_delete where i = 1;
+SELECT * FROM ice_delete;
+---- RESULTS
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO ice_delete VALUES(1, 'one'), (2, 'two'), (3, 'three');
+DELETE FROM ice_delete WHERE i = 2;
+SELECT * FROM ice_delete;
+---- RESULTS
+1,'one'
+3,'three'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+SELECT count(*) FROM ice_delete;
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+INSERT INTO ice_delete VALUES (4, 'four'), (5, 'five'), (6, 'six');
+SELECT * FROM ice_delete;
+---- RESULTS
+1,'one'
+3,'three'
+4,'four'
+5,'five'
+6,'six'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+DELETE FROM ice_delete WHERE s like 'f%' and i > 4;
+SELECT * FROM ice_delete;
+---- RESULTS
+1,'one'
+3,'three'
+4,'four'
+6,'six'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO ice_delete VALUES (7, 'seven'), (8, 'eight');
+DELETE FROM ice_delete WHERE i in (SELECT i FROM ice_delete where s in ('one', 'three'));
+SELECT * FROM ice_delete;
+---- RESULTS
+4,'four'
+6,'six'
+7,'seven'
+8,'eight'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+DELETE FROM ice_delete WHERE FILE__POSITION = 0;
+SELECT * FROM ice_delete;
+---- RESULTS
+6,'six'
+8,'eight'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO ice_delete VALUES (9, 'nine'), (10, 'ten');
+DELETE FROM ice_delete WHERE s = (SELECT min(s) FROM ice_delete);
+SELECT * FROM ice_delete;
+---- RESULTS
+6,'six'
+9,'nine'
+10,'ten'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+DELETE FROM ice_delete WHERE i < 10;
+SELECT * FROM ice_delete;
+---- RESULTS
+10,'ten'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+DELETE FROM ice_delete WHERE i = 1000;
+SELECT * FROM ice_delete;
+---- RESULTS
+10,'ten'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+CREATE TABLE ice_lineitem STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2')
+AS SELECT * FROM tpch_parquet.lineitem;
+DELETE FROM ice_lineitem WHERE l_orderkey % 5 = 1;
+SELECT count(*) FROM ice_lineitem;
+---- RESULTS
+4799418
+---- TYPES
+BIGINT
+====
+---- QUERY
+SELECT * FROM ice_lineitem WHERE l_orderkey % 5 = 1;
+---- RESULTS
+====

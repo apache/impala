@@ -29,15 +29,17 @@ import java.util.Set;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.IcebergPositionDeleteTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.planner.DataSink;
 import org.apache.impala.rewrite.ExprRewriter;
-import org.apache.thrift.TBaseHelper;
+import org.apache.impala.thrift.TIcebergFileFormat;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -79,13 +81,14 @@ public abstract class ModifyStmt extends StatementBase {
   // will be modified.
   protected SelectStmt sourceStmt_;
 
-  // Target Kudu table. Since currently only Kudu tables are supported, we use a
-  // concrete table class. Result of analysis.
-  protected FeKuduTable table_;
+  // Target table.
+  protected FeTable table_;
+
+  private ModifyImpl modifyImpl_;
 
   // Serialized metadata of transaction object which is set by the Frontend if the
   // target table is Kudu table and Kudu's transaction is enabled.
-  protected java.nio.ByteBuffer kuduTxnToken_;
+  java.nio.ByteBuffer kuduTxnToken_;
 
   // END: Members that need to be reset()
   /////////////////////////////////////////
@@ -104,7 +107,6 @@ public abstract class ModifyStmt extends StatementBase {
     fromClause_ = Preconditions.checkNotNull(fromClause);
     assignments_ = Preconditions.checkNotNull(assignmentExprs);
     wherePredicate_ = wherePredicate;
-    kuduTxnToken_ = null;
   }
 
   @Override
@@ -159,13 +161,21 @@ public abstract class ModifyStmt extends StatementBase {
 
     Preconditions.checkNotNull(targetTableRef_);
     FeTable dstTbl = targetTableRef_.getTable();
-    // Only Kudu tables can be updated
-    if (!(dstTbl instanceof FeKuduTable)) {
+    table_ = dstTbl;
+    // Only Kudu and Iceberg tables can be updated.
+    if (!(dstTbl instanceof FeKuduTable) && !(dstTbl instanceof FeIcebergTable)) {
       throw new AnalysisException(
-          format("Impala does not support modifying a non-Kudu table: %s",
+          format("Impala only supports modifying Kudu and Iceberg tables, " +
+              "but the following table is neither: %s",
               dstTbl.getFullName()));
     }
-    table_ = (FeKuduTable) dstTbl;
+    if (dstTbl instanceof FeKuduTable) {
+      modifyImpl_ = this.new ModifyKudu();
+    } else if (dstTbl instanceof FeIcebergTable) {
+      modifyImpl_ = this.new ModifyIceberg();
+    }
+
+    modifyImpl_.analyze(analyzer);
 
     // Make sure that the user is allowed to modify the target table. Use ALL because no
     // UPDATE / DELETE privilege exists yet (IMPALA-3840).
@@ -186,6 +196,7 @@ public abstract class ModifyStmt extends StatementBase {
     fromClause_.reset();
     if (sourceStmt_ != null) sourceStmt_.reset();
     table_ = null;
+    modifyImpl_ = null;
   }
 
   /**
@@ -208,13 +219,7 @@ public abstract class ModifyStmt extends StatementBase {
     sourceStmt_ = new SelectStmt(new SelectList(selectList), fromClause_, wherePredicate_,
         null, null, null, null);
 
-    // cast result expressions to the correct type of the referenced slot of the
-    // target table
-    int keyColumnsOffset = table_.getPrimaryKeyColumnNames().size();
-    for (int i = keyColumnsOffset; i < sourceStmt_.resultExprs_.size(); ++i) {
-      sourceStmt_.resultExprs_.set(i, sourceStmt_.resultExprs_.get(i).castTo(
-          assignments_.get(i - keyColumnsOffset).first.getType()));
-    }
+    modifyImpl_.addCastsToAssignmentsInSourceStmt(analyzer);
   }
 
   /**
@@ -244,16 +249,8 @@ public abstract class ModifyStmt extends StatementBase {
       colIndexMap.put(cols.get(i).getName(), i);
     }
 
-    // Add the key columns as slot refs
-    for (String k : table_.getPrimaryKeyColumnNames()) {
-      List<String> path = Path.createRawPath(targetTableRef_.getUniqueAlias(), k);
-      SlotRef ref = new SlotRef(path);
-      ref.analyze(analyzer);
-      selectList.add(new SelectListItem(ref, null));
-      uniqueSlots.add(ref.getSlotId());
-      keySlots.add(ref.getSlotId());
-      referencedColumns.add(colIndexMap.get(k));
-    }
+    modifyImpl_.addKeyColumns(analyzer, selectList, referencedColumns, uniqueSlots,
+        keySlots, colIndexMap);
 
     // Assignments are only used in the context of updates.
     for (Pair<SlotRef, Expr> valueAssignment : assignments_) {
@@ -341,6 +338,7 @@ public abstract class ModifyStmt extends StatementBase {
    * Set Kudu transaction token.
    */
   public void setKuduTransactionToken(byte[] kuduTxnToken) {
+    Preconditions.checkState(table_ instanceof FeKuduTable);
     Preconditions.checkNotNull(kuduTxnToken);
     kuduTxnToken_ = java.nio.ByteBuffer.wrap(kuduTxnToken.clone());
   }
@@ -348,10 +346,135 @@ public abstract class ModifyStmt extends StatementBase {
   /**
    * Return bytes of Kudu transaction token.
    */
-  public byte[] getKuduTransactionToken() {
-    return kuduTxnToken_ == null ? null : kuduTxnToken_.array();
+  public java.nio.ByteBuffer getKuduTransactionToken() {
+    return kuduTxnToken_;
+  }
+
+  private void addKeyColumn(Analyzer analyzer, List<SelectListItem> selectList,
+      List<Integer> referencedColumns, Set<SlotId> uniqueSlots, Set<SlotId> keySlots,
+      Map<String, Integer> colIndexMap, String colName) throws AnalysisException {
+    List<String> path = Path.createRawPath(targetTableRef_.getUniqueAlias(), colName);
+    SlotRef ref = new SlotRef(path);
+    ref.analyze(analyzer);
+    selectList.add(new SelectListItem(ref, null));
+    uniqueSlots.add(ref.getSlotId());
+    keySlots.add(ref.getSlotId());
+    referencedColumns.add(colIndexMap.get(colName));
   }
 
   @Override
   public abstract String toSql(ToSqlOptions options);
+
+  private interface ModifyImpl {
+    void analyze(Analyzer analyzer) throws AnalysisException;
+
+    void addCastsToAssignmentsInSourceStmt(Analyzer analyzer)
+      throws AnalysisException;
+
+    void addKeyColumns(Analyzer analyzer,
+        List<SelectListItem> selectList, List<Integer> referencedColumns,
+        Set<SlotId> uniqueSlots, Set<SlotId> keySlots, Map<String, Integer> colIndexMap)
+        throws AnalysisException;
+  }
+
+  private class ModifyKudu implements ModifyImpl {
+    // Target Kudu table. Result of analysis.
+    FeKuduTable kuduTable_ = (FeKuduTable)table_;
+
+    @Override
+    public void analyze(Analyzer analyzer) throws AnalysisException {}
+
+    @Override
+    public void addCastsToAssignmentsInSourceStmt(Analyzer analyzer)
+        throws AnalysisException {
+      // cast result expressions to the correct type of the referenced slot of the
+      // target table
+      int keyColumnsOffset = kuduTable_.getPrimaryKeyColumnNames().size();
+      for (int i = keyColumnsOffset; i < sourceStmt_.resultExprs_.size(); ++i) {
+        sourceStmt_.resultExprs_.set(i, sourceStmt_.resultExprs_.get(i).castTo(
+            assignments_.get(i - keyColumnsOffset).first.getType()));
+      }
+    }
+
+    @Override
+    public void addKeyColumns(Analyzer analyzer, List<SelectListItem> selectList,
+        List<Integer> referencedColumns, Set<SlotId> uniqueSlots, Set<SlotId> keySlots,
+        Map<String, Integer> colIndexMap) throws AnalysisException {
+      // Add the key columns as slot refs
+      for (String k : kuduTable_.getPrimaryKeyColumnNames()) {
+        addKeyColumn(analyzer, selectList, referencedColumns, uniqueSlots, keySlots,
+            colIndexMap, k);
+      }
+    }
+  }
+
+  private class ModifyIceberg implements ModifyImpl {
+    FeIcebergTable originalTargetTable_;
+    IcebergPositionDeleteTable icePosDelTable_;
+
+    public ModifyIceberg() {
+      originalTargetTable_ = (FeIcebergTable)table_;
+      icePosDelTable_ = new IcebergPositionDeleteTable((FeIcebergTable)table_);
+      // Make the virtual position delete table the new target table.
+      table_ = icePosDelTable_;
+    }
+
+    @Override
+    public void analyze(Analyzer analyzer) throws AnalysisException {
+      if (ModifyStmt.this instanceof UpdateStmt) {
+        throw new AnalysisException("UPDATE is not supported for Iceberg table " +
+            originalTargetTable_.getFullName());
+      }
+
+      if (icePosDelTable_.getFormatVersion() == 1) {
+        throw new AnalysisException("Iceberg V1 table do not support DELETE/UPDATE " +
+            "operations: " + originalTargetTable_.getFullName());
+      }
+
+      String deleteMode = originalTargetTable_.getIcebergApiTable().properties().get(
+          org.apache.iceberg.TableProperties.DELETE_MODE);
+      if (deleteMode != null && !deleteMode.equals("merge-on-read")) {
+        throw new AnalysisException(String.format("Unsupported delete mode: '%s' for " +
+            "Iceberg table: %s", deleteMode, originalTargetTable_.getFullName()));
+      }
+
+      if (originalTargetTable_.isPartitioned()) {
+        throw new AnalysisException("Cannot execute DELETE/UPDATE statement on " +
+            "partitioned Iceberg table: " + originalTargetTable_.getFullName());
+      }
+
+      if (originalTargetTable_.getDeleteFileFormat() != TIcebergFileFormat.PARQUET) {
+        throw new AnalysisException("Impala can only write delete files in PARQUET, " +
+            "but the given table uses a different file format: " +
+            originalTargetTable_.getFullName());
+      }
+
+      if (wherePredicate_ == null ||
+          org.apache.impala.analysis.Expr.IS_TRUE_LITERAL.apply(wherePredicate_)) {
+        // TODO (IMPALA-12136): rewrite DELETE FROM t; statements to TRUNCATE TABLE t;
+        throw new AnalysisException("For deleting every row, please use TRUNCATE.");
+      }
+    }
+
+    @Override
+    public void addCastsToAssignmentsInSourceStmt(Analyzer analyzer)
+        throws AnalysisException {
+    }
+
+    @Override
+    public void addKeyColumns(Analyzer analyzer, List<SelectListItem> selectList,
+        List<Integer> referencedColumns,
+        Set<SlotId> uniqueSlots, Set<SlotId> keySlots, Map<String, Integer> colIndexMap)
+        throws AnalysisException {
+      String[] deleteCols;
+      Preconditions.checkState(!icePosDelTable_.isPartitioned());
+      deleteCols = new String[] {"INPUT__FILE__NAME", "FILE__POSITION"};
+      // Add the key columns as slot refs
+      for (String k : deleteCols) {
+        addKeyColumn(analyzer, selectList, referencedColumns, uniqueSlots, keySlots,
+            colIndexMap, k);
+      }
+    }
+  }
+
 }

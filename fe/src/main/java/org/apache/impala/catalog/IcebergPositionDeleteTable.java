@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -48,6 +49,11 @@ public class IcebergPositionDeleteTable extends VirtualTable implements FeIceber
   public static String FILE_PATH_COLUMN = "file_path";
   public static String POS_COLUMN = "pos";
 
+  public IcebergPositionDeleteTable(FeIcebergTable baseTable) {
+    this(baseTable, baseTable.getName() + "-POSITION-DELETE", Collections.emptySet(), 0,
+        new TColumnStats());
+  }
+
   public IcebergPositionDeleteTable(FeIcebergTable baseTable, String name,
       Set<FileDescriptor> deleteFiles,
       long deleteRecordsCount, TColumnStats filePathsStats) {
@@ -66,6 +72,8 @@ public class IcebergPositionDeleteTable extends VirtualTable implements FeIceber
     addColumn(filePath);
     addColumn(pos);
   }
+
+  public FeIcebergTable getBaseTable() { return baseTable_; }
 
   private TColumnStats getPosStats(Column pos) {
     TColumnStats colStats = new TColumnStats();
@@ -165,7 +173,7 @@ public class IcebergPositionDeleteTable extends VirtualTable implements FeIceber
 
   @Override
   public List<IcebergPartitionSpec> getPartitionSpecs() {
-    return null;
+    return baseTable_.getPartitionSpecs();
   }
 
   @Override

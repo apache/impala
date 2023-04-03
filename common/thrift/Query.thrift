@@ -831,8 +831,19 @@ struct TPlanExecInfo {
       per_node_scan_ranges
 }
 
+struct TIcebergDmlFinalizeParams {
+  // Type of the Iceberg operation
+  1: required Types.TIcebergOperation operation
+
+  // Stores the Iceberg spec id of the partition spec used for this DML operation.
+  2: optional i32 spec_id;
+
+  // Stores the Iceberg snapshot id of the target table for this DML operation.
+  3: optional i64 initial_snapshot_id;
+}
+
 // Metadata required to finalize a query - that is, to clean up after the query is done.
-// Only relevant for INSERT queries.
+// Only relevant for DML statements.
 struct TFinalizeParams {
   // True if the INSERT query was OVERWRITE, rather than INTO
   1: required bool is_overwrite
@@ -861,11 +872,8 @@ struct TFinalizeParams {
   // Stores the ACID write id of the target table for transactional INSERTs.
   8: optional i64 write_id;
 
-  // Stores the Iceberg spec id of the partition spec used for this INSERT.
-  9: optional i32 spec_id;
-
-  // Stores the Iceberg snapshot id of the target table for INSERTs.
-  10: optional i64 initial_snapshot_id;
+  // Stores params for Iceberg operation
+  9: optional TIcebergDmlFinalizeParams iceberg_params;
 }
 
 // Result of call to ImpalaPlanService/JniFrontend.CreateQueryRequest()
