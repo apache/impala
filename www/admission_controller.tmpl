@@ -99,12 +99,44 @@ Example of json received from the impala server
 <strong>{{statestore_update_staleness_detail}}</strong>
 </div>
 {{/statestore_update_staleness_detail}}
-<script src='{{ __common__.host-url }}/www/Chart-2.7.3.min.js'></script>
+<script src='{{ __common__.host-url }}/www/Chart-2.9.4.min.js'></script>
 <script type="text/javascript">
 window.onload = function() {
   renderGraph();
   formatMemoryColumns();
 };
+
+// Workaround for https://github.com/chartjs/Chart.js/issues/6154, where the last X-axis
+// label is always omitted. This function bakes in a lot of assumptions for our chart.
+function afterFit(axis) {
+  const ticks = axis.getTicks();
+  const widest = axis._labelSizes.widest.width;
+  const chartWidth = axis.width;
+
+  // Apply a rough heuristic for rotation.
+  const maxFit = Math.trunc(3 * chartWidth / (2 * widest));
+  // Limit to 20 labels.
+  const willFit = Math.min(maxFit, 20);
+
+  // Ensure first and last are always shown.
+  const validLabelIndices = new Set();
+  validLabelIndices.add(0);
+  validLabelIndices.add(ticks.length - 1);
+
+  const numLabels = ticks.length % 2 === 0 ? willFit : willFit - 1;
+
+  const interval = ticks.length / (numLabels - 1);
+  for (let i = 1; i < willFit - 1; i += 1) {
+    validLabelIndices.add(Math.floor(interval * i));
+  }
+
+  ticks.forEach((tick, index) => {
+    Object.assign(
+      tick,
+      { label: validLabelIndices.has(index) ? tick.label : null },
+    );
+  });
+}
 
 // Picks up all the canvas elements associated with each resource pool and renders its
 // peak memory usage histogram.
@@ -147,6 +179,14 @@ function renderGraph() {
               title: {
                   display: true,
                   text: 'Peak Memory per Host'
+              },
+              scales: {
+                xAxes: [{
+                  afterFit: afterFit,
+                  ticks: {
+                    autoSkip: false
+                  }
+                }]
               }
           }
       });
