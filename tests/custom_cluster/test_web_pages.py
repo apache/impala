@@ -123,6 +123,7 @@ class TestWebPage(CustomClusterTestSuite):
     response = requests.get("http://localhost:25000/queries?json")
     response_json = response.text
     assert expected in response_json, "No matching statement found in the queries site."
+    assert '"resource_pool": "default-pool"' in response_json
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -140,6 +141,7 @@ class TestWebPage(CustomClusterTestSuite):
     response = requests.get("http://localhost:25000/queries?json")
     response_json = response.text
     assert expected in response_json, "No matching statement found in the queries site."
+    assert '"resource_pool": "default-pool"' in response_json
 
   # Checks if 'messages' exists/does not exist in 'result_stderr' based on the value of
   # 'should_exist'

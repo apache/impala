@@ -1269,6 +1269,7 @@ Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
     if (!is_external_req) {
       (*query_handle)->query_events()->MarkEvent("Planning finished");
     }
+    (*query_handle)->SetPlanningDone();
     (*query_handle)->set_user_profile_access(result.user_has_profile_access);
     (*query_handle)->summary_profile()->AddEventSequence(
         result.timeline.name, result.timeline);

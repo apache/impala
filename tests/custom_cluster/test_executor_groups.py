@@ -147,6 +147,28 @@ class TestExecutorGroups(CustomClusterTestSuite):
     pool."""
     return self.impalad_test_service.get_num_running_queries("default-pool")
 
+  def _verify_total_admitted_queries(self, resource_pool, expected_query_num):
+    """Verify the total number of queries that have been admitted to the given resource
+    pool on the Web admission site."""
+    query_num = self.impalad_test_service.get_total_admitted_queries(resource_pool)
+    assert query_num == expected_query_num, \
+        "Not matched number of queries admitted to %s pool on the Web admission site." \
+        % (resource_pool)
+
+  def _verify_query_num_for_resource_pool(self, resource_pool, expected_query_num):
+    """ Verify the number of queries which use the given resource pool on
+    the Web queries site."""
+    queries_json = self.impalad_test_service.get_queries_json()
+    queries = queries_json.get("in_flight_queries") + \
+              queries_json.get("completed_queries")
+    query_num = 0
+    for query in queries:
+      if query["resource_pool"] == resource_pool:
+        query_num += 1
+    assert query_num == expected_query_num, \
+        "Not matched number of queries using %s pool on the Web queries site: %s." \
+        % (resource_pool, json)
+
   def _wait_for_num_executor_groups(self, num_exec_grps, only_healthy=False):
     """Waits for the number of executor groups to reach 'num_exec_grps'. If 'only_healthy'
     is True, only the healthy executor groups are accounted for, otherwise all groups
@@ -905,6 +927,14 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self._run_query_and_verify_profile(GROUPING_TEST_QUERY, CPU_DOP_OPTIONS,
         ["Executor Group: root.small-group", "ExecutorGroupsConsidered: 2",
           "Verdict: Match", "CpuAsk: 4", "CpuAskUnbounded: 1"])
+
+    # Check resource pools on the Web queries site and admission site
+    self._verify_query_num_for_resource_pool("root.small", 2)
+    self._verify_query_num_for_resource_pool("root.tiny", 1)
+    self._verify_query_num_for_resource_pool("root.large", 2)
+    self._verify_total_admitted_queries("root.small", 2)
+    self._verify_total_admitted_queries("root.tiny", 1)
+    self._verify_total_admitted_queries("root.large", 2)
     self.client.close()
 
   @pytest.mark.execute_serially
@@ -915,6 +945,9 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self._run_query_and_verify_profile(CPU_TEST_QUERY, CPU_DOP_OPTIONS,
         ["Executor Group: root.tiny-group", "EffectiveParallelism: 3",
          "ExecutorGroupsConsidered: 1"])
+    # Check resource pools on the Web queries site and admission site
+    self._verify_query_num_for_resource_pool("root.tiny", 1)
+    self._verify_total_admitted_queries("root.tiny", 1)
     self.client.close()
 
   @pytest.mark.execute_serially
@@ -935,6 +968,9 @@ class TestExecutorGroups(CustomClusterTestSuite):
         ["Executor Group: root.large-group", "EffectiveParallelism: 7",
          "ExecutorGroupsConsidered: 3", "CpuAsk: 234",
          "Verdict: no executor group set fit. Admit to last executor group set."])
+    # Check resource pools on the Web queries site and admission site
+    self._verify_query_num_for_resource_pool("root.large", 2)
+    self._verify_total_admitted_queries("root.large", 2)
     self.client.close()
 
   @pytest.mark.execute_serially

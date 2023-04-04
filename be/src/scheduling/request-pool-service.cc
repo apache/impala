@@ -83,8 +83,6 @@ static const string DEFAULT_POOL_NAME = "default-pool";
 
 static const string RESOLVE_POOL_METRIC_NAME = "request-pool-service.resolve-pool-duration-ms";
 
-static const string ERROR_USER_TO_POOL_MAPPING_NOT_FOUND =
-    "No mapping found for request from user '$0' with requested pool '$1'";
 static const string ERROR_USER_NOT_ALLOWED_IN_POOL = "Request from user '$0' with "
     "requested pool '$1' denied access to assigned pool '$2'";
 static const string ERROR_USER_NOT_SPECIFIED = "User must be specified because "
@@ -176,10 +174,6 @@ Status RequestPoolService::ResolveRequestPool(const TQueryCtx& ctx,
 
   if (result.status.status_code != TErrorCode::OK) {
     return Status(boost::algorithm::join(result.status.error_msgs, "; "));
-  }
-  if (result.resolved_pool.empty()) {
-    return Status(Substitute(ERROR_USER_TO_POOL_MAPPING_NOT_FOUND,
-        user, requested_pool));
   }
   if (!result.has_access) {
     return Status(Substitute(ERROR_USER_NOT_ALLOWED_IN_POOL, user,
