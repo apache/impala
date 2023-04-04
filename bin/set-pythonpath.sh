@@ -42,6 +42,3 @@ for PYTHON_DIR in ${THRIFT_PY_HOME}/python/lib{64,}; do
       PYTHONPATH=${PYTHONPATH}:${PKG_DIR}/
     done
 done
-
-# Add Hive after Thrift because Hive supplies its own Thrift modules
-PYTHONPATH=${PYTHONPATH}:${HIVE_HOME}/lib/py

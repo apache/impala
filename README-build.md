@@ -35,7 +35,7 @@ can do so through the environment variables and scripts listed below.
 | IMPALA_JDK_VERSION | "system" | Set to 8 or 11 to select a system Java version. Default will set JAVA_HOME based on the javac symlink in PATH. |
 | JAVA | "${JAVA_HOME}/bin/java" | Java binary location. |
 | CLASSPATH | | See bin/set-classpath.sh for details. |
-| PYTHONPATH |  Will be changed to include: "${IMPALA_HOME}/shell/gen-py" "${IMPALA_HOME}/testdata" "${THRIFT_PY_HOME}/python/lib/python2.7/site-packages" "${HIVE_HOME}/lib/py" |
+| PYTHONPATH |  Will be changed to include: "${IMPALA_HOME}/shell/gen-py" "${IMPALA_HOME}/testdata" "${THRIFT_PY_HOME}/python/lib/python2.7/site-packages" |
 
 ## Source Directories for Impala
 
