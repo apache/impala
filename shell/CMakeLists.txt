@@ -39,13 +39,18 @@ add_custom_target(shell_pypi_test_package DEPENDS shell_tarball impala_python
 
 set(PYTHON2_VENV "${CMAKE_SOURCE_DIR}/shell/build/py2_venv")
 set(PYTHON3_VENV "${CMAKE_SOURCE_DIR}/shell/build/py3_venv")
+# IMPALA-12117: Use separate pip cache directories to avoid concurrency
+# issues. The standard location is in ~/.cache/pip, so this uses directories
+# inside ~/.cache. These typical consume a couple MB each.
+set(PYTHON2_PIP_CACHE "~/.cache/impala_py2_pip")
+set(PYTHON3_PIP_CACHE "~/.cache/impala_py3_pip")
 
 add_custom_command(OUTPUT "${PYTHON2_VENV}" DEPENDS impala_python
   COMMAND impala-virtualenv --python "$ENV{IMPALA_SYSTEM_PYTHON2}" "${PYTHON2_VENV}"
 )
 
 add_custom_target(shell_python2_install DEPENDS "${PYTHON2_VENV}" shell_pypi_test_package
-  COMMAND "${PYTHON2_VENV}/bin/pip" install "${SHELL_TEST_PKG}"
+  COMMAND "${PYTHON2_VENV}/bin/pip" install --cache-dir "${PYTHON2_PIP_CACHE}" "${SHELL_TEST_PKG}"
 )
 
 add_custom_command(OUTPUT "${PYTHON3_VENV}" DEPENDS impala_python
@@ -53,5 +58,5 @@ add_custom_command(OUTPUT "${PYTHON3_VENV}" DEPENDS impala_python
 )
 
 add_custom_target(shell_python3_install DEPENDS "${PYTHON3_VENV}" shell_pypi_test_package
-  COMMAND "${PYTHON3_VENV}/bin/pip" install "${SHELL_TEST_PKG}"
+  COMMAND "${PYTHON3_VENV}/bin/pip" install --cache-dir "${PYTHON3_PIP_CACHE}" "${SHELL_TEST_PKG}"
 )
