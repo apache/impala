@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 ##############################################################################
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -20,8 +20,7 @@
 ##############################################################################
 
 if [[ "${IMPALA_USE_PYTHON3_TESTS}" == "true" ]]; then
-    source $(dirname "$0")/impala-python3-common.sh
+    exec impala-python3 "$@"
 else
-    source $(dirname "$0")/impala-python-common.sh
+    exec impala-python "$@"
 fi
-exec "$PY_ENV_DIR/bin/py.test" "$@"

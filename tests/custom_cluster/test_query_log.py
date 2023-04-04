@@ -921,7 +921,9 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
     sqls["select 1"] = True
 
     control_queries_count = 0
-    for sql, experiment_control in sqls.items():
+    # Note: This needs to iterate over a copy of sqls.items(), because it modifies
+    # sqls as it iterates.
+    for sql, experiment_control in list(sqls.items()):
       results = client.execute(sql)
       assert results.success, "could not execute query '{0}'".format(sql)
       sqls[sql] = results.query_id

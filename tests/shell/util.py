@@ -321,7 +321,7 @@ class ImpalaShell(object):
     stdout_arg = stdout_file if stdout_file is not None else PIPE
     stderr_arg = stderr_file if stderr_file is not None else PIPE
     return Popen(cmd, shell=False, stdout=stdout_arg, stdin=PIPE, stderr=stderr_arg,
-                 env=build_shell_env(env))
+                 universal_newlines=True, env=build_shell_env(env))
 
 
 def get_unused_port():

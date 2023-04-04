@@ -28,6 +28,7 @@ from thrift.protocol import TBinaryProtocol
 from tests.common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_PORT
 from tests.common.test_result_verifier import error_msg_expected
 from time import sleep, time
+import sys
 
 
 def add_session_helper(self, protocol_version, conf_overlay, close_session, fn):
@@ -91,8 +92,11 @@ def needs_session_cluster_properties(protocol_version=
 
 def operation_id_to_query_id(operation_id):
   lo, hi = operation_id.guid[:8],  operation_id.guid[8:]
-  lo = ''.join(['%0.2X' % ord(c) for c in lo[::-1]])
-  hi = ''.join(['%0.2X' % ord(c) for c in hi[::-1]])
+  if sys.version_info.major < 3:
+    lo = [ord(x) for x in lo]
+    hi = [ord(x) for x in hi]
+  lo = ''.join(['%0.2X' % c for c in lo[::-1]])
+  hi = ''.join(['%0.2X' % c for c in hi[::-1]])
   return "%s:%s" % (lo, hi)
 
 
@@ -100,13 +104,13 @@ def create_session_handle_without_secret(session_handle):
   """Create a HS2 session handle with the same session ID as 'session_handle' but a
   bogus secret of the right length, i.e. 16 bytes."""
   return TCLIService.TSessionHandle(TCLIService.THandleIdentifier(
-      session_handle.sessionId.guid, r"xxxxxxxxxxxxxxxx"))
+      session_handle.sessionId.guid, b"xxxxxxxxxxxxxxxx"))
 
 
 def create_op_handle_without_secret(op_handle):
   """Create a HS2 operation handle with same parameters as 'op_handle' but with a bogus
   secret of the right length, i.e. 16 bytes."""
-  op_id = TCLIService.THandleIdentifier(op_handle.operationId.guid, r"xxxxxxxxxxxxxxxx")
+  op_id = TCLIService.THandleIdentifier(op_handle.operationId.guid, b"xxxxxxxxxxxxxxxx")
   return TCLIService.TOperationHandle(
       op_id, op_handle.operationType, op_handle.hasResultSet)
 
@@ -290,11 +294,16 @@ class HS2TestSuite(ImpalaTestSuite):
         for col_type in HS2TestSuite.HS2_V6_COLUMN_TYPES:
           typed_col = getattr(c, col_type)
           if typed_col != None:
-            indicator = ord(typed_col.nulls[i // 8])
+            indicator = typed_col.nulls[i // 8]
+            if sys.version_info.major < 3:
+              indicator = ord(indicator)
             if indicator & (1 << (i % 8)):
               row.append("NULL")
             else:
-              row.append(str(typed_col.values[i]))
+              if isinstance(typed_col.values[i], bytes):
+                row.append(typed_col.values[i].decode())
+              else:
+                row.append(str(typed_col.values[i]))
             break
       formatted += (", ".join(row) + "\n")
     return (num_rows, formatted)

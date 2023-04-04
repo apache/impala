@@ -19,6 +19,7 @@ from __future__ import absolute_import, division, print_function
 from builtins import map
 import os
 import struct
+import sys
 
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
@@ -28,7 +29,7 @@ from subprocess import check_call
 from thrift.protocol import TCompactProtocol
 from thrift.transport import TTransport
 
-PARQUET_VERSION_NUMBER = 'PAR1'
+PARQUET_VERSION_NUMBER = b'PAR1'
 
 
 def create_protocol(serialized_object_buffer):
@@ -99,10 +100,14 @@ def decode_decimal(schema, value):
   assert schema.type_length == len(value)
   assert schema.type == Type.FIXED_LEN_BYTE_ARRAY
 
-  numeric = Decimal(reduce(lambda x, y: x * 256 + y, list(map(ord, value))))
+  if sys.version_info.major < 3:
+    byte_values = list(map(ord, value))
+  else:
+    byte_values = list(value)
+  numeric = Decimal(reduce(lambda x, y: x * 256 + y, byte_values))
 
   # Compute two's complement for negative values.
-  if (ord(value[0]) > 127):
+  if (byte_values[0] > 127):
     bit_width = 8 * len(value)
     numeric = numeric - (2 ** bit_width)
 
@@ -154,7 +159,7 @@ def get_parquet_metadata(filename):
   file path.
   """
   file_size = os.path.getsize(filename)
-  with open(filename) as f:
+  with open(filename, 'rb') as f:
     # Check file starts and ends with magic bytes
     start_magic = f.read(len(PARQUET_VERSION_NUMBER))
     assert start_magic == PARQUET_VERSION_NUMBER

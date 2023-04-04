@@ -73,7 +73,7 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
     row_group = file_meta_data.row_groups[0]
     assert len(schemas) == len(row_group.columns)
     row_group_index = []
-    with open(parquet_file) as file_handle:
+    with open(parquet_file, 'rb') as file_handle:
       for column, schema in zip(row_group.columns, schemas):
         column_index_offset = column.column_index_offset
         column_index_length = column.column_index_length
@@ -170,7 +170,7 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
       if not null_page:
         page_min_value = decode_stats_value(column_info.schema, page_min_str)
         # If type is str, page_min_value might have been truncated.
-        if isinstance(page_min_value, basestring):
+        if isinstance(page_min_value, bytes):
           assert page_min_value >= column_min_value[:len(page_min_value)]
         else:
           assert page_min_value >= column_min_value
@@ -180,9 +180,9 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
       if not null_page:
         page_max_value = decode_stats_value(column_info.schema, page_max_str)
         # If type is str, page_max_value might have been truncated and incremented.
-        if (isinstance(page_max_value, basestring) and
-            len(page_max_value) == PAGE_INDEX_MAX_STRING_LENGTH):
-          max_val_prefix = page_max_value.rstrip('\0')
+        if (isinstance(page_max_value, bytes)
+            and len(page_max_value) == PAGE_INDEX_MAX_STRING_LENGTH):
+          max_val_prefix = page_max_value.rstrip(b'\0')
           assert max_val_prefix[:-1] <= column_max_value
         else:
           assert page_max_value <= column_max_value
@@ -389,7 +389,7 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
     column = row_group_indexes[0][0]
     assert len(column.column_index.max_values) == 1
     max_value = column.column_index.max_values[0]
-    assert max_value == 'aab'
+    assert max_value == b'aab'
 
   def test_row_count_limit(self, vector, unique_database, tmpdir):
     """Tests that we can set the page row count limit via a query option.

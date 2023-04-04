@@ -682,8 +682,8 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
         ColumnStats('bigint_col', 0, 90, 0),
         ColumnStats('float_col', 0, RoundFloat(9.9, 1), 0),
         ColumnStats('double_col', 0, RoundFloat(90.9, 1), 0),
-        ColumnStats('date_string_col', '01/01/09', '12/31/10', 0),
-        ColumnStats('string_col', '0', '9', 0),
+        ColumnStats('date_string_col', b'01/01/09', b'12/31/10', 0),
+        ColumnStats('string_col', b'0', b'9', 0),
         ColumnStats('timestamp_col', TimeStamp('2009-01-01 00:00:00.0'),
                     TimeStamp('2010-12-31 05:09:13.860000'), 0),
         ColumnStats('year', 2009, 2010, 0),
@@ -732,15 +732,15 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
     # Expected values for tpch_parquet.customer
     expected_min_max_values = [
         ColumnStats('c_custkey', 1, 150000, 0),
-        ColumnStats('c_name', 'Customer#000000001', 'Customer#000150000', 0),
-        ColumnStats('c_address', '   2uZwVhQvwA', 'zzxGktzXTMKS1BxZlgQ9nqQ', 0),
+        ColumnStats('c_name', b'Customer#000000001', b'Customer#000150000', 0),
+        ColumnStats('c_address', b'   2uZwVhQvwA', b'zzxGktzXTMKS1BxZlgQ9nqQ', 0),
         ColumnStats('c_nationkey', 0, 24, 0),
-        ColumnStats('c_phone', '10-100-106-1617', '34-999-618-6881', 0),
+        ColumnStats('c_phone', b'10-100-106-1617', b'34-999-618-6881', 0),
         ColumnStats('c_acctbal', Decimal('-999.99'), Decimal('9999.99'), 0),
-        ColumnStats('c_mktsegment', 'AUTOMOBILE', 'MACHINERY', 0),
-        ColumnStats('c_comment', ' Tiresias according to the slyly blithe instructions '
-                    'detect quickly at the slyly express courts. express dinos wake ',
-                    'zzle. blithely regular instructions cajol', 0),
+        ColumnStats('c_mktsegment', b'AUTOMOBILE', b'MACHINERY', 0),
+        ColumnStats('c_comment', b' Tiresias according to the slyly blithe instructions '
+                    b'detect quickly at the slyly express courts. express dinos wake ',
+                    b'zzle. blithely regular instructions cajol', 0),
     ]
 
     self._ctas_table_and_verify_stats(vector, unique_database, tmpdir.strpath,
@@ -750,13 +750,13 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
     """Test that we don't write min/max statistics for null columns. Ensure null_count
     is set for columns with null values."""
     expected_min_max_values = [
-        ColumnStats('a', 'a', 'a', 0),
-        ColumnStats('b', '', '', 0),
+        ColumnStats('a', b'a', b'a', 0),
+        ColumnStats('b', b'', b'', 0),
         ColumnStats('c', None, None, 1),
         ColumnStats('d', None, None, 1),
         ColumnStats('e', None, None, 1),
-        ColumnStats('f', 'a\x00b', 'a\x00b', 0),
-        ColumnStats('g', '\x00', '\x00', 0)
+        ColumnStats('f', b'a\x00b', b'a\x00b', 0),
+        ColumnStats('g', b'\x00', b'\x00', 0)
     ]
 
     self._ctas_table_and_verify_stats(vector, unique_database, tmpdir.strpath,
@@ -778,9 +778,9 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
         """.format(qualified_table_name)
     self.execute_query(insert_stmt)
     expected_min_max_values = [
-        ColumnStats('c3', 'abc', 'xy', 0),
-        ColumnStats('vc', 'abc banana', 'ghj xyz', 0),
-        ColumnStats('st', 'abc xyz', 'lorem ipsum', 0)
+        ColumnStats('c3', b'abc', b'xy', 0),
+        ColumnStats('vc', b'abc banana', b'ghj xyz', 0),
+        ColumnStats('st', b'abc xyz', b'lorem ipsum', 0)
     ]
     self._ctas_table_and_verify_stats(vector, unique_database, tmpdir.strpath,
                                       qualified_table_name, expected_min_max_values)
@@ -875,10 +875,10 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
 
     # Expected values for tpch_parquet.customer
     expected_min_max_values = [
-        ColumnStats('id', '8600000US00601', '8600000US999XX', 0),
-        ColumnStats('zip', '00601', '999XX', 0),
-        ColumnStats('description1', '\"00601 5-Digit ZCTA', '\"999XX 5-Digit ZCTA', 0),
-        ColumnStats('description2', ' 006 3-Digit ZCTA\"', ' 999 3-Digit ZCTA\"', 0),
+        ColumnStats('id', b'8600000US00601', b'8600000US999XX', 0),
+        ColumnStats('zip', b'00601', b'999XX', 0),
+        ColumnStats('description1', b'\"00601 5-Digit ZCTA', b'\"999XX 5-Digit ZCTA', 0),
+        ColumnStats('description2', b' 006 3-Digit ZCTA\"', b' 999 3-Digit ZCTA\"', 0),
         ColumnStats('income', 0, 189570, 29),
     ]
 

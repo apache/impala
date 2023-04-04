@@ -32,6 +32,7 @@ import time
 import shlex
 import getpass
 import re
+import sys
 
 from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
@@ -419,6 +420,10 @@ class ImpalaBeeswaxClient(object):
     return exec_result
 
   def __get_query_type(self, query_string):
+    # Python 2's shlex does not work if the query string contains Unicode characters.
+    # Convert to bytes.
+    if sys.version_info.major == 2:
+      query_string = query_string.encode('utf-8')
     # Set posix=True and add "'" to escaped quotes
     # to deal with escaped quotes in string literals
     lexer = shlex.shlex(query_string.lstrip(), posix=True)

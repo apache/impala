@@ -37,7 +37,8 @@ def exec_local_command(cmd):
   Return:
     STDOUT
   """
-  proc = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  proc = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          universal_newlines=True)
   output, error = proc.communicate()
   retcode = proc.poll()
   if retcode:

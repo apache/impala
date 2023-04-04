@@ -465,8 +465,8 @@ class TestHS2(HS2TestSuite):
     impalad)"""
     operation_handle = TCLIService.TOperationHandle()
     operation_handle.operationId = TCLIService.THandleIdentifier()
-    operation_handle.operationId.guid = "short"
-    operation_handle.operationId.secret = "short_secret"
+    operation_handle.operationId.guid = b"short"
+    operation_handle.operationId.secret = b"short_secret"
     assert len(operation_handle.operationId.guid) != 16
     assert len(operation_handle.operationId.secret) != 16
     operation_handle.operationType = TCLIService.TOperationType.EXECUTE_STATEMENT
@@ -485,8 +485,8 @@ class TestHS2(HS2TestSuite):
   def test_invalid_query_handle(self):
     operation_handle = TCLIService.TOperationHandle()
     operation_handle.operationId = TCLIService.THandleIdentifier()
-    operation_handle.operationId.guid = "\x01\x23\x45\x67\x89\xab\xcd\xef76543210"
-    operation_handle.operationId.secret = "PasswordIsPencil"
+    operation_handle.operationId.guid = b"\x01\x23\x45\x67\x89\xab\xcd\xef76543210"
+    operation_handle.operationId.secret = b"PasswordIsPencil"
     operation_handle.operationType = TCLIService.TOperationType.EXECUTE_STATEMENT
     operation_handle.hasResultSet = False
 

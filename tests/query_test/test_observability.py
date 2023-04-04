@@ -916,9 +916,11 @@ class TestObservability(ImpalaTestSuite):
     assert "Resizes:" in runtime_profile
     nprobes = re.search('Probes:.*\((\d+)\)', runtime_profile)
     # Probes and travel can be 0. The number can be an integer or float with K.
-    assert nprobes and len(nprobes.groups()) == 1 and nprobes.group(1) >= 0
+    # The number extracted is the number inside parenthesis, which is always
+    # an integer.
+    assert nprobes and len(nprobes.groups()) == 1 and int(nprobes.group(1)) >= 0
     ntravel = re.search('Travel:.*\((\d+)\)', runtime_profile)
-    assert ntravel and len(ntravel.groups()) == 1 and ntravel.group(1) >= 0
+    assert ntravel and len(ntravel.groups()) == 1 and int(ntravel.group(1)) >= 0
 
   def test_query_profle_hashtable(self):
     """Test that the profile for join/aggregate contains hash table related

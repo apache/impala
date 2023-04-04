@@ -320,7 +320,7 @@ class TestParquetBloomFilter(ImpalaTestSuite):
     row_group = file_meta_data.row_groups[0]
     assert len(schemas) == len(row_group.columns)
     col_to_bloom_filter = dict()
-    with open(filename) as file_handle:
+    with open(filename, 'rb') as file_handle:
       for i, column in enumerate(row_group.columns):
         column_meta_data = column.meta_data
         if column_meta_data and column_meta_data.bloom_filter_offset:

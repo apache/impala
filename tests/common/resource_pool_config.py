@@ -83,7 +83,9 @@ class ResourcePoolConfig(object):
     # Make sure the change to the file is atomic. Write to a temp file and replace the
     # original with it.
     temp_path = file_name + "-temp"
-    file_handle = open(temp_path, "w")
+    # ElementTree.tostring produces a bytestring on Python 3, so open the file in
+    # binary mode.
+    file_handle = open(temp_path, "wb")
     file_handle.write(ET.tostring(xml_root))
     file_handle.flush()
     os.fsync(file_handle.fileno())

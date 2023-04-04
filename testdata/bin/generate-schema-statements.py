@@ -94,8 +94,9 @@
 # This should be used sparingly, because these commands are executed
 # serially.
 #
-from __future__ import absolute_import, division, print_function
+from __future__ import absolute_import, division, print_function, unicode_literals
 from builtins import object
+import io
 import json
 import os
 import re
@@ -719,7 +720,7 @@ class Statements(object):
     # If there is no content to write, skip
     if not self: return
     output = self.create + self.load_base + self.load
-    with open(filename, 'w') as f:
+    with io.open(filename, 'w', encoding='utf-8') as f:
       f.write('\n\n'.join(output))
 
   def __bool__(self):
@@ -734,7 +735,8 @@ def eval_section(section_str):
   cmd = section_str[1:]
   # Use bash explicitly instead of setting shell=True so we get more advanced shell
   # features (e.g. "for i in {1..n}")
-  p = subprocess.Popen(['/bin/bash', '-c', cmd], stdout=subprocess.PIPE)
+  p = subprocess.Popen(['/bin/bash', '-c', cmd], stdout=subprocess.PIPE,
+      universal_newlines=True)
   stdout, stderr = p.communicate()
   if stderr: print(stderr)
   assert p.returncode == 0

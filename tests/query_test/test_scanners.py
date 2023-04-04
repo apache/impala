@@ -1543,7 +1543,8 @@ class TestTextSplitDelimiters(ImpalaTestSuite):
     query = "create table %s (s string) location '%s'" % (qualified_table_name, location)
     self.client.execute(query)
 
-    with tempfile.NamedTemporaryFile() as f:
+    # Passing "w+" to NamedTemporaryFile prevents it from opening the file in bytes mode
+    with tempfile.NamedTemporaryFile(mode="w+") as f:
       f.write(data)
       f.flush()
       self.filesystem_client.copy_from_local(f.name, location)

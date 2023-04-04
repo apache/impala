@@ -54,14 +54,16 @@ MAX_SQL_LOGGING_LENGTH = 128 * 1024
 def log_sql_stmt(sql_stmt):
   """If the 'sql_stmt' is shorter than MAX_SQL_LOGGING_LENGTH, log it unchanged. If
      it is larger than MAX_SQL_LOGGING_LENGTH, truncate it and comment it out."""
+  # sql_stmt could contain Unicode characters, so explicitly use unicode literals
+  # so that Python 2 works.
   if (len(sql_stmt) <= MAX_SQL_LOGGING_LENGTH):
-    LOG.info("{0};\n".format(sql_stmt))
+    LOG.info(u"{0};\n".format(sql_stmt))
   else:
     # The logging output should be valid SQL, so the truncated SQL is commented out.
     LOG.info("-- Skip logging full SQL statement of length {0}".format(len(sql_stmt)))
     LOG.info("-- Logging a truncated version, commented out:")
     for line in sql_stmt[0:MAX_SQL_LOGGING_LENGTH].split("\n"):
-      LOG.info("-- {0}".format(line))
+      LOG.info(u"-- {0}".format(line))
     LOG.info("-- [...]")
 
 
@@ -398,8 +400,10 @@ class ImpylaHS2Connection(ImpalaConnection):
     """Return the string representation of the query id."""
     guid_bytes = \
         operation_handle.get_handle()._last_operation.handle.operationId.guid
-    return "{0}:{1}".format(codecs.encode(guid_bytes[7::-1], 'hex_codec'),
-                            codecs.encode(guid_bytes[16:7:-1], 'hex_codec'))
+    # hex_codec works on bytes, so this needs to a decode() to get back to a string
+    hi_str = codecs.encode(guid_bytes[7::-1], 'hex_codec').decode()
+    lo_str = codecs.encode(guid_bytes[16:7:-1], 'hex_codec').decode()
+    return "{0}:{1}".format(hi_str, lo_str)
 
   def get_state(self, operation_handle):
     LOG.info("-- getting state for operation: {0}".format(operation_handle))

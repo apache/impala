@@ -1194,6 +1194,7 @@ class ImpalaTestSuite(BaseTestSuite):
         # read to avoid hanging, especially when running interactively
         # with py.test.
         stdin=open("/dev/null"),
+        universal_newlines=True,
         env=env)
     (stdout, stderr) = call.communicate()
     call.wait()
@@ -1456,8 +1457,14 @@ class ImpalaTestSuite(BaseTestSuite):
         found = 0
         log_file_path = self.__build_log_path(daemon, level)
         last_re_result = None
-        with open(log_file_path) as log_file:
+        with open(log_file_path, 'rb') as log_file:
           for line in log_file:
+            # The logs could contain invalid unicode (and end-to-end tests don't control
+            # the logs from other tests). Skip lines with invalid unicode.
+            try:
+              line = line.decode()
+            except UnicodeDecodeError:
+              continue
             re_result = pattern.search(line)
             if re_result:
               found += 1

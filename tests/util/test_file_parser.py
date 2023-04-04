@@ -115,7 +115,7 @@ def parse_table_constraints(constraints_file):
   if not os.path.isfile(constraints_file):
     LOG.info('No schema constraints file file found')
   else:
-    with open(constraints_file, 'rb') as constraints_file:
+    with open(constraints_file, 'r') as constraints_file:
       for line in constraints_file.readlines():
         line = line.strip()
         if not line or line.startswith('#'):
@@ -164,7 +164,10 @@ def parse_test_file(test_file_name, valid_section_names, skip_unknown_sections=T
   """
   with open(test_file_name, 'rb') as test_file:
     file_data = test_file.read()
-    if encoding: file_data = file_data.decode(encoding)
+    if encoding:
+      file_data = file_data.decode(encoding)
+    else:
+      file_data = file_data.decode('utf-8')
     if os.environ["USE_APACHE_HIVE"] == "true":
       # Remove Hive 4.0 feature for tpcds_schema_template.sql
       if "tpcds_schema_template" in test_file_name:

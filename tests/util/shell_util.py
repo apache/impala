@@ -52,7 +52,8 @@ def exec_process_async(cmd):
   LOG.debug('Executing: %s' % (cmd,))
   # Popen needs a list as its first parameter.  The first element is the command,
   # with the rest being arguments.
-  return Popen(shlex.split(cmd), shell=False, stdout=PIPE, stderr=PIPE)
+  return Popen(shlex.split(cmd), shell=False, stdout=PIPE, stderr=PIPE,
+      universal_newlines=True)
 
 def shell(cmd, cmd_prepend="set -euo pipefail\n", stdout=PIPE, stderr=STDOUT,
     timeout_secs=None, **popen_kwargs):

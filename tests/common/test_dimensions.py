@@ -324,7 +324,7 @@ def load_table_info_dimension(workload_name, exploration_strategy, file_formats=
 
   vector_values = []
 
-  with open(test_vector_file, 'rb') as vector_file:
+  with open(test_vector_file, 'r') as vector_file:
     for line in vector_file.readlines():
       if line.strip().startswith('#'):
         continue

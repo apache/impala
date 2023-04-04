@@ -18,7 +18,7 @@
 # py.test configuration module
 #
 from __future__ import absolute_import, division, print_function
-from builtins import map, range
+from builtins import map, range, zip
 from impala.dbapi import connect as impala_connect
 from kudu import connect as kudu_connect
 from random import choice, sample
@@ -196,7 +196,7 @@ def pytest_assertrepr_compare(op, left, right):
   if isinstance(left, QueryTestResult) and isinstance(right, QueryTestResult) and \
      op == "==":
     result = ['Comparing QueryTestResults (expected vs actual):']
-    for l, r in map(None, left.rows, right.rows):
+    for l, r in zip(left.rows, right.rows):
       result.append("%s == %s" % (l, r) if l == r else "%s != %s" % (l, r))
     if len(left.rows) != len(right.rows):
       result.append('Number of rows returned (expected vs actual): '
@@ -291,7 +291,7 @@ def testid_checksum(request):
   #  "'abort_on_error': 1, 'exec_single_node_rows_threshold': 0, 'batch_size': 0, "
   #  "'num_nodes': 0} | query_type: SELECT | cancel_delay: 3 | action: WAIT | "
   #  "query: select l_returnflag from lineitem]")
-  return '{0:x}'.format(crc32(request.node.nodeid) & 0xffffffff)
+  return '{0:x}'.format(crc32(request.node.nodeid.encode('utf-8')) & 0xffffffff)
 
 
 @pytest.fixture

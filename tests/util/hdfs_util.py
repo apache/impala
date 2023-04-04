@@ -259,7 +259,7 @@ class HadoopFsCommandLineClient(BaseFilesystem):
     Overwrites files by default to avoid S3 consistency issues. Specifes the '-d' option
     by default, which 'Skip[s] creation of temporary file with the suffix ._COPYING_.' to
     avoid extraneous copies on S3. 'src' must be either a string or a list of strings."""
-    assert isinstance(src, list) or isinstance(src, basestring)
+    assert isinstance(src, list) or isinstance(src, str)
     src_list = src if isinstance(src, list) else [src]
     (status, stdout, stderr) = self._hadoop_fs_shell(['-copyFromLocal', '-d', '-f'] +
         src_list + [dst])
