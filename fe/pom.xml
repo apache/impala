@@ -120,6 +120,10 @@ under the License.
             <groupId>org.rocksdb</groupId>
             <artifactId>rocksdbjni</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>com.esotericsoftware</groupId>
+            <artifactId>kryo-shaded</artifactId>
+          </exclusion>
         </exclusions>
     </dependency>
 
