@@ -26,6 +26,7 @@ import argparse
 import codecs
 import errno
 import os
+import re
 import textwrap
 from xml.dom import minidom
 from xml.etree import ElementTree as ET
@@ -171,6 +172,22 @@ class JunitReport(object):
     return junit_log_file
 
   @staticmethod
+  def remove_ansi_escape_sequences(string):
+    """
+    Remove ANSI escape sequences from this string.
+
+    ANSI escape sequences customize terminal output by adding colors, etc.
+    Compilers use them to add color to error messages. ANSI escape
+    sequences interfere with producing the JUnitXML (and do not add any
+    value for JUnitXML), so this function strips them.
+
+    See https://stackoverflow.com/questions/14693701 for more information
+    on this solution.
+    """
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    return ansi_escape.sub('', string)
+
+  @staticmethod
   def get_xml_content(file_or_string=None):
     """
     Derive additional content for the XML report.
@@ -196,7 +213,7 @@ class JunitReport(object):
       # This is a string passed in on the command line. Make sure to return it as
       # a unicode string.
       content = unicode(file_or_string, encoding="UTF-8")
-    return content
+    return JunitReport.remove_ansi_escape_sequences(content)
 
   def __unicode__(self):
     """
