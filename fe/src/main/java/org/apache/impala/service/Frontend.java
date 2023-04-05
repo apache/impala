@@ -2085,19 +2085,6 @@ public class Frontend {
         }
       }
 
-      // If it is for a single node plan, enable_replan is disabled, or it is not a query
-      // that can be auto scaled, return the 1st plan generated.
-      if (queryOptions.num_nodes == 1) {
-        reason = "the number of nodes is 1";
-        break;
-      } else if (!enable_replan) {
-        reason = "query option 'enable_replan' is false";
-        break;
-      } else if (!Frontend.canStmtBeAutoScaled(req.stmt_type)) {
-        reason = "query is not auto-scalable";
-        break;
-      }
-
       // Counters about this group set.
       int available_cores = expectedTotalCores(group_set);
       String profileName = "Executor group " + (i + 1);
@@ -2110,6 +2097,31 @@ public class Frontend {
           new TCounter(MEMORY_MAX, TUnit.BYTES,
               LongMath.saturatedMultiply(
                   expectedNumExecutor(group_set), group_set.getMax_mem_limit())));
+      if (ProcessingCost.isComputeCost(queryOptions)) {
+        addCounter(groupSetProfile, new TCounter(CPU_MAX, TUnit.UNIT, available_cores));
+      }
+
+      // If it is for a single node plan, enable_replan is disabled, or it is not a query
+      // that can be auto scaled, return the 1st plan generated.
+      boolean notScalable = false;
+      if (queryOptions.num_nodes == 1) {
+        reason = "the number of nodes is 1";
+        notScalable = true;
+      } else if (!enable_replan) {
+        reason = "query option ENABLE_REPLAN=false";
+        notScalable = true;
+      } else if (!Frontend.canStmtBeAutoScaled(req.stmt_type)) {
+        reason = "query is not auto-scalable";
+        notScalable = true;
+      }
+
+      if (notScalable) {
+        setGroupNamePrefix(default_executor_group, req, group_set);
+        addInfoString(
+            groupSetProfile, VERDICT, "Assign to first group because " + reason);
+        FrontendProfile.getCurrent().addChildrenProfile(groupSetProfile);
+        break;
+      }
 
       // Find out the per host memory estimated from two possible sources.
       long per_host_mem_estimate = -1;
@@ -2140,7 +2152,6 @@ public class Frontend {
                 cores_requirement / BackendConfig.INSTANCE.getQueryCpuCountDivisor()));
         cpuReqSatisfied = scaled_cores_requirement <= available_cores;
 
-        addCounter(groupSetProfile, new TCounter(CPU_MAX, TUnit.UNIT, available_cores));
         addCounter(
             groupSetProfile, new TCounter(CPU_ASK, TUnit.UNIT, scaled_cores_requirement));
         addCounter(groupSetProfile,
@@ -2204,15 +2215,7 @@ public class Frontend {
       FrontendProfile.getCurrent().addChildrenProfile(groupSetProfile);
 
       if (matchFound) {
-        // Set the group name prefix in both the returned query options and
-        // the query context for non default group setup.
-        if (!default_executor_group) {
-          String namePrefix = group_set.getExec_group_name_prefix();
-          req.query_options.setRequest_pool(namePrefix);
-          if (req.query_exec_request != null) {
-            req.query_exec_request.query_ctx.setRequest_pool(namePrefix);
-          }
-        }
+        setGroupNamePrefix(default_executor_group, req, group_set);
         break;
       }
 
@@ -2261,6 +2264,19 @@ public class Frontend {
     req.setUser_has_profile_access(planCtx.compilationState_.userHasProfileAccess());
 
     return req;
+  }
+
+  private static void setGroupNamePrefix(
+      boolean default_executor_group, TExecRequest req, TExecutorGroupSet group_set) {
+    // Set the group name prefix in both the returned query options and
+    // the query context for non default group setup.
+    if (!default_executor_group) {
+      String namePrefix = group_set.getExec_group_name_prefix();
+      req.query_options.setRequest_pool(namePrefix);
+      if (req.query_exec_request != null) {
+        req.query_exec_request.query_ctx.setRequest_pool(namePrefix);
+      }
+    }
   }
 
   private static TRuntimeProfileNode createTRuntimeProfileNode(

@@ -928,12 +928,38 @@ class TestExecutorGroups(CustomClusterTestSuite):
         ["Executor Group: root.small-group", "ExecutorGroupsConsidered: 2",
           "Verdict: Match", "CpuAsk: 4", "CpuAskUnbounded: 1"])
 
+    # ENABLE_REPLAN=false should force query to run in tiny group.
+    self.execute_query_expect_success(self.client, "SET ENABLE_REPLAN=false;")
+    self._run_query_and_verify_profile(CPU_TEST_QUERY, CPU_DOP_OPTIONS,
+        ["Executor Group: root.tiny-group", "ExecutorGroupsConsidered: 1",
+         "Verdict: Assign to first group because query option ENABLE_REPLAN=false"])
+    self.execute_query_expect_success(self.client, "SET ENABLE_REPLAN='';")
+
+    # Trivial query should be assigned to tiny group by Frontend.
+    # Backend may decide to run it in coordinator only.
+    self._run_query_and_verify_profile("SELECT 1", CPU_DOP_OPTIONS,
+        ["Executor Group: empty group (using coordinator only)",
+         "ExecutorGroupsConsidered: 1",
+         "Verdict: Assign to first group because the number of nodes is 1"])
+
+    # CREATE/DROP database should work and assigned to tiny group.
+    self._run_query_and_verify_profile(
+        "CREATE DATABASE test_non_scalable_query;", CPU_DOP_OPTIONS,
+        ["ExecutorGroupsConsidered: 1",
+         "Verdict: Assign to first group because query is not auto-scalable"],
+        ["Executor Group:"])
+    self._run_query_and_verify_profile(
+        "DROP DATABASE test_non_scalable_query;", CPU_DOP_OPTIONS,
+        ["ExecutorGroupsConsidered: 1",
+         "Verdict: Assign to first group because query is not auto-scalable"],
+        ["Executor Group:"])
+
     # Check resource pools on the Web queries site and admission site
     self._verify_query_num_for_resource_pool("root.small", 2)
-    self._verify_query_num_for_resource_pool("root.tiny", 1)
+    self._verify_query_num_for_resource_pool("root.tiny", 3)
     self._verify_query_num_for_resource_pool("root.large", 2)
     self._verify_total_admitted_queries("root.small", 2)
-    self._verify_total_admitted_queries("root.tiny", 1)
+    self._verify_total_admitted_queries("root.tiny", 3)
     self._verify_total_admitted_queries("root.large", 2)
     self.client.close()
 
