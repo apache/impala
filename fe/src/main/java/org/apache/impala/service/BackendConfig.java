@@ -394,4 +394,8 @@ public class BackendConfig {
   public boolean isSkipResourceCheckingOnLastExecutorGroupSet() {
     return backendCfg_.skip_resource_checking_on_last_executor_group_set;
   }
+
+  public int getThriftRpcMaxMessageSize() {
+    return backendCfg_.thrift_rpc_max_message_size;
+  }
 }
