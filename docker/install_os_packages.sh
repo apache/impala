@@ -124,6 +124,7 @@ elif [[ $DISTRIBUTION == Redhat ]]; then
       hostname \
       krb5-workstation \
       openldap-devel \
+      procps-ng \
       tzdata
 
   # UTF-8 masking functions require the presence of en_US.utf8.
