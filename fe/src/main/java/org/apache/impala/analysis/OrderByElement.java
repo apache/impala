@@ -53,7 +53,7 @@ public class OrderByElement {
     expr_ = other.expr_.clone();
     isAsc_ = other.isAsc_;
     if (other.nullsFirstParam_ != null) {
-      nullsFirstParam_ = new Boolean(other.nullsFirstParam_.booleanValue());
+      nullsFirstParam_ = Boolean.valueOf(other.nullsFirstParam_.booleanValue());
     } else {
       nullsFirstParam_ = null;
     }

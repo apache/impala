@@ -1098,7 +1098,7 @@ public class Frontend {
 
     @Override
     public Boolean call() throws Exception {
-      return new Boolean(isAccessibleToUser(dbName_, tblName_, owner_, user_));
+      return Boolean.valueOf(isAccessibleToUser(dbName_, tblName_, owner_, user_));
     }
   }
 

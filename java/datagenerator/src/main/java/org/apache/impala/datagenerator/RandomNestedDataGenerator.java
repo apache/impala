@@ -237,11 +237,11 @@ public class RandomNestedDataGenerator {
         }
         return m;
       }
-      case BOOLEAN: return new Boolean(getRandomBoolean());
-      case DOUBLE: return new Double(getRandomDouble());
-      case FLOAT: return new Float(getRandomFloat());
-      case INT: return new Integer(getRandomInt());
-      case LONG: return new Long(getRandomLong());
+      case BOOLEAN: return Boolean.valueOf(getRandomBoolean());
+      case DOUBLE: return Double.valueOf(getRandomDouble());
+      case FLOAT: return Float.valueOf(getRandomFloat());
+      case INT: return Integer.valueOf(getRandomInt());
+      case LONG: return Long.valueOf(getRandomLong());
       case STRING: return getRandomString();
       // TODO: Decimal
       // TODO: Timestamp
@@ -256,8 +256,8 @@ public class RandomNestedDataGenerator {
       System.exit(1);
     }
     String schemaFile = args[0];
-    int numElements = new Integer(args[1]);
-    numListItems = new Integer(args[2]);
+    int numElements = Integer.valueOf(args[1]);
+    numListItems = Integer.valueOf(args[2]);
     String outputFile = args[3];
 
     generateDataToFile(schemaFile, numElements, outputFile);

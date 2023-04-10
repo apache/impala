@@ -36,7 +36,7 @@ import org.apache.log4j.Logger;
 // See the comments in be/src/exprs/hive-udf-call.h for more details.
 // TODO: should we cache loaded jars and classes?
 @SuppressWarnings("restriction")
-public class UdfExecutor {
+public class UdfExecutor implements AutoCloseable {
   private static final Logger LOG = Logger.getLogger(UdfExecutor.class);
 
   private final static TBinaryProtocol.Factory PROTOCOL_FACTORY =
@@ -76,11 +76,6 @@ public class UdfExecutor {
   }
 
   @Override
-  protected void finalize() throws Throwable {
-    close();
-    super.finalize();
-  }
-
   public void close() {
     hiveUdfExecutor_.close();
     udfLoader_.close();
