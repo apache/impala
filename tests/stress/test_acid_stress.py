@@ -27,6 +27,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import SkipIf, SkipIfHive2, SkipIfFS, SkipIfDockerizedCluster
 from tests.stress.stress_util import Task, run_tasks
+from tests.util.filesystem_utils import IS_OZONE
 
 NUM_OVERWRITES = 2
 NUM_INSERTS_PER_OVERWRITE = 4
@@ -306,7 +307,9 @@ class TestConcurrentAcidInserts(TestAcidStress):
     checkers = [Task(self._impala_role_concurrent_checker, tbl_name, i, counter,
                      num_writers)
                 for i in range(0, num_checkers)]
-    run_tasks(writers + checkers)
+    # HDDS-8289: Ozone listStatus is slow with lots of files
+    timeout = 900 if IS_OZONE else 600
+    run_tasks(writers + checkers, timeout_seconds=timeout)
 
 
 class TestFailingAcidInserts(TestAcidStress):

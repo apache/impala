@@ -194,6 +194,7 @@ class TestDdlStatements(TestDdlBase):
       # Reset to its default value.
       self.client.execute("set s3_skip_insert_staging=true")
 
+  @SkipIfFS.incorrent_reported_ec
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_truncate_table(self, vector, unique_database):
     vector.get_value('exec_option')['abort_on_error'] = False
@@ -286,6 +287,7 @@ class TestDdlStatements(TestDdlBase):
     self.run_test_case('QueryTest/create-table', vector, use_db=unique_database,
         multiple_impalad=self._use_multiple_impalad(vector))
 
+  @SkipIfFS.incorrent_reported_ec
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_create_table_like_table(self, vector, unique_database):
     vector.get_value('exec_option')['abort_on_error'] = False
@@ -442,6 +444,7 @@ class TestDdlStatements(TestDdlBase):
 
   # TODO: don't use hdfs_client
   @SkipIfLocal.hdfs_client
+  @SkipIfFS.incorrent_reported_ec
   @UniqueDatabase.parametrize(sync_ddl=True, num_dbs=2)
   def test_alter_table(self, vector, unique_database):
     vector.get_value('exec_option')['abort_on_error'] = False
@@ -774,6 +777,7 @@ class TestDdlStatements(TestDdlBase):
     assert result.data[0] == ''
     assert result.data[1] == 'NULL'
 
+  @SkipIfFS.incorrent_reported_ec
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_partition_ddl_predicates(self, vector, unique_database):
     self.run_test_case('QueryTest/partition-ddl-predicates-all-fs', vector,

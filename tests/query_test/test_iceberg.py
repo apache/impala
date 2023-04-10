@@ -36,7 +36,7 @@ import json
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.iceberg_test_suite import IcebergTestSuite
-from tests.common.skip import SkipIf, SkipIfDockerizedCluster
+from tests.common.skip import SkipIf, SkipIfFS, SkipIfDockerizedCluster
 from tests.common.file_utils import (
   create_iceberg_table_from_directory,
   create_table_from_parquet)
@@ -1089,6 +1089,7 @@ class TestIcebergTable(IcebergTestSuite):
 
     assert parquet_column_name_type_list == iceberg_column_name_type_list
 
+  @SkipIfFS.incorrent_reported_ec
   def test_compute_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-compute-stats', vector, unique_database)
 

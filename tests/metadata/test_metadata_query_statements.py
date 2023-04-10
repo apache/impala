@@ -66,6 +66,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   def test_show(self, vector):
     self.run_test_case('QueryTest/show', vector)
 
+  @SkipIfFS.incorrent_reported_ec
   def test_show_stats(self, vector):
     self.run_test_case('QueryTest/show-stats', vector, "functional")
 

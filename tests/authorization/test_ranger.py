@@ -2016,6 +2016,7 @@ class TestRanger(CustomClusterTestSuite):
         admin_client.execute(statement, user=ADMIN)
 
   @pytest.mark.execute_serially
+  @SkipIfFS.incorrent_reported_ec
   @CustomClusterTestSuite.with_args(
     # We additionally provide impalad and catalogd with the customized user-to-groups
     # mapper since some test cases in grant_revoke.test require Impala to retrieve the

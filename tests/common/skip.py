@@ -75,6 +75,7 @@ class SkipIfFS:
       reason="block size is larger than 128MB")
   read_speed_dependent = pytest.mark.skipif(not IS_HDFS or IS_EC,
       reason="success depends on fast scan node performance")
+  incorrent_reported_ec = pytest.mark.skipif(IS_OZONE and IS_EC, reason="HDDS-8543")
 
   # These need test infra work to re-enable.
   hive = pytest.mark.skipif(not IS_HDFS, reason="Hive doesn't work")

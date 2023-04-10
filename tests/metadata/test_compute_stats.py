@@ -52,10 +52,12 @@ class TestComputeStats(ImpalaTestSuite):
         create_uncompressed_text_dimension(cls.get_workload()))
 
   @SkipIfLocal.hdfs_blocks
+  @SkipIfFS.incorrent_reported_ec
   def test_compute_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/compute-stats', vector, unique_database)
 
   @SkipIfLocal.hdfs_blocks
+  @SkipIfFS.incorrent_reported_ec
   def test_compute_stats_avro(self, vector, unique_database, cluster_properties):
     if cluster_properties.is_catalog_v2_cluster():
       # IMPALA-7308: changed behaviour of various Avro edge cases significantly in the
@@ -66,16 +68,19 @@ class TestComputeStats(ImpalaTestSuite):
       self.run_test_case('QueryTest/compute-stats-avro', vector, unique_database)
 
   @SkipIfLocal.hdfs_blocks
+  @SkipIfFS.incorrent_reported_ec
   def test_compute_stats_decimal(self, vector, unique_database):
     # Test compute stats on decimal columns separately so we can vary between platforms
     # with and without write support for decimals (Hive < 0.11 and >= 0.11).
     self.run_test_case('QueryTest/compute-stats-decimal', vector, unique_database)
 
   @SkipIfLocal.hdfs_blocks
+  @SkipIfFS.incorrent_reported_ec
   def test_compute_stats_date(self, vector, unique_database):
     # Test compute stats on date columns separately.
     self.run_test_case('QueryTest/compute-stats-date', vector, unique_database)
 
+  @SkipIfFS.incorrent_reported_ec
   def test_compute_stats_incremental(self, vector, unique_database):
     self.run_test_case('QueryTest/compute-stats-incremental', vector, unique_database)
 

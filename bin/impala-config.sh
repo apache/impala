@@ -212,19 +212,19 @@ fi
 : ${IMPALA_TOOLCHAIN_HOST:=native-toolchain.s3.amazonaws.com}
 export IMPALA_TOOLCHAIN_HOST
 
-export CDP_BUILD_NUMBER=39127492
+export CDP_BUILD_NUMBER=39671873
 export CDP_MAVEN_REPOSITORY=\
 "https://${IMPALA_TOOLCHAIN_HOST}/build/cdp_components/${CDP_BUILD_NUMBER}/maven"
-export CDP_AVRO_JAVA_VERSION=1.8.2.7.2.17.0-160
-export CDP_HADOOP_VERSION=3.1.1.7.2.17.0-160
-export CDP_HBASE_VERSION=2.4.6.7.2.17.0-160
-export CDP_HIVE_VERSION=3.1.3000.7.2.17.0-160
-export CDP_ICEBERG_VERSION=1.1.0.7.2.17.0-160
-export CDP_KNOX_VERSION=1.3.0.7.2.17.0-160
-export CDP_OZONE_VERSION=1.3.0.7.2.17.0-160
-export CDP_PARQUET_VERSION=1.10.99.7.2.17.0-160
-export CDP_RANGER_VERSION=2.3.0.7.2.17.0-160
-export CDP_TEZ_VERSION=0.9.1.7.2.17.0-160
+export CDP_AVRO_JAVA_VERSION=1.8.2.7.2.17.0-204
+export CDP_HADOOP_VERSION=3.1.1.7.2.17.0-204
+export CDP_HBASE_VERSION=2.4.6.7.2.17.0-204
+export CDP_HIVE_VERSION=3.1.3000.7.2.17.0-204
+export CDP_ICEBERG_VERSION=1.1.0.7.2.17.0-204
+export CDP_KNOX_VERSION=1.3.0.7.2.17.0-204
+export CDP_OZONE_VERSION=1.3.0.7.2.17.0-204
+export CDP_PARQUET_VERSION=1.10.99.7.2.17.0-204
+export CDP_RANGER_VERSION=2.3.0.7.2.17.0-204
+export CDP_TEZ_VERSION=0.9.1.7.2.17.0-204
 
 # Ref: https://infra.apache.org/release-download-pages.html#closer
 : ${APACHE_MIRROR:="https://www.apache.org/dyn/closer.cgi"}
@@ -760,7 +760,7 @@ elif [ "${TARGET_FILESYSTEM}" = "ozone" ]; then
   if [[ "${ERASURE_CODING}" = true ]]; then
     export OZONE_ERASURECODE_POLICY="RS-3-2-1024k"
     # Ozone normalizes the policy for internal storage. Use this string for tests.
-    export ERASURECODE_POLICY="rs-3-2-1048576"
+    export ERASURECODE_POLICY="rs-3-2-1024k"
   fi
 else
   echo "Unsupported filesystem '$TARGET_FILESYSTEM'"
