@@ -162,6 +162,12 @@ if ! hostname ; then
   exit 1
 fi
 
+# graceful_shutdown_backends.sh requires the pgrep utility. Verify it is present.
+if ! command -v pgrep ; then
+  echo "ERROR: 'pgrep' is not present."
+  exit 1
+fi
+
 # Impala will fail to start if the permissions on /var/tmp are not set to include
 # the sticky bit (i.e. +t). Some versions of Redhat UBI images do not have
 # this set by default, so specifically set the sticky bit for both /tmp and /var/tmp.

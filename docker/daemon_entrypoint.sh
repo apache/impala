@@ -176,6 +176,13 @@ fi
 # Set ulimit core file size 0.
 ulimit -c 0
 
+# graceful_shutdown_backends.sh requires pgrep, so verify it is present
+# at startup.
+if ! command -v pgrep ; then
+  echo "ERROR: 'pgrep' is not present."
+  exit 1
+fi
+
 # The UTF-8 masking functions rely on the presence of en_US.utf8. Make sure
 # it is present.
 if locale -a | grep en_US.utf8 ; then
