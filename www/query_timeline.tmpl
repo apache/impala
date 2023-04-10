@@ -62,6 +62,7 @@ under the License.
 
 $("#plan-timing-tab").addClass("active");
 
+var profile = {};
 var phases = [
   { color: "#C0C0FF", label: "Prepare" }
 , { color: "#E0E0E0", label: "Open" }
@@ -69,29 +70,18 @@ var phases = [
 , { color: "#C0FFFF", label: "Send First Batch" }
 , { color: "#C0FFC0", label: "Process Remaining Batches" }
 , { color: "#FFC0C0", label: "Close" }
-]
-
+];
 var fragment_colors = ["#A9A9A9", "#FF8C00", "#8A2BE2", "#A52A2A", "#00008B", "#006400",
-                       "#228B22", "#4B0082", "#DAA520", "#008B8B", "#000000", "#DC143C"]
+                       "#228B22", "#4B0082", "#DAA520", "#008B8B", "#000000", "#DC143C"];
+var fragments = [];
+var rownum = 0;
+var char_width = 6;
+var max_namelen = 0;
+var all_nodes = [];
+var receiver_nodes = [];
+var profile_available = false;
+var maxts = 0;
 
-var query_finished = false;
-var intervalId = 0;
-
-function minimum(numlist) {
-  var minval = numlist[0];
-  for (var i = 1; i < numlist.length; ++i) {
-    minval=Math.min(minval, numlist[i]);
-  }
-  return minval;
-}
-
-function maximum(numlist) {
-  var maxval = numlist[0];
-  for (var i = 1; i < numlist.length; ++i) {
-    maxval=Math.max(maxval, numlist[i]);
-  }
-  return maxval;
-}
 
 function DrawBars(ctx, rownum, height, events, xoffset, px_per_ns) {
   var color_idx = 0;
@@ -103,7 +93,7 @@ function DrawBars(ctx, rownum, height, events, xoffset, px_per_ns) {
       var x = last_end;
       var y = rownum * height;
 
-      var endts = maximum(ev.tslist);
+      var endts = Math.max.apply(null, ev.tslist);
       var width = xoffset + endts * px_per_ns - last_end;
       last_end = x + width;
 
@@ -133,17 +123,170 @@ function DrawBars(ctx, rownum, height, events, xoffset, px_per_ns) {
   });
 }
 
-function renderTiming(ignored_arg) {
-  if (req.status != 200) {
-    return;
-  }
-  var json = JSON.parse(req.responseText);
-  var profile = json["profile_json"];
-  var qs = profile.child_profiles[0].info_strings.find(({ key }) => key === "Query State").value;
-  if (qs == "FINISHED" ) {
-    query_finished = true;
-  }
+function collectFromProfile(ignored_arg) {
+  rownum = 0;
+  maxts = 0;
+  max_namelen = 0;
+  fragments = [];
+  var color_idx = 0;
+  all_nodes = [];
+  receiver_nodes = [];
+  try {
+    // First pass: compute sizes
+    profile.child_profiles[2].child_profiles.forEach(function(fp) {
 
+      var cp = fp.child_profiles[0];
+
+      if (cp.event_sequences != undefined) {
+        var fevents = fp.child_profiles[0].event_sequences[0].events;
+
+        // Build list of timestamps that spans instances for each event
+        for (var en = 0; en < fevents.length; ++en) {
+          fevents[en].tslist = [ fevents[en].timestamp ];
+          for (var instance = 1; instance < fp.child_profiles.length; ++instance) {
+            if (fp.child_profiles[instance].event_sequences != undefined) {
+              fevents[en].tslist.push(
+                  fp.child_profiles[instance].event_sequences[0].events[en].timestamp);
+            }
+          }
+        }
+
+        fragment = {
+          name: fp.profile_name,
+          events: fevents,
+          nodes: [ ],
+          color: fragment_colors[color_idx]
+        }
+        // Pick a new color for each plan fragment
+        color_idx = (color_idx + 1) % fragment_colors.length;
+        maxts = Math.max(maxts, fevents[fevents.length - 1].timestamp);
+        max_namelen = Math.max(max_namelen, fp.profile_name.length);
+        var node_path = [];
+        var node_stack = [];
+        cp.child_profiles.forEach(function get_plan_nodes(pp, index) {
+          if (pp.node_metadata != undefined) {
+            node_path.push(index);
+            var name_flds = pp.profile_name.split(/[()]/);
+            var node_type = name_flds[0].trim();
+            var node_id = name_flds.length > 1 ? name_flds[1].split(/[=]/)[1] : 0;
+            node_name = pp.profile_name.replace("_NODE", "").replace("_", " ")
+                .replace("KrpcDataStreamSender", "SENDER").replace("Hash Join Builder", "JOIN BUILD")
+                .replace("join node_", "");
+            if (node_type.indexOf("SCAN_NODE") >= 0) {
+              var table_name = pp.info_strings.find(({ key }) => key === "Table Name")
+                  .value.split(/[.]/);
+              node_name = node_name.replace("SCAN",
+                  "SCAN [" + table_name[table_name.length - 1] + "]");
+            }
+
+            var is_receiver = node_type == "EXCHANGE_NODE" ||
+                (node_type == "HASH_JOIN_NODE" && pp.num_children < 3);
+
+            var is_sender = (node_type == "Hash Join Builder" ||
+                             node_type == "KrpcDataStreamSender");
+            var parent_node;
+            if (node_type == "PLAN_ROOT_SINK") {
+              parent_node = undefined;
+            } else if (pp.node_metadata.data_sink_id != undefined) {
+              parent_node = receiver_nodes[node_id]; // Exchange sender dst
+            } else if (pp.node_metadata.join_build_id != undefined) {
+              parent_node = receiver_nodes[node_id]; // Join sender dst
+            } else if (node_stack.length > 0) {
+              parent_node = node_stack[node_stack.length - 1];
+            } else if (all_nodes.length) {
+              parent_node = all_nodes[all_nodes.length - 1];
+            }
+
+            max_namelen = Math.max(max_namelen, node_name.length + node_stack.length + 1);
+
+            if (pp.event_sequences != undefined) {
+              var node_events = pp.event_sequences[0].events;
+
+              // Start the instance event list for each event with timestamps from this instance
+              for (var en = 0; en < node_events.length; ++en) {
+                node_events[en].tslist = [ node_events[en].timestamp ];
+                if (node_type == "HASH_JOIN_NODE" && (en == 1 || en == 2)) {
+                  node_events[en].no_bar = true;
+                }
+              }
+            }
+            var node = {
+                name: node_name,
+                type: node_type,
+                node_id: node_id,
+                num_children: 0,
+                child_index: 0,
+                metadata: pp.node_metadata,
+                parent_node: parent_node,
+                events: node_events,
+                path: node_path.slice(0),
+                is_receiver: is_receiver,
+                is_sender: is_sender
+            }
+
+            if (is_sender) {
+              node.parent_node.sender_frag_index = fragments.length;
+            }
+
+            if (is_receiver) {
+              receiver_nodes[node_id] = node;
+            }
+
+            if (parent_node != undefined) {
+              node.child_index = parent_node.num_children++;
+            }
+
+            all_nodes.push(node);
+
+            fragment.nodes.push(node);
+
+            if (pp.child_profiles != undefined) {
+              node_stack.push(node);
+              pp.child_profiles.forEach(get_plan_nodes);
+              node = node_stack.pop();
+            }
+            rownum++;
+            node_path.pop();
+          }
+        });
+
+
+        // For each node, retrieve the instance timestamps for the remaining instances
+        for (var ni = 0; ni < fragment.nodes.length; ++ni) {
+          var node = fragment.nodes[ni];
+          for (var cpn = 1; cpn < fp.child_profiles.length; ++cpn) {
+            var cp = fp.child_profiles[cpn];
+
+            // Use the saved node path to traverse to the same position in this instance
+            for (var pi = 0; pi < node.path.length; ++pi) {
+              cp = cp.child_profiles[node.path[pi]];
+            }
+            console.assert(cp.node_metadata.data_sink_id == undefined ||
+                           cp.profile_name.indexOf("(dst_id=" + node.node_id + ")"));
+            console.assert(cp.node_metadata.plan_node_id == undefined ||
+                           cp.node_metadata.plan_node_id == node.node_id);
+
+            // Add instance events to this node
+            if (cp.event_sequences != undefined) {
+              for (var en = 0; en < node.events.length; ++en) {
+                node.events[en].tslist.push(cp.event_sequences[0].events[en].timestamp);
+              }
+            }
+          }
+        }
+
+        fragments.push(fragment);
+      }
+    });
+    profile_available = true;
+  } catch(e) {
+    console.log(e);
+    profile_available = false;
+  }
+}
+
+function renderTiming(ignored_arg) {
+  var plan_order = document.getElementById("plan_order").checked;
 
   var header_canvas = document.getElementById('header_canvas');
   var timing_canvas = document.getElementById('timing_canvas');
@@ -160,159 +303,6 @@ function renderTiming(ignored_arg) {
   var timing_ctx = timing_canvas.getContext('2d');
   var footer_ctx = footer_canvas.getContext('2d');
 
-  var plan_order = document.getElementById("plan_order").checked;
-
-  var rownum = 0;
-  var maxts = 0;
-  var max_namelen = 0;
-  var char_width = 6;
-  var color_idx = 0;
-  var fragments = [];
-
-  var all_nodes = [];
-  var receiver_nodes = [];
-  // First pass: compute sizes
-  profile.child_profiles[2].child_profiles.forEach(function(fp) {
-
-    var cp = fp.child_profiles[0];
-
-    if (cp.event_sequences != undefined) {
-      var fevents = fp.child_profiles[0].event_sequences[0].events;
-
-      // Build list of timestamps that spans instances for each event
-      for (var en = 0; en < fevents.length; ++en) {
-        fevents[en].tslist = [ fevents[en].timestamp ];
-        for (var instance = 1; instance < fp.child_profiles.length; ++instance) {
-          if (fp.child_profiles[instance].event_sequences != undefined) {
-            fevents[en].tslist.push(fp.child_profiles[instance].event_sequences[0].events[en].timestamp);
-          }
-        }
-      }
-
-      fragment = {
-        name: fp.profile_name,
-        events: fevents,
-        nodes: [ ],
-        color: fragment_colors[color_idx]
-      }
-
-      // Pick a new color for each plan fragment
-      color_idx = (color_idx + 1) % fragment_colors.length;
-      maxts = Math.max(maxts, fevents[fevents.length - 1].timestamp);
-      max_namelen = Math.max(max_namelen, fp.profile_name.length);
-      var node_path = [];
-      var node_stack = [];
-      cp.child_profiles.forEach(function get_plan_nodes(pp, index) {
-        if (pp.node_metadata != undefined) {
-          node_path.push(index);
-          var name_flds = pp.profile_name.split(/[()]/);
-          var node_type = name_flds[0].trim();
-          var node_id = name_flds.length > 1 ? name_flds[1].split(/[=]/)[1] : 0;
-          node_name = pp.profile_name.replace("_NODE", "").replace("_"," ").replace("KrpcDataStreamSender", "SENDER").replace("Hash Join Builder", "JOIN BUILD").replace("join node_","")
-          if (node_type.indexOf("SCAN_NODE") >= 0) {
-            var table_name = pp.info_strings.find(({ key }) => key === "Table Name").value.split(/[.]/);
-            node_name = node_name.replace("SCAN", "SCAN [" + table_name[table_name.length - 1] + "]");
-          }
-
-          var is_receiver = node_type == "EXCHANGE_NODE" ||
-              (node_type == "HASH_JOIN_NODE" && pp.num_children < 3);
-
-          var is_sender = (node_type == "Hash Join Builder" ||
-                           node_type == "KrpcDataStreamSender");
-          var parent_node;
-          if (node_type == "PLAN_ROOT_SINK") {
-            parent_node = undefined;
-          } else if (pp.node_metadata.data_sink_id != undefined) {
-            parent_node = receiver_nodes[node_id]; // Exchange sender dst
-          } else if (pp.node_metadata.join_build_id != undefined) {
-            parent_node = receiver_nodes[node_id]; // Join sender dst
-          } else if (node_stack.length > 0) {
-            parent_node = node_stack[node_stack.length - 1];
-          } else if (all_nodes.length) {
-            parent_node = all_nodes[all_nodes.length - 1];
-          }
-
-          max_namelen = Math.max(max_namelen, node_name.length + node_stack.length + 1);
-
-          if (pp.event_sequences != undefined) {
-            var node_events = pp.event_sequences[0].events;
-
-            // Start the instance event list for each event with timestamps from this instance
-            for (var en = 0; en < node_events.length; ++en) {
-              node_events[en].tslist = [ node_events[en].timestamp ];
-              if (node_type == "HASH_JOIN_NODE" && (en == 1 || en == 2)) {
-                node_events[en].no_bar = true;
-              }
-            }
-          }
-          var node = {
-              name: node_name,
-              type: node_type,
-              node_id: node_id,
-              num_children: 0,
-              child_index: 0,
-              metadata: pp.node_metadata,
-              parent_node: parent_node,
-              events: node_events,
-              path: node_path.slice(0),
-              is_receiver: is_receiver,
-              is_sender: is_sender
-          }
-
-          if (is_sender) {
-            node.parent_node.sender_frag_index = fragments.length;
-          }
-
-          if (is_receiver) {
-            receiver_nodes[node_id] = node;
-          }
-
-          if (parent_node != undefined) {
-            node.child_index = parent_node.num_children++;
-          }
-
-          all_nodes.push(node);
-
-          fragment.nodes.push(node);
-
-          if (pp.child_profiles != undefined) {
-            node_stack.push(node);
-            pp.child_profiles.forEach(get_plan_nodes);
-            node = node_stack.pop();
-          }
-          rownum++;
-          node_path.pop();
-        }
-      });
-
-
-      // For each node, retrieve the instance timestamps for the remaining instances
-      for (var ni = 0; ni < fragment.nodes.length; ++ni) {
-        var node = fragment.nodes[ni];
-        for (var cpn = 1; cpn < fp.child_profiles.length; ++cpn) {
-          var cp = fp.child_profiles[cpn];
-
-          // Use the saved node path to traverse to the same position in this instance
-          for (var pi = 0; pi < node.path.length; ++pi) {
-            cp = cp.child_profiles[node.path[pi]];
-          }
-          console.assert(cp.node_metadata.data_sink_id == undefined ||
-                         cp.profile_name.indexOf("(dst_id=" + node.node_id + ")"));
-          console.assert(cp.node_metadata.plan_node_id == undefined ||
-                         cp.node_metadata.plan_node_id == node.node_id);
-
-          // Add instance events to this node
-          if (cp.event_sequences != undefined) {
-            for (var en = 0; en < node.events.length; ++en) {
-              node.events[en].tslist.push(cp.event_sequences[0].events[en].timestamp);
-            }
-          }
-        }
-      }
-
-      fragments.push(fragment);
-    }
-  });
 
   var frag_name_width = (Math.max(2, (fragments.length - 1).toString().length) + 3) * char_width;
   var name_width = max_namelen * char_width + (frag_name_width + 2);
@@ -320,7 +310,8 @@ function renderTiming(ignored_arg) {
   var height = 15;
 
   timing_canvas.height = rownum * height;
-  var screen_height = Math.min(timing_canvas.height + 10, window.innerHeight - timing_canvas.offsetTop - 30);
+  var screen_height = Math.min(timing_canvas.height + 10,
+      window.innerHeight - timing_canvas.offsetTop - 30);
   timing_canvas.parentNode.setAttribute("style",
       "height:" + screen_height + "px; overflow-y:auto; border:1px solid #c3c3c3;");
 
@@ -342,7 +333,7 @@ function renderTiming(ignored_arg) {
     header_ctx.fillText(p.label, x + width / 3, text_y, Math.min(text_width, width / 2));
   });
 
-  rownum = 0;
+  var rownum_l = 0;
   var max_indent = 0;
   var pending_children = 0;
   var pending_senders = 0;
@@ -359,18 +350,22 @@ function renderTiming(ignored_arg) {
       timing_ctx.fillText(frag_name, 1, text_y, frag_name_width);
 
       // Fragment/sender timing row
-      DrawBars(timing_ctx, rownum, height, fevents, name_width, px_per_ns);
+      DrawBars(timing_ctx, rownum_l, height, fevents, name_width, px_per_ns);
 
-      for(var i = 0; i < fragment.nodes.length; i++) {
+      for (var i = 0; i < fragment.nodes.length; ++i) {
         var node = fragment.nodes[i];
 
         if (node.events != undefined) {
           // Plan node timing row
-          DrawBars(timing_ctx, rownum, height, node.events, name_width, px_per_ns);
+          DrawBars(timing_ctx, rownum_l, height, node.events, name_width, px_per_ns);
           if (node.type == "HASH_JOIN_NODE") {
             timing_ctx.fillStyle = "#000000";
-            timing_ctx.fillText("X", name_width + minimum(node.events[2].tslist) * px_per_ns, text_y, char_width);
-            timing_ctx.fillText("O", name_width + minimum(node.events[2].tslist) * px_per_ns, text_y, char_width);
+            timing_ctx.fillText("X",
+                name_width + Math.min.apply(null, node.events[2].tslist) * px_per_ns,
+                text_y, char_width);
+            timing_ctx.fillText("O",
+                name_width + Math.min.apply(null,node.events[2].tslist) * px_per_ns,
+                text_y, char_width);
           }
         }
 
@@ -393,8 +388,7 @@ function renderTiming(ignored_arg) {
         if (node.parent_node != undefined) {
           var y = height * node.parent_node.rendering.rownum;
           if (node.is_sender) {
-            var x = name_width + minimum(fevents[3].tslist) * px_per_ns;
-
+            var x = name_width + Math.min.apply(null, fevents[3].tslist) * px_per_ns;
             // Dotted horizontal connector to received rows
             timing_ctx.beginPath();
             timing_ctx.setLineDash([2, 2]);
@@ -404,7 +398,7 @@ function renderTiming(ignored_arg) {
 
             // Dotted rectangle for received rows
             timing_ctx.beginPath();
-            var x2 = name_width + maximum(fevents[4].tslist) * px_per_ns;
+            var x2 = name_width + Math.max.apply(null, fevents[4].tslist) * px_per_ns;
             timing_ctx.strokeRect(x, y + 4, x2 - x, height - 10);
             timing_ctx.setLineDash([]);
           }
@@ -426,11 +420,11 @@ function renderTiming(ignored_arg) {
           timing_ctx.stroke();
 
         }
-        node.rendering = { rownum: rownum, label_end: label_x + label_width };
+        node.rendering = { rownum: rownum_l, label_end: label_x + label_width };
         if (node.num_children) // Scan (leaf) node
           pending_children += (node.num_children - node.is_receiver);
         text_y += height;
-        rownum++;
+        rownum_l++;
 
         if (node.is_receiver) {
           if (plan_order) {
@@ -447,9 +441,11 @@ function renderTiming(ignored_arg) {
 
     }
   });
-
-  rownum = 0;
-  var text_y = (rownum + 1) * height - 4;
+  fragments.forEach(function(fragment) {
+    fragment.printed = false;
+  });
+  rownum_l = 0;
+  var text_y = (rownum_l + 1) * height - 4;
 
   // Time scale below timing diagram
   var ntics = 10;
@@ -458,7 +454,7 @@ function renderTiming(ignored_arg) {
   var x = name_width;
   for (var i = 0; i < ntics; ++i) {
     footer_ctx.fillStyle = "#000000";
-    var y = rownum * height;
+    var y = rownum_l * height;
     footer_ctx.fillRect(x, y, px_per_tic, height);
     footer_ctx.fillStyle = "#F0F0F0";
     footer_ctx.fillRect(x + 1, y + 1, px_per_tic - 2, height - 2);
@@ -466,27 +462,37 @@ function renderTiming(ignored_arg) {
     footer_ctx.fillText((i * sec_per_tic).toFixed(2), x + px_per_tic - 25, text_y, chart_width / ntics);
     x += px_per_tic;
   }
-
-  if (query_finished && intervalId) {
-    clearInterval(intervalId);
-    intervalId = 0;
-  }
 }
 
-
 function refresh() {
-  req = new XMLHttpRequest();
-  req.onload = renderTiming;
+  var req = new XMLHttpRequest();
+  req.onload = function() {
+    if (req.status == 200) {
+      profile = JSON.parse(req.responseText)["profile_json"];
+      collectFromProfile();
+      if (!profile_available) {
+        setTimeout(refresh, 1000);
+      } else {
+        if (profile.child_profiles[0].info_strings.find(({key}) => key === "Query State").value
+            != "FINISHED") {
+          setTimeout(refresh, 1000);
+        }
+        renderTiming();
+      }
+    }
+  }
   req.open("GET", make_url("/query_timeline?query_id={{query_id}}&json"), true);
   req.send();
 }
 
-// Force one refresh before starting the timer.
-refresh();
+
 
 window.addEventListener('resize', function(event) {
-  renderTiming();
+  if (profile_available) {
+    renderTiming();
+  }
 }, true);
 
+window.onload = refresh;
 
 </script>
