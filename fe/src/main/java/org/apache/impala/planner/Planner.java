@@ -54,6 +54,7 @@ import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.MathUtil;
 import org.apache.impala.util.MaxRowsProcessedVisitor;
+import org.apache.kudu.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -219,7 +220,22 @@ public class Planner {
             }
             graph.addTargetColumnLabels(targetColLabels);
           } else {
-            graph.addTargetColumnLabels(targetTable);
+            Preconditions.checkState(ctx_.isCtas());
+            if (((FeKuduTable)targetTable).hasAutoIncrementingColumn()) {
+              // Omit auto-incrementing column for Kudu table since the column is not in
+              // expression. The auto-incrementing column is only added to target table
+              // for CTAS statement so that the table has same layout as the table
+              // created by Kudu engine. We don't need to compute Lineage graph for the
+              // column.
+              List<ColumnLabel> targetColLabels = new ArrayList<>();
+              for (String column: targetTable.getColumnNames()) {
+                if (column.equals(Schema.getAutoIncrementingColumnName())) continue;
+                targetColLabels.add(new ColumnLabel(column, targetTable.getTableName()));
+              }
+              graph.addTargetColumnLabels(targetColLabels);
+            } else {
+              graph.addTargetColumnLabels(targetTable);
+            }
           }
         } else if (targetTable instanceof FeHBaseTable) {
           graph.addTargetColumnLabels(targetTable);

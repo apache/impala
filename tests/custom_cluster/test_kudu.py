@@ -19,6 +19,7 @@ from __future__ import absolute_import, division, print_function
 import logging
 import os
 import pytest
+import tempfile
 from kudu.schema import INT32
 from time import sleep
 
@@ -139,6 +140,8 @@ class TestKuduClientTimeout(CustomKuduTest):
 
 
 class TestKuduHMSIntegration(CustomKuduTest):
+  START_END_TIME_LINEAGE_LOG_DIR = tempfile.mkdtemp(prefix="start_end_time")
+
   # TODO(IMPALA-8614): parameterize the common tests in query_test/test_kudu.py
   # to run with HMS integration enabled. Also avoid restarting Impala to reduce
   # tests time.
@@ -170,6 +173,16 @@ class TestKuduHMSIntegration(CustomKuduTest):
        with the Hive Metastore for managed tables. Increase timeout of individual Kudu
        client rpcs to avoid requests fail due to operation delay in the Hive Metastore
        for managed tables (IMPALA-8856)."""
+    vector.get_value('exec_option')['kudu_read_mode'] = "READ_AT_SNAPSHOT"
+    self.run_test_case('QueryTest/kudu_create', vector, use_db=unique_database)
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  @CustomClusterTestSuite.with_args(impalad_args="-kudu_client_rpc_timeout_ms=30000 "
+                                    "--lineage_event_log_dir={0}"
+                                    .format(START_END_TIME_LINEAGE_LOG_DIR))
+  def test_create_kudu_tables_with_lineage_enabled(self, vector, unique_database):
+    """Same as above test_create_managed_kudu_tables, but with lineage enabled."""
     vector.get_value('exec_option')['kudu_read_mode'] = "READ_AT_SNAPSHOT"
     self.run_test_case('QueryTest/kudu_create', vector, use_db=unique_database)
 

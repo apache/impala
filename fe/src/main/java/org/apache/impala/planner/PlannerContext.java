@@ -106,6 +106,7 @@ public class PlannerContext {
     return analysisResult_.isInsertStmt() || analysisResult_.isCreateTableAsSelectStmt();
   }
   public boolean isInsert() { return analysisResult_.isInsertStmt(); }
+  public boolean isCtas() { return analysisResult_.isCreateTableAsSelectStmt(); }
   public boolean isUpdateOrDelete() {
     return analysisResult_.isUpdateStmt() || analysisResult_.isDeleteStmt(); }
   public boolean isQuery() { return analysisResult_.isQueryStmt(); }
