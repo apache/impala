@@ -74,7 +74,7 @@ class FileArchiver(object):
       size = 0
     else:
       with closing(tarfile.open(self.output_file_path, mode='w:gz')) as out:
-        for i in xrange(num_files):
+        for i in range(num_files):
           out.add(self.file_list[i])
       size = os.stat(self.output_file_path).st_size
     self.resulting_sizes[num_files] = size
