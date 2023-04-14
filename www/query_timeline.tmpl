@@ -21,7 +21,7 @@ under the License.
 
 </div>
 
-<div class="container" style="width:1200px;margin:0 auto;">
+<div class="container">
 
 <style id="css">
 </style>
@@ -42,16 +42,17 @@ under the License.
 
 </div>
 
-<div style="height:20px; margin-bottom:5px; border:1px solid #c3c3c3;">
-<canvas id="header_canvas" style="height: 15px;"></canvas>
+<div id="timing_diagram" style="border:1px solid #c3c3c3; overflow:hidden;">
+  <div style="margin-top:5px; border:1px solid #c3c3c3;">
+    <svg id="phases_header" height="15px"></svg>
+  </div>
+  <div style="margin-top:5px; border:1px solid #c3c3c3; overflow-y:auto;">
+    <svg id="fragment_diagram"></svg>
+  </div>
+  <div style="margin-top:5px; border:1px solid #c3c3c3;">
+    <svg id="timeticks_footer" height="15px"></svg>
+  </div>
 </div>
-<div style="height:auto; overflow-y:auto; border:1px solid #c3c3c3;">
-<canvas id="timing_canvas"></canvas>
-</div>
-<div style="height:20px; margin-top:5px; border:1px solid #c3c3c3;">
-<canvas id="footer_canvas" style="height: 15px;"></canvas>
-</div>
-
 
 
 {{/plan_metadata_unavailable}}
@@ -82,41 +83,81 @@ var receiver_nodes = [];
 var profile_available = false;
 var maxts = 0;
 
+function get_svg_rect(fill_color, x, y, width, height, dash, stroke_color){
+  var rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  rect.setAttribute("x", x + "px");
+  rect.setAttribute("y", y + "px");
+  rect.setAttribute("width", width + "px");
+  rect.setAttribute("height", height + "px");
+  rect.setAttribute("fill", fill_color);
+  if (dash) {
+    rect.setAttribute("stroke", stroke_color);
+    rect.setAttribute("stroke-dasharray", "2 2");
+  }
+  return rect;
+}
 
-function DrawBars(ctx, rownum, height, events, xoffset, px_per_ns) {
+function get_svg_text(text, fill_color, x, y, height, container_center, max_width = 0){
+  var text_el = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  text_el.appendChild(document.createTextNode(text));
+  text_el.setAttribute("x", x + "px");
+  text_el.setAttribute("y", y + "px");
+  text_el.style.fontSize = height / 1.5 + "px";
+  if (container_center) {
+    text_el.setAttribute("dominant-baseline", "middle");
+    text_el.setAttribute("text-anchor", "middle");
+  }
+  text_el.setAttribute("fill", fill_color);
+  if (max_width != 0) {
+    text_el.setAttribute("textLength", max_width);
+    text_el.setAttribute("lengthAdjust", "spacingAndGlyphs");
+  }
+  return text_el;
+}
+
+function get_svg_line(stroke_color, x1, y1, x2, y2, dash){
+  var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  line.setAttribute("x1", x1 + "px");
+  line.setAttribute("y1", y1 + "px");
+  line.setAttribute("x2", x2 + "px");
+  line.setAttribute("y2", y2 + "px");
+  line.setAttribute("stroke", stroke_color);
+  if (dash) {
+    line.setAttribute("stroke-dasharray", "2 2");
+  }
+  return line;
+}
+
+function DrawBars(svg, rownum, row_height, events, xoffset, px_per_ns) {
   var color_idx = 0;
   var last_end = xoffset;
-  bar_height = height - 2;
+  bar_height = row_height - 2;
 
   events.forEach(function(ev) {
     if (ev.no_bar == undefined) {
       var x = last_end;
-      var y = rownum * height;
+      var y = rownum * row_height;
 
       var endts = Math.max.apply(null, ev.tslist);
       var width = xoffset + endts * px_per_ns - last_end;
       last_end = x + width;
 
       // Block phase outline
-      ctx.fillStyle = "#000000";
-      ctx.fillRect(x, y, width, bar_height);
-      ctx.fillStyle = phases[color_idx++].color;
-
-      // Colored phase box if duration long enough
+      svg.appendChild(get_svg_rect("#000000", x, y, width, bar_height, false));
       if (width > 2) {
-        ctx.fillRect(x + 1, y + 1, width - 2, bar_height - 2);
+        svg.appendChild(get_svg_rect(phases[color_idx].color, x + 1, y + 1,
+            width - 2, bar_height - 2, false));
       }
 
+      color_idx++;
+
       // Grey dividers for other instances that finished earlier
-      ctx.beginPath()
       ev.tslist.forEach(function(ts) {
         var dx = (endts - ts) * px_per_ns;
-        ctx.strokeStyle = "#505050";
         var ignore_px = 2; // Don't print tiny skews
         if (Math.abs(dx) > ignore_px) {
-          ctx.moveTo(last_end - dx, y);
-          ctx.lineTo(last_end - dx, y + bar_height);
-          ctx.stroke();
+          svg.appendChild(get_svg_line("#505050", last_end - dx, y , last_end - dx,
+              y + bar_height, false));
         }
       });
     }
@@ -170,7 +211,8 @@ function collectFromProfile(ignored_arg) {
             var node_type = name_flds[0].trim();
             var node_id = name_flds.length > 1 ? name_flds[1].split(/[=]/)[1] : 0;
             node_name = pp.profile_name.replace("_NODE", "").replace("_", " ")
-                .replace("KrpcDataStreamSender", "SENDER").replace("Hash Join Builder", "JOIN BUILD")
+                .replace("KrpcDataStreamSender", "SENDER")
+                .replace("Hash Join Builder", "JOIN BUILD")
                 .replace("join node_", "");
             if (node_type.indexOf("SCAN_NODE") >= 0) {
               var table_name = pp.info_strings.find(({ key }) => key === "Table Name")
@@ -286,52 +328,45 @@ function collectFromProfile(ignored_arg) {
 }
 
 function renderTiming(ignored_arg) {
-  var plan_order = document.getElementById("plan_order").checked;
+  var plan_order = document.getElementById('plan_order').checked;
 
-  var header_canvas = document.getElementById('header_canvas');
-  var timing_canvas = document.getElementById('timing_canvas');
-  var footer_canvas = document.getElementById('footer_canvas');
+  var timing_diagram = document.getElementById('timing_diagram');
+  var phases_header = document.getElementById('phases_header');
+  var fragment_diagram = document.getElementById('fragment_diagram');
+  var timeticks_footer = document.getElementById('timeticks_footer');
 
-  timing_canvas.width = window.innerWidth - 50;
-  header_canvas.width = footer_canvas.width = timing_canvas.clientWidth;
+  phases_header.innerHTML = "";
+  fragment_diagram.innerHTML = "";
+  timeticks_footer.innerHTML = "";
 
-  header_canvas.height = 15; // Height gets resized later
-  timing_canvas.height = 200; // Height gets resized later
-  footer_canvas.height = 15; // Height gets resized later
+  var row_height = 15;
+  var display_height = window.innerHeight - timing_diagram.offsetTop - 70;
+  fragment_diagram.parentNode.style.height = display_height * 1 + "px";
+  fragment_diagram.setAttribute("height", rownum * row_height + "px");
 
-  var header_ctx = header_canvas.getContext('2d');
-  var timing_ctx = timing_canvas.getContext('2d');
-  var footer_ctx = footer_canvas.getContext('2d');
-
+  fragment_diagram.setAttribute("width", timing_diagram.clientWidth - 50);
+  phases_header.setAttribute("width", fragment_diagram.clientWidth);
+  timeticks_footer.setAttribute("width", fragment_diagram.clientWidth);
 
   var frag_name_width = (Math.max(2, (fragments.length - 1).toString().length) + 3) * char_width;
   var name_width = max_namelen * char_width + (frag_name_width + 2);
-  var chart_width = timing_canvas.width - name_width;
-  var height = 15;
-
-  timing_canvas.height = rownum * height;
-  var screen_height = Math.min(timing_canvas.height + 10,
-      window.innerHeight - timing_canvas.offsetTop - 30);
-  timing_canvas.parentNode.setAttribute("style",
-      "height:" + screen_height + "px; overflow-y:auto; border:1px solid #c3c3c3;");
+  var chart_width = fragment_diagram.clientWidth - name_width;
 
   var px_per_ns = chart_width / maxts;
 
-  var text_y = height - 4;
+  var text_y = row_height - 4;
   var color_idx = 0;
   var width = Math.ceil(chart_width / phases.length);
   phases.forEach(function(p) {
     var x = name_width + Math.ceil(chart_width * color_idx / phases.length);
-    x = Math.min(x, header_canvas.width - width);
+    x = Math.min(x, phases_header.clientWidth - width);
 
-    header_ctx.fillStyle = "#000000";
-    header_ctx.fillRect(x, 0, width, height);
-    header_ctx.fillStyle = phases[color_idx++].color;
-    header_ctx.fillRect(x + 1, 1, width - 2, height - 2);
-    header_ctx.fillStyle = "#000000";
-    var text_width = p.label.length * char_width;
-    header_ctx.fillText(p.label, x + width / 3, text_y, Math.min(text_width, width / 2));
-  });
+    phases_header.appendChild(get_svg_rect("#000000", x, 0, width, row_height, false));
+    phases_header.appendChild(get_svg_rect(phases[color_idx++].color, x + 1, 1,
+        width - 2, row_height - 2, false));
+    phases_header.appendChild(get_svg_text(p.label, "#000000", x + width / 2,
+        text_y - 2, row_height, true, Math.min(p.label.length * char_width, width / 1.5)));
+   });
 
   var rownum_l = 0;
   var max_indent = 0;
@@ -346,30 +381,27 @@ function renderTiming(ignored_arg) {
 
       frag_name = fragment.name.replace("Coordinator ", "").replace("Fragment ", "");
 
-      timing_ctx.fillStyle = fragment.color;
-      timing_ctx.fillText(frag_name, 1, text_y, frag_name_width);
+      fragment_diagram.appendChild(get_svg_text(frag_name, fragment.color, 1, text_y,
+          row_height, false));
 
       // Fragment/sender timing row
-      DrawBars(timing_ctx, rownum_l, height, fevents, name_width, px_per_ns);
+      DrawBars(fragment_diagram, rownum_l, row_height, fevents, name_width, px_per_ns);
 
       for (var i = 0; i < fragment.nodes.length; ++i) {
         var node = fragment.nodes[i];
 
         if (node.events != undefined) {
           // Plan node timing row
-          DrawBars(timing_ctx, rownum_l, height, node.events, name_width, px_per_ns);
+          DrawBars(fragment_diagram, rownum_l, row_height, node.events, name_width, px_per_ns);
           if (node.type == "HASH_JOIN_NODE") {
-            timing_ctx.fillStyle = "#000000";
-            timing_ctx.fillText("X",
+            fragment_diagram.appendChild(get_svg_text("X", "#000000",
                 name_width + Math.min.apply(null, node.events[2].tslist) * px_per_ns,
-                text_y, char_width);
-            timing_ctx.fillText("O",
-                name_width + Math.min.apply(null,node.events[2].tslist) * px_per_ns,
-                text_y, char_width);
+                text_y, row_height, false));
+            fragment_diagram.appendChild(get_svg_text("O", "#000000",
+                name_width + Math.min.apply(null, node.events[2].tslist) * px_per_ns,
+                text_y, row_height, false));
           }
         }
-
-        timing_ctx.fillStyle = fragment.color;
 
         if (node.is_receiver) {
           pending_senders++;
@@ -381,49 +413,49 @@ function renderTiming(ignored_arg) {
         }
 
         var label_x = frag_name_width + char_width * pending_children;
-        var label_width = Math.min(char_width * node.name.length, name_width - label_x - 2);
-        timing_ctx.fillText(node.name, label_x, text_y, label_width);
-        timing_ctx.strokeStyle = fragment.color;
+        var label_width = Math.min(char_width * node.name.length,
+            name_width - label_x - 2);
+        fragment_diagram.appendChild(get_svg_text(node.name, fragment.color,
+            label_x, text_y, row_height, false));
 
         if (node.parent_node != undefined) {
-          var y = height * node.parent_node.rendering.rownum;
+          var y = row_height * node.parent_node.rendering.rownum;
           if (node.is_sender) {
             var x = name_width + Math.min.apply(null, fevents[3].tslist) * px_per_ns;
             // Dotted horizontal connector to received rows
-            timing_ctx.beginPath();
-            timing_ctx.setLineDash([2, 2]);
-            timing_ctx.moveTo(name_width, y + height / 2 - 1);
-            timing_ctx.lineTo(x, y + height / 2 - 1);
-            timing_ctx.stroke();
+            fragment_diagram.appendChild(get_svg_line(fragment.color, name_width,
+                y + row_height / 2 - 1, x, y + row_height / 2 - 1, true));
 
             // Dotted rectangle for received rows
-            timing_ctx.beginPath();
-            var x2 = name_width + Math.max.apply(null, fevents[4].tslist) * px_per_ns;
-            timing_ctx.strokeRect(x, y + 4, x2 - x, height - 10);
-            timing_ctx.setLineDash([]);
+            var x2 = name_width + Math.max.apply(null,fevents[4].tslist) * px_per_ns;
+            fragment_diagram.appendChild(get_svg_rect("rgba(0,0,0,0)", x, y + 4, x2 - x,
+                row_height - 10, true, fragment.color));
           }
 
-          timing_ctx.beginPath();
-          if (node.is_sender && node.parent_node.rendering.rownum != rownum - 1) {
+          if (node.is_sender && node.parent_node.rendering.rownum != rownum_l - 1) {
             // DAG edge on right side to distant sender
             var x = name_width - (pending_senders) * char_width - char_width / 2;
-            timing_ctx.moveTo(node.parent_node.rendering.label_end, y + height / 2);
-            timing_ctx.lineTo(x, y + height / 2);
-            timing_ctx.lineTo(x, text_y - height / 2 + 3);
-            timing_ctx.lineTo(label_x + label_width, text_y - height / 2 + 3);
+            fragment_diagram.appendChild(get_svg_line(fragment.color,
+                node.parent_node.rendering.label_end,
+                y + row_height / 2, x , y + row_height / 2, false));
+            fragment_diagram.appendChild(get_svg_line(fragment.color, x, y + row_height / 2,
+                x, text_y - row_height / 2 + 3, false));
+            fragment_diagram.appendChild(get_svg_line(fragment.color, x,
+                text_y - row_height / 2 + 3, label_x + label_width,
+                text_y - row_height / 2 + 3, false));
+
           } else {
             // DAG edge from parent to immediate child
             var x = frag_name_width + (pending_children + 1) * char_width - char_width / 2;
-            timing_ctx.moveTo(x, y + height - 3);
-            timing_ctx.lineTo(x, text_y - height + 6);
+            fragment_diagram.appendChild(get_svg_line(fragment.color, x, y + row_height - 3,
+                x, text_y - row_height + 6, false));
           }
-          timing_ctx.stroke();
 
         }
         node.rendering = { rownum: rownum_l, label_end: label_x + label_width };
         if (node.num_children) // Scan (leaf) node
           pending_children += (node.num_children - node.is_receiver);
-        text_y += height;
+        text_y += row_height;
         rownum_l++;
 
         if (node.is_receiver) {
@@ -445,21 +477,22 @@ function renderTiming(ignored_arg) {
     fragment.printed = false;
   });
   rownum_l = 0;
-  var text_y = (rownum_l + 1) * height - 4;
+  var text_y = (rownum_l + 1) * row_height - 4;
 
   // Time scale below timing diagram
   var ntics = 10;
   var sec_per_tic = maxts / ntics / 1000000000;
   var px_per_tic = chart_width / ntics;
   var x = name_width;
+  var decimals = 2;
   for (var i = 1; i <= ntics; ++i) {
-    footer_ctx.fillStyle = "#000000";
-    var y = rownum_l * height;
-    footer_ctx.fillRect(x, y, px_per_tic, height);
-    footer_ctx.fillStyle = "#F0F0F0";
-    footer_ctx.fillRect(x + 1, y + 1, px_per_tic - 2, height - 2);
-    footer_ctx.fillStyle = "#000000";
-    footer_ctx.fillText((i * sec_per_tic).toFixed(2), x + px_per_tic - 25, text_y, chart_width / ntics);
+    var y = rownum_l * row_height;
+    timeticks_footer.appendChild(get_svg_rect("#000000", x, y, px_per_tic,
+        row_height, false));
+    timeticks_footer.appendChild(get_svg_rect("#F0F0F0", x + 1, y + 1, px_per_tic - 2,
+        row_height - 2, false));
+    timeticks_footer.appendChild(get_svg_text((i * sec_per_tic).toFixed(decimals),
+        "#000000", x + px_per_tic - decimals * char_width, text_y - 2, row_height, true));
     x += px_per_tic;
   }
 }
@@ -484,8 +517,6 @@ function refresh() {
   req.open("GET", make_url("/query_timeline?query_id={{query_id}}&json"), true);
   req.send();
 }
-
-
 
 window.addEventListener('resize', function(event) {
   if (profile_available) {
