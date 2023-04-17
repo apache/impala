@@ -159,6 +159,28 @@ class TestScannersFuzzing(ImpalaTestSuite):
         self.run_fuzz_test(vector, "functional_orc_def", src_table_name, unique_database,
                            fuzz_table_name, 10)
 
+  def test_fuzz_parquet_v2(self, vector, unique_database):
+    table_format = vector.get_value('table_format')
+    if table_format.file_format != 'parquet': pytest.skip()
+
+    tables = ["alltypesagg_parquet_v2_uncompressed", "alltypesagg_parquet_v2_snappy"]
+    for table_name in tables:
+      custom_queries = [
+        "select avg(float_col), avg(double_col), avg(timestamp_col)"
+        "  from %s where bool_col;" % table_name
+      ]
+      self.run_fuzz_test(vector, "functional_parquet", table_name, unique_database,
+                      table_name, 10, custom_queries)
+
+    tables = ["complextypestbl_parquet_v2_uncompressed",
+              "complextypestbl_parquet_v2_snappy"]
+    for table_name in tables:
+      custom_queries = [
+        "select int_array from %s;" % table_name
+      ]
+      self.run_fuzz_test(vector, "functional_parquet", table_name, unique_database,
+                  table_name, 10, custom_queries)
+
   # TODO: add test coverage for additional data types like char and varchar
 
   def run_fuzz_test(self, vector, src_db, src_table, fuzz_db, fuzz_table, num_copies=1,
@@ -311,6 +333,9 @@ class TestScannersFuzzing(ImpalaTestSuite):
           not suffix.startswith('base_') and
           not suffix.startswith('delta_') and
           not suffix.startswith('delete_delta_')):
+        # Null partitions are stored as __HIVE_DEFAULT_PARTITION__ but expected as null
+        # in ALTER TABLE ADD PARTITION.
+        suffix = suffix.replace("__HIVE_DEFAULT_PARTITION__", "null")
         reversed_partitions.append(suffix)
     return reversed(reversed_partitions)
 

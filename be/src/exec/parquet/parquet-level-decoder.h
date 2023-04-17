@@ -49,11 +49,19 @@ class ParquetLevelDecoder {
     : decoding_error_code_(is_def_level_decoder ? TErrorCode::PARQUET_DEF_LEVEL_ERROR :
                                                   TErrorCode::PARQUET_REP_LEVEL_ERROR) {}
 
-  /// Initialize the LevelDecoder. Reads and advances the provided data buffer if the
-  /// encoding requires reading metadata from the page header. 'cache_size' will be
-  /// rounded up to a multiple of 32 internally.
-  Status Init(const std::string& filename, const parquet::Encoding::type* encoding,
-      MemPool* cache_pool, int cache_size, int max_level, uint8_t** data, int* data_size);
+  /// Initialize the LevelDecoder. Assumes that data is RLE encoded.
+  /// 'cache_size' will be rounded up to a multiple of 32 internally.
+  Status Init(const std::string& filename, MemPool* cache_pool, int cache_size,
+      int max_level, uint8_t* data, int32_t num_bytes);
+
+  /// Parses the number of bytes used for level encoding from the buffer and moves
+  /// 'data' forward.
+  static Status ParseRleByteSize(const string& filename,
+      uint8_t** data, int* total_data_size, int32_t* num_bytes);
+
+  // Validates that encoding is RLE.
+  static Status ValidateEncoding(const string& filename,
+      const parquet::Encoding::type encoding);
 
   /// Returns the next level or INVALID_LEVEL if there was an error. Not as efficient
   /// as batched methods.

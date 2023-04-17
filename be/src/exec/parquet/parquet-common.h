@@ -37,7 +37,8 @@
 namespace impala {
 
 const uint8_t PARQUET_VERSION_NUMBER[4] = {'P', 'A', 'R', '1'};
-const uint32_t PARQUET_CURRENT_VERSION = 1;
+const uint32_t PARQUET_MAX_SUPPORTED_VERSION = 2;
+const uint32_t PARQUET_WRITER_VERSION = 1;
 
 /// Struct that specifies an inclusive range of rows.
 struct RowRange {

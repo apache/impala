@@ -33,10 +33,42 @@ const int16_t ParquetLevel::ROW_GROUP_END;
 const int16_t ParquetLevel::INVALID_LEVEL;
 const int16_t ParquetLevel::INVALID_POS;
 
-Status ParquetLevelDecoder::Init(const string& filename, const Encoding::type* encoding,
-    MemPool* cache_pool, int cache_size, int max_level, uint8_t** data, int* data_size) {
-  DCHECK(*data != nullptr);
-  DCHECK_GE(*data_size, 0);
+Status ParquetLevelDecoder::ValidateEncoding(const string& filename,
+    const Encoding::type encoding) {
+  if (Ubsan::EnumToInt(&encoding) > Encoding::MAX_ENUM_VALUE) {
+    stringstream ss;
+    ss << "Unsupported encoding: " << Ubsan::EnumToInt(&encoding);
+    return Status(ss.str());
+  }
+  switch (encoding) {
+    case Encoding::RLE:
+      return Status::OK();
+    case Encoding::BIT_PACKED:
+      return Status(TErrorCode::PARQUET_BIT_PACKED_LEVELS, filename);
+    default: {
+      stringstream ss;
+      ss << "Unsupported encoding: " << encoding;
+      return Status(ss.str());
+    }
+  }
+}
+
+Status ParquetLevelDecoder::ParseRleByteSize(const string& filename,
+    uint8_t** data, int* total_data_size, int32_t* num_bytes) {
+  Status status;
+  if (!ReadWriteUtil::Read(data, total_data_size, num_bytes, &status)) {
+    return status;
+  }
+  if (*num_bytes < 0 || *num_bytes > *total_data_size) {
+    return Status(TErrorCode::PARQUET_CORRUPT_RLE_BYTES, filename, *num_bytes);
+  }
+  return Status::OK();
+}
+
+Status ParquetLevelDecoder::Init(const string& filename, MemPool* cache_pool,
+    int cache_size, int max_level, uint8_t* data, int32_t num_bytes) {
+  DCHECK(data != nullptr);
+  DCHECK_GE(num_bytes, 0);
   DCHECK_GT(cache_size, 0);
   cache_size = BitUtil::RoundUpToPowerOf2(cache_size, 32);
   max_level_ = max_level;
@@ -46,40 +78,9 @@ Status ParquetLevelDecoder::Init(const string& filename, const Encoding::type* e
   // Return because there is no level data to read, e.g., required field.
   if (max_level == 0) return Status::OK();
 
-  int32_t num_bytes = 0;
-  if (Ubsan::EnumToInt(encoding) > Encoding::MAX_ENUM_VALUE) {
-    stringstream ss;
-    ss << "Unsupported encoding: " << Ubsan::EnumToInt(encoding);
-    return Status(ss.str());
-  }
-  switch (*encoding) {
-    case Encoding::RLE: {
-      Status status;
-      if (!ReadWriteUtil::Read(data, data_size, &num_bytes, &status)) {
-        return status;
-      }
-      if (num_bytes < 0 || num_bytes > *data_size) {
-        return Status(TErrorCode::PARQUET_CORRUPT_RLE_BYTES, filename, num_bytes);
-      }
-      int bit_width = BitUtil::Log2Ceiling64(max_level + 1);
-      rle_decoder_.Reset(*data, num_bytes, bit_width);
-      break;
-    }
-    case parquet::Encoding::BIT_PACKED:
-      return Status(TErrorCode::PARQUET_BIT_PACKED_LEVELS, filename);
-    default: {
-      stringstream ss;
-      ss << "Unsupported encoding: " << *encoding;
-      return Status(ss.str());
-    }
-  }
-  if (UNLIKELY(num_bytes < 0 || num_bytes > *data_size)) {
-    return Status(Substitute("Corrupt Parquet file '$0': $1 bytes of encoded levels but "
-                             "only $2 bytes left in page",
-        filename, num_bytes, *data_size));
-  }
-  *data += num_bytes;
-  *data_size -= num_bytes;
+  int bit_width = BitUtil::Log2Ceiling64(max_level + 1);
+  rle_decoder_.Reset(data, num_bytes, bit_width);
+
   return Status::OK();
 }
 

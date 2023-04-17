@@ -1280,7 +1280,7 @@ void HdfsParquetTableWriter::ConfigureForIceberg(int num_cols) {
 
 Status HdfsParquetTableWriter::Init() {
   // Initialize file metadata
-  file_metadata_.version = PARQUET_CURRENT_VERSION;
+  file_metadata_.version = PARQUET_WRITER_VERSION;
 
   stringstream created_by;
   created_by << "impala version " << GetDaemonBuildVersion()

@@ -29,7 +29,8 @@ class MemPool;
 class ScopedBuffer;
 
 /// A class to read data from Parquet pages. It handles the page headers, decompression
-/// and the possible copying of the data buffers.
+/// and the possible copying of the data buffers. It also hides the differences between
+/// v1 and v2 data pages.
 /// Before reading, InitColumnChunk(), set_io_reservation() and StartScan() must be called
 /// in this order.
 class ParquetColumnChunkReader {
@@ -50,23 +51,29 @@ class ParquetColumnChunkReader {
     VAR_LEN_STR
   };
 
+  // Class to hide differences between v1 and v2 data pages.
+  struct DataPageInfo {
+    parquet::Encoding::type rep_level_encoding;
+    parquet::Encoding::type def_level_encoding;
+    parquet::Encoding::type data_encoding;
+    uint8_t* rep_level_ptr = nullptr;
+    uint8_t* def_level_ptr = nullptr;
+    uint8_t* data_ptr  = nullptr;
+    int rep_level_size = -1;
+    int def_level_size = -1;
+    int data_size = -1;
+    bool is_valid = false;
+  };
+
   const char* filename() const { return parent_->filename(); }
 
-  const parquet::PageHeader& CurrentPageHeader() const {
-    return page_reader_.CurrentPageHeader();
-  }
-
   io::ScanRange* scan_range() const { return page_reader_.scan_range(); }
-  parquet::PageType::type page_type() const { return CurrentPageHeader().type; }
   ScannerContext::Stream* stream() const { return page_reader_.stream(); }
-
-  parquet::Encoding::type encoding() const {
-    return CurrentPageHeader().data_page_header.encoding;
-  }
 
   /// Moved to implementation to be able to forward declare class in scoped_ptr.
   ParquetColumnChunkReader(HdfsParquetScanner* parent, std::string schema_name,
-      int slot_id, ValueMemoryType value_mem_type);
+      int slot_id, ValueMemoryType value_mem_type,
+      bool has_rep_level, bool has_def_level);
   ~ParquetColumnChunkReader();
 
   /// Resets the reader for each row group in the file and creates the scan
@@ -113,16 +120,16 @@ class ParquetColumnChunkReader {
       ScopedBuffer* uncompressed_buffer, uint8_t** dict_values,
       int64_t* data_size, int* num_entries);
 
-  /// Reads the next data page to '*data' and '*data_size', if 'read_data' is true.
-  /// Else reads page header only, following which client should either call
-  /// 'ReadDataPageData' or 'SkipPageData'.
-  /// Skips other types of pages (except for dictionary) until it finds a data page. If it
-  /// finds a dictionary page, returns an error as the dictionary page should be the first
-  /// page and this method should only be called if a data page is expected.
-  /// If the stream reaches the end before reading a complete page header, '*eos' is set
-  /// to true.
-  Status ReadNextDataPage(
-      bool* eos, uint8_t** data, int* data_size, bool read_data = true);
+  /// Reads the next non-empty data page's page header, following which the client
+  /// should either call 'ReadDataPageData' or 'SkipPageData'.
+  /// Skips other types of pages (except for dictionary) and empty data pages until it
+  /// finds a non-empty data page. If it finds a dictionary page, returns an error as
+  /// the dictionary page should be the first page and this method should only be called
+  /// if a data page is expected.
+  /// `num_values` is set to the number of values in the page (including nulls).
+  /// If the stream reaches the end before reading a complete page header for a non-empty
+  /// data page `num_values` is set to 0 to indicate EOS.
+  Status ReadNextDataPageHeader(int* num_values);
 
   /// If the column type is a variable length string, transfers the remaining resources
   /// backing tuples to 'mem_pool' and frees up other resources. Otherwise frees all
@@ -132,12 +139,11 @@ class ParquetColumnChunkReader {
   /// Skips the data part of the page. The header must be already read.
   Status SkipPageData();
 
-  /// Reads the data part of the next data page. Sets '*data' to point to the buffer and
-  /// '*data_size' to its size.
+  /// Reads the data part of the next data page and fills the members of `page_info`.
   /// If the column type is a variable length string, the buffer is allocated from
   /// data_page_pool_. Otherwise the returned buffer will be valid only until the next
   /// function call that advances the buffer.
-  Status ReadDataPageData(uint8_t** data, int* data_size);
+  Status ReadDataPageData(DataPageInfo* page_info);
 
  private:
   HdfsParquetScanner* parent_;
@@ -160,6 +166,11 @@ class ParquetColumnChunkReader {
 
   boost::scoped_ptr<Codec> decompressor_;
 
+  ValueMemoryType value_mem_type_;
+
+  const bool has_rep_level_;
+  const bool has_def_level_;
+
   /// See TryReadDictionaryPage() for information about the parameters.
   Status ReadDictionaryData(ScopedBuffer* uncompressed_buffer, uint8_t** dict_values,
       int64_t* data_size, int* num_entries);
@@ -170,7 +181,17 @@ class ParquetColumnChunkReader {
   Status AllocateUncompressedDataPage(
       int64_t size, const char* err_ctx, uint8_t** buffer);
 
-  ValueMemoryType value_mem_type_;
+  const parquet::PageHeader& CurrentPageHeader() const {
+    return page_reader_.CurrentPageHeader();
+  }
+
+  // Fills rep/def level related members in page_info by parsing the start of the buffer.
+  Status ProcessRepDefLevelsInDataPageV1(const parquet::DataPageHeader* header_v1,
+      DataPageInfo* page_info, uint8_t** data, int* data_size);
+
+  // Fills rep/def level related members in page_info based on the header.
+  Status ProcessRepDefLevelsInDataPageV2(const parquet::DataPageHeaderV2* header_v2,
+      DataPageInfo* page_info, uint8_t* data, int max_size);
 };
 
 } // namespace impala

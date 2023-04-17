@@ -253,7 +253,7 @@ const std::vector<ParquetSchemaResolver::ArrayEncoding>
 
 Status ParquetMetadataUtils::ValidateFileVersion(
     const parquet::FileMetaData& file_metadata, const char* filename) {
-  if (file_metadata.version > PARQUET_CURRENT_VERSION) {
+  if (file_metadata.version > PARQUET_MAX_SUPPORTED_VERSION) {
     stringstream ss;
     ss << "File: " << filename << " is of an unsupported version. "
        << "file version: " << file_metadata.version;

@@ -372,3 +372,8 @@ table_name:insert_only_major_and_minor_compacted, constraint:restrict_to, table_
 
 # The table is used in large scale metadata test. File format doesn't matter so restrict to text only
 table_name:widetable_2000_cols_partitioned, constraint:restrict_to, table_format:text/none/none
+
+table_name:alltypesagg_parquet_v2_uncompressed, constraint:restrict_to, table_format:parquet/none/none
+table_name:alltypesagg_parquet_v2_snappy, constraint:restrict_to, table_format:parquet/none/none
+table_name:complextypestbl_parquet_v2_uncompressed, constraint:restrict_to, table_format:parquet/none/none
+table_name:complextypestbl_parquet_v2_snappy, constraint:restrict_to, table_format:parquet/none/none

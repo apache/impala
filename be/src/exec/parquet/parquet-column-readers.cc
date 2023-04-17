@@ -184,7 +184,7 @@ class ScalarColumnReader : public BaseScalarColumnReader {
     dict_decoder_init_ = false;
   }
 
-  virtual Status InitDataPage(uint8_t* data, int size) override;
+  virtual Status InitDataDecoder(uint8_t* data, int size) override;
 
   virtual bool SkipEncodedValuesInPage(int64_t num_values) override;
 
@@ -344,16 +344,21 @@ inline bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>
 
 // TODO: consider performing filter selectivity checks in this function.
 template <typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
-Status ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::InitDataPage(
+Status ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::InitDataDecoder(
     uint8_t* data, int size) {
   // Data can be empty if the column contains all NULLs
   DCHECK_GE(size, 0);
   DCHECK(slot_desc_ == nullptr || slot_desc_->type().type != TYPE_BOOLEAN)
       << "Bool has specialized impl";
-  page_encoding_ = col_chunk_reader_.encoding();
   if (!IsDictionaryEncoding(page_encoding_)
       && page_encoding_ != parquet::Encoding::PLAIN) {
     return GetUnsupportedDecodingError();
+  }
+
+  // PLAIN_DICTIONARY is deprecated in Parquet V2. It means the same as RLE_DICTIONARY
+  // so internally PLAIN_DICTIONARY can be used to represent both encodings.
+  if (page_encoding_ == parquet::Encoding::RLE_DICTIONARY) {
+    page_encoding_ = parquet::Encoding::PLAIN_DICTIONARY;
   }
 
   // If slot_desc_ is NULL, we don't need to decode any values so dict_decoder_ does
@@ -379,11 +384,10 @@ Status ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::InitDataPag
 }
 
 template <>
-Status ScalarColumnReader<bool, parquet::Type::BOOLEAN, true>::InitDataPage(
+Status ScalarColumnReader<bool, parquet::Type::BOOLEAN, true>::InitDataDecoder(
     uint8_t* data, int size) {
   // Data can be empty if the column contains all NULLs
   DCHECK_GE(size, 0);
-  page_encoding_ = col_chunk_reader_.encoding();
 
   /// Boolean decoding is delegated to 'bool_decoder_'.
   if (bool_decoder_->SetData(page_encoding_, data, size)) return Status::OK();
@@ -1156,34 +1160,20 @@ Status BaseScalarColumnReader::ReadDataPage() {
     return Status::OK();
   }
 
-  bool eos;
-  int data_size;
-  RETURN_IF_ERROR(col_chunk_reader_.ReadNextDataPage(&eos, &data_, &data_size));
-  if (eos) return HandleTooEarlyEos();
-  data_end_ = data_ + data_size;
-  const parquet::PageHeader& current_page_header = col_chunk_reader_.CurrentPageHeader();
-  int num_values = current_page_header.data_page_header.num_values;
-  if (num_values < 0) {
-    return Status(Substitute("Error reading data page in Parquet file '$0'. "
-          "Invalid number of values in metadata: $1", filename(), num_values));
-  }
-  num_buffered_values_ = num_values;
+  // Read the next header, return if not found.
+  RETURN_IF_ERROR(col_chunk_reader_.ReadNextDataPageHeader(&num_buffered_values_));
+  if (num_buffered_values_ == 0) return HandleTooEarlyEos();
+  DCHECK_GT(num_buffered_values_, 0);
+
+  // Read the data in the data page.
+  ParquetColumnChunkReader::DataPageInfo page;
+  RETURN_IF_ERROR(col_chunk_reader_.ReadDataPageData(&page));
+  DCHECK(page.is_valid);
+
   num_values_read_ += num_buffered_values_;
 
-  /// TODO: Move the level decoder initialisation to ParquetPageReader to abstract away
-  /// the differences between Parquet header V1 and V2.
-  // Initialize the repetition level data
-  RETURN_IF_ERROR(rep_levels_.Init(filename(),
-        &current_page_header.data_page_header.repetition_level_encoding,
-        parent_->perm_pool_.get(), parent_->state_->batch_size(), max_rep_level(), &data_,
-        &data_size));
-  // Initialize the definition level data
-  RETURN_IF_ERROR(def_levels_.Init(filename(),
-        &current_page_header.data_page_header.definition_level_encoding,
-        parent_->perm_pool_.get(), parent_->state_->batch_size(), max_def_level(), &data_,
-        &data_size));
-  // Data can be empty if the column contains all NULLs
-  RETURN_IF_ERROR(InitDataPage(data_, data_size));
+  RETURN_IF_ERROR(InitDataPageDecoders(page));
+
   // Skip rows if needed.
   RETURN_IF_ERROR(StartPageFiltering());
 
@@ -1208,45 +1198,46 @@ Status BaseScalarColumnReader::ReadNextDataPageHeader() {
     return Status::OK();
   }
 
-  bool eos;
-  int data_size;
-  RETURN_IF_ERROR(col_chunk_reader_.ReadNextDataPage(&eos, &data_, &data_size,
-      false /*Read next data page's header only*/));
-  if (eos) return HandleTooEarlyEos();
-  const parquet::PageHeader& current_page_header = col_chunk_reader_.CurrentPageHeader();
-  int num_values = current_page_header.data_page_header.num_values;
-  if (UNLIKELY(num_values < 0)) {
-    return Status(Substitute("Error reading data page in Parquet file '$0'. "
-                             "Invalid number of values in metadata: $1",
-        filename(), num_values));
-  }
-  num_buffered_values_ = num_values;
+  RETURN_IF_ERROR(col_chunk_reader_.ReadNextDataPageHeader(&num_buffered_values_));
+  if (num_buffered_values_ == 0) return HandleTooEarlyEos();
+  DCHECK_GT(num_buffered_values_, 0);
+
   num_values_read_ += num_buffered_values_;
   if (parent_->candidate_ranges_.empty()) COUNTER_ADD(parent_->num_pages_counter_, 1);
   return Status::OK();
 }
 
 Status BaseScalarColumnReader::ReadCurrentDataPage() {
-  int data_size;
-  RETURN_IF_ERROR(col_chunk_reader_.ReadDataPageData(&data_, &data_size));
-  data_end_ = data_ + data_size;
-  const parquet::PageHeader& current_page_header = col_chunk_reader_.CurrentPageHeader();
-  /// TODO: Move the level decoder initialisation to ParquetPageReader to abstract away
-  /// the differences between Parquet header V1 and V2.
-  // Initialize the repetition level data
-  RETURN_IF_ERROR(rep_levels_.Init(filename(),
-      &current_page_header.data_page_header.repetition_level_encoding,
-      parent_->perm_pool_.get(), parent_->state_->batch_size(), max_rep_level(), &data_,
-      &data_size));
-  // Initialize the definition level data
-  RETURN_IF_ERROR(def_levels_.Init(filename(),
-      &current_page_header.data_page_header.definition_level_encoding,
-      parent_->perm_pool_.get(), parent_->state_->batch_size(), max_def_level(), &data_,
-      &data_size));
-  // Data can be empty if the column contains all NULLs
-  RETURN_IF_ERROR(InitDataPage(data_, data_size));
+  ParquetColumnChunkReader::DataPageInfo page;
+  RETURN_IF_ERROR(col_chunk_reader_.ReadDataPageData(&page));
+  DCHECK(page.is_valid);
+
+  RETURN_IF_ERROR(InitDataPageDecoders(page));
+
   // Skip rows if needed.
   RETURN_IF_ERROR(StartPageFiltering());
+  return Status::OK();
+}
+
+Status BaseScalarColumnReader::InitDataPageDecoders(
+    const ParquetColumnChunkReader::DataPageInfo& page) {
+  // Initialize the repetition level data
+  DCHECK(page.rep_level_encoding == Encoding::RLE || page.rep_level_size == 0 );
+  RETURN_IF_ERROR(rep_levels_.Init(filename(),
+      parent_->perm_pool_.get(), parent_->state_->batch_size(), max_rep_level(),
+      page.rep_level_ptr, page.rep_level_size));
+
+  // Initialize the definition level data
+  DCHECK(page.def_level_encoding == Encoding::RLE || page.def_level_size == 0 );
+  RETURN_IF_ERROR(def_levels_.Init(filename(),
+      parent_->perm_pool_.get(), parent_->state_->batch_size(), max_def_level(),
+      page.def_level_ptr, page.def_level_size));
+
+  page_encoding_ = page.data_encoding;
+  data_ = page.data_ptr;
+  data_end_ = data_ + page.data_size;
+  // Data can be empty if the column contains all NULLs
+  RETURN_IF_ERROR(InitDataDecoder(page.data_ptr, page.data_size));
   return Status::OK();
 }
 
@@ -1661,24 +1652,18 @@ bool BaseScalarColumnReader::SkipRowsInternal(int64_t num_rows, int64_t skip_row
       if (!AdvanceNextPageHeader()) {
         return false;
       }
-      const parquet::PageHeader& current_page_header =
-          col_chunk_reader_.CurrentPageHeader();
-      int32_t current_page_values = current_page_header.data_page_header.num_values;
-      if (UNLIKELY(current_page_values <= 0)) {
-        return false;
-      }
+      DCHECK_GT(num_buffered_values_, 0);
       // Keep advancing to next page header if rows to be skipped are more than number
       // of values in the page. Note we will just be reading headers and skipping
       // pages without decompressing them as we advance.
-      while (num_rows > current_page_values) {
+      while (num_rows > num_buffered_values_) {
         COUNTER_ADD(parent_->num_pages_skipped_by_late_materialization_counter_, 1);
-        num_rows -= current_page_values;
-        current_row_ += current_page_values;
+        num_rows -= num_buffered_values_;
+        current_row_ += num_buffered_values_;
         if (!col_chunk_reader_.SkipPageData().ok() || !AdvanceNextPageHeader()) {
           return false;
         }
-        current_page_values =
-            col_chunk_reader_.CurrentPageHeader().data_page_header.num_values;
+        DCHECK_GT(num_buffered_values_, 0);
       }
       // Read the data page (includes decompressing them if required).
       Status page_read = ReadCurrentDataPage();

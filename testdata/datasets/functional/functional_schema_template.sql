@@ -4068,3 +4068,89 @@ INSERT INTO TABLE {db_name}{db_suffix}.{table_name} VALUES (6);
 transactional=true
 transactional_properties=insert_only
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+alltypesagg_parquet_v2_uncompressed
+---- PARTITION_COLUMNS
+year int
+month int
+day int
+---- COLUMNS
+id int
+bool_col boolean
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+date_string_col string
+string_col string
+timestamp_col timestamp
+---- DEPENDENT_LOAD_HIVE
+INSERT OVERWRITE {db_name}{db_suffix}.{table_name} select * from functional.alltypesagg;
+---- TABLE_PROPERTIES
+parquet.writer.version=v2
+parquet.compression=UNCOMPRESSED
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+alltypesagg_parquet_v2_snappy
+---- PARTITION_COLUMNS
+year int
+month int
+day int
+---- COLUMNS
+id int
+bool_col boolean
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+date_string_col string
+string_col string
+timestamp_col timestamp
+---- DEPENDENT_LOAD_HIVE
+INSERT OVERWRITE {db_name}{db_suffix}.{table_name} select * from functional.alltypesagg;
+---- TABLE_PROPERTIES
+parquet.writer.version=v2
+parquet.compression=SNAPPY
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+complextypestbl_parquet_v2_uncompressed
+---- COLUMNS
+id bigint
+int_array array<int>
+int_array_array array<array<int>>
+int_map map<string, int>
+int_map_array array<map<string, int>>
+nested_struct struct<a: int, b: array<int>, c: struct<d: array<array<struct<e: int, f: string>>>>, g: map<string, struct<h: struct<i: array<double>>>>>
+---- DEPENDENT_LOAD_HIVE
+INSERT OVERWRITE {db_name}{db_suffix}.{table_name} select * from functional_parquet.complextypestbl;
+---- TABLE_PROPERTIES
+parquet.writer.version=v2
+parquet.compression=UNCOMPRESSED
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+complextypestbl_parquet_v2_snappy
+---- COLUMNS
+id bigint
+int_array array<int>
+int_array_array array<array<int>>
+int_map map<string, int>
+int_map_array array<map<string, int>>
+nested_struct struct<a: int, b: array<int>, c: struct<d: array<array<struct<e: int, f: string>>>>, g: map<string, struct<h: struct<i: array<double>>>>>
+---- DEPENDENT_LOAD_HIVE
+INSERT OVERWRITE {db_name}{db_suffix}.{table_name} select * from functional_parquet.complextypestbl;
+---- TABLE_PROPERTIES
+parquet.writer.version=v2
+parquet.compression=SNAPPY
+====

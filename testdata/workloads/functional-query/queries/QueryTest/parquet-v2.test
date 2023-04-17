@@ -1,0 +1,97 @@
+====
+---- QUERY
+# Check if count(*) optimization works correctly.
+select count(*) from alltypesagg_parquet_v2_uncompressed
+---- RESULTS
+11000
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from alltypesagg_parquet_v2_snappy
+---- RESULTS
+11000
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Check that definition levels are decoded correctly.
+select count(double_col) from alltypesagg_parquet_v2_uncompressed
+---- RESULTS
+10980
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(double_col) from alltypesagg_parquet_v2_snappy
+---- RESULTS
+10980
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Check that values are decoded correctly.
+select distinct double_col from alltypesagg_parquet_v2_uncompressed
+  order by double_col limit 5
+---- RESULTS
+10.1
+20.2
+30.3
+40.4
+50.5
+---- TYPES
+double
+====
+---- QUERY
+select distinct double_col from alltypesagg_parquet_v2_snappy
+  order by double_col limit 5
+---- RESULTS
+10.1
+20.2
+30.3
+40.4
+50.5
+---- TYPES
+double
+====
+---- QUERY
+# Check that repetition levels are decoded correctly.
+select int_array from complextypestbl_parquet_v2_uncompressed
+---- RESULTS
+'[1,2,3]'
+'[null,1,2,null,3,null]'
+'[]'
+'NULL'
+'NULL'
+'NULL'
+'NULL'
+'[-1]'
+---- TYPES
+string
+====
+---- QUERY
+select int_array from complextypestbl_parquet_v2_snappy
+---- RESULTS
+'[1,2,3]'
+'[null,1,2,null,3,null]'
+'[]'
+'NULL'
+'NULL'
+'NULL'
+'NULL'
+'[-1]'
+---- TYPES
+string
+====
+---- QUERY
+# Check that DELTA_BINARY_PACKED encoding returns an error message.
+select count(id) from alltypesagg_parquet_v2_snappy
+---- CATCH
+unsupported encoding: DELTA_BINARY_PACKED for column 'id'
+====
+---- QUERY
+# Check that DELTA_BYTE_ARRAY encoding returns an error message.
+select count(string_col) from alltypesagg_parquet_v2_snappy
+---- CATCH
+unsupported encoding: DELTA_BYTE_ARRAY for column 'string_col'
+====

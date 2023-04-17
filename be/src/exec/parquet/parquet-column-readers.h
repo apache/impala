@@ -301,7 +301,9 @@ class BaseScalarColumnReader : public ParquetColumnReader {
       const SlotDescriptor* slot_desc)
     : ParquetColumnReader(parent, node, slot_desc),
       col_chunk_reader_(parent, node.element->name,
-        slot_desc != nullptr ? slot_desc->id() : -1, PageReaderValueMemoryType()) {
+        slot_desc != nullptr ? slot_desc->id() : -1, PageReaderValueMemoryType(),
+        max_rep_level() > 0,
+        max_def_level() > 0) {
     DCHECK_GE(node_.col_idx, 0) << node_.DebugString();
   }
 
@@ -407,7 +409,11 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   ParquetLevelDecoder rep_levels_{false};
 
   /// Page encoding for values of the current data page. Cached here for perf. Set in
-  /// InitDataPage().
+  /// InitDataPageDecoders().
+  ///
+  /// Parquet V2 deprecated PLAIN_DICTIONARY and RLE_DICTIONARY should be used instead.
+  /// In this member PLAIN_DICTIONARY is used both for pages with PLAIN_DICTIONARY and
+  /// RLE_DICTIONARY as the encodings mean the same.
   parquet::Encoding::type page_encoding_ = parquet::Encoding::PLAIN_DICTIONARY;
 
   /// Num values remaining in the current data page
@@ -519,7 +525,10 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// decompressed data page. Decoders can initialize state from here. The caller must
   /// validate the input such that 'size' is non-negative and that 'data' has at least
   /// 'size' bytes remaining.
-  virtual Status InitDataPage(uint8_t* data, int size) = 0;
+  virtual Status InitDataDecoder(uint8_t* data, int size) = 0;
+
+  /// Initializes decoders for rep/def levels and data.
+  Status InitDataPageDecoders(const ParquetColumnChunkReader::DataPageInfo& page_info);
 
   ParquetColumnChunkReader::ValueMemoryType PageReaderValueMemoryType() {
     if (slot_desc_ == nullptr) {
