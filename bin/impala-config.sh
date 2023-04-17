@@ -81,7 +81,7 @@ export USE_APACHE_HIVE=${USE_APACHE_HIVE-false}
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=258-821f1d91bd
+export IMPALA_TOOLCHAIN_BUILD_ID=268-f2a9999487
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p5
@@ -147,8 +147,6 @@ export IMPALA_ZSTD_VERSION=1.5.2
 unset IMPALA_ZSTD_URL
 export IMPALA_OPENLDAP_VERSION=2.4.47
 unset IMPALA_OPENLDAP_URL
-export IMPALA_OPENSSL_VERSION=1.0.2l
-unset IMPALA_OPENSSL_URL
 export IMPALA_ORC_VERSION=1.7.0-p14
 unset IMPALA_ORC_URL
 export IMPALA_PROTOBUF_VERSION=3.14.0
@@ -173,7 +171,7 @@ export IMPALA_TPC_DS_VERSION=2.1.0-p1
 unset IMPALA_TPC_DS_URL
 export IMPALA_TPC_H_VERSION=2.17.0
 unset IMPALA_TPC_H_URL
-export IMPALA_ZLIB_VERSION=1.2.12
+export IMPALA_ZLIB_VERSION=1.2.13
 unset IMPALA_ZLIB_URL
 export IMPALA_CALLONCEHACK_VERSION=1.0.0
 unset IMPALA_CALLONCEHACK_URL
@@ -206,8 +204,6 @@ if [[ $OSTYPE == "darwin"* ]]; then
   unset IMPALA_CYRUS_SASL_URL
   IMPALA_GPERFTOOLS_VERSION=2.3
   unset IMPALA_GPERFTOOLS_URL
-  IMPALA_OPENSSL_VERSION=1.0.1p
-  unset IMPALA_OPENSSL_URL
 fi
 
 : ${IMPALA_TOOLCHAIN_HOST:=native-toolchain.s3.amazonaws.com}
