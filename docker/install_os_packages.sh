@@ -24,12 +24,12 @@
 set -euo pipefail
 
 INSTALL_DEBUG_TOOLS=false
-USE_JAVA11=false
+JAVA_VERSION=8
 
 function print_usage {
     echo "install_os_packages.sh - Helper script to install OS dependencies"
     echo "[--install-debug-tools] : Also install debug tools like curl, iproute, etc"
-    echo "[--use-java11] : Use Java 11 rather than the default Java 8."
+    echo "[--java <version>] : Use specified Java version rather than the default Java 8."
 }
 
 while [ -n "$*" ]
@@ -38,8 +38,9 @@ do
     --install-debug-tools)
       INSTALL_DEBUG_TOOLS=true
       ;;
-    --use-java11)
-      USE_JAVA11=true
+    --java)
+      JAVA_VERSION="${2-}"
+      shift;
       ;;
     --help|*)
       print_usage
@@ -50,7 +51,7 @@ do
 done
 
 echo "INSTALL_DEBUG_TOOLS=${INSTALL_DEBUG_TOOLS}"
-echo "USE_JAVA11=${USE_JAVA11}"
+echo "JAVA_VERSION=${JAVA_VERSION}"
 
 # This can get more detailed if there are specific steps
 # for specific versions, but at the moment the distribution
@@ -67,7 +68,7 @@ else
 
     # Ubuntu 16.04 does not have Java 11 in its package repository,
     # so exit with an error.
-    if [[ $DISTRIB_RELEASE == 16.04 ]] && $USE_JAVA11 ; then
+    if [[ $DISTRIB_RELEASE == 16.04 ]] && [[ $JAVA_VERSION == 11 ]] ; then
       echo "ERROR: Java 11 is not supported on Ubuntu 16.04"
       exit 1
     fi
@@ -85,11 +86,6 @@ fi
 if [[ $DISTRIBUTION == Ubuntu ]]; then
   export DEBIAN_FRONTEND=noninteractive
   apt-get update
-  if $USE_JAVA11 ; then
-    apt-get install -y openjdk-11-jre-headless
-  else
-    apt-get install -y openjdk-8-jre-headless
-  fi
   apt-get install -y \
       hostname \
       krb5-user \
@@ -97,6 +93,7 @@ if [[ $DISTRIBUTION == Ubuntu ]]; then
       libsasl2-2 \
       libsasl2-modules \
       libsasl2-modules-gssapi-mit \
+      openjdk-${JAVA_VERSION}-jre-headless \
       tzdata
   if $INSTALL_DEBUG_TOOLS ; then
     echo "Installing extra debug tools"
@@ -111,17 +108,14 @@ if [[ $DISTRIBUTION == Ubuntu ]]; then
         vim
   fi
 elif [[ $DISTRIBUTION == Redhat ]]; then
-  if $USE_JAVA11 ; then
-    yum install -y --disableplugin=subscription-manager \
-        java-11-openjdk-headless
-  else
-    yum install -y --disableplugin=subscription-manager \
-        java-1.8.0-openjdk-headless
+  if [[ $JAVA_VERSION == 8 ]]; then
+    JAVA_VERSION=1.8.0
   fi
   yum install -y --disableplugin=subscription-manager \
       cyrus-sasl-gssapi \
       cyrus-sasl-plain \
       hostname \
+      java-${JAVA_VERSION}-openjdk-headless \
       krb5-workstation \
       openldap-devel \
       procps-ng \

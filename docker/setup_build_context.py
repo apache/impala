@@ -33,17 +33,12 @@ parser.add_argument("--debug-build", help="Setup build context for debug build",
 parser.add_argument("--utility-context",
                     help="Setup utility build context instead of daemon",
                     action="store_true")
+parser.add_argument("--output-dir", help="Directory to use for output")
 args = parser.parse_args()
 
 IMPALA_HOME = os.environ["IMPALA_HOME"]
-if args.debug_build:
-  BUILD_TYPE = "debug"
-else:
-  BUILD_TYPE = "release"
-if args.utility_context:
-  OUTPUT_DIR = os.path.join(IMPALA_HOME, "docker/build_context_utility", BUILD_TYPE)
-else:
-  OUTPUT_DIR = os.path.join(IMPALA_HOME, "docker/build_context", BUILD_TYPE)
+BUILD_TYPE = "debug" if args.debug_build else "release"
+OUTPUT_DIR = args.output_dir
 
 IMPALA_TOOLCHAIN_PACKAGES_HOME = os.environ["IMPALA_TOOLCHAIN_PACKAGES_HOME"]
 IMPALA_GCC_VERSION = os.environ["IMPALA_GCC_VERSION"]

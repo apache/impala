@@ -70,27 +70,18 @@ MESSAGE(STATUS "Picked docker base image based on host OS: ${DISTRO_BASE_IMAGE}"
 if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
   # Add a target to build a base docker image for 'build_type'. 'build_context_args' are
   # passed to the setup_build_context.py script.
-  function(add_base_image build_type build_context_args)
+  function(add_base_image build_type build_context_args install_os_packages_args)
     # Build context depends on daemons and frontend jars.
     # Sending the whole impala workspace including test binaries, testdata, etc
     # to the docker daemon can be very expensive, so we create a build context
     # with symlinks
     add_custom_target(impala_base_build_context_${build_type}
       COMMAND ${CMAKE_SOURCE_DIR}/docker/setup_build_context.py ${build_context_args}
+              --output-dir ${IMPALA_BASE_BUILD_CONTEXT_DIR}/${build_type}
       DEPENDS daemons java ${CMAKE_SOURCE_DIR}/docker/setup_build_context.py
       COMMENT "Creating impala base build context build_type=${build_type}."
       VERBATIM
     )
-    # The base image Dockerfile takes an argument INSTALL_OS_PACKAGES_ARGS to specify
-    # arguments for install_os_packages.sh. This can can be set to "--install-debug-tools"
-    # to add extra utilities. Enable this for debug builds.
-    set(INSTALL_OS_PACKAGES_ARGS "")
-    if (${build_type} STREQUAL "debug")
-      set(INSTALL_OS_PACKAGES_ARGS "--install-debug-tools")
-    endif()
-    if ($ENV{IMPALA_DOCKER_USE_JAVA11} STREQUAL "true")
-      set(INSTALL_OS_PACKAGES_ARGS "${INSTALL_OS_PACKAGES_ARGS} --use-java11")
-    endif()
     # Target for the base Impala image.
     add_custom_target(impala_base_image_${build_type}
       # Run docker build inside the build context directory so that all dependencies are
@@ -99,7 +90,7 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
       COMMAND tar cvh . -C ${CMAKE_SOURCE_DIR}/docker/impala_base/ . |
               ${DOCKER_BUILD} -t impala_base_${build_type}
                 --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE}
-                --build-arg INSTALL_OS_PACKAGES_ARGS=${INSTALL_OS_PACKAGES_ARGS} -
+                --build-arg INSTALL_OS_PACKAGES_ARGS=${install_os_packages_args} -
       WORKING_DIRECTORY ${IMPALA_BASE_BUILD_CONTEXT_DIR}/${build_type}
       DEPENDS impala_base_build_context_${build_type} ${CMAKE_SOURCE_DIR}/docker/impala_base/Dockerfile
       DEPENDS ${CMAKE_SOURCE_DIR}/docker/daemon_entrypoint.sh
@@ -109,13 +100,18 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
       VERBATIM
     )
   endfunction()
-  add_base_image(release "")
-  add_base_image(debug "--debug-build")
+  add_base_image(release "" "")
+  add_base_image(release_java11 "" "--java 11")
+  # Debug images include debug tools
+  add_base_image(debug "--debug-build" "--install-debug-tools")
+  add_base_image(debug_java11 "--debug-build" "--install-debug-tools --java 11")
 
   # Target to build all docker images. Dependencies are added for each docker image
   # instantiated below.
   add_custom_target(docker_images)
+  add_custom_target(docker_java11_images)
   add_custom_target(docker_debug_images)
+  add_custom_target(docker_debug_java11_images)
   add_custom_target(quickstart_docker_images)
 
   set(exported_image_names "")
@@ -146,13 +142,20 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
   function(add_daemon_docker_images daemon_name)
     set(release_image ${daemon_name})
     set(release_target ${daemon_name}_image)
+    set(release_java11_image ${daemon_name}_java11)
+    set(release_java11_target ${daemon_name}_java11_image)
     set(debug_image ${daemon_name}_debug)
     set(debug_target ${daemon_name}_debug_image)
+    set(debug_java11_image ${daemon_name}_debug_java11)
+    set(debug_java11_target ${daemon_name}_debug_java11_image)
     add_daemon_docker_image(${release_target} ${daemon_name} ${release_image} release)
+    add_daemon_docker_image(${release_java11_target} ${daemon_name} ${release_java11_image} release_java11)
     add_daemon_docker_image(${debug_target} ${daemon_name} ${debug_image} debug)
+    add_daemon_docker_image(${debug_java11_target} ${daemon_name} ${debug_java11_image} debug_java11)
     ADD_DEPENDENCIES(docker_images ${release_target})
+    ADD_DEPENDENCIES(docker_java11_images ${release_java11_target})
     ADD_DEPENDENCIES(docker_debug_images ${debug_target})
-    set(exported_image_names "${exported_image_names} ${release_image}" PARENT_SCOPE)
+    ADD_DEPENDENCIES(docker_debug_java11_images ${debug_java11_target})
   endfunction()
 
   # Stamp out image targets for all of the Impala daemons.
@@ -211,7 +214,8 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
     # to the docker daemon can be very expensive, so we create a build context
     # with symlinks
     add_custom_target(impala_utility_build_context_${build_type}
-      COMMAND ${CMAKE_SOURCE_DIR}/docker/setup_build_context.py ${build_context_args} --utility-context
+      COMMAND ${CMAKE_SOURCE_DIR}/docker/setup_build_context.py ${build_context_args}
+              --utility-context --output-dir ${IMPALA_UTILITY_BUILD_CONTEXT_DIR}/${build_type}
       DEPENDS impala-profile-tool ${CMAKE_SOURCE_DIR}/docker/setup_build_context.py
       COMMENT "Creating impala utility build context build_type=${build_type}."
       VERBATIM

@@ -80,7 +80,11 @@ start-impala-cluster.py --kill
 # Build the docker images required to start the cluster.
 # parquet-reader and impala-profile-tool are needed for e2e tests but not built for
 # non-test build.
-make -j ${IMPALA_BUILD_THREADS} docker_debug_images parquet-reader impala-profile-tool
+IMAGE_TYPE=docker_debug
+if ${IMPALA_DOCKER_USE_JAVA11-false}; then
+  IMAGE_TYPE=${IMAGE_TYPE}_java11
+fi
+make -j ${IMPALA_BUILD_THREADS} ${IMAGE_TYPE}_images parquet-reader impala-profile-tool
 
 source_impala_config
 

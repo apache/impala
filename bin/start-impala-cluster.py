@@ -687,6 +687,8 @@ class DockerMiniClusterOperations(object):
       image_tag = daemon + "_debug"
     else:
       image_tag = daemon
+    if os.getenv('IMPALA_DOCKER_USE_JAVA11', '') == "true":
+      image_tag += "_java11"
     host_name = self.__gen_host_name__(daemon, instance)
     container_name = self.__gen_container_name__(daemon, instance)
     # Mount configuration into container so that we don't need to rebuild container

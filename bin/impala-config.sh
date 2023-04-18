@@ -266,10 +266,9 @@ export IMPALA_OBS_VERSION=3.1.1-hw-42
 export IMPALA_REDHAT7_DOCKER_BASE=${IMPALA_REDHAT7_DOCKER_BASE:-"centos:centos7.9.2009"}
 export IMPALA_REDHAT8_DOCKER_BASE=${IMPALA_REDHAT8_DOCKER_BASE:-"rockylinux:8.5"}
 
-# When set to true, this modifies the Docker image build logic to install Java 11
-# rather than the default of Java 8. This is strictly about what is shipped in the
-# Docker image, and it has no impact on what version of Java is used to compile
-# Impala's Java code.
+# When set to true, this instructs start-impala-cluster.py to start with Java 11 images
+# created via 'make docker_java11_images' (or 'docker_debug_java11_images'). The Java
+# version used in these images is independent of the Java version used to compile Impala.
 export IMPALA_DOCKER_USE_JAVA11=${IMPALA_DOCKER_USE_JAVA11:-"false"}
 
 # There are multiple compatible implementations of zlib. Cloudflare Zlib is an
