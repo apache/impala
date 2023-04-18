@@ -24,6 +24,11 @@ under the License.
 <div class="container">
 
 <style id="css">
+#fragment_diagram, #phases_header, #timeticks_footer {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+      Arial, "Noto Sans", sans-serif;
+  vertical-align: middle;
+}
 </style>
 
 {{> www/query_detail_tabs.tmpl }}
@@ -34,26 +39,56 @@ under the License.
 {{/plan_metadata_unavailable}}
 
 {{^plan_metadata_unavailable}}
-<h3>Timeline</h3>
+  <div style="display:flex; justify-content:space-between;">
+    <h3>Timeline</h3>
+    <label>
+      <h4 style="display:inline;"> Download : </h4>
+      <input type="button" class="btn btn-primary" data-toggle="modal" value="HTML"
+          data-target="#export_modal" role="button"/>
+    </label>
+  </div>
   <label>
-  <input type="checkbox" id="plan_order" onClick="renderTiming()"/>
-  Print tree in plan order (if unchecked, print in fragment order)
+    <input type="checkbox" id="plan_order" onClick="renderTiming()"/>
+    Print tree in plan order (if unchecked, print in fragment order)
   </label>
 
 </div>
 
-<div id="timing_diagram" style="border:1px solid #c3c3c3; overflow:hidden;">
-  <div style="margin-top:5px; border:1px solid #c3c3c3;">
-    <svg id="phases_header" height="15px"></svg>
-  </div>
-  <div style="margin-top:5px; border:1px solid #c3c3c3; overflow-y:auto;">
-    <svg id="fragment_diagram"></svg>
-  </div>
-  <div style="margin-top:5px; border:1px solid #c3c3c3;">
-    <svg id="timeticks_footer" height="15px"></svg>
+<div id="export_modal" style="transition-duration: 0.15s;" class="modal fade"
+    role="dialog" data-keyboard="true" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5> Download Timeline </h5>
+        <input class="btn btn-primary" type="button" value="X" data-dismiss="modal"/>
+      </div>
+      <div class="modal-body">
+        <h6 class="d-inline"> Filename: </h6>
+        <input id="export_filename" class="form-control-sm" type="text"
+          value="{{query_id}}_timeline"/>
+        <select id="export_format" class="form-control-sm btn btn-primary">
+          <option selected>.html</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <a id="export_link" class="btn btn-primary" data-dismiss="modal" href="#"
+            role="button"> Download </a>
+      </div>
+    </div>
   </div>
 </div>
 
+<div id="timing_diagram" style="border:1px solid #c3c3c3;">
+  <div style="margin-top:5px; border:1px solid #c3c3c3; overflow:hidden;">
+    <svg id="phases_header" height="15px"></svg>
+  </div>
+  <div style="margin-top:5px; border:1px solid #c3c3c3; overflow-y:auto; overflow-x:hidden;">
+    <svg id="fragment_diagram"></svg>
+  </div>
+  <div style="margin-top:5px; border:1px solid #c3c3c3; overflow:hidden;">
+    <svg id="timeticks_footer" height="15px"></svg>
+  </div>
+</div>
 
 {{/plan_metadata_unavailable}}
 
@@ -83,7 +118,11 @@ var receiver_nodes = [];
 var profile_available = false;
 var maxts = 0;
 
-function get_svg_rect(fill_color, x, y, width, height, dash, stroke_color){
+var export_filename = document.getElementById("export_filename");
+var export_format = document.getElementById("export_format");
+export_filename.value = export_filename.value.replace(/\W/g,'_');
+
+function get_svg_rect(fill_color, x, y, width, height, dash, stroke_color) {
   var rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
   rect.setAttribute("x", x + "px");
   rect.setAttribute("y", y + "px");
@@ -97,7 +136,7 @@ function get_svg_rect(fill_color, x, y, width, height, dash, stroke_color){
   return rect;
 }
 
-function get_svg_text(text, fill_color, x, y, height, container_center, max_width = 0){
+function get_svg_text(text, fill_color, x, y, height, container_center, max_width = 0) {
   var text_el = document.createElementNS("http://www.w3.org/2000/svg", "text");
   text_el.appendChild(document.createTextNode(text));
   text_el.setAttribute("x", x + "px");
@@ -115,7 +154,7 @@ function get_svg_text(text, fill_color, x, y, height, container_center, max_widt
   return text_el;
 }
 
-function get_svg_line(stroke_color, x1, y1, x2, y2, dash){
+function get_svg_line(stroke_color, x1, y1, x2, y2, dash) {
   var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
   line.setAttribute("x1", x1 + "px");
   line.setAttribute("y1", y1 + "px");
@@ -518,6 +557,34 @@ function refresh() {
   req.open("GET", make_url("/query_timeline?query_id={{query_id}}&json"), true);
   req.send();
 }
+
+// Attaches a SVG blob of the complete timeline to the associated link
+export_link.addEventListener('click', function(event) {
+  if (export_format.value == ".html") {
+    var phases_header = document.getElementById('phases_header');
+    var fragment_diagram = document.getElementById('fragment_diagram');
+    var timeticks_footer = document.getElementById('timeticks_footer');
+    var export_style = document.getElementById("css");
+
+    // Deep clone 'parentNode's as wrappers to SVG components
+    var phases_header_wrapper = phases_header.parentNode.cloneNode(true);
+    var fragment_diagram_wrapper = fragment_diagram.parentNode.cloneNode(true);
+    var timeticks_footer_wrapper = timeticks_footer.parentNode.cloneNode(true);
+
+    // Set dimensions for fragment diagram's wrapper
+    fragment_diagram_wrapper.style.height = fragment_diagram.style.height;
+    fragment_diagram_wrapper.style.width = fragment_diagram.style.width;
+
+    var html_blob = new Blob([`<!DOCTYPE html><body>`,
+        `<h1 style="font-family:monospace;">Query {{query_id}}</h1>`,
+        export_style.outerHTML, phases_header_wrapper.outerHTML,
+        fragment_diagram_wrapper.outerHTML, timeticks_footer_wrapper.outerHTML,
+        `</body></html>`], {type: "text/html;charset=utf-8"});
+    export_link.href = URL.createObjectURL(html_blob);
+  }
+  export_link.download = `${export_filename.value}${export_format.value}`;
+  export_link.click();
+});
 
 window.addEventListener('resize', function(event) {
   if (profile_available) {
