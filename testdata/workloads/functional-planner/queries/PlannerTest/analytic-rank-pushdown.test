@@ -1676,3 +1676,437 @@ PLAN-ROOT SINK
    predicates: int_col = 1
    row-size=23B cardinality=11
 ====
+# Analytic predicate can only be copied to inline view.
+select a.id, rnk from functional.alltypesagg a
+left join (
+    select id, row_number() over (order by string_col desc) as rnk
+    from functional.alltypesagg
+) b on a.id = b.id where rnk < 100
+---- PLAN
+PLAN-ROOT SINK
+|
+05:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = id
+|  other predicates: row_number() < 100
+|  row-size=31B cardinality=11.00K
+|
+|--04:SELECT
+|  |  predicates: row_number() < 100
+|  |  row-size=27B cardinality=99
+|  |
+|  03:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: string_col DESC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=27B cardinality=99
+|  |
+|  02:TOP-N [LIMIT=99]
+|  |  order by: string_col DESC
+|  |  source expr: row_number() < CAST(100 AS BIGINT)
+|  |  row-size=19B cardinality=99
+|  |
+|  01:SCAN HDFS [functional.alltypesagg]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=19B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg a]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=4B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+05:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: a.id = id
+|  other predicates: row_number() < 100
+|  row-size=31B cardinality=11.00K
+|
+|--07:EXCHANGE [BROADCAST]
+|  |
+|  04:SELECT
+|  |  predicates: row_number() < 100
+|  |  row-size=27B cardinality=99
+|  |
+|  03:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: string_col DESC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=27B cardinality=99
+|  |
+|  06:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  order by: string_col DESC
+|  |  limit: 99
+|  |
+|  02:TOP-N [LIMIT=99]
+|  |  order by: string_col DESC
+|  |  source expr: row_number() < CAST(100 AS BIGINT)
+|  |  row-size=19B cardinality=99
+|  |
+|  01:SCAN HDFS [functional.alltypesagg]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=19B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg a]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=4B cardinality=11.00K
+====
+# Analytic predicate can only be copied when outer-joined inline view is with statement.
+with b as (select id, row_number() over (order by string_col desc) as rnk
+    from functional.alltypesagg)
+select a.id, rnk from functional.alltypesagg a
+left join b on a.id = b.id where rnk < 100
+---- PLAN
+PLAN-ROOT SINK
+|
+05:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = id
+|  other predicates: row_number() < 100
+|  row-size=31B cardinality=11.00K
+|
+|--04:SELECT
+|  |  predicates: row_number() < 100
+|  |  row-size=27B cardinality=99
+|  |
+|  03:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: string_col DESC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=27B cardinality=99
+|  |
+|  02:TOP-N [LIMIT=99]
+|  |  order by: string_col DESC
+|  |  source expr: row_number() < CAST(100 AS BIGINT)
+|  |  row-size=19B cardinality=99
+|  |
+|  01:SCAN HDFS [functional.alltypesagg]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=19B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg a]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=4B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+05:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: a.id = id
+|  other predicates: row_number() < 100
+|  row-size=31B cardinality=11.00K
+|
+|--07:EXCHANGE [BROADCAST]
+|  |
+|  04:SELECT
+|  |  predicates: row_number() < 100
+|  |  row-size=27B cardinality=99
+|  |
+|  03:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: string_col DESC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=27B cardinality=99
+|  |
+|  06:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  order by: string_col DESC
+|  |  limit: 99
+|  |
+|  02:TOP-N [LIMIT=99]
+|  |  order by: string_col DESC
+|  |  source expr: row_number() < CAST(100 AS BIGINT)
+|  |  row-size=19B cardinality=99
+|  |
+|  01:SCAN HDFS [functional.alltypesagg]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=19B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg a]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=4B cardinality=11.00K
+====
+# Analytic predicate cannot be pushed down when outer-joined inline view is union statement.
+select * from functional.alltypesagg a
+left join
+(select a.id, row_number() over (order by a.string_col desc) as rnk from functional.alltypesagg a
+union select b.id, row_number() over (order by b.string_col desc) as rnk from functional.alltypesagg b) b
+on a.id = b.id
+where b.rnk < 100
+---- PLAN
+PLAN-ROOT SINK
+|
+09:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = id
+|  other predicates: rnk < 100
+|  row-size=107B cardinality=11.00K
+|
+|--08:AGGREGATE [FINALIZE]
+|  |  group by: id, rnk
+|  |  having: rnk < 100
+|  |  row-size=12B cardinality=2.20K
+|  |
+|  01:UNION
+|  |  row-size=12B cardinality=22.00K
+|  |
+|  |--07:ANALYTIC
+|  |  |  functions: row_number()
+|  |  |  order by: string_col DESC
+|  |  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  |  row-size=27B cardinality=11.00K
+|  |  |
+|  |  06:SORT
+|  |  |  order by: string_col DESC
+|  |  |  row-size=19B cardinality=11.00K
+|  |  |
+|  |  05:SCAN HDFS [functional.alltypesagg b]
+|  |     HDFS partitions=11/11 files=11 size=814.73KB
+|  |     row-size=19B cardinality=11.00K
+|  |
+|  04:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: string_col DESC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=27B cardinality=11.00K
+|  |
+|  03:SORT
+|  |  order by: string_col DESC
+|  |  row-size=19B cardinality=11.00K
+|  |
+|  02:SCAN HDFS [functional.alltypesagg a]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=19B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg a]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=95B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+13:EXCHANGE [UNPARTITIONED]
+|
+09:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: a.id = id
+|  other predicates: rnk < 100
+|  row-size=107B cardinality=11.00K
+|
+|--12:EXCHANGE [BROADCAST]
+|  |
+|  08:AGGREGATE [FINALIZE]
+|  |  group by: id, rnk
+|  |  having: rnk < 100
+|  |  row-size=12B cardinality=2.20K
+|  |
+|  01:UNION
+|  |  row-size=12B cardinality=22.00K
+|  |
+|  |--07:ANALYTIC
+|  |  |  functions: row_number()
+|  |  |  order by: string_col DESC
+|  |  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  |  row-size=27B cardinality=11.00K
+|  |  |
+|  |  11:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  |  order by: string_col DESC
+|  |  |
+|  |  06:SORT
+|  |  |  order by: string_col DESC
+|  |  |  row-size=19B cardinality=11.00K
+|  |  |
+|  |  05:SCAN HDFS [functional.alltypesagg b]
+|  |     HDFS partitions=11/11 files=11 size=814.73KB
+|  |     row-size=19B cardinality=11.00K
+|  |
+|  04:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: string_col DESC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=27B cardinality=11.00K
+|  |
+|  10:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  order by: string_col DESC
+|  |
+|  03:SORT
+|  |  order by: string_col DESC
+|  |  row-size=19B cardinality=11.00K
+|  |
+|  02:SCAN HDFS [functional.alltypesagg a]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=19B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg a]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=95B cardinality=11.00K
+====
+# Analytic predicate can only be copied when inline view contains outer join.
+select * from functional.alltypesagg a
+left join
+(select a.id, row_number() over (order by a.string_col desc) as rnk from functional.alltypesagg a
+left join functional.alltypesagg b on a.id = b.id) b
+on a.id = b.id
+where b.rnk < 100
+---- PLAN
+PLAN-ROOT SINK
+|
+07:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = id
+|  other predicates: row_number() < 100
+|  row-size=126B cardinality=11.00K
+|
+|--06:SELECT
+|  |  predicates: row_number() < 100
+|  |  row-size=31B cardinality=99
+|  |
+|  05:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: string_col DESC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=31B cardinality=99
+|  |
+|  04:TOP-N [LIMIT=99]
+|  |  order by: string_col DESC
+|  |  source expr: row_number() < CAST(100 AS BIGINT)
+|  |  row-size=23B cardinality=99
+|  |
+|  03:HASH JOIN [LEFT OUTER JOIN]
+|  |  hash predicates: a.id = b.id
+|  |  row-size=23B cardinality=11.77K
+|  |
+|  |--02:SCAN HDFS [functional.alltypesagg b]
+|  |     HDFS partitions=11/11 files=11 size=814.73KB
+|  |     row-size=4B cardinality=11.00K
+|  |
+|  01:SCAN HDFS [functional.alltypesagg a]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=19B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg a]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=95B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+12:EXCHANGE [UNPARTITIONED]
+|
+07:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: a.id = id
+|  other predicates: row_number() < 100
+|  row-size=126B cardinality=11.00K
+|
+|--11:EXCHANGE [BROADCAST]
+|  |
+|  06:SELECT
+|  |  predicates: row_number() < 100
+|  |  row-size=31B cardinality=99
+|  |
+|  05:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: string_col DESC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=31B cardinality=99
+|  |
+|  10:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  order by: string_col DESC
+|  |  limit: 99
+|  |
+|  04:TOP-N [LIMIT=99]
+|  |  order by: string_col DESC
+|  |  source expr: row_number() < CAST(100 AS BIGINT)
+|  |  row-size=23B cardinality=99
+|  |
+|  03:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
+|  |  hash predicates: a.id = b.id
+|  |  row-size=23B cardinality=11.77K
+|  |
+|  |--09:EXCHANGE [HASH(b.id)]
+|  |  |
+|  |  02:SCAN HDFS [functional.alltypesagg b]
+|  |     HDFS partitions=11/11 files=11 size=814.73KB
+|  |     row-size=4B cardinality=11.00K
+|  |
+|  08:EXCHANGE [HASH(a.id)]
+|  |
+|  01:SCAN HDFS [functional.alltypesagg a]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=19B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg a]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=95B cardinality=11.00K
+====
+# Analytic predicate can be pushed down when there are more predicates.
+# Only the analytic predicate can be pushed down.
+select * from functional.alltypesagg a
+left join
+(select a.id + 1 as id, row_number() over (order by a.string_col desc) as rnk, length(string_col) AS len
+from functional.alltypesagg a) b
+on a.id = b.id
+where b.rnk < 100 and b.len = 0 and b.id > 0
+---- PLAN
+PLAN-ROOT SINK
+|
+05:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = id + 1
+|  other predicates: row_number() < 100, length(string_col) = 0, id + 1 > 0
+|  row-size=122B cardinality=11.00K
+|
+|--04:SELECT
+|  |  predicates: row_number() < 100
+|  |  row-size=27B cardinality=99
+|  |
+|  03:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: string_col DESC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=27B cardinality=99
+|  |
+|  02:TOP-N [LIMIT=99]
+|  |  order by: string_col DESC
+|  |  source expr: row_number() < CAST(100 AS BIGINT)
+|  |  row-size=19B cardinality=99
+|  |
+|  01:SCAN HDFS [functional.alltypesagg a]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=19B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg a]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=95B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+05:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: a.id = id + 1
+|  other predicates: row_number() < 100, length(string_col) = 0, id + 1 > 0
+|  row-size=122B cardinality=11.00K
+|
+|--07:EXCHANGE [BROADCAST]
+|  |
+|  04:SELECT
+|  |  predicates: row_number() < 100
+|  |  row-size=27B cardinality=99
+|  |
+|  03:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: string_col DESC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=27B cardinality=99
+|  |
+|  06:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  order by: string_col DESC
+|  |  limit: 99
+|  |
+|  02:TOP-N [LIMIT=99]
+|  |  order by: string_col DESC
+|  |  source expr: row_number() < CAST(100 AS BIGINT)
+|  |  row-size=19B cardinality=99
+|  |
+|  01:SCAN HDFS [functional.alltypesagg a]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=19B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg a]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=95B cardinality=11.00K
+====

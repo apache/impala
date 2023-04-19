@@ -1308,9 +1308,8 @@ public class SingleNodePlanner {
    * inline view, add it to 'evalAfterJoinPreds'.
    */
   private void getConjunctsToInlineView(final Analyzer analyzer, final String alias,
-      final List<TupleId> tupleIds, List<Expr> evalInInlineViewPreds,
-      List<Expr> evalAfterJoinPreds) {
-    List<Expr> unassignedConjuncts = analyzer.getUnassignedConjuncts(tupleIds, true);
+      final List<TupleId> tupleIds, final List<Expr> unassignedConjuncts,
+      List<Expr> evalInInlineViewPreds, List<Expr> evalAfterJoinPreds) {
     for (Expr e: unassignedConjuncts) {
       if (!e.isBoundByTupleIds(tupleIds)) continue;
       List<TupleId> tids = new ArrayList<>();
@@ -1391,42 +1390,47 @@ public class SingleNodePlanner {
       List<Expr> analyticPreds = findAnalyticConjunctsToMigrate(analyzer, inlineViewRef,
               unassignedConjuncts);
       if (analyticPreds.size() > 0) {
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("Migrate analytic predicates into view " +
-              Expr.debugString(analyticPreds));
-        }
-        analyzer.markConjunctsAssigned(analyticPreds);
-        unassignedConjuncts.removeAll(analyticPreds);
-        addConjunctsIntoInlineView(analyzer, inlineViewRef, analyticPreds);
+        migrateOrCopyConjunctsToInlineView(analyzer, inlineViewRef, tids,
+            analyticPreds, unassignedConjuncts);
       }
-
-      // mark (fully resolve) slots referenced by unassigned conjuncts as
-      // materialized
-      List<Expr> substUnassigned = Expr.substituteList(unassignedConjuncts,
-          inlineViewRef.getBaseTblSmap(), analyzer, false);
-      analyzer.materializeSlots(substUnassigned);
-      return;
+    } else {
+      migrateOrCopyConjunctsToInlineView(analyzer, inlineViewRef, tids,
+          unassignedConjuncts, unassignedConjuncts);
     }
-
-    List<Expr> preds = new ArrayList<>();
-    List<Expr> evalAfterJoinPreds = new ArrayList<>();
-    getConjunctsToInlineView(analyzer, inlineViewRef.getExplicitAlias(), tids, preds,
-        evalAfterJoinPreds);
-    unassignedConjuncts.removeAll(preds);
-    // Migrate the conjuncts by marking the original ones as assigned. They will either
-    // be ignored if they are identity predicates (e.g. a = a), or be substituted into
-    // new ones (viewPredicates below). The substituted ones will be re-registered.
-    analyzer.markConjunctsAssigned(preds);
-    // Propagate the conjuncts evaluating the nullable side of outer-join.
-    // Don't mark them as assigned so they would be assigned at the JOIN node.
-    preds.addAll(evalAfterJoinPreds);
-    addConjunctsIntoInlineView(analyzer, inlineViewRef, preds);
 
     // mark (fully resolve) slots referenced by remaining unassigned conjuncts as
     // materialized
     List<Expr> substUnassigned = Expr.substituteList(unassignedConjuncts,
         inlineViewRef.getBaseTblSmap(), analyzer, false);
     analyzer.materializeSlots(substUnassigned);
+  }
+
+  /**
+   * Migrate or copy unassigned conjuncts into an inline view. Parameter evalPreds is
+   * analytic predicates when there has specific analytic, equals to unassignedConjuncts
+   * when there has no LIMIT/OFFSET or anylitic functions.
+   */
+  private void migrateOrCopyConjunctsToInlineView(final Analyzer analyzer,
+      final InlineViewRef inlineViewRef, final List<TupleId> tids,
+      List<Expr> evalPreds, List<Expr> unassignedConjuncts)
+      throws ImpalaException {
+    List<Expr> evalInInlineViewPreds = new ArrayList<>();
+    List<Expr> evalAfterJoinPreds = new ArrayList<>();
+    getConjunctsToInlineView(analyzer, inlineViewRef.getExplicitAlias(), tids,
+        evalPreds, evalInInlineViewPreds, evalAfterJoinPreds);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Assign predicates for view: migrating {}, coping {}.",
+          Expr.debugString(evalInInlineViewPreds), Expr.debugString(evalAfterJoinPreds));
+    }
+    unassignedConjuncts.removeAll(evalInInlineViewPreds);
+    // Migrate the conjuncts by marking the original ones as assigned. They will either
+    // be ignored if they are identity predicates (e.g. a = a), or be substituted into
+    // new ones. The substituted ones will be re-registered.
+    analyzer.markConjunctsAssigned(evalInInlineViewPreds);
+    // Propagate the conjuncts evaluating the nullable side of outer-join.
+    // Don't mark them as assigned so they can be assigned at the JOIN node.
+    evalInInlineViewPreds.addAll(evalAfterJoinPreds);
+    addConjunctsIntoInlineView(analyzer, inlineViewRef, evalInInlineViewPreds);
   }
 
   /**

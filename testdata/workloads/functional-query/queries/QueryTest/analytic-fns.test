@@ -2230,3 +2230,87 @@ INT, STRING, BIGINT, BIGINT
 85,'0',86,11
 95,'0',96,12
 ====
+---- QUERY
+# IMPALA-11030: Propagate analytic tuple predicates of outer-joined InlineView
+select a.id, b.prime_rank from alltypessmall a
+left join
+ (select id, row_number() over (partition by string_col order by id) prime_rank
+ from alltypessmall) b on a.id = b.id where a.string_col = '0' and b.prime_rank <= 10
+---- TYPES
+INT, BIGINT
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,1
+10,2
+20,3
+25,4
+35,5
+45,6
+50,7
+60,8
+70,9
+75,10
+====
+---- QUERY
+# IMPALA-11030: Propagate analytic tuple predicates of outer-joined InlineView
+with b as (select id, row_number() over (partition by string_col order by id) prime_rank
+ from alltypessmall)
+select a.id, b.prime_rank from alltypessmall a
+left join b on a.id = b.id where a.string_col = '0' and b.prime_rank <= 10
+---- TYPES
+INT, BIGINT
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,1
+10,2
+20,3
+25,4
+35,5
+45,6
+50,7
+60,8
+70,9
+75,10
+====
+---- QUERY
+# IMPALA-11030: Propagate analytic tuple predicates of outer-joined InlineView
+select a.id, b.prime_rank from alltypessmall a
+left join
+(select id, row_number() over (partition by string_col order by id) prime_rank from alltypessmall a
+union select id, row_number() over (partition by string_col order by id) prime_rank from alltypessmall b) b
+on a.id = b.id
+where a.string_col = '0' and b.prime_rank <= 10
+---- TYPES
+INT, BIGINT
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+75,10
+35,5
+20,3
+0,1
+25,4
+10,2
+45,6
+70,9
+60,8
+50,7
+====
+---- QUERY
+# IMPALA-11030: Propagate analytic tuple predicates of outer-joined InlineView
+select a.id, b.prime_rank from alltypessmall a
+left join
+(select a.id, row_number() over (partition by a.string_col order by a.id) prime_rank from alltypessmall a
+left join alltypessmall b on a.id = b.id) b
+on a.id = b.id
+where a.string_col = '0' and b.prime_rank <= 10
+---- TYPES
+INT, BIGINT
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,1
+10,2
+20,3
+25,4
+35,5
+45,6
+50,7
+60,8
+70,9
+75,10
+====
