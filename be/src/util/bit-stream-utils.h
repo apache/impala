@@ -54,26 +54,26 @@ class BitWriter {
 
   /// Writes a value to buffered_values_, flushing to buffer_ if necessary.  This is bit
   /// packed.  Returns false if there was not enough space. num_bits must be <= 64.
-  bool PutValue(uint64_t v, int num_bits);
+  WARN_UNUSED_RESULT bool PutValue(uint64_t v, int num_bits);
 
   /// Writes v to the next aligned byte using num_bytes. If T is larger than num_bytes, the
   /// extra high-order bytes will be ignored. Returns false if there was not enough space.
   template<typename T>
-  bool PutAligned(T v, int num_bytes);
+  WARN_UNUSED_RESULT bool PutAligned(T v, int num_bytes);
 
   /// Write an unsigned ULEB-128 encoded int to the buffer. Return false if there was not
   /// enough room. The value is written byte aligned. For more details on ULEB-128:
   /// https://en.wikipedia.org/wiki/LEB128
   /// UINT_T must be an unsigned integer type.
   template<typename UINT_T>
-  bool PutUleb128(UINT_T v);
+  WARN_UNUSED_RESULT bool PutUleb128(UINT_T v);
 
   /// Write a ZigZag encoded int to the buffer. Return false if there was not enough
   /// room. The value is written byte aligned. For more details on ZigZag encoding:
   /// https://developers.google.com/protocol-buffers/docs/encoding#signed-integers
   /// INT_T must be a signed integer type.
   template<typename INT_T>
-  bool PutZigZagInteger(INT_T v);
+  WARN_UNUSED_RESULT bool PutZigZagInteger(INT_T v);
 
   /// Get a pointer to the next aligned byte and advance the underlying buffer
   /// by num_bytes.
@@ -147,7 +147,8 @@ class BatchedBitReader {
   /// Skip 'num_values_to_skip' bit-packed values.
   /// 'num_values_to_skip * bit_width' is either divisible by 8, or
   /// 'num_values_to_skip' equals to the count of the remaining bit-packed values.
-  bool SkipBatch(int bit_width, int num_values_to_skip);
+  /// Returns false if there are not enough bytes left.
+  WARN_UNUSED_RESULT bool SkipBatch(int bit_width, int num_values_to_skip);
 
   /// Unpack bit-packed values in the same way as UnpackBatch() and decode them using the
   /// dictionary 'dict' with 'dict_len' entries. Return -1 if a decoding error is
@@ -155,14 +156,14 @@ class BatchedBitReader {
   /// Otherwise returns the number of values decoded. The values are written to 'v' with
   /// a stride of 'stride' bytes.
   template <typename T>
-  int UnpackAndDecodeBatch(
+  WARN_UNUSED_RESULT int UnpackAndDecodeBatch(
       int bit_width, T* dict, int64_t dict_len, int num_values, T* v, int64_t stride);
 
   /// Reads an unpacked 'num_bytes'-sized value from the buffer and stores it in 'v'. T
   /// needs to be a little-endian native type and big enough to store 'num_bytes'.
   /// Returns false if there are not enough bytes left.
   template<typename T>
-  bool GetBytes(int num_bytes, T* v);
+  WARN_UNUSED_RESULT bool GetBytes(int num_bytes, T* v);
 
   /// Read an unsigned ULEB-128 encoded int from the stream. The encoded int must start
   /// at the beginning of a byte. Return false if there were not enough bytes in the
@@ -170,7 +171,7 @@ class BatchedBitReader {
   /// https://en.wikipedia.org/wiki/LEB128
   /// UINT_T must be an unsigned integer type.
   template<typename UINT_T>
-  bool GetUleb128(UINT_T* v);
+  WARN_UNUSED_RESULT bool GetUleb128(UINT_T* v);
 
   /// Read a ZigZag encoded int from the stream. The encoded int must start at the
   /// beginning of a byte. Return false if there were not enough bytes in the buffer or
@@ -178,7 +179,7 @@ class BatchedBitReader {
   /// https://developers.google.com/protocol-buffers/docs/encoding#signed-integers
   /// INT_T must be a signed integer type.
   template<typename INT_T>
-  bool GetZigZagInteger(INT_T* v);
+  WARN_UNUSED_RESULT bool GetZigZagInteger(INT_T* v);
 
   /// Returns the number of bytes left in the stream.
   int bytes_left() { return buffer_end_ - buffer_pos_; }
