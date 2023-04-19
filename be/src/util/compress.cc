@@ -330,6 +330,12 @@ Status Lz4Compressor::ProcessBlock(bool output_preallocated, int64_t input_lengt
 ZstandardCompressor::ZstandardCompressor(MemPool* mem_pool, bool reuse_buffer, int clevel)
   : Codec(mem_pool, reuse_buffer), clevel_(clevel) {}
 
+ZstandardCompressor::~ZstandardCompressor() {
+  if (stream_ != nullptr) {
+    static_cast<void>(ZSTD_freeCCtx(stream_));
+  }
+}
+
 int64_t ZstandardCompressor::MaxOutputLen(int64_t input_len, const uint8_t* input) {
   return ZSTD_compressBound(input_len);
 }
@@ -339,7 +345,14 @@ Status ZstandardCompressor::ProcessBlock(bool output_preallocated, int64_t input
   DCHECK_GE(input_length, 0);
   DCHECK(output_preallocated) << "Output was not allocated for Zstd Codec";
   if (input_length == 0) return Status::OK();
-  *output_length = ZSTD_compress(*output, *output_length, input, input_length, clevel_);
+  if (stream_ == nullptr) {
+    stream_ = ZSTD_createCCtx();
+    if (stream_ == nullptr) {
+      return Status(TErrorCode::ZSTD_ERROR, "ZSTD_createCCtx", "nullptr");
+    }
+  }
+  *output_length = ZSTD_compressCCtx(stream_, *output, *output_length, input,
+      input_length, clevel_);
   if (ZSTD_isError(*output_length)) {
     return Status(TErrorCode::ZSTD_ERROR, "ZSTD_compress",
         ZSTD_getErrorString(ZSTD_getErrorCode(*output_length)));

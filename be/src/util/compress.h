@@ -139,7 +139,7 @@ class ZstandardCompressor : public Codec {
  public:
   ZstandardCompressor(MemPool* mem_pool = nullptr, bool reuse_buffer = false,
       int clevel = ZSTD_CLEVEL_DEFAULT);
-  virtual ~ZstandardCompressor() {}
+  virtual ~ZstandardCompressor();
 
   virtual int64_t MaxOutputLen(
       int64_t input_len, const uint8_t* input = nullptr) override;
@@ -150,6 +150,7 @@ class ZstandardCompressor : public Codec {
 
  private:
   int clevel_;
+  ZSTD_CCtx* stream_ = nullptr;
 };
 
 /// Hadoop's block compression scheme on top of LZ4.

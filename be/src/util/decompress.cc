@@ -630,7 +630,14 @@ Status ZstandardDecompressor::ProcessBlock(bool output_preallocated, int64_t inp
     const uint8_t* input, int64_t* output_length, uint8_t** output) {
   DCHECK(output_preallocated) << "Output was not allocated for Zstd Codec";
   if (*output_length == 0) return Status::OK();
-  size_t ret = ZSTD_decompress(*output, *output_length, input, input_length);
+  if (stream_ == NULL) {
+    stream_ = ZSTD_createDCtx();
+    if (stream_ == NULL) {
+      return Status(TErrorCode::COMPRESSED_FILE_DECOMPRESSOR_ERROR, "Zstd",
+          "ZSTD_createDCtx()", 0);
+    }
+  }
+  size_t ret = ZSTD_decompressDCtx(stream_, *output, *output_length, input, input_length);
   if (ZSTD_isError(ret)) {
     *output_length = 0;
     return Status(TErrorCode::ZSTD_ERROR, "ZSTD_decompress",
@@ -656,8 +663,8 @@ Status ZstandardDecompressor::ProcessBlockStreaming(int64_t input_length,
   if (stream_ == NULL) {
     stream_ = ZSTD_createDCtx();
     if (stream_ == NULL) {
-      return Status(
-          TErrorCode::COMPRESSED_FILE_DECOMPRESSOR_ERROR, "Zstd", "ZSTD_createDCtx()");
+      return Status(TErrorCode::COMPRESSED_FILE_DECOMPRESSOR_ERROR, "Zstd",
+          "ZSTD_createDCtx()", 0);
     }
   }
   *input_bytes_read = 0;
