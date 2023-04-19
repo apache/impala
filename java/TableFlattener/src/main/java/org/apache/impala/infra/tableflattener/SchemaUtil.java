@@ -24,7 +24,6 @@ import org.apache.avro.Schema;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.generic.GenericRecord;
-import org.codehaus.jackson.JsonNode;
 
 import java.util.Map;
 
@@ -43,7 +42,7 @@ public class SchemaUtil {
     return createField(name, type, null, null);
   }
 
-  static Field createField(String name, Type type, String doc, JsonNode defaultValue) {
+  static Field createField(String name, Type type, String doc, Object defaultValue) {
     return new Field(name, Schema.createUnion(
         Schema.create(Type.NULL), Schema.create(type)), doc, defaultValue);
   }
@@ -52,8 +51,7 @@ public class SchemaUtil {
     return createField(name, schema, null, null);
   }
 
-  static Field createField(String name, Schema schema, String doc,
-      JsonNode defaultValue) {
+  static Field createField(String name, Schema schema, String doc, Object defaultValue) {
     Preconditions.checkState(!schemaHasNesting(schema));
     if (schema.getType() == Type.UNION) {
       return new Field(name, Schema.createUnion(schema.getTypes()), doc, defaultValue);

@@ -62,7 +62,7 @@ public class SchemaFlattener {
       Schema fieldSchema = field.schema();
       if (SchemaUtil.isSimpleType(fieldSchema)) {
         dstSchemaFields.add(SchemaUtil.createField(fieldNamePrefix + field.name(),
-            fieldSchema, field.doc(), field.defaultValue()));
+            fieldSchema, field.doc(), field.defaultVal()));
         continue;
       }
       if (SchemaUtil.isNullable(fieldSchema)) {
