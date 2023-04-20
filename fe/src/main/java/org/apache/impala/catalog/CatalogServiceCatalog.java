@@ -497,7 +497,7 @@ public class CatalogServiceCatalog extends Catalog {
    * {@link CatalogServiceCatalog#tryWriteLock(Table)} but with a custom timeout.
    */
   public boolean tryLock(Table tbl, final boolean useWriteLock, final long timeout) {
-    Preconditions.checkArgument(timeout > 0);
+    Preconditions.checkArgument(timeout >= 0);
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(
         String.format("Attempting to %s lock table %s with a timeout of %s ms",
             (useWriteLock ? "write" : "read"), tbl.getFullName(), timeout))) {
