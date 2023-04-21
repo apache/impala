@@ -107,6 +107,7 @@ def load_data(db_to_load, table_formats, scale):
     configured_call(["{0}/tests/util/compute_table_stats.py".format(IMPALA_HOME),
                      "--stop_on_error", "--db_names", db_name])
 
+
 def get_git_hash_for_name(name):
   return sh.git("rev-parse", name).strip()
 
@@ -169,7 +170,7 @@ def report_benchmark_results(file_a, file_b, description):
   sh.cat(result, _out=sys.stdout)
 
 
-def compare(base_dir, hash_a, hash_b):
+def compare(base_dir, hash_a, hash_b, options):
   """Take the results of two performance runs and compare them."""
   file_a = os.path.join(base_dir, hash_a + ".json")
   file_b = os.path.join(base_dir, hash_b + ".json")
@@ -177,14 +178,22 @@ def compare(base_dir, hash_a, hash_b):
   report_benchmark_results(file_a, file_b, description)
 
   # From the two json files extract the profiles and diff them
-  generate_profile_file(file_a, hash_a, base_dir)
-  generate_profile_file(file_b, hash_b, base_dir)
-
-  sh.diff("-u",
-          os.path.join(base_dir, hash_a + "_profile.txt"),
-          os.path.join(base_dir, hash_b + "_profile.txt"),
-          _out=os.path.join(IMPALA_HOME, "performance_result_profile_diff.txt"),
-          _ok_code=[0, 1])
+  if options.split_profiles:
+    generate_profile_files(file_a, hash_a, base_dir)
+    generate_profile_files(file_b, hash_b, base_dir)
+    sh.diff("-u",
+            os.path.join(base_dir, hash_a + "_profiles"),
+            os.path.join(base_dir, hash_b + "_profiles"),
+            _out=os.path.join(IMPALA_HOME, "performance_result_profile_diff.txt"),
+            _ok_code=[0, 1])
+  else:
+    generate_profile_file(file_a, hash_a, base_dir)
+    generate_profile_file(file_b, hash_b, base_dir)
+    sh.diff("-u",
+            os.path.join(base_dir, hash_a + "_profile.txt"),
+            os.path.join(base_dir, hash_b + "_profile.txt"),
+            _out=os.path.join(IMPALA_HOME, "performance_result_profile_diff.txt"),
+            _ok_code=[0, 1])
 
 
 def generate_profile_file(name, hash, base_dir):
@@ -200,6 +209,33 @@ def generate_profile_file(name, hash, base_dir):
         for iteration in data[key]:
           out.write(iteration["runtime_profile"])
           out.write("\n\n")
+
+
+def generate_profile_files(name, hash, base_dir):
+  """Extracts runtime profiles from the JSON file 'name'.
+
+  Writes the runtime profiles back as separated simple text file in '[hash]_profiles' dir
+  in base_dir.
+  """
+  profile_dir = os.path.join(base_dir, hash + "_profiles")
+  if not os.path.exists(profile_dir):
+    os.makedirs(profile_dir)
+  with open(name) as fid:
+    data = json.loads(fid.read().decode("utf-8", "ignore"))
+    iter_num = {}
+    # For each query
+    for key in data:
+      for iteration in data[key]:
+        query_name = iteration["query"]["name"]
+        if query_name in iter_num:
+          iter_num[query_name] += 1
+        else:
+          iter_num[query_name] = 1
+        curr_iter = iter_num[query_name]
+
+        file_name = "{}_iter{:03d}.txt".format(query_name, curr_iter)
+        with open(os.path.join(profile_dir, file_name), "w") as out:
+          out.write(iteration["runtime_profile"])
 
 
 def backup_workloads():
@@ -266,7 +302,7 @@ def perf_ab_test(options, args):
     restore_workloads(workload_dir)
     start_impala(options.num_impalads, options)
     run_workload(temp_dir, workloads, options)
-    compare(temp_dir, hash_a, hash_b)
+    compare(temp_dir, hash_a, hash_b, options)
 
 
 def parse_options():
@@ -289,10 +325,16 @@ def parse_options():
   parser.add_option("--start_minicluster", action="store_true",
                     help="start a new Hadoop minicluster")
   parser.add_option("--ninja", action="store_true",
-                    help = "use ninja, rather than Make, as the build tool")
+                    help="use ninja, rather than Make, as the build tool")
   parser.add_option("--impalad_args", dest="impalad_args", action="append", type="string",
                     default=[],
                     help="Additional arguments to pass to each Impalad during startup")
+  parser.add_option("--split_profiles", action="store_true", dest="split_profiles",
+                    default=True, help=("If specified, query profiles will be generated "
+                      "as separate files"))
+  parser.add_option("--no_split_profiles", action="store_false", dest="split_profiles",
+                    help=("If specified, query profiles will be generated as a "
+                      "single-combined file"))
 
   parser.set_usage(textwrap.dedent("""
     single_node_perf_run.py [options] git_hash_A [git_hash_B]
