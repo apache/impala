@@ -29,6 +29,7 @@ import socket
 import ssl
 import sys
 import time
+import traceback
 from datetime import datetime
 import uuid
 
@@ -1592,3 +1593,7 @@ class ImpalaBeeswaxClient(ImpalaClient):
           raise RPCException("ERROR: %s" % e.message)
         if "QueryNotFoundException" in str(e):
           raise QueryStateException('Error: Stale query handle')
+        # Print more details for other kinds of exceptions
+        print('Caught exception {0}, type={1}'.format(str(e), type(e)), file=sys.stderr)
+        traceback.print_exc()
+        raise Exception("Encountered unknown exception")
