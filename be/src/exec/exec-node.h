@@ -56,9 +56,9 @@ class ExecNode;
 /// PlanNode and ExecNode are the super-classes of all plan nodes and execution nodes
 /// respectively. The plan nodes contain a subset of the static state of their
 /// corresponding ExecNode, of which there is one instance per fragment. ExecNode contains
-/// only runtime state and there can be up to MT_DOP instances of it per fragment.
-/// Hence every ExecNode has a corresponding PlanNode which may or may not be at the same
-/// level of hierarchy as the ExecNode.
+/// only runtime state and there can be up to num_instances_per_node() of it per
+/// fragment. Hence every ExecNode has a corresponding PlanNode which may or may not be at
+/// the same level of hierarchy as the ExecNode.
 /// TODO: IMPALA-9216: Move all the static state of ExecNode into PlanNode.
 ///
 /// All subclasses need to make sure to check RuntimeState::is_cancelled()
@@ -128,6 +128,9 @@ class PlanNode {
   /// profile to convey codegen related information. Populated in Codegen().
   std::vector<std::string> codegen_status_msgs_;
 
+  bool is_mt_fragment() const { return is_mt_fragment_; }
+  int num_instances_per_node() const { return num_instances_per_node_; }
+
  protected:
   /// Helper method to add codegen messages from status objects.
   void AddCodegenStatus(
@@ -135,6 +138,13 @@ class PlanNode {
 
  private:
   DISALLOW_COPY_AND_ASSIGN(PlanNode);
+
+  /// Whether multi-threaded fragment strategy is being used.
+  /// ie., either MT_DOP>0 or COMPUTE_PROCESSING_COST=true.
+  bool is_mt_fragment_ = false;
+
+  /// The effective degree of parallelism of this fragment.
+  int num_instances_per_node_ = 1;
 
   /// Create a single exec node derived from thrift node; place exec node in 'pool'.
   static Status CreatePlanNode(ObjectPool* pool, const TPlanNode& tnode, PlanNode** node);

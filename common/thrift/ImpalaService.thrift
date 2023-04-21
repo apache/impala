@@ -770,7 +770,7 @@ enum TImpalaQueryOptions {
   // Control whether to consider CPU processing cost during query planning.
   COMPUTE_PROCESSING_COST = 153;
 
-  // Minimum number of threads of a query fragment per host in processing
+  // Minimum number of threads of a query fragment per node in processing
   // cost algorithm. It is recommend to not set it with value more than number of
   // physical cores in executor node. Valid values are in [1, 128]. Default to 1.
   PROCESSING_COST_MIN_THREADS = 154;
@@ -783,6 +783,14 @@ enum TImpalaQueryOptions {
   // this to a value between 0 to 1 computes the combined selectivity by
   // taking the product of the selectivities and dividing by this factor.
   JOIN_SELECTIVITY_CORRELATION_FACTOR = 155;
+
+  // Maximum number of threads of a query fragment per node in processing
+  // cost algorithm. It is recommend to not set it with value more than number of
+  // physical cores in executor node. This query option may be ignored if selected
+  // executor group has lower max-query-cpu-core-per-node-limit configuration or
+  // PROCESSING_COST_MIN_THREADS option has higher value.
+  // Valid values are in [1, 128]. Default to 128.
+  MAX_FRAGMENT_INSTANCES_PER_NODE = 156
 }
 
 // The summary of a DML statement.

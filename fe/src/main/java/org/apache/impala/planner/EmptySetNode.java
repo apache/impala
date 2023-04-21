@@ -83,9 +83,4 @@ public class EmptySetNode extends PlanNode {
 
   @Override
   protected boolean displayCardinality(TExplainLevel detailLevel) { return false; }
-
-  @Override
-  protected boolean isLeafNode() {
-    return true;
-  }
 }

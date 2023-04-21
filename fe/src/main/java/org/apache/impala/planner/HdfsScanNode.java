@@ -2118,7 +2118,7 @@ public class HdfsScanNode extends ScanNode {
   @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     // Update 'useMtScanNode_' before any return cases. It's used in BE.
-    useMtScanNode_ = queryOptions.mt_dop > 0;
+    useMtScanNode_ = Planner.useMTFragment(queryOptions);
     Preconditions.checkNotNull(scanRangeSpecs_, "Cost estimation requires scan ranges.");
     long scanRangeSize = getEffectiveNumScanRanges();
     if (scanRangeSize == 0) {
@@ -2170,6 +2170,11 @@ public class HdfsScanNode extends ScanNode {
     long perThreadIoBuffers =
         Math.min((long) Math.ceil(avgScanRangeBytes / (double) maxIoBufferSize),
             MAX_IO_BUFFERS_PER_THREAD) + 1;
+    if (queryOptions.compute_processing_cost) {
+      // In scan-node.cc, we fix max_row_batches to a constant of 2.
+      Preconditions.checkState(maxScannerThreads == 1);
+      perThreadIoBuffers = 2;
+    }
     long perInstanceMemEstimate = checkedMultiply(
         checkedMultiply(maxScannerThreads, perThreadIoBuffers), maxIoBufferSize);
 

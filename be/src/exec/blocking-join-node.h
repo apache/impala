@@ -46,7 +46,7 @@ class BlockingJoinPlanNode : public PlanNode {
   /// Note: This depends on the containing subplan being initialized, and isn't accurate
   /// until the whole PlanNode tree has been initialized.
   bool UseSeparateBuild(const TQueryOptions& query_options) const {
-    return !IsInSubplan() && query_options.mt_dop > 0 && query_options.num_nodes != 1;
+    return !IsInSubplan() && query_options.num_nodes != 1 && is_mt_fragment();
   }
 
   TJoinOp::type join_op() const { return join_op_; }

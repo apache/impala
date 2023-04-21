@@ -83,6 +83,18 @@ Status PlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
     RETURN_IF_ERROR(
         ScalarExpr::Create(tnode_->conjuncts, *row_descriptor_, state, &conjuncts_));
   }
+
+  if (state->query_options().compute_processing_cost) {
+    DCHECK_GT(state->fragment().effective_instance_count, 0);
+    is_mt_fragment_ = true;
+    num_instances_per_node_ = state->fragment().effective_instance_count;
+  } else if (state->query_options().mt_dop > 0) {
+    is_mt_fragment_ = true;
+    num_instances_per_node_ = state->query_options().mt_dop;
+  } else {
+    is_mt_fragment_ = false;
+    num_instances_per_node_ = 1;
+  }
   return Status::OK();
 }
 

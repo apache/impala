@@ -128,11 +128,10 @@ Status ScanPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const 
       break;
     case TPlanNodeType::KUDU_SCAN_NODE:
       if (tnode_->kudu_scan_node.use_mt_scan_node) {
-        DCHECK_GT(state->query_options().mt_dop, 0);
+        DCHECK(is_mt_fragment());
         *node = pool->Add(new KuduScanNodeMt(pool, *this, state->desc_tbl()));
       } else {
-        DCHECK(state->query_options().mt_dop == 0
-            || state->query_options().num_scanner_threads == 1);
+        DCHECK(!is_mt_fragment() || state->query_options().num_scanner_threads == 1);
         *node = pool->Add(new KuduScanNode(pool, *this, state->desc_tbl()));
       }
       break;
@@ -273,30 +272,40 @@ void ScanNode::ScannerThreadState::Open(
     ScanNode* parent, int64_t max_row_batches_override) {
   RuntimeState* state = parent->runtime_state_;
   max_num_scanner_threads_ = CpuInfo::num_cores();
-  if (state->query_options().num_scanner_threads > 0) {
-    max_num_scanner_threads_ = state->query_options().num_scanner_threads;
-  }
-  DCHECK_GT(max_num_scanner_threads_, 0);
-
   int max_row_batches = max_row_batches_override;
-  if (max_row_batches_override <= 0) {
-    // Legacy heuristic to determine the size, based on the idea that more disks means a
-    // faster producer. Also used for Kudu under the assumption that the scan runs
-    // co-located with a Kudu tablet server and that the tablet server is using disks
-    // similarly as a datanode would.
-    // TODO: IMPALA-7096: re-evaluate this heuristic to get a tighter bound on memory
-    // consumption, we could do something better.
-    max_row_batches = max(1, min(
-        10 * (DiskInfo::num_disks() + io::DiskIoMgr::REMOTE_NUM_DISKS),
-        max_num_scanner_threads_ * FLAGS_max_queued_row_batches_per_scanner_thread));
-  }
-  if (state->query_options().__isset.mt_dop && state->query_options().mt_dop > 0) {
-    // To avoid a significant memory increase when running the multithreaded scans
-    // with mt_dop > 0 (if mt_dop is not supported for this scan), then adjust the number
-    // of maximally queued row batches per scan instance based on MT_DOP. The max
-    // materialized row batches is at least 2 to allow for some parallelism between
-    // the producer/consumer.
-    max_row_batches = max(2, max_row_batches / state->query_options().mt_dop);
+
+  if (state->query_options().compute_processing_cost) {
+    // If COMPUTE_PROCESSING_COST=true, we fix the maximum num scanner threads to 1 per
+    // instance and maximum row batches to 2.
+    max_num_scanner_threads_ = 1;
+    max_row_batches = 2;
+  } else {
+    if (state->query_options().num_scanner_threads > 0) {
+      max_num_scanner_threads_ = state->query_options().num_scanner_threads;
+    }
+    DCHECK_GT(max_num_scanner_threads_, 0);
+
+    if (max_row_batches_override <= 0) {
+      // Legacy heuristic to determine the size, based on the idea that more disks means a
+      // faster producer. Also used for Kudu under the assumption that the scan runs
+      // co-located with a Kudu tablet server and that the tablet server is using disks
+      // similarly as a datanode would.
+      // TODO: IMPALA-7096: re-evaluate this heuristic to get a tighter bound on memory
+      // consumption, we could do something better.
+      max_row_batches = max(1,
+          min(10 * (DiskInfo::num_disks() + io::DiskIoMgr::REMOTE_NUM_DISKS),
+              max_num_scanner_threads_
+                  * FLAGS_max_queued_row_batches_per_scanner_thread));
+    }
+    if (parent->plan_node().is_mt_fragment()) {
+      // To avoid a significant memory increase when running the multithreaded scans
+      // (if multithreaded fragment is not supported for this scan), then adjust the
+      // number of maximally queued row batches per scan instance based on
+      // num_instances_per_node(). The max materialized row batches is at least 2 to allow
+      // for some parallelism between the producer/consumer.
+      max_row_batches =
+          max(2, max_row_batches / parent->plan_node().num_instances_per_node());
+    }
   }
   VLOG(2) << "Max row batch queue size for scan node '" << parent->id()
           << "' in fragment instance '" << PrintId(state->fragment_instance_id())

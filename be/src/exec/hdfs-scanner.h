@@ -385,7 +385,8 @@ class HdfsScanner {
   vector<LocalFilterStats> filter_stats_;
 
   /// Counter for the number of batches returned from GetNext(). Only updated by the
-  /// GetNext() API (i.e. mt_dop > 0), not the ProcessSplit() API.
+  /// GetNext() API (i.e. PlanNode::num_instances_per_node() > 0),
+  /// not the ProcessSplit() API.
   int64_t getnext_batches_returned_ = 0;
 
   /// Check runtime filters' effectiveness every BATCHES_PER_FILTER_SELECTIVITY_CHECK

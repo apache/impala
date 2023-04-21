@@ -282,12 +282,17 @@ public class HashJoinNode extends JoinNode {
         computeMaxSpillableBufferSize(bufferSize, queryOptions.getMax_row_size());
     long perInstanceBuildMinMemReservation =
         bufferSize * (minBuildBuffers - 2) + maxRowBufferSize * 2;
-    if (queryOptions.mt_dop > 0 && canShareBuild()) {
+    if (Planner.useMTFragment(queryOptions) && canShareBuild()) {
       // Ensure we reserve enough memory to hand off to the PartitionedHashJoinNodes for
-      // probe streams when spilling. mt_dop is an upper bound on the number of
-      // PartitionedHashJoinNodes per builder.
+      // probe streams when spilling. numInstancePerHost is an upper bound on the number
+      // of PartitionedHashJoinNodes per builder.
       // TODO: IMPALA-9416: be less conservative here
-      perInstanceBuildMinMemReservation *= queryOptions.mt_dop;
+      // TODO: In case of compute_processing_cost=false, it is probably OK to stil use
+      //     getNumInstancesPerHost(). Leave this for future work to avoid regression.
+      int numInstancePerHost = queryOptions.compute_processing_cost ?
+          fragment_.getNumInstancesPerHost(queryOptions) :
+          queryOptions.getMt_dop();
+      perInstanceBuildMinMemReservation *= numInstancePerHost;
     }
     // Most reservation for probe buffers is obtained from the join builder when
     // spilling. However, for NAAJ, two additional probe streams are needed that

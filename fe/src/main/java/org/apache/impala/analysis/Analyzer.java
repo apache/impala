@@ -99,6 +99,7 @@ import org.apache.impala.rewrite.SimplifyDistinctFromRule;
 import org.apache.impala.rewrite.CountDistinctToNdvRule;
 import org.apache.impala.rewrite.DefaultNdvScaleRule;
 import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.QueryConstants;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TLineageGraph;
@@ -158,6 +159,7 @@ public class Analyzer {
   public static final byte ACCESSTYPE_READ = (byte)2;
   public static final byte ACCESSTYPE_WRITE = (byte)4;
   public static final byte ACCESSTYPE_READWRITE = (byte)8;
+
   // Common analysis error messages
   public final static String DB_DOES_NOT_EXIST_ERROR_MSG = "Database does not exist: ";
   public final static String DB_ALREADY_EXISTS_ERROR_MSG = "Database already exists: ";
@@ -575,6 +577,8 @@ public class Analyzer {
     // singleton.
     private int numExecutorsForPlanning_ = -1;
 
+    private int availableCoresPerNode_ = -1;
+
     // Cache of KuduTables opened for this query. (map from table name to kudu table)
     // This cache prevent multiple openTable calls for a given table in the same query.
     public final Map<String, org.apache.kudu.client.KuduTable> kuduTables =
@@ -644,6 +648,37 @@ public class Analyzer {
   }
   public void setNumExecutorsForPlanning(int x) {
     globalState_.numExecutorsForPlanning_ = x;
+  }
+
+  public int getAvailableCoresPerNode() {
+    Preconditions.checkState(globalState_.availableCoresPerNode_ > 0);
+    return globalState_.availableCoresPerNode_;
+  }
+
+  public void setAvailableCoresPerNode(int x) {
+    Preconditions.checkArgument(x > 0);
+    globalState_.availableCoresPerNode_ =
+        Math.min(QueryConstants.MAX_FRAGMENT_INSTANCES_PER_NODE, x);
+  }
+
+  public int getMinParallelismPerNode() {
+    if (getQueryOptions().isCompute_processing_cost()) {
+      return getQueryOptions().getProcessing_cost_min_threads();
+    } else {
+      return 1;
+    }
+  }
+
+  public int getMaxParallelismPerNode() {
+    if (getQueryOptions().isCompute_processing_cost()) {
+      return Math.max(getMinParallelismPerNode(),
+          Math.min(getQueryOptions().getMax_fragment_instances_per_node(),
+              getAvailableCoresPerNode()));
+    } else if (getQueryOptions().getMt_dop() > 0) {
+      return getQueryOptions().getMt_dop();
+    } else {
+      return 1;
+    }
   }
 
   // An analyzer stores analysis state for a single select block. A select block can be

@@ -389,11 +389,4 @@ public class UnionNode extends PlanNode {
       }
     }
   }
-
-  @Override
-  protected boolean isLeafNode() {
-    // Union node is being scheduled the same as scan node.
-    // See Scheduler::CreateCollocatedAndScanInstances() in scheduler.cc.
-    return true;
-  }
 }

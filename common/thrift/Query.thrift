@@ -111,6 +111,9 @@ enum TParquetBloomFilterWrite {
 // constants for TQueryOptions.num_nodes
 const i32 NUM_NODES_ALL = 0
 const i32 NUM_NODES_ALL_RACKS = -1
+// constant used as upperbound for TQueryOptions.processing_cost_min_threads and
+// TQueryOptions.max_fragment_instances_per_node
+const i32 MAX_FRAGMENT_INSTANCES_PER_NODE = 128
 
 // Query options that correspond to ImpalaService.ImpalaQueryOptions, with their
 // respective defaults. Query options can be set in the following ways:
@@ -627,6 +630,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   156: optional double join_selectivity_correlation_factor = 0.0;
+
+  // See comment in ImpalaService.thrift
+  157: optional i32 max_fragment_instances_per_node = MAX_FRAGMENT_INSTANCES_PER_NODE
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

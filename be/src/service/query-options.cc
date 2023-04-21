@@ -26,6 +26,7 @@
 
 #include "exprs/timezone_db.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
+#include "gen-cpp/Query_constants.h"
 #include "runtime/runtime-filter.h"
 #include "service/query-option-parser.h"
 #include "util/debug-util.h"
@@ -200,6 +201,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
     return Status(Substitute("Invalid query option: $0", key));
   }
 
+  QueryConstants qc;
   TImpalaQueryOptions::type option = static_cast<TImpalaQueryOptions::type>(option_int);
 
   if (value.empty()) {
@@ -1068,10 +1070,11 @@ Status impala::SetQueryOption(const string& key, const string& value,
         StringParser::ParseResult result;
         const int32_t min_num =
             StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
-        if (result != StringParser::PARSE_SUCCESS || min_num < 1 || min_num > 128) {
+        if (result != StringParser::PARSE_SUCCESS || min_num < 1
+            || min_num > qc.MAX_FRAGMENT_INSTANCES_PER_NODE) {
           return Status(Substitute("$0 is not valid for processing_cost_min_threads. "
-                                   "Valid values are in [1, 128].",
-              value));
+                                   "Valid values are in [1, $1].",
+              value, qc.MAX_FRAGMENT_INSTANCES_PER_NODE));
         }
         query_options->__set_processing_cost_min_threads(min_num);
         break;
@@ -1081,6 +1084,19 @@ Status impala::SetQueryOption(const string& key, const string& value,
         RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckInclusiveRange<double>(
             option, value, 0.0, 1.0, &double_val));
         query_options->__set_join_selectivity_correlation_factor(double_val);
+        break;
+      }
+      case TImpalaQueryOptions::MAX_FRAGMENT_INSTANCES_PER_NODE: {
+        StringParser::ParseResult result;
+        const int32_t max_num =
+            StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS || max_num < 1
+            || max_num > qc.MAX_FRAGMENT_INSTANCES_PER_NODE) {
+          return Status(Substitute("$0 is not valid for max_fragment_instances_per_node. "
+                                   "Valid values are in [1, $1].",
+              value, qc.MAX_FRAGMENT_INSTANCES_PER_NODE));
+        }
+        query_options->__set_max_fragment_instances_per_node(max_num);
         break;
       }
       default:

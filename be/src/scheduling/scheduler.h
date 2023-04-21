@@ -365,13 +365,13 @@ class Scheduler {
   /// This includes the routing information (destinations, per_exch_num_senders,
   /// sender_id)
   /// 'executor_config' is the executor configuration to use for scheduling.
-  void ComputeFragmentExecParams(
+  Status ComputeFragmentExecParams(
       const ExecutorConfig& executor_config, ScheduleState* state);
 
   /// Recursively create FInstanceScheduleState and set per_node_scan_ranges for
   /// fragment_state and its input fragments via a depth-first traversal.
   /// All fragments are part of plan_exec_info.
-  void ComputeFragmentExecParams(const ExecutorConfig& executor_config,
+  Status ComputeFragmentExecParams(const ExecutorConfig& executor_config,
       const TPlanExecInfo& plan_exec_info, FragmentScheduleState* fragment_state,
       ScheduleState* state);
 
@@ -383,7 +383,8 @@ class Scheduler {
   /// joins or grouping aggregates as children runs on at least as many hosts as the
   /// input to those children).
   ///
-  /// The maximum number of instances per host is the value of query option mt_dop.
+  /// The maximum number of instances per host is the value of query option mt_dop,
+  /// or fragment's effective_instance_count if compute_processing_cost=true.
   /// For HDFS, this load balances among instances within a host using
   /// AssignRangesToInstances().
   void CreateCollocatedAndScanInstances(const ExecutorConfig& executor_config,
@@ -442,7 +443,7 @@ class Scheduler {
   /// If TPlanFragment.effective_instance_count is positive, verify that resulting
   /// instance_states size match with effective_instance_count. Fragment with UnionNode or
   /// ScanNode or one where IsExceedMaxFsWriters equals true is not checked.
-  static void CheckEffectiveInstanceCount(
+  static Status CheckEffectiveInstanceCount(
       const FragmentScheduleState* fragment_state, const ScheduleState* state);
 
   /// Check if sink_fragment_state has hdfs_table_sink AND ref_fragment_state scheduled

@@ -31,6 +31,7 @@
 #include "gen-cpp/DataSinks_types.h"
 #include "gen-cpp/ErrorCodes_types.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
+#include "gen-cpp/Query_constants.h"
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/common.pb.h"
 #include "gen-cpp/statestore_service.pb.h"
@@ -208,7 +209,7 @@ Status Scheduler::ComputeScanRangeAssignment(
   return Status::OK();
 }
 
-void Scheduler::ComputeFragmentExecParams(
+Status Scheduler::ComputeFragmentExecParams(
     const ExecutorConfig& executor_config, ScheduleState* state) {
   const TQueryExecRequest& exec_request = state->request();
 
@@ -218,8 +219,8 @@ void Scheduler::ComputeFragmentExecParams(
   // be easily co-located with the plans consuming their output.
   for (const TPlanExecInfo& plan_exec_info : exec_request.plan_exec_info) {
     // set instance_id, host, per_node_scan_ranges
-    ComputeFragmentExecParams(executor_config, plan_exec_info,
-        state->GetFragmentScheduleState(plan_exec_info.fragments[0].idx), state);
+    RETURN_IF_ERROR(ComputeFragmentExecParams(executor_config, plan_exec_info,
+        state->GetFragmentScheduleState(plan_exec_info.fragments[0].idx), state));
 
     // Set destinations, per_exch_num_senders, sender_id.
     for (const TPlanFragment& src_fragment : plan_exec_info.fragments) {
@@ -262,35 +263,81 @@ void Scheduler::ComputeFragmentExecParams(
       }
     }
   }
+  return Status::OK();
 }
 
-void Scheduler::CheckEffectiveInstanceCount(
+Status Scheduler::CheckEffectiveInstanceCount(
     const FragmentScheduleState* fragment_state, const ScheduleState* state) {
-  int effective_instance_count = fragment_state->fragment.effective_instance_count;
-  if (effective_instance_count > 0) {
-    if (ContainsUnionNode(fragment_state->fragment.plan)
-        || ContainsScanNode(fragment_state->fragment.plan)
-        || IsExceedMaxFsWriters(fragment_state, fragment_state, state)) {
-      // TODO: Fragment with UnionNode or ScanNode or one where IsExceedMaxFsWriters
-      // equals true is not checked for now since it require further modification of the
-      // scan-range based scheduling in CreateCollocatedAndScanInstances().
-      return;
-    }
+  // These checks are only intended if COMPUTE_PROCESSING_COST=true.
+  if (!state->query_options().compute_processing_cost) return Status::OK();
 
-    DCHECK_GE(effective_instance_count, fragment_state->instance_states.size())
-        << fragment_state->fragment.display_name
-        << " scheduled higher than the effective count.";
+  int effective_instance_count = fragment_state->fragment.effective_instance_count;
+  if (effective_instance_count < fragment_state->instance_states.size()) {
+    return Status(
+        Substitute("$0 scheduled $1 instances, higher than the effective count ($2). "
+                   "Consider running the query with COMPUTE_PROCESSING_COST=false.",
+            fragment_state->fragment.display_name, fragment_state->instance_states.size(),
+            effective_instance_count));
   }
+
+  DCHECK(!fragment_state->instance_states.empty());
+  // Find host with the largest instance assignment.
+  // Initialize to the first fragment instance.
+  int largest_inst_idx = 0;
+  int largest_inst_per_host = 1;
+  int this_inst_count = 1;
+  int num_host = 1;
+  for (int i = 1; i < fragment_state->instance_states.size(); i++) {
+    if (fragment_state->instance_states[i].host
+        == fragment_state->instance_states[i - 1].host) {
+      this_inst_count++;
+    } else {
+      if (largest_inst_per_host < this_inst_count) {
+        largest_inst_per_host = this_inst_count;
+        largest_inst_idx = i - 1;
+      }
+      this_inst_count = 1;
+      num_host++;
+    }
+  }
+  if (largest_inst_per_host < this_inst_count) {
+    largest_inst_per_host = this_inst_count;
+    largest_inst_idx = fragment_state->instance_states.size() - 1;
+  }
+
+  QueryConstants qc;
+  if (largest_inst_per_host > qc.MAX_FRAGMENT_INSTANCES_PER_NODE) {
+    return Status(Substitute(
+        "$0 scheduled $1 instances, higher than maximum instances per node ($2). "
+        "Consider running the query with COMPUTE_PROCESSING_COST=false.",
+        fragment_state->fragment.display_name, largest_inst_per_host,
+        qc.MAX_FRAGMENT_INSTANCES_PER_NODE));
+  }
+
+  int planned_inst_per_host = ceil((float)effective_instance_count / num_host);
+  if (largest_inst_per_host > planned_inst_per_host) {
+    stringstream err_msg;
+    err_msg << fragment_state->fragment.display_name
+            << " has imbalance number of instance to host assignment."
+            << " Consider running the query with COMPUTE_PROCESSING_COST=false."
+            << " Host " << fragment_state->instance_states[largest_inst_idx].host
+            << " has " << largest_inst_per_host << " instances assigned."
+            << " effective_instance_count=" << effective_instance_count
+            << " planned_inst_per_host=" << planned_inst_per_host
+            << " num_host=" << num_host;
+    return Status(err_msg.str());
+  }
+  return Status::OK();
 }
 
-void Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_config,
+Status Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_config,
     const TPlanExecInfo& plan_exec_info, FragmentScheduleState* fragment_state,
     ScheduleState* state) {
   // Create exec params for child fragments connected by an exchange. Instance creation
   // for this fragment depends on where the input fragment instances are scheduled.
   for (FragmentIdx input_fragment_idx : fragment_state->exchange_input_fragments) {
-    ComputeFragmentExecParams(executor_config, plan_exec_info,
-        state->GetFragmentScheduleState(input_fragment_idx), state);
+    RETURN_IF_ERROR(ComputeFragmentExecParams(executor_config, plan_exec_info,
+        state->GetFragmentScheduleState(input_fragment_idx), state));
   }
 
   const TPlanFragment& fragment = fragment_state->fragment;
@@ -370,7 +417,7 @@ void Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_config,
     // follow the effective_instance_count specified by planner.
     CreateInputCollocatedInstances(fragment_state, state);
   }
-  CheckEffectiveInstanceCount(fragment_state, state);
+  return CheckEffectiveInstanceCount(fragment_state, state);
 }
 
 // Maybe the easiest way to understand the objective of this algorithm is as a
@@ -459,11 +506,24 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
     int& host_num_instances = instances_per_host[host_addr];
     host_num_instances = max(1, host_num_instances);
   }
-  DCHECK(!instances_per_host.empty()) << "no hosts for fragment " << fragment.idx;
+  DCHECK(!instances_per_host.empty())
+      << "no hosts for fragment " << fragment.idx << " (" << fragment.display_name << ")";
 
-  // Number of instances should be bounded by mt_dop.
-  int max_num_instances =
-      max(1, state->request().query_ctx.client_request.query_options.mt_dop);
+  const TQueryOptions& request_query_option =
+      state->request().query_ctx.client_request.query_options;
+  int max_num_instances = 1;
+  if (request_query_option.compute_processing_cost) {
+    // Numbers should follow 'effective_instance_count' from planner.
+    // 'effective_instance_count' is total instances across all executors.
+    DCHECK(fragment.effective_instance_count > 0);
+    int inst_per_host =
+        ceil((float)fragment.effective_instance_count / instances_per_host.size());
+    max_num_instances = max(1, inst_per_host);
+  } else {
+    // Number of instances should be bounded by mt_dop.
+    max_num_instances = max(1, request_query_option.mt_dop);
+  }
+
   // Track the index of the next instance to be created for this fragment.
   int per_fragment_instance_idx = 0;
   for (const auto& entry : instances_per_host) {
@@ -492,7 +552,12 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
     int num_instances = entry.second;
     DCHECK_GE(num_instances, 1);
     DCHECK_LE(num_instances, max_num_instances)
-        << "Input parallelism too high for mt_dop";
+        << "Input parallelism too high. Fragment " << fragment.display_name
+        << " num_host=" << instances_per_host.size()
+        << " scan_host_count=" << scan_hosts.size()
+        << " mt_dop=" << request_query_option.mt_dop
+        << " compute_processing_cost=" << request_query_option.compute_processing_cost
+        << " effective_instance_count=" << fragment.effective_instance_count;
     for (const auto& per_scan_ranges : per_scan_per_instance_ranges) {
       num_instances = max(num_instances, static_cast<int>(per_scan_ranges.size()));
     }
@@ -846,7 +911,7 @@ void Scheduler::GetScanHosts(const vector<TPlanNodeId>& scan_ids,
 Status Scheduler::Schedule(const ExecutorConfig& executor_config, ScheduleState* state) {
   RETURN_IF_ERROR(DebugAction(state->query_options(), "SCHEDULER_SCHEDULE"));
   RETURN_IF_ERROR(ComputeScanRangeAssignment(executor_config, state));
-  ComputeFragmentExecParams(executor_config, state);
+  RETURN_IF_ERROR(ComputeFragmentExecParams(executor_config, state));
   ComputeBackendExecParams(executor_config, state);
 #ifndef NDEBUG
   state->Validate();

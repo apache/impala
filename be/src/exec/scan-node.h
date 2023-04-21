@@ -260,10 +260,14 @@ class ScanNode : public ExecNode {
     /// Thread group for all scanner threads.
     ThreadGroup scanner_threads_;
 
-    /// Maximum number of scanner threads. Set to 'NUM_SCANNER_THREADS' if that query
-    /// option is set. Otherwise, it's set to the number of cpu cores. Scanner threads
-    /// are generally cpu bound so there is no benefit in spinning up more threads than
-    /// the number of cores. Set in Open().
+    /// Maximum number of scanner threads.
+    /// The value is set to either of the following:
+    /// - 1, if COMPUTE_PROCESSING_COST=true;
+    /// - 'NUM_SCANNER_THREADS', if that query option is set and
+    ///   COMPUTE_PROCESSING_COST=false;
+    /// - Otherwise, it's set to the number of cpu cores.
+    /// Scanner threads are generally cpu bound so there is no benefit in spinning up
+    /// more threads than the number of cores. Set in Open().
     int max_num_scanner_threads_ = 0;
 
     /// Estimated amount of memory that each additional scanner thread will consume. Used

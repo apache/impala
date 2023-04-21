@@ -509,7 +509,8 @@ public class DistributedPlanner {
         // because it must be broadcast once per instance.
         long dataPayload = rhsDataSize * leftChildNodes;
         long hashTblBuildCost = dataPayload;
-        if (mt_dop > 1 && ctx_.getQueryOptions().use_dop_for_costing) {
+        if (mt_dop > 1 && ctx_.getQueryOptions().use_dop_for_costing
+            && !ProcessingCost.isComputeCost(ctx_.getQueryOptions())) {
           // In the broadcast join a single thread per node is building the hash
           // table of size N compared to the partition case where m threads are
           // building hash tables of size N/m each (assuming uniform distribution).
@@ -517,8 +518,11 @@ public class DistributedPlanner {
           // we multiply the hash table build cost by C sqrt(m) where m = plan node's
           // parallelism and C = a coefficient that controls the function's rate of
           // growth (a tunable parameter). We use the sqrt to model a non-linear
-          // function since the slowdown with broadcast is not exactly linear (TODO:
-          // more analysis is needed to establish an accurate correlation).
+          // function since the slowdown with broadcast is not exactly linear.
+          // TODO: more analysis is needed to establish an accurate correlation.
+          // TODO: this cost calculation is disabled if COMPUTE_PROCESSING_COST=true
+          // since num instances might change after plan created during
+          // Planner.computeProcessingCost() later. Need to find way to enable this back.
           PlanNode leftPlanRoot = leftChildFragment.getPlanRoot();
           int actual_dop = leftPlanRoot.getNumInstances()/leftPlanRoot.getNumNodes();
           hashTblBuildCost *= (long) (ctx_.getQueryOptions().broadcast_to_partition_factor

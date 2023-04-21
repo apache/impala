@@ -37,8 +37,8 @@
   </property>
   <property>
     <name>impala.admission-control.max-query-mem-limit.root.small</name>
-   <!-- 70 MB -->
-    <value>73400320</value>
+   <!-- 90 MB -->
+    <value>94371840</value>
   </property>
   <property>
     <name>impala.admission-control.min-query-mem-limit.root.small</name>

@@ -97,7 +97,7 @@ public abstract class ProcessingCost implements Cloneable {
   }
 
   public static boolean isComputeCost(TQueryOptions queryOptions) {
-    return queryOptions.getMt_dop() > 0 && queryOptions.isCompute_processing_cost();
+    return queryOptions.isCompute_processing_cost();
   }
 
   /**
@@ -206,14 +206,27 @@ public abstract class ProcessingCost implements Cloneable {
     return numInstanceSupplier_ != null && numInstanceSupplier_.get() > 0;
   }
 
-  private int getNumInstanceMax() {
-    long maxInstance = LongMath.divide(getTotalCost(),
+  protected int getNumInstanceMax() { return getNumInstanceMax(1); }
+
+  protected int getNumInstanceMax(int numNodes) {
+    long maxParallelism = LongMath.divide(getTotalCost(),
         BackendConfig.INSTANCE.getMinProcessingPerThread(), RoundingMode.CEILING);
-    if (maxInstance > 0) {
-      return maxInstance < Integer.MAX_VALUE ? (int) maxInstance : Integer.MAX_VALUE;
-    } else {
-      return 1;
+    return roundUpNumNodeMultiple(maxParallelism, numNodes);
+  }
+
+  protected static int roundUpNumNodeMultiple(long parallelism, int numNodes) {
+    // Round up to the nearest multiple of numNodes.
+    // Little over-parallelize is better than under-parallelize.
+    long maxParallelism =
+        LongMath.divide(parallelism, numNodes, RoundingMode.CEILING) * numNodes;
+
+    if (maxParallelism <= 0) {
+      maxParallelism = 1;
+    } else if (maxParallelism > Integer.MAX_VALUE) {
+      // Floor Integer.MAX_VALUE to the nearest multiple of numNodes.
+      maxParallelism = Integer.MAX_VALUE - (Integer.MAX_VALUE % numNodes);
     }
+    return (int) maxParallelism;
   }
 
   /**

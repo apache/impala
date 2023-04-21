@@ -45,8 +45,8 @@ class TInsertStats;
 
 /// Configuration class for creating DataSink objects. It contains a subset of the static
 /// state of their corresponding DataSink, of which there is one instance per fragment.
-/// DataSink contains the runtime state and there can be up to MT_DOP instances of it per
-/// fragment.
+/// DataSink contains the runtime state and there can be up to
+/// PlanNode::num_instances_per_node() of it per fragment.
 class DataSinkConfig {
  public:
   DataSinkConfig() = default;

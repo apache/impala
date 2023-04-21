@@ -537,8 +537,7 @@ public class AggregationNode extends PlanNode {
       TQueryOptions queryOptions, AggregateInfo aggInfo) {
     Preconditions.checkNotNull(
         fragment_, "PlanNode must be placed into a fragment before calling this method.");
-    long perInstanceCardinality =
-        fragment_.getPerInstanceNdv(queryOptions.getMt_dop(), aggInfo.getGroupingExprs());
+    long perInstanceCardinality = fragment_.getPerInstanceNdv(aggInfo.getGroupingExprs());
     long perInstanceMemEstimate;
     long perInstanceDataBytes = -1;
     if (perInstanceCardinality == -1) {

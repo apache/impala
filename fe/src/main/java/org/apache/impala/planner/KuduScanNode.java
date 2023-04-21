@@ -422,7 +422,7 @@ public class KuduScanNode extends ScanNode {
         kudu_scanner_thread_max_estimated_bytes;
     long mem_estimate_per_thread = Math.min(getNumMaterializedSlots(desc_) *
         estimated_bytes_per_column_per_thread, max_estimated_bytes_per_thread);
-    useMtScanNode_ = queryOptions.mt_dop > 0;
+    useMtScanNode_ = Planner.useMTFragment(queryOptions);
     nodeResourceProfile_ = new ResourceProfileBuilder()
         .setMemEstimateBytes(mem_estimate_per_thread * maxScannerThreads)
         .setThreadReservation(useMtScanNode_ ? 0 : 1).build();

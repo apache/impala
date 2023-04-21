@@ -17,7 +17,6 @@
 
 package org.apache.impala.planner;
 
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -34,7 +33,6 @@ import org.apache.impala.common.TreeNode;
 import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.planner.PlanNode.ExecPhaseResourceProfiles;
 import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
-import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPartitionType;
 import org.apache.impala.thrift.TPlanFragment;
@@ -49,7 +47,6 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.math.IntMath;
-import com.google.common.math.LongMath;
 
 /**
  * PlanFragments form a tree structure via their ExchangeNodes. A tree of fragments
@@ -148,7 +145,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   private CostingSegment rootSegment_;
 
   // Maximum allowed parallelism based on minimum processing load per fragment.
-  // Set in getCostBasedMaxParallelism().
+  // Set in adjustToMaxParallelism().
   private int costBasedMaxParallelism_ = -1;
 
   // An adjusted number of instance based on ProcessingCost calculation.
@@ -259,14 +256,13 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    *
    * @param queryOptions A query options for this query.
    */
-  public void computeCostingSegment(
-      TQueryOptions queryOptions, boolean limitScanParallelism) {
-    for (PlanNode node : collectPlanNodes()) {
-      if (node instanceof ScanNode) {
-        ((ScanNode) node).setLimitScanParallelism(limitScanParallelism);
-      }
+  public void computeCostingSegment(TQueryOptions queryOptions) {
+    List<PlanNode> planNodes = collectPlanNodes();
+    // Iterate node list in reverse from leaf to root.
+    for (int i = planNodes.size() - 1; i >= 0; i--) {
+      PlanNode node = planNodes.get(i);
       node.computeProcessingCost(queryOptions);
-      node.computeRowConsumptionAndProductionToCost(limitScanParallelism);
+      node.computeRowConsumptionAndProductionToCost();
       if (LOG.isTraceEnabled()) {
         LOG.trace("ProcessingCost Node " + node.getProcessingCost().debugString());
       }
@@ -485,8 +481,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   /*
    * Return the resource profile for all instances on a single backend.
    */
-  public ResourceProfile getTotalPerBackendResourceProfile(int mtDop) {
-    return perInstanceResourceProfile_.multiply(getNumInstancesPerHost(mtDop))
+  public ResourceProfile getTotalPerBackendResourceProfile(TQueryOptions queryOptions) {
+    return perInstanceResourceProfile_.multiply(getNumInstancesPerHost(queryOptions))
         .sum(perBackendResourceProfile_);
   }
 
@@ -513,12 +509,15 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    * Return an estimate of the number of instances of this fragment per host that it
    * executes on.
    */
-  public int getNumInstancesPerHost(int mt_dop) {
+  public int getNumInstancesPerHost(TQueryOptions queryOptions) {
     // Assume that instances are evenly divided across hosts.
     int numNodes = getNumNodes();
     int numInstances = getNumInstances();
-    // Fall back to assuming that all mt_dop instances will be generated.
-    if (numNodes == -1 || numInstances == -1) return Math.max(1, mt_dop);
+    if (numNodes == -1 || numInstances == -1) {
+      Preconditions.checkState(!queryOptions.isCompute_processing_cost());
+      // Fall back to assuming that all maxDop instances will be generated.
+      return Math.max(1, queryOptions.getMt_dop());
+    }
     return (int) Math.ceil((double)numInstances / (double)numNodes);
   }
 
@@ -546,7 +545,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     * Returns -1 for an invalid estimate, e.g., because getNumDistinctValues() failed on
     * one of the exprs.
     */
-  public long getPerInstanceNdv(int mt_dop, List<Expr> exprs) {
+  public long getPerInstanceNdv(List<Expr> exprs) {
     Preconditions.checkNotNull(dataPartition_);
     long result = 1;
     int numInstances = getNumInstances();
@@ -662,25 +661,25 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    */
   public String getFragmentHeaderString(String firstLinePrefix, String detailPrefix,
       TQueryOptions queryOptions, TExplainLevel explainLevel) {
-    int mt_dop = queryOptions.getMt_dop();
+    boolean isComputeCost = ProcessingCost.isComputeCost(queryOptions);
+    boolean useMTFragment = Planner.useMTFragment(queryOptions);
     StringBuilder builder = new StringBuilder();
     builder.append(String.format("%s%s:PLAN FRAGMENT [%s]", firstLinePrefix,
         fragmentId_.toString(), dataPartition_.getExplainString()));
     builder.append(PrintUtils.printNumHosts(" ", getNumNodes()));
     builder.append(PrintUtils.printNumInstances(" ", getNumInstances()));
-    if (ProcessingCost.isComputeCost(queryOptions)
-        && originalInstanceCount_ != getNumInstances()) {
+    if (isComputeCost && originalInstanceCount_ != getNumInstances()) {
       builder.append(" (adjusted from " + originalInstanceCount_ + ")");
     }
     builder.append("\n");
-    String perHostPrefix = mt_dop == 0 ?
-        "Per-Host Resources: " : "Per-Host Shared Resources: ";
+    String perHostPrefix =
+        !useMTFragment ? "Per-Host Resources: " : "Per-Host Shared Resources: ";
     String perHostExplainString = null;
     String perInstanceExplainString = null;
-    if (mt_dop == 0) {
+    if (!useMTFragment) {
       // There is no point separating out per-host and per-instance resources when there
       // is only a single instance per host so combine them together.
-      ResourceProfile perHostProfile = getTotalPerBackendResourceProfile(mt_dop);
+      ResourceProfile perHostProfile = getTotalPerBackendResourceProfile(queryOptions);
       StringBuilder perHostBuilder = new StringBuilder(perHostProfile.getExplainString());
       long totalRuntimeFilterReservation = producedRuntimeFiltersMemReservationBytes_
           + consumedGlobalRuntimeFiltersMemReservationBytes_;
@@ -725,16 +724,15 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       builder.append(perInstanceExplainString);
       builder.append("\n");
     }
-    if (ProcessingCost.isComputeCost(queryOptions) && rootSegment_ != null
+    if (isComputeCost && rootSegment_ != null
         && explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
       // Print processing cost.
       builder.append(detailPrefix);
       builder.append("max-parallelism=");
-      if (isFixedParallelism_
-          || ((sink_ instanceof JoinBuildSink) && !((JoinBuildSink) sink_).isShared())) {
-        builder.append(getAdjustedInstanceCount());
+      if (costBasedMaxParallelism_ > 0) {
+        builder.append(costBasedMaxParallelism_);
       } else {
-        builder.append(getCostBasedMaxParallelism());
+        builder.append(getAdjustedInstanceCount());
       }
       builder.append(" segment-costs=");
       builder.append(costingSegmentSummary());
@@ -877,13 +875,11 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   /**
    * Get maximum allowed parallelism based on minimum processing load per fragment.
    * <p>This is controlled by {@code min_processing_per_thread} flag. Only valid after
-   * {@link #computeCostingSegment(TQueryOptions, boolean)} has been called.
+   * {@link #computeCostingSegment(TQueryOptions)} has been called.
    *
    * @return maximum allowed parallelism based on minimum processing load per fragment.
    */
   protected int getCostBasedMaxParallelism() {
-    if (costBasedMaxParallelism_ >= 0) return costBasedMaxParallelism_;
-
     ProcessingCost maxCostingSegment = ProcessingCost.zero();
     List<CostingSegment> allSegments = rootSegment_.getNodesPostOrder();
     for (CostingSegment costingSegment : allSegments) {
@@ -891,23 +887,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
           ProcessingCost.maxCost(maxCostingSegment, costingSegment.getProcessingCost());
     }
 
-    long maxParallelism = LongMath.divide(maxCostingSegment.getTotalCost(),
-        BackendConfig.INSTANCE.getMinProcessingPerThread(), RoundingMode.CEILING);
-    // Round up to the nearest multiple of numNodes.
-    // Little over-parallelize is better than under-parallelize.
-    int numNodes = getNumNodes();
-    maxParallelism =
-        LongMath.divide(maxParallelism, numNodes, RoundingMode.CEILING) * numNodes;
-
-    if (maxParallelism <= 0) {
-      costBasedMaxParallelism_ = 1;
-    } else if (maxParallelism <= Integer.MAX_VALUE) {
-      costBasedMaxParallelism_ = (int) maxParallelism;
-    } else {
-      // Floor Integer.MAX_VALUE to the nearest multiple of numNodes.
-      costBasedMaxParallelism_ = Integer.MAX_VALUE - (Integer.MAX_VALUE % numNodes);
-    }
-    return costBasedMaxParallelism_;
+    return maxCostingSegment.getNumInstanceMax(getNumNodes());
   }
 
   protected boolean hasBlockingNode() {
@@ -997,21 +977,20 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    * @param minThreadPerNode Minimum thread per fragment per node based on
    *                         {@code PROCESSING_COST_MIN_THREADS} query option.
    * @param maxThreadPerNode Maximum thread per fragment per node based on
-   *                         {@code max(PROCESSING_COST_MIN_THREADS, MT_DOP,
+   *                         {@code max(PROCESSING_COST_MIN_THREADS,
    *                         TExecutorGroupSet.num_cores_per_executor)}.
    * @param parentParallelism Number of instance of parent fragment.
-   * @param limitScanParallelism Whether scan nodes parallelism is fixed to MT_DOP or not.
    */
-  protected void traverseEffectiveParallelism(int minThreadPerNode, int maxThreadPerNode,
-      int parentParallelism, boolean limitScanParallelism) {
+  protected void traverseEffectiveParallelism(
+      int minThreadPerNode, int maxThreadPerNode, int parentParallelism) {
     Preconditions.checkNotNull(
         rootSegment_, "ProcessingCost Fragment %s has not been computed!", getId());
     int nodeStepCount = getNumInstances() % getNumNodes() == 0 ? getNumNodes() : 1;
 
     // step 1: Set initial parallelism to the maximum possible.
     //   Subsequent steps after this will not exceed maximum parallelism sets here.
-    boolean canTryLower = adjustToMaxParallelism(minThreadPerNode, maxThreadPerNode,
-        parentParallelism, nodeStepCount, limitScanParallelism);
+    boolean canTryLower = adjustToMaxParallelism(
+        minThreadPerNode, maxThreadPerNode, parentParallelism, nodeStepCount);
 
     if (canTryLower) {
       // step 2: Try lower parallelism by comparing output ProcessingCost of the input
@@ -1040,8 +1019,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     //   parallelism to match the child fragment parallelism.
     for (PlanFragment child : getChildren()) {
       if (child.getSink() instanceof JoinBuildSink) {
-        child.traverseEffectiveParallelism(minThreadPerNode, maxThreadPerNode,
-            getAdjustedInstanceCount(), limitScanParallelism);
+        child.traverseEffectiveParallelism(
+            minThreadPerNode, maxThreadPerNode, getAdjustedInstanceCount());
       }
     }
   }
@@ -1052,17 +1031,16 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    * @param minThreadPerNode Minimum thread per fragment per node based on
    *                         {@code PROCESSING_COST_MIN_THREADS} query option.
    * @param maxThreadPerNode Maximum thread per fragment per node based on
-   *                         {@code max(PROCESSING_COST_MIN_THREADS, MT_DOP,
+   *                         {@code max(PROCESSING_COST_MIN_THREADS,
    *                         TExecutorGroupSet.num_cores_per_executor)}.
    * @param parentParallelism Parallelism of parent fragment.
    * @param nodeStepCount The step count used to increase this fragment's parallelism.
    *                      Usually equal to number of nodes or just 1.
-   * @param limitScanParallelism Whether scan nodes parallelism is fixed to MT_DOP or not.
    * @return True if it is possible to lower this fragment's parallelism through
    * ProcessingCost comparison. False if the parallelism should not be changed anymore.
    */
   private boolean adjustToMaxParallelism(int minThreadPerNode, int maxThreadPerNode,
-      int parentParallelism, int nodeStepCount, boolean limitScanParallelism) {
+      int parentParallelism, int nodeStepCount) {
     boolean canTryLower = true;
     // Compute maximum allowed parallelism.
     int maxParallelism = getNumInstances();
@@ -1080,46 +1058,82 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       maxParallelism = parentParallelism;
       canTryLower = false; // no need to compute effective parallelism anymore.
     } else {
-      // TODO: Fragment with UnionNode but without ScanNode should have its parallelism
-      //   bounded by the maximum parallelism between its exchanging child.
-      //   For now, it wont get here since fragment with UnionNode has fixed parallelism
-      //   (equal to MT_DOP, and previouslyAdjusted == true).
-      //   However, a fragment that has leaf node (EmptySetNode, ScanNode, or UnionNode)
-      //   may still reach this code if this is the first planning round over selected
-      //   executor group (see IMPALA-12029).
-      maxParallelism = IntMath.saturatedMultiply(maxThreadPerNode, getNumNodes());
-      int minParallelism = IntMath.saturatedMultiply(minThreadPerNode, getNumNodes());
-      int costBasedMaxParallelism = Math.max(nodeStepCount, getCostBasedMaxParallelism());
-      if (costBasedMaxParallelism < maxParallelism) {
-        if (costBasedMaxParallelism < minParallelism) {
-          maxParallelism = minParallelism;
+      if (hasUnionNode()) {
+        // We set parallelism of union fragment as a max between its input fragments and
+        // its collocated ScanNode's expected parallelism
+        // (see Scheduler::CreateCollocatedAndScanInstances()).
+        // We skip any join builder child fragment here because their parallelism
+        // is not adjusted yet.
+        maxParallelism = 1;
+        for (PlanFragment child : getChildren()) {
+          if (child.getSink() instanceof JoinBuildSink) continue;
+          Preconditions.checkState(child.hasAdjustedInstanceCount());
+          maxParallelism = Math.max(maxParallelism, child.getAdjustedInstanceCount());
+        }
+
+        List<ScanNode> scanNodes = Lists.newArrayList();
+        collectPlanNodes(Predicates.instanceOf(ScanNode.class), scanNodes);
+        for (ScanNode scanNode : scanNodes) {
+          // Increase maxParallelism following ScanNode with largest effective scan range
+          // count.
+          maxParallelism =
+              Math.max(maxParallelism, scanNode.getMaxScannerThreads(nodeStepCount));
+        }
+        canTryLower = false;
+      } else {
+        // This is an interior fragment or fragment with single scan node.
+        // We calculate maxParallelism, minParallelism, and costBasedMaxParallelism across
+        // all executors in the selected executor group.
+        maxParallelism = IntMath.saturatedMultiply(maxThreadPerNode, getNumNodes());
+
+        // Bound maxParallelism by ScanNode's effective scan range count if this fragment
+        // has ScanNode.
+        List<ScanNode> scanNodes = Lists.newArrayList();
+        collectPlanNodes(Predicates.instanceOf(ScanNode.class), scanNodes);
+        if (!scanNodes.isEmpty()) {
+          Preconditions.checkState(scanNodes.size() <= 1);
+          ScanNode scanNode = scanNodes.get(0);
+          int maxScannerThreads = scanNode.getMaxScannerThreads(nodeStepCount);
+          if (nodeStepCount == getNumNodes()) {
+            Preconditions.checkState(maxScannerThreads >= getNumNodes(),
+                "nodeStepCount=" + nodeStepCount + " getNumNodes=" + getNumNodes()
+                    + " maxScannerThreads=" + maxScannerThreads);
+          } else {
+            // This fragment parallelism is limited by its scan range count.
+            Preconditions.checkState(nodeStepCount == 1);
+            Preconditions.checkState(maxScannerThreads <= getNumNodes(),
+                "nodeStepCount=" + nodeStepCount + " getNumNodes=" + getNumNodes()
+                    + " maxScannerThreads=" + maxScannerThreads);
+          }
+          maxParallelism = Math.min(maxParallelism, maxScannerThreads);
+          // Prevent caller from lowering parallelism if fragment has ScanNode.
           canTryLower = false;
-          if (LOG.isTraceEnabled()) {
-            logCountAdjustmentTrace(
-                getNumInstances(), maxParallelism, "Follow minThreadPerNode.");
+        }
+
+        int minParallelism = Math.min(
+            maxParallelism, IntMath.saturatedMultiply(minThreadPerNode, getNumNodes()));
+        int costBasedMaxParallelism_ =
+            Math.max(nodeStepCount, getCostBasedMaxParallelism());
+
+        if (costBasedMaxParallelism_ < maxParallelism) {
+          if (costBasedMaxParallelism_ < minParallelism) {
+            maxParallelism = minParallelism;
+            canTryLower = false;
+            if (LOG.isTraceEnabled()) {
+              logCountAdjustmentTrace(
+                  getNumInstances(), maxParallelism, "Follow minThreadPerNode.");
+            }
+          } else {
+            maxParallelism = costBasedMaxParallelism_;
+            if (LOG.isTraceEnabled()) {
+              logCountAdjustmentTrace(
+                  getNumInstances(), maxParallelism, "Follow minimum work per thread.");
+            }
           }
         } else {
-          maxParallelism = costBasedMaxParallelism;
           if (LOG.isTraceEnabled()) {
             logCountAdjustmentTrace(
-                getNumInstances(), maxParallelism, "Follow minimum work per thread.");
-          }
-        }
-      } else {
-        if (LOG.isTraceEnabled()) {
-          logCountAdjustmentTrace(
-              getNumInstances(), maxParallelism, "Follow maxThreadPerNode.");
-        }
-      }
-
-      if (!limitScanParallelism) {
-        // If this is the first round of executor group planning, then it is possible for
-        // scan/leaf node to have its parallelism NOT fixed to MT_DOP. In that case
-        // prevent the next step from lowering parallelism.
-        for (PlanNode node : collectPlanNodes()) {
-          if (node.isLeafNode()) {
-            canTryLower = false;
-            break;
+                getNumInstances(), maxParallelism, "Follow maxThreadPerNode.");
           }
         }
       }
@@ -1128,6 +1142,18 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     // Initialize this fragment's parallelism to the maxParallelism.
     setAdjustedInstanceCount(maxParallelism);
     return canTryLower;
+  }
+
+  private boolean hasUnionNode() {
+    List<ScanNode> nodes = Lists.newArrayList();
+    collectPlanNodes(Predicates.instanceOf(UnionNode.class), nodes);
+    return !nodes.isEmpty();
+  }
+
+  private boolean hasScanNode() {
+    List<ScanNode> nodes = Lists.newArrayList();
+    collectPlanNodes(Predicates.instanceOf(ScanNode.class), nodes);
+    return !nodes.isEmpty();
   }
 
   /**
@@ -1160,7 +1186,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   /**
    * Override parallelism of this fragment with adjusted parallelism from CPU costing
    * algorithm.
-   * <p>Only valid after {@link #traverseEffectiveParallelism(int, int, int, boolean)}
+   * <p>Only valid after {@link #traverseEffectiveParallelism(int, int, int)}
    * called.
    */
   protected void setEffectiveNumInstance() {

@@ -30,7 +30,6 @@ import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TupleDescriptor;
-import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.NotImplementedException;
@@ -83,11 +82,6 @@ abstract public class ScanNode extends PlanNode {
 
   // Refer to the comment of 'TableRef.tableNumRowsHint_'
   protected long tableNumRowsHint_ = -1;
-
-  // When in multiple executor group set setup, true value means scan instance count
-  // is limited by MT_DOP. Otherwise, scan parallelism is decided by ProcessingCost.
-  // Set by PlanFragment.computeCostingSegment().
-  protected boolean limitScanParallelism_;
 
   public ScanNode(PlanNodeId id, TupleDescriptor desc, String displayName) {
     super(id, desc.getId().asList(), displayName);
@@ -334,7 +328,7 @@ abstract public class ScanNode extends PlanNode {
   protected int computeMaxNumberOfScannerThreads(TQueryOptions queryOptions,
       int perHostScanRanges) {
     // The non-MT scan node requires at least one scanner thread.
-    if (queryOptions.getMt_dop() >= 1) {
+    if (Planner.useMTFragment(queryOptions)) {
       return 1;
     }
     int maxScannerThreads = Math.min(perHostScanRanges,
@@ -350,31 +344,35 @@ abstract public class ScanNode extends PlanNode {
 
   protected ProcessingCost computeScanProcessingCost(
       TQueryOptions queryOptions, long effectiveScanRangeCount) {
-    ProcessingCost cardinalityBasedCost =
-        ProcessingCost.basicCost(getDisplayLabel(), getInputCardinality(),
-            ExprUtil.computeExprsTotalCost(conjuncts_), rowMaterializationCost());
+    ProcessingCost cardinalityBasedCost = ProcessingCost.basicCost(getDisplayLabel(),
+        getInputCardinality(), ExprUtil.computeExprsTotalCost(conjuncts_),
+        rowMaterializationCost(effectiveScanRangeCount));
 
-    long maxScanThreads = effectiveScanRangeCount;
-    if (!limitScanParallelism_ && queryOptions.getNum_scanner_threads() > 0) {
-      maxScanThreads = Math.min(maxScanThreads,
-          LongMath.saturatedMultiply(
-              getNumNodes(), queryOptions.getNum_scanner_threads()));
+    int maxScannerThreads = (int) Math.min(effectiveScanRangeCount, Integer.MAX_VALUE);
+    if (ProcessingCost.isComputeCost(queryOptions)) {
+      // maxThread calculation below intentionally does not include core count from
+      // executor group config. This is to allow scan fragment parallelism to scale
+      // regardless of the core count limit.
+      int maxThreads = Math.max(queryOptions.getProcessing_cost_min_threads(),
+          queryOptions.getMax_fragment_instances_per_node());
+      maxScannerThreads = (int) Math.min(
+          maxScannerThreads, LongMath.saturatedMultiply(getNumNodes(), maxThreads));
     }
 
     if (getInputCardinality() == 0) {
       Preconditions.checkState(cardinalityBasedCost.getTotalCost() == 0,
           "Scan is empty but cost is non-zero.");
       return cardinalityBasedCost;
-    } else if (maxScanThreads < cardinalityBasedCost.getTotalCost()
+    } else if (maxScannerThreads < cardinalityBasedCost.getTotalCost()
             / BackendConfig.INSTANCE.getMinProcessingPerThread()) {
       // Input cardinality is unknown or cost is too high compared to maxScanThreads
       // Return synthetic ProcessingCost based on maxScanThreads.
       long syntheticCardinality =
-          Math.max(1, Math.min(getInputCardinality(), maxScanThreads));
+          Math.max(1, Math.min(getInputCardinality(), maxScannerThreads));
       long syntheticPerRowCost = LongMath.saturatedMultiply(
-          (long) Math.ceil((double) BackendConfig.INSTANCE.getMinProcessingPerThread()
-              / syntheticCardinality),
-          maxScanThreads);
+          Math.max(1,
+              BackendConfig.INSTANCE.getMinProcessingPerThread() / syntheticCardinality),
+          maxScannerThreads);
 
       return ProcessingCost.basicCost(
           getDisplayLabel(), syntheticCardinality, 0, syntheticPerRowCost);
@@ -385,15 +383,20 @@ abstract public class ScanNode extends PlanNode {
   }
 
   /**
-   * Estimate per-row cost as 1 per 1KB row size.
+   * Estimate per-row cost as 1 per 1KB row size plus
+   * (0.5% * min_processing_per_thread) for every scan ranges.
    * <p>
-   * This reflects deserialization/copy cost per row.
+   * This reflects deserialization/copy cost per row and scan range open cost.
+   * (0.5% * min_processing_per_thread) for every scan ranges roughly means that one scan
+   * node instance will handle at most 200 scan ranges.
    */
-  private float rowMaterializationCost() { return getAvgRowSize() / 1024; }
+  private float rowMaterializationCost(long effectiveScanRangeCount) {
+    float perRowCost = getAvgRowSize() / 1024;
+    if (getInputCardinality() <= 0) return perRowCost;
 
-  @Override
-  protected boolean isLeafNode() {
-    return true;
+    float perScanRangeCost = BackendConfig.INSTANCE.getMinProcessingPerThread() * 0.005f
+        / getInputCardinality() * effectiveScanRangeCount;
+    return perRowCost + perScanRangeCost;
   }
 
   /**
@@ -410,7 +413,7 @@ abstract public class ScanNode extends PlanNode {
 
   public ExprSubstitutionMap getOptimizedAggSmap() { return optimizedAggSmap_; }
 
-  protected void setLimitScanParallelism(boolean isLimitScanParallelism) {
-    limitScanParallelism_ = isLimitScanParallelism;
+  protected int getMaxScannerThreads(int numNodes) {
+    return processingCost_.getNumInstanceMax(numNodes);
   }
 }

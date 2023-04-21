@@ -43,6 +43,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.QueryConstants;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TMinmaxFilteringLevel;
 import org.apache.impala.thrift.TQueryCtx;
@@ -276,11 +277,16 @@ public class Planner {
 
   /**
    * Return true if we should generate a parallel plan for this query, based on the
-   * current mt_dop value and whether a single-node plan was chosen.
+   * current parallelism mode and whether a single-node plan was chosen.
    */
   public static boolean useParallelPlan(PlannerContext planCtx) {
-    Preconditions.checkState(planCtx.getQueryOptions().isSetMt_dop());
-    return planCtx.getQueryOptions().mt_dop > 0 && !planCtx.isSingleNodeExec();
+    return useMTFragment(planCtx.getQueryOptions()) && !planCtx.isSingleNodeExec();
+  }
+
+  // Return true if MT_DOP>0 or COMPUTE_PROCESSING_COST=true.
+  public static boolean useMTFragment(TQueryOptions queryOptions) {
+    Preconditions.checkState(queryOptions.isSetMt_dop());
+    return queryOptions.getMt_dop() > 0 || queryOptions.isCompute_processing_cost();
   }
 
   /**
@@ -419,17 +425,20 @@ public class Planner {
    * Adjust effective parallelism of each plan fragment of query after considering
    * processing cost rate and blocking operator.
    * <p>
-   * Only valid after {@link PlanFragment#computeCostingSegment(TQueryOptions, boolean)}
+   * Only valid after {@link PlanFragment#computeCostingSegment(TQueryOptions)}
    * has been called for all plan fragments in the list.
    */
-  private static void computeEffectiveParallelism(List<PlanFragment> postOrderFragments,
-      int minThreadPerNode, int maxThreadPerNode, boolean limitScanParallelism) {
+  private static void computeEffectiveParallelism(
+      List<PlanFragment> postOrderFragments, int minThreadPerNode, int maxThreadPerNode) {
+    Preconditions.checkArgument(minThreadPerNode > 0);
+    Preconditions.checkArgument(maxThreadPerNode >= minThreadPerNode);
+    Preconditions.checkArgument(
+        QueryConstants.MAX_FRAGMENT_INSTANCES_PER_NODE >= maxThreadPerNode);
     for (PlanFragment fragment : postOrderFragments) {
       if (!(fragment.getSink() instanceof JoinBuildSink)) {
         // Only adjust parallelism of non-join build fragment.
         // Join build fragment will be adjusted later by fragment hosting the join node.
-        fragment.traverseEffectiveParallelism(
-            minThreadPerNode, maxThreadPerNode, -1, limitScanParallelism);
+        fragment.traverseEffectiveParallelism(minThreadPerNode, maxThreadPerNode, -1);
       }
     }
 
@@ -442,7 +451,7 @@ public class Planner {
    * This method returns the effective CPU requirement of a query when considering
    * processing cost rate and blocking operator.
    * <p>
-   * Only valid after {@link #computeEffectiveParallelism(List, int, int, boolean)} has
+   * Only valid after {@link #computeEffectiveParallelism(List, int, int)} has
    * been called over the plan fragment list.
    */
   private static CoreCount computeBlockingAwareCores(
@@ -470,38 +479,30 @@ public class Planner {
    * Compute processing cost of each plan fragment in the query plan and adjust each
    * fragment parallelism according to producer-consumer rate between them.
    */
-  public static void computeProcessingCost(List<PlanFragment> planRoots,
-      TQueryExecRequest request, PlannerContext planCtx, int numCoresPerExecutor,
-      boolean limitScanParallelism) {
-    TQueryOptions queryOptions = planCtx.getRootAnalyzer().getQueryOptions();
-
-    if (!ProcessingCost.isComputeCost(queryOptions)) {
+  public static void computeProcessingCost(
+      List<PlanFragment> planRoots, TQueryExecRequest request, PlannerContext planCtx) {
+    Analyzer rootAnalyzer = planCtx.getRootAnalyzer();
+    if (!ProcessingCost.isComputeCost(rootAnalyzer.getQueryOptions())) {
       request.setCores_required(-1);
       return;
     }
 
-    // TODO: remove dependence on MT_DOP in the future.
-    //   We still depend on MT_DOP here since many aspect of query planning is still
-    //   controlled through MT_DOP.
-    int mtDop = queryOptions.getMt_dop();
-    int numNode = planCtx.getRootAnalyzer().numExecutorsForPlanning();
-    int minThreads = queryOptions.getProcessing_cost_min_threads();
-    int maxThreads = Math.max(minThreads, Math.max(mtDop, numCoresPerExecutor));
-
     PlanFragment rootFragment = planRoots.get(0);
     List<PlanFragment> postOrderFragments = rootFragment.getNodesPostOrder();
     for (PlanFragment fragment : postOrderFragments) {
-      fragment.computeCostingSegment(queryOptions, limitScanParallelism);
+      fragment.computeCostingSegment(rootAnalyzer.getQueryOptions());
     }
 
     if (LOG.isTraceEnabled()) {
-      LOG.trace("Computing effective parallelism. numNode=" + numNode + " mtDop=" + mtDop
-          + " numCoresPerExecutor=" + numCoresPerExecutor + " minThreads=" + minThreads
-          + " maxThreads=" + maxThreads);
+      LOG.trace("Computing effective parallelism."
+          + " numNode=" + rootAnalyzer.numExecutorsForPlanning()
+          + " availableCoresPerNode=" + rootAnalyzer.getAvailableCoresPerNode()
+          + " minThreads=" + rootAnalyzer.getMinParallelismPerNode()
+          + " maxThreads=" + rootAnalyzer.getMaxParallelismPerNode());
     }
 
-    computeEffectiveParallelism(
-        postOrderFragments, minThreads, maxThreads, limitScanParallelism);
+    computeEffectiveParallelism(postOrderFragments,
+        rootAnalyzer.getMinParallelismPerNode(), rootAnalyzer.getMaxParallelismPerNode());
     CoreCount effectiveCores = computeBlockingAwareCores(postOrderFragments);
     request.setCores_required(effectiveCores.total());
 
@@ -519,7 +520,6 @@ public class Planner {
     Preconditions.checkState(!planRoots.isEmpty());
     Preconditions.checkNotNull(request);
     TQueryOptions queryOptions = planCtx.getRootAnalyzer().getQueryOptions();
-    int mtDop = queryOptions.getMt_dop();
 
     // Peak per-host peak resources for all plan fragments, assuming that all fragments
     // are scheduled on all nodes. The actual per-host resource requirements are computed
@@ -545,8 +545,8 @@ public class Planner {
       // at the same time, i.e. that the query-wide peak resources is the sum of the
       // per-fragment-instance peak resources.
       // TODO: IMPALA-9255: take into account parallel plan dependencies.
-      maxPerHostPeakResources =
-          maxPerHostPeakResources.sum(fragment.getTotalPerBackendResourceProfile(mtDop));
+      maxPerHostPeakResources = maxPerHostPeakResources.sum(
+          fragment.getTotalPerBackendResourceProfile(queryOptions));
       // Coordinator has to have a copy of each of the runtime filters to perform filter
       // aggregation. Note that this overestimates because it includes local runtime
       // filters that do not go via the coordinator.

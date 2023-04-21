@@ -413,10 +413,37 @@ class TestInsertHdfsWriterLimit(ImpalaTestSuite):
     self.__run_insert_and_verify_instances(query, max_fs_writers=30, mt_dop=10,
                                            expected_num_instances_per_host=[8, 8, 8])
 
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  def test_processing_cost_writer_limit(self, unique_database):
+    # Root internal (non-leaf) fragment.
+    query = "create table {0}.test1 as select int_col from " \
+            "functional_parquet.alltypes".format(unique_database)
+    self.__run_insert_and_verify_instances(query, max_fs_writers=11, mt_dop=0,
+                                           expected_num_instances_per_host=[4, 5, 5],
+                                           processing_cost_min_threads=10)
+    # Root coordinator fragment.
+    query = "create table {0}.test2 as select int_col from " \
+            "functional_parquet.alltypes limit 100000".format(unique_database)
+    self.__run_insert_and_verify_instances(query, max_fs_writers=2, mt_dop=0,
+                                           expected_num_instances_per_host=[1, 1, 2],
+                                           processing_cost_min_threads=10)
+    # Root scan fragment. Instance count within limit.
+    query = "create table {0}.test3 as select int_col from " \
+            "functional_parquet.alltypes".format(unique_database)
+    self.__run_insert_and_verify_instances(query, max_fs_writers=30, mt_dop=0,
+                                           expected_num_instances_per_host=[8, 8, 8],
+                                           processing_cost_min_threads=10)
+
   def __run_insert_and_verify_instances(self, query, max_fs_writers, mt_dop,
-                                        expected_num_instances_per_host):
+                                        expected_num_instances_per_host,
+                                        processing_cost_min_threads=0):
     self.client.set_configuration_option("max_fs_writers", max_fs_writers)
     self.client.set_configuration_option("mt_dop", mt_dop)
+    if processing_cost_min_threads > 0:
+      self.client.set_configuration_option("compute_processing_cost", "true")
+      self.client.set_configuration_option("processing_cost_min_threads",
+          processing_cost_min_threads)
     # Test depends on both planner and scheduler to see the same state of the cluster
     # having 3 executors, so to reduce flakiness we make sure all 3 executors are up
     # and running.

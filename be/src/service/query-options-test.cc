@@ -21,6 +21,7 @@
 #include <boost/preprocessor/seq/for_each.hpp>
 #include <boost/preprocessor/tuple/to_seq.hpp>
 
+#include "gen-cpp/Query_constants.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/runtime-filter.h"
 #include "testutil/gtest-util.h"
@@ -243,6 +244,7 @@ TEST(QueryOptions, SetEnumOptions) {
 // Test integer options. Some of them have lower/upper bounds.
 TEST(QueryOptions, SetIntOptions) {
   TQueryOptions options;
+  QueryConstants qc;
   // List of pairs of Key and its valid range
   pair<OptionDef<int32_t>, Range<int32_t>> case_set[]{
       {MAKE_OPTIONDEF(runtime_filter_wait_time_ms),    {0, I32_MAX}},
@@ -259,7 +261,10 @@ TEST(QueryOptions, SetIntOptions) {
       {MAKE_OPTIONDEF(max_cnf_exprs),                  {-1, I32_MAX}},
       {MAKE_OPTIONDEF(max_fs_writers),                 {0, I32_MAX}},
       {MAKE_OPTIONDEF(default_ndv_scale),              {1, 10}},
-      {MAKE_OPTIONDEF(processing_cost_min_threads),    {1, 128}},
+      {MAKE_OPTIONDEF(processing_cost_min_threads),
+          {1, qc.MAX_FRAGMENT_INSTANCES_PER_NODE}},
+      {MAKE_OPTIONDEF(max_fragment_instances_per_node),
+          {1, qc.MAX_FRAGMENT_INSTANCES_PER_NODE}},
   };
   for (const auto& test_case : case_set) {
     const OptionDef<int32_t>& option_def = test_case.first;

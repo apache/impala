@@ -914,31 +914,20 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   /**
    * Compute peak resources consumed when executing this PlanNode, initializing
-   * 'nodeResourceProfile_' and 'processingCost_'. May only be called after this PlanNode
+   * 'nodeResourceProfile_'. May only be called after this PlanNode
    * has been placed in a PlanFragment because the cost computation is dependent on the
    * enclosing fragment's data partition.
    */
   public abstract void computeNodeResourceProfile(TQueryOptions queryOptions);
 
   /**
-   * Determine whether a PlanNode is a leaf node within the plan tree.
-   * @return true if a PlanNode is a leaf node within the plan tree.
-   */
-  protected boolean isLeafNode() { return false; }
-
-  /**
    * Set number of rows consumed and produced data fields in processing cost.
    */
-  public void computeRowConsumptionAndProductionToCost(boolean limitScanParallelism) {
+  public void computeRowConsumptionAndProductionToCost() {
     Preconditions.checkState(processingCost_.isValid(),
         "Processing cost of PlanNode " + getDisplayLabel() + " is invalid!");
     processingCost_.setNumRowToConsume(getInputCardinality());
     processingCost_.setNumRowToProduce(getCardinality());
-    if ((isLeafNode() && limitScanParallelism)
-        && (!fragment_.hasAdjustedInstanceCount()
-            || fragment_.getAdjustedInstanceCount() < getNumInstances())) {
-      fragment_.setFixedInstanceCount(getNumInstances());
-    }
   }
 
   /**
@@ -1030,10 +1019,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   /**
    * Returns the max number of instances of a fragment that can be scheduled on a single
-   * node - the mt_dop value if mt_dop > 0, or 1 otherwise.
+   * node.
    */
   protected int getMaxInstancesPerNode(Analyzer analyzer) {
-    return Math.max(1, analyzer.getQueryOptions().getMt_dop());
+    return Math.max(1, analyzer.getMaxParallelismPerNode());
   }
 
   protected void addRuntimeFilter(RuntimeFilter filter) { runtimeFilters_.add(filter); }

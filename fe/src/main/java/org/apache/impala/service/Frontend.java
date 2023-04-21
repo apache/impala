@@ -316,13 +316,9 @@ public class Frontend {
       // The group set being applied in current compilation.
       protected TExecutorGroupSet group_set_ = null;
 
-      // If false, set leaf fragment parallelism to maxScanParallelism_ per executor node.
-      // Otherwise, leaf fragment parallelism is set to MT_DOP per executor node.
-      protected boolean limitScanParallelism_ = true;
-
-      // Maximum leaf fragment parallelism per executor node.
-      // Only used if limitScanParallelism_ is false.
-      protected int maxLeafParallelism_ = 1;
+      // Available cores per executor node.
+      // Valid value must be >= 0. Set by Frontend.getTExecRequest().
+      protected int availableCoresPerNode_ = -1;
 
       public boolean disableAuthorization() { return disableAuthorization_; }
 
@@ -332,13 +328,11 @@ public class Frontend {
       public int getCoresRequired() { return cores_required_; }
       public void setCoresRequired(int x) { cores_required_ = x; }
 
-      public boolean isLimitScanParallelism() { return limitScanParallelism_; }
-      public void setLimitScanParallelism(boolean isLimitScanParallelism) {
-        limitScanParallelism_ = isLimitScanParallelism;
+      public int getAvailableCoresPerNode() {
+        Preconditions.checkState(availableCoresPerNode_ >= 0);
+        return availableCoresPerNode_;
       }
-
-      public int getMaxLeafParallelism() { return maxLeafParallelism_; }
-      public void setMaxLeafParallelism(int x) { maxLeafParallelism_ = x; }
+      public void setAvailableCoresPerNode(int x) { availableCoresPerNode_ = x; }
 
       // Capture the current state and initialize before iterative compilations begin.
       public void captureState() {
@@ -1785,12 +1779,7 @@ public class Frontend {
 
     // Compute resource requirements of the final plans.
     TQueryExecRequest result = new TQueryExecRequest();
-    boolean isLimitScanParallelism = planCtx.compilationState_.isLimitScanParallelism();
-    int maxCores = isLimitScanParallelism ?
-        planCtx.compilationState_.getGroupSet().getNum_cores_per_executor() :
-        planCtx.compilationState_.getMaxLeafParallelism();
-    Planner.computeProcessingCost(
-        planRoots, result, planner.getPlannerCtx(), maxCores, isLimitScanParallelism);
+    Planner.computeProcessingCost(planRoots, result, planner.getPlannerCtx());
     Planner.computeResourceReqs(planRoots, queryCtx, result,
         planner.getPlannerCtx(), planner.getAnalysisResult().isQueryStmt());
 
@@ -2032,8 +2021,9 @@ public class Frontend {
 
     // Capture the current state.
     planCtx.compilationState_.captureState();
+    boolean isComputeCost = ProcessingCost.isComputeCost(queryOptions);
 
-    if (ProcessingCost.isComputeCost(queryOptions)) {
+    if (isComputeCost) {
       FrontendProfile.getCurrent().setToCounter(CPU_COUNT_DIVISOR, TUnit.DOUBLE_VALUE,
           Double.doubleToLongBits(BackendConfig.INSTANCE.getQueryCpuCountDivisor()));
     }
@@ -2041,8 +2031,6 @@ public class Frontend {
     TExecutorGroupSet group_set = null;
     String reason = "Unknown";
     int attempt = 0;
-    planCtx.compilationState_.setLimitScanParallelism(
-        num_executor_group_sets <= 1 || !ProcessingCost.isComputeCost(queryOptions));
     int lastExecutorGroupTotalCores =
         expectedTotalCores(executorGroupSetsToUse.get(num_executor_group_sets - 1));
     long memoryAskUnbounded = -1;
@@ -2051,16 +2039,15 @@ public class Frontend {
     while (i < num_executor_group_sets) {
       group_set = executorGroupSetsToUse.get(i);
       planCtx.compilationState_.setGroupSet(group_set);
-      if (i == num_executor_group_sets - 1) {
-        // This is the last executor group. Fix leaf nodes parallelism back to MT_DOP.
-        planCtx.compilationState_.setLimitScanParallelism(true);
-        planCtx.compilationState_.setMaxLeafParallelism(
-            group_set.getNum_cores_per_executor());
-      } else if (!planCtx.compilationState_.isLimitScanParallelism()) {
-        planCtx.compilationState_.setMaxLeafParallelism(
-            lastExecutorGroupTotalCores / expectedNumExecutor(group_set));
+      if (isComputeCost) {
+        planCtx.compilationState_.setAvailableCoresPerNode(
+            Math.max(queryOptions.getProcessing_cost_min_threads(),
+                lastExecutorGroupTotalCores / expectedNumExecutor(group_set)));
+      } else {
+        planCtx.compilationState_.setAvailableCoresPerNode(queryOptions.getMt_dop());
       }
-      LOG.info("Consider executor group set: " + group_set);
+      LOG.info("Consider executor group set: " + group_set + " with assumption of "
+          + planCtx.compilationState_.getAvailableCoresPerNode() + " cores per node.");
 
       String retryMsg = "";
       while (true) {
@@ -2097,7 +2084,7 @@ public class Frontend {
           new TCounter(MEMORY_MAX, TUnit.BYTES,
               LongMath.saturatedMultiply(
                   expectedNumExecutor(group_set), group_set.getMax_mem_limit())));
-      if (ProcessingCost.isComputeCost(queryOptions)) {
+      if (isComputeCost) {
         addCounter(groupSetProfile, new TCounter(CPU_MAX, TUnit.UNIT, available_cores));
       }
 
@@ -2145,7 +2132,7 @@ public class Frontend {
 
       boolean cpuReqSatisfied = true;
       int scaled_cores_requirement = -1;
-      if (ProcessingCost.isComputeCost(queryOptions)) {
+      if (isComputeCost) {
         Preconditions.checkState(cores_requirement > 0);
         scaled_cores_requirement = (int) Math.min(Integer.MAX_VALUE,
             Math.ceil(
@@ -2182,20 +2169,6 @@ public class Frontend {
         addInfoString(groupSetProfile, VERDICT, reason);
         matchFound = true;
       } else if (memReqSatisfied && cpuReqSatisfied) {
-        if (!planCtx.compilationState_.isLimitScanParallelism()) {
-          // Fix leaf nodes parallelism back to MT_DOP and replan.
-          // TODO: Remove this extra replanning and related codes in the future once we
-          //   can fully manage scan node parallelism without MT_DOP.
-          planCtx.compilationState_.setLimitScanParallelism(true);
-          memoryAskUnbounded = per_host_mem_estimate;
-          if (ProcessingCost.isComputeCost(queryOptions)) {
-            cpuAskUnbounded = scaled_cores_requirement;
-          }
-          planCtx.compilationState_.restoreState();
-          LOG.info("Executor group " + group_set + " fit the unbounded scan plan. "
-              + "Replanning again with scan parallelism equals MT_DOP.");
-          continue;
-        }
         reason = "suitable group found (estimated per-host memory="
             + PrintUtils.printBytes(per_host_mem_estimate)
             + ", estimated cpu cores required=" + cores_requirement
@@ -2348,6 +2321,8 @@ public class Frontend {
     // used during planner phase for scans (see HdfsScanNode.computeNumNodes()).
     analysisResult.getAnalyzer().setNumExecutorsForPlanning(
         expectedNumExecutor(planCtx.compilationState_.getGroupSet()));
+    analysisResult.getAnalyzer().setAvailableCoresPerNode(
+        Math.max(1, planCtx.compilationState_.getAvailableCoresPerNode()));
 
     try {
       TQueryOptions queryOptions = queryCtx.client_request.query_options;
