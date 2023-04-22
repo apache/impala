@@ -1,5 +1,3 @@
-#!/bin/bash
-#
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -17,25 +15,22 @@
 # specific language governing permissions and limitations
 # under the License.
 
-set -euo pipefail
-. $IMPALA_HOME/bin/report_build_error.sh
-setup_report_build_error
+IMPALA_JDK_VERSION=${IMPALA_JDK_VERSION:-system}
 
-RANGER_LOG_DIR="${IMPALA_CLUSTER_LOGS_DIR}/ranger"
-if [[ ! -d "${RANGER_LOG_DIR}" ]]; then
-    mkdir -p "${RANGER_LOG_DIR}"
+# Set OS Java package variables for bootstrap_system and Docker builds
+if [[ "${IMPALA_JDK_VERSION}" == "system" || "${IMPALA_JDK_VERSION}" == "8" ]]; then
+  UBUNTU_JAVA_VERSION=8
+  REDHAT_JAVA_VERSION=1.8.0
+elif [[ "${IMPALA_JDK_VERSION}" == "11" ]]; then
+  UBUNTU_JAVA_VERSION=11
+  REDHAT_JAVA_VERSION=11
+else
+  echo "Unknown value for IMPALA_JDK_VERSION=${IMPALA_JDK_VERSION}"
+  exit 1
 fi
 
-# IMPALA-8815: don't allow additional potentially incompatible jars to get onto
-# the ranger classpath. We should only need the test cluster configs on the classpath.
-unset CLASSPATH
-. $IMPALA_HOME/bin/impala-config.sh
-
-# Required to start Ranger with Java 11
-if [[ ! -d "${RANGER_HOME}"/ews/logs ]]; then
-  mkdir -p "${RANGER_HOME}"/ews/logs
+if [[ "$(uname -p)" == 'aarch64' ]]; then
+  UBUNTU_PACKAGE_ARCH='arm64'
+else
+  UBUNTU_PACKAGE_ARCH='amd64'
 fi
-
-JAVA_DBG_SOCKET="-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=30130"
-JAVA_OPTS="-XX:+IgnoreUnrecognizedVMOptions -Xdebug ${JAVA_DBG_SOCKET}" \
-    "${RANGER_HOME}"/ews/ranger-admin-services.sh restart

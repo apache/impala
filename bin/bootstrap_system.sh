@@ -214,13 +214,19 @@ if [[ "$UBUNTU" == true ]]; then
     sleep 1
   done
 fi
+
+# Set UBUNTU_JAVA_VERSION, UBUNTU_PACKAGE_ARCH, REDHAT_JAVA_VERSION
+source "$IMPALA_HOME/bin/impala-config-java.sh"
+
 ubuntu apt-get update
 ubuntu apt-get --yes install ccache curl gawk g++ gcc apt-utils git libffi-dev \
         libkrb5-dev krb5-admin-server krb5-kdc krb5-user libsasl2-dev \
         libsasl2-modules libsasl2-modules-gssapi-mit libssl-dev make ninja-build \
         python-dev python-setuptools python3-dev python3-setuptools postgresql \
-        ssh wget vim-common psmisc lsof openjdk-8-jdk openjdk-8-source openjdk-8-dbg \
-        net-tools language-pack-en libxml2-dev libxslt-dev
+        ssh wget vim-common psmisc lsof net-tools language-pack-en libxml2-dev \
+        libxslt-dev openjdk-${UBUNTU_JAVA_VERSION}-jdk \
+        openjdk-${UBUNTU_JAVA_VERSION}-source openjdk-${UBUNTU_JAVA_VERSION}-dbg
+
 # Required by Kudu in the minicluster
 ubuntu20 apt-get --yes install libtinfo5
 ARCH_NAME=$(uname -p)
@@ -230,46 +236,18 @@ if [[ $ARCH_NAME == 'aarch64' ]]; then
           libncurses5-dev libreadline-dev
 fi
 
-if [[ "$UBUNTU" == true ]]; then
-  # Don't use openjdk-8-jdk 8u181-b13-1ubuntu0.16.04.1 which is known to break the
-  # surefire tests. If we detect that version, we downgrade to the last known good one.
-  # See https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=911925 for details.
-  JDK_BAD_VERSION="8u181-b13-1ubuntu0.16.04.1"
-  if dpkg -l openjdk-8-jdk | grep -q $JDK_BAD_VERSION; then
-    JDK_TARGET_VERSION="8u181-b13-0ubuntu0.16.04.1"
-    DEB_DIR=$(mktemp -d)
-    pushd $DEB_DIR
-    wget --no-verbose \
-        "https://launchpadlibrarian.net/380913637/openjdk-8-jdk_8u181-b13-0ubuntu0.16.04.1_amd64.deb" \
-        "https://launchpadlibrarian.net/380913636/openjdk-8-jdk-headless_8u181-b13-0ubuntu0.16.04.1_amd64.deb" \
-        "https://launchpadlibrarian.net/380913641/openjdk-8-jre_8u181-b13-0ubuntu0.16.04.1_amd64.deb" \
-        "https://launchpadlibrarian.net/380913638/openjdk-8-jre-headless_8u181-b13-0ubuntu0.16.04.1_amd64.deb" \
-        "https://launchpadlibrarian.net/380913642/openjdk-8-source_8u181-b13-0ubuntu0.16.04.1_all.deb" \
-        "https://launchpadlibrarian.net/380913633/openjdk-8-dbg_8u181-b13-0ubuntu0.16.04.1_amd64.deb"
-    sudo dpkg -i *.deb
-    popd
-    rm -rf $DEB_DIR
-  fi
-fi
-
-# Ubuntu 18.04 and 20.04 install OpenJDK 11 and configure it as the default Java version.
-# Impala is currently tested with OpenJDK 8, so configure that version as the default.
-if [[ $ARCH_NAME == 'aarch64' ]]; then
-  ubuntu20 sudo update-java-alternatives -s java-1.8.0-openjdk-arm64
-  ubuntu18 sudo update-java-alternatives -s java-1.8.0-openjdk-arm64
-else
-  ubuntu18 sudo update-java-alternatives -s java-1.8.0-openjdk-amd64
-  ubuntu20 sudo update-java-alternatives -s java-1.8.0-openjdk-amd64
-fi
+# Configure the default Java version to be the version we selected.
+ubuntu sudo update-java-alternatives -s \
+    java-1.${UBUNTU_JAVA_VERSION}.0-openjdk-${UBUNTU_PACKAGE_ARCH}
 
 redhat sudo yum install -y curl gawk gcc gcc-c++ git krb5-devel krb5-server \
         krb5-workstation libevent-devel libffi-devel make openssl-devel cyrus-sasl \
         cyrus-sasl-gssapi cyrus-sasl-devel cyrus-sasl-plain \
         postgresql postgresql-server \
         wget vim-common nscd cmake fuse-devel zlib-devel \
-        psmisc lsof openssh-server redhat-lsb java-1.8.0-openjdk-devel \
-        java-1.8.0-openjdk-src python3-devel python3-setuptools net-tools \
-        langpacks-en glibc-langpack-en libxml2-devel libxslt-devel
+        psmisc lsof openssh-server redhat-lsb python3-devel python3-setuptools \
+        net-tools langpacks-en glibc-langpack-en libxml2-devel libxslt-devel \
+        java-${REDHAT_JAVA_VERSION}-openjdk-src java-${REDHAT_JAVA_VERSION}-openjdk-devel
 
 # Enable the Powertools repo for snappy-devel on RedHat 8
 redhat8 sudo yum install -y dnf-plugins-core
@@ -464,22 +442,6 @@ cd "$IMPALA_HOME"
 SET_IMPALA_HOME="export IMPALA_HOME=$(pwd)"
 echo -e "\n$SET_IMPALA_HOME" >> ~/.bashrc
 eval "$SET_IMPALA_HOME"
-
-# Ubuntu and RH install JDK's in slightly different paths.
-if [[ $UBUNTU == true ]]; then
-  # Assert that there's only one glob match.
-  [ 1 == $(compgen -G "/usr/lib/jvm/java-8-openjdk-*" | wc -l) ]
-  SET_JAVA_HOME="export JAVA_HOME=$(compgen -G '/usr/lib/jvm/java-8-openjdk-*')"
-else
-  # Assert that there's only one glob match.
-  [ 1 == $(compgen -G "/usr/lib/jvm/java-1.8.0-openjdk-*" | wc -l) ]
-  SET_JAVA_HOME="export JAVA_HOME=$(compgen -G '/usr/lib/jvm/java-1.8.0-openjdk-*')"
-fi
-
-echo -e "\n$SET_JAVA_HOME" >> "${IMPALA_HOME}/bin/impala-config-local.sh"
-eval "$SET_JAVA_HOME"
-# Assert that we have a java available
-test -f $JAVA_HOME/bin/java
 
 if [[ $ARCH_NAME == 'aarch64' ]]; then
   echo -e "\nexport SKIP_TOOLCHAIN_BOOTSTRAP=true" >> \
