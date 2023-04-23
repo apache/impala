@@ -6356,7 +6356,7 @@ public class CatalogOpExecutor {
   /**
    * Executes a TResetMetadataRequest and returns the result as a
    * TResetMetadataResponse. Based on the request parameters, this operation
-   * may do one of three things:
+   * may do one of these things:
    * 1) invalidate the entire catalog, forcing the metadata for all catalog
    *    objects to be reloaded.
    * 2) invalidate a specific table, forcing the metadata to be reloaded
@@ -6496,7 +6496,7 @@ public class CatalogOpExecutor {
               updatedThriftTable.getTable().getDb_name() + " was removed by a " +
               "concurrent operation. Try invalidating the table again.");
         }
-        resp.getResult().addToUpdated_catalog_objects(addedDb.toTCatalogObject());
+        addDbToCatalogUpdate(addedDb, req.header.want_minimal_response, resp.getResult());
       }
       resp.getResult().setVersion(updatedThriftTable.getCatalog_version());
     } else if (req.isAuthorization()) {
@@ -7214,7 +7214,6 @@ public class CatalogOpExecutor {
     Preconditions.checkNotNull(db);
     TCatalogObject updatedCatalogObject = wantMinimalResult ?
         db.toMinimalTCatalogObject() : db.toTCatalogObject();
-    updatedCatalogObject.setCatalog_version(updatedCatalogObject.getCatalog_version());
     result.addToUpdated_catalog_objects(updatedCatalogObject);
     result.setVersion(updatedCatalogObject.getCatalog_version());
   }
