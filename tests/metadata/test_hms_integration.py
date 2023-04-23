@@ -144,6 +144,16 @@ class TestHmsIntegrationSanity(ImpalaTestSuite):
     else:
       assert False
 
+  def test_invalidate_metadata(self, unique_name):
+    """Verify invalidate metadata on tables under unloaded db won't fail"""
+    db = unique_name + "_db"
+    tbl = db + "." + unique_name + "_tbl"
+    try:
+      self.run_stmt_in_hive("create database " + db)
+      self.run_stmt_in_hive("create table %s (i int)" % tbl)
+      self.client.execute("invalidate metadata %s" % tbl)
+    finally:
+      self.run_stmt_in_hive("drop database %s cascade" % db)
 
 @SkipIfFS.hive
 class TestHmsIntegration(ImpalaTestSuite):

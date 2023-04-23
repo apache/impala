@@ -6404,10 +6404,16 @@ public class CatalogOpExecutor {
       // Thrift representation of the result of the invalidate/refresh operation.
       TCatalogObject updatedThriftTable = null;
       TableName tblName = TableName.fromThrift(req.getTable_name());
-      Table tbl = catalog_.getTable(tblName.getDb(), tblName.getTbl());
-      if (req.isIs_refresh()) {
+      Table tbl = null;
+      if (!req.isIs_refresh()) {
+        // For INVALIDATE METADATA <db>.<table>, the db might be unloaded.
+        // So we can't update 'tbl' here.
+        updatedThriftTable = catalog_.invalidateTable(
+            req.getTable_name(), tblWasRemoved, dbWasAdded);
+      } else {
         // Quick check to see if the table exists in the catalog without triggering
         // a table load.
+        tbl = catalog_.getTable(tblName.getDb(), tblName.getTbl());
         if (tbl != null) {
           // If the table is not loaded, no need to perform refresh after the initial
           // metadata load.
@@ -6454,9 +6460,6 @@ public class CatalogOpExecutor {
             }
           }
         }
-      } else {
-        updatedThriftTable = catalog_.invalidateTable(
-            req.getTable_name(), tblWasRemoved, dbWasAdded);
       }
 
       if (updatedThriftTable == null) {
@@ -6467,6 +6470,11 @@ public class CatalogOpExecutor {
       }
 
       if (BackendConfig.INSTANCE.enableReloadEvents()) {
+        // For INVALIDATE METADATA <table>, 'tbl' can only be got after it succeeds.
+        if (!req.isIs_refresh()) {
+          tbl = catalog_.getTable(tblName.getDb(), tblName.getTbl());
+        }
+        Preconditions.checkNotNull(tbl, "tbl is null in " + cmdString);
         // fire event for refresh event and update the last refresh event id
         fireReloadEventAndUpdateRefreshEventId(req, updatedThriftTable, tblName, tbl);
       }

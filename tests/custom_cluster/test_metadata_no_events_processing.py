@@ -296,3 +296,17 @@ class TestMetadataNoEventsProcessing(CustomClusterTestSuite):
     result = self.client.execute("show partitions %s" % tbl)
     assert result.get_data().startswith("1\t1\t2"),\
         "Incorrect partition stats %s" % result.get_data()
+
+  @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=0")
+  def test_invalidate_metadata(self, unique_name):
+    """Verify invalidate metadata on tables under unloaded db won't fail"""
+    db = unique_name + "_db"
+    tbl = db + "." + unique_name + "_tbl"
+    try:
+      self.run_stmt_in_hive("create database " + db)
+      self.run_stmt_in_hive("create table %s (i int)" % tbl)
+      self.client.execute("invalidate metadata %s" % tbl)
+      res = self.client.execute("describe %s" % tbl)
+      assert res.data == ["i\tint\t"]
+    finally:
+      self.run_stmt_in_hive("drop database %s cascade" % db)
