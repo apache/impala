@@ -789,7 +789,7 @@ class ImpalaShell(cmd.Cmd, object):
       summary, failed_summary = self.imp_client.get_summary(self.last_query_handle)
     except RPCException as e:
       import re
-      error_pattern = re.compile("ERROR: Query id \d+:\d+ not found.")
+      error_pattern = re.compile("ERROR: Query id [a-f0-9]+:[a-f0-9]+ not found.")
       if error_pattern.match(e.value):
         print("Could not retrieve summary for query.", file=sys.stderr)
       else:
@@ -808,7 +808,10 @@ class ImpalaShell(cmd.Cmd, object):
     elif display_mode == QueryAttemptDisplayModes.LATEST:
       self.print_exec_summary(summary)
     elif display_mode == QueryAttemptDisplayModes.ORIGINAL:
-      self.print_exec_summary(failed_summary)
+      if failed_summary:
+        self.print_exec_summary(failed_summary)
+      else:
+        print("No failed summary found")
     else:
       raise FatalShellException("Invalid value for query summary display mode")
 
@@ -819,6 +822,7 @@ class ImpalaShell(cmd.Cmd, object):
         QueryAttemptDisplayModes.LATEST, QueryAttemptDisplayModes.ORIGINAL]:
       print("Invalid value for query attempt display mode: \'" +
           arg_mode + "\'. Valid values are [ALL | LATEST | ORIGINAL]")
+      return None
     return arg_mode
 
   def print_exec_summary(self, summary):
