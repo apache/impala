@@ -304,8 +304,15 @@ class BitUtil {
   }
 
   template<typename T>
-  static inline int CountLeadingZeros(T v) {
+  static constexpr inline int CountLeadingZeros(T v) {
+    static_assert(sizeof(T) == 4 || sizeof(T) == 8 || sizeof(T) == 16);
     DCHECK(v >= 0);
+
+    // __builtin_clz() and __builtin_clzll() is undefined for 0.
+    if (UNLIKELY(v == 0)) {
+      return sizeof(T) * CHAR_BIT;
+    }
+
     if (sizeof(T) == 4) {
       uint32_t orig = static_cast<uint32_t>(v);
       return __builtin_clz(orig);
@@ -314,7 +321,6 @@ class BitUtil {
       return __builtin_clzll(orig);
     } else {
       DCHECK(sizeof(T) == 16);
-      if (UNLIKELY(v == 0)) return 128;
       unsigned __int128 orig = static_cast<unsigned __int128>(v);
       unsigned __int128 shifted = orig >> 64;
       if (shifted != 0) {
