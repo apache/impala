@@ -103,6 +103,12 @@ IS_BUGGY_EL6_KERNEL = 'el6' in kernel_release and kernel_version < [2, 6, 32, 67
 IS_TEST_JDK = os.environ.get("TEST_JAVA_HOME_OVERRIDE",
                              os.environ.get("TEST_JDK_VERSION", "")) != ""
 
+# Detect if we are testing with tuple cache enabled.
+IS_TUPLE_CACHE = (
+    os.getenv("TUPLE_CACHE_DIR", "") != ""
+    and os.getenv("TUPLE_CACHE_CAPACITY", "") != ""
+)
+
 class ImpalaBuildFlavors:
   """
   Represents the possible CMAKE_BUILD_TYPE values. These build flavors are needed

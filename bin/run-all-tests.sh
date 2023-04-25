@@ -81,6 +81,10 @@ fi
 : ${DATA_CACHE_EVICTION_POLICY:=}
 # Number of data cache async write threads.
 : ${DATA_CACHE_NUM_ASYNC_WRITE_THREADS:=}
+# Tuple cache root directory location.
+: ${TUPLE_CACHE_DIR:=}
+# Tuple cache capacity.
+: ${TUPLE_CACHE_CAPACITY:=}
 if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
   # TODO: Remove abort_on_config_error flag from here and create-load-data.sh once
   # checkConfiguration() accepts the local filesystem (see IMPALA-1850).
@@ -108,6 +112,14 @@ if [[ -n "${DATA_CACHE_DIR}" && -n "${DATA_CACHE_SIZE}" ]]; then
       TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} "`
           `"--impalad_args=--always_use_data_cache=true"
    fi
+fi
+
+# Enable tuple cache if configured.
+if [[ -n "${TUPLE_CACHE_DIR}" && -n "${TUPLE_CACHE_CAPACITY}" ]]; then
+   TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} "`
+       `"--tuple_cache_dir=${TUPLE_CACHE_DIR} "
+   TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} "`
+       `"--tuple_cache_capacity=${TUPLE_CACHE_CAPACITY} "
 fi
 
 if [[ "${ERASURE_CODING}" = true ]]; then

@@ -27,7 +27,8 @@ from functools import partial
 from tests.common.environ import (ImpalaTestClusterProperties,
                                   IS_DOCKERIZED_TEST_CLUSTER, IS_BUGGY_EL6_KERNEL,
                                   HIVE_MAJOR_VERSION, IS_REDHAT_6_DERIVATIVE,
-                                  IS_APACHE_HIVE, IS_TEST_JDK)
+                                  IS_APACHE_HIVE, IS_TEST_JDK,
+                                  IS_TUPLE_CACHE)
 from tests.common.kudu_test_suite import get_kudu_master_flag
 from tests.util.filesystem_utils import (
     IS_ABFS,
@@ -129,6 +130,8 @@ class SkipIf:
   is_test_jdk = pytest.mark.skipif(IS_TEST_JDK, reason="Testing with different JDK")
   runs_slowly = pytest.mark.skipif(IMPALA_TEST_CLUSTER_PROPERTIES.runs_slowly(),
       reason="Test cluster runs slowly due to enablement of code coverage or sanitizer")
+  not_tuple_cache = pytest.mark.skipif(not IS_TUPLE_CACHE,
+      reason="Tuple Cache needed")
 
 class SkipIfLocal:
   # These are skipped due to product limitations.

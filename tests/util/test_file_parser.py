@@ -439,3 +439,40 @@ def load_tpc_queries(workload, include_stress_queries=False, query_name_filters=
       raise Exception("Expected exactly 1 query to be in file %s but got %s"
           % (file_path, len(test_cases)))
   return queries
+
+
+def tpc_sort_key(s):
+    """
+    Sorting key for sorting strings in the format "tpch-qx-y" or "tpch-qx" or "tpch-qxX".
+    Args:
+        s (str): Input string to be sorted.
+    Returns:
+        tuple: Tuple of (int, int, str), where the first integer is the value of "x",
+               the second integer is the value of "y" if present, otherwise 0, and the
+               third element is the character of "X" of the string, if present and not
+               numeric, otherwise an empty string ('').
+    """
+    parts = s.split("-")
+    match = re.search(r"q(\d+)(\D)?", parts[1])
+    x = int(match.group(1)) if match else 0
+    x_char = match.group(2) if match else ''
+    y = int(parts[2]) if len(parts) > 2 else 0
+    return x, y, x_char
+
+
+def load_tpc_queries_name_sorted(workload):
+    """
+    Returns a list of queries for the given workload. Only tpch and tpcds are supported,
+    and only the name of the queries will be returned. The names are be sorted and
+    converted to lowercase before being returned.
+    Args:
+        workload (str): tpch or tpcds.
+    """
+    queries = list(load_tpc_queries(workload).keys())
+    queries = [s.lower() for s in queries]
+    queries = sorted(queries, key=tpc_sort_key)
+    if workload == 'tpcds':
+      # TPCDS is assumed to always use decimal_v2, in alignment with load_tpc_queries()
+      substring = "tpcds-decimal_v2"
+      queries = [x.replace(workload, substring) for x in queries]
+    return queries
