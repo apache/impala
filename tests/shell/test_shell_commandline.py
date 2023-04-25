@@ -186,6 +186,12 @@ class TestImpalaShell(ImpalaTestSuite):
     results = run_impala_shell_cmd(vector, [], wait_until_connected=False)
     assert "with no authentication" in results.stderr
 
+  def test_fastbinary_warning_message(self, vector):
+    results = run_impala_shell_cmd(vector, [], wait_until_connected=False)
+    # Verify that we don't print any message about fastbinary
+    # This doesn't check the full error string, because that could change.
+    assert "fastbinary" not in results.stderr
+
   def test_print_header(self, vector, populated_table):
     args = ['--print_header', '-B', '--output_delim=,', '-q',
             'select * from {0}'.format(populated_table)]

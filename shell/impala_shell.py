@@ -2193,6 +2193,14 @@ def impala_shell_main():
       if options.verbose:
         print("SSL is enabled", file=sys.stderr)
 
+  if options.verbose:
+    try:
+      import thrift.protocol.fastbinary
+    except Exception as e:
+      print("WARNING: Failed to load Thrift's fastbinary module. Thrift's "
+            "BinaryProtocol will not be accelerated, which can reduce performance. "
+            "Error was '{0}'".format(e), file=sys.stderr)
+
   if options.output_file:
     try:
       # Make sure the given file can be opened for writing. This will also clear the file
