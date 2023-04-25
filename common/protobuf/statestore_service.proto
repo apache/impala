@@ -76,4 +76,12 @@ message BackendDescriptorPB {
   // The number of admission slots for this backend that can be occupied by running
   // queries.
   optional int64 admission_slots = 12;
+
+  // The process start time of this backend, represented as a date-time string in the
+  // local time zone.
+  optional string process_start_time = 13;
+
+  // The pretty-printed string representation of program version and build version for
+  // this backend.
+  optional string version = 14;
 }

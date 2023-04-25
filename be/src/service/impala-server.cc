@@ -87,6 +87,7 @@
 #include "util/auth-util.h"
 #include "util/bit-util.h"
 #include "util/coding-util.h"
+#include "util/common-metrics.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
 #include "util/histogram-metric.h"
@@ -2344,6 +2345,13 @@ void ImpalaServer::BuildLocalBackendDescriptorInternal(BackendDescriptorPB* be_d
   be_desc->set_admission_slots(exec_env_->admission_slots());
   be_desc->set_is_quiescing(is_quiescing);
   SetExecutorGroups(FLAGS_executor_groups, be_desc);
+
+  if (CommonMetrics::PROCESS_START_TIME != nullptr) {
+    be_desc->set_process_start_time(CommonMetrics::PROCESS_START_TIME->GetValue());
+  } else {
+    be_desc->set_process_start_time(CurrentTimeString());
+  }
+  be_desc->set_version(GetBuildVersion(/* compact */ true));
 }
 
 ImpalaServer::QueryStateRecord::QueryStateRecord(

@@ -20,13 +20,15 @@ under the License.
 
 <h2>Active backend(s): {{num_active_backends}}</h2>
 
-<table id="backends" class='table table-hover table-bordered'>
+<table id="backends" class='table table-hover table-bordered table-responsive'>
   <thead>
     <tr>
       <th></th>
       <th>Address</th>
       <th>Krpc Address</th>
       <th>Backend Id</th>
+      <th>Version</th>
+      <th>Process Start Time</th>
       <th>Coordinator</th>
       <th>Executor</th>
       <th>Memory Limit for Admission</th>
@@ -45,6 +47,8 @@ under the License.
       <td>{{address}}</td>
       <td>{{krpc_address}}</td>
       <td>{{backend_id}}</td>
+      <td>{{version}}</td>
+      <td>{{process_start_time}}</td>
       <td>{{is_coordinator}}</td>
       <td>{{is_executor}}</td>
       <td>{{admit_mem_limit}}</td>
@@ -62,13 +66,15 @@ under the License.
 {{#num_quiescing_backends}}
 <h2>Quiescing backend(s)<sup><a href='#' data-toggle="tooltip" title="{{> www/quiescing_tooltip.txt }}">[?]</a></sup>: {{num_quiescing_backends}}</h2>
 
-<table id="quiescing_backends" class='table table-hover table-bordered'>
+<table id="quiescing_backends" class='table table-hover table-bordered table-responsive'>
   <thead>
     <tr>
       <th></th>
       <th>Address</th>
       <th>Krpc Address</th>
       <th>Backend Id</th>
+      <th>Version</th>
+      <th>Process Start Time</th>
       <th>Coordinator</th>
       <th>Executor</th>
       <th>Memory Limit for Admission</th>
@@ -87,6 +93,8 @@ under the License.
       <td>{{address}}</td>
       <td>{{krpc_address}}</td>
       <td>{{backend_id}}</td>
+      <td>{{version}}</td>
+      <td>{{process_start_time}}</td>
       <td>{{is_coordinator}}</td>
       <td>{{is_executor}}</td>
       <td>{{admit_mem_limit}}</td>
@@ -105,13 +113,15 @@ under the License.
 {{#num_blacklisted_backends}}
 <h2>Blacklisted backend(s)<sup><a href='#' data-toggle="tooltip" title="{{> www/blacklisted_tooltip.txt }}">[?]</a></sup>: {{num_blacklisted_backends}}</h2>
 
-<table id="blacklisted_backends" class='table table-hover table-bordered'>
+<table id="blacklisted_backends" class='table table-hover table-bordered table-responsive'>
   <thead>
     <tr>
       <th></th>
       <th>Address</th>
       <th>Krpc Address</th>
       <th>Backend Id</th>
+      <th>Version</th>
+      <th>Process Start Time</th>
       <th>Blacklisting Cause</th>
       <th>Time remaining on blacklist</th>
       <th>Coordinator</th>
@@ -132,6 +142,8 @@ under the License.
       <td>{{address}}</td>
       <td>{{krpc_address}}</td>
       <td>{{backend_id}}</td>
+      <td>{{version}}</td>
+      <td>{{process_start_time}}</td>
       <td>{{blacklist_cause}}</td>
       <td>{{blacklist_time_remaining}}</td>
       <td>{{is_coordinator}}</td>

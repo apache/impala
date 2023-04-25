@@ -771,6 +771,8 @@ class TestWebPage(ImpalaTestSuite):
     assert not backend_row['is_quiescing']
     assert not backend_row['is_blacklisted']
     assert len(backend_row['admit_mem_limit']) > 0
+    assert len(backend_row['process_start_time']) > 0
+    assert len(backend_row['version']) > 0
 
   def test_download_profile(self):
     """Test download text profile for a query"""

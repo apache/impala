@@ -1186,6 +1186,10 @@ void ImpalaHttpHandler::BackendsHandler(const Webserver::WebRequest& req,
     Value executor_groups(JoinStrings(group_names, ", ").c_str(),
         document->GetAllocator());
     backend_obj.AddMember("executor_groups", executor_groups, document->GetAllocator());
+    Value start_time_val(backend.process_start_time().c_str(), document->GetAllocator());
+    backend_obj.AddMember("process_start_time", start_time_val, document->GetAllocator());
+    Value version_val(backend.version().c_str(), document->GetAllocator());
+    backend_obj.AddMember("version", version_val, document->GetAllocator());
     backends_list.PushBack(backend_obj, document->GetAllocator());
   }
   document->AddMember("backends", backends_list, document->GetAllocator());
