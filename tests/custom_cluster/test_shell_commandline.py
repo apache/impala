@@ -43,6 +43,9 @@ class TestImpalaShellCommandLine(CustomClusterTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
+    """Overrides all other add_dimension methods in super classes up the entire class
+    hierarchy ensuring that each test in this class only get run once using the
+    hs2-http protocol."""
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_http_transport())
 
   @pytest.mark.execute_serially
@@ -52,7 +55,7 @@ class TestImpalaShellCommandLine(CustomClusterTestSuite):
     all calls to the backend impala engine made using the hs2 over http protocol.
     The impala coordinator logs are searched to ensure these tracing headers were added
     and also were passed through to the coordinator."""
-    args = ['--protocol', 'hs2-http', '-q', 'select version();profile']
+    args = ['--protocol', vector.get_value('protocol'), '-q', 'select version();profile']
     result = run_impala_shell_cmd(vector, args)
 
     # Shut down cluster to ensure logs flush to disk.
@@ -150,7 +153,7 @@ class TestImpalaShellCommandLine(CustomClusterTestSuite):
   def test_http_tracing_headers_off(self, vector):
     """Asserts the impala shell command line parameter to prevent the addition of http
     tracing headers actually leaves out those tracing headers."""
-    args = ['--protocol', 'hs2-http', '--no_http_tracing',
+    args = ['--protocol', vector.get_value('protocol'), '--no_http_tracing',
             '-q', 'select version();profile']
     result = run_impala_shell_cmd(vector, args)
 

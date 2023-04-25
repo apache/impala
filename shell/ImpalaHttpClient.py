@@ -187,6 +187,18 @@ class ImpalaHttpClient(TTransportBase):
     custom_headers['Authorization'] = "Basic " + self.__basic_auth
     return custom_headers
 
+  def getCustomHeadersWithBearerAuth(self, cookie_header, has_auth_cookie):
+    custom_headers = {}
+    if cookie_header:
+      # Add cookies to HTTP header.
+      custom_headers['Cookie'] = cookie_header
+    # Add the 'Authorization' header to request even if the auth cookie is
+    # present to avoid a round trip in case the cookie is expired when server
+    # receive the request. Since the 'auth' value is calculated once, so it
+    # won't cause a performance issue.
+    custom_headers['Authorization'] = "Bearer {0}".format(self.__bearer_token)
+    return custom_headers
+
   def getCustomHeadersWithNegotiateAuth(self, cookie_header, has_auth_cookie):
     import kerberos
     custom_headers = {}
@@ -216,6 +228,12 @@ class ImpalaHttpClient(TTransportBase):
     # auth mechanism: LDAP
     self.__basic_auth = basic_auth
     self.__get_custom_headers_func = self.getCustomHeadersWithBasicAuth
+
+  # Set function to generate customized HTTP headers for JWT authorization.
+  def setJwtAuth(self, jwt):
+    # auth mechanism: JWT
+    self.__bearer_token = jwt
+    self.__get_custom_headers_func = self.getCustomHeadersWithBearerAuth
 
   # Set function to generate customized HTTP headers for Kerberos authorization.
   def setKerberosAuth(self, kerb_service):

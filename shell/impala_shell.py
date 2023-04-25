@@ -190,14 +190,17 @@ class ImpalaShell(cmd.Cmd, object):
     self.ca_cert = options.ca_cert
     self.user = options.user
     self.ldap_password_cmd = options.ldap_password_cmd
+    self.jwt_cmd = options.jwt_cmd
     self.strict_hs2_protocol = options.strict_hs2_protocol
     self.ldap_password = options.ldap_password
+    self.use_jwt = options.use_jwt
+    self.jwt = options.jwt
     # When running tests in strict mode, the server uses the ldap
     # protocol but can allow any password.
     if options.use_ldap_test_password:
       self.ldap_password = 'password'
     self.use_ldap = options.use_ldap or \
-        (self.strict_hs2_protocol and not self.use_kerberos)
+        (self.strict_hs2_protocol and not self.use_kerberos and not self.use_jwt)
     self.client_connect_timeout_ms = options.client_connect_timeout_ms
     self.http_socket_timeout_s = None
     if (options.http_socket_timeout_s != 'None' and
@@ -622,7 +625,8 @@ class ImpalaShell(cmd.Cmd, object):
                           use_http_base_transport=True, http_path=self.http_path,
                           http_cookie_names=self.http_cookie_names,
                           value_converter=value_converter, rpc_stdout=self.rpc_stdout,
-                          rpc_file=self.rpc_file, http_tracing=self.http_tracing)
+                          rpc_file=self.rpc_file, http_tracing=self.http_tracing,
+                          jwt=self.jwt)
     if protocol == 'hs2':
       return ImpalaHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
@@ -643,7 +647,7 @@ class ImpalaShell(cmd.Cmd, object):
                           value_converter=value_converter,
                           connect_max_tries=self.connect_max_tries,
                           rpc_stdout=self.rpc_stdout, rpc_file=self.rpc_file,
-                          http_tracing=self.http_tracing)
+                          http_tracing=self.http_tracing, jwt=self.jwt)
     elif protocol == 'beeswax':
       return ImpalaBeeswaxClient(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
@@ -951,6 +955,9 @@ class ImpalaShell(cmd.Cmd, object):
     if self.use_ldap and self.ldap_password is None:
       self.ldap_password = getpass.getpass("LDAP password for %s: " % self.user)
 
+    if self.use_jwt and self.jwt is None:
+      self.jwt = getpass.getpass("Enter JWT: ")
+
     if not args: args = socket.getfqdn()
     tokens = args.split(" ")
     # validate the connection string.
@@ -995,6 +1002,8 @@ class ImpalaShell(cmd.Cmd, object):
           self.use_kerberos = True
           self.use_ldap = False
           self.ldap_password = None
+          self.use_jwt = False
+          self.jwt = None
           self.imp_client = self._new_impala_client()
           self._connect()
       except OSError:
@@ -1942,6 +1951,10 @@ def get_intro(options):
     intro += ("\n\nLDAP authentication is enabled, but the connection to Impala is "
               "not secured by TLS.\nALL PASSWORDS WILL BE SENT IN THE CLEAR TO IMPALA.")
 
+  if not options.ssl and options.creds_ok_in_clear and options.use_jwt:
+    intro += ("\n\nJWT authentication is enabled, but the connection to Impala is "
+              "not secured by TLS.\nALL JWTs WILL BE SENT IN THE CLEAR TO IMPALA.")
+
   if options.protocol == 'beeswax':
     intro += ("\n\nWARNING: The beeswax protocol is deprecated and will be removed in a "
               "future version of Impala.")
@@ -1960,6 +1973,31 @@ def _validate_hs2_fp_format_specification(format_specification):
     raise e
   except (ValueError, TypeError) as e:
     raise FatalShellException(e)
+
+
+def read_password_cmd(password_cmd, auth_method_desc, strip_newline=False):
+  try:
+    p = subprocess.Popen(shlex.split(password_cmd), stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
+    password, stderr = p.communicate()
+
+    if p.returncode != 0:
+      print("Error retrieving %s (command was '%s', error was: "
+            "'%s')" % (auth_method_desc, password_cmd, stderr.strip()), file=sys.stderr)
+      raise FatalShellException()
+
+    if sys.version_info.major > 2:
+      # Ensure we can manipulate the password as a string later.
+      password = password.decode('utf-8')
+
+    if strip_newline:
+      password = password.rstrip('\r\n')
+
+    return password
+  except Exception as e:
+    print("Error retrieving %s (command was: '%s', exception "
+          "was: '%s')" % (auth_method_desc, password_cmd, e), file=sys.stderr)
+    raise FatalShellException()
 
 
 
@@ -2049,8 +2087,18 @@ def impala_shell_main():
             "must be a 1-character string." % delim, file=sys.stderr)
       raise FatalShellException()
 
-  if options.use_kerberos and options.use_ldap:
-    print("Please specify at most one authentication mechanism (-k or -l)",
+  auth_method_count = 0
+  if options.use_kerberos:
+    auth_method_count += 1
+
+  if options.use_ldap:
+    auth_method_count += 1
+
+  if options.use_jwt:
+    auth_method_count += 1
+
+  if auth_method_count > 1:
+    print("Please specify at most one authentication mechanism (-k, -l, or -j)",
           file=sys.stderr)
     raise FatalShellException()
 
@@ -2063,6 +2111,25 @@ def impala_shell_main():
   if not options.use_ldap and options.ldap_password_cmd:
     print("Option --ldap_password_cmd requires using LDAP authentication " +
           "mechanism (-l)", file=sys.stderr)
+    raise FatalShellException()
+
+  if options.use_jwt and options.protocol.lower() != 'hs2-http':
+    print("Invalid protocol '{0}'. JWT authentication requires using the 'hs2-http' "
+          "protocol".format(options.protocol), file=sys.stderr)
+    raise FatalShellException()
+
+  if options.use_jwt and options.strict_hs2_protocol:
+    print("JWT authentication is not supported when using strict hs2.", file=sys.stderr)
+    raise FatalShellException()
+
+  if options.use_jwt and not options.ssl and not options.creds_ok_in_clear:
+    print("JWTs may not be sent over insecure connections. Enable SSL or "
+          "set --auth_creds_ok_in_clear", file=sys.stderr)
+    raise FatalShellException()
+
+  if not options.use_jwt and options.jwt_cmd:
+    print("Option --jwt_cmd requires using JWT authentication mechanism (-j)",
+          file=sys.stderr)
     raise FatalShellException()
 
   if options.hs2_fp_format:
@@ -2100,6 +2167,10 @@ def impala_shell_main():
     if options.verbose:
       ldap_msg = "with LDAP-based authentication"
       print("{0} {1} {2}".format(start_msg, ldap_msg, py_version_msg), file=sys.stderr)
+  elif options.use_jwt:
+    if options.verbose:
+      ldap_msg = "with JWT-based authentication"
+      print("{0} {1} {2}".format(start_msg, ldap_msg, py_version_msg), file=sys.stderr)
   else:
     if options.verbose:
       no_auth_msg = "with no authentication"
@@ -2107,21 +2178,11 @@ def impala_shell_main():
 
   options.ldap_password = None
   if options.use_ldap and options.ldap_password_cmd:
-    try:
-      p = subprocess.Popen(shlex.split(options.ldap_password_cmd), stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE)
-      options.ldap_password, stderr = p.communicate()
-      if p.returncode != 0:
-        print("Error retrieving LDAP password (command was '%s', error was: "
-              "'%s')" % (options.ldap_password_cmd, stderr.strip()), file=sys.stderr)
-        raise FatalShellException()
-      if sys.version_info.major > 2:
-        # Ensure we can manipulate the password as a string later.
-        options.ldap_password = options.ldap_password.decode('utf-8')
-    except Exception as e:
-      print("Error retrieving LDAP password (command was: '%s', exception "
-            "was: '%s')" % (options.ldap_password_cmd, e), file=sys.stderr)
-      raise FatalShellException()
+    options.ldap_password = read_password_cmd(options.ldap_password_cmd, "LDAP password")
+
+  options.jwt = None
+  if options.use_jwt and options.jwt_cmd:
+    options.jwt = read_password_cmd(options.jwt_cmd, "JWT", True)
 
   if options.ssl:
     if options.ca_cert is None:
