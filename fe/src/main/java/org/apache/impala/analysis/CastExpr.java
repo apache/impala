@@ -335,10 +335,23 @@ public class CastExpr extends Expr {
     }
 
     if (children_.get(0) instanceof NumericLiteral && type_.isFloatingPointType()) {
-      // Special case casting a decimal literal to a floating point number. The
-      // decimal literal can be interpreted as either and we want to avoid casts
-      // since that can result in loss of accuracy.
-      ((NumericLiteral)children_.get(0)).explicitlyCastToFloat(type_);
+      // Special case casting a decimal literal to a floating point number. The decimal
+      // literal can be interpreted as either and we want to avoid casts since that can
+      // result in loss of accuracy. However, if 'type_' is FLOAT and the value does not
+      // fit in a FLOAT, we do not do an unchecked conversion
+      // ('NumericLiteral.explicitlyCastToFloat()') here but let the conversion fail in
+      // the BE.
+      NumericLiteral child = (NumericLiteral) children_.get(0);
+      final boolean isOverflow = NumericLiteral.isOverflow(child.getValue(), type_);
+      if (type_.isScalarType(PrimitiveType.FLOAT)) {
+        if (!isOverflow) {
+          ((NumericLiteral)children_.get(0)).explicitlyCastToFloat(type_);
+        }
+      } else {
+        Preconditions.checkState(type_.isScalarType(PrimitiveType.DOUBLE));
+        Preconditions.checkState(!isOverflow);
+        ((NumericLiteral)children_.get(0)).explicitlyCastToFloat(type_);
+      }
     }
 
     if (children_.get(0).getType().isNull()) {

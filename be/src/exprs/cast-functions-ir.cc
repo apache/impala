@@ -18,8 +18,10 @@
 #include "exprs/cast-functions.h"
 
 #include <cmath>
+#include <limits>
 #include <sstream>
 #include <string>
+#include <type_traits>
 
 #include <gutil/strings/numbers.h>
 #include <gutil/strings/substitute.h>
@@ -55,9 +57,161 @@ const int MAX_TINYINT_CHARS = 4;
 // 1 0
 const int MAX_BOOLEAN_CHARS = 1;
 
+namespace {
+
+// This struct is used as a helper in the validation of casts. For a cast from 'FROM_TYPE'
+// to 'TO_TYPE' it provides compile time constants about what type of conversion it is.
+// These constants are used in the template specifications of the 'Validate()' function to
+// group together the relevant cases.
+template <class FROM_TYPE, class TO_TYPE>
+struct ConversionType {
+  // std::is_integral includes 'bool' but 'bool' behaves differently from integers in
+  // conversions.
+  template <class T>
+  static constexpr bool is_non_bool_integer =
+      std::is_integral_v<T> &&
+      !std::is_same_v<T, bool>;
+
+  ///////////////////////////////////
+  // Conversions that cannot fail. //
+  ///////////////////////////////////
+  static constexpr bool same_type_conversion = std::is_same_v<FROM_TYPE, TO_TYPE>;
+
+  static constexpr bool integer_to_integer_conversion =
+      is_non_bool_integer<FROM_TYPE> &&
+      is_non_bool_integer<TO_TYPE>;
+
+  static constexpr bool boolean_conversion =
+    std::is_same_v<FROM_TYPE, bool> ||
+    std::is_same_v<TO_TYPE, bool>;
+
+  // Integer to floating point cannot fail because a 32-bit float can represent the min
+  // and max value of a 64-bit integer.
+  static constexpr bool integer_to_floatingpoint_conversion =
+      is_non_bool_integer<FROM_TYPE> &&
+      std::is_floating_point_v<TO_TYPE>;
+
+  static constexpr bool float_to_double_conversion =
+      std::is_same_v<FROM_TYPE, float> &&
+      std::is_same_v<TO_TYPE, double>;
+
+  static constexpr bool conversion_always_succeeds =
+      same_type_conversion ||
+      integer_to_integer_conversion ||
+      boolean_conversion ||
+      integer_to_floatingpoint_conversion ||
+      float_to_double_conversion;
+
+  ////////////////////////////////
+  // Conversions that can fail. //
+  ////////////////////////////////
+  static constexpr bool floatingpoint_to_integer_conversion =
+      std::is_floating_point_v<FROM_TYPE> &&
+      is_non_bool_integer<TO_TYPE>;
+
+  static constexpr bool double_to_float_conversion =
+      std::is_same_v<FROM_TYPE, double> &&
+      std::is_same_v<TO_TYPE, float>;
+};
+
+template <class FROM_TYPE, class TO_TYPE, typename std::enable_if_t<
+    ConversionType<FROM_TYPE, TO_TYPE>::conversion_always_succeeds
+    >* = nullptr>
+bool Validate(FROM_TYPE from, FunctionContext* ctx) {
+  return true;
+}
+
+template <class FROM_TYPE, class TO_TYPE, typename std::enable_if_t<
+    ConversionType<FROM_TYPE, TO_TYPE>::floatingpoint_to_integer_conversion
+    >* = nullptr>
+bool Validate(FROM_TYPE from, FunctionContext* ctx) {
+  // Rules for conversion from floating point types to integral types:
+  //  1. the fractional part is discarded
+  //  2. if the destination type can hold the integer part, that is used as the result,
+  //     otherwise the behaviour is undefined.
+  // See https://en.cppreference.com/w/cpp/language/implicit_conversion
+  //
+  // We need to check whether the floating point number 'from' fits within the range of
+  // the integer type 'TO_TYPE'. We convert the max and min value of 'TO_TYPE' to
+  // 'FROM_TYPE'. This conversion may not be exact but in this case either the closest
+  // higher or the closest lower value is selected. This guarentees that if 'from' is
+  // within these values, it can be converted to 'TO_TYPE'.
+  //
+  // Note that we cannot allow equality in the general case because the maximal value of
+  // 'TO_TYPE' converted to floating point may be larger than the maximal value of
+  // 'TO_TYPE' because of inexact conversion (and similarly for the minimal value).
+  //
+  // A 'double' can exactly represent the maximal and minimal values of 32-bit and smaller
+  // integers, but not of 64-bit integers. For a 'float' 32-bit integers are too big but
+  // 16-bit and smaller integers are ok.
+  constexpr FROM_TYPE upper_limit = static_cast<FROM_TYPE>(
+      std::numeric_limits<TO_TYPE>::max());
+  constexpr FROM_TYPE lower_limit = static_cast<FROM_TYPE>(
+      std::numeric_limits<TO_TYPE>::lowest());
+
+  constexpr int INT_SIZE_LIMIT = std::is_same_v<FROM_TYPE, double> ? 4 : 2;
+  bool is_ok = false;
+  if (sizeof(TO_TYPE) <= INT_SIZE_LIMIT) {
+    is_ok = lower_limit <= from && from <= upper_limit;
+  } else {
+    is_ok = lower_limit < from && from < upper_limit;
+  }
+
+  if (UNLIKELY(!is_ok)) {
+    if (std::isnan(from)) {
+      ctx->SetError("NaN value cannot be converted to integer type.");
+    } else if (!std::isfinite(from)) {
+      ctx->SetError("Non-finite value cannot be converted to integer type.");
+    } else {
+      ctx->SetError("Out-of-range floating point value cannot be converted to "
+          "integer type.");
+    }
+  }
+
+  return is_ok;
+}
+
+template <class FROM_TYPE, class TO_TYPE, typename std::enable_if_t<
+    ConversionType<FROM_TYPE, TO_TYPE>::double_to_float_conversion
+    >* = nullptr>
+bool Validate(FROM_TYPE from, FunctionContext* ctx) {
+  // Rules for conversion from floating point types to integral types:
+  //  1. If the source value can be represented exactly in the destination type, it does
+  //     not change.
+  //  2. If the source value is between two representable values of the destination type,
+  //     the result is one of those two values (it is implementation-defined which one).
+  //  3. Otherwise, the behavior is undefined.
+  // See https://en.cppreference.com/w/cpp/language/implicit_conversion
+  //
+  // The algorithm is similar to the case of floating point to integer conversion. We
+  // check whether the double value 'from' is within the range of float. The min and max
+  // values of float can be exactly represented as double, so we allow equality.
+  constexpr FROM_TYPE upper_limit = std::numeric_limits<TO_TYPE>::max();
+  constexpr FROM_TYPE lower_limit = std::numeric_limits<TO_TYPE>::lowest();
+  const bool in_range = lower_limit <= from && from <= upper_limit;
+
+  // In-range values, NaNs and infinite values can be converted to float.
+  const bool is_ok = in_range || std::isnan(from) || !std::isfinite(from);
+
+  if (UNLIKELY(!is_ok)) {
+      ctx->SetError(
+          "Out-of-range double value cannot be converted to float.");
+  }
+
+  return is_ok;
+}
+
+} // anonymous namespace
+
 #define CAST_FUNCTION(from_type, to_type) \
   to_type CastFunctions::CastTo##to_type(FunctionContext* ctx, const from_type& val) { \
     if (val.is_null) return to_type::null(); \
+    using from_underlying_type = decltype(from_type::val); \
+    using to_underlying_type = decltype(to_type::val); \
+    const bool valid = Validate<from_underlying_type, to_underlying_type>(val.val, ctx); \
+    /* The query will be aborted because 'Validate()' sets an error but we have to return
+     * something so we return NULL. */\
+    if (UNLIKELY(!valid)) return to_type::null(); \
     return to_type(val.val); \
   }
 

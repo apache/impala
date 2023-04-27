@@ -691,6 +691,16 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
     EXPECT_TRUE(GetValue(expr, expr_type) == "NULL") << expr;
   }
 
+  template <class T>
+  void TestValueOrError(const string& expr, PrimitiveType expr_type,
+      const T& expected_result, bool expect_error) {
+    if (expect_error) {
+      TestError(expr);
+    } else {
+      TestValue(expr, expr_type, expected_result);
+    }
+  }
+
   void TestIsNotNull(const string& expr, PrimitiveType expr_type) {
     return TestIsNotNull(expr, ColumnType(expr_type));
   }
@@ -1185,19 +1195,30 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
   void TestSingleLiteralConstruction(
       PrimitiveType type, const T& value, const string& string_val);
 
-  // Test casting stmt to all types.  Expected result is val.
+  // Test casting stmt to all types. 'min_integer_size' is the byte size of the smallest
+  // signed integer expected to be able to hold the value. 'float_out_of_range' should be
+  // set to true if the value does not fit in a single precision float. The expected
+  // result is 'val' for the types that can hold the value and error for other types.
   template<typename T>
-  void TestCast(const string& stmt, T val, bool timestamp_out_of_range = false) {
+  void TestCast(const string& stmt, T val, int min_integer_size = 1,
+      bool float_out_of_range = false, bool timestamp_out_of_range = false) {
     TestValue("cast(" + stmt + " as boolean)", TYPE_BOOLEAN, static_cast<bool>(val));
-    TestValue("cast(" + stmt + " as tinyint)", TYPE_TINYINT, static_cast<int8_t>(val));
-    TestValue("cast(" + stmt + " as smallint)", TYPE_SMALLINT, static_cast<int16_t>(val));
-    TestValue("cast(" + stmt + " as int)", TYPE_INT, static_cast<int32_t>(val));
-    TestValue("cast(" + stmt + " as integer)", TYPE_INT, static_cast<int32_t>(val));
-    TestValue("cast(" + stmt + " as bigint)", TYPE_BIGINT, static_cast<int64_t>(val));
-    TestValue("cast(" + stmt + " as float)", TYPE_FLOAT, static_cast<float>(val));
     TestValue("cast(" + stmt + " as double)", TYPE_DOUBLE, static_cast<double>(val));
     TestValue("cast(" + stmt + " as real)", TYPE_DOUBLE, static_cast<double>(val));
     TestStringValue("cast(" + stmt + " as string)", lexical_cast<string>(val));
+
+    TestValueOrError("cast(" + stmt + " as tinyint)", TYPE_TINYINT,
+        static_cast<int8_t>(val), min_integer_size > sizeof(int8_t));
+    TestValueOrError("cast(" + stmt + " as smallint)", TYPE_SMALLINT,
+        static_cast<int16_t>(val), min_integer_size > sizeof(int16_t));
+    TestValueOrError("cast(" + stmt + " as int)", TYPE_INT,
+        static_cast<int32_t>(val), min_integer_size > sizeof(int32_t));
+    TestValueOrError("cast(" + stmt + " as integer)", TYPE_INT,
+        static_cast<int32_t>(val), min_integer_size > sizeof(int32_t));
+    TestValueOrError("cast(" + stmt + " as bigint)", TYPE_BIGINT,
+        static_cast<int64_t>(val), min_integer_size > sizeof(int64_t));
+    TestValueOrError("cast(" + stmt + " as float)", TYPE_FLOAT,
+        static_cast<float>(val), float_out_of_range);
     if (!timestamp_out_of_range) {
       TestTimestampValue("cast(" + stmt + " as timestamp)", CreateTestTimestamp(val));
     } else {
@@ -1242,23 +1263,32 @@ TimestampValue ExprTest::CreateTestTimestamp(int64_t val) {
   return TimestampValue::FromUnixTime(val, UTCPTR);
 }
 
-// Test casting 'stmt' to each of the native types.  The result should be 'val'
-// 'stmt' is a partial stmt that could be of any valid type.
+// Test casting 'stmt' to each of the native types. See the general template definition
+// for more information.
 template<>
-void ExprTest::TestCast(const string& stmt, const char* val,
-    bool timestamp_out_of_range) {
+void ExprTest::TestCast(const string& stmt, const char* val, int min_integer_size,
+    bool float_out_of_range, bool timestamp_out_of_range) {
   try {
     int8_t val8 = static_cast<int8_t>(lexical_cast<int16_t>(val));
 #if 0
     // Hive has weird semantics.  What do we want to do?
     TestValue(stmt + " as boolean)", TYPE_BOOLEAN, lexical_cast<bool>(val));
 #endif
-    TestValue("cast(" + stmt + " as tinyint)", TYPE_TINYINT, val8);
-    TestValue("cast(" + stmt + " as smallint)", TYPE_SMALLINT, lexical_cast<int16_t>(val));
-    TestValue("cast(" + stmt + " as int)", TYPE_INT, lexical_cast<int32_t>(val));
-    TestValue("cast(" + stmt + " as bigint)", TYPE_BIGINT, lexical_cast<int64_t>(val));
-    TestValue("cast(" + stmt + " as float)", TYPE_FLOAT, lexical_cast<float>(val));
+    TestValueOrError("cast(" + stmt + " as tinyint)", TYPE_TINYINT,
+        val8, min_integer_size > sizeof(int8_t));
+    TestValueOrError("cast(" + stmt + " as smallint)", TYPE_SMALLINT,
+        lexical_cast<int16_t>(val), min_integer_size > sizeof(int16_t));
+    TestValueOrError("cast(" + stmt + " as int)", TYPE_INT,
+        lexical_cast<int32_t>(val), min_integer_size > sizeof(int32_t));
+    TestValueOrError("cast(" + stmt + " as integer)", TYPE_INT,
+        lexical_cast<int32_t>(val), min_integer_size > sizeof(int32_t));
+    TestValueOrError("cast(" + stmt + " as bigint)", TYPE_BIGINT,
+        lexical_cast<int64_t>(val), min_integer_size > sizeof(int64_t));
+    TestValueOrError("cast(" + stmt + " as float)", TYPE_FLOAT,
+        lexical_cast<float>(val), float_out_of_range);
+
     TestValue("cast(" + stmt + " as double)", TYPE_DOUBLE, lexical_cast<double>(val));
+    TestValue("cast(" + stmt + " as real)", TYPE_DOUBLE, lexical_cast<double>(val));
     TestStringValue("cast(" + stmt + " as string)", lexical_cast<string>(val));
   } catch (bad_lexical_cast& e) {
     EXPECT_TRUE(false) << e.what();
@@ -3217,21 +3247,20 @@ TEST_P(ExprTest, CastExprs) {
   TestCast("cast(0.1234567890123 as float)", 0.1234567890123f);
   TestCast("cast(0.1234567890123 as float)", 0.123456791f); // same as above
   TestCast("cast(0.00000000001234567890123 as float)", 0.00000000001234567890123f);
-  TestCast("cast(123456 as float)", 123456.0f);
+  TestCast("cast(123456 as float)", 123456.0f, 4, false, false);
 
   // From http://en.wikipedia.org/wiki/Single-precision_floating-point_format
   // Min positive normal value
   TestCast("cast(1.1754944e-38 as float)", 1.1754944e-38f);
   // Max representable value
-  TestCast("cast(3.4028234e38 as float)", 3.4028234e38f, true);
-
+  TestCast("cast(3.4028234e38 as float)", 3.4028234e38f, 32, false, true);
 
   // From Double
   TestCast("cast(0.0 as double)", 0.0);
   TestCast("cast(5.0 as double)", 5.0);
   TestCast("cast(-5.0 as double)", -5.0);
-  TestCast("cast(0.123e10 as double)", 0.123e10);
-  TestCast("cast(123.123e10 as double)", 123.123e10, true);
+  TestCast("cast(0.123e10 as double)", 0.123e10, 4, false, false);
+  TestCast("cast(123.123e10 as double)", 123.123e10, 8, false, true);
   TestCast("cast(1.01234567890123456789 as double)", 1.01234567890123456789);
   TestCast("cast(1.01234567890123456789 as double)", 1.0123456789012346); // same as above
   TestCast("cast(0.01234567890123456789 as double)", 0.01234567890123456789);
@@ -3240,8 +3269,8 @@ TEST_P(ExprTest, CastExprs) {
   // casting string to double
   TestCast("cast('0.43149576573887316' as double)", 0.43149576573887316);
   TestCast("cast('-0.43149576573887316' as double)", -0.43149576573887316);
-  TestCast("cast('0.123e10' as double)", 0.123e10);
-  TestCast("cast('123.123e10' as double)", 123.123e10, true);
+  TestCast("cast('0.123e10' as double)", 0.123e10, 4, false, false);
+  TestCast("cast('123.123e10' as double)", 123.123e10, 8, false, true);
   TestCast("cast('1.01234567890123456789' as double)", 1.01234567890123456789);
 
   // From http://en.wikipedia.org/wiki/Double-precision_floating-point_format
@@ -3255,8 +3284,10 @@ TEST_P(ExprTest, CastExprs) {
   TestCast("cast(2.2250738585072014e-308 as double)", 2.2250738585072014e-308);
   TestCast("cast('2.2250738585072014e-308' as double)", 2.2250738585072014e-308);
   // Max Double
-  TestCast("cast(1.7976931348623157e+308 as double)", 1.7976931348623157e308, true);
-  TestCast("cast('1.7976931348623157e+308' as double)", 1.7976931348623157e308, true);
+  TestCast("cast(1.7976931348623157e+308 as double)", 1.7976931348623157e308,
+      128, true, true);
+  TestCast("cast('1.7976931348623157e+308' as double)", 1.7976931348623157e308,
+      128, true, true);
 
   // From String
   TestCast("'0'", "0");
@@ -3515,6 +3546,81 @@ TEST_P(ExprTest, CastExprs) {
   TestValue<int16_t>("cast(10000000 as smallint)", TYPE_SMALLINT, val & 0xffff);
   TestValue<int16_t>("cast(-10000000 as smallint)", TYPE_SMALLINT, -val & 0xffff);
 #endif
+}
+
+// Test overflow and boundaries in case of narrowing conversions: from floating point to
+// integer types or from double to float.
+TEST_P(ExprTest, CastFloatingPointNarrowing) {
+  // TINYINT
+  // Valid values on the boundary.
+  constexpr int64_t int8_max = std::numeric_limits<int8_t>::max();
+  constexpr int64_t int8_min = std::numeric_limits<int8_t>::min();
+  TestValue(Substitute("cast(cast($0 as float) as tinyint)", int8_max),
+      TYPE_TINYINT, int8_max);
+  TestValue(Substitute("cast(cast($0 as float) as tinyint)", -int8_max),
+      TYPE_TINYINT, -int8_max);
+  TestValue(Substitute("cast(cast($0 as float) as tinyint)", int8_min),
+      TYPE_TINYINT, int8_min);
+
+  // Values outside the valid range.
+  TestError(Substitute("cast(cast($0 as float) as tinyint)", int8_max + 1));
+  TestError(Substitute("cast(cast($0 as float) as tinyint)", int8_min - 1));
+
+  // SMALLINT
+  // Valid values on the boundary.
+  constexpr int64_t int16_max = std::numeric_limits<int16_t>::max();
+  constexpr int64_t int16_min = std::numeric_limits<int16_t>::min();
+  TestValue(Substitute("cast(cast($0 as float) as smallint)", int16_max),
+      TYPE_SMALLINT, int16_max);
+  TestValue(Substitute("cast(cast($0 as float) as smallint)", -int16_max),
+      TYPE_SMALLINT, -int16_max);
+  TestValue(Substitute("cast(cast($0 as float) as smallint)", int16_min),
+      TYPE_SMALLINT, int16_min);
+
+  // Values outside the valid range.
+  TestError(Substitute("cast(cast($0 as float) as smallint)", int16_max + 1));
+  TestError(Substitute("cast(cast($0 as float) as smallint)", int16_min - 1));
+
+  // INT
+  // Valid values on the boundary.
+  constexpr int64_t int32_max = std::numeric_limits<int32_t>::max();
+  constexpr int64_t int32_min = std::numeric_limits<int32_t>::min();
+  TestValue(Substitute("cast(cast($0 as double) as int)", int32_max),
+      TYPE_INT, int32_max);
+  TestValue(Substitute("cast(cast($0 as double) as int)", -int32_max),
+      TYPE_INT, -int32_max);
+  TestValue(Substitute("cast(cast($0 as double) as int)", int32_min),
+      TYPE_INT, int32_min);
+
+  // Values outside the valid range.
+  TestError(Substitute("cast(cast($0 as double) as int)", int32_max + 1));
+  TestError(Substitute("cast(cast($0 as double) as int)", int32_min - 1));
+
+  // BIGINT
+  // Values outside the valid range: the limit values of BIGINT cannot be represented
+  // exactly as DOUBLE, and casting them to DOUBLE produces a value that is outside the
+  // range of BIGINT.
+  constexpr int64_t int64_max = std::numeric_limits<int64_t>::max();
+  constexpr int64_t int64_min = std::numeric_limits<int64_t>::min();
+  TestError(Substitute("cast(cast($0 as double) as bigint)", int64_max));
+  TestError(Substitute("cast(cast($0 as double) as bigint)", int64_min));
+
+  // DOUBLE to FLOAT
+  // Valid values on the boundary.
+  constexpr double float_max = std::numeric_limits<float>::max();
+  constexpr double float_min = std::numeric_limits<float>::lowest();
+  TestValue(Substitute("cast(cast($0 as double) as float)", float_max),
+      TYPE_FLOAT, float_max);
+  TestValue(Substitute("cast(cast($0 as double) as float)", float_min),
+      TYPE_FLOAT, float_min);
+
+  // Values outside the valid range.
+  // 'float_max + 1' is not representable as a float or double. We find the next
+  // representable double that is greater than 'float_max'.
+  const double next_double = std::nextafter(
+      float_max, std::numeric_limits<double>::max());
+  TestError(Substitute("cast(cast($0 as double) as float)", next_double));
+  TestError(Substitute("cast(cast($0 as double) as float)", -next_double));
 }
 
 // Test casting from/to Date.
@@ -5978,14 +6084,8 @@ TEST_P(ExprTest, MathFunctions) {
   TestValue("abs(-32768)", TYPE_INT, 32768);
   TestValue("abs(32767)", TYPE_INT, 32767);
   TestValue("abs(32768)", TYPE_BIGINT, 32768);
-#ifndef __aarch64__
-  TestValue("abs(-1 * cast(pow(2, 31) as int))", TYPE_BIGINT, 2147483648);
-  TestValue("abs(cast(pow(2, 31) as int))", TYPE_BIGINT, 2147483648);
-#else
-  TestValue("abs(-1 * cast(pow(2, 31) as int))", TYPE_BIGINT, 2147483647);
-  TestValue("abs(cast(pow(2, 31) as int))", TYPE_BIGINT, 2147483647);
-#endif
-  TestValue("abs(2147483647)", TYPE_BIGINT, 2147483647);
+  TestError("abs(-1 * cast(pow(2, 31) as int))");
+  TestError("abs(cast(pow(2, 31) as int))");
   TestValue("abs(2147483647)", TYPE_BIGINT, 2147483647);
   TestValue("abs(-9223372036854775807)", TYPE_BIGINT,  9223372036854775807);
   TestValue("abs(9223372036854775807)", TYPE_BIGINT,  9223372036854775807);

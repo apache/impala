@@ -37,6 +37,13 @@ using impala_udf::TimestampVal;
 using impala_udf::StringVal;
 using impala_udf::DecimalVal;
 
+/// Some of the numeric (number to number) conversion functions always succeed and have
+/// some defined way of handling overflow (e.g. integer to integer conversions). Some of
+/// them may fail, such as floating point to integer conversions as well as double to
+/// float conversion. See https://en.cppreference.com/w/cpp/language/implicit_conversion.
+/// If the conversion fails, an error is raised.
+///
+/// Other conversion functions either raise an error or return NULL on failure.
 class CastFunctions {
  public:
   static BooleanVal CastToBooleanVal(FunctionContext* context, const TinyIntVal& val);
