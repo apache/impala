@@ -286,10 +286,13 @@ Status JniUtil::GetJniExceptionMsg(JNIEnv* env, bool log_stack, const string& pr
     JniUtfCharGuard c_stack_guard;
     RETURN_IF_ERROR(JniUtfCharGuard::create(env, stack, &c_stack_guard));
     VLOG(1) << c_stack_guard.get();
+    env->DeleteLocalRef(stack);
   }
 
+  const char* msg_str = msg_str_guard.get();
+  env->DeleteLocalRef(msg);
   env->DeleteLocalRef(exc);
-  return Status(Substitute("$0$1", prefix, msg_str_guard.get()));
+  return Status(Substitute("$0$1", prefix, msg_str));
 }
 
 Status JniUtil::GetJvmMemoryMetrics(TGetJvmMemoryMetricsResponse* result) {
