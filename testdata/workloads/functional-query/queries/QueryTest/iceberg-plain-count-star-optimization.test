@@ -224,12 +224,34 @@ aggregation(SUM, NumRowGroups): 0
 aggregation(SUM, NumFileMetadataRead): 3
 ====
 ---- QUERY
-select count(*) as c from ice_tbl_u1  union all (select count(*) c from ice_tbl_u2) order by c;
+select count(*) as c from ice_tbl_u1 union all (select count(*) c from ice_tbl_u2) order by c;
 ---- RESULTS
 3
 6
 ---- TYPES
 BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+with u1 as (select count(*) from ice_tbl_u1), u2 as (select count(*) from ice_tbl_u2) select * from u1, u2;
+---- RESULTS
+3,6
+---- TYPES
+BIGINT,BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+with u1 as (select count(*) from ice_tbl_u1),
+u2 as (select count(*) from ice_tbl_u1 union all (select count(*) from ice_tbl_u2)) select * from u1, u2 order by 1,2;
+---- RESULTS
+3,3
+3,6
+---- TYPES
+BIGINT,BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
 aggregation(SUM, NumFileMetadataRead): 0

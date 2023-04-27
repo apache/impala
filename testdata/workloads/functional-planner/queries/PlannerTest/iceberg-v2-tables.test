@@ -1040,3 +1040,115 @@ PLAN-ROOT SINK
    skipped Iceberg predicates: action = 'download'
    row-size=64B cardinality=6
 ====
+with u1 as (select count(*) from iceberg_v2_positional_not_all_data_files_have_delete_files),
+u2 as (select -1 as c),
+u3 as (select count(*) from iceberg_v2_positional_not_all_data_files_have_delete_files) select * from u1, u2, u3;
+---- PLAN
+PLAN-ROOT SINK
+|
+10:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=17B cardinality=1
+|
+|--08:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  07:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  |  row-size=20B cardinality=6
+|  |
+|  |--06:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-POSITION-DELETE-06 functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete]
+|  |     HDFS partitions=1/1 files=2 size=5.33KB
+|  |     row-size=267B cardinality=4
+|  |
+|  05:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files]
+|     HDFS partitions=1/1 files=2 size=1.22KB
+|     row-size=20B cardinality=6
+|
+09:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=9B cardinality=1
+|
+|--04:UNION
+|     constant-operands=1
+|     row-size=1B cardinality=1
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  row-size=20B cardinality=6
+|
+|--01:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-POSITION-DELETE-01 functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete]
+|     HDFS partitions=1/1 files=2 size=5.33KB
+|     row-size=267B cardinality=4
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files]
+   HDFS partitions=1/1 files=2 size=1.22KB
+   row-size=20B cardinality=6
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+10:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=17B cardinality=1
+|
+|--20:EXCHANGE [UNPARTITIONED]
+|  |
+|  19:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  18:EXCHANGE [UNPARTITIONED]
+|  |
+|  08:AGGREGATE
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  07:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
+|  |  row-size=20B cardinality=6
+|  |
+|  |--17:EXCHANGE [HASH(functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete.pos,functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete.file_path)]
+|  |  |
+|  |  06:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-POSITION-DELETE-06 functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete]
+|  |     HDFS partitions=1/1 files=2 size=5.33KB
+|  |     row-size=267B cardinality=4
+|  |
+|  16:EXCHANGE [HASH(functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.file__position,functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.input__file__name)]
+|  |
+|  05:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files]
+|     HDFS partitions=1/1 files=2 size=1.22KB
+|     row-size=20B cardinality=6
+|
+09:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=9B cardinality=1
+|
+|--15:EXCHANGE [UNPARTITIONED]
+|  |
+|  04:UNION
+|     constant-operands=1
+|     row-size=1B cardinality=1
+|
+14:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+13:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
+|  row-size=20B cardinality=6
+|
+|--12:EXCHANGE [HASH(functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete.pos,functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete.file_path)]
+|  |
+|  01:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-POSITION-DELETE-01 functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete]
+|     HDFS partitions=1/1 files=2 size=5.33KB
+|     row-size=267B cardinality=4
+|
+11:EXCHANGE [HASH(functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.file__position,functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.input__file__name)]
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files]
+   HDFS partitions=1/1 files=2 size=1.22KB
+   row-size=20B cardinality=6
+====

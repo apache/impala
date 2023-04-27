@@ -272,7 +272,7 @@ public class SelectStmt extends QueryStmt {
     if (isAnalyzed()) return;
     super.analyze(analyzer);
     new SelectAnalyzer(analyzer).analyze();
-    this.optimizePlainCountStarQuery();
+    this.optimizePlainCountStarQueryForIcebergTable();
   }
 
   /**
@@ -1430,10 +1430,16 @@ public class SelectStmt extends QueryStmt {
    *  - table is the Iceberg table
    *  - SelectList must contains 'count(*)' or 'count(constant)'
    *  - SelectList can contain constant
+   *  - stmt does not have WITH clause
    *  - only for V1: SelectList can contain other agg functions, e.g. min, sum, etc
    * e.g. 'SELECT count(*) FROM iceberg_tbl' would be rewritten as 'SELECT constant'.
    */
-  public void optimizePlainCountStarQuery() throws AnalysisException {
+  public void optimizePlainCountStarQueryForIcebergTable() throws AnalysisException {
+    // When optimizing the simple count star query for the Iceberg table, the WITH CLAUSE
+    // should be skipped, but that doesn't mean the SQL can't be optimized, because when
+    // the WITH CLAUSE is inlined, the final Stmt is optimized by CountStarToConstRule.
+    if (this.analyzer_.hasWithClause()) return;
+
     if (this.hasWhereClause()) return;
     if (this.hasGroupByClause()) return;
     if (this.hasHavingClause()) return;
