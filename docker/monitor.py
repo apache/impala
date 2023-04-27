@@ -70,7 +70,8 @@ def _memory():
   Swap:             0           0           0
   """
 
-  free_lines = subprocess.check_output(["free", "-b", "-w"]).split('\n')
+  free_lines = subprocess.check_output(["free", "-b", "-w"],
+      universal_newlines=True).split('\n')
   free_grid = [x.split() for x in free_lines]
   # Identify columns for "total" and "available"
   total_idx = free_grid[0].index("total")
@@ -179,7 +180,7 @@ class ContainerMonitor(object):
     # Ubuntu systems typically mount cpuacct cgroup in /sys/fs/cgroup/cpu,cpuacct,
     # but this can vary by OS distribution.
     all_cgroups = subprocess.check_output(
-        "findmnt -n -o TARGET -t cgroup --source cgroup".split()
+        "findmnt -n -o TARGET -t cgroup --source cgroup".split(), universal_newlines=True
     ).split("\n")
     cpuacct_root = [c for c in all_cgroups if "cpuacct" in c][0]
     memory_root = [c for c in all_cgroups if "memory" in c][0]

@@ -30,7 +30,8 @@ from prettytable import PrettyTable
 def get_bin_size_data(file):
   data = ""
   try:
-    data = subprocess.check_output(["size", "-B", "-t", file], stderr=subprocess.STDOUT)
+    data = subprocess.check_output(["size", "-B", "-t", file],
+        stderr=subprocess.STDOUT, universal_newlines=True)
   except Exception as e:
     data = e.output
 

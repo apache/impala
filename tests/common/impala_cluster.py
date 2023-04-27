@@ -268,7 +268,8 @@ class ImpalaCluster(object):
     statestoreds = []
     catalogd = None
     admissiond = None
-    output = check_output(["docker", "network", "inspect", self.docker_network])
+    output = check_output(["docker", "network", "inspect", self.docker_network],
+                          universal_newlines=True)
     # Only one network should be present in the top level array.
     for container_id in json.loads(output)[0]["Containers"]:
       container_info = get_container_info(container_id)
@@ -630,8 +631,8 @@ def run_daemon(daemon_binary, args, build_type="latest", env_vars={}, output_fil
 
 def get_container_info(container_id):
   """Get the output of "docker container inspect" as a python data structure."""
-  containers = json.loads(
-      check_output(["docker", "container", "inspect", container_id]))
+  containers = json.loads(check_output(["docker", "container", "inspect", container_id],
+                                       universal_newlines=True))
   # Only one container should be present in the top level array.
   assert len(containers) == 1, json.dumps(containers, indent=4)
   return containers[0]

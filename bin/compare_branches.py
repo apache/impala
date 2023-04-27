@@ -139,8 +139,9 @@ def build_commit_map(branch, merge_base):
   fields = ['%H', '%s', '%an', '%cd', '%b']
   pretty_format = '\x1f'.join(fields) + '\x1e'
   result = OrderedDict()
-  for line in subprocess.check_output(["git", "log", branch, "^" + merge_base,
-    "--pretty=" + pretty_format, "--color=never"]).split('\x1e'):
+  for line in subprocess.check_output(
+      ["git", "log", branch, "^" + merge_base, "--pretty=" + pretty_format,
+       "--color=never"], universal_newlines=True).split('\x1e'):
     if line == "":
       # if no changes are identified by the git log, we get an empty string
       continue
@@ -180,9 +181,10 @@ def cherrypick(cherry_pick_hashes, full_target_branch_name, partial_ok):
     return
 
   # Cherrypicking only makes sense if we're on the equivalent of the target branch.
-  head_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
+  head_sha = subprocess.check_output(
+      ['git', 'rev-parse', 'HEAD'], universal_newlines=True).strip()
   target_branch_sha = subprocess.check_output(
-      ['git', 'rev-parse', full_target_branch_name]).strip()
+      ['git', 'rev-parse', full_target_branch_name], universal_newlines=True).strip()
   if head_sha != target_branch_sha:
     print("Cannot cherrypick because %s (%s) and HEAD (%s) are divergent." % (
         full_target_branch_name, target_branch_sha, head_sha))
@@ -231,7 +233,7 @@ def main():
     full_target_branch_name = options.target_branch
 
   merge_base = subprocess.check_output(["git", "merge-base",
-      full_source_branch_name, full_target_branch_name]).strip()
+      full_source_branch_name, full_target_branch_name], universal_newlines=True).strip()
   source_commits = build_commit_map(full_source_branch_name, merge_base)
   target_commits = build_commit_map(full_target_branch_name, merge_base)
 
@@ -270,9 +272,7 @@ def main():
       logging.debug("NOT ignoring commit {0} since not in ignored commits ({1},{2})"
                    .format(commit_hash, options.source_branch, options.target_branch))
     if not change_in_target and not ignore_by_config and not ignore_by_commit_message:
-      print(u'{0} {1} ({2}) - {3}'
-          .format(commit_hash, msg.decode('utf8'), date, author.decode('utf8'))
-          .encode('utf8'))
+      print('{0} {1} ({2}) - {3}'.format(commit_hash, msg, date, author))
       cherry_pick_hashes.append(commit_hash)
       jira_keys += jira_key_pat.findall(msg)
 

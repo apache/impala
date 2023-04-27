@@ -722,7 +722,8 @@ class DockerMiniClusterOperations(object):
       mount_args + mem_limit_args + [image_tag] + args)
     LOG.info("Running command {0}".format(run_cmd))
     check_call(run_cmd)
-    port_mapping = check_output(["docker", "port", container_name])
+    port_mapping = check_output(["docker", "port", container_name],
+                                universal_newlines=True)
     LOG.info("Launched container {0} with port mapping:\n{1}".format(
         container_name, port_mapping))
 
@@ -740,7 +741,8 @@ class DockerMiniClusterOperations(object):
 
   def __get_network_info__(self):
     """Get the output of "docker network inspect" as a python data structure."""
-    output = check_output(["docker", "network", "inspect", self.network_name])
+    output = check_output(["docker", "network", "inspect", self.network_name],
+                          universal_newlines=True)
     # Only one network should be present in the top level array.
     return json.loads(output)[0]
 

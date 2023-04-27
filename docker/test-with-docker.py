@@ -396,7 +396,7 @@ def _call(args, check=True):
 def _check_output(*args, **kwargs):
   """Wrapper for subprocess.check_output, with logging."""
   logging.info("Running: %s, %s; cmdline: %s.", args, kwargs, " ".join(*args))
-  return subprocess.check_output(*args, **kwargs)
+  return subprocess.check_output(*args, universal_newlines=True, **kwargs)
 
 
 def _make_dir_if_not_exist(*parts):

@@ -185,8 +185,10 @@ class BaseImpalaService(object):
     # Requests a minidump for each running impalad/catalogd. The minidump will be
     # written to the processes's minidump_path. For simplicity, we leave it there,
     # as it will be preserved along with everything else in the log directory.
-    impalad_pids = subprocess.check_output(["pgrep", "impalad"]).split("\n")[:-1]
-    catalogd_pids = subprocess.check_output(["pgrep", "-f", "catalogd"]).split("\n")[:-1]
+    impalad_pids = subprocess.check_output(["pgrep", "impalad"],
+        universal_newlines=True).split("\n")[:-1]
+    catalogd_pids = subprocess.check_output(["pgrep", "-f", "catalogd"],
+        universal_newlines=True).split("\n")[:-1]
     minidump_diag_string = "Dumping minidumps for impalads/catalogds...\n"
     for pid in impalad_pids:
       self.__request_minidump(pid)
