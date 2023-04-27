@@ -21,6 +21,7 @@
 #include <iomanip>
 #include "cctz/civil_time.h"
 #include "runtime/date-parse-util.h"
+#include "runtime/datetime-simple-date-format-parser.h"
 
 #include "common/names.h"
 
@@ -29,6 +30,7 @@ namespace impala {
 using datetime_parse_util::DateTimeFormatContext;
 using datetime_parse_util::GetMonthAndDayFromDaysSinceJan1;
 using datetime_parse_util::IsLeapYear;
+using datetime_parse_util::SimpleDateFormatTokenizer;
 
 const int EPOCH_YEAR = 1970;
 const int MIN_YEAR = 1;
@@ -427,13 +429,7 @@ bool DateValue::MonthsBetween(const DateValue& other, double* months_between) co
 }
 
 string DateValue::ToString() const {
-  stringstream ss;
-  int year, month, day;
-  if (ToYearMonthDay(&year, &month, &day)) {
-    ss << std::setfill('0') << setw(4) << year << "-" << setw(2) << month << "-"
-       << setw(2) << day;
-  }
-  return ss.str();
+  return Format(*SimpleDateFormatTokenizer::GetDefaultDateFormatContext());
 }
 
 ostream& operator<<(ostream& os, const DateValue& date_value) {

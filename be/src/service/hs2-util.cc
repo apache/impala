@@ -255,8 +255,7 @@ static void TimestampExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     column->stringVal.values.emplace_back();
     if (!val.is_null) {
       TimestampValue value = TimestampValue::FromTimestampVal(val);
-      RawValue::PrintValue(
-          &value, ColumnType(TYPE_TIMESTAMP), -1, &(column->stringVal.values.back()));
+      column->stringVal.values.back() = value.ToString();
     }
     SetNullBit(output_row_idx, val.is_null, &column->stringVal.nulls);
     ++output_row_idx;
@@ -273,8 +272,7 @@ static void DateExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     column->stringVal.values.emplace_back();
     if (!val.is_null) {
       DateValue value = DateValue::FromDateVal(val);
-      RawValue::PrintValue(
-          &value, ColumnType(TYPE_DATE), -1, &(column->stringVal.values.back()));
+      column->stringVal.values.back() = value.ToString();
     }
     SetNullBit(output_row_idx, val.is_null, &column->stringVal.nulls);
     ++output_row_idx;

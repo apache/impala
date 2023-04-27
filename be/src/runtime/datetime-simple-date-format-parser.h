@@ -125,6 +125,10 @@ public:
                                            &DEFAULT_SHORT_DATE_TIME_CTX;
   }
 
+  static ALWAYS_INLINE const DateTimeFormatContext* GetDefaultDateFormatContext() {
+    return &DEFAULT_DATE_CTX;
+  }
+
   /// Initialize the default format contexts. This *must* be called before using
   /// GetDefaultFormatContext().
   static void InitCtx();

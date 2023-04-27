@@ -23,6 +23,7 @@
 #include "cctz/civil_time.h"
 #include "gutil/basictypes.h"
 #include "runtime/date-value.h"
+#include "runtime/datetime-simple-date-format-parser.h"
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
 
@@ -34,19 +35,20 @@ using std::uniform_int_distribution;
 
 using namespace impala;
 
-// Machine Info: Intel(R) Core(TM) i5-6600 CPU @ 3.30GHz
-// ToYearMonthDay:     Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
-//                                                                   (relative) (relative) (relative)
-// --------------------------------------------------------------------------------------------------
-//       TestCctzToYearMonthDay               0.24    0.245     0.25         1X         1X         1X
-//           TestToYearMonthDay                1.3     1.33     1.38      5.42X      5.44X      5.53X
-//                   TestToYear               8.67     8.86     9.04      36.1X      36.1X      36.2X
+// ToYearMonthDay:            Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
+//                                                                          (relative) (relative) (relative)
+// ---------------------------------------------------------------------------------------------------------
+//              TestCctzToYearMonthDay               23.1     23.4     23.7         1X         1X         1X
+//                  TestToYearMonthDay                 68     69.6     70.7      2.95X      2.98X      2.98X
+//                          TestToYear                443      446      448      19.2X      19.1X      18.9X
+//                        TestToString               9.02     9.04     9.06     0.391X     0.386X     0.382X
+//           TestToString_stringstream               2.04     2.04     2.08    0.0883X    0.0871X    0.0875X
 
 const cctz::civil_day EPOCH_DATE(1970, 1, 1);
 
 class TestData {
 public:
-  void AddRandomRange(const DateValue& dv_min, const DateValue& dv_max) {
+  void AddRandomRange(const DateValue& dv_min, const DateValue& dv_max, int data_size) {
     DCHECK(dv_min.IsValid());
     DCHECK(dv_max.IsValid());
 
@@ -60,7 +62,7 @@ public:
     uniform_int_distribution<int32_t> dis_dse(min_dse, max_dse);
 
     // Add random DateValue values in the [dv_min, dv_max] range.
-    for (int i = 0; i <= max_dse - min_dse; ++i) {
+    for (int i = 0; i <= data_size; ++i) {
       DateValue dv(dis_dse(gen));
       DCHECK(dv.IsValid());
       date_.push_back(dv);
@@ -68,6 +70,8 @@ public:
     cctz_to_ymd_result_.resize(date_.size());
     to_ymd_result_.resize(date_.size());
     to_year_result_.resize(date_.size());
+    to_string_result_.resize(date_.size());
+    to_string_old_result_.resize(date_.size());
   }
 
   void CctzToYearMonthDay(const DateValue& dv, int* year, int* month, int* day) const {
@@ -116,6 +120,31 @@ public:
     }
   }
 
+  void TestToString(int batch_size) {
+    for (int i = 0; i < batch_size; ++i) {
+      int n = date_.size();
+      for (int j = 0; j < n; ++j) {
+        to_string_result_[j] = date_[j].ToString();
+      }
+    }
+  }
+
+  void TestToString_stringstream(int batch_size) {
+    for (int i = 0; i < batch_size; ++i) {
+      int n = date_.size();
+      for (int j = 0; j < n; ++j) {
+        // Old implementation before IMPALA-12111.
+        stringstream ss;
+        int year, month, day;
+        if (date_[j].ToYearMonthDay(&year, &month, &day)) {
+          ss << std::setfill('0') << setw(4) << year << "-" << setw(2) << month << "-"
+            << setw(2) << day;
+        }
+        to_string_old_result_[j] = ss.str();
+      }
+    }
+  }
+
   bool CheckResults() {
     DCHECK(to_ymd_result_.size() == cctz_to_ymd_result_.size());
     DCHECK(to_year_result_.size() == cctz_to_ymd_result_.size());
@@ -131,6 +160,11 @@ public:
         cerr << "Incorrect results (ToYear() vs CctzToYearMonthDay()): " << date_[i]
              << ": " << to_year_result_[i] << " != " << cctz_to_ymd_result_[i].year_
              << endl;
+        ok = false;
+      }
+      if (to_string_result_[i] != to_string_old_result_[i]) {
+        cerr << "Incorrect results (ToString() vs TestToString_stringstream()): "
+             << to_string_result_[i] << " != " << to_string_old_result_[i] << endl;
         ok = false;
       }
     }
@@ -159,6 +193,8 @@ private:
   vector<YearMonthDayResult> cctz_to_ymd_result_;
   vector<YearMonthDayResult> to_ymd_result_;
   vector<int> to_year_result_;
+  vector<string> to_string_result_;
+  vector<string> to_string_old_result_;
 };
 
 void TestCctzToYearMonthDay(int batch_size, void* d) {
@@ -176,19 +212,33 @@ void TestToYear(int batch_size, void* d) {
   data->TestToYear(batch_size);
 }
 
+void TestToString(int batch_size, void* d) {
+  TestData* data = reinterpret_cast<TestData*>(d);
+  data->TestToString(batch_size);
+}
+
+void TestToString_stringstream(int batch_size, void* d) {
+  TestData* data = reinterpret_cast<TestData*>(d);
+  data->TestToString_stringstream(batch_size);
+}
+
 int main(int argc, char* argv[]) {
   CpuInfo::Init();
   cout << Benchmark::GetMachineInfo() << endl;
 
-  TestData data;
-  data.AddRandomRange(DateValue(1965, 1, 1), DateValue(2020, 12, 31));
+  datetime_parse_util::SimpleDateFormatTokenizer::InitCtx();
 
-  // Benchmark TestData::CctzToYearMonthDay(), DateValue::ToYearMonthDay() and
-  // DateValue::ToYear().
+  TestData data;
+  data.AddRandomRange(DateValue(1965, 1, 1), DateValue(2020, 12, 31), 1000);
+
+  // Benchmark TestData::CctzToYearMonthDay(), DateValue::ToYearMonthDay(),
+  // DateValue::ToYear() and DateValue().ToString's current and old implementation.
   Benchmark suite("ToYearMonthDay");
   suite.AddBenchmark("TestCctzToYearMonthDay", TestCctzToYearMonthDay, &data);
   suite.AddBenchmark("TestToYearMonthDay", TestToYearMonthDay, &data);
   suite.AddBenchmark("TestToYear", TestToYear, &data);
+  suite.AddBenchmark("TestToString", TestToString, &data);
+  suite.AddBenchmark("TestToString_stringstream", TestToString_stringstream, &data);
   cout << suite.Measure();
 
   return data.CheckResults() ? 0 : 1;
