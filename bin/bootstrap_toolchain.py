@@ -123,7 +123,7 @@ def wget_and_unpack_package(download_path, file_name, destination, wget_no_clobb
       download_path, destination, file_name, attempt))
     # --no-clobber avoids downloading the file if a file with the name already exists
     try:
-      cmd = ["wget", download_path,
+      cmd = ["wget", "-q", download_path,
              "--output-document={0}/{1}".format(destination, file_name)]
       if wget_no_clobber:
         cmd.append("--no-clobber")
