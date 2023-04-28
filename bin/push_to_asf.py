@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -35,7 +35,6 @@
 # TODO: Improve console output: replace 'print' with format strings
 #       and use sys.stderr/sys.stdout.
 
-from __future__ import absolute_import, division, print_function
 import logging
 import optparse
 import os
