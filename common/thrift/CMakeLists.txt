@@ -64,8 +64,8 @@ function(THRIFT_GEN VAR)
       # from Hive or Parquet.
       add_custom_command(
         OUTPUT ${OUTPUT_BE_FILE}
-        COMMAND ${THRIFT_CPP_COMPILER} ${CPP_ARGS} ${THRIFT_FILE}
-        COMMAND ${THRIFT_PY_COMPILER} ${PYTHON_ARGS} ${THRIFT_FILE}
+        COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_CPP_COMPILER} ${CPP_ARGS} ${THRIFT_FILE}
+        COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_PY_COMPILER} ${PYTHON_ARGS} ${THRIFT_FILE}
         DEPENDS ${ABS_THRIFT_FILE}
         COMMENT "Running thrift compiler on ${THRIFT_FILE}"
         VERBATIM
@@ -73,7 +73,7 @@ function(THRIFT_GEN VAR)
     ELSEIF (THRIFT_FILE STREQUAL "ImpalaService.thrift")
       add_custom_command(
         OUTPUT ${OUTPUT_BE_FILE}
-        COMMAND ${THRIFT_CPP_COMPILER} ${CPP_ARGS} ${THRIFT_FILE}
+        COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_CPP_COMPILER} ${CPP_ARGS} ${THRIFT_FILE}
         # Because of some CMake bug we can't just use
         #     sed -i.bak "'s|\\(dispatchCallTemplated.*\\));|\\1) override;|'"
         # here because for some reason CMake doesn't remove the quotes and generates
@@ -81,8 +81,8 @@ function(THRIFT_GEN VAR)
         COMMAND ${CMAKE_SOURCE_DIR}/bin/cmake_aux/add_override.sh
             ${BE_OUTPUT_DIR}/gen-cpp/ImpalaHiveServer2Service.h
             ${BE_OUTPUT_DIR}/gen-cpp/ImpalaService.h
-        COMMAND ${THRIFT_JAVA_COMPILER} ${JAVA_FE_ARGS} ${THRIFT_FILE}
-        COMMAND ${THRIFT_PY_COMPILER} ${PYTHON_ARGS} ${THRIFT_FILE}
+        COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_JAVA_COMPILER} ${JAVA_FE_ARGS} ${THRIFT_FILE}
+        COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_PY_COMPILER} ${PYTHON_ARGS} ${THRIFT_FILE}
         DEPENDS ${ABS_THRIFT_FILE}
         COMMENT "Running thrift compiler on ${THRIFT_FILE}"
         VERBATIM
@@ -90,9 +90,9 @@ function(THRIFT_GEN VAR)
     ELSE (THRIFT_FILE STREQUAL ${TCLI_SERVICE_THRIFT} OR THRIFT_FILE STREQUAL "parquet.thrift")
       add_custom_command(
         OUTPUT ${OUTPUT_BE_FILE}
-        COMMAND ${THRIFT_CPP_COMPILER} ${CPP_ARGS} ${THRIFT_FILE}
-        COMMAND ${THRIFT_JAVA_COMPILER} ${JAVA_FE_ARGS} ${THRIFT_FILE}
-        COMMAND ${THRIFT_PY_COMPILER} ${PYTHON_ARGS} ${THRIFT_FILE}
+        COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_CPP_COMPILER} ${CPP_ARGS} ${THRIFT_FILE}
+        COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_JAVA_COMPILER} ${JAVA_FE_ARGS} ${THRIFT_FILE}
+        COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_PY_COMPILER} ${PYTHON_ARGS} ${THRIFT_FILE}
         DEPENDS ${ABS_THRIFT_FILE}
         COMMENT "Running thrift compiler on ${THRIFT_FILE}"
         VERBATIM
@@ -125,7 +125,7 @@ function(THRIFT_GEN_DS VAR)
     list(APPEND ${VAR} ${OUTPUT_FILE})
     add_custom_command(
       OUTPUT ${OUTPUT_FILE}
-      COMMAND ${THRIFT_JAVA_COMPILER} ${JAVA_EXT_DS_ARGS} ${THRIFT_FILE} &&
+      COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_JAVA_COMPILER} ${JAVA_EXT_DS_ARGS} ${THRIFT_FILE} &&
               mkdir -p ${OUTPUT_DIR} && echo ${OUTPUT_FILE_MESSAGE} > ${OUTPUT_FILE}
       DEPENDS ${ABS_THRIFT_FILE}
       COMMENT "Running thrift compiler for ext-data-source on ${THRIFT_FILE}"
@@ -140,6 +140,7 @@ set(TCLI_SERVICE_THRIFT "${HIVE_THRIFT_SOURCE_DIR}/TCLIService.thrift")
 message("Using Thrift CPP compiler: ${THRIFT_CPP_COMPILER}")
 message("Using Thrift JAVA compiler: ${THRIFT_JAVA_COMPILER}")
 message("Using Thrift PY compiler: ${THRIFT_PY_COMPILER}")
+set(THRIFT_QUIET_WRAPPER "${CMAKE_SOURCE_DIR}/bin/thrift-quiet-wrapper.sh")
 set(THRIFT_CPP_INCLUDE_DIR_OPTION -I ${THRIFT_CPP_CONTRIB_DIR}
   -I $ENV{HIVE_METASTORE_THRIFT_DIR} -I ${HIVE_THRIFT_SOURCE_DIR})
 set(THRIFT_JAVA_INCLUDE_DIR_OPTION -I ${THRIFT_JAVA_CONTRIB_DIR}
