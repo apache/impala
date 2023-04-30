@@ -644,3 +644,24 @@ create table non_unique_key_create_tbl14 (id int primary key, auto_incrementing_
 ---- CATCH
 IllegalArgumentException: Column name auto_incrementing_id is reserved by Kudu engine
 ====
+---- QUERY
+# Create Kudu table in CTAS statement without specifying primary key.
+# Partition column 'id' is promoted as non unique primary key.
+create table non_unique_key_create_tbl15
+partition by range (id) (partition values <= 1, partition 1 < values <= 3,
+  partition 3 < values <= 5, partition 5 < values)
+stored as kudu
+as select id, int_col from functional.alltypestiny order by id asc limit 100;
+select id, int_col, auto_incrementing_id from non_unique_key_create_tbl15 order by id asc;
+---- RESULTS
+0,0,1
+1,1,2
+2,0,1
+3,1,2
+4,0,1
+5,1,2
+6,0,1
+7,1,2
+---- TYPES
+INT,INT,BIGINT
+====

@@ -3306,11 +3306,20 @@ public class ParserTest extends FrontendTestBase {
     // Flexible partitioning
     ParsesOk("CREATE TABLE Foo PRIMARY KEY (i) PARTITION BY HASH(i) PARTITIONS 4 AS " +
         "SELECT 1");
-    ParserError("CREATE TABLE Foo PARTITION BY HASH(i) PARTITIONS 4 AS SELECT 1");
+    ParsesOk("CREATE TABLE Foo PARTITION BY HASH(i) PARTITIONS 4 AS SELECT 1");
     ParsesOk("CREATE TABLE Foo PRIMARY KEY (a) PARTITION BY HASH(a) PARTITIONS 4 " +
         "TBLPROPERTIES ('a'='b', 'c'='d') AS SELECT * from bar");
     ParsesOk("CREATE TABLE Foo PRIMARY KEY (a) PARTITION BY RANGE(a) " +
         "(PARTITION 1 < VALUES < 10, PARTITION 10 <= VALUES < 20, PARTITION VALUE = 30) " +
+        "STORED AS KUDU AS SELECT * FROM Bar");
+    ParsesOk("CREATE TABLE Foo NON UNIQUE PRIMARY KEY (a) " +
+        "PARTITION BY HASH (a) PARTITIONS 2 " +
+        "STORED AS KUDU AS SELECT * FROM Bar");
+    ParsesOk("CREATE TABLE Foo PARTITION BY RANGE(a) " +
+        "(PARTITION 1 < VALUES < 10, PARTITION 10 <= VALUES < 20, " +
+        " PARTITION VALUE = 30) " +
+        "STORED AS KUDU AS SELECT * FROM Bar");
+    ParsesOk("CREATE TABLE Foo PARTITION BY HASH (a) PARTITIONS 2 " +
         "STORED AS KUDU AS SELECT * FROM Bar");
   }
 
