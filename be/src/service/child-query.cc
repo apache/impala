@@ -45,7 +45,7 @@ Status ChildQuery::ExecAndFetch() {
   ImpalaServer::TUniqueIdToTHandleIdentifier(session_id, session_secret,
       &exec_stmt_req.sessionHandle.sessionId);
   exec_stmt_req.__set_statement(query_);
-  SetQueryOptions(parent_request_state_->exec_request().query_options, &exec_stmt_req);
+  SetQueryOptions(&exec_stmt_req);
   exec_stmt_req.confOverlay[PARENT_QUERY_OPT] =
       PrintId(parent_request_state_->query_id());
 
@@ -145,9 +145,10 @@ void PrintQueryOptionValue(const set<impala::TRuntimeFilterType::type>& filter_t
   val << filter_types;
 }
 
-void ChildQuery::SetQueryOptions(const TQueryOptions& parent_options,
-    TExecuteStatementReq* exec_stmt_req) {
+void ChildQuery::SetQueryOptions(TExecuteStatementReq* exec_stmt_req) {
   map<string, string> conf;
+  const TQueryOptions& parent_options =
+      parent_request_state_->exec_request().query_options;
 #define QUERY_OPT_FN(NAME, ENUM, LEVEL)\
   if (parent_options.__isset.NAME) {\
     stringstream val;\
@@ -161,6 +162,12 @@ void ChildQuery::SetQueryOptions(const TQueryOptions& parent_options,
   // Ignore debug actions on child queries because they may cause deadlock.
   map<string, string>::iterator it = conf.find("DEBUG_ACTION");
   if (it != conf.end()) conf.erase(it);
+
+  if (parent_request_state_->exec_request().request_pool_set_by_frontend) {
+    // Remove REQUEST_POOL if this option was set by Frontend auto-scaling.
+    it = conf.find("REQUEST_POOL");
+    if (it != conf.end()) conf.erase(it);
+  }
   exec_stmt_req->__set_confOverlay(conf);
 }
 

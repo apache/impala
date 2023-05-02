@@ -2273,6 +2273,7 @@ public class Frontend {
     if (!default_executor_group) {
       String namePrefix = group_set.getExec_group_name_prefix();
       req.query_options.setRequest_pool(namePrefix);
+      req.setRequest_pool_set_by_frontend(true);
       if (req.query_exec_request != null) {
         req.query_exec_request.query_ctx.setRequest_pool(namePrefix);
       }

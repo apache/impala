@@ -41,6 +41,9 @@ CPU_TEST_QUERY = "select * from tpcds_parquet.store_sales where ss_item_sk = 1 l
 GROUPING_TEST_QUERY = ("select ss_item_sk from tpcds_parquet.store_sales"
     " group by (ss_item_sk) order by ss_item_sk limit 10")
 
+# A query to test behavior of child queries.
+COMPUTE_STATS_QUERY = "COMPUTE STATS tpcds_parquet.store_sales"
+
 # Default query option to use for testing CPU requirement.
 CPU_DOP_OPTIONS = {'MT_DOP': '2', 'COMPUTE_PROCESSING_COST': 'true'}
 
@@ -910,6 +913,15 @@ class TestExecutorGroups(CustomClusterTestSuite):
           "Memory and cpu limit checking is skipped."),
          "EffectiveParallelism: 7", "ExecutorGroupsConsidered: 1"])
 
+    # Test that child queries follow REQUEST_POOL that was set by client.
+    # Two child queries should all run in root.large.
+    self._verify_total_admitted_queries("root.large", 1)
+    self._run_query_and_verify_profile(COMPUTE_STATS_QUERY, options,
+        ["ExecutorGroupsConsidered: 1",
+         "Verdict: Assign to first group because query is not auto-scalable"],
+        ["Executor Group:"])
+    self._verify_total_admitted_queries("root.large", 3)
+
     # Test setting REQUEST_POOL and disabling COMPUTE_PROCESSING_COST
     options['COMPUTE_PROCESSING_COST'] = 'false'
     options['REQUEST_POOL'] = 'root.large'
@@ -922,6 +934,18 @@ class TestExecutorGroups(CustomClusterTestSuite):
 
     # Unset REQUEST_POOL.
     self.execute_query_expect_success(self.client, "SET REQUEST_POOL='';")
+
+    # Test that child queries unset REQUEST_POOL that was set by Frontend planner for
+    # parent query. One child queries should run in root.small, and another one in
+    # root.large.
+    self._verify_total_admitted_queries("root.small", 1)
+    self._verify_total_admitted_queries("root.large", 4)
+    self._run_query_and_verify_profile(COMPUTE_STATS_QUERY, CPU_DOP_OPTIONS,
+        ["ExecutorGroupsConsidered: 1",
+         "Verdict: Assign to first group because query is not auto-scalable"],
+        ["Executor Group:"])
+    self._verify_total_admitted_queries("root.small", 2)
+    self._verify_total_admitted_queries("root.large", 5)
 
     # Test that GROUPING_TEST_QUERY will get assigned to the small group.
     self._run_query_and_verify_profile(GROUPING_TEST_QUERY, CPU_DOP_OPTIONS,
@@ -955,12 +979,12 @@ class TestExecutorGroups(CustomClusterTestSuite):
         ["Executor Group:"])
 
     # Check resource pools on the Web queries site and admission site
-    self._verify_query_num_for_resource_pool("root.small", 2)
+    self._verify_query_num_for_resource_pool("root.small", 3)
     self._verify_query_num_for_resource_pool("root.tiny", 3)
-    self._verify_query_num_for_resource_pool("root.large", 2)
-    self._verify_total_admitted_queries("root.small", 2)
+    self._verify_query_num_for_resource_pool("root.large", 5)
+    self._verify_total_admitted_queries("root.small", 3)
     self._verify_total_admitted_queries("root.tiny", 3)
-    self._verify_total_admitted_queries("root.large", 2)
+    self._verify_total_admitted_queries("root.large", 5)
     self.client.close()
 
   @pytest.mark.execute_serially
