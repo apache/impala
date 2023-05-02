@@ -226,7 +226,8 @@ ubuntu20 apt-get --yes install libtinfo5
 ARCH_NAME=$(uname -p)
 if [[ $ARCH_NAME == 'aarch64' ]]; then
   ubuntu apt-get --yes install unzip pkg-config flex maven python3-pip build-essential \
-          texinfo bison autoconf automake libtool libz-dev libncurses-dev
+          texinfo bison autoconf automake libtool libz-dev libncurses-dev \
+          libncurses5-dev libreadline-dev
 fi
 
 if [[ "$UBUNTU" == true ]]; then
