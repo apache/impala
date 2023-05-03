@@ -452,7 +452,7 @@ function renderTiming(ignored_arg) {
   var sec_per_tic = maxts / ntics / 1000000000;
   var px_per_tic = chart_width / ntics;
   var x = name_width;
-  for (var i = 0; i < ntics; ++i) {
+  for (var i = 1; i <= ntics; ++i) {
     footer_ctx.fillStyle = "#000000";
     var y = rownum_l * height;
     footer_ctx.fillRect(x, y, px_per_tic, height);
