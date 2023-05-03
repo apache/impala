@@ -105,6 +105,7 @@ DECLARE_bool(pull_table_types_and_comments);
 DECLARE_bool(enable_reload_events);
 DECLARE_string(geospatial_library);
 DECLARE_int32(thrift_rpc_max_message_size);
+DECLARE_string(file_metadata_reload_properties);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -408,6 +409,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_min_processing_per_thread(FLAGS_min_processing_per_thread);
   cfg.__set_skip_resource_checking_on_last_executor_group_set(
       FLAGS_skip_resource_checking_on_last_executor_group_set);
+  cfg.__set_file_metadata_reload_properties(FLAGS_file_metadata_reload_properties);
   cfg.__set_thrift_rpc_max_message_size(FLAGS_thrift_rpc_max_message_size);
   return Status::OK();
 }

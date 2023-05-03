@@ -132,6 +132,12 @@ DEFINE_bool(enable_reload_events, false, "This configuration is used to fire a "
     "This config only affects the firing of the reload event. Processing of reload "
     "event will always happen");
 
+DEFINE_string(file_metadata_reload_properties, "EXTERNAL, metadata_location,"
+    "transactional, transactional_properties, TRANSLATED_TO_EXTERNAL, repl.last.id",
+    "This configuration is used to whitelist the table properties that are supposed to"
+    "refresh file metadata when these properties are changed. To skip this optimization,"
+    "set the value to empty string");
+
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_subscriber_port);
 DECLARE_int32(state_store_port);

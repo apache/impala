@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -133,6 +134,7 @@ import org.slf4j.LoggerFactory;
 import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -319,6 +321,10 @@ public class CatalogServiceCatalog extends Catalog {
   private final Set<String> blacklistedDbs_;
   // Tables that will be skipped in loading.
   private final Set<TableName> blacklistedTables_;
+
+  // Table properties that require file metadata reload
+  private final Set<String> whitelistedTblProperties_;
+
   /**
    * Initialize the CatalogServiceCatalog using a given MetastoreClientPool impl.
    *
@@ -364,6 +370,12 @@ public class CatalogServiceCatalog extends Catalog {
     catalogdTableInvalidator_ = CatalogdTableInvalidator.create(this,
         BackendConfig.INSTANCE);
     Preconditions.checkState(PARTIAL_FETCH_RPC_QUEUE_TIMEOUT_S > 0);
+    String whitelist = BackendConfig.INSTANCE.getFileMetadataReloadProperties();
+    whitelistedTblProperties_ = Sets.newHashSet();
+    for (String tblProps: Splitter.on(',').trimResults().omitEmptyStrings().split(
+        whitelist)) {
+      whitelistedTblProperties_.add(tblProps);
+    }
   }
 
   public void startEventsProcessor() {
@@ -2477,7 +2489,7 @@ public class CatalogServiceCatalog extends Catalog {
    * and ignore the result.
    */
   public void reloadTable(Table tbl, String reason) throws CatalogException {
-    reloadTable(tbl, reason, -1);
+    reloadTable(tbl, reason, -1, false);
   }
 
   /**
@@ -2486,10 +2498,22 @@ public class CatalogServiceCatalog extends Catalog {
    * and ignore the result.
    * eventId: HMS event id which triggered reload
    */
-  public void reloadTable(Table tbl, String reason, long eventId)
-      throws CatalogException {
+  public void reloadTable(Table tbl, String reason, long eventId,
+      boolean isSkipFileMetadataReload) throws CatalogException {
     reloadTable(tbl, new TResetMetadataRequest(), CatalogObject.ThriftObjectType.NONE,
-        reason, eventId);
+        reason, eventId, isSkipFileMetadataReload);
+  }
+
+  /**
+   * Wrapper around {@link #reloadTable(Table, boolean, CatalogObject.ThriftObjectType,
+   * String, long)} which passes false for {@code refreshUpdatedPartitions} argument.
+   * eventId: HMS event id which triggered reload
+   */
+  public TCatalogObject reloadTable(Table tbl, TResetMetadataRequest request,
+      CatalogObject.ThriftObjectType resultType, String reason, long eventId)
+      throws CatalogException {
+    return reloadTable(tbl, request, resultType, reason, eventId,
+        /*isSkipFileMetadataReload*/false);
   }
 
   /**
@@ -2507,8 +2531,8 @@ public class CatalogServiceCatalog extends Catalog {
    * table. Otherwise, set the eventId as table's last synced id after reload is done
    */
   public TCatalogObject reloadTable(Table tbl, TResetMetadataRequest request,
-      CatalogObject.ThriftObjectType resultType, String reason, long eventId)
-      throws CatalogException {
+      CatalogObject.ThriftObjectType resultType, String reason, long eventId,
+      boolean isSkipFileMetadataReload) throws CatalogException {
     LOG.info(String.format("Refreshing table metadata: %s", tbl.getFullName()));
     Preconditions.checkState(!(tbl instanceof IncompleteTable));
     String dbName = tbl.getDb().getName();
@@ -2550,8 +2574,10 @@ public class CatalogServiceCatalog extends Catalog {
         }
         if (tbl instanceof HdfsTable) {
           ((HdfsTable) tbl)
-              .load(true, msClient.getHiveClient(), msTbl,
-                  request.refresh_updated_hms_partitions, request.debug_action, reason);
+              .load(true, msClient.getHiveClient(), msTbl, !isSkipFileMetadataReload,
+                  /* loadTableSchema*/true, request.refresh_updated_hms_partitions,
+                  /* partitionsToUpdate*/null, request.debug_action,
+                  /*partitionToEventId*/null, reason);
         } else {
           tbl.load(true, msClient.getHiveClient(), msTbl, reason);
         }
@@ -2757,7 +2783,7 @@ public class CatalogServiceCatalog extends Catalog {
    * otherwise.
    */
   public boolean reloadTableIfExists(String dbName, String tblName, String reason,
-      long eventId) throws CatalogException {
+      long eventId, boolean isSkipFileMetadataReload) throws CatalogException {
     try {
       Table table = getTable(dbName, tblName);
       if (table == null || table instanceof IncompleteTable) return false;
@@ -2766,7 +2792,7 @@ public class CatalogServiceCatalog extends Catalog {
             + "event {}.", dbName, tblName, eventId, table.getCreateEventId());
         return false;
       }
-      reloadTable(table, reason, eventId);
+      reloadTable(table, reason, eventId, isSkipFileMetadataReload);
     } catch (DatabaseNotFoundException | TableLoadingException e) {
       LOG.info(String.format("Reload table if exists failed with: %s", e.getMessage()));
       return false;
@@ -3859,5 +3885,9 @@ public class CatalogServiceCatalog extends Catalog {
           "reload the partition.", ex);
     }
     return false;
+  }
+
+  public Set<String> getWhitelistedTblProperties() {
+    return whitelistedTblProperties_;
   }
 }

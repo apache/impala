@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -749,6 +750,10 @@ public class MetastoreEvents {
     // case of alter events
     protected org.apache.hadoop.hive.metastore.api.Table msTbl_;
 
+    // A boolean flag used in alter table event to record if the file metadata reload
+    // can be skipped for certain type of alter table statements
+    protected boolean skipFileMetadataReload_ = false;
+
     // in case of partition batch events, this method can be overridden to return
     // the partition object from the events which are batched together.
     protected Partition getPartitionForBatching() { return null; }
@@ -850,7 +855,8 @@ public class MetastoreEvents {
         throws CatalogException {
       try {
         if (!catalog_.reloadTableIfExists(dbName_, tblName_,
-            "Processing " + operation + " event from HMS", getEventId())) {
+            "Processing " + operation + " event from HMS", getEventId(),
+            skipFileMetadataReload_)) {
           debugLog("Automatic refresh on table {} failed as the table "
                   + "either does not exist anymore or is not in loaded state.",
               getFullyQualifiedTblName());
@@ -1465,6 +1471,7 @@ public class MetastoreEvents {
             + "which can be ignored.");
         return;
       }
+      skipFileMetadataReload_ = canSkipFileMetadataReload(tableBefore_, tableAfter_);
       // in case of table level alters from external systems it is better to do a full
       // refresh  eg. this could be due to as simple as adding a new parameter or a
       // full blown adding or changing column type
@@ -1493,6 +1500,83 @@ public class MetastoreEvents {
             "TableAfter: {}", PrintUtils.printTimeNs(durationNs),
             tableBefore_.toString(), tableAfter_.toString());
       }
+    }
+
+
+    /**
+     * This method checks if the reloading of file metadata can be skipped for an alter
+     * statement. This method accepts two arguments, 1) pre-modified HMS table instance
+     * 2) post-modified HMS table instance and compare what really changed in the alter
+     * event.
+     */
+    private boolean canSkipFileMetadataReload(
+        org.apache.hadoop.hive.metastore.api.Table beforeTable,
+        org.apache.hadoop.hive.metastore.api.Table afterTable) {
+      Set<String> whitelistedTblProperties = catalog_.getWhitelistedTblProperties();
+      // If the whitelisted table properties are empty, then we skip this optimization
+      if (whitelistedTblProperties.isEmpty()) {
+        return false;
+      }
+      // There are lot of other alter statements which doesn't require file metadata
+      // reload but these are the most common types for alter statements.
+      if (isFieldSchemaChanged(beforeTable, afterTable) ||
+          isTableOwnerChanged(beforeTable.getOwner(), afterTable.getOwner()) ||
+          !isCustomTblPropsChanged(whitelistedTblProperties, beforeTable, afterTable)) {
+        return true;
+      }
+      return false;
+    }
+
+    private boolean isFieldSchemaChanged(
+        org.apache.hadoop.hive.metastore.api.Table beforeTable,
+        org.apache.hadoop.hive.metastore.api.Table afterTable) {
+      List<FieldSchema> beforeCols = beforeTable.getSd().getCols();
+      List<FieldSchema> afterCols = afterTable.getSd().getCols();
+      // check if columns are added or removed
+      if (beforeCols.size() != afterCols.size()) {
+        infoLog("Change in number of columns detected for table {}.{} from {} to {}",
+            dbName_, tblName_, beforeCols.size(), afterCols.size());
+        return true;
+      }
+      // check if columns are replaced or column definition is changed
+      // Field schema's comment is rarely used, so it'll be ignored
+      for (int i = 0; i < beforeCols.size(); i++) {
+        if (!beforeCols.get(i).getName().equals(afterCols.get(i).getName()) ||
+            !beforeCols.get(i).getType().equals(afterCols.get(i).getType())) {
+          infoLog("Change in table schema detected for table {}.{} from {} to {} ",
+              tblName_, dbName_, beforeCols.get(i).getName() + " (" +
+                  beforeCols.get(i).getType() +")", afterCols.get(i).getName() + " (" +
+                  afterCols.get(i).getType() + ")");
+          return true;
+        }
+      }
+      return false;
+    }
+
+    private boolean isTableOwnerChanged(String ownerBefore, String ownerAfter) {
+      if (!Objects.equals(ownerBefore, ownerAfter)) {
+        infoLog("Change in Ownership detected for table {}.{}, oldOwner: {}, " +
+            "newOwner: {}", dbName_, tblName_, ownerBefore, ownerAfter);
+        return true;
+      }
+      return false;
+    }
+
+    // Check if the whitelisted properties are changed during the alter statement
+    private boolean isCustomTblPropsChanged(Set<String> whitelistedTblProperties,
+        org.apache.hadoop.hive.metastore.api.Table beforeTable,
+        org.apache.hadoop.hive.metastore.api.Table afterTable) {
+      for (String whitelistConfig : whitelistedTblProperties) {
+        String configBefore = beforeTable.getParameters().get(whitelistConfig);
+        String configAfter = afterTable.getParameters().get(whitelistConfig);
+        if (!Objects.equals(configBefore, configAfter)) {
+          infoLog("Change in whitelisted table properties detected for table {}.{} " +
+              "whitelisted config: {}, value before: {}, value after: {}", dbName_,
+              tblName_, whitelistConfig, configBefore, configAfter);
+          return true;
+        }
+      }
+      return false;
     }
 
     /**

@@ -18,6 +18,7 @@
 package org.apache.impala.catalog.events;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -2785,6 +2786,84 @@ public class MetastoreEventsProcessorTest {
   }
 
   /**
+   * Some of the the alter table events doesn't require to reload file metadata, this
+   * test asserts that file metadata is not reloaded for such alter table events
+   */
+  @Test
+  public void testAlterTableNoFileMetadataReload() throws Exception {
+    createDatabase(TEST_DB_NAME, null);
+    final String testTblName = "testAlterTableNoFileMetadataReload";
+    createTable(testTblName, true);
+    eventsProcessor_.processEvents();
+    // load the table first
+    loadTable(testTblName);
+    HdfsTable tbl = (HdfsTable) catalog_.getTable(TEST_DB_NAME, testTblName);
+    // get file metadata load counter before altering the partition
+    long fileMetadataLoadBefore =
+        tbl.getMetrics().getCounter(HdfsTable.NUM_LOAD_FILEMETADATA_METRIC).getCount();
+    // Test 1: alter table add cols
+    alterTableAddCol(testTblName, "newCol", "string", "");
+    eventsProcessor_.processEvents();
+
+    // Test 2: alter table change column type
+    altertableChangeCol(testTblName, "newCol", "int", null);
+    eventsProcessor_.processEvents();
+
+    // Test 3: alter table set owner
+    alterTableSetOwner(testTblName, "testOwner");
+    eventsProcessor_.processEvents();
+
+    // Test 4: alter table set non-whitelisted tbl properties
+    alterTableAddParameter(testTblName, "dummyKey1", "dummyValue1");
+    eventsProcessor_.processEvents();
+
+    // Verify that the file metadata isn't reloaded
+    tbl = (HdfsTable) catalog_.getTable(TEST_DB_NAME, testTblName);
+    long fileMetadataLoadAfter =
+        tbl.getMetrics().getCounter(HdfsTable.NUM_LOAD_FILEMETADATA_METRIC).getCount();
+    assertEquals(fileMetadataLoadAfter, fileMetadataLoadBefore);
+
+    // Test 5: alter table add whitelisted property
+    alterTableAddParameter(testTblName, "EXTERNAL", "true");
+    eventsProcessor_.processEvents();
+    // Verify that the file metadata is reloaded
+    tbl = (HdfsTable) catalog_.getTable(TEST_DB_NAME, testTblName);
+    fileMetadataLoadAfter =
+        tbl.getMetrics().getCounter(HdfsTable.NUM_LOAD_FILEMETADATA_METRIC).getCount();
+    assertNotEquals(fileMetadataLoadAfter, fileMetadataLoadBefore);
+    fileMetadataLoadBefore = fileMetadataLoadAfter;
+
+    // Test 6: alter table change whitelisted property
+    alterTableAddParameter(testTblName, "EXTERNAL", "false");
+    eventsProcessor_.processEvents();
+    // Verify that the file metadata is reloaded
+    tbl = (HdfsTable) catalog_.getTable(TEST_DB_NAME, testTblName);
+    fileMetadataLoadAfter =
+        tbl.getMetrics().getCounter(HdfsTable.NUM_LOAD_FILEMETADATA_METRIC).getCount();
+    assertNotEquals(fileMetadataLoadAfter, fileMetadataLoadBefore);
+    fileMetadataLoadBefore = fileMetadataLoadAfter;
+
+    // Test 6: alter table set the same value for whitelisted property
+    alterTableAddParameter(testTblName, "EXTERNAL", "false");
+    eventsProcessor_.processEvents();
+    // Verify that the file metadata isn't reloaded
+    tbl = (HdfsTable) catalog_.getTable(TEST_DB_NAME, testTblName);
+    fileMetadataLoadAfter =
+        tbl.getMetrics().getCounter(HdfsTable.NUM_LOAD_FILEMETADATA_METRIC).getCount();
+    assertEquals(fileMetadataLoadAfter, fileMetadataLoadBefore);
+
+    // Test 7: alter table remove whitelisted property
+    alterTableAddParameter(testTblName, "EXTERNAL", null); // sending null value will
+    // unset the parameter
+    eventsProcessor_.processEvents();
+    // Verify that the file metadata is reloaded
+    tbl = (HdfsTable) catalog_.getTable(TEST_DB_NAME, testTblName);
+    fileMetadataLoadAfter =
+        tbl.getMetrics().getCounter(HdfsTable.NUM_LOAD_FILEMETADATA_METRIC).getCount();
+    assertNotEquals(fileMetadataLoadAfter, fileMetadataLoadBefore);
+  }
+
+  /**
    * For an external table, the test asserts file metadata is not reloaded during
    * AlterPartitionEvent processing if only partition parameters are changed
    * @throws Exception
@@ -3823,6 +3902,23 @@ public class MetastoreEventsProcessorTest {
       }
       assertNotNull("Column " + colName + " does not exist", targetCol);
       msTable.getSd().getCols().remove(targetCol);
+      msClient.getHiveClient().alter_table_with_environmentContext(
+          TEST_DB_NAME, tblName, msTable, null);
+    }
+  }
+
+  /**
+   * Sets the owner info from HMS
+   * @param tblName
+   * @param newOwner
+   * @throws TException
+   */
+  private void alterTableSetOwner(String tblName, String newOwner) throws TException {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+      org.apache.hadoop.hive.metastore.api.Table msTable =
+          msClient.getHiveClient().getTable(TEST_DB_NAME, tblName);
+      msTable.setOwner(newOwner);
+      msTable.setOwnerType(PrincipalType.USER);
       msClient.getHiveClient().alter_table_with_environmentContext(
           TEST_DB_NAME, tblName, msTable, null);
     }

@@ -398,4 +398,13 @@ public class BackendConfig {
   public int getThriftRpcMaxMessageSize() {
     return backendCfg_.thrift_rpc_max_message_size;
   }
+
+  public String getFileMetadataReloadProperties() {
+    return backendCfg_.file_metadata_reload_properties;
+  }
+
+  @VisibleForTesting
+  public void setFileMetadataReloadProperties(String newPropertiesConfig) {
+    backendCfg_.file_metadata_reload_properties = newPropertiesConfig;
+  }
 }
