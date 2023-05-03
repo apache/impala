@@ -596,15 +596,25 @@ export EXTERNAL_LISTEN_HOST="${EXTERNAL_LISTEN_HOST-0.0.0.0}"
 export DEFAULT_FS="${DEFAULT_FS-hdfs://${INTERNAL_LISTEN_HOST}:20500}"
 export WAREHOUSE_LOCATION_PREFIX="${WAREHOUSE_LOCATION_PREFIX-}"
 export LOCAL_FS="file:${WAREHOUSE_LOCATION_PREFIX}"
-export IMPALA_CLUSTER_NODES_DIR="${IMPALA_CLUSTER_NODES_DIR-$IMPALA_HOME/testdata/cluster/cdh$CDH_MAJOR_VERSION}"
+# Use different node directories for each filesystem so we don't need to recreate them
+# from scratch when switching.
+UNIQUE_FS_LABEL=
+if [[ "${TARGET_FILESYSTEM}" != "hdfs" ]]; then
+  UNIQUE_FS_LABEL="${UNIQUE_FS_LABEL}-${TARGET_FILESYSTEM}"
+fi
+if [[ "${ERASURE_CODING}" = true ]]; then
+  UNIQUE_FS_LABEL="${UNIQUE_FS_LABEL}-ec"
+fi
+DEFAULT_NODES_DIR="$IMPALA_HOME/testdata/cluster/cdh$CDH_MAJOR_VERSION$UNIQUE_FS_LABEL"
+export IMPALA_CLUSTER_NODES_DIR="${IMPALA_CLUSTER_NODES_DIR-$DEFAULT_NODES_DIR}"
 
-ESCAPED_IMPALA_HOME=$(sed "s/[^0-9a-zA-Z]/_/g" <<< "$IMPALA_HOME")
+ESCAPED_DB_UID=$(sed "s/[^0-9a-zA-Z]/_/g" <<< "$UNIQUE_FS_LABEL$IMPALA_HOME")
 if $USE_APACHE_HIVE; then
   export HIVE_HOME="$APACHE_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-bin"
   export HIVE_SRC_DIR="$APACHE_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-src"
   # if apache hive is being used change the metastore db name, so we don't have to
   # format the metastore db everytime we switch between hive versions
-  export METASTORE_DB=${METASTORE_DB-"$(cut -c-59 <<< HMS$ESCAPED_IMPALA_HOME)_apache"}
+  export METASTORE_DB=${METASTORE_DB-"$(cut -c-59 <<< HMS$ESCAPED_DB_UID)_apache"}
 else
   export HIVE_HOME=${HIVE_HOME_OVERRIDE:-\
 "$CDP_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-bin"}
@@ -612,7 +622,7 @@ else
 "${CDP_COMPONENTS_HOME}/hive-${IMPALA_HIVE_VERSION}"}
   # Previously, there were multiple configurations and the "_cdp" included below
   # allowed the two to be distinct. We keep this "_cdp" for historical reasons.
-  export METASTORE_DB=${METASTORE_DB-"$(cut -c-59 <<< HMS$ESCAPED_IMPALA_HOME)_cdp"}
+  export METASTORE_DB=${METASTORE_DB-"$(cut -c-59 <<< HMS$ESCAPED_DB_UID)_cdp"}
 fi
 # Set the path to the hive_metastore.thrift which is used to build thrift code
 export HIVE_METASTORE_THRIFT_DIR=${HIVE_METASTORE_THRIFT_DIR_OVERRIDE:-\
@@ -627,7 +637,7 @@ fi
 # Set the Hive binaries in the path
 export PATH="$HIVE_HOME/bin:$HBASE_HOME/bin:$OZONE_HOME/bin:$PATH"
 
-RANGER_POLICY_DB=${RANGER_POLICY_DB-$(cut -c-63 <<< ranger$ESCAPED_IMPALA_HOME)}
+RANGER_POLICY_DB=${RANGER_POLICY_DB-$(cut -c-63 <<< ranger$ESCAPED_DB_UID)}
 # The DB script in Ranger expects the database name to be in lower case.
 export RANGER_POLICY_DB=$(echo ${RANGER_POLICY_DB} | tr '[:upper:]' '[:lower:]')
 

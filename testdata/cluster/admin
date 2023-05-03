@@ -231,11 +231,12 @@ function create_cluster {
 
     # Add some easy access links closer to IMPALA_HOME
     EASY_ACCESS_LOG_LINK="$EASY_ACCESS_LOG_DIR/cdh$CDH_MAJOR_VERSION-$NODE"
-    if [[ ! -e "$EASY_ACCESS_LOG_LINK" ]]; then
-      mkdir -p "$EASY_ACCESS_LOG_DIR"
-      ln -s "$NODE_DIR/var/log" "$EASY_ACCESS_LOG_DIR"
-      mv "$IMPALA_CLUSTER_LOGS_DIR/log" "$EASY_ACCESS_LOG_LINK"
+    if [[ -e "$EASY_ACCESS_LOG_LINK" ]]; then
+      rm "${EASY_ACCESS_LOG_LINK}"
     fi
+    mkdir -p "$EASY_ACCESS_LOG_DIR"
+    ln -s "$NODE_DIR/var/log" "$EASY_ACCESS_LOG_DIR"
+    mv "$EASY_ACCESS_LOG_DIR/log" "$EASY_ACCESS_LOG_LINK"
 
     # Template population
     DATANODE_PORT=$((DATANODE_FREE_PORT_START++))
