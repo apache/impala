@@ -177,6 +177,13 @@ public interface FeIcebergTable extends FeFsTable {
    */
   int getDefaultPartitionSpecId();
 
+  default IcebergPartitionSpec getPartitionSpec(int specId) {
+    for (IcebergPartitionSpec spec : getPartitionSpecs()) {
+      if (spec.getSpecId() == specId) return spec;
+    }
+    return null;
+  }
+
   default int getFormatVersion() {
     return ((BaseTable)getIcebergApiTable()).operations().current().formatVersion();
   }

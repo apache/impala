@@ -30,13 +30,9 @@ class TupleRow;
 class RuntimeState;
 class MemTracker;
 
-class IcebergDeleteSinkConfig : public DataSinkConfig {
+class IcebergDeleteSinkConfig : public TableSinkBaseConfig {
  public:
   DataSink* CreateSink(RuntimeState* state) const override;
-  void Close() override;
-
-  /// Expressions for computing the target partitions to which a row is written.
-  std::vector<ScalarExpr*> partition_key_exprs_;
 
   ~IcebergDeleteSinkConfig() override {}
 
@@ -73,15 +69,28 @@ class IcebergDeleteSink : public TableSinkBase {
   std::string DebugString() const override;
 
  private:
-  /// Initialises the filenames of a given output partition, and opens the temporary file.
-  Status InitOutputPartition(RuntimeState* state) WARN_UNUSED_RESULT;
+  /// Fills output_partition's partition_name, raw_partition_names and
+  /// external_partition_name based on the row's columns. In case of partitioned
+  /// tables 'row' must contain the Iceberg virtual columns PARTITION__SPEC__ID and
+  /// ICEBERG__PARTITION__SERIALIZED. Every information needed for 'output_partition' can
+  /// be retrieved from these fields and from the 'table_desc_'.
+  void ConstructPartitionInfo(
+      const TupleRow* row,
+      OutputPartition* output_partition) override;
 
-  /// For now we only allow non-partitioned Iceberg tables.
-  PartitionPair output_partition_;
+  /// Maps all rows in 'batch' to partitions and appends them to their temporary Hdfs
+  /// files. The input must be ordered by the partition key expressions.
+  Status WriteClusteredRowBatch(RuntimeState* state, RowBatch* batch) WARN_UNUSED_RESULT;
 
-  /// The partition descriptor used when creating new partitions from this sink.
-  /// Currently we don't support multi-format sinks.
-  const HdfsPartitionDescriptor* prototype_partition_;
+  /// Sets and initializes the 'current_partition_' based on key. For unpartitioned tables
+  /// it is only invoked once to initialize the only output partition.
+  /// For partitioned tables the rows are clustered based on partition data, i.e. when the
+  /// key changes we initialize a new output partition.
+  Status SetCurrentPartition(RuntimeState* state, const TupleRow* row,
+      const std::string& key) WARN_UNUSED_RESULT;
+
+  /// The sink writes partitions one-by-one.
+  PartitionPair current_partition_;
 };
 
 }

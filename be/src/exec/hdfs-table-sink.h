@@ -30,17 +30,12 @@ namespace impala {
 
 class Expr;
 class TupleDescriptor;
-class TupleRow;
 class RuntimeState;
 class MemTracker;
 
-class HdfsTableSinkConfig : public DataSinkConfig {
+class HdfsTableSinkConfig : public TableSinkBaseConfig {
  public:
   DataSink* CreateSink(RuntimeState* state) const override;
-  void Close() override;
-
-  /// Expressions for computing the target partitions to which a row is written.
-  std::vector<ScalarExpr*> partition_key_exprs_;
 
   ~HdfsTableSinkConfig() override {}
 
@@ -132,32 +127,18 @@ class HdfsTableSink : public TableSinkBase {
   /// the PARTITION clause of the INSERT statement.
   void BuildPartitionDescMap();
 
-  /// Initialises the filenames of a given output partition, and opens the temporary file.
-  /// The partition key is derived from 'row'. If the partition will not have any rows
-  /// added to it, empty_partition must be true.
-  Status InitOutputPartition(RuntimeState* state,
-      const HdfsPartitionDescriptor& partition_descriptor, const TupleRow* row,
-      OutputPartition* output_partition, bool empty_partition) WARN_UNUSED_RESULT;
-
-  /// Constructs the partition name using 'partition_key_expr_evals_'.
-  /// 'url_encoded_partition_name' is the full partition name in URL encoded form. E.g.:
-  /// it's "a=12%2F31%2F11/b=10" if we have 2 partition columns "a" and "b", and "a" has
+  /// Fille 'output_partition' using 'partition_key_expr_evals_'.
+  /// 'output_partition->partition_name' will contain the full partition name in URL
+  /// encoded form. E.g.:
+  /// It's "a=12%2F31%2F11/b=10" if we have 2 partition columns "a" and "b", and "a" has
   /// the value of "12/31/11" and "b" has the value of 10. Since this is URL encoded,
   /// can be used for paths.
-  /// 'raw_partition_name' is a vector of partition key-values in a non-encoded format.
+  /// 'output_partition->raw_partition_names' is a vector of partition key-values in a
+  /// non-encoded format.
   /// Staying with the above example this would hold ["a=12/31/11", "b=10"].
-  /// 'external_partition_name' is a subset of 'url_encoded_partition_name'.
-  void ConstructPartitionNames(
+  void ConstructPartitionInfo(
       const TupleRow* row,
-      string* url_encoded_partition_name,
-      std::vector<std::string>* raw_partition_names,
-      string* external_partition_name);
-
-  /// Generates string key for hash_tbl_ as a concatenation of all evaluated exprs,
-  /// evaluated against 'row'. The generated string is much shorter than the full Hdfs
-  /// file name.
-  void GetHashTblKey(const TupleRow* row,
-      const std::vector<ScalarExprEvaluator*>& evals, std::string* key);
+      OutputPartition* output_partition) override;
 
   /// Returns partition descriptor object for the given key.
   const HdfsPartitionDescriptor* GetPartitionDescriptor(const std::string& key);
@@ -173,15 +154,8 @@ class HdfsTableSink : public TableSinkBase {
   /// files. The input must be ordered by the partition key expressions.
   Status WriteClusteredRowBatch(RuntimeState* state, RowBatch* batch) WARN_UNUSED_RESULT;
 
-  /// Returns the ith partition name of the table.
-  std::string GetPartitionName(int i);
-
   /// Returns TRUE for Hive ACID tables.
   bool IsHiveAcid() const override { return write_id_ != -1; }
-
-  /// The partition descriptor used when creating new partitions from this sink.
-  /// Currently we don't support multi-format sinks.
-  const HdfsPartitionDescriptor* prototype_partition_;
 
   /// The 'skip.header.line.count' property of the target Hdfs table. We will insert this
   /// many empty lines at the beginning of new text files, which will be skipped by the
@@ -207,14 +181,6 @@ class HdfsTableSink : public TableSinkBase {
   // Represents the sorting order used in SORT BY queries.
   const TSortingOrder::type sorting_order_;
 
-  /// Stores the current partition during clustered inserts across subsequent row batches.
-  /// Only set if 'input_is_clustered_' is true.
-  PartitionPair* current_clustered_partition_;
-
-  /// Stores the current partition key during clustered inserts across subsequent row
-  /// batches. Only set if 'input_is_clustered_' is true.
-  std::string current_clustered_partition_key_;
-
   /// The directory in which to write intermediate results. Set to
   /// <hdfs_table_base_dir>/_impala_insert_staging/ during Prepare()
   std::string staging_dir_;
@@ -234,14 +200,6 @@ class HdfsTableSink : public TableSinkBase {
   /// If there are no partitions (and no partition keys) we store a single
   /// OutputPartition in the map to simplify the code.
   PartitionMap partition_keys_to_output_partitions_;
-
-  /// Expressions for computing the target partitions to which a row is written.
-  const std::vector<ScalarExpr*>& partition_key_exprs_;
-  std::vector<ScalarExprEvaluator*> partition_key_expr_evals_;
-
-  /// Subset of partition_key_expr_evals_ which are not constant. Set in Prepare().
-  /// Used for generating the string key of hash_tbl_.
-  std::vector<ScalarExprEvaluator*> dynamic_partition_key_expr_evals_;
 
   /// Map from row key (i.e. concatenated non-constant partition keys) to
   /// partition descriptor. We don't own the HdfsPartitionDescriptors, they

@@ -935,6 +935,7 @@ public class IcebergUtil {
     if (fileFormat != -1) {
       FbIcebergMetadata.addFileFormat(fbb, fileFormat);
     }
+    FbIcebergMetadata.addSpecId(fbb, cf.specId());
     FbIcebergMetadata.addRecordCount(fbb, cf.recordCount());
     if (partKeysOffset != -1) {
       FbIcebergMetadata.addPartitionKeys(fbb, partKeysOffset);

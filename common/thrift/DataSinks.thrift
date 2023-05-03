@@ -103,7 +103,12 @@ struct THdfsTableSink {
   11: optional map<string, i64> parquet_bloom_filter_col_info;
 }
 
+// Structure to encapsulate specific options that are passed down to the
+// IcebergDeleteSink.
 struct TIcebergDeleteSink {
+  // Partition expressions of this sink. In case of Iceberg DELETEs these are the
+  // partition spec id and the serialized partition data.
+  1: required list<Exprs.TExpr> partition_key_exprs
 }
 
 // Structure to encapsulate specific options that are passed down to the KuduTableSink

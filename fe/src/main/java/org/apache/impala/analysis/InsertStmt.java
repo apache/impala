@@ -67,7 +67,7 @@ import org.apache.impala.util.IcebergUtil;
  * Representation of a single insert or upsert statement, including the select statement
  * whose results are to be inserted.
  */
-public class InsertStmt extends StatementBase {
+public class InsertStmt extends DmlStatementBase {
   // Determines the location of optional hints. The "Start" option is motivated by
   // Oracle's hint placement at the start of the statement and the "End" option places
   // the hint right before the query (if specified).
@@ -131,13 +131,6 @@ public class InsertStmt extends StatementBase {
   // Select or union whose results are to be inserted. If null, will be set after
   // analysis.
   private QueryStmt queryStmt_;
-
-  // Set in analyze(). Contains metadata of target table to determine type of sink.
-  private FeTable table_;
-
-  // Set in analyze(). Set the limit on the maximum number of table sink instances.
-  // A value of 0 means no limit.
-  private int maxTableSinks_ = 0;
 
   // Set in analyze(). Exprs correspond to the partitionKeyValues, if specified, or to
   // the partition columns for Kudu tables.
@@ -205,10 +198,6 @@ public class InsertStmt extends StatementBase {
   // Set by the Frontend if the target table is transactional.
   private long writeId_ = -1;
 
-  // Serialized metadata of transaction object which is set by the Frontend if the
-  // target table is Kudu table and Kudu's transaction is enabled.
-  private java.nio.ByteBuffer kuduTxnToken_ = null;
-
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
@@ -264,10 +253,8 @@ public class InsertStmt extends StatementBase {
     queryStmt_ = other.queryStmt_ != null ? other.queryStmt_.clone() : null;
     needsGeneratedQueryStatement_ = other.needsGeneratedQueryStatement_;
     columnPermutation_ = other.columnPermutation_;
-    table_ = other.table_;
     isUpsert_ = other.isUpsert_;
     writeId_ = other.writeId_;
-    kuduTxnToken_ = org.apache.thrift.TBaseHelper.copyBinary(other.kuduTxnToken_);
   }
 
   @Override
@@ -276,7 +263,6 @@ public class InsertStmt extends StatementBase {
     if (withClause_ != null) withClause_.reset();
     targetTableName_ = originalTableName_;
     queryStmt_.reset();
-    table_ = null;
     partitionKeyExprs_.clear();
     partitionColPos_.clear();
     hasShuffleHint_ = false;
@@ -290,7 +276,6 @@ public class InsertStmt extends StatementBase {
     mentionedColumns_.clear();
     primaryKeyExprs_.clear();
     writeId_ = -1;
-    kuduTxnToken_ = null;
   }
 
   @Override
@@ -1209,15 +1194,9 @@ public class InsertStmt extends StatementBase {
 
   public List<PlanHint> getPlanHints() { return planHints_; }
   public TableName getTargetTableName() { return targetTableName_; }
-  public FeTable getTargetTable() { return table_; }
   public void setTargetTable(FeTable table) { this.table_ = table; }
   public boolean isTargetTableKuduTable() { return (table_ instanceof FeKuduTable); }
-  public void setMaxTableSinks(int maxTableSinks) { this.maxTableSinks_ = maxTableSinks; }
   public void setWriteId(long writeId) { this.writeId_ = writeId; }
-  public void setKuduTransactionToken(byte[] kuduTxnToken) {
-    Preconditions.checkNotNull(kuduTxnToken);
-    kuduTxnToken_ = java.nio.ByteBuffer.wrap(kuduTxnToken.clone());
-  }
   public boolean isOverwrite() { return overwrite_; }
   public TSortingOrder getSortingOrder() { return sortingOrder_; }
 
@@ -1225,18 +1204,21 @@ public class InsertStmt extends StatementBase {
    * Only valid after analysis
    */
   public QueryStmt getQueryStmt() { return queryStmt_; }
+  @Override
   public List<Expr> getPartitionKeyExprs() { return partitionKeyExprs_; }
   public List<Integer> getPartitionColPos() { return partitionColPos_; }
+  @Override
   public boolean hasShuffleHint() { return hasShuffleHint_; }
+  @Override
   public boolean hasNoShuffleHint() { return hasNoShuffleHint_; }
+  @Override
   public boolean hasClusteredHint() { return hasClusteredHint_; }
+  @Override
   public boolean hasNoClusteredHint() { return hasNoClusteredHint_; }
   public List<Expr> getPrimaryKeyExprs() { return primaryKeyExprs_; }
+  @Override
   public List<Expr> getSortExprs() { return sortExprs_; }
   public long getWriteId() { return writeId_; }
-  public byte[] getKuduTransactionToken() {
-    return kuduTxnToken_ == null ? null : kuduTxnToken_.array();
-  }
 
   // Clustering is enabled by default. If the table has a 'sort.columns' property and the
   // query has a 'noclustered' hint, we issue a warning during analysis and ignore the

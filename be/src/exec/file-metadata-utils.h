@@ -23,6 +23,10 @@
 #include <map>
 #include <memory>
 
+namespace org::apache::impala::fb {
+  struct FbIcebergMetadata;
+}
+
 namespace impala {
 
 struct HdfsFileDesc;
@@ -67,6 +71,11 @@ private:
   /// template_tuple.
   void AddIcebergColumns(MemPool* mem_pool, Tuple** template_tuple,
       std::map<const SlotId, const SlotDescriptor*>* slot_descs_written);
+
+  /// Writes Iceberg-related virtual column values to the template tuple.
+  void AddVirtualIcebergColumn(MemPool* mem_pool, Tuple* template_tuple,
+      const org::apache::impala::fb::FbIcebergMetadata& ice_metadata,
+      const SlotDescriptor* slot_desc);
 
   HdfsScanNodeBase* const scan_node_;
 

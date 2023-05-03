@@ -1,0 +1,211 @@
+====
+---- QUERY
+select partition__spec__id, iceberg__partition__serialized, * from iceberg_alltypes_part;
+---- RESULTS
+0,'dHJ1ZQ==.MQ==.MTE=.MS4x.Mi4yMjI=.MTIzLjMyMQ==.MTkwNDU=.aW1wYWxh',1,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+0,'dHJ1ZQ==.MQ==.MTE=.MS4x.Mi4yMjI=.MTIzLjMyMQ==.MTkwNDU=.aW1wYWxh',2,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+---- TYPES
+INT, BINARY, INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
+select *, base64decode(split_part(p, '.', 1)), base64decode(split_part(p, '.', 2)), base64decode(split_part(p, '.', 3)), base64decode(split_part(p, '.', 4)),
+          base64decode(split_part(p, '.', 5)), base64decode(split_part(p, '.', 6)), base64decode(split_part(p, '.', 7)), base64decode(split_part(p, '.', 8))
+from (select partition__spec__id, cast(iceberg__partition__serialized as STRING) p from iceberg_alltypes_part) v;
+---- RESULTS
+0,'dHJ1ZQ==.MQ==.MTE=.MS4x.Mi4yMjI=.MTIzLjMyMQ==.MTkwNDU=.aW1wYWxh','true','1','11','1.1','2.222','123.321','19045','impala'
+0,'dHJ1ZQ==.MQ==.MTE=.MS4x.Mi4yMjI=.MTIzLjMyMQ==.MTkwNDU=.aW1wYWxh','true','1','11','1.1','2.222','123.321','19045','impala'
+---- TYPES
+INT, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select *, base64decode(split_part(p, '.', 1)), base64decode(split_part(p, '.', 2)), base64decode(split_part(p, '.', 3)), base64decode(split_part(p, '.', 4)),
+          base64decode(split_part(p, '.', 5)), base64decode(split_part(p, '.', 6)), base64decode(split_part(p, '.', 7)), base64decode(split_part(p, '.', 8))
+from (select partition__spec__id, cast(iceberg__partition__serialized as STRING) p from iceberg_alltypes_part_orc) v;
+---- RESULTS
+0,'dHJ1ZQ==.MQ==.MTE=.MS4x.Mi4yMjI=.MTIzLjMyMQ==.MTkwNDU=.aW1wYWxh','true','1','11','1.1','2.222','123.321','19045','impala'
+0,'dHJ1ZQ==.MQ==.MTE=.MS4x.Mi4yMjI=.MTIzLjMyMQ==.MTkwNDU=.aW1wYWxh','true','1','11','1.1','2.222','123.321','19045','impala'
+---- TYPES
+INT, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select partition__spec__id, iceberg__partition__serialized, * from iceberg_alltypes_part where i = 2;
+---- RESULTS
+0,'dHJ1ZQ==.MQ==.MTE=.MS4x.Mi4yMjI=.MTIzLjMyMQ==.MTkwNDU=.aW1wYWxh',2,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+---- TYPES
+INT, BINARY, INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
+set TIMEZONE='Europe/Budapest';
+select partition__spec__id, iceberg__partition__serialized, * from iceberg_non_partitioned where id < 5;
+---- RESULTS
+0,'',4,'Alex','view',2020-01-01 09:00:00
+0,'',1,'Alex','view',2020-01-01 09:00:00
+0,'',3,'Alan','click',2020-01-01 10:00:00
+0,'',2,'Lisa','download',2020-01-01 11:00:00
+---- TYPES
+INT, BINARY, INT, STRING, STRING, TIMESTAMP
+====
+---- QUERY
+set TIMEZONE='Europe/Budapest';
+select partition__spec__id, iceberg__partition__serialized,
+    base64decode(split_part(cast(iceberg__partition__serialized as string), '.', 2)) p, *
+from iceberg_partitioned;
+---- RESULTS
+0,'NDM4Mjk3.Y2xpY2s=','click',10,'Alan','click',2020-01-01 10:00:00
+0,'NDM4Mjk3.Y2xpY2s=','click',12,'Alan','click',2020-01-01 10:00:00
+0,'NDM4Mjk2.dmlldw==','view',20,'Alex','view',2020-01-01 09:00:00
+0,'NDM4Mjk4.ZG93bmxvYWQ=','download',7,'Lisa','download',2020-01-01 11:00:00
+0,'NDM4Mjk4.ZG93bmxvYWQ=','download',5,'Lisa','download',2020-01-01 11:00:00
+0,'NDM4Mjk4.ZG93bmxvYWQ=','download',2,'Lisa','download',2020-01-01 11:00:00
+0,'NDM4Mjk2.dmlldw==','view',11,'Alex','view',2020-01-01 09:00:00
+0,'NDM4Mjk3.Y2xpY2s=','click',3,'Alan','click',2020-01-01 10:00:00
+0,'NDM4Mjk3.Y2xpY2s=','click',9,'Alan','click',2020-01-01 10:00:00
+0,'NDM4Mjk2.dmlldw==','view',17,'Alex','view',2020-01-01 09:00:00
+0,'NDM4Mjk3.Y2xpY2s=','click',13,'Alan','click',2020-01-01 10:00:00
+0,'NDM4Mjk2.dmlldw==','view',1,'Alex','view',2020-01-01 09:00:00
+0,'NDM4Mjk2.dmlldw==','view',4,'Alex','view',2020-01-01 09:00:00
+0,'NDM4Mjk2.dmlldw==','view',15,'Alex','view',2020-01-01 09:00:00
+0,'NDM4Mjk4.ZG93bmxvYWQ=','download',16,'Lisa','download',2020-01-01 11:00:00
+0,'NDM4Mjk4.ZG93bmxvYWQ=','download',14,'Lisa','download',2020-01-01 11:00:00
+0,'NDM4Mjk2.dmlldw==','view',6,'Alex','view',2020-01-01 09:00:00
+0,'NDM4Mjk3.Y2xpY2s=','click',18,'Alan','click',2020-01-01 10:00:00
+0,'NDM4Mjk4.ZG93bmxvYWQ=','download',8,'Lisa','download',2020-01-01 11:00:00
+0,'NDM4Mjk2.dmlldw==','view',19,'Alex','view',2020-01-01 09:00:00
+---- TYPES
+INT, BINARY, STRING, INT, STRING, STRING, TIMESTAMP
+====
+---- QUERY
+select partition__spec__id, iceberg__partition__serialized,
+    base64decode(split_part(cast(iceberg__partition__serialized as string), '.', 1)), *
+from iceberg_partitioned_orc_external
+where base64decode(split_part(cast(iceberg__partition__serialized as string), '.', 1)) in ('click', 'download');
+---- RESULTS
+0,'Y2xpY2s=','click',10,'Alan','click'
+0,'Y2xpY2s=','click',12,'Alan','click'
+0,'ZG93bmxvYWQ=','download',7,'Lisa','download'
+0,'ZG93bmxvYWQ=','download',5,'Lisa','download'
+0,'ZG93bmxvYWQ=','download',2,'Lisa','download'
+0,'Y2xpY2s=','click',3,'Alan','click'
+0,'Y2xpY2s=','click',9,'Alan','click'
+0,'Y2xpY2s=','click',13,'Alan','click'
+0,'ZG93bmxvYWQ=','download',16,'Lisa','download'
+0,'ZG93bmxvYWQ=','download',14,'Lisa','download'
+0,'Y2xpY2s=','click',18,'Alan','click'
+0,'ZG93bmxvYWQ=','download',8,'Lisa','download'
+---- TYPES
+INT, BINARY, STRING, INT, STRING, STRING
+====
+---- QUERY
+set TIMEZONE='Europe/Budapest';
+select partition__spec__id, iceberg__partition__serialized, * from iceberg_partitioned
+where partition__spec__id = 0;
+---- RESULTS
+0,'NDM4Mjk4.ZG93bmxvYWQ=',5,'Lisa','download',2020-01-01 11:00:00
+0,'NDM4Mjk2.dmlldw==',20,'Alex','view',2020-01-01 09:00:00
+0,'NDM4Mjk2.dmlldw==',11,'Alex','view',2020-01-01 09:00:00
+0,'NDM4Mjk2.dmlldw==',19,'Alex','view',2020-01-01 09:00:00
+0,'NDM4Mjk2.dmlldw==',1,'Alex','view',2020-01-01 09:00:00
+0,'NDM4Mjk3.Y2xpY2s=',9,'Alan','click',2020-01-01 10:00:00
+0,'NDM4Mjk4.ZG93bmxvYWQ=',14,'Lisa','download',2020-01-01 11:00:00
+0,'NDM4Mjk2.dmlldw==',17,'Alex','view',2020-01-01 09:00:00
+0,'NDM4Mjk3.Y2xpY2s=',10,'Alan','click',2020-01-01 10:00:00
+0,'NDM4Mjk4.ZG93bmxvYWQ=',16,'Lisa','download',2020-01-01 11:00:00
+0,'NDM4Mjk3.Y2xpY2s=',12,'Alan','click',2020-01-01 10:00:00
+0,'NDM4Mjk2.dmlldw==',4,'Alex','view',2020-01-01 09:00:00
+0,'NDM4Mjk4.ZG93bmxvYWQ=',8,'Lisa','download',2020-01-01 11:00:00
+0,'NDM4Mjk3.Y2xpY2s=',3,'Alan','click',2020-01-01 10:00:00
+0,'NDM4Mjk3.Y2xpY2s=',13,'Alan','click',2020-01-01 10:00:00
+0,'NDM4Mjk2.dmlldw==',15,'Alex','view',2020-01-01 09:00:00
+0,'NDM4Mjk2.dmlldw==',6,'Alex','view',2020-01-01 09:00:00
+0,'NDM4Mjk4.ZG93bmxvYWQ=',2,'Lisa','download',2020-01-01 11:00:00
+0,'NDM4Mjk3.Y2xpY2s=',18,'Alan','click',2020-01-01 10:00:00
+0,'NDM4Mjk4.ZG93bmxvYWQ=',7,'Lisa','download',2020-01-01 11:00:00
+---- TYPES
+INT, BINARY, INT, STRING, STRING, TIMESTAMP
+====
+---- QUERY
+set TIMEZONE='Europe/Budapest';
+select partition__spec__id, iceberg__partition__serialized, * from iceberg_partitioned
+where iceberg__partition__serialized = cast('NDM4Mjk3.Y2xpY2s=' as BINARY);
+---- RESULTS
+0,'NDM4Mjk3.Y2xpY2s=',12,'Alan','click',2020-01-01 10:00:00
+0,'NDM4Mjk3.Y2xpY2s=',3,'Alan','click',2020-01-01 10:00:00
+0,'NDM4Mjk3.Y2xpY2s=',13,'Alan','click',2020-01-01 10:00:00
+0,'NDM4Mjk3.Y2xpY2s=',18,'Alan','click',2020-01-01 10:00:00
+0,'NDM4Mjk3.Y2xpY2s=',9,'Alan','click',2020-01-01 10:00:00
+0,'NDM4Mjk3.Y2xpY2s=',10,'Alan','click',2020-01-01 10:00:00
+---- TYPES
+INT, BINARY, INT, STRING, STRING, TIMESTAMP
+====
+---- QUERY
+select *, base64decode(split_part(p, '.', 1)), base64decode(split_part(p, '.', 2)),
+    base64decode(split_part(p, '.', 3))
+from (select partition__spec__id, cast(iceberg__partition__serialized as string) p, count(*)
+      from iceberg_partition_evolution
+      where year=2009 and month=1 group by 1,2) v
+---- RESULTS
+0,'MjAwOQ==.MDEyMg==',10,'2009','0122',''
+0,'MjAwOQ==.MDEwMQ==',10,'2009','0101',''
+1,'MjAwOQ==.MDEzMQ==.MQ==',10,'2009','0131','1'
+0,'MjAwOQ==.MDExMw==',10,'2009','0113',''
+0,'MjAwOQ==.MDEzMQ==',10,'2009','0131',''
+1,'MjAwOQ==.MDEwNg==.MQ==',10,'2009','0106','1'
+1,'MjAwOQ==.MDEyMA==.MQ==',10,'2009','0120','1'
+1,'MjAwOQ==.MDEwMg==.MQ==',10,'2009','0102','1'
+1,'MjAwOQ==.MDEwNQ==.MQ==',10,'2009','0105','1'
+1,'MjAwOQ==.MDEwNA==.MQ==',10,'2009','0104','1'
+1,'MjAwOQ==.MDEyMw==.MQ==',10,'2009','0123','1'
+0,'MjAwOQ==.MDEyNQ==',10,'2009','0125',''
+0,'MjAwOQ==.MDEyNA==',10,'2009','0124',''
+1,'MjAwOQ==.MDExNA==.MQ==',10,'2009','0114','1'
+0,'MjAwOQ==.MDExOA==',10,'2009','0118',''
+0,'MjAwOQ==.MDEyOQ==',10,'2009','0129',''
+0,'MjAwOQ==.MDEwMg==',10,'2009','0102',''
+0,'MjAwOQ==.MDExMA==',10,'2009','0110',''
+0,'MjAwOQ==.MDEyMQ==',10,'2009','0121',''
+1,'MjAwOQ==.MDEzMA==.MQ==',10,'2009','0130','1'
+1,'MjAwOQ==.MDEwOQ==.MQ==',10,'2009','0109','1'
+1,'MjAwOQ==.MDEwOA==.MQ==',10,'2009','0108','1'
+0,'MjAwOQ==.MDEyOA==',10,'2009','0128',''
+0,'MjAwOQ==.MDExOQ==',10,'2009','0119',''
+0,'MjAwOQ==.MDEwNg==',10,'2009','0106',''
+0,'MjAwOQ==.MDEwNA==',10,'2009','0104',''
+0,'MjAwOQ==.MDExNg==',10,'2009','0116',''
+0,'MjAwOQ==.MDExNA==',10,'2009','0114',''
+1,'MjAwOQ==.MDEyNQ==.MQ==',10,'2009','0125','1'
+1,'MjAwOQ==.MDEyMQ==.MQ==',10,'2009','0121','1'
+1,'MjAwOQ==.MDEyNg==.MQ==',10,'2009','0126','1'
+1,'MjAwOQ==.MDEyMg==.MQ==',10,'2009','0122','1'
+1,'MjAwOQ==.MDEwMQ==.MQ==',10,'2009','0101','1'
+1,'MjAwOQ==.MDExMw==.MQ==',10,'2009','0113','1'
+0,'MjAwOQ==.MDEwNw==',10,'2009','0107',''
+0,'MjAwOQ==.MDExNQ==',10,'2009','0115',''
+1,'MjAwOQ==.MDExNQ==.MQ==',10,'2009','0115','1'
+0,'MjAwOQ==.MDEwOA==',10,'2009','0108',''
+1,'MjAwOQ==.MDExOQ==.MQ==',10,'2009','0119','1'
+1,'MjAwOQ==.MDExOA==.MQ==',10,'2009','0118','1'
+0,'MjAwOQ==.MDEzMA==',10,'2009','0130',''
+0,'MjAwOQ==.MDExMg==',10,'2009','0112',''
+0,'MjAwOQ==.MDEyMw==',10,'2009','0123',''
+0,'MjAwOQ==.MDEyMA==',10,'2009','0120',''
+0,'MjAwOQ==.MDEwMw==',10,'2009','0103',''
+0,'MjAwOQ==.MDExMQ==',10,'2009','0111',''
+0,'MjAwOQ==.MDEwOQ==',10,'2009','0109',''
+1,'MjAwOQ==.MDEyOA==.MQ==',10,'2009','0128','1'
+1,'MjAwOQ==.MDEyOQ==.MQ==',10,'2009','0129','1'
+1,'MjAwOQ==.MDEwNw==.MQ==',10,'2009','0107','1'
+1,'MjAwOQ==.MDEyNA==.MQ==',10,'2009','0124','1'
+1,'MjAwOQ==.MDEwMw==.MQ==',10,'2009','0103','1'
+1,'MjAwOQ==.MDEyNw==.MQ==',10,'2009','0127','1'
+0,'MjAwOQ==.MDEyNw==',10,'2009','0127',''
+0,'MjAwOQ==.MDEyNg==',10,'2009','0126',''
+1,'MjAwOQ==.MDExMg==.MQ==',10,'2009','0112','1'
+1,'MjAwOQ==.MDExNg==.MQ==',10,'2009','0116','1'
+1,'MjAwOQ==.MDExNw==.MQ==',10,'2009','0117','1'
+1,'MjAwOQ==.MDExMQ==.MQ==',10,'2009','0111','1'
+0,'MjAwOQ==.MDEwNQ==',10,'2009','0105',''
+1,'MjAwOQ==.MDExMA==.MQ==',10,'2009','0110','1'
+0,'MjAwOQ==.MDExNw==',10,'2009','0117',''
+---- TYPES
+INT, STRING, BIGINT, STRING, STRING, STRING
+====

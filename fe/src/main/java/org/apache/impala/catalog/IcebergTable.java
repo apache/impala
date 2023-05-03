@@ -443,6 +443,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
   private void addVirtualColumns() {
     addVirtualColumn(VirtualColumn.INPUT_FILE_NAME);
     addVirtualColumn(VirtualColumn.FILE_POSITION);
+    addVirtualColumn(VirtualColumn.PARTITION_SPEC_ID);
+    addVirtualColumn(VirtualColumn.ICEBERG_PARTITION_SERIALIZED);
   }
 
   @Override
@@ -522,6 +524,13 @@ public class IcebergTable extends Table implements FeIcebergTable {
     Map<HdfsPartition, TPartialPartitionInfo> missingPartialInfos = new HashMap<>();
     TGetPartialCatalogObjectResponse resp =
         getHdfsTable().getPartialInfo(req, missingPartialInfos);
+    if (resp.table_info != null) {
+      // Clear HdfsTable virtual columns and add IcebergTable virtual columns.
+      resp.table_info.unsetVirtual_columns();
+      for (VirtualColumn vCol : getVirtualColumns()) {
+        resp.table_info.addToVirtual_columns(vCol.toThrift());
+      }
+    }
     if (req.table_info_selector.want_iceberg_table) {
       resp.table_info.setIceberg_table(Utils.getTIcebergTable(this));
       if (!resp.table_info.isSetNetwork_addresses()) {

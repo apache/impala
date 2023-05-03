@@ -257,9 +257,10 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc, ObjectPo
   if (tdesc.__isset.icebergTable) {
     is_iceberg_ = true;
     iceberg_table_location_ = tdesc.icebergTable.table_location;
-    const TIcebergPartitionSpec& spec = tdesc.icebergTable.partition_spec[
-        tdesc.icebergTable.default_partition_spec_id];
-    DCHECK_EQ(spec.spec_id, tdesc.icebergTable.default_partition_spec_id);
+    iceberg_spec_id_ = tdesc.icebergTable.default_partition_spec_id;
+    iceberg_partition_specs_ = tdesc.icebergTable.partition_spec;
+    const TIcebergPartitionSpec& spec = iceberg_partition_specs_[iceberg_spec_id_];
+    DCHECK_EQ(spec.spec_id, iceberg_spec_id_);
     for (const TIcebergPartitionField& spec_field : spec.partition_fields) {
       if (spec_field.transform.transform_type == TIcebergPartitionTransformType::VOID) {
         continue;

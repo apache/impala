@@ -61,7 +61,6 @@ public class UpdateStmt extends ModifyStmt {
   /**
    * Return an instance of a KuduTableSink specialized as an Update operation.
    */
-  @Override
   public DataSink createDataSink(List<Expr> resultExprs) {
     // analyze() must have been called before.
     Preconditions.checkState(table_ != null);

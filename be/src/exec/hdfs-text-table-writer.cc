@@ -36,7 +36,7 @@
 
 namespace impala {
 
-HdfsTextTableWriter::HdfsTextTableWriter(HdfsTableSink* parent,
+HdfsTextTableWriter::HdfsTextTableWriter(TableSinkBase* parent,
     RuntimeState* state, OutputPartition* output,
     const HdfsPartitionDescriptor* partition,
     const HdfsTableDescriptor* table_desc)

@@ -52,17 +52,21 @@ public class DeleteStmt extends ModifyStmt {
         new ArrayList<>(), other.wherePredicate_.clone());
   }
 
-  @Override
-  public DataSink createDataSink(List<Expr> resultExprs) {
+  public DataSink createDataSink() {
     // analyze() must have been called before.
     Preconditions.checkState(table_ != null);
     TableSink tableSink = TableSink.create(table_, TableSink.Op.DELETE,
-        ImmutableList.<Expr>of(), resultExprs, referencedColumns_, false, false,
+        partitionKeyExprs_, resultExprs_, referencedColumns_, false, false,
         new Pair<>(ImmutableList.<Integer>of(), TSortingOrder.LEXICAL), -1,
         getKuduTransactionToken(),
-        0);
+        maxTableSinks_);
     Preconditions.checkState(!referencedColumns_.isEmpty());
     return tableSink;
+  }
+
+  public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
+    resultExprs_ = Expr.substituteList(resultExprs_, smap, analyzer, true);
+    partitionKeyExprs_ = Expr.substituteList(partitionKeyExprs_, smap, analyzer, true);
   }
 
   @Override

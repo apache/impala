@@ -161,7 +161,7 @@ public class Planner {
       insertStmt.substituteResultExprs(rootNodeSmap, ctx_.getRootAnalyzer());
       if (!ctx_.isSingleNodeExec()) {
         // repartition on partition keys
-        rootFragment = distributedPlanner.createInsertFragment(
+        rootFragment = distributedPlanner.createDmlFragment(
             rootFragment, insertStmt, ctx_.getRootAnalyzer(), fragments);
       }
       // Add optional sort node to the plan, based on clustered/noclustered plan hint.
@@ -180,12 +180,14 @@ public class Planner {
         // Set up delete sink for root fragment
         DeleteStmt deleteStmt = ctx_.getAnalysisResult().getDeleteStmt();
         if (deleteStmt.getTargetTable() instanceof FeIcebergTable) {
+          if (!ctx_.isSingleNodeExec()) {
+            // repartition on partition keys
+            rootFragment = distributedPlanner.createDmlFragment(
+                rootFragment, deleteStmt, ctx_.getRootAnalyzer(), fragments);
+          }
           createPreDeleteSort(deleteStmt, rootFragment, ctx_.getRootAnalyzer());
-          SortNode sortNode = (SortNode)rootFragment.getPlanRoot();
-          resultExprs = Expr.substituteList(resultExprs,
-              sortNode.getSortInfo().getOutputSmap(), ctx_.getRootAnalyzer(), true);
         }
-        rootFragment.setSink(deleteStmt.createDataSink(resultExprs));
+        rootFragment.setSink(deleteStmt.createDataSink());
       } else if (ctx_.isQuery()) {
         rootFragment.setSink(
             ctx_.getAnalysisResult().getQueryStmt().createDataSink(resultExprs));
@@ -909,7 +911,7 @@ public class Planner {
       Analyzer analyzer) throws ImpalaException {
     List<Expr> orderingExprs = new ArrayList<>();
 
-    orderingExprs.addAll(deleteStmt.getResultExprs());
+    orderingExprs.addAll(deleteStmt.getSortExprs());
 
     // Build sortinfo to sort by the ordering exprs.
     List<Boolean> isAscOrder = Collections.nCopies(orderingExprs.size(), true);
@@ -918,6 +920,7 @@ public class Planner {
         TSortingOrder.LEXICAL);
     sortInfo.createSortTupleInfo(deleteStmt.getResultExprs(), analyzer);
     sortInfo.getSortTupleDescriptor().materializeSlots();
+    deleteStmt.substituteResultExprs(sortInfo.getOutputSmap(), analyzer);
 
     PlanNode node = SortNode.createTotalSortNode(
         ctx_.getNextNodeId(), inputFragment.getPlanRoot(), sortInfo, 0);

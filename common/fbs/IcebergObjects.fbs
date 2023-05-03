@@ -40,13 +40,14 @@ enum FbIcebergTransformType : byte {
 table FbIcebergPartitionTransformValue {
   transform_type: FbIcebergTransformType;
   transform_param: int;
-  transform_value: string;
+  transform_value: [ubyte];
   source_id: int;
 }
 
 table FbIcebergMetadata {
   file_format : FbIcebergDataFileFormat;
   record_count : long;
+  spec_id : ushort;
   partition_keys : [FbIcebergPartitionTransformValue];
 }
 
@@ -64,6 +65,7 @@ table FbIcebergDataFile {
   format: FbIcebergDataFileFormat = PARQUET;
   record_count: long = 0;
   file_size_in_bytes: long = 0;
+  spec_id: ushort;
   partition_path: string;
   raw_partition_fields: [string];
   per_column_stats: [FbIcebergColumnStats];

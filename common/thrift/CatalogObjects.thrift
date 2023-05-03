@@ -77,7 +77,9 @@ enum THdfsFileFormat {
 enum TVirtualColumnType {
   NONE,
   INPUT_FILE_NAME,
-  FILE_POSITION
+  FILE_POSITION,
+  PARTITION_SPEC_ID,
+  ICEBERG_PARTITION_SERIALIZED
 }
 
 // TODO: Since compression is also enabled for Kudu columns, we should

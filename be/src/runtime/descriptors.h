@@ -437,6 +437,9 @@ class HdfsTableDescriptor : public TableDescriptor {
 
   bool IsIcebergTable() const { return is_iceberg_; }
   const std::string& IcebergTableLocation() const { return iceberg_table_location_; }
+  const std::vector<TIcebergPartitionSpec>& IcebergPartitionSpecs() const {
+    return iceberg_partition_specs_;
+  }
   const std::vector<std::string>& IcebergNonVoidPartitionNames() const {
     return iceberg_non_void_partition_names_;
   }
@@ -454,6 +457,10 @@ class HdfsTableDescriptor : public TableDescriptor {
     return iceberg_parquet_dict_page_size_;
   }
 
+  int32_t IcebergSpecId() const {
+    return iceberg_spec_id_;
+  }
+
   virtual std::string DebugString() const;
 
  protected:
@@ -469,11 +476,13 @@ class HdfsTableDescriptor : public TableDescriptor {
   TValidWriteIdList valid_write_id_list_;
   bool is_iceberg_ = false;
   std::string iceberg_table_location_;
+  std::vector<TIcebergPartitionSpec> iceberg_partition_specs_;
   std::vector<std::string> iceberg_non_void_partition_names_;
   TCompressionCodec iceberg_parquet_compression_codec_;
   int64_t iceberg_parquet_row_group_size_;
   int64_t iceberg_parquet_plain_page_size_;
   int64_t iceberg_parquet_dict_page_size_;
+  int32_t iceberg_spec_id_;
 };
 
 class HBaseTableDescriptor : public TableDescriptor {

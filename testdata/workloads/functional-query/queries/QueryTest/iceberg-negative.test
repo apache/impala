@@ -727,11 +727,3 @@ delete from ice_delete where i = 1;
 ---- CATCH
 AnalysisException: Unsupported delete mode: 'copy-on-write' for Iceberg table: $DATABASE.ice_delete
 ====
----- QUERY
-# Cannot delete from partitioned Iceberg table.
-alter table ice_delete set tblproperties ('write.delete.mode'='merge-on-read');
-alter table ice_delete set partition spec (bucket(5, i));
-delete from ice_delete;
----- CATCH
-AnalysisException: Cannot execute DELETE/UPDATE statement on partitioned Iceberg table: $DATABASE.ice_delete
-====

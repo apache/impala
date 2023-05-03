@@ -19,7 +19,6 @@ package org.apache.impala.analysis;
 
 import static java.lang.String.format;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -34,10 +33,10 @@ import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.IcebergPositionDeleteTable;
 import org.apache.impala.catalog.KuduColumn;
+import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
-import org.apache.impala.planner.DataSink;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.thrift.TIcebergFileFormat;
 
@@ -58,11 +57,8 @@ import com.google.common.base.Preconditions;
  * match the right-hand side of the assignments in addition to projecting the key columns
  * of the underlying table. During query execution, the plan that
  * is generated from this SelectStmt produces all rows that need to be modified.
- *
- * Currently, only Kudu tables can be modified.
  */
-public abstract class ModifyStmt extends StatementBase {
-
+public abstract class ModifyStmt extends DmlStatementBase {
   // List of explicitly mentioned assignment expressions in the UPDATE's SET clause
   protected final List<Pair<SlotRef, Expr>> assignments_;
 
@@ -77,26 +73,41 @@ public abstract class ModifyStmt extends StatementBase {
 
   protected FromClause fromClause_;
 
+  /////////////////////////////////////////
+  // START: Members that are set in first run of analyze().
+
+  // Exprs correspond to the partitionKeyValues, if specified, or to the partition columns
+  // for tables.
+  protected List<Expr> partitionKeyExprs_ = new ArrayList<>();
+
+  // For every column of the target table that is referenced in the optional
+  // 'sort.columns' table property, this list will contain the corresponding result expr
+  // from 'resultExprs_'. Before insertion, all rows will be sorted by these exprs. If the
+  // list is empty, no additional sorting by non-partitioning columns will be performed.
+  // The column list must not contain partition columns and must be empty for non-Hdfs
+  // tables.
+  protected List<Expr> sortExprs_ = new ArrayList<>();
+
+  // Output expressions that produce the final results to write to the target table. May
+  // include casts. Set in first run of analyze().
+  //
+  // In case of DELETE statements it contains the columns that identify the deleted rows.
+  protected List<Expr> resultExprs_ = new ArrayList<>();
+
   // Result of the analysis of the internal SelectStmt that produces the rows that
   // will be modified.
   protected SelectStmt sourceStmt_;
 
-  // Target table.
-  protected FeTable table_;
-
+  // Implementation of the modify statement. Depends on the target table type.
   private ModifyImpl modifyImpl_;
-
-  // Serialized metadata of transaction object which is set by the Frontend if the
-  // target table is Kudu table and Kudu's transaction is enabled.
-  java.nio.ByteBuffer kuduTxnToken_;
-
-  // END: Members that need to be reset()
-  /////////////////////////////////////////
 
   // Position mapping of output expressions of the sourceStmt_ to column indices in the
   // target table. The i'th position in this list maps to the referencedColumns_[i]'th
   // position in the target table. Set in createSourceStmt() during analysis.
-  protected List<Integer> referencedColumns_;
+  protected List<Integer> referencedColumns_ = new ArrayList<>();
+
+  // END: Members that are set in first run of analyze
+  /////////////////////////////////////////
 
   // SQL string of the ModifyStmt. Set in analyze().
   protected String sqlString_;
@@ -195,9 +206,13 @@ public abstract class ModifyStmt extends StatementBase {
     super.reset();
     fromClause_.reset();
     if (sourceStmt_ != null) sourceStmt_.reset();
-    table_ = null;
     modifyImpl_ = null;
   }
+
+  @Override
+  public List<Expr> getPartitionKeyExprs() { return partitionKeyExprs_; }
+  @Override
+  public List<Expr> getSortExprs() { return sortExprs_; }
 
   @Override
   public boolean resolveTableMask(Analyzer analyzer) throws AnalysisException {
@@ -217,8 +232,7 @@ public abstract class ModifyStmt extends StatementBase {
       throws AnalysisException {
     // Builds the select list and column position mapping for the target table.
     ArrayList<SelectListItem> selectList = new ArrayList<>();
-    referencedColumns_ = new ArrayList<>();
-    buildAndValidateAssignmentExprs(analyzer, selectList, referencedColumns_);
+    buildAndValidateAssignmentExprs(analyzer, selectList);
 
     // Analyze the generated select statement.
     sourceStmt_ = new SelectStmt(new SelectList(selectList), fromClause_, wherePredicate_,
@@ -241,7 +255,7 @@ public abstract class ModifyStmt extends StatementBase {
    * are always prepended to the list of expression representing the assignments.
    */
   private void buildAndValidateAssignmentExprs(Analyzer analyzer,
-      List<SelectListItem> selectList, List<Integer> referencedColumns)
+      List<SelectListItem> selectList)
       throws AnalysisException {
     // The order of the referenced columns equals the order of the result expressions
     Set<SlotId> uniqueSlots = new HashSet<>();
@@ -254,7 +268,7 @@ public abstract class ModifyStmt extends StatementBase {
       colIndexMap.put(cols.get(i).getName(), i);
     }
 
-    modifyImpl_.addKeyColumns(analyzer, selectList, referencedColumns, uniqueSlots,
+    modifyImpl_.addKeyColumns(analyzer, selectList, referencedColumns_, uniqueSlots,
         keySlots, colIndexMap);
 
     // Assignments are only used in the context of updates.
@@ -304,7 +318,7 @@ public abstract class ModifyStmt extends StatementBase {
           c, rhsExpr, analyzer.isDecimalV2(), null /*widestTypeSrcExpr*/);
       uniqueSlots.add(lhsSlotRef.getSlotId());
       selectList.add(new SelectListItem(rhsExpr, null));
-      referencedColumns.add(colIndexMap.get(c.getName()));
+      referencedColumns_.add(colIndexMap.get(c.getName()));
     }
   }
 
@@ -326,7 +340,6 @@ public abstract class ModifyStmt extends StatementBase {
   }
 
   public QueryStmt getQueryStmt() { return sourceStmt_; }
-  public abstract DataSink createDataSink(List<Expr> resultExprs);
 
   /**
    * Return true if the target table is Kudu table.
@@ -334,28 +347,26 @@ public abstract class ModifyStmt extends StatementBase {
    */
   public boolean isTargetTableKuduTable() { return (table_ instanceof FeKuduTable); }
 
-  /**
-   * Return target table.
-   */
-  public FeTable getTargetTable() { return table_; }
-
-  /**
-   * Set Kudu transaction token.
-   */
-  public void setKuduTransactionToken(byte[] kuduTxnToken) {
-    Preconditions.checkState(table_ instanceof FeKuduTable);
-    Preconditions.checkNotNull(kuduTxnToken);
-    kuduTxnToken_ = java.nio.ByteBuffer.wrap(kuduTxnToken.clone());
-  }
-
-  /**
-   * Return bytes of Kudu transaction token.
-   */
-  public java.nio.ByteBuffer getKuduTransactionToken() {
-    return kuduTxnToken_;
-  }
-
   private void addKeyColumn(Analyzer analyzer, List<SelectListItem> selectList,
+      List<Integer> referencedColumns, Set<SlotId> uniqueSlots, Set<SlotId> keySlots,
+      Map<String, Integer> colIndexMap, String colName, boolean isSortingColumn)
+      throws AnalysisException {
+    SlotRef ref = addSlotRef(analyzer, selectList, referencedColumns, uniqueSlots,
+        keySlots, colIndexMap, colName);
+    resultExprs_.add(ref);
+    if (isSortingColumn) sortExprs_.add(ref);
+  }
+
+  private void addPartitioningColumn(Analyzer analyzer, List<SelectListItem> selectList,
+  List<Integer> referencedColumns, Set<SlotId> uniqueSlots, Set<SlotId> keySlots,
+  Map<String, Integer> colIndexMap, String colName) throws AnalysisException {
+    SlotRef ref = addSlotRef(analyzer, selectList, referencedColumns, uniqueSlots,
+        keySlots, colIndexMap, colName);
+    partitionKeyExprs_.add(ref);
+    sortExprs_.add(ref);
+  }
+
+  private SlotRef addSlotRef(Analyzer analyzer, List<SelectListItem> selectList,
       List<Integer> referencedColumns, Set<SlotId> uniqueSlots, Set<SlotId> keySlots,
       Map<String, Integer> colIndexMap, String colName) throws AnalysisException {
     List<String> path = Path.createRawPath(targetTableRef_.getUniqueAlias(), colName);
@@ -365,6 +376,7 @@ public abstract class ModifyStmt extends StatementBase {
     uniqueSlots.add(ref.getSlotId());
     keySlots.add(ref.getSlotId());
     referencedColumns.add(colIndexMap.get(colName));
+    return ref;
   }
 
   @Override
@@ -408,7 +420,7 @@ public abstract class ModifyStmt extends StatementBase {
       // Add the key columns as slot refs
       for (String k : kuduTable_.getPrimaryKeyColumnNames()) {
         addKeyColumn(analyzer, selectList, referencedColumns, uniqueSlots, keySlots,
-            colIndexMap, k);
+            colIndexMap, k, false);
       }
     }
   }
@@ -426,6 +438,7 @@ public abstract class ModifyStmt extends StatementBase {
 
     @Override
     public void analyze(Analyzer analyzer) throws AnalysisException {
+      setMaxTableSinks(analyzer_.getQueryOptions().getMax_fs_writers());
       if (ModifyStmt.this instanceof UpdateStmt) {
         throw new AnalysisException("UPDATE is not supported for Iceberg table " +
             originalTargetTable_.getFullName());
@@ -441,11 +454,6 @@ public abstract class ModifyStmt extends StatementBase {
       if (deleteMode != null && !deleteMode.equals("merge-on-read")) {
         throw new AnalysisException(String.format("Unsupported delete mode: '%s' for " +
             "Iceberg table: %s", deleteMode, originalTargetTable_.getFullName()));
-      }
-
-      if (originalTargetTable_.isPartitioned()) {
-        throw new AnalysisException("Cannot execute DELETE/UPDATE statement on " +
-            "partitioned Iceberg table: " + originalTargetTable_.getFullName());
       }
 
       if (originalTargetTable_.getDeleteFileFormat() != TIcebergFileFormat.PARQUET) {
@@ -471,15 +479,22 @@ public abstract class ModifyStmt extends StatementBase {
         List<Integer> referencedColumns,
         Set<SlotId> uniqueSlots, Set<SlotId> keySlots, Map<String, Integer> colIndexMap)
         throws AnalysisException {
+      if (originalTargetTable_.isPartitioned()) {
+        String[] partitionCols;
+        partitionCols = new String[] {"PARTITION__SPEC__ID",
+            "ICEBERG__PARTITION__SERIALIZED"};
+        for (String k : partitionCols) {
+          addPartitioningColumn(analyzer, selectList, referencedColumns, uniqueSlots,
+              keySlots, colIndexMap, k);
+        }
+      }
       String[] deleteCols;
-      Preconditions.checkState(!icePosDelTable_.isPartitioned());
       deleteCols = new String[] {"INPUT__FILE__NAME", "FILE__POSITION"};
       // Add the key columns as slot refs
       for (String k : deleteCols) {
         addKeyColumn(analyzer, selectList, referencedColumns, uniqueSlots, keySlots,
-            colIndexMap, k);
+            colIndexMap, k, true);
       }
     }
   }
-
 }

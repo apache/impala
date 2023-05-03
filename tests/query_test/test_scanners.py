@@ -169,6 +169,28 @@ class TestScannersVirtualColumns(ImpalaTestSuite):
     self.run_test_case('QueryTest/mixing-virtual-columns', vector, unique_database)
 
 
+class TestIcebergVirtualColumns(ImpalaTestSuite):
+  BATCH_SIZES = [0, 1, 16]
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestIcebergVirtualColumns, cls).add_test_dimensions()
+    if cls.exploration_strategy() == 'core':
+      cls.ImpalaTestMatrix.add_dimension(cls.create_table_info_dimension('pairwise'))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('batch_size', *TestScannersAllTableFormats.BATCH_SIZES))
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def test_partition_columns(self, vector):
+    """Tests partition-level Iceberg-only virtual columns."""
+    self.run_test_case('QueryTest/iceberg-virtual-partition-columns', vector)
+
+
 # Test all the scanners with a simple limit clause. The limit clause triggers
 # cancellation in the scanner code paths.
 class TestScannersAllTableFormatsWithLimit(ImpalaTestSuite):

@@ -33,15 +33,25 @@ import com.google.common.base.Preconditions;
 public class VirtualColumn extends Column {
   private final TVirtualColumnType virtualColType_;
 
+  // Virtual columns of FileSystem-based tables.
   public static VirtualColumn INPUT_FILE_NAME = new VirtualColumn("INPUT__FILE__NAME",
       Type.STRING, TVirtualColumnType.INPUT_FILE_NAME);
   public static VirtualColumn FILE_POSITION = new VirtualColumn("FILE__POSITION",
       Type.BIGINT, TVirtualColumnType.FILE_POSITION);
 
+  /// Iceberg-related virtual columns.
+  public static VirtualColumn PARTITION_SPEC_ID = new VirtualColumn("PARTITION__SPEC__ID",
+      Type.INT, TVirtualColumnType.PARTITION_SPEC_ID);
+  public static VirtualColumn ICEBERG_PARTITION_SERIALIZED = new
+      VirtualColumn("ICEBERG__PARTITION__SERIALIZED", Type.BINARY,
+      TVirtualColumnType.ICEBERG_PARTITION_SERIALIZED);
+
   public static VirtualColumn getVirtualColumn(TVirtualColumnType virtColType) {
     switch (virtColType) {
       case INPUT_FILE_NAME: return INPUT_FILE_NAME;
       case FILE_POSITION: return FILE_POSITION;
+      case PARTITION_SPEC_ID: return PARTITION_SPEC_ID;
+      case ICEBERG_PARTITION_SERIALIZED: return ICEBERG_PARTITION_SERIALIZED;
       default: break;
     }
     return null;

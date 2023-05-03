@@ -1,0 +1,409 @@
+====
+---- QUERY
+CREATE TABLE id_part (i int, s string)
+PARTITIONED BY SPEC (i)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+====
+---- QUERY
+# Delete from empty table is no-op.
+DELETE FROM id_part where i = 1;
+SELECT * FROM id_part;
+---- RESULTS
+---- TYPES
+INT,STRING
+====
+---- QUERY
+SHOW FILES IN id_part;
+---- RESULTS
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+INSERT INTO id_part VALUES(1, 'one'), (2, 'two'), (3, 'three');
+DELETE FROM id_part WHERE i = 2;
+SELECT * FROM id_part;
+---- RESULTS
+1,'one'
+3,'three'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO id_part VALUES(4, 'four'), (5, 'five'), (6, 'six');
+DELETE FROM id_part WHERE i % 2 = 0;
+SELECT * FROM id_part;
+---- RESULTS
+1,'one'
+3,'three'
+5,'five'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+SHOW FILES IN id_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=1/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=2/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=2/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=3/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=4/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=4/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=5/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=6/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=6/(?!delete-).*.parq','.*B','','NONE'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+DELETE FROM id_part WHERE strleft(s, 1) = 'o';
+SELECT * FROM id_part;
+---- RESULTS
+5,'five'
+3,'three'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+DELETE FROM id_part WHERE i > 0;
+SELECT * FROM id_part;
+---- RESULTS
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO id_part VALUES (null, 'null');
+SELECT * FROM id_part;
+---- RESULTS
+NULL,'null'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+DELETE FROM id_part where s = 'null';
+SELECT * FROM id_part;
+---- RESULTS
+---- TYPES
+INT,STRING
+====
+---- QUERY
+SHOW FILES IN id_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=1/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=1/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=2/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=2/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=3/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=3/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=4/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=4/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=5/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=5/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=6/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=6/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=__HIVE_DEFAULT_PARTITION__/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=__HIVE_DEFAULT_PARTITION__/(?!delete-).*.parq','.*B','','NONE'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+CREATE TABLE trunc_part (i int, s string)
+PARTITIONED BY SPEC (truncate(1, s))
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+====
+---- QUERY
+# Delete from empty table is no-op.
+DELETE FROM trunc_part where i = 1;
+SELECT * FROM trunc_part;
+---- RESULTS
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO trunc_part VALUES(1, 'one'), (2, 'two'), (3, 'three');
+DELETE FROM trunc_part WHERE s like 't%';
+SELECT * FROM trunc_part;
+---- RESULTS
+1,'one'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO trunc_part VALUES(4, 'four'), (5, 'five'), (6, 'six');
+DELETE FROM trunc_part WHERE i % 2 = 0;
+SELECT * FROM trunc_part;
+---- RESULTS
+1,'one'
+5,'five'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+DELETE FROM trunc_part WHERE i > 0;
+SELECT * FROM trunc_part;
+---- RESULTS
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO trunc_part VALUES (0, null);
+SELECT * FROM trunc_part;
+---- RESULTS
+0,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+DELETE FROM trunc_part where s is null;
+SELECT * FROM trunc_part;
+---- RESULTS
+---- TYPES
+INT,STRING
+====
+---- QUERY
+SHOW FILES IN trunc_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=f/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=f/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=f/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=o/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=o/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=s/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=s/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=t/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=t/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=t/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=__HIVE_DEFAULT_PARTITION__/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=__HIVE_DEFAULT_PARTITION__/(?!delete-).*.parq','.*B','','NONE'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+CREATE TABLE multi_part (i int, s string, f double)
+PARTITIONED BY SPEC (bucket(3, i), truncate(1, s))
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+====
+---- QUERY
+# Delete from empty table is no-op.
+DELETE FROM multi_part where i = 1;
+SELECT * FROM multi_part;
+---- RESULTS
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+INSERT INTO multi_part VALUES(1, 'one', 1.1), (2, 'two', 2.2), (3, 'three', 3.33);
+DELETE FROM multi_part
+WHERE i != (select min(i) from multi_part) and
+      i != (select max(i) from multi_part);
+SELECT * FROM multi_part;
+---- RESULTS
+1,'one',1.1
+3,'three',3.33
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+INSERT INTO multi_part VALUES(4, 'four', 4.4), (5, 'five', 5.5), (6, 'six', 6.6);
+DELETE FROM multi_part WHERE i % 2 = 0;
+SELECT * FROM multi_part;
+---- RESULTS
+1,'one',1.1
+3,'three',3.33
+5,'five',5.5
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+DELETE FROM multi_part WHERE i > 0;
+SELECT * FROM multi_part;
+---- RESULTS
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+INSERT INTO multi_part VALUES (null, 'null',0.0);
+SELECT * FROM multi_part;
+---- RESULTS
+NULL,'null',0.0
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+DELETE FROM multi_part where s = 'null';
+SELECT * FROM multi_part;
+---- RESULTS
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+SHOW FILES IN multi_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=0/s_trunc=f/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=0/s_trunc=f/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=0/s_trunc=t/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=0/s_trunc=t/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=0/s_trunc=t/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=2/s_trunc=f/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=2/s_trunc=f/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=2/s_trunc=o/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=2/s_trunc=o/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=2/s_trunc=s/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=2/s_trunc=s/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=__HIVE_DEFAULT_PARTITION__/s_trunc=n/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=__HIVE_DEFAULT_PARTITION__/s_trunc=n/(?!delete-).*.parq','.*B','','NONE'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+CREATE TABLE evolve_part (i int, s string, f double)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+====
+---- QUERY
+INSERT INTO evolve_part VALUES(1, 'one', 1.1), (2, 'two', 2.2), (3, 'three', 3.33);
+DELETE FROM evolve_part WHERE i = 2;
+SELECT * FROM evolve_part;
+---- RESULTS
+1,'one',1.1
+3,'three',3.33
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+ALTER TABLE evolve_part SET PARTITION SPEC (i);
+SELECT * FROM evolve_part;
+---- RESULTS
+1,'one',1.1
+3,'three',3.33
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+INSERT INTO evolve_part VALUES (10, 'ten', 10.10), (20, 'twenty', 20.20);
+SELECT * FROM evolve_part;
+---- RESULTS
+1,'one',1.1
+3,'three',3.33
+10,'ten',10.10
+20,'twenty',20.20
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+DELETE FROM evolve_part WHERE i = 20;
+SELECT * FROM evolve_part;
+---- RESULTS
+1,'one',1.1
+3,'three',3.33
+10,'ten',10.10
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+ALTER TABLE evolve_part SET PARTITION SPEC (truncate(1, s));
+SELECT * FROM evolve_part;
+---- RESULTS
+1,'one',1.1
+3,'three',3.33
+10,'ten',10.10
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+INSERT INTO evolve_part VALUES (30, 'thirty', 30.30), (40, 'forty', 40.40), (50, 'fifty', 50.50);
+SELECT * FROM evolve_part;
+---- RESULTS
+1,'one',1.1
+3,'three',3.33
+10,'ten',10.10
+30,'thirty',30.30
+40,'forty',40.40
+50,'fifty',50.50
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+DELETE FROM evolve_part WHERE i = 50;
+SELECT * FROM evolve_part;
+---- RESULTS
+1,'one',1.1
+3,'three',3.33
+10,'ten',10.10
+30,'thirty',30.30
+40,'forty',40.40
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+ALTER TABLE evolve_part SET PARTITION SPEC (void(s));
+SELECT * FROM evolve_part;
+---- RESULTS
+1,'one',1.1
+3,'three',3.33
+10,'ten',10.10
+30,'thirty',30.30
+40,'forty',40.40
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+DELETE FROM evolve_part WHERE length(s) < 4;
+SELECT * FROM evolve_part;
+---- RESULTS
+3,'three',3.33
+30,'thirty',30.3
+40,'forty',40.4
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+SHOW FILES IN evolve_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/i=10/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/i=10/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/i=20/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/i=20/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc=f/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc=f/delete-.*parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc=f/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc=t/(?!delete-).*.parq','.*B','','NONE'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+CREATE TABLE ice_store_sales PARTITIONED BY SPEC (ss_sold_date_sk)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2')
+AS SELECT * FROM tpcds_parquet.store_sales;
+SELECT count(*) FROM ice_store_sales;
+---- RESULTS
+2880404
+---- TYPES
+BIGINT
+====
+---- QUERY
+SELECT count(*) FROM ice_store_sales where ss_customer_sk % 10 = 0;
+---- RESULTS
+278906
+---- TYPES
+BIGINT
+====
+---- QUERY
+DELETE FROM ice_store_sales where ss_customer_sk % 10 = 0;
+SELECT count(*) FROM ice_store_sales;
+---- RESULTS
+2601498
+---- TYPES
+BIGINT
+====
+---- QUERY
+SELECT * FROM ice_store_sales where ss_customer_sk % 10 = 0;
+---- RESULTS
+---- TYPES
+INT, BIGINT, INT, INT, INT, INT, INT, INT, BIGINT, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, INT
+====

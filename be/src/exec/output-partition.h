@@ -67,9 +67,15 @@ struct OutputPartition {
   /// value in this member is URL encoded for the sake of e.g. data file name creation.
   std::string partition_name;
 
+  /// Used when an external Frontend specifies the staging directory and how partitions
+  /// should be created. See IMPALA-10553 for details.
+  std::string external_partition_name;
+
   /// This is a split of the 'partition_name' variable by '/'. Note, the partition keys
   /// and values in this variable are not URL encoded.
   std::vector<std::string> raw_partition_names;
+
+  int32_t iceberg_spec_id = -1;
 
   /// Connection to hdfs.
   hdfsFS hdfs_connection = nullptr;

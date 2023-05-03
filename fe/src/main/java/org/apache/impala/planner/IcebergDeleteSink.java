@@ -44,9 +44,13 @@ public class IcebergDeleteSink extends TableSink {
   // A value of 0 means no limit.
   private int maxHdfsSinks_;
 
-  public IcebergDeleteSink(FeIcebergTable targetTable, List<Expr> outputExprs,
-      int maxTableSinks) {
+  // Exprs for computing the output partition(s).
+  protected final List<Expr> partitionKeyExprs_;
+
+  public IcebergDeleteSink(FeIcebergTable targetTable, List<Expr> partitionKeyExprs,
+      List<Expr> outputExprs, int maxTableSinks) {
     super(targetTable, Op.DELETE, outputExprs);
+    partitionKeyExprs_ = partitionKeyExprs;
     maxHdfsSinks_ = maxTableSinks;
   }
 
@@ -95,7 +99,11 @@ public class IcebergDeleteSink extends TableSink {
         targetTable_.getFullName()));
     if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
       output.append(detailPrefix + "output exprs: ")
-          .append(Expr.getExplainString(outputExprs_, explainLevel) + "\n");
+            .append(Expr.getExplainString(outputExprs_, explainLevel) + "\n");
+      if (!partitionKeyExprs_.isEmpty()) {
+        output.append(detailPrefix + "partition keys: ")
+              .append(Expr.getExplainString(partitionKeyExprs_, explainLevel) + "\n");
+      }
     }
   }
 
@@ -106,7 +114,8 @@ public class IcebergDeleteSink extends TableSink {
 
   @Override
   protected void toThriftImpl(TDataSink tsink) {
-    TIcebergDeleteSink icebergDeleteSink = new TIcebergDeleteSink();
+    TIcebergDeleteSink icebergDeleteSink = new TIcebergDeleteSink(
+        Expr.treesToThrift(partitionKeyExprs_));
     TTableSink tTableSink = new TTableSink(DescriptorTable.TABLE_SINK_ID,
             TTableSinkType.HDFS, sinkOp_.toThrift());
     tTableSink.iceberg_delete_sink = icebergDeleteSink;
@@ -121,6 +130,7 @@ public class IcebergDeleteSink extends TableSink {
 
   @Override
   public void collectExprs(List<Expr> exprs) {
+    exprs.addAll(partitionKeyExprs_);
     exprs.addAll(outputExprs_);
   }
 

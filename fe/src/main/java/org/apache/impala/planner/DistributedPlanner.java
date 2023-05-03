@@ -22,11 +22,14 @@ import java.util.List;
 
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.DeleteStmt;
+import org.apache.impala.analysis.DmlStatementBase;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.MultiAggregateInfo.AggPhase;
 import org.apache.impala.analysis.QueryStmt;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.common.ImpalaException;
@@ -176,6 +179,13 @@ public class DistributedPlanner {
     return exprs.isEmpty() ? 1 : Expr.getNumDistinctValues(exprs);
   }
 
+  public PlanFragment createInsertFragment(
+    PlanFragment inputFragment, DmlStatementBase dmlStmt, Analyzer analyzer,
+      List<PlanFragment> fragments)
+      throws ImpalaException {
+    return createDmlFragment(inputFragment, dmlStmt, analyzer, fragments);
+  }
+
   /**
    * Decides whether to repartition the output of 'inputFragment' before feeding
    * its data into the table sink of the given 'insertStmt'. The decision obeys
@@ -188,17 +198,17 @@ public class DistributedPlanner {
    * query option is used. If this functions ends up creating a new fragment, appends
    * that to 'fragments'.
    */
-  public PlanFragment createInsertFragment(
-      PlanFragment inputFragment, InsertStmt insertStmt, Analyzer analyzer,
+  public PlanFragment createDmlFragment(
+      PlanFragment inputFragment, DmlStatementBase dmlStmt, Analyzer analyzer,
       List<PlanFragment> fragments)
       throws ImpalaException {
     boolean isComputeCost = analyzer.getQueryOptions().isCompute_processing_cost();
-    boolean enforce_hdfs_writer_limit = insertStmt.getTargetTable() instanceof FeFsTable
+    boolean enforce_hdfs_writer_limit = dmlStmt.getTargetTable() instanceof FeFsTable
         && (analyzer.getQueryOptions().getMax_fs_writers() > 0 || isComputeCost);
 
-    if (insertStmt.hasNoShuffleHint() && !enforce_hdfs_writer_limit) return inputFragment;
+    if (dmlStmt.hasNoShuffleHint() && !enforce_hdfs_writer_limit) return inputFragment;
 
-    List<Expr> partitionExprs = Lists.newArrayList(insertStmt.getPartitionKeyExprs());
+    List<Expr> partitionExprs = Lists.newArrayList(dmlStmt.getPartitionKeyExprs());
     // Ignore constants for the sake of partitioning.
     Expr.removeConstants(partitionExprs);
 
@@ -208,7 +218,7 @@ public class DistributedPlanner {
     if (!partitionExprs.isEmpty()
         && analyzer.setsHaveValueTransfer(inputPartition.getPartitionExprs(),
             partitionExprs, true)
-        && !(insertStmt.getTargetTable() instanceof FeKuduTable)
+        && !(dmlStmt.getTargetTable() instanceof FeKuduTable)
         && !enforce_hdfs_writer_limit) {
       return inputFragment;
     }
@@ -259,7 +269,7 @@ public class DistributedPlanner {
         maxHdfsWriters = costBasedMaxWriter;
       }
       Preconditions.checkState(maxHdfsWriters > 0);
-      insertStmt.setMaxTableSinks(maxHdfsWriters);
+      dmlStmt.setMaxTableSinks(maxHdfsWriters);
       // At this point, parallelism of writer fragment is fixed and will not be adjusted
       // by costing phase.
 
@@ -283,8 +293,8 @@ public class DistributedPlanner {
     }
 
     // Make a cost-based decision only if no user hint was supplied.
-    if (!insertStmt.hasShuffleHint()) {
-      if (insertStmt.getTargetTable() instanceof FeKuduTable) {
+    if (!dmlStmt.hasShuffleHint()) {
+      if (dmlStmt.getTargetTable() instanceof FeKuduTable) {
         // If the table is unpartitioned or all of the partition exprs are constants,
         // don't insert the exchange.
         // TODO: make a more sophisticated decision here for partitioned tables and when
@@ -347,9 +357,10 @@ public class DistributedPlanner {
       } else {
         partition = DataPartition.UNPARTITIONED;
       }
-    } else if (insertStmt.getTargetTable() instanceof FeKuduTable) {
+    } else if (dmlStmt instanceof InsertStmt &&
+               dmlStmt.getTargetTable() instanceof FeKuduTable) {
       partition = DataPartition.kuduPartitioned(
-          KuduUtil.createPartitionExpr(insertStmt, ctx_.getRootAnalyzer()));
+          KuduUtil.createPartitionExpr((InsertStmt)dmlStmt, ctx_.getRootAnalyzer()));
     } else {
       partition = DataPartition.hashPartitioned(partitionExprs);
     }

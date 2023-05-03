@@ -58,6 +58,8 @@ public class IcebergPartitionSpec extends StmtNode {
     return icebergPartitionFields_ != null && (!icebergPartitionFields_.isEmpty());
   }
 
+  public int getSpecId() { return specId_; }
+
   public int getIcebergPartitionFieldsSize() {
     if (!hasPartitionFields()) return 0;
     return getIcebergPartitionFields().size();

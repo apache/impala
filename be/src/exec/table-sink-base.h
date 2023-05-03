@@ -23,12 +23,25 @@
 
 namespace impala {
 
+class TupleRow;
+
+class TableSinkBaseConfig : public DataSinkConfig {
+ public:
+  void Close() override;
+
+  /// Expressions for computing the target partitions to which a row is written.
+  std::vector<ScalarExpr*> partition_key_exprs_;
+
+  ~TableSinkBaseConfig() override {}
+};
+
 class TableSinkBase : public DataSink {
 public:
-  TableSinkBase(TDataSinkId sink_id, const DataSinkConfig& sink_config,
+  TableSinkBase(TDataSinkId sink_id, const TableSinkBaseConfig& sink_config,
       const std::string& name, RuntimeState* state) :
       DataSink(sink_id, sink_config, name, state),
-      table_id_(sink_config.tsink_->table_sink.target_table_id) {}
+      table_id_(sink_config.tsink_->table_sink.target_table_id),
+      partition_key_exprs_(sink_config.partition_key_exprs_) {}
 
   virtual bool is_overwrite() const { return false; }
   virtual bool is_result_sink() const { return false; }
@@ -45,7 +58,9 @@ public:
     return dummy;
   }
 
-  Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker);
+  Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) override;
+  Status Open(RuntimeState* state) override;
+  void Close(RuntimeState* state) override;
 
   RuntimeProfile::Counter* rows_inserted_counter() { return rows_inserted_counter_; }
   RuntimeProfile::Counter* bytes_written_counter() { return bytes_written_counter_; }
@@ -71,12 +86,36 @@ protected:
 
   virtual bool IsHiveAcid() const { return false; }
 
+  virtual void ConstructPartitionInfo(
+      const TupleRow* row,
+      OutputPartition* output_partition) = 0;
+
+  /// Initialises the filenames of a given output partition, and opens the temporary file.
+  /// The partition key is derived from 'row'. If the partition will not have any rows
+  /// added to it, empty_partition must be true.
+  Status InitOutputPartition(RuntimeState* state,
+      const HdfsPartitionDescriptor& partition_descriptor, const TupleRow* row,
+      OutputPartition* output_partition, bool empty_partition) WARN_UNUSED_RESULT;
+
   /// Sets hdfs_file_name and tmp_hdfs_file_name of given output partition.
   /// The Hdfs directory is created from the target table's base Hdfs dir,
   /// the partition_key_names_ and the evaluated partition_key_exprs_.
   /// The Hdfs file name is the unique_id_str_.
   void BuildHdfsFileNames(const HdfsPartitionDescriptor& partition_descriptor,
-      OutputPartition* output, const std::string &external_partition_path);
+      OutputPartition* output);
+
+  /// Returns the ith partition name of the table.
+  std::string GetPartitionName(int i);
+
+  // Directory names containing partition-key values need to be UrlEncoded, in
+  // particular to avoid problems when '/' is part of the key value (which might
+  // occur, for example, with date strings). Hive will URL decode the value
+  // transparently when Impala's frontend asks the metastore for partition key values,
+  // which makes it particularly important that we use the same encoding as Hive. It's
+  // also not necessary to encode the values when writing partition metadata. You can
+  // check this with 'show partitions <tbl>' in Hive, followed by a select from a
+  // decoded partition key value.
+  std::string UrlEncodePartitionValue(const std::string& raw_str);
 
   /// Add a temporary file to an output partition.  Files are created in a
   /// temporary directory and then moved to the real partition directory by the
@@ -115,6 +154,12 @@ protected:
   /// Returns TRUE if an external output directory was provided.
   bool HasExternalOutputDir() { return !external_output_dir_.empty(); }
 
+  /// Generates string key for hash_tbl_ as a concatenation of all evaluated exprs,
+  /// evaluated against 'row'. The generated string is much shorter than the full Hdfs
+  /// file name.
+  void GetHashTblKey(const TupleRow* row,
+      const std::vector<ScalarExprEvaluator*>& evals, std::string* key);
+
   /// Table id resolved in Prepare() to set tuple_desc_;
   TableId table_id_;
 
@@ -124,6 +169,26 @@ protected:
 
   /// Descriptor of target table. Set in Prepare().
   const HdfsTableDescriptor* table_desc_ = nullptr;
+
+  /// The partition descriptor used when creating new partitions from this sink.
+  /// Currently we don't support multi-format sinks.
+  const HdfsPartitionDescriptor* prototype_partition_;
+
+  /// Expressions for computing the target partitions to which a row is written.
+  const std::vector<ScalarExpr*>& partition_key_exprs_;
+  std::vector<ScalarExprEvaluator*> partition_key_expr_evals_;
+
+  /// Subset of partition_key_expr_evals_ which are not constant. Set in Prepare().
+  /// Used for generating the string key of hash_tbl_.
+  std::vector<ScalarExprEvaluator*> dynamic_partition_key_expr_evals_;
+
+  /// Stores the current partition during clustered inserts across subsequent row batches.
+  /// Only set if 'input_is_clustered_' is true.
+  PartitionPair* current_clustered_partition_ = nullptr;
+
+  /// Stores the current partition key during clustered inserts across subsequent row
+  /// batches. Only set if 'input_is_clustered_' is true.
+  std::string current_clustered_partition_key_;
 
   /// The directory in which an external FE expects results to be written to.
   std::string external_output_dir_;

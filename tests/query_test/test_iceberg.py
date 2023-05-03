@@ -1149,6 +1149,35 @@ class TestIcebergV2Table(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-delete', vector,
         unique_database)
 
+  def test_delete_partitioned(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-delete-partitioned', vector,
+        unique_database)
+    if IS_HDFS:
+      self._partitioned_hive_tests(unique_database)
+
+  def _partitioned_hive_tests(self, db):
+    # Hive needs table property 'format-version' explicitly set
+    for tbl in ["id_part", "trunc_part", "multi_part", "evolve_part", "ice_store_sales"]:
+      self.run_stmt_in_hive(
+          "ALTER TABLE {}.{} SET TBLPROPERTIES('format-version'='2')".format(db, tbl))
+    hive_output = self.run_stmt_in_hive("SELECT * FROM {}.{} ORDER BY i".format(
+        db, "id_part"))
+    assert hive_output == "id_part.i,id_part.s\n"
+    hive_output = self.run_stmt_in_hive("SELECT * FROM {}.{} ORDER BY i".format(
+        db, "trunc_part"))
+    assert hive_output == "trunc_part.i,trunc_part.s\n"
+    hive_output = self.run_stmt_in_hive("SELECT * FROM {}.{} ORDER BY i".format(
+        db, "multi_part"))
+    assert hive_output == "multi_part.i,multi_part.s,multi_part.f\n"
+    hive_output = self.run_stmt_in_hive("SELECT * FROM {}.{} ORDER BY i".format(
+        db, "evolve_part"))
+    assert hive_output == \
+        "evolve_part.i,evolve_part.s,evolve_part.f\n3,three,3.33\n" \
+        "30,thirty,30.3\n40,forty,40.4\n"
+    hive_output = self.run_stmt_in_hive("SELECT count(*) FROM {}.{}".format(
+        db, "ice_store_sales"))
+    assert hive_output == "_c0\n2601498\n"
+
   @SkipIfFS.hive
   def test_delete_hive_read(self, vector, unique_database):
     ice_delete = unique_database + ".ice_delete"

@@ -42,7 +42,7 @@ class TupleRow;
 /// as delimited text into Hdfs files.
 class HdfsTextTableWriter : public HdfsTableWriter {
  public:
-  HdfsTextTableWriter(HdfsTableSink* parent,
+  HdfsTextTableWriter(TableSinkBase* parent,
       RuntimeState* state, OutputPartition* output,
       const HdfsPartitionDescriptor* partition,
       const HdfsTableDescriptor* table_desc);

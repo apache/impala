@@ -521,6 +521,7 @@ string createIcebergDataFileString(
       FbIcebergDataFileFormat::FbIcebergDataFileFormat_PARQUET,
       num_rows,
       file_size,
+      partition.iceberg_spec_id,
       fbb.CreateString(partition.partition_name),
       fbb.CreateVector(raw_partition_fields),
       fbb.CreateVector(ice_col_stats_vec));

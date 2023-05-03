@@ -45,6 +45,7 @@ import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.iceberg.expressions.Expressions;
+import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
@@ -345,7 +346,9 @@ public class IcebergCatalogOpExecutor {
     for (ByteBuffer buf : deleteFilesFb) {
       FbIcebergDataFile deleteFile = FbIcebergDataFile.getRootAsFbIcebergDataFile(buf);
 
-      PartitionSpec partSpec = nativeIcebergTable.specs().get(icebergOp.getSpec_id());
+      PartitionSpec partSpec = nativeIcebergTable.specs().get(deleteFile.specId());
+      IcebergPartitionSpec impPartSpec = feIcebergTable.getPartitionSpec(
+          deleteFile.specId());
       Metrics metrics = buildDataFileMetrics(deleteFile);
       FileMetadata.Builder builder = FileMetadata.deleteFileBuilder(partSpec)
           .ofPositionDeletes()
@@ -354,6 +357,9 @@ public class IcebergCatalogOpExecutor {
           .withFormat(IcebergUtil.fbFileFormatToIcebergFileFormat(deleteFile.format()))
           .withRecordCount(deleteFile.recordCount())
           .withFileSizeInBytes(deleteFile.fileSizeInBytes());
+      IcebergUtil.PartitionData partitionData = IcebergUtil.partitionDataFromDataFile(
+          partSpec.partitionType(), impPartSpec, deleteFile);
+      if (partitionData != null) builder.withPartition(partitionData);
       rowDelta.addDeletes(builder.build());
     }
     try {
@@ -381,8 +387,12 @@ public class IcebergCatalogOpExecutor {
     }
     for (ByteBuffer buf : dataFilesFb) {
       FbIcebergDataFile dataFile = FbIcebergDataFile.getRootAsFbIcebergDataFile(buf);
+      Preconditions.checkState(dataFile.specId() == icebergOp.getSpec_id());
+      int specId = icebergOp.getSpec_id();
 
-      PartitionSpec partSpec = nativeIcebergTable.specs().get(icebergOp.getSpec_id());
+      PartitionSpec partSpec = nativeIcebergTable.specs().get(specId);
+      IcebergPartitionSpec impPartSpec =
+          feIcebergTable.getPartitionSpec(specId);
       Metrics metrics = buildDataFileMetrics(dataFile);
       DataFiles.Builder builder =
           DataFiles.builder(partSpec)
@@ -392,8 +402,7 @@ public class IcebergCatalogOpExecutor {
           .withRecordCount(dataFile.recordCount())
           .withFileSizeInBytes(dataFile.fileSizeInBytes());
       IcebergUtil.PartitionData partitionData = IcebergUtil.partitionDataFromDataFile(
-          partSpec.partitionType(),
-          feIcebergTable.getDefaultPartitionSpec(), dataFile);
+          partSpec.partitionType(), impPartSpec, dataFile);
       if (partitionData != null) builder.withPartition(partitionData);
       batchWrite.addFile(builder.build());
     }

@@ -82,14 +82,17 @@ void FileMetadataUtils::AddIcebergColumns(MemPool* mem_pool, Tuple** template_tu
   const FbFileMetadata* file_metadata = file_desc_->file_metadata;
   const FbIcebergMetadata* ice_metadata = file_metadata->iceberg_metadata();
   auto transforms = ice_metadata->partition_keys();
-  if (transforms == nullptr) return;
 
   const TupleDescriptor* tuple_desc = scan_node_->tuple_desc();
   if (*template_tuple == nullptr) {
     *template_tuple = Tuple::Create(tuple_desc->byte_size(), mem_pool);
   }
   for (const SlotDescriptor* slot_desc : scan_node_->tuple_desc()->slots()) {
-    if (slot_desc->IsVirtual()) continue;
+    if (slot_desc->IsVirtual()) {
+      AddVirtualIcebergColumn(mem_pool, *template_tuple, *ice_metadata, slot_desc);
+      continue;
+    }
+    if (transforms == nullptr) continue;
     const SchemaPath& path = slot_desc->col_path();
     if (path.size() != 1) continue;
     const ColumnDescriptor& col_desc =
@@ -105,7 +108,7 @@ void FileMetadataUtils::AddIcebergColumns(MemPool* mem_pool, Tuple** template_tu
       const AuxColumnType& aux_type =
           scan_node_->hdfs_table()->GetColumnDesc(slot_desc).auxType();
       if (!text_converter.WriteSlot(slot_desc, &aux_type, *template_tuple,
-                                    transform->transform_value()->c_str(),
+                                    (const char*)transform->transform_value()->data(),
                                     transform->transform_value()->size(),
                                     true, false,
                                     mem_pool)) {
@@ -114,7 +117,7 @@ void FileMetadataUtils::AddIcebergColumns(MemPool* mem_pool, Tuple** template_tu
                 "column '$0' in file '$1'. Partition string is '$2' "
                 "NULL Partition key value is '$3'",
                 col_desc.name(), file_desc_->filename,
-                transform->transform_value()->c_str(),
+                transform->transform_value()->data(),
                 scan_node_->hdfs_table()->null_partition_key_value()));
         // Dates are stored as INTs in the partition data in Iceberg, so let's try
         // to parse them as INTs.
@@ -122,7 +125,7 @@ void FileMetadataUtils::AddIcebergColumns(MemPool* mem_pool, Tuple** template_tu
           int32_t* slot = (*template_tuple)->GetIntSlot(slot_desc->tuple_offset());
           StringParser::ParseResult parse_result;
           *slot = StringParser::StringToInt<int32_t>(
-              transform->transform_value()->c_str(),
+              (const char*)transform->transform_value()->data(),
               transform->transform_value()->size(),
               &parse_result);
           if (parse_result == StringParser::ParseResult::PARSE_SUCCESS) {
@@ -138,6 +141,45 @@ void FileMetadataUtils::AddIcebergColumns(MemPool* mem_pool, Tuple** template_tu
         slot_descs_written->insert({slot_desc->id(), slot_desc});
       }
     }
+  }
+}
+
+void FileMetadataUtils::AddVirtualIcebergColumn(MemPool* mem_pool, Tuple* template_tuple,
+      const org::apache::impala::fb::FbIcebergMetadata& ice_metadata,
+      const SlotDescriptor* slot_desc) {
+  DCHECK(slot_desc->IsVirtual());
+  if (slot_desc->virtual_column_type() == TVirtualColumnType::PARTITION_SPEC_ID) {
+    int32_t* slot = template_tuple->GetIntSlot(slot_desc->tuple_offset());
+    *slot = ice_metadata.spec_id();
+  } else if (slot_desc->virtual_column_type() ==
+             TVirtualColumnType::ICEBERG_PARTITION_SERIALIZED) {
+    auto transforms = ice_metadata.partition_keys();
+    if (transforms == nullptr) return;
+    string partitions;
+    for (int i = 0; i < transforms->size(); ++i) {
+      using namespace org::apache::impala::fb;
+      auto transform = transforms->Get(i);
+      if (transform->transform_type() ==
+            FbIcebergTransformType::FbIcebergTransformType_VOID) {
+        continue;
+      }
+      stringstream part_ss;
+      Base64Encode((const char*)transform->transform_value()->data(),
+                   transform->transform_value()->size(), &part_ss);
+      string part_value(part_ss.str());
+      if (partitions.empty()) {
+        partitions = part_value;
+      } else {
+        partitions += '.' + part_value;
+      }
+    }
+    StringValue* slot = template_tuple->GetStringSlot(slot_desc->tuple_offset());
+    int len = partitions.length();
+    char* partition_serialized_copy = reinterpret_cast<char*>(mem_pool->Allocate(len));
+    Ubsan::MemCpy(partition_serialized_copy, partitions.c_str(), len);
+    slot->ptr = partition_serialized_copy;
+    slot->len = len;
+    template_tuple->SetNotNull(slot_desc->null_indicator_offset());
   }
 }
 
