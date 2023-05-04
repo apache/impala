@@ -39,7 +39,6 @@ SELECT count(*) from iceberg_v2_no_deletes
 bigint
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 COMPUTE STATS iceberg_v2_delete_positional
@@ -81,7 +80,6 @@ SELECT count(*) from iceberg_v2_delete_positional for system_version as of 68169
 bigint
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 SELECT count(*) from iceberg_v2_delete_positional;
@@ -91,7 +89,6 @@ SELECT count(*) from iceberg_v2_delete_positional;
 bigint
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 2
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 COMPUTE STATS iceberg_v2_positional_delete_all_rows
@@ -133,7 +130,6 @@ SELECT count(*) from iceberg_v2_positional_delete_all_rows for system_version as
 bigint
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 SELECT count(*) from iceberg_v2_positional_delete_all_rows
@@ -143,7 +139,6 @@ SELECT count(*) from iceberg_v2_positional_delete_all_rows
 bigint
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 2
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 COMPUTE STATS iceberg_v2_positional_not_all_data_files_have_delete_files
@@ -197,7 +192,6 @@ SELECT count(*) from iceberg_v2_positional_not_all_data_files_have_delete_files 
 bigint
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 SELECT count(*) from iceberg_v2_positional_not_all_data_files_have_delete_files for system_version as of 752781918366351945
@@ -207,7 +201,6 @@ SELECT count(*) from iceberg_v2_positional_not_all_data_files_have_delete_files 
 bigint
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 2
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 SELECT count(*) from iceberg_v2_positional_not_all_data_files_have_delete_files
@@ -217,7 +210,6 @@ SELECT count(*) from iceberg_v2_positional_not_all_data_files_have_delete_files
 bigint
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 4
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 COMPUTE STATS iceberg_v2_positional_update_all_rows
@@ -268,7 +260,6 @@ SELECT count(*) from iceberg_v2_positional_update_all_rows for system_version as
 bigint
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 2
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 SELECT count(*) from iceberg_v2_positional_update_all_rows
@@ -278,7 +269,6 @@ SELECT count(*) from iceberg_v2_positional_update_all_rows
 bigint
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 2
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 COMPUTE STATS iceberg_v2_partitioned_position_deletes
@@ -320,7 +310,6 @@ SELECT count(*) from iceberg_v2_partitioned_position_deletes for system_version 
 bigint
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 SELECT count(*) from iceberg_v2_partitioned_position_deletes
@@ -330,7 +319,6 @@ SELECT count(*) from iceberg_v2_partitioned_position_deletes
 bigint
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 6
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 SELECT count(*) from iceberg_v2_no_deletes where i = 2;

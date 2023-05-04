@@ -20,7 +20,6 @@ BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 4
 aggregation(SUM, NumOrcStripes): 4
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 with u1 as (select count(*) as c from functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files),
@@ -35,7 +34,6 @@ BIGINT,BIGINT,TINYINT,BIGINT,BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 4
 aggregation(SUM, NumOrcStripes): 4
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 select count(*) as c from iceberg_v2_positional_not_all_data_files_have_delete_files for system_version as of 752781918366351945
@@ -58,7 +56,6 @@ BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 2
 aggregation(SUM, NumOrcStripes): 2
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 with u1 as (select count(*) as c from functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files for system_version as of 752781918366351945),
@@ -73,5 +70,4 @@ BIGINT,BIGINT,TINYINT,BIGINT,BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 2
 aggregation(SUM, NumOrcStripes): 2
-aggregation(SUM, NumFileMetadataRead): 0
 ====

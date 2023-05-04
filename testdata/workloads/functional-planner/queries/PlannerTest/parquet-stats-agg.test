@@ -1,7 +1,6 @@
 # Verify that that the parquet count(*) optimization is applied in all count(*) or
 # count(<literal>) cases when scanning a Parquet table. In the last case, we are scanning
-# a text table, so the optimization is not applied. The optimization is observed when
-# the cardinality of the Parquet scan (24) is the same as # the # of files (24).
+# a text table, so the optimization is not applied.
 select count(*) from functional_parquet.alltypes
 union all
 select count(1) from functional_parquet.alltypes
@@ -30,7 +29,7 @@ PLAN-ROOT SINK
 |  |
 |  05:SCAN HDFS [functional_parquet.alltypes]
 |     HDFS partitions=24/24 files=24 size=200.45KB
-|     row-size=8B cardinality=24
+|     row-size=8B cardinality=12.75K
 |
 |--04:AGGREGATE [FINALIZE]
 |  |  output: sum_init_zero(functional_parquet.alltypes.stats: num_rows)
@@ -38,7 +37,7 @@ PLAN-ROOT SINK
 |  |
 |  03:SCAN HDFS [functional_parquet.alltypes]
 |     HDFS partitions=24/24 files=24 size=200.45KB
-|     row-size=8B cardinality=24
+|     row-size=8B cardinality=12.75K
 |
 02:AGGREGATE [FINALIZE]
 |  output: sum_init_zero(functional_parquet.alltypes.stats: num_rows)
@@ -46,7 +45,7 @@ PLAN-ROOT SINK
 |
 01:SCAN HDFS [functional_parquet.alltypes]
    HDFS partitions=24/24 files=24 size=200.45KB
-   row-size=8B cardinality=24
+   row-size=8B cardinality=12.75K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -80,7 +79,7 @@ PLAN-ROOT SINK
 |  |
 |  05:SCAN HDFS [functional_parquet.alltypes]
 |     HDFS partitions=24/24 files=24 size=200.45KB
-|     row-size=8B cardinality=24
+|     row-size=8B cardinality=12.75K
 |
 |--12:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
@@ -94,7 +93,7 @@ PLAN-ROOT SINK
 |  |
 |  03:SCAN HDFS [functional_parquet.alltypes]
 |     HDFS partitions=24/24 files=24 size=200.45KB
-|     row-size=8B cardinality=24
+|     row-size=8B cardinality=12.75K
 |
 10:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
@@ -108,7 +107,7 @@ PLAN-ROOT SINK
 |
 01:SCAN HDFS [functional_parquet.alltypes]
    HDFS partitions=24/24 files=24 size=200.45KB
-   row-size=8B cardinality=24
+   row-size=8B cardinality=12.75K
 ====
 # Verify that the parquet count(*) optimization is applied even if there is more than
 # one item in the select list.
@@ -122,7 +121,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    HDFS partitions=24/24 files=24 size=200.45KB
-   row-size=8B cardinality=24
+   row-size=8B cardinality=12.75K
 ====
 # Select count(<partition col>) - the optimization should be disabled because it's not a
 # count(<literal>) or count(*) aggregate function.
@@ -150,7 +149,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    HDFS partitions=24/24 files=24 size=200.45KB
-   row-size=16B cardinality=24
+   row-size=16B cardinality=12.75K
 ====
 # The optimization is disabled because tinyint_col is not a partition col.
 select tinyint_col, count(*) from functional_parquet.alltypes group by tinyint_col, year
@@ -209,7 +208,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    HDFS partitions=24/24 files=24 size=200.45KB
-   row-size=8B cardinality=24
+   row-size=8B cardinality=12.75K
 ====
 # The count(*) optimization is applied in the inline view.
 select count(*), count(a) from (select count(1) as a from functional_parquet.alltypes) t
@@ -226,7 +225,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    HDFS partitions=24/24 files=24 size=200.45KB
-   row-size=8B cardinality=24
+   row-size=8B cardinality=12.75K
 ====
 # The count(*) optimization is applied to the inline view even if there is a join.
 select *
@@ -248,7 +247,7 @@ PLAN-ROOT SINK
 |  |
 |  01:SCAN HDFS [functional_parquet.alltypes]
 |     HDFS partitions=24/24 files=24 size=200.45KB
-|     row-size=12B cardinality=24
+|     row-size=12B cardinality=12.75K
 |
 00:SCAN HDFS [functional.alltypes x]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -287,7 +286,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.alltypes]
    partition predicates: `year` < 2010, `month` > 8
    HDFS partitions=4/24 files=4 size=33.53KB
-   row-size=8B cardinality=4
+   row-size=8B cardinality=2.13K
 ====
 # tinyint_col is not a partition column so the optimization is disabled.
 select count(1) from functional_parquet.alltypes where year < 2010 and tinyint_col > 8;
@@ -315,7 +314,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    HDFS partitions=24/24 files=24 size=200.45KB
-   row-size=8B cardinality=24
+   row-size=8B cardinality=12.75K
 ====
 # Optimization is not applied to count(null).
 select count(1 + null + 3) from functional_parquet.alltypes
@@ -421,5 +420,5 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.alltypes]
    partition predicates: `month` = 1
    HDFS partitions=2/24 files=2 size=17.07KB
-   row-size=12B cardinality=2
+   row-size=12B cardinality=1.09K
 ====

@@ -50,7 +50,7 @@ class ParquetColumnReader;
 class ParquetPageReader;
 template<typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
 class ScalarColumnReader;
-
+class BoolColumnReader;
 
 /// This scanner parses Parquet files located in HDFS, and writes the content as tuples in
 /// the Impala in-memory representation of data, e.g.  (tuples, rows, row batches).
@@ -394,21 +394,29 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
       "You can increase PARQUET_FOOTER_SIZE if you want, "
       "just don't forget to increase READ_SIZE_MIN_VALUE as well.");
 
- protected:
-  virtual int64_t GetNumberOfRowsInFile() const override {
-    return file_metadata_.num_rows;
-  }
-
  private:
   friend class ParquetColumnReader;
   friend class CollectionColumnReader;
   friend class BaseScalarColumnReader;
   template<typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
   friend class ScalarColumnReader;
+  friend class BoolColumnReader;
   friend class HdfsParquetScannerTest;
   friend class ParquetPageIndex;
   friend class ParquetColumnChunkReader;
   friend class ParquetPageReader;
+
+  /// Index of the current row group being processed. Initialized to -1 which indicates
+  /// that we have not started processing the first row group yet (GetNext() has not yet
+  /// been called).
+  int32_t row_group_idx_;
+
+  /// Counts the number of rows processed for the current row group.
+  int64_t row_group_rows_read_;
+
+  /// Indicates whether we should advance to the next row group in the next GetNext().
+  /// Starts out as true to move to the very first row group.
+  bool advance_row_group_;
 
   boost::scoped_ptr<ParquetSchemaResolver> schema_resolver_;
 
@@ -491,6 +499,9 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// Memory used to store the tuples used for dictionary filtering. Tuples owned by
   /// perm_pool_.
   std::unordered_map<const TupleDescriptor*, Tuple*> dict_filter_tuple_map_;
+
+  /// Timer for materializing rows.  This ignores time getting the next buffer.
+  ScopedTimer<MonotonicStopWatch> assemble_rows_timer_;
 
   /// Average and min/max time spent processing the page index for each row group.
   RuntimeProfile::SummaryStatsCounter* process_page_index_stats_;

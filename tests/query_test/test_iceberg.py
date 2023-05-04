@@ -453,7 +453,6 @@ class TestIcebergTable(IcebergTestSuite):
       assert len(data.data) == 1
       assert expected in data.data
       assert "NumRowGroups" not in data.runtime_profile
-      assert "NumFileMetadataRead" not in data.runtime_profile
 
     def expect_results_t(ts, expected_results, expected_cols):
       expect_results(

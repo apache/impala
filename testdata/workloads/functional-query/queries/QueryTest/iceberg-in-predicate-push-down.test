@@ -33,7 +33,6 @@ select count(1) from ice_pred_pd1;
 BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 show files in ice_pred_pd1;
@@ -63,6 +62,7 @@ aggregation(SUM, NumRowGroups): 3
 ---- QUERY
 # Filtering only on a partition column is done by Iceberg and in Impala we can get the results
 # simply using file metadata.
+# IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 3.
 select
   count(1)
 from
@@ -72,8 +72,7 @@ where
 ---- RESULTS
 9
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 0
-aggregation(SUM, NumFileMetadataRead): 3
+aggregation(SUM, NumRowGroups): 3
 ====
 ---- QUERY
 # The IN predicate matches two row groups
@@ -447,6 +446,7 @@ aggregation(SUM, NumRowGroups): 1
 ====
 ---- QUERY
 # NOT_IN could be answered using file metadata if only partition cols are included
+# IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 1.
 select
   count(1)
 from
@@ -456,8 +456,7 @@ where
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 0
-aggregation(SUM, NumFileMetadataRead): 1
+aggregation(SUM, NumRowGroups): 1
 ====
 ---- QUERY
 # NOT_IN does not work because col_dt is not the partition column
@@ -548,7 +547,6 @@ select count(1) from ice_pred_pd2;
 BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 show files in ice_pred_pd2;

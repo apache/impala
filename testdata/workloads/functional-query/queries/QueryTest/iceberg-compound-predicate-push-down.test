@@ -39,7 +39,6 @@ select count(1) from ice_compound_pred_pd;
 BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 show files in ice_compound_pred_pd;
@@ -424,7 +423,6 @@ select count(1) from ice_compound_pred_pd1;
 BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 show files in ice_compound_pred_pd1;

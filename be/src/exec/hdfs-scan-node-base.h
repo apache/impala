@@ -30,7 +30,6 @@
 #include <boost/unordered_map.hpp>
 
 #include "codegen/codegen-fn-ptr.h"
-#include "exec/acid-metadata-utils.h"
 #include "exec/file-metadata-utils.h"
 #include "exec/filter-context.h"
 #include "exec/scan-node.h"
@@ -464,12 +463,10 @@ class HdfsScanNodeBase : public ScanNode {
   const AvroSchemaElement& avro_schema() const { return avro_schema_; }
   int skip_header_line_count() const { return skip_header_line_count_; }
   io::RequestContext* reader_context() const { return reader_context_.get(); }
-  bool optimize_count_star() const {
-    bool is_optimized = count_star_slot_offset_ != -1;
-    DCHECK(!hdfs_table_->IsTableFullAcid() || !is_optimized);
-    return is_optimized;
+  bool optimize_parquet_count_star() const {
+    return parquet_count_star_slot_offset_ != -1;
   }
-  int count_star_slot_offset() const { return count_star_slot_offset_; }
+  int parquet_count_star_slot_offset() const { return parquet_count_star_slot_offset_; }
   bool is_partition_key_scan() const { return is_partition_key_scan_; }
 
   typedef std::unordered_map<TupleId, std::vector<ScalarExprEvaluator*>>
@@ -601,32 +598,6 @@ class HdfsScanNodeBase : public ScanNode {
         virtual_column_slots().empty();
   }
 
-  /// Return true if scan over 'filename' require row validation.
-  /// Hive Streaming Ingestion allocates multiple write ids, hence create delta
-  /// directories like delta_5_10. Then it continuously appends new stripes (and footers)
-  /// to the ORC files of the delte dir. So it's possible that the file has rows that
-  /// Impala is not allowed to see based on its valid write id list. In such cases we need
-  /// to validate the write ids of the row batches.
-  inline bool RequireRowValidation(std::string filename) const {
-    if (!hdfs_table()->IsTableFullAcid()) return false;
-    if (ValidWriteIdList::IsCompacted(filename)) return false;
-    ValidWriteIdList valid_write_ids;
-    std::pair<int64_t, int64_t> acid_write_id_range =
-        valid_write_ids.GetWriteIdRange(filename);
-    valid_write_ids.InitFrom(hdfs_table()->ValidWriteIdList());
-    ValidWriteIdList::RangeResponse rows_valid = valid_write_ids.IsWriteIdRangeValid(
-        acid_write_id_range.first, acid_write_id_range.second);
-    DCHECK_NE(rows_valid, ValidWriteIdList::NONE);
-    return rows_valid == ValidWriteIdList::SOME;
-  }
-
-  /// Return true if scan over 'filename 'can be served only by reading the file metadata,
-  /// such as a count(*) over the table.
-  inline bool ReadsFileMetadataOnly(std::string filename) const {
-    return !RequireRowValidation(filename)
-        && (IsZeroSlotTableScan() || optimize_count_star());
-  }
-
   /// Transfers all memory from 'pool' to shared state of all scanners.
   void TransferToSharedStatePool(MemPool* pool);
 
@@ -715,11 +686,11 @@ class HdfsScanNodeBase : public ScanNode {
   /// Tuple id of the tuple descriptor to be used.
   const int tuple_id_;
 
-  /// The byte offset of the slot for Parquet/ORC metadata if count star optimization
+  /// The byte offset of the slot for Parquet metadata if Parquet count star optimization
   /// is enabled. When set, this scan node can optimize a count(*) query by populating
   /// the tuple with data from the Parquet num rows statistic. See
-  /// applyCountStarOptimization() in ScanNode.java.
-  const int count_star_slot_offset_;
+  /// applyParquetCountStartOptimization() in HdfsScanNode.java.
+  const int parquet_count_star_slot_offset_;
 
   // True if this is a partition key scan that needs only to return at least one row from
   // each scan range. If true, the scan node and scanner implementations should attempt
