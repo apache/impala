@@ -212,28 +212,6 @@ def build_java_tool_options(jvm_debug_port=None):
         "server=y,suspend=n ").format(debug_port=jvm_debug_port) + java_tool_options
   if options.jvm_args is not None:
     java_tool_options += " " + options.jvm_args
-
-  if int(os.environ["IMPALA_JDK_VERSION"]) >= 9:
-    JAVA11_BASE_OPENS = ["java.io", "java.lang.module", "java.lang.ref", "java.lang",
-                         "java.net", "java.nio.charset", "java.nio.file.attribute",
-                         "java.nio", "java.security", "java.util.concurrent",
-                         "java.util.jar", "java.util.zip", "java.util",
-                         "jdk.internal.loader", "jdk.internal.math",
-                         "jdk.internal.module", "jdk.internal.perf", "jdk.internal.ref",
-                         "jdk.internal.reflect", "jdk.internal.util.jar", "sun.nio.fs"]
-    for base_open in JAVA11_BASE_OPENS:
-      java_tool_options += " --add-opens=java.base/{0}=ALL-UNNAMED".format(base_open)
-
-    JAVA11_DYNALINK_OPENS = ["jdk.dynalink.beans", "jdk.dynalink.linker.support",
-                             "jdk.dynalink.linker", "jdk.dynalink.support",
-                             "jdk.dynalink"]
-    for dynalink_open in JAVA11_DYNALINK_OPENS:
-      java_tool_options += \
-          " --add-opens=jdk.dynalink/{0}=ALL-UNNAMED".format(dynalink_open)
-
-    java_tool_options += " --add-opens=jdk.management.jfr/jdk.management.jfr=ALL-UNNAMED"
-    java_tool_options += \
-        " --add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED"
   return java_tool_options
 
 def kill_matching_processes(binary_names, force=False):

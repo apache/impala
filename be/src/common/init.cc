@@ -94,6 +94,10 @@ DEFINE_string(local_library_dir, "/tmp",
     "Scratch space for local fs operations. Currently used for copying "
     "UDF binaries locally from HDFS and also for initializing the timezone db");
 
+DEFINE_bool(jvm_automatic_add_opens, true,
+    "Adds necessary --add-opens options for core Java modules necessary to correctly "
+    "calculate catalog metadata cache object sizes.");
+
 // Defined by glog. This allows users to specify the log level using a glob. For
 // example -vmodule=*scanner*=3 would enable full logging for scanners. If redaction
 // is enabled, this option won't be allowed because some logging dumps table data
@@ -297,6 +301,57 @@ void BlockImpalaShutdownSignal() {
   AbortIfError(pthread_sigmask(SIG_BLOCK, &signals, nullptr), error_msg);
 }
 
+// Append add-opens args to JAVA_TOOL_OPTIONS for ehcache.
+static Status JavaAddOpens() {
+  if (!FLAGS_jvm_automatic_add_opens) return Status::OK();
+
+  stringstream val_out;
+  char* current_val_c = getenv("JAVA_TOOL_OPTIONS");
+  if (current_val_c != NULL) {
+    val_out << current_val_c;
+  }
+
+  // These options are required for Java 9+, and ignored by Java 8.
+  for (const string& param : {
+    "--add-opens=java.base/java.io=ALL-UNNAMED",
+    "--add-opens=java.base/java.lang.module=ALL-UNNAMED",
+    "--add-opens=java.base/java.lang.ref=ALL-UNNAMED",
+    "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
+    "--add-opens=java.base/java.lang=ALL-UNNAMED",
+    "--add-opens=java.base/java.net=ALL-UNNAMED",
+    "--add-opens=java.base/java.nio.charset=ALL-UNNAMED",
+    "--add-opens=java.base/java.nio.file.attribute=ALL-UNNAMED",
+    "--add-opens=java.base/java.nio=ALL-UNNAMED",
+    "--add-opens=java.base/java.security=ALL-UNNAMED",
+    "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED",
+    "--add-opens=java.base/java.util.jar=ALL-UNNAMED",
+    "--add-opens=java.base/java.util.zip=ALL-UNNAMED",
+    "--add-opens=java.base/java.util=ALL-UNNAMED",
+    "--add-opens=java.base/jdk.internal.loader=ALL-UNNAMED",
+    "--add-opens=java.base/jdk.internal.math=ALL-UNNAMED",
+    "--add-opens=java.base/jdk.internal.module=ALL-UNNAMED",
+    "--add-opens=java.base/jdk.internal.perf=ALL-UNNAMED",
+    "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
+    "--add-opens=java.base/jdk.internal.reflect=ALL-UNNAMED",
+    "--add-opens=java.base/jdk.internal.util.jar=ALL-UNNAMED",
+    "--add-opens=java.base/sun.nio.fs=ALL-UNNAMED",
+    "--add-opens=jdk.dynalink/jdk.dynalink.beans=ALL-UNNAMED",
+    "--add-opens=jdk.dynalink/jdk.dynalink.linker.support=ALL-UNNAMED",
+    "--add-opens=jdk.dynalink/jdk.dynalink.linker=ALL-UNNAMED",
+    "--add-opens=jdk.dynalink/jdk.dynalink.support=ALL-UNNAMED",
+    "--add-opens=jdk.dynalink/jdk.dynalink=ALL-UNNAMED",
+    "--add-opens=jdk.management.jfr/jdk.management.jfr=ALL-UNNAMED",
+    "--add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED"
+  }) {
+    val_out << " " << param;
+  }
+
+  if (setenv("JAVA_TOOL_OPTIONS", val_out.str().c_str(), 1) < 0) {
+    return Status(Substitute("Could not update JAVA_TOOL_OPTIONS: $0", GetStrErrMsg()));
+  }
+  return Status::OK();
+}
+
 void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
     TestInfo::Mode test_mode, bool external_fe) {
   srand(time(NULL));
@@ -451,6 +506,9 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   if (!fs_cache_init_status.ok()) CLEAN_EXIT_WITH_ERROR(fs_cache_init_status.GetDetail());
 
   if (init_jvm) {
+    // Add JAVA_TOOL_OPTIONS for ehcache
+    ABORT_IF_ERROR(JavaAddOpens());
+
     if (!external_fe) {
       JniUtil::InitLibhdfs();
     }

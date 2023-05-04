@@ -55,13 +55,11 @@ fi
 # This detection logic handles both Java 8 and Java 11.
 # If both are present (which shouldn't happen), Java 11 is preferred.
 JAVA_HOME=Unknown
-USING_JAVA11=false
 if [[ $DISTRIBUTION == Ubuntu ]]; then
   # Since the Java location includes the CPU architecture, use a glob
   # to find Java home
   if compgen -G "/usr/lib/jvm/java-11-openjdk*" ; then
     JAVA_HOME=$(compgen -G "/usr/lib/jvm/java-11-openjdk*")
-    USING_JAVA11=true
     if compgen -G "/usr/lib/jvm/java-8-openjdk*" ; then
       echo "WARNING: Java 8 is also present"
     fi
@@ -73,7 +71,6 @@ elif [[ $DISTRIBUTION == Redhat ]]; then
   if [[ -d /usr/lib/jvm/jre-11 ]]; then
     echo "Detected Java 11"
     JAVA_HOME=/usr/lib/jvm/jre-11
-    USING_JAVA11=true
     if [[ -d /usr/lib/jvm/jre-1.8.0 ]]; then
       echo "WARNING: Java 8 is also present"
     fi
@@ -116,41 +113,6 @@ do
 done
 echo "CLASSPATH: $CLASSPATH"
 echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
-
-# IMPALA-11260: ehcache underestimates sizes on Java 9+ due to restrictions
-# on reflection. As a workaround, this turns off the restrictions to allow
-# ehcache to function. The real fix needs to happen on the ehcache side.
-if $USING_JAVA11 ; then
-  JAVA11_OPTIONS=" --add-opens=java.base/java.io=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/java.lang.module=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/java.lang.ref=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/java.lang.reflect=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/java.lang=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/java.net=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/java.nio.charset=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/java.nio.file.attribute=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/java.nio=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/java.security=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/java.util.concurrent=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/java.util.jar=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/java.util.zip=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/java.util=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/jdk.internal.loader=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/jdk.internal.math=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/jdk.internal.module=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/jdk.internal.reflect=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/jdk.internal.util.jar=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=java.base/sun.nio.fs=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink.beans=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink.linker.support=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink.linker=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink.support=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=jdk.management.jfr/jdk.management.jfr=ALL-UNNAMED"
-  JAVA11_OPTIONS+=" --add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED"
-  JAVA_TOOL_OPTIONS="$JAVA11_OPTIONS $JAVA_TOOL_OPTIONS"
-fi
 
 # Default to 2GB heap. Allow overriding by externally-set JAVA_TOOL_OPTIONS.
 export JAVA_TOOL_OPTIONS="-Xmx2g $JAVA_TOOL_OPTIONS"
