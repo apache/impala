@@ -64,6 +64,9 @@ PROFILE_DEFINE_COUNTER(IoReadTotalBytes, DEBUG, TUnit::BYTES,
     "The total number of bytes read from streams.");
 PROFILE_DEFINE_COUNTER(IoReadSkippedBytes, DEBUG, TUnit::BYTES,
     "The total number of bytes skipped from streams.");
+PROFILE_DEFINE_COUNTER(NumFileMetadataRead, DEBUG, TUnit::UNIT,
+    "The total number of file metadata reads done in place of rows or row groups / "
+    "stripe iteration.");
 
 const char* HdfsColumnarScanner::LLVM_CLASS_NAME = "class.impala::HdfsColumnarScanner";
 
@@ -95,6 +98,7 @@ Status HdfsColumnarScanner::Open(ScannerContext* context) {
   io_total_request_ = PROFILE_IoReadTotalRequest.Instantiate(profile);
   io_total_bytes_ = PROFILE_IoReadTotalBytes.Instantiate(profile);
   io_skipped_bytes_ = PROFILE_IoReadSkippedBytes.Instantiate(profile);
+  num_file_metadata_read_ = PROFILE_NumFileMetadataRead.Instantiate(profile);
   return Status::OK();
 }
 

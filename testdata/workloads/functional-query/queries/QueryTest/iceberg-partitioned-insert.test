@@ -170,6 +170,7 @@ select count(*) from ice_bigints;
 BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 # When filtered only by partition column Iceberg can do the filtering and no need to read data in Impala.
@@ -181,6 +182,7 @@ where i = 0 and j = 0;
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 1
 aggregation(SUM, RowsRead): 0
+aggregation(SUM, NumFileMetadataRead): 1
 ====
 ---- QUERY
 # When not just partition columns are involved in the filtering then Impala has to read data to answer the query.
@@ -289,6 +291,7 @@ where bool_col = true;
 BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumFileMetadataRead): 4
 ====
 ---- QUERY
 # IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 4.
@@ -300,6 +303,7 @@ where float_col = 0;
 BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumFileMetadataRead): 4
 ====
 ---- QUERY
 # IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 4.
@@ -311,6 +315,7 @@ where double_col = 0;
 BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumFileMetadataRead): 4
 ====
 ---- QUERY
 # IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 2.
@@ -322,6 +327,7 @@ where date_col = '2009-01-01';
 BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumFileMetadataRead): 2
 ====
 ---- QUERY
 # IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 4.
@@ -333,6 +339,7 @@ where string_col = '0';
 BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumFileMetadataRead): 4
 ====
 ---- QUERY
 # 'timestamp_col' is not a partitioning column, so min/max stats will not be used to

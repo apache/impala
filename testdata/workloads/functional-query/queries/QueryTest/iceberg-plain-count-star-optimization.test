@@ -13,6 +13,7 @@ select count(*) from ice_tbl;
 0
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 insert into
@@ -33,6 +34,7 @@ select count(*) from ice_tbl;
 3
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 create table ice_tbl_u1 stored as iceberg as select * from ice_tbl;
@@ -45,6 +47,7 @@ select count(*) from ice_tbl_u1;
 3
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 insert into
@@ -66,6 +69,7 @@ select count(*) from ice_tbl;
 6
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 create table ice_tbl_u2 stored as iceberg as select * from ice_tbl;
@@ -78,6 +82,7 @@ select count(*) from ice_tbl_u2;
 6
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 insert into
@@ -100,6 +105,7 @@ select count(*) from ice_tbl;
 8
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 select count(*) from ice_tbl for system_time as of now();
@@ -107,6 +113,7 @@ select count(*) from ice_tbl for system_time as of now();
 8
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 set explain_level=3;
@@ -149,6 +156,7 @@ where
 4
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumFileMetadataRead): 2
 ====
 ---- QUERY
 select
@@ -160,6 +168,7 @@ having
 ---- RESULTS
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 select
@@ -173,6 +182,7 @@ group by
 4
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 select
@@ -183,6 +193,7 @@ from
 6
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 truncate ice_tbl;
@@ -195,6 +206,7 @@ select count(*) from ice_tbl;
 0
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 create table parq_tbl(col_i INT, col_s STRING) PARTITIONED BY(x INT) STORED AS PARQUET;
@@ -211,6 +223,7 @@ select count(*) from parq_tbl;
 3
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumFileMetadataRead): 3
 ====
 ---- QUERY
 select count(*) as c from ice_tbl_u1 union all (select count(*) c from ice_tbl_u2) order by c;
@@ -221,6 +234,7 @@ select count(*) as c from ice_tbl_u1 union all (select count(*) c from ice_tbl_u
 BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 with u1 as (select count(*) from ice_tbl_u1), u2 as (select count(*) from ice_tbl_u2) select * from u1, u2;
@@ -230,6 +244,7 @@ with u1 as (select count(*) from ice_tbl_u1), u2 as (select count(*) from ice_tb
 BIGINT,BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 with u1 as (select count(*) from ice_tbl_u1),
@@ -241,4 +256,5 @@ u2 as (select count(*) from ice_tbl_u1 union all (select count(*) from ice_tbl_u
 BIGINT,BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
 ====

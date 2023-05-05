@@ -449,6 +449,7 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
       DCHECK_LE(row_group_idx_, file_metadata_.row_groups.size());
       DCHECK_LE(row_group_rows_read_, file_metadata_.num_rows);
       if (row_group_idx_ == file_metadata_.row_groups.size()) break;
+      COUNTER_ADD(num_file_metadata_read_, 1);
       Tuple* dst_tuple = reinterpret_cast<Tuple*>(tuple_buf);
       TupleRow* dst_row = row_batch->GetRow(row_batch->AddRow());
       InitTuple(template_tuple_, dst_tuple);
@@ -470,6 +471,7 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
       eos_ = true;
       return Status::OK();
     }
+    COUNTER_ADD(num_file_metadata_read_, 1);
     assemble_rows_timer_.Start();
     DCHECK_LE(row_group_rows_read_, file_metadata_.num_rows);
     int64_t rows_remaining = file_metadata_.num_rows - row_group_rows_read_;

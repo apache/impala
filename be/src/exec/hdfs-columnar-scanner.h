@@ -142,6 +142,11 @@ class HdfsColumnarScanner : public HdfsScanner {
   /// Total number of bytes skipped during stream reading.
   RuntimeProfile::Counter* io_skipped_bytes_;
 
+  /// Total file metadata reads done.
+  /// Incremented when serving query from metadata instead of iterating rows or
+  /// row groups / stripes.
+  RuntimeProfile::Counter* num_file_metadata_read_;
+
  private:
   int ProcessScratchBatchCodegenOrInterpret(RowBatch* dst_batch);
 };

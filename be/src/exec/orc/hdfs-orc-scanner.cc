@@ -789,6 +789,7 @@ Status HdfsOrcScanner::GetNextInternal(RowBatch* row_batch) {
       eos_ = true;
       return Status::OK();
     }
+    COUNTER_ADD(num_file_metadata_read_, 1);
     assemble_rows_timer_.Start();
     DCHECK_LT(stripe_rows_read_, file_rows);
     int64_t rows_remaining = file_rows - stripe_rows_read_;
