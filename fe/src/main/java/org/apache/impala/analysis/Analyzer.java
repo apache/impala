@@ -3313,6 +3313,10 @@ public class Analyzer {
       }
       // Now that we've found a compatible type, add implicit casts if necessary.
       for (int j = 0; j < exprLists.size(); ++j) {
+        // Checking compatibility with every expression
+        Type commonType = getCompatibleType(compatibleType,
+            widestExprs.get(i), exprLists.get(j).get(i));
+        Preconditions.checkState(commonType.equals(compatibleType));
         if (!exprLists.get(j).get(i).getType().equals(compatibleType)) {
           Expr castExpr = exprLists.get(j).get(i).castTo(compatibleType);
           exprLists.get(j).set(i, castExpr);

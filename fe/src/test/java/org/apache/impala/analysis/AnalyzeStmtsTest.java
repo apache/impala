@@ -3558,6 +3558,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "Target table 'functional.alltypes' is incompatible with source expressions.\n" +
         "Expression ''a'' (type: STRING) is not compatible with column 'tinyint_col'" +
         " (type: TINYINT)");
+    // Regression test for IMPALA-12042: Transitive compatibility is not
+    // allowed (boolean -> tinyint -> decimal(4,1))
+    AnalysisError("values (true), (123), (111.0)",
+        "Incompatible return types 'DECIMAL(4,1)' and 'BOOLEAN'"
+            + " of exprs '111.0' and 'TRUE'");
   }
 
   @Test
