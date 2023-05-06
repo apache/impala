@@ -438,8 +438,7 @@ public class Function extends CatalogObjectImpl {
   // If an error occurs and the mtime cannot be retrieved, an IllegalStateException is
   // thrown.
   public final long getLastModifiedTime() {
-    if (getBinaryType() != TFunctionBinaryType.BUILTIN && getLocation() != null) {
-      Preconditions.checkState(!getLocation().toString().isEmpty());
+    if (!isBuiltinOrJava()) {
       TSymbolLookupParams lookup = Preconditions.checkNotNull(getLookupParams());
       try {
         TSymbolLookupResult result = FeSupport.LookupSymbol(lookup);
@@ -451,6 +450,17 @@ public class Function extends CatalogObjectImpl {
       }
     }
     return -1;
+  }
+
+  /**
+   * Returns true for BUILTINs, and JAVA functions when location is either null or empty.
+   *
+   * @return boolean
+   */
+  private boolean isBuiltinOrJava() {
+    return getBinaryType() == TFunctionBinaryType.BUILTIN ||
+        (getBinaryType() == TFunctionBinaryType.JAVA &&
+            (getLocation() == null || getLocation().toString().isEmpty()));
   }
 
   // Returns the resolved symbol in the binary. The BE will do a lookup of 'symbol'
