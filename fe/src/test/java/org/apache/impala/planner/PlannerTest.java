@@ -1390,6 +1390,11 @@ public class PlannerTest extends PlannerTestBase {
     runPlannerTestFile("tpcds-dist-method", "tpcds");
   }
 
+  @Test
+  public void testOrcStatsAgg() {
+    runPlannerTestFile("orc-stats-agg");
+  }
+
   /**
    * Test new hint of 'TABLE_NUM_ROWS'
    */

@@ -406,9 +406,10 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
     row_batches_need_validation_ = rows_valid == ValidWriteIdList::SOME;
   }
 
-  if (UNLIKELY(scan_node_->optimize_parquet_count_star())) {
-    DCHECK(false);
-    return Status("Internal ERROR: ORC scanner cannot optimize count star slot.");
+  if (scan_node_->optimize_count_star()) {
+    DCHECK(!row_batches_need_validation_);
+    template_tuple_ = template_tuple_map_[scan_node_->tuple_desc()];
+    return Status::OK();
   }
 
   // Update 'row_reader_options_' based on the tuple descriptor so the ORC lib can skip
@@ -779,10 +780,39 @@ Status HdfsOrcScanner::ProcessSplit() {
 }
 
 Status HdfsOrcScanner::GetNextInternal(RowBatch* row_batch) {
-  // In case 'row_batches_need_validation_' is true, we need to look at the row
-  // batches and check their validity. In that case 'currentTransaction' is the only
-  // selected field from the file (in case of zero slot scans).
-  if (scan_node_->IsZeroSlotTableScan() && !row_batches_need_validation_) {
+  if (scan_node_->optimize_count_star()) {
+    // There are no materialized slots, e.g. count(*) over the table.  We can serve
+    // this query from just the file metadata.  We don't need to read the column data.
+    // Only scanner of the footer split will run in this case. See the logic in
+    // HdfsScanner::IssueFooterRanges() and HdfsScanNodeBase::ReadsFileMetadataOnly().
+    DCHECK(!row_batches_need_validation_);
+    DCHECK(is_footer_scanner_);
+    uint64_t file_rows = reader_->getNumberOfRows();
+    DCHECK_LT(stripe_rows_read_, file_rows);
+    COUNTER_ADD(num_file_metadata_read_, 1);
+    int64_t tuple_buffer_size;
+    uint8_t* tuple_buffer;
+    int capacity = 1;
+    RETURN_IF_ERROR(row_batch->ResizeAndAllocateTupleBuffer(state_,
+        row_batch->tuple_data_pool(), row_batch->row_desc()->GetRowSize(), &capacity,
+        &tuple_buffer_size, &tuple_buffer));
+    Tuple* dst_tuple = reinterpret_cast<Tuple*>(tuple_buffer);
+    InitTuple(template_tuple_, dst_tuple);
+    int64_t* dst_slot = dst_tuple->GetBigIntSlot(scan_node_->count_star_slot_offset());
+    *dst_slot = file_rows;
+    TupleRow* dst_row = row_batch->GetRow(row_batch->AddRow());
+    dst_row->SetTuple(0, dst_tuple);
+    row_batch->CommitLastRow();
+    stripe_rows_read_ += file_rows;
+    COUNTER_ADD(scan_node_->rows_read_counter(), file_rows);
+    eos_ = true;
+    return Status::OK();
+  } else if (scan_node_->IsZeroSlotTableScan() && !row_batches_need_validation_) {
+    // In case 'row_batches_need_validation_' is true, we need to look at the row
+    // batches and check their validity. In that case 'currentTransaction' is the only
+    // selected field from the file (in case of zero slot scans).
+    // This block only handle case when 'row_batches_need_validation_' is false.
+    DCHECK(is_footer_scanner_);
     uint64_t file_rows = reader_->getNumberOfRows();
     // There are no materialized slots, e.g. count(*) over the table.  We can serve
     // this query from just the file metadata.  We don't need to read the column data.
@@ -790,6 +820,7 @@ Status HdfsOrcScanner::GetNextInternal(RowBatch* row_batch) {
       eos_ = true;
       return Status::OK();
     }
+    DCHECK_LT(stripe_rows_read_, file_rows);
     COUNTER_ADD(num_file_metadata_read_, 1);
     assemble_rows_timer_.Start();
     DCHECK_LT(stripe_rows_read_, file_rows);

@@ -1013,6 +1013,8 @@ Status HdfsScanner::IssueFooterRanges(HdfsScanNodeBase* scan_node,
 
     // Try to find the split with the footer.
     ScanRange* footer_split = FindFooterSplit(files[i]);
+    bool footer_scanner =
+        scan_node->IsZeroSlotTableScan() || scan_node->optimize_count_star();
 
     for (int j = 0; j < files[i]->splits.size(); ++j) {
       ScanRange* split = files[i]->splits[j];
@@ -1023,7 +1025,7 @@ Status HdfsScanner::IssueFooterRanges(HdfsScanNodeBase* scan_node,
       // groups. We only want a single node to process the file footer in this case,
       // which is the node with the footer split.  If it's not a count(*), we create a
       // footer range for the split always.
-      if (!scan_node->IsZeroSlotTableScan() || footer_split == split) {
+      if (!footer_scanner || footer_split == split) {
         ScanRangeMetadata* split_metadata =
             static_cast<ScanRangeMetadata*>(split->meta_data());
         // Each split is processed by first issuing a scan range for the file footer, which

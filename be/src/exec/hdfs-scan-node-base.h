@@ -463,10 +463,8 @@ class HdfsScanNodeBase : public ScanNode {
   const AvroSchemaElement& avro_schema() const { return avro_schema_; }
   int skip_header_line_count() const { return skip_header_line_count_; }
   io::RequestContext* reader_context() const { return reader_context_.get(); }
-  bool optimize_parquet_count_star() const {
-    return parquet_count_star_slot_offset_ != -1;
-  }
-  int parquet_count_star_slot_offset() const { return parquet_count_star_slot_offset_; }
+  bool optimize_count_star() const { return count_star_slot_offset_ != -1; }
+  int count_star_slot_offset() const { return count_star_slot_offset_; }
   bool is_partition_key_scan() const { return is_partition_key_scan_; }
 
   typedef std::unordered_map<TupleId, std::vector<ScalarExprEvaluator*>>
@@ -686,11 +684,11 @@ class HdfsScanNodeBase : public ScanNode {
   /// Tuple id of the tuple descriptor to be used.
   const int tuple_id_;
 
-  /// The byte offset of the slot for Parquet metadata if Parquet count star optimization
+  /// The byte offset of the slot for Parquet/ORC metadata if count star optimization
   /// is enabled. When set, this scan node can optimize a count(*) query by populating
   /// the tuple with data from the Parquet num rows statistic. See
-  /// applyParquetCountStartOptimization() in HdfsScanNode.java.
-  const int parquet_count_star_slot_offset_;
+  /// applyCountStarOptimization() in ScanNode.java.
+  const int count_star_slot_offset_;
 
   // True if this is a partition key scan that needs only to return at least one row from
   // each scan range. If true, the scan node and scanner implementations should attempt

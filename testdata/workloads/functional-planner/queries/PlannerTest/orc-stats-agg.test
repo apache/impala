@@ -1,0 +1,439 @@
+# Verify that that the ORC count(*) optimization is applied in all count(*) or
+# count(<literal>) cases when scanning a ORC table. In the last case, we are scanning
+# a text table, so the optimization is not applied. The optimization is observed when
+# the cardinality of the ORC scan (24) is the same as # the # of files (24).
+select count(*) from functional_orc_def.uncomp_src_alltypes
+union all
+select count(1) from functional_orc_def.uncomp_src_alltypes
+union all
+select count(123) from functional_orc_def.uncomp_src_alltypes
+union all
+select count(*) from functional.alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  pass-through-operands: all
+|  row-size=8B cardinality=4
+|
+|--08:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  07:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=0B cardinality=7.30K
+|
+|--06:AGGREGATE [FINALIZE]
+|  |  output: sum_init_zero(functional_orc_def.uncomp_src_alltypes.stats: num_rows)
+|  |  row-size=8B cardinality=1
+|  |
+|  05:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+|     HDFS partitions=24/24 files=24 size=205.47KB
+|     row-size=4B cardinality=24
+|
+|--04:AGGREGATE [FINALIZE]
+|  |  output: sum_init_zero(functional_orc_def.uncomp_src_alltypes.stats: num_rows)
+|  |  row-size=8B cardinality=1
+|  |
+|  03:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+|     HDFS partitions=24/24 files=24 size=205.47KB
+|     row-size=4B cardinality=24
+|
+02:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(functional_orc_def.uncomp_src_alltypes.stats: num_rows)
+|  row-size=8B cardinality=1
+|
+01:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+   HDFS partitions=24/24 files=24 size=205.47KB
+   row-size=4B cardinality=24
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  pass-through-operands: all
+|  row-size=8B cardinality=4
+|
+|--16:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  15:EXCHANGE [UNPARTITIONED]
+|  |
+|  08:AGGREGATE
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  07:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=0B cardinality=7.30K
+|
+|--14:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  13:EXCHANGE [UNPARTITIONED]
+|  |
+|  06:AGGREGATE
+|  |  output: sum_init_zero(functional_orc_def.uncomp_src_alltypes.stats: num_rows)
+|  |  row-size=8B cardinality=1
+|  |
+|  05:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+|     HDFS partitions=24/24 files=24 size=205.47KB
+|     row-size=4B cardinality=24
+|
+|--12:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  11:EXCHANGE [UNPARTITIONED]
+|  |
+|  04:AGGREGATE
+|  |  output: sum_init_zero(functional_orc_def.uncomp_src_alltypes.stats: num_rows)
+|  |  row-size=8B cardinality=1
+|  |
+|  03:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+|     HDFS partitions=24/24 files=24 size=205.47KB
+|     row-size=4B cardinality=24
+|
+10:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+09:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  output: sum_init_zero(functional_orc_def.uncomp_src_alltypes.stats: num_rows)
+|  row-size=8B cardinality=1
+|
+01:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+   HDFS partitions=24/24 files=24 size=205.47KB
+   row-size=4B cardinality=24
+====
+# Verify that the ORC count(*) optimization is applied even if there is more than
+# one item in the select list.
+select count(*), count(1), count(123) from functional_orc_def.uncomp_src_alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(functional_orc_def.uncomp_src_alltypes.stats: num_rows)
+|  row-size=8B cardinality=1
+|
+00:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+   HDFS partitions=24/24 files=24 size=205.47KB
+   row-size=4B cardinality=24
+====
+# Select count(<partition col>) - the optimization is disabled because it's not a
+# count(<literal>) or count(*) aggregate function.
+select count(year) from functional_orc_def.uncomp_src_alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(`year`)
+|  row-size=8B cardinality=1
+|
+00:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+   HDFS partitions=24/24 files=24 size=205.47KB
+   row-size=4B cardinality=13.07K
+====
+# Group by partition columns.
+select month, count(*) from functional_orc_def.uncomp_src_alltypes group by month, year
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(functional_orc_def.uncomp_src_alltypes.stats: num_rows)
+|  group by: `month`, `year`
+|  row-size=16B cardinality=24
+|
+00:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+   HDFS partitions=24/24 files=24 size=205.47KB
+   row-size=16B cardinality=24
+====
+# The optimization is disabled because tinyint_col is not a partition col.
+select tinyint_col, count(*) from functional_orc_def.uncomp_src_alltypes group by tinyint_col, year
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: tinyint_col, `year`
+|  row-size=13B cardinality=13.07K
+|
+00:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+   HDFS partitions=24/24 files=24 size=205.47KB
+   row-size=5B cardinality=13.07K
+====
+# The optimization is disabled because it can not be applied to the 1st aggregate
+# function.
+select avg(year), count(*) from functional_orc_def.uncomp_src_alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: avg(`year`), count(*)
+|  row-size=16B cardinality=1
+|
+00:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+   HDFS partitions=24/24 files=24 size=205.47KB
+   row-size=4B cardinality=13.07K
+====
+# Optimization is not applied because the inner count(*) is not materialized. The outer
+# count(*) does not reference a base table.
+select count(*) from (select count(*) from functional_orc_def.uncomp_src_alltypes) t
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+01:AGGREGATE [FINALIZE]
+|  row-size=0B cardinality=1
+|
+00:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+   HDFS partitions=24/24 files=24 size=205.47KB
+   partition key scan
+   row-size=0B cardinality=24
+====
+# The optimization is applied if count(*) is in the having clause.
+select 1 from functional_orc_def.uncomp_src_alltypes having count(*) > 1
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(functional_orc_def.uncomp_src_alltypes.stats: num_rows)
+|  having: count(*) > 1
+|  row-size=8B cardinality=0
+|
+00:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+   HDFS partitions=24/24 files=24 size=205.47KB
+   row-size=4B cardinality=24
+====
+# The count(*) optimization is applied in the inline view.
+select count(*), count(a) from (select count(1) as a from functional_orc_def.uncomp_src_alltypes) t
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(*), count(count(*))
+|  row-size=16B cardinality=1
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(functional_orc_def.uncomp_src_alltypes.stats: num_rows)
+|  row-size=8B cardinality=1
+|
+00:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+   HDFS partitions=24/24 files=24 size=205.47KB
+   row-size=4B cardinality=24
+====
+# The count(*) optimization is applied to the inline view even if there is a join.
+select *
+from functional.alltypes x inner join (
+  select count(1) as a from functional_orc_def.uncomp_src_alltypes group by year
+) t on x.id = t.a;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: x.id = count(*)
+|  runtime filters: RF000 <- count(*)
+|  row-size=101B cardinality=2
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: sum_init_zero(functional_orc_def.uncomp_src_alltypes.stats: num_rows)
+|  |  group by: `year`
+|  |  row-size=12B cardinality=2
+|  |
+|  01:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+|     HDFS partitions=24/24 files=24 size=205.47KB
+|     row-size=12B cardinality=24
+|
+00:SCAN HDFS [functional.alltypes x]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> x.id
+   row-size=89B cardinality=7.30K
+====
+# The count(*) optimization is not applied if there is more than 1 table ref.
+select count(*) from functional_orc_def.uncomp_src_alltypes a, functional_orc_def.uncomp_src_alltypes b
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=0B cardinality=170.85M
+|
+|--01:SCAN HDFS [functional_orc_def.uncomp_src_alltypes b]
+|     HDFS partitions=24/24 files=24 size=205.47KB
+|     row-size=0B cardinality=13.07K
+|
+00:SCAN HDFS [functional_orc_def.uncomp_src_alltypes a]
+   HDFS partitions=24/24 files=24 size=205.47KB
+   row-size=0B cardinality=13.07K
+====
+# The count(*) optimization is applied if all predicates are on partition columns only.
+select count(1) from functional_orc_def.uncomp_src_alltypes where year < 2010 and month > 8;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(functional_orc_def.uncomp_src_alltypes.stats: num_rows)
+|  row-size=8B cardinality=1
+|
+00:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+   partition predicates: `year` < 2010, `month` > 8
+   HDFS partitions=4/24 files=4 size=33.53KB
+   row-size=8B cardinality=4
+====
+# tinyint_col is not a partition column so the optimization is disabled.
+select count(1) from functional_orc_def.uncomp_src_alltypes where year < 2010 and tinyint_col > 8;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+00:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+   partition predicates: `year` < 2010
+   HDFS partitions=12/24 files=12 size=102.74KB
+   predicates: tinyint_col > 8
+   row-size=1B cardinality=654
+====
+# Optimization is applied after constant folding.
+select count(1 + 2 + 3) from functional_orc_def.uncomp_src_alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(functional_orc_def.uncomp_src_alltypes.stats: num_rows)
+|  row-size=8B cardinality=1
+|
+00:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+   HDFS partitions=24/24 files=24 size=205.47KB
+   row-size=4B cardinality=24
+====
+# Optimization is not applied to count(null).
+select count(1 + null + 3) from functional_orc_def.uncomp_src_alltypes
+union all
+select count(null) from functional_orc_def.uncomp_src_alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  pass-through-operands: all
+|  row-size=8B cardinality=2
+|
+|--04:AGGREGATE [FINALIZE]
+|  |  output: count(NULL)
+|  |  row-size=8B cardinality=1
+|  |
+|  03:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+|     HDFS partitions=24/24 files=24 size=205.47KB
+|     row-size=0B cardinality=13.07K
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(NULL + 3)
+|  row-size=8B cardinality=1
+|
+01:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+   HDFS partitions=24/24 files=24 size=205.47KB
+   row-size=0B cardinality=13.07K
+====
+# Optimization is not applied when selecting from an empty table.
+select count(*) from functional_orc_def.emptytable
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=0
+|
+00:SCAN HDFS [functional_orc_def.emptytable]
+   partitions=0/0 files=0 size=0B
+   row-size=0B cardinality=0
+====
+# Optimization is not applied when all partitions are pruned.
+select count(1) from functional_orc_def.uncomp_src_alltypes where year = -1
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=0
+|
+00:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+   partition predicates: `year` = -1
+   partitions=0/24 files=0 size=0B
+   row-size=0B cardinality=0
+====
+# Optimization is not applied across query blocks, even though it would be correct here.
+select count(*) from (select int_col from functional_orc_def.uncomp_src_alltypes) t
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+00:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+   HDFS partitions=24/24 files=24 size=205.47KB
+   row-size=0B cardinality=13.07K
+====
+# In general, optimization is not applied when there is a distinct agg.
+select count(*), count(distinct 1) from functional_orc_def.uncomp_src_alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(1), count:merge(*)
+|  row-size=16B cardinality=1
+|
+01:AGGREGATE
+|  output: count(*)
+|  group by: 1
+|  row-size=9B cardinality=1
+|
+00:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+   HDFS partitions=24/24 files=24 size=205.47KB
+   row-size=0B cardinality=13.07K
+====
+# The optimization is applied here because only the count(*) and a partition column are
+# materialized. Non-materialized agg exprs are ignored.
+select year, cnt from (
+  select year, count(bigint_col), count(*) cnt, avg(int_col)
+  from functional_orc_def.uncomp_src_alltypes
+  where month=1
+  group by year
+) t
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(functional_orc_def.uncomp_src_alltypes.stats: num_rows)
+|  group by: `year`
+|  row-size=12B cardinality=2
+|
+00:SCAN HDFS [functional_orc_def.uncomp_src_alltypes]
+   partition predicates: `month` = 1
+   HDFS partitions=2/24 files=2 size=17.07KB
+   row-size=12B cardinality=2
+====
+# Optimization is not applied when selecting from a full acid table.
+select count(*) from functional_orc_def.complextypestbl
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=0
+|
+00:SCAN HDFS [functional_orc_def.complextypestbl]
+   HDFS partitions=1/1 files=2 size=4.04KB
+   row-size=0B cardinality=2.57K
+====

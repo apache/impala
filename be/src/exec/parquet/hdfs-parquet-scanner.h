@@ -50,7 +50,6 @@ class ParquetColumnReader;
 class ParquetPageReader;
 template<typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
 class ScalarColumnReader;
-class BoolColumnReader;
 
 /// This scanner parses Parquet files located in HDFS, and writes the content as tuples in
 /// the Impala in-memory representation of data, e.g.  (tuples, rows, row batches).
@@ -400,7 +399,6 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   friend class BaseScalarColumnReader;
   template<typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
   friend class ScalarColumnReader;
-  friend class BoolColumnReader;
   friend class HdfsParquetScannerTest;
   friend class ParquetPageIndex;
   friend class ParquetColumnChunkReader;

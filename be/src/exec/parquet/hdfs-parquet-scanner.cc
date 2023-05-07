@@ -383,7 +383,7 @@ static bool CheckRowGroupOverlapsSplit(const parquet::RowGroup& row_group,
 
 int HdfsParquetScanner::CountScalarColumns(
     const vector<ParquetColumnReader*>& column_readers) {
-  DCHECK(!column_readers.empty() || scan_node_->optimize_parquet_count_star());
+  DCHECK(!column_readers.empty() || scan_node_->optimize_count_star());
   int num_columns = 0;
   stack<ParquetColumnReader*> readers;
   for (ParquetColumnReader* r: column_readers_) readers.push(r);
@@ -433,7 +433,8 @@ Status HdfsParquetScanner::ProcessSplit() {
 
 Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
   DCHECK(parse_status_.ok()) << parse_status_.GetDetail();
-  if (scan_node_->optimize_parquet_count_star()) {
+  if (scan_node_->optimize_count_star()) {
+    // This is an optimized count(*) case.
     // Populate the single slot with the Parquet num rows statistic.
     DCHECK(is_footer_scanner_);
     int64_t tuple_buf_size;
@@ -447,8 +448,7 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
       Tuple* dst_tuple = reinterpret_cast<Tuple*>(tuple_buf);
       TupleRow* dst_row = row_batch->GetRow(row_batch->AddRow());
       InitTuple(template_tuple_, dst_tuple);
-      int64_t* dst_slot =
-          dst_tuple->GetBigIntSlot(scan_node_->parquet_count_star_slot_offset());
+      int64_t* dst_slot = dst_tuple->GetBigIntSlot(scan_node_->count_star_slot_offset());
       *dst_slot = 0;
       for (const auto &row_group : file_metadata_.row_groups) {
         *dst_slot += row_group.num_rows;
@@ -460,6 +460,7 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
     eos_ = true;
     return Status::OK();
   } else if (scan_node_->IsZeroSlotTableScan()) {
+    DCHECK(is_footer_scanner_);
     // There are no materialized slots and we are not optimizing count(*), e.g.
     // "select 1 from alltypes". We can serve this query from just the file metadata.
     // We don't need to read the column data.
@@ -2836,7 +2837,7 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
   DCHECK(column_readers != nullptr);
   DCHECK(column_readers->empty());
 
-  if (scan_node_->optimize_parquet_count_star()) {
+  if (scan_node_->optimize_count_star()) {
     // Column readers are not needed because we are not reading from any columns if this
     // optimization is enabled.
     return Status::OK();

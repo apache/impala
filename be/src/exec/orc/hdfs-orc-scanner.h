@@ -195,7 +195,6 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   friend class OrcStructReader;
   friend class OrcListReader;
   friend class OrcMapReader;
-  friend class HdfsOrcScannerTest;
 
   /// Memory guard of the tuple_mem_
   uint8_t* tuple_mem_end_ = nullptr;
