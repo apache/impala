@@ -486,6 +486,8 @@ class TestObservability(CustomClusterTestSuite):
       cache_miss_rate_metric_key = "catalog.cache.miss-rate"
       cache_hit_count_metric_key = "catalog.cache.hit-count"
       cache_request_count_metric_key = "catalog.cache.request-count"
+      cache_entry_median_size_key = "catalog.cache.entry-median-size"
+      cache_entry_99th_size_key = "catalog.cache.entry-99th-size"
       cache_request_count_prev_run = 0
       cache_hit_count_prev_run = 0
       test_table_name = "%s.test_cache_metrics_test_tbl" % unique_database
@@ -512,6 +514,12 @@ class TestObservability(CustomClusterTestSuite):
           assert cache_request_count > cache_request_count_prev_run,\
              "%s not updated betweeen two query runs, query - %s"\
              % (cache_request_count_metric_key, query)
+
+          cache_entry_median_size = cache_metrics[cache_entry_median_size_key]
+          cache_entry_99th_size = cache_metrics[cache_entry_99th_size_key]
+          assert cache_entry_median_size > 300 and cache_entry_median_size < 1000
+          assert cache_entry_99th_size > 12500 and cache_entry_99th_size < 18000
+
           cache_hit_count_prev_run = cache_hit_count
           cache_request_count_prev_run = cache_request_count
     finally:

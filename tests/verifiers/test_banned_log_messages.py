@@ -22,7 +22,6 @@ import os
 import subprocess
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfDockerizedCluster
 
 
 class TestBannedLogMessages(ImpalaTestSuite):
@@ -31,13 +30,17 @@ class TestBannedLogMessages(ImpalaTestSuite):
   This test suite should be run after all the tests have been run.
   """
 
-  @SkipIfDockerizedCluster.daemon_logs_not_exposed
-  def test_no_inaccessible_objects(self):
-    """Test that cluster logs do not contain InaccessibleObjectException"""
-    log_dir = os.environ["IMPALA_LOGS_DIR"]
-    message = 'InaccessibleObjectException'
+  def assert_message_absent(self, message, log_dir=os.environ["IMPALA_LOGS_DIR"]):
     for root, _, files in os.walk(log_dir):
       for file in files:
         log_file_path = os.path.join(root, file)
         returncode = subprocess.call(['grep', message, log_file_path])
         assert returncode == 1, "%s contains '%s'" % (log_file_path, message)
+
+  def test_no_inaccessible_objects(self):
+    """Test that cluster logs do not contain InaccessibleObjectException"""
+    self.assert_message_absent('InaccessibleObjectException')
+
+  def test_no_unsupported_operations(self):
+    """Test that cluster logs do not contain jamm.CannotAccessFieldException"""
+    self.assert_message_absent('CannotAccessFieldException')

@@ -51,6 +51,7 @@ import org.apache.impala.util.MetaStoreUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.codahale.metrics.Snapshot;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheStats;
@@ -418,6 +419,10 @@ public abstract class FeCatalogUtils {
     metrics.setCache_hit_rate(stats.hitRate());
     metrics.setCache_load_exception_rate(stats.loadExceptionRate());
     metrics.setCache_miss_rate(stats.missRate());
+
+    Snapshot cacheEntrySize = ((CatalogdMetaProvider) provider).getCacheEntrySize();
+    metrics.setCache_entry_median_size(cacheEntrySize.getMedian());
+    metrics.setCache_entry_99th_size(cacheEntrySize.get99thPercentile());
   }
 
 

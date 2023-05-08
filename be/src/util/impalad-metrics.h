@@ -218,6 +218,12 @@ class ImpaladMetricKeys {
   /// Total time spent in Impalad Catalog cache loading new values.
   static const char* CATALOG_CACHE_TOTAL_LOAD_TIME;
 
+  /// Median size of Impalad Catalog cache entries.
+  static const char* CATALOG_CACHE_ENTRY_MEDIAN_SIZE;
+
+  /// 99th percentile size of Impalad Catalog cache entries.
+  static const char* CATALOG_CACHE_ENTRY_99TH_SIZE;
+
   /// Number of files open for insert
   static const char* NUM_FILES_OPEN_FOR_INSERT;
 
@@ -320,6 +326,8 @@ class ImpaladMetrics {
   static DoubleGauge* CATALOG_CACHE_HIT_RATE;
   static DoubleGauge* CATALOG_CACHE_LOAD_EXCEPTION_RATE;
   static DoubleGauge* CATALOG_CACHE_MISS_RATE;
+  static DoubleGauge* CATALOG_CACHE_ENTRY_MEDIAN_SIZE;
+  static DoubleGauge* CATALOG_CACHE_ENTRY_99TH_SIZE;
   static IntGauge* IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS;
   static IntGauge* IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS;
   static MetricGroup* IO_MGR_METRICS;

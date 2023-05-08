@@ -26,6 +26,8 @@ set -euo pipefail
 . "${IMPALA_HOME}/bin/set-classpath.sh"
 . "${IMPALA_HOME}/bin/set-ld-library-path.sh"
 
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:$(dirname ${LIB_JVM})"
+
 # LLVM must be on path to symbolise sanitiser stack traces.
 export PATH="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-${IMPALA_LLVM_VERSION}/bin:${PATH}"
 exec "$@"

@@ -121,6 +121,59 @@ TEST(FilesystemUtil, Paths) {
   EXPECT_EQ(string("def"), relpath);
 }
 
+TEST(FilesystemUtil, FindFileInPath) {
+  path dir = filesystem::unique_path();
+
+  // Paths to existent and non-existent dirs.
+  path subdir1 = dir / "impala1";
+  path subdir2 = dir / "impala2";
+  filesystem::create_directories(subdir1);
+
+  // Paths to existent and non-existent file.
+  path file1 = dir / "a_file1";
+  path file2 = dir / "a_file2";
+  ASSERT_OK(FileSystemUtil::CreateFile(file1.string()));
+
+  path file3 = subdir1 / "a_file3";
+  ASSERT_OK(FileSystemUtil::CreateFile(file3.string()));
+
+  string path = FileSystemUtil::FindFileInPath(dir.string(), "a.*1");
+  EXPECT_EQ(file1.string(), path);
+  path = FileSystemUtil::FindFileInPath(dir.string(), "a.*2");
+  EXPECT_EQ("", path);
+  path = FileSystemUtil::FindFileInPath(dir.string(), "a.*3");
+  EXPECT_EQ("", path);
+  path = FileSystemUtil::FindFileInPath(dir.string(), "");
+  EXPECT_EQ("", path);
+
+  path = FileSystemUtil::FindFileInPath(dir.string() + "/*", "a_file1");
+  EXPECT_EQ(file1.string(), path);
+  path = FileSystemUtil::FindFileInPath(dir.string(), "a_file2");
+  EXPECT_EQ("", path);
+
+  path = FileSystemUtil::FindFileInPath(dir.string(), "impala1");
+  EXPECT_EQ(subdir1.string(), path);
+  path = FileSystemUtil::FindFileInPath(dir.string(), "impala2");
+  EXPECT_EQ("", path);
+
+  path = FileSystemUtil::FindFileInPath(subdir1.string(), "a.*3");
+  EXPECT_EQ(file3.string(), path);
+  path = FileSystemUtil::FindFileInPath(subdir1.string(), "anything");
+  EXPECT_EQ("", path);
+  path = FileSystemUtil::FindFileInPath(subdir2.string(), ".*");
+  EXPECT_EQ("", path);
+
+  path = FileSystemUtil::FindFileInPath(file1.string(), "a.*1");
+  EXPECT_EQ(file1.string(), path);
+  path = FileSystemUtil::FindFileInPath(file1.string(), "a.*2");
+  EXPECT_EQ("", path);
+  path = FileSystemUtil::FindFileInPath(file2.string(), "a.*2");
+  EXPECT_EQ("", path);
+
+  // Cleanup
+  filesystem::remove_all(dir);
+}
+
 // This test exercises the handling of different directory entry types by GetEntryNames().
 TEST(FilesystemUtil, DirEntryTypes) {
   // Setup a temporary directory with one subdir

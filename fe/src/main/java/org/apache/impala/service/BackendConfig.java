@@ -411,4 +411,8 @@ public class BackendConfig {
   public float getScanRangeCostFactor() {
     return (float) backendCfg_.scan_range_cost_factor;
   }
+
+  public boolean useJammWeigher() {
+    return backendCfg_.use_jamm_weigher;
+  }
 }

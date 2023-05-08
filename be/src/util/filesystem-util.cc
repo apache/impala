@@ -29,6 +29,7 @@
 #include <string>
 #include <vector>
 
+#include <boost/algorithm/string/trim.hpp>
 #include <boost/filesystem.hpp>
 
 #include "common/status.h"
@@ -261,6 +262,25 @@ bool FileSystemUtil::GetRelativePath(const string& path, const string& start,
     return true;
   }
   return false;
+}
+
+std::string FileSystemUtil::FindFileInPath(string path, const std::string& regex) {
+  // Wildcard at the end matches any file, so trim and treat as a directory.
+  boost::algorithm::trim_right_if(path, boost::algorithm::is_any_of("*"));
+  if (path.empty()) return "";
+  if (!filesystem::exists(path)) return "";
+  std::regex pattern{regex};
+  if (filesystem::is_directory(path)) {
+    for (filesystem::directory_entry& child : filesystem::directory_iterator(path)) {
+      // If child matches pattern, use it
+      if (std::regex_match(child.path().filename().string(), pattern)) {
+        return child.path().string();
+      }
+    }
+  } else if (std::regex_match(filesystem::path(path).filename().string(), pattern)) {
+    return path;
+  }
+  return "";
 }
 
 FileSystemUtil::Directory::Directory(const string& path)

@@ -52,28 +52,28 @@ fi
 
 # Need libjvm.so and libjsig.so on LD_LIBRARY_PATH
 # Ubuntu and Redhat use different locations for JAVA_HOME.
-# This detection logic handles both Java 8 and Java 11.
-# If both are present (which shouldn't happen), Java 11 is preferred.
+# This detection logic handles Java 8, 11, and 17. Prefers the newest version.
 JAVA_HOME=Unknown
 if [[ $DISTRIBUTION == Ubuntu ]]; then
   # Since the Java location includes the CPU architecture, use a glob
   # to find Java home
-  if compgen -G "/usr/lib/jvm/java-11-openjdk*" ; then
+  if compgen -G "/usr/lib/jvm/java-17-openjdk*" ; then
+    echo "Detected Java 17"
+    JAVA_HOME=$(compgen -G "/usr/lib/jvm/java-17-openjdk*")
+  elif compgen -G "/usr/lib/jvm/java-11-openjdk*" ; then
+    echo "Detected Java 11"
     JAVA_HOME=$(compgen -G "/usr/lib/jvm/java-11-openjdk*")
-    if compgen -G "/usr/lib/jvm/java-8-openjdk*" ; then
-      echo "WARNING: Java 8 is also present"
-    fi
   elif compgen -G "/usr/lib/jvm/java-8-openjdk*" ; then
     echo "Detected Java 8"
     JAVA_HOME=$(compgen -G "/usr/lib/jvm/java-8-openjdk*")
   fi
 elif [[ $DISTRIBUTION == Redhat ]]; then
-  if [[ -d /usr/lib/jvm/jre-11 ]]; then
+  if [[ -d /usr/lib/jvm/jre-17 ]]; then
+    echo "Detected Java 17"
+    JAVA_HOME=/usr/lib/jvm/jre-17
+  elif [[ -d /usr/lib/jvm/jre-11 ]]; then
     echo "Detected Java 11"
     JAVA_HOME=/usr/lib/jvm/jre-11
-    if [[ -d /usr/lib/jvm/jre-1.8.0 ]]; then
-      echo "WARNING: Java 8 is also present"
-    fi
   elif [[ -d /usr/lib/jvm/jre-1.8.0 ]]; then
     echo "Detected Java 8"
     JAVA_HOME=/usr/lib/jvm/jre-1.8.0
@@ -82,7 +82,7 @@ fi
 
 if [[ $JAVA_HOME == Unknown ]]; then
   echo "ERROR: Did not find Java in any expected location."
-  echo "Only Java 8 and Java 11 are supported."
+  echo "Only Java 8, 11, and 17 are supported."
   exit 1
 fi
 

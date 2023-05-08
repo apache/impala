@@ -21,12 +21,9 @@ IMPALA_JDK_VERSION=${IMPALA_JDK_VERSION:-system}
 if [[ "${IMPALA_JDK_VERSION}" == "system" || "${IMPALA_JDK_VERSION}" == "8" ]]; then
   UBUNTU_JAVA_VERSION=8
   REDHAT_JAVA_VERSION=1.8.0
-elif [[ "${IMPALA_JDK_VERSION}" == "11" ]]; then
-  UBUNTU_JAVA_VERSION=11
-  REDHAT_JAVA_VERSION=11
 else
-  echo "Unknown value for IMPALA_JDK_VERSION=${IMPALA_JDK_VERSION}"
-  exit 1
+  UBUNTU_JAVA_VERSION="${IMPALA_JDK_VERSION}"
+  REDHAT_JAVA_VERSION="${IMPALA_JDK_VERSION}"
 fi
 
 if [[ "$(uname -p)" == 'aarch64' ]]; then

@@ -88,6 +88,15 @@ class FileSystemUtil {
   static bool GetRelativePath(const std::string& path, const std::string& start,
       std::string* relpath);
 
+  /// Finds the first file matching the supplied 'regex' in 'path', or returns empty
+  /// string; matches the behavior of paths specified in Java CLASSPATH for JARs.
+  /// If 'path' is a file, returns 'path' if 'regex' matches its filename.
+  /// If 'path' is a directory, returns the absolute path for a match if 'regex' matches
+  /// any files in that directory.
+  /// If 'path' ends with a wildcard - as in "/lib/*" - it will treat path as a directory
+  /// excluding the wildcard.
+  static std::string FindFileInPath(string path, const std::string& regex);
+
   /// Ext filesystem on certain kernel versions may result in inconsistent metadata after
   /// punching holes in files. The filesystem may require fsck repair on next reboot.
   /// See KUDU-1508 for details. This function checks if the filesystem at 'path' resides

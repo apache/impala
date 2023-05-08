@@ -243,9 +243,14 @@ do
     # Requires a running impalad cluster because some tests (such as DataErrorTest and
     # JdbcTest) queries against an impala cluster.
     pushd "${IMPALA_FE_DIR}"
+
+    # Add Jamm as javaagent for CatalogdMetaProviderTest.testWeights
+    JAMM_JAR=$(compgen -G ${IMPALA_HOME}/fe/target/dependency/jamm-*.jar)
+    export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS-} -javaagent:${JAMM_JAR}"
+
     if $JAVA -version 2>&1 | grep -q -E ' version "(9|[1-9][0-9])\.'; then
       # If running with Java 9+, add-opens to JAVA_TOOL_OPTIONS for
-      # CatalogdMetaProviderTest.testWeights
+      # CatalogdMetaProviderTest.testWeights with ehcache.sizeof.
       JAVA_OPTIONS=" --add-opens=java.base/java.io=ALL-UNNAMED"
       JAVA_OPTIONS+=" --add-opens=java.base/java.lang.module=ALL-UNNAMED"
       JAVA_OPTIONS+=" --add-opens=java.base/java.lang.ref=ALL-UNNAMED"

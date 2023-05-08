@@ -2918,6 +2918,26 @@
     "key": "catalog.cache.total-load-time"
   },
   {
+    "description": "Median size of entries added to the Impalad Catalog cache.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impalad catalog cache entry median size",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "catalog.cache.entry-median-size"
+  },
+  {
+    "description": "99th percentile size of entries added to the Impalad Catalog.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impalad catalog cache entry 99th percentile size",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "catalog.cache.entry-99th-size"
+  },
+  {
     "description": "RPC queue length for partial object fetches.",
     "contexts": [
       "CATALOGSERVER"

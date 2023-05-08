@@ -19,6 +19,18 @@ add_custom_target(validate_java_pom_versions ALL
   COMMAND $ENV{IMPALA_HOME}/bin/validate-java-pom-versions.sh
 )
 
-add_custom_target(java ALL DEPENDS gen-deps function-registry geospatial-udf-wrappers validate_java_pom_versions
+include(ExternalProject)
+ExternalProject_Add(jamm
+  GIT_REPOSITORY    https://github.com/jbellis/jamm
+  # 0.4.0 RC. A release is expected soon: https://github.com/jbellis/jamm/issues/44
+  GIT_TAG           49c3e691c43a39ddaccaf19839ef316807009377
+  PATCH_COMMAND     sed -i.bak s/0.4.0-SNAPSHOT/0.4.0-IMPALA/ pom.xml
+  CONFIGURE_COMMAND sed s:JAVA_HOME:$ENV{JAVA_HOME}:g ${CMAKE_CURRENT_SOURCE_DIR}/toolchains.xml.tmpl > toolchains.xml
+  BUILD_IN_SOURCE   true
+  BUILD_COMMAND     mvn --toolchains toolchains.xml install -Dmaven.test.skip=true -DskipTests
+  INSTALL_COMMAND   ""
+)
+
+add_custom_target(java ALL DEPENDS gen-deps function-registry geospatial-udf-wrappers validate_java_pom_versions jamm
   COMMAND $ENV{IMPALA_HOME}/bin/mvn-quiet.sh -B install -DskipTests
 )

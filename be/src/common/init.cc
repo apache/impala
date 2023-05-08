@@ -45,6 +45,7 @@
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
+#include "util/filesystem-util.h"
 #include "util/jni-util.h"
 #include "util/logging-support.h"
 #include "util/mem-info.h"
@@ -66,6 +67,7 @@
 #include "common/names.h"
 
 using namespace impala;
+namespace filesystem = boost::filesystem;
 
 DECLARE_bool(enable_process_lifetime_heap_profiling);
 DECLARE_string(heap_profile_dir);
@@ -100,6 +102,11 @@ DEFINE_string(local_library_dir, "/tmp",
 DEFINE_bool(jvm_automatic_add_opens, true,
     "Adds necessary --add-opens options for core Java modules necessary to correctly "
     "calculate catalog metadata cache object sizes.");
+
+DEFINE_string_hidden(java_weigher, "auto",
+    "Choose between 'jamm' (com.github.jbellis:jamm) and 'sizeof' (org.ehcache:sizeof) "
+    "weighers for determining catalog metadata cache entry size. 'auto' uses 'sizeof' "
+    "for Java 8 - 11, and 'jamm' for Java 15+.");
 
 // Defined by glog. This allows users to specify the log level using a glob. For
 // example -vmodule=*scanner*=3 would enable full logging for scanners. If redaction
@@ -304,24 +311,21 @@ void BlockImpalaShutdownSignal() {
   AbortIfError(pthread_sigmask(SIG_BLOCK, &signals, nullptr), error_msg);
 }
 
-// Append add-opens args to JAVA_TOOL_OPTIONS for ehcache.
-static Status JavaAddOpens() {
-  if (!FLAGS_jvm_automatic_add_opens) return Status::OK();
-
-  // Unknown flags in JAVA_TOOL_OPTIONS causes Java to ignore everything, so only include
-  // --add-opens for Java 9+. Uses JAVA_HOME if set, otherwise relies on PATH.
+// Returns Java major version, such as 8, 11, or 17.
+static int GetJavaMajorVersion() {
   string cmd = "java";
   const char* java_home = getenv("JAVA_HOME");
   if (java_home != NULL) {
-    cmd = (boost::filesystem::path(java_home) / "bin" / "java").string();
+    cmd = (filesystem::path(java_home) / "bin" / "java").string();
   }
   cmd += " -version 2>&1";
   string msg;
   if (!RunShellProcess(cmd, &msg, false, {"JAVA_TOOL_OPTIONS"})) {
-    return Status(msg);
+    LOG(INFO) << Substitute("Unable to determine Java version (default to 8): $0", msg);
+    return 8;
   }
 
-  // Find a version string in the first line. Return if major version isn't 9+.
+  // Find a version string in the first line.
   string first_line;
   std::getline(istringstream(msg), first_line);
   // Need to allow for a wide variety of formats for different JDK implementations.
@@ -329,10 +333,41 @@ static Status JavaAddOpens() {
   std::regex java_version_pattern("\"([0-9]{1,3})\\.[0-9]+\\.[0-9]+[^\"]*\"");
   std::smatch matches;
   if (!std::regex_search(first_line, matches, java_version_pattern)) {
-    return Status(Substitute("Could not determine Java version: $0", msg));
+    LOG(INFO) << Substitute("Unable to determine Java version (default to 8): $0", msg);
+    return 8;
   }
   DCHECK_EQ(matches.size(), 2);
-  if (std::stoi(matches.str(1)) < 9) return Status::OK();
+  return std::stoi(matches.str(1));
+}
+
+// Append the javaagent arg to JAVA_TOOL_OPTIONS to load jamm.
+static Status JavaAddJammAgent() {
+  stringstream val_out;
+  char* current_val_c = getenv("JAVA_TOOL_OPTIONS");
+  if (current_val_c != NULL) {
+    val_out << current_val_c << " ";
+  }
+
+  istringstream classpath {getenv("CLASSPATH")};
+  string jamm_path, test_path;
+  while (getline(classpath, test_path, ':')) {
+    jamm_path = FileSystemUtil::FindFileInPath(test_path, "jamm-.*.jar");
+    if (!jamm_path.empty()) break;
+  }
+  if (jamm_path.empty()) {
+    return Status("Could not find jamm-*.jar in Java CLASSPATH");
+  }
+  val_out << "-javaagent:" << jamm_path;
+
+  if (setenv("JAVA_TOOL_OPTIONS", val_out.str().c_str(), 1) < 0) {
+    return Status(Substitute("Could not update JAVA_TOOL_OPTIONS: $0", GetStrErrMsg()));
+  }
+  return Status::OK();
+}
+
+// Append add-opens args to JAVA_TOOL_OPTIONS for ehcache and jamm.
+static Status JavaAddOpens(bool useSizeOf) {
+  if (!FLAGS_jvm_automatic_add_opens) return Status::OK();
 
   stringstream val_out;
   char* current_val_c = getenv("JAVA_TOOL_OPTIONS");
@@ -341,41 +376,74 @@ static Status JavaAddOpens() {
   }
 
   for (const string& param : {
-    "--add-opens=java.base/java.io=ALL-UNNAMED",
-    "--add-opens=java.base/java.lang.module=ALL-UNNAMED",
-    "--add-opens=java.base/java.lang.ref=ALL-UNNAMED",
-    "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
+    // Needed for jamm and ehcache
     "--add-opens=java.base/java.lang=ALL-UNNAMED",
-    "--add-opens=java.base/java.net=ALL-UNNAMED",
-    "--add-opens=java.base/java.nio.charset=ALL-UNNAMED",
-    "--add-opens=java.base/java.nio.file.attribute=ALL-UNNAMED",
     "--add-opens=java.base/java.nio=ALL-UNNAMED",
-    "--add-opens=java.base/java.security=ALL-UNNAMED",
-    "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED",
-    "--add-opens=java.base/java.util.jar=ALL-UNNAMED",
-    "--add-opens=java.base/java.util.zip=ALL-UNNAMED",
-    "--add-opens=java.base/java.util=ALL-UNNAMED",
-    "--add-opens=java.base/jdk.internal.loader=ALL-UNNAMED",
-    "--add-opens=java.base/jdk.internal.math=ALL-UNNAMED",
-    "--add-opens=java.base/jdk.internal.module=ALL-UNNAMED",
-    "--add-opens=java.base/jdk.internal.perf=ALL-UNNAMED",
-    "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
-    "--add-opens=java.base/jdk.internal.reflect=ALL-UNNAMED",
-    "--add-opens=java.base/jdk.internal.util.jar=ALL-UNNAMED",
-    "--add-opens=java.base/sun.nio.fs=ALL-UNNAMED",
-    "--add-opens=jdk.dynalink/jdk.dynalink.beans=ALL-UNNAMED",
-    "--add-opens=jdk.dynalink/jdk.dynalink.linker.support=ALL-UNNAMED",
-    "--add-opens=jdk.dynalink/jdk.dynalink.linker=ALL-UNNAMED",
-    "--add-opens=jdk.dynalink/jdk.dynalink.support=ALL-UNNAMED",
-    "--add-opens=jdk.dynalink/jdk.dynalink=ALL-UNNAMED",
-    "--add-opens=jdk.management.jfr/jdk.management.jfr=ALL-UNNAMED",
-    "--add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED"
+    "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
   }) {
     val_out << " " << param;
   }
 
+  if (useSizeOf) {
+    for (const string& param : {
+      // Only needed for ehcache
+      "--add-opens=java.base/java.io=ALL-UNNAMED",
+      "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED",
+      "--add-opens=java.base/java.lang.module=ALL-UNNAMED",
+      "--add-opens=java.base/java.lang.ref=ALL-UNNAMED",
+      "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
+      "--add-opens=java.base/java.net=ALL-UNNAMED",
+      "--add-opens=java.base/java.nio.charset=ALL-UNNAMED",
+      "--add-opens=java.base/java.nio.file.attribute=ALL-UNNAMED",
+      "--add-opens=java.base/java.security=ALL-UNNAMED",
+      "--add-opens=java.base/java.util.concurrent.locks=ALL-UNNAMED",
+      "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED",
+      "--add-opens=java.base/java.util.jar=ALL-UNNAMED",
+      "--add-opens=java.base/java.util.zip=ALL-UNNAMED",
+      "--add-opens=java.base/java.util=ALL-UNNAMED",
+      "--add-opens=java.base/jdk.internal.loader=ALL-UNNAMED",
+      "--add-opens=java.base/jdk.internal.math=ALL-UNNAMED",
+      "--add-opens=java.base/jdk.internal.module=ALL-UNNAMED",
+      "--add-opens=java.base/jdk.internal.perf=ALL-UNNAMED",
+      "--add-opens=java.base/jdk.internal.platform=ALL-UNNAMED",
+      "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
+      "--add-opens=java.base/jdk.internal.reflect=ALL-UNNAMED",
+      "--add-opens=java.base/jdk.internal.util.jar=ALL-UNNAMED",
+      "--add-opens=java.base/sun.net.www.protocol.jar=ALL-UNNAMED",
+      "--add-opens=java.base/sun.nio.fs=ALL-UNNAMED",
+      "--add-opens=jdk.dynalink/jdk.dynalink.beans=ALL-UNNAMED",
+      "--add-opens=jdk.dynalink/jdk.dynalink.linker.support=ALL-UNNAMED",
+      "--add-opens=jdk.dynalink/jdk.dynalink.linker=ALL-UNNAMED",
+      "--add-opens=jdk.dynalink/jdk.dynalink.support=ALL-UNNAMED",
+      "--add-opens=jdk.dynalink/jdk.dynalink=ALL-UNNAMED",
+      "--add-opens=jdk.management.jfr/jdk.management.jfr=ALL-UNNAMED",
+      "--add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED"
+    }) {
+      val_out << " " << param;
+    }
+  }
+
   if (setenv("JAVA_TOOL_OPTIONS", val_out.str().c_str(), 1) < 0) {
     return Status(Substitute("Could not update JAVA_TOOL_OPTIONS: $0", GetStrErrMsg()));
+  }
+  return Status::OK();
+}
+
+static Status InitializeJavaWeigher() {
+  // This is set up so the default if things go wrong is to continue using ehcache.sizeof.
+  int version = GetJavaMajorVersion();
+  if (FLAGS_java_weigher == "auto") {
+    // Update for backend-gflag-util.cc setting use_jamm_weigher.
+    FLAGS_java_weigher = (version >= 15) ? "jamm" : "sizeof";
+  }
+  LOG(INFO) << "Using Java weigher " << FLAGS_java_weigher;
+
+  if (FLAGS_java_weigher == "jamm") {
+    RETURN_IF_ERROR(JavaAddJammAgent());
+  }
+  if (version >= 9) {
+    // add-opens is only supported in Java 9+.
+    RETURN_IF_ERROR(JavaAddOpens(FLAGS_java_weigher != "jamm"));
   }
   return Status::OK();
 }
@@ -559,13 +627,9 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   if (!fs_cache_init_status.ok()) CLEAN_EXIT_WITH_ERROR(fs_cache_init_status.GetDetail());
 
   if (init_jvm) {
-    // Add JAVA_TOOL_OPTIONS for ehcache
-    ABORT_IF_ERROR(JavaAddOpens());
-
-    ABORT_IF_ERROR(JavaSetProcessName(
-        boost::filesystem::path(argv[0]).filename().string()));
-
     if (!external_fe) {
+      ABORT_IF_ERROR(InitializeJavaWeigher());
+      ABORT_IF_ERROR(JavaSetProcessName(filesystem::path(argv[0]).filename().string()));
       JniUtil::InitLibhdfs();
     }
     ABORT_IF_ERROR(JniUtil::Init());

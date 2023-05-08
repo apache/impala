@@ -35,6 +35,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import com.codahale.metrics.Histogram;
+import com.codahale.metrics.Snapshot;
+import com.codahale.metrics.UniformReservoir;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableMap;
@@ -107,6 +110,8 @@ import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.ehcache.sizeof.SizeOf;
+import org.github.jamm.CannotAccessFieldException;
+import org.github.jamm.MemoryMeter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -285,6 +290,8 @@ public class CatalogdMetaProvider implements MetaProvider {
    */
   final Cache<Object,Object> cache_;
 
+  private final Histogram cacheEntrySize_ = new Histogram(new UniformReservoir());
+
   /**
    * The last catalog version seen in an update from the catalogd.
    *
@@ -364,13 +371,18 @@ public class CatalogdMetaProvider implements MetaProvider {
     cache_ = CacheBuilder.newBuilder()
         .maximumWeight(cacheSizeBytes)
         .expireAfterAccess(expirationSecs, TimeUnit.SECONDS)
-        .weigher(new SizeOfWeigher())
+        .weigher(new SizeOfWeigher(
+            BackendConfig.INSTANCE.useJammWeigher(), cacheEntrySize_))
         .recordStats()
         .build();
   }
 
   public CacheStats getCacheStats() {
     return cache_.stats();
+  }
+
+  public Snapshot getCacheEntrySize() {
+    return cacheEntrySize_.getSnapshot();
   }
 
   @Override
@@ -2004,8 +2016,6 @@ public class CatalogdMetaProvider implements MetaProvider {
     // Cache the reflected sizes of classes seen.
     private static final boolean CACHE_SIZES = true;
 
-    private static SizeOf SIZEOF = SizeOf.newInstance(BYPASS_FLYWEIGHT, CACHE_SIZES);
-
     private static final int BYTES_PER_WORD = 8; // Assume 64-bit VM.
     // Guava cache overhead based on:
     // http://code-o-matic.blogspot.com/2012/02/updated-memory-cost-per-javaguava.html
@@ -2013,9 +2023,51 @@ public class CatalogdMetaProvider implements MetaProvider {
         12 * BYTES_PER_WORD + // base cost per entry
         4 * BYTES_PER_WORD;  // for use of 'maximumSize()'
 
+    // Retain Ehcache while Jamm is thoroughly tested. We only expect to make one
+    // CatalogdMetaProvider and thus one SizeOfWeigher.
+    private final SizeOf SIZEOF;
+    private final MemoryMeter METER;
+
+    private final boolean useJamm_;
+    private final Histogram entrySize_;
+
+    public SizeOfWeigher(boolean useJamm, Histogram entrySize) {
+      if (useJamm) {
+        METER = MemoryMeter.builder().build();
+        SIZEOF = null;
+      } else {
+        SIZEOF = SizeOf.newInstance(BYPASS_FLYWEIGHT, CACHE_SIZES);
+        METER = null;
+      }
+      useJamm_ = useJamm;
+      entrySize_ = entrySize;
+    }
+
+    public SizeOfWeigher() {
+      this(true, null);
+    }
+
     @Override
     public int weigh(Object key, Object value) {
-      long size = SIZEOF.deepSizeOf(key, value) + OVERHEAD_PER_ENTRY;
+      long size = OVERHEAD_PER_ENTRY;
+      try {
+        if (useJamm_) {
+          size += METER.measureDeep(key);
+          size += METER.measureDeep(value);
+        } else {
+          size += SIZEOF.deepSizeOf(key, value);
+        }
+      } catch (CannotAccessFieldException e) {
+        // This may happen if we miss an add-opens call for lambdas in Java 17.
+        LOG.warn("Unable to weigh cache entry, additional add-opens needed", e);
+      } catch (UnsupportedOperationException e) {
+        // Thrown by ehcache for lambdas in Java 17.
+        LOG.warn("Unable to weigh cache entry", e);
+      }
+
+      if (entrySize_ != null) {
+        entrySize_.update(size);
+      }
       if (size > Integer.MAX_VALUE) {
         return Integer.MAX_VALUE;
       }

@@ -133,6 +133,7 @@ fe/src/test/resources/adusers.ldif
 fe/src/test/resources/hbase-jaas-client.conf.template
 fe/src/test/resources/hbase-jaas-server.conf.template
 fe/src/test/resources/users.ldif
+java/toolchains.xml.tmpl
 testdata/AllTypesError/*.txt
 testdata/AllTypesErrorNoNulls/*.txt
 *.avsc

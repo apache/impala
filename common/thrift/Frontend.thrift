@@ -113,6 +113,8 @@ struct TGetCatalogMetricsResult {
   12: optional double cache_hit_rate
   13: optional double cache_load_exception_rate
   14: optional double cache_miss_rate
+  15: optional double cache_entry_median_size
+  16: optional double cache_entry_99th_size
 }
 
 // Arguments to getDbs, which returns a list of dbs that match an optional pattern

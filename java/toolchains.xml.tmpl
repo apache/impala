@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<toolchains>
+  <!-- Provide toolchain entries for all versions Jamm expects. We don't actually use
+       11 or 17 to build or run tests however, so what they point to doesn't matter. -->
+  <toolchain>
+    <type>jdk</type>
+    <provides>
+      <version>1.8</version>
+      <vendor>Oracle Corporation</vendor>
+    </provides>
+    <configuration>
+      <jdkHome>JAVA_HOME</jdkHome>
+    </configuration>
+  </toolchain>
+  <toolchain>
+    <type>jdk</type>
+    <provides>
+      <version>11</version>
+      <vendor>Oracle Corporation</vendor>
+    </provides>
+    <configuration>
+      <jdkHome>JAVA_HOME</jdkHome>
+    </configuration>
+  </toolchain>
+  <toolchain>
+    <type>jdk</type>
+    <provides>
+      <version>17</version>
+      <vendor>Oracle Corporation</vendor>
+    </provides>
+    <configuration>
+      <jdkHome>JAVA_HOME</jdkHome>
+    </configuration>
+  </toolchain>
+</toolchains>

@@ -358,9 +358,15 @@ under the License.
     </dependency>
 
     <dependency>
-        <groupId>org.ehcache</groupId>
-        <artifactId>sizeof</artifactId>
-        <version>0.4.0</version>
+      <groupId>org.ehcache</groupId>
+      <artifactId>sizeof</artifactId>
+      <version>0.4.0</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.github.jbellis</groupId>
+      <artifactId>jamm</artifactId>
+      <version>0.4.0-IMPALA</version>
     </dependency>
 
     <dependency>

@@ -138,6 +138,10 @@ const char* ImpaladMetricKeys::CATALOG_CACHE_REQUEST_COUNT =
     "catalog.cache.request-count";
 const char* ImpaladMetricKeys::CATALOG_CACHE_TOTAL_LOAD_TIME =
     "catalog.cache.total-load-time";
+const char* ImpaladMetricKeys::CATALOG_CACHE_ENTRY_MEDIAN_SIZE =
+    "catalog.cache.entry-median-size";
+const char* ImpaladMetricKeys::CATALOG_CACHE_ENTRY_99TH_SIZE =
+    "catalog.cache.entry-99th-size";
 const char* ImpaladMetricKeys::NUM_FILES_OPEN_FOR_INSERT =
     "impala-server.num-files-open-for-insert";
 const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS =
@@ -237,6 +241,8 @@ DoubleGauge* ImpaladMetrics::CATALOG_CACHE_AVG_LOAD_TIME = nullptr;
 DoubleGauge* ImpaladMetrics::CATALOG_CACHE_HIT_RATE = nullptr;
 DoubleGauge* ImpaladMetrics::CATALOG_CACHE_LOAD_EXCEPTION_RATE = nullptr;
 DoubleGauge* ImpaladMetrics::CATALOG_CACHE_MISS_RATE = nullptr;
+DoubleGauge* ImpaladMetrics::CATALOG_CACHE_ENTRY_MEDIAN_SIZE = nullptr;
+DoubleGauge* ImpaladMetrics::CATALOG_CACHE_ENTRY_99TH_SIZE = nullptr;
 
 // Properties
 BooleanProperty* ImpaladMetrics::CATALOG_READY = nullptr;
@@ -296,6 +302,10 @@ void ImpaladMetrics::InitCatalogMetrics(MetricGroup* m) {
         catalog_metrics->AddCounter(ImpaladMetricKeys::CATALOG_CACHE_REQUEST_COUNT, 0);
     CATALOG_CACHE_TOTAL_LOAD_TIME =
         catalog_metrics->AddCounter(ImpaladMetricKeys::CATALOG_CACHE_TOTAL_LOAD_TIME, 0);
+    CATALOG_CACHE_ENTRY_MEDIAN_SIZE = catalog_metrics->AddDoubleGauge(
+        ImpaladMetricKeys::CATALOG_CACHE_ENTRY_MEDIAN_SIZE, 0);
+    CATALOG_CACHE_ENTRY_99TH_SIZE = catalog_metrics->AddDoubleGauge(
+        ImpaladMetricKeys::CATALOG_CACHE_ENTRY_99TH_SIZE, 0);
   }
 }
 

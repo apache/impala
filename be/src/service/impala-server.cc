@@ -1561,6 +1561,8 @@ Status ImpalaServer::UpdateCatalogMetrics() {
   DCHECK(metrics.__isset.cache_hit_rate);
   DCHECK(metrics.__isset.cache_load_exception_rate);
   DCHECK(metrics.__isset.cache_miss_rate);
+  DCHECK(metrics.__isset.cache_entry_median_size);
+  DCHECK(metrics.__isset.cache_entry_99th_size);
   ImpaladMetrics::CATALOG_CACHE_EVICTION_COUNT->SetValue(metrics.cache_eviction_count);
   ImpaladMetrics::CATALOG_CACHE_HIT_COUNT->SetValue(metrics.cache_hit_count);
   ImpaladMetrics::CATALOG_CACHE_LOAD_COUNT->SetValue(metrics.cache_load_count);
@@ -1576,8 +1578,10 @@ Status ImpalaServer::UpdateCatalogMetrics() {
   ImpaladMetrics::CATALOG_CACHE_LOAD_EXCEPTION_RATE->SetValue(
       metrics.cache_load_exception_rate);
   ImpaladMetrics::CATALOG_CACHE_MISS_RATE->SetValue(metrics.cache_miss_rate);
+  ImpaladMetrics::CATALOG_CACHE_ENTRY_MEDIAN_SIZE->SetValue(
+      metrics.cache_entry_median_size);
+  ImpaladMetrics::CATALOG_CACHE_ENTRY_99TH_SIZE->SetValue(metrics.cache_entry_99th_size);
   return Status::OK();
-
 }
 
 shared_ptr<QueryDriver> ImpalaServer::GetQueryDriver(
