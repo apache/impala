@@ -176,9 +176,9 @@ function collectFromProfile(ignored_arg) {
     // First pass: compute sizes
     profile.child_profiles[2].child_profiles.forEach(function(fp) {
 
-      var cp = fp.child_profiles[0];
-
-      if (cp.event_sequences != undefined) {
+      if (fp.child_profiles != undefined &&
+          fp.child_profiles[0].event_sequences != undefined) {
+        var cp = fp.child_profiles[0];
         var fevents = fp.child_profiles[0].event_sequences[0].events;
 
         // Build list of timestamps that spans instances for each event
@@ -506,8 +506,8 @@ function refresh() {
       if (!profile_available) {
         setTimeout(refresh, 1000);
       } else {
-        if (profile.child_profiles[0].info_strings.find(({key}) => key === "Query State").value
-            != "FINISHED") {
+        if (profile.child_profiles[0].info_strings.find(({key}) => key === "End Time").value
+            == "") {
           setTimeout(refresh, 1000);
         }
         renderTiming();
