@@ -82,11 +82,25 @@ class TestLineage(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--lineage_event_log_dir={0}"
                                     .format(CREATE_TABLE_TIME_LINEAGE_LOG_DIR))
-  def test_create_table_timestamp(self, vector, unique_database):
+  def test_create_table_timestamp(self, unique_database):
+    for table_format in ['textfile', 'kudu', 'iceberg']:
+      self.run_test_create_table_timestamp(unique_database, table_format)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      "--lineage_event_log_dir={0}"
+      .format(CREATE_TABLE_TIME_LINEAGE_LOG_DIR),
+      catalogd_args="--hms_event_polling_interval_s=0")
+  def test_create_table_timestamp_without_hms_events(self, unique_database):
+    for table_format in ['textfile', 'kudu', 'iceberg']:
+      self.run_test_create_table_timestamp(unique_database, table_format)
+
+  def run_test_create_table_timestamp(self, unique_database, table_format):
     """Test that 'createTableTime' in the lineage graph are populated with valid value
        from HMS."""
-    query = "create table {0}.lineage_test_tbl as select int_col, tinyint_col " \
-            "from functional.alltypes".format(unique_database)
+    query = "create table {0}.lineage_test_tbl_{1} primary key (int_col) stored as {1} " \
+            "as select int_col, bigint_col from functional.alltypes".format(
+                unique_database, table_format)
     result = self.execute_query_expect_success(self.client, query)
     profile_query_id = re.search("Query \(id=(.*)\):", result.runtime_profile).group(1)
 
@@ -98,16 +112,23 @@ class TestLineage(CustomClusterTestSuite):
       # Only the coordinator's log file will be populated.
       if os.path.getsize(log_path) > 0:
         with open(log_path) as log_file:
-          lineage_json = json.load(log_file)
-          assert lineage_json["queryId"] == profile_query_id
-          vertices = lineage_json["vertices"]
-          for vertex in vertices:
-            if vertex["vertexId"] == "int_col":
-              assert "metadata" in vertex
-              table_name = vertex["metadata"]["tableName"]
-              table_create_time = int(vertex["metadata"]["tableCreateTime"])
-              assert "{0}.lineage_test_tbl".format(unique_database) == table_name
-              assert table_create_time != -1
+          for line in log_file:
+            # Now that the test is executed multiple times we need to take a look at
+            # only the line that contains the expected table name.
+            expected_table_name =\
+                "{0}.lineage_test_tbl_{1}".format(unique_database, table_format)
+            if expected_table_name not in line: continue
+
+            lineage_json = json.loads(line)
+            assert lineage_json["queryId"] == profile_query_id
+            vertices = lineage_json["vertices"]
+            for vertex in vertices:
+              if vertex["vertexId"] == "int_col":
+                assert "metadata" in vertex
+                table_name = vertex["metadata"]["tableName"]
+                table_create_time = int(vertex["metadata"]["tableCreateTime"])
+                assert expected_table_name == table_name
+                assert table_create_time != -1
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--lineage_event_log_dir={0}"

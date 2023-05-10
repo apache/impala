@@ -3495,6 +3495,10 @@ public class CatalogOpExecutor {
       Pair<Long, org.apache.hadoop.hive.metastore.api.Table> eventTblPair =
           getTableFromEvents(events, params.if_not_exists);
       createEventId = eventTblPair == null ? -1 : eventTblPair.first;
+      org.apache.hadoop.hive.metastore.api.Table msTable =
+          eventTblPair == null ? null : eventTblPair.second;
+      setTableNameAndCreateTimeInResponse(msTable,
+          newTable.getDbName(), newTable.getTableName(), response);
 
       // Add the table to the catalog cache
       Table newTbl = catalog_
@@ -3574,9 +3578,8 @@ public class CatalogOpExecutor {
               .getTable(newTable.getDbName(), newTable.getTableName()));
         }
         msTable = eventIdTblPair.second;
-        long tableCreateTime = msTable.getCreateTime();
-        response.setTable_name(newTable.getDbName() + "." + newTable.getTableName());
-        response.setTable_create_time(tableCreateTime);
+        setTableNameAndCreateTimeInResponse(msTable, newTable.getDbName(),
+            newTable.getTableName(), response);
         // For external tables set table location needed for lineage generation.
         if (newTable.getTableType() == TableType.EXTERNAL_TABLE.toString()) {
           String tableLocation = newTable.getSd().getLocation();
@@ -3632,6 +3635,23 @@ public class CatalogOpExecutor {
       getMetastoreDdlLock().unlock();
     }
     return true;
+  }
+
+  /**
+   * Sets table name and creation time in 'response' based on 'msTable'.
+   * If 'msTable' is null, then it loads the table from HMS.
+   * Throws exception if table is not found.
+   */
+  private void setTableNameAndCreateTimeInResponse(
+      org.apache.hadoop.hive.metastore.api.Table msTable, String dbName, String tblName,
+      TDdlExecResponse response) throws org.apache.thrift.TException {
+    if (msTable == null) {
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+        msTable = msClient.getHiveClient().getTable(dbName, tblName);
+      }
+    }
+    response.setTable_name(dbName + "." + tblName);
+    response.setTable_create_time(msTable.getCreateTime());
   }
 
   /**
@@ -3762,6 +3782,10 @@ public class CatalogOpExecutor {
       Pair<Long, org.apache.hadoop.hive.metastore.api.Table> eventTblPair
           = getTableFromEvents(events, ifNotExists);
       long createEventId = eventTblPair == null ? -1 : eventTblPair.first;
+      org.apache.hadoop.hive.metastore.api.Table msTable =
+          eventTblPair == null ? null : eventTblPair.second;
+      setTableNameAndCreateTimeInResponse(msTable,
+          newTable.getDbName(), newTable.getTableName(), response);
       // Add the table to the catalog cache
       Table newTbl = catalog_.addIncompleteTable(newTable.getDbName(),
           newTable.getTableName(), TImpalaTableType.TABLE, tblComment,
