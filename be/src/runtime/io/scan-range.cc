@@ -342,6 +342,7 @@ Status ScanRange::ReadSubRanges(
         buffer_desc->buffer_len() - buffer_desc->len());
 
     if (cache_.data != nullptr) {
+      DCHECK_LE(offset + bytes_to_read, cache_.len);
       memcpy(buffer_desc->buffer_ + buffer_desc->len(),
           cache_.data + offset, bytes_to_read);
     } else {
@@ -637,6 +638,10 @@ Status ScanRange::ReadFromCache(
   if (cache_.len < len()) {
     VLOG_QUERY << "Error reading file from HDFS cache: " << file_ << ". Expected "
       << len() << " bytes, but read " << cache_.len << ". Switching to disk read path.";
+    // Null out the cache buffer to avoid any interactions when this falls
+    // back to the regular read path.
+    cache_.len = 0;
+    cache_.data = nullptr;
     // Close the scan range. 'read_succeeded' is still false, so the caller will fall back
     // to non-cached read of this scan range.
     file_reader_->Close();

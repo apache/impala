@@ -323,7 +323,7 @@ class DiskIoMgrTest : public testing::Test {
       vector<ScanRange::SubRange> sub_ranges = {});
 
   void CachedReadsTestBody(const char* data, const char* expected,
-      bool fake_cache, vector<ScanRange::SubRange> sub_ranges = {});
+      HdfsCachingScenario scenario, vector<ScanRange::SubRange> sub_ranges = {});
 
   /// Convenience function to get a reference to the buffer pool.
   BufferPool* buffer_pool() const { return ExecEnv::GetInstance()->buffer_pool(); }
@@ -1050,7 +1050,7 @@ TEST_F(DiskIoMgrTest, MemScarcity) {
 }
 
 void DiskIoMgrTest::CachedReadsTestBody(const char* data, const char* expected,
-    bool fake_cache, vector<ScanRange::SubRange> sub_ranges) {
+    HdfsCachingScenario scenario, vector<ScanRange::SubRange> sub_ranges) {
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
   uint8_t* cached_data = reinterpret_cast<uint8_t*>(const_cast<char*>(data));
   int len = strlen(data);
@@ -1073,10 +1073,8 @@ void DiskIoMgrTest::CachedReadsTestBody(const char* data, const char* expected,
     ScanRange* complete_range =
         InitRange(&pool_, tmp_file, 0, strlen(data), 0, stat_val.st_mtime, nullptr, true,
             sub_ranges);
-    if (fake_cache) {
-      SetReaderStub(complete_range, make_unique<CacheReaderTestStub>(
-          complete_range, cached_data, len));
-    }
+    SetReaderStub(complete_range, make_unique<CacheReaderTestStub>(complete_range,
+        cached_data, len, scenario));
 
     // Issue some reads before the async ones are issued
     ValidateSyncRead(&io_mgr, reader.get(), &read_client, complete_range, expected);
@@ -1088,9 +1086,8 @@ void DiskIoMgrTest::CachedReadsTestBody(const char* data, const char* expected,
       ScanRange* range = InitRange(&pool_, tmp_file, 0, len, disk_id, stat_val.st_mtime,
           nullptr, true, sub_ranges);
       ranges.push_back(range);
-      if (fake_cache) {
-        SetReaderStub(range, make_unique<CacheReaderTestStub>(range, cached_data, len));
-      }
+      SetReaderStub(range, make_unique<CacheReaderTestStub>(range, cached_data,
+          len, scenario));
     }
     ASSERT_OK(reader->AddScanRanges(ranges, EnqueueLocation::TAIL));
 
@@ -1124,10 +1121,11 @@ void DiskIoMgrTest::CachedReadsTestBody(const char* data, const char* expected,
 TEST_F(DiskIoMgrTest, CachedReads) {
   InitRootReservation(LARGE_RESERVATION_LIMIT);
   const char* data = "abcdefghijklm";
-  // Don't fake the cache, i.e. test the fallback mechanism
-  CachedReadsTestBody(data, data, false);
-  // Fake the test with a file reader stub.
-  CachedReadsTestBody(data, data, true);
+  // Test the fallback mechanism for the cache
+  CachedReadsTestBody(data, data, FALLBACK_NULL_BUFFER);
+  CachedReadsTestBody(data, data, FALLBACK_INCOMPLETE_BUFFER);
+  // Test the success path for the cache
+  CachedReadsTestBody(data, data, VALID_BUFFER);
 }
 
 // Test when some scan ranges are marked as being cached and there
@@ -1139,10 +1137,11 @@ TEST_F(DiskIoMgrTest, CachedReadsSubRanges) {
 
   // first iteration tests the fallback mechanism with sub-ranges
   // second iteration fakes a cache
-  for (bool fake_cache : {false, true}) {
-    CachedReadsTestBody(data, data, fake_cache, {{0, data_len}});
-    CachedReadsTestBody(data, "bc", fake_cache, {{1, 2}});
-    CachedReadsTestBody(data, "abchilm", fake_cache, {{0, 3}, {7, 2}, {11, 2}});
+  for (HdfsCachingScenario scenario :
+       {VALID_BUFFER, FALLBACK_NULL_BUFFER, FALLBACK_INCOMPLETE_BUFFER}) {
+    CachedReadsTestBody(data, data, scenario, {{0, data_len}});
+    CachedReadsTestBody(data, "bc", scenario, {{1, 2}});
+    CachedReadsTestBody(data, "abchilm", scenario, {{0, 3}, {7, 2}, {11, 2}});
   }
 }
 
@@ -1635,18 +1634,19 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBufferSubRanges) {
   // Reader doesn't need to provide client if it's providing buffers.
   unique_ptr<RequestContext> reader = io_mgr->RegisterContext();
 
-  auto test_case = [&](bool fake_cache, const char* expected_result,
+  auto test_case = [&](HdfsCachingScenario scenario, const char* expected_result,
       vector<ScanRange::SubRange> sub_ranges) {
     int result_len = strlen(expected_result);
     vector<uint8_t> client_buffer(result_len);
     ScanRange* range = pool_.Add(new ScanRange);
-    int cache_options = fake_cache ? BufferOpts::USE_HDFS_CACHE : BufferOpts::NO_CACHING;
+    // Note: Even though this specifies HDFS caching, some scenarios will fall back
+    // to doing regular reads.
+    int cache_options = BufferOpts::USE_HDFS_CACHE;
     range->Reset(ScanRange::FileInfo{tmp_file, nullptr, stat_val.st_mtime}, data_len, 0,
         0, true, BufferOpts::ReadInto(cache_options, client_buffer.data(), result_len),
         move(sub_ranges));
-    if (fake_cache) {
-      SetReaderStub(range, make_unique<CacheReaderTestStub>(range, cache, data_len));
-    }
+    SetReaderStub(range, make_unique<CacheReaderTestStub>(range, cache, data_len,
+        scenario));
     bool needs_buffers;
     ASSERT_OK(reader->StartScanRange(range, &needs_buffers));
     ASSERT_FALSE(needs_buffers);
@@ -1663,11 +1663,12 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBufferSubRanges) {
     range->ReturnBuffer(move(io_buffer));
   };
 
-  for (bool fake_cache : {false, true}) {
-    test_case(fake_cache, data, {{0, data_len}});
-    test_case(fake_cache, data, {{0, 15}, {15, data_len - 15}});
-    test_case(fake_cache, "quick fox", {{4, 5}, {15, 4}});
-    test_case(fake_cache, "the brown dog", {{0, 3}, {9, 6}, {data_len - 4, 4}});
+  for (HdfsCachingScenario scenario :
+       {VALID_BUFFER, FALLBACK_NULL_BUFFER, FALLBACK_INCOMPLETE_BUFFER}) {
+    test_case(scenario, data, {{0, data_len}});
+    test_case(scenario, data, {{0, 15}, {15, data_len - 15}});
+    test_case(scenario, "quick fox", {{4, 5}, {15, 4}});
+    test_case(scenario, "the brown dog", {{0, 3}, {9, 6}, {data_len - 4, 4}});
   }
 
   io_mgr->UnregisterContext(reader.get());
