@@ -340,7 +340,8 @@ function renderTiming(ignored_arg) {
   timeticks_footer.innerHTML = "";
 
   var row_height = 15;
-  var display_height = window.innerHeight - timing_diagram.offsetTop - 70;
+  var display_height = Math.min(window.innerHeight - timing_diagram.offsetTop - 70,
+      rownum * row_height);
   fragment_diagram.parentNode.style.height = display_height * 1 + "px";
   fragment_diagram.setAttribute("height", rownum * row_height + "px");
 
