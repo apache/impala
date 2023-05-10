@@ -1041,7 +1041,9 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    */
   private boolean adjustToMaxParallelism(int minThreadPerNode, int maxThreadPerNode,
       int parentParallelism, int nodeStepCount) {
+    int maxThreadAllowed = IntMath.saturatedMultiply(maxThreadPerNode, getNumNodes());
     boolean canTryLower = true;
+
     // Compute maximum allowed parallelism.
     int maxParallelism = getNumInstances();
     if (isFixedParallelism_) {
@@ -1084,14 +1086,14 @@ public class PlanFragment extends TreeNode<PlanFragment> {
         // This is an interior fragment or fragment with single scan node.
         // We calculate maxParallelism, minParallelism, and costBasedMaxParallelism across
         // all executors in the selected executor group.
-        maxParallelism = IntMath.saturatedMultiply(maxThreadPerNode, getNumNodes());
+        maxParallelism = maxThreadAllowed;
 
         // Bound maxParallelism by ScanNode's effective scan range count if this fragment
         // has ScanNode.
         List<ScanNode> scanNodes = Lists.newArrayList();
         collectPlanNodes(Predicates.instanceOf(ScanNode.class), scanNodes);
         if (!scanNodes.isEmpty()) {
-          Preconditions.checkState(scanNodes.size() <= 1);
+          Preconditions.checkState(scanNodes.size() == 1);
           ScanNode scanNode = scanNodes.get(0);
           int maxScannerThreads = scanNode.getMaxScannerThreads(nodeStepCount);
           if (nodeStepCount == getNumNodes()) {
@@ -1138,6 +1140,12 @@ public class PlanFragment extends TreeNode<PlanFragment> {
         }
       }
     }
+
+    // Validate that maxParallelism does not exceed maxThreadAllowed.
+    // maxParallelism can be lower than minThreadPerNode, ie., in the case of plan root
+    // sink (only 1 per query) or scan with very few scan ranges, so this does not
+    // validate against minThreadPerNode.
+    Preconditions.checkState(maxParallelism <= maxThreadAllowed);
 
     // Initialize this fragment's parallelism to the maxParallelism.
     setAdjustedInstanceCount(maxParallelism);

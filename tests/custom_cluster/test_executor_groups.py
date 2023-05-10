@@ -20,6 +20,7 @@
 from __future__ import absolute_import, division, print_function
 from builtins import range
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.parametrize import UniqueDatabase
 from tests.util.concurrent_workload import ConcurrentWorkload
 
 import json
@@ -35,7 +36,7 @@ LOG = logging.getLogger("test_auto_scaling")
 TEST_QUERY = "select count(*) from functional.alltypes where month + random() < 3"
 
 # A query to test CPU requirement. Estimated memory per host is 37MB.
-CPU_TEST_QUERY = "select * from tpcds_parquet.store_sales where ss_item_sk = 1 limit 50;"
+CPU_TEST_QUERY = "select * from tpcds_parquet.store_sales where ss_item_sk = 1 limit 50"
 
 # A query with full table scan characteristics.
 GROUPING_TEST_QUERY = ("select ss_item_sk from tpcds_parquet.store_sales"
@@ -874,7 +875,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
   def _set_query_options(self, query_options):
     """Set query options"""
     for k, v in query_options.items():
-      self.execute_query_expect_success(self.client, "SET {}='{}';".format(k, v))
+      self.execute_query_expect_success(self.client, "SET {}='{}'".format(k, v))
 
   def _run_query_and_verify_profile(self, query,
       expected_strings_in_profile, not_expected_in_profile=[]):
@@ -886,9 +887,26 @@ class TestExecutorGroups(CustomClusterTestSuite):
       assert expected_profile in str(result.runtime_profile)
     for not_expected in not_expected_in_profile:
       assert not_expected not in str(result.runtime_profile)
+    return result
 
+  def __verify_fs_writers(self, result, expected_num_writers,
+                          expected_instances_per_host):
+    assert 'HDFS WRITER' in result.exec_summary[0]['operator'], result.runtime_profile
+    num_writers = int(result.exec_summary[0]['num_instances'])
+    assert (num_writers == expected_num_writers), result.runtime_profile
+    num_hosts = len(expected_instances_per_host)
+    regex = (r'Per Host Number of Fragment Instances:'
+             + (num_hosts * r'.*?\((.*?)\)') + r'.*?\n')
+    matches = re.findall(regex, result.runtime_profile)
+    assert len(matches) == 1 and len(matches[0]) == num_hosts, result.runtime_profile
+    num_instances_per_host = [int(i) for i in matches[0]]
+    num_instances_per_host.sort()
+    expected_instances_per_host.sort()
+    assert num_instances_per_host == expected_instances_per_host, result.runtime_profile
+
+  @UniqueDatabase.parametrize(sync_ddl=True)
   @pytest.mark.execute_serially
-  def test_query_cpu_count_divisor_default(self):
+  def test_query_cpu_count_divisor_default(self, unique_database):
     # Expect to run the query on the small group by default.
     coordinator_test_args = ""
     self._setup_three_exec_group_cluster(coordinator_test_args)
@@ -1039,14 +1057,105 @@ class TestExecutorGroups(CustomClusterTestSuite):
       'PROCESSING_COST_MIN_THREADS': '',
       'MAX_FRAGMENT_INSTANCES_PER_NODE': ''})
 
+    # BEGIN testing insert + MAX_FS_WRITER
+    # Test unpartitioned insert, small scan, no MAX_FS_WRITER.
+    # Scanner and writer will collocate since num scanner equals to num writer (1).
+    result = self._run_query_and_verify_profile(
+      ("create table {0}.{1} as "
+       "select id, year from functional_parquet.alltypes"
+       ).format(unique_database, "test_ctas1"),
+      ["Executor Group: root.tiny-group", "ExecutorGroupsConsidered: 1",
+       "Verdict: Match", "CpuAsk: 1"])
+    self.__verify_fs_writers(result, 1, [0, 1])
+
+    # Test unpartitioned insert, small scan, no MAX_FS_WRITER, with limit.
+    # The limit will cause an exchange node insertion between scanner and writer.
+    result = self._run_query_and_verify_profile(
+      ("create table {0}.{1} as "
+       "select id, year from functional_parquet.alltypes limit 100000"
+       ).format(unique_database, "test_ctas2"),
+      ["Executor Group: root.tiny-group", "ExecutorGroupsConsidered: 1",
+       "Verdict: Match", "CpuAsk: 2"])
+    self.__verify_fs_writers(result, 1, [0, 2])
+
+    # Test partitioned insert, small scan, no MAX_FS_WRITER.
+    # Scanner and writer will collocate since num scanner equals to num writer (1).
+    result = self._run_query_and_verify_profile(
+      ("create table {0}.{1} partitioned by (year) as "
+       "select id, year from functional_parquet.alltypes"
+       ).format(unique_database, "test_ctas3"),
+      ["Executor Group: root.tiny-group", "ExecutorGroupsConsidered: 1",
+       "Verdict: Match", "CpuAsk: 1"])
+    self.__verify_fs_writers(result, 1, [0, 1])
+
+    # Test unpartitioned insert, large scan, no MAX_FS_WRITER.
+    result = self._run_query_and_verify_profile(
+      ("create table {0}.{1} as "
+       "select ss_item_sk, ss_ticket_number, ss_store_sk "
+       "from tpcds_parquet.store_sales").format(unique_database, "test_ctas4"),
+      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+       "Verdict: Match", "CpuAsk: 13"])
+    self.__verify_fs_writers(result, 1, [0, 4, 4, 5])
+
+    # Test partitioned insert, large scan, no MAX_FS_WRITER.
+    result = self._run_query_and_verify_profile(
+      ("create table {0}.{1} partitioned by (ss_store_sk) as "
+       "select ss_item_sk, ss_ticket_number, ss_store_sk "
+       "from tpcds_parquet.store_sales").format(unique_database, "test_ctas5"),
+      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+       "Verdict: Match", "CpuAsk: 15"])
+    self.__verify_fs_writers(result, 3, [0, 5, 5, 5])
+
+    # Test partitioned insert, large scan, high MAX_FS_WRITER.
+    self._set_query_options({'MAX_FS_WRITERS': '30'})
+    result = self._run_query_and_verify_profile(
+      ("create table {0}.{1} partitioned by (ss_store_sk) as "
+       "select ss_item_sk, ss_ticket_number, ss_store_sk "
+       "from tpcds_parquet.store_sales").format(unique_database, "test_ctas6"),
+      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+       "Verdict: Match", "CpuAsk: 15"])
+    self.__verify_fs_writers(result, 3, [0, 5, 5, 5])
+
+    # Test partitioned insert, large scan, low MAX_FS_WRITER.
+    self._set_query_options({'MAX_FS_WRITERS': '2'})
+    result = self._run_query_and_verify_profile(
+      ("create table {0}.{1} partitioned by (ss_store_sk) as "
+       "select ss_item_sk, ss_ticket_number, ss_store_sk "
+       "from tpcds_parquet.store_sales").format(unique_database, "test_ctas7"),
+      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+       "Verdict: Match", "CpuAsk: 14"])
+    self.__verify_fs_writers(result, 2, [0, 4, 5, 5])
+
+    # Test that non-CTAS unpartitioned insert works. MAX_FS_WRITER=2.
+    result = self._run_query_and_verify_profile(
+      ("insert overwrite {0}.{1} "
+       "select ss_item_sk, ss_ticket_number, ss_store_sk "
+       "from tpcds_parquet.store_sales").format(unique_database, "test_ctas4"),
+      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+       "Verdict: Match", "CpuAsk: 13"])
+    self.__verify_fs_writers(result, 1, [0, 4, 4, 5])
+
+    # Test that non-CTAS partitioned insert works. MAX_FS_WRITER=2.
+    result = self._run_query_and_verify_profile(
+      ("insert overwrite {0}.{1} (ss_item_sk, ss_ticket_number) "
+       "partition (ss_store_sk) "
+       "select ss_item_sk, ss_ticket_number, ss_store_sk "
+       "from tpcds_parquet.store_sales").format(unique_database, "test_ctas7"),
+      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+       "Verdict: Match", "CpuAsk: 14"])
+    self.__verify_fs_writers(result, 2, [0, 4, 5, 5])
+
+    # Unset MAX_FS_WRITERS.
+    self._set_query_options({'MAX_FS_WRITERS': ''})
+    # END testing insert + MAX_FS_WRITER
+
     # Check resource pools on the Web queries site and admission site
     self._verify_query_num_for_resource_pool("root.small", 4)
     self._verify_query_num_for_resource_pool("root.tiny", 4)
-    self._verify_query_num_for_resource_pool("root.large", 10)
+    self._verify_query_num_for_resource_pool("root.large", 12)
     self._verify_total_admitted_queries("root.small", 4)
-    self._verify_total_admitted_queries("root.tiny", 3)
-    self._verify_total_admitted_queries("root.large", 10)
-    self.client.close()
+    self._verify_total_admitted_queries("root.tiny", 6)
+    self._verify_total_admitted_queries("root.large", 16)
 
   @pytest.mark.execute_serially
   def test_query_cpu_count_divisor_two(self):
@@ -1059,10 +1168,10 @@ class TestExecutorGroups(CustomClusterTestSuite):
         ["Executor Group: root.small-group",
          "CpuAsk: 6", "EffectiveParallelism: 11",
          "ExecutorGroupsConsidered: 2"])
+
     # Check resource pools on the Web queries site and admission site
     self._verify_query_num_for_resource_pool("root.small", 1)
     self._verify_total_admitted_queries("root.small", 1)
-    self.client.close()
 
   @pytest.mark.execute_serially
   def test_query_cpu_count_divisor_fraction(self):
@@ -1087,10 +1196,10 @@ class TestExecutorGroups(CustomClusterTestSuite):
         ["Executor Group: root.large-group", "EffectiveParallelism: 16",
          "ExecutorGroupsConsidered: 3", "CpuAsk: 534",
          "Verdict: no executor group set fit. Admit to last executor group set."])
+
     # Check resource pools on the Web queries site and admission site
     self._verify_query_num_for_resource_pool("root.large", 2)
     self._verify_total_admitted_queries("root.large", 2)
-    self.client.close()
 
   @pytest.mark.execute_serially
   def test_no_skip_resource_checking(self):
@@ -1103,7 +1212,6 @@ class TestExecutorGroups(CustomClusterTestSuite):
     result = self.execute_query_expect_failure(self.client, CPU_TEST_QUERY)
     assert ("AnalysisException: The query does not fit largest executor group sets. "
         "Reason: not enough cpu cores (require=434, max=192).") in str(result)
-    self.client.close()
 
   @pytest.mark.execute_serially
   def test_min_processing_per_thread_small(self):
@@ -1131,7 +1239,11 @@ class TestExecutorGroups(CustomClusterTestSuite):
         ["Executor Group: root.tiny-group", "ExecutorGroupsConsidered: 1",
           "Verdict: Match", "CpuAsk: 1"])
 
-    self.client.close()
+    # Check resource pools on the Web queries site and admission site
+    self._verify_query_num_for_resource_pool("root.tiny", 1)
+    self._verify_query_num_for_resource_pool("root.large", 2)
+    self._verify_total_admitted_queries("root.tiny", 1)
+    self._verify_total_admitted_queries("root.large", 2)
 
   @pytest.mark.execute_serially
   def test_per_exec_group_set_metrics(self):

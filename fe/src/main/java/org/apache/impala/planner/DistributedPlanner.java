@@ -40,6 +40,7 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
+import com.google.common.math.IntMath;
 
 /**
  * The distributed planner is responsible for creating an executable, distributed plan
@@ -171,31 +172,29 @@ public class DistributedPlanner {
    * or -1 if any of them doesn't have a distinct value estimate.
    */
   private long getNumDistinctValues(List<Expr> exprs) {
-    long result = 1;
-    for (Expr expr: exprs) {
-      result *= expr.getNumDistinctValues();
-      if (result < 0) return -1;
-    }
-    return result;
+    Preconditions.checkNotNull(exprs);
+    return exprs.isEmpty() ? 1 : Expr.getNumDistinctValues(exprs);
   }
 
   /**
    * Decides whether to repartition the output of 'inputFragment' before feeding
    * its data into the table sink of the given 'insertStmt'. The decision obeys
-   * the shuffle/noshuffle plan hints if present unless MAX_FS_WRITERS query
-   * option is used where the noshuffle hint is ignored. The decision is based on
-   * a number of factors including, whether the target table is partitioned or
-   * unpartitioned, the input fragment and the target table's partition
-   * expressions, expected number of output partitions, num of nodes on which the
-   * input partition will run, whether MAX_FS_WRITERS query option is used. If
-   * this functions ends up creating a new fragment, appends that to 'fragments'.
+   * the shuffle/noshuffle plan hints if present unless MAX_FS_WRITERS
+   * or COMPUTE_PROCESSING_COST query option is used where the noshuffle hint is
+   * ignored. The decision is based on a number of factors including, whether the target
+   * table is partitioned or unpartitioned, the input fragment and the target table's
+   * partition expressions, expected number of output partitions, num of nodes on which
+   * the input partition will run, whether MAX_FS_WRITERS or COMPUTE_PROCESSING_COST
+   * query option is used. If this functions ends up creating a new fragment, appends
+   * that to 'fragments'.
    */
   public PlanFragment createInsertFragment(
       PlanFragment inputFragment, InsertStmt insertStmt, Analyzer analyzer,
       List<PlanFragment> fragments)
       throws ImpalaException {
+    boolean isComputeCost = ProcessingCost.isComputeCost(analyzer.getQueryOptions());
     boolean enforce_hdfs_writer_limit = insertStmt.getTargetTable() instanceof FeFsTable
-        && analyzer.getQueryOptions().getMax_fs_writers() > 0;
+        && (analyzer.getQueryOptions().getMax_fs_writers() > 0 || isComputeCost);
 
     if (insertStmt.hasNoShuffleHint() && !enforce_hdfs_writer_limit) return inputFragment;
 
@@ -218,11 +217,71 @@ public class DistributedPlanner {
     // We also consider fragments containing union nodes along with scan fragments
     // (leaf fragments) since they are either a part of those scan fragments or are
     // co-located with them to maintain parallelism.
-    List<ScanNode> hdfsScanORUnionNodes = Lists.newArrayList();
-    inputFragment.collectPlanNodes(Predicates.instanceOf(HdfsScanNode.class),
-        hdfsScanORUnionNodes);
-    inputFragment.collectPlanNodes(Predicates.instanceOf(UnionNode.class),
-        hdfsScanORUnionNodes);
+    List<HdfsScanNode> hdfsScanNodes = Lists.newArrayList();
+    inputFragment.collectPlanNodes(
+        Predicates.instanceOf(HdfsScanNode.class), hdfsScanNodes);
+    List<UnionNode> unionNodes = Lists.newArrayList();
+    inputFragment.collectPlanNodes(Predicates.instanceOf(UnionNode.class), unionNodes);
+    boolean hasHdfsScanORUnion = !hdfsScanNodes.isEmpty() || !unionNodes.isEmpty();
+
+    int expectedNumInputInstance = inputFragment.getNumInstances();
+    if (enforce_hdfs_writer_limit && isComputeCost) {
+      // Default to minParallelism * numNodes if cardinality or average row size is
+      // unknown.
+      int costBasedMaxWriter = IntMath.saturatedMultiply(
+          inputFragment.getNumNodes(), analyzer.getMinParallelismPerNode());
+
+      PlanNode root = inputFragment.getPlanRoot();
+      if (root.getCardinality() > -1 && root.getAvgRowSize() > -1) {
+        // Both cardinality and avg row size is known.
+        // Estimate such that each writer will work on at least MIN_WRITE_BYTES of rows.
+        // However, if this is a partitioned insert, the output volume will be divided
+        // into several partitions. In that case, consider totalNumPartitions so that:
+        // total num writers is close to totalNumPartitions.
+        int totalNumPartitions = (int) Math.min(
+            Integer.MAX_VALUE, Math.max(1, getNumDistinctValues(partitionExprs)));
+        int minNumWriter = Math.min(totalNumPartitions, inputFragment.getNumNodes());
+        int maxNumWriter = Math.min(totalNumPartitions,
+            IntMath.saturatedMultiply(
+                inputFragment.getNumNodes(), analyzer.getMaxParallelismPerNode()));
+        costBasedMaxWriter = (int) Math.round(
+            Math.ceil((root.getAvgRowSize() / HdfsTableSink.MIN_WRITE_BYTES)
+                * root.getCardinality()));
+        costBasedMaxWriter =
+            Math.min(maxNumWriter, Math.max(minNumWriter, costBasedMaxWriter));
+      }
+
+      if (maxHdfsWriters > 0) {
+        // Pick min between MAX_FS_WRITER option and costBasedMaxWriter.
+        maxHdfsWriters = Math.min(maxHdfsWriters, costBasedMaxWriter);
+      } else {
+        // User does not set MAX_FS_WRITER option.
+        maxHdfsWriters = costBasedMaxWriter;
+      }
+      Preconditions.checkState(maxHdfsWriters > 0);
+      insertStmt.setMaxTableSinks(maxHdfsWriters);
+      // At this point, parallelism of writer fragment is fixed and will not be adjusted
+      // by costing phase.
+
+      if (!hdfsScanNodes.isEmpty() && fragments.size() == 1) {
+        // If input fragment have HdfsScanNode and input fragment is the only fragment in
+        // the plan, check for opportunity to collocate scan nodes and table sink.
+        // Since the actual costing phase only happens later after distributed plan
+        // created, this code redundantly compute the scan cost ahead of costing phase
+        // to help estimate the scan parallelism.
+        int maxScanThread = 1;
+        for (HdfsScanNode scanNode : hdfsScanNodes) {
+          long totalScanRange = scanNode.getEffectiveNumScanRanges();
+          ProcessingCost scanCost = scanNode.computeScanProcessingCost(
+              analyzer.getQueryOptions(), totalScanRange);
+          maxScanThread = Math.max(
+              maxScanThread, scanCost.getNumInstanceMax(inputFragment.getNumNodes()));
+        }
+        // Override expectedNumInputInstance so that collocation may happen
+        // (case 3 in branch below).
+        expectedNumInputInstance = maxScanThread;
+      }
+    }
 
     // Make a cost-based decision only if no user hint was supplied.
     if (!insertStmt.hasShuffleHint()) {
@@ -232,8 +291,8 @@ public class DistributedPlanner {
         // TODO: make a more sophisticated decision here for partitioned tables and when
         // we have info about tablet locations.
         if (partitionExprs.isEmpty()) return inputFragment;
-      } else if (!enforce_hdfs_writer_limit || hdfsScanORUnionNodes.size() == 0
-          || inputFragment.getNumInstances() <= maxHdfsWriters) {
+      } else if (!enforce_hdfs_writer_limit || !hasHdfsScanORUnion
+          || (expectedNumInputInstance <= maxHdfsWriters)) {
         // Only consider skipping the addition of an exchange node if
         // 1. The hdfs writer limit does not apply
         // 2. Writer limit applies and there are no hdfs scan or union nodes. In this
@@ -242,10 +301,13 @@ public class DistributedPlanner {
         //    of instances are already under the writer limit.
         // Basically covering all cases where we don't mind restricting the parallelism
         // of their instances.
-        int input_instances = inputFragment.getNumInstances();
-        if (enforce_hdfs_writer_limit && hdfsScanORUnionNodes.size() == 0) {
+        Preconditions.checkState(
+            expectedNumInputInstance <= inputFragment.getNumInstances());
+        int input_instances = expectedNumInputInstance;
+        if (enforce_hdfs_writer_limit && !hasHdfsScanORUnion) {
           // For an internal fragment we enforce an upper limit based on the
-          // MAX_FS_WRITER query option.
+          // resulting maxHdfsWriters.
+          Preconditions.checkState(maxHdfsWriters > 0);
           input_instances = Math.min(input_instances, maxHdfsWriters);
         }
         // If the existing partition exprs are a subset of the table partition exprs,
@@ -265,7 +327,7 @@ public class DistributedPlanner {
         // size in the particular file format of the output table/partition.
         // We should always know on how many nodes our input is running.
         long numPartitions = getNumDistinctValues(partitionExprs);
-        Preconditions.checkState(inputFragment.getNumInstances() != -1);
+        Preconditions.checkState(expectedNumInputInstance != -1);
         if (numPartitions > 0 && numPartitions <= input_instances) {
           return inputFragment;
         }

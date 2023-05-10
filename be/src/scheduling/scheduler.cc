@@ -620,10 +620,10 @@ void Scheduler::CreateInputCollocatedInstances(
   int per_fragment_instance_idx = 0;
 
   int max_instances = input_fragment_state.instance_states.size();
-  if (IsExceedMaxFsWriters(fragment_state, &input_fragment_state, state)) {
-    max_instances = state->query_options().max_fs_writers;
-  } else if (fragment.effective_instance_count > 0) {
+  if (fragment.effective_instance_count > 0) {
     max_instances = fragment.effective_instance_count;
+  } else if (IsExceedMaxFsWriters(fragment_state, &input_fragment_state, state)) {
+    max_instances = state->query_options().max_fs_writers;
   }
 
   if (max_instances != input_fragment_state.instance_states.size()) {

@@ -74,12 +74,6 @@ enum TImpalaQueryOptions {
   MAX_IO_BUFFERS = 7 // Removed
 
   // Number of scanner threads.
-  // EXPERIMENTAL: if COMPUTE_PROCESSING_COST=true, this query option will be used to
-  // cap scan node cost to:
-  //    (num_executor * NUM_SCANNER_THREADS * min_processing_per_thread)
-  // if the original scan cost exceed that value during the first round of planning.
-  // NUM_SCANNER_THREADS will be ignored once MT_DOP is restored in the second round of
-  // planning.
   NUM_SCANNER_THREADS = 8
 
   ALLOW_UNSUPPORTED_FORMATS = 9 // Removed

@@ -342,6 +342,13 @@ abstract public class ScanNode extends PlanNode {
     return maxScannerThreads;
   }
 
+  /**
+   * Given effectiveScanRangeCount, compute processing cost of this scan node.
+   * <p>
+   * This method does not mutate any state of the scan node object, including
+   * the processingCost_ field. Caller must set processingCost_ themself with
+   * the return value of this method.
+   */
   protected ProcessingCost computeScanProcessingCost(
       TQueryOptions queryOptions, long effectiveScanRangeCount) {
     ProcessingCost cardinalityBasedCost = ProcessingCost.basicCost(getDisplayLabel(),
@@ -413,6 +420,9 @@ abstract public class ScanNode extends PlanNode {
 
   public ExprSubstitutionMap getOptimizedAggSmap() { return optimizedAggSmap_; }
 
+  /**
+   * Return maximum number of scanner thread, rounded up to next multiple of numNodes.
+   */
   protected int getMaxScannerThreads(int numNodes) {
     return processingCost_.getNumInstanceMax(numNodes);
   }

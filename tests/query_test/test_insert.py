@@ -416,28 +416,55 @@ class TestInsertHdfsWriterLimit(ImpalaTestSuite):
   @UniqueDatabase.parametrize(sync_ddl=True)
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   def test_processing_cost_writer_limit(self, unique_database):
+    """Test both scenario of partitioned and unpartitioned insert.
+    All of the unpartitioned testscases will result in one instance writer because the
+    output volume is less than 256MB. Partitoned insert will result in 1 writer per node
+    unless max_fs_writers is set lower than num nodes."""
     # Root internal (non-leaf) fragment.
     query = "create table {0}.test1 as select int_col from " \
             "functional_parquet.alltypes".format(unique_database)
-    self.__run_insert_and_verify_instances(query, max_fs_writers=11, mt_dop=0,
-                                           expected_num_instances_per_host=[4, 5, 5],
-                                           processing_cost_min_threads=10)
+    self.__run_insert_and_verify_instances(query, max_fs_writers=2,
+                                           expected_num_instances_per_host=[1, 1, 2],
+                                           processing_cost_min_threads=1)
     # Root coordinator fragment.
     query = "create table {0}.test2 as select int_col from " \
             "functional_parquet.alltypes limit 100000".format(unique_database)
-    self.__run_insert_and_verify_instances(query, max_fs_writers=2, mt_dop=0,
+    self.__run_insert_and_verify_instances(query, max_fs_writers=2,
                                            expected_num_instances_per_host=[1, 1, 2],
-                                           processing_cost_min_threads=10)
-    # Root scan fragment. Instance count within limit.
+                                           processing_cost_min_threads=1)
+    # Root internal (non-leaf) fragment. Instance count within limit.
     query = "create table {0}.test3 as select int_col from " \
             "functional_parquet.alltypes".format(unique_database)
-    self.__run_insert_and_verify_instances(query, max_fs_writers=30, mt_dop=0,
-                                           expected_num_instances_per_host=[8, 8, 8],
-                                           processing_cost_min_threads=10)
+    self.__run_insert_and_verify_instances(query, max_fs_writers=30,
+                                           expected_num_instances_per_host=[1, 1, 2],
+                                           processing_cost_min_threads=1)
+    # Root internal (non-leaf) fragment. No max_fs_writers.
+    # Scan node and writer sink should always be in separate fragment with cost-based
+    # scaling.
+    query = "create table {0}.test4 as select int_col from " \
+            "functional_parquet.alltypes".format(unique_database)
+    self.__run_insert_and_verify_instances(query, max_fs_writers=0,
+                                           expected_num_instances_per_host=[1, 1, 2],
+                                           processing_cost_min_threads=1)
+    # Partitioned insert with 6 distinct partition values.
+    # Should create at least 1 writer per node.
+    query = "create table {0}.test5 partitioned by (ss_store_sk) as " \
+            "select ss_item_sk, ss_ticket_number, ss_store_sk " \
+            "from tpcds_parquet.store_sales".format(unique_database)
+    self.__run_insert_and_verify_instances(query, max_fs_writers=0,
+                                           expected_num_instances_per_host=[5, 5, 5],
+                                           processing_cost_min_threads=1)
+    # Partitioned insert can still be limited by max_fs_writers option.
+    query = "create table {0}.test6 partitioned by (ss_store_sk) as " \
+            "select ss_item_sk, ss_ticket_number, ss_store_sk " \
+            "from tpcds_parquet.store_sales".format(unique_database)
+    self.__run_insert_and_verify_instances(query, max_fs_writers=2,
+                                           expected_num_instances_per_host=[4, 5, 5],
+                                           processing_cost_min_threads=1)
 
-  def __run_insert_and_verify_instances(self, query, max_fs_writers, mt_dop,
-                                        expected_num_instances_per_host,
-                                        processing_cost_min_threads=0):
+  def __run_insert_and_verify_instances(self, query, max_fs_writers=0, mt_dop=0,
+                                        processing_cost_min_threads=0,
+                                        expected_num_instances_per_host=[]):
     self.client.set_configuration_option("max_fs_writers", max_fs_writers)
     self.client.set_configuration_option("mt_dop", mt_dop)
     if processing_cost_min_threads > 0:
@@ -451,8 +478,9 @@ class TestInsertHdfsWriterLimit(ImpalaTestSuite):
                                                     3)
     result = self.client.execute(query)
     assert 'HDFS WRITER' in result.exec_summary[0]['operator'], result.runtime_profile
-    assert int(result.exec_summary[0]['num_instances']) <= int(
-      max_fs_writers), result.runtime_profile
+    if (max_fs_writers > 0):
+      num_writers = int(result.exec_summary[0]['num_instances'])
+      assert (num_writers <= max_fs_writers), result.runtime_profile
     regex = r'Per Host Number of Fragment Instances' \
             r':.*?\((.*?)\).*?\((.*?)\).*?\((.*?)\).*?\n'
     matches = re.findall(regex, result.runtime_profile)

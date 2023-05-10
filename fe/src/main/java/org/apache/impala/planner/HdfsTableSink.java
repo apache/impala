@@ -66,6 +66,11 @@ public class HdfsTableSink extends TableSink {
   public static final long PARQUET_BLOOM_FILTER_MAX_BYTES = 128 * 1024 * 1024;
   public static final long PARQUET_BLOOM_FILTER_MIN_BYTES = 64;
 
+  // Minimum total writes in bytes that individual HdfsTableSink should aim.
+  // Used to estimate parallelism of writer fragment in DistributedPlanner.java.
+  // This is set to match with HDFS_BLOCK_SIZE in hdfs-parquet-table-writer.h.
+  public static final int MIN_WRITE_BYTES = 256 * 1024 * 1024;
+
   // Default number of partitions used for computeResourceProfile() in the absence of
   // column stats.
   protected final long DEFAULT_NUM_PARTITIONS = 10;

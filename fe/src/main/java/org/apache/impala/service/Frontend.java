@@ -1967,8 +1967,11 @@ public class Frontend {
   // Only the following types of statements are considered auto scalable since each
   // can be planned by the distributed planner utilizing the number of executors in
   // an executor group as input.
-  public static boolean canStmtBeAutoScaled(TStmtType type) {
-    return type == TStmtType.EXPLAIN || type == TStmtType.QUERY || type == TStmtType.DML;
+  public static boolean canStmtBeAutoScaled(TExecRequest req) {
+    return req.stmt_type == TStmtType.EXPLAIN || req.stmt_type == TStmtType.QUERY
+        || req.stmt_type == TStmtType.DML
+        || (req.stmt_type == TStmtType.DDL && req.query_exec_request != null
+            && req.query_exec_request.stmt_type == TStmtType.DML /* CTAS */);
   }
 
   private static int expectedNumExecutor(TExecutorGroupSet execGroupSet) {
@@ -2097,7 +2100,7 @@ public class Frontend {
       } else if (!enable_replan) {
         reason = "query option ENABLE_REPLAN=false";
         notScalable = true;
-      } else if (!Frontend.canStmtBeAutoScaled(req.stmt_type)) {
+      } else if (!Frontend.canStmtBeAutoScaled(req)) {
         reason = "query is not auto-scalable";
         notScalable = true;
       }
