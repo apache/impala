@@ -20,6 +20,7 @@
 from __future__ import absolute_import, division, print_function
 from builtins import range
 import os
+import shutil
 from six.moves import urllib
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal, SkipIfFS, SkipIfCatalogV2
@@ -172,17 +173,25 @@ class TestRecoverPartitions(ImpalaTestSuite):
 
     TBL_NAME = "test_recover_partitions"
     FQ_TBL_NAME = unique_database + "." + TBL_NAME
-    TBL_LOCATION = self.__get_fs_location(unique_database, TBL_NAME)
+    DB_LOCATION = '%s/%s.db/' % (WAREHOUSE, unique_database)
 
     self.execute_query_expect_success(self.client,
         "CREATE TABLE %s (c int) PARTITIONED BY (s string)" % (FQ_TBL_NAME))
 
     # Create 700 partitions externally
-    for i in range(1, 700):
-        PART_DIR = "s=part%d/" % i
-        FILE_PATH = "test"
-        INSERTED_VALUE = "666"
-        self.create_fs_partition(TBL_LOCATION, PART_DIR, FILE_PATH, INSERTED_VALUE)
+    try:
+      SRC_DIR = os.path.join("/tmp", unique_database, TBL_NAME)
+      if os.path.exists(SRC_DIR):
+          shutil.rmtree(SRC_DIR)
+      os.makedirs(SRC_DIR)
+      for i in range(1, 700):
+        partition_dir = os.path.join(SRC_DIR, "s=part%d/" % i)
+        os.makedirs(partition_dir)
+        with open(os.path.join(partition_dir, "test"), 'w') as f:
+          f.write("666")
+      self.filesystem_client.copy_from_local(SRC_DIR, DB_LOCATION)
+    finally:
+      shutil.rmtree(SRC_DIR)
 
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % FQ_TBL_NAME)

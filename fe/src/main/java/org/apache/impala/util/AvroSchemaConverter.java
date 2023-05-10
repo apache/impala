@@ -21,9 +21,6 @@ import java.util.List;
 
 import org.apache.avro.Schema;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.node.IntNode;
-import org.codehaus.jackson.node.JsonNodeFactory;
 
 import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.catalog.ArrayType;
@@ -105,7 +102,6 @@ public class AvroSchemaConverter {
   private Schema convertFieldSchemasImpl(
       List<FieldSchema> fieldSchemas, String schemaName) {
     List<Schema.Field> avroFields = Lists.newArrayList();
-    JsonNode nullDefault = JsonNodeFactory.instance.nullNode();
     for (FieldSchema fs: fieldSchemas) {
       Type impalaType = Type.parseColumnType(fs.getType());
       if (impalaType == null) {
@@ -113,7 +109,7 @@ public class AvroSchemaConverter {
             fs.getType() + " is not a suppported Impala type");
       }
       final Schema.Field avroField = new Schema.Field(fs.getName(),
-          createAvroSchema(impalaType), fs.getComment(), nullDefault);
+          createAvroSchema(impalaType), fs.getComment(), Schema.NULL_VALUE);
       avroFields.add(avroField);
     }
     return createAvroRecord(avroFields, schemaName);
@@ -178,10 +174,8 @@ public class AvroSchemaConverter {
     Schema decimalSchema = Schema.create(Schema.Type.BYTES);
     decimalSchema.addProp(AVRO_LOGICAL_TYPE, AVRO_DECIMAL_TYPE);
     // precision and scale must be integer values
-    decimalSchema.addProp(PRECISION_PROP_NAME,
-        new IntNode(impalaDecimalType.decimalPrecision()));
-    decimalSchema.addProp(SCALE_PROP_NAME,
-        new IntNode(impalaDecimalType.decimalScale()));
+    decimalSchema.addProp(PRECISION_PROP_NAME, impalaDecimalType.decimalPrecision());
+    decimalSchema.addProp(SCALE_PROP_NAME, impalaDecimalType.decimalScale());
     return decimalSchema;
   }
 

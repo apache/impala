@@ -1,0 +1,114 @@
+explain SELECT * FROM functional_parquet.iceberg_alltypes_part_orc.history
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN ICEBERG METADATA [functional_parquet.iceberg_alltypes_part_orc.history]
+   row-size=33B cardinality=unavailable
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN ICEBERG METADATA [functional_parquet.iceberg_alltypes_part_orc.history]
+   row-size=33B cardinality=unavailable
+====
+explain select *
+from functional_parquet.iceberg_alltypes_part_orc.history q
+  join functional_parquet.iceberg_alltypes_part_orc.history z
+  on z.snapshot_id = q.snapshot_id
+---- PLAN
+PLAN-ROOT SINK
+|
+02:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=66B cardinality=unavailable
+|
+|--01:SCAN ICEBERG METADATA [functional_parquet.iceberg_alltypes_part_orc.history z]
+|     row-size=33B cardinality=unavailable
+|
+00:SCAN ICEBERG METADATA [functional_parquet.iceberg_alltypes_part_orc.history q]
+   row-size=33B cardinality=unavailable
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=66B cardinality=unavailable
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN ICEBERG METADATA [functional_parquet.iceberg_alltypes_part_orc.history z]
+|     row-size=33B cardinality=unavailable
+|
+00:SCAN ICEBERG METADATA [functional_parquet.iceberg_alltypes_part_orc.history q]
+   row-size=33B cardinality=unavailable
+====
+explain select q.snapshot_id, z.made_current_at as test1, z.made_current_at as test2
+from functional_parquet.iceberg_alltypes_part_orc.history q
+  join functional_parquet.iceberg_alltypes_part_orc.history z
+  on z.snapshot_id = q.snapshot_id
+---- PLAN
+PLAN-ROOT SINK
+|
+02:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=24B cardinality=unavailable
+|
+|--01:SCAN ICEBERG METADATA [functional_parquet.iceberg_alltypes_part_orc.history z]
+|     row-size=16B cardinality=unavailable
+|
+00:SCAN ICEBERG METADATA [functional_parquet.iceberg_alltypes_part_orc.history q]
+   row-size=8B cardinality=unavailable
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=24B cardinality=unavailable
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN ICEBERG METADATA [functional_parquet.iceberg_alltypes_part_orc.history z]
+|     row-size=16B cardinality=unavailable
+|
+00:SCAN ICEBERG METADATA [functional_parquet.iceberg_alltypes_part_orc.history q]
+   row-size=8B cardinality=unavailable
+====
+explain select * from functional_parquet.iceberg_alltypes_part_orc.manifests a, a.partition_summaries
+---- PLAN
+PLAN-ROOT SINK
+|
+01:SUBPLAN
+|  row-size=98B cardinality=unavailable
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=98B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=72B cardinality=1
+|  |
+|  03:UNNEST [a.partition_summaries]
+|     row-size=0B cardinality=10
+|
+00:SCAN ICEBERG METADATA [functional_parquet.iceberg_alltypes_part_orc.manifests a]
+   row-size=72B cardinality=unavailable
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+01:SUBPLAN
+|  row-size=98B cardinality=unavailable
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=98B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=72B cardinality=1
+|  |
+|  03:UNNEST [a.partition_summaries]
+|     row-size=0B cardinality=10
+|
+00:SCAN ICEBERG METADATA [functional_parquet.iceberg_alltypes_part_orc.manifests a]
+   row-size=72B cardinality=unavailable
+====

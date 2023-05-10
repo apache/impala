@@ -25,6 +25,7 @@ from compatibility import _xrange as xrange
 import cmd
 import errno
 import getpass
+import logging
 import os
 import prettytable
 import random
@@ -788,7 +789,7 @@ class ImpalaShell(cmd.Cmd, object):
       summary, failed_summary = self.imp_client.get_summary(self.last_query_handle)
     except RPCException as e:
       import re
-      error_pattern = re.compile("ERROR: Query id \d+:\d+ not found.")
+      error_pattern = re.compile("ERROR: Query id [a-f0-9]+:[a-f0-9]+ not found.")
       if error_pattern.match(e.value):
         print("Could not retrieve summary for query.", file=sys.stderr)
       else:
@@ -807,7 +808,10 @@ class ImpalaShell(cmd.Cmd, object):
     elif display_mode == QueryAttemptDisplayModes.LATEST:
       self.print_exec_summary(summary)
     elif display_mode == QueryAttemptDisplayModes.ORIGINAL:
-      self.print_exec_summary(failed_summary)
+      if failed_summary:
+        self.print_exec_summary(failed_summary)
+      else:
+        print("No failed summary found")
     else:
       raise FatalShellException("Invalid value for query summary display mode")
 
@@ -818,6 +822,7 @@ class ImpalaShell(cmd.Cmd, object):
         QueryAttemptDisplayModes.LATEST, QueryAttemptDisplayModes.ORIGINAL]:
       print("Invalid value for query attempt display mode: \'" +
           arg_mode + "\'. Valid values are [ALL | LATEST | ORIGINAL]")
+      return None
     return arg_mode
 
   def print_exec_summary(self, summary):
@@ -1783,7 +1788,7 @@ warned, it can be very long!",
   "Want to know what version of Impala you're connected to? Run the VERSION command to \
 find out!",
   "You can change the Impala daemon that you're connected to by using the CONNECT \
-command."
+command.",
   "To see how Impala will plan to run your query without actually executing it, use the \
 EXPLAIN command. You can change the level of detail in the EXPLAIN output by setting the \
 EXPLAIN_LEVEL query option.",
@@ -2172,6 +2177,9 @@ def impala_shell_main():
       raise FatalShellException()
 
   intro = get_intro(options)
+
+  # Suppressing unwanted notifications from Thrift
+  logging.getLogger('thrift').addHandler(logging.NullHandler())
 
   with ImpalaShell(options, query_options) as shell:
     while shell.is_alive:

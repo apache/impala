@@ -25,7 +25,7 @@
 #
 # TODO Add support for SQL Error Codes
 #      https://msdn.microsoft.com/en-us/library/ms714687%28v=vs.85%29.aspx
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 error_codes = (
   ("OK", 0, ""),
 

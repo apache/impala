@@ -86,10 +86,14 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
 
 HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
   : HdfsColumnarScanner(scan_node, state),
+    row_group_idx_(-1),
+    row_group_rows_read_(0),
+    advance_row_group_(true),
     min_max_tuple_(nullptr),
     row_batches_produced_(0),
     dictionary_pool_(new MemPool(scan_node->mem_tracker())),
     stats_batch_read_pool_(new MemPool(scan_node->mem_tracker())),
+    assemble_rows_timer_(scan_node_->materialize_tuple_timer()),
     num_stats_filtered_row_groups_counter_(nullptr),
     num_minmax_filtered_row_groups_counter_(nullptr),
     num_bloom_filtered_row_groups_counter_(nullptr),
@@ -379,7 +383,7 @@ static bool CheckRowGroupOverlapsSplit(const parquet::RowGroup& row_group,
 
 int HdfsParquetScanner::CountScalarColumns(
     const vector<ParquetColumnReader*>& column_readers) {
-  DCHECK(!column_readers.empty() || scan_node_->optimize_count_star());
+  DCHECK(!column_readers.empty() || scan_node_->optimize_parquet_count_star());
   int num_columns = 0;
   stack<ParquetColumnReader*> readers;
   for (ParquetColumnReader* r: column_readers_) readers.push(r);
@@ -429,15 +433,55 @@ Status HdfsParquetScanner::ProcessSplit() {
 
 Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
   DCHECK(parse_status_.ok()) << parse_status_.GetDetail();
-  if (scan_node_->optimize_count_star()) {
-    // This is an optimized count(*) case.
+  if (scan_node_->optimize_parquet_count_star()) {
     // Populate the single slot with the Parquet num rows statistic.
-    return GetNextWithCountStarOptimization(row_batch);
+    int64_t tuple_buf_size;
+    uint8_t* tuple_buf;
+    // We try to allocate a smaller row batch here because in most cases the number row
+    // groups in a file is much lower than the default row batch capacity.
+    int capacity = min(
+        static_cast<int>(file_metadata_.row_groups.size()), row_batch->capacity());
+    RETURN_IF_ERROR(RowBatch::ResizeAndAllocateTupleBuffer(state_,
+        row_batch->tuple_data_pool(), row_batch->row_desc()->GetRowSize(),
+        &capacity, &tuple_buf_size, &tuple_buf));
+    while (!row_batch->AtCapacity()) {
+      RETURN_IF_ERROR(NextRowGroup());
+      DCHECK_LE(row_group_idx_, file_metadata_.row_groups.size());
+      DCHECK_LE(row_group_rows_read_, file_metadata_.num_rows);
+      if (row_group_idx_ == file_metadata_.row_groups.size()) break;
+      Tuple* dst_tuple = reinterpret_cast<Tuple*>(tuple_buf);
+      TupleRow* dst_row = row_batch->GetRow(row_batch->AddRow());
+      InitTuple(template_tuple_, dst_tuple);
+      int64_t* dst_slot =
+          dst_tuple->GetBigIntSlot(scan_node_->parquet_count_star_slot_offset());
+      *dst_slot = file_metadata_.row_groups[row_group_idx_].num_rows;
+      row_group_rows_read_ += *dst_slot;
+      dst_row->SetTuple(0, dst_tuple);
+      row_batch->CommitLastRow();
+      tuple_buf += scan_node_->tuple_desc()->byte_size();
+    }
+    eos_ = row_group_idx_ == file_metadata_.row_groups.size();
+    return Status::OK();
   } else if (scan_node_->IsZeroSlotTableScan()) {
     // There are no materialized slots and we are not optimizing count(*), e.g.
     // "select 1 from alltypes". We can serve this query from just the file metadata.
     // We don't need to read the column data.
-    return GetNextWithTemplateTuple(row_batch);
+    if (row_group_rows_read_ == file_metadata_.num_rows) {
+      eos_ = true;
+      return Status::OK();
+    }
+    assemble_rows_timer_.Start();
+    DCHECK_LE(row_group_rows_read_, file_metadata_.num_rows);
+    int64_t rows_remaining = file_metadata_.num_rows - row_group_rows_read_;
+    int max_tuples = min<int64_t>(row_batch->capacity(), rows_remaining);
+    TupleRow* current_row = row_batch->GetRow(row_batch->AddRow());
+    int num_to_commit = WriteTemplateTuples(current_row, max_tuples);
+    Status status = CommitRows(row_batch, num_to_commit);
+    assemble_rows_timer_.Stop();
+    RETURN_IF_ERROR(status);
+    row_group_rows_read_ += max_tuples;
+    COUNTER_ADD(scan_node_->rows_read_counter(), max_tuples);
+    return Status::OK();
   }
 
   // Transfer remaining tuples from the scratch batch.
@@ -449,18 +493,18 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
     if (row_batch->AtCapacity()) return Status::OK();
   }
 
-  while (advance_group_ || column_readers_[0]->RowGroupAtEnd()) {
+  while (advance_row_group_ || column_readers_[0]->RowGroupAtEnd()) {
     // Transfer resources and clear streams if there is any leftover from the previous
     // row group. We will create new streams for the next row group.
     FlushRowGroupResources(row_batch);
-    if (!advance_group_) {
+    if (!advance_row_group_) {
       Status status =
-          ValidateEndOfRowGroup(column_readers_, group_idx_, rows_read_in_group_);
+          ValidateEndOfRowGroup(column_readers_, row_group_idx_, row_group_rows_read_);
       if (!status.ok()) RETURN_IF_ERROR(state_->LogOrReturnError(status.msg()));
     }
     RETURN_IF_ERROR(NextRowGroup());
-    DCHECK_LE(group_idx_, file_metadata_.row_groups.size());
-    if (group_idx_ == file_metadata_.row_groups.size()) {
+    DCHECK_LE(row_group_idx_, file_metadata_.row_groups.size());
+    if (row_group_idx_ == file_metadata_.row_groups.size()) {
       eos_ = true;
       DCHECK(parse_status_.ok());
       return Status::OK();
@@ -481,9 +525,9 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
   assemble_rows_timer_.Start();
   Status status;
   if (filter_pages_) {
-    status = AssembleRows<true>(row_batch, &advance_group_);
+    status = AssembleRows<true>(row_batch, &advance_row_group_);
   } else {
-    status = AssembleRows<false>(row_batch, &advance_group_);
+    status = AssembleRows<false>(row_batch, &advance_row_group_);
   }
   assemble_rows_timer_.Stop();
   RETURN_IF_ERROR(status);
@@ -819,11 +863,11 @@ Status HdfsParquetScanner::NextRowGroup() {
   const HdfsFileDesc* file_desc =
       scan_node_->GetFileDesc(context_->partition_descriptor()->id(), filename());
 
-  bool start_with_first_row_group = group_idx_ == -1;
+  bool start_with_first_row_group = row_group_idx_ == -1;
   bool misaligned_row_group_skipped = false;
 
-  advance_group_ = false;
-  rows_read_in_group_ = 0;
+  advance_row_group_ = false;
+  row_group_rows_read_ = 0;
 
   // Loop until we have found a non-empty row group, and successfully initialized and
   // seeded the column readers. Return a non-OK status from within loop only if the error
@@ -835,8 +879,8 @@ Status HdfsParquetScanner::NextRowGroup() {
     // or previous row groups.
     DCHECK_EQ(0, context_->NumStreams());
 
-    ++group_idx_;
-    if (group_idx_ >= file_metadata_.row_groups.size()) {
+    ++row_group_idx_;
+    if (row_group_idx_ >= file_metadata_.row_groups.size()) {
       if (start_with_first_row_group && misaligned_row_group_skipped) {
         // We started with the first row group and skipped all the row groups because
         // they were misaligned. The execution flow won't reach this point if there is at
@@ -845,7 +889,7 @@ Status HdfsParquetScanner::NextRowGroup() {
       }
       break;
     }
-    const parquet::RowGroup& row_group = file_metadata_.row_groups[group_idx_];
+    const parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
     // Also check 'file_metadata_.num_rows' to make sure 'select count(*)' and 'select *'
     // behave consistently for corrupt files that have 'file_metadata_.num_rows == 0'
     // but some data in row groups.
@@ -854,7 +898,7 @@ Status HdfsParquetScanner::NextRowGroup() {
     // Let's find the index of the first row in this row group. It's needed to track the
     // file position of each row.
     int64_t row_group_first_row = 0;
-    for (int i = 0; i < group_idx_; ++i) {
+    for (int i = 0; i < row_group_idx_; ++i) {
       const parquet::RowGroup& row_group = file_metadata_.row_groups[i];
       row_group_first_row += row_group.num_rows;
     }
@@ -1280,7 +1324,7 @@ Status HdfsParquetScanner::ProcessPageIndex() {
   MonotonicStopWatch single_process_page_index_timer;
   single_process_page_index_timer.Start();
   ResetPageFiltering();
-  RETURN_IF_ERROR(page_index_.ReadAll(group_idx_));
+  RETURN_IF_ERROR(page_index_.ReadAll(row_group_idx_));
   if (page_index_.IsEmpty()) return Status::OK();
   // We can release the raw page index buffer when we exit this function.
   const auto scope_exit = MakeScopeExitTrigger([this](){page_index_.Release();});
@@ -1404,7 +1448,7 @@ Status HdfsParquetScanner::FindSkipRangesForPagesWithMinMaxFilters(
   }
 
   min_max_tuple_->Init(min_max_tuple_desc->byte_size());
-  parquet::RowGroup& row_group = file_metadata_.row_groups[group_idx_];
+  parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
 
   int filtered_pages = 0;
 
@@ -1507,7 +1551,7 @@ Status HdfsParquetScanner::FindSkipRangesForPagesWithMinMaxFilters(
 }
 
 Status HdfsParquetScanner::EvaluatePageIndex() {
-  parquet::RowGroup& row_group = file_metadata_.row_groups[group_idx_];
+  parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
   vector<RowRange> skip_ranges;
 
   for (int i = 0; i < stats_conjunct_evals_.size(); ++i) {
@@ -1597,7 +1641,7 @@ Status HdfsParquetScanner::EvaluatePageIndex() {
 Status HdfsParquetScanner::ComputeCandidatePagesForColumns() {
   if (candidate_ranges_.empty()) return Status::OK();
 
-  parquet::RowGroup& row_group = file_metadata_.row_groups[group_idx_];
+  parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
   for (BaseScalarColumnReader* scalar_reader : scalar_readers_) {
     const auto& page_locations = scalar_reader->offset_index_.page_locations;
     if (!ComputeCandidatePages(page_locations, candidate_ranges_, row_group.num_rows,
@@ -2186,8 +2230,7 @@ Status HdfsParquetScanner::ProcessBloomFilter(const parquet::RowGroup&
       if (!bloom_filter.Find(hash)) {
         *skip_row_group = true;
         VLOG(3) << Substitute("Row group with idx $0 filtered by Parquet Bloom filter on "
-                              "column with idx $1 in file $2.",
-            group_idx_, col_idx, filename());
+            "column with idx $1 in file $2.", row_group_idx_, col_idx, filename());
         return Status::OK();
       }
     }
@@ -2261,7 +2304,7 @@ Status HdfsParquetScanner::AssembleRowsWithoutLateMaterialization(
     RETURN_IF_ERROR(CommitRows(row_batch, num_row_to_commit));
     if (row_batch->AtCapacity()) break;
   }
-  rows_read_in_group_ += num_rows_read;
+  row_group_rows_read_ += num_rows_read;
   COUNTER_ADD(scan_node_->rows_read_counter(), num_rows_read);
   // Merge Scanner-local counter into HdfsScanNode counter and reset.
   COUNTER_ADD(scan_node_->collection_items_read_counter(), coll_items_read_counter_);
@@ -2388,7 +2431,7 @@ Status HdfsParquetScanner::AssembleRows(RowBatch* row_batch, bool* skip_row_grou
       break;
     }
   }
-  rows_read_in_group_ += num_rows_read;
+  row_group_rows_read_ += num_rows_read;
   COUNTER_ADD(scan_node_->rows_read_counter(), num_rows_read);
   // Merge Scanner-local counter into HdfsScanNode counter and reset.
   COUNTER_ADD(scan_node_->collection_items_read_counter(), coll_items_read_counter_);
@@ -2788,7 +2831,7 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
   DCHECK(column_readers != nullptr);
   DCHECK(column_readers->empty());
 
-  if (scan_node_->optimize_count_star()) {
+  if (scan_node_->optimize_parquet_count_star()) {
     // Column readers are not needed because we are not reading from any columns if this
     // optimization is enabled.
     return Status::OK();
@@ -2955,7 +2998,7 @@ Status HdfsParquetScanner::InitScalarColumns(int64_t row_group_first_row) {
   int64_t partition_id = context_->partition_descriptor()->id();
   const HdfsFileDesc* file_desc = scan_node_->GetFileDesc(partition_id, filename());
   DCHECK(file_desc != nullptr);
-  parquet::RowGroup& row_group = file_metadata_.row_groups[group_idx_];
+  parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
 
   // Used to validate that the number of values in each reader in column_readers_ at the
   // same SchemaElement is the same.
@@ -2975,7 +3018,7 @@ Status HdfsParquetScanner::InitScalarColumns(int64_t row_group_first_row) {
       return Status(TErrorCode::PARQUET_NUM_COL_VALS_ERROR, scalar_reader->col_idx(),
           col_chunk.meta_data.num_values, num_values, filename());
     }
-    RETURN_IF_ERROR(scalar_reader->Reset(*file_desc, col_chunk, group_idx_,
+    RETURN_IF_ERROR(scalar_reader->Reset(*file_desc, col_chunk, row_group_idx_,
         row_group_first_row));
   }
 

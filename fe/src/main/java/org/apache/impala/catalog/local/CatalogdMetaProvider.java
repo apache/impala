@@ -99,12 +99,13 @@ import org.apache.impala.thrift.TValidWriteIdList;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.ListMap;
+import org.apache.impala.util.TByteBuffer;
 import org.apache.impala.util.ThreadNameAnnotator;
+import org.apache.thrift.TConfiguration;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
-import org.apache.thrift.transport.TByteBuffer;
 import org.ehcache.sizeof.SizeOf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1223,12 +1224,15 @@ public class CatalogdMetaProvider implements MetaProvider {
     ObjectUpdateSequencer hdfsCachePoolSequencer = new ObjectUpdateSequencer();
 
     Pair<Boolean, ByteBuffer> update;
+    int maxMessageSize = BackendConfig.INSTANCE.getThriftRpcMaxMessageSize();
+    final TConfiguration config = new TConfiguration(maxMessageSize,
+        TConfiguration.DEFAULT_MAX_FRAME_SIZE, TConfiguration.DEFAULT_RECURSION_DEPTH);
     while ((update = FeSupport.NativeGetNextCatalogObjectUpdate(req.native_iterator_ptr))
         != null) {
       boolean isDelete = update.first;
       TCatalogObject obj = new TCatalogObject();
       try {
-        obj.read(new TBinaryProtocol(new TByteBuffer(update.second)));
+        obj.read(new TBinaryProtocol(new TByteBuffer(config, update.second)));
       } catch (TException e) {
         // TODO(todd) include the bad key here! currently the JNI bridge doesn't expose
         // the key in any way.

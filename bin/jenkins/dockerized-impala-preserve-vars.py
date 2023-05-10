@@ -28,7 +28,7 @@
 # If an environment variable is not defined in the current environment,
 # it is omitted with a warning.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import sys
 import os
 

@@ -154,6 +154,10 @@ ln -s "${CONFIG_DIR}/hive-site_events_cleanup.xml" hive-site-events-cleanup/hive
 export HIVE_VARIANT=ranger_auth
 HIVE_RANGER_CONF_DIR=hive-site-ranger-auth
 $IMPALA_HOME/bin/generate_xml_config.py hive-site.xml.py hive-site_ranger_auth.xml
+
+# Cleanup pycache if created
+rm -rf __pycache__
+
 rm -rf $HIVE_RANGER_CONF_DIR
 mkdir -p $HIVE_RANGER_CONF_DIR
 ln -s "${CONFIG_DIR}/hive-site_ranger_auth.xml" $HIVE_RANGER_CONF_DIR/hive-site.xml

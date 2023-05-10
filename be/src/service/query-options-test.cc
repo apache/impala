@@ -259,6 +259,7 @@ TEST(QueryOptions, SetIntOptions) {
       {MAKE_OPTIONDEF(max_cnf_exprs),                  {-1, I32_MAX}},
       {MAKE_OPTIONDEF(max_fs_writers),                 {0, I32_MAX}},
       {MAKE_OPTIONDEF(default_ndv_scale),              {1, 10}},
+      {MAKE_OPTIONDEF(processing_cost_min_threads),    {1, 128}},
   };
   for (const auto& test_case : case_set) {
     const OptionDef<int32_t>& option_def = test_case.first;

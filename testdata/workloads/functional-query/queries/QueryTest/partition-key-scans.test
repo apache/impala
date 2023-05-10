@@ -11,10 +11,6 @@ INT
 ---- RUNTIME_PROFILE
 # Confirm that only one row per file is read.
 aggregation(SUM, RowsRead): 24
----- RUNTIME_PROFILE: table_format=parquet,orc
-# Confirm that only one metadata per file is read.
-aggregation(SUM, RowsRead): 0
-aggregation(SUM, NumFileMetadataRead): 24
 ====
 ---- QUERY
 # Test with more complex multiple distinct aggregation.
@@ -27,10 +23,6 @@ BIGINT,BIGINT
 ---- RUNTIME_PROFILE
 # Confirm that only one row per file is read.
 aggregation(SUM, RowsRead): 24
----- RUNTIME_PROFILE: table_format=parquet,orc
-# Confirm that only one metadata per file is read.
-aggregation(SUM, RowsRead): 0
-aggregation(SUM, NumFileMetadataRead): 24
 ====
 ---- QUERY
 # Distinct aggregation with multiple columns.
@@ -66,10 +58,6 @@ INT,INT
 ---- RUNTIME_PROFILE
 # Confirm that only one row per file is read.
 aggregation(SUM, RowsRead): 24
----- RUNTIME_PROFILE: table_format=parquet,orc
-# Confirm that only one metadata per file is read.
-aggregation(SUM, RowsRead): 0
-aggregation(SUM, NumFileMetadataRead): 24
 ====
 ---- QUERY
 # Partition key scan combined with analytic function.
@@ -83,10 +71,6 @@ INT,BIGINT
 ---- RUNTIME_PROFILE
 # Confirm that only one row per file is read.
 aggregation(SUM, RowsRead): 24
----- RUNTIME_PROFILE: table_format=parquet,orc
-# Confirm that only one metadata per file is read.
-aggregation(SUM, RowsRead): 0
-aggregation(SUM, NumFileMetadataRead): 24
 ====
 ---- QUERY
 # Partition scan combined with sort.
@@ -123,10 +107,6 @@ INT,INT
 ---- RUNTIME_PROFILE
 # Confirm that only one row per file is read.
 aggregation(SUM, RowsRead): 24
----- RUNTIME_PROFILE: table_format=parquet,orc
-# Confirm that only one metadata per file is read.
-aggregation(SUM, RowsRead): 0
-aggregation(SUM, NumFileMetadataRead): 24
 ====
 ---- QUERY
 # Partition key scan combined with predicate on partition columns
@@ -141,10 +121,6 @@ INT,INT
 ---- RUNTIME_PROFILE
 # Confirm that only one row per file is read.
 aggregation(SUM, RowsRead): 2
----- RUNTIME_PROFILE: table_format=parquet,orc
-# Confirm that only one metadata per file is read.
-aggregation(SUM, RowsRead): 0
-aggregation(SUM, NumFileMetadataRead): 2
 ====
 ---- QUERY
 # Partition key scan combined with having predicate.
@@ -160,10 +136,6 @@ INT,INT
 ---- RUNTIME_PROFILE
 # Confirm that only one row per file is read.
 aggregation(SUM, RowsRead): 24
----- RUNTIME_PROFILE: table_format=parquet,orc
-# Confirm that only one metadata per file is read.
-aggregation(SUM, RowsRead): 0
-aggregation(SUM, NumFileMetadataRead): 24
 ====
 ---- QUERY
 # Empty table should not return any rows

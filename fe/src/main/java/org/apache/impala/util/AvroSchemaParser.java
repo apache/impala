@@ -44,7 +44,6 @@ import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
-import org.codehaus.jackson.JsonNode;
 
 /**
  * Utility class used to parse Avro schema. Checks that the schema is valid
@@ -201,15 +200,16 @@ public class AvroSchemaParser {
    * Throws a SchemaParseException if the property doesn't parse to a
    * natural number.
    */
-  private static Integer getDecimalProp(Schema schema, String propName)
-      throws SchemaParseException {
-    JsonNode node = schema.getJsonProp(propName);
+  private static Integer getDecimalProp(Schema schema, String propName) {
+    Object node = schema.getObjectProp(propName);
     if (node == null) return null;
-    int propValue = node.getValueAsInt(-1);
-    if (propValue < 0) {
+    Integer value = -1;
+    if (node instanceof Integer) value = (Integer) node;
+    if (node instanceof Double) value = ((Double) node).intValue();
+    if (value < 0) {
       throw new SchemaParseException(String.format("Invalid decimal '%s' " +
-          "property value: %s", propName, node.getValueAsText()));
+          "property value: %s", propName, node));
     }
-    return propValue;
+    return value;
   }
 }

@@ -17,6 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import absolute_import, division, print_function
 import argparse
 import datetime
 import errno
@@ -87,7 +88,8 @@ class Command(object):
     cmd_string = " ".join(self.cmd)
     logging.info("Starting command %s with a timeout of %s"
         % (cmd_string, str(self.timeout)))
-    self.child = subprocess.Popen(self.cmd, stdin=cmd_stdin, stdout=cmd_stdout)
+    self.child = subprocess.Popen(self.cmd, stdin=cmd_stdin, stdout=cmd_stdout,
+        universal_newlines=True)
     timer = Timer(self.timeout, self.kill_child)
     try:
       timer.start()
@@ -312,7 +314,7 @@ class ImpalaDiagnosticsHandler(object):
       cmds_to_run.append((Command(cmd_args, self.args.timeout), "pstack", False))
 
     collection_start_ts = time.time()
-    for i in xrange(stacks_count):
+    for i in range(stacks_count):
       for cmd, file_prefix, is_minidump in cmds_to_run:
         if file_prefix:
           stdout_file = os.path.join(stacks_dir, file_prefix + "-" + str(i) + ".txt")
@@ -341,7 +343,7 @@ class ImpalaDiagnosticsHandler(object):
     cmd_args = ["kill", "-SIGUSR1", str(self.args.pid)]
     cmd = Command(cmd_args, self.args.timeout)
     collection_start_ts = time.time()
-    for i in xrange(minidump_count):
+    for i in range(minidump_count):
       cmd.run()
       self.wait_for_minidump()
       time.sleep(minidump_interval_secs)

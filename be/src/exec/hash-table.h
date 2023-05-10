@@ -43,6 +43,7 @@ namespace llvm {
 
 namespace impala {
 
+class CodegenAnyVal;
 class LlvmCodeGen;
 class MemTracker;
 class RowDescriptor;

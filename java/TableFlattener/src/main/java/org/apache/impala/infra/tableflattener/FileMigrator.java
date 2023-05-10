@@ -70,7 +70,7 @@ public class FileMigrator {
       if (SchemaUtil.recordHasField(srcRecord, field.name())) {
         value = srcRecord.get(field.name());
       } else {
-        Preconditions.checkNotNull(field.defaultValue());
+        Preconditions.checkNotNull(field.defaultVal());
         value = GenericData.get().getDefaultValue(field);
       }
       writeValue(value, field.schema(), field.name(), dstRecord, dstDataset,

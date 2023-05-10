@@ -68,18 +68,15 @@ for file in $(git ls-files '**/*.py'); do
     if [[ "${file}" =~ "shell/" && ! "${file}" =~ "tests/shell" ]]; then
         continue
     fi
-    # For the moment, the focus is on enforcing py3k checks on files that use the
-    # impala-python virtualenv. Ignore executable python files that do not
-    # use impala-python. In practice, this tends to be scripts used during the
-    # build or various scripts for developers in bin.
+    # Ignore files that are created to run with python3.
     FIRST_LINE=$(head -n1 ${file})
     if [[ "${file}: ${FIRST_LINE}" =~ "#!" ]]; then
         if [[ "${FIRST_LINE}" =~ "python3" ]]; then
             >&2 echo "SKIPPING: ${file} is already using python3: ${FIRST_LINE}"
             continue
         fi
-        if [[ ! "${FIRST_LINE}" =~ "impala-python" ]]; then
-            >&2 echo "SKIPPING: ${file} is not using impala-python: ${FIRST_LINE}"
+        if [[ "${FIRST_LINE}" =~ "/bin/bash" ]]; then
+            >&2 echo "SKIPPING: ${file} is a weird bash/python hybrid: ${FIRST_LINE}"
             continue
         fi
     fi

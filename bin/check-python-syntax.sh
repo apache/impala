@@ -36,7 +36,11 @@ for file in $(git ls-files '**/*.py'); do
     # -l = no recursion
     # -q = only print errors
     # -f = force recompile
-    if ! python2 -m compileall -l -q -f ${file} > /dev/null 2>&1; then
+    # Ignore files that are created to run with python3.
+    FIRST_LINE=$(head -n1 ${file})
+    if [[ "${FIRST_LINE}" =~ "python3" ]]; then
+        >&2 echo "SKIPPING: ${file} is already using python3: ${FIRST_LINE}"
+    elif ! python2 -m compileall -l -q -f ${file} > /dev/null 2>&1; then
         RETCODE=1
         echo "Python 2 compilation failed for ${file}:"
         set +e

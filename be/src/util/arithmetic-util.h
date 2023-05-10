@@ -35,6 +35,12 @@ struct MakeUnsigned<__int128_t> {
   using type = __uint128_t;
 };
 
+// std::make_unsigned<>() also works for unsigned types and returns the same type.
+template <>
+struct MakeUnsigned< __uint128_t> {
+  using type = __uint128_t;
+};
+
 template <typename T>
 using UnsignedType = typename MakeUnsigned<T>::type;
 

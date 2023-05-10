@@ -6356,7 +6356,7 @@ public class CatalogOpExecutor {
   /**
    * Executes a TResetMetadataRequest and returns the result as a
    * TResetMetadataResponse. Based on the request parameters, this operation
-   * may do one of three things:
+   * may do one of these things:
    * 1) invalidate the entire catalog, forcing the metadata for all catalog
    *    objects to be reloaded.
    * 2) invalidate a specific table, forcing the metadata to be reloaded
@@ -6404,10 +6404,16 @@ public class CatalogOpExecutor {
       // Thrift representation of the result of the invalidate/refresh operation.
       TCatalogObject updatedThriftTable = null;
       TableName tblName = TableName.fromThrift(req.getTable_name());
-      Table tbl = catalog_.getTable(tblName.getDb(), tblName.getTbl());
-      if (req.isIs_refresh()) {
+      Table tbl = null;
+      if (!req.isIs_refresh()) {
+        // For INVALIDATE METADATA <db>.<table>, the db might be unloaded.
+        // So we can't update 'tbl' here.
+        updatedThriftTable = catalog_.invalidateTable(
+            req.getTable_name(), tblWasRemoved, dbWasAdded);
+      } else {
         // Quick check to see if the table exists in the catalog without triggering
         // a table load.
+        tbl = catalog_.getTable(tblName.getDb(), tblName.getTbl());
         if (tbl != null) {
           // If the table is not loaded, no need to perform refresh after the initial
           // metadata load.
@@ -6454,9 +6460,6 @@ public class CatalogOpExecutor {
             }
           }
         }
-      } else {
-        updatedThriftTable = catalog_.invalidateTable(
-            req.getTable_name(), tblWasRemoved, dbWasAdded);
       }
 
       if (updatedThriftTable == null) {
@@ -6467,6 +6470,11 @@ public class CatalogOpExecutor {
       }
 
       if (BackendConfig.INSTANCE.enableReloadEvents()) {
+        // For INVALIDATE METADATA <table>, 'tbl' can only be got after it succeeds.
+        if (!req.isIs_refresh()) {
+          tbl = catalog_.getTable(tblName.getDb(), tblName.getTbl());
+        }
+        Preconditions.checkNotNull(tbl, "tbl is null in " + cmdString);
         // fire event for refresh event and update the last refresh event id
         fireReloadEventAndUpdateRefreshEventId(req, updatedThriftTable, tblName, tbl);
       }
@@ -6488,7 +6496,7 @@ public class CatalogOpExecutor {
               updatedThriftTable.getTable().getDb_name() + " was removed by a " +
               "concurrent operation. Try invalidating the table again.");
         }
-        resp.getResult().addToUpdated_catalog_objects(addedDb.toTCatalogObject());
+        addDbToCatalogUpdate(addedDb, req.header.want_minimal_response, resp.getResult());
       }
       resp.getResult().setVersion(updatedThriftTable.getCatalog_version());
     } else if (req.isAuthorization()) {
@@ -6831,6 +6839,11 @@ public class CatalogOpExecutor {
     if (update.isSync_ddl()) {
       response.getResult().setVersion(
           catalog_.waitForSyncDdlVersion(response.getResult()));
+    }
+
+    if (update.isSetDebug_action()) {
+      DebugUtils.executeDebugAction(update.getDebug_action(),
+          DebugUtils.INSERT_FINISH_DELAY);
     }
     return response;
   }
@@ -7201,7 +7214,6 @@ public class CatalogOpExecutor {
     Preconditions.checkNotNull(db);
     TCatalogObject updatedCatalogObject = wantMinimalResult ?
         db.toMinimalTCatalogObject() : db.toTCatalogObject();
-    updatedCatalogObject.setCatalog_version(updatedCatalogObject.getCatalog_version());
     result.addToUpdated_catalog_objects(updatedCatalogObject);
     result.setVersion(updatedCatalogObject.getCatalog_version());
   }

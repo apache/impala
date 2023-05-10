@@ -19,7 +19,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 from string import Template
 import os
 import shutil
@@ -231,7 +231,12 @@ ir_functions = [
   ["KRPC_DSS_HASH_AND_ADD_ROWS",
   "_ZN6impala20KrpcDataStreamSender14HashAndAddRowsEPNS_8RowBatchE"],
   ["GET_FUNCTION_CTX",
-  "_ZN6impala11HiveUdfCall18GetFunctionContextEPNS_19ScalarExprEvaluatorEi"],
+  "_ZN6impala19ScalarExprEvaluator18GetFunctionContextEPS0_i"],
+  ["GET_CHILD_EVALUATOR", "_ZN6impala19ScalarExprEvaluator17GetChildEvaluatorEPS0_i"],
+  ["STORE_RESULT_IN_EVALUATOR",
+  "_ZN6impala19ScalarExprEvaluator11StoreResultERKN10impala_udf6AnyValERKNS_10ColumnTypeE"],
+  ["FN_CTX_ALLOCATE_FOR_RESULTS",
+  "_Z23FnCtxAllocateForResultsPN10impala_udf15FunctionContextEl"],
   ["GET_JNI_CONTEXT",
   "_ZN6impala11HiveUdfCall13GetJniContextEPN10impala_udf15FunctionContextE"],
   ["JNI_CTX_SET_INPUT_NULL_BUFF_ELEM",

@@ -154,7 +154,6 @@ class HiveUdfCall : public ScalarExpr {
   /// Static helper functions for codegen.
   static jclass* GetExecutorClass();
   static jmethodID* GetExecutorEvaluateId();
-  static FunctionContext* GetFunctionContext(ScalarExprEvaluator* eval, int fn_ctx_idx);
   static JniContext* GetJniContext(FunctionContext* fn_ctx);
   static JNIEnv* GetJniEnv(JniContext* jni_ctx);
   static AnyVal* CallJavaAndStoreResult(const  ColumnType* type, FunctionContext* fn_ctx,

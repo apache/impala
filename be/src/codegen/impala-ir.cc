@@ -58,6 +58,7 @@
 #include "exprs/math-functions-ir.cc"
 #include "exprs/operators-ir.cc"
 #include "exprs/scalar-expr-ir.cc"
+#include "exprs/scalar-expr-evaluator-ir.cc"
 #include "exprs/string-functions-ir.cc"
 #include "exprs/timestamp-functions-ir.cc"
 #include "exprs/tuple-is-null-predicate-ir.cc"

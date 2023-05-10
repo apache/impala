@@ -22,7 +22,8 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS, SkipIfLocal, SkipIfNotHdfsMinicluster
 from tests.util.filesystem_utils import IS_EC, WAREHOUSE
-from time import sleep
+from tests.util.parse_util import get_duration_us_from_str
+from time import sleep, time
 from RuntimeProfile.ttypes import TRuntimeProfileFormat
 import pytest
 import re
@@ -608,7 +609,7 @@ class TestObservability(ImpalaTestSuite):
     assert len(start_time_sub_sec_str) == 9, start_time
 
   @pytest.mark.execute_serially
-  def test_end_time(self):
+  def test_query_end_time(self):
     """ Test that verifies that the end time of a query with a coordinator is set once
     the coordinator releases its admission control resources. This ensures that the
     duration of the query will be determined by the time taken to do real work rather
@@ -642,6 +643,41 @@ class TestObservability(ImpalaTestSuite):
     tree = last_op.get_profile(TRuntimeProfileFormat.THRIFT)
     end_time = tree.nodes[1].info_strings["End Time"]
     assert end_time is not None
+
+  def test_dml_end_time(self, unique_database):
+    """Same as the above test but verifies the end time of DML is set only after the work
+    in catalogd is done."""
+    stmt = "create table %s.alltypestiny like functional.alltypestiny" % unique_database
+    self.execute_query(stmt)
+    # Warm up the table
+    self.execute_query("describe %s.alltypestiny" % unique_database)
+    stmt = "insert overwrite %s.alltypestiny partition(year, month)" \
+           " select * from functional.alltypestiny" % unique_database
+    # Use debug_action to inject a delay in catalogd. The INSERT usually finishes in
+    # 300ms without the delay.
+    delay_s = 5
+    self.hs2_client.set_configuration_option(
+        "debug_action", "catalogd_insert_finish_delay:SLEEP@%d" % (delay_s * 1000))
+    start_ts = time()
+    handle = self.hs2_client.execute_async(stmt)
+    self.hs2_client.clear_configuration()
+    end_time_str = ""
+    duration_str = ""
+    while len(end_time_str) == 0:
+      sleep(1)
+      tree = self.hs2_client.get_runtime_profile(handle, TRuntimeProfileFormat.THRIFT)
+      end_time_str = tree.nodes[1].info_strings["End Time"]
+      duration_str = tree.nodes[1].info_strings["Duration"]
+      # End time should not show up earlier than the delay.
+      if time() - start_ts < delay_s:
+        assert len(end_time_str) == 0, "End time show up too early: {end_str}. " \
+                                       "{delay_s} second delay expected since " \
+                                       "{start_str} ({start_ts:.6f})".format(
+          end_str=end_time_str, delay_s=delay_s, start_ts=start_ts,
+          start_str=datetime.utcfromtimestamp(start_ts).strftime('%Y-%m-%d %H:%M:%S.%f'))
+    self.hs2_client.close_query(handle)
+    duration_us = get_duration_us_from_str(duration_str)
+    assert duration_us > delay_s * 1000000
 
   def test_query_profile_contains_number_of_fragment_instance(self):
     """Test that the expected section for number of fragment instance in

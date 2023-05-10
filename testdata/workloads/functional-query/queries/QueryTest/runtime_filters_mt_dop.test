@@ -15,10 +15,6 @@ on p.month = b.int_col and b.month = 1 and b.string_col = "1"
 620
 ---- RUNTIME_PROFILE
 row_regex: .*RowsRead: 2.43K .*
----- RUNTIME_PROFILE: table_format=parquet,orc
-row_regex: .*RowsReturned: 2.43K .*
-aggregation(SUM, RowsRead): 2
-aggregation(SUM, NumFileMetadataRead): 48
 ====
 ---- QUERY
 # Now turn on local filtering: we expect to see a reduction in scan volume.
@@ -53,10 +49,6 @@ on p.month = b.int_col and b.month = 1 and b.string_col = "1"
 620
 ---- RUNTIME_PROFILE
 row_regex: .*RowsRead: 2.43K .*
----- RUNTIME_PROFILE: table_format=parquet,orc
-row_regex: .*RowsReturned: 2.43K .*
-aggregation(SUM, RowsRead): 2
-aggregation(SUM, NumFileMetadataRead): 48
 ====
 ---- QUERY
 # Shuffle join, global mode. Expect filters to be propagated.

@@ -20,7 +20,7 @@
 '''This is a mapper for use with hadoop streaming. See data_generator.DatabasePopulator
    for more information on how this file is used.
 '''
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 import os
 import random
@@ -45,7 +45,7 @@ for line in sys.stdin:
   batch_idx = 0
   while row_count > 0:
     table_data_generator.row_count = min(row_count, rows_per_batch)
-    table_data_generator.randomization_seed = int(random.random() * sys.maxint)
+    table_data_generator.randomization_seed = int(random.random() * sys.maxsize)
 
     # Generate input for the reducers.
     print("%s\t%s\t%s" % (table_data_generator.table.name, batch_idx,

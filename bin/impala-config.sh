@@ -81,7 +81,7 @@ export USE_APACHE_HIVE=${USE_APACHE_HIVE-false}
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=258-821f1d91bd
+export IMPALA_TOOLCHAIN_BUILD_ID=268-f2a9999487
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p5
@@ -129,8 +129,9 @@ unset IMPALA_LLVM_URL
 export IMPALA_LLVM_ASAN_VERSION=5.0.1-p5
 unset IMPALA_LLVM_ASAN_URL
 
-# Maximum memory available for mini-cluster and CDH cluster
-export IMPALA_CLUSTER_MAX_MEM_GB
+# To limit maximum memory available for the mini-cluster and CDH cluster, add the
+# following in $IMPALA_HOME/bin/impala-config-local.sh
+#   export IMPALA_CLUSTER_MAX_MEM_GB=<value>
 
 # LLVM stores some files in subdirectories that are named after what
 # version it thinks it is. We might think it is 5.0.1-p1, based on a
@@ -147,8 +148,6 @@ export IMPALA_ZSTD_VERSION=1.5.2
 unset IMPALA_ZSTD_URL
 export IMPALA_OPENLDAP_VERSION=2.4.47
 unset IMPALA_OPENLDAP_URL
-export IMPALA_OPENSSL_VERSION=1.0.2l
-unset IMPALA_OPENSSL_URL
 export IMPALA_ORC_VERSION=1.7.0-p14
 unset IMPALA_ORC_URL
 export IMPALA_PROTOBUF_VERSION=3.14.0
@@ -173,8 +172,10 @@ export IMPALA_TPC_DS_VERSION=2.1.0-p1
 unset IMPALA_TPC_DS_URL
 export IMPALA_TPC_H_VERSION=2.17.0
 unset IMPALA_TPC_H_URL
-export IMPALA_ZLIB_VERSION=1.2.12
+export IMPALA_ZLIB_VERSION=1.2.13
 unset IMPALA_ZLIB_URL
+export IMPALA_CLOUDFLAREZLIB_VERSION=9e601a3f37
+unset IMPALA_CLOUDFLAREZLIB_URL
 export IMPALA_CALLONCEHACK_VERSION=1.0.0
 unset IMPALA_CALLONCEHACK_URL
 # Thrift related environment variables.
@@ -206,8 +207,6 @@ if [[ $OSTYPE == "darwin"* ]]; then
   unset IMPALA_CYRUS_SASL_URL
   IMPALA_GPERFTOOLS_VERSION=2.3
   unset IMPALA_GPERFTOOLS_URL
-  IMPALA_OPENSSL_VERSION=1.0.1p
-  unset IMPALA_OPENSSL_URL
 fi
 
 : ${IMPALA_TOOLCHAIN_HOST:=native-toolchain.s3.amazonaws.com}
@@ -253,7 +252,7 @@ export IMPALA_ORC_JAVA_VERSION=1.7.6
 export IMPALA_PAC4J_VERSION=4.5.5
 export IMPALA_RELOAD4j_VERSION=1.2.22
 export IMPALA_SLF4J_VERSION=2.0.3
-export IMPALA_SPRINGFRAMEWORK_VERSION=5.3.20
+export IMPALA_SPRINGFRAMEWORK_VERSION=5.3.26
 export IMPALA_XMLSEC_VERSION=2.2.3
 export IMPALA_OBS_VERSION=3.1.1-hw-42
 
@@ -272,6 +271,13 @@ export IMPALA_REDHAT8_DOCKER_BASE=${IMPALA_REDHAT8_DOCKER_BASE:-"rockylinux:8.5"
 # Docker image, and it has no impact on what version of Java is used to compile
 # Impala's Java code.
 export IMPALA_DOCKER_USE_JAVA11=${IMPALA_DOCKER_USE_JAVA11:-"false"}
+
+# There are multiple compatible implementations of zlib. Cloudflare Zlib is an
+# implementation with optimizations to use platform-specific CPU features that are not
+# in the standard Zlib implementation. When set to true, this builds and links against
+# Cloudflare Zlib. When false, the build uses the regular Madler Zlib. This defaults
+# to true due to the large performance benefits.
+export IMPALA_USE_CLOUDFLARE_ZLIB=${IMPALA_USE_CLOUDFLARE_ZLIB:-"true"}
 
 # When IMPALA_(CDP_COMPONENT)_URL are overridden, they may contain '$(platform_label)'
 # which will be substituted for the CDP platform label in bootstrap_toolchain.py

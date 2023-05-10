@@ -30,7 +30,7 @@ import time
 from getpass import getuser
 from random import choice
 from signal import SIGKILL
-from subprocess import check_call
+from subprocess import check_call, check_output
 from time import sleep
 
 import tests.common.environ
@@ -40,10 +40,6 @@ from tests.common.impala_service import (
     ImpaladService,
     StateStoredService)
 from tests.util.shell_util import exec_process, exec_process_async
-
-if sys.version_info >= (2, 7):
-  # We use some functions in the docker code that don't exist in Python 2.6.
-  from subprocess import check_output
 
 LOG = logging.getLogger('impala_cluster')
 LOG.setLevel(level=logging.DEBUG)
@@ -272,7 +268,8 @@ class ImpalaCluster(object):
     statestoreds = []
     catalogd = None
     admissiond = None
-    output = check_output(["docker", "network", "inspect", self.docker_network])
+    output = check_output(["docker", "network", "inspect", self.docker_network],
+                          universal_newlines=True)
     # Only one network should be present in the top level array.
     for container_id in json.loads(output)[0]["Containers"]:
       container_info = get_container_info(container_id)
@@ -634,8 +631,8 @@ def run_daemon(daemon_binary, args, build_type="latest", env_vars={}, output_fil
 
 def get_container_info(container_id):
   """Get the output of "docker container inspect" as a python data structure."""
-  containers = json.loads(
-      check_output(["docker", "container", "inspect", container_id]))
+  containers = json.loads(check_output(["docker", "container", "inspect", container_id],
+                                       universal_newlines=True))
   # Only one container should be present in the top level array.
   assert len(containers) == 1, json.dumps(containers, indent=4)
   return containers[0]

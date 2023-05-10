@@ -1023,3 +1023,202 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> t2.tinyint_col
    row-size=5B cardinality=11.00K
 ====
+# IMPALA-11536: Convert a full join to a left join, only non-nullable tuple ids of the left
+# tuple ids can be removed from outerJoinedTupleIds. For this test case, the 'testtbl' can
+# not be removed and we can not propagate 'coalesce(testtbl.zip, 0) = 0' into 'testtbl'
+SELECT COALESCE(jointbl.test_id, testtbl.id, dimtbl.id) AS id, test_zip,testtbl.zip
+FROM functional.jointbl
+FULL OUTER JOIN
+functional.testtbl
+ON jointbl.test_id = testtbl.id
+FULL OUTER JOIN
+functional.dimtbl
+ON coalesce(jointbl.test_id, testtbl.id) = dimtbl.id
+WHERE
+jointbl.test_zip = 94611 and coalesce(testtbl.zip, 0) = 0;
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: coalesce(jointbl.test_id, testtbl.id) = dimtbl.id
+|  other predicates: coalesce(testtbl.zip, 0) = 0
+|  row-size=32B cardinality=6
+|
+|--02:SCAN HDFS [functional.dimtbl]
+|     HDFS partitions=1/1 files=1 size=171B
+|     row-size=8B cardinality=10
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: jointbl.test_id = testtbl.id
+|  row-size=24B cardinality=6
+|
+|--01:SCAN HDFS [functional.testtbl]
+|     HDFS partitions=1/1 files=0 size=0B
+|     row-size=12B cardinality=0
+|
+00:SCAN HDFS [functional.jointbl]
+   HDFS partitions=1/1 files=1 size=433B
+   predicates: jointbl.test_zip = 94611
+   row-size=12B cardinality=6
+====
+# IMPALA-11536: test all non-nullable tuple ids are removed from outerJoinedTupleIds
+# and the predicates propagate correctly
+SELECT COALESCE(jointbl.test_id, testtbl.id, dimtbl.id) AS id, test_zip,testtbl.zip
+FROM functional.jointbl
+FULL OUTER JOIN
+functional.testtbl
+ON jointbl.test_id = testtbl.id
+FULL OUTER JOIN
+functional.dimtbl
+ON coalesce(jointbl.test_id, testtbl.id) = dimtbl.id
+WHERE
+jointbl.test_zip = 94611 and testtbl.zip = 1;
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: coalesce(jointbl.test_id, testtbl.id) = dimtbl.id
+|  row-size=32B cardinality=6
+|
+|--02:SCAN HDFS [functional.dimtbl]
+|     HDFS partitions=1/1 files=1 size=171B
+|     row-size=8B cardinality=10
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: jointbl.test_id = testtbl.id
+|  runtime filters: RF000 <- testtbl.id
+|  row-size=24B cardinality=6
+|
+|--01:SCAN HDFS [functional.testtbl]
+|     HDFS partitions=1/1 files=0 size=0B
+|     predicates: testtbl.zip = 1
+|     row-size=12B cardinality=0
+|
+00:SCAN HDFS [functional.jointbl]
+   HDFS partitions=1/1 files=1 size=433B
+   predicates: jointbl.test_zip = 94611
+   runtime filters: RF000 -> jointbl.test_id
+   row-size=12B cardinality=6
+====
+# IMPALA-11536: Convert a full join to an inner join, only non-nullable tuple ids of the left
+# tuple ids can be removed from outerJoinedTupleIds. For this test case, the 'jointbl' can
+# not be removed and we can not propagate 'coalesce(jointbl.test_zip, 0) = 0' into 'jointbl'
+SELECT COALESCE(jointbl.test_id, testtbl.id, dimtbl.id) AS id, test_zip,testtbl.zip
+FROM functional.jointbl
+FULL OUTER JOIN
+functional.testtbl
+ON jointbl.test_id = testtbl.id
+FULL OUTER JOIN
+functional.dimtbl
+ON coalesce(jointbl.test_id, testtbl.id) = dimtbl.id
+WHERE
+testtbl.zip = 94611 and coalesce(jointbl.test_zip, 0) = 0 and dimtbl.zip=0;
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: coalesce(jointbl.test_id, testtbl.id) = dimtbl.id
+|  other predicates: coalesce(jointbl.test_zip, 0) = 0
+|  runtime filters: RF000 <- dimtbl.id
+|  row-size=36B cardinality=19
+|
+|--02:SCAN HDFS [functional.dimtbl]
+|     HDFS partitions=1/1 files=1 size=171B
+|     predicates: dimtbl.zip = 0
+|     row-size=12B cardinality=2
+|
+03:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: jointbl.test_id = testtbl.id
+|  runtime filters: RF002 <- testtbl.id
+|  row-size=24B cardinality=19
+|
+|--01:SCAN HDFS [functional.testtbl]
+|     HDFS partitions=1/1 files=0 size=0B
+|     predicates: testtbl.zip = 94611
+|     row-size=12B cardinality=0
+|
+00:SCAN HDFS [functional.jointbl]
+   HDFS partitions=1/1 files=1 size=433B
+   runtime filters: RF000 -> coalesce(functional.jointbl.test_id, functional.jointbl.test_id), RF002 -> jointbl.test_id
+   row-size=12B cardinality=19
+====
+# IMPALA-11536: Convert a right join to an inner join, only non-nullable tuple ids of the left
+# tuple ids can be removed from outerJoinedTupleIds. For this test case, the 'jointbl' can
+# not be removed and we can not propagate 'coalesce(jointbl.test_zip, 0) = 0' into 'jointbl'
+SELECT COALESCE(jointbl.test_id, testtbl.id, dimtbl.id) AS id, test_zip,testtbl.zip
+FROM functional.jointbl
+RIGHT OUTER JOIN
+functional.testtbl
+ON jointbl.test_id = testtbl.id
+RIGHT OUTER JOIN
+functional.dimtbl
+ON coalesce(jointbl.test_id, testtbl.id) = dimtbl.id
+WHERE
+testtbl.zip = 94611 and coalesce(jointbl.test_zip, 0) = 0;
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: coalesce(jointbl.test_id, testtbl.id) = dimtbl.id
+|  other predicates: coalesce(jointbl.test_zip, 0) = 0
+|  runtime filters: RF000 <- dimtbl.id
+|  row-size=32B cardinality=19
+|
+|--02:SCAN HDFS [functional.dimtbl]
+|     HDFS partitions=1/1 files=1 size=171B
+|     row-size=8B cardinality=10
+|
+03:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: jointbl.test_id = testtbl.id
+|  runtime filters: RF002 <- testtbl.id
+|  row-size=24B cardinality=19
+|
+|--01:SCAN HDFS [functional.testtbl]
+|     HDFS partitions=1/1 files=0 size=0B
+|     predicates: testtbl.zip = 94611
+|     row-size=12B cardinality=0
+|
+00:SCAN HDFS [functional.jointbl]
+   HDFS partitions=1/1 files=1 size=433B
+   runtime filters: RF000 -> coalesce(functional.jointbl.test_id, functional.jointbl.test_id), RF002 -> jointbl.test_id
+   row-size=12B cardinality=19
+====
+# IMPALA-11536: we can not propagate 'coalesce(jointbl.test_zip, 0) = 0' into 'jointbl'
+# because the 'jointbl' is nullable
+SELECT COALESCE(jointbl.test_id, testtbl.id, dimtbl.id) AS id, test_zip,testtbl.zip
+FROM functional.jointbl
+FULL OUTER JOIN
+functional.testtbl
+ON jointbl.test_id = testtbl.id
+FULL OUTER JOIN
+functional.dimtbl
+ON coalesce(jointbl.test_id, testtbl.id) = dimtbl.id
+WHERE
+testtbl.zip = 94611 and coalesce(jointbl.test_zip, 0) = 0;
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: coalesce(jointbl.test_id, testtbl.id) = dimtbl.id
+|  other predicates: coalesce(jointbl.test_zip, 0) = 0
+|  row-size=32B cardinality=19
+|
+|--02:SCAN HDFS [functional.dimtbl]
+|     HDFS partitions=1/1 files=1 size=171B
+|     row-size=8B cardinality=10
+|
+03:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: jointbl.test_id = testtbl.id
+|  runtime filters: RF000 <- testtbl.id
+|  row-size=24B cardinality=19
+|
+|--01:SCAN HDFS [functional.testtbl]
+|     HDFS partitions=1/1 files=0 size=0B
+|     predicates: testtbl.zip = 94611
+|     row-size=12B cardinality=0
+|
+00:SCAN HDFS [functional.jointbl]
+   HDFS partitions=1/1 files=1 size=433B
+   runtime filters: RF000 -> jointbl.test_id
+   row-size=12B cardinality=19
+====

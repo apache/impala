@@ -351,9 +351,9 @@ public class IcebergCatalogOpExecutor {
           .withFormat(IcebergUtil.fbFileFormatToIcebergFileFormat(dataFile.format()))
           .withRecordCount(dataFile.recordCount())
           .withFileSizeInBytes(dataFile.fileSizeInBytes());
-      IcebergUtil.PartitionData partitionData = IcebergUtil.partitionDataFromPath(
+      IcebergUtil.PartitionData partitionData = IcebergUtil.partitionDataFromDataFile(
           partSpec.partitionType(),
-          feIcebergTable.getDefaultPartitionSpec(), dataFile.partitionPath());
+          feIcebergTable.getDefaultPartitionSpec(), dataFile);
       if (partitionData != null) builder.withPartition(partitionData);
       batchWrite.addFile(builder.build());
     }

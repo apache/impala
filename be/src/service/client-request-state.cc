@@ -108,10 +108,10 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
     session_(session),
     coord_exec_called_(false),
     // Profile is assigned name w/ id after planning
-    profile_(RuntimeProfile::Create(&profile_pool_, "Query")),
+    profile_(RuntimeProfile::Create(&profile_pool_, "Query", false)),
     frontend_profile_(RuntimeProfile::Create(&profile_pool_, "Frontend", false)),
-    server_profile_(RuntimeProfile::Create(&profile_pool_, "ImpalaServer")),
-    summary_profile_(RuntimeProfile::Create(&profile_pool_, "Summary")),
+    server_profile_(RuntimeProfile::Create(&profile_pool_, "ImpalaServer", false)),
+    summary_profile_(RuntimeProfile::Create(&profile_pool_, "Summary", false)),
     exec_request_(exec_request),
     frontend_(frontend),
     parent_server_(server),
@@ -154,6 +154,7 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
   summary_profile_->AddInfoString("Start Time", ToStringFromUnixMicros(start_time_us(),
       TimePrecision::Nanosecond));
   summary_profile_->AddInfoString("End Time", "");
+  summary_profile_->AddInfoString("Duration", "");
   summary_profile_->AddInfoString("Query Type", "N/A");
   summary_profile_->AddInfoString("Query State", PrintValue(BeeswaxQueryState()));
   summary_profile_->AddInfoString(
@@ -1134,6 +1135,7 @@ void ClientRequestState::Wait() {
       query_events()->MarkEvent("Rows available");
     } else {
       query_events()->MarkEvent("Request finished");
+      UpdateEndTime();
     }
     discard_result(UpdateQueryStatus(status));
   }
@@ -1513,6 +1515,9 @@ Status ClientRequestState::UpdateCatalog() {
     TUpdateCatalogRequest catalog_update;
     catalog_update.__set_sync_ddl(exec_request_->query_options.sync_ddl);
     catalog_update.__set_header(GetCatalogServiceRequestHeader());
+    if (exec_request_->query_options.__isset.debug_action) {
+      catalog_update.__set_debug_action(exec_request_->query_options.debug_action);
+    }
     DmlExecState* dml_exec_state = GetCoordinator()->dml_exec_state();
     if (!dml_exec_state->PrepareCatalogUpdate(&catalog_update)) {
       VLOG_QUERY << "No partitions altered, not updating metastore (query id: "
@@ -1840,6 +1845,9 @@ void ClientRequestState::UpdateEndTime() {
     // of nanosecond precision, so we explicitly specify the precision here.
     summary_profile_->AddInfoString(
         "End Time", ToStringFromUnixMicros(end_time_us(), TimePrecision::Nanosecond));
+    int64_t duration = end_time_us() - start_time_us();
+    summary_profile_->AddInfoString("Duration", Substitute("$0 ($1 us)",
+        PrettyPrinter::Print(duration, TUnit::TIME_US), duration));
   }
 }
 

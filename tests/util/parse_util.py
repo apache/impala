@@ -102,6 +102,14 @@ def parse_duration_string_ms(duration):
   return (times['h'] * 60 * 60 + times['m'] * 60 + times['s']) * 1000 + times['ms']
 
 
+def get_duration_us_from_str(duration_str):
+  """Parses the duration string got in profile and returns the duration in us"""
+  match_res = re.search(r"\((\d+) us\)", duration_str)
+  if match_res:
+    return int(match_res.group(1))
+  raise Exception("Illegal duration string: " + duration_str)
+
+
 def match_memory_estimate(explain_lines):
   """
   Given a list of strings from EXPLAIN output, find the estimated memory needed. This is

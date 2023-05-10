@@ -145,7 +145,8 @@ class ImpalaHttpHandler {
 
   /// Helper method to put query profile in 'document' with required format.
   void QueryProfileHelper(const Webserver::WebRequest& req,
-      rapidjson::Document* document, TRuntimeProfileFormat::type format);
+      rapidjson::Document* document, TRuntimeProfileFormat::type format,
+      bool internal_profile = false);
 
   /// Upon return, 'document' will contain the query profile as a base64 encoded object in
   /// 'contents'.

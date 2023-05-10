@@ -508,30 +508,35 @@ string HdfsTableSink::GetPartitionName(int i) {
   }
 }
 
-Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
-    const HdfsPartitionDescriptor& partition_descriptor, const TupleRow* row,
-    OutputPartition* output_partition, bool empty_partition) {
-  // Build the unique name for this partition from the partition keys, e.g. "j=1/f=foo/"
-  // etc.
-  stringstream partition_name_ss;
+void HdfsTableSink::ConstructPartitionNames(
+    const TupleRow* row,
+    string* url_encoded_partition_name,
+    vector<string>* raw_partition_names,
+    string* external_partition_name) {
+  DCHECK(url_encoded_partition_name != nullptr);
+  DCHECK(external_partition_name != nullptr);
+  DCHECK(raw_partition_names != nullptr);
+  DCHECK(raw_partition_names->empty());
+
+  stringstream url_encoded_partition_name_ss;
   stringstream external_partition_name_ss;
-  for (int j = 0; j < partition_key_expr_evals_.size(); ++j) {
-    bool is_external_part = HasExternalOutputDir() &&
-        j >= external_output_partition_depth_;
-    if (is_external_part) {
-      external_partition_name_ss << GetPartitionName(j) << "=";
-    }
-    partition_name_ss << GetPartitionName(j) << "=";
-    void* value = partition_key_expr_evals_[j]->GetValue(row);
-    // nullptr partition keys get a special value to be compatible with Hive.
+  for (int i = 0; i < partition_key_expr_evals_.size(); ++i) {
+    stringstream raw_partition_key_value_ss;
+    stringstream encoded_partition_key_value_ss;
+
+    raw_partition_key_value_ss << GetPartitionName(i) << "=";
+    encoded_partition_key_value_ss << GetPartitionName(i) << "=";
+
+    void* value = partition_key_expr_evals_[i]->GetValue(row);
     if (value == nullptr) {
-      partition_name_ss << table_desc_->null_partition_key_value();
-      if (is_external_part) {
-        external_partition_name_ss << table_desc_->null_partition_key_value();
-      }
+      raw_partition_key_value_ss << table_desc_->null_partition_key_value();
+      encoded_partition_key_value_ss << table_desc_->null_partition_key_value();
     } else {
       string value_str;
-      partition_key_expr_evals_[j]->PrintValue(value, &value_str);
+      partition_key_expr_evals_[i]->PrintValue(value, &value_str);
+
+      raw_partition_key_value_ss << value_str;
+
       // Directory names containing partition-key values need to be UrlEncoded, in
       // particular to avoid problems when '/' is part of the key value (which might
       // occur, for example, with date strings). Hive will URL decode the value
@@ -545,23 +550,32 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
       string part_key_value = (encoded_str.empty() ?
                               table_desc_->null_partition_key_value() : encoded_str);
       // If the string is empty, map it to nullptr (mimicking Hive's behaviour)
-      partition_name_ss << part_key_value;
-      if (is_external_part) {
-        external_partition_name_ss << part_key_value;
-      }
+      encoded_partition_key_value_ss << part_key_value;
     }
-    if (j < partition_key_expr_evals_.size() - 1) {
-      partition_name_ss << "/";
-      if (is_external_part) {
-        external_partition_name_ss << "/";
-      }
+    if (i < partition_key_expr_evals_.size() - 1) encoded_partition_key_value_ss << "/";
+
+    url_encoded_partition_name_ss << encoded_partition_key_value_ss.str();
+    if (HasExternalOutputDir() && i >= external_output_partition_depth_) {
+      external_partition_name_ss << encoded_partition_key_value_ss.str();
     }
+
+    raw_partition_names->push_back(raw_partition_key_value_ss.str());
   }
 
-  // partition_name_ss now holds the unique descriptor for this partition,
-  output_partition->partition_name = partition_name_ss.str();
-  BuildHdfsFileNames(partition_descriptor, output_partition,
-      external_partition_name_ss.str());
+  *url_encoded_partition_name = url_encoded_partition_name_ss.str();
+  *external_partition_name = external_partition_name_ss.str();
+}
+
+Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
+    const HdfsPartitionDescriptor& partition_descriptor, const TupleRow* row,
+    OutputPartition* output_partition, bool empty_partition) {
+  // Build the unique name for this partition from the partition keys, e.g. "j=1/f=foo/"
+  // etc.
+  string external_partition_name;
+  ConstructPartitionNames(row, &output_partition->partition_name,
+      &output_partition->raw_partition_names, &external_partition_name);
+
+  BuildHdfsFileNames(partition_descriptor, output_partition, external_partition_name);
 
   if (ShouldSkipStaging(state, output_partition)) {
     // We will be writing to the final file if we're skipping staging, so get a connection

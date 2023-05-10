@@ -15,6 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <array>
+#include <memory>
 #include <string>
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
@@ -136,6 +138,19 @@ Status HttpGet(const string& host, const int32_t& port, const string& url_path,
   return HttpRequest{url_path, host, port}.Do(out, expected_code, method);
 }
 
+string exec(const char* cmd) {
+    std::array<char, 1024> buffer;
+    string result;
+    unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
+    if (!pipe) {
+      throw std::runtime_error(Substitute("popen() failed with $0", errno));
+    }
+    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+      result += buffer.data();
+    }
+    return result;
+}
+
 TEST(Webserver, SmokeTest) {
   MetricGroup metrics("webserver-test");
   Webserver webserver("", FLAGS_webserver_port, &metrics);
@@ -144,6 +159,9 @@ TEST(Webserver, SmokeTest) {
 
   stringstream contents;
   ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port, "/", &contents));
+  ASSERT_TRUE(contents.str().find("X-Content-Type-Options: nosniff") != string::npos);
+  ASSERT_TRUE(contents.str().find("Cache-Control: no-store") != string::npos);
+  ASSERT_TRUE(contents.str().find("Strict-Transport-Security: ") == string::npos);
 }
 
 void PostOnlyCallback(bool* success, const Webserver::WebRequest& req,
@@ -285,6 +303,13 @@ TEST(Webserver, SslTest) {
   MetricGroup metrics("webserver-test");
   Webserver webserver("", FLAGS_webserver_port, &metrics);
   ASSERT_OK(webserver.Start());
+  AddDefaultUrlCallbacks(&webserver);
+
+  string cmd = Substitute("curl -v -f -s --cacert $0 'https://localhost:$1' 2>&1",
+      FLAGS_webserver_certificate_file, FLAGS_webserver_port);
+  string response = exec(cmd.c_str());
+  ASSERT_TRUE(response.find(
+      "Strict-Transport-Security: max-age=31536000; includeSubDomains") != string::npos);
 }
 
 TEST(Webserver, SslBadCertTest) {

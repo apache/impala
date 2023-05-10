@@ -45,6 +45,7 @@ add_library(ExprsIr
   math-functions-ir.cc
   operators-ir.cc
   scalar-expr-ir.cc
+  scalar-expr-evaluator-ir.cc
   string-functions-ir.cc
   timestamp-functions-ir.cc
   tuple-is-null-predicate-ir.cc
@@ -70,8 +71,8 @@ add_library(Exprs
   literal.cc
   ${MURMURHASH_SRC_DIR}/MurmurHash3.cpp
   null-literal.cc
-  scalar-expr.cc
   scalar-expr-evaluator.cc
+  scalar-expr.cc
   slot-ref.cc
   string-functions.cc
   timestamp-functions.cc

@@ -184,12 +184,12 @@ public class SelectStmt extends QueryStmt {
         return null;
       }
       if (hasLimit()) {
-        return new Pair<>(new Boolean(true), getLimit());
+        return new Pair<>(Boolean.valueOf(true), getLimit());
       } else {
         // even if this SELECT statement does not have a LIMIT, it is a
         // simple select which may be an inline view and eligible for a
         // limit pushdown from an outer block, so we return a non-null value
-        return new Pair<>(new Boolean(false), null);
+        return new Pair<>(Boolean.valueOf(false), null);
       }
     }
     return null;
@@ -272,7 +272,7 @@ public class SelectStmt extends QueryStmt {
     if (isAnalyzed()) return;
     super.analyze(analyzer);
     new SelectAnalyzer(analyzer).analyze();
-    this.optimizePlainCountStarQuery();
+    this.optimizePlainCountStarQueryForIcebergTable();
   }
 
   /**
@@ -574,11 +574,6 @@ public class SelectStmt extends QueryStmt {
               || !mapType.getValueType().isSupported()) {
             throw new AnalysisException("Unsupported type '" +
                 expr.getType().toSql() + "' in '" + expr.toSql() + "'.");
-          }
-        } else if (expr.getType().isStructType()) {
-          if (!analyzer_.getQueryCtx().client_request.query_options.disable_codegen) {
-            throw new AnalysisException("Struct type in select list is not allowed " +
-                "when Codegen is ON. You might want to set DISABLE_CODEGEN=true");
           }
         }
         if (!expr.getType().isSupported()) {
@@ -1435,10 +1430,16 @@ public class SelectStmt extends QueryStmt {
    *  - table is the Iceberg table
    *  - SelectList must contains 'count(*)' or 'count(constant)'
    *  - SelectList can contain constant
+   *  - stmt does not have WITH clause
    *  - only for V1: SelectList can contain other agg functions, e.g. min, sum, etc
    * e.g. 'SELECT count(*) FROM iceberg_tbl' would be rewritten as 'SELECT constant'.
    */
-  public void optimizePlainCountStarQuery() throws AnalysisException {
+  public void optimizePlainCountStarQueryForIcebergTable() throws AnalysisException {
+    // When optimizing the simple count star query for the Iceberg table, the WITH CLAUSE
+    // should be skipped, but that doesn't mean the SQL can't be optimized, because when
+    // the WITH CLAUSE is inlined, the final Stmt is optimized by CountStarToConstRule.
+    if (this.analyzer_.hasWithClause()) return;
+
     if (this.hasWhereClause()) return;
     if (this.hasGroupByClause()) return;
     if (this.hasHavingClause()) return;

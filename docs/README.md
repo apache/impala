@@ -9,16 +9,29 @@ instructions.
 
 ## Download Docs Source
 
-* Open a terminal window and run the following commands to get the Impala
-  documentation source files from Git:
+* There are two ways to obtain docs sources.
+  * Clone the whole repository. Open a terminal window and run the following
+    commands to get the whole Impala repository from Git and go to the docs folder:
     ```
-    git clone https://gitbox.apache.org/repos/asf/impala.git/docs
-    cd <local_directory>
-    git checkout master
+      git clone https://gitbox.apache.org/repos/asf/impala.git
+      cd <local_directory>
+      git checkout master
+      cd docs/
     ```
 
     Where `master` is the branch where Impala documentation source files
     are uploaded.
+  * Clone only the docs directory. Open a terminal window and run the following
+    commands to get only the Impala documentation source files from Git:
+    ```
+      git init impala_docs
+      cd impala_docs
+      git remote add origin https://gitbox.apache.org/repos/asf/impala.git
+      git sparse-checkout set docs/
+      git pull origin master
+      cd docs/
+    ```
+    You'll see only the 'docs/' sub-directory is downloaded.
 
 ## Download DITA Open Toolkit
 

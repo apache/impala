@@ -97,11 +97,9 @@ void RawValue::PrintValue(const void* value, const ColumnType& type, int scale,
     return;
   }
 
-  stringstream out;
-  out.precision(ASCII_PRECISION);
   const StringValue* string_val = NULL;
-  string tmp;
   bool val;
+  string tmp;
 
   // Special case types that we can print more efficiently without using a stringstream
   switch (type.type) {
@@ -118,12 +116,24 @@ void RawValue::PrintValue(const void* value, const ColumnType& type, int scale,
     case TYPE_CHAR:
       *str = string(reinterpret_cast<const char*>(value), type.len);
       return;
+    case TYPE_TIMESTAMP:
+      *str = reinterpret_cast<const TimestampValue*>(value)->ToString();
+      return;
+    case TYPE_DATE:
+      *str = reinterpret_cast<const DateValue*>(value)->ToString();
+      return;
     case TYPE_FIXED_UDA_INTERMEDIATE:
       *str = "Intermediate UDA step, no value printed";
       return;
     default:
-      PrintValue(value, type, scale, &out);
+      break;
   }
+
+  stringstream out;
+  out.precision(ASCII_PRECISION);
+
+  PrintValue(value, type, scale, &out);
+
   *str = out.str();
 }
 

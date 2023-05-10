@@ -124,6 +124,7 @@ elif [[ $DISTRIBUTION == Redhat ]]; then
       hostname \
       krb5-workstation \
       openldap-devel \
+      procps-ng \
       tzdata
 
   # UTF-8 masking functions require the presence of en_US.utf8.
@@ -158,6 +159,12 @@ fi
 
 if ! hostname ; then
   echo "ERROR: 'hostname' command failed."
+  exit 1
+fi
+
+# graceful_shutdown_backends.sh requires the pgrep utility. Verify it is present.
+if ! command -v pgrep ; then
+  echo "ERROR: 'pgrep' is not present."
   exit 1
 fi
 

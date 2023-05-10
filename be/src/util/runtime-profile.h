@@ -433,6 +433,15 @@ class RuntimeProfile : public RuntimeProfileBase {
   class SamplingTimeSeriesCounter;
   class ChunkedTimeSeriesCounter;
 
+  /// String constants for instruction count names.
+  static const string FRAGMENT_INSTANCE_LIFECYCLE_TIMINGS;
+  static const string BUFFER_POOL;
+  static const string DEQUEUE;
+  static const string ENQUEUE;
+  static const string HASH_TABLE;
+  static const string PREFIX_FILTER;
+  static const string PREFIX_GROUPING_AGGREGATOR;
+
   /// Create a runtime profile object with 'name'. The profile, counters and any other
   /// structures owned by the profile are allocated from 'pool'.
   /// If add_default_counters is false, TotalTime and InactiveTotalTime will be
@@ -464,8 +473,10 @@ class RuntimeProfile : public RuntimeProfileBase {
   /// Creates a new child profile with the given 'name'. A child profile with that name
   /// must not already exist. If 'prepend' is true, prepended before other child profiles,
   /// otherwise appended after other child profiles.
-  RuntimeProfile* CreateChild(
-      const std::string& name, bool indent = true, bool prepend = false);
+  /// If 'add_default_counters' is false, TotalTime and InactiveTotalTime will be
+  /// hidden in any newly created RuntimeProfile node.
+  RuntimeProfile* CreateChild(const std::string& name, bool indent = true,
+      bool prepend = false, bool add_default_counters = false);
 
   /// Sorts all children according to descending total time. Does not
   /// invalidate pointers to profiles.
@@ -829,7 +840,7 @@ class AggregatedRuntimeProfile : public RuntimeProfileBase {
   /// will have UpdateAggregated*() called on it. The descendants of the root are
   /// created and updated by that call.
   static AggregatedRuntimeProfile* Create(ObjectPool* pool, const std::string& name,
-      int num_input_profiles, bool is_root = true);
+      int num_input_profiles, bool is_root = true, bool add_default_counters = true);
 
   /// Updates the AveragedCounter counters in this profile with the counters from the
   /// 'src' profile, which is the input instance that was assigned index 'idx'. If a
@@ -839,7 +850,8 @@ class AggregatedRuntimeProfile : public RuntimeProfileBase {
   ///
   /// Note that 'src' must be all instances of RuntimeProfile - no
   /// AggregatedRuntimeProfiles can be part of the input.
-  void UpdateAggregatedFromInstance(RuntimeProfile* src, int idx);
+  void UpdateAggregatedFromInstance(
+      RuntimeProfile* src, int idx, bool add_default_counters = true);
 
   /// Updates the AveragedCounter counters in this profile with the counters from the
   /// 'src' profile, which must be a serialized AggregatedProfile. The instances in
@@ -847,7 +859,8 @@ class AggregatedRuntimeProfile : public RuntimeProfileBase {
   /// this profile. If a counter is present in 'src' but missing in this profile, a
   /// new AveragedCounter is created with the same name. Obtains locks on the counter
   /// maps and child counter maps in this profile.
-  void UpdateAggregatedFromInstances(const TRuntimeProfileTree& src, int start_idx);
+  void UpdateAggregatedFromInstances(
+      const TRuntimeProfileTree& src, int start_idx, bool add_default_counters = true);
 
  protected:
   virtual int GetNumInputProfiles() const override { return num_input_profiles_; }
@@ -922,8 +935,8 @@ class AggregatedRuntimeProfile : public RuntimeProfileBase {
   /// Time series counters. Protected by 'counter_map_lock_'.
   std::map<std::string, TAggTimeSeriesCounter> time_series_counter_map_;
 
-  AggregatedRuntimeProfile(
-      ObjectPool* pool, const std::string& name, int num_input_profiles, bool is_root);
+  AggregatedRuntimeProfile(ObjectPool* pool, const std::string& name,
+      int num_input_profiles, bool is_root, bool add_default_counters = true);
 
   /// Group the values in 'info_string_values' by value, with a vector of indices where
   /// that value appears. 'info_string_values' must be a value from 'info_strings_'.
@@ -931,7 +944,8 @@ class AggregatedRuntimeProfile : public RuntimeProfileBase {
       const std::vector<std::string>& info_string_values) const;
 
   /// Helper for UpdateAggregatedFromInstance() that are invoked recursively on 'src'.
-  void UpdateAggregatedFromInstanceRecursive(RuntimeProfile* src, int idx);
+  void UpdateAggregatedFromInstanceRecursive(
+      RuntimeProfile* src, int idx, bool add_default_counter = true);
 
   /// Helpers for UpdateAggregatedFromInstanceRecursive() that update particular parts
   /// of this profile node from 'src'.
@@ -941,8 +955,8 @@ class AggregatedRuntimeProfile : public RuntimeProfileBase {
   void UpdateEventSequencesFromInstance(RuntimeProfile* src, int idx);
 
   /// Helper for UpdateAggregatedFromInstances() that are invoked recursively on 'src'.
-  void UpdateAggregatedFromInstancesRecursive(
-      const TRuntimeProfileTree& src, int* node_idx, int start_idx);
+  void UpdateAggregatedFromInstancesRecursive(const TRuntimeProfileTree& src,
+      int* node_idx, int start_idx, bool add_default_counter = true);
 
   /// Helpers for UpdateAggregatedFromInstancesRecursive() that update particular parts
   /// of this profile node from 'src'. 'src' must have an aggregated profile set.

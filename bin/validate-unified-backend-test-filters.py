@@ -17,7 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import os
 import subprocess
 import sys
@@ -32,7 +32,7 @@ def get_set_of_tests(unified_binary, filters):
                "--gtest_list_tests"]
     if filters is not None:
         command.append("--gtest_filter={0}".format(filters))
-    p = subprocess.Popen(command, stdout=subprocess.PIPE)
+    p = subprocess.Popen(command, stdout=subprocess.PIPE, universal_newlines=True)
     out, err = p.communicate()
     if p.returncode != 0:
         print("FAILED: Unified backend test executable returned an error when trying\n"

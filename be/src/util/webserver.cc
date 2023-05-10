@@ -239,8 +239,15 @@ void SendResponse(struct sq_connection* connection, const string& response_code_
     oss << h << CRLF;
   }
   oss << "X-Frame-Options: " << FLAGS_webserver_x_frame_options << CRLF;
+  oss << "X-Content-Type-Options: nosniff" << CRLF;
+  oss << "Cache-Control: no-store" << CRLF;
   if (!FLAGS_disable_content_security_policy_header) {
     oss << "Content-Security-Policy: " << CSP_HEADER << CRLF;
+  }
+
+  struct sq_request_info* request_info = sq_get_request_info(connection);
+  if (request_info->is_ssl) {
+    oss << "Strict-Transport-Security: max-age=31536000; includeSubDomains" << CRLF;
   }
   oss << "Content-Type: " << content_type << CRLF;
   oss << "Content-Length: " << content.size() << CRLF;

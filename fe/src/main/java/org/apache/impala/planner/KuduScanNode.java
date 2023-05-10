@@ -397,7 +397,9 @@ public class KuduScanNode extends ScanNode {
 
   @Override
   public void computeProcessingCost(TQueryOptions queryOptions) {
-    processingCost_ = computeScanProcessingCost(queryOptions);
+    Preconditions.checkNotNull(scanRangeSpecs_);
+    processingCost_ =
+        computeScanProcessingCost(queryOptions, scanRangeSpecs_.getConcrete_rangesSize());
   }
 
   @Override

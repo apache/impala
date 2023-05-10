@@ -24,7 +24,7 @@
 #       --role_name=statestored --max_output_size=50000000 --end_time=1463033495000 \
 #       --output_file_path=/tmp/minidump_package.tar.gz
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import os
 import re
 import sys
@@ -74,7 +74,7 @@ class FileArchiver(object):
       size = 0
     else:
       with closing(tarfile.open(self.output_file_path, mode='w:gz')) as out:
-        for i in xrange(num_files):
+        for i in range(num_files):
           out.add(self.file_list[i])
       size = os.stat(self.output_file_path).st_size
     self.resulting_sizes[num_files] = size

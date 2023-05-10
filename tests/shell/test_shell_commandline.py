@@ -457,10 +457,28 @@ class TestImpalaShell(ImpalaTestSuite):
     result_set = run_impala_shell_cmd(vector, args)
     assert "Summary not available" in result_set.stderr
 
+    args = ['-q', 'show tables; summary 1;']
+    result_set = run_impala_shell_cmd(vector, args, expect_success=False)
+    invalid_err = "Invalid value for query attempt display mode"
+    valid_opts = "Valid values are [ALL | LATEST | ORIGINAL]"
+    assert "{0}: '1'. {1}".format(invalid_err, valid_opts) in result_set.stdout
+
     # Test queries without an exchange
     args = ['-q', 'select 1; summary;']
     result_set = run_impala_shell_cmd(vector, args)
     assert "00:UNION" in result_set.stdout
+
+    args = ['-q', 'select 1; summary all;']
+    result_set = run_impala_shell_cmd(vector, args)
+    assert "00:UNION" in result_set.stdout
+
+    args = ['-q', 'select 1; summary latest;']
+    result_set = run_impala_shell_cmd(vector, args)
+    assert "00:UNION" in result_set.stdout
+
+    args = ['-q', 'select 1; summary original;']
+    result_set = run_impala_shell_cmd(vector, args)
+    assert "No failed summary found" in result_set.stdout
 
   @pytest.mark.execute_serially
   def test_queries_closed(self, vector):

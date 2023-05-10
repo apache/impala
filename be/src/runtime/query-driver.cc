@@ -129,6 +129,12 @@ void QueryDriver::TryQueryRetry(
   if (exec_request_->query_options.retry_failed_queries) {
     lock_guard<mutex> l(*client_request_state->lock());
 
+    if (client_request_state->stmt_type() != TStmtType::QUERY) {
+      // Retrying DML queries would be useful but currently it is
+      // buggy / untested (see IMPALA-10585).
+      return;
+    }
+
     // Queries can only be retried if no rows for the query have been fetched
     // (IMPALA-9225).
     if (client_request_state->fetched_rows()) {

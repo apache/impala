@@ -25,6 +25,7 @@ import org.apache.iceberg.MetadataTableType;
 import org.apache.iceberg.MetadataTableUtils;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
+import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeIcebergTable;
@@ -45,12 +46,14 @@ import com.google.common.base.Preconditions;
  */
 public class IcebergMetadataTable extends VirtualTable {
   private FeIcebergTable baseTable_;
+  private String metadataTableName_;
 
   public IcebergMetadataTable(FeTable baseTable, String metadataTableTypeStr)
       throws ImpalaRuntimeException {
     super(null, baseTable.getDb(), baseTable.getName(), baseTable.getOwnerUser());
     Preconditions.checkArgument(baseTable instanceof FeIcebergTable);
     baseTable_ = (FeIcebergTable) baseTable;
+    metadataTableName_ = metadataTableTypeStr;
     MetadataTableType type = MetadataTableType.from(metadataTableTypeStr.toUpperCase());
     Preconditions.checkNotNull(type);
     Table metadataTable = MetadataTableUtils.createMetadataTableInstance(
@@ -72,6 +75,16 @@ public class IcebergMetadataTable extends VirtualTable {
   }
 
   @Override
+  public String getFullName() {
+    return super.getFullName() + "." + metadataTableName_;
+  }
+
+  @Override
+  public TableName getTableName() {
+    return new TableName(db_.getName(), name_, metadataTableName_);
+  }
+
+  @Override
   public TTableStats getTTableStats() {
     long totalBytes = 0;
     TTableStats ret = new TTableStats(getNumRows());
@@ -79,9 +92,14 @@ public class IcebergMetadataTable extends VirtualTable {
     return ret;
   }
 
+  @Override
+  public org.apache.hadoop.hive.metastore.api.Table getMetaStoreTable() {
+    return baseTable_.getMetaStoreTable();
+  }
+
   /**
    * Return same descriptor as the base table, but with a schema that corresponds to
-   * the metadtata table schema.
+   * the metadata table schema.
    */
   @Override
   public TTableDescriptor toThriftDescriptor(int tableId,

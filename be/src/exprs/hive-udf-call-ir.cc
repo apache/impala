@@ -26,11 +26,6 @@
 
 namespace impala {
 
-FunctionContext* HiveUdfCall::GetFunctionContext(
-    ScalarExprEvaluator* eval, int fn_ctx_idx) {
-  return eval->fn_context(fn_ctx_idx);
-}
-
 HiveUdfCall::JniContext* HiveUdfCall::GetJniContext(FunctionContext* fn_ctx) {
   JniContext* jni_ctx = reinterpret_cast<JniContext*>(
       fn_ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));

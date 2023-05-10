@@ -56,10 +56,6 @@ class SchedulerWrapper;
 /// subscriber is recovering from a connection failure. This allows other backends to
 /// re-register with the statestore after a statestore restart.
 ///
-/// TODO(IMPALA-8484): Allow specifying executor groups during backend startup. Currently
-/// only one executor group named "default" exists. All backends are part of that group
-/// and it's the only group available for scheduling.
-///
 /// The class also allows the local backend (ImpalaServer), the local Frontend and the
 /// AdmissionController to register callbacks to receive notifications of changes to the
 /// cluster membership. Note: The notifications for blacklisted executors are not sent
@@ -79,8 +75,7 @@ class ClusterMembershipMgr {
   /// Maps backend IDs to backend descriptors.
   typedef std::unordered_map<std::string, BackendDescriptorPB> BackendIdMap;
 
-  /// Maps executor group names to executor groups. For now, only a default group exists
-  /// and all executors are part of that group.
+  /// Maps executor group names to executor groups.
   typedef std::unordered_map<std::string, ExecutorGroup> ExecutorGroups;
 
   // A snapshot of the current cluster membership. The ClusterMembershipMgr maintains a

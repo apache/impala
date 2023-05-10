@@ -27,6 +27,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -691,6 +692,30 @@ public class JdbcTest extends JdbcTestBase {
 
     for (Connection connection : connections) {
       assertNull("Connection is not null", connection);
+    }
+  }
+
+  /**
+   * test the query options in connection URL take effect.
+   */
+  @Test
+  public void testSetQueryOptionsInConnectionURL() throws Exception {
+    String divideZeroSQL = "SELECT CAST(1 AS DECIMAL)/0";
+    String connStr = ImpalaJdbcClient.getNoAuthConnectionStr(connectionType_);
+    connStr += "?DECIMAL_V2=false";
+    try (Connection connection = createConnection(connStr)) {
+      Statement stmt = connection.createStatement();
+      try (ResultSet rs = stmt.executeQuery(divideZeroSQL);) {
+        // DECIMAL_V2=false, no exception is expected to be thrown
+        rs.next();
+      }
+      stmt.execute("SET DECIMAL_V2=true");
+      try (ResultSet rs = stmt.executeQuery(divideZeroSQL);) {
+        // DECIMAL_V2=true, an exception is expected to be thrown
+        rs.next();
+      } catch (SQLException e) {
+        assertTrue(e.getMessage().contains("UDF ERROR: Cannot divide decimal by zero"));
+      }
     }
   }
 }

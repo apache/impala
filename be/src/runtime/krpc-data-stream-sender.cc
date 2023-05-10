@@ -803,38 +803,45 @@ Status KrpcDataStreamSender::Open(RuntimeState* state) {
   return ScalarExprEvaluator::Open(partition_expr_evals_, state);
 }
 
-//
-// An example of generated code with int type.
+// An example of generated code. Used the following query to generate it:
+//   use functional_orc_def;
+//   select a.outer_struct, b.small_struct
+//   from complextypes_nested_structs a
+//       full outer join complextypes_structs b
+//           on b.small_struct.i = a.outer_struct.inner_struct2.i + 19091;
 //
 // define i64 @KrpcDataStreamSenderHashRow(%"class.impala::KrpcDataStreamSender"* %this,
 //                                         %"class.impala::TupleRow"* %row,
-//                                         i64 %seed) #52 {
+//                                         i64 %seed) #49 {
 // entry:
-//   %0 = alloca i32
+//   %0 = alloca i64
 //   %1 = call %"class.impala::ScalarExprEvaluator"*
 //       @_ZN6impala20KrpcDataStreamSender25GetPartitionExprEvaluatorEi(
 //           %"class.impala::KrpcDataStreamSender"* %this, i32 0)
-//   %partition_val = call i64 @GetSlotRef(
-//       %"class.impala::ScalarExprEvaluator"* %1, %"class.impala::TupleRow"* %row)
-//   %is_null = trunc i64 %partition_val to i1
-//   br i1 %is_null, label %is_null_block, label %not_null_block
+//   %partition_val = call { i8, i64 }
+//       @"impala::Operators::Add_BigIntVal_BigIntValWrapper"(
+//           %"class.impala::ScalarExprEvaluator"* %1, %"class.impala::TupleRow"* %row)
+//   br label %entry1
 //
-// is_null_block:                                ; preds = %entry
+// entry1:                                           ; preds = %entry
+//   %2 = extractvalue { i8, i64 } %partition_val, 0
+//   %is_null = trunc i8 %2 to i1
+//   br i1 %is_null, label %null, label %non_null
+//
+// non_null:                                         ; preds = %entry1
+//   %val = extractvalue { i8, i64 } %partition_val, 1
+//   store i64 %val, i64* %0
+//   %native_ptr = bitcast i64* %0 to i8*
 //   br label %hash_val_block
 //
-// not_null_block:                               ; preds = %entry
-//   %2 = ashr i64 %partition_val, 32
-//   %3 = trunc i64 %2 to i32
-//   store i32 %3, i32* %0
-//   %native_ptr = bitcast i32* %0 to i8*
+// null:                                             ; preds = %entry1
 //   br label %hash_val_block
 //
-// hash_val_block:                               ; preds = %not_null_block, %is_null_block
-//   %val_ptr_phi = phi i8* [ %native_ptr, %not_null_block ], [ null, %is_null_block ]
+// hash_val_block:                                   ; preds = %non_null, %null
+//   %native_ptr_phi = phi i8* [ %native_ptr, %non_null ], [ null, %null ]
 //   %hash_val = call i64
 //       @_ZN6impala8RawValue20GetHashValueFastHashEPKvRKNS_10ColumnTypeEm(
-//           i8* %val_ptr_phi, %"struct.impala::ColumnType"* @expr_type_arg,
-//               i64 %seed)
+//           i8* %native_ptr_phi, %"struct.impala::ColumnType"* @expr_type_arg, i64 %seed)
 //   ret i64 %hash_val
 // }
 Status KrpcDataStreamSenderConfig::CodegenHashRow(
@@ -876,33 +883,26 @@ Status KrpcDataStreamSenderConfig::CodegenHashRow(
     CodegenAnyVal partition_val = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
         partition_exprs_[i]->type(), compute_fn, compute_fn_args, "partition_val");
 
-    llvm::BasicBlock* is_null_block =
-        llvm::BasicBlock::Create(context, "is_null_block", hash_row_fn);
-    llvm::BasicBlock* not_null_block =
-        llvm::BasicBlock::Create(context, "not_null_block", hash_row_fn);
+    CodegenAnyValReadWriteInfo rwi = partition_val.ToReadWriteInfo();
+    rwi.entry_block().BranchTo(&builder);
+
     llvm::BasicBlock* hash_val_block =
         llvm::BasicBlock::Create(context, "hash_val_block", hash_row_fn);
 
-    // Check if 'partition_val' is NULL
-    llvm::Value* val_is_null = partition_val.GetIsNull();
-    builder.CreateCondBr(val_is_null, is_null_block, not_null_block);
-
     // Set the pointer to NULL in case 'partition_val' evaluates to NULL
-    builder.SetInsertPoint(is_null_block);
+    builder.SetInsertPoint(rwi.null_block());
     llvm::Value* null_ptr = codegen->null_ptr_value();
     builder.CreateBr(hash_val_block);
 
     // Saves 'partition_val' on the stack and passes a pointer to it to the hash function
-    builder.SetInsertPoint(not_null_block);
-    llvm::Value* native_ptr = partition_val.ToNativePtr();
+    builder.SetInsertPoint(rwi.non_null_block());
+    llvm::Value* native_ptr = SlotDescriptor::CodegenStoreNonNullAnyValToNewAlloca(rwi);
     native_ptr = builder.CreatePointerCast(native_ptr, codegen->ptr_type(), "native_ptr");
     builder.CreateBr(hash_val_block);
 
     // Picks the input value to hash function
     builder.SetInsertPoint(hash_val_block);
-    llvm::PHINode* val_ptr_phi = builder.CreatePHI(codegen->ptr_type(), 2, "val_ptr_phi");
-    val_ptr_phi->addIncoming(native_ptr, not_null_block);
-    val_ptr_phi->addIncoming(null_ptr, is_null_block);
+    llvm::PHINode* val_ptr_phi = rwi.CodegenNullPhiNode(native_ptr, null_ptr);
 
     // Creates a global constant of the partition expression's ColumnType. It has to be a
     // constant for constant propagation and dead code elimination in 'get_hash_value_fn'

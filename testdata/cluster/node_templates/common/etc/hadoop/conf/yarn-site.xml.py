@@ -17,7 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import os
 import sys
 
@@ -26,15 +26,15 @@ hive_major_version = int(os.environ['IMPALA_HIVE_VERSION'][0])
 
 
 def _get_system_ram_mb():
-  lines = file("/proc/meminfo").readlines()
+  lines = open("/proc/meminfo").readlines()
   memtotal_line = [l for l in lines if l.startswith('MemTotal')][0]
   mem_kb = int(memtotal_line.split()[1])
-  return mem_kb / 1024
+  return mem_kb // 1024
 
 
 def _get_yarn_nm_ram_mb():
   sys_ram = _get_system_ram_mb()
-  available_ram_gb = int(os.getenv("IMPALA_CLUSTER_MAX_MEM_GB", str(sys_ram / 1024)))
+  available_ram_gb = int(os.getenv("IMPALA_CLUSTER_MAX_MEM_GB", str(sys_ram // 1024)))
   # Fit into the following envelope:
   # - need 4GB at a bare minimum
   # - leave at least 20G for other services

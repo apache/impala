@@ -1196,25 +1196,31 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// FIFO list of query records, which are written after the query finishes executing.
   /// Queries may briefly have entries in 'query_log_' and 'query_driver_map_'
-  /// while the query is being unregistered.
-  typedef std::list<std::unique_ptr<QueryStateRecord>> QueryLog;
+  /// while the query is being unregistered. To ensure that the records provided by
+  /// GetQueryRecord function are always valid, this list uses shared_ptr to hold
+  /// QueryStateRecord, preventing its lifecycle from ending prematurely due to removal
+  /// from the list.
+  typedef std::list<std::shared_ptr<QueryStateRecord>> QueryLog;
   QueryLog query_log_;
 
   /// Index that allows lookup via TUniqueId into the query log. The QueryStateRecord
-  /// value is owned by 'query_log_' so the entry in this index must be removed when
+  /// pointer is owned by 'query_log_' so the entry in this index must be removed when
   /// it is removed from 'query_log_'.
-  typedef boost::unordered_map<TUniqueId, QueryStateRecord*> QueryLogIndex;
+  typedef boost::unordered_map<TUniqueId, std::shared_ptr<QueryStateRecord>*>
+      QueryLogIndex;
   QueryLogIndex query_log_index_;
 
-  /// Sets the given QueryLogIndex for the given query_id. Returns an error Status if the
-  /// given query_id cannot be found in the QueryLogIndex.
+  /// Sets the given query_record (and retried_query_record too if given) for the given
+  /// query_id. Returns an error Status if the given query_id cannot be found in the
+  /// QueryLogIndex.
   Status GetQueryRecord(
-      const TUniqueId& query_id, QueryLogIndex::const_iterator* query_record);
+      const TUniqueId& query_id, std::shared_ptr<QueryStateRecord>* query_record,
+      std::shared_ptr<QueryStateRecord>* retried_query_record = nullptr);
 
   /// Decompresses the profile in the given QueryStateRecord into the specified format.
   /// The decompressed profile is added to the given RuntimeProfileOutput.
   Status DecompressToProfile(TRuntimeProfileFormat::type format,
-      QueryLogIndex::const_iterator query_record, RuntimeProfileOutput* profile);
+      std::shared_ptr<QueryStateRecord> query_record, RuntimeProfileOutput* profile);
 
   /// Logger for writing encoded query profiles, one per line with the following format:
   /// <ms-since-epoch> <query-id> <thrift query profile URL encoded and gzipped>

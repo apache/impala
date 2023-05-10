@@ -21,6 +21,7 @@
 # We do not use Impala's python environment here, nor do we depend on
 # non-standard python libraries to avoid needing extra build steps before
 # triggering this.
+from __future__ import absolute_import, division, print_function
 import argparse
 import datetime
 import itertools
@@ -395,7 +396,7 @@ def _call(args, check=True):
 def _check_output(*args, **kwargs):
   """Wrapper for subprocess.check_output, with logging."""
   logging.info("Running: %s, %s; cmdline: %s.", args, kwargs, " ".join(*args))
-  return subprocess.check_output(*args, **kwargs)
+  return subprocess.check_output(*args, universal_newlines=True, **kwargs)
 
 
 def _make_dir_if_not_exist(*parts):
@@ -781,7 +782,7 @@ class TestSuiteRunner(object):
     test_with_docker = self.test_with_docker
     suite = self.suite
     envs = ["-e", "NUM_CONCURRENT_TESTS=" + str(test_with_docker.parallel_test_concurrency)]
-    for k, v in sorted(suite.envs.iteritems()):
+    for k, v in sorted(suite.envs.items()):
       envs.append("-e")
       envs.append("%s=%s" % (k, v))
 

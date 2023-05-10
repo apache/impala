@@ -2275,8 +2275,6 @@ class TestRangerColumnMaskingComplexTypesInSelectList(CustomClusterTestSuite):
     cls.ImpalaTestMatrix.add_dimension(create_orc_dimension(cls.get_workload()))
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('protocol') == 'hs2')
-    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
-        disable_codegen_options=[True]))
 
   @classmethod
   def add_custom_cluster_constraints(cls):

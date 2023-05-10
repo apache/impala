@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <iostream>
 #include <numeric>
+#include <type_traits>
 
 #include <boost/utility.hpp>
 
@@ -253,6 +254,44 @@ TEST(BitUtil, ByteSwap) {
 
   // Test BitUtil::ByteSwap(Black Box Testing)
   for (int i = 0; i <= 32; ++i) TestByteSwapSimd(0, i);
+}
+
+template <class INT_T>
+void TestCountLeadingZeros() {
+  constexpr int BITWIDTH = sizeof(INT_T) * 8;
+  using UINT_T = typename MakeUnsigned<INT_T>::type;
+  // Unsigned constant 1 with bit width of BITWIDTH.
+  constexpr UINT_T ONE = 1;
+
+  // Test 0.
+  EXPECT_EQ(BITWIDTH, BitUtil::CountLeadingZeros<INT_T>(0));
+
+  // Test 1.
+  EXPECT_EQ(BITWIDTH - 1, BitUtil::CountLeadingZeros<INT_T>(ONE));
+
+  for (int i = 2; i < BITWIDTH - 1; ++i) {
+    INT_T smallest_with_bit_width = ONE << (i - 1);
+    EXPECT_EQ(BITWIDTH - i, BitUtil::CountLeadingZeros(smallest_with_bit_width));
+
+    INT_T largest_with_bit_width = (ONE << i) - 1;
+    EXPECT_EQ(BITWIDTH - i, BitUtil::CountLeadingZeros(largest_with_bit_width));
+  }
+
+  // Test max value for unsigned int types - for signed types they are negative which we
+  // don't allow.
+  if (std::is_same_v<INT_T, UINT_T>) {
+    UINT_T max = std::numeric_limits<UINT_T>::max();
+    EXPECT_EQ(0, BitUtil::CountLeadingZeros(max));
+  }
+}
+
+TEST(BitUtil, CountLeadingZeros) {
+  TestCountLeadingZeros<int32_t>();
+  TestCountLeadingZeros<uint32_t>();
+  TestCountLeadingZeros<int64_t>();
+  TestCountLeadingZeros<uint64_t>();
+  TestCountLeadingZeros<__int128>();
+  TestCountLeadingZeros<unsigned __int128>();
 }
 
 TEST(BitUtil, Log2) {

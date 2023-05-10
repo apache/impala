@@ -251,7 +251,14 @@ class ClientRequestState {
   /// control.
   /// Admission control resource pool associated with this query.
   std::string request_pool() const {
-    return query_ctx_.__isset.request_pool ? query_ctx_.request_pool : "";
+    if (is_planning_done_.load() && exec_request_ != nullptr
+        && exec_request_->query_exec_request.query_ctx.__isset.request_pool) {
+      // If the request pool has been set by Planner, return the request pool selected
+      // by Planner.
+      return exec_request_->query_exec_request.query_ctx.request_pool;
+    } else {
+      return query_ctx_.__isset.request_pool ? query_ctx_.request_pool : "";
+    }
   }
 
   int num_rows_fetched() const { return num_rows_fetched_; }
@@ -426,6 +433,11 @@ class ClientRequestState {
   void SetBlacklistedExecutorAddresses(
       std::unordered_set<NetworkAddressPB>& executor_addresses);
 
+  /// Mark planning as done for this request.
+  /// This function should be called after QueryDriver::RunFrontendPlanner() is
+  /// returned without error.
+  void SetPlanningDone() { is_planning_done_.store(true); }
+
  protected:
   /// Updates the end_time_us_ of this query if it isn't set. The end time is determined
   /// when this function is called for the first time, calling it multiple times does not
@@ -463,6 +475,9 @@ class ClientRequestState {
 
   /// True if there was a transaction and it got committed or aborted.
   bool transaction_closed_ = false;
+
+  /// Indicates whether the planning is done for the request.
+  std::atomic_bool is_planning_done_{false};
 
   /// Executor for any child queries (e.g. compute stats subqueries). Always non-NULL.
   const boost::scoped_ptr<ChildQueryExecutor> child_query_executor_;

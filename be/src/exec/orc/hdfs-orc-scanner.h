@@ -185,11 +185,6 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
     return THdfsFileFormat::ORC;
   }
 
- protected:
-  virtual int64_t GetNumberOfRowsInFile() const override {
-    return static_cast<int64_t>(reader_->getNumberOfRows());
-  }
-
  private:
   friend class OrcColumnReader;
   friend class OrcDateColumnReader;
@@ -200,9 +195,22 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   friend class OrcStructReader;
   friend class OrcListReader;
   friend class OrcMapReader;
+  friend class HdfsOrcScannerTest;
 
   /// Memory guard of the tuple_mem_
   uint8_t* tuple_mem_end_ = nullptr;
+
+  /// Index of the current stripe being processed. Stripe in ORC is equivalent to
+  /// RowGroup in Parquet. Initialized to -1 which indicates that we have not started
+  /// processing the first stripe yet (GetNext() has not yet been called).
+  int32_t stripe_idx_ = -1;
+
+  /// Counts the number of rows processed for the current stripe.
+  int64_t stripe_rows_read_ = 0;
+
+  /// Indicates whether we should advance to the next stripe in the next GetNext().
+  /// Starts out as true to move to the very first stripe.
+  bool advance_stripe_ = true;
 
   /// Indicates whether we are at the end of a stripe.
   bool end_of_stripe_ = true;
@@ -287,6 +295,9 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   /// StartColumnReading() guarantees that columnRanges_ is sorted by the element's
   /// offset, and there are no two overlapping range.
   vector<ColumnRange> columnRanges_;
+
+  /// Timer for materializing rows. This ignores time getting the next buffer.
+  ScopedTimer<MonotonicStopWatch> assemble_rows_timer_;
 
   /// Number of stripes that need to be read.
   RuntimeProfile::Counter* num_stripes_counter_ = nullptr;

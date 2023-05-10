@@ -739,16 +739,28 @@ Status ImpalaServer::GetRuntimeProfileOutput(const string& user,
   return Status::OK();
 }
 
-Status ImpalaServer::GetQueryRecord(
-    const TUniqueId& query_id, QueryLogIndex::const_iterator* query_record) {
+Status ImpalaServer::GetQueryRecord(const TUniqueId& query_id,
+    shared_ptr<QueryStateRecord>* query_record,
+    shared_ptr<QueryStateRecord>* retried_query_record) {
   lock_guard<mutex> l(query_log_lock_);
-  *query_record = query_log_index_.find(query_id);
-  if (*query_record == query_log_index_.end()) {
+  auto iterator = query_log_index_.find(query_id);
+  if (iterator == query_log_index_.end()) {
     // Common error, so logging explicitly and eliding Status's stack trace.
     string err =
         strings::Substitute(LEGACY_INVALID_QUERY_HANDLE_TEMPLATE, PrintId(query_id));
     VLOG(1) << err;
     return Status::Expected(err);
+  }
+  *query_record = *(iterator->second);
+  if (retried_query_record != nullptr && (*query_record)->was_retried) {
+    DCHECK((*query_record)->retried_query_id != nullptr);
+    iterator = query_log_index_.find(*(*query_record)->retried_query_id);
+
+    // The record of the retried query should always be later in the query log compared
+    // to the original query. Since the query log is a FIFO queue, this means that if the
+    // original query is in the log, then the retried query must be in the log as well.
+    DCHECK(iterator != query_log_index_.end());
+    *retried_query_record = *(iterator->second);
   }
   return Status::OK();
 }
@@ -794,31 +806,22 @@ Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
   // The query was not found in the active query map, search the query log.
   {
     // Set the profile for the original query.
-    QueryLogIndex::const_iterator query_record;
-    RETURN_IF_ERROR(GetQueryRecord(query_id, &query_record));
-    RETURN_IF_ERROR(CheckProfileAccess(user, query_record->second->effective_user,
-        query_record->second->user_has_profile_access));
+    shared_ptr<QueryStateRecord> query_record;
+    shared_ptr<QueryStateRecord> retried_query_record;
+    RETURN_IF_ERROR(GetQueryRecord(query_id, &query_record, &retried_query_record));
+    RETURN_IF_ERROR(CheckProfileAccess(user, query_record->effective_user,
+        query_record->user_has_profile_access));
     RETURN_IF_ERROR(DecompressToProfile(format, query_record, original_profile));
 
     // Set the profile for the retried query.
-    if (query_record->second->was_retried) {
+    if (query_record->was_retried) {
       *was_retried = true;
-      DCHECK(query_record->second->retried_query_id != nullptr);
-      QueryLogIndex::const_iterator retried_query_record;
-
-      // The profile of the retried profile should always be earlier in the query log
-      // compared to the original profile. Since the query log is a FIFO queue, this
-      // means that if the original profile is in the log, then the retried profile
-      // must be in the log as well.
-      Status status =
-          GetQueryRecord(*query_record->second->retried_query_id, &retried_query_record);
-      DCHECK(status.ok());
-      RETURN_IF_ERROR(status);
+      DCHECK(retried_query_record != nullptr);
 
       // If the original profile was accessible by the user, then the retried profile
       // must be accessible by the user as well.
-      status = CheckProfileAccess(user, retried_query_record->second->effective_user,
-          retried_query_record->second->user_has_profile_access);
+      Status status = CheckProfileAccess(user, retried_query_record->effective_user,
+          retried_query_record->user_has_profile_access);
       DCHECK(status.ok());
       RETURN_IF_ERROR(status);
 
@@ -832,7 +835,7 @@ Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
     const string& user, TRuntimeProfileFormat::type format,
     RuntimeProfileOutput* profile) {
   DCHECK(profile != nullptr);
-  DCHECK(profile->string_output != nullptr);
+  DCHECK(format == TRuntimeProfileFormat::JSON || profile->string_output != nullptr);
 
   // Search for the query id in the active query map
   {
@@ -847,34 +850,34 @@ Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
 
   // The query was not found the active query map, search the query log.
   {
-    QueryLogIndex::const_iterator query_record = query_log_index_.find(query_id);
+    shared_ptr<QueryStateRecord> query_record;
     RETURN_IF_ERROR(GetQueryRecord(query_id, &query_record));
-    RETURN_IF_ERROR(CheckProfileAccess(user, query_record->second->effective_user,
-        query_record->second->user_has_profile_access));
+    RETURN_IF_ERROR(CheckProfileAccess(user, query_record->effective_user,
+        query_record->user_has_profile_access));
     RETURN_IF_ERROR(DecompressToProfile(format, query_record, profile));
   }
   return Status::OK();
 }
 
 Status ImpalaServer::DecompressToProfile(TRuntimeProfileFormat::type format,
-    QueryLogIndex::const_iterator query_record, RuntimeProfileOutput* profile) {
+    shared_ptr<QueryStateRecord> query_record, RuntimeProfileOutput* profile) {
   if (format == TRuntimeProfileFormat::BASE64) {
-    Base64Encode(query_record->second->compressed_profile, profile->string_output);
+    Base64Encode(query_record->compressed_profile, profile->string_output);
   } else if (format == TRuntimeProfileFormat::THRIFT) {
     RETURN_IF_ERROR(RuntimeProfile::DecompressToThrift(
-        query_record->second->compressed_profile, profile->thrift_output));
+        query_record->compressed_profile, profile->thrift_output));
   } else if (format == TRuntimeProfileFormat::JSON) {
     ObjectPool tmp_pool;
     RuntimeProfile* tmp_profile;
     RETURN_IF_ERROR(RuntimeProfile::DecompressToProfile(
-        query_record->second->compressed_profile, &tmp_pool, &tmp_profile));
+        query_record->compressed_profile, &tmp_pool, &tmp_profile));
     tmp_profile->ToJson(profile->json_output);
   } else {
     DCHECK_EQ(format, TRuntimeProfileFormat::STRING);
     ObjectPool tmp_pool;
     RuntimeProfile* tmp_profile;
     RETURN_IF_ERROR(RuntimeProfile::DecompressToProfile(
-        query_record->second->compressed_profile, &tmp_pool, &tmp_profile));
+        query_record->compressed_profile, &tmp_pool, &tmp_profile));
     tmp_profile->PrettyPrint(profile->string_output);
   }
   return Status::OK();
@@ -944,7 +947,6 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
   }
 
   // Look for the query in completed query log.
-  // IMPALA-5275: Don't create Status while holding query_log_lock_
   {
     string effective_user;
     bool user_has_profile_access = false;
@@ -952,22 +954,18 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
     TExecSummary exec_summary;
     TExecSummary retried_exec_summary;
     {
-      lock_guard<mutex> l(query_log_lock_);
-      QueryLogIndex::const_iterator query_record = query_log_index_.find(query_id);
-      is_query_missing = query_record == query_log_index_.end();
+      shared_ptr<QueryStateRecord> query_record;
+      shared_ptr<QueryStateRecord> retried_query_record;
+      is_query_missing =
+          !GetQueryRecord(query_id, &query_record, &retried_query_record).ok();
       if (!is_query_missing) {
-        effective_user = query_record->second->effective_user;
-        user_has_profile_access = query_record->second->user_has_profile_access;
-        exec_summary = query_record->second->exec_summary;
-        if (query_record->second->was_retried) {
+        effective_user = query_record->effective_user;
+        user_has_profile_access = query_record->user_has_profile_access;
+        exec_summary = query_record->exec_summary;
+        if (query_record->was_retried) {
           if (was_retried != nullptr) *was_retried = true;
-          DCHECK(query_record->second->retried_query_id != nullptr);
-          QueryLogIndex::const_iterator retried_query_record =
-              query_log_index_.find(*query_record->second->retried_query_id);
-          // The retried query ran later than the original query. We should be able to
-          // find it in the query log since we have found the original query.
-          DCHECK(retried_query_record != query_log_index_.end());
-          retried_exec_summary = retried_query_record->second->exec_summary;
+          DCHECK(retried_query_record != nullptr);
+          retried_exec_summary = retried_query_record->exec_summary;
         }
       }
     }
@@ -1059,10 +1057,10 @@ void ImpalaServer::ArchiveQuery(const QueryHandle& query_handle) {
   // 'fetch_rows_lock()' protects several fields in ClientReqestState that are read
   // during QueryStateRecord creation. There should be no contention on this lock because
   // the query has already been closed (e.g. no more results can be fetched).
-  unique_ptr<QueryStateRecord> record = nullptr;
+  shared_ptr<QueryStateRecord> record = nullptr;
   {
     lock_guard<mutex> l(*query_handle->fetch_rows_lock());
-    record = make_unique<QueryStateRecord>(*query_handle, move(compressed_profile));
+    record = make_shared<QueryStateRecord>(*query_handle, move(compressed_profile));
   }
   if (query_handle->GetCoordinator() != nullptr) {
     query_handle->GetCoordinator()->GetTExecSummary(&record->exec_summary);
@@ -1070,8 +1068,8 @@ void ImpalaServer::ArchiveQuery(const QueryHandle& query_handle) {
   {
     lock_guard<mutex> l(query_log_lock_);
     // Add record to the beginning of the log, and to the lookup index.
-    query_log_index_[query_handle->query_id()] = record.get();
-    query_log_.insert(query_log_.begin(), move(record));
+    query_log_.push_front(move(record));
+    query_log_index_[query_handle->query_id()] = &query_log_.front();
 
     if (FLAGS_query_log_size > -1 && FLAGS_query_log_size < query_log_.size()) {
       DCHECK_EQ(query_log_.size() - FLAGS_query_log_size, 1);
@@ -1172,12 +1170,13 @@ void DumpTExecReq(const TExecRequest& exec_request, const char* dump_type,
   if (FLAGS_dump_exec_request_path.empty()) return;
   int depth = 0;
   std::stringstream tmpstr;
-  string fn(Substitute("$1/TExecRequest-$2.$3", FLAGS_dump_exec_request_path,
+  string fn(Substitute("$0/TExecRequest-$1.$2", FLAGS_dump_exec_request_path,
       dump_type, PrintId(query_id, "-")));
   std::ofstream ofs(fn);
   tmpstr << exec_request;
-  const int len = tmpstr.str().length();
-  const char *p = tmpstr.str().c_str();
+  std::string s = tmpstr.str();
+  const char *p = s.c_str();
+  const int len = s.length();
   for (int i = 0; i < len; ++i) {
     const char ch = p[i];
     ofs << ch;
@@ -1268,6 +1267,7 @@ Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
     if (!is_external_req) {
       (*query_handle)->query_events()->MarkEvent("Planning finished");
     }
+    (*query_handle)->SetPlanningDone();
     (*query_handle)->set_user_profile_access(result.user_has_profile_access);
     (*query_handle)->summary_profile()->AddEventSequence(
         result.timeline.name, result.timeline);

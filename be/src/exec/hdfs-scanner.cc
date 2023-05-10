@@ -873,13 +873,12 @@ Status HdfsScanner::IssueFooterRanges(HdfsScanNodeBase* scan_node,
       ScanRange* split = files[i]->splits[j];
 
       DCHECK_LE(split->offset() + split->len(), files[i]->file_length);
-      // If scan only reads file metadata (such as count(*) over the table), we can
+      // If there are no materialized slots (such as count(*) over the table), we can
       // get the result with the file metadata alone and don't need to read any row
       // groups. We only want a single node to process the file footer in this case,
       // which is the node with the footer split.  If it's not a count(*), we create a
       // footer range for the split always.
-      if (!scan_node->ReadsFileMetadataOnly(files[i]->filename)
-          || footer_split == split) {
+      if (!scan_node->IsZeroSlotTableScan() || footer_split == split) {
         ScanRangeMetadata* split_metadata =
             static_cast<ScanRangeMetadata*>(split->meta_data());
         // Each split is processed by first issuing a scan range for the file footer, which

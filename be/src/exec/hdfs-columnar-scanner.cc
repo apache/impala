@@ -64,27 +64,20 @@ PROFILE_DEFINE_COUNTER(IoReadTotalBytes, DEBUG, TUnit::BYTES,
     "The total number of bytes read from streams.");
 PROFILE_DEFINE_COUNTER(IoReadSkippedBytes, DEBUG, TUnit::BYTES,
     "The total number of bytes skipped from streams.");
-PROFILE_DEFINE_COUNTER(NumFileMetadataRead, DEBUG, TUnit::UNIT,
-    "The total number of file metadata reads done in place of rows or row groups / "
-    "stripe iteration.");
 
 const char* HdfsColumnarScanner::LLVM_CLASS_NAME = "class.impala::HdfsColumnarScanner";
 
-HdfsColumnarScanner::HdfsColumnarScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
-  : HdfsScanner(scan_node, state),
+HdfsColumnarScanner::HdfsColumnarScanner(HdfsScanNodeBase* scan_node,
+    RuntimeState* state) :
+    HdfsScanner(scan_node, state),
     scratch_batch_(new ScratchTupleBatch(
-        *scan_node->row_desc(), state_->batch_size(), scan_node->mem_tracker())),
-    assemble_rows_timer_(scan_node->materialize_tuple_timer()) {}
+        *scan_node->row_desc(), state_->batch_size(), scan_node->mem_tracker())) {
+}
 
 HdfsColumnarScanner::~HdfsColumnarScanner() {}
 
 Status HdfsColumnarScanner::Open(ScannerContext* context) {
   RETURN_IF_ERROR(HdfsScanner::Open(context));
-  // Memorize 'is_footer_scanner_' here since 'stream_' can be released early.
-  const io::ScanRange* range = stream_->scan_range();
-  is_footer_scanner_ =
-      range->offset() + range->bytes_to_read() >= stream_->file_desc()->file_length;
-
   RuntimeProfile* profile = scan_node_->runtime_profile();
   num_cols_counter_ = PROFILE_NumColumns.Instantiate(profile);
   num_scanners_with_no_reads_counter_ =
@@ -102,7 +95,6 @@ Status HdfsColumnarScanner::Open(ScannerContext* context) {
   io_total_request_ = PROFILE_IoReadTotalRequest.Instantiate(profile);
   io_total_bytes_ = PROFILE_IoReadTotalBytes.Instantiate(profile);
   io_skipped_bytes_ = PROFILE_IoReadSkippedBytes.Instantiate(profile);
-  num_file_metadata_read_ = PROFILE_NumFileMetadataRead.Instantiate(profile);
   return Status::OK();
 }
 
@@ -295,60 +287,6 @@ Status HdfsColumnarScanner::DivideReservationBetweenColumns(
 
   reservation_per_column = DivideReservationBetweenColumnsHelper(
       min_buffer_size, max_buffer_size, col_range_lengths, context_->total_reservation());
-  return Status::OK();
-}
-
-Status HdfsColumnarScanner::GetNextWithCountStarOptimization(RowBatch* row_batch) {
-  // There are no materialized slots, e.g. count(*) over the table.  We can serve
-  // this query from just the file metadata.  We don't need to read the column data.
-  // Only scanner of the footer split will run in this case. See the logic in
-  // HdfsScanner::IssueFooterRanges() and HdfsScanNodeBase::ReadsFileMetadataOnly().
-  DCHECK(is_footer_scanner_);
-  int64_t tuple_buffer_size;
-  uint8_t* tuple_buffer;
-  int capacity = 1;
-  RETURN_IF_ERROR(row_batch->ResizeAndAllocateTupleBuffer(state_,
-      row_batch->tuple_data_pool(), row_batch->row_desc()->GetRowSize(), &capacity,
-      &tuple_buffer_size, &tuple_buffer));
-  int64_t num_rows = GetNumberOfRowsInFile();
-  COUNTER_ADD(num_file_metadata_read_, 1);
-  DCHECK_LE(rows_read_in_group_, num_rows);
-  Tuple* dst_tuple = reinterpret_cast<Tuple*>(tuple_buffer);
-  InitTuple(template_tuple_, dst_tuple);
-  int64_t* dst_slot = dst_tuple->GetBigIntSlot(scan_node_->count_star_slot_offset());
-  *dst_slot = num_rows;
-  TupleRow* dst_row = row_batch->GetRow(row_batch->AddRow());
-  dst_row->SetTuple(0, dst_tuple);
-  row_batch->CommitLastRow();
-  rows_read_in_group_ += num_rows;
-  eos_ = true;
-  return Status::OK();
-}
-
-Status HdfsColumnarScanner::GetNextWithTemplateTuple(RowBatch* row_batch) {
-  // There are no materialized slots, e.g. "select 1" over the table.  We can serve
-  // this query from just the file metadata.  We don't need to read the column data.
-  // Only scanner of the footer split will run in this case. See the logic in
-  // HdfsScanner::IssueFooterRanges() and HdfsScanNodeBase::ReadsFileMetadataOnly().
-  // We might also get here for count(*) query against full acid table such as:
-  // "select count(*) from functional_orc_def.alltypes;"
-  DCHECK(is_footer_scanner_);
-  int64_t file_rows = GetNumberOfRowsInFile();
-  COUNTER_ADD(num_file_metadata_read_, 1);
-  if (rows_read_in_group_ == file_rows) {
-    eos_ = true;
-    return Status::OK();
-  }
-  assemble_rows_timer_.Start();
-  DCHECK_LT(rows_read_in_group_, file_rows);
-  int64_t rows_remaining = file_rows - rows_read_in_group_;
-  int max_tuples = min<int64_t>(row_batch->capacity(), rows_remaining);
-  TupleRow* current_row = row_batch->GetRow(row_batch->AddRow());
-  int num_to_commit = WriteTemplateTuples(current_row, max_tuples);
-  Status status = CommitRows(num_to_commit, row_batch);
-  assemble_rows_timer_.Stop();
-  RETURN_IF_ERROR(status);
-  rows_read_in_group_ += max_tuples;
   return Status::OK();
 }
 

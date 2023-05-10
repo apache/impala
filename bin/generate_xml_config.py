@@ -39,8 +39,7 @@ REPL:
 
 """
 
-from __future__ import with_statement
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import imp
 import os
 import re
@@ -79,7 +78,7 @@ def dump_config(d, source_path, out):
       -->
       <configuration>""".format(source_path=os.path.abspath(source_path))
   print(dedent(header), file=out)
-  for k, v in sorted(d.iteritems()):
+  for k, v in sorted(d.items()):
     try:
       k_new = _substitute_env_vars(k)
       if isinstance(v, int):
@@ -113,7 +112,7 @@ def main():
                     .format(path=in_path))
 
   tmp_path = out_path + ".tmp"
-  with file(tmp_path, "w") as out:
+  with open(tmp_path, "w") as out:
     try:
       dump_config(conf, in_path, out)
     except:  # noqa

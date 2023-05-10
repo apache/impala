@@ -37,6 +37,13 @@ TEST_QUERY = "select count(*) from functional.alltypes where month + random() < 
 # A query to test CPU requirement. Estimated memory per host is 37MB.
 CPU_TEST_QUERY = "select * from tpcds_parquet.store_sales where ss_item_sk = 1 limit 50;"
 
+# A query with full table scan characteristics.
+GROUPING_TEST_QUERY = ("select ss_item_sk from tpcds_parquet.store_sales"
+    " group by (ss_item_sk) order by ss_item_sk limit 10")
+
+# A query to test behavior of child queries.
+COMPUTE_STATS_QUERY = "COMPUTE STATS tpcds_parquet.store_sales"
+
 # Default query option to use for testing CPU requirement.
 CPU_DOP_OPTIONS = {'MT_DOP': '2', 'COMPUTE_PROCESSING_COST': 'true'}
 
@@ -142,6 +149,28 @@ class TestExecutorGroups(CustomClusterTestSuite):
     """Returns the number of queries that are currently running in the default resource
     pool."""
     return self.impalad_test_service.get_num_running_queries("default-pool")
+
+  def _verify_total_admitted_queries(self, resource_pool, expected_query_num):
+    """Verify the total number of queries that have been admitted to the given resource
+    pool on the Web admission site."""
+    query_num = self.impalad_test_service.get_total_admitted_queries(resource_pool)
+    assert query_num == expected_query_num, \
+        "Not matched number of queries admitted to %s pool on the Web admission site." \
+        % (resource_pool)
+
+  def _verify_query_num_for_resource_pool(self, resource_pool, expected_query_num):
+    """ Verify the number of queries which use the given resource pool on
+    the Web queries site."""
+    queries_json = self.impalad_test_service.get_queries_json()
+    queries = queries_json.get("in_flight_queries") + \
+              queries_json.get("completed_queries")
+    query_num = 0
+    for query in queries:
+      if query["resource_pool"] == resource_pool:
+        query_num += 1
+    assert query_num == expected_query_num, \
+        "Not matched number of queries using %s pool on the Web queries site: %s." \
+        % (resource_pool, json)
 
   def _wait_for_num_executor_groups(self, num_exec_grps, only_healthy=False):
     """Waits for the number of executor groups to reach 'num_exec_grps'. If 'only_healthy'
@@ -742,7 +771,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     different number of executors and memory limit in each."""
     # A small query with estimated memory per host of 10MB that can run on the small
     # executor group
-    SMALL_QUERY = "select count(*) from tpcds_parquet.date_dim where d_year=2022;"
+    SMALL_QUERY = "select count(*) from tpcds_parquet.date_dim;"
     # A large query with estimated memory per host of 132MB that can only run on
     # the large executor group.
     LARGE_QUERY = "select * from tpcds_parquet.store_sales where ss_item_sk = 1 limit 50;"
@@ -755,7 +784,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # max-query-cpu-core-per-node-limit and max-query-cpu-core-coordinator-limit
     # properties of the three sets:
     # tiny: [0, 64MB, 4, 4]
-    # small: [0, 64MB, 8, 8]
+    # small: [0, 70MB, 8, 8]
     # large: [64MB+1Byte, 8PB, 64, 64]
     llama_site_path = os.path.join(RESOURCES_DIR, "llama-site-3-groups.xml")
     # Start with a regular admission config with multiple pools and no resource limits.
@@ -808,7 +837,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # max-query-cpu-core-per-node-limit and max-query-cpu-core-coordinator-limit
     # properties of the three sets:
     # tiny: [0, 64MB, 4, 4]
-    # small: [0, 64MB, 8, 8]
+    # small: [0, 70MB, 8, 8]
     # large: [64MB+1Byte, 8PB, 64, 64]
     llama_site_path = os.path.join(RESOURCES_DIR, "llama-site-3-groups.xml")
 
@@ -884,6 +913,15 @@ class TestExecutorGroups(CustomClusterTestSuite):
           "Memory and cpu limit checking is skipped."),
          "EffectiveParallelism: 7", "ExecutorGroupsConsidered: 1"])
 
+    # Test that child queries follow REQUEST_POOL that was set by client.
+    # Two child queries should all run in root.large.
+    self._verify_total_admitted_queries("root.large", 1)
+    self._run_query_and_verify_profile(COMPUTE_STATS_QUERY, options,
+        ["ExecutorGroupsConsidered: 1",
+         "Verdict: Assign to first group because query is not auto-scalable"],
+        ["Executor Group:"])
+    self._verify_total_admitted_queries("root.large", 3)
+
     # Test setting REQUEST_POOL and disabling COMPUTE_PROCESSING_COST
     options['COMPUTE_PROCESSING_COST'] = 'false'
     options['REQUEST_POOL'] = 'root.large'
@@ -894,6 +932,59 @@ class TestExecutorGroups(CustomClusterTestSuite):
          "ExecutorGroupsConsidered: 1"],
         ["EffectiveParallelism:", "CpuAsk:"])
 
+    # Unset REQUEST_POOL.
+    self.execute_query_expect_success(self.client, "SET REQUEST_POOL='';")
+
+    # Test that child queries unset REQUEST_POOL that was set by Frontend planner for
+    # parent query. One child queries should run in root.small, and another one in
+    # root.large.
+    self._verify_total_admitted_queries("root.small", 1)
+    self._verify_total_admitted_queries("root.large", 4)
+    self._run_query_and_verify_profile(COMPUTE_STATS_QUERY, CPU_DOP_OPTIONS,
+        ["ExecutorGroupsConsidered: 1",
+         "Verdict: Assign to first group because query is not auto-scalable"],
+        ["Executor Group:"])
+    self._verify_total_admitted_queries("root.small", 2)
+    self._verify_total_admitted_queries("root.large", 5)
+
+    # Test that GROUPING_TEST_QUERY will get assigned to the small group.
+    self._run_query_and_verify_profile(GROUPING_TEST_QUERY, CPU_DOP_OPTIONS,
+        ["Executor Group: root.small-group", "ExecutorGroupsConsidered: 2",
+          "Verdict: Match", "CpuAsk: 4", "CpuAskUnbounded: 1"])
+
+    # ENABLE_REPLAN=false should force query to run in tiny group.
+    self.execute_query_expect_success(self.client, "SET ENABLE_REPLAN=false;")
+    self._run_query_and_verify_profile(CPU_TEST_QUERY, CPU_DOP_OPTIONS,
+        ["Executor Group: root.tiny-group", "ExecutorGroupsConsidered: 1",
+         "Verdict: Assign to first group because query option ENABLE_REPLAN=false"])
+    self.execute_query_expect_success(self.client, "SET ENABLE_REPLAN='';")
+
+    # Trivial query should be assigned to tiny group by Frontend.
+    # Backend may decide to run it in coordinator only.
+    self._run_query_and_verify_profile("SELECT 1", CPU_DOP_OPTIONS,
+        ["Executor Group: empty group (using coordinator only)",
+         "ExecutorGroupsConsidered: 1",
+         "Verdict: Assign to first group because the number of nodes is 1"])
+
+    # CREATE/DROP database should work and assigned to tiny group.
+    self._run_query_and_verify_profile(
+        "CREATE DATABASE test_non_scalable_query;", CPU_DOP_OPTIONS,
+        ["ExecutorGroupsConsidered: 1",
+         "Verdict: Assign to first group because query is not auto-scalable"],
+        ["Executor Group:"])
+    self._run_query_and_verify_profile(
+        "DROP DATABASE test_non_scalable_query;", CPU_DOP_OPTIONS,
+        ["ExecutorGroupsConsidered: 1",
+         "Verdict: Assign to first group because query is not auto-scalable"],
+        ["Executor Group:"])
+
+    # Check resource pools on the Web queries site and admission site
+    self._verify_query_num_for_resource_pool("root.small", 3)
+    self._verify_query_num_for_resource_pool("root.tiny", 3)
+    self._verify_query_num_for_resource_pool("root.large", 5)
+    self._verify_total_admitted_queries("root.small", 3)
+    self._verify_total_admitted_queries("root.tiny", 3)
+    self._verify_total_admitted_queries("root.large", 5)
     self.client.close()
 
   @pytest.mark.execute_serially
@@ -904,6 +995,9 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self._run_query_and_verify_profile(CPU_TEST_QUERY, CPU_DOP_OPTIONS,
         ["Executor Group: root.tiny-group", "EffectiveParallelism: 3",
          "ExecutorGroupsConsidered: 1"])
+    # Check resource pools on the Web queries site and admission site
+    self._verify_query_num_for_resource_pool("root.tiny", 1)
+    self._verify_total_admitted_queries("root.tiny", 1)
     self.client.close()
 
   @pytest.mark.execute_serially
@@ -924,6 +1018,9 @@ class TestExecutorGroups(CustomClusterTestSuite):
         ["Executor Group: root.large-group", "EffectiveParallelism: 7",
          "ExecutorGroupsConsidered: 3", "CpuAsk: 234",
          "Verdict: no executor group set fit. Admit to last executor group set."])
+    # Check resource pools on the Web queries site and admission site
+    self._verify_query_num_for_resource_pool("root.large", 2)
+    self._verify_total_admitted_queries("root.large", 2)
     self.client.close()
 
   @pytest.mark.execute_serially
@@ -937,6 +1034,36 @@ class TestExecutorGroups(CustomClusterTestSuite):
     result = self.execute_query_expect_failure(self.client, CPU_TEST_QUERY)
     assert ("AnalysisException: The query does not fit largest executor group sets. "
         "Reason: not enough cpu cores (require=234, max=192).") in str(result)
+    self.client.close()
+
+  @pytest.mark.execute_serially
+  def test_min_processing_per_thread_small(self):
+    """Test processing cost with min_processing_per_thread smaller than default"""
+    coordinator_test_args = "-min_processing_per_thread=500000"
+    self._setup_three_exec_group_cluster(coordinator_test_args)
+
+    # Test that GROUPING_TEST_QUERY will get assigned to the large group.
+    self._run_query_and_verify_profile(GROUPING_TEST_QUERY, CPU_DOP_OPTIONS,
+        ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+          "Verdict: Match", "CpuAsk: 6"],
+        ["CpuAskUnbounded:"])
+
+    # Test that high_scan_cost_query will get assigned to the large group.
+    high_scan_cost_query = ("SELECT ss_item_sk FROM tpcds_parquet.store_sales "
+        "WHERE ss_item_sk < 1000000 GROUP BY ss_item_sk LIMIT 10")
+    options = copy.deepcopy(CPU_DOP_OPTIONS)
+    self._run_query_and_verify_profile(high_scan_cost_query, options,
+        ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+          "Verdict: Match", "CpuAsk: 6"],
+        ["CpuAskUnbounded:"])
+
+    # Test that high_scan_cost_query will get assigned to the small group
+    # if NUM_SCANNER_THREADS is limited to 1.
+    options['NUM_SCANNER_THREADS'] = '1'
+    self._run_query_and_verify_profile(high_scan_cost_query, options,
+        ["Executor Group: root.small-group", "ExecutorGroupsConsidered: 2",
+          "Verdict: Match", "CpuAsk: 4", "CpuAskUnbounded: 4"])
+
     self.client.close()
 
   @pytest.mark.execute_serially

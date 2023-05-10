@@ -929,12 +929,12 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   /**
    * Set number of rows consumed and produced data fields in processing cost.
    */
-  public void computeRowConsumptionAndProductionToCost() {
+  public void computeRowConsumptionAndProductionToCost(boolean limitScanParallelism) {
     Preconditions.checkState(processingCost_.isValid(),
         "Processing cost of PlanNode " + getDisplayLabel() + " is invalid!");
     processingCost_.setNumRowToConsume(getInputCardinality());
     processingCost_.setNumRowToProduce(getCardinality());
-    if (isLeafNode()
+    if ((isLeafNode() && limitScanParallelism)
         && (!fragment_.hasAdjustedInstanceCount()
             || fragment_.getAdjustedInstanceCount() < getNumInstances())) {
       fragment_.setFixedInstanceCount(getNumInstances());

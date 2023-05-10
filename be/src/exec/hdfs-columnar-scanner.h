@@ -60,25 +60,6 @@ class HdfsColumnarScanner : public HdfsScanner {
   /// top-level tuples. See AssembleRows() in the derived classes.
   boost::scoped_ptr<ScratchTupleBatch> scratch_batch_;
 
-  /// Timer for materializing rows.  This ignores time getting the next buffer.
-  ScopedTimer<MonotonicStopWatch> assemble_rows_timer_;
-
-  /// Index of the current row group / stripe being processed. Initialized to -1 which
-  /// indicates that we have not started processing the first group yet (GetNext() has
-  /// not yet been called).
-  int32_t group_idx_ = -1;
-
-  /// Counts the number of rows processed for the current row group / stripe.
-  int64_t rows_read_in_group_ = 0;
-
-  /// Indicates whether we should advance to the next row group / stripe in the next
-  /// GetNext(). Starts out as true to move to the very first row group.
-  bool advance_group_ = true;
-
-  /// Indicate whether this is a footer scanner or not.
-  /// Assigned in HdfsColumnarScanner::Open().
-  bool is_footer_scanner_ = false;
-
   /// Scan range for the metadata.
   const io::ScanRange* metadata_range_ = nullptr;
 
@@ -119,9 +100,6 @@ class HdfsColumnarScanner : public HdfsScanner {
   Status DivideReservationBetweenColumns(const ColumnRangeLengths& col_range_lengths,
       ColumnReservations& reservation_per_column);
 
-  /// Get the number of rows in file.
-  virtual int64_t GetNumberOfRowsInFile() const = 0;
-
   /// Helper for DivideReservationBetweenColumns(). Implements the core algorithm for
   /// dividing a reservation of 'reservation_to_distribute' bytes between columns with
   /// scan range lengths 'col_range_lengths' given a min and max buffer size. Returns
@@ -135,16 +113,6 @@ class HdfsColumnarScanner : public HdfsScanner {
   /// 'col_range_lengths' given the min and max buffer size of the singleton DiskIoMgr
   /// in ExecEnv.
   static int64_t ComputeIdealReservation(const ColumnRangeLengths& col_range_lengths);
-
-  /// Handle count(*) queries by reading the row count from the footer statistics.
-  /// The optimization is possible only in simpler cases e.g. when there are no conjucts.
-  /// Check ScanNode.java#canApplyCountStarOptimization for full detail.
-  Status GetNextWithCountStarOptimization(RowBatch* row_batch);
-
-  /// Handle zero slot scan queries by reading the row count from the footer statistics.
-  /// Possible queries include "select 1" or "select count(*)" over full acid table that
-  /// does not require row validation.
-  Status GetNextWithTemplateTuple(RowBatch* row_batch);
 
   /// Number of columns that need to be read.
   RuntimeProfile::Counter* num_cols_counter_;
@@ -173,11 +141,6 @@ class HdfsColumnarScanner : public HdfsScanner {
 
   /// Total number of bytes skipped during stream reading.
   RuntimeProfile::Counter* io_skipped_bytes_;
-
-  /// Total file metadata reads done.
-  /// Incremented when serving query from metadata instead of iterating rows or
-  /// row groups / stripes.
-  RuntimeProfile::Counter* num_file_metadata_read_;
 
  private:
   int ProcessScratchBatchCodegenOrInterpret(RowBatch* dst_batch);

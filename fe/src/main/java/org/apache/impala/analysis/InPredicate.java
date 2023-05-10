@@ -173,6 +173,9 @@ public class InPredicate extends Predicate {
   }
 
   protected void computeSelectivity() {
+    if (hasValidSelectivityHint()) {
+      return;
+    }
     // TODO: Fix selectivity_ for nested predicate
     Reference<SlotRef> slotRefRef = new Reference<SlotRef>();
     Reference<Integer> idxRef = new Reference<Integer>();

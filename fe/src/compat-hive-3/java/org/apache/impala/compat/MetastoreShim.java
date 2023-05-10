@@ -690,8 +690,15 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
     Map<String, Long> partNameToCompactionId = new HashMap<>();
     if (hdfsTable.isPartitioned()) {
       for (CompactionInfoStruct ci : response.getCompactions()) {
-        partNameToCompactionId.put(
-            Preconditions.checkNotNull(ci.getPartitionname()), ci.getId());
+        // It is possible for a partitioned table to have null partitionname in case of
+        // an aborted dynamic partition insert.
+        if (ci.getPartitionname() != null) {
+          partNameToCompactionId.put(ci.getPartitionname(), ci.getId());
+        } else {
+          LOG.warn(
+              "Partitioned table {} has null partitionname in CompactionInfoStruct: {}",
+              hdfsTable.getFullName(), ci.toString());
+        }
       }
     } else {
       CompactionInfoStruct ci = Iterables.getOnlyElement(response.getCompactions(), null);
@@ -749,8 +756,13 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
     Map<String, Long> partNameToCompactionId = new HashMap<>();
     if (table.isPartitioned()) {
       for (CompactionInfoStruct ci : response.getCompactions()) {
-        partNameToCompactionId.put(
-            Preconditions.checkNotNull(ci.getPartitionname()), ci.getId());
+        if (ci.getPartitionname() != null) {
+          partNameToCompactionId.put(ci.getPartitionname(), ci.getId());
+        } else {
+          LOG.warn(
+              "Partitioned table {} has null partitionname in CompactionInfoStruct: {}",
+              tableName, ci.toString());
+        }
       }
     } else {
       CompactionInfoStruct ci = Iterables.getOnlyElement(response.getCompactions(),

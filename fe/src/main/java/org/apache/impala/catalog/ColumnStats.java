@@ -423,7 +423,7 @@ public class ColumnStats {
     if (!longStats.isSetLowValue()) {
       lowValue_ = null;
     } else {
-      Long value = new Long(longStats.getLowValue());
+      Long value = Long.valueOf(longStats.getLowValue());
       lowValue_ = new TColumnValue();
       switch (type) {
         case TINYINT:
@@ -451,7 +451,7 @@ public class ColumnStats {
     if (!longStats.isSetHighValue()) {
       highValue_ = null;
     } else {
-      Long value = new Long(longStats.getHighValue());
+      Long value = Long.valueOf(longStats.getHighValue());
       highValue_ = new TColumnValue();
       switch (type) {
         case TINYINT:
@@ -766,10 +766,10 @@ public class ColumnStats {
           Long lowValue = null;
           Long highValue = null;
           if (isLowValueSet && colStats.low_value.isSetByte_val()) {
-            lowValue = new Long(colStats.low_value.getByte_val());
+            lowValue = Long.valueOf(colStats.low_value.getByte_val());
           }
           if (isHighValueSet && colStats.high_value.isSetByte_val()) {
-            highValue = new Long(colStats.high_value.getByte_val());
+            highValue = Long.valueOf(colStats.high_value.getByte_val());
           }
           updateLowAndHighForHiveColumnStatsData(lowValue, highValue, longColStatsData);
           colStatsData.setLongStats(longColStatsData);
@@ -783,10 +783,10 @@ public class ColumnStats {
           Long lowValue = null;
           Long highValue = null;
           if (isLowValueSet && colStats.low_value.isSetShort_val()) {
-            lowValue = new Long(colStats.low_value.getShort_val());
+            lowValue = Long.valueOf(colStats.low_value.getShort_val());
           }
           if (isHighValueSet && colStats.high_value.isSetShort_val()) {
-            highValue = new Long(colStats.high_value.getShort_val());
+            highValue = Long.valueOf(colStats.high_value.getShort_val());
           }
           updateLowAndHighForHiveColumnStatsData(lowValue, highValue, longColStatsData);
 
@@ -801,10 +801,10 @@ public class ColumnStats {
           Long lowValue = null;
           Long highValue = null;
           if (isLowValueSet && colStats.low_value.isSetInt_val()) {
-            lowValue = new Long(colStats.low_value.getInt_val());
+            lowValue = Long.valueOf(colStats.low_value.getInt_val());
           }
           if (isHighValueSet && colStats.high_value.isSetInt_val()) {
-            highValue = new Long(colStats.high_value.getInt_val());
+            highValue = Long.valueOf(colStats.high_value.getInt_val());
           }
           updateLowAndHighForHiveColumnStatsData(lowValue, highValue, longColStatsData);
 
@@ -836,10 +836,10 @@ public class ColumnStats {
           Long lowValue = null;
           Long highValue = null;
           if (isLowValueSet && colStats.low_value.isSetLong_val()) {
-            lowValue = new Long(colStats.low_value.getLong_val());
+            lowValue = Long.valueOf(colStats.low_value.getLong_val());
           }
           if (isHighValueSet && colStats.high_value.isSetLong_val()) {
-            highValue = new Long(colStats.high_value.getLong_val());
+            highValue = Long.valueOf(colStats.high_value.getLong_val());
           }
           updateLowAndHighForHiveColumnStatsData(lowValue, highValue, longColStatsData);
 
@@ -858,10 +858,10 @@ public class ColumnStats {
           Double lowValue = null;
           Double highValue = null;
           if (isLowValueSet && colStats.low_value.isSetDouble_val()) {
-            lowValue = new Double(colStats.low_value.getDouble_val());
+            lowValue = Double.valueOf(colStats.low_value.getDouble_val());
           }
           if (isHighValueSet && colStats.high_value.isSetDouble_val()) {
-            highValue = new Double(colStats.high_value.getDouble_val());
+            highValue = Double.valueOf(colStats.high_value.getDouble_val());
           }
           updateLowAndHighForHiveColumnStatsData(lowValue, highValue, doubleColStatsData);
 

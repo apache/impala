@@ -802,9 +802,7 @@ public class PlannerTest extends PlannerTestBase {
     // Also tests that selecting the whole struct or fields from an inline view or
     // directly from the table give the same row size.
 
-    // For comlex types in the select list, we have to turn codegen off.
     TQueryOptions queryOpts = defaultQueryOptions();
-    queryOpts.setDisable_codegen(true);
 
     String queryWholeStruct =
         "select outer_struct from functional_orc_def.complextypes_nested_structs";
@@ -854,12 +852,7 @@ public class PlannerTest extends PlannerTestBase {
     // the select list, no extra slots are generated in the row for the struct fields but
     // the memory of the struct is reused, i.e. the row size is the same as when only the
     // struct is queried.
-
-    // For complex types in the select list, we have to turn codegen off.
-    // TODO: Remove this when IMPALA-10851 is fixed.
     TQueryOptions queryOpts = defaultQueryOptions();
-    queryOpts.setDisable_codegen(true);
-
     String queryTemplate =
         "select %s from functional_orc_def.complextypes_nested_structs";
 
@@ -887,9 +880,6 @@ public class PlannerTest extends PlannerTestBase {
     // star expansion.
 
     TQueryOptions queryOpts = defaultQueryOptions();
-    // For complex types in the select list, we have to turn codegen off.
-    // TODO: Remove this when IMPALA-10851 is fixed.
-    queryOpts.setDisable_codegen(true);
     // Enable star-expandion of complex types.
     queryOpts.setExpand_complex_types(true);
 
@@ -1275,11 +1265,29 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   /**
+   * Checks exercising predicate pushdown with Iceberg tables.
+   */
+  @Test
+  public void testIcebergPredicates() {
+    runPlannerTestFile("iceberg-predicates", "functional_parquet",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
+  /**
    * Check that Iceberg V2 table scans work as expected.
    */
   @Test
   public void testIcebergV2TableScans() {
     runPlannerTestFile("iceberg-v2-tables", "functional_parquet",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
+  /**
+   * Check that Iceberg metadata table scan plans are as expected.
+   */
+  @Test
+  public void testIcebergMetadataTableScans() {
+    runPlannerTestFile("iceberg-metadata-table-scan", "functional_parquet",
         ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
@@ -1335,11 +1343,6 @@ public class PlannerTest extends PlannerTestBase {
     runPlannerTestFile("tpcds-dist-method", "tpcds");
   }
 
-  @Test
-  public void testOrcStatsAgg() {
-    runPlannerTestFile("orc-stats-agg");
-  }
-
   /**
    * Test new hint of 'TABLE_NUM_ROWS'
    */
@@ -1366,6 +1369,7 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = new TQueryOptions();
     options.setMt_dop(4);
     options.setCompute_processing_cost(true);
+    options.setProcessing_cost_min_threads(2);
     options.setMinmax_filter_threshold(0.5);
     options.setMinmax_filter_sorted_columns(false);
     options.setMinmax_filter_partition_columns(false);
@@ -1374,5 +1378,14 @@ public class PlannerTest extends PlannerTestBase {
             PlannerTestOption.INCLUDE_RESOURCE_HEADER,
             PlannerTestOption.VALIDATE_RESOURCES,
             PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
+  /**
+   * Test SELECTIVITY hints
+   */
+  @Test
+  public void testPredicateSelectivityHints() {
+    runPlannerTestFile("predicate-selectivity-hint",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 }

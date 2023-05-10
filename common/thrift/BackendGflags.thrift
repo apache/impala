@@ -250,4 +250,6 @@ struct TBackendGflags {
   109: required i64 min_processing_per_thread
 
   110: required bool skip_resource_checking_on_last_executor_group_set
+
+  111: required i32 thrift_rpc_max_message_size
 }

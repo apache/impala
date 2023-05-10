@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -35,7 +35,6 @@
 # TODO: Improve console output: replace 'print' with format strings
 #       and use sys.stderr/sys.stdout.
 
-from __future__ import print_function
 import logging
 import optparse
 import os
@@ -63,25 +62,6 @@ class Colors(object):
   RESET = __on_tty("\x1b[m")
 
 
-def check_output(*popenargs, **kwargs):
-  r"""Run command with arguments and return its output as a byte string.
-  Backported from Python 2.7 as it's implemented as pure python on stdlib.
-  >>> check_output(['/usr/bin/python', '--version'])
-  Python 2.6.2
-  """
-  process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
-  output, unused_err = process.communicate()
-  retcode = process.poll()
-  if retcode:
-    cmd = kwargs.get("args")
-    if cmd is None:
-      cmd = popenargs[0]
-    error = subprocess.CalledProcessError(retcode, cmd)
-    error.output = output
-    raise error
-  return output
-
-
 def confirm_prompt(prompt):
   """
   Issue the given prompt, and ask the user to confirm yes/no. Returns true
@@ -94,7 +74,7 @@ def confirm_prompt(prompt):
       print("Not running interactively. Assuming 'N'.")
       return False
 
-    r = raw_input().strip().lower()
+    r = input().strip().lower()
     if r in ['y', 'yes', '']:
       return True
     elif r in ['n', 'no']:
@@ -103,7 +83,8 @@ def confirm_prompt(prompt):
 
 def get_my_email():
   """ Return the email address in the user's git config. """
-  return check_output(['git', 'config', '--get', 'user.email']).strip()
+  return subprocess.check_output(['git', 'config', '--get', 'user.email'],
+      universal_newlines=True).strip()
 
 
 def check_apache_remote():
@@ -112,9 +93,8 @@ def check_apache_remote():
   Otherwise, exits with an error message.
   """
   try:
-    url = check_output(\
-        ['git', 'config', '--local', '--get',
-            'remote.' + OPTIONS.apache_remote + '.url']).strip()
+    url = subprocess.check_output(['git', 'config', '--local', '--get',
+        'remote.' + OPTIONS.apache_remote + '.url'], universal_newlines=True).strip()
   except subprocess.CalledProcessError:
     print("No remote named " + OPTIONS.apache_remote
         + ". Please set one up, for example with: ", file=sys.stderr)
@@ -133,8 +113,8 @@ def check_gerrit_remote():
   Otherwise, exits with an error message.
   """
   try:
-    url = check_output(['git', 'config', '--local', '--get',
-                        'remote.' + OPTIONS.gerrit_remote + '.url']).strip()
+    url = subprocess.check_output(['git', 'config', '--local', '--get',
+        'remote.' + OPTIONS.gerrit_remote + '.url'], universal_newlines=True).strip()
   except subprocess.CalledProcessError:
     print("No remote named " + OPTIONS.gerrit_remote
         + ". Please set one up following ", file=sys.stderr)
@@ -157,7 +137,8 @@ def fetch(remote):
 
 def get_branches(remote):
   """ Fetch a dictionary mapping branch name to SHA1 hash from the given remote. """
-  out = check_output(["git", "ls-remote", remote, "refs/heads/*"])
+  out = subprocess.check_output(["git", "ls-remote", remote, "refs/heads/*"],
+      universal_newlines=True)
   ret = {}
   for l in out.splitlines():
     sha, ref = l.split("\t")
@@ -169,20 +150,22 @@ def get_branches(remote):
 def rev_parse(rev):
   """Run git rev-parse, returning the sha1, or None if not found"""
   try:
-    return check_output(['git', 'rev-parse', rev], stderr=subprocess.STDOUT).strip()
+    return subprocess.check_output(['git', 'rev-parse', rev],
+        stderr=subprocess.STDOUT, universal_newlines=True).strip()
   except subprocess.CalledProcessError:
     return None
 
 
 def rev_list(arg):
   """Run git rev-list, returning an array of SHA1 commit hashes."""
-  return check_output(['git', 'rev-list', arg]).splitlines()
+  return subprocess.check_output(['git', 'rev-list', arg],
+      universal_newlines=True).splitlines()
 
 
 def describe_commit(rev):
   """ Return a one-line description of a commit. """
-  return subprocess.check_output(
-      ['git', 'log', '--color', '-n1', '--oneline', rev]).strip()
+  return subprocess.check_output(['git', 'log', '--color', '-n1', '--oneline', rev],
+      universal_newlines=True).strip()
 
 
 def is_fast_forward(ancestor, child):
@@ -191,7 +174,8 @@ def is_fast_forward(ancestor, child):
   could be fast-forward merged.
   """
   try:
-    merge_base = check_output(['git', 'merge-base', ancestor, child]).strip()
+    merge_base = subprocess.check_output(['git', 'merge-base', ancestor, child],
+        universal_newlines=True).strip()
   except:
     # If either of the commits is unknown, count this as a non-fast-forward.
     return False
@@ -200,7 +184,8 @@ def is_fast_forward(ancestor, child):
 
 def get_committer_email(rev):
   """ Return the email address of the committer of the given revision. """
-  return check_output(['git', 'log', '-n1', '--pretty=format:%ce', rev]).strip()
+  return subprocess.check_output(['git', 'log', '-n1', '--pretty=format:%ce', rev],
+      universal_newlines=True).strip()
 
 
 def do_update(branch, gerrit_sha, apache_sha):
@@ -294,7 +279,7 @@ def main():
   # Check the current state of branches on Apache.
   # For each branch, we try to update it if the revisions don't match.
   apache_branches = get_branches(OPTIONS.apache_remote)
-  for branch, apache_sha in sorted(apache_branches.iteritems()):
+  for branch, apache_sha in sorted(apache_branches.items()):
     gerrit_sha = rev_parse("remotes/" + OPTIONS.gerrit_remote + "/" + branch)
     print("Branch '%s':\t" % branch, end='')
     if gerrit_sha is None:

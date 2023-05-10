@@ -585,7 +585,8 @@ inline bool RleBatchDecoder<T>::SkipLiteralValues(int32_t num_literals_to_skip) 
   int32_t num_to_skip = std::min<int32_t>(literal_count_,
       BitUtil::RoundDownToPowerOf2(num_remaining, 32));
   if (num_to_skip > 0) {
-    bit_reader_.SkipBatch(bit_width_, num_to_skip);
+    bool skipped = bit_reader_.SkipBatch(bit_width_, num_to_skip);
+    DCHECK(skipped);
     literal_count_ -= num_to_skip;
     num_remaining -= num_to_skip;
   }

@@ -187,6 +187,11 @@ void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver, bool metrics_only
       [this](const auto& req, auto* doc) {
         this->QuerySummaryHandler(true, true, req, doc); }, false);
 
+  webserver->RegisterUrlCallback("/query_timeline", "query_timeline.tmpl",
+      [this](const auto& req, auto* doc) {
+        this->QueryProfileHelper(req, doc, TRuntimeProfileFormat::JSON, true);
+        }, false);
+
   webserver->RegisterUrlCallback("/query_plan_text", "query_plan_text.tmpl",
       [this](const auto& req, auto* doc) {
         this->QuerySummaryHandler(false, false, req, doc); }, false);
@@ -318,7 +323,7 @@ void ImpalaHttpHandler::QueryProfileHandler(const Webserver::WebRequest& req,
 }
 
 void ImpalaHttpHandler::QueryProfileHelper(const Webserver::WebRequest& req,
-    Document* document, TRuntimeProfileFormat::type format) {
+    Document* document, TRuntimeProfileFormat::type format, bool internal_profile) {
   TUniqueId unique_id;
   stringstream ss;
   Status status = ParseIdFromRequest(req, &unique_id, "query_id");
@@ -326,10 +331,16 @@ void ImpalaHttpHandler::QueryProfileHelper(const Webserver::WebRequest& req,
     ss << status.GetDetail();
   } else {
     ImpalaServer::RuntimeProfileOutput runtime_profile;
-    runtime_profile.string_output = &ss;
+    if (internal_profile) {
+      Value query_id_val(PrintId(unique_id).c_str(), document->GetAllocator());
+      document->AddMember("query_id", query_id_val, document->GetAllocator());
+      document->AddMember("internal_profile", true, document->GetAllocator());
+    }
+    if (format != TRuntimeProfileFormat::JSON) {
+      runtime_profile.string_output = &ss;
+    }
     runtime_profile.json_output = document;
-    Status status =
-        server_->GetRuntimeProfileOutput(unique_id, "", format, &runtime_profile);
+    status = server_->GetRuntimeProfileOutput(unique_id, "", format, &runtime_profile);
     if (!status.ok()) {
       ss.str(Substitute("Could not obtain runtime profile: $0", status.GetDetail()));
     }
@@ -338,6 +349,16 @@ void ImpalaHttpHandler::QueryProfileHelper(const Webserver::WebRequest& req,
   if (format != TRuntimeProfileFormat::JSON){
     Value profile(ss.str().c_str(), document->GetAllocator());
     document->AddMember("contents", profile, document->GetAllocator());
+  } else if (internal_profile) {
+    if (!status.ok()) {
+      Value error(ss.str().c_str(), document->GetAllocator());
+      document->AddMember("error", error, document->GetAllocator());
+      return;
+    }
+    // Add OK Status like other handlers have. These status lines could be
+    // eliminated if error was handled uniformly in all handlers.
+    Value json_status("OK");
+    document->AddMember("status", json_status, document->GetAllocator());
   }
 }
 
@@ -528,7 +549,7 @@ void ImpalaHttpHandler::QueryStateHandler(const Webserver::WebRequest& req,
   Value completed_queries(kArrayType);
   {
     lock_guard<mutex> l(server_->query_log_lock_);
-    for (const unique_ptr<ImpalaServer::QueryStateRecord>& log_entry :
+    for (const shared_ptr<ImpalaServer::QueryStateRecord>& log_entry :
         server_->query_log_) {
       // Don't show duplicated entries between in-flight and completed queries.
       if (in_flight_query_ids.find(log_entry->id) != in_flight_query_ids.end()) continue;
@@ -936,23 +957,21 @@ void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include
   }
 
   if (!found) {
-    lock_guard<mutex> l(server_->query_log_lock_);
-    ImpalaServer::QueryLogIndex::const_iterator query_record =
-        server_->query_log_index_.find(query_id);
-    if (query_record == server_->query_log_index_.end()) {
+    shared_ptr<ImpalaServer::QueryStateRecord> query_record;
+    if (!server_->GetQueryRecord(query_id, &query_record).ok()) {
       const string& err = Substitute("Unknown query id: $0", PrintId(query_id));
       Value json_error(err.c_str(), document->GetAllocator());
       document->AddMember("error", json_error, document->GetAllocator());
       return;
     }
     if (include_json_plan || include_summary) {
-      summary = query_record->second->exec_summary;
+      summary = query_record->exec_summary;
     }
-    stmt = query_record->second->stmt;
-    plan = query_record->second->plan;
-    query_status = query_record->second->query_status;
+    stmt = query_record->stmt;
+    plan = query_record->plan;
+    query_status = query_record->query_status;
     if (include_json_plan) {
-      fragments = query_record->second->fragments;
+      fragments = query_record->fragments;
     }
   }
 

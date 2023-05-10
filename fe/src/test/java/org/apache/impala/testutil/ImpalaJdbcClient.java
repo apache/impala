@@ -41,7 +41,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
- * Basic tool for executing queries and and displaying results using Impala
+ * Basic tool for executing queries and displaying results using Impala
  * over JDBC.
  */
 public class ImpalaJdbcClient {

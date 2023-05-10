@@ -1076,6 +1076,13 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_processing_cost_min_threads(min_num);
         break;
       }
+      case TImpalaQueryOptions::JOIN_SELECTIVITY_CORRELATION_FACTOR: {
+        double double_val = 0.0f;
+        RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckInclusiveRange<double>(
+            option, value, 0.0, 1.0, &double_val));
+        query_options->__set_join_selectivity_correlation_factor(double_val);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

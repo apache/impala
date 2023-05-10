@@ -54,6 +54,7 @@ import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.MathUtil;
 import org.apache.impala.util.MaxRowsProcessedVisitor;
+import org.apache.kudu.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -219,7 +220,22 @@ public class Planner {
             }
             graph.addTargetColumnLabels(targetColLabels);
           } else {
-            graph.addTargetColumnLabels(targetTable);
+            Preconditions.checkState(ctx_.isCtas());
+            if (((FeKuduTable)targetTable).hasAutoIncrementingColumn()) {
+              // Omit auto-incrementing column for Kudu table since the column is not in
+              // expression. The auto-incrementing column is only added to target table
+              // for CTAS statement so that the table has same layout as the table
+              // created by Kudu engine. We don't need to compute Lineage graph for the
+              // column.
+              List<ColumnLabel> targetColLabels = new ArrayList<>();
+              for (String column: targetTable.getColumnNames()) {
+                if (column.equals(Schema.getAutoIncrementingColumnName())) continue;
+                targetColLabels.add(new ColumnLabel(column, targetTable.getTableName()));
+              }
+              graph.addTargetColumnLabels(targetColLabels);
+            } else {
+              graph.addTargetColumnLabels(targetTable);
+            }
           }
         } else if (targetTable instanceof FeHBaseTable) {
           graph.addTargetColumnLabels(targetTable);
@@ -403,16 +419,17 @@ public class Planner {
    * Adjust effective parallelism of each plan fragment of query after considering
    * processing cost rate and blocking operator.
    * <p>
-   * Only valid after {@link PlanFragment#computeCostingSegment(TQueryOptions)} has
-   * been called for all plan fragments in the list.
+   * Only valid after {@link PlanFragment#computeCostingSegment(TQueryOptions, boolean)}
+   * has been called for all plan fragments in the list.
    */
-  private static void computeEffectiveParallelism(
-      List<PlanFragment> postOrderFragments, int minThreadPerNode, int maxThreadPerNode) {
+  private static void computeEffectiveParallelism(List<PlanFragment> postOrderFragments,
+      int minThreadPerNode, int maxThreadPerNode, boolean limitScanParallelism) {
     for (PlanFragment fragment : postOrderFragments) {
       if (!(fragment.getSink() instanceof JoinBuildSink)) {
         // Only adjust parallelism of non-join build fragment.
         // Join build fragment will be adjusted later by fragment hosting the join node.
-        fragment.traverseEffectiveParallelism(minThreadPerNode, maxThreadPerNode, -1);
+        fragment.traverseEffectiveParallelism(
+            minThreadPerNode, maxThreadPerNode, -1, limitScanParallelism);
       }
     }
 
@@ -425,7 +442,7 @@ public class Planner {
    * This method returns the effective CPU requirement of a query when considering
    * processing cost rate and blocking operator.
    * <p>
-   * Only valid after {@link #computeEffectiveParallelism(List, int, int)} has
+   * Only valid after {@link #computeEffectiveParallelism(List, int, int, boolean)} has
    * been called over the plan fragment list.
    */
   private static CoreCount computeBlockingAwareCores(
@@ -454,7 +471,8 @@ public class Planner {
    * fragment parallelism according to producer-consumer rate between them.
    */
   public static void computeProcessingCost(List<PlanFragment> planRoots,
-      TQueryExecRequest request, PlannerContext planCtx, int numCoresPerExecutor) {
+      TQueryExecRequest request, PlannerContext planCtx, int numCoresPerExecutor,
+      boolean limitScanParallelism) {
     TQueryOptions queryOptions = planCtx.getRootAnalyzer().getQueryOptions();
 
     if (!ProcessingCost.isComputeCost(queryOptions)) {
@@ -473,7 +491,7 @@ public class Planner {
     PlanFragment rootFragment = planRoots.get(0);
     List<PlanFragment> postOrderFragments = rootFragment.getNodesPostOrder();
     for (PlanFragment fragment : postOrderFragments) {
-      fragment.computeCostingSegment(queryOptions);
+      fragment.computeCostingSegment(queryOptions, limitScanParallelism);
     }
 
     if (LOG.isTraceEnabled()) {
@@ -482,7 +500,8 @@ public class Planner {
           + " maxThreads=" + maxThreads);
     }
 
-    computeEffectiveParallelism(postOrderFragments, minThreads, maxThreads);
+    computeEffectiveParallelism(
+        postOrderFragments, minThreads, maxThreads, limitScanParallelism);
     CoreCount effectiveCores = computeBlockingAwareCores(postOrderFragments);
     request.setCores_required(effectiveCores.total());
 

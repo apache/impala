@@ -438,8 +438,9 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
       << "for plans with no union and multiple scans per fragment";
   vector<NetworkAddressPB> scan_hosts;
   GetScanHosts(scan_node_ids, *fragment_state, &scan_hosts);
-  if (scan_hosts.empty()) {
-    // None of the scan nodes have any scan ranges; run it on a random executor.
+  if (scan_hosts.empty() && instances_per_host.empty()) {
+    // None of the scan nodes have any scan ranges and there is no input fragment feeding
+    // into this fragment; run it on a random executor.
     // TODO TODO: the TODO below seems partially stale
     // TODO: we'll need to revisit this strategy once we can partition joins
     // (in which case this fragment might be executing a right outer join

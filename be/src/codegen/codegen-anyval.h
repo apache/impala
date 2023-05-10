@@ -28,6 +28,8 @@ class Value;
 
 namespace impala {
 
+class CodegenAnyValReadWriteInfo;
+
 /// Class for handling AnyVal subclasses during codegen. Codegen functions should use this
 /// wrapper instead of creating or manipulating *Val values directly in most cases. This is
 /// because the struct types must be lowered to integer types in many cases in order to
@@ -50,6 +52,7 @@ namespace impala {
 /// TYPE_DOUBLE/DoubleVal: { i8, double }
 /// TYPE_STRING,TYPE_VARCHAR,TYPE_CHAR,TYPE_FIXED_UDA_INTERMEDIATE/StringVal: { i64, i8* }
 /// TYPE_ARRAY/TYPE_MAP/CollectionVal: { i64, i8* }
+/// TYPE_STRUCT/StructVal: { i64, i8* }
 /// TYPE_TIMESTAMP/TimestampVal: { i64, i64 }
 /// TYPE_DECIMAL/DecimalVal (isn't lowered):
 /// %"struct.impala_udf::DecimalVal" { {i8}, [15 x i8], {i128} }
@@ -59,6 +62,7 @@ namespace impala {
 /// - unit tests
 class CodegenAnyVal {
  public:
+  static const char* LLVM_ANYVAL_NAME;
   static const char* LLVM_BOOLEANVAL_NAME;
   static const char* LLVM_TINYINTVAL_NAME;
   static const char* LLVM_SMALLINTVAL_NAME;
@@ -107,6 +111,9 @@ class CodegenAnyVal {
   /// Returns the unlowered AnyVal pointer type associated with 'type'.
   /// E.g.: TYPE_BOOLEAN => %"struct.impala_udf::BooleanVal"*
   static llvm::PointerType* GetUnloweredPtrType(LlvmCodeGen* cg, const ColumnType& type);
+
+  /// Returns the pointer type to the AnyVal base class (AnyVal*).
+  static llvm::PointerType* GetAnyValPtrType(LlvmCodeGen* cg);
 
   /// Return the constant type-lowered value corresponding to a null *Val.
   /// E.g.: passing TYPE_DOUBLE (corresponding to the lowered DoubleVal { i8, double })
@@ -193,60 +200,25 @@ class CodegenAnyVal {
   /// unlowered type. This *Val should be non-null. The output variable is called 'name'.
   llvm::Value* GetUnloweredPtr(const std::string& name = "") const;
 
-  /// Load this *Val's value from 'raw_val_ptr', which must be a pointer to the matching
-  /// native type, e.g. a StringValue or TimestampValue slot in a tuple.
-  void LoadFromNativePtr(llvm::Value* raw_val_ptr);
+  /// Stores this value in an alloca allocation, and returns the pointer, which has the
+  /// type 'AnyVal*'. This *Val should be non-null. The output variable is called 'name'.
+  llvm::Value* GetAnyValPtr(const std::string& name = "") const;
 
-  /// Stores this *Val's value into a native slot, e.g. a StringValue or TimestampValue.
-  /// This should only be used if this *Val is not null.
+  /// Rewrites the bit values of a value in a canonical form. Floating point values may be
+  /// "NaN". Nominally, NaN != NaN, but for grouping purposes we want that to not be the
+  /// case. Therefore all NaN values need to be converted into a consistent form where all
+  /// bits are the same. This method will do that - ensure that all NaN values have the
+  /// same bit pattern. Similarly, -0 == +0 is handled here.
   ///
-  /// Not valid to call for FIXED_UDA_INTERMEDIATE: in that case the StringVal must be
-  /// set up to point directly to the underlying slot, e.g. by LoadFromNativePtr().
-  ///
-  /// If 'pool_val' is non-NULL, var-len data will be copied into 'pool_val'.
-  /// 'pool_val' has to be of type MemPool*.
-  void StoreToNativePtr(llvm::Value* raw_val_ptr, llvm::Value* pool_val = nullptr);
-
-  /// Creates a pointer, e.g. StringValue* to an alloca() allocation with the
-  /// equivalent of this value. This should only be used if this Val is not null.
-  ///
-  /// If 'pool_val' is non-NULL, var-len data will be copied into 'pool_val'.
-  /// 'pool_val' has to be of type MemPool*.
-  llvm::Value* ToNativePtr(llvm::Value* pool_val = nullptr);
-
-  /// Writes this *Val's value to the appropriate slot in 'tuple' if non-null, or sets the
-  /// appropriate null bit if null. This assumes null bits are initialized to 0. Analogous
-  /// to RawValue::Write(void* value, Tuple*, SlotDescriptor*, MemPool*). 'tuple' should
-  /// be a pointer to the generated LLVM struct type, not an opaque Tuple*.
-  ///
-  /// Creates new basic blocks in order to branch on the 'is_null' fields, and leaves
-  /// builder_'s insert point at the block after these new blocks. This block will be
-  /// 'insert_before' if specified, or a new basic block created at the end of the
-  /// function if 'insert_before' is NULL.
-  ///
-  /// If 'pool_val' is non-NULL, var-len data will be copied into 'pool_val'.
-  /// 'pool_val' has to be of type MemPool*.
-  void WriteToSlot(const SlotDescriptor& slot_desc, llvm::Value* tuple,
-      llvm::Value* pool_val, llvm::BasicBlock* insert_before = nullptr);
-
-  /// Rewrites the bit values of a value in a canonical form.
-  /// Floating point values may be "NaN".  Nominally, NaN != NaN, but
-  /// for grouping purposes we want that to not be the case.
-  /// Therefore all NaN values need to be converted into a consistent
-  /// form where all bits are the same.  This method will do that -
-  /// ensure that all NaN values have the same bit pattern.
-  /// Similarly, -0 == +0 is handled here.
-  ///
-  /// Generically speaking, a canonical form of a value ensures that
-  /// all ambiguity is removed from a value's bit settings -- if there
-  /// are bits that can be freely changed without changing the logical
-  /// value of the value. (Currently this only has an impact for NaN
-  /// float and double values.)
+  /// Generically speaking, a canonical form of a value ensures that all ambiguity is
+  /// removed from a value's bit settings -- if there are bits that can be freely changed
+  /// without changing the logical value of the value. (Currently this only has an impact
+  /// for NaN float and double values.)
   void ConvertToCanonicalForm();
 
-  /// Replaces negative floating point zero with positive zero,
-  /// leaves everything else unchanged.
-  llvm::Value* ConvertToPositiveZero(llvm::Value* val);
+  /// Same as the above but works on a raw llvm::Value*.
+  static llvm::Value* ConvertToCanonicalForm(LlvmCodeGen* codegen, LlvmBuilder* builder,
+      const ColumnType& type, llvm::Value* val);
 
   /// Returns the i1 result of this == other. this and other must be non-null.
   llvm::Value* Eq(CodegenAnyVal* other);
@@ -285,6 +257,18 @@ class CodegenAnyVal {
       codegen_(nullptr), builder_(nullptr) {}
 
   LlvmCodeGen* codegen() const { return codegen_; }
+  LlvmBuilder* builder() const { return builder_; }
+  const ColumnType& type() { return type_; }
+
+  static CodegenAnyVal CreateFromReadWriteInfo(
+      const CodegenAnyValReadWriteInfo& read_write_info);
+
+  // Generate a 'CodegenAnyValReadWriteInfo' so that a destination can use it to write the
+  // value.
+  //
+  // After the function returns, the instruction point of the LlvmBuilder will be reset to
+  // where it was before the call.
+  CodegenAnyValReadWriteInfo ToReadWriteInfo();
 
  private:
   ColumnType type_;
@@ -303,6 +287,20 @@ class CodegenAnyVal {
   /// Both 'dst' and 'src' should be integer types.
   llvm::Value* SetHighBits(int num_bits, llvm::Value* src, llvm::Value* dst,
                            const char* name = "");
+
+  /// Replaces negative floating point zero with positive zero, leaves everything else
+  /// unchanged.
+  static llvm::Value* ConvertToPositiveZero(LlvmBuilder* builder, llvm::Value* val);
+
+  // Returns the last block generated so we can set it as a predecessor in PHI nodes.
+  static llvm::BasicBlock* CreateStructValFromReadWriteInfo(
+      const CodegenAnyValReadWriteInfo& read_write_info, llvm::Value** ptr,
+      llvm::Value** len, llvm::BasicBlock* struct_produce_value_block);
+
+  static void StructToReadWriteInfo(CodegenAnyValReadWriteInfo* read_write_info,
+      llvm::Value* children_ptr);
+  static void StructChildToReadWriteInfo(CodegenAnyValReadWriteInfo* read_write_info,
+      const ColumnType& type, llvm::Value* child_ptr);
 };
 
 }

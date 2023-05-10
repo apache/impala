@@ -158,8 +158,8 @@ Status FragmentInstanceState::Prepare() {
 
   // total_time_counter() is in the runtime_state_ so start it up now.
   SCOPED_TIMER(profile()->total_time_counter());
-  timings_profile_ =
-      RuntimeProfile::Create(obj_pool(), "Fragment Instance Lifecycle Timings");
+  timings_profile_ = RuntimeProfile::Create(
+      obj_pool(), RuntimeProfile::FRAGMENT_INSTANCE_LIFECYCLE_TIMINGS, false);
   profile()->AddChild(timings_profile_);
   SCOPED_TIMER(ADD_TIMER(timings_profile_, PREPARE_TIMER_NAME));
 

@@ -427,7 +427,8 @@ BufferPool::Client::Client(BufferPool* pool, TmpFileGroup* file_group,
     num_pages_(0),
     buffers_allocated_bytes_(0) {
   // Set up a child profile with buffer pool info.
-  RuntimeProfile* child_profile = profile->CreateChild("Buffer pool", true, true);
+  RuntimeProfile* child_profile =
+      profile->CreateChild(RuntimeProfile::BUFFER_POOL, true, true, false);
   reservation_.InitChildTracker(
       child_profile, parent_reservation, mem_tracker, reservation_limit, mem_limit_mode);
   counters_.alloc_time = ADD_TIMER(child_profile, "AllocTime");

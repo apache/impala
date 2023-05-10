@@ -294,6 +294,8 @@ function create_cluster {
       ACTUAL_PATH="${TEMPLATE_PATH%$PY_TEMPLATE_SUFFIX}".xml
       $IMPALA_HOME/bin/generate_xml_config.py $TEMPLATE_PATH $ACTUAL_PATH
       rm $TEMPLATE_PATH
+      # Remove pycache if created
+      rm -rf $(dirname $TEMPLATE_PATH)/__pycache__
     done
   done
 }

@@ -641,6 +641,10 @@ struct TExecRequest {
 
   // Additional profile nodes to be displayed nested right under 'profile' field.
   17: optional list<RuntimeProfile.TRuntimeProfileNode> profile_children
+
+  // True if request pool is set by Frontend rather than user specifically setting it via
+  // REQUEST_POOL query option.
+  18: optional bool request_pool_set_by_frontend = false
 }
 
 // Parameters to FeSupport.cacheJar().

@@ -196,8 +196,8 @@ CREATE TABLE ice_t (i INT) STORED AS ICEBERG;
         </codeblock>
       </p>
       <p>
-        By default Impala assumes that the Iceberg table uses Parquet data files. ORC is also supported,
-        but we need to tell Impala via setting the table property 'write.format.default' to 'ORC'.
+        By default Impala assumes that the Iceberg table uses Parquet data files. ORC and AVRO are also supported,
+        but we need to tell Impala via setting the table property 'write.format.default' to e.g. 'ORC'.
       </p>
       <p>
         You can also use <codeph>CREATE TABLE AS SELECT</codeph> to create new Iceberg tables, e.g.:
@@ -353,6 +353,9 @@ CREATE TABLE ice_ctas_part_spec PARTITIONED BY SPEC (truncate(3, s)) STORED AS I
           <li>float to double</li>
           <li>decimal(P, S) to decimal(P', S) if P' > P – widen the precision of decimal types.</li>
         </ul>
+      </p>
+      <p>
+        Impala currently does not support schema evolution for tables with AVRO file format.
       </p>
       <p>
         See
@@ -614,7 +617,7 @@ ALTER TABLE ice_tbl EXECUTE expire_snapshots(now() - interval 5 days);
           </li>
           <li><codeph>iceberg.catalog_location</codeph>: Iceberg table catalog location when <codeph>iceberg.catalog</codeph> is <codeph>'hadoop.catalog'</codeph></li>
           <li><codeph>iceberg.table_identifier</codeph>: Iceberg table identifier. We use &lt;database&gt;.&lt;table&gt; instead if this property is not set</li>
-          <li><codeph>write.format.default</codeph>: data file format of the table. Impala can read ORC and PARQUET data files in Iceberg tables, and can write PARQUET data files only.</li>
+          <li><codeph>write.format.default</codeph>: data file format of the table. Impala can read AVRO, ORC and PARQUET data files in Iceberg tables, and can write PARQUET data files only.</li>
           <li><codeph>write.parquet.compression-codec</codeph>:
             Parquet compression codec. Supported values are: NONE, GZIP, SNAPPY
             (default value), LZ4, ZSTD. The table property will be ignored if

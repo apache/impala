@@ -18,6 +18,8 @@
 #include "codegen/codegen-anyval.h"
 
 #include "codegen/codegen-util.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Constants.h"
 #include "runtime/multi-precision.h"
 #include "runtime/raw-value.h"
 #include "common/names.h"
@@ -25,6 +27,7 @@
 using namespace impala;
 using namespace impala_udf;
 
+const char* CodegenAnyVal::LLVM_ANYVAL_NAME       = "struct.impala_udf::AnyVal";
 const char* CodegenAnyVal::LLVM_BOOLEANVAL_NAME   = "struct.impala_udf::BooleanVal";
 const char* CodegenAnyVal::LLVM_TINYINTVAL_NAME   = "struct.impala_udf::TinyIntVal";
 const char* CodegenAnyVal::LLVM_SMALLINTVAL_NAME  = "struct.impala_udf::SmallIntVal";
@@ -80,6 +83,7 @@ llvm::Type* CodegenAnyVal::GetLoweredType(LlvmCodeGen* cg, const ColumnType& typ
     case TYPE_FIXED_UDA_INTERMEDIATE: // { i64, i8* }
     case TYPE_ARRAY: // CollectionVal has same memory layout as StringVal.
     case TYPE_MAP: // CollectionVal has same memory layout as StringVal.
+    case TYPE_STRUCT: // StructVal has same memory layout as StringVal.
 #ifndef __aarch64__
       return llvm::StructType::get(cg->i64_type(), cg->ptr_type());
 #else
@@ -161,6 +165,10 @@ llvm::Type* CodegenAnyVal::GetUnloweredType(LlvmCodeGen* cg, const ColumnType& t
 llvm::PointerType* CodegenAnyVal::GetUnloweredPtrType(
     LlvmCodeGen* cg, const ColumnType& type) {
   return GetUnloweredType(cg, type)->getPointerTo();
+}
+
+llvm::PointerType* CodegenAnyVal::GetAnyValPtrType(LlvmCodeGen* cg) {
+  return cg->GetNamedType(LLVM_ANYVAL_NAME)->getPointerTo();
 }
 
 llvm::Value* CodegenAnyVal::CreateCall(LlvmCodeGen* cg, LlvmBuilder* builder,
@@ -248,7 +256,8 @@ llvm::Value* CodegenAnyVal::GetIsNull(const char* name) const {
     case TYPE_FIXED_UDA_INTERMEDIATE:
     case TYPE_TIMESTAMP:
     case TYPE_ARRAY:
-    case TYPE_MAP: {
+    case TYPE_MAP:
+    case TYPE_STRUCT: {
       // Lowered type is of form { i64, *}. Get the first byte of the i64 value.
       llvm::Value* v = builder_->CreateExtractValue(value_, 0);
       DCHECK(v->getType() == codegen_->i64_type());
@@ -300,7 +309,8 @@ void CodegenAnyVal::SetIsNull(llvm::Value* is_null) {
     case TYPE_FIXED_UDA_INTERMEDIATE:
     case TYPE_TIMESTAMP:
     case TYPE_ARRAY:
-    case TYPE_MAP: {
+    case TYPE_MAP:
+    case TYPE_STRUCT: {
       // Lowered type is of the form { i64, * }. Set the first byte of the i64 value to
       // 'is_null'
       llvm::Value* v = builder_->CreateExtractValue(value_, 0);
@@ -340,6 +350,10 @@ llvm::Value* CodegenAnyVal::GetVal(const char* name) {
       << "Use GetPtr and GetLen for FixedUdaIntermediate";
   DCHECK(type_.type != TYPE_TIMESTAMP)
       << "Use GetDate and GetTimeOfDay for TimestampVals";
+  DCHECK(!type_.IsCollectionType())
+      << "Use GetPtr and GetLen for CollectionVal";
+  DCHECK(!type_.IsStructType())
+      << "Use GetPtr and GetLen for StructVal";
   switch(type_.type) {
     case TYPE_BOOLEAN:
     case TYPE_TINYINT:
@@ -399,6 +413,7 @@ void CodegenAnyVal::SetVal(llvm::Value* val) {
   DCHECK(type_.type != TYPE_TIMESTAMP)
       << "Use SetDate and SetTimeOfDay for TimestampVals";
   DCHECK(!type_.IsCollectionType()) << "Use SetPtr and SetLen for CollectionVal";
+  DCHECK(!type_.IsStructType()) << "Use SetPtr and SetLen for StructVal";
   switch(type_.type) {
     case TYPE_BOOLEAN:
     case TYPE_TINYINT:
@@ -490,7 +505,7 @@ void CodegenAnyVal::SetVal(double val) {
 
 llvm::Value* CodegenAnyVal::GetPtr() {
   // Set the second pointer value to 'ptr'.
-  DCHECK(type_.IsStringType() || type_.IsCollectionType());
+  DCHECK(type_.IsStringType() || type_.IsCollectionType() || type_.IsStructType());
   llvm::Value* val = builder_->CreateExtractValue(value_, 1, name_);
 #ifdef __aarch64__
   val = builder_->CreateIntToPtr(val, codegen_->ptr_type());
@@ -500,7 +515,7 @@ llvm::Value* CodegenAnyVal::GetPtr() {
 
 llvm::Value* CodegenAnyVal::GetLen() {
   // Get the high bytes of the first value.
-  DCHECK(type_.IsStringType() || type_.IsCollectionType());
+  DCHECK(type_.IsStringType() || type_.IsCollectionType() || type_.IsStructType());
   llvm::Value* v = builder_->CreateExtractValue(value_, 0);
   return GetHighBits(32, v);
 }
@@ -508,7 +523,7 @@ llvm::Value* CodegenAnyVal::GetLen() {
 void CodegenAnyVal::SetPtr(llvm::Value* ptr) {
   // Set the second pointer value to 'ptr'.
   DCHECK(type_.IsStringType() || type_.type == TYPE_FIXED_UDA_INTERMEDIATE
-      || type_.IsCollectionType());
+      || type_.IsCollectionType() || type_.IsStructType());
 #ifdef __aarch64__
   ptr = builder_->CreatePtrToInt(ptr, codegen_->i64_type());
 #endif
@@ -518,7 +533,7 @@ void CodegenAnyVal::SetPtr(llvm::Value* ptr) {
 void CodegenAnyVal::SetLen(llvm::Value* len) {
   // Set the high bytes of the first value to 'len'.
   DCHECK(type_.IsStringType() || type_.type == TYPE_FIXED_UDA_INTERMEDIATE
-      || type_.IsCollectionType());
+      || type_.IsCollectionType() || type_.IsStructType());
   llvm::Value* v = builder_->CreateExtractValue(value_, 0);
   v = SetHighBits(32, len, v);
   value_ = builder_->CreateInsertValue(value_, v, 0, name_);
@@ -551,36 +566,51 @@ void CodegenAnyVal::SetDate(llvm::Value* date) {
   value_ = builder_->CreateInsertValue(value_, v, 0, name_);
 }
 
-llvm::Value* CodegenAnyVal::ConvertToPositiveZero(llvm::Value* val) {
-  // Replaces negative zero with positive, leaves everything else unchanged.
-  llvm::Value* is_negative_zero = builder_->CreateFCmpOEQ(
-      val, llvm::ConstantFP::getNegativeZero(val->getType()), "cmp_zero");
-  return builder_->CreateSelect(is_negative_zero,
-                llvm::ConstantFP::get(val->getType(), 0.0), val);
-}
-
-void CodegenAnyVal::ConvertToCanonicalForm() {
+llvm::Value* CodegenAnyVal::ConvertToCanonicalForm(LlvmCodeGen* codegen,
+      LlvmBuilder* builder, const ColumnType& type, llvm::Value* val) {
   // Convert the value to a bit pattern that is unambiguous.
   // Specifically, for floating point type values, NaN values are converted to
   // the same bit pattern, and -0 is converted to +0.
+  switch(type.type) {
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE: {
+      llvm::Value* canonical_val;
+      if (type.type == TYPE_FLOAT) {
+        canonical_val = llvm::ConstantFP::getNaN(codegen->float_type());
+      } else {
+        canonical_val = llvm::ConstantFP::getNaN(codegen->double_type());
+      }
+      DCHECK(val != nullptr);
+      llvm::Value* is_nan = builder->CreateFCmpUNO(val, val, "cmp_nan");
+
+      return builder->CreateSelect(is_nan, canonical_val,
+          ConvertToPositiveZero(builder, val));
+    }
+    default:
+      return val;
+  }
+}
+
+void CodegenAnyVal::ConvertToCanonicalForm() {
   switch(type_.type) {
     case TYPE_FLOAT:
     case TYPE_DOUBLE: {
-      llvm::Value* raw = GetVal();
-      llvm::Value* canonical_val;
-      if (type_.type == TYPE_FLOAT) {
-        canonical_val = llvm::ConstantFP::getNaN(codegen_->float_type());
-      } else {
-        canonical_val = llvm::ConstantFP::getNaN(codegen_->double_type());
-      }
-      llvm::Value* is_nan = builder_->CreateFCmpUNO(raw, raw, "cmp_nan");
-
-      SetVal(builder_->CreateSelect(is_nan, canonical_val, ConvertToPositiveZero(raw)));
-      break;
+      llvm::Value* new_val = ConvertToCanonicalForm(codegen_,
+          builder_, type_, GetVal());
+      SetVal(new_val);
     }
     default:
       ;
   }
+}
+
+llvm::Value* CodegenAnyVal::ConvertToPositiveZero(LlvmBuilder* builder,
+    llvm::Value* val) {
+  // Replaces negative zero with positive, leaves everything else unchanged.
+  llvm::Value* is_negative_zero = builder->CreateFCmpOEQ(
+      val, llvm::ConstantFP::getNegativeZero(val->getType()), "cmp_zero");
+  return builder->CreateSelect(is_negative_zero,
+                llvm::ConstantFP::get(val->getType(), 0.0), val);
 }
 
 llvm::Value* CodegenAnyVal::GetLoweredPtr(const string& name) const {
@@ -600,192 +630,9 @@ llvm::Value* CodegenAnyVal::GetUnloweredPtr(const string& name) const {
       GetLoweredPtr(), GetUnloweredPtrType(codegen_, type_), name);
 }
 
-void CodegenAnyVal::LoadFromNativePtr(llvm::Value* raw_val_ptr) {
-  DCHECK(raw_val_ptr->getType()->isPointerTy());
-  llvm::Type* raw_val_type = raw_val_ptr->getType()->getPointerElementType();
-  DCHECK_EQ(raw_val_type, codegen_->GetSlotType(type_))
-      << endl
-      << LlvmCodeGen::Print(raw_val_ptr) << endl
-      << type_ << " => " << LlvmCodeGen::Print(
-          codegen_->GetSlotType(type_));
-  switch (type_.type) {
-    case TYPE_STRING:
-    case TYPE_VARCHAR: {
-      // Convert StringValue to StringVal
-      llvm::Value* string_value = builder_->CreateLoad(raw_val_ptr, "string_value");
-      SetPtr(builder_->CreateExtractValue(string_value, 0, "ptr"));
-      SetLen(builder_->CreateExtractValue(string_value, 1, "len"));
-      break;
-    }
-    case TYPE_CHAR:
-    case TYPE_FIXED_UDA_INTERMEDIATE: {
-      // Convert fixed-size slot to StringVal.
-      SetPtr(builder_->CreateBitCast(raw_val_ptr, codegen_->ptr_type()));
-      SetLen(codegen_->GetI32Constant(type_.len));
-      break;
-    }
-    case TYPE_TIMESTAMP: {
-      // Convert TimestampValue to TimestampVal
-      // TimestampValue has type
-      //   { boost::posix_time::time_duration, boost::gregorian::date }
-      // = { {{{i64}}}, {{i32}} }
-
-      llvm::Value* ts_value = builder_->CreateLoad(raw_val_ptr, "ts_value");
-      // Extract time_of_day i64 from boost::posix_time::time_duration.
-      uint32_t time_of_day_idxs[] = {0, 0, 0, 0};
-      llvm::Value* time_of_day =
-          builder_->CreateExtractValue(ts_value, time_of_day_idxs, "time_of_day");
-      DCHECK(time_of_day->getType()->isIntegerTy(64));
-      SetTimeOfDay(time_of_day);
-      // Extract i32 from boost::gregorian::date
-      uint32_t date_idxs[] = {1, 0, 0};
-      llvm::Value* date = builder_->CreateExtractValue(ts_value, date_idxs, "date");
-      DCHECK(date->getType()->isIntegerTy(32));
-      SetDate(date);
-      break;
-    }
-    case TYPE_BOOLEAN:
-    case TYPE_TINYINT:
-    case TYPE_SMALLINT:
-    case TYPE_INT:
-    case TYPE_BIGINT:
-    case TYPE_FLOAT:
-    case TYPE_DOUBLE:
-    case TYPE_DECIMAL:
-    case TYPE_DATE:
-      SetVal(builder_->CreateLoad(raw_val_ptr, "raw_val"));
-      break;
-    default:
-      DCHECK(false) << "NYI: " << type_.DebugString();
-      break;
-  }
-}
-
-void CodegenAnyVal::StoreToNativePtr(llvm::Value* raw_val_ptr, llvm::Value* pool_val) {
-  llvm::Type* raw_type = codegen_->GetSlotType(type_);
-  switch (type_.type) {
-    case TYPE_STRING:
-    case TYPE_VARCHAR:
-    case TYPE_ARRAY: // CollectionVal has same memory layout as StringVal.
-    case TYPE_MAP: { // CollectionVal has same memory layout as StringVal.
-      // Convert StringVal to StringValue
-      llvm::Value* string_value = llvm::Constant::getNullValue(raw_type);
-      llvm::Value* len = GetLen();
-      string_value = builder_->CreateInsertValue(string_value, len, 1);
-      if (pool_val == nullptr) {
-        // Set string_value.ptr from this->ptr
-        string_value = builder_->CreateInsertValue(string_value, GetPtr(), 0);
-      } else {
-        // Allocate string_value.ptr from 'pool_val' and copy this->ptr
-        llvm::Value* new_ptr =
-            codegen_->CodegenMemPoolAllocate(builder_, pool_val, len, "new_ptr");
-        codegen_->CodegenMemcpy(builder_, new_ptr, GetPtr(), len);
-        string_value = builder_->CreateInsertValue(string_value, new_ptr, 0);
-      }
-      builder_->CreateStore(string_value, raw_val_ptr);
-      break;
-    }
-    case TYPE_CHAR:
-      codegen_->CodegenMemcpy(builder_, raw_val_ptr, GetPtr(), type_.len);
-      break;
-    case TYPE_FIXED_UDA_INTERMEDIATE:
-      DCHECK(false) << "FIXED_UDA_INTERMEDIATE does not need to be copied: the "
-                    << "StringVal must be set up to point to the output slot";
-      break;
-    case TYPE_TIMESTAMP: {
-      // Convert TimestampVal to TimestampValue
-      // TimestampValue has type
-      //   { boost::posix_time::time_duration, boost::gregorian::date }
-      // = { {{{i64}}}, {{i32}} }
-      llvm::Value* timestamp_value = llvm::Constant::getNullValue(raw_type);
-      uint32_t time_of_day_idxs[] = {0, 0, 0, 0};
-      timestamp_value =
-          builder_->CreateInsertValue(timestamp_value, GetTimeOfDay(), time_of_day_idxs);
-      uint32_t date_idxs[] = {1, 0, 0};
-      timestamp_value =
-          builder_->CreateInsertValue(timestamp_value, GetDate(), date_idxs);
-      builder_->CreateStore(timestamp_value, raw_val_ptr);
-      break;
-    }
-    case TYPE_BOOLEAN:
-    case TYPE_TINYINT:
-    case TYPE_SMALLINT:
-    case TYPE_INT:
-    case TYPE_BIGINT:
-    case TYPE_FLOAT:
-    case TYPE_DOUBLE:
-    case TYPE_DECIMAL:
-    case TYPE_DATE:
-      // The representations of the types match - just store the value.
-      builder_->CreateStore(GetVal(), raw_val_ptr);
-      break;
-    default:
-      DCHECK(false) << "NYI: " << type_.DebugString();
-      break;
-  }
-}
-
-llvm::Value* CodegenAnyVal::ToNativePtr(llvm::Value* pool_val) {
-  llvm::Value* native_ptr = codegen_->CreateEntryBlockAlloca(*builder_,
-      codegen_->GetSlotType(type_));
-  StoreToNativePtr(native_ptr, pool_val);
-  return native_ptr;
-}
-
-// Example output for materializing an int slot:
-//
-//   ; [insert point starts here]
-//   %is_null = trunc i64 %src to i1
-//   br i1 %is_null, label %null, label %non_null ;
-//
-// non_null:                                         ; preds = %entry
-//   %slot = getelementptr inbounds { i8, i32, %"struct.impala::StringValue" }* %tuple,
-//       i32 0, i32 1
-//   %2 = ashr i64 %src, 32
-//   %3 = trunc i64 %2 to i32
-//   store i32 %3, i32* %slot
-//   br label %end_write
-//
-// null:                                             ; preds = %entry
-//   call void @SetNull6({ i8, i32, %"struct.impala::StringValue" }* %tuple)
-//   br label %end_write
-//
-// end_write:                                        ; preds = %null, %non_null
-//   ; [insert point ends here]
-void CodegenAnyVal::WriteToSlot(const SlotDescriptor& slot_desc, llvm::Value* tuple_val,
-    llvm::Value* pool_val, llvm::BasicBlock* insert_before) {
-  DCHECK(tuple_val->getType()->isPointerTy());
-  DCHECK(tuple_val->getType()->getPointerElementType()->isStructTy());
-  llvm::LLVMContext& context = codegen_->context();
-  llvm::Function* fn = builder_->GetInsertBlock()->getParent();
-
-  // Create new block that will come after conditional blocks if necessary
-  if (insert_before == nullptr) {
-    insert_before = llvm::BasicBlock::Create(context, "end_write", fn);
-  }
-
-  // Create new basic blocks and br instruction
-  llvm::BasicBlock* non_null_block =
-      llvm::BasicBlock::Create(context, "non_null", fn, insert_before);
-  llvm::BasicBlock* null_block =
-      llvm::BasicBlock::Create(context, "null", fn, insert_before);
-  builder_->CreateCondBr(GetIsNull(), null_block, non_null_block);
-
-  // Non-null block: write slot
-  builder_->SetInsertPoint(non_null_block);
-  llvm::Value* slot =
-      builder_->CreateStructGEP(nullptr, tuple_val, slot_desc.llvm_field_idx(), "slot");
-  StoreToNativePtr(slot, pool_val);
-  builder_->CreateBr(insert_before);
-
-  // Null block: set null bit
-  builder_->SetInsertPoint(null_block);
-  slot_desc.CodegenSetNullIndicator(
-      codegen_, builder_, tuple_val, codegen_->true_value());
-  builder_->CreateBr(insert_before);
-
-  // Leave builder_ after conditional blocks
-  builder_->SetInsertPoint(insert_before);
+llvm::Value* CodegenAnyVal::GetAnyValPtr(const std::string& name) const {
+  return builder_->CreateBitCast(
+      GetLoweredPtr(), GetAnyValPtrType(codegen_), name);
 }
 
 llvm::Value* CodegenAnyVal::Eq(CodegenAnyVal* other) {
@@ -880,9 +727,9 @@ llvm::Value* CodegenAnyVal::EqToNativePtr(llvm::Value* native_ptr,
 
 llvm::Value* CodegenAnyVal::Compare(CodegenAnyVal* other, const char* name) {
   DCHECK_EQ(type_, other->type_);
-  llvm::Value* v1 = ToNativePtr();
+  llvm::Value* v1 = SlotDescriptor::CodegenStoreNonNullAnyValToNewAlloca(*this);
   llvm::Value* void_v1 = builder_->CreateBitCast(v1, codegen_->ptr_type());
-  llvm::Value* v2 = other->ToNativePtr();
+  llvm::Value* v2 = SlotDescriptor::CodegenStoreNonNullAnyValToNewAlloca(*other);
   llvm::Value* void_v2 = builder_->CreateBitCast(v2, codegen_->ptr_type());
   // Create a global constant of the values' ColumnType. It needs to be a constant
   // for constant propagation and dead code elimination in 'compare_fn'.
@@ -1000,4 +847,338 @@ CodegenAnyVal CodegenAnyVal::GetNonNullVal(LlvmCodeGen* codegen, LlvmBuilder* bu
   // All zeros => 'is_null' = false
   llvm::Value* value = llvm::Constant::getNullValue(val_type);
   return CodegenAnyVal(codegen, builder, type, value, name);
+}
+
+// Returns the last block generated so we can set it as a predecessor in PHI nodes.
+llvm::BasicBlock* CodegenAnyVal::CreateStructValFromReadWriteInfo(
+    const CodegenAnyValReadWriteInfo& read_write_info,
+    llvm::Value** ptr, llvm::Value** len, llvm::BasicBlock* struct_produce_value_block) {
+  LlvmCodeGen* codegen = read_write_info.codegen();
+  LlvmBuilder* builder = read_write_info.builder();
+
+  DCHECK(read_write_info.type().IsStructType() && read_write_info.children().size() > 0);
+  DCHECK(read_write_info.GetEval() != nullptr);
+  DCHECK_GT(read_write_info.GetFnCtxIdx(), -1);
+
+  // Cross-compiled functions this hand-crafted function will call.
+  llvm::Function* const allocate_for_results_fn =
+         codegen->GetFunction(IRFunction::FN_CTX_ALLOCATE_FOR_RESULTS, false);
+  llvm::Function* const store_result_in_eval_fn =
+         codegen->GetFunction(IRFunction::STORE_RESULT_IN_EVALUATOR, false);
+
+  builder->SetInsertPoint(read_write_info.non_null_block());
+  std::size_t num_children = read_write_info.children().size();
+  DCHECK_GT(num_children, 0);
+  llvm::Value* fn_ctx = read_write_info.CodegenGetFnCtx();
+
+  // Allocate a buffer for the child pointers. If allocation fails, the struct will be
+  // null.
+  llvm::Value* children_ptrs_buffer = builder->CreateCall(allocate_for_results_fn,
+      {fn_ctx, codegen->GetI64Constant(num_children * sizeof(uint8_t*))},
+      "children_ptrs_buffer");
+  llvm::Value* cast_children_ptrs_buffer = builder->CreateBitCast(
+      children_ptrs_buffer, codegen->ptr_ptr_type(), "cast_children_ptrs_buffer");
+  llvm::Value* buffer_is_null = builder->CreateIsNull(
+      cast_children_ptrs_buffer, "buffer_is_null");
+
+  // Branch based on 'buffer_is_null'.
+  read_write_info.children()[0].entry_block().BranchToIfNot(builder, buffer_is_null,
+      NonWritableBasicBlock(read_write_info.null_block()));
+  for (std::size_t i = 0; i < num_children; ++i) {
+    const CodegenAnyValReadWriteInfo& child_codegen_value_read_write_info =
+        read_write_info.children()[i];
+    CodegenAnyVal child_any_val =
+        CreateFromReadWriteInfo(child_codegen_value_read_write_info);
+
+    llvm::ConstantStruct* child_type_ir =
+        child_codegen_value_read_write_info.GetIrType();
+    llvm::Value* child_type_ir_ptr = codegen->CreateEntryBlockAlloca(
+        *builder, child_type_ir->getType(), "child_type_ptr");
+    builder->CreateStore(child_type_ir, child_type_ir_ptr);
+
+    llvm::Value* child_any_val_ptr = child_any_val.GetAnyValPtr("child_ptr");
+
+    // Convert and store the child in the corresponding ScalarExprEvaluator - this takes
+    // care of the lifetime of the object.
+    llvm::Value* stored_child_ptr = builder->CreateCall(store_result_in_eval_fn,
+        {child_codegen_value_read_write_info.GetEval(), child_any_val_ptr,
+        child_type_ir_ptr},
+        "stored_value");
+
+    // The address where the child pointer should be written. This is in the pointer list
+    // of the StructVal.
+    llvm::Value* dst_child_ptr_addr = builder->CreateInBoundsGEP(
+        cast_children_ptrs_buffer, codegen->GetI32Constant(i), "child_ptr_addr");
+    builder->CreateStore(stored_child_ptr, dst_child_ptr_addr);
+
+    if (i < num_children - 1) {
+      // Do not add a new block after the last child.
+      read_write_info.children()[i+1].entry_block().BranchTo(builder);
+    }
+  }
+
+  llvm::BasicBlock* last_block = builder->GetInsertBlock();
+  builder->CreateBr(struct_produce_value_block);
+  builder->SetInsertPoint(struct_produce_value_block);
+  *ptr = builder->CreateBitCast(children_ptrs_buffer, codegen->ptr_type());
+  *len = codegen->GetI32Constant(num_children);
+  return last_block;
+}
+
+CodegenAnyVal CodegenAnyVal::CreateFromReadWriteInfo(
+    const CodegenAnyValReadWriteInfo& read_write_info) {
+  LlvmCodeGen* codegen = read_write_info.codegen();
+  LlvmBuilder* builder = read_write_info.builder();
+  const ColumnType& type = read_write_info.type();
+
+  llvm::LLVMContext& context = codegen->context();
+  llvm::Function* fn = read_write_info.non_null_block()->getParent();
+
+  llvm::BasicBlock* produce_value_block =
+      llvm::BasicBlock::Create(context, "produce_value", fn);
+
+  builder->SetInsertPoint(read_write_info.null_block());
+  builder->CreateBr(produce_value_block);
+
+  if (!type.IsStructType()) {
+    builder->SetInsertPoint(read_write_info.non_null_block());
+    builder->CreateBr(produce_value_block);
+  }
+
+  builder->SetInsertPoint(produce_value_block);
+  CodegenAnyVal result = CodegenAnyVal::GetNonNullVal(codegen, builder, type, "result");
+
+  // For structs the code that reads the value consists of multiple basic blocks, so the
+  // block that should branch to 'produce_value_block' is not
+  // 'read_write_info.non_null_block'. This variable will be set to the appropriate block.
+  llvm::BasicBlock* non_null_incoming_block = read_write_info.non_null_block();
+  if (type.IsStringType() || type.type == TYPE_FIXED_UDA_INTERMEDIATE
+      || type.IsCollectionType() || type.IsStructType()) {
+    llvm::Value* ptr = nullptr;
+    llvm::Value* len = nullptr;
+
+    if (type.IsStructType()) {
+      non_null_incoming_block = CreateStructValFromReadWriteInfo(
+          read_write_info, &ptr, &len, produce_value_block);
+    } else {
+      ptr = read_write_info.GetPtrAndLen().ptr;
+      len = read_write_info.GetPtrAndLen().len;
+    }
+
+    DCHECK(ptr != nullptr);
+    DCHECK(len != nullptr);
+
+    llvm::Value* ptr_null = llvm::Constant::getNullValue(ptr->getType());
+    llvm::PHINode* ptr_phi = LlvmCodeGen::CreateBinaryPhiNode(builder, ptr, ptr_null,
+        non_null_incoming_block, read_write_info.null_block());
+
+    llvm::Value* len_null = llvm::ConstantInt::get(len->getType(), 0);
+    llvm::PHINode* len_phi = LlvmCodeGen::CreateBinaryPhiNode(builder, len, len_null,
+        non_null_incoming_block, read_write_info.null_block());
+
+    result.SetPtr(ptr_phi);
+    result.SetLen(len_phi);
+  } else if (type.type == TYPE_TIMESTAMP) {
+    llvm::Value* time_of_day_null = llvm::ConstantInt::get(
+        read_write_info.GetTimeAndDate().time_of_day->getType(), 0);
+    llvm::PHINode* time_of_day_phi = LlvmCodeGen::CreateBinaryPhiNode(builder,
+        read_write_info.GetTimeAndDate().time_of_day, time_of_day_null,
+        non_null_incoming_block, read_write_info.null_block());
+
+    llvm::Value* date_null = llvm::ConstantInt::get(
+        read_write_info.GetTimeAndDate().date->getType(), 0);
+    llvm::PHINode* date_phi = LlvmCodeGen::CreateBinaryPhiNode(builder,
+        read_write_info.GetTimeAndDate().date, date_null, non_null_incoming_block,
+        read_write_info.null_block());
+
+    result.SetTimeOfDay(time_of_day_phi);
+    result.SetDate(date_phi);
+  } else {
+    llvm::Value* null = llvm::Constant::getNullValue(
+        read_write_info.GetSimpleVal()->getType());
+    llvm::PHINode* val_phi = LlvmCodeGen::CreateBinaryPhiNode(builder,
+        read_write_info.GetSimpleVal(), null, non_null_incoming_block,
+        read_write_info.null_block());
+
+    result.SetVal(val_phi);
+  }
+
+  llvm::Value* zero = codegen->GetI8Constant(0);
+  llvm::Value* one = codegen->GetI8Constant(1);
+
+  // PHI nodes must be inserted at the beginning of basic blocks.
+  llvm::IRBuilderBase::InsertPoint ip = builder->saveIP();
+  builder->SetInsertPoint(produce_value_block, produce_value_block->begin());
+  llvm::PHINode* is_null_phi = LlvmCodeGen::CreateBinaryPhiNode(builder, zero, one,
+      non_null_incoming_block, read_write_info.null_block(), "is_null_phi");
+  builder->restoreIP(ip);
+  result.SetIsNull(is_null_phi);
+  return result;
+}
+
+CodegenAnyValReadWriteInfo CodegenAnyVal::ToReadWriteInfo() {
+  llvm::IRBuilderBase::InsertPoint ip = builder_->saveIP();
+
+  llvm::LLVMContext& context = codegen_->context();
+  llvm::Function* fn = builder_->GetInsertBlock()->getParent();
+
+  CodegenAnyValReadWriteInfo res(codegen_, builder_, type_);
+
+  llvm::BasicBlock* entry_block = llvm::BasicBlock::Create(context, "entry", fn);
+  builder_->SetInsertPoint(entry_block);
+
+  // Create new basic blocks and branch instruction
+  llvm::BasicBlock* non_null_block = llvm::BasicBlock::Create(context, "non_null", fn);
+  llvm::BasicBlock* null_block = llvm::BasicBlock::Create(context, "null", fn);
+  llvm::Value* is_null = GetIsNull();
+  builder_->CreateCondBr(is_null, null_block, non_null_block);
+
+  builder_->SetInsertPoint(non_null_block);
+  if (type_.IsStructType()) {
+    StructToReadWriteInfo(&res, GetPtr());
+  } else if (type_.IsStringType() || type_.IsCollectionType()) {
+    res.SetPtrAndLen(GetPtr(), GetLen());
+  } else if (type_.type == TYPE_TIMESTAMP) {
+    res.SetTimeAndDate(GetTimeOfDay(), GetDate());
+  } else {
+    res.SetSimpleVal(GetVal());
+  }
+
+  res.SetBlocks(entry_block, null_block, non_null_block);
+
+  builder_->restoreIP(ip);
+  return res;
+}
+
+void CodegenAnyVal::StructChildToReadWriteInfo(
+    CodegenAnyValReadWriteInfo* read_write_info,
+    const ColumnType& type, llvm::Value* child_ptr) {
+  LlvmCodeGen* codegen = read_write_info->codegen();
+  LlvmBuilder* builder = read_write_info->builder();
+  llvm::Type* slot_type = codegen->GetSlotType(type);
+
+  // Children of struct-typed 'AnyVal's are stored in one of the members of an 'ExprValue'
+  // belonging to the appropriate 'ScalarExprEvaluator'. These have the same type and
+  // layout as the values stored in the slots, except for BOOLEANs, which are stored as i1
+  // in the slots but are stored as 'bool' variables in 'ExprValue' (as children of struct
+  // 'AnyVal's). As this code deals with values in 'AnyVal's, for BOOLEANS we use i8,
+  // which is the LLVM type corresponding to 'bool', and for other types we use the slot
+  // type.
+  llvm::Type* child_type = type.type == TYPE_BOOLEAN ?
+    codegen->i8_type() : slot_type;
+  llvm::Value* cast_child_ptr = builder->CreateBitCast(child_ptr,
+      child_type->getPointerTo(), "cast_child_ptr");
+
+  switch (type.type) {
+    case TYPE_STRING:
+    case TYPE_VARCHAR:
+    case TYPE_CHAR:
+    case TYPE_ARRAY: // CollectionVal has the same memory layout as StringVal.
+    case TYPE_MAP: { // CollectionVal has the same memory layout as StringVal.
+      llvm::Value* ptr_addr = builder->CreateStructGEP(
+          nullptr, cast_child_ptr, 0, "ptr_addr");
+      llvm::Value* ptr = builder->CreateLoad(ptr_addr, "ptr");
+
+      llvm::Value* len;
+      if (type.type == TYPE_CHAR) {
+        len = codegen->GetI32Constant(type.len);
+      } else {
+        llvm::Value* len_addr = builder->CreateStructGEP(
+            nullptr, cast_child_ptr, 1, "len_addr");
+        len = builder->CreateLoad(len_addr, "len");
+      }
+      read_write_info->SetPtrAndLen(ptr, len);
+      break;
+    }
+    case TYPE_FIXED_UDA_INTERMEDIATE:
+      DCHECK(false) << "FIXED_UDA_INTERMEDIATE does not need to be copied: the "
+                    << "StringVal must be set up to point to the output slot";
+      break;
+    case TYPE_TIMESTAMP: {
+      llvm::Value* time_of_day_addr = builder->CreateStructGEP(
+          nullptr, cast_child_ptr, 0, "time_of_day_addr");
+      llvm::Value* time_of_day_addr_lowered = builder->CreateBitCast(
+          time_of_day_addr, codegen->i64_ptr_type(), "time_of_day_addr");
+      llvm::Value* time_of_day = builder->CreateLoad(
+          time_of_day_addr_lowered, "time_of_day");
+
+      llvm::Value* date_addr = builder->CreateStructGEP(
+          nullptr, cast_child_ptr, 1, "date_addr");
+      llvm::Value* date_addr_lowered = builder->CreateBitCast(
+          date_addr, codegen->i32_ptr_type(), "date_addr_lowered");
+      llvm::Value* date = builder->CreateLoad(date_addr_lowered, "date");
+      read_write_info->SetTimeAndDate(time_of_day, date);
+      break;
+    }
+    case TYPE_BOOLEAN:
+    case TYPE_TINYINT:
+    case TYPE_SMALLINT:
+    case TYPE_INT:
+    case TYPE_BIGINT:
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE:
+    case TYPE_DECIMAL:
+    case TYPE_DATE: {
+      // The representations of the types match - just take the value.
+      llvm::Value* child = builder->CreateLoad(child_type, cast_child_ptr, "child");
+      read_write_info->SetSimpleVal(child);
+      break;
+    }
+    default:
+      DCHECK(false) << type.DebugString();
+      break;
+  }
+}
+
+void CodegenAnyVal::StructToReadWriteInfo(
+    CodegenAnyValReadWriteInfo* read_write_info,
+    llvm::Value* children_ptr) {
+  const ColumnType& type = read_write_info->type();
+  DCHECK(type.IsStructType());
+
+  LlvmCodeGen* codegen = read_write_info->codegen();
+  llvm::LLVMContext& context = codegen->context();
+  LlvmBuilder* builder = read_write_info->builder();
+  llvm::Function* fn = builder->GetInsertBlock()->getParent();
+
+  llvm::Value* cast_children_ptr = builder->CreateBitCast(
+      children_ptr, codegen->ptr_ptr_type(), "cast_children_ptr");
+
+  for (int i = 0; i < type.children.size(); ++i) {
+    const ColumnType& child_type = type.children[i];
+    CodegenAnyValReadWriteInfo child_read_write_info(codegen, builder, child_type);
+
+    llvm::BasicBlock* child_entry_block = llvm::BasicBlock::Create(context, "entry", fn);
+
+    builder->SetInsertPoint(child_entry_block);
+    llvm::Value* child_ptr_addr = builder->CreateInBoundsGEP(cast_children_ptr,
+        codegen->GetI32Constant(i), "child_ptr_addr");
+    llvm::Value* child_ptr = builder->CreateLoad(codegen->ptr_type(), child_ptr_addr,
+        "child_ptr");
+
+    // Check whether child_ptr is NULL.
+    llvm::Value* child_is_null = builder->CreateIsNull(child_ptr, "child_is_null");
+
+    llvm::BasicBlock* non_null_block =
+        llvm::BasicBlock::Create(context, "non_null", fn);
+    llvm::BasicBlock* null_block =
+        llvm::BasicBlock::Create(context, "null", fn);
+    builder->CreateCondBr(child_is_null, null_block, non_null_block);
+    builder->SetInsertPoint(non_null_block);
+
+    if (child_type.IsStructType()) {
+      llvm::Value* child_struct_ptr = builder->CreateBitCast(
+          child_ptr, GetLoweredPtrType(codegen, child_type), "child_struct_ptr");
+      llvm::Value* child_struct = builder->CreateLoad(child_struct_ptr, "child_struct");
+      CodegenAnyVal child_anyval = CodegenAnyVal(
+          codegen, builder, child_type, child_struct);
+      llvm::Value* child_children_ptr = child_anyval.GetPtr();
+      StructToReadWriteInfo(&child_read_write_info, child_children_ptr);
+    } else {
+      StructChildToReadWriteInfo(&child_read_write_info, child_type, child_ptr);
+    }
+
+    child_read_write_info.SetBlocks(child_entry_block, null_block, non_null_block);
+    read_write_info->children().emplace_back(std::move(child_read_write_info));
+  }
 }

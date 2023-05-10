@@ -111,7 +111,7 @@ QueryState::QueryState(
     refcnt_(0),
     is_cancelled_(0),
     query_spilled_(0),
-    host_profile_(RuntimeProfile::Create(obj_pool(), "<track resource usage>")) {
+    host_profile_(RuntimeProfile::Create(obj_pool(), "<track resource usage>", false)) {
   if (query_ctx_.request_pool.empty()) {
     // fix up pool name for tests
     DCHECK(!request_pool.empty());
@@ -176,7 +176,7 @@ Status QueryState::Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
 
   ExecEnv* exec_env = ExecEnv::GetInstance();
 
-  RuntimeProfile* jvm_host_profile = RuntimeProfile::Create(&obj_pool_, "JVM");
+  RuntimeProfile* jvm_host_profile = RuntimeProfile::Create(&obj_pool_, "JVM", false);
   host_profile_->AddChild(jvm_host_profile);
 
   int64_t gc_count = JvmMemoryCounterMetric::GC_COUNT->GetValue();

@@ -245,7 +245,7 @@ public class UdfExecutorTest {
     for (Object originalArg: originalArgs) {
       Preconditions.checkNotNull(originalArg);
       Type argType = getType(originalArg);
-      inputByteOffsets.add(new Integer(inputBufferSize));
+      inputByteOffsets.add(Integer.valueOf(inputBufferSize));
       inputBufferSize += argType.getSlotSize();
       argTypes.add(argType);
     }
@@ -277,43 +277,44 @@ public class UdfExecutorTest {
   void TestUdfImpl(String jarFile, Class<?> c, Object expectedValue,
       Type expectedType, boolean validate, Object[] originalArgs, Object[] args)
     throws ImpalaException, MalformedURLException, TException {
-    UdfExecutor e = createUdfExecutor(
-        jarFile, c.getName(), expectedType, originalArgs, args);
-    Method method = e.getMethod();
-    Object[] inputArgs = new Object[args.length];
-    for (int i = 0; i < args.length; ++i) {
-      validateArgType(args[i]);
-      if (args[i] != null && args[i] instanceof String) {
-        // For authoring the test, we'll just pass string and make the proper
-        // object here.
-        if (method != null && method.getParameterTypes()[i] == Text.class) {
-          inputArgs[i] = createText((String)args[i]);
+    try (UdfExecutor e = createUdfExecutor(
+        jarFile, c.getName(), expectedType, originalArgs, args)) {
+      Method method = e.getMethod();
+      Object[] inputArgs = new Object[args.length];
+      for (int i = 0; i < args.length; ++i) {
+        validateArgType(args[i]);
+        if (args[i] != null && args[i] instanceof String) {
+          // For authoring the test, we'll just pass string and make the proper
+          // object here.
+          if (method != null && method.getParameterTypes()[i] == Text.class) {
+            inputArgs[i] = createText((String)args[i]);
+          } else {
+            inputArgs[i] = createBytes((String)args[i]);
+          }
         } else {
-          inputArgs[i] = createBytes((String)args[i]);
+          inputArgs[i] = args[i];
         }
-      } else {
-        inputArgs[i] = args[i];
       }
-    }
 
-    // Run the executor a few times to make sure nothing gets messed up
-    // between runs.
-    for (int i = 0; i < 10; ++i) {
-      long r = e.evaluateForTesting(inputArgs);
-      if (!validate) continue;
-      // Check if there was a mismatch and print a detailed error log.
-      List<String> errMsgs = Lists.newArrayList();
-      ValidateReturnPtr(r, expectedValue, expectedType, errMsgs);
-      if (!errMsgs.isEmpty()) {
-        errMsgs.add("Eval iteration:  " + i);
-        errMsgs.add("Return type:     " + expectedType.toSql());
-        List<String> argTypeStrs = Lists.newArrayList();
-        for (Object arg: args) argTypeStrs.add(arg.getClass().getSimpleName());
-        errMsgs.add("Argument types:  " + Joiner.on(",").join(argTypeStrs));
-        if (e.getMethod() != null) {
-          errMsgs.add("Resolved method: " + e.getMethod().toGenericString());
+      // Run the executor a few times to make sure nothing gets messed up
+      // between runs.
+      for (int i = 0; i < 10; ++i) {
+        long r = e.evaluateForTesting(inputArgs);
+        if (!validate) continue;
+        // Check if there was a mismatch and print a detailed error log.
+        List<String> errMsgs = Lists.newArrayList();
+        ValidateReturnPtr(r, expectedValue, expectedType, errMsgs);
+        if (!errMsgs.isEmpty()) {
+          errMsgs.add("Eval iteration:  " + i);
+          errMsgs.add("Return type:     " + expectedType.toSql());
+          List<String> argTypeStrs = Lists.newArrayList();
+          for (Object arg: args) argTypeStrs.add(arg.getClass().getSimpleName());
+          errMsgs.add("Argument types:  " + Joiner.on(",").join(argTypeStrs));
+          if (e.getMethod() != null) {
+            errMsgs.add("Resolved method: " + e.getMethod().toGenericString());
+          }
+          Assert.fail("\n" + Joiner.on("\n").join(errMsgs));
         }
-        Assert.fail("\n" + Joiner.on("\n").join(errMsgs));
       }
     }
   }

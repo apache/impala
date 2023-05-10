@@ -402,10 +402,10 @@ public class AnalyticPlanner {
       List<Expr> sortExprs = Lists.newArrayList(partitionByExprs);
       // for PB exprs use ASC, NULLS LAST to match the behavior of the default
       // order-by and to ensure that limit pushdown works correctly
-      List<Boolean> isAsc =
-          Lists.newArrayList(Collections.nCopies(sortExprs.size(), new Boolean(true)));
-      List<Boolean> nullsFirst =
-          Lists.newArrayList(Collections.nCopies(sortExprs.size(), new Boolean(false)));
+      List<Boolean> isAsc = Lists.newArrayList(
+          Collections.nCopies(sortExprs.size(), Boolean.valueOf(true)));
+      List<Boolean> nullsFirst = Lists.newArrayList(
+          Collections.nCopies(sortExprs.size(), Boolean.valueOf(false)));
 
       // then sort on orderByExprs
       for (OrderByElement orderByElement: sortGroup.orderByElements) {

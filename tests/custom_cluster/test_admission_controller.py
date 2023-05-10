@@ -304,14 +304,13 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     queueA_mem_limit = "MEM_LIMIT=%s" % (128 * 1024 * 1024)
     try:
       for pool in ['', 'not_a_pool_name']:
-        expected_error =\
-            "No mapping found for request from user '\S+' with requested pool '%s'"\
-            % (pool)
+        expected_error = re.compile(r"Request from user '\S+' with requested pool "
+            "'%s' denied access to assigned pool" % (pool))
         self.__check_pool_rejected(client, pool, expected_error)
 
       # Check rejected if user does not have access.
-      expected_error = "Request from user '\S+' with requested pool 'root.queueC' "\
-          "denied access to assigned pool 'root.queueC'"
+      expected_error = re.compile(r"Request from user '\S+' with requested pool "
+          "'root.queueC' denied access to assigned pool 'root.queueC'")
       self.__check_pool_rejected(client, 'root.queueC', expected_error)
 
       # Also try setting a valid pool

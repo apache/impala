@@ -36,7 +36,7 @@
 # TODO: generalise to other warnings
 # * clang-tidy
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 from argparse import ArgumentParser
 from collections import defaultdict
 import json
@@ -143,7 +143,8 @@ def get_misc_comments(revision):
   #  @@ -128 +133,2 @@ if __name__ == "__main__":
   RANGE_RE = re.compile(r"^@@ -[0-9,]* \+([0-9]*).*$")
 
-  diff = check_output(["git", "diff", "-U0", "{0}^..{0}".format(revision)])
+  diff = check_output(["git", "diff", "-U0", "{0}^..{0}".format(revision)],
+      universal_newlines=True)
   curr_file = None
   check_source_file = False
   curr_line_num = 0
@@ -213,7 +214,7 @@ def post_review_to_gerrit(review_input):
 
 
 def merge_comments(a, b):
-  for k, v in b.iteritems():
+  for k, v in b.items():
     a[k].extend(v)
 
 

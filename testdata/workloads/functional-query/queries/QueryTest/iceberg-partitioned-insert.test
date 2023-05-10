@@ -170,11 +170,22 @@ select count(*) from ice_bigints;
 BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
-aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
+# When filtered only by partition column Iceberg can do the filtering and no need to read data in Impala.
+# IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 1.
 select count(*) from ice_bigints
 where i = 0 and j = 0;
+---- RESULTS
+1217
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# When not just partition columns are involved in the filtering then Impala has to read data to answer the query.
+select count(*) from ice_bigints
+where i = 0 and j = 0 and  k >= 0;
 ---- RESULTS
 1217
 ---- RUNTIME_PROFILE
@@ -269,6 +280,7 @@ select count(*) from alltypes_part;
 Expression 'timestamp_col' (type: TIMESTAMP) would need to be cast to STRING for column 'string_col'
 ====
 ---- QUERY
+# IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 4.
 select count(*) from alltypes_part
 where bool_col = true;
 ---- RESULTS
@@ -279,6 +291,7 @@ BIGINT
 aggregation(SUM, NumRowGroups): 4
 ====
 ---- QUERY
+# IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 4.
 select count(*) from alltypes_part
 where float_col = 0;
 ---- RESULTS
@@ -289,6 +302,7 @@ BIGINT
 aggregation(SUM, NumRowGroups): 4
 ====
 ---- QUERY
+# IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 4.
 select count(*) from alltypes_part
 where double_col = 0;
 ---- RESULTS
@@ -299,6 +313,7 @@ BIGINT
 aggregation(SUM, NumRowGroups): 4
 ====
 ---- QUERY
+# IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 2.
 select count(*) from alltypes_part
 where date_col = '2009-01-01';
 ---- RESULTS
@@ -309,6 +324,7 @@ BIGINT
 aggregation(SUM, NumRowGroups): 2
 ====
 ---- QUERY
+# IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 4.
 select count(*) from alltypes_part
 where string_col = '0';
 ---- RESULTS
@@ -665,4 +681,115 @@ select count(*) from store_sales where ss_sold_date_sk is null;
 130093
 ---- TYPES
 BIGINT
+====
+---- QUERY
+# Insert into a string partition column some chars that have to be URL encoded for the path creation.
+# Check that result strings are not URL encoded.
+create table special_char_partitions (i int, s string, s2 string)
+partitioned by spec (i, s, truncate(4, s))
+stored as iceberg;
+insert into special_char_partitions
+    values (1, '11/14/31', '44/1'), (2, '11"14"31', '43"3'), (3, '11=14=31', '65=2'), (4, '', 'a'), (5, cast(null as string), 'b');
+select * from special_char_partitions;
+---- RESULTS
+1,'11/14/31','44/1'
+2,'11"14"31','43"3'
+3,'11=14=31','65=2'
+4,'','a'
+5,'NULL','b'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Check that filtering using special chars work as expected.
+select * from special_char_partitions where s = '11/14/31';
+---- RESULTS
+1,'11/14/31','44/1'
+---- TYPES
+INT,STRING,STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+select * from special_char_partitions where s = '';
+---- RESULTS
+4,'','a'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+select * from special_char_partitions where s is NULL;
+---- RESULTS
+5,'NULL','b'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Check that the file path contains URL encoded strings.
+show files in special_char_partitions;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=1/s=11%2F14%2F31/s_trunc=11%2F1/.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=2/s=11%2214%2231/s_trunc=11%221/.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=3/s=11%3D14%3D31/s_trunc=11%3D1/.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=4/s=__HIVE_DEFAULT_PARTITION__/s_trunc=__HIVE_DEFAULT_PARTITION__/.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=5/s=__HIVE_DEFAULT_PARTITION__/s_trunc=__HIVE_DEFAULT_PARTITION__/.*parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Check that values in SHOW PARTITIONS are nor URL encoded (but simply escaped).
+show partitions special_char_partitions;
+---- RESULTS
+'{"i":"1","s":"11\\/14\\/31","s_trunc":"11\\/1"}',1,1
+'{"i":"2","s":"11\\"14\\"31","s_trunc":"11\\"1"}',1,1
+'{"i":"3","s":"11=14=31","s_trunc":"11=1"}',1,1
+'{"i":"4","s":"","s_trunc":""}',1,1
+'{"i":"5","s":null,"s_trunc":null}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====
+---- QUERY
+# Check special chars in a string partition column after partition evolution.
+alter table special_char_partitions set partition spec (s2);
+insert into special_char_partitions values (6, '11/22/33', '98/22');
+select * from special_char_partitions;
+---- RESULTS
+1,'11/14/31','44/1'
+2,'11"14"31','43"3'
+3,'11=14=31','65=2'
+4,'','a'
+5,'NULL','b'
+6,'11/22/33','98/22'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Check that the new partition column's path contains URL encoded strings.
+show files in special_char_partitions;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=1/s=11%2F14%2F31/s_trunc=11%2F1/.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=2/s=11%2214%2231/s_trunc=11%221/.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=3/s=11%3D14%3D31/s_trunc=11%3D1/.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=4/s=__HIVE_DEFAULT_PARTITION__/s_trunc=__HIVE_DEFAULT_PARTITION__/.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=5/s=__HIVE_DEFAULT_PARTITION__/s_trunc=__HIVE_DEFAULT_PARTITION__/.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/s2=98%2F22/.*parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+show partitions special_char_partitions;
+---- RESULTS
+'{"i":"1","s":"11\\/14\\/31","s_trunc":"11\\/1"}',1,1
+'{"i":"2","s":"11\\"14\\"31","s_trunc":"11\\"1"}',1,1
+'{"i":"3","s":"11=14=31","s_trunc":"11=1"}',1,1
+'{"i":"4","s":"","s_trunc":""}',1,1
+'{"i":"5","s":null,"s_trunc":null}',1,1
+'{"s2":"98\\/22"}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
 ====

@@ -50,6 +50,10 @@ public class DebugUtils {
   // debug action label for introducing delay in update stats command.
   public static final String UPDATE_STATS_DELAY = "catalogd_update_stats_delay";
 
+  // debug action label for introducing delay when the catalog operation of INSERT, i.e.
+  // CatalogOpExecutor#updateCatalog() finishes.
+  public static final String INSERT_FINISH_DELAY = "catalogd_insert_finish_delay";
+
   /**
    * Given list of debug actions, execute the debug action pertaining to the given label.
    * The debugActions string is of the format specified for the query_option/configuration

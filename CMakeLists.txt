@@ -143,6 +143,7 @@ set_dep_root(ZLIB)
 set_dep_root(CCTZ)
 set_dep_root(CURL)
 set_dep_root(CALLONCEHACK)
+set_dep_root(CLOUDFLAREZLIB)
 
 # The boost-cmake project hasn't been maintained for years. Let's make sure we
 # don't accidentally use it if it can be found.
@@ -203,21 +204,9 @@ include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 message(STATUS "Boost include dir: " ${Boost_INCLUDE_DIRS})
 message(STATUS "Boost libraries: ${Boost_LIBRARIES}")
 
-# If at all possible, try to link with system OpenSSL in an attempt to match what the
-# platform that this build might ultimately be deployed on. If no suitable OpenSSL is
-# found, use the toolchain version - but beware that Impala will then fail to start if
-# deployed on a system with a lower version.
-find_package(OpenSSL 1.0.1 QUIET)
-if (NOT ${OPENSSL_FOUND})
-  set_dep_root(OPENSSL)
-  set(OPENSSL_FOUND ON)
-  set(OPENSSL_INCLUDE_DIR ${OPENSSL_ROOT}/include)
-  set(OPENSSL_SSL_LIBRARY ${OPENSSL_ROOT}/lib/libssl.so)
-  set(OPENSSL_CRYPTO_LIBRARY ${OPENSSL_ROOT}/lib/libcrypto.so)
-  set(OPENSSL_VERSION $ENV{IMPALA_OPENSSL_VERSION})
-  message(STATUS "System OpenSSL not found. Defaulting to toolchain version in"
-    " ${OPENSSL_ROOT_DIR}")
-endif()
+# Use OpenSSL from the system, because that is the closest match to the version that this
+# build will use when it is deployed.
+find_package(OpenSSL 1.0.2 REQUIRED)
 
 # OpenSSL, being a security dependency, is always dynamically linked.
 IMPALA_ADD_THIRDPARTY_LIB(openssl_ssl ${OPENSSL_INCLUDE_DIR} "" ${OPENSSL_SSL_LIBRARY})
@@ -226,6 +215,9 @@ IMPALA_ADD_THIRDPARTY_LIB(openssl_crypto "" "" ${OPENSSL_CRYPTO_LIBRARY})
 find_package(Bzip2 REQUIRED)
 IMPALA_ADD_THIRDPARTY_LIB(bzip2 ${BZIP2_INCLUDE_DIR} ${BZIP2_STATIC_LIBRARIES} "")
 
+if ($ENV{IMPALA_USE_CLOUDFLARE_ZLIB} STREQUAL "true")
+  set(ZLIB_ROOT ${CLOUDFLAREZLIB_ROOT})
+endif()
 find_package(Zlib REQUIRED)
 IMPALA_ADD_THIRDPARTY_LIB(zlib ${ZLIB_INCLUDE_DIR} ${ZLIB_STATIC_LIBRARIES}
   ${ZLIB_SHARED_LIBRARIES})

@@ -86,7 +86,8 @@ Coordinator::BackendState::BackendState(const QueryExecParams& exec_params, int 
 
 void Coordinator::BackendState::Init(const vector<FragmentStats*>& fragment_stats,
     RuntimeProfile* host_profile_parent, ObjectPool* obj_pool) {
-  host_profile_ = RuntimeProfile::Create(obj_pool, NetworkAddressPBToString(host_));
+  host_profile_ =
+      RuntimeProfile::Create(obj_pool, NetworkAddressPBToString(host_), false);
   host_profile_parent->AddChild(host_profile_);
   RuntimeProfile::Counter* admission_slots =
       ADD_COUNTER(host_profile_, "AdmissionSlots", TUnit::UNIT);
@@ -568,7 +569,7 @@ void Coordinator::BackendState::UpdateHostProfile(
     const TRuntimeProfileTree& thrift_profile) {
   // We do not take 'lock_' here because RuntimeProfile::Update() is thread-safe.
   DCHECK(!IsEmptyBackend());
-  host_profile_->Update(thrift_profile);
+  host_profile_->Update(thrift_profile, false);
 }
 
 void Coordinator::BackendState::UpdateExecStats(
@@ -893,8 +894,8 @@ void Coordinator::BackendState::InstanceStats::ToJson(Value* value, Document* do
 Coordinator::FragmentStats::FragmentStats(const string& agg_profile_name,
     const string& root_profile_name, int num_instances, ObjectPool* obj_pool)
   : agg_profile_(
-        AggregatedRuntimeProfile::Create(obj_pool, agg_profile_name, num_instances)),
-    root_profile_(RuntimeProfile::Create(obj_pool, root_profile_name)),
+      AggregatedRuntimeProfile::Create(obj_pool, agg_profile_name, num_instances)),
+    root_profile_(RuntimeProfile::Create(obj_pool, root_profile_name, false)),
     num_instances_(num_instances) {}
 
 void Coordinator::FragmentStats::AddSplitStats() {

@@ -36,7 +36,7 @@ function setup-ranger {
     --header="accept:application/json" \
     --header="Content-Type:application/json" \
     http://localhost:6080/service/xusers/secure/groups |
-    python -c "import sys, json; print json.load(sys.stdin)['id']")
+    python -c "import sys, json; print(json.load(sys.stdin)['id'])")
   export GROUP_ID_OWNER
 
   GROUP_ID_NON_OWNER=$(wget -qO - --auth-no-challenge --user=admin \
@@ -44,7 +44,7 @@ function setup-ranger {
     --header="accept:application/json" \
     --header="Content-Type:application/json" \
     http://localhost:6080/service/xusers/secure/groups |
-    python -c "import sys, json; print json.load(sys.stdin)['id']")
+    python -c "import sys, json; print(json.load(sys.stdin)['id'])")
   export GROUP_ID_NON_OWNER
 
   perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \

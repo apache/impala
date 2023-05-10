@@ -79,11 +79,6 @@ class TestQueryRetries(CustomClusterTestSuite):
         union all
         select count(*) from functional.alltypes where bool_col = sleep(50)"""
 
-  # A simple count query with predicate. The predicate is needed so that the planner does
-  # not create the optimized count(star) query plan.
-  _count_query = "select count(*) from tpch_parquet.lineitem where l_orderkey < 50"
-  _count_query_result = "55"
-
   @classmethod
   def get_workload(cls):
     return 'functional-query'
@@ -257,7 +252,7 @@ class TestQueryRetries(CustomClusterTestSuite):
 
     # Kill an impalad, and run a query. The query should be retried.
     killed_impalad = self.__kill_random_impalad()
-    query = self._count_query
+    query = "select count(*) from tpch_parquet.lineitem"
     handle = self.execute_query_async(query,
         query_options={'retry_failed_queries': 'true'})
     self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 60)
@@ -269,7 +264,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     results = self.client.fetch(query, handle)
     assert results.success
     assert len(results.data) == 1
-    assert self._count_query_result in results.data[0]
+    assert "6001215" in results.data[0]
 
     # The runtime profile of the retried query.
     retried_runtime_profile = self.client.get_runtime_profile(handle)
@@ -317,7 +312,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     # and the query should be retried. Add delay before admission so that the 2nd node
     # is removed from the blacklist before scheduler makes schedule for the retried
     # query.
-    query = self._count_query
+    query = "select count(*) from tpch_parquet.lineitem"
     handle = self.execute_query_async(query,
         query_options={'retry_failed_queries': 'true',
                        'debug_action': 'AC_BEFORE_ADMISSION:SLEEP@18000'})
@@ -330,7 +325,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     results = self.client.fetch(query, handle)
     assert results.success
     assert len(results.data) == 1
-    assert self._count_query_result in results.data[0]
+    assert "6001215" in results.data[0]
 
     # The runtime profile of the retried query.
     retried_runtime_profile = self.client.get_runtime_profile(handle)
@@ -380,7 +375,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     rpc_not_accessible_impalad = self.cluster.impalads[1]
     assert rpc_not_accessible_impalad.service.krpc_port == FAILED_KRPC_PORT
 
-    query = self._count_query
+    query = "select count(*) from tpch_parquet.lineitem"
     handle = self.execute_query_async(query,
         query_options={'retry_failed_queries': 'true',
                        'debug_action': 'AC_BEFORE_ADMISSION:SLEEP@18000'})
@@ -703,7 +698,7 @@ class TestQueryRetries(CustomClusterTestSuite):
 
     # Kill an impalad, and run a query. The query should be retried.
     self.cluster.impalads[1].kill()
-    query = self._count_query
+    query = "select count(*) from tpch_parquet.lineitem"
     handle = self.execute_query_async(query,
         query_options={'retry_failed_queries': 'true'})
     self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 60)
@@ -742,7 +737,7 @@ class TestQueryRetries(CustomClusterTestSuite):
 
     # Kill an impalad, and run a query. The query should be retried.
     self.cluster.impalads[1].kill()
-    query = self._count_query
+    query = "select count(*) from tpch_parquet.lineitem"
     handle = self.execute_query_async(query,
         query_options={'retry_failed_queries': 'true'})
     self.__wait_until_retry_state(handle, 'RETRYING')
@@ -772,7 +767,7 @@ class TestQueryRetries(CustomClusterTestSuite):
 
     # Kill an impalad, and run a query. The query should be retried.
     self.cluster.impalads[1].kill()
-    query = self._count_query
+    query = "select count(*) from tpch_parquet.lineitem"
     handle = self.execute_query_async(query,
         query_options={'retry_failed_queries': 'true'})
 
@@ -796,7 +791,7 @@ class TestQueryRetries(CustomClusterTestSuite):
 
     # Kill an impalad, and run a query. The query should be retried.
     self.cluster.impalads[1].kill()
-    query = self._count_query
+    query = "select count(*) from tpch_parquet.lineitem"
     self.hs2_client.set_configuration({'retry_failed_queries': 'true'})
     self.hs2_client.set_configuration_option('impala.resultset.cache.size', '1024')
     self.hs2_client.execute_async(query)
@@ -823,7 +818,7 @@ class TestQueryRetries(CustomClusterTestSuite):
 
     # Kill an impalad, and run a query. The query should be retried.
     self.cluster.impalads[1].kill()
-    query = self._count_query
+    query = "select count(*) from tpch_parquet.lineitem"
     self.execute_query_async(query, query_options={'retry_failed_queries': 'true'})
     # The number of in-flight queries is 0 at the beginning, then 1 when the original
     # query is submitted. It's 2 when the retried query is registered. Although the retry
@@ -853,7 +848,7 @@ class TestQueryRetries(CustomClusterTestSuite):
 
     # Kill an impalad, and run a query. The query should be retried.
     self.cluster.impalads[1].kill()
-    query = self._count_query
+    query = "select count(*) from tpch_parquet.lineitem"
     handle = self.execute_query_async(query,
         query_options={'retry_failed_queries': 'true', 'query_timeout_s': '1'})
     self.wait_for_state(handle, self.client.QUERY_STATES['EXCEPTION'], 60)
@@ -892,7 +887,7 @@ class TestQueryRetries(CustomClusterTestSuite):
 
     # Kill an impalad, and run a query. The query should be retried.
     self.cluster.impalads[1].kill()
-    query = self._count_query
+    query = "select count(*) from tpch_parquet.lineitem"
     client = self.cluster.get_first_impalad().service.create_beeswax_client()
     client.set_configuration({'retry_failed_queries': 'true'})
     handle = client.execute_async(query)
@@ -922,7 +917,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     """Test query retries with the HS2 protocol. Enable the results set cache as well and
     test that query retries work with the results cache."""
     self.cluster.impalads[1].kill()
-    query = self._count_query
+    query = "select count(*) from tpch_parquet.lineitem"
     self.hs2_client.set_configuration({'retry_failed_queries': 'true'})
     self.hs2_client.set_configuration_option('impala.resultset.cache.size', '1024')
     handle = self.hs2_client.execute_async(query)
@@ -931,7 +926,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     results = self.hs2_client.fetch(query, handle)
     assert results.success
     assert len(results.data) == 1
-    assert results.data[0] == self._count_query_result
+    assert int(results.data[0]) == 6001215
 
     # Validate the live exec summary.
     retried_query_id = \

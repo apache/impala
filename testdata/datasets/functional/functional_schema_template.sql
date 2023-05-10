@@ -3256,6 +3256,32 @@ hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/ice/i
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+iceberg_partition_evolution
+---- CREATE
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+(id int, int_col int, string_col string, date_string_col string, year int, month int)
+PARTITIONED BY SPEC (year, truncate(4, date_string_col))
+STORED AS ICEBERG;
+---- DEPENDENT_LOAD
+# We can use 'date_string_col' as it is once IMPALA-11954 is done.
+INSERT INTO {db_name}{db_suffix}.iceberg_partition_evolution
+    SELECT id, int_col, string_col, regexp_replace(date_string_col, '/', ''), year, month
+    FROM {db_name}{db_suffix}.alltypes;
+ALTER TABLE {db_name}{db_suffix}.iceberg_partition_evolution
+    SET PARTITION SPEC (year, truncate(4, date_string_col), month);
+INSERT INTO {db_name}{db_suffix}.iceberg_partition_evolution
+    SELECT
+        cast(id + 7300 as int),
+        int_col,
+        string_col,
+        regexp_replace(date_string_col, '/', ''),
+        year,
+        month
+    FROM {db_name}{db_suffix}.alltypes;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 airports_orc
 ---- CREATE
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
@@ -3941,7 +3967,6 @@ functional
 ---- BASE_TABLE_NAME
 collection_struct_mix_view
 ---- CREATE
-SET disable_codegen=1;
 DROP VIEW IF EXISTS {db_name}{db_suffix}.{table_name};
 CREATE VIEW {db_name}{db_suffix}.{table_name}
 AS SELECT id, arr_contains_struct, arr_contains_nested_struct, struct_contains_nested_arr FROM {db_name}{db_suffix}.collection_struct_mix;

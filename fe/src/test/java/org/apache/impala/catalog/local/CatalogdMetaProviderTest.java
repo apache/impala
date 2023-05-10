@@ -19,6 +19,7 @@ package org.apache.impala.catalog.local;
 
 import static org.junit.Assert.*;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -57,6 +58,9 @@ import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TRuntimeProfileNode;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.util.ListMap;
+import org.apache.impala.util.TByteBuffer;
+import org.apache.thrift.TConfiguration;
+import org.apache.thrift.transport.TTransportException;
 import org.junit.Assume;
 import org.junit.Rule;
 import org.junit.Test;
@@ -640,5 +644,18 @@ public class CatalogdMetaProviderTest {
           .collect(Collectors.toList());
       assertEquals("Actual paths: " + paths, 1, paths.size());
     }
+  }
+
+  public void testLargeTConfiguration() throws Exception {
+    // THRIFT-5696: Test that TByteBuffer init pass with large max message size beyond
+    // TConfiguration.DEFAULT_MAX_MESSAGE_SIZE.
+    int maxSize = BackendConfig.INSTANCE.getThriftRpcMaxMessageSize();
+    assertEquals(1024 * 1024 * 1024, maxSize);
+    int bufferSize = (100 * 1024 + 512) * 1024;
+    final TConfiguration configLarge = new TConfiguration(maxSize,
+        TConfiguration.DEFAULT_MAX_FRAME_SIZE, TConfiguration.DEFAULT_RECURSION_DEPTH);
+    TByteBuffer validTByteBuffer =
+        new TByteBuffer(configLarge, ByteBuffer.allocate(bufferSize));
+    validTByteBuffer.close();
   }
 }

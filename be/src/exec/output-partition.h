@@ -63,8 +63,13 @@ struct OutputPartition {
   /// Path: tmp_hdfs_dir_name/partition_name/<unique_id_str>
   std::string tmp_hdfs_file_name_prefix;
 
-  /// key1=val1/key2=val2/ etc. Used to identify partitions to the metastore.
+  /// key1=val1/key2=val2/ etc. Used to identify partitions to the metastore. Note, the
+  /// value in this member is URL encoded for the sake of e.g. data file name creation.
   std::string partition_name;
+
+  /// This is a split of the 'partition_name' variable by '/'. Note, the partition keys
+  /// and values in this variable are not URL encoded.
+  std::vector<std::string> raw_partition_names;
 
   /// Connection to hdfs.
   hdfsFS hdfs_connection = nullptr;

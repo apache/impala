@@ -22,7 +22,7 @@
 # This script generates be/src/common/version.h which contains the build version based
 # on the git hash.
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 import os
 from subprocess import call
 

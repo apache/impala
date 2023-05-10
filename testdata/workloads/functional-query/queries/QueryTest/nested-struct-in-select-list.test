@@ -49,6 +49,18 @@ order by id;
 INT,STRING
 ====
 ---- QUERY
+# Select a nested struct with an order by and a limit. The limit triggers materialisation
+# in the TopN node.
+select id, outer_struct
+from functional_orc_def.complextypes_nested_structs
+order by id limit 2;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
+2,'{"str":"str","inner_struct1":null,"inner_struct2":{"i":100,"str":"str3"},"inner_struct3":{"s":{"i":321,"s":"dfgs"}}}'
+---- TYPES
+INT,STRING
+====
+---- QUERY
 # Select a nested struct with an order by.
 select id, outer_struct
 from complextypes_nested_structs

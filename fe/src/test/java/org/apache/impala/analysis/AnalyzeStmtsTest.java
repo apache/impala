@@ -432,10 +432,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
    */
   private void testSlotRefPath(String sql, List<Integer> expectedAbsPath) {
     AnalysisContext ctx = createAnalysisCtx();
-    // TODO: Turning Codegen OFF could be removed once the Codegen support is implemented
-    // for structs given in the select list.
-    ctx.getQueryOptions().setDisable_codegen(true);
-
     SelectStmt stmt = (SelectStmt) AnalyzesOk(sql, ctx);
     Expr e = stmt.getResultExprs().get(stmt.getResultExprs().size() - 1);
     Preconditions.checkState(e instanceof SlotRef);
@@ -776,7 +772,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // Check the support of struct in the select list for different file formats.
     AnalysisContext ctx = createAnalysisCtx();
-    ctx.getQueryOptions().setDisable_codegen(true);
     AnalysisError("select int_struct_col from functional.allcomplextypes", ctx,
         "Querying STRUCT is only supported for ORC and Parquet file formats.");
     AnalyzesOk("select alltypes from functional_orc_def.complextypes_structs", ctx);
@@ -804,7 +799,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // Slot path is not ambiguous and resolves to a struct.
     AnalysisContext ctx = createAnalysisCtx();
-    ctx.getQueryOptions().setDisable_codegen(true);
     AnalyzesOk("select a from a.a", ctx);
     AnalyzesOk("select t.a from a.a t", ctx);
     AnalyzesOk("select t.a.a from a.a t", ctx);
@@ -1025,11 +1019,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // Struct in select list works only if codegen is OFF.
     AnalysisContext ctx = createAnalysisCtx();
-    ctx.getQueryOptions().setDisable_codegen(false);
-    AnalysisError("select alltypes from functional_orc_def.complextypes_structs", ctx,
-        "Struct type in select list is not allowed when Codegen is ON. You might want " +
-        "to set DISABLE_CODEGEN=true");
-    ctx.getQueryOptions().setDisable_codegen(true);
     AnalyzesOk("select alltypes from functional_orc_def.complextypes_structs", ctx);
     AnalyzesOk("select int_array_col from functional.allcomplextypes");
     AnalyzesOk("select int_array_col from functional.allcomplextypes " +
@@ -1070,8 +1059,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     //Make complex types available in star queries
     ctx.getQueryOptions().setExpand_complex_types(true);
-    //TODO: Once IMPALA-10851 is resolved it can be removed
-    ctx.getQueryOptions().setDisable_codegen(true);
 
     AnalyzesOk("select * from functional_parquet.complextypes_structs",ctx);
     AnalyzesOk("select * from functional_parquet.complextypes_nested_structs",ctx);
@@ -5136,5 +5123,60 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select * from functional_hbase.alltypes /* +TABLE_NUM_ROWS(100) */",
         "Table hint not recognized for table " +
             "functional_hbase.alltypes: TABLE_NUM_ROWS(100)");
+  }
+
+  @Test
+  public void testSelectivityHintNegative() {
+    // Selectivity hint must use bracket, even for single predicate
+    AnalysisError("select * from t1 where a > 1 and b > 2 /* +SELECTIVITY(0.1) */",
+        "Syntax error in line 1");
+    AnalysisError("select * from t1 where a > 1 /* +SELECTIVITY(0.1) */",
+        "Syntax error in line 1");
+
+    // Cannot set selectivity hint exists predicate
+    AnalysisError("select * from t1 where exists (select x from t2) " +
+            "/* +SELECTIVITY(0.1) */",
+        "Syntax error in line 1");
+
+    // Selectivity hint only accept one parameter with decimal type
+    // Negative number and zero are not allowed
+    AnalysisError("select * from t1 where (a > 1) /* +SELECTIVITY('0.1') */",
+        "Syntax error in line 1");
+    AnalysisError("select * from t1 where (a > 1) /* +SELECTIVITY(0) */",
+        "Syntax error in line 1");
+    AnalysisError("select * from t1 where (a > 1) /* +SELECTIVITY(-1.0) */",
+        "Syntax error in line 1");
+    AnalysisError("select * from t1 where (a > 1) /* +SELECTIVITY(0.1, 0.2) */",
+        "Syntax error in line 1");
+    AnalysisError("select * from t1 where (a > 1) /* +SELECTIVITY(1/3) */",
+        "Syntax error in line 1");
+  }
+
+  @Test
+  public void testSelectivityHintPositive() {
+    // Selectivity hint legal value is (0,1]
+    AnalyzesOk("select * from tpch.lineitem where (l_shipdate <= '1998-09-02') " +
+            "/* +SELECTIVITY(1.1) */",
+        "Invalid selectivity hint value: 1.1, allowed value should be a double value in "
+            + "(0, 1].");
+    AnalyzesOk("select * from tpch.lineitem where (l_shipdate <= '1998-09-02') " +
+            "/* +SELECTIVITY(0.0) */",
+        "Invalid selectivity hint value: 0.0, allowed value should be a double value in "
+            + "(0, 1].");
+
+    // Also valid for a very long decimal value
+    AnalyzesOk("select * from functional.alltypes where (id > 1000)" +
+        "/* +SELECTIVITY(0.3333333333333333333333333333333333) */");
+    // Set selectivity hint for compound predicate
+    AnalyzesOk("select * from functional.alltypes where (id > 1000 and int_col = 1)" +
+        "/* +SELECTIVITY(0.1) */");
+    AnalyzesOk("select * from functional.alltypes where (id > 1000 or int_col = 1)" +
+        "/* +SELECTIVITY(0.1) */");
+
+    // Selectivity hint is invalid for 'AND' compound predicate.
+    AnalyzesOk("select * from tpch.lineitem where (l_shipdate <= '1998-09-02' and " +
+            "l_shipdate >= '1997-09-02')/* +SELECTIVITY(0.5) */",
+        "Selectivity hints are ignored for 'AND' compound predicates, either in the SQL "
+            + "query or internally generated.");
   }
 }

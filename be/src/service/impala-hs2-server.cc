@@ -103,6 +103,10 @@ namespace impala {
 
 const string IMPALA_RESULT_CACHING_OPT = "impala.resultset.cache.size";
 
+const string SET_HIVECONF_PREFIX = "set:hiveconf:";
+
+const int SET_HIVECONF_PREFIX_LEN = SET_HIVECONF_PREFIX.length();
+
 void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
     TMetadataOpRequest* request, TOperationHandle* handle, thrift::TStatus* status) {
   TUniqueId session_id;
@@ -361,11 +365,16 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
       } else if (iequals(v.first, "use:database")) {
         state->database = v.second;
       } else {
+        string key = v.first, value = v.second;
+        // Hive JDBC will add a prefix to the configuration, see IMPALA-11992
+        if (key.rfind(SET_HIVECONF_PREFIX, 0) != string::npos) {
+          key = key.substr(SET_HIVECONF_PREFIX_LEN);
+        }
         // Normal configuration key. Use it to set session default query options.
         // Ignore failure (failures will be logged in SetQueryOption()).
-        Status status = SetQueryOption(v.first, v.second, &state->set_query_options,
+        Status status = SetQueryOption(key, value, &state->set_query_options,
             &state->set_query_options_mask);
-        if (status.ok() && iequals(v.first, "idle_session_timeout")) {
+        if (status.ok() && iequals(key, "idle_session_timeout")) {
           state->session_timeout = state->set_query_options.idle_session_timeout;
           VLOG_QUERY << "OpenSession(): session: " << PrintId(session_id)
                      << " idle_session_timeout="

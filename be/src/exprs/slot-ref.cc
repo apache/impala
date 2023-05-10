@@ -24,6 +24,7 @@
 #include "codegen/llvm-codegen.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "gen-cpp/Exprs_types.h"
+#include "llvm/IR/BasicBlock.h"
 #include "runtime/collection-value.h"
 #include "runtime/decimal-value.h"
 #include "runtime/fragment-state.h"
@@ -154,38 +155,51 @@ void SlotRef::AssignFnCtxIdx(int* next_fn_ctx_idx) {
 // (Note: some of the GEPs that look like no-ops are because certain offsets are 0
 // in this slot descriptor.)
 //
-// define { i8, i64 } @GetSlotRef(i8** %context, %"class.impala::TupleRow"* %row) {
+// define { i8, i64 } @GetSlotRef.22(
+//     %"class.impala::ScalarExprEvaluator"* %eval, %"class.impala::TupleRow"* %row) #51 {
 // entry:
 //   %cast_row_ptr = bitcast %"class.impala::TupleRow"* %row to i8**
-//   %tuple_addr = getelementptr i8** %cast_row_ptr, i32 0
-//   %tuple_ptr = load i8** %tuple_addr
-//   br label %check_slot_null
+//   %tuple_ptr_addr = getelementptr inbounds i8*, i8** %cast_row_ptr, i32 0
+//   %tuple_ptr = load i8*, i8** %tuple_ptr_addr
+//   br label %check_tuple_null
 //
-// check_slot_null:                                  ; preds = %entry
-//   %null_byte_ptr = getelementptr i8* %tuple_ptr, i32 0
-//   %null_byte = load i8* %null_ptr
-//   %null_byte_set = and i8 %null_byte, 2
-//   %is_null = icmp ne i8 %null_byte_set, 0
-//   br i1 %is_null, label %ret, label %get_slot
+// check_tuple_null:                         ; preds = %entry
+//   %tuple_is_null = icmp eq i8* %tuple_ptr, null
+//   br i1 %tuple_is_null, label %null_block, label %check_slot_null
 //
-// get_slot:                                         ; preds = %check_slot_null
-//   %slot_addr = getelementptr i8* %tuple_ptr, i32 8
+// check_slot_null:                          ; preds = %check_tuple_null
+//   %null_byte_ptr = getelementptr inbounds i8, i8* %tuple_ptr, i32 8
+//   %null_byte = load i8, i8* %null_byte_ptr
+//   %null_mask = and i8 %null_byte, 1
+//   %is_null = icmp ne i8 %null_mask, 0
+//   br i1 %is_null, label %null_block, label %read_slot
+//
+// read_slot:                                ; preds = %check_slot_null
+//   %slot_addr = getelementptr inbounds i8, i8* %tuple_ptr, i32 0
 //   %val_ptr = bitcast i8* %slot_addr to i64*
-//   %val = load i64* %val_ptr
-//   br label %ret
+//   %val = load i64, i64* %val_ptr
+//   br label %produce_value
 //
-// ret:                                              ; preds = %get_slot, %check_slot_null
-//   %is_null_phi = phi i8 [ 1, %check_slot_null ], [ 0, %get_slot ]
-//   %val_phi = phi i64 [ 0, %check_slot_null ], [ %val, %get_slot ]
-//   %result = insertvalue { i8, i64 } zeroinitializer, i8 %is_null_phi, 0
-//   %result1 = insertvalue { i8, i64 } %result, i64 %val_phi, 1
+// null_block:                               ; preds = %check_slot_null, %check_tuple_null
+//   br label %produce_value
+//
+// produce_value:                            ; preds = %read_slot, %null_block
+//   %is_null_phi = phi i8 [ 1, %null_block ], [ 0, %read_slot ]
+//   %val_phi = phi i64 [ 0, %null_block ], [ %val, %read_slot ]
+//   %result = insertvalue { i8, i64 } zeroinitializer, i64 %val_phi, 1
+//   %result1 = insertvalue { i8, i64 } %result, i8 %is_null_phi, 0
 //   ret { i8, i64 } %result1
 // }
+//
+// Produced for the following query:
+//   select t1.int_col, t2.bigint_col
+//   from functional.alltypestiny t1 left outer join functional.alltypestiny t2
+//   on t1.int_col = t2.bigint_col
+//   order by bigint_col;
 //
 // TODO: We could generate a typed struct (and not a char*) for Tuple for llvm.  We know
 // the types from the TupleDesc.  It will likely make this code simpler to reason about.
 Status SlotRef::GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Function** fn) {
-  DCHECK_EQ(GetNumChildren(), 0);
   // SlotRefs are based on the slot_id and tuple_idx.  Combine them to make a
   // query-wide unique id. We also need to combine whether the tuple is nullable. For
   // example, in an outer join the scan node could have the same tuple id and slot id
@@ -202,195 +216,251 @@ Status SlotRef::GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Function** 
     return Status::OK();
   }
 
-  llvm::LLVMContext& context = codegen->context();
   llvm::Value* args[2];
   *fn = CreateIrFunctionPrototype("GetSlotRef", codegen, &args);
+  llvm::Value* eval_ptr = args[0];
   llvm::Value* row_ptr = args[1];
 
-  llvm::Value* tuple_offset = codegen->GetI32Constant(tuple_idx_);
-  llvm::Value* slot_offset = codegen->GetI32Constant(slot_offset_);
-  llvm::Value* zero = codegen->GetI8Constant(0);
-  llvm::Value* one = codegen->GetI8Constant(1);
-
-  llvm::BasicBlock* entry_block = llvm::BasicBlock::Create(context, "entry", *fn);
-  bool slot_is_nullable = null_indicator_offset_.bit_mask != 0;
-  llvm::BasicBlock* check_slot_null_indicator_block = NULL;
-  if (slot_is_nullable) {
-    check_slot_null_indicator_block =
-        llvm::BasicBlock::Create(context, "check_slot_null", *fn);
-  }
-  llvm::BasicBlock* get_slot_block = llvm::BasicBlock::Create(context, "get_slot", *fn);
-  llvm::BasicBlock* ret_block = llvm::BasicBlock::Create(context, "ret", *fn);
-
-  LlvmBuilder builder(entry_block);
-  // Get the tuple offset addr from the row
-  llvm::Value* cast_row_ptr = builder.CreateBitCast(
-      row_ptr, codegen->ptr_ptr_type(), "cast_row_ptr");
-  llvm::Value* tuple_addr =
-      builder.CreateInBoundsGEP(cast_row_ptr, tuple_offset, "tuple_addr");
-  // Load the tuple*
-  llvm::Value* tuple_ptr = builder.CreateLoad(tuple_addr, "tuple_ptr");
-
-  // Check if tuple* is null only if the tuple is nullable
-  if (tuple_is_nullable_) {
-    llvm::Value* tuple_is_null = builder.CreateIsNull(tuple_ptr, "tuple_is_null");
-    // Check slot is null only if the null indicator bit is set
-    if (slot_is_nullable) {
-      builder.CreateCondBr(tuple_is_null, ret_block, check_slot_null_indicator_block);
-    } else {
-      builder.CreateCondBr(tuple_is_null, ret_block, get_slot_block);
-    }
-  } else {
-    if (slot_is_nullable) {
-      builder.CreateBr(check_slot_null_indicator_block);
-    } else {
-      builder.CreateBr(get_slot_block);
-    }
-  }
-
-  // Branch for tuple* != NULL.  Need to check if null-indicator is set
-  if (slot_is_nullable) {
-    builder.SetInsertPoint(check_slot_null_indicator_block);
-    llvm::Value* is_slot_null = SlotDescriptor::CodegenIsNull(
-        codegen, &builder, null_indicator_offset_, tuple_ptr);
-    builder.CreateCondBr(is_slot_null, ret_block, get_slot_block);
-  }
-
-  // Branch for slot != NULL
-  builder.SetInsertPoint(get_slot_block);
-  llvm::Value* slot_ptr = builder.CreateInBoundsGEP(tuple_ptr, slot_offset, "slot_addr");
-  llvm::Value* val_ptr = builder.CreateBitCast(slot_ptr,
-      codegen->GetSlotPtrType(type_), "val_ptr");
-  // Depending on the type, load the values we need
-  llvm::Value* val = NULL;
-  llvm::Value* ptr = NULL;
-  llvm::Value* len = NULL;
-  llvm::Value* time_of_day = NULL;
-  llvm::Value* date = NULL;
-  if (type_.IsVarLenStringType() || type_.IsCollectionType()) {
-    llvm::Value* ptr_ptr = builder.CreateStructGEP(NULL, val_ptr, 0, "ptr_ptr");
-    ptr = builder.CreateLoad(ptr_ptr, "ptr");
-    llvm::Value* len_ptr = builder.CreateStructGEP(NULL, val_ptr, 1, "len_ptr");
-    len = builder.CreateLoad(len_ptr, "len");
-  } else if (type_.type == TYPE_CHAR || type_.type == TYPE_FIXED_UDA_INTERMEDIATE) {
-    // ptr and len are the slot and its fixed length.
-    ptr = builder.CreateBitCast(val_ptr, codegen->ptr_type());
-    len = codegen->GetI32Constant(type_.len);
-  } else if (type_.type == TYPE_TIMESTAMP) {
-    llvm::Value* time_of_day_ptr =
-        builder.CreateStructGEP(NULL, val_ptr, 0, "time_of_day_ptr");
-    // Cast boost::posix_time::time_duration to i64
-    llvm::Value* time_of_day_cast =
-        builder.CreateBitCast(time_of_day_ptr, codegen->i64_ptr_type());
-    time_of_day = builder.CreateLoad(time_of_day_cast, "time_of_day");
-    llvm::Value* date_ptr = builder.CreateStructGEP(NULL, val_ptr, 1, "date_ptr");
-    // Cast boost::gregorian::date to i32
-    llvm::Value* date_cast =
-        builder.CreateBitCast(date_ptr, codegen->i32_ptr_type());
-    date = builder.CreateLoad(date_cast, "date");
-  } else {
-    // val_ptr is a native type
-    val = builder.CreateLoad(val_ptr, "val");
-  }
-  builder.CreateBr(ret_block);
-
-  // Return block
-  builder.SetInsertPoint(ret_block);
-  llvm::PHINode* is_null_phi =
-      builder.CreatePHI(codegen->i8_type(), 2, "is_null_phi");
-  if (tuple_is_nullable_) is_null_phi->addIncoming(one, entry_block);
-  if (check_slot_null_indicator_block != NULL) {
-    is_null_phi->addIncoming(one, check_slot_null_indicator_block);
-  }
-  is_null_phi->addIncoming(zero, get_slot_block);
-
-  // Depending on the type, create phi nodes for each value needed to populate the return
-  // *Val. The optimizer does a better job when there is a phi node for each value, rather
-  // than having get_slot_block generate an AnyVal and having a single phi node over that.
-  // TODO: revisit this code, can possibly be simplified
-  if (type_.IsStringType() || type_.type == TYPE_FIXED_UDA_INTERMEDIATE
-      || type_.IsCollectionType()) {
-    DCHECK(ptr != NULL);
-    DCHECK(len != NULL);
-    llvm::PHINode* ptr_phi = builder.CreatePHI(ptr->getType(), 2, "ptr_phi");
-    llvm::Value* null = llvm::Constant::getNullValue(ptr->getType());
-    if (tuple_is_nullable_) {
-      ptr_phi->addIncoming(null, entry_block);
-    }
-    if (check_slot_null_indicator_block != NULL) {
-      ptr_phi->addIncoming(null, check_slot_null_indicator_block);
-    }
-    ptr_phi->addIncoming(ptr, get_slot_block);
-
-    llvm::PHINode* len_phi = builder.CreatePHI(len->getType(), 2, "len_phi");
-    null = llvm::ConstantInt::get(len->getType(), 0);
-    if (tuple_is_nullable_) {
-      len_phi->addIncoming(null, entry_block);
-    }
-    if (check_slot_null_indicator_block != NULL) {
-      len_phi->addIncoming(null, check_slot_null_indicator_block);
-    }
-    len_phi->addIncoming(len, get_slot_block);
-
-    CodegenAnyVal result =
-        CodegenAnyVal::GetNonNullVal(codegen, &builder, type(), "result");
-    result.SetIsNull(is_null_phi);
-    result.SetPtr(ptr_phi);
-    result.SetLen(len_phi);
-    builder.CreateRet(result.GetLoweredValue());
-  } else if (type_.type == TYPE_TIMESTAMP) {
-    DCHECK(time_of_day != NULL);
-    DCHECK(date != NULL);
-    llvm::PHINode* time_of_day_phi =
-        builder.CreatePHI(time_of_day->getType(), 2, "time_of_day_phi");
-    llvm::Value* null = llvm::ConstantInt::get(time_of_day->getType(), 0);
-    if (tuple_is_nullable_) {
-      time_of_day_phi->addIncoming(null, entry_block);
-    }
-    if (check_slot_null_indicator_block != NULL) {
-      time_of_day_phi->addIncoming(null, check_slot_null_indicator_block);
-    }
-    time_of_day_phi->addIncoming(time_of_day, get_slot_block);
-
-    llvm::PHINode* date_phi = builder.CreatePHI(date->getType(), 2, "date_phi");
-    null = llvm::ConstantInt::get(date->getType(), 0);
-    if (tuple_is_nullable_) {
-      date_phi->addIncoming(null, entry_block);
-    }
-    if (check_slot_null_indicator_block != NULL) {
-      date_phi->addIncoming(null, check_slot_null_indicator_block);
-    }
-    date_phi->addIncoming(date, get_slot_block);
-
-    CodegenAnyVal result =
-        CodegenAnyVal::GetNonNullVal(codegen, &builder, type(), "result");
-    result.SetIsNull(is_null_phi);
-    result.SetTimeOfDay(time_of_day_phi);
-    result.SetDate(date_phi);
-    builder.CreateRet(result.GetLoweredValue());
-  } else {
-    DCHECK(val != NULL);
-    llvm::PHINode* val_phi = builder.CreatePHI(val->getType(), 2, "val_phi");
-    llvm::Value* null = llvm::Constant::getNullValue(val->getType());
-    if (tuple_is_nullable_) {
-      val_phi->addIncoming(null, entry_block);
-    }
-    if (check_slot_null_indicator_block != NULL) {
-      val_phi->addIncoming(null, check_slot_null_indicator_block);
-    }
-    val_phi->addIncoming(val, get_slot_block);
-
-    CodegenAnyVal result =
-        CodegenAnyVal::GetNonNullVal(codegen, &builder, type(), "result");
-    result.SetIsNull(is_null_phi);
-    result.SetVal(val_phi);
-    builder.CreateRet(result.GetLoweredValue());
-  }
+  LlvmBuilder builder(codegen->context());
+  CodegenAnyVal result_value = CodegenValue(codegen, &builder, *fn, eval_ptr, row_ptr);
+  builder.CreateRet(result_value.GetLoweredValue());
 
   *fn = codegen->FinalizeFunction(*fn);
   if (UNLIKELY(*fn == NULL)) return Status(TErrorCode::IR_VERIFY_FAILED, "SlotRef");
   codegen->RegisterExprFn(unique_slot_id, *fn);
   return Status::OK();
+}
+
+// Generates null checking code: null checking may be generated for the tuple and for the
+// slot based on 'tuple_is_nullable' and 'slot_is_nullable'. If any one of the checks
+// returns null, control is transferred to 'next_block_if_null', otherwise to
+// 'next_block_if_not_null.
+void SlotRef::CodegenNullChecking(LlvmCodeGen* codegen, LlvmBuilder* builder,
+    llvm::Function* fn, llvm::BasicBlock* next_block_if_null,
+    llvm::BasicBlock* next_block_if_not_null, llvm::Value* tuple_ptr) {
+  bool slot_is_nullable = null_indicator_offset_.bit_mask != 0;
+  llvm::BasicBlock* const check_tuple_null_block = tuple_is_nullable_ ?
+    llvm::BasicBlock::Create(codegen->context(), "check_tuple_null",
+        fn, /* insert before */ next_block_if_not_null)
+    : nullptr;
+  llvm::BasicBlock* const check_slot_null_block = slot_is_nullable ?
+    llvm::BasicBlock::Create(codegen->context(), "check_slot_null",
+        fn, /* insert before */ next_block_if_not_null)
+    : nullptr;
+
+  // Check if tuple* is null only if the tuple is nullable
+  if (tuple_is_nullable_) {
+    builder->CreateBr(check_tuple_null_block);
+    builder->SetInsertPoint(check_tuple_null_block);
+    llvm::Value* tuple_is_null = builder->CreateIsNull(tuple_ptr, "tuple_is_null");
+    // Check slot is null only if the null indicator bit is set
+    if (slot_is_nullable) {
+      builder->CreateCondBr(tuple_is_null, next_block_if_null, check_slot_null_block);
+    } else {
+      builder->CreateCondBr(tuple_is_null, next_block_if_null, next_block_if_not_null);
+    }
+  } else {
+    if (slot_is_nullable) {
+      builder->CreateBr(check_slot_null_block);
+    } else {
+      builder->CreateBr(next_block_if_not_null);
+    }
+  }
+
+  // Branch for tuple* != NULL.  Need to check if null-indicator is set
+  if (slot_is_nullable) {
+    builder->SetInsertPoint(check_slot_null_block);
+    llvm::Value* is_slot_null = SlotDescriptor::CodegenIsNull(
+        codegen, builder, null_indicator_offset_, tuple_ptr);
+    builder->CreateCondBr(is_slot_null, next_block_if_null, next_block_if_not_null);
+  }
+}
+
+// Codegens reading the members of a StringVal or a CollectionVal from the slot pointed to
+// by 'val_ptr'. Returns the resulting values in '*ptr' and '*len'.
+void CodegenReadingStringOrCollectionVal(LlvmCodeGen* codegen, LlvmBuilder* builder,
+    const ColumnType& type, llvm::Value* val_ptr, llvm::Value** ptr, llvm::Value** len) {
+  if (type.IsVarLenStringType() || type.IsCollectionType()) {
+    llvm::Value* ptr_ptr = builder->CreateStructGEP(nullptr, val_ptr, 0, "ptr_ptr");
+    *ptr = builder->CreateLoad(ptr_ptr, "ptr");
+    llvm::Value* len_ptr = builder->CreateStructGEP(nullptr, val_ptr, 1, "len_ptr");
+    *len = builder->CreateLoad(len_ptr, "len");
+  } else {
+    DCHECK(type.type == TYPE_CHAR || type.type == TYPE_FIXED_UDA_INTERMEDIATE);
+    // ptr and len are the slot and its fixed length.
+    *ptr = builder->CreateBitCast(val_ptr, codegen->ptr_type());
+    *len = codegen->GetI32Constant(type.len);
+  }
+}
+
+void CodegenReadingTimestamp(LlvmCodeGen* codegen, LlvmBuilder* builder,
+    llvm::Value* val_ptr, llvm::Value** time_of_day, llvm::Value** date) {
+  llvm::Value* time_of_day_ptr =
+    builder->CreateStructGEP(nullptr, val_ptr, 0, "time_of_day_ptr");
+  // Cast boost::posix_time::time_duration to i64
+  llvm::Value* time_of_day_cast =
+    builder->CreateBitCast(time_of_day_ptr, codegen->i64_ptr_type());
+  *time_of_day = builder->CreateLoad(time_of_day_cast, "time_of_day");
+  llvm::Value* date_ptr = builder->CreateStructGEP(nullptr, val_ptr, 1, "date_ptr");
+  // Cast boost::gregorian::date to i32
+  llvm::Value* date_cast =
+    builder->CreateBitCast(date_ptr, codegen->i32_ptr_type());
+  *date = builder->CreateLoad(date_cast, "date");
+}
+
+CodegenAnyValReadWriteInfo SlotRef::CodegenReadSlot(LlvmCodeGen* codegen,
+    LlvmBuilder* builder,
+    llvm::Value* eval_ptr, llvm::Value* row_ptr, llvm::BasicBlock* entry_block,
+    llvm::BasicBlock* null_block, llvm::BasicBlock* read_slot_block,
+    llvm::Value* tuple_ptr, llvm::Value* slot_offset) {
+  builder->SetInsertPoint(read_slot_block);
+  llvm::Value* slot_ptr = builder->CreateInBoundsGEP(tuple_ptr, slot_offset, "slot_addr");
+
+  // This is not used for structs because the child expressions have their own slot
+  // pointers and we only read through those, not through the struct slot pointer.
+  llvm::Value* val_ptr = type_.IsStructType() ? nullptr : builder->CreateBitCast(slot_ptr,
+      codegen->GetSlotPtrType(type_), "val_ptr");
+
+  // For structs the code that reads the value consists of multiple basic blocks, so the
+  // block that should branch to 'produce_value_block' is not 'read_slot_block'. This
+  // variable is set to the appropriate block.
+  llvm::BasicBlock* non_null_incoming_block = read_slot_block;
+
+  CodegenAnyValReadWriteInfo res(codegen, builder, type_);
+
+  // Depending on the type, create phi nodes for each value needed to populate the return
+  // *Val. The optimizer does a better job when there is a phi node for each value, rather
+  // than having read_slot_block generate an AnyVal and having a single phi node over
+  // that.
+  if (type_.IsStructType()) {
+    llvm::Function* fn = builder->GetInsertBlock()->getParent();
+    std::size_t num_children = children_.size();
+    for (std::size_t i = 0; i < num_children; ++i) {
+      ScalarExpr* child_expr = children_[i];
+      DCHECK(child_expr != nullptr);
+      SlotRef* child_slot_ref = dynamic_cast<SlotRef*>(child_expr);
+      DCHECK(child_slot_ref != nullptr);
+
+      llvm::Function* const get_child_eval_fn =
+        codegen->GetFunction(IRFunction::GET_CHILD_EVALUATOR, false);
+
+      llvm::BasicBlock* child_entry_block = llvm::BasicBlock::Create(codegen->context(),
+          "child_entry", fn);
+      builder->SetInsertPoint(child_entry_block);
+      llvm::Value* child_eval = builder->CreateCall(get_child_eval_fn,
+          {eval_ptr, codegen->GetI32Constant(i)}, "child_eval");
+      CodegenAnyValReadWriteInfo codegen_anyval_info =
+          child_slot_ref->CreateCodegenAnyValReadWriteInfo(codegen, builder, fn,
+           child_eval, row_ptr, child_entry_block);
+     res.children().push_back(codegen_anyval_info);
+    }
+  } else if (type_.IsStringType() || type_.type == TYPE_FIXED_UDA_INTERMEDIATE
+      || type_.IsCollectionType()) {
+    llvm::Value* ptr;
+    llvm::Value* len;
+    CodegenReadingStringOrCollectionVal(codegen, builder, type_, val_ptr,
+        &ptr, &len);
+    DCHECK(ptr != nullptr);
+    DCHECK(len != nullptr);
+    res.SetPtrAndLen(ptr, len);
+  } else if (type_.type == TYPE_TIMESTAMP) {
+    llvm::Value* time_of_day;
+    llvm::Value* date;
+    CodegenReadingTimestamp(codegen, builder, val_ptr, &time_of_day, &date);
+    DCHECK(time_of_day != nullptr);
+    DCHECK(date != nullptr);
+    res.SetTimeAndDate(time_of_day, date);
+  } else {
+    res.SetSimpleVal(builder->CreateLoad(val_ptr, "val"));
+  }
+
+  res.SetFnCtxIdx(fn_ctx_idx_);
+  res.SetEval(eval_ptr);
+  res.SetBlocks(entry_block, null_block, non_null_incoming_block);
+  return res;
+}
+
+/// Generates code to read the value corresponding to this 'SlotRef' into a *Val. Returns
+/// a 'CodegenAnyVal' containing the read value. No return statement is generated in the
+/// code, so this function can be called recursively for structs without putting function
+/// calls in the generated code.
+///
+/// The generated code can be conceptually divided into the following parts:
+/// 1. Find and load the tuple address (the entry block)
+/// 2. Null checking (blocks 'check_tuple_null', 'check_slot_null' and 'null_block')
+/// 3. Reading the actual non-null value from its slot (the 'read_slot' block)
+/// 4. Produce a final *Val value, whether it is null or not (the 'produce_value' block)
+///
+/// Number 1. is straightforward.
+///
+/// Null checking may involve checking the tuple, checking the null indicators for the
+/// slot, both or none, depending on what is nullable. If any null check returns true,
+/// control branches to 'null_block'. This basic block will be used in PHI nodes as an
+/// incoming branch indicating that the *Val is null.
+///
+/// If all null checks return false, control is transferred to the 'read_slot' block. Here
+/// we actually read the value from the slot. This may involve several loads yielding
+/// different parts of the value, for example the pointer and the length of a StringValue.
+/// If the value is a struct, we recurse to / read the struct members - this produces
+/// additional basic blocks.
+///
+/// The final block, 'produce_value' is used to create the final *Val. This block unites
+/// the null and the non-null paths. It has PHI nodes for each value part (ptr, len etc.)
+/// from 'null_block' and 'read_slot' (or one of its descendants in case of structs). If
+/// control reaches here from 'null_block', the *Val is set to null, otherwise to the
+/// value read from the slot.
+CodegenAnyVal SlotRef::CodegenValue(LlvmCodeGen* codegen, LlvmBuilder* builder,
+    llvm::Function* fn, llvm::Value* eval_ptr, llvm::Value* row_ptr,
+    llvm::BasicBlock* entry_block) {
+  CodegenAnyValReadWriteInfo read_write_info = CreateCodegenAnyValReadWriteInfo(codegen,
+      builder, fn, eval_ptr, row_ptr, entry_block);
+  return CodegenAnyVal::CreateFromReadWriteInfo(read_write_info);
+}
+
+CodegenAnyValReadWriteInfo SlotRef::CreateCodegenAnyValReadWriteInfo(
+    LlvmCodeGen* codegen, LlvmBuilder* builder, llvm::Function* fn,
+    llvm::Value* eval_ptr, llvm::Value* row_ptr, llvm::BasicBlock* entry_block) {
+  llvm::IRBuilderBase::InsertPoint ip = builder->saveIP();
+
+  llvm::Value* tuple_offset = codegen->GetI32Constant(tuple_idx_);
+  llvm::Value* slot_offset = codegen->GetI32Constant(slot_offset_);
+
+  llvm::LLVMContext& context = codegen->context();
+
+  // Create the necessary basic blocks.
+  if (entry_block == nullptr) {
+    entry_block = llvm::BasicBlock::Create(context, "entry", fn);
+  }
+
+  llvm::BasicBlock* read_slot_block = llvm::BasicBlock::Create(context, "read_slot", fn);
+
+  // We use this block to collect all code paths that lead to the result being null. It
+  // does nothing but branches unconditionally to 'produce_value_block' and the PHI nodes
+  // there can add this block as an incoming branch for the null case; it is simpler and
+  // more readable than having many predeccesor blocks for the null case in
+  // 'produce_value_block'.
+  llvm::BasicBlock* null_block = llvm::BasicBlock::Create(context, "null_block", fn);
+
+  /// Start generating instructions.
+  //### Part 1: find the tuple address.
+  builder->SetInsertPoint(entry_block);
+  // Get the tuple offset addr from the row
+  llvm::Value* cast_row_ptr = builder->CreateBitCast(
+      row_ptr, codegen->ptr_ptr_type(), "cast_row_ptr");
+  llvm::Value* tuple_ptr_addr =
+      builder->CreateInBoundsGEP(cast_row_ptr, tuple_offset, "tuple_ptr_addr");
+  // Load the tuple*
+  llvm::Value* tuple_ptr = builder->CreateLoad(tuple_ptr_addr, "tuple_ptr");
+
+  //### Part 2: null checking
+  CodegenNullChecking(codegen, builder, fn, null_block, read_slot_block, tuple_ptr);
+
+  //### Part 3: read non-null value.
+  CodegenAnyValReadWriteInfo res = CodegenReadSlot(codegen, builder, eval_ptr,
+      row_ptr, entry_block, null_block, read_slot_block, tuple_ptr, slot_offset);
+
+  builder->restoreIP(ip);
+  return res;
 }
 
 #define SLOT_REF_GET_FUNCTION(type_lit, type_val, type_c) \

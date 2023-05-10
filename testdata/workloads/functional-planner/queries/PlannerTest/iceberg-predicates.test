@@ -1,0 +1,77 @@
+# A predicate on a partition that is present both before and after partition evolution is
+# not pushed down to scan node because Iceberg already filtered out the associated rows.
+# Additionally, the slot associated with this predicate is not materialized.
+SELECT id, int_col, string_col from iceberg_partition_evolution where year = 2010;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
+   HDFS partitions=1/1 files=730 size=1.25MB
+   skipped Iceberg predicates: `year` = 2010
+   row-size=20B cardinality=7.30K
+====
+# A predicate on a partition that is introduced by partition evolution is pushed down to
+# the scan node. Also the associated slot is materialized.
+SELECT id, int_col, string_col from iceberg_partition_evolution where month = 1;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
+   HDFS partitions=1/1 files=124 size=216.63KB
+   predicates: `month` = 1
+   row-size=24B cardinality=1.24K
+====
+# The predicates that couldn't be pushed to Iceberg are pushed down to the scan node,
+# while the ones that are pushed to Iceberg could be skipped from pushing down to
+# Impala's scan node if they won't filter any further rows.
+SELECT id, int_col, string_col from iceberg_partition_evolution where year = 2010 and power(id, 3) > 1000;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
+   HDFS partitions=1/1 files=730 size=1.25MB
+   predicates: power(id, 3) > 1000
+   skipped Iceberg predicates: `year` = 2010
+   row-size=20B cardinality=730
+====
+# Here both predicates are pushed to Iceberg and also to Impala's scan node. However,
+# here is a room for optimisation as we could skip pushing down 'year' to the scan node
+# as it won't filter further rows.
+SELECT id, int_col, string_col from iceberg_partition_evolution where year = 2010 and id > 1000;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
+   HDFS partitions=1/1 files=730 size=1.25MB
+   predicates: `year` = 2010, id > 1000
+   row-size=24B cardinality=730
+====
+# If we have predicates on partition columns with non-identity transform that could not
+# be pushed to Iceberg then all the predicates are also pushed to Impala's scan node.
+# However, here is a room for optimisation as we could skip pushing down 'year' to the
+# scan node as it won't filter further rows.
+SELECT * FROM iceberg_partition_evolution
+WHERE year = 2010 AND date_string_col='061610';
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
+   HDFS partitions=1/1 files=2 size=3.49KB
+   predicates: `year` = 2010, date_string_col = '061610'
+   row-size=40B cardinality=2
+====
+# Checks when all the predicates are skipped in a count(*) query then the relevant
+# optimization kicks in for Parquet scanners.
+SELECT COUNT(*) FROM functional_parquet.iceberg_partitioned WHERE action = 'click';
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(functional_parquet.iceberg_partitioned.stats: num_rows)
+|  row-size=8B cardinality=1
+|
+00:SCAN HDFS [functional_parquet.iceberg_partitioned]
+   HDFS partitions=1/1 files=6 size=6.85KB
+   skipped Iceberg predicates: action = 'click'
+   row-size=8B cardinality=6
+====

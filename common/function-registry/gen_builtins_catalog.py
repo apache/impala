@@ -20,6 +20,7 @@
 # This script generates the FE calls to populate the builtins.
 # To add a builtin, add an entry to impala_functions.py.
 
+from __future__ import absolute_import, division, print_function
 import os
 import impala_functions
 

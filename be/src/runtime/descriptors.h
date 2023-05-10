@@ -24,6 +24,7 @@
 #include <utility>
 #include <vector>
 
+#include "codegen/codegen-anyval-read-write-info.h"
 #include "codegen/impala-ir.h"
 #include "common/global-types.h"
 #include "common/status.h"
@@ -35,11 +36,13 @@
 namespace llvm {
   class Constant;
   class StructType;
+  class Type;
   class Value;
 };
 
 namespace impala {
 
+class CodegenAnyVal;
 class LlvmBuilder;
 class LlvmCodeGen;
 class ObjectPool;
@@ -154,6 +157,10 @@ class SlotDescriptor {
   /// of other_desc, but not necessarily ids.
   bool LayoutEquals(const SlotDescriptor& other_desc) const;
 
+  /// Load "any_val"'s value from 'raw_val_ptr', which must be a pointer to the matching
+  /// native type, e.g. a StringValue or TimestampValue slot in a tuple.
+  static void CodegenLoadAnyVal(CodegenAnyVal* any_val, llvm::Value* raw_val_ptr);
+
   /// Generate LLVM code at the insert position of 'builder' that returns a boolean value
   /// represented as a LLVM i1 indicating whether this slot is null in 'tuple'.
   llvm::Value* CodegenIsNull(
@@ -170,6 +177,38 @@ class SlotDescriptor {
   /// to the tuple, and 'is_null' is an boolean value represented as a LLVM i1.
   void CodegenSetNullIndicator(LlvmCodeGen* codegen, LlvmBuilder* builder,
       llvm::Value* tuple, llvm::Value* is_null) const;
+
+  void CodegenWriteToSlot(const CodegenAnyValReadWriteInfo& read_write_info,
+      llvm::Value* tuple_llvm_struct_ptr,
+      llvm::Value* pool_val, llvm::BasicBlock* insert_before = nullptr) const;
+
+  /// Stores this 'any_val' into a native slot, e.g. a StringValue or TimestampValue.
+  /// This should only be used if 'any_val' is not null.
+  ///
+  /// Not valid to call for FIXED_UDA_INTERMEDIATE: in that case the StringVal must be
+  /// set up to point directly to the underlying slot, e.g. by LoadFromNativePtr().
+  ///
+  /// Not valid to call for structs.
+  ///
+  /// If 'pool_val' is non-NULL, var-len data will be copied into 'pool_val'.
+  /// 'pool_val' has to be of type MemPool*.
+  static void CodegenStoreNonNullAnyVal(CodegenAnyVal& any_val,
+      llvm::Value* raw_val_ptr, llvm::Value* pool_val = nullptr);
+
+  /// Like the above, but takes a 'CodegenAnyValReadWriteInfo' instead of a
+  /// 'CodegenAnyVal'.
+  static void CodegenStoreNonNullAnyVal(const CodegenAnyValReadWriteInfo& read_write_info,
+      llvm::Value* raw_val_ptr, llvm::Value* pool_val = nullptr);
+
+  /// Like 'CodegenStoreNonNullAnyVal' but stores the value into a new alloca()
+  /// allocation. Returns a pointer to the stored value.
+  static llvm::Value* CodegenStoreNonNullAnyValToNewAlloca(
+      CodegenAnyVal& any_val, llvm::Value* pool_val = nullptr);
+
+  /// Like the above, but takes a 'CodegenAnyValReadWriteInfo' instead of a
+  /// 'CodegenAnyVal'.
+  static llvm::Value* CodegenStoreNonNullAnyValToNewAlloca(
+      const CodegenAnyValReadWriteInfo& read_write_info, llvm::Value* pool_val = nullptr);
 
   /// Returns true if this slot is a child of a struct slot.
   inline bool IsChildOfStruct() const;
@@ -206,6 +245,35 @@ class SlotDescriptor {
   static llvm::Value* CodegenGetNullByte(LlvmCodeGen* codegen, LlvmBuilder* builder,
       const NullIndicatorOffset& null_indicator_offset, llvm::Value* tuple,
       llvm::Value** null_byte_ptr);
+
+  void CodegenWriteToSlotHelper(const CodegenAnyValReadWriteInfo& read_write_info,
+      llvm::Value* main_tuple_llvm_struct_ptr, llvm::Value* tuple_llvm_struct_ptr,
+      llvm::Value* pool_val, NonWritableBasicBlock insert_before) const;
+
+  /// Stores a struct value into a native slot. This should only be used if this struct is
+  /// not null.
+  ///
+  /// 'main_tuple_ptr' should be a pointer to the beginning of the whole main tuple, while
+  /// 'struct_slot_ptr' should be the slot where the struct should be stored. The first
+  /// one is needed because the offsets of the struct's children are calculated from the
+  /// beginning of the main tuple.
+  void CodegenStoreStructToNativePtr(const CodegenAnyValReadWriteInfo& read_write_info,
+      llvm::Value* main_tuple_ptr, llvm::Value* struct_slot_ptr, llvm::Value* pool_val,
+      NonWritableBasicBlock insert_before) const;
+
+  // Sets the null indicator bit to 0 - recursively for structs.
+  void CodegenSetToNull(const CodegenAnyValReadWriteInfo& read_write_info,
+      llvm::Value* tuple) const;
+
+  /// Codegens writing a string or a collection to the address pointed to by 'slot_ptr'.
+  /// If 'pool_val' is non-NULL, the data will be copied into 'pool_val'.  'pool_val' has
+  /// to be of type MemPool*.
+  static void CodegenWriteStringOrCollectionToSlot(
+      const CodegenAnyValReadWriteInfo& read_write_info,
+      llvm::Value* slot_ptr, llvm::Value* pool_val);
+
+  static llvm::Value* CodegenToTimestampValue(
+      const CodegenAnyValReadWriteInfo& read_write_info);
 };
 
 class ColumnDescriptor {
@@ -543,6 +611,11 @@ class TupleDescriptor {
 
   /// Returns slots in their physical order.
   std::vector<SlotDescriptor*> SlotsOrderedByIdx() const;
+
+  std::pair<std::vector<llvm::Type*>, int> GetLlvmTypesAndOffset(LlvmCodeGen* codegen,
+      int curr_struct_offset) const;
+  llvm::StructType* CreateLlvmStructTypeFromFieldTypes(LlvmCodeGen* codegen,
+      const std::vector<llvm::Type*>& field_types, int parent_slot_offset) const;
 };
 
 class DescriptorTbl {
@@ -573,6 +646,11 @@ class DescriptorTbl {
 
   std::string DebugString() const;
 
+  /// Converts a TDescriptorTableSerialized to a TDescriptorTable. Returns
+  /// an error if deserialization fails.
+  static Status DeserializeThrift(const TDescriptorTableSerialized& serial_tbl,
+      TDescriptorTable* desc_tbl) WARN_UNUSED_RESULT;
+
  private:
   // The friend classes use CreateInternal().
   friend class DescriptorTblBuilder;
@@ -589,11 +667,6 @@ class DescriptorTbl {
 
   static Status CreatePartKeyExprs(
       const HdfsTableDescriptor& hdfs_tbl, ObjectPool* pool) WARN_UNUSED_RESULT;
-
-  /// Converts a TDescriptorTableSerialized to a TDescriptorTable. Returns
-  /// an error if deserialization fails.
-  static Status DeserializeThrift(const TDescriptorTableSerialized& serial_tbl,
-      TDescriptorTable* desc_tbl) WARN_UNUSED_RESULT;
 
   /// Creates a TableDescriptor (allocated in 'pool', returned via 'desc')
   /// corresponding to tdesc. Returns error status on failure.

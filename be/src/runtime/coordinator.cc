@@ -152,12 +152,12 @@ Status Coordinator::Exec() {
              << " stmt=" << request.query_ctx.client_request.stmt;
   stmt_type_ = request.stmt_type;
 
-  query_profile_ =
-      RuntimeProfile::Create(obj_pool(), "Execution Profile " + PrintId(query_id()));
+  query_profile_ = RuntimeProfile::Create(
+      obj_pool(), "Execution Profile " + PrintId(query_id()), false);
   finalization_timer_ = PROFILE_FinalizationTimer.Instantiate(query_profile_);
   filter_updates_received_ = PROFILE_FiltersReceived.Instantiate(query_profile_);
 
-  host_profiles_ = RuntimeProfile::Create(obj_pool(), "Per Node Profiles");
+  host_profiles_ = RuntimeProfile::Create(obj_pool(), "Per Node Profiles", false);
   query_profile_->AddChild(host_profiles_);
 
   SCOPED_TIMER(query_profile_->total_time_counter());
@@ -813,7 +813,10 @@ void Coordinator::HandleExecStateTransition(
   }
   ReleaseQueryAdmissionControlResources();
   // Once the query has released its admission control resources, update its end time.
-  parent_request_state_->UpdateEndTime();
+  // However, for non Query statement like DML statement, we still need to update HMS
+  // after the query finishes. So the end time of non Query statement is not set here.
+  // Instead, we set it in ClientRequestState::Wait().
+  if (stmt_type_ == TStmtType::QUERY) parent_request_state_->UpdateEndTime();
   // Can compute summary only after we stop accepting reports from the backends. Both
   // WaitForBackends() and CancelBackends() ensures that.
   // TODO: should move this off of the query execution path?
@@ -947,7 +950,7 @@ Status Coordinator::Wait() {
     RETURN_IF_ERROR(UpdateExecState(FinalizeResultSink(), nullptr, FLAGS_hostname));
   }
 
-  // DML requests are finished at this point.
+  // DML queries are finished at this point.
   RETURN_IF_ERROR(SetNonErrorTerminalState(ExecState::RETURNED_RESULTS));
   query_profile_->AddInfoString(
       "DML Stats", dml_exec_state_.OutputPartitionStats("\n"));

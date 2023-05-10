@@ -623,7 +623,9 @@ TEST_F(RleTest, RepeatCountOverflow) {
     // are 1.
     const uint32_t REPEATED_RUN_HEADER = 0xfffffffe;
     const uint32_t LITERAL_RUN_HEADER = 0xffffffff;
-    writer.PutUleb128<uint32_t>(literal_run ? LITERAL_RUN_HEADER : REPEATED_RUN_HEADER);
+    bool success = writer.PutUleb128<uint32_t>(literal_run ?
+        LITERAL_RUN_HEADER : REPEATED_RUN_HEADER);
+    ASSERT_TRUE(success);
     writer.Flush();
 
     RleBatchDecoder<uint64_t> decoder(buffer, BUFFER_LEN, 1);

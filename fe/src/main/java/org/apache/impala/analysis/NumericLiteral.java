@@ -19,6 +19,7 @@ package org.apache.impala.analysis;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.math.RoundingMode;
 
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
@@ -429,7 +430,7 @@ public class NumericLiteral extends LiteralExpr {
 
     // If cast to an integer type, round the fractional part.
     if (targetType.isIntegerType() && value.scale() != 0) {
-      return value.setScale(0, BigDecimal.ROUND_HALF_UP);
+      return value.setScale(0, RoundingMode.HALF_UP);
     }
 
     // If non-decimal (integer or float), use the existing value.
@@ -447,7 +448,7 @@ public class NumericLiteral extends LiteralExpr {
 
     // Truncate (round) extra digits if necessary.
     if (value.scale() > decimalType.decimalScale()) {
-      return value.setScale(decimalType.decimalScale(), BigDecimal.ROUND_HALF_UP);
+      return value.setScale(decimalType.decimalScale(), RoundingMode.HALF_UP);
     }
 
     // Existing value fits, use it.

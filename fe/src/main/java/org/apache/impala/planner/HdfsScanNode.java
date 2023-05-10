@@ -89,7 +89,6 @@ import org.apache.impala.thrift.TScanRangeLocationList;
 import org.apache.impala.thrift.TScanRangeSpec;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTableStats;
-import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.BitUtil;
 import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.apache.impala.util.MathUtil;
@@ -335,8 +334,6 @@ public class HdfsScanNode extends ScanNode {
   // Used only to display EXPLAIN information.
   private final List<Expr> partitionConjuncts_;
 
-  private boolean isFullAcidTable_ = false;
-
   /**
    * Construct a node to scan given data files into tuples described by 'desc',
    * with 'conjuncts' being the unevaluated conjuncts bound by the tuple and
@@ -357,8 +354,6 @@ public class HdfsScanNode extends ScanNode {
     tableNumRowsHint_ = hdfsTblRef.getTableNumRowsHint();
     FeFsTable hdfsTable = (FeFsTable)hdfsTblRef.getTable();
     Preconditions.checkState(tbl_ == hdfsTable);
-    isFullAcidTable_ =
-        AcidUtils.isFullAcidTable(hdfsTable.getMetaStoreTable().getParameters());
     StringBuilder error = new StringBuilder();
     aggInfo_ = aggInfo;
     skipHeaderLineCount_ = tbl_.parseSkipHeaderLineCount(error);
@@ -403,14 +398,13 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * Returns true if the count(*) optimization can be applied to the query block
+   * Returns true if the Parquet count(*) optimization can be applied to the query block
    * of this scan node.
    */
   protected boolean canApplyCountStarOptimization(Analyzer analyzer,
       Set<HdfsFileFormat> fileFormats) {
     if (fileFormats.size() != 1) return false;
-    if (isFullAcidTable_) return false;
-    if (!hasParquet(fileFormats) && !hasOrc(fileFormats)) return false;
+    if (!hasParquet(fileFormats)) return false;
     return canApplyCountStarOptimization(analyzer);
   }
 
@@ -1203,7 +1197,9 @@ public class HdfsScanNode extends ScanNode {
       long partitionNumRows = partition.getNumRows();
 
       analyzer.getDescTbl().addReferencedPartition(tbl_, partition.getId());
-      fileFormats_.add(partition.getFileFormat());
+      if (partition.getFileFormat() != HdfsFileFormat.ICEBERG) {
+        fileFormats_.add(partition.getFileFormat());
+      }
       if (!partition.getFileFormat().isParquetBased()) {
         allParquet = false;
       }
@@ -1387,7 +1383,7 @@ public class HdfsScanNode extends ScanNode {
         || partition.getFileFormat() == HdfsFileFormat.ORC)) {
       // IMPALA-8834 introduced the optimization for partition key scan by generating
       // one scan range for each HDFS file. With Parquet and ORC, we start with the last
-      // block is to get a scan range that contains a file footer for short-circuiting.
+      // block to get a scan range that contains a file footer for short-circuiting.
       i = fileDesc.getNumFileBlocks() - 1;
     }
     for (; i < fileDesc.getNumFileBlocks(); ++i) {
@@ -1560,13 +1556,6 @@ public class HdfsScanNode extends ScanNode {
       inputCardinality_ = inputCardinality_ < 0 ?
           numRangesAdjusted :
           Math.min(inputCardinality_, numRangesAdjusted);
-    }
-
-    if (countStarSlot_ != null) {
-      // We are doing optimized count star. Override cardinality with total num files.
-      long totalFiles = sumValues(totalFilesPerFs_);
-      inputCardinality_ = totalFiles;
-      cardinality_ = totalFiles;
     }
     if (LOG.isTraceEnabled()) {
       LOG.trace("HdfsScan: cardinality_=" + Long.toString(cardinality_));
@@ -1817,8 +1806,7 @@ public class HdfsScanNode extends ScanNode {
     numNodes_ = (cardinality == 0 || totalNodes == 0) ? 1 : totalNodes;
     numInstances_ = (cardinality == 0 || totalInstances == 0) ? 1 : totalInstances;
     if (LOG.isTraceEnabled()) {
-      LOG.trace("computeNumNodes totalRanges="
-          + (scanRangeSpecs_.getConcrete_rangesSize() + generatedScanRangeCount_)
+      LOG.trace("computeNumNodes totalRanges=" + getEffectiveNumScanRanges()
           + " localRanges=" + numLocalRanges + " remoteRanges=" + numRemoteRanges
           + " localRangeCounts.size=" + localRangeCounts.size()
           + " totalLocalParallelism=" + totalLocalParallelism
@@ -1866,7 +1854,8 @@ public class HdfsScanNode extends ScanNode {
     msg.hdfs_scan_node.setUse_mt_scan_node(useMtScanNode_);
     Preconditions.checkState((optimizedAggSmap_ == null) == (countStarSlot_ == null));
     if (countStarSlot_ != null) {
-      msg.hdfs_scan_node.setCount_star_slot_offset(countStarSlot_.getByteOffset());
+      msg.hdfs_scan_node.setParquet_count_star_slot_offset(
+          countStarSlot_.getByteOffset());
     }
     if (!statsConjuncts_.isEmpty()) {
       for (Expr e: statsConjuncts_) {
@@ -1974,6 +1963,9 @@ public class HdfsScanNode extends ScanNode {
       if (isPartitionKeyScan_) {
         output.append(detailPrefix + "partition key scan\n");
       }
+
+      String derivedExplain = getDerivedExplainString(detailPrefix, detailLevel);
+      if (!derivedExplain.isEmpty()) output.append(derivedExplain);
     }
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
       output.append(getStatsExplainString(detailPrefix)).append("\n");
@@ -1991,11 +1983,11 @@ public class HdfsScanNode extends ScanNode {
             .append("\n");
       if (numScanRangesNoDiskIds_ > 0) {
         output.append(detailPrefix)
-          .append(String.format("missing disk ids: "
-                + "partitions=%s/%s files=%s/%s scan ranges %s/%s\n",
-            numPartitionsNoDiskIds_, sumValues(numPartitionsPerFs_),
-            numFilesNoDiskIds_, sumValues(totalFilesPerFs_), numScanRangesNoDiskIds_,
-            scanRangeSpecs_.getConcrete_rangesSize() + generatedScanRangeCount_));
+            .append(String.format("missing disk ids: "
+                    + "partitions=%s/%s files=%s/%s scan ranges %s/%s\n",
+                numPartitionsNoDiskIds_, sumValues(numPartitionsPerFs_),
+                numFilesNoDiskIds_, sumValues(totalFilesPerFs_), numScanRangesNoDiskIds_,
+                getEffectiveNumScanRanges()));
       }
       // Groups the min max original conjuncts by tuple descriptor.
       output.append(getMinMaxOriginalConjunctsExplainString(detailPrefix, detailLevel));
@@ -2015,6 +2007,14 @@ public class HdfsScanNode extends ScanNode {
           .append("\n");
     }
     return output.toString();
+  }
+
+  // Overriding this function can be used to add extra information to the explain string
+  // of the HDFS Scan node from the derived classes (e.g. IcebergScanNode). Each new line
+  // in the output should be appended to 'explainLevel' to have the correct indentation.
+  protected String getDerivedExplainString(
+      String indentPrefix, TExplainLevel detailLevel) {
+    return "";
   }
 
   // Helper method that prints min max original conjuncts by tuple descriptor.
@@ -2110,7 +2110,9 @@ public class HdfsScanNode extends ScanNode {
 
   @Override
   public void computeProcessingCost(TQueryOptions queryOptions) {
-    processingCost_ = computeScanProcessingCost(queryOptions);
+    Preconditions.checkNotNull(scanRangeSpecs_);
+    processingCost_ =
+        computeScanProcessingCost(queryOptions, getEffectiveNumScanRanges());
   }
 
   @Override
@@ -2118,8 +2120,7 @@ public class HdfsScanNode extends ScanNode {
     // Update 'useMtScanNode_' before any return cases. It's used in BE.
     useMtScanNode_ = queryOptions.mt_dop > 0;
     Preconditions.checkNotNull(scanRangeSpecs_, "Cost estimation requires scan ranges.");
-    long scanRangeSize =
-        scanRangeSpecs_.getConcrete_rangesSize() + generatedScanRangeCount_;
+    long scanRangeSize = getEffectiveNumScanRanges();
     if (scanRangeSize == 0) {
       nodeResourceProfile_ = ResourceProfile.noReservation(0);
       return;
@@ -2483,6 +2484,17 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkNotNull(scanRangeSpecs_);
     return scanRangeSpecs_.getConcrete_rangesSize()
         + scanRangeSpecs_.getSplit_specsSize();
+  }
+
+  /**
+   * Return the number of scan ranges when considering MAX_SCAN_RANGE_LENGTH option.
+   * computeScanRangeLocations() must be called before calling this.
+   */
+  public long getEffectiveNumScanRanges() {
+    Preconditions.checkNotNull(scanRangeSpecs_);
+    Preconditions.checkState(
+        generatedScanRangeCount_ >= scanRangeSpecs_.getSplit_specsSize());
+    return scanRangeSpecs_.getConcrete_rangesSize() + generatedScanRangeCount_;
   }
 
   /**

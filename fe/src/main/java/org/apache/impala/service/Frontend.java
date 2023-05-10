@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.math.IntMath;
+import com.google.common.math.LongMath;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -123,6 +124,7 @@ import org.apache.impala.catalog.ImpaladTableUsageTracker;
 import org.apache.impala.catalog.MaterializedViewHdfsTable;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
@@ -249,8 +251,10 @@ public class Frontend {
   private static final String VERDICT = "Verdict";
   private static final String MEMORY_MAX = "MemoryMax";
   private static final String MEMORY_ASK = "MemoryAsk";
+  private static final String MEMORY_ASK_UNBOUNDED = "MemoryAskUnbounded";
   private static final String CPU_MAX = "CpuMax";
   private static final String CPU_ASK = "CpuAsk";
+  private static final String CPU_ASK_UNBOUNDED = "CpuAskUnbounded";
 
   /**
    * Plan-time context that allows capturing various artifacts created
@@ -287,9 +291,8 @@ public class Frontend {
       protected long estimated_memory_per_host_ = -1;
 
       // The processing cores required to execute the query.
-      // Certain queries such as EXPLAIN that do not populate
-      // TExecRequest.query_exec_request. Therefore, cores requirement will be set here
-      // through setCoresRequired().
+      // Certain queries such as EXPLAIN do not populate TExecRequest.query_exec_request.
+      // Therefore, cores requirement will be set here through setCoresRequired().
       protected int cores_required_ = -1;
 
       // The initial length of content in explain buffer to help return the buffer
@@ -313,6 +316,14 @@ public class Frontend {
       // The group set being applied in current compilation.
       protected TExecutorGroupSet group_set_ = null;
 
+      // If false, set leaf fragment parallelism to maxScanParallelism_ per executor node.
+      // Otherwise, leaf fragment parallelism is set to MT_DOP per executor node.
+      protected boolean limitScanParallelism_ = true;
+
+      // Maximum leaf fragment parallelism per executor node.
+      // Only used if limitScanParallelism_ is false.
+      protected int maxLeafParallelism_ = 1;
+
       public boolean disableAuthorization() { return disableAuthorization_; }
 
       public long getEstimatedMemoryPerHost() { return estimated_memory_per_host_; }
@@ -320,6 +331,14 @@ public class Frontend {
 
       public int getCoresRequired() { return cores_required_; }
       public void setCoresRequired(int x) { cores_required_ = x; }
+
+      public boolean isLimitScanParallelism() { return limitScanParallelism_; }
+      public void setLimitScanParallelism(boolean isLimitScanParallelism) {
+        limitScanParallelism_ = isLimitScanParallelism;
+      }
+
+      public int getMaxLeafParallelism() { return maxLeafParallelism_; }
+      public void setMaxLeafParallelism(int x) { maxLeafParallelism_ = x; }
 
       // Capture the current state and initialize before iterative compilations begin.
       public void captureState() {
@@ -1079,7 +1098,7 @@ public class Frontend {
 
     @Override
     public Boolean call() throws Exception {
-      return new Boolean(isAccessibleToUser(dbName_, tblName_, owner_, user_));
+      return Boolean.valueOf(isAccessibleToUser(dbName_, tblName_, owner_, user_));
     }
   }
 
@@ -1766,8 +1785,12 @@ public class Frontend {
 
     // Compute resource requirements of the final plans.
     TQueryExecRequest result = new TQueryExecRequest();
-    Planner.computeProcessingCost(planRoots, result, planner.getPlannerCtx(),
-        planCtx.compilationState_.getGroupSet().getNum_cores_per_executor());
+    boolean isLimitScanParallelism = planCtx.compilationState_.isLimitScanParallelism();
+    int maxCores = isLimitScanParallelism ?
+        planCtx.compilationState_.getGroupSet().getNum_cores_per_executor() :
+        planCtx.compilationState_.getMaxLeafParallelism();
+    Planner.computeProcessingCost(
+        planRoots, result, planner.getPlannerCtx(), maxCores, isLimitScanParallelism);
     Planner.computeResourceReqs(planRoots, queryCtx, result,
         planner.getPlannerCtx(), planner.getAnalysisResult().isQueryStmt());
 
@@ -1959,12 +1982,15 @@ public class Frontend {
     return type == TStmtType.EXPLAIN || type == TStmtType.QUERY || type == TStmtType.DML;
   }
 
-  private static int expectedTotalCores(TExecutorGroupSet execGroupSet) {
-    int numExecutors = execGroupSet.getCurr_num_executors() > 0 ?
+  private static int expectedNumExecutor(TExecutorGroupSet execGroupSet) {
+    return execGroupSet.getCurr_num_executors() > 0 ?
         execGroupSet.getCurr_num_executors() :
         execGroupSet.getExpected_num_executors();
+  }
+
+  private static int expectedTotalCores(TExecutorGroupSet execGroupSet) {
     return IntMath.saturatedMultiply(
-        numExecutors, execGroupSet.getNum_cores_per_executor());
+        expectedNumExecutor(execGroupSet), execGroupSet.getNum_cores_per_executor());
   }
 
   private TExecRequest getTExecRequest(PlanCtx planCtx, EventSequence timeline)
@@ -2015,12 +2041,26 @@ public class Frontend {
     TExecutorGroupSet group_set = null;
     String reason = "Unknown";
     int attempt = 0;
-    for (int i = 0; i < num_executor_group_sets; i++) {
+    planCtx.compilationState_.setLimitScanParallelism(
+        num_executor_group_sets <= 1 || !ProcessingCost.isComputeCost(queryOptions));
+    int lastExecutorGroupTotalCores =
+        expectedTotalCores(executorGroupSetsToUse.get(num_executor_group_sets - 1));
+    long memoryAskUnbounded = -1;
+    int cpuAskUnbounded = -1;
+    int i = 0;
+    while (i < num_executor_group_sets) {
       group_set = executorGroupSetsToUse.get(i);
       planCtx.compilationState_.setGroupSet(group_set);
+      if (i == num_executor_group_sets - 1) {
+        // This is the last executor group. Fix leaf nodes parallelism back to MT_DOP.
+        planCtx.compilationState_.setLimitScanParallelism(true);
+        planCtx.compilationState_.setMaxLeafParallelism(
+            group_set.getNum_cores_per_executor());
+      } else if (!planCtx.compilationState_.isLimitScanParallelism()) {
+        planCtx.compilationState_.setMaxLeafParallelism(
+            lastExecutorGroupTotalCores / expectedNumExecutor(group_set));
+      }
       LOG.info("Consider executor group set: " + group_set);
-      FrontendProfile.getCurrent().addToCounter(
-          EXECUTOR_GROUPS_CONSIDERED, TUnit.UNIT, 1);
 
       String retryMsg = "";
       while (true) {
@@ -2045,19 +2085,6 @@ public class Frontend {
         }
       }
 
-      // If it is for a single node plan, enable_replan is disabled, or it is not a query
-      // that can be auto scaled, return the 1st plan generated.
-      if (queryOptions.num_nodes == 1) {
-        reason = "the number of nodes is 1";
-        break;
-      } else if (!enable_replan) {
-        reason = "query option 'enable_replan' is false";
-        break;
-      } else if (!Frontend.canStmtBeAutoScaled(req.stmt_type)) {
-        reason = "query is not auto-scalable";
-        break;
-      }
-
       // Counters about this group set.
       int available_cores = expectedTotalCores(group_set);
       String profileName = "Executor group " + (i + 1);
@@ -2067,9 +2094,34 @@ public class Frontend {
       }
       TRuntimeProfileNode groupSetProfile = createTRuntimeProfileNode(profileName);
       addCounter(groupSetProfile,
-          new TCounter(MEMORY_MAX, TUnit.BYTES, group_set.getMax_mem_limit()));
-      addCounter(groupSetProfile, new TCounter(CPU_MAX, TUnit.UNIT, available_cores));
-      FrontendProfile.getCurrent().addChildrenProfile(groupSetProfile);
+          new TCounter(MEMORY_MAX, TUnit.BYTES,
+              LongMath.saturatedMultiply(
+                  expectedNumExecutor(group_set), group_set.getMax_mem_limit())));
+      if (ProcessingCost.isComputeCost(queryOptions)) {
+        addCounter(groupSetProfile, new TCounter(CPU_MAX, TUnit.UNIT, available_cores));
+      }
+
+      // If it is for a single node plan, enable_replan is disabled, or it is not a query
+      // that can be auto scaled, return the 1st plan generated.
+      boolean notScalable = false;
+      if (queryOptions.num_nodes == 1) {
+        reason = "the number of nodes is 1";
+        notScalable = true;
+      } else if (!enable_replan) {
+        reason = "query option ENABLE_REPLAN=false";
+        notScalable = true;
+      } else if (!Frontend.canStmtBeAutoScaled(req.stmt_type)) {
+        reason = "query is not auto-scalable";
+        notScalable = true;
+      }
+
+      if (notScalable) {
+        setGroupNamePrefix(default_executor_group, req, group_set);
+        addInfoString(
+            groupSetProfile, VERDICT, "Assign to first group because " + reason);
+        FrontendProfile.getCurrent().addChildrenProfile(groupSetProfile);
+        break;
+      }
 
       // Find out the per host memory estimated from two possible sources.
       long per_host_mem_estimate = -1;
@@ -2086,8 +2138,10 @@ public class Frontend {
 
       Preconditions.checkState(per_host_mem_estimate >= 0);
       boolean memReqSatisfied = per_host_mem_estimate <= group_set.getMax_mem_limit();
-      addCounter(
-          groupSetProfile, new TCounter(MEMORY_ASK, TUnit.BYTES, per_host_mem_estimate));
+      addCounter(groupSetProfile,
+          new TCounter(MEMORY_ASK, TUnit.BYTES,
+              LongMath.saturatedMultiply(
+                  expectedNumExecutor(group_set), per_host_mem_estimate)));
 
       boolean cpuReqSatisfied = true;
       int scaled_cores_requirement = -1;
@@ -2097,10 +2151,24 @@ public class Frontend {
             Math.ceil(
                 cores_requirement / BackendConfig.INSTANCE.getQueryCpuCountDivisor()));
         cpuReqSatisfied = scaled_cores_requirement <= available_cores;
+
         addCounter(
             groupSetProfile, new TCounter(CPU_ASK, TUnit.UNIT, scaled_cores_requirement));
         addCounter(groupSetProfile,
             new TCounter(EFFECTIVE_PARALLELISM, TUnit.UNIT, cores_requirement));
+
+        if (memoryAskUnbounded > 0) {
+          addCounter(groupSetProfile,
+              new TCounter(MEMORY_ASK_UNBOUNDED, TUnit.BYTES,
+                  LongMath.saturatedMultiply(
+                      expectedNumExecutor(group_set), memoryAskUnbounded)));
+          memoryAskUnbounded = -1;
+        }
+        if (cpuAskUnbounded > 0) {
+          addCounter(groupSetProfile,
+              new TCounter(CPU_ASK_UNBOUNDED, TUnit.UNIT, cpuAskUnbounded));
+          cpuAskUnbounded = -1;
+        }
       }
 
       boolean matchFound = false;
@@ -2114,6 +2182,20 @@ public class Frontend {
         addInfoString(groupSetProfile, VERDICT, reason);
         matchFound = true;
       } else if (memReqSatisfied && cpuReqSatisfied) {
+        if (!planCtx.compilationState_.isLimitScanParallelism()) {
+          // Fix leaf nodes parallelism back to MT_DOP and replan.
+          // TODO: Remove this extra replanning and related codes in the future once we
+          //   can fully manage scan node parallelism without MT_DOP.
+          planCtx.compilationState_.setLimitScanParallelism(true);
+          memoryAskUnbounded = per_host_mem_estimate;
+          if (ProcessingCost.isComputeCost(queryOptions)) {
+            cpuAskUnbounded = scaled_cores_requirement;
+          }
+          planCtx.compilationState_.restoreState();
+          LOG.info("Executor group " + group_set + " fit the unbounded scan plan. "
+              + "Replanning again with scan parallelism equals MT_DOP.");
+          continue;
+        }
         reason = "suitable group found (estimated per-host memory="
             + PrintUtils.printBytes(per_host_mem_estimate)
             + ", estimated cpu cores required=" + cores_requirement
@@ -2129,16 +2211,11 @@ public class Frontend {
         matchFound = true;
       }
 
+      // Append this exec group set profile node.
+      FrontendProfile.getCurrent().addChildrenProfile(groupSetProfile);
+
       if (matchFound) {
-        // Set the group name prefix in both the returned query options and
-        // the query context for non default group setup.
-        if (!default_executor_group) {
-          String namePrefix = group_set.getExec_group_name_prefix();
-          req.query_options.setRequest_pool(namePrefix);
-          if (req.query_exec_request != null) {
-            req.query_exec_request.query_ctx.setRequest_pool(namePrefix);
-          }
-        }
+        setGroupNamePrefix(default_executor_group, req, group_set);
         break;
       }
 
@@ -2162,6 +2239,9 @@ public class Frontend {
 
       // Restore to the captured state.
       planCtx.compilationState_.restoreState();
+      FrontendProfile.getCurrent().addToCounter(
+          EXECUTOR_GROUPS_CONSIDERED, TUnit.UNIT, 1);
+      i++;
     }
 
     if (group_set == null) {
@@ -2172,6 +2252,10 @@ public class Frontend {
             "The query does not fit largest executor group sets. Reason: " + reason
             + ".");
       }
+    } else {
+      // This group_set is a match.
+      FrontendProfile.getCurrent().addToCounter(
+          EXECUTOR_GROUPS_CONSIDERED, TUnit.UNIT, 1);
     }
 
     LOG.info("Selected executor group: " + group_set + ", reason: " + reason);
@@ -2180,6 +2264,20 @@ public class Frontend {
     req.setUser_has_profile_access(planCtx.compilationState_.userHasProfileAccess());
 
     return req;
+  }
+
+  private static void setGroupNamePrefix(
+      boolean default_executor_group, TExecRequest req, TExecutorGroupSet group_set) {
+    // Set the group name prefix in both the returned query options and
+    // the query context for non default group setup.
+    if (!default_executor_group) {
+      String namePrefix = group_set.getExec_group_name_prefix();
+      req.query_options.setRequest_pool(namePrefix);
+      req.setRequest_pool_set_by_frontend(true);
+      if (req.query_exec_request != null) {
+        req.query_exec_request.query_ctx.setRequest_pool(namePrefix);
+      }
+    }
   }
 
   private static TRuntimeProfileNode createTRuntimeProfileNode(
@@ -2245,11 +2343,11 @@ public class Frontend {
     Preconditions.checkNotNull(analysisResult.getStmt());
     TExecRequest result = createBaseExecRequest(queryCtx, analysisResult);
 
-    // Transfer the current number of executors in executor group set from planCtx to
+    // Transfer the expected number of executors in executor group set to
     // analyzer's global state. The info is needed to compute the number of nodes to be
     // used during planner phase for scans (see HdfsScanNode.computeNumNodes()).
     analysisResult.getAnalyzer().setNumExecutorsForPlanning(
-        planCtx.compilationState_.getGroupSet().getCurr_num_executors());
+        expectedNumExecutor(planCtx.compilationState_.getGroupSet()));
 
     try {
       TQueryOptions queryOptions = queryCtx.client_request.query_options;
@@ -2371,6 +2469,14 @@ public class Frontend {
         // Return the EXPLAIN request
         createExplainRequest(planCtx.getExplainString(), result);
         return result;
+      }
+
+      // Blocking query execution for queries that contain IcebergMetadataTables
+      for (FeTable table : stmtTableCache.tables.values()) {
+        if (table instanceof IcebergMetadataTable) {
+          throw new NotImplementedException(String.format("'%s' refers to a metadata "
+              + "table which is currently not supported.", table.getFullName()));
+        }
       }
 
       result.setQuery_exec_request(queryExecRequest);
