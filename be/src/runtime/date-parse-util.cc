@@ -128,6 +128,24 @@ bool DateParser::ParseIsoSqlFormat(const char* str, int len,
   return date->IsValid();
 }
 
+// Formats date into dst using the default format
+// Format:  yyyy-MM-dd
+// Offsets: 0123456789
+int DateParser::FormatDefault(const DateValue& date, char* dst) {
+  int year, month, day;
+  if (!date.ToYearMonthDay(&year, &month, &day)) {
+    *dst = '\0';
+    return -1;
+  }
+  else {
+    ZeroPad(dst, year, 4);
+    ZeroPad(dst + 5, month, 2);
+    ZeroPad(dst + 8, day, 2);
+    dst[7] = dst[4] = '-';
+    return SimpleDateFormatTokenizer::DEFAULT_DATE_FMT_LEN;
+  }
+}
+
 string DateParser::Format(const DateTimeFormatContext& dt_ctx, const DateValue& date) {
   DCHECK(dt_ctx.toks.size() > 0);
   DCHECK(dt_ctx.has_date_toks && !dt_ctx.has_time_toks);

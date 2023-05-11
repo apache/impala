@@ -429,11 +429,23 @@ bool DateValue::MonthsBetween(const DateValue& other, double* months_between) co
 }
 
 string DateValue::ToString() const {
-  return Format(*SimpleDateFormatTokenizer::GetDefaultDateFormatContext());
+  string s;
+  s.resize(SimpleDateFormatTokenizer::DEFAULT_DATE_FMT_LEN);
+  const int out_len = DateParser::FormatDefault(*this, s.data());
+  if (UNLIKELY(out_len != SimpleDateFormatTokenizer::DEFAULT_DATE_FMT_LEN)) {
+    s.clear();
+  }
+  return s;
 }
 
 ostream& operator<<(ostream& os, const DateValue& date_value) {
-  return os << date_value.ToString();
+  char dst[SimpleDateFormatTokenizer::DEFAULT_DATE_FMT_LEN + 1];
+  const int out_len = DateParser::FormatDefault(date_value, dst);
+  if (LIKELY(out_len >= 0)) {
+    dst[out_len] = '\0';
+    os << dst;
+  }
+  return os;
 }
 
 }

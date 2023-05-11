@@ -59,6 +59,9 @@ class DateParser {
       const datetime_parse_util::DateTimeFormatContext& dt_ctx, DateValue* date)
       WARN_UNUSED_RESULT;
 
+  /// Optimized formatter for default date format
+  static int FormatDefault(const DateValue& date, char* dst);
+
   /// Format the date values using the given format context.
   /// dt_ctx -- date format context
   /// date -- the date value

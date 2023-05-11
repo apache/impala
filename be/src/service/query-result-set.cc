@@ -60,7 +60,12 @@ class AsciiQueryResultSet : public QueryResultSet {
   /// Rows are added into 'rowset'.
   AsciiQueryResultSet(const TResultSetMetadata& metadata, vector<string>* rowset,
       bool stringify_map_keys)
-    : metadata_(metadata), result_set_(rowset), stringify_map_keys_(stringify_map_keys) {}
+    : metadata_(metadata), result_set_(rowset), stringify_map_keys_(stringify_map_keys) {
+    types_.reserve(metadata.columns.size());
+    for (int i = 0; i < metadata.columns.size(); ++i) {
+      types_.push_back(ColumnType::FromThrift(metadata_.columns[i].columnType));
+    }
+  }
 
   virtual ~AsciiQueryResultSet() {}
 
@@ -87,6 +92,9 @@ class AsciiQueryResultSet : public QueryResultSet {
 
   // If true, converts map keys to strings; see IMPALA-11778.
   const bool stringify_map_keys_;
+
+  // De-serialized column metadata
+  vector<ColumnType> types_;
 };
 
 /// Result set container for Hive protocol versions >= V6, where results are returned in
@@ -210,16 +218,12 @@ Status AsciiQueryResultSet::AddRows(const vector<ScalarExprEvaluator*>& expr_eva
       // ODBC-187 - ODBC can only take "\t" as the delimiter
       out_stream << (i > 0 ? "\t" : "");
 
-      if (metadata_.columns[i].columnType.types.size() == 1) {
-        RawValue::PrintValue(expr_evals[i]->GetValue(it.Get()),
-            ColumnType::FromThrift(metadata_.columns[i].columnType), scales[i],
-            &out_stream);
-      } else if (metadata_.columns[i].columnType.types.size() > 1) {
-        ColumnType col_type = ColumnType::FromThrift(metadata_.columns[i].columnType);
-        PrintComplexValue(expr_evals[i], it.Get(), &out_stream, col_type,
-            stringify_map_keys_);
+      if (!types_[i].IsComplexType()) {
+        RawValue::PrintValue(expr_evals[i]->GetValue(it.Get()), types_[i],
+            scales[i], &out_stream);
       } else {
-        DCHECK(false);
+        PrintComplexValue(expr_evals[i], it.Get(), &out_stream, types_[i],
+            stringify_map_keys_);
       }
     }
     result_set_->push_back(out_stream.str());

@@ -182,6 +182,19 @@ public:
       const DateTimeFormatContext& dt_ctx, DateTimeParseResult* dt_result);
 };
 
+/// Helper function for formatting small numbers with leading zeros
+/// This is used inline with data and timestamp formatting functions
+inline void ZeroPad(char* const dst, uint32 val, const uint32 digits) {
+  char* p = dst + digits;
+  while(val) {
+    *--p = '0' + (val % 10);
+    val /= 10;
+  }
+  while(p != dst) {
+    *--p = '0';
+  }
+}
+
 }
 
 }

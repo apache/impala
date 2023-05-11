@@ -73,6 +73,10 @@ class TimestampParser {
       const datetime_parse_util::DateTimeFormatContext& dt_ctx, boost::gregorian::date* d,
       boost::posix_time::time_duration* t) WARN_UNUSED_RESULT;
 
+  /// Optimized formatter for default short and long formats
+  static int FormatDefault(const boost::gregorian::date& d,
+      const boost::posix_time::time_duration& t, char* dst);
+
   /// Format the date/time values using the given format context.
   /// Caller must make sure that it has enough buffer space in 'dst' to hold the output.
   /// Return total output length that is written into 'dst'. Return -1 If 'd' or 't' is

@@ -24,6 +24,8 @@
 #include "gutil/basictypes.h"
 #include "runtime/date-value.h"
 #include "runtime/datetime-simple-date-format-parser.h"
+#include "runtime/date-parse-util.h"
+#include "runtime/timestamp-parse-util.h"
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
 
@@ -34,21 +36,30 @@ using std::mt19937;
 using std::uniform_int_distribution;
 
 using namespace impala;
+using datetime_parse_util::SimpleDateFormatTokenizer;
 
 // ToYearMonthDay:            Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//              TestCctzToYearMonthDay               23.1     23.4     23.7         1X         1X         1X
-//                  TestToYearMonthDay                 68     69.6     70.7      2.95X      2.98X      2.98X
-//                          TestToYear                443      446      448      19.2X      19.1X      18.9X
-//                        TestToString               9.02     9.04     9.06     0.391X     0.386X     0.382X
-//           TestToString_stringstream               2.04     2.04     2.08    0.0883X    0.0871X    0.0875X
+//             TestCctzToYearMonthDay               16.5     16.6     16.7         1X         1X         1X
+//                 TestToYearMonthDay               61.1     62.1     62.3      3.69X      3.75X      3.73X
+//                         TestToYear                280      308      308      16.9X      18.6X      18.5X
+//                       TestToString                 18     19.5     19.7      1.09X      1.18X      1.18X
+//          TestToString_stringstream               1.86     2.08     2.12     0.113X     0.125X     0.127X
+//           TestDefaultDateToCharBuf               25.5       27     27.2      1.54X      1.63X      1.63X
+//              TestTimestampToString               11.7     12.6     12.6     0.707X      0.76X     0.757X
+//      TestDefaultTimestampToCharBuf               15.7     17.2     17.2     0.949X      1.04X      1.03X
+
+
+
+
 
 const cctz::civil_day EPOCH_DATE(1970, 1, 1);
 
 class TestData {
 public:
-  void AddRandomRange(const DateValue& dv_min, const DateValue& dv_max, int data_size) {
+  void AddRandomRange(const DateValue& dv_min, const DateValue& dv_max,
+      int data_size) {
     DCHECK(dv_min.IsValid());
     DCHECK(dv_max.IsValid());
 
@@ -60,18 +71,29 @@ public:
     mt19937 gen(rd());
     // Random values in a [min_dse..max_dse] days range.
     uniform_int_distribution<int32_t> dis_dse(min_dse, max_dse);
+    uniform_int_distribution<int64_t> dis_utc(-9223372036, 9223372036);
 
     // Add random DateValue values in the [dv_min, dv_max] range.
     for (int i = 0; i <= data_size; ++i) {
       DateValue dv(dis_dse(gen));
       DCHECK(dv.IsValid());
       date_.push_back(dv);
+      timestamp_.push_back(TimestampValue::FromUnixTime(dis_utc(gen), UTCPTR));
     }
     cctz_to_ymd_result_.resize(date_.size());
     to_ymd_result_.resize(date_.size());
     to_year_result_.resize(date_.size());
     to_string_result_.resize(date_.size());
     to_string_old_result_.resize(date_.size());
+    date_to_char_buf_result_.resize(timestamp_.size());
+    timestamp_to_char_buf_result_.resize(timestamp_.size());
+    timestamp_to_string_result_.resize(timestamp_.size());
+    for(int i = 0; i < timestamp_.size(); ++i) {
+      timestamp_to_char_buf_result_[i].reserve(
+          SimpleDateFormatTokenizer::DEFAULT_DATE_TIME_FMT_LEN);
+      timestamp_to_string_result_[i].reserve(
+          SimpleDateFormatTokenizer::DEFAULT_DATE_TIME_FMT_LEN);
+    }
   }
 
   void CctzToYearMonthDay(const DateValue& dv, int* year, int* month, int* day) const {
@@ -129,6 +151,42 @@ public:
     }
   }
 
+  void TestDefaultDateToCharBuf(int batch_size) {
+    for (int i = 0; i < batch_size; ++i) {
+      int n = date_.size();
+      for (int j = 0; j < n; ++j) {
+        date_to_char_buf_result_[j].resize(
+            SimpleDateFormatTokenizer::DEFAULT_DATE_FMT_LEN);
+        DateParser::FormatDefault(date_[j], &(date_to_char_buf_result_[j][0]));
+      }
+    }
+  }
+
+  void TestTimestampToString(int batch_size) {
+    for (int i = 0; i < batch_size; ++i) {
+      int n = timestamp_.size();
+      for (int j = 0; j < n; ++j) {
+        timestamp_to_string_result_[j] = timestamp_[j].ToString();
+      }
+    }
+  }
+
+  void TestDefaultTimestampToCharBuf(int batch_size) {
+    for (int i = 0; i < batch_size; ++i) {
+      int n = timestamp_.size();
+      for (int j = 0; j < n; ++j) {
+        const uint32 len = timestamp_[j].time().fractional_seconds() ?
+            SimpleDateFormatTokenizer::DEFAULT_DATE_TIME_FMT_LEN :
+            SimpleDateFormatTokenizer::DEFAULT_SHORT_DATE_TIME_FMT_LEN;
+
+        char buf[len + 1];
+        TimestampParser::FormatDefault(timestamp_[j].date(), timestamp_[j].time(), buf);
+        buf[len] = '\0';
+        timestamp_to_char_buf_result_[j] = buf;
+      }
+    }
+  }
+
   void TestToString_stringstream(int batch_size) {
     for (int i = 0; i < batch_size; ++i) {
       int n = date_.size();
@@ -167,6 +225,18 @@ public:
              << to_string_result_[i] << " != " << to_string_old_result_[i] << endl;
         ok = false;
       }
+      if (date_to_char_buf_result_[i] != to_string_result_[i]) {
+        cerr << "Incorrect results (TestDefaultDateToCharBuf() vs ToString()): "
+             << date_to_char_buf_result_[i] << " != " << to_string_result_[i] << endl;
+        ok = false;
+      }
+      if (timestamp_to_char_buf_result_[i] != timestamp_to_string_result_[i]) {
+        cerr << "Incorrect results (TestDefaultTimestampToCharBuf()"
+             << " vs TestTimestampToString()): "
+             << timestamp_to_char_buf_result_[i] << " != "
+             << timestamp_to_string_result_[i] << endl;
+        ok = false;
+      }
     }
     return ok;
   }
@@ -190,11 +260,15 @@ private:
   };
 
   vector<DateValue> date_;
+  vector<TimestampValue> timestamp_;
   vector<YearMonthDayResult> cctz_to_ymd_result_;
   vector<YearMonthDayResult> to_ymd_result_;
   vector<int> to_year_result_;
   vector<string> to_string_result_;
   vector<string> to_string_old_result_;
+  vector<string> date_to_char_buf_result_;
+  vector<string> timestamp_to_char_buf_result_;
+  vector<string> timestamp_to_string_result_;
 };
 
 void TestCctzToYearMonthDay(int batch_size, void* d) {
@@ -215,6 +289,21 @@ void TestToYear(int batch_size, void* d) {
 void TestToString(int batch_size, void* d) {
   TestData* data = reinterpret_cast<TestData*>(d);
   data->TestToString(batch_size);
+}
+
+void TestDefaultDateToCharBuf(int batch_size, void* d) {
+  TestData* data = reinterpret_cast<TestData*>(d);
+  data->TestDefaultDateToCharBuf(batch_size);
+}
+
+void TestTimestampToString(int batch_size, void* d) {
+  TestData* data = reinterpret_cast<TestData*>(d);
+  data->TestTimestampToString(batch_size);
+}
+
+void TestDefaultTimestampToCharBuf(int batch_size, void* d) {
+  TestData* data = reinterpret_cast<TestData*>(d);
+  data->TestDefaultTimestampToCharBuf(batch_size);
 }
 
 void TestToString_stringstream(int batch_size, void* d) {
@@ -239,6 +328,10 @@ int main(int argc, char* argv[]) {
   suite.AddBenchmark("TestToYear", TestToYear, &data);
   suite.AddBenchmark("TestToString", TestToString, &data);
   suite.AddBenchmark("TestToString_stringstream", TestToString_stringstream, &data);
+  suite.AddBenchmark("TestDefaultDateToCharBuf", TestDefaultDateToCharBuf, &data);
+  suite.AddBenchmark("TestTimestampToString", TestTimestampToString, &data);
+  suite.AddBenchmark("TestDefaultTimestampToCharBuf", TestDefaultTimestampToCharBuf,
+      &data);
   cout << suite.Measure();
 
   return data.CheckResults() ? 0 : 1;
