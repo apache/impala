@@ -342,9 +342,19 @@ Status ScanRange::ReadSubRanges(
         buffer_desc->buffer_len() - buffer_desc->len());
 
     if (cache_.data != nullptr) {
-      DCHECK_LE(offset + bytes_to_read, cache_.len);
+      // The cache_.data buffer starts at offset_, so adjust the starting
+      // offset for the copies.
+      int64_t buffer_offset = offset - offset_;
+      DCHECK_LE(buffer_offset + bytes_to_read, cache_.len);
+      // DCHECKs are only effective with test coverage, so also return an error
+      // if this would read past the edge of the cache_.data buffer. We wanted
+      // bytes_to_read, but only cache_.len - buffer_offset bytes were available.
+      if (buffer_offset + bytes_to_read > cache_.len) {
+        return Status(TErrorCode::SCANNER_INCOMPLETE_READ, bytes_to_read,
+            cache_.len - buffer_offset, file(), offset);
+      }
       memcpy(buffer_desc->buffer_ + buffer_desc->len(),
-          cache_.data + offset, bytes_to_read);
+          cache_.data + buffer_offset, bytes_to_read);
     } else {
       int64_t current_bytes_read;
       Status read_status = file_reader->ReadFromPos(queue, offset,

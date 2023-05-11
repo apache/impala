@@ -247,8 +247,10 @@ class DiskIoMgrTest : public testing::Test {
 
   static void ValidateScanRange(DiskIoMgr* io_mgr, ScanRange* range,
       const char* expected, int expected_len, const Status& expected_status) {
-    char result[expected_len + 1];
-    memset(result, 0, expected_len + 1);
+    // TODO: Disentagle the offsets/expected results properly so this doesn't need to
+    // overallocate.
+    char result[range->offset() + expected_len + 1];
+    memset(result, 0, range->offset() + expected_len + 1);
     int64_t scan_range_offset = 0;
 
     while (true) {
@@ -323,7 +325,8 @@ class DiskIoMgrTest : public testing::Test {
       vector<ScanRange::SubRange> sub_ranges = {});
 
   void CachedReadsTestBody(const char* data, const char* expected,
-      HdfsCachingScenario scenario, vector<ScanRange::SubRange> sub_ranges = {});
+      HdfsCachingScenario scenario, int offset,
+      vector<ScanRange::SubRange> sub_ranges = {});
 
   /// Convenience function to get a reference to the buffer pool.
   BufferPool* buffer_pool() const { return ExecEnv::GetInstance()->buffer_pool(); }
@@ -1050,11 +1053,15 @@ TEST_F(DiskIoMgrTest, MemScarcity) {
 }
 
 void DiskIoMgrTest::CachedReadsTestBody(const char* data, const char* expected,
-    HdfsCachingScenario scenario, vector<ScanRange::SubRange> sub_ranges) {
+    HdfsCachingScenario scenario, int offset, vector<ScanRange::SubRange> sub_ranges) {
+  // The data passed in is the full data with any extra initial offset. This
+  // is necessary to make the file on disk able to service the data at the
+  // appropriate offset.
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
-  uint8_t* cached_data = reinterpret_cast<uint8_t*>(const_cast<char*>(data));
-  int len = strlen(data);
   CreateTempFile(tmp_file, data);
+  // The actual scan range data is the original test data at the appropriate offset.
+  uint8_t* cached_data = reinterpret_cast<uint8_t*>(const_cast<char*>(data)) + offset;
+  int len = strlen(data) - offset;
 
   // Get mtime for file
   struct stat stat_val;
@@ -1071,7 +1078,7 @@ void DiskIoMgrTest::CachedReadsTestBody(const char* data, const char* expected,
     unique_ptr<RequestContext> reader = io_mgr.RegisterContext();
 
     ScanRange* complete_range =
-        InitRange(&pool_, tmp_file, 0, strlen(data), 0, stat_val.st_mtime, nullptr, true,
+        InitRange(&pool_, tmp_file, offset, len, 0, stat_val.st_mtime, nullptr, true,
             sub_ranges);
     SetReaderStub(complete_range, make_unique<CacheReaderTestStub>(complete_range,
         cached_data, len, scenario));
@@ -1083,8 +1090,8 @@ void DiskIoMgrTest::CachedReadsTestBody(const char* data, const char* expected,
     vector<ScanRange*> ranges;
     for (int i = 0; i < len; ++i) {
       int disk_id = i % num_disks;
-      ScanRange* range = InitRange(&pool_, tmp_file, 0, len, disk_id, stat_val.st_mtime,
-          nullptr, true, sub_ranges);
+      ScanRange* range = InitRange(&pool_, tmp_file, offset, len, disk_id,
+          stat_val.st_mtime, nullptr, true, sub_ranges);
       ranges.push_back(range);
       SetReaderStub(range, make_unique<CacheReaderTestStub>(range, cached_data,
           len, scenario));
@@ -1120,28 +1127,47 @@ void DiskIoMgrTest::CachedReadsTestBody(const char* data, const char* expected,
 // Test when some scan ranges are marked as being cached.
 TEST_F(DiskIoMgrTest, CachedReads) {
   InitRootReservation(LARGE_RESERVATION_LIMIT);
-  const char* data = "abcdefghijklm";
-  // Test the fallback mechanism for the cache
-  CachedReadsTestBody(data, data, FALLBACK_NULL_BUFFER);
-  CachedReadsTestBody(data, data, FALLBACK_INCOMPLETE_BUFFER);
-  // Test the success path for the cache
-  CachedReadsTestBody(data, data, VALID_BUFFER);
+  std::string data_str = "abcdefghijklm";
+  const char* data = data_str.data();
+
+  // Test at different offsets to validate offset handling
+  for (int offset: {0, 1000}) {
+    // The full data is 'offset' copies of 0 followed by the test string above.
+    std::string full_data_str(offset, '0');
+    full_data_str += data_str;
+    const char* full_data = full_data_str.data();
+    // Test the fallback mechanism for the cache
+    CachedReadsTestBody(full_data, data, FALLBACK_NULL_BUFFER, offset);
+    CachedReadsTestBody(full_data, data, FALLBACK_INCOMPLETE_BUFFER, offset);
+    // Test the success path for the cache
+    CachedReadsTestBody(full_data, data, VALID_BUFFER, offset);
+  }
 }
 
 // Test when some scan ranges are marked as being cached and there
 // are sub-ranges as well.
 TEST_F(DiskIoMgrTest, CachedReadsSubRanges) {
   InitRootReservation(LARGE_RESERVATION_LIMIT);
-  const char* data = "abcdefghijklm";
-  int64_t data_len = strlen(data);
+  std::string data_str = "abcdefghijklm";
+  const char* data = data_str.data();
+  int64_t data_len = data_str.length();
 
   // first iteration tests the fallback mechanism with sub-ranges
   // second iteration fakes a cache
   for (HdfsCachingScenario scenario :
        {VALID_BUFFER, FALLBACK_NULL_BUFFER, FALLBACK_INCOMPLETE_BUFFER}) {
-    CachedReadsTestBody(data, data, scenario, {{0, data_len}});
-    CachedReadsTestBody(data, "bc", scenario, {{1, 2}});
-    CachedReadsTestBody(data, "abchilm", scenario, {{0, 3}, {7, 2}, {11, 2}});
+    // Test at different offsets to validate offset handling
+    for (int offset : {0, 1000}) {
+      // The full data is 'offset' copies of 0 followed by the test string above.
+      std::string full_data_str(offset, '0');
+      full_data_str += data_str;
+      const char* full_data = full_data_str.data();
+      CachedReadsTestBody(full_data, data, scenario, offset,
+          {{0 + offset, data_len}});
+      CachedReadsTestBody(full_data, "bc", scenario, offset, {{1 + offset, 2}});
+      CachedReadsTestBody(full_data, "abchilm", scenario, offset,
+          {{0 + offset, 3}, {7 + offset, 2}, {11 + offset, 2}});
+    }
   }
 }
 
