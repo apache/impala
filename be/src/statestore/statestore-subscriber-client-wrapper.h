@@ -56,6 +56,14 @@ class StatestoreSubscriberClientWrapper : public StatestoreSubscriberClient {
      recv_UpdateState(_return);
    }
 
+   void UpdateCatalogd(TUpdateCatalogdResponse& _return,
+       const TUpdateCatalogdRequest& params, bool* send_done) {
+     DCHECK(!*send_done);
+     send_UpdateCatalogd(params);
+     *send_done = true;
+     recv_UpdateCatalogd(_return);
+   }
+
 #pragma clang diagnostic pop
 };
 

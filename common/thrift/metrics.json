@@ -1730,6 +1730,41 @@
     "key": "statestore-subscriber.registration-id"
   },
   {
+    "description": "The most recent statestore ID for this subscriber with the statestore. Set to 'N/A' if no registration has been completed",
+    "contexts": [
+      "ADMISSIOND",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Statestore Id",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "statestore-subscriber.statestore-id"
+  },
+  {
+    "description": "The number of RPCs received for updating catalogd.",
+    "contexts": [
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Number of UpdateCatalogd RPCs",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "statestore-subscriber.num-update-catalogd"
+  },
+  {
+    "description": "The number of Re-Registration Attempt.",
+    "contexts": [
+      "ADMISSIOND",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Number of Re-Registration Attempt",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "statestore-subscriber.num-re-register-attempt"
+  },
+  {
     "description": "The number of active StateStore subscriber clients in this Impala Daemon's client cache. These clients are for communication from this role to the StateStore.",
     "contexts": [
       "CATALOGSERVER",
@@ -1804,6 +1839,16 @@
     "units": "TIME_S",
     "kind": "STATS",
     "key": "statestore.heartbeat-durations"
+  },
+  {
+    "description": "The number of RPCs sent for updating catalogd.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "Number of UpdateCatalogd RPCs",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "statestore.num-update-catalogd"
   },
   {
     "description": "The number of registered Statestore subscribers.",
@@ -1924,6 +1969,26 @@
     "units": "NONE",
     "kind": "GAUGE",
     "key": "subscriber-update-state.client-cache.total-clients"
+  },
+  {
+    "description": "The number of clients in use by the Statestore update catalogd client cache.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "Subscriber Update Catalogd Client Cache Clients In Use",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "subscriber-update-catalogd.client-cache.clients-in-use"
+  },
+  {
+    "description": "The total number of clients in the Statestore update catalogd client cache.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "Subscriber Update Catalogd Client Cache Total Clients",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "subscriber-update-catalogd.client-cache.total-clients"
   },
   {
     "description": "Number of bytes used by the application. This will not typically match the memory use reported by the OS, because it does not include TCMalloc overhead or memory fragmentation.",
@@ -3060,7 +3125,8 @@
     "units": "NONE",
     "kind": "COUNTER",
     "key": "cluster-membership.group-set.executor-groups.total-healthy.$0"
-  },{
+  },
+  {
     "description": "Total number of backends in the executor group set $0 registered with the statestore",
     "contexts": [
       "IMPALAD"

@@ -29,7 +29,12 @@ include "SqlConstraints.thrift"
 // CatalogServer service API and related structs.
 
 enum CatalogServiceVersion {
-  V1
+  V1 = 0
+  // There is back version incompatibility for Thrift structure since some entries were
+  // added in the middle of Thrift structure, like IMPALA-11350. We need to increase
+  // the service version for Catalog so that CatalogServer will refuse the requests
+  // from the incompatible clients.
+  V2 = 1
 }
 
 // Prefix used on statestore topic entry keys to indicate that the entry
@@ -100,7 +105,7 @@ struct TDdlQueryOptions {
 
 // Request for executing a DDL operation (CREATE, ALTER, DROP).
 struct TDdlExecRequest {
-  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
+  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V2
 
   // Common header included in all CatalogService requests.
   2: optional TCatalogServiceRequestHeader header
@@ -235,7 +240,7 @@ struct TUpdatedPartition {
 // after DML operations.
 // TODO: Rename this struct to something more descriptive.
 struct TUpdateCatalogRequest {
-  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
+  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V2
 
   // True if SYNC_DDL is set in query options.
   2: required bool sync_ddl
@@ -276,7 +281,7 @@ struct TUpdateCatalogResponse {
 
 // Parameters of REFRESH/INVALIDATE METADATA commands
 struct TResetMetadataRequest {
-  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
+  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V2
 
   // Common header included in all CatalogService requests.
   2: optional TCatalogServiceRequestHeader header
@@ -316,7 +321,7 @@ struct TResetMetadataResponse {
 
 // Request to GetFunctions()
 struct TGetFunctionsRequest {
-  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
+  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V2
 
   // Common header included in all CatalogService requests.
   3: optional TCatalogServiceRequestHeader header
@@ -553,7 +558,7 @@ struct TPartialDbInfo {
 
 // RPC request for GetPartialCatalogObject.
 struct TGetPartialCatalogObjectRequest {
-  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
+  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V2
 
   // A catalog object descriptor: a TCatalogObject with the object name and type fields
   // set. This may be a TABLE, DB, CATALOG, or FUNCTION. The selectors below can
@@ -600,7 +605,7 @@ struct TGetPartialCatalogObjectResponse {
 // Request the complete metadata for a given catalog object. May trigger a metadata load
 // if the object is not already in the catalog cache.
 struct TGetCatalogObjectRequest {
-  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
+  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V2
 
   // Common header included in all CatalogService requests.
   3: optional TCatalogServiceRequestHeader header
@@ -612,12 +617,14 @@ struct TGetCatalogObjectRequest {
 
 // Response from TGetCatalogObjectRequest
 struct TGetCatalogObjectResponse {
-  1: required CatalogObjects.TCatalogObject catalog_object
+  1: required Status.TStatus status;
+
+  2: required CatalogObjects.TCatalogObject catalog_object
 }
 
 // Request the partition statistics for the specified table.
 struct TGetPartitionStatsRequest {
-  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
+  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V2
   2: required CatalogObjects.TTableName table_name
   // if the table is transactional then this field represents the client's view
   // of the table snapshot view in terms of ValidWriteIdList.
@@ -645,7 +652,7 @@ struct TGetPartitionStatsResponse {
 // catalog objects. Currently only used for controlling the priority of loading
 // tables/views since Db/Function metadata is loaded on startup.
 struct TPrioritizeLoadRequest {
-  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
+  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V2
 
   // Common header included in all CatalogService requests.
   2: optional TCatalogServiceRequestHeader header
@@ -667,7 +674,9 @@ struct TTableUsage {
 }
 
 struct TUpdateTableUsageRequest {
-  1: required list<TTableUsage> usages
+  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V2
+
+  2: required list<TTableUsage> usages
 }
 
 struct TUpdateTableUsageResponse {

@@ -57,13 +57,15 @@ TEST(StatestoreTest, SmokeTest) {
 
   StatestoreSubscriber* sub_will_start = perm_objects->Add(
       new StatestoreSubscriber("sub1", MakeNetworkAddress("localhost", 0),
-          MakeNetworkAddress("localhost", statestore->port()), new MetricGroup("")));
+          MakeNetworkAddress("localhost", statestore->port()),
+          new MetricGroup(""), TStatestoreSubscriberType::COORDINATOR_EXECUTOR));
   ASSERT_OK(sub_will_start->Start());
 
   // Confirm that a subscriber trying to use an in-use port will fail to start.
   StatestoreSubscriber* sub_will_not_start = perm_objects->Add(new StatestoreSubscriber(
       "sub3", MakeNetworkAddress("localhost", sub_will_start->heartbeat_port()),
-      MakeNetworkAddress("localhost", statestore->port()), new MetricGroup("")));
+      MakeNetworkAddress("localhost", statestore->port()),
+      new MetricGroup(""), TStatestoreSubscriberType::COORDINATOR_EXECUTOR));
   ASSERT_FALSE(sub_will_not_start->Start().ok());
 
   statestore->ShutdownForTesting();
@@ -91,7 +93,8 @@ void SslSmokeTestHelper(const string& server_ca_certificate,
 
   StatestoreSubscriber* sub = perm_objects->Add(
       new StatestoreSubscriber("smoke_sub", MakeNetworkAddress("localhost", 0),
-          MakeNetworkAddress("localhost", statestore->port()), new MetricGroup("")));
+          MakeNetworkAddress("localhost", statestore->port()),
+          new MetricGroup(""), TStatestoreSubscriberType::COORDINATOR_EXECUTOR));
   Status sub_status = sub->Start();
   ASSERT_EQ(sub_should_start, sub_status.ok());
 

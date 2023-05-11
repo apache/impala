@@ -479,7 +479,15 @@ error_codes = (
 
   ("PARQUET_ROWS_SKIPPING", 155, "Couldn't skip rows in column '$0' in file '$1'."),
 
-  ("QUERY_OPTION_PARSE_FAILED", 156, "Failed to parse query option '$0': $1")
+  ("QUERY_OPTION_PARSE_FAILED", 156, "Failed to parse query option '$0': $1"),
+
+  ("CATALOG_INCOMPATIBLE_PROTOCOL", 157,
+   "Client has incompatible protocol version V$0 conflicting with catalogd's version "
+   "V$1"),
+
+  ("STATESTORE_INCOMPATIBLE_PROTOCOL", 158,
+   "Subscriber '$0' has incompatible protocol version V$1 conflicting with statestored's "
+   "version V$2")
 )
 
 import sys

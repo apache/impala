@@ -32,6 +32,7 @@
 #include "common/atomic.h"
 #include "common/status.h"
 #include "gen-cpp/StatestoreService.h"
+#include "gen-cpp/StatestoreService_types.h"
 #include "gen-cpp/StatestoreSubscriber.h"
 #include "gen-cpp/Types_types.h"
 #include "rpc/thrift-client.h"
@@ -39,6 +40,7 @@
 #include "statestore/failure-detector.h"
 #include "statestore/statestore-subscriber-client-wrapper.h"
 #include "util/aligned-new.h"
+#include "util/condition-variable.h"
 #include "util/metrics-fwd.h"
 #include "util/thread-pool.h"
 #include "util/webserver.h"
@@ -51,6 +53,8 @@ class Status;
 
 typedef ClientCache<StatestoreSubscriberClientWrapper> StatestoreSubscriberClientCache;
 typedef TUniqueId RegistrationId;
+
+std::string SubscriberTypeToString(TStatestoreSubscriberType::type t);
 
 /// The Statestore is a soft-state key-value store that maintains a set of Topics, which
 /// are maps from string keys to byte array values.
@@ -104,6 +108,13 @@ typedef TUniqueId RegistrationId;
 /// These empty updates are important so that subscribers can keep track of the current
 /// version number and report back their progress in receiving the topic contents.
 ///
+/// The Statestore is the central manager of the cluster. Subscribers join in the cluster
+/// through registration. To avoid incompatibility issues between the different components
+/// in the cluster, statestore uses protocol version to isolate cluster components, and
+/// only accepts the registration requests from the subscribers with compatible protocol
+/// versions. This ensure all of components in a cluster could communicate with compatible
+/// APIs and message format in the wire.
+///
 /// +================+
 /// | Implementation |
 /// +================+
@@ -153,7 +164,12 @@ class Statestore : public CacheLineAligned {
   Status RegisterSubscriber(const SubscriberId& subscriber_id,
       const TNetworkAddress& location,
       const std::vector<TTopicRegistration>& topic_registrations,
-      RegistrationId* registration_id) WARN_UNUSED_RESULT;
+      TStatestoreSubscriberType::type subscriber_type,
+      bool subscribe_catalogd_change,
+      const TCatalogRegistration& catalogd_registration,
+      RegistrationId* registration_id,
+      bool* has_registered_catalogd,
+      TCatalogRegistration* registered_catalogd_registration);
 
   /// Registers webpages for the input webserver. If metrics_only is set then only
   /// '/healthz' page is registered.
@@ -186,6 +202,12 @@ class Statestore : public CacheLineAligned {
   /// Amount of time in ms that it takes the statestore to decide that a executor is down
   /// after it stops responding to heartbeats.
   static int64_t FailedExecutorDetectionTimeMs();
+
+  const TUniqueId& GetStateStoreId() const { return statestore_id_; }
+
+  StatestoreServiceVersion::type GetProtocolVersion() const {
+    return protocol_version_;
+  }
 
  private:
   /// A TopicEntry is a single entry in a topic, and logically is a <string, byte string>
@@ -358,7 +380,9 @@ class Statestore : public CacheLineAligned {
    public:
     Subscriber(const SubscriberId& subscriber_id, const RegistrationId& registration_id,
         const TNetworkAddress& network_address,
-        const std::vector<TTopicRegistration>& subscribed_topics);
+        const std::vector<TTopicRegistration>& subscribed_topics,
+        TStatestoreSubscriberType::type subscriber_type,
+        bool subscribe_catalogd_change);
 
     /// Information about a subscriber's subscription to a specific topic.
     struct TopicSubscription {
@@ -454,6 +478,16 @@ class Statestore : public CacheLineAligned {
     /// Refresh the subscriber's last heartbeat timestamp to the current monotonic time.
     void RefreshLastHeartbeatTimestamp();
 
+    /// Check if the subscriber is Catalog daemon.
+    bool IsCatalogd() const {
+      return subscriber_type_ == TStatestoreSubscriberType::CATALOGD;
+    }
+
+    /// Check if the subscriber wants to receive the notification of catalogd change.
+    bool IsSubscribedCatalogdChange() const {
+      return subscribe_catalogd_change_;
+    }
+
    private:
     /// Unique human-readable identifier for this subscriber, set by the subscriber itself
     /// on a Register call.
@@ -467,6 +501,12 @@ class Statestore : public CacheLineAligned {
 
     /// The location of the subscriber service that this subscriber runs.
     const TNetworkAddress network_address_;
+
+    /// Subscriber type
+    TStatestoreSubscriberType::type subscriber_type_;
+
+    /// Indicate if the subscriber subscribe to the notification of updating catalogd.
+    bool subscribe_catalogd_change_;
 
     /// Maps of topic subscriptions to current TopicSubscription, with separate maps for
     /// priority and non-priority topics. The state describes whether updates on the
@@ -489,6 +529,54 @@ class Statestore : public CacheLineAligned {
     bool unregistered_ = false;
   };
 
+  /// CatalogManager:
+  ///   Tracks variety of bookkeeping information for Catalog daemon.
+  class CatalogManager {
+   public:
+    CatalogManager()
+      : is_registered_(false),
+        sending_sequence_(0) {}
+
+    /// Register one catalogd.
+    bool RegisterCatalogd(const SubscriberId& subscriber_id,
+        const RegistrationId& registration_id,
+        const TCatalogRegistration& catalogd_registration);
+
+    /// Return the protocol version of catalog service and address of catalogd.
+    const TCatalogRegistration& GetCatalogRegistration(bool* is_registered);
+
+    /// Return the mutex lock.
+    std::mutex* GetLock() { return &catalog_mgr_lock_; }
+
+    /// Get sending sequence number.
+    int64 GetSendingSequence();
+
+   private:
+    /// Protect all member variable.
+    std::mutex catalog_mgr_lock_;
+
+    /// Indicate if the catalogd has been registered.
+    bool is_registered_;
+
+    /// subscriber_id of the registered catalogd.
+    SubscriberId catalogd_subscriber_id_;
+
+    /// RegistrationId of the registered catalogd.
+    RegistrationId catalogd_registration_id_;
+
+    /// Additional registration info for catalog daemon.
+    TCatalogRegistration catalogd_registration_;
+
+    /// Sending sequence number.
+    int64 sending_sequence_;
+  };
+
+  /// Unique identifier for this statestore instance.
+  TUniqueId statestore_id_;
+
+  /// Protocol version of the statestore.
+  StatestoreServiceVersion::type protocol_version_;
+
   /// Protects access to subscribers_ and subscriber_uuid_generator_. See the class
   /// comment for the lock acquisition order.
   std::mutex subscribers_lock_;
@@ -501,9 +589,14 @@ class Statestore : public CacheLineAligned {
   /// Subscribers are held in shared_ptrs so that RegisterSubscriber() may overwrite their
   /// entry in this map while UpdateSubscriber() tries to update an existing registration
   /// without risk of use-after-free.
-  typedef boost::unordered_map<SubscriberId, std::shared_ptr<Subscriber>>
-    SubscriberMap;
+  typedef boost::unordered_map<SubscriberId, std::shared_ptr<Subscriber>> SubscriberMap;
   SubscriberMap subscribers_;
+
+  /// CatalogD Manager
+  CatalogManager catalog_manager_;
+
+  /// Condition variable for sending the notifications of updating catalogd.
+  ConditionVariable update_catalod_cv_;
 
   /// Used to generated unique IDs for each new registration.
   boost::uuids::random_generator subscriber_uuid_generator_;
@@ -568,6 +661,9 @@ class Statestore : public CacheLineAligned {
   /// Thread that monitors the heartbeats of all subscribers.
   std::unique_ptr<Thread> heartbeat_monitoring_thread_;
 
+  /// Thread to send notification of updating catalogd.
+  std::unique_ptr<Thread> update_catalogd_thread_;
+
   /// Indicates whether the statestore has been initialized and the service is ready.
   std::atomic_bool service_started_{false};
 
@@ -580,6 +676,11 @@ class Statestore : public CacheLineAligned {
   /// whereas they are not safe for UpdateState() RPCs which can take an unbounded amount
   /// of time.
   boost::scoped_ptr<StatestoreSubscriberClientCache> heartbeat_client_cache_;
+
+  /// Cache of subscriber clients used for UpdateCatalogd() RPCs. Only one client per
+  /// subscriber should be used, but the cache helps with the client lifecycle on
+  /// failure.
+  boost::scoped_ptr<StatestoreSubscriberClientCache> update_catalogd_client_cache_;
 
   /// Container for the internal statestore service.
   boost::scoped_ptr<ThriftServer> thrift_server_;
@@ -616,6 +717,9 @@ class Statestore : public CacheLineAligned {
 
   /// Same as above, but for SendHeartbeat() RPCs.
   StatsMetric<double>* heartbeat_duration_metric_;
+
+  /// Metric to count the total number of UpdateCatalogd RPCs sent by statestore.
+  IntCounter* update_catalogd_metric_;
 
   /// Utility method to add an update to the given thread pool, and to fail if the thread
   /// pool is already at capacity. Assumes that subscribers_lock_ is held by the caller.
@@ -725,6 +829,12 @@ class Statestore : public CacheLineAligned {
   /// last_heartbeat_ts_ has not been updated in that interval, it logs the subscriber's
   /// id.
   [[noreturn]] void MonitorSubscriberHeartbeat();
+
+  /// Monitors the notification of updating catalogd.
+  [[noreturn]] void MonitorUpdateCatalogd();
+
+  /// Send notification of updating catalogd to the coordinators.
+  void SendUpdateCatalogdNotification();
 
   /// Raw callback to indicate whether the service is ready.
   void HealthzHandler(const Webserver::WebRequest& req, std::stringstream* data,

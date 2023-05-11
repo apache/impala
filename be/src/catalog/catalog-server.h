@@ -23,15 +23,15 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/unordered_set.hpp>
 
+#include "catalog/catalog.h"
 #include "gen-cpp/CatalogService.h"
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/Types_types.h"
-#include "catalog/catalog.h"
 #include "kudu/util/web_callback_registry.h"
-#include "statestore/statestore-subscriber.h"
+#include "rapidjson/rapidjson.h"
+#include "statestore/statestore-subscriber-catalog.h"
 #include "util/condition-variable.h"
 #include "util/metrics-fwd.h"
-#include "rapidjson/rapidjson.h"
 
 using kudu::HttpStatusCode;
 
@@ -87,7 +87,15 @@ class CatalogServer {
   /// service has started.
   void MarkServiceAsStarted();
 
+  // Returns the protocol version of catalog service.
+  CatalogServiceVersion::type GetProtocolVersion() const {
+    return protocol_version_;
+  }
+
  private:
+  /// Protocol version of the Catalog Service.
+  CatalogServiceVersion::type protocol_version_;
+
   /// Indicates whether the catalog service is ready.
   std::atomic_bool service_started_{false};
 
@@ -96,7 +104,7 @@ class CatalogServer {
   ThriftSerializer thrift_serializer_;
   MetricGroup* metrics_;
   boost::scoped_ptr<Catalog> catalog_;
-  boost::scoped_ptr<StatestoreSubscriber> statestore_subscriber_;
+  boost::scoped_ptr<StatestoreSubscriberCatalog> statestore_subscriber_;
 
   /// Metric that tracks the amount of time taken preparing a catalog update.
   StatsMetric<double>* topic_processing_time_metric_;

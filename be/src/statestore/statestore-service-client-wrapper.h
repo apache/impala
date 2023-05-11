@@ -48,6 +48,14 @@ class StatestoreServiceClientWrapper : public StatestoreServiceClient {
     recv_RegisterSubscriber(_return);
   }
 
+  void GetProtocolVersion(TGetProtocolVersionResponse& _return,
+      const TGetProtocolVersionRequest& params, bool* send_done) {
+    DCHECK(!*send_done);
+    send_GetProtocolVersion(params);
+    *send_done = true;
+    recv_GetProtocolVersion(_return);
+  }
+
 #pragma clang diagnostic pop
 };
 

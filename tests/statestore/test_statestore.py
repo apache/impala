@@ -205,7 +205,7 @@ class StatestoreSubscriber(object):
     self.heartbeat_event.acquire()
     try:
       self.heartbeat_count += 1
-      response = Subscriber.THeartbeatResponse()
+      response = Subscriber.THeartbeatResponse(status=STATUS_OK)
       if self.heartbeat_cb is not None and self.exception is None:
         try:
           response = self.heartbeat_cb(self, args)
@@ -280,6 +280,7 @@ class StatestoreSubscriber(object):
     request = Subscriber.TRegisterSubscriberRequest(
       topic_registrations=topics,
       subscriber_location=TNetworkAddress("localhost", self.port),
+      subscriber_type=Subscriber.TStatestoreSubscriberType.COORDINATOR_EXECUTOR,
       subscriber_id=self.subscriber_id)
     response = self.client.RegisterSubscriber(request)
     if response.status.status_code == TErrorCode.OK:
@@ -549,7 +550,7 @@ class TestStatestore():
       # Delay every second heartbeat.
       if (heartbeat_count[0] % 2 == 1):
         time.sleep(4)
-      return Subscriber.THeartbeatResponse()
+      return Subscriber.THeartbeatResponse(status=STATUS_OK)
 
     with StatestoreSubscriber(heartbeat_cb=heartbeat_cb) as sub:
       topic_name = "test_intermittent_hung_heartbeats"

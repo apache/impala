@@ -129,3 +129,11 @@ class TestCatalogServiceClient(ImpalaTestSuite):
     LOG.debug(response)
     assert response.status.status_code == TErrorCode.GENERAL
     assert 'Database name must be set' in str(response.status)
+
+    # Negative test with incompatible protocol version
+    request = TGetFunctionsRequest()
+    request.db_name = unique_database
+    request.protocol_version = CatalogService.CatalogServiceVersion.V1
+    response = catalog_client.GetFunctions(request)
+    LOG.debug(response)
+    assert response.status.status_code == TErrorCode.CATALOG_INCOMPATIBLE_PROTOCOL

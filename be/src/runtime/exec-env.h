@@ -25,6 +25,7 @@
 #include <kudu/client/client.h>
 
 // NOTE: try not to add more headers here: exec-env.h is included in many many files.
+#include "common/atomic.h"
 #include "common/global-types.h"
 #include "common/status.h"
 #include "runtime/client-cache-types.h"
@@ -70,6 +71,7 @@ class ThreadResourceMgr;
 class TmpFileMgr;
 class Webserver;
 class CodeGenCache;
+class TCatalogRegistration;
 
 namespace io {
   class DiskIoMgr;
@@ -192,6 +194,23 @@ class ExecEnv {
   /// Returns true if the admission control service is enabled.
   bool AdmissionServiceEnabled() const;
 
+  /// Returns true if the registration with statestore is completed.
+  bool IsStatestoreRegistrationCompleted() const {
+    return statestore_registration_completed_.Load() != 0;
+  }
+
+  /// Set the flag when the registration with statestore is completed.
+  void SetStatestoreRegistrationCompleted() {
+    statestore_registration_completed_.CompareAndSwap(0, 1);
+  }
+
+  /// Callback function for receiving notification of updating catalogd.
+  /// This function is called after catalogd is registered to statestore.
+  void UpdateCatalogd(const TCatalogRegistration& catalogd_registration);
+
+  /// Return the current address of Catalog service.
+  std::shared_ptr<const TNetworkAddress> GetCatalogdAddress() const;
+
  private:
   // Used to uniquely identify this impalad.
   BackendIdPB backend_id_;
@@ -295,6 +314,15 @@ class ExecEnv {
   /// The number of slots limits the number of queries that can run concurrently on
   /// this backend. Queries take up multiple slots only when mt_dop > 1.
   int64_t admission_slots_;
+
+  /// Flag that indicate if the registration with statestore is completed.
+  AtomicInt32 statestore_registration_completed_{0};
+
+  /// Current address of Catalog service
+  std::shared_ptr<const TNetworkAddress> catalogd_address_;
+
+  /// Protects catalogd_address_.
+  mutable std::mutex catalogd_address_lock_;
 
   /// Initialize ExecEnv based on Hadoop config from frontend.
   Status InitHadoopConfig();

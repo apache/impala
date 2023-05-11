@@ -139,6 +139,8 @@ DECLARE_int32(webserver_port);
 DECLARE_int64(tcmalloc_max_total_thread_cache_bytes);
 DECLARE_string(admission_service_host);
 DECLARE_int32(admission_service_port);
+DECLARE_string(catalog_service_host);
+DECLARE_int32(catalog_service_port);
 
 DECLARE_string(ssl_client_ca_certificate);
 
@@ -245,15 +247,33 @@ ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
   TNetworkAddress statestore_address =
       MakeNetworkAddress(statestore_host, statestore_port);
 
+  catalogd_address_ = std::make_shared<const TNetworkAddress>(
+      MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port));
+
+  TStatestoreSubscriberType::type subscriber_type = TStatestoreSubscriberType::UNKNOWN;
+  if (FLAGS_is_coordinator) {
+    subscriber_type = FLAGS_is_executor ? TStatestoreSubscriberType::COORDINATOR_EXECUTOR
+                                        : TStatestoreSubscriberType::COORDINATOR;
+  } else if (FLAGS_is_executor) {
+    subscriber_type = TStatestoreSubscriberType::EXECUTOR;
+  }
   // Set StatestoreSubscriber::subscriber_id as hostname + krpc_port.
   statestore_subscriber_.reset(new StatestoreSubscriber(
       Substitute("impalad@$0:$1", FLAGS_hostname, FLAGS_krpc_port), subscriber_address,
-      statestore_address, metrics_.get()));
+      statestore_address, metrics_.get(), subscriber_type));
 
   if (FLAGS_is_coordinator) {
     hdfs_op_thread_pool_.reset(
         CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024));
+
+    StatestoreSubscriber::UpdateCatalogdCallback update_catalogd_cb =
+        bind<void>(mem_fn(&ExecEnv::UpdateCatalogd), this, _1);
+    statestore_subscriber_->AddUpdateCatalogdTopic(update_catalogd_cb);
   }
+  StatestoreSubscriber::CompleteRegistrationCallback complete_registration_cb =
+      bind<void>(mem_fn(&ExecEnv::SetStatestoreRegistrationCompleted), this);
+  statestore_subscriber_->AddCompleteRegistrationTopic(complete_registration_cb);
+
   if (FLAGS_is_coordinator && !AdmissionServiceEnabled()) {
     // We only need a Scheduler if we're performing admission control locally, i.e. if
     // this is a coordinator and there isn't an admissiond.
@@ -494,10 +514,17 @@ Status ExecEnv::StartStatestoreSubscriberService() {
 
   // Must happen after all topic registrations / callbacks are done
   if (statestore_subscriber_.get() != nullptr) {
-    Status status = statestore_subscriber_->Start();
+    bool has_registered_catalogd = false;
+    TCatalogRegistration catalogd_registration;
+    Status status =
+        statestore_subscriber_->Start(&has_registered_catalogd, &catalogd_registration);
     if (!status.ok()) {
       status.AddDetail("Statestore subscriber did not start up.");
       return status;
+    }
+    if (statestore_subscriber_->IsRegistered()) SetStatestoreRegistrationCompleted();
+    if (has_registered_catalogd && FLAGS_is_coordinator) {
+      UpdateCatalogd(catalogd_registration);
     }
   }
 
@@ -638,6 +665,46 @@ Status ExecEnv::GetAdmissionServiceAddress(
         ip, FLAGS_admission_service_port, UdsAddressUniqueIdPB::IP_ADDRESS);
   }
   return Status::OK();
+}
+
+void ExecEnv::UpdateCatalogd(const TCatalogRegistration& catalogd_registration) {
+  if (catalogd_registration.address.hostname.empty()
+      || catalogd_registration.address.port == 0) {
+    return;
+  }
+  if (catalogd_registration.protocol
+      != statestore_subscriber_->GetCatalogProtocolVersion()) {
+    // This should not happen now. Since we bump up catalog and statestore service
+    // versions at same time, coordinators must have same protocol versions as catalogd
+    // if they can join one cluster. But in future, it may happen if the two protocol
+    // versions are not updated at same time for some reason.
+    // Note that Impalad coordinators must wait for their local replica of the catalog to
+    // be initialized from the statestore prior to opening up client ports. If the
+    // coordinator has incompatible protocol version from catalogd, it should not open
+    // client ports.
+    LOG(INFO) << "Protocol version of Catalog service does not match the protocol "
+              << "version of registered catalogd: "
+              << statestore_subscriber_->GetCatalogProtocolVersion()
+              << " vs. " << catalogd_registration.protocol;
+  }
+  std::lock_guard<std::mutex> l(catalogd_address_lock_);
+  DCHECK(catalogd_address_.get() != nullptr);
+  bool is_matching = (catalogd_registration.address.port == catalogd_address_->port
+      && catalogd_registration.address.hostname == catalogd_address_->hostname);
+  if (!is_matching) {
+    LOG(INFO) << "The address of Catalog service is changed from "
+              << TNetworkAddressToString(*catalogd_address_.get())
+              << " to " << TNetworkAddressToString(catalogd_registration.address);
+    catalogd_address_ =
+        std::make_shared<const TNetworkAddress>(catalogd_registration.address);
+  }
+}
+
+std::shared_ptr<const TNetworkAddress> ExecEnv::GetCatalogdAddress() const {
+  std::lock_guard<std::mutex> l(catalogd_address_lock_);
+  DCHECK(catalogd_address_.get() != nullptr);
+  std::shared_ptr<const TNetworkAddress> address = catalogd_address_;
+  return address;
 }
 
 } // namespace impala

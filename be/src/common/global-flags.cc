@@ -169,6 +169,9 @@ DEFINE_int32(stress_catalog_startup_delay_ms, 0, "A stress option that injects e
     "catalogd opens ports or accepts connections. Delay <= 0 injects no delay.");
 DEFINE_int32(stress_disk_read_delay_ms, 0, "A stress option that injects extra delay"
     " in milliseconds when the I/O manager is reading from disk.");
+DEFINE_int32(stress_statestore_startup_delay_ms, 0, "A stress option that injects extra "
+    "delay in milliseconds during the startup of statestore. The delay is before the "
+    "statestored opens ports or accepts connections. Delay <= 0 injects no delay.");
 #endif
 
 DEFINE_string(debug_actions, "", "For testing only. Uses the same format as the debug "
@@ -374,6 +377,12 @@ DEFINE_bool(pull_table_types_and_comments, false,
     "just contain the table names, but also the table types and comments. This is a "
     "catalogd-only flag. Required if users want GET_TABLES requests return correct table "
     "types or comments.");
+
+DEFINE_bool(tolerate_statestore_startup_delay, false, "If set to true, the subscriber "
+    "is able to tolerate the delay of the statestore's availability. The subscriber's "
+    "process will not exit if it cannot register with the specified statestore on "
+    "startup. But instead it enters into Recovery mode, it will loop, sleep and retry "
+    "till it successfully registers with the statestore.");
 
 // TGeospatialLibrary's values are mapped here as constants
 static const string geo_lib_none = "NONE";

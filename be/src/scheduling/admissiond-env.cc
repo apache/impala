@@ -60,7 +60,8 @@ AdmissiondEnv::AdmissiondEnv()
       MakeNetworkAddress(FLAGS_state_store_host, FLAGS_state_store_port);
   statestore_subscriber_.reset(new StatestoreSubscriber(
       Substitute("admissiond@$0", TNetworkAddressToString(admission_service_addr)),
-      subscriber_address, statestore_address, metrics));
+      subscriber_address, statestore_address, metrics,
+      TStatestoreSubscriberType::ADMISSIOND));
 
   scheduler_.reset(new Scheduler(metrics, request_pool_service()));
   cluster_membership_mgr_.reset(new ClusterMembershipMgr(

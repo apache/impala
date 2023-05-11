@@ -23,6 +23,7 @@
 
 #include <boost/lexical_cast.hpp>
 #include <thrift/Thrift.h>
+#include <thrift/protocol/TProtocolException.h>
 #include <gutil/strings/substitute.h>
 #include <gutil/strings/util.h>
 
@@ -106,12 +107,20 @@ DEFINE_int32(statestore_update_tcp_timeout_seconds, 300, "(Advanced) The time af
     "badly hung machines that are not able to respond to the update RPC in short "
     "order.");
 
+DEFINE_int32(statestore_update_catalogd_tcp_timeout_seconds, 3, "(Advanced) The "
+    "time after which a UpdateCatalogd RPC to a subscriber will timeout. This setting "
+    "protects against badly hung machines that are not able to respond to the "
+    "UpdateCatalogd RPC in short order");
+
 DECLARE_string(debug_actions);
 DECLARE_string(ssl_server_certificate);
 DECLARE_string(ssl_private_key);
 DECLARE_string(ssl_private_key_password_cmd);
 DECLARE_string(ssl_cipher_list);
 DECLARE_string(ssl_minimum_version);
+#ifndef NDEBUG
+DECLARE_int32(stress_statestore_startup_delay_ms);
+#endif
 
 // Metric keys
 // TODO: Replace 'backend' with 'subscriber' when we can coordinate a change with CM
@@ -124,6 +133,7 @@ const string STATESTORE_UPDATE_DURATION = "statestore.topic-update-durations";
 const string STATESTORE_PRIORITY_UPDATE_DURATION =
     "statestore.priority-topic-update-durations";
 const string STATESTORE_HEARTBEAT_DURATION = "statestore.heartbeat-durations";
+const string STATESTORE_UPDATE_CATALOGD_NUM = "statestore.num-update-catalogd";
 
 // Initial version for each Topic registered by a Subscriber. Generally, the Topic will
 // have a Version that is the MAX() of all entries in the Topic, but this initial
@@ -140,6 +150,28 @@ const char* Statestore::IMPALA_REQUEST_QUEUE_TOPIC = "impala-request-queue";
 
 typedef ClientConnection<StatestoreSubscriberClientWrapper> StatestoreSubscriberConn;
 
+namespace impala {
+
+std::string SubscriberTypeToString(TStatestoreSubscriberType::type t) {
+  switch (t) {
+    case TStatestoreSubscriberType::ADMISSIOND:
+      return "ADMISSIOND";
+    case TStatestoreSubscriberType::CATALOGD:
+      return "CATALOGD";
+    case TStatestoreSubscriberType::COORDINATOR:
+      return "COORDINATOR";
+    case TStatestoreSubscriberType::EXECUTOR:
+      return "EXECUTOR";
+    case TStatestoreSubscriberType::COORDINATOR_EXECUTOR:
+      return "COORDINATOR AND EXECUTOR";
+    case TStatestoreSubscriberType::UNKNOWN:
+    default:
+      return "UNKNOWN";
+  };
+}
+
+}
+
 class StatestoreThriftIf : public StatestoreServiceIf {
  public:
   StatestoreThriftIf(Statestore* statestore)
@@ -149,12 +181,63 @@ class StatestoreThriftIf : public StatestoreServiceIf {
 
   virtual void RegisterSubscriber(TRegisterSubscriberResponse& response,
       const TRegisterSubscriberRequest& params) {
+    if (FLAGS_debug_actions == "START_STATESTORE_IN_PROTOCOL_V1"
+        && strncmp(params.subscriber_id.c_str(), "python-test-client", 18) == 0
+        && params.protocol_version > StatestoreServiceVersion::V1) {
+      // Simulate the behaviour of old statestore to throw exception for new version
+      // of subscribers.
+      throw apache::thrift::protocol::TProtocolException(
+          apache::thrift::protocol::TProtocolException::INVALID_DATA, "Invalid data");
+    }
+    if (params.protocol_version < statestore_->GetProtocolVersion()) {
+      // Refuse old version of subscribers
+      response.__set_protocol_version(statestore_->GetProtocolVersion());
+      response.__set_statestore_id(statestore_->GetStateStoreId());
+      Status status = Status(TErrorCode::STATESTORE_INCOMPATIBLE_PROTOCOL,
+          params.subscriber_id, params.protocol_version + 1,
+          statestore_->GetProtocolVersion() + 1);
+      status.ToThrift(&response.status);
+      return;
+    }
+    TStatestoreSubscriberType::type subscriber_type = TStatestoreSubscriberType::UNKNOWN;
+    if (params.__isset.subscriber_type) {
+      subscriber_type = params.subscriber_type;
+    }
+    bool subscribe_catalogd_change = false;
+    if (params.__isset.subscribe_catalogd_change) {
+      subscribe_catalogd_change = params.subscribe_catalogd_change;
+    }
+    TCatalogRegistration catalogd_registration;
+    if (params.__isset.catalogd_registration) {
+      catalogd_registration = params.catalogd_registration;
+    }
+
     RegistrationId registration_id;
+    bool has_registered_catalogd;
+    TCatalogRegistration registered_catalogd_registration;
     Status status = statestore_->RegisterSubscriber(params.subscriber_id,
-        params.subscriber_location, params.topic_registrations, &registration_id);
+        params.subscriber_location, params.topic_registrations, subscriber_type,
+        subscribe_catalogd_change, catalogd_registration, &registration_id,
+        &has_registered_catalogd, &registered_catalogd_registration);
     status.ToThrift(&response.status);
     response.__set_registration_id(registration_id);
+    response.__set_statestore_id(statestore_->GetStateStoreId());
+    response.__set_protocol_version(statestore_->GetProtocolVersion());
+    if (has_registered_catalogd) {
+      response.__set_catalogd_registration(registered_catalogd_registration);
+    }
   }
+
+  virtual void GetProtocolVersion(TGetProtocolVersionResponse& response,
+      const TGetProtocolVersionRequest& params) {
+    LOG(INFO) << "Subscriber protocol version: " << params.protocol_version;
+    response.__set_protocol_version(statestore_->GetProtocolVersion());
+    response.__set_statestore_id(statestore_->GetStateStoreId());
+    Status status = Status::OK();
+    status.ToThrift(&response.status);
+    return;
+  }
+
  private:
   Statestore* statestore_;
 };
@@ -318,10 +401,16 @@ void Statestore::Topic::ToJson(Document* document, Value* topic_json) {
 
 Statestore::Subscriber::Subscriber(const SubscriberId& subscriber_id,
     const RegistrationId& registration_id, const TNetworkAddress& network_address,
-    const vector<TTopicRegistration>& subscribed_topics)
+    const vector<TTopicRegistration>& subscribed_topics,
+    TStatestoreSubscriberType::type subscriber_type, bool subscribe_catalogd_change)
   : subscriber_id_(subscriber_id),
     registration_id_(registration_id),
-    network_address_(network_address) {
+    network_address_(network_address),
+    subscriber_type_(subscriber_type),
+    subscribe_catalogd_change_(subscribe_catalogd_change) {
+  LOG(INFO) << "Subscriber '" << subscriber_id_
+            << "' with type " << SubscriberTypeToString(subscriber_type_)
+            << " registered (registration id: " << PrintId(registration_id_) << ")";
   RefreshLastHeartbeatTimestamp();
   for (const TTopicRegistration& topic : subscribed_topics) {
     GetTopicsMapForId(topic.topic_name)
@@ -406,7 +495,8 @@ void Statestore::Subscriber::RefreshLastHeartbeatTimestamp() {
 }
 
 Statestore::Statestore(MetricGroup* metrics)
-  : subscriber_topic_update_threadpool_("statestore-update",
+  : protocol_version_(StatestoreServiceVersion::V2),
+    subscriber_topic_update_threadpool_("statestore-update",
         "subscriber-update-worker",
         FLAGS_statestore_num_update_threads,
         FLAGS_statestore_max_subscribers,
@@ -432,10 +522,15 @@ Statestore::Statestore(MetricGroup* metrics)
         FLAGS_statestore_heartbeat_tcp_timeout_seconds * 1000,
         FLAGS_statestore_heartbeat_tcp_timeout_seconds * 1000, "",
         IsInternalTlsConfigured())),
+    update_catalogd_client_cache_(new StatestoreSubscriberClientCache(1, 0,
+        FLAGS_statestore_update_catalogd_tcp_timeout_seconds * 1000,
+        FLAGS_statestore_update_catalogd_tcp_timeout_seconds * 1000, "",
+        IsInternalTlsConfigured())),
     thrift_iface_(new StatestoreThriftIf(this)),
     failure_detector_(new MissedHeartbeatFailureDetector(
         FLAGS_statestore_max_missed_heartbeats,
         FLAGS_statestore_max_missed_heartbeats / 2)) {
+  UUIDToTUniqueId(boost::uuids::random_generator()(), &statestore_id_);
   DCHECK(metrics != NULL);
   metrics_ = metrics;
   num_subscribers_metric_ = metrics->AddGauge(STATESTORE_LIVE_SUBSCRIBERS, 0);
@@ -451,9 +546,12 @@ Statestore::Statestore(MetricGroup* metrics)
       metrics, STATESTORE_PRIORITY_UPDATE_DURATION);
   heartbeat_duration_metric_ =
       StatsMetric<double>::CreateAndRegister(metrics, STATESTORE_HEARTBEAT_DURATION);
+  update_catalogd_metric_ = metrics->AddCounter(STATESTORE_UPDATE_CATALOGD_NUM, 0);
 
   update_state_client_cache_->InitMetrics(metrics, "subscriber-update-state");
   heartbeat_client_cache_->InitMetrics(metrics, "subscriber-heartbeat");
+  update_catalogd_client_cache_->InitMetrics(
+      metrics, "subscriber-update-catalogd");
 }
 
 Statestore::~Statestore() {
@@ -461,6 +559,13 @@ Statestore::~Statestore() {
 }
 
 Status Statestore::Init(int32_t state_store_port) {
+#ifndef NDEBUG
+  if (FLAGS_stress_statestore_startup_delay_ms > 0) {
+    LOG(INFO) << "Stress statestore startup delay: "
+              << FLAGS_stress_statestore_startup_delay_ms << " ms";
+    SleepForMs(FLAGS_stress_statestore_startup_delay_ms);
+  }
+#endif
   std::shared_ptr<TProcessor> processor(new StatestoreServiceProcessor(thrift_iface()));
   std::shared_ptr<TProcessorEventHandler> event_handler(
       new RpcEventHandler("statestore", metrics_));
@@ -486,6 +591,8 @@ Status Statestore::Init(int32_t state_store_port) {
   RETURN_IF_ERROR(subscriber_heartbeat_threadpool_.Init());
   RETURN_IF_ERROR(Thread::Create("statestore-heartbeat", "heartbeat-monitoring-thread",
       &Statestore::MonitorSubscriberHeartbeat, this, &heartbeat_monitoring_thread_));
+  RETURN_IF_ERROR(Thread::Create("statestore-update-catalogd", "update-catalogd-thread",
+      &Statestore::MonitorUpdateCatalogd, this, &update_catalogd_thread_));
   service_started_ = true;
 
   return Status::OK();
@@ -604,8 +711,16 @@ Status Statestore::OfferUpdate(const ScheduledSubscriberUpdate& update,
 Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
     const TNetworkAddress& location,
     const vector<TTopicRegistration>& topic_registrations,
-    RegistrationId* registration_id) {
-  if (subscriber_id.empty()) return Status("Subscriber ID cannot be empty string");
+    TStatestoreSubscriberType::type subscriber_type,
+    bool subscribe_catalogd_change,
+    const TCatalogRegistration& catalogd_registration,
+    RegistrationId* registration_id,
+    bool* has_registered_catalogd,
+    TCatalogRegistration* registered_catalogd_registration) {
+  bool is_catalogd = subscriber_type == TStatestoreSubscriberType::CATALOGD;
+  if (subscriber_id.empty()) {
+    return Status("Subscriber ID cannot be empty string");
+  }
 
   // Create any new topics first, so that when the subscriber is first sent a topic update
   // by the worker threads its topics are guaranteed to exist.
@@ -630,14 +745,32 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
   LOG(INFO) << "Registering: " << subscriber_id;
   {
     lock_guard<mutex> l(subscribers_lock_);
+    UUIDToTUniqueId(subscriber_uuid_generator_(), registration_id);
     SubscriberMap::iterator subscriber_it = subscribers_.find(subscriber_id);
     if (subscriber_it != subscribers_.end()) {
-      UnregisterSubscriber(subscriber_it->second.get());
+      shared_ptr<Subscriber> subscriber = subscriber_it->second;
+      UnregisterSubscriber(subscriber.get());
+      // Check if the subscriber's network addresses are matching.
+      if (subscriber->network_address().hostname != location.hostname
+          || subscriber->network_address().port != location.port) {
+        LOG(INFO) << "Subscriber " << subscriber_id
+                  << " re-register with different address, old address: "
+                  << TNetworkAddressToString(subscriber->network_address())
+                  << " , new address: " << TNetworkAddressToString(location);
+      }
     }
 
-    UUIDToTUniqueId(subscriber_uuid_generator_(), registration_id);
-    shared_ptr<Subscriber> current_registration(
-        new Subscriber(subscriber_id, *registration_id, location, topic_registrations));
+    if (is_catalogd) {
+      if (catalog_manager_.RegisterCatalogd(subscriber_id, *registration_id,
+              catalogd_registration)) {
+        LOG(INFO) << "CatalogD: " << subscriber_id << " is registered.";
+        update_catalod_cv_.NotifyAll();
+      }
+    }
+
+    shared_ptr<Subscriber> current_registration(new Subscriber(
+        subscriber_id, *registration_id, location, topic_registrations,
+        subscriber_type, subscribe_catalogd_change));
     subscribers_.emplace(subscriber_id, current_registration);
     failure_detector_->UpdateHeartbeat(subscriber_id, true);
     num_subscribers_metric_->SetValue(subscribers_.size());
@@ -648,11 +781,34 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
     RETURN_IF_ERROR(OfferUpdate(update, &subscriber_topic_update_threadpool_));
     RETURN_IF_ERROR(OfferUpdate(update, &subscriber_priority_topic_update_threadpool_));
     RETURN_IF_ERROR(OfferUpdate(update, &subscriber_heartbeat_threadpool_));
+    *registered_catalogd_registration =
+        catalog_manager_.GetCatalogRegistration(has_registered_catalogd);
   }
 
-  LOG(INFO) << "Subscriber '" << subscriber_id << "' registered (registration id: "
-            << PrintId(*registration_id) << ")";
   return Status::OK();
+}
+
+bool Statestore::CatalogManager::RegisterCatalogd(const SubscriberId& subscriber_id,
+    const RegistrationId& registration_id,
+    const TCatalogRegistration& catalogd_registration) {
+  lock_guard<mutex> l(catalog_mgr_lock_);
+  is_registered_ = true;
+  catalogd_subscriber_id_ = subscriber_id;
+  catalogd_registration_id_ = registration_id;
+  catalogd_registration_ = catalogd_registration;
+  return true;
+}
+
+const TCatalogRegistration& Statestore::CatalogManager::GetCatalogRegistration(
+    bool* is_registered) {
+  lock_guard<mutex> l(catalog_mgr_lock_);
+  *is_registered = is_registered_;
+  return catalogd_registration_;
+}
+
+int64 Statestore::CatalogManager::GetSendingSequence() {
+  lock_guard<mutex> l(catalog_mgr_lock_);
+  return ++sending_sequence_;
 }
 
 bool Statestore::FindSubscriber(const SubscriberId& subscriber_id,
@@ -685,6 +841,7 @@ Status Statestore::SendTopicUpdate(Subscriber* subscriber, UpdateKind update_kin
   // Set the expected registration ID, so that the subscriber can reject this update if
   // they have moved on to a new registration instance.
   update_state_request.__set_registration_id(subscriber->registration_id());
+  update_state_request.__set_statestore_id(statestore_id_);
 
   // Second: try and send it
   Status status;
@@ -877,6 +1034,7 @@ Status Statestore::SendHeartbeat(Subscriber* subscriber) {
   THeartbeatRequest request;
   THeartbeatResponse response;
   request.__set_registration_id(subscriber->registration_id());
+  request.__set_statestore_id(statestore_id_);
   RETURN_IF_ERROR(
       client.DoRpc(&StatestoreSubscriberClientWrapper::Heartbeat, request, &response));
 
@@ -1042,6 +1200,63 @@ void Statestore::DoSubscriberUpdate(UpdateKind update_kind, int thread_id,
   }
 }
 
+[[noreturn]] void Statestore::MonitorUpdateCatalogd() {
+  // Wait for notification. If catalogd is registered, send notification to all
+  // coordinators
+  while (1) {
+    {
+      unique_lock<mutex> l(*catalog_manager_.GetLock());
+      update_catalod_cv_.Wait(l);
+    }
+    SendUpdateCatalogdNotification();
+  }
+}
+
+void Statestore::SendUpdateCatalogdNotification() {
+  bool has_registered_catalogd;
+  TCatalogRegistration catalogd_registration =
+      catalog_manager_.GetCatalogRegistration(&has_registered_catalogd);
+  DCHECK(has_registered_catalogd);
+  if (!has_registered_catalogd) return;
+
+  vector<std::shared_ptr<Subscriber>> receivers;
+  {
+    lock_guard<mutex> l(subscribers_lock_);
+    for (const auto& subscriber : subscribers_) {
+      if (subscriber.second->IsSubscribedCatalogdChange()) {
+        receivers.push_back(subscriber.second);
+      }
+    }
+  }
+  for (const auto& subscriber : receivers) {
+    Status status;
+    StatestoreSubscriberConn client(update_catalogd_client_cache_.get(),
+        subscriber->network_address(), &status);
+    if (status.ok()) {
+      TUpdateCatalogdRequest request;
+      TUpdateCatalogdResponse response;
+      request.__set_registration_id(subscriber->registration_id());
+      request.__set_statestore_id(statestore_id_);
+      request.__set_sequence(catalog_manager_.GetSendingSequence());
+      request.__set_catalogd_registration(catalogd_registration);
+      status = client.DoRpc(
+          &StatestoreSubscriberClientWrapper::UpdateCatalogd, request, &response);
+      if (!status.ok()) {
+        if (status.code() == TErrorCode::RPC_RECV_TIMEOUT) {
+          // Add details to status to make it more useful, while preserving the stack
+          status.AddDetail(Substitute(
+              "Subscriber $0 timed-out during update catalogd RPC. Timeout is $1s.",
+                  subscriber->id(),
+                  FLAGS_statestore_update_catalogd_tcp_timeout_seconds));
+        }
+        LOG(ERROR) << "Couldn't send UpdateCatalogd RPC,  " << status.GetDetail();
+      } else {
+        update_catalogd_metric_->Increment(1);
+      }
+    }
+  }
+}
+
 void Statestore::UnregisterSubscriber(Subscriber* subscriber) {
   SubscriberMap::const_iterator it = subscribers_.find(subscriber->id());
   if (it == subscribers_.end() ||
@@ -1053,6 +1268,7 @@ void Statestore::UnregisterSubscriber(Subscriber* subscriber) {
   // Close all active clients so that the next attempt to use them causes a Reopen()
   update_state_client_cache_->CloseConnections(subscriber->network_address());
   heartbeat_client_cache_->CloseConnections(subscriber->network_address());
+  update_catalogd_client_cache_->CloseConnections(subscriber->network_address());
 
   // Prevent the failure detector from growing without bound
   failure_detector_->EvictPeer(subscriber->id());

@@ -81,6 +81,9 @@ class DummyStatestoreService : public StatestoreServiceIf {
   virtual void RegisterSubscriber(TRegisterSubscriberResponse& response,
       const TRegisterSubscriberRequest& request) {
   }
+  virtual void GetProtocolVersion(TGetProtocolVersionResponse& response,
+      const TGetProtocolVersionRequest& request) {
+  }
 };
 
 std::shared_ptr<TProcessor> MakeProcessor() {

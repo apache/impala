@@ -47,8 +47,6 @@ using namespace apache::hive::service::cli::thrift;
 using namespace apache::thrift;
 
 DECLARE_bool(use_local_catalog);
-DECLARE_int32(catalog_service_port);
-DECLARE_string(catalog_service_host);
 DECLARE_string(debug_actions);
 
 DECLARE_int32(catalog_client_connection_num_retries);
@@ -96,8 +94,6 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
   DCHECK(profile_ != NULL);
   RuntimeProfile::Counter* exec_timer = ADD_TIMER(profile_, "CatalogOpExecTimer");
   SCOPED_TIMER(exec_timer);
-  const TNetworkAddress& address =
-      MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);
   RETURN_IF_ERROR(status);
   switch (request.op_type) {
     case TCatalogOpType::DDL: {
@@ -107,7 +103,8 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
       exec_response_.reset(new TDdlExecResponse());
       int attempt = 0; // Used for debug action only.
       CatalogServiceConnection::RpcStatus rpc_status =
-          CatalogServiceConnection::DoRpcWithRetry(env_->catalogd_client_cache(), address,
+          CatalogServiceConnection::DoRpcWithRetry(env_->catalogd_client_cache(),
+              *ExecEnv::GetInstance()->GetCatalogdAddress().get(),
               &CatalogServiceClientWrapper::ExecDdl, request.ddl_params,
               FLAGS_catalog_client_connection_num_retries,
               FLAGS_catalog_client_rpc_retry_interval_ms,
@@ -130,7 +127,8 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
       TResetMetadataResponse response;
       int attempt = 0; // Used for debug action only.
       CatalogServiceConnection::RpcStatus rpc_status =
-          CatalogServiceConnection::DoRpcWithRetry(env_->catalogd_client_cache(), address,
+          CatalogServiceConnection::DoRpcWithRetry(env_->catalogd_client_cache(),
+              *ExecEnv::GetInstance()->GetCatalogdAddress().get(),
               &CatalogServiceClientWrapper::ResetMetadata, request.reset_metadata_params,
               FLAGS_catalog_client_connection_num_retries,
               FLAGS_catalog_client_rpc_retry_interval_ms,
@@ -344,15 +342,14 @@ void CatalogOpExecutor::SetColumnStats(const TTableSchema& col_stats_schema,
 
 Status CatalogOpExecutor::GetCatalogObject(const TCatalogObject& object_desc,
     TCatalogObject* result) {
-  const TNetworkAddress& address =
-      MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);
   TGetCatalogObjectRequest request;
   request.__set_object_desc(object_desc);
 
   TGetCatalogObjectResponse response;
   int attempt = 0; // Used for debug action only.
   CatalogServiceConnection::RpcStatus rpc_status =
-      CatalogServiceConnection::DoRpcWithRetry(env_->catalogd_client_cache(), address,
+      CatalogServiceConnection::DoRpcWithRetry(env_->catalogd_client_cache(),
+          *ExecEnv::GetInstance()->GetCatalogdAddress().get(),
           &CatalogServiceClientWrapper::GetCatalogObject, request,
           FLAGS_catalog_client_connection_num_retries,
           FLAGS_catalog_client_rpc_retry_interval_ms,
@@ -366,14 +363,13 @@ Status CatalogOpExecutor::GetPartialCatalogObject(
     const TGetPartialCatalogObjectRequest& req,
     TGetPartialCatalogObjectResponse* resp) {
   DCHECK(FLAGS_use_local_catalog || TestInfo::is_test());
-  const TNetworkAddress& address =
-      MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);
   if (FLAGS_inject_latency_before_catalog_fetch_ms > 0) {
     SleepForMs(FLAGS_inject_latency_before_catalog_fetch_ms);
   }
   int attempt = 0; // Used for debug action only.
   CatalogServiceConnection::RpcStatus rpc_status =
-      CatalogServiceConnection::DoRpcWithRetry(env_->catalogd_client_cache(), address,
+      CatalogServiceConnection::DoRpcWithRetry(env_->catalogd_client_cache(),
+          *ExecEnv::GetInstance()->GetCatalogdAddress().get(),
           &CatalogServiceClientWrapper::GetPartialCatalogObject, req,
           FLAGS_catalog_client_connection_num_retries,
           FLAGS_catalog_client_rpc_retry_interval_ms,
@@ -388,11 +384,10 @@ Status CatalogOpExecutor::GetPartialCatalogObject(
 
 Status CatalogOpExecutor::PrioritizeLoad(const TPrioritizeLoadRequest& req,
     TPrioritizeLoadResponse* result) {
-  const TNetworkAddress& address =
-      MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);
   int attempt = 0; // Used for debug action only.
   CatalogServiceConnection::RpcStatus rpc_status =
-      CatalogServiceConnection::DoRpcWithRetry(env_->catalogd_client_cache(), address,
+      CatalogServiceConnection::DoRpcWithRetry(env_->catalogd_client_cache(),
+          *ExecEnv::GetInstance()->GetCatalogdAddress().get(),
           &CatalogServiceClientWrapper::PrioritizeLoad, req,
           FLAGS_catalog_client_connection_num_retries,
           FLAGS_catalog_client_rpc_retry_interval_ms,
@@ -403,11 +398,10 @@ Status CatalogOpExecutor::PrioritizeLoad(const TPrioritizeLoadRequest& req,
 
 Status CatalogOpExecutor::GetPartitionStats(
     const TGetPartitionStatsRequest& req, TGetPartitionStatsResponse* result) {
-  const TNetworkAddress& address =
-      MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);
   int attempt = 0; // Used for debug action only.
   CatalogServiceConnection::RpcStatus rpc_status =
-      CatalogServiceConnection::DoRpcWithRetry(env_->catalogd_client_cache(), address,
+      CatalogServiceConnection::DoRpcWithRetry(env_->catalogd_client_cache(),
+          *ExecEnv::GetInstance()->GetCatalogdAddress().get(),
           &CatalogServiceClientWrapper::GetPartitionStats, req,
           FLAGS_catalog_client_connection_num_retries,
           FLAGS_catalog_client_rpc_retry_interval_ms,
@@ -418,11 +412,10 @@ Status CatalogOpExecutor::GetPartitionStats(
 
 Status CatalogOpExecutor::UpdateTableUsage(const TUpdateTableUsageRequest& req,
   TUpdateTableUsageResponse* resp) {
-  const TNetworkAddress& address =
-      MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);
   int attempt = 0; // Used for debug action only.
   CatalogServiceConnection::RpcStatus rpc_status =
-      CatalogServiceConnection::DoRpcWithRetry(env_->catalogd_client_cache(), address,
+      CatalogServiceConnection::DoRpcWithRetry(env_->catalogd_client_cache(),
+          *ExecEnv::GetInstance()->GetCatalogdAddress().get(),
           &CatalogServiceClientWrapper::UpdateTableUsage, req,
           FLAGS_catalog_client_connection_num_retries,
           FLAGS_catalog_client_rpc_retry_interval_ms,

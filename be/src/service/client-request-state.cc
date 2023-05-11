@@ -82,8 +82,6 @@ using namespace strings;
 DECLARE_bool(abort_on_failed_audit_event);
 DECLARE_bool(abort_on_failed_lineage_event);
 DECLARE_int32(krpc_port);
-DECLARE_int32(catalog_service_port);
-DECLARE_string(catalog_service_host);
 DECLARE_int64(max_result_cache_size);
 DECLARE_bool(use_local_catalog);
 
@@ -828,10 +826,8 @@ void ClientRequestState::ExecLoadDataRequestImpl(bool exec_in_worker_thread) {
   catalog_update.db_name = exec_request_->load_data_request.table_name.db_name;
   catalog_update.is_overwrite = exec_request_->load_data_request.overwrite;
 
-  const TNetworkAddress& address =
-      MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);
-  CatalogServiceConnection client(
-      ExecEnv::GetInstance()->catalogd_client_cache(), address, &status);
+  CatalogServiceConnection client(ExecEnv::GetInstance()->catalogd_client_cache(),
+      *ExecEnv::GetInstance()->GetCatalogdAddress().get(), &status);
   {
     lock_guard<mutex> l(lock_);
     RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
@@ -1572,10 +1568,8 @@ Status ClientRequestState::UpdateCatalog() {
       }
 
       Status cnxn_status;
-      const TNetworkAddress& address =
-          MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);
-      CatalogServiceConnection client(
-          ExecEnv::GetInstance()->catalogd_client_cache(), address, &cnxn_status);
+      CatalogServiceConnection client(ExecEnv::GetInstance()->catalogd_client_cache(),
+          *ExecEnv::GetInstance()->GetCatalogdAddress().get(), &cnxn_status);
       RETURN_IF_ERROR(cnxn_status);
 
       VLOG_QUERY << "Executing FinalizeDml() using CatalogService";

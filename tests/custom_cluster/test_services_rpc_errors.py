@@ -44,6 +44,17 @@ class TestStatestoreRpcErrors(CustomClusterTestSuite):
     result = self.execute_query("select count(*) from functional_parquet.alltypes")
     assert result.success, str(result)
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      " --debug_actions=GET_PROTOCOL_VERSION_FIRST_ATTEMPT:FAIL@1.0")
+  def test_get_protocol_version_rpc_error(self, vector):
+    self.assert_impalad_log_contains("INFO",
+        "Injected RPC error.*Debug Action: GET_PROTOCOL_VERSION_FIRST_ATTEMPT")
+
+    # Ensure cluster has started up by running a query.
+    result = self.execute_query("select count(*) from functional_parquet.alltypes")
+    assert result.success, str(result)
+
 
 class TestCatalogRpcErrors(CustomClusterTestSuite):
   """Tests for catalog RPC handling."""

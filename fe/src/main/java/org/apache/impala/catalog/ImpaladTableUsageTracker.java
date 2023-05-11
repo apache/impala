@@ -101,8 +101,8 @@ public class ImpaladTableUsageTracker {
         TUpdateTableUsageRequest reqToSend;
         synchronized (this) {
           if (unreportedUsages.isEmpty()) continue;
-          reqToSend =
-              new TUpdateTableUsageRequest(new ArrayList<>(unreportedUsages.values()));
+          reqToSend = new TUpdateTableUsageRequest();
+          reqToSend.setUsages(new ArrayList<>(unreportedUsages.values()));
           unreportedUsages.clear();
         }
         byte[] byteResp =

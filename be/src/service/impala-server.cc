@@ -634,7 +634,7 @@ bool ImpalaServer::IsCoordinator() { return is_coordinator_; }
 
 bool ImpalaServer::IsExecutor() { return is_executor_; }
 
-bool ImpalaServer::IsHealthy() { return services_started_.load(); }
+bool ImpalaServer::IsHealthy() { return AreServicesReady(); }
 
 int ImpalaServer::GetBeeswaxPort() {
   DCHECK(beeswax_server_ != nullptr);
@@ -2306,7 +2306,7 @@ void ImpalaServer::CancelQueriesOnFailedBackends(
 }
 
 std::shared_ptr<const BackendDescriptorPB> ImpalaServer::GetLocalBackendDescriptor() {
-  if (!services_started_.load()) return nullptr;
+  if (!AreServicesReady()) return nullptr;
 
   lock_guard<mutex> l(local_backend_descriptor_lock_);
   // Check if the current backend descriptor needs to be initialized.
@@ -2329,7 +2329,7 @@ std::shared_ptr<const BackendDescriptorPB> ImpalaServer::GetLocalBackendDescript
 }
 
 void ImpalaServer::BuildLocalBackendDescriptorInternal(BackendDescriptorPB* be_desc) {
-  DCHECK(services_started_.load());
+  DCHECK(AreServicesReady());
   bool is_quiescing = shutting_down_.Load() != 0;
 
   *be_desc->mutable_backend_id() = exec_env_->backend_id();
@@ -3164,6 +3164,10 @@ void ImpalaServer::Join() {
     beeswax_server_.reset();
     hs2_server_.reset();
   }
+}
+
+bool ImpalaServer::AreServicesReady() const {
+  return services_started_.load() && exec_env_->IsStatestoreRegistrationCompleted();
 }
 
 Status ImpalaServer::CheckClientRequestSession(

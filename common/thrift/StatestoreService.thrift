@@ -20,9 +20,14 @@ namespace java org.apache.impala.thrift
 
 include "Status.thrift"
 include "Types.thrift"
+include "CatalogService.thrift"
 
 enum StatestoreServiceVersion {
    V1 = 0
+   // There is back version incompatibility. We need to increase the service version
+   // for Statestore so that Statestore will refuse the registration requests from
+   // the incompatible subscribers.
+   V2 = 1
 }
 
 // Description of a single entry in a list of heavy memory usage queries
@@ -179,9 +184,29 @@ struct TTopicRegistration {
   4: optional string filter_prefix
 }
 
+// Define the type for statestore subscriber
+enum TStatestoreSubscriberType {
+  UNKNOWN = 0
+  ADMISSIOND = 1
+  CATALOGD = 2
+  COORDINATOR = 3
+  EXECUTOR = 4
+  COORDINATOR_EXECUTOR = 5
+}
+
+// Additional registration info for catalog daemon.
+struct TCatalogRegistration {
+  // Protocol version of Catalog service.
+  1: required CatalogService.CatalogServiceVersion protocol;
+
+  // Address of catalogd.
+  2: required Types.TNetworkAddress address;
+}
+
 struct TRegisterSubscriberRequest {
+  // Protocol version of the subscriber
   1: required StatestoreServiceVersion protocol_version =
-      StatestoreServiceVersion.V1
+      StatestoreServiceVersion.V2
 
   // Unique, human-readable identifier for this subscriber
   2: required string subscriber_id;
@@ -191,6 +216,18 @@ struct TRegisterSubscriberRequest {
 
   // List of topics to subscribe to
   4: required list<TTopicRegistration> topic_registrations;
+
+  // Subscribe type
+  5: optional TStatestoreSubscriberType subscriber_type;
+
+  // Indicate if the subscriber wishes to be notified of changes to the catalogd.
+  // When it's set as true, statestore will send UpdateCatalogd RPC to the subscriber
+  // once there is catalogd change. Currently it as true for coordinators. In future,
+  // it will be set as true for catalogd when supporting Catalog HA.
+  6: optional bool subscribe_catalogd_change;
+
+  // Set iff this subscriber is catalogd.
+  7: optional TCatalogRegistration catalogd_registration;
 }
 
 struct TRegisterSubscriberResponse {
@@ -200,23 +237,58 @@ struct TRegisterSubscriberResponse {
   // Unique identifier for this registration. Changes with every call to
   // RegisterSubscriber().
   2: optional Types.TUniqueId registration_id;
+
+  // Protocol version of the statestore
+  3: optional StatestoreServiceVersion protocol_version;
+
+  // Unique identifier for the statestore instance. It could be changed for a new
+  // call RegisterSubscriber() if the statestore instance has been restarted since
+  // last registration.
+  4: optional Types.TUniqueId statestore_id;
+
+  // Catalog registration info.
+  5: optional TCatalogRegistration catalogd_registration;
+}
+
+struct TGetProtocolVersionRequest {
+  // Protocol version of the subscriber
+  1: required StatestoreServiceVersion protocol_version =
+      StatestoreServiceVersion.V2
+}
+
+struct TGetProtocolVersionResponse {
+  // whether the call was executed correctly at the application level
+  1: required Status.TStatus status;
+
+  // Protocol version of the statestore
+  2: required StatestoreServiceVersion protocol_version;
+
+  // Unique identifier for the statestore instance.
+  3: optional Types.TUniqueId statestore_id;
 }
 
 service StatestoreService {
   // Register a single subscriber. Note that after a subscriber is registered, no new
   // topics may be added.
   TRegisterSubscriberResponse RegisterSubscriber(1: TRegisterSubscriberRequest params);
+
+  // Get protocol version of the statestore
+  TGetProtocolVersionResponse GetProtocolVersion(1: TGetProtocolVersionRequest params);
 }
 
 struct TUpdateStateRequest {
+  // Protocol version of the statestore
   1: required StatestoreServiceVersion protocol_version =
-      StatestoreServiceVersion.V1
+      StatestoreServiceVersion.V2
 
   // Map from topic name to a list of changes for that topic.
   2: required map<string, TTopicDelta> topic_deltas;
 
   // Registration ID for the last known registration from this subscriber.
   3: optional Types.TUniqueId registration_id;
+
+  // Unique identifier for the statestore instance.
+  4: optional Types.TUniqueId statestore_id;
 }
 
 struct TUpdateStateResponse {
@@ -233,11 +305,43 @@ struct TUpdateStateResponse {
 }
 
 struct THeartbeatRequest {
-  1: optional Types.TUniqueId registration_id;
+  // Protocol version of the statestore
+  1: optional StatestoreServiceVersion protocol_version =
+      StatestoreServiceVersion.V2
+
+  // registration_id of the receiver
+  2: optional Types.TUniqueId registration_id;
+
+  // Unique identifier for the statestore instance.
+  3: optional Types.TUniqueId statestore_id;
 }
 
 struct THeartbeatResponse {
+  // Whether the call was executed correctly at the application level
+  1: required Status.TStatus status;
+}
 
+struct TUpdateCatalogdRequest {
+  // Protocol version of the statestore
+  1: required StatestoreServiceVersion protocol_version =
+      StatestoreServiceVersion.V2
+
+  // registration_id of the receiver
+  2: required Types.TUniqueId registration_id;
+
+  // Unique identifier for the statestore instance.
+  3: required Types.TUniqueId statestore_id;
+
+  // Monotonously increasing number
+  4: required i64 sequence;
+
+  // Catalog registration info.
+  5: required TCatalogRegistration catalogd_registration;
+}
+
+struct TUpdateCatalogdResponse {
+  // Whether the call was executed correctly at the application level
+  1: required Status.TStatus status;
 }
 
 service StatestoreSubscriber {
@@ -255,4 +359,7 @@ service StatestoreSubscriber {
 
   // Called when the statestore sends a heartbeat.
   THeartbeatResponse Heartbeat(1: THeartbeatRequest params);
+
+  // Called when active catalogd has been updated.
+  TUpdateCatalogdResponse UpdateCatalogd(1: TUpdateCatalogdRequest params);
 }

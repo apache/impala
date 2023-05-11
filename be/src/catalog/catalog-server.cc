@@ -176,7 +176,10 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   // Executes a TDdlExecRequest and returns details on the result of the operation.
   void ExecDdl(TDdlExecResponse& resp, const TDdlExecRequest& req) override {
     VLOG_RPC << "ExecDdl(): request=" << ThriftDebugString(req);
-    Status status = catalog_server_->catalog()->ExecDdl(req, &resp);
+    Status status = CheckProtocolVersion(req.protocol_version);
+    if (status.ok()) {
+      status = catalog_server_->catalog()->ExecDdl(req, &resp);
+    }
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     TStatus thrift_status;
     status.ToThrift(&thrift_status);
@@ -189,7 +192,10 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
       override {
     VLOG_RPC << "ResetMetadata(): request=" << ThriftDebugString(req);
     DebugActionNoFail(FLAGS_debug_actions, "RESET_METADATA_DELAY");
-    Status status = catalog_server_->catalog()->ResetMetadata(req, &resp);
+    Status status = CheckProtocolVersion(req.protocol_version);
+    if (status.ok()) {
+      status = catalog_server_->catalog()->ResetMetadata(req, &resp);
+    }
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     TStatus thrift_status;
     status.ToThrift(&thrift_status);
@@ -202,7 +208,10 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   void UpdateCatalog(TUpdateCatalogResponse& resp, const TUpdateCatalogRequest& req)
       override {
     VLOG_RPC << "UpdateCatalog(): request=" << ThriftDebugString(req);
-    Status status = catalog_server_->catalog()->UpdateCatalog(req, &resp);
+    Status status = CheckProtocolVersion(req.protocol_version);
+    if (status.ok()) {
+      status = catalog_server_->catalog()->UpdateCatalog(req, &resp);
+    }
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     TStatus thrift_status;
     status.ToThrift(&thrift_status);
@@ -215,7 +224,10 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   void GetFunctions(TGetFunctionsResponse& resp, const TGetFunctionsRequest& req)
       override {
     VLOG_RPC << "GetFunctions(): request=" << ThriftDebugString(req);
-    Status status = catalog_server_->catalog()->GetFunctions(req, &resp);
+    Status status = CheckProtocolVersion(req.protocol_version);
+    if (status.ok()) {
+      status = catalog_server_->catalog()->GetFunctions(req, &resp);
+    }
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     TStatus thrift_status;
     status.ToThrift(&thrift_status);
@@ -227,9 +239,15 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   void GetCatalogObject(TGetCatalogObjectResponse& resp,
       const TGetCatalogObjectRequest& req) override {
     VLOG_RPC << "GetCatalogObject(): request=" << ThriftDebugString(req);
-    Status status = catalog_server_->catalog()->GetCatalogObject(req.object_desc,
-        &resp.catalog_object);
+    Status status = CheckProtocolVersion(req.protocol_version);
+    if (status.ok()) {
+      status = catalog_server_->catalog()->GetCatalogObject(
+          req.object_desc, &resp.catalog_object);
+    }
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
+    TStatus thrift_status;
+    status.ToThrift(&thrift_status);
+    resp.__set_status(thrift_status);
     VLOG_RPC << "GetCatalogObject(): response=" << ThriftDebugStringNoThrow(resp);
   }
 
@@ -243,7 +261,10 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     // so a heavy query workload against a table undergoing a slow refresh doesn't
     // end up taking down the catalog by creating thousands of threads.
     VLOG_RPC << "GetPartialCatalogObject(): request=" << ThriftDebugString(req);
-    Status status = catalog_server_->catalog()->GetPartialCatalogObject(req, &resp);
+    Status status = CheckProtocolVersion(req.protocol_version);
+    if (status.ok()) {
+      status = catalog_server_->catalog()->GetPartialCatalogObject(req, &resp);
+    }
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     TStatus thrift_status;
     status.ToThrift(&thrift_status);
@@ -254,7 +275,10 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   void GetPartitionStats(TGetPartitionStatsResponse& resp,
       const TGetPartitionStatsRequest& req) override {
     VLOG_RPC << "GetPartitionStats(): request=" << ThriftDebugString(req);
-    Status status = catalog_server_->catalog()->GetPartitionStats(req, &resp);
+    Status status = CheckProtocolVersion(req.protocol_version);
+    if (status.ok()) {
+      status = catalog_server_->catalog()->GetPartitionStats(req, &resp);
+    }
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     TStatus thrift_status;
     status.ToThrift(&thrift_status);
@@ -268,7 +292,10 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   void PrioritizeLoad(TPrioritizeLoadResponse& resp, const TPrioritizeLoadRequest& req)
       override {
     VLOG_RPC << "PrioritizeLoad(): request=" << ThriftDebugString(req);
-    Status status = catalog_server_->catalog()->PrioritizeLoad(req);
+    Status status = CheckProtocolVersion(req.protocol_version);
+    if (status.ok()) {
+      status = catalog_server_->catalog()->PrioritizeLoad(req);
+    }
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     TStatus thrift_status;
     status.ToThrift(&thrift_status);
@@ -279,16 +306,33 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   void UpdateTableUsage(TUpdateTableUsageResponse& resp,
       const TUpdateTableUsageRequest& req) override {
     VLOG_RPC << "UpdateTableUsage(): request=" << ThriftDebugString(req);
-    Status status = catalog_server_->catalog()->UpdateTableUsage(req);
+    Status status = CheckProtocolVersion(req.protocol_version);
+    if (status.ok()) {
+      status = catalog_server_->catalog()->UpdateTableUsage(req);
+    }
     if (!status.ok()) LOG(WARNING) << status.GetDetail();
+    TStatus thrift_status;
+    status.ToThrift(&thrift_status);
+    resp.__set_status(thrift_status);
+    VLOG_RPC << "UpdateTableUsage(): response.status=" << resp.status;
   }
 
  private:
   CatalogServer* catalog_server_;
+
+  Status CheckProtocolVersion(CatalogServiceVersion::type client_version) {
+    Status status = Status::OK();
+    if (client_version < catalog_server_->GetProtocolVersion()) {
+      status = Status(TErrorCode::CATALOG_INCOMPATIBLE_PROTOCOL, client_version + 1,
+          catalog_server_->GetProtocolVersion() + 1);
+    }
+    return status;
+  }
 };
 
 CatalogServer::CatalogServer(MetricGroup* metrics)
-  : thrift_iface_(new CatalogServiceThriftIf(this)),
+  : protocol_version_(CatalogServiceVersion::V2),
+    thrift_iface_(new CatalogServiceThriftIf(this)),
     thrift_serializer_(FLAGS_compact_catalog_topic), metrics_(metrics),
     topic_updates_ready_(false), last_sent_catalog_version_(0L),
     catalog_objects_max_version_(0L) {
@@ -319,9 +363,10 @@ Status CatalogServer::Start() {
   RETURN_IF_ERROR(Thread::Create("catalog-server", "catalog-metrics-refresh-thread",
       &CatalogServer::RefreshMetrics, this, &catalog_metrics_refresh_thread_));
 
-  statestore_subscriber_.reset(new StatestoreSubscriber(
+  statestore_subscriber_.reset(new StatestoreSubscriberCatalog(
      Substitute("catalog-server@$0", TNetworkAddressToString(server_address)),
-     subscriber_address, statestore_address, metrics_));
+     subscriber_address, statestore_address, metrics_, protocol_version_,
+     server_address));
 
   StatestoreSubscriber::UpdateCallback cb =
       bind<void>(mem_fn(&CatalogServer::UpdateCatalogTopicCallback), this, _1, _2);
@@ -337,6 +382,7 @@ Status CatalogServer::Start() {
     status.AddDetail("CatalogService failed to start");
     return status;
   }
+
   RETURN_IF_ERROR(statestore_subscriber_->Start());
 
   // Notify the thread to start for the first time.

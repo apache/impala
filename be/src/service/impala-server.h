@@ -483,6 +483,10 @@ class ImpalaServer : public ImpalaServiceIf,
   void CancelQueriesOnFailedBackends(
       const std::unordered_set<BackendIdPB>& current_membership);
 
+  /// Returns true if all services required for the server have been started and the
+  /// registration with statestore is completed.
+  bool AreServicesReady() const;
+
   /// Start the shutdown process. Return an error if it could not be started. Otherwise,
   /// if it was successfully started by this or a previous call, return OK along with
   /// information about the pending shutdown in 'shutdown_status'. 'relative_deadline_s'

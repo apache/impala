@@ -69,6 +69,7 @@ DEFINE_int64_hidden(statestore_subscriber_recovery_grace_period_ms, 30000L, "Per
 DEFINE_int32(statestore_client_rpc_timeout_ms, 300000, "(Advanced) The underlying "
     "TSocket send/recv timeout in milliseconds for a catalog client RPC.");
 
+DECLARE_bool(tolerate_statestore_startup_delay);
 DECLARE_string(debug_actions);
 DECLARE_string(ssl_client_ca_certificate);
 DECLARE_string(ssl_server_certificate);
@@ -100,73 +101,243 @@ class StatestoreSubscriberThriftIf : public StatestoreSubscriberIf {
  public:
   StatestoreSubscriberThriftIf(StatestoreSubscriber* subscriber)
       : subscriber_(subscriber) { DCHECK(subscriber != NULL); }
+
   virtual void UpdateState(TUpdateStateResponse& response,
                            const TUpdateStateRequest& params) {
-    TUniqueId registration_id;
-    if (params.__isset.registration_id) {
-      registration_id = params.registration_id;
-    }
+    Status status = CheckProtocolVersion(params.protocol_version);
+    if (status.ok()) {
+      TUniqueId registration_id, statestore_id;
+      if (params.__isset.registration_id) {
+        registration_id = params.registration_id;
+      }
+      if (params.__isset.statestore_id) {
+        statestore_id = params.statestore_id;
+      }
 
-    subscriber_->UpdateState(params.topic_deltas, registration_id,
-        &response.topic_updates, &response.skipped).ToThrift(&response.status);
-    // Make sure Thrift thinks the field is set.
-    response.__set_skipped(response.skipped);
+      subscriber_
+          ->UpdateState(params.topic_deltas, registration_id, statestore_id,
+              &response.topic_updates, &response.skipped)
+          .ToThrift(&response.status);
+      // Make sure Thrift thinks the field is set.
+      response.__set_skipped(response.skipped);
+    }
+    TStatus thrift_status;
+    status.ToThrift(&thrift_status);
+    response.__set_status(thrift_status);
   }
 
   virtual void Heartbeat(THeartbeatResponse& response, const THeartbeatRequest& request) {
-    subscriber_->Heartbeat(request.registration_id);
+    Status status = CheckProtocolVersion(request.protocol_version);
+    if (status.ok()) {
+      TUniqueId registration_id, statestore_id;
+      if (request.__isset.registration_id) {
+        registration_id = request.registration_id;
+      }
+      if (request.__isset.statestore_id) {
+        statestore_id = request.statestore_id;
+      }
+      subscriber_->Heartbeat(registration_id, statestore_id);
+    }
+    TStatus thrift_status;
+    status.ToThrift(&thrift_status);
+    response.__set_status(thrift_status);
+  }
+
+  virtual void UpdateCatalogd(TUpdateCatalogdResponse& response,
+      const TUpdateCatalogdRequest& request) {
+    Status status = CheckProtocolVersion(request.protocol_version);
+    if (status.ok()) {
+      subscriber_->UpdateCatalogd(request.catalogd_registration,
+          request.registration_id, request.statestore_id, request.sequence);
+    }
+    TStatus thrift_status;
+    status.ToThrift(&thrift_status);
+    response.__set_status(thrift_status);
   }
 
  private:
   StatestoreSubscriber* subscriber_;
+
+  Status CheckProtocolVersion(StatestoreServiceVersion::type statestore_version) {
+    Status status = Status::OK();
+    if (statestore_version < subscriber_->GetProtocolVersion()) {
+      status = Status(TErrorCode::STATESTORE_INCOMPATIBLE_PROTOCOL, subscriber_->id(),
+          subscriber_->GetProtocolVersion() + 1, statestore_version + 1);
+    }
+    return status;
+  }
 };
 
 StatestoreSubscriber::StatestoreSubscriber(const string& subscriber_id,
     const TNetworkAddress& heartbeat_address, const TNetworkAddress& statestore_address,
-    MetricGroup* metrics)
+    MetricGroup* metrics, TStatestoreSubscriberType::type subscriber_type)
   : subscriber_id_(subscriber_id),
-    statestore_address_(statestore_address),
+    protocol_version_(StatestoreServiceVersion::V2),
+    catalog_protocol_version_(CatalogServiceVersion::V2),
+    heartbeat_address_(heartbeat_address),
+    subscriber_type_(subscriber_type),
     thrift_iface_(new StatestoreSubscriberThriftIf(this)),
-    failure_detector_(
-        new TimeoutFailureDetector(seconds(FLAGS_statestore_subscriber_timeout_seconds),
-            seconds(FLAGS_statestore_subscriber_timeout_seconds / 2))),
     client_cache_(new StatestoreClientCache(1, 0, FLAGS_statestore_client_rpc_timeout_ms,
         FLAGS_statestore_client_rpc_timeout_ms, "",
         !FLAGS_ssl_client_ca_certificate.empty())),
-    metrics_(metrics->GetOrCreateChildGroup("statestore-subscriber")),
-    heartbeat_address_(heartbeat_address),
-    is_registered_(false) {
-  connected_to_statestore_metric_ =
-      metrics_->AddProperty("statestore-subscriber.connected", false);
-  connection_failure_metric_ =
-    metrics_->AddCounter("statestore-subscriber.num-connection-failures", 0);
-  last_recovery_duration_metric_ = metrics_->AddDoubleGauge(
-      "statestore-subscriber.last-recovery-duration", 0.0);
-  last_recovery_time_metric_ = metrics_->AddProperty<string>(
-      "statestore-subscriber.last-recovery-time", "N/A");
-  topic_update_interval_metric_ = StatsMetric<double>::CreateAndRegister(metrics_,
-      "statestore-subscriber.topic-update-interval-time");
-  topic_update_duration_metric_ = StatsMetric<double>::CreateAndRegister(metrics_,
-      "statestore-subscriber.topic-update-duration");
-  heartbeat_interval_metric_ = StatsMetric<double>::CreateAndRegister(metrics_,
-      "statestore-subscriber.heartbeat-interval-time");
-  registration_id_metric_ = metrics->AddProperty<string>(
-      "statestore-subscriber.registration-id", "N/A");
+    metrics_(metrics->GetOrCreateChildGroup("statestore-subscriber")) {
+  statestore_ = new StatestoreStub(this, statestore_address, metrics);
   client_cache_->InitMetrics(metrics, "statestore-subscriber.statestore");
 }
 
 Status StatestoreSubscriber::AddTopic(const Statestore::TopicId& topic_id,
     bool is_transient, bool populate_min_subscriber_topic_version,
     string filter_prefix, const UpdateCallback& callback) {
+  return statestore_->AddTopic(topic_id, is_transient,
+      populate_min_subscriber_topic_version, filter_prefix, callback);
+}
+
+void StatestoreSubscriber::AddUpdateCatalogdTopic(
+    const UpdateCatalogdCallback& callback) {
+  statestore_->AddUpdateCatalogdTopic(callback);
+}
+
+void StatestoreSubscriber::AddCompleteRegistrationTopic(
+    const CompleteRegistrationCallback& callback) {
+  statestore_->AddCompleteRegistrationTopic(callback);
+}
+
+bool StatestoreSubscriber::IsInPostRecoveryGracePeriod() const {
+  return statestore_->IsInPostRecoveryGracePeriod();
+}
+
+bool StatestoreSubscriber::IsRegistered() const {
+  return statestore_->IsRegistered();
+}
+
+Status StatestoreSubscriber::Start(bool* has_registered_catalogd,
+    TCatalogRegistration* registered_catalogd_registration) {
+  // Backend must be started before registration
+  std::shared_ptr<TProcessor> processor(
+      new StatestoreSubscriberProcessor(thrift_iface_));
+  std::shared_ptr<TProcessorEventHandler> event_handler(
+      new RpcEventHandler("statestore-subscriber", metrics_));
+  processor->setEventHandler(event_handler);
+
+  ThriftServerBuilder builder(
+      "StatestoreSubscriber", processor, heartbeat_address_.port);
+  if (IsInternalTlsConfigured()) {
+    SSLProtocol ssl_version;
+    RETURN_IF_ERROR(
+        SSLProtoVersions::StringToProtocol(FLAGS_ssl_minimum_version, &ssl_version));
+    LOG(INFO) << "Enabling SSL for Statestore subscriber";
+    builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
+        .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
+        .ssl_version(ssl_version)
+        .cipher_list(FLAGS_ssl_cipher_list);
+  }
+
+  ThriftServer* server;
+  RETURN_IF_ERROR(builder.Build(&server));
+  heartbeat_server_.reset(server);
+  RETURN_IF_ERROR(heartbeat_server_->Start());
+
+  // Specify the port which the heartbeat server is listening on.
+  heartbeat_address_.port = heartbeat_server_->port();
+
+  return statestore_->Start(has_registered_catalogd, registered_catalogd_registration);
+}
+
+/// Set Register Request
+Status StatestoreSubscriber::SetRegisterRequest(
+    TRegisterSubscriberRequest* request) {
+  // Resolve the heartbeat address if necessary. Don't re-register with statestore
+  // if the heartbeat address cannot be resolved.
+  TNetworkAddress heartbeat_address = heartbeat_address_;
+  if (FLAGS_statestore_subscriber_use_resolved_address) {
+    IpAddr ip_address;
+    RETURN_IF_ERROR(HostnameToIpAddr(heartbeat_address.hostname, &ip_address));
+    heartbeat_address.hostname = ip_address;
+    LOG(INFO) << Substitute(
+        "Registering with statestore with resolved address $0", ip_address);
+  }
+  request->__set_subscriber_location(heartbeat_address);
+  request->__set_subscriber_id(subscriber_id_);
+  request->__set_subscriber_type(subscriber_type_);
+  request->__set_subscribe_catalogd_change(statestore_->IsSubscribedCatalogdChange());
+  return Status::OK();
+}
+
+void StatestoreSubscriber::Heartbeat(
+    const RegistrationId& registration_id, const TUniqueId& statestore_id) {
+  // It's possible the heartbeat is received for previous registration.
+  if (statestore_->IsMatchingStatestoreId(statestore_id)) {
+    statestore_->Heartbeat(registration_id);
+  }
+}
+
+void StatestoreSubscriber::UpdateCatalogd(
+    const TCatalogRegistration& catalogd_registration,
+    const RegistrationId& registration_id,
+    const TUniqueId& statestore_id, int64 sequence) {
+  if (statestore_->IsMatchingStatestoreId(statestore_id)) {
+    statestore_->UpdateCatalogd(catalogd_registration, registration_id, sequence);
+  }
+}
+
+Status StatestoreSubscriber::UpdateState(const TopicDeltaMap& incoming_topic_deltas,
+    const RegistrationId& registration_id, const TUniqueId& statestore_id,
+    vector<TTopicDelta>* subscriber_topic_updates, bool* skipped) {
+  if (statestore_->IsMatchingStatestoreId(statestore_id)) {
+    return statestore_->UpdateState(
+        incoming_topic_deltas, registration_id, subscriber_topic_updates, skipped);
+  }
+  return Status::OK();
+}
+
+StatestoreSubscriber::StatestoreStub::StatestoreStub(StatestoreSubscriber* subscriber,
+    const TNetworkAddress& statestore_address, MetricGroup* metrics)
+  : subscriber_(subscriber),
+    statestore_address_(statestore_address),
+    failure_detector_(
+        new TimeoutFailureDetector(seconds(FLAGS_statestore_subscriber_timeout_seconds),
+            seconds(FLAGS_statestore_subscriber_timeout_seconds / 2))),
+    is_registered_(false) {
+  std::string metrics_name_prefix = "";
+  metrics_ = metrics->GetOrCreateChildGroup(
+      metrics_name_prefix + "statestore-subscriber");
+  connected_to_statestore_metric_ = metrics_->AddProperty(
+      "statestore-subscriber.connected", false);
+  connection_failure_metric_ = metrics_->AddCounter(
+      "statestore-subscriber.num-connection-failures", 0);
+  last_recovery_duration_metric_ = metrics_->AddDoubleGauge(
+      "statestore-subscriber.last-recovery-duration", 0.0);
+  last_recovery_time_metric_ = metrics_->AddProperty<string>(
+      "statestore-subscriber.last-recovery-time", "N/A");
+  topic_update_interval_metric_ = StatsMetric<double>::CreateAndRegister(
+      metrics_, "statestore-subscriber.topic-update-interval-time");
+  topic_update_duration_metric_ = StatsMetric<double>::CreateAndRegister(
+      metrics_, "statestore-subscriber.topic-update-duration");
+  heartbeat_interval_metric_ = StatsMetric<double>::CreateAndRegister(
+      metrics_, "statestore-subscriber.heartbeat-interval-time");
+  registration_id_metric_ = metrics_->AddProperty<string>(
+      "statestore-subscriber.registration-id", "N/A");
+  statestore_id_metric_ = metrics_->AddProperty<string>(
+      "statestore-subscriber.statestore-id", "N/A");
+  update_catalogd_metric_ = metrics_->AddCounter(
+      "statestore-subscriber.num-update-catalogd", 0);
+  re_registr_attempt_metric_ = metrics_->AddCounter(
+      "statestore-subscriber.num-re-register-attempt", 0);
+}
+
+Status StatestoreSubscriber::StatestoreStub::AddTopic(
+    const Statestore::TopicId& topic_id, bool is_transient,
+    bool populate_min_subscriber_topic_version, string filter_prefix,
+    const UpdateCallback& callback) {
   lock_guard<shared_mutex> exclusive_lock(lock_);
   if (is_registered_) return Status("Subscriber already started, can't add new topic");
   TopicRegistration& registration = topic_registrations_[topic_id];
   registration.callbacks.push_back(callback);
   if (registration.processing_time_metric == nullptr) {
-    registration.processing_time_metric = StatsMetric<double>::CreateAndRegister(metrics_,
-        CALLBACK_METRIC_PATTERN, topic_id);
-    registration.update_interval_metric = StatsMetric<double>::CreateAndRegister(metrics_,
-        UPDATE_INTERVAL_METRIC_PATTERN, topic_id);
+    registration.processing_time_metric = StatsMetric<double>::CreateAndRegister(
+        metrics_, CALLBACK_METRIC_PATTERN, topic_id);
+    registration.update_interval_metric = StatsMetric<double>::CreateAndRegister(
+        metrics_, UPDATE_INTERVAL_METRIC_PATTERN, topic_id);
     registration.update_interval_timer.Start();
   }
   registration.is_transient = is_transient;
@@ -176,8 +347,51 @@ Status StatestoreSubscriber::AddTopic(const Statestore::TopicId& topic_id,
   return Status::OK();
 }
 
-Status StatestoreSubscriber::Register() {
-  Status client_status;
+void StatestoreSubscriber::StatestoreStub::AddUpdateCatalogdTopic(
+    const UpdateCatalogdCallback& callback) {
+  update_catalogd_callbacks_.push_back(callback);
+}
+
+void StatestoreSubscriber::StatestoreStub::AddCompleteRegistrationTopic(
+    const CompleteRegistrationCallback& callback) {
+  complete_registration_callbacks_.push_back(callback);
+}
+
+Status StatestoreSubscriber::StatestoreStub::Register(bool* has_registered_catalogd,
+    TCatalogRegistration* registered_catalogd_registration) {
+  // Check protocol version of the statestore first.
+  TGetProtocolVersionRequest get_protocol_request;
+  TGetProtocolVersionResponse get_protocol_response;
+  get_protocol_request.__set_protocol_version(subscriber_->GetProtocolVersion());
+  int attempt = 0; // Used for debug action only.
+  StatestoreServiceConn::RpcStatus rpc_status =
+      StatestoreServiceConn::DoRpcWithRetry(subscriber_->client_cache_.get(),
+          statestore_address_,
+          &StatestoreServiceClientWrapper::GetProtocolVersion,
+          get_protocol_request,
+          FLAGS_statestore_subscriber_cnxn_attempts,
+          FLAGS_statestore_subscriber_cnxn_retry_interval_ms,
+          [&attempt]() {
+            return attempt++ == 0 ?
+                DebugAction(FLAGS_debug_actions, "GET_PROTOCOL_VERSION_FIRST_ATTEMPT") :
+                Status::OK();
+          },
+          &get_protocol_response);
+  RETURN_IF_ERROR(rpc_status.status);
+  Status status = Status(get_protocol_response.status);
+  if (status.ok()) {
+    connected_to_statestore_metric_->SetValue(true);
+    if (get_protocol_response.protocol_version < subscriber_->GetProtocolVersion()) {
+      // Return error for incompatible statestore.
+      return Status(TErrorCode::STATESTORE_INCOMPATIBLE_PROTOCOL, subscriber_->id(),
+          subscriber_->GetProtocolVersion() + 1,
+          get_protocol_response.protocol_version + 1);
+    }
+  } else {
+    return status;
+  }
+
+  // Register subscriber
   TRegisterSubscriberRequest request;
   for (const auto& registration : topic_registrations_) {
     TTopicRegistration thrift_topic;
@@ -189,13 +403,14 @@ Status StatestoreSubscriber::Register() {
     request.topic_registrations.push_back(thrift_topic);
   }
 
-  request.subscriber_location = heartbeat_address_;
-  request.subscriber_id = subscriber_id_;
+  RETURN_IF_ERROR(subscriber_->SetRegisterRequest(&request));
   TRegisterSubscriberResponse response;
-  int attempt = 0; // Used for debug action only.
-  StatestoreServiceConn::RpcStatus rpc_status =
-      StatestoreServiceConn::DoRpcWithRetry(client_cache_.get(), statestore_address_,
-          &StatestoreServiceClientWrapper::RegisterSubscriber, request,
+  attempt = 0; // Used for debug action only.
+  rpc_status =
+      StatestoreServiceConn::DoRpcWithRetry(subscriber_->client_cache_.get(),
+          statestore_address_,
+          &StatestoreServiceClientWrapper::RegisterSubscriber,
+          request,
           FLAGS_statestore_subscriber_cnxn_attempts,
           FLAGS_statestore_subscriber_cnxn_retry_interval_ms,
           [&attempt]() {
@@ -205,94 +420,104 @@ Status StatestoreSubscriber::Register() {
           },
           &response);
   RETURN_IF_ERROR(rpc_status.status);
-  Status status = Status(response.status);
+  status = Status(response.status);
   if (status.ok()) {
     connected_to_statestore_metric_->SetValue(true);
     last_registration_ms_.Store(MonotonicMillis());
   }
-  if (response.__isset.registration_id) {
-    lock_guard<mutex> l(registration_id_lock_);
-    registration_id_ = response.registration_id;
-    const string& registration_string = PrintId(registration_id_);
-    registration_id_metric_->SetValue(registration_string);
-    VLOG(1) << "Subscriber registration ID: " << registration_string;
-  } else {
-    VLOG(1) << "No subscriber registration ID received from statestore";
+  {
+    lock_guard<mutex> l(id_lock_);
+    if (response.__isset.protocol_version) {
+      protocol_version_ = response.protocol_version;
+      VLOG(1) << "Statestore protocol version: " << protocol_version_;
+    } else {
+      VLOG(1) << "No service_version received from statestore";
+      protocol_version_ = StatestoreServiceVersion::V1;
+    }
+    if (response.__isset.registration_id) {
+      registration_id_ = response.registration_id;
+      const string& registration_string = PrintId(registration_id_);
+      registration_id_metric_->SetValue(registration_string);
+      VLOG(1) << "Subscriber registration ID: " << registration_string;
+    } else {
+      VLOG(1) << "No subscriber registration ID received from statestore";
+    }
+    if (response.__isset.statestore_id) {
+      statestore_id_ = response.statestore_id;
+      const string& statestore_id_string = PrintId(statestore_id_);
+      statestore_id_metric_->SetValue(statestore_id_string);
+      VLOG(1) << "Statestore ID: " << statestore_id_string;
+    } else {
+      VLOG(1) << "No statestore ID received from statestore";
+    }
+    if (status.ok() && response.__isset.catalogd_registration) {
+      VLOG(1) << "Registered catalogd address: "
+              << TNetworkAddressToString(response.catalogd_registration.address);
+      if (has_registered_catalogd != nullptr) *has_registered_catalogd = true;
+      if (registered_catalogd_registration != nullptr) {
+        *registered_catalogd_registration = response.catalogd_registration;
+      }
+    }
   }
   heartbeat_interval_timer_.Start();
   return status;
 }
 
-Status StatestoreSubscriber::Start() {
+Status StatestoreSubscriber::StatestoreStub::Start(bool* has_registered_catalogd,
+    TCatalogRegistration* registered_catalogd_registration) {
   Status status;
   {
     // Take the lock to ensure that, if a topic-update is received during registration
-    // (perhaps because Register() has succeeded, but we haven't finished setting up state
-    // on the client side), UpdateState() will reject the message.
+    // (perhaps because Register() has succeeded, but we haven't finished setting up
+    // state on the client side), UpdateState() will reject the message.
     lock_guard<shared_mutex> exclusive_lock(lock_);
     LOG(INFO) << "Starting statestore subscriber";
-
-    // Backend must be started before registration
-    std::shared_ptr<TProcessor> processor(
-        new StatestoreSubscriberProcessor(thrift_iface_));
-    std::shared_ptr<TProcessorEventHandler> event_handler(
-        new RpcEventHandler("statestore-subscriber", metrics_));
-    processor->setEventHandler(event_handler);
-
-    ThriftServerBuilder builder(
-        "StatestoreSubscriber", processor, heartbeat_address_.port);
-    if (IsInternalTlsConfigured()) {
-      SSLProtocol ssl_version;
-      RETURN_IF_ERROR(
-          SSLProtoVersions::StringToProtocol(FLAGS_ssl_minimum_version, &ssl_version));
-      LOG(INFO) << "Enabling SSL for Statestore subscriber";
-      builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
-          .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
-          .ssl_version(ssl_version)
-          .cipher_list(FLAGS_ssl_cipher_list);
+    // Inject failure before registering to statestore.
+    status = DebugAction(FLAGS_debug_actions, "REGISTER_STATESTORE_ON_STARTUP");
+    if (status.ok()) {
+      status = Register(has_registered_catalogd, registered_catalogd_registration);
     }
-
-    ThriftServer* server;
-    RETURN_IF_ERROR(builder.Build(&server));
-    heartbeat_server_.reset(server);
-    RETURN_IF_ERROR(heartbeat_server_->Start());
-
-    // Resolve the heartbeat address if necessary. Also specify the port which
-    // the heartbeat server is listening on.
-    if (FLAGS_statestore_subscriber_use_resolved_address) {
-      IpAddr ip_address;
-      RETURN_IF_ERROR(HostnameToIpAddr(heartbeat_address_.hostname, &ip_address));
-      heartbeat_address_.hostname = ip_address;
-      LOG(INFO) << Substitute("Registering with statestore with resolved address $0",
-          ip_address);
-    }
-    heartbeat_address_.port = heartbeat_server_->port();
-
-    LOG(INFO) << "Registering with statestore";
-    status = Register();
     if (status.ok()) {
       is_registered_ = true;
-      LOG(INFO) << "statestore registration successful";
+      LOG(INFO) << "statestore registration successful on startup";
     } else {
-      LOG(INFO) << "statestore registration unsuccessful: " << status.GetDetail();
+      LOG(INFO) << "statestore registration unsuccessful on startup: "
+                << status.GetDetail();
+      if (FLAGS_tolerate_statestore_startup_delay) {
+        LOG(INFO) << "Tolerate the delay of the statestore's availability on startup";
+        status = Status::OK();
+      }
     }
   }
 
-  // Registration is finished at this point, so it's fine to release the lock.
-  RETURN_IF_ERROR(Thread::Create("statestore-subscriber", "recovery-mode-thread",
-      &StatestoreSubscriber::RecoveryModeChecker, this, &recovery_mode_thread_));
-
+  if (status.ok()) {
+    // Registration is finished at this point, so it's fine to release the lock.
+    status = Thread::Create("statestore-subscriber", "recovery-mode-thread",
+        &StatestoreSubscriber::StatestoreStub::RecoveryModeChecker, this,
+        &recovery_mode_thread_);
+  }
   return status;
 }
 
-void StatestoreSubscriber::RecoveryModeChecker() {
-  failure_detector_->UpdateHeartbeat(STATESTORE_ID, true);
+void StatestoreSubscriber::StatestoreStub::RecoveryModeChecker() {
+  // Define a local variable is_registered since we need to hold lock when accessing
+  // class member variable is_registered_.
+  bool is_registered;
+  {
+    lock_guard<shared_mutex> exclusive_lock(lock_);
+    is_registered = is_registered_;
+  }
+  if (is_registered) {
+    failure_detector_->UpdateHeartbeat(STATESTORE_ID, true);
+  }
 
   // Every few seconds, wake up and check if the failure detector has determined
   // that the statestore has failed from our perspective. If so, enter recovery
   // mode and try to reconnect, followed by reregistering all subscriptions.
   while (true) {
-    if (failure_detector_->GetPeerState(STATESTORE_ID) == FailureDetector::FAILED) {
+    FailureDetector::PeerState state = failure_detector_->GetPeerState(STATESTORE_ID);
+    if (state == FailureDetector::FAILED
+        || (state == FailureDetector::UNKNOWN && !is_registered)) {
       // When entering recovery mode, the class-wide lock_ is taken to
       // ensure mutual exclusion with any operations in flight.
       lock_guard<shared_mutex> exclusive_lock(lock_);
@@ -300,19 +525,36 @@ void StatestoreSubscriber::RecoveryModeChecker() {
       recovery_timer.Start();
       connected_to_statestore_metric_->SetValue(false);
       connection_failure_metric_->Increment(1);
-      LOG(INFO) << subscriber_id_
+      LOG(INFO) << subscriber_->subscriber_id_
                 << ": Connection with statestore lost, entering recovery mode";
       uint32_t attempt_count = 1;
+      bool has_registered_catalogd = false;
+      TCatalogRegistration registered_catalogd_registration;
       while (true) {
         LOG(INFO) << "Trying to re-register with statestore, attempt: "
                   << attempt_count++;
-        Status status = Register();
+        re_registr_attempt_metric_->Increment(1);
+        Status status =
+            Register(&has_registered_catalogd, &registered_catalogd_registration);
         if (status.ok()) {
-          // Make sure to update failure detector so that we don't immediately fail on the
-          // next loop while we're waiting for heartbeat messages to resume.
+          if (!is_registered_) {
+            is_registered_ = true;
+            is_registered = true;
+            for (const CompleteRegistrationCallback& callback
+                : complete_registration_callbacks_) {
+              callback();
+            }
+          }
+          // Make sure to update failure detector so that we don't immediately fail on
+          // the next loop while we're waiting for heartbeat messages to resume.
           failure_detector_->UpdateHeartbeat(STATESTORE_ID, true);
           LOG(INFO) << "Reconnected to statestore. Exiting recovery mode";
 
+          if (has_registered_catalogd) {
+            for (const UpdateCatalogdCallback& callback : update_catalogd_callbacks_) {
+              callback(registered_catalogd_registration);
+            }
+          }
           // Break out of enclosing while (true) to top of outer-scope loop.
           break;
         } else {
@@ -338,23 +580,43 @@ void StatestoreSubscriber::RecoveryModeChecker() {
   }
 }
 
-Status StatestoreSubscriber::CheckRegistrationId(const RegistrationId& registration_id) {
-  {
-    lock_guard<mutex> r(registration_id_lock_);
-    // If this subscriber has just started, the registration_id_ may not have been set
-    // despite the statestore starting to send updates. The 'unset' RegistrationId is 0:0,
-    // so we can differentiate between a) an early message from an eager statestore, and
-    // b) a message that's targeted to a previous registration.
-    if (registration_id_ != TUniqueId() && registration_id != registration_id_) {
-      return Status(Substitute("Unexpected registration ID: $0, was expecting $1",
-          PrintId(registration_id), PrintId(registration_id_)));
-    }
+Status StatestoreSubscriber::StatestoreStub::CheckRegistrationId(
+    const RegistrationId& registration_id) {
+  lock_guard<mutex> r(id_lock_);
+  // If this subscriber has just started, the registration_id_ may not have been set
+  // despite the statestore starting to send updates. The 'unset' RegistrationId is 0:0,
+  // so we can differentiate between a) an early message from an eager statestore, and
+  // b) a message that's targeted to a previous registration.
+  if (registration_id_ != TUniqueId() && registration_id != registration_id_) {
+    return Status(Substitute("Unexpected registration ID: $0, was expecting $1",
+        PrintId(registration_id), PrintId(registration_id_)));
   }
-
   return Status::OK();
 }
 
-void StatestoreSubscriber::Heartbeat(const RegistrationId& registration_id) {
+Status StatestoreSubscriber::StatestoreStub::CheckRegistrationIdAndUpdateCatalogdSeq(
+    const RegistrationId& registration_id, int64 sequence){
+  lock_guard<mutex> r(id_lock_);
+  if (registration_id_ != TUniqueId() &&
+      (registration_id != registration_id_ || sequence <= last_update_catalogd_seq_)) {
+    return Status(Substitute("Unexpected registration ID: $0, was expecting $1 "
+        "or unexpected sequence number: $2, was expecting greater than $3",
+            PrintId(registration_id), PrintId(registration_id_), sequence,
+            last_update_catalogd_seq_));
+  }
+  last_update_catalogd_seq_ = sequence;
+  return Status::OK();
+}
+
+
+bool StatestoreSubscriber::StatestoreStub::IsMatchingStatestoreId(
+    const TUniqueId statestore_id) {
+  lock_guard<mutex> r(id_lock_);
+  return statestore_id == statestore_id_;
+}
+
+void StatestoreSubscriber::StatestoreStub::Heartbeat(
+    const RegistrationId& registration_id) {
   const Status& status = CheckRegistrationId(registration_id);
   if (status.ok()) {
     heartbeat_interval_metric_->Update(
@@ -365,9 +627,22 @@ void StatestoreSubscriber::Heartbeat(const RegistrationId& registration_id) {
   }
 }
 
-Status StatestoreSubscriber::UpdateState(const TopicDeltaMap& incoming_topic_deltas,
-    const RegistrationId& registration_id, vector<TTopicDelta>* subscriber_topic_updates,
-    bool* skipped) {
+void StatestoreSubscriber::StatestoreStub::UpdateCatalogd(
+    const TCatalogRegistration& catalogd_registration,
+    const RegistrationId& registration_id, int64 sequence) {
+  update_catalogd_metric_->Increment(1);
+  const Status& status =
+      CheckRegistrationIdAndUpdateCatalogdSeq(registration_id, sequence);
+  if (status.ok()) {
+    for (const UpdateCatalogdCallback& callback : update_catalogd_callbacks_) {
+      callback(catalogd_registration);
+    }
+  }
+}
+
+Status StatestoreSubscriber::StatestoreStub::UpdateState(
+    const TopicDeltaMap& incoming_topic_deltas, const RegistrationId& registration_id,
+    vector<TTopicDelta>* subscriber_topic_updates, bool* skipped) {
   RETURN_IF_ERROR(CheckRegistrationId(registration_id));
 
   // Put the updates into ascending order of topic name to match the lock acquisition
@@ -488,15 +763,21 @@ Status StatestoreSubscriber::UpdateState(const TopicDeltaMap& incoming_topic_del
     registration.update_interval_timer.Reset();
   }
   sw.Stop();
-  topic_update_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
+  topic_update_duration_metric_->Update(
+      sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
   return Status::OK();
 }
 
-bool StatestoreSubscriber::IsInPostRecoveryGracePeriod() const {
+bool StatestoreSubscriber::StatestoreStub::IsInPostRecoveryGracePeriod() const {
   bool has_failed_before = connection_failure_metric_->GetValue() > 0;
   bool in_grace_period = MilliSecondsSinceLastRegistration()
       < FLAGS_statestore_subscriber_recovery_grace_period_ms;
   return has_failed_before && in_grace_period;
+}
+
+bool StatestoreSubscriber::StatestoreStub::IsRegistered() {
+  lock_guard<shared_mutex> exclusive_lock(lock_);
+  return is_registered_;
 }
 
 }
