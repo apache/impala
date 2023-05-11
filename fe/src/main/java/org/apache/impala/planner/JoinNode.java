@@ -150,7 +150,8 @@ public abstract class JoinNode extends PlanNode {
     switch (joinOp_) {
       case LEFT_ANTI_JOIN:
       case LEFT_SEMI_JOIN:
-      case NULL_AWARE_LEFT_ANTI_JOIN: {
+      case NULL_AWARE_LEFT_ANTI_JOIN:
+      case ICEBERG_DELETE_JOIN: {
         tupleIds_.addAll(outer.getTupleIds());
         break;
       }
@@ -723,7 +724,8 @@ public abstract class JoinNode extends PlanNode {
           break;
         }
         case LEFT_ANTI_JOIN:
-        case NULL_AWARE_LEFT_ANTI_JOIN: {
+        case NULL_AWARE_LEFT_ANTI_JOIN:
+        case ICEBERG_DELETE_JOIN: {
           selectivity = (double) Math.max(lhsNdv - rhsNdv, lhsNdv) / (double) lhsNdv;
           break;
         }
@@ -814,7 +816,8 @@ public abstract class JoinNode extends PlanNode {
         break;
       }
       case LEFT_ANTI_JOIN:
-      case NULL_AWARE_LEFT_ANTI_JOIN: {
+      case NULL_AWARE_LEFT_ANTI_JOIN:
+      case ICEBERG_DELETE_JOIN: {
         if (leftCard != -1) {
           cardinality_ = Math.min(leftCard, cardinality_);
         }

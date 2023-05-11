@@ -631,7 +631,6 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   156: optional double join_selectivity_correlation_factor = 0.0;
-
   // See comment in ImpalaService.thrift
   157: optional i32 max_fragment_instances_per_node = MAX_FRAGMENT_INSTANCES_PER_NODE
 
@@ -644,6 +643,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   160: optional i32 num_threads_for_table_migration = 1;
+
+  // See comment in ImpalaService.thrift
+  161: optional bool disable_optimized_iceberg_v2_read = false;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

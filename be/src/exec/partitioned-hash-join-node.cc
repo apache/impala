@@ -83,9 +83,7 @@ Status PartitionedHashJoinPlanNode::Init(
       probe_exprs_, PhjBuilder::HashTableStoresNulls(join_op_, is_not_distinct_from_),
       is_not_distinct_from_));
 
-  // Create the config always. It is only used if UseSeparateBuild() is true, but in
-  // Init(), IsInSubplan() isn't available yet.
-  // TODO: simplify this by ensuring that UseSeparateBuild() is accurate in Init().
+  // TODO: IMPALA-12265: create the config only if it is necessary
   RETURN_IF_ERROR(
       PhjBuilderConfig::CreateConfig(state, tnode_->node_id, tnode_->join_node.join_op,
           &build_row_desc(), eq_join_conjuncts, tnode_->runtime_filters,

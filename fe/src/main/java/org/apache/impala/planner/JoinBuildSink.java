@@ -84,6 +84,11 @@ public class JoinBuildSink extends DataSink {
           ((HashJoinNode)joinNode_).getThriftEquiJoinConjuncts());
       tBuildSink.setHash_seed(joinNode_.getFragment().getHashSeed());
     }
+    if (joinNode_ instanceof IcebergDeleteNode) {
+      tBuildSink.setEq_join_conjuncts(
+          ((IcebergDeleteNode) joinNode_).getThriftEquiJoinConjuncts());
+      tBuildSink.setHash_seed(joinNode_.getFragment().getHashSeed());
+    }
     for (RuntimeFilter filter : runtimeFilters_) {
       tBuildSink.addToRuntime_filters(filter.toThrift());
     }
@@ -95,9 +100,11 @@ public class JoinBuildSink extends DataSink {
   protected TDataSinkType getSinkType() {
     if (joinNode_ instanceof HashJoinNode) {
       return TDataSinkType.HASH_JOIN_BUILDER;
-    } else {
-      Preconditions.checkState(joinNode_ instanceof NestedLoopJoinNode);
+    } else if (joinNode_ instanceof NestedLoopJoinNode) {
       return TDataSinkType.NESTED_LOOP_JOIN_BUILDER;
+    } else {
+      Preconditions.checkState(joinNode_ instanceof IcebergDeleteNode);
+      return TDataSinkType.ICEBERG_DELETE_BUILDER;
     }
   }
 

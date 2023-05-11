@@ -55,6 +55,7 @@ public class NestedLoopJoinNode extends JoinNode {
     super(outer, inner, isStraightJoin, distrMode, joinOp,
         Collections.<BinaryPredicate>emptyList(), otherJoinConjuncts,
         "NESTED LOOP JOIN");
+    Preconditions.checkState(joinOp_ != JoinOperator.ICEBERG_DELETE_JOIN);
   }
 
   @Override

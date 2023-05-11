@@ -91,7 +91,8 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
   switch (join_op_) {
     case TJoinOp::LEFT_ANTI_JOIN:
     case TJoinOp::LEFT_SEMI_JOIN:
-    case TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN: {
+    case TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN:
+    case TJoinOp::ICEBERG_DELETE_JOIN: {
       // Only return the surviving probe-side tuples.
       DCHECK(row_desc()->Equals(probe_row_desc()));
       break;

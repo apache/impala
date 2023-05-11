@@ -3699,6 +3699,22 @@ INSERT INTO TABLE {db_name}{db_suffix}.{table_name} values(3, 'parquet', 2.5, fa
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+iceberg_lineitem_multiblock
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
+              'iceberg.catalog_location'='/test-warehouse/iceberg_test/hadoop_catalog',
+              'iceberg.table_identifier'='ice.iceberg_lineitem_multiblock',
+              'format-version'='2');
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir -p /test-warehouse/iceberg_test/hadoop_catalog/ice && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/ice/iceberg_lineitem_multiblock /test-warehouse/iceberg_test/hadoop_catalog/ice
+
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 mv1_alltypes_jointbl
 ---- HIVE_MAJOR_VERSION
 3

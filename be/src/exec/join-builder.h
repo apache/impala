@@ -28,6 +28,7 @@ namespace impala {
 
 class NljBuilder;
 class PhjBuilder;
+class IcebergDeleteBuilder;
 
 class JoinBuilderConfig : public DataSinkConfig {
  public:
@@ -37,6 +38,7 @@ class JoinBuilderConfig : public DataSinkConfig {
   friend class JoinBuilder;
   friend class NljBuilder;
   friend class PhjBuilder;
+  friend class IcebergDeleteBuilder;
 
   Status Init(const TDataSink& tsink, const RowDescriptor* input_row_desc,
       FragmentState* state) override;

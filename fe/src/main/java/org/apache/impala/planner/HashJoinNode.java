@@ -56,6 +56,7 @@ public class HashJoinNode extends JoinNode {
         otherJoinConjuncts, "HASH JOIN");
     Preconditions.checkNotNull(eqJoinConjuncts);
     Preconditions.checkState(joinOp_ != JoinOperator.CROSS_JOIN);
+    Preconditions.checkState(joinOp_ != JoinOperator.ICEBERG_DELETE_JOIN);
   }
 
   @Override

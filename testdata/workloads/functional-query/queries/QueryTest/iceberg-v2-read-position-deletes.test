@@ -656,3 +656,38 @@ regex:'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time
 ---- TYPES
 STRING, INT, STRING, STRING, TIMESTAMP
 ====
+---- QUERY
+SELECT count(*) from iceberg_lineitem_multiblock;
+---- RESULTS
+17886
+---- TYPES
+bigint
+====
+---- QUERY
+SET BATCH_SIZE=2;
+SELECT count(*) from iceberg_lineitem_multiblock;
+---- RESULTS
+17886
+---- TYPES
+bigint
+====
+---- QUERY
+SELECT * from iceberg_v2_partitioned_position_deletes;
+---- RESULTS
+6,'Alex','view',2020-01-01 09:00:00
+20,'Alex','view',2020-01-01 09:00:00
+4,'Alex','view',2020-01-01 09:00:00
+18,'Alan','click',2020-01-01 10:00:00
+12,'Alan','click',2020-01-01 10:00:00
+10,'Alan','click',2020-01-01 10:00:00
+2,'Lisa','download',2020-01-01 11:00:00
+14,'Lisa','download',2020-01-01 11:00:00
+8,'Lisa','download',2020-01-01 11:00:00
+16,'Lisa','download',2020-01-01 11:00:00
+---- TYPES
+INT, STRING, STRING, TIMESTAMP
+====
+---- QUERY
+# Changing back in case we add new tests later
+SET BATCH_SIZE=0;
+====

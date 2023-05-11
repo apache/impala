@@ -32,6 +32,7 @@ enum TDataSinkType {
   HASH_JOIN_BUILDER = 2
   PLAN_ROOT_SINK = 3
   NESTED_LOOP_JOIN_BUILDER = 4
+  ICEBERG_DELETE_BUILDER = 5
 }
 
 enum TSinkAction {

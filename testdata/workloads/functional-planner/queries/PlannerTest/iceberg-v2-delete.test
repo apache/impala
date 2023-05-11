@@ -30,7 +30,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
 |  order by: input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
 |  row-size=20B cardinality=1
 |
-02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
 |  row-size=28B cardinality=1
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE-01 functional_parquet.iceberg_v2_delete_positional-position-delete]
@@ -48,7 +48,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
 |  order by: input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
 |  row-size=20B cardinality=1
 |
-02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, BROADCAST]
 |  row-size=28B cardinality=1
 |
 |--03:EXCHANGE [BROADCAST]
@@ -80,7 +80,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
 |  |  output: min(id)
 |  |  row-size=8B cardinality=1
 |  |
-|  05:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  05:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
 |  |  row-size=28B cardinality=3
 |  |
 |  |--04:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE-04 functional_parquet.iceberg_v2_delete_positional-position-delete]
@@ -91,7 +91,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
 |     HDFS partitions=1/1 files=1 size=662B
 |     row-size=28B cardinality=3
 |
-02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
 |  row-size=28B cardinality=3
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE-01 functional_parquet.iceberg_v2_delete_positional-position-delete]
@@ -126,7 +126,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
 |  |  output: min(id)
 |  |  row-size=8B cardinality=1
 |  |
-|  05:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  05:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, BROADCAST]
 |  |  row-size=28B cardinality=3
 |  |
 |  |--09:EXCHANGE [BROADCAST]
@@ -139,7 +139,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
 |     HDFS partitions=1/1 files=1 size=662B
 |     row-size=28B cardinality=3
 |
-02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, BROADCAST]
 |  row-size=28B cardinality=3
 |
 |--08:EXCHANGE [BROADCAST]
@@ -161,7 +161,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
 |  order by: input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
 |  row-size=20B cardinality=1
 |
-02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
 |  row-size=28B cardinality=1
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE-01 functional_parquet.iceberg_v2_delete_positional-position-delete]
@@ -179,7 +179,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
 |  order by: input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
 |  row-size=20B cardinality=1
 |
-02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, BROADCAST]
 |  row-size=28B cardinality=1
 |
 |--03:EXCHANGE [BROADCAST]
@@ -201,7 +201,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST, input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
 |  row-size=36B cardinality=2
 |
-02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
 |  row-size=40B cardinality=2
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
@@ -221,16 +221,16 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |
 05:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.PARTITION__SPEC__ID,functional_parquet.iceberg_v2_partitioned_position_deletes.ICEBERG__PARTITION__SERIALIZED)]
 |
-02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, PARTITIONED]
 |  row-size=40B cardinality=2
 |
-|--04:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.pos,functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.file_path)]
+|--04:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.file_path)]
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
 |     HDFS partitions=1/1 files=3 size=9.47KB
 |     row-size=204B cardinality=10
 |
-03:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.file__position,functional_parquet.iceberg_v2_partitioned_position_deletes.input__file__name)]
+03:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.input__file__name)]
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=3 size=3.48KB
@@ -245,7 +245,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST, input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
 |  row-size=36B cardinality=6
 |
-02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
 |  row-size=36B cardinality=6
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
@@ -263,7 +263,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST, input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
 |  row-size=36B cardinality=6
 |
-02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, BROADCAST]
 |  row-size=36B cardinality=6
 |
 |--03:EXCHANGE [BROADCAST]
@@ -285,7 +285,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST, input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
 |  row-size=36B cardinality=2
 |
-02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
 |  row-size=48B cardinality=2
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
@@ -305,16 +305,16 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |
 05:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.PARTITION__SPEC__ID,functional_parquet.iceberg_v2_partitioned_position_deletes.ICEBERG__PARTITION__SERIALIZED)]
 |
-02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, PARTITIONED]
 |  row-size=48B cardinality=2
 |
-|--04:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.pos,functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.file_path)]
+|--04:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.file_path)]
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
 |     HDFS partitions=1/1 files=3 size=9.47KB
 |     row-size=204B cardinality=10
 |
-03:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.file__position,functional_parquet.iceberg_v2_partitioned_position_deletes.input__file__name)]
+03:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.input__file__name)]
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=3 size=3.48KB
@@ -339,7 +339,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |  |  output: max(id)
 |  |  row-size=8B cardinality=1
 |  |
-|  05:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  05:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
 |  |  row-size=28B cardinality=3
 |  |
 |  |--04:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE-04 functional_parquet.iceberg_v2_delete_positional-position-delete]
@@ -350,7 +350,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |     HDFS partitions=1/1 files=1 size=662B
 |     row-size=28B cardinality=3
 |
-02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
 |  row-size=40B cardinality=20
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
@@ -387,7 +387,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |  |  output: max(id)
 |  |  row-size=8B cardinality=1
 |  |
-|  05:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  05:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, BROADCAST]
 |  |  row-size=28B cardinality=3
 |  |
 |  |--10:EXCHANGE [BROADCAST]
@@ -400,16 +400,16 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |     HDFS partitions=1/1 files=1 size=662B
 |     row-size=28B cardinality=3
 |
-02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, PARTITIONED]
 |  row-size=40B cardinality=20
 |
-|--09:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.pos,functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.file_path)]
+|--09:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.file_path)]
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
 |     HDFS partitions=1/1 files=3 size=9.47KB
 |     row-size=204B cardinality=10
 |
-08:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.file__position,functional_parquet.iceberg_v2_partitioned_position_deletes.input__file__name)]
+08:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.input__file__name)]
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=3 size=3.48KB
@@ -424,7 +424,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST, input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
 |  row-size=36B cardinality=2
 |
-02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
 |  row-size=40B cardinality=2
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
@@ -444,16 +444,16 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |
 05:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.PARTITION__SPEC__ID,functional_parquet.iceberg_v2_partitioned_position_deletes.ICEBERG__PARTITION__SERIALIZED)]
 |
-02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, PARTITIONED]
 |  row-size=40B cardinality=2
 |
-|--04:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.pos,functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.file_path)]
+|--04:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.file_path)]
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
 |     HDFS partitions=1/1 files=3 size=9.47KB
 |     row-size=204B cardinality=10
 |
-03:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.file__position,functional_parquet.iceberg_v2_partitioned_position_deletes.input__file__name)]
+03:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.input__file__name)]
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=3 size=3.48KB

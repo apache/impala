@@ -1282,6 +1282,16 @@ public class PlannerTest extends PlannerTestBase {
         ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
+  /**
+   * Check that Iceberg V2 table scans work as expected with hash join
+   */
+  @Test
+  public void testIcebergV2TableScansHashJoin() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setDisable_optimized_iceberg_v2_read(true);
+    runPlannerTestFile("iceberg-v2-tables-hash-join", "functional_parquet", options,
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
 
   /**
    * Check that Iceberg V2 DELETE statements work as expected.

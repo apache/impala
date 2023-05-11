@@ -196,7 +196,8 @@ class DataSink {
 
 static inline bool IsJoinBuildSink(const TDataSinkType::type& type) {
   return type == TDataSinkType::HASH_JOIN_BUILDER
-      || type == TDataSinkType::NESTED_LOOP_JOIN_BUILDER;
+      || type == TDataSinkType::NESTED_LOOP_JOIN_BUILDER
+      || type == TDataSinkType::ICEBERG_DELETE_BUILDER;
 }
 
 } // namespace impala

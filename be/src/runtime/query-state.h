@@ -293,6 +293,10 @@ class QueryState {
     return (it != fragment_state_map_.end()) ? it->second : nullptr;
   }
 
+  const std::unordered_map<TFragmentIdx, FragmentState*>& FragmentStateMap() {
+    return fragment_state_map_;
+  }
+
  private:
   friend class QueryExecMgr;
 

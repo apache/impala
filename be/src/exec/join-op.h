@@ -26,7 +26,8 @@ namespace impala {
 /// build rows.
 inline bool IsLeftSemiJoin(TJoinOp::type join_op) {
   return join_op == TJoinOp::LEFT_ANTI_JOIN || join_op == TJoinOp::LEFT_SEMI_JOIN
-      || join_op == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN;
+      || join_op == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN
+      || join_op == TJoinOp::ICEBERG_DELETE_JOIN;
 }
 
 /// Returns true if this is a semi-join that does not return tuple data from the

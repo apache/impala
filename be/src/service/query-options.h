@@ -50,7 +50,7 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
 // time we add or remove a query option to/from the enum TImpalaQueryOptions.
 #define QUERY_OPTS_TABLE                                                                 \
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),                                 \
-      TImpalaQueryOptions::NUM_THREADS_FOR_TABLE_MIGRATION + 1);                         \
+      TImpalaQueryOptions::DISABLE_OPTIMIZED_ICEBERG_V2_READ + 1);                       \
   REMOVED_QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED) \
   QUERY_OPT_FN(abort_on_error, ABORT_ON_ERROR, TQueryOptionLevel::REGULAR)               \
   REMOVED_QUERY_OPT_FN(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS)             \
@@ -295,6 +295,8 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
   QUERY_OPT_FN(max_sort_run_size, MAX_SORT_RUN_SIZE, TQueryOptionLevel::DEVELOPMENT)     \
   QUERY_OPT_FN(allow_unsafe_casts, ALLOW_UNSAFE_CASTS, TQueryOptionLevel::DEVELOPMENT)   \
   QUERY_OPT_FN(num_threads_for_table_migration, NUM_THREADS_FOR_TABLE_MIGRATION,         \
+      TQueryOptionLevel::ADVANCED)                                                       \
+  QUERY_OPT_FN(disable_optimized_iceberg_v2_read, DISABLE_OPTIMIZED_ICEBERG_V2_READ,     \
       TQueryOptionLevel::ADVANCED);
 
 /// Enforce practical limits on some query options to avoid undesired query state.

@@ -37,6 +37,7 @@
 #include "exec/hbase/hbase-scan-node.h"
 #include "exec/hdfs-scan-node-mt.h"
 #include "exec/hdfs-scan-node.h"
+#include "exec/iceberg-delete-node.h"
 #include "exec/kudu/kudu-scan-node-mt.h"
 #include "exec/kudu/kudu-scan-node.h"
 #include "exec/kudu/kudu-util.h"
@@ -221,6 +222,9 @@ Status PlanNode::CreatePlanNode(
       break;
     case TPlanNodeType::CARDINALITY_CHECK_NODE:
       *node = pool->Add(new CardinalityCheckPlanNode());
+      break;
+    case TPlanNodeType::ICEBERG_DELETE_NODE:
+      *node = pool->Add(new IcebergDeletePlanNode());
       break;
     default:
       map<int, const char*>::const_iterator i =

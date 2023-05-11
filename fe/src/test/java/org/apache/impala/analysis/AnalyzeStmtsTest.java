@@ -84,7 +84,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // Test join types. Parent/collection joins do not require an ON or USING clause.
     for (JoinOperator joinOp: JoinOperator.values()) {
-      if (joinOp.isNullAwareLeftAntiJoin()) continue;
+      if (joinOp.isNullAwareLeftAntiJoin() || joinOp.isIcebergDeleteJoin()) continue;
       TblsAnalyzeOk(String.format("select 1 from $TBL %s allcomplextypes.%s",
           joinOp, collectionTable), tbl);
       TblsAnalyzeOk(String.format("select 1 from $TBL a %s a.%s",
@@ -102,9 +102,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         collectionField, collectionTable), tbl);
     // Non parent/collection outer or semi  joins require an ON or USING clause.
     for (JoinOperator joinOp: JoinOperator.values()) {
-      if (joinOp.isNullAwareLeftAntiJoin()
-          || joinOp.isCrossJoin()
-          || joinOp.isInnerJoin()) {
+      if (joinOp.isNullAwareLeftAntiJoin() || joinOp.isCrossJoin() || joinOp.isInnerJoin()
+          || joinOp.isIcebergDeleteJoin()) {
         continue;
       }
       AnalysisError(String.format(
@@ -321,7 +320,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // Test that parent/collection joins without an ON clause analyze ok.
     for (JoinOperator joinOp: JoinOperator.values()) {
-      if (joinOp.isNullAwareLeftAntiJoin()) continue;
+      if (joinOp.isNullAwareLeftAntiJoin() || joinOp.isIcebergDeleteJoin()) continue;
       AnalyzesOk(String.format(
           "select 1 from functional.allcomplextypes a %s a.int_array_col b", joinOp));
       AnalyzesOk(String.format(
@@ -1568,7 +1567,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // Test that joins without an ON clause analyze ok if the rhs table is correlated.
     for (JoinOperator joinOp: JoinOperator.values()) {
-      if (joinOp.isNullAwareLeftAntiJoin()) continue;
+      if (joinOp.isNullAwareLeftAntiJoin() || joinOp.isIcebergDeleteJoin()) continue;
       AnalyzesOk(String.format("select 1 from functional.allcomplextypes a %s " +
           "(select item from a.int_array_col) v", joinOp));
       AnalyzesOk(String.format("select 1 from functional.allcomplextypes a %s " +

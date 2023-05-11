@@ -32,8 +32,9 @@ public enum JoinOperator {
   // Variant of the LEFT ANTI JOIN that is used for the rewrite of
   // NOT IN subqueries. It can have a single equality join conjunct
   // that returns TRUE when the rhs is NULL.
-  NULL_AWARE_LEFT_ANTI_JOIN("NULL AWARE LEFT ANTI JOIN",
-      TJoinOp.NULL_AWARE_LEFT_ANTI_JOIN);
+  NULL_AWARE_LEFT_ANTI_JOIN(
+      "NULL AWARE LEFT ANTI JOIN", TJoinOp.NULL_AWARE_LEFT_ANTI_JOIN),
+  ICEBERG_DELETE_JOIN("ICEBERG DELETE JOIN", TJoinOp.ICEBERG_DELETE_JOIN);
 
   private final String description_;
   private final TJoinOp thriftJoinOp_;
@@ -58,14 +59,16 @@ public enum JoinOperator {
   }
 
   public boolean isSemiJoin() {
-    return this == JoinOperator.LEFT_SEMI_JOIN || this == JoinOperator.LEFT_ANTI_JOIN ||
-        this == JoinOperator.RIGHT_SEMI_JOIN || this == JoinOperator.RIGHT_ANTI_JOIN ||
-        this == JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN;
+    return this == JoinOperator.LEFT_SEMI_JOIN || this == JoinOperator.LEFT_ANTI_JOIN
+        || this == JoinOperator.RIGHT_SEMI_JOIN || this == JoinOperator.RIGHT_ANTI_JOIN
+        || this == JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN
+        || this == JoinOperator.ICEBERG_DELETE_JOIN;
   }
 
   public boolean isLeftSemiJoin() {
-    return this == JoinOperator.LEFT_SEMI_JOIN || this == JoinOperator.LEFT_ANTI_JOIN ||
-        this == JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN;
+    return this == JoinOperator.LEFT_SEMI_JOIN || this == JoinOperator.LEFT_ANTI_JOIN
+        || this == JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN
+        || this == JoinOperator.ICEBERG_DELETE_JOIN;
   }
 
   public boolean isRightSemiJoin() {
@@ -85,8 +88,13 @@ public enum JoinOperator {
   }
 
   public boolean isAntiJoin() {
-    return this == JoinOperator.LEFT_ANTI_JOIN || this == JoinOperator.RIGHT_ANTI_JOIN ||
-        this == JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN;
+    return this == JoinOperator.LEFT_ANTI_JOIN || this == JoinOperator.RIGHT_ANTI_JOIN
+        || this == JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN
+        || this == JoinOperator.ICEBERG_DELETE_JOIN;
+  }
+
+  public boolean isIcebergDeleteJoin() {
+    return this == JoinOperator.ICEBERG_DELETE_JOIN;
   }
 
   public JoinOperator invert() {
@@ -97,7 +105,8 @@ public enum JoinOperator {
       case RIGHT_SEMI_JOIN: return LEFT_SEMI_JOIN;
       case LEFT_ANTI_JOIN: return RIGHT_ANTI_JOIN;
       case RIGHT_ANTI_JOIN: return LEFT_ANTI_JOIN;
-      case NULL_AWARE_LEFT_ANTI_JOIN: throw new IllegalStateException("Not implemented");
+      case NULL_AWARE_LEFT_ANTI_JOIN:
+      case ICEBERG_DELETE_JOIN: throw new IllegalStateException("Not implemented");
       default: return this;
     }
   }

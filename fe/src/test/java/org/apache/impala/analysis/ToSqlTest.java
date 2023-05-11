@@ -56,15 +56,17 @@ public class ToSqlTest extends FrontendTestBase {
 
   static {
     // Exclude the NULL AWARE LEFT ANTI JOIN operator because it cannot
-    // be directly expressed via SQL.
-    joinTypes_ = new String[JoinOperator.values().length - 2];
-    int numNonSemiJoinTypes = JoinOperator.values().length - 2 -
-        leftSemiJoinTypes_.length - rightSemiJoinTypes_.length;
+    // be directly expressed via SQL, and ICEBERG DELETE JOIN, because it is not
+    // a real join.
+    joinTypes_ = new String[JoinOperator.values().length - 3];
+    int numNonSemiJoinTypes = JoinOperator.values().length - 3 - leftSemiJoinTypes_.length
+        - rightSemiJoinTypes_.length;
     nonSemiJoinTypes_ = new String[numNonSemiJoinTypes];
     int i = 0;
     int j = 0;
     for (JoinOperator op: JoinOperator.values()) {
-      if (op.isCrossJoin() || op.isNullAwareLeftAntiJoin()) continue;
+      if (op.isCrossJoin() || op.isNullAwareLeftAntiJoin() || op.isIcebergDeleteJoin())
+        continue;
       joinTypes_[i++] = op.toString();
       if (op.isSemiJoin()) continue;
       nonSemiJoinTypes_[j++] = op.toString();

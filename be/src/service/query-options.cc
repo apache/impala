@@ -1118,6 +1118,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_num_threads_for_table_migration(int32_t_val);
         break;
       }
+      case TImpalaQueryOptions::DISABLE_OPTIMIZED_ICEBERG_V2_READ: {
+        query_options->__set_disable_optimized_iceberg_v2_read(IsTrue(value));
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

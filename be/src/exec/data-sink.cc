@@ -21,19 +21,20 @@
 #include <map>
 
 #include "common/logging.h"
+#include "exec/blocking-plan-root-sink.h"
+#include "exec/buffered-plan-root-sink.h"
 #include "exec/exec-node.h"
 #include "exec/hbase/hbase-table-sink.h"
 #include "exec/hdfs-table-sink.h"
+#include "exec/iceberg-delete-builder.h"
 #include "exec/iceberg-delete-sink.h"
 #include "exec/kudu/kudu-table-sink.h"
 #include "exec/kudu/kudu-util.h"
-#include "exec/blocking-plan-root-sink.h"
-#include "exec/buffered-plan-root-sink.h"
 #include "exec/nested-loop-join-builder.h"
 #include "exec/partitioned-hash-join-builder.h"
 #include "exec/plan-root-sink.h"
-#include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/scalar-expr.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gutil/strings/substitute.h"
@@ -118,6 +119,10 @@ Status DataSinkConfig::CreateConfig(const TDataSink& thrift_sink,
     }
     case TDataSinkType::NESTED_LOOP_JOIN_BUILDER: {
       *data_sink = pool->Add(new NljBuilderConfig());
+      break;
+    }
+    case TDataSinkType::ICEBERG_DELETE_BUILDER: {
+      *data_sink = pool->Add(new IcebergDeleteBuilderConfig());
       break;
     }
     default:

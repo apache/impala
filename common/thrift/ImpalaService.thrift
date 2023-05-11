@@ -803,6 +803,9 @@ enum TImpalaQueryOptions {
   // The maximum number of threads Impala can use for migrating a table to a different
   // type. E.g. from Hive table to Iceberg table.
   NUM_THREADS_FOR_TABLE_MIGRATION = 159;
+
+  // Turns off optimized Iceberg V2 reads, falls back to Hash Join
+  DISABLE_OPTIMIZED_ICEBERG_V2_READ = 160;
 }
 
 // The summary of a DML statement.

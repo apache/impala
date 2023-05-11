@@ -80,9 +80,11 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.planner.IcebergDeleteNode;
 import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.thrift.TColumnStats;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TVirtualColumnType;
 import org.apache.impala.util.ExprUtil;
 import org.apache.impala.util.IcebergUtil;
@@ -258,9 +260,16 @@ public class IcebergScanPlanner {
     List<BinaryPredicate> positionJoinConjuncts = createPositionJoinConjuncts(
             analyzer_, tblRef_.getDesc(), deleteDeltaRef.getDesc());
 
-    JoinNode joinNode = new HashJoinNode(dataScanNode, deleteScanNode,
-        /*straight_join=*/true, DistributionMode.NONE, JoinOperator.LEFT_ANTI_JOIN,
-        positionJoinConjuncts, /*otherJoinConjuncts=*/Collections.emptyList());
+    TQueryOptions queryOpts = analyzer_.getQueryCtx().client_request.query_options;
+    JoinNode joinNode = null;
+    if (queryOpts.disable_optimized_iceberg_v2_read) {
+      joinNode = new HashJoinNode(dataScanNode, deleteScanNode,
+          /*straight_join=*/true, DistributionMode.NONE, JoinOperator.LEFT_ANTI_JOIN,
+          positionJoinConjuncts, /*otherJoinConjuncts=*/Collections.emptyList());
+    } else {
+      joinNode =
+          new IcebergDeleteNode(dataScanNode, deleteScanNode, positionJoinConjuncts);
+    }
     joinNode.setId(ctx_.getNextNodeId());
     joinNode.init(analyzer_);
     joinNode.setIsDeleteRowsJoin();
@@ -306,6 +315,8 @@ public class IcebergScanPlanner {
       TupleDescriptor insertTupleDesc, TupleDescriptor deleteTupleDesc)
       throws AnalysisException {
     List<BinaryPredicate> ret = new ArrayList<>();
+    BinaryPredicate filePathEq = null;
+    BinaryPredicate posEq = null;
     for (SlotDescriptor deleteSlotDesc : deleteTupleDesc.getSlots()) {
       boolean foundMatch = false;
       Column col = deleteSlotDesc.getParent().getTable().getColumns().get(
@@ -314,23 +325,29 @@ public class IcebergScanPlanner {
       int fieldId = ((IcebergColumn)col).getFieldId();
       for (SlotDescriptor insertSlotDesc : insertTupleDesc.getSlots()) {
         TVirtualColumnType virtColType = insertSlotDesc.getVirtualColumnType();
-        if (fieldId == IcebergTable.V2_FILE_PATH_FIELD_ID &&
-            virtColType != TVirtualColumnType.INPUT_FILE_NAME) {
-          continue;
+        if (fieldId == IcebergTable.V2_FILE_PATH_FIELD_ID
+            && virtColType == TVirtualColumnType.INPUT_FILE_NAME) {
+          foundMatch = true;
+          filePathEq = new BinaryPredicate(
+              Operator.EQ, new SlotRef(insertSlotDesc), new SlotRef(deleteSlotDesc));
+          filePathEq.analyze(analyzer);
+          break;
         }
-        if (fieldId == IcebergTable.V2_POS_FIELD_ID &&
-            virtColType != TVirtualColumnType.FILE_POSITION) {
-          continue;
+        if (fieldId == IcebergTable.V2_POS_FIELD_ID
+            && virtColType == TVirtualColumnType.FILE_POSITION) {
+          foundMatch = true;
+          posEq = new BinaryPredicate(
+              Operator.EQ, new SlotRef(insertSlotDesc), new SlotRef(deleteSlotDesc));
+          posEq.analyze(analyzer);
+          break;
         }
-        foundMatch = true;
-        BinaryPredicate pred = new BinaryPredicate(
-            Operator.EQ, new SlotRef(insertSlotDesc), new SlotRef(deleteSlotDesc));
-        pred.analyze(analyzer);
-        ret.add(pred);
-        break;
       }
       Preconditions.checkState(foundMatch);
     }
+    Preconditions.checkState(filePathEq != null);
+    Preconditions.checkState(posEq != null);
+    ret.add(filePathEq);
+    ret.add(posEq);
     return ret;
   }
 

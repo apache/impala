@@ -51,6 +51,7 @@ enum TPlanNodeType {
   KUDU_SCAN_NODE = 15
   CARDINALITY_CHECK_NODE = 16
   MULTI_AGGREGATION_NODE = 17
+  ICEBERG_DELETE_NODE = 18
 }
 
 // phases of an execution node
@@ -414,6 +415,9 @@ enum TJoinOp {
   RIGHT_ANTI_JOIN = 7
   FULL_OUTER_JOIN = 8
   CROSS_JOIN = 9
+
+  // Iceberg Delete operator is based on join operation
+  ICEBERG_DELETE_JOIN = 10
 }
 
 struct THashJoinNode {
@@ -434,6 +438,11 @@ struct TNestedLoopJoinNode {
   1: optional list<Exprs.TExpr> join_conjuncts
 }
 
+struct TIcebergDeleteNode {
+  // equi-join predicates
+  1: required list<TEqJoinCondition> eq_join_conjuncts
+}
+
 // Top-level struct for a join node. Elements that are shared between the different
 // join implementations are top-level variables and elements that are specific to a
 // join implementation live in a specialized struct.
@@ -449,6 +458,7 @@ struct TJoinNode {
   // One of these must be set.
   4: optional THashJoinNode hash_join_node
   5: optional TNestedLoopJoinNode nested_loop_join_node
+  6: optional TIcebergDeleteNode iceberg_delete_node
 }
 
 struct TAggregator {
