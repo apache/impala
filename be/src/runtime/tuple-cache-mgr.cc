@@ -20,6 +20,8 @@
 #include <boost/filesystem.hpp>
 
 #include "common/logging.h"
+#include "exec/tuple-file-reader.h"
+#include "exec/tuple-text-file-reader.h"
 #include "gutil/strings/split.h"
 #include "gutil/strings/substitute.h"
 #include "kudu/util/env.h"
@@ -49,6 +51,9 @@ DEFINE_string(tuple_cache, "", "The configuration string for the tuple cache. "
 DEFINE_string(tuple_cache_eviction_policy, "LRU",
     "(Advanced) The cache eviction policy to use for the tuple cache. "
     "Either 'LRU' (default) or 'LIRS' (experimental)");
+DEFINE_string(tuple_cache_debug_dump_dir, "",
+    "Directory for dumping the intermediate query result tuples for debugging purpose.");
+
 // Global feature flag for tuple caching. If false, enable_tuple_cache cannot be true
 // and the coordinator cannot produce plans with TupleCacheNodes. The tuple_cache
 // parameter also cannot be specified.
@@ -65,6 +70,25 @@ static const char* MIN_TUPLE_CACHE_CAPACITY_STR = "64MB";
 static constexpr int64_t STATS_MAX_TUPLE_CACHE_ENTRY_SIZE = 128L << 20;
 
 static const char* CACHE_FILE_PREFIX = "tuple-cache-";
+static const char* DUBUG_DUMP_SUB_DIR_NAME = "tuple-cache-debug-dump";
+
+static string ConstructTupleCacheDebugDumpPath() {
+  // Construct and return the path for debug dumping the tuple cache if configured.
+  string& cache_debug_dump_dir = FLAGS_tuple_cache_debug_dump_dir;
+  if (cache_debug_dump_dir != "") {
+    filesystem::path path(cache_debug_dump_dir);
+    path /= DUBUG_DUMP_SUB_DIR_NAME;
+    // Remove and recreate the subdirectory if it exists.
+    Status cr_status = FileSystemUtil::RemoveAndCreateDirectory(path.string());
+    if (cr_status.ok()) {
+      LOG(INFO) << "Created tuple cache debug dump path in " << path.string();
+      return path.string();
+    }
+    LOG(WARNING) << "Unable to create directory for tuple cache dumping: "
+                 << cr_status.GetDetail();
+  }
+  return string();
+}
 
 TupleCacheMgr::TupleCacheMgr(MetricGroup* metrics)
   : TupleCacheMgr(FLAGS_tuple_cache, FLAGS_tuple_cache_eviction_policy, metrics, 0) {}
@@ -73,6 +97,7 @@ TupleCacheMgr::TupleCacheMgr(string cache_config, string eviction_policy_str,
     MetricGroup* metrics, uint8_t debug_pos)
   : cache_config_(move(cache_config)),
     eviction_policy_str_(move(eviction_policy_str)),
+    cache_debug_dump_dir_(ConstructTupleCacheDebugDumpPath()),
     debug_pos_(debug_pos),
     tuple_cache_hits_(metrics->AddCounter("impala.tuple-cache.hits", 0)),
     tuple_cache_misses_(metrics->AddCounter("impala.tuple-cache.misses", 0)),
@@ -348,6 +373,51 @@ const char* TupleCacheMgr::GetPath(UniqueHandle& handle) const {
   return reinterpret_cast<const char*>(data + sizeof(TupleCacheEntry));
 }
 
+Status TupleCacheMgr::CreateDebugDumpSubdir(const string& sub_dir) {
+  DCHECK(!sub_dir.empty());
+  bool path_exists = false;
+  std::lock_guard<std::mutex> l(debug_dump_subdir_lock_);
+  // Try to create the subdir if it doesn't already exist.
+  RETURN_IF_ERROR(FileSystemUtil::PathExists(sub_dir, &path_exists));
+  if (!path_exists) {
+    RETURN_IF_ERROR(FileSystemUtil::CreateDirectory(sub_dir));
+  }
+  return Status::OK();
+}
+
+string TupleCacheMgr::GetDebugDumpPath(
+    const string& sub_dir, const string& file_name, string* sub_dir_full_path) const {
+  filesystem::path full_path(cache_debug_dump_dir_);
+  full_path /= sub_dir;
+  if (sub_dir_full_path != nullptr) *sub_dir_full_path = full_path.string();
+  full_path /= file_name;
+  return full_path.string();
+}
+
+void TupleCacheMgr::StoreMetadataForTupleCache(
+    const string& cache_key, const string& fragment_id) {
+  std::lock_guard<std::mutex> l(debug_dump_lock_);
+  DebugDumpCacheMetaData& cache = debug_dump_caches_metadata_[cache_key];
+  cache.fragment_id = fragment_id;
+}
+
+string TupleCacheMgr::GetFragmentIdForTupleCache(const string& cache_key) {
+  std::lock_guard<std::mutex> l(debug_dump_lock_);
+  auto iter = debug_dump_caches_metadata_.find(cache_key);
+  if (iter == debug_dump_caches_metadata_.end()) {
+    return string();
+  }
+  return iter->second.fragment_id;
+}
+
+void TupleCacheMgr::RemoveMetadataForTupleCache(const string& cache_key) {
+  std::lock_guard<std::mutex> l(debug_dump_lock_);
+  auto it = debug_dump_caches_metadata_.find(cache_key);
+  if (it != debug_dump_caches_metadata_.end()) {
+    debug_dump_caches_metadata_.erase(it);
+  }
+}
+
 void TupleCacheMgr::EvictedEntry(Slice key, Slice value) {
   const TupleCacheEntry* entry = reinterpret_cast<const TupleCacheEntry*>(value.data());
   if (TupleCacheState::TOMBSTONE != entry->state) {
@@ -374,6 +444,11 @@ void TupleCacheMgr::EvictedEntry(Slice key, Slice value) {
     LOG(WARNING) <<
         Substitute("Failed to unlink $0: $1", value.ToString(), status.ToString());
   }
+  // If correctness checking is enabled, remove the associated metadata as well.
+  if (DebugDumpEnabled()) {
+    string key_str(reinterpret_cast<const char*>(key.data()), key.size());
+    RemoveMetadataForTupleCache(key_str);
+  }
 }
 
 Status TupleCacheMgr::DeleteExistingFiles() const {
@@ -390,5 +465,4 @@ Status TupleCacheMgr::DeleteExistingFiles() const {
   }
   return Status::OK();
 }
-
 } // namespace impala

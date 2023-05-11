@@ -26,6 +26,7 @@ namespace impala {
 
 class TupleFileReader;
 class TupleFileWriter;
+class TupleTextFileWriter;
 
 class TupleCachePlanNode : public PlanNode {
  public:
@@ -83,6 +84,17 @@ private:
   TupleCacheMgr::UniqueHandle handle_;
   std::unique_ptr<TupleFileReader> reader_;
   std::unique_ptr<TupleFileWriter> writer_;
+  std::unique_ptr<TupleTextFileWriter> debug_dump_text_writer_;
+  std::unique_ptr<TupleTextFileWriter> debug_dump_text_writer_ref_;
+
+  /// Helper function to generate the path for debug dumping the tuple cache.
+  /// If sub_dir_full_path is not nullptr, the subdirectory path will be returned,
+  /// allowing the caller to create the subdirectory if necessary.
+  string GetDebugDumpPath(const RuntimeState* state, const string& fragment_id,
+      string* sub_dir_full_path = nullptr) const;
+
+  /// Helper function to verify the correctness of the debug tuple cache.
+  Status VerifyAndMoveDebugCache(RuntimeState* state);
 };
 
 }

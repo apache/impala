@@ -17,10 +17,13 @@
 
 #include <gflags/gflags.h>
 
-#include "exec/tuple-cache-node.h"
 #include "exec/exec-node-util.h"
+#include "exec/tuple-cache-node.h"
 #include "exec/tuple-file-reader.h"
 #include "exec/tuple-file-writer.h"
+#include "exec/tuple-text-file-reader.h"
+#include "exec/tuple-text-file-util.h"
+#include "exec/tuple-text-file-writer.h"
 #include "runtime/exec-env.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
@@ -46,6 +49,11 @@ TupleCacheNode::TupleCacheNode(
 }
 
 TupleCacheNode::~TupleCacheNode() = default;
+
+static bool TupleCacheVerificationEnabled(RuntimeState* state) {
+  DCHECK(state != nullptr);
+  return state->query_options().enable_tuple_cache_verification;
+}
 
 Status TupleCacheNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
@@ -79,14 +87,44 @@ Status TupleCacheNode::Open(RuntimeState* state) {
   TupleCacheMgr* tuple_cache_mgr = ExecEnv::GetInstance()->tuple_cache_mgr();
   handle_ = tuple_cache_mgr->Lookup(combined_key_, true);
   if (tuple_cache_mgr->IsAvailableForRead(handle_)) {
-    reader_ = make_unique<TupleFileReader>(
-        tuple_cache_mgr->GetPath(handle_), mem_tracker(), runtime_profile());
-    Status status = reader_->Open(state);
-    // Clear reader if it's not usable
-    if (!status.ok()) {
-      LOG(WARNING) << "Could not read cache entry for "
-                   << tuple_cache_mgr->GetPath(handle_);
-      reader_.reset();
+    if (tuple_cache_mgr->DebugDumpEnabled() && TupleCacheVerificationEnabled(state)) {
+      // We need the original fragment id to construct the path for the reference debug
+      // cache file. If it's missing from the metadata, we return an error status
+      // immediately.
+      string org_fragment_id = tuple_cache_mgr->GetFragmentIdForTupleCache(combined_key_);
+      if (org_fragment_id.empty()) {
+        return Status(TErrorCode::TUPLE_CACHE_INCONSISTENCY,
+            Substitute("Metadata of tuple cache '$0' is missing for correctness check",
+                combined_key_));
+      }
+      string ref_sub_dir;
+      string sub_dir;
+      string ref_file_path = GetDebugDumpPath(state, org_fragment_id, &ref_sub_dir);
+      string file_path = GetDebugDumpPath(state, string(), &sub_dir);
+      DCHECK_EQ(ref_sub_dir, sub_dir);
+      DCHECK(!ref_sub_dir.empty());
+      DCHECK(!ref_file_path.empty());
+      DCHECK(!file_path.empty());
+      // Create the subdirectory for the debug caches if needed.
+      RETURN_IF_ERROR(tuple_cache_mgr->CreateDebugDumpSubdir(ref_sub_dir));
+      // Open the writer for writing the tuple data from the cache entries to be
+      // the reference cache data.
+      debug_dump_text_writer_ref_ = make_unique<TupleTextFileWriter>(ref_file_path);
+      RETURN_IF_ERROR(debug_dump_text_writer_ref_->Open());
+      // Open the writer for writing the tuple data from children in GetNext() to
+      // compare with the reference debug cache file.
+      debug_dump_text_writer_ = make_unique<TupleTextFileWriter>(file_path);
+      RETURN_IF_ERROR(debug_dump_text_writer_->Open());
+    } else {
+      reader_ = make_unique<TupleFileReader>(
+          tuple_cache_mgr->GetPath(handle_), mem_tracker(), runtime_profile());
+      Status status = reader_->Open(state);
+      // Clear reader if it's not usable
+      if (!status.ok()) {
+        LOG(WARNING) << "Could not read cache entry for "
+                     << tuple_cache_mgr->GetPath(handle_);
+        reader_.reset();
+      }
     }
   } else if (tuple_cache_mgr->IsAvailableForWrite(handle_)) {
     writer_ = make_unique<TupleFileWriter>(tuple_cache_mgr->GetPath(handle_),
@@ -123,7 +161,71 @@ Status TupleCacheNode::Open(RuntimeState* state) {
   if (!buffer_pool_client()->is_registered()) {
     RETURN_IF_ERROR(ClaimBufferReservation(state));
   }
+
   return Status::OK();
+}
+
+// Helper function to rename the bad file.
+static void MoveBadDebugCacheFile(const string& file_path) {
+  DCHECK(!file_path.empty());
+  string new_path = file_path + DEBUG_TUPLE_CACHE_BAD_POSTFIX;
+  int result = rename(file_path.c_str(), new_path.c_str());
+  if (result != 0) {
+    string error_msg = GetStrErrMsg();
+    LOG(ERROR) << "Failed to move debug tuple cache file from " << file_path << " to "
+               << new_path << ". Error message: " << error_msg << ": " << result;
+  } else {
+    LOG(INFO) << "Moved bad debug tuple cache file from " << file_path << " to "
+              << new_path;
+  }
+}
+
+// Move the debug dump cache after verification.
+// If the verification passed, we clear the cache file.
+// Otherwise, we will move the file with a "bad" postfix.
+// The writer will be reset after the function.
+static void MoveDebugCache(bool suc, unique_ptr<TupleTextFileWriter>& writer) {
+  DCHECK(writer != nullptr);
+  if (suc) {
+    writer->Delete();
+  } else {
+    MoveBadDebugCacheFile(writer->GetPath());
+  }
+  writer.reset();
+}
+
+Status TupleCacheNode::VerifyAndMoveDebugCache(RuntimeState* state) {
+  DCHECK(debug_dump_text_writer_ref_ != nullptr);
+  DCHECK(ExecEnv::GetInstance()->tuple_cache_mgr()->DebugDumpEnabled());
+  DCHECK(TupleCacheVerificationEnabled(state));
+  if (debug_dump_text_writer_->IsEmpty()) {
+    return Status::OK();
+  }
+  string ref_file_path = debug_dump_text_writer_ref_->GetPath();
+  string dump_file_path = debug_dump_text_writer_->GetPath();
+  bool passed = false;
+
+  DCHECK(!ref_file_path.empty());
+  DCHECK(!dump_file_path.empty());
+
+  VLOG_FILE << "Verify debug tuple cache file ref_file_path: " << ref_file_path
+            << " and dump_file_path: " << dump_file_path
+            << " with cache key:" << combined_key_;
+
+  // Fast path to verify the cache.
+  Status verify_status =
+      TupleTextFileUtil::VerifyDebugDumpCache(dump_file_path, ref_file_path, &passed);
+  if (verify_status.ok() && !passed) {
+    // Slow path to compare all rows in an order-insensitive way if the files are not the
+    // same.
+    verify_status = TupleTextFileUtil::VerifyRows(ref_file_path, dump_file_path);
+    passed = verify_status.ok();
+  }
+
+  // Move or clear the file after verification.
+  MoveDebugCache(passed, debug_dump_text_writer_ref_);
+  MoveDebugCache(passed, debug_dump_text_writer_);
+  return verify_status;
 }
 
 Status TupleCacheNode::GetNext(
@@ -188,6 +290,15 @@ Status TupleCacheNode::GetNext(
         size_t bytes_written = writer_->BytesWritten();
         Status status = writer_->Commit(state);
         if (status.ok()) {
+          if (tuple_cache_mgr->DebugDumpEnabled()) {
+            // Store the metadata whenever the debug dump path is set, regardless of
+            // whether the correctness verification is enabled in the query option. This
+            // is because the tuple cache eviction function does not account for the query
+            // option when removing metadata. Keeping this consistent ensures proper
+            // handling.
+            tuple_cache_mgr->StoreMetadataForTupleCache(
+                combined_key_, PrintId(state->fragment_instance_id()));
+          }
           tuple_cache_mgr->CompleteWrite(move(handle_), bytes_written);
         } else {
           writer_->Abort();
@@ -195,6 +306,10 @@ Status TupleCacheNode::GetNext(
         }
         writer_.reset();
       }
+    }
+    if (debug_dump_text_writer_) {
+      RETURN_IF_ERROR(debug_dump_text_writer_->Write(output_row_batch));
+      if (*eos) debug_dump_text_writer_->Commit();
     }
   }
 
@@ -205,6 +320,28 @@ Status TupleCacheNode::GetNext(
   int num_rows_added = output_row_batch->num_rows() - num_rows_before;
   DCHECK_GE(num_rows_added, 0);
   IncrementNumRowsReturned(num_rows_added);
+  if (*eos && debug_dump_text_writer_) {
+    DCHECK(debug_dump_text_writer_ref_ != nullptr);
+    TupleFileReader cache_reader(
+        ExecEnv::GetInstance()->tuple_cache_mgr()->GetPath(handle_), mem_tracker(),
+        runtime_profile());
+    RETURN_IF_ERROR(cache_reader.Open(state));
+    // Read the cache entries from the cache reader, and write as the reference
+    // debug cache file. If an error occurs, abort the verification, and return the
+    // error status.
+    RowBatch row_batch(child(0)->row_desc(), state->batch_size(), mem_tracker());
+    bool cache_eos = false;
+    while (!cache_eos) {
+      RETURN_IF_ERROR(
+          cache_reader.GetNext(state, buffer_pool_client(), &row_batch, &cache_eos));
+      DCHECK(row_batch.num_rows() > 0 || cache_eos);
+      RETURN_IF_ERROR(debug_dump_text_writer_ref_->Write(&row_batch));
+      row_batch.Reset();
+    }
+    DCHECK(cache_eos);
+    debug_dump_text_writer_ref_->Commit();
+    RETURN_IF_ERROR(VerifyAndMoveDebugCache(state));
+  }
   COUNTER_SET(rows_returned_counter_, rows_returned());
   return Status::OK();
 }
@@ -232,8 +369,31 @@ void TupleCacheNode::Close(RuntimeState* state) {
     writer_->Abort();
     tuple_cache_mgr->AbortWrite(move(handle_), false);
   }
+  if (debug_dump_text_writer_) {
+    debug_dump_text_writer_->Delete();
+    debug_dump_text_writer_.reset();
+  }
+  if (debug_dump_text_writer_ref_) {
+    debug_dump_text_writer_ref_->Delete();
+    debug_dump_text_writer_ref_.reset();
+  }
   ReleaseResult();
   ExecNode::Close(state);
+}
+
+string TupleCacheNode::GetDebugDumpPath(const RuntimeState* state,
+    const string& org_fragment_id, string* sub_dir_full_path) const {
+  // The name of the subdirectory is hash key.
+  // For non-reference files, the file name is the fragment instance id.
+  // For reference files, the name includes the current fragment instance id, the original
+  // fragment id, and a "ref" suffix.
+  string file_name = PrintId(state->fragment_instance_id());
+  if (!org_fragment_id.empty()) {
+    // Adds the original fragment id of the cache to the path for debugging purpose.
+    file_name += "_" + org_fragment_id + "_ref";
+  }
+  return ExecEnv::GetInstance()->tuple_cache_mgr()->GetDebugDumpPath(
+      combined_key_, file_name, sub_dir_full_path);
 }
 
 void TupleCacheNode::DebugString(int indentation_level, stringstream* out) const {

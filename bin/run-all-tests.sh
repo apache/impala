@@ -85,6 +85,8 @@ fi
 : ${TUPLE_CACHE_DIR:=}
 # Tuple cache capacity.
 : ${TUPLE_CACHE_CAPACITY:=}
+# Tuple cache debug dump directory location.
+: ${TUPLE_CACHE_DEBUG_DUMP_DIR:=}
 if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
   # TODO: Remove abort_on_config_error flag from here and create-load-data.sh once
   # checkConfiguration() accepts the local filesystem (see IMPALA-1850).
@@ -120,6 +122,10 @@ if [[ -n "${TUPLE_CACHE_DIR}" && -n "${TUPLE_CACHE_CAPACITY}" ]]; then
        `"--tuple_cache_dir=${TUPLE_CACHE_DIR} "
    TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} "`
        `"--tuple_cache_capacity=${TUPLE_CACHE_CAPACITY} "
+   if [[ -n "${TUPLE_CACHE_DEBUG_DUMP_DIR}" ]]; then
+       TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} "`
+           `"--tuple_cache_debug_dump_dir=${TUPLE_CACHE_DEBUG_DUMP_DIR}"
+   fi
 fi
 
 if [[ "${ERASURE_CODING}" = true ]]; then

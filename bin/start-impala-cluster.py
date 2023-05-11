@@ -187,6 +187,10 @@ parser.add_option("--tuple_cache_capacity", dest="tuple_cache_capacity",
                   default=os.environ.get("TUPLE_CACHE_CAPACITY", "1GB"),
                   help="This specifies the maximum storage usage of the tuple cache "
                        "each Impala daemon can use.")
+parser.add_option("--tuple_cache_debug_dump_dir", dest="tuple_cache_debug_dump_dir",
+                  default=os.environ.get("TUPLE_CACHE_DEBUG_DUMP_DIR", None),
+                  help="Specifies a base directory for the dumping tuple cache files "
+                       "for debug purposes")
 parser.add_option("--tuple_cache_eviction_policy", dest="tuple_cache_eviction_policy",
                   default="LRU", help="This specifies the cache eviction policy to use "
                   "for the tuple cache.")
@@ -611,6 +615,23 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
       # Add the eviction policy
       args = "-tuple_cache_eviction_policy={policy} {args}".format(
           policy=options.tuple_cache_eviction_policy, args=args)
+
+      if options.tuple_cache_debug_dump_dir:
+        # create the base directory
+        tuple_cache_debug_dump_path = \
+            os.path.join(options.tuple_cache_debug_dump_dir,
+                         "impala-tuplecache-debugdump-{0}".format(str(i)))
+        # Try creating the directory if it doesn't exist already. May raise exception.
+        if not os.path.exists(tuple_cache_debug_dump_path):
+          os.makedirs(tuple_cache_debug_dump_path)
+        if options.docker_network is None:
+          tuple_cache_debug_dump_path_arg = tuple_cache_debug_dump_path
+        else:
+          # The cache directory will always be mounted at the same path inside the
+          # container. Reuses the data cache dedicated mount.
+          tuple_cache_debug_dump_path_arg = DATA_CACHE_CONTAINER_PATH
+        args = "-tuple_cache_debug_dump_dir={dir} {args}".format(
+            dir=tuple_cache_debug_dump_path_arg, args=args)
 
     if options.enable_admission_service:
       args = "{args} -admission_service_host={host}".format(

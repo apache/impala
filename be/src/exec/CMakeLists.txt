@@ -111,6 +111,9 @@ add_library(Exec
   tuple-cache-node.cc
   tuple-file-reader.cc
   tuple-file-writer.cc
+  tuple-text-file-reader.cc
+  tuple-text-file-writer.cc
+  tuple-text-file-util.cc
   union-node.cc
   unnest-node.cc
 )
@@ -128,6 +131,7 @@ add_library(ExecTests STATIC
   incr-stats-util-test.cc
   read-write-util-test.cc
   tuple-file-read-write-test.cc
+  tuple-text-file-util-test.cc
   zigzag-test.cc
 )
 add_dependencies(ExecTests gen-deps)
@@ -138,6 +142,7 @@ ADD_UNIFIED_BE_LSAN_TEST(hash-table-test HashTableTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(delimited-text-parser-test DelimitedTextParser.*)
 ADD_UNIFIED_BE_LSAN_TEST(read-write-util-test ReadWriteUtil.*)
 ADD_UNIFIED_BE_LSAN_TEST(tuple-file-read-write-test TupleFileReadWriteTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(tuple-text-file-util-test TupleTextFileUtilTest.*)
 # Exception to unified be tests: Custom main with global Frontend object
 ADD_BE_LSAN_TEST(row-batch-list-test)
 ADD_BE_LSAN_TEST(scratch-tuple-batch-test)

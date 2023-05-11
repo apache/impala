@@ -97,6 +97,11 @@ Status FileSystemUtil::RemoveAndCreateDirectory(const string& directory) {
           "removing directory '$0': $1", directory, errcode.message())));
     }
   }
+  return CreateDirectory(directory);
+}
+
+Status FileSystemUtil::CreateDirectory(const string& directory) {
+  error_code errcode;
   filesystem::create_directories(directory, errcode);
   if (errcode != errc::success) {
     return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute(

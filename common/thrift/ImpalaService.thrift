@@ -962,6 +962,12 @@ enum TImpalaQueryOptions {
   // notification when the query completes and avoid added latency from waiting on the
   // client side. This defaults to off (0ms).
   LONG_POLLING_TIME_MS = 182
+
+  // Enables the verification process for intermediate result caching.
+  // Tuple cache verification is performed only when the startup flag
+  // tuple_cache_debug_dump_dir is specified and enable_tuple_cache_verification is set
+  // to true.
+  ENABLE_TUPLE_CACHE_VERIFICATION = 183
 }
 
 // The summary of a DML statement.

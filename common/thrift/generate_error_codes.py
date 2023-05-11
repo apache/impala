@@ -489,7 +489,9 @@ error_codes = (
    "Subscriber '$0' has incompatible protocol version V$1 conflicting with statestored's "
    "version V$2"),
 
-  ("JDBC_CONFIGURATION_ERROR", 159, "Error in JDBC table configuration: $0.")
+  ("JDBC_CONFIGURATION_ERROR", 159, "Error in JDBC table configuration: $0."),
+
+  ("TUPLE_CACHE_INCONSISTENCY", 160, "Inconsistent tuple cache found: $0.")
 )
 
 import sys

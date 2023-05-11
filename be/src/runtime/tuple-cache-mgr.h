@@ -30,6 +30,8 @@ namespace impala {
 class HistogramMetric;
 class TupleReader;
 
+// Declaration of the debug tuple cache bad postfix constant.
+extern const char* DEBUG_TUPLE_CACHE_BAD_POSTFIX;
 
 /// The TupleCacheMgr maintains per-daemon settings and metadata for the tuple cache.
 /// This it used by the various TupleCacheNodes from queries to lookup the cache
@@ -64,6 +66,11 @@ public:
     MISS,
     SKIPPED,
     HALTED,
+  };
+
+  struct DebugDumpCacheMetaData {
+    /// The fragment id of the tuple cache for debug purpose.
+    std::string fragment_id;
   };
 
   struct Handle;
@@ -130,6 +137,24 @@ public:
   /// meta-data of where the cached data is stored.
   virtual void EvictedEntry(kudu::Slice key, kudu::Slice value) override;
 
+  /// Returns the full file path for debug dumping of the tuple cache.
+  /// If sub_dir_full_path is not nullptr, returns the full path of the subdirectory of
+  /// the debug tuple cache.
+  string GetDebugDumpPath(const string& sub_dir, const string& file_name,
+      string* sub_dir_full_path = nullptr) const;
+
+  /// Return whether debug dumping is enabled.
+  bool DebugDumpEnabled() const { return cache_debug_dump_dir_ != ""; }
+
+  /// Store, retrieve or remove the metadata of the stored tuple cache for correctness
+  /// verification.
+  void StoreMetadataForTupleCache(const string& cache_key, const string& fragment_id);
+  string GetFragmentIdForTupleCache(const string& cache_key);
+  void RemoveMetadataForTupleCache(const string& cache_key);
+
+  /// Create the subdirectory for debug dumping of the tuple cache if needed.
+  Status CreateDebugDumpSubdir(const string& sub_dir);
+
  private:
   // Disallow copy and assign
   TupleCacheMgr(const TupleCacheMgr&) = delete;
@@ -152,6 +177,7 @@ public:
   const std::string eviction_policy_str_;
 
   std::string cache_dir_;
+  std::string cache_debug_dump_dir_;
   bool enabled_ = false;
   uint8_t debug_pos_;
 
@@ -171,6 +197,15 @@ public:
   /// The instance of the cache.
   mutable std::mutex creation_lock_;
   std::unique_ptr<Cache> cache_;
+
+  /// Used by CreateDebugDumpSubdir() to ensure no two threads are creating the same
+  /// sub directory.
+  std::mutex debug_dump_subdir_lock_;
+  /// Protects the debug_dump_caches_metadata_.
+  std::mutex debug_dump_lock_;
+  /// An in-memory presentation for metadata of tuple caches for debug verification.
+  /// The key is the key of the tuple cache.
+  std::unordered_map<std::string, DebugDumpCacheMetaData> debug_dump_caches_metadata_;
 };
 
 }
