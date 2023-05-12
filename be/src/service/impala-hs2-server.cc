@@ -222,9 +222,16 @@ Status ImpalaServer::FetchInternal(TUniqueId query_id, SessionState* session,
   bool is_child_query = query_handle->parent_query_id() != TUniqueId();
   TProtocolVersion::type version = is_child_query ?
       TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V1 : session->hs2_version;
+
+  // In the first fetch, expect 0 results to avoid reserving unnecessarily large result
+  // vectors for small queries. If there are more fetches (so there are more rows than
+  // num_rows_fetched), then expect subsequent fetches to be fully filled.
+  int expected_result_count = query_handle->num_rows_fetched() == 0 ? 0
+      : fetch_size;
+
   scoped_ptr<QueryResultSet> result_set(QueryResultSet::CreateHS2ResultSet(
       version, *(query_handle->result_metadata()), &(fetch_results->results),
-      query_handle->query_options().stringify_map_keys));
+      query_handle->query_options().stringify_map_keys, expected_result_count));
   RETURN_IF_ERROR(
       query_handle->FetchRows(fetch_size, result_set.get(), block_on_wait_time_us));
   *num_results = result_set->size();
@@ -552,7 +559,7 @@ Status ImpalaServer::SetupResultsCacheing(const QueryHandle& query_handle,
     const TResultSetMetadata* result_set_md = query_handle->result_metadata();
     QueryResultSet* result_set =
         QueryResultSet::CreateHS2ResultSet(session->hs2_version, *result_set_md, nullptr,
-            query_handle->query_options().stringify_map_keys);
+            query_handle->query_options().stringify_map_keys, 0);
     RETURN_IF_ERROR(query_handle->SetResultCache(result_set, cache_num_rows));
   }
   return Status::OK();

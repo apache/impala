@@ -79,7 +79,8 @@ class QueryResultSet {
   static QueryResultSet* CreateHS2ResultSet(
       apache::hive::service::cli::thrift::TProtocolVersion::type version,
       const TResultSetMetadata& metadata,
-      apache::hive::service::cli::thrift::TRowSet* rowset, bool stringify_map_keys);
+      apache::hive::service::cli::thrift::TRowSet* rowset, bool stringify_map_keys,
+      int expected_result_count);
 
 protected:
   /// Wrapper to call ComplexValueWriter::CollectionValueToJSON() or

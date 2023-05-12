@@ -94,7 +94,7 @@ class AsciiQueryResultSet : public QueryResultSet {
 class HS2ColumnarResultSet : public QueryResultSet {
  public:
   HS2ColumnarResultSet(const TResultSetMetadata& metadata, TRowSet* rowset,
-      bool stringify_map_keys);
+      bool stringify_map_keys, int expected_result_count);
 
   virtual ~HS2ColumnarResultSet() {}
 
@@ -129,6 +129,10 @@ class HS2ColumnarResultSet : public QueryResultSet {
 
   // If true, converts map keys to strings; see IMPALA-11778.
   const bool stringify_map_keys_;
+
+  // Expected number of result rows that will be returned with this
+  // fetch request. Used to reserve results vector memory.
+  const int expected_result_count_;
 
   void InitColumns();
 };
@@ -174,11 +178,12 @@ QueryResultSet* QueryResultSet::CreateAsciiQueryResultSet(
 
 QueryResultSet* QueryResultSet::CreateHS2ResultSet(
     TProtocolVersion::type version, const TResultSetMetadata& metadata, TRowSet* rowset,
-    bool stringify_map_keys) {
+    bool stringify_map_keys, int expected_result_count) {
   if (version < TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V6) {
     return new HS2RowOrientedResultSet(metadata, rowset);
   } else {
-    return new HS2ColumnarResultSet(metadata, rowset, stringify_map_keys);
+    return new HS2ColumnarResultSet(
+        metadata, rowset, stringify_map_keys, expected_result_count);
   }
 }
 
@@ -342,9 +347,11 @@ uint32_t TColumnByteSize(const ThriftTColumn& col, uint32_t start_idx, uint32_t 
 // Result set container for Hive protocol versions >= V6, where results are returned in
 // column-orientation.
 HS2ColumnarResultSet::HS2ColumnarResultSet(
-    const TResultSetMetadata& metadata, TRowSet* rowset, bool stringify_map_keys)
+    const TResultSetMetadata& metadata, TRowSet* rowset, bool stringify_map_keys,
+    int expected_result_count)
   : metadata_(metadata), result_set_(rowset), num_rows_(0),
-    stringify_map_keys_(stringify_map_keys) {
+    stringify_map_keys_(stringify_map_keys),
+    expected_result_count_(expected_result_count) {
   if (rowset == NULL) {
     owned_result_set_.reset(new TRowSet());
     result_set_ = owned_result_set_.get();
@@ -355,13 +362,15 @@ HS2ColumnarResultSet::HS2ColumnarResultSet(
 Status HS2ColumnarResultSet::AddRows(const vector<ScalarExprEvaluator*>& expr_evals,
     RowBatch* batch, int start_idx, int num_rows) {
   DCHECK_GE(batch->num_rows(), start_idx + num_rows);
+  int expected_result_count =
+      std::max((int64_t) expected_result_count_, num_rows + num_rows_);
   int num_col = expr_evals.size();
   DCHECK_EQ(num_col, metadata_.columns.size());
   for (int i = 0; i < num_col; ++i) {
     const TColumnType& type = metadata_.columns[i].columnType;
     ScalarExprEvaluator* expr_eval = expr_evals[i];
     ExprValuesToHS2TColumn(expr_eval, type, batch, start_idx, num_rows, num_rows_,
-        stringify_map_keys_, &(result_set_->columns[i]));
+        expected_result_count, stringify_map_keys_, &(result_set_->columns[i]));
   }
   num_rows_ += num_rows;
   return Status::OK();
