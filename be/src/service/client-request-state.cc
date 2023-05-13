@@ -131,6 +131,8 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
   num_rows_fetched_from_cache_counter_ =
       ADD_COUNTER(server_profile_, "NumRowsFetchedFromCache", TUnit::UNIT);
   client_wait_timer_ = ADD_TIMER(server_profile_, "ClientFetchWaitTimer");
+  client_wait_time_stats_ =
+      ADD_SUMMARY_STATS_TIMER(server_profile_, "ClientFetchWaitTimeStats");
   bool is_external_fe = session_type() == TSessionType::EXTERNAL_FRONTEND;
   // "Impala Backend Timeline" was specifically chosen to exploit the lexicographical
   // ordering defined by the underlying std::map holding the timelines displayed in
@@ -1691,7 +1693,24 @@ void ClientRequestState::MarkInactive() {
 void ClientRequestState::MarkActive() {
   client_wait_sw_.Stop();
   int64_t elapsed_time = client_wait_sw_.ElapsedTime();
-  client_wait_timer_->Set(elapsed_time);
+  // If we have reached eos, then the query is already complete,
+  // and we should not accumulate more client wait time. This mostly
+  // impacts the finalization step, where the client is closing the
+  // query and does not need any more rows. Fetching may have already
+  // completed prior to this point, so finalization time should not
+  // count in that case. If the fetch was incomplete, then the client
+  // time should be counted for finalization as well.
+  if (!eos()) {
+    client_wait_timer_->Set(elapsed_time);
+    // The first call is before any MarkInactive() call has run and produces
+    // a zero-length sample. Skip this zero-length sample (but not any later
+    // zero-length samples).
+    if (elapsed_time != 0 || last_client_wait_time_ != 0) {
+      int64_t current_wait_time = elapsed_time - last_client_wait_time_;
+      client_wait_time_stats_->UpdateCounter(current_wait_time);
+    }
+    last_client_wait_time_ = elapsed_time;
+  }
   lock_guard<mutex> l(expiration_data_lock_);
   last_active_time_ms_ = UnixMillis();
   ++ref_count_;

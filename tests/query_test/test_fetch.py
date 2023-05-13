@@ -21,7 +21,8 @@ import re
 from time import sleep
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import extend_exec_option_dimension
-from tests.util.parse_util import parse_duration_string_ms
+from tests.util.parse_util import parse_duration_string_ms, \
+    get_time_summary_stats_counter
 
 
 class TestFetch(ImpalaTestSuite):
@@ -67,6 +68,72 @@ class TestFetch(ImpalaTestSuite):
           parse_duration_string_ms(materialization_timer.group(1)) > 1000
     finally:
       self.client.close_query(handle)
+
+  def test_client_fetch_time_stats(self, vector):
+    num_rows = 27
+    query = "select sleep(10) from functional.alltypes limit {0}".format(num_rows)
+    handle = self.execute_query_async(query, vector.get_value('exec_option'))
+    try:
+      # Wait until the query is 'FINISHED' and results are available for fetching.
+      self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 30)
+
+      # This loop will do 6 fetches that contain data and a final fetch with
+      # no data. The last fetch is after eos has been set, so it does not count.
+      rows_fetched = 0
+      while True:
+        result = self.client.fetch(query, handle, max_rows=5)
+        assert result.success
+        rows_fetched += len(result.data)
+        # If no rows are returned, we are done.
+        if len(result.data) == 0:
+          break
+        sleep(0.1)
+
+      # After fetching all rows, sleep before closing the query. This should not
+      # count as client wait time, because the query is already done.
+      sleep(2.5)
+    finally:
+      self.client.close_query(handle)
+
+    runtime_profile = self.client.get_runtime_profile(handle)
+    summary_stats = get_time_summary_stats_counter("ClientFetchWaitTimeStats",
+                                                   runtime_profile)
+    assert len(summary_stats) == 1
+    assert summary_stats[0].total_num_values == 6
+    # The 2.5 second sleep should not count, so the max must be less than 2.5 seconds.
+    assert summary_stats[0].max_value < 2500000000
+    assert summary_stats[0].min_value > 0
+
+  def test_client_fetch_time_stats_incomplete(self, vector):
+    num_rows = 27
+    query = "select sleep(10) from functional.alltypes limit {0}".format(num_rows)
+    handle = self.execute_query_async(query, vector.get_value('exec_option'))
+    try:
+      # Wait until the query is 'FINISHED' and results are available for fetching.
+      self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 30)
+
+      # This loop will do 5 fetches for a total of 25 rows. This is incomplete.
+      for i in range(5):
+        result = self.client.fetch(query, handle, max_rows=5)
+        assert result.success
+        sleep(0.1)
+
+      # Sleep before closing the query. For an incomplete fetch, this still counts
+      # towards the query time, so this does show up in the counters.
+      sleep(2.5)
+    finally:
+      self.client.close_query(handle)
+
+    runtime_profile = self.client.get_runtime_profile(handle)
+
+    summary_stats = get_time_summary_stats_counter("ClientFetchWaitTimeStats",
+                                                   runtime_profile)
+    assert len(summary_stats) == 1
+    # There are 5 fetches and the finalization sample for a total of 6.
+    assert summary_stats[0].total_num_values == 6
+    # The 2.5 second sleep does count for an incomplete fetch, verify the max is higher.
+    assert summary_stats[0].max_value >= 2500000000
+    assert summary_stats[0].min_value > 0
 
 
 class TestFetchAndSpooling(ImpalaTestSuite):

@@ -589,9 +589,13 @@ class ClientRequestState {
   RuntimeProfile::Counter* row_materialization_rate_;
 
   /// Tracks how long we are idle waiting for a client to fetch rows.
+  /// Keep summary statistics to get a sense for the number of fetch calls and
+  /// the typical round-trip time.
   RuntimeProfile::Counter* client_wait_timer_;
+  RuntimeProfile::SummaryStatsCounter* client_wait_time_stats_;
   /// Timer to track idle time for the above counter.
   MonotonicStopWatch client_wait_sw_;
+  int64_t last_client_wait_time_ = 0;
 
   RuntimeProfile::EventSequence* query_events_;
 

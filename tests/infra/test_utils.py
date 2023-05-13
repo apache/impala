@@ -19,7 +19,8 @@
 
 from __future__ import absolute_import, division, print_function
 from tests.util.filesystem_utils import prepend_with_fs
-from tests.util.parse_util import get_bytes_summary_stats_counter
+from tests.util.parse_util import get_bytes_summary_stats_counter, \
+    get_time_summary_stats_counter
 
 
 def test_filesystem_utils():
@@ -47,3 +48,21 @@ def test_get_bytes_summary_stats_counter():
   assert len(summary_stats) == 1
   assert summary_stats[0].sum == 32768 and summary_stats[0].min_value == 6144 and \
          summary_stats[0].max_value == 10240 and summary_stats[0].total_num_values == 4
+
+
+def test_get_time_summary_stats_counter():
+  """Test get_time_summary_stats_counter(counter_name, runtime_profile) using a dummy
+     runtime profile.
+  """
+  # This is constructed to test the parsing logic for timestamps, so the number don't
+  # add up.
+  runtime_profile = "- ExampleTimeStats: (Avg: 161.554ms ; " \
+                    "Min: 101.411us ; " \
+                    "Max: 1h2m3s4ms5us6ns ; " \
+                    "Number of samples: 6)"
+  summary_stats = get_time_summary_stats_counter("ExampleTimeStats", runtime_profile)
+  assert len(summary_stats) == 1
+  assert summary_stats[0].sum == 969324000
+  assert summary_stats[0].min_value == 101411
+  assert summary_stats[0].max_value == 3723004005006
+  assert summary_stats[0].total_num_values == 6
