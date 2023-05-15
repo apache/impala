@@ -21,6 +21,7 @@ from __future__ import absolute_import, division, print_function
 import pytest
 
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfDockerizedCluster
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     is_supported_insert_format)
@@ -743,6 +744,7 @@ class TestTpcdsUnmodified(ImpalaTestSuite):
     self.run_test_case('tpcds-q89', vector)
 
 
+@SkipIfDockerizedCluster.insufficient_mem_limit
 class TestTpcdsQueryWithProcessingCost(TestTpcdsQuery):
   @classmethod
   def get_workload(cls):
