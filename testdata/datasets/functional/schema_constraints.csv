@@ -383,3 +383,6 @@ table_name:alltypesagg_parquet_v2_uncompressed, constraint:restrict_to, table_fo
 table_name:alltypesagg_parquet_v2_snappy, constraint:restrict_to, table_format:parquet/none/none
 table_name:complextypestbl_parquet_v2_uncompressed, constraint:restrict_to, table_format:parquet/none/none
 table_name:complextypestbl_parquet_v2_snappy, constraint:restrict_to, table_format:parquet/none/none
+
+# The table is used to test a specific parquet page layout bug
+table_name:empty_parquet_page_source_impala10186, constraint:restrict_to, table_format:text/none/none

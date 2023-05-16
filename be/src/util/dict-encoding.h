@@ -72,6 +72,9 @@ class DictEncoderBase {
   /// The number of entries in the dictionary.
   virtual int num_entries() const = 0;
 
+  /// Returns true if the dictionary is full.
+  virtual bool IsFull() const = 0;
+
   /// Clears all the indices (but leaves the dictionary).
   void ClearIndices() { buffered_indices_.clear(); }
 
@@ -184,9 +187,14 @@ class DictEncoder : public DictEncoderBase {
     return sizeof(Node) * nodes_.size();
   }
 
-  virtual void WriteDict(uint8_t* buffer);
+  void WriteDict(uint8_t* buffer) override;
 
-  virtual int num_entries() const { return nodes_.size(); }
+  int num_entries() const override { return nodes_.size(); }
+
+  /// Returns true if the dictionary is full.
+  bool IsFull() const override {
+    return nodes_.size() >= Node::INVALID_INDEX;
+  }
 
   /// Execute 'func' for each key that is present in the dictionary. Stops execution the
   /// first time 'func' returns an error, propagating the error. Returns OK otherwise.
@@ -226,6 +234,7 @@ class DictEncoder : public DictEncoderBase {
 
     /// The maximum number of values in the dictionary.  Chosen to be around 60% of
     /// HASH_TABLE_SIZE to limit the expected length of the chains.
+    /// Changing this value will require re-tuning test_parquet_page_index.py.
     enum { INVALID_INDEX = 40000 };
   };
 
