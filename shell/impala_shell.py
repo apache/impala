@@ -45,7 +45,8 @@ from impala_client import ImpalaHS2Client, StrictHS2Client, \
 from impala_shell_config_defaults import impala_shell_defaults
 from option_parser import get_option_parser, get_config_from_file
 from shell_output import (DelimitedOutputFormatter, OutputStream, PrettyOutputFormatter,
-                          OverwritingStdErrOutputStream, VerticalOutputFormatter)
+                          OverwritingStdErrOutputStream, VerticalOutputFormatter,
+                          match_string_type)
 from subprocess import call
 from shell_exceptions import (RPCException, DisconnectedException, QueryStateException,
     QueryCancelledByShellException, MissingThriftMethodException)
@@ -1138,11 +1139,13 @@ class ImpalaShell(cmd.Cmd, object):
     """
     if self.show_profiles or status:
       if profile:
-        query_profile_prefix = "Query Runtime Profile:\n"
+        query_profile_prefix = match_string_type("Query Runtime Profile:\n", profile)
         if profile_display_mode == QueryAttemptDisplayModes.ALL:
           print(query_profile_prefix + profile)
           if failed_profile:
-            print("Failed Query Runtime Profile(s):\n" + failed_profile)
+            failed_profile_prefix = \
+                match_string_type("Failed Query Runtime Profile(s):\n", failed_profile)
+            print(failed_profile_prefix + failed_profile)
         elif profile_display_mode == QueryAttemptDisplayModes.LATEST:
           print(query_profile_prefix + profile)
         elif profile_display_mode == QueryAttemptDisplayModes.ORIGINAL:

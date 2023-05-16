@@ -613,6 +613,16 @@ class TestImpalaShell(ImpalaTestSuite):
     assert 'UnicodeDecodeError' not in result.stderr
     assert RUSSIAN_CHARS.encode('utf-8') in result.stdout
 
+  def test_international_characters_profile(self, vector):
+    """IMPALA-12145: ensure we can handle international characters in the profile. """
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Profile not supported in strict hs2 mode.")
+    text = RUSSIAN_CHARS.encode('utf-8')
+    args = ['-o', '/dev/null', '-p', '-q', "select '{0}'".format(text)]
+    result = run_impala_shell_cmd(vector, args)
+    assert 'UnicodeDecodeError' not in result.stderr
+    assert text in result.stdout
+
   def test_utf8_decoding_error_handling(self, vector):
     """IMPALA-10145,IMPALA-10299: Regression tests for elegantly handling malformed utf-8
     characters."""

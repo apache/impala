@@ -29,6 +29,26 @@ except ImportError:
   from io import StringIO  # python 3
 
 
+def match_string_type(str_to_convert, reference_str):
+  """ Returns 'str_to_convert' converted to the same type as 'reference_str'.
+      Can handle only str and unicode. NOOP in Python 3.
+  """
+  if sys.version_info.major >= 3:
+    assert isinstance(reference_str, str)
+    assert isinstance(str_to_convert, str)
+    return str_to_convert
+
+  if type(str_to_convert) == type(reference_str):
+    return str_to_convert
+
+  if isinstance(reference_str, str):
+    assert isinstance(str_to_convert, unicode)
+    return str_to_convert.encode('UTF-8')
+  else:
+    assert isinstance(reference_str, str)
+    return str_to_convert.decode('UTF-8')
+
+
 class PrettyOutputFormatter(object):
   def __init__(self, prettytable):
     self.prettytable = prettytable
