@@ -97,19 +97,71 @@ IllegalStateException: UNION, EXCEPT and INTERSECT are not supported for collect
 ====
 ---- QUERY
 # Changing a column to a different type leads "non-pass-through" union that does a
-# deepcopy on the tuple, which is not yet implemented in BE for arrays. This case is
-# currently caught in the planner.
+# deepcopy on the tuple, which is only implemented for collections of fixed-length types
+# in BE for arrays.
 select id, int_array from complextypestbl
   union all select cast(id as tinyint), int_array from complextypestbl
----- CATCH
-IllegalStateException: only pass-through UNION ALL is supported for array columns
+---- RESULTS
+1,'[1,2,3]'
+2,'[null,1,2,null,3,null]'
+3,'[]'
+4,'NULL'
+5,'NULL'
+6,'NULL'
+7,'NULL'
+8,'[-1]'
+1,'[1,2,3]'
+2,'[null,1,2,null,3,null]'
+3,'[]'
+4,'NULL'
+5,'NULL'
+6,'NULL'
+7,'NULL'
+8,'[-1]'
+---- TYPES
+bigint,string
 ====
 ---- QUERY
-# Constants in the select list of unions also lead to "non-pass-through" union.
+# Changing a column to a different type leads "non-pass-through" union that does a
+# deepcopy on the tuple, which is only implemented for collections of fixed-length types
+# in BE for arrays.
+select id, int_array_array from complextypestbl
+  union all select cast(id as tinyint), int_array_array from complextypestbl
+---- CATCH
+IllegalStateException: only pass-through UNION ALL is supported for collections of variable length types.
+====
+---- QUERY
+# Constants in the select list of unions also lead to "non-pass-through" union but
+# collections of fixed length types are allowed.
 select 1, int_array from complextypestbl
   union all select 2, int_array from complextypestbl;
+---- RESULTS
+1,'[-1]'
+1,'[1,2,3]'
+1,'[null,1,2,null,3,null]'
+1,'[]'
+1,'NULL'
+1,'NULL'
+1,'NULL'
+1,'NULL'
+2,'[-1]'
+2,'[1,2,3]'
+2,'[null,1,2,null,3,null]'
+2,'[]'
+2,'NULL'
+2,'NULL'
+2,'NULL'
+2,'NULL'
+---- TYPES
+tinyint,string
+====
+---- QUERY
+# Constants in the select list of unions also lead to "non-pass-through" union and
+# collections of variable length types are not allowed yet.
+select 1, int_array_array from complextypestbl
+  union all select 2, int_array_array from complextypestbl;
 ---- CATCH
-IllegalStateException: only pass-through UNION ALL is supported for array columns
+IllegalStateException: only pass-through UNION ALL is supported for collections of variable length types.
 ====
 ---- QUERY
 select 1 from (select int_array from complextypestbl) s

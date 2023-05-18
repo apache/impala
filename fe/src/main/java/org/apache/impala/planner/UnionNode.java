@@ -22,10 +22,11 @@ import java.util.List;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
-import org.apache.impala.analysis.TupleDescriptor;
-import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.analysis.SortInfo;
+import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.analysis.TupleId;
 import org.apache.impala.thrift.TExecNodePhase;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TExpr;
@@ -262,8 +263,10 @@ public class UnionNode extends PlanNode {
     for (int i = 0; i < children_.size(); i++) {
       if (!isChildPassthrough(analyzer, children_.get(i), resultExprLists_.get(i))) {
         for (Expr expr : resultExprLists_.get(i)) {
-          Preconditions.checkState(!expr.getType().isCollectionType(),
-              "only pass-through UNION ALL is supported for array columns");
+          Preconditions.checkState(!SortInfo.checkTypeForVarLenCollection(
+              expr.getType()).isPresent(),
+              "only pass-through UNION ALL is supported for collections of "
+              + "variable length types.");
         }
         newResultExprLists.add(resultExprLists_.get(i));
         newChildren.add(children_.get(i));

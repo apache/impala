@@ -97,19 +97,77 @@ IllegalStateException: UNION, EXCEPT and INTERSECT are not supported for collect
 ====
 ---- QUERY
 # Changing a column to a different type leads "non-pass-through" union that does a
-# deepcopy on the tuple, which is not yet implemented in BE for arrays. This case is
-# currently caught in the planner.
+# deepcopy on the tuple, which is only implemented for collections of fixed-length types
+# in BE for arrays.
+select id, map_int_int from map_non_varlen
+  union all select cast(id as tinyint), map_int_int from map_non_varlen
+---- RESULTS
+1,'{10:100,11:110,12:120}'
+2,'{20:200,21:210,22:220}'
+3,'{30:300,31:310,32:320}'
+4,'{40:400,41:410,42:420}'
+5,'{50:500,51:510,52:520}'
+6,'{60:600,61:610,62:620}'
+7,'{70:700,71:710,72:720}'
+8,'{80:800,81:810,82:820}'
+9,'{90:900,91:910,92:920}'
+10,'{100:1000,101:1010,102:1020}'
+1,'{10:100,11:110,12:120}'
+2,'{20:200,21:210,22:220}'
+3,'{30:300,31:310,32:320}'
+4,'{40:400,41:410,42:420}'
+5,'{50:500,51:510,52:520}'
+6,'{60:600,61:610,62:620}'
+7,'{70:700,71:710,72:720}'
+8,'{80:800,81:810,82:820}'
+9,'{90:900,91:910,92:920}'
+10,'{100:1000,101:1010,102:1020}'
+---- TYPES
+int,string
+====
+---- QUERY
+# Changing a column to a different type leads "non-pass-through" union that does a
+# deepcopy on the tuple, which is only implemented for collections of fixed-length types
+# in BE for arrays.
 select id, int_map from complextypestbl
   union all select cast(id as tinyint), int_map from complextypestbl
 ---- CATCH
-IllegalStateException: only pass-through UNION ALL is supported for array columns
+IllegalStateException: only pass-through UNION ALL is supported for collections of variable length types.
+====
+---- QUERY
+# Constants in the select list of unions also lead to "non-pass-through" union.
+select 1, map_int_int from map_non_varlen
+  union all select 2, map_int_int from map_non_varlen;
+---- RESULTS
+1,'{10:100,11:110,12:120}'
+1,'{20:200,21:210,22:220}'
+1,'{30:300,31:310,32:320}'
+1,'{40:400,41:410,42:420}'
+1,'{50:500,51:510,52:520}'
+1,'{60:600,61:610,62:620}'
+1,'{70:700,71:710,72:720}'
+1,'{80:800,81:810,82:820}'
+1,'{90:900,91:910,92:920}'
+1,'{100:1000,101:1010,102:1020}'
+2,'{10:100,11:110,12:120}'
+2,'{20:200,21:210,22:220}'
+2,'{30:300,31:310,32:320}'
+2,'{40:400,41:410,42:420}'
+2,'{50:500,51:510,52:520}'
+2,'{60:600,61:610,62:620}'
+2,'{70:700,71:710,72:720}'
+2,'{80:800,81:810,82:820}'
+2,'{90:900,91:910,92:920}'
+2,'{100:1000,101:1010,102:1020}'
+---- TYPES
+tinyint,string
 ====
 ---- QUERY
 # Constants in the select list of unions also lead to "non-pass-through" union.
 select 1, int_map from complextypestbl
   union all select 2, int_map from complextypestbl;
 ---- CATCH
-IllegalStateException: only pass-through UNION ALL is supported for array columns
+IllegalStateException: only pass-through UNION ALL is supported for collections of variable length types.
 ====
 ---- QUERY
 select 1 from (select int_map from complextypestbl) s
