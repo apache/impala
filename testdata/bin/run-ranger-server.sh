@@ -31,11 +31,5 @@ fi
 unset CLASSPATH
 . $IMPALA_HOME/bin/impala-config.sh
 
-# Required to start Ranger with Java 11
-if [[ ! -d "${RANGER_HOME}"/ews/logs ]]; then
-  mkdir -p "${RANGER_HOME}"/ews/logs
-fi
-
-JAVA_DBG_SOCKET="-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=30130"
-JAVA_OPTS="-XX:+IgnoreUnrecognizedVMOptions -Xdebug ${JAVA_DBG_SOCKET}" \
+JAVA_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=30130" \
     "${RANGER_HOME}"/ews/ranger-admin-services.sh restart

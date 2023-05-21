@@ -380,72 +380,20 @@ fi
 
 # It is important to have a coherent view of the JAVA_HOME and JAVA executable.
 # The JAVA_HOME should be determined first, then the JAVA executable should be
-# derived from JAVA_HOME. For development, it is useful to be able to specify
-# the JDK version as part of bin/impala-config-local.sh
+# derived from JAVA_HOME. bin/bootstrap_development.sh adds code to
+# bin/impala-config-local.sh to set JAVA_HOME, so it is important to pick up that
+# setting before deciding what JAVA_HOME to use.
 
-# Decision tree:
-# if IMPALA_JAVA_HOME_OVERRIDE is set, respect it
-# else if IMPALA_JDK_VERSION == system, look for system JDK
-# else if IMPALA_JDK_VERSION == 8, look for Java 8 JDK
-# else if IMPALA_JDK_VERSION == 11, look for Java 11 JDK
-
-# Initialize IMPALA_JDK_VERSION and set package variables for Docker builds
-. "$IMPALA_HOME/bin/impala-config-java.sh"
-
-if [[ -n "${IMPALA_JAVA_HOME_OVERRIDE-}" ]]; then
-  IMPALA_JDK_VERSION=override
-fi
-
-DETECTED_JAVA_HOME=Invalid
-if [[ "${IMPALA_JDK_VERSION}" == "system" ]]; then
-  # Try to detect the system's JAVA_HOME
-  # If javac exists, then the system has a Java SDK (JRE does not have javac).
-  # Follow the symbolic links and use this to determine the system's JAVA_HOME.
-  DETECTED_JAVA_HOME="/usr/java/default"
-  if [ -n "$(which javac)" ]; then
-    DETECTED_JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac))))
-  fi
-elif [[ "${IMPALA_JDK_VERSION}" != "override" ]]; then
-  # Now, we are looking for a specific version, and that will depend on the
-  # distribution. Currently, this is implemented for Redhat and Ubuntu.
-  DISTRIBUTION=Unknown
-  if [[ -f /etc/redhat-release ]]; then
-    echo "Identified Redhat image."
-    DISTRIBUTION=Redhat
-  else
-    source /etc/lsb-release
-    if [[ $DISTRIB_ID == Ubuntu ]]; then
-      echo "Identified Ubuntu image."
-      DISTRIBUTION=Ubuntu
-    fi
-  fi
-  if [[ "${DISTRIBUTION}" == "Unknown" ]]; then
-    echo "ERROR: auto-detection of JAVA_HOME only supported for Ubuntu and RedHat."
-    echo "Use IMPALA_JAVA_HOME_OVERRIDE to configure JAVA_HOME."
-    return 1
-  fi
-
-  JVMS_PATH=/usr/lib/jvm
-  if [[ "${DISTRIBUTION}" == "Ubuntu" ]]; then
-    JAVA_PACKAGE_NAME="java-${IMPALA_JDK_VERSION}-openjdk-${UBUNTU_PACKAGE_ARCH}"
-    DETECTED_JAVA_HOME="${JVMS_PATH}/${JAVA_PACKAGE_NAME}"
-  elif [[ "${DISTRIBUTION}" == "Redhat" ]]; then
-    if [[ "${IMPALA_JDK_VERSION}" == "8" ]]; then
-      DETECTED_JAVA_HOME="${JVMS_PATH}/java-1.8.0"
-    else
-      DETECTED_JAVA_HOME="${JVMS_PATH}/java-${IMPALA_JDK_VERSION}"
-    fi
-  fi
-
-  if [[ ! -d "${DETECTED_JAVA_HOME}" ]]; then
-    echo "ERROR: Could not detect Java ${IMPALA_JDK_VERSION}."\
-         "${DETECTED_JAVA_HOME} is not a directory."
-    return 1
-  fi
+# Try to detect the system's JAVA_HOME
+# If javac exists, then the system has a Java SDK (JRE does not have javac).
+# Follow the symbolic links and use this to determine the system's JAVA_HOME.
+SYSTEM_JAVA_HOME="/usr/java/default"
+if [ -n "$(which javac)" ]; then
+  SYSTEM_JAVA_HOME=$(which javac | xargs readlink -f | sed "s:/bin/javac::")
 fi
 
 # Prefer the JAVA_HOME set in the environment, but use the system's JAVA_HOME otherwise
-export JAVA_HOME="${IMPALA_JAVA_HOME_OVERRIDE:-${DETECTED_JAVA_HOME}}"
+export JAVA_HOME="${JAVA_HOME:-${SYSTEM_JAVA_HOME}}"
 if [ ! -d "$JAVA_HOME" ]; then
   echo "JAVA_HOME must be set to the location of your JDK!"
   return 1
@@ -454,16 +402,6 @@ export JAVA="$JAVA_HOME/bin/java"
 if [[ ! -e "$JAVA" ]]; then
   echo "Could not find java binary at $JAVA" >&2
   return 1
-fi
-
-# Determine the JDK version for later checks
-IMPALA_JDK_VERSION=$($JAVA -version 2>&1 | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-IMPALA_JDK_MAJOR=$(echo $IMPALA_JDK_VERSION | cut -d'.' -f1)
-IMPALA_JDK_MINOR=$(echo $IMPALA_JDK_VERSION | cut -d'.' -f2)
-if [[ $IMPALA_JDK_MAJOR -gt 1 ]]; then
-  export IMPALA_JDK_VERSION=$IMPALA_JDK_MAJOR
-else
-  export IMPALA_JDK_VERSION=$IMPALA_JDK_MINOR
 fi
 
 # Java libraries required by executables and java tests.
@@ -1083,7 +1021,7 @@ fi
 
 # Check for minimum required Java version
 # Only issue Java version warning when running Java 7.
-if [ $IMPALA_JDK_VERSION -le 7 ]; then
+if $JAVA -version 2>&1 | grep -q 'java version "1.7'; then
   cat << EOF
 
 WARNING: Your development environment is configured for Hadoop 3 and Java 7. Hadoop 3

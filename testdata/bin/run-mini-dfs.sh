@@ -42,7 +42,7 @@ set +e
 $IMPALA_HOME/testdata/cluster/admin start_cluster
 if [[ $? != 0 ]]; then
   # Only issue Java version warning when running Java 7.
-  [ $IMPALA_JDK_VERSION -le 7 ] || exit $?
+  $JAVA -version 2>&1 | grep -q 'java version "1.7' || exit 1
 
   cat << EOF
 

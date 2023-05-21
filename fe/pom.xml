@@ -621,7 +621,7 @@ under the License.
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.11.0</version>
+        <version>3.3</version>
         <configuration>
           <source>1.8</source>
           <target>1.8</target>
@@ -632,7 +632,7 @@ under the License.
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
-        <version>3.3.0</version>
+        <version>2.6</version>
       <executions>
         <execution>
           <goals>
@@ -685,7 +685,7 @@ under the License.
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
-        <version>3.5.0</version>
+        <version>3.1.1</version>
         <executions>
           <!-- TODO(todd): consider removing this execution or moving it to
                some kind of 'dist' profile. No need to copy all of these jars
@@ -734,7 +734,7 @@ under the License.
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.0.0</version>
+        <version>2.20</version>
         <configuration>
           <trimStackTrace>false</trimStackTrace>
           <reportsDirectory>${surefire.reports.dir}</reportsDirectory>
@@ -761,7 +761,7 @@ under the License.
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>build-helper-maven-plugin</artifactId>
-        <version>3.3.0</version>
+        <version>1.5</version>
         <executions>
           <!-- Tell maven about our generated files -->
           <execution>
@@ -822,7 +822,7 @@ under the License.
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
-        <version>3.1.0</version>
+        <version>3.0.0-M1</version>
         <executions>
           <execution>
             <id>enforce-banned-dependencies</id>
@@ -1059,7 +1059,7 @@ under the License.
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-compiler-plugin</artifactId>
-            <version>3.11.0</version>
+            <version>3.3</version>
             <configuration>
               <showWarnings>true</showWarnings>
               <compilerId>javac-with-errorprone</compilerId>
@@ -1103,7 +1103,7 @@ under the License.
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-compiler-plugin</artifactId>
-            <version>3.11.0</version>
+            <version>3.3</version>
             <configuration>
               <excludes>
                 <exclude>**/org/apache/impala/catalog/metastore/*.java</exclude>
