@@ -27,6 +27,7 @@ bool StructColumnReader::NextLevels() {
   }
   def_level_ = children_[0]->def_level();
   rep_level_ = children_[0]->rep_level();
+  if (rep_level_ <= max_rep_level() - 1) pos_current_value_ = 0;
   return result;
 }
 
@@ -54,6 +55,7 @@ bool StructColumnReader::ReadValue(MemPool* pool, Tuple* tuple, bool* read_row) 
 
   def_level_ = children_[0]->def_level();
   rep_level_ = children_[0]->rep_level();
+  if (rep_level_ <= max_rep_level() - 1) pos_current_value_ = 0;
   return should_abort;
 }
 
@@ -98,6 +100,19 @@ bool StructColumnReader::ReadValueBatch(MemPool* pool, int max_values, int tuple
   while (val_count < max_values && !RowGroupAtEnd() && continue_execution) {
     Tuple* tuple = reinterpret_cast<Tuple*>(tuple_mem + val_count * tuple_size);
     bool read_row = false;
+    // Fill in position slots if applicable
+    if (pos_slot_desc() != nullptr) {
+      DCHECK(file_pos_slot_desc() == nullptr);
+      ReadItemPositionBatched(rep_level_,
+          tuple->GetBigIntSlot(pos_slot_desc()->tuple_offset()));
+    } else if (file_pos_slot_desc() != nullptr) {
+      DCHECK(pos_slot_desc() == nullptr);
+      // It is OK to call the non-batched version because we let the child readers
+      // determine the LastProcessedRow() and we use the non-bached ReadValue() functions
+      // of the children.
+      ReadFilePositionNonBatched(
+          tuple->GetBigIntSlot(file_pos_slot_desc()->tuple_offset()));
+    }
     continue_execution = ReadValue<IN_COLLECTION>(pool, tuple, &read_row);
     if (read_row) ++val_count;
     if (SHOULD_TRIGGER_COL_READER_DEBUG_ACTION(val_count)) {

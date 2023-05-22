@@ -152,6 +152,10 @@ class TestNestedStructsInSelectList(ImpalaTestSuite):
     new_vector.get_value('exec_option')['convert_legacy_hive_parquet_utc_timestamps'] = 1
     self.run_test_case('QueryTest/nested-struct-in-select-list', new_vector)
 
+  def test_struct_positions(self, vector):
+    """Queries where structs and (file/collection) positions are used together"""
+    self.run_test_case('QueryTest/struct-positions', vector)
+
 
 class TestNestedCollectionsInSelectList(ImpalaTestSuite):
   """Functional tests for nested arrays provided in the select list."""

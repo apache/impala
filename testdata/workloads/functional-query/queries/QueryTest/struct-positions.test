@@ -1,0 +1,200 @@
+====
+---- QUERY
+# Let's just have the positions here for reference.
+select id, file__position from complextypestbl;
+---- RESULTS
+1,0
+2,1
+3,2
+4,3
+5,4
+6,5
+7,6
+8,0
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+# Let's query the top-level sruct so we can verify the following results.
+select id, file__position, nested_struct from complextypestbl;
+---- RESULTS
+1,0,'{"a":1,"b":[1],"c":{"d":[[{"e":10,"f":"aaa"},{"e":-10,"f":"bbb"}],[{"e":11,"f":"c"}]]},"g":{"foo":{"h":{"i":[1.1]}}}}'
+2,1,'{"a":null,"b":[null],"c":{"d":[[{"e":null,"f":null},{"e":10,"f":"aaa"},{"e":null,"f":null},{"e":-10,"f":"bbb"},{"e":null,"f":null}],[{"e":11,"f":"c"},null],[],null]},"g":{"g1":{"h":{"i":[2.2,null]}},"g2":{"h":{"i":[]}},"g3":null,"g4":{"h":{"i":null}},"g5":{"h":null}}}'
+3,2,'{"a":null,"b":null,"c":{"d":[]},"g":{}}'
+4,3,'{"a":null,"b":null,"c":{"d":null},"g":null}'
+5,4,'{"a":null,"b":null,"c":null,"g":{"foo":{"h":{"i":[2.2,3.3]}}}}'
+6,5,'NULL'
+7,6,'{"a":7,"b":[2,3,null],"c":{"d":[[],[null],null]},"g":null}'
+8,0,'{"a":-1,"b":[-1],"c":{"d":[[{"e":-1,"f":"nonnullable"}]]},"g":{}}'
+---- TYPES
+BIGINT, BIGINT, STRING
+====
+---- QUERY
+# We only query the 'nested_struct' non-virtual column, so the STRUCT reader
+# needs to set the file positions
+select file__position, nested_struct from complextypestbl;
+---- RESULTS
+0,'{"a":1,"b":[1],"c":{"d":[[{"e":10,"f":"aaa"},{"e":-10,"f":"bbb"}],[{"e":11,"f":"c"}]]},"g":{"foo":{"h":{"i":[1.1]}}}}'
+1,'{"a":null,"b":[null],"c":{"d":[[{"e":null,"f":null},{"e":10,"f":"aaa"},{"e":null,"f":null},{"e":-10,"f":"bbb"},{"e":null,"f":null}],[{"e":11,"f":"c"},null],[],null]},"g":{"g1":{"h":{"i":[2.2,null]}},"g2":{"h":{"i":[]}},"g3":null,"g4":{"h":{"i":null}},"g5":{"h":null}}}'
+2,'{"a":null,"b":null,"c":{"d":[]},"g":{}}'
+3,'{"a":null,"b":null,"c":{"d":null},"g":null}'
+4,'{"a":null,"b":null,"c":null,"g":{"foo":{"h":{"i":[2.2,3.3]}}}}'
+5,'NULL'
+6,'{"a":7,"b":[2,3,null],"c":{"d":[[],[null],null]},"g":null}'
+0,'{"a":-1,"b":[-1],"c":{"d":[[{"e":-1,"f":"nonnullable"}]]},"g":{}}'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
+select file__position, nested_struct from complextypestbl
+where file__position = 2;
+---- RESULTS
+2,'{"a":null,"b":null,"c":{"d":[]},"g":{}}'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
+select file__position, nested_struct from complextypestbl
+where nested_struct.a > 0;
+---- RESULTS
+0,'{"a":1,"b":[1],"c":{"d":[[{"e":10,"f":"aaa"},{"e":-10,"f":"bbb"}],[{"e":11,"f":"c"}]]},"g":{"foo":{"h":{"i":[1.1]}}}}'
+6,'{"a":7,"b":[2,3,null],"c":{"d":[[],[null],null]},"g":null}'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
+select id, file__position, item from complextypestbl c, c.nested_struct.c.d.item;
+---- RESULTS
+1,0,'{"e":10,"f":"aaa"}'
+1,0,'{"e":-10,"f":"bbb"}'
+1,0,'{"e":11,"f":"c"}'
+2,1,'{"e":null,"f":null}'
+2,1,'{"e":10,"f":"aaa"}'
+2,1,'{"e":null,"f":null}'
+2,1,'{"e":-10,"f":"bbb"}'
+2,1,'{"e":null,"f":null}'
+2,1,'{"e":11,"f":"c"}'
+2,1,'NULL'
+7,6,'NULL'
+8,0,'{"e":-1,"f":"nonnullable"}'
+---- TYPES
+BIGINT, BIGINT, STRING
+====
+---- QUERY
+select file__position, item from complextypestbl c, c.nested_struct.c.d.item;
+---- RESULTS
+0,'{"e":10,"f":"aaa"}'
+0,'{"e":-10,"f":"bbb"}'
+0,'{"e":11,"f":"c"}'
+1,'{"e":null,"f":null}'
+1,'{"e":10,"f":"aaa"}'
+1,'{"e":null,"f":null}'
+1,'{"e":-10,"f":"bbb"}'
+1,'{"e":null,"f":null}'
+1,'{"e":11,"f":"c"}'
+1,'NULL'
+6,'NULL'
+0,'{"e":-1,"f":"nonnullable"}'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
+select pos, item from complextypestbl c, c.nested_struct.c.d.item;
+---- RESULTS
+0,'{"e":10,"f":"aaa"}'
+1,'{"e":-10,"f":"bbb"}'
+0,'{"e":11,"f":"c"}'
+0,'{"e":null,"f":null}'
+1,'{"e":10,"f":"aaa"}'
+2,'{"e":null,"f":null}'
+3,'{"e":-10,"f":"bbb"}'
+4,'{"e":null,"f":null}'
+0,'{"e":11,"f":"c"}'
+1,'NULL'
+0,'NULL'
+0,'{"e":-1,"f":"nonnullable"}'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
+select pos, item from complextypestbl c, c.nested_struct.c.d.item
+where pos = 1;
+---- RESULTS
+1,'{"e":-10,"f":"bbb"}'
+1,'{"e":10,"f":"aaa"}'
+1,'NULL'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
+select pos, item from complextypestbl c, c.nested_struct.c.d.item it
+where it.e < 11;
+---- RESULTS
+0,'{"e":10,"f":"aaa"}'
+1,'{"e":-10,"f":"bbb"}'
+1,'{"e":10,"f":"aaa"}'
+3,'{"e":-10,"f":"bbb"}'
+0,'{"e":-1,"f":"nonnullable"}'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
+# Queries like above, but with a flat tuple structure, i.e. the items
+# are in the top-level (and only) tuple.
+select pos, item from complextypestbl.nested_struct.c.d.item;
+---- RESULTS
+0,'{"e":10,"f":"aaa"}'
+1,'{"e":-10,"f":"bbb"}'
+0,'{"e":11,"f":"c"}'
+0,'{"e":null,"f":null}'
+1,'{"e":10,"f":"aaa"}'
+2,'{"e":null,"f":null}'
+3,'{"e":-10,"f":"bbb"}'
+4,'{"e":null,"f":null}'
+0,'{"e":11,"f":"c"}'
+1,'NULL'
+0,'NULL'
+0,'{"e":-1,"f":"nonnullable"}'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
+select pos, item from complextypestbl.nested_struct.c.d.item
+where pos = 1;
+---- RESULTS
+1,'{"e":-10,"f":"bbb"}'
+1,'{"e":10,"f":"aaa"}'
+1,'NULL'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
+select pos, item from complextypestbl.nested_struct.c.d.item it
+where it.e < 11;
+---- RESULTS
+0,'{"e":10,"f":"aaa"}'
+1,'{"e":-10,"f":"bbb"}'
+1,'{"e":10,"f":"aaa"}'
+3,'{"e":-10,"f":"bbb"}'
+0,'{"e":-1,"f":"nonnullable"}'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
+select file__position, pos, item from complextypestbl c, c.nested_struct.c.d.item;
+---- RESULTS
+0,0,'{"e":10,"f":"aaa"}'
+0,1,'{"e":-10,"f":"bbb"}'
+0,0,'{"e":11,"f":"c"}'
+1,0,'{"e":null,"f":null}'
+1,1,'{"e":10,"f":"aaa"}'
+1,2,'{"e":null,"f":null}'
+1,3,'{"e":-10,"f":"bbb"}'
+1,4,'{"e":null,"f":null}'
+1,0,'{"e":11,"f":"c"}'
+1,1,'NULL'
+6,0,'NULL'
+0,0,'{"e":-1,"f":"nonnullable"}'
+---- TYPES
+BIGINT, BIGINT, STRING
+====

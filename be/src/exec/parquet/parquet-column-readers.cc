@@ -158,10 +158,6 @@ class ScalarColumnReader : public BaseScalarColumnReader {
   /// It updates 'current_row_' when 'rep_level' is 0.
   inline ALWAYS_INLINE void ReadFilePositionBatched(int16_t rep_level, int64_t* file_pos);
 
-  /// Reads position into 'pos' and updates 'pos_current_value_' based on 'rep_level'.
-  /// It updates 'current_row_' when 'rep_level' is 0.
-  inline ALWAYS_INLINE void ReadItemPositionBatched(int16_t rep_level, int64_t* pos);
-
   virtual Status CreateDictionaryDecoder(
       uint8_t* values, int size, DictDecoderBase** decoder) override {
     DCHECK(slot_desc_->type().type != TYPE_BOOLEAN)
@@ -908,14 +904,6 @@ template <typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIAL
 void ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::
     ReadFilePositionBatched(int16_t rep_level, int64_t* file_pos) {
   *file_pos = FilePositionOfCurrentRow();
-}
-
-template <typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
-void ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::
-    ReadItemPositionBatched(int16_t rep_level, int64_t* pos) {
-  // Reset position counter if we are at the start of a new parent collection.
-  if (rep_level <= max_rep_level() - 1) pos_current_value_ = 0;
-  *pos = pos_current_value_++;
 }
 
 template <typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>

@@ -214,6 +214,12 @@ class ParquetColumnReader {
     return pos_slot_desc_ != nullptr || file_pos_slot_desc_ != nullptr;
   }
 
+  void ReadItemPositionBatched(int16_t rep_level, int64_t* pos) {
+    // Reset position counter if we are at the start of a new parent collection.
+    if (rep_level <= max_rep_level() - 1) pos_current_value_ = 0;
+    *pos = pos_current_value_++;
+  }
+
  protected:
   HdfsParquetScanner* parent_;
   const SchemaNode& node_;
