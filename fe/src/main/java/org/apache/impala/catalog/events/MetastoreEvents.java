@@ -1156,7 +1156,7 @@ public class MetastoreEvents {
         // determined that the event needs to be processed instead of skipped, or we
         // somehow missed the previous create database event.
         throw new MetastoreNotificationException(
-            debugString("Unable to process event", e));
+            debugString("Unable to process event"), e);
       }
     }
 

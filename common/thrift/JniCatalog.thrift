@@ -1025,4 +1025,6 @@ struct TEventProcessorMetricsSummaryResponse {
   // summary view of the events processor which can include status,
   // metrics and other details
   1: required string summary
+  // Error messages if the events processor goes into ERROR/NEEDS_INVALIDATE states
+  2: optional string error_msg
 }

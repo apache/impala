@@ -366,7 +366,7 @@ void CatalogServer::RegisterWebpages(Webserver* webserver, bool metrics_only) {
       false);
   webserver->RegisterUrlCallback(EVENT_WEB_PAGE, EVENT_METRICS_TEMPLATE,
       [this](const auto& args, auto* doc) { this->EventMetricsUrlCallback(args, doc); },
-      false);
+      true);
   webserver->RegisterUrlCallback(CATALOG_OPERATIONS_WEB_PAGE, CATALOG_OPERATIONS_TEMPLATE,
       [this](const auto& args, auto* doc) { this->OperationUsageUrlCallback(args, doc); },
       true);
@@ -677,6 +677,12 @@ void CatalogServer::EventMetricsUrlCallback(
       event_processor_summary_response.summary.c_str(), document->GetAllocator());
   document->AddMember(
       "event_processor_metrics", event_processor_summary, document->GetAllocator());
+  if (event_processor_summary_response.__isset.error_msg) {
+    Value error_msg(
+        event_processor_summary_response.error_msg.c_str(), document->GetAllocator());
+    document->AddMember(
+        "event_processor_error_msg", error_msg, document->GetAllocator());
+  }
 }
 
 void CatalogServer::CatalogObjectsUrlCallback(const Webserver::WebRequest& req,

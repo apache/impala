@@ -23,6 +23,7 @@ import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -33,6 +34,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient.NotificationFilter;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
@@ -232,6 +234,14 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   public static final String STATUS_METRIC = "status";
   // last synced event id
   public static final String LAST_SYNCED_ID_METRIC = "last-synced-event-id";
+  // last synced event time
+  public static final String LAST_SYNCED_EVENT_TIME = "last-synced-event-time-ms";
+  // latest event id in Hive metastore
+  public static final String LATEST_EVENT_ID = "latest-event-id";
+  // event time of the latest event in Hive metastore
+  public static final String LATEST_EVENT_TIME = "latest-event-time-ms";
+  // delay(ms) in events processing
+  public static final String EVENT_PROCESSING_DELAY = "event-processing-delay-ms";
   // metric name for number of tables which are refreshed by event processor so far
   public static final String NUMBER_OF_TABLE_REFRESHES = "tables-refreshed";
   // number of times events processor refreshed a partition
@@ -489,8 +499,14 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   // current status of this event processor
   private EventProcessorStatus eventProcessorStatus_ = EventProcessorStatus.STOPPED;
 
+  // error message when event processor comes into ERROR/NEEDS_INVALIDATE states
+  private String eventProcessorErrorMsg_ = null;
+
   // event factory which is used to get or create MetastoreEvents
   private final MetastoreEventFactory metastoreEventFactory_;
+
+  // keeps track of the current event that we are processing
+  private NotificationEvent currentEvent_;
 
   // keeps track of the last event id which we have synced to
   private final AtomicLong lastSyncedEventId_ = new AtomicLong(-1);
@@ -588,10 +604,13 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     metrics_.addTimer(EVENTS_PROCESS_DURATION_METRIC);
     metrics_.addMeter(EVENTS_RECEIVED_METRIC);
     metrics_.addCounter(EVENTS_SKIPPED_METRIC);
-    metrics_.addGauge(STATUS_METRIC,
-        (Gauge<String>) () -> getStatus().toString());
-    metrics_.addGauge(LAST_SYNCED_ID_METRIC,
-        (Gauge<Long>) () -> lastSyncedEventId_.get());
+    metrics_.addGauge(STATUS_METRIC, (Gauge<String>) () -> getStatus().toString());
+    metrics_.addGauge(LAST_SYNCED_ID_METRIC, (Gauge<Long>) lastSyncedEventId_::get);
+    metrics_.addGauge(LAST_SYNCED_EVENT_TIME, (Gauge<Long>) lastSyncedEventTimeMs_::get);
+    metrics_.addGauge(LATEST_EVENT_ID, (Gauge<Long>) latestEventId_::get);
+    metrics_.addGauge(LATEST_EVENT_TIME, (Gauge<Long>) latestEventTimeMs_::get);
+    metrics_.addGauge(EVENT_PROCESSING_DELAY,
+        (Gauge<Long>) () -> latestEventTimeMs_.get() - lastSyncedEventTimeMs_.get());
     metrics_.addCounter(NUMBER_OF_TABLE_REFRESHES);
     metrics_.addCounter(NUMBER_OF_PARTITION_REFRESHES);
     metrics_.addCounter(NUMBER_OF_TABLES_ADDED);
@@ -837,7 +856,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    */
   @Override
   public void processEvents() {
-    NotificationEvent lastProcessedEvent = null;
+    currentEvent_ = null;
     try {
       EventProcessorStatus currentStatus = eventProcessorStatus_;
       if (currentStatus != EventProcessorStatus.ACTIVE) {
@@ -856,14 +875,20 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         "may be unavailable. Will retry.", ex);
     } catch(MetastoreNotificationNeedsInvalidateException ex) {
       updateStatus(EventProcessorStatus.NEEDS_INVALIDATE);
-      LOG.error("Event processing needs a invalidate command to resolve the state", ex);
+      String msg = "Event processing needs a invalidate command to resolve the state";
+      LOG.error(msg, ex);
+      eventProcessorErrorMsg_ = LocalDateTime.now().toString() + '\n' + msg + '\n' +
+          ExceptionUtils.getFullStackTrace(ex);
     } catch (Exception ex) {
       // There are lot of Preconditions which can throw RuntimeExceptions when we
       // process events this catch all exception block is needed so that the scheduler
       // thread does not die silently
       updateStatus(EventProcessorStatus.ERROR);
-      LOG.error("Unexpected exception received while processing event", ex);
-      dumpEventInfoToLog(lastProcessedEvent);
+      String msg = "Unexpected exception received while processing event";
+      LOG.error(msg, ex);
+      eventProcessorErrorMsg_ = LocalDateTime.now().toString() + '\n' + msg + '\n' +
+          ExceptionUtils.getFullStackTrace(ex);
+      dumpEventInfoToLog(currentEvent_);
     }
   }
 
@@ -973,6 +998,9 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     TEventProcessorMetricsSummaryResponse summaryResponse =
         new TEventProcessorMetricsSummaryResponse();
     summaryResponse.setSummary(metrics_.toString());
+    if (eventProcessorErrorMsg_ != null) {
+      summaryResponse.setError_msg(eventProcessorErrorMsg_);
+    }
     return summaryResponse;
   }
 
@@ -988,7 +1016,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   @VisibleForTesting
   protected void processEvents(List<NotificationEvent> events)
       throws MetastoreNotificationException {
-    NotificationEvent lastProcessedEvent = null;
+    currentEvent_ = null;
     // update the events received metric before returning
     metrics_.getMeter(EVENTS_RECEIVED_METRIC).mark(events.size());
     if (events.isEmpty()) return;
@@ -1009,7 +1037,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
           if (eventProcessorStatus_ != EventProcessorStatus.ACTIVE) {
             break;
           }
-          lastProcessedEvent = event.metastoreNotificationEvent_;
+          currentEvent_ = event.metastoreNotificationEvent_;
           event.processIfEnabled();
           deleteEventLog_.garbageCollect(event.getEventId());
           lastSyncedEventId_.set(event.getEventId());
@@ -1019,7 +1047,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     } catch (CatalogException e) {
       throw new MetastoreNotificationException(String.format(
           "Unable to process event %d of type %s. Event processing will be stopped.",
-          lastProcessedEvent.getEventId(), lastProcessedEvent.getEventType()), e);
+          currentEvent_.getEventId(), currentEvent_.getEventType()), e);
     } finally {
       long elapsed_ns = context.stop();
       lastEventProcessDurationNs_.set(elapsed_ns);
@@ -1037,7 +1065,9 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
 
   private void dumpEventInfoToLog(NotificationEvent event) {
     if (event == null) {
-      LOG.error("Notification event is null");
+      String error = "Notification event is null";
+      LOG.error(error);
+      eventProcessorErrorMsg_ += '\n' + error;
       return;
     }
     StringBuilder msg =
@@ -1049,7 +1079,9 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       msg.append("Table name: ").append(event.getTableName()).append("\n");
     }
     msg.append("Event message: ").append(event.getMessage()).append("\n");
-    LOG.error(msg.toString());
+    String msgStr = msg.toString();
+    LOG.error(msgStr);
+    eventProcessorErrorMsg_ += '\n' + msgStr;
   }
 
   /**

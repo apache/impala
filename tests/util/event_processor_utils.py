@@ -60,7 +60,9 @@ class EventProcessorUtils(object):
         break
       status = EventProcessorUtils.get_event_processor_status()
       if status not in ["ACTIVE", "PAUSED"]:
-        raise Exception("Event processor is not working. Status: {0}".format(status))
+        error_msg = EventProcessorUtils.get_event_processor_error_msg()
+        raise Exception("Event processor is not working. Status: {0}. Error msg: {1}"
+                        .format(status, error_msg))
       made_progress = current_synced_id > last_synced_id
       if t >= end_time:
         raise Exception(
@@ -114,6 +116,17 @@ class EventProcessorUtils(object):
 
     pairs = [strip_pair(kv.split(':')) for kv in metrics if kv]
     return dict(pairs)
+
+  @staticmethod
+  def get_event_processor_error_msg():
+    """Scrapes the catalog's /events webpage and return the error message (if exists) of
+    the event processor"""
+    response = requests.get("%s/events?json" % EventProcessorUtils.DEFAULT_CATALOG_URL)
+    assert response.status_code == requests.codes.ok
+    res_json = json.loads(response.text)
+    if "event_processor_error_msg" in res_json:
+      return res_json["event_processor_error_msg"].strip()
+    return None
 
   @staticmethod
   def get_int_metric(metric_key, default_val=None):

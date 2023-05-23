@@ -22,4 +22,9 @@ under the License.
 <h3>Event Processor Summary</h3>
 <pre>{{event_processor_metrics}}</pre>
 
+{{?event_processor_error_msg}}
+<h3>Error Message</h3>
+<pre>{{event_processor_error_msg}}</pre>
+{{/event_processor_error_msg}}
+
 {{> www/common-footer.tmpl }}
