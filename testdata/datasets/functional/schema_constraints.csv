@@ -381,8 +381,8 @@ table_name:collection_struct_mix, constraint:restrict_to, table_format:orc/def/b
 table_name:collection_struct_mix_view, constraint:restrict_to, table_format:parquet/none/none
 table_name:collection_struct_mix_view, constraint:restrict_to, table_format:orc/def/block
 
-table_name:simple_arrays_big, constraint:restrict_to, table_format:parquet/none/none
-table_name:simple_arrays_big, constraint:restrict_to, table_format:orc/def/block
+table_name:arrays_big, constraint:restrict_to, table_format:parquet/none/none
+table_name:arrays_big, constraint:restrict_to, table_format:orc/def/block
 
 table_name:complextypes_maps_view, constraint:restrict_to, table_format:parquet/none/none
 table_name:complextypes_maps_view, constraint:restrict_to, table_format:orc/def/block

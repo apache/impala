@@ -321,7 +321,7 @@ public abstract class QueryStmt extends StatementBase {
       }
     }
 
-    checkForVarLenCollectionSorting(analyzer);
+    checkTypeValidityForSorting(analyzer);
 
     sortInfo_.createSortTupleInfo(resultExprs_, analyzer);
 
@@ -344,13 +344,14 @@ public abstract class QueryStmt extends StatementBase {
     substituteResultExprs(smap, analyzer);
   }
 
-  private void checkForVarLenCollectionSorting(Analyzer analyzer)
+  private void checkTypeValidityForSorting(Analyzer analyzer)
       throws AnalysisException {
     for (Expr expr: getResultExprs()) {
       Type exprType = expr.getType();
-      Optional<String> err = SortInfo.checkTypeForVarLenCollection(exprType);
-      if (err.isPresent()) {
-        throw new AnalysisException(err.get());
+      if (!SortInfo.isValidInSortingTuple(exprType)) {
+        String error = "Sorting is not supported if the select list "
+            + "contains collection(s) nested in struct(s).";
+        throw new AnalysisException(error);
       }
     }
   }

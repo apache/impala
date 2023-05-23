@@ -4180,18 +4180,20 @@ AS SELECT id, arr_contains_struct, arr_contains_nested_struct, struct_contains_n
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
-simple_arrays_big
+arrays_big
 ---- COLUMNS
 int_col INT
 string_col STRING
 int_array ARRAY<INT>
-double_array ARRAY<DOUBLE>
+double_map MAP<STRING,DOUBLE>
+string_array ARRAY<STRING>
+mixed MAP<STRING,ARRAY<MAP<STRING,STRUCT<string_member: STRING, int_member: INT>>>>
 ---- DEPENDENT_LOAD
-`hadoop fs -mkdir -p /test-warehouse/simple_arrays_big_parquet && \
-hadoop fs -put -f ${IMPALA_HOME}/testdata/ComplexTypesTbl/simple_arrays_big.parq \
-/test-warehouse/simple_arrays_big_parquet/
+`hadoop fs -mkdir -p /test-warehouse/arrays_big_parquet && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/ComplexTypesTbl/arrays_big.parq \
+/test-warehouse/arrays_big_parquet/
 ---- DEPENDENT_LOAD_ACID
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM functional_parquet.simple_arrays_big;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM functional_parquet.arrays_big;
 ====
 ---- DATASET
 functional

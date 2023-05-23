@@ -243,9 +243,7 @@ void RawValue::WriteNonNull(const void* value, Tuple* tuple,
 
   if (COLLECT_VAR_LEN_VALS) {
     DCHECK(string_values != nullptr);
-    DCHECK(string_values->size() == 0);
     DCHECK(collection_values != nullptr);
-    DCHECK(collection_values->size() == 0);
   }
 
   if (slot_desc->type().IsStructType()) {
@@ -256,7 +254,7 @@ void RawValue::WriteNonNull(const void* value, Tuple* tuple,
         string_values, collection_values);
   } else {
     WritePrimitiveCollectVarlen<COLLECT_VAR_LEN_VALS>(value, tuple, slot_desc, pool,
-        string_values, collection_values);
+        string_values);
   }
 }
 
@@ -278,17 +276,16 @@ void RawValue::WriteStruct(const void* value, Tuple* tuple,
   for (int i = 0; i < src->num_children; ++i) {
     SlotDescriptor* child_slot = children_tuple_desc->slots()[i];
     uint8_t* src_child = src->ptr[i];
+    // TODO IMPALA-12160: Handle collections in structs.
     if (child_slot->type().IsStructType()) {
       // Recursive call in case of nested structs.
       WriteStruct<COLLECT_VAR_LEN_VALS>(src_child, tuple, child_slot, pool,
           string_values, collection_values);
-      continue;
-    }
-    if (src_child == nullptr) {
+    } else if (src_child == nullptr) {
       tuple->SetNull(child_slot->null_indicator_offset());
     } else {
       WritePrimitiveCollectVarlen<COLLECT_VAR_LEN_VALS>(src_child, tuple, child_slot,
-          pool, string_values, collection_values);
+          pool, string_values);
     }
   }
 }
@@ -301,13 +298,16 @@ void RawValue::WriteCollection(const void* value, Tuple* tuple,
 
   void* dst = tuple->GetSlot(slot_desc->tuple_offset());
 
-  // TODO IMPALA-10939: Enable recursive collections.
   const CollectionValue* src = reinterpret_cast<const CollectionValue*>(value);
   CollectionValue* dest = reinterpret_cast<CollectionValue*>(dst);
   dest->num_tuples = src->num_tuples;
 
   int64_t byte_size = dest->ByteSize(*slot_desc->children_tuple_descriptor());
   if (pool != nullptr) {
+    // If 'dest' and 'src' point to the same address, assigning the address of the newly
+    // allocated buffer to 'dest->ptr' will also overwrite 'src->ptr', and the memcpy will
+    // be from the destination to the destination.
+    DCHECK_NE(dest, src);
     // Note: if this changes to TryAllocate(), SlotDescriptor::CodegenWriteToSlot() will
     // need to reflect this change as well (the codegen'd Allocate() call is actually
     // generated in SlotDescriptor::CodegenWriteStringOrCollectionToSlot()).
@@ -315,6 +315,13 @@ void RawValue::WriteCollection(const void* value, Tuple* tuple,
     Ubsan::MemCpy(dest->ptr, src->ptr, byte_size);
   } else {
     dest->ptr = src->ptr;
+  }
+
+  // We only need to recurse if this is a deep copy (pool != nullptr) OR if we collect
+  // var-len values.
+  if (pool != nullptr || COLLECT_VAR_LEN_VALS) {
+    WriteCollectionChildren<COLLECT_VAR_LEN_VALS>(*dest, *src, *slot_desc, pool,
+        string_values, collection_values);
   }
 
   if (COLLECT_VAR_LEN_VALS) {
@@ -325,18 +332,77 @@ void RawValue::WriteCollection(const void* value, Tuple* tuple,
 }
 
 template <bool COLLECT_VAR_LEN_VALS>
-void RawValue::WritePrimitiveCollectVarlen(const void* value, Tuple* tuple,
-    const SlotDescriptor* slot_desc, MemPool* pool, vector<StringValue*>* string_values,
+void RawValue::WriteCollectionChildren(const CollectionValue& dest,
+    const CollectionValue& src, const SlotDescriptor& collection_slot_desc, MemPool* pool,
+    vector<StringValue*>* string_values,
     vector<pair<CollectionValue*, int64_t>>* collection_values) {
+  DCHECK_EQ(src.num_tuples, dest.num_tuples);
+  const TupleDescriptor* child_tuple_desc =
+      collection_slot_desc.children_tuple_descriptor();
+  DCHECK(child_tuple_desc != nullptr);
+
+  for (int i = 0; i < dest.num_tuples; i++) {
+    Tuple* child_src_tuple = reinterpret_cast<Tuple*>(
+        src.ptr + i * child_tuple_desc->byte_size());
+    Tuple* child_dest_tuple = reinterpret_cast<Tuple*>(
+        dest.ptr + i * child_tuple_desc->byte_size());
+
+    for (const SlotDescriptor* string_slot_desc : child_tuple_desc->string_slots()) {
+      WriteCollectionVarlenChild<COLLECT_VAR_LEN_VALS>(child_dest_tuple, child_src_tuple,
+          string_slot_desc, pool, string_values, collection_values);
+    }
+
+    for (const SlotDescriptor* collection_slot_desc
+        : child_tuple_desc->collection_slots()) {
+      WriteCollectionVarlenChild<COLLECT_VAR_LEN_VALS>(child_dest_tuple, child_src_tuple,
+          collection_slot_desc, pool, string_values, collection_values);
+    }
+  }
+}
+
+template <bool COLLECT_VAR_LEN_VALS>
+void RawValue::WriteCollectionVarlenChild(Tuple* child_dest_tuple, Tuple* child_src_tuple,
+    const SlotDescriptor* slot_desc, MemPool* pool, vector<StringValue*>* string_values,
+    vector<pair<CollectionValue*, int64_t>>* collection_values ) {
+  DCHECK(slot_desc != nullptr);
+  DCHECK(slot_desc->type().IsVarLenStringType() || slot_desc->type().IsCollectionType());
+
+  if (!child_dest_tuple->IsNull(slot_desc->null_indicator_offset())) {
+    // The fixed length part of the child (the pointer and the length / number of tuples)
+    // is already in the destination tuple, copied there as the var-len data of the
+    // parent. We continue the recursion for two things:
+    //   1. deep-copying the var-len data of the child
+    //   2. collecting var-len slots.
+    // At least one of these is true, otherwise we never get here. The called recursive
+    // function will once again set the length (always unnecessary) and the pointer
+    // (unnecessary if we're not deep-copying, only collecting). This is not costly enough
+    // to justify complicating the code. Note, however, that although at this point the
+    // source and destination slots hold the same value (pointer and length / number of
+    // tuples), we take 'child_value', the source in the recursive call, from the source
+    // tuple, because in case of deep-copying, the pointer of the destination slot will be
+    // re-assigned to the newly allocated buffer, and if we took 'child_value' from the
+    // destination slot, the 'source' pointer and the 'destination' pointer would be the
+    // same, meaning the 'source' pointer would also be overwritten before we copied the
+    // data it pointed to.
+    void* child_value = child_src_tuple->GetSlot(slot_desc->tuple_offset());
+
+    WriteNonNull<COLLECT_VAR_LEN_VALS>(child_value, child_dest_tuple,
+        slot_desc, pool, string_values, collection_values);
+  }
+}
+
+template <bool COLLECT_VAR_LEN_VALS>
+void RawValue::WritePrimitiveCollectVarlen(const void* value, Tuple* tuple,
+    const SlotDescriptor* slot_desc, MemPool* pool, vector<StringValue*>* string_values) {
   DCHECK(value != nullptr && tuple != nullptr && slot_desc != nullptr);
 
   void* dst = tuple->GetSlot(slot_desc->tuple_offset());
   WriteNonNullPrimitive(value, dst, slot_desc->type(), pool);
-  if (COLLECT_VAR_LEN_VALS) {
+  if constexpr (COLLECT_VAR_LEN_VALS) {
     DCHECK(string_values != nullptr);
-    DCHECK(collection_values != nullptr);
     if (slot_desc->type().IsVarLenStringType()) {
-      string_values->push_back(reinterpret_cast<StringValue*>(dst));
+      StringValue* str_value = reinterpret_cast<StringValue*>(dst);
+      if (!str_value->IsSmall()) string_values->push_back(str_value);
     } else if (slot_desc->type().IsCollectionType()) {
       DCHECK(false) << "Collections should be handled in WriteCollection.";
     }
@@ -483,11 +549,9 @@ template void RawValue::WriteStruct<false>(const void* value, Tuple* tuple,
 
 template void RawValue::WritePrimitiveCollectVarlen<true>(const void* value,
     Tuple* tuple, const SlotDescriptor* slot_desc, MemPool* pool,
-    std::vector<StringValue*>* string_values,
-    std::vector<std::pair<CollectionValue*, int64_t>>* collection_values);
+    std::vector<StringValue*>* string_values);
 template void RawValue::WritePrimitiveCollectVarlen<false>(const void* value,
     Tuple* tuple,
     const SlotDescriptor* slot_desc, MemPool* pool,
-    std::vector<StringValue*>* string_values,
-    std::vector<std::pair<CollectionValue*, int64_t>>* collection_values);
+    std::vector<StringValue*>* string_values);
 }

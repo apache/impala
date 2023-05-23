@@ -166,52 +166,55 @@ class Tuple {
   /// IR function for the case 'pool' is non-NULL and false for the NULL pool case.
   ///
   /// If 'COLLECT_VAR_LEN_VALS' is true
-  ///  - the materialized non-NULL string value slots and are returned in
-  ///    'non_null_string_values',
+  ///  - the materialized non-NULL non-smallified string value slots are returned in
+  ///    'non_null_string_values' - smallified strings (see Small
+  ///    String Optimization, IMPALA-12373) are not collected;
   ///  - the materialized non-NULL collection value slots, along with their byte sizes,
   ///    are returned in 'non_null_collection_values' and
   ///  - the total length of the string and collection slots is returned in
   ///    'total_varlen_lengths'.
   /// 'non_null_string_values', 'non_null_collection_values' and 'total_varlen_lengths'
-  /// must be non-NULL in this case. 'non_null_string_values' and
-  /// 'non_null_collection_values' do not need to be empty; their original contents will
-  /// be overwritten.
+  /// must be non-NULL in this case. Their contents will be overwritten. The var-len
+  /// values are collected recursively. This means that if there are no collections with
+  /// variable length types in the tuple, the length of 'non_null_string_values' will be
+  /// 'desc.string_slots().size()' and the length of 'non_null_collection_values' will be
+  /// 'desc.collection_slots().size()'; if there are collections with variable length
+  /// types, the lengths of these vectors will be more.
+  ///
+  /// Children are placed before their parents in the vectors (post-order traversal). The
+  /// order matters in case of serialisation. When a child is serialised, the pointer of
+  /// the parent needs to be updated. If the parent itself also needs to be serialised
+  /// (because it is also a var-len child of a 'CollectionValue'), it should be serialised
+  /// after its child so that its pointer is already updated at that time. For the same
+  /// reason, the 'StringValue's must be serialised before the 'CollectionValue's -
+  /// strings can be children of collections but not the other way around. For more see
+  /// Sorter::Run::CollectNonNullVarSlots().
   template <bool COLLECT_VAR_LEN_VALS, bool NULL_POOL>
   inline void IR_ALWAYS_INLINE MaterializeExprs(TupleRow* row,
       const TupleDescriptor& desc, const std::vector<ScalarExprEvaluator*>& evals,
       MemPool* pool, std::vector<StringValue*>* non_null_string_values = nullptr,
-      std::vector<CollValueAndSize>* non_null_collection_values = nullptr,
+      std::vector<std::pair<CollectionValue*, int64_t>>*
+         non_null_collection_values = nullptr,
       int* total_varlen_lengths = nullptr) {
     DCHECK_EQ(NULL_POOL, pool == nullptr);
     DCHECK_EQ(evals.size(), desc.slots().size());
 
-    StringValue** non_null_string_values_array = nullptr;
-    CollValueAndSize* non_null_coll_vals_and_sizes_array = nullptr;
     int num_non_null_string_values = 0;
     int num_non_null_collection_values = 0;
     if (COLLECT_VAR_LEN_VALS) {
       DCHECK(non_null_string_values != nullptr);
       DCHECK(non_null_collection_values != nullptr);
       DCHECK(total_varlen_lengths != nullptr);
-      // vector::resize() will zero-initialize any new values, so we resize to the largest
-      // possible size here, then truncate the vector below once we know the actual size
-      // (which preserves already-written values).
-      non_null_string_values->resize(desc.string_slots().size());
-      non_null_collection_values->resize(desc.collection_slots().size());
 
-      non_null_string_values_array = non_null_string_values->data();
-      non_null_coll_vals_and_sizes_array = non_null_collection_values->data();
-
+      non_null_string_values->clear();
+      non_null_collection_values->clear();
       *total_varlen_lengths = 0;
     }
+
     MaterializeExprs<COLLECT_VAR_LEN_VALS, NULL_POOL>(row, desc,
-        evals.data(), pool, non_null_string_values_array,
-        non_null_coll_vals_and_sizes_array, total_varlen_lengths,
-        &num_non_null_string_values, &num_non_null_collection_values);
-    if (COLLECT_VAR_LEN_VALS) {
-      non_null_string_values->resize(num_non_null_string_values);
-      non_null_collection_values->resize(num_non_null_collection_values);
-    }
+        evals.data(), pool, non_null_string_values, non_null_collection_values,
+        total_varlen_lengths, &num_non_null_string_values,
+        &num_non_null_collection_values);
   }
 
   /// Copy the var-len string data in this tuple into the provided memory pool and update
@@ -343,15 +346,37 @@ class Tuple {
   void DeepCopyVarlenData(const TupleDescriptor& desc, char** data, int* offset,
       bool convert_ptrs);
 
+  /// During the construction of hand-crafted codegen'd functions, types cannot generally
+  /// be looked up by name. In our own types we use the static 'LLVM_CLASS_NAME' member to
+  /// facilitate this, but it cannot be used with other types, for example standard
+  /// containers. This struct contains members with types that we'd like to use - struct
+  /// members can be retrieved by their index in LLVM.
+  struct CodegenTypes {
+    // Use type aliases to ensure that we use the same types in codegen and the
+    // corresponding normal code.
+    using StringValuePtrVecType = std::vector<StringValue*>;
+    using CollValuePtrAndSizeVecType = std::vector<std::pair<CollectionValue*, int64_t>>;
+
+    StringValuePtrVecType string_value_vec;
+    CollValuePtrAndSizeVecType coll_size_andvalue_vec;
+
+    static llvm::Type* getStringValuePtrVecType(LlvmCodeGen* codegen);
+    static llvm::Type* getCollValuePtrAndSizeVecType(LlvmCodeGen* codegen);
+
+    /// For C++/IR interop, we need to be able to look up types by name.
+    static const char* LLVM_CLASS_NAME;
+  };
+
   /// Implementation of MaterializedExprs(). This function is replaced during codegen.
   /// 'num_non_null_string_values' and 'num_non_null_collection_values' must be
   /// initialized by the caller.
   template <bool COLLECT_VAR_LEN_VALS, bool NULL_POOL>
   void IR_NO_INLINE MaterializeExprs(TupleRow* row, const TupleDescriptor& desc,
       ScalarExprEvaluator* const* evals, MemPool* pool,
-      StringValue** non_null_string_values, CollValueAndSize* non_null_collection_values,
+      CodegenTypes::StringValuePtrVecType* non_null_string_values,
+      CodegenTypes::CollValuePtrAndSizeVecType* non_null_collection_values,
       int* total_varlen_lengths, int* num_non_null_string_values,
-      int* num_non_null_collection_values);
+      int* num_non_null_collection_values) noexcept;
 
   /// Helper for CopyStrings() to allocate 'bytes' of memory. Returns a pointer to the
   /// allocated buffer on success. Otherwise an error was encountered, in which case NULL
@@ -359,6 +384,9 @@ class Tuple {
   /// avoid emitting unnecessary code for ~Status() in perf-critical code.
   char* AllocateStrings(const char* err_ctx, RuntimeState* state, int64_t bytes,
       MemPool* pool, Status* status) noexcept;
+
+  // Defined in tuple-ir.cc to force the compilation of the CodegenTypes struct.
+  void dummy(Tuple::CodegenTypes*);
 };
 
 }

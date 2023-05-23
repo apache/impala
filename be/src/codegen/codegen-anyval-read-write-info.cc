@@ -19,6 +19,7 @@
 
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
+#include "llvm/IR/LLVMContext.h"
 
 namespace impala {
 
@@ -37,6 +38,11 @@ void NonWritableBasicBlock::BranchToIfNot(LlvmBuilder* builder,
     llvm::Value* condition, const NonWritableBasicBlock& then_block) const {
   DCHECK(builder != nullptr);
   builder->CreateCondBr(condition, then_block.basic_block_, basic_block_);
+}
+
+llvm::BasicBlock* NonWritableBasicBlock::CreateBasicBlockBefore(
+    llvm::LLVMContext& context, const std::string& name, llvm::Function* fn) const {
+  return llvm::BasicBlock::Create(context, name, fn, basic_block_);
 }
 
 llvm::Value* CodegenAnyValReadWriteInfo::GetSimpleVal() const {

@@ -42,6 +42,7 @@
 namespace impala {
 
 const char* Tuple::LLVM_CLASS_NAME = "class.impala::Tuple";
+const char* Tuple::CodegenTypes::LLVM_CLASS_NAME = "struct.impala::Tuple::CodegenTypes";
 const char* SlotOffsets::LLVM_CLASS_NAME = "struct.impala::SlotOffsets";
 
 const char* Tuple::MATERIALIZE_EXPRS_SYMBOL = "MaterializeExprsILb0ELb0";
@@ -241,13 +242,41 @@ void Tuple::SetNullIndicators(NullIndicatorOffset offset, int64_t num_tuples,
   }
 }
 
+// Note: 'noexcept' is added because otherwise in LLVM code this function is called with
+// the 'invoke' instruction, not the 'call' instruction. This is bad because we can't
+// replace functions called with 'invoke' with a codegen'd function.
+//
+// The 'invoke' instruction is for functions that can throw exceptions. It would be chosen
+// here - if we didn't add 'noexcept' - because std::vector<...> (the actual type of
+// 'non_null_string_values' and 'non_null_collection_values') can throw if it fails to
+// allocate memory when it tries to grow. If a noexcept function throws, std::terminate()
+// is called (so no Undefined Behaviour).
+//
+// Currently the hand-crafted function we replace this function with doesn't use the
+// vectors (COLLECT_VAR_LEN_VALS is always false), so no exception will be thrown in
+// codegen code.
+//
+// In interpreted mode, if we crash because of std::terminate(), it is the same as what we
+// did before changing the type of these parameters to std::vector<...>: vector resizing
+// was done in the caller, but there was no catch block for it. This will also be the case
+// if the hand-crafted function in codegen code starts using the vectors.
 template <bool COLLECT_VAR_LEN_VALS, bool NO_POOL>
 void Tuple::MaterializeExprs(TupleRow* row, const TupleDescriptor& desc,
     ScalarExprEvaluator* const* evals, MemPool* pool,
-    StringValue** non_null_string_values, CollValueAndSize* non_null_collection_values,
+    CodegenTypes::StringValuePtrVecType* non_null_string_values,
+    CodegenTypes::CollValuePtrAndSizeVecType* non_null_collection_values,
     int* total_varlen_lengths,
-    int* num_non_null_string_values, int* num_non_null_collection_values) {
+    int* num_non_null_string_values, int* num_non_null_collection_values) noexcept {
+  if constexpr (COLLECT_VAR_LEN_VALS) {
+    DCHECK(non_null_string_values != nullptr);
+    DCHECK(non_null_collection_values != nullptr);
+    DCHECK(total_varlen_lengths != nullptr);
+    DCHECK(num_non_null_string_values != nullptr);
+    DCHECK(num_non_null_collection_values != nullptr);
+  }
+
   ClearNullBits(desc);
+
   // Evaluate the materialize_expr_evals and place the results in the tuple.
   for (int i = 0; i < desc.slots().size(); ++i) {
     SlotDescriptor* slot_desc = desc.slots()[i];
@@ -258,27 +287,30 @@ void Tuple::MaterializeExprs(TupleRow* row, const TupleDescriptor& desc,
         slot_desc->type() == evals[i]->root().type());
     void* src = evals[i]->GetValue(row);
 
-    vector<StringValue*> string_values;
-    vector<pair<CollectionValue*, int64_t>> collection_values;
+    const size_t old_num_string_values = COLLECT_VAR_LEN_VALS ?
+        non_null_string_values->size() : 0;
+    const size_t old_num_collection_values = COLLECT_VAR_LEN_VALS ?
+        non_null_collection_values->size() : 0;
     RawValue::Write<COLLECT_VAR_LEN_VALS>(src, this, slot_desc, pool,
-        &string_values, &collection_values);
-    if (string_values.size() > 0) {
-      for (StringValue* string_val : string_values) {
-        *(non_null_string_values++) = string_val;
-        if (string_val->IsSmall()) continue;
+        non_null_string_values, non_null_collection_values);
+
+    if constexpr (COLLECT_VAR_LEN_VALS) {
+      const size_t new_num_string_values = non_null_string_values->size();
+      for (size_t i = old_num_string_values; i < new_num_string_values; i++) {
+        const StringValue* string_val = (*non_null_string_values)[i];
+        DCHECK(!string_val->IsSmall());
         *total_varlen_lengths += string_val->Len();
       }
-      (*num_non_null_string_values) += string_values.size();
-    }
+      (*num_non_null_string_values) += new_num_string_values - old_num_string_values;
 
-    if (collection_values.size() > 0) {
-      for (const pair<CollectionValue*, int64_t>& collection_val_pair
-          : collection_values) {
-        CollValueAndSize cvs(collection_val_pair.first, collection_val_pair.second);
-        *(non_null_collection_values++) = cvs;
+      const size_t new_num_collection_values = non_null_collection_values->size();
+      for (size_t i = old_num_collection_values; i < new_num_collection_values; i++) {
+        const pair<CollectionValue*, int64_t>& collection_val_pair =
+            (*non_null_collection_values)[i];
         *total_varlen_lengths += collection_val_pair.second;
       }
-      (*num_non_null_collection_values) += collection_values.size();
+      (*num_non_null_collection_values) +=
+          new_num_collection_values - old_num_collection_values;
     }
   }
 }
@@ -315,14 +347,14 @@ char* Tuple::AllocateStrings(const char* err_ctx, RuntimeState* state,
 //   order by l_comment
 //   limit 10;
 //
+//
 // define void @MaterializeExprs(%"class.impala::Tuple"* %opaque_tuple,
 //     %"class.impala::TupleRow"* %row, %"class.impala::TupleDescriptor"* %desc,
 //     %"class.impala::ScalarExprEvaluator"** %slot_materialize_expr_evals,
 //     %"class.impala::MemPool"* %pool,
-//     %"struct.impala::StringValue"** %non_null_string_values,
-//     %"struct.impala::CollValueAndSize"* %non_null_collection_values,
-//     i32* %total_varlen_lengths, i32* %num_non_null_string_values,
-//     i32* %num_non_null_collection_values) #50 {
+//     %"class.std::vector.1154"* %non_null_string_values,
+//     %"class.std::vector.1159"* %non_null_collection_values, i32* %total_varlen_lengths,
+//     i32* %num_non_null_string_values, i32* %num_non_null_collection_values) #50 {
 // entry:
 //   %tuple = bitcast %"class.impala::Tuple"* %opaque_tuple
 //       to <{ %"struct.impala::StringValue", i8 }>*
@@ -336,7 +368,8 @@ char* Tuple::AllocateStrings(const char* err_ctx, RuntimeState* state,
 //   %src = call { i64, i8* } @GetSlotRef.4(
 //       %"class.impala::ScalarExprEvaluator"* %expr_eval,
 //       %"class.impala::TupleRow"* %row)
-//   ; -- generated by CodegenAnyVal::ToReadWriteInfo() and SlotDescriptor::WriteToSlot()
+//   ; -- generated by CodegenAnyVal::ToReadWriteInfo() and
+//   ; -- SlotDescriptor::CodegenWriteToSlot()
 //   br label %entry1
 //
 // entry1:                                           ; preds = %entry
@@ -353,11 +386,11 @@ char* Tuple::AllocateStrings(const char* err_ctx, RuntimeState* state,
 //       <{ %"struct.impala::StringValue", i8 }>* %tuple, i32 0, i32 0
 //   %5 = insertvalue %"struct.impala::StringValue" zeroinitializer, i32 %4, 1
 //   %6 = sext i32 %4 to i64
-//   %new_ptr = call i8* @_ZN6impala7MemPool8AllocateILb0EEEPhli(
+//   %new_coll_val_ptr = call i8* @_ZN6impala7MemPool8AllocateILb0EEEPhli(
 //       %"class.impala::MemPool"* %pool, i64 %6, i32 8)
-//   call void @llvm.memcpy.p0i8.p0i8.i32(i8* %new_ptr, i8* %src2, i32 %4, i32 0,
+//   call void @llvm.memcpy.p0i8.p0i8.i32(i8* %new_coll_val_ptr, i8* %src2, i32 %4, i32 0,
 //       i1 false)
-//   %7 = insertvalue %"struct.impala::StringValue" %5, i8* %new_ptr, 0
+//   %7 = insertvalue %"struct.impala::StringValue" %5, i8* %new_coll_val_ptr, 0
 //   store %"struct.impala::StringValue" %7, %"struct.impala::StringValue"* %slot
 //   br label %end_write
 //
@@ -370,7 +403,7 @@ char* Tuple::AllocateStrings(const char* err_ctx, RuntimeState* state,
 //   br label %end_write
 //
 // end_write:                                        ; preds = %null, %non_null
-//   ; -- end CodegenAnyVal::ToReadWriteInfo() and SlotDescriptor::WriteToSlot() --------
+//   ; -- end CodegenAnyVal::ToReadWriteInfo() and SlotDescriptor::CodegenWriteToSlot()
 //   ret void
 // }
 Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_varlen_vals,
@@ -398,8 +431,8 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_varlen_
   // used in xcompiled IR). With 'pool':
   // void MaterializeExprs(Tuple* opaque_tuple, TupleRow* row,
   //     const TupleDescriptor& desc, ScalarExprEvaluator* const* evals, MemPool* pool,
-  //     StringValue** non_null_string_values,
-  //     CollValueAndSize* non_null_collection_values,
+  //     CodegenTypes::StringValuePtrVecType* non_null_string_values,
+  //     CodegenTypes::CollValuePtrAndSizeVecType* non_null_collection_values,
   //     int* total_varlen_lengths, int* num_non_null_string_values,
   //     int* num_non_null_collection_values);
   llvm::PointerType* opaque_tuple_type = codegen->GetStructPtrType<Tuple>();
@@ -408,10 +441,12 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_varlen_
   llvm::PointerType* expr_evals_type =
       codegen->GetStructPtrPtrType<ScalarExprEvaluator>();
   llvm::PointerType* pool_type = codegen->GetStructPtrType<MemPool>();
-  llvm::PointerType* string_values_type = codegen->GetStructPtrPtrType<StringValue>();
-  llvm::PointerType* coll_values_and_sizes_type =
-      codegen->GetStructPtrType<CollValueAndSize>();
+  llvm::Type* string_values_type =
+      CodegenTypes::getStringValuePtrVecType(codegen)->getPointerTo();
+  llvm::Type* coll_values_and_sizes_type =
+      CodegenTypes::getCollValuePtrAndSizeVecType(codegen)->getPointerTo();
   llvm::PointerType* int_ptr_type = codegen->i32_ptr_type();
+
   LlvmCodeGen::FnPrototype prototype(codegen, "MaterializeExprs", codegen->void_type());
   prototype.AddArgument("opaque_tuple", opaque_tuple_type);
   prototype.AddArgument("row", row_type);
@@ -441,9 +476,8 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_varlen_
 
   // Cast the opaque Tuple* argument to the generated struct type
   llvm::Type* tuple_struct_type = desc.GetLlvmStruct(codegen);
-  if (tuple_struct_type == NULL) {
-    return Status("CodegenMaterializeExprs(): failed to generate tuple desc");
-  }
+  DCHECK(tuple_struct_type != nullptr);
+
   llvm::PointerType* tuple_type = codegen->GetPtrType(tuple_struct_type);
   llvm::Value* tuple = builder.CreateBitCast(opaque_tuple_arg, tuple_type, "tuple");
 
@@ -541,16 +575,26 @@ llvm::Constant* SlotOffsets::ToIR(LlvmCodeGen* codegen) const {
           codegen->GetI32Constant(tuple_offset)});
 }
 
+llvm::Type* Tuple::CodegenTypes::getStringValuePtrVecType(LlvmCodeGen* codegen) {
+  llvm::StructType* codegenTypes = codegen->GetStructType<Tuple::CodegenTypes>();
+  return codegenTypes->getElementType(0);
+}
+
+llvm::Type* Tuple::CodegenTypes::getCollValuePtrAndSizeVecType(LlvmCodeGen* codegen) {
+  llvm::StructType* codegenTypes = codegen->GetStructType<Tuple::CodegenTypes>();
+  return codegenTypes->getElementType(1);
+}
+
 template void Tuple::MaterializeExprs<false, false>(TupleRow*, const TupleDescriptor&,
-    ScalarExprEvaluator* const*, MemPool*, StringValue**, CollValueAndSize*,
-    int*, int*, int*);
+    ScalarExprEvaluator* const*, MemPool*, Tuple::CodegenTypes::StringValuePtrVecType*,
+    Tuple::CodegenTypes::CollValuePtrAndSizeVecType*, int*, int*, int*);
 template void Tuple::MaterializeExprs<false, true>(TupleRow*, const TupleDescriptor&,
-    ScalarExprEvaluator* const*, MemPool*, StringValue**, CollValueAndSize*,
-    int*, int*, int*);
+    ScalarExprEvaluator* const*, MemPool*, Tuple::CodegenTypes::StringValuePtrVecType*,
+    Tuple::CodegenTypes::CollValuePtrAndSizeVecType*, int*, int*, int*);
 template void Tuple::MaterializeExprs<true, false>(TupleRow*, const TupleDescriptor&,
-    ScalarExprEvaluator* const*, MemPool*, StringValue**, CollValueAndSize*,
-    int*, int*, int*);
+    ScalarExprEvaluator* const*, MemPool*, Tuple::CodegenTypes::StringValuePtrVecType*,
+    Tuple::CodegenTypes::CollValuePtrAndSizeVecType*, int*, int*, int*);
 template void Tuple::MaterializeExprs<true, true>(TupleRow*, const TupleDescriptor&,
-    ScalarExprEvaluator* const*, MemPool*, StringValue**, CollValueAndSize*,
-    int*, int*, int*);
+    ScalarExprEvaluator* const*, MemPool*, Tuple::CodegenTypes::StringValuePtrVecType*,
+    Tuple::CodegenTypes::CollValuePtrAndSizeVecType*, int*, int*, int*);
 }

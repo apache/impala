@@ -359,19 +359,31 @@ class TestArraySort(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'parquet')
 
-  def test_simple_arrays(self, vector):
-    """Test arrays that do not contain var-len data."""
-    query = """select string_col, int_array, double_array
-         from functional_parquet.simple_arrays_big order by string_col;"""
+  def test_array_sort(self, vector):
+    self._run_test_sort_query(vector, None)
+
+  def test_array_sort_with_limit(self, vector):
+    self._run_test_sort_query(vector, 3000)
+
+  def _run_test_sort_query(self, vector, limit):
+    """Test sorting with spilling where an array that contains var-len data is in the
+    sorting tuple. If 'limit' is set to an integer, applies that limit."""
+    query = """select string_col, int_array, double_map, string_array, mixed
+        from functional_parquet.arrays_big order by string_col"""
+
+    if limit:
+      assert isinstance(limit, int)
+      limit_clause = " limit {}".format(limit)
+      query = query + limit_clause
 
     exec_option = copy(vector.get_value('exec_option'))
     exec_option['disable_outermost_topn'] = 1
     exec_option['num_nodes'] = 1
-    exec_option['buffer_pool_limit'] = '28m'
+    exec_option['buffer_pool_limit'] = '44m'
     table_format = vector.get_value('table_format')
 
     query_result = self.execute_query(query, exec_option, table_format=table_format)
-    assert "SpilledRuns: 2" in query_result.runtime_profile
+    assert "SpilledRuns: 3" in query_result.runtime_profile
 
     # Split result rows (strings) into columns.
     result = split_result_rows(query_result.data)

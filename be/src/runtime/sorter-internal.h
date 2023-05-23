@@ -244,15 +244,36 @@ class Sorter::Run {
   /// if the run is unpinned.
   Status FinalizePages(vector<Page>* pages);
 
-  void CheckTypeForVarLenCollectionSorting();
+  void CheckTypesAreValidInSortingTuple();
 
-  /// Collects the non-null var-len slots (strings and collections) from 'src'. Strings
-  /// are returned in 'string_values' and collections are returned, along with their byte
-  /// size, in 'collection_values'. The total length of all var-len values is returned in
-  /// 'total_var_len'.
-  void CollectNonNullNonSmallVarSlots(
-      Tuple* src, vector<StringValue*>* string_values,
-      std::vector<CollValueAndSize>* collection_values,
+  /// Collects the non-null var-len slots (non-smallified strings and collections) from
+  /// 'src'. Smallified strings (see Small String Optimization, IMPALA-12373) are not
+  /// collected. Strings are returned in 'string_values' and collections are returned,
+  /// along with their byte size, in 'collection_values' (any existing elements of
+  /// 'string_values' and 'collection_values' are cleared). The total length of all
+  /// var-len values is returned in 'total_var_len'. Nested (non-top-level) var-len values
+  /// are collected recursively.
+  ///
+  /// Children are placed before their parents in the vectors (post-order traversal).
+  /// This order is chosen because of the way we serialise the values in CopyVarLenData()
+  /// and CopyVarLenDataConvertOffset(): we write the var-len part of 'StringValue's and
+  /// 'CollectionValue's to the buffer and update the pointers in-place. The order becomes
+  /// important if these '(String|Collection)Value's are themselves (var-len) children of
+  /// other 'CollectionValue's. If children are written before their parents, then when
+  /// the parents are written their pointers have already been updated so they can be
+  /// written as-is. If parents were written before their children, updating the pointers
+  /// in-place would not be enough, the already serialised pointers would have to be
+  /// updated in the byte buffer. Note that to ensure that this order is kept, the
+  /// 'StringValue's must be serialised before the 'CollectionValue's - strings can be
+  /// children of collections but not the other way around.
+  void CollectNonNullNonSmallVarSlots(Tuple* src, const TupleDescriptor& tuple_desc,
+      vector<StringValue*>* string_values,
+      std::vector<std::pair<CollectionValue*, int64_t>>* collection_values,
+      int* total_var_len);
+
+  void CollectNonNullNonSmallVarSlotsHelper(Tuple* src, const TupleDescriptor& tuple_desc,
+      vector<StringValue*>* string_values,
+      std::vector<std::pair<CollectionValue*, int64_t>>* collection_values,
       int* total_var_len);
 
   enum AddPageMode { KEEP_PREV_PINNED, UNPIN_PREV };
@@ -282,28 +303,37 @@ class Sorter::Run {
   /// Copy the var len data in 'string_values' and 'collection_values_and_sizes' to 'dest'
   /// in order and update the pointers to point to the copied data.
   void CopyVarLenData(const vector<StringValue*>& string_values,
-      const vector<CollValueAndSize>& collection_values_and_sizes, uint8_t* dest);
+      const vector<std::pair<CollectionValue*, int64_t>>& collection_values_and_sizes,
+      uint8_t* dest);
 
   /// Copy the StringValues in 'var_values' and the CollectionValues referenced in
   /// 'collection_values_and_sizes' to 'dest' in order. Update the StringValue ptrs in
   /// 'dest' to contain a packed offset for the copied data comprising page_index and the
   /// offset relative to page_start.
   void CopyVarLenDataConvertOffset(const vector<StringValue*>& var_values,
-      const std::vector<CollValueAndSize>& collection_values_and_sizes,
+      const std::vector<std::pair<CollectionValue*, int64_t>>&
+          collection_values_and_sizes,
       int page_index, const uint8_t* page_start, uint8_t* dest);
 
-  /// Convert encoded offsets to valid pointers in tuple with layout 'sort_tuple_desc_'.
+  /// Convert encoded offsets to valid pointers in 'tuple' with layout 'tuple_desc'.
   /// 'tuple' is modified in-place. Returns true if the pointers refer to the page at
-  /// 'var_len_pages_index_' and were successfully converted or false if the var len
-  /// data is in the next page, in which case 'tuple' is unmodified.
-  bool ConvertOffsetsToPtrs(Tuple* tuple);
+  /// 'var_len_pages_index_' and were successfully converted or false if the var len data
+  /// is in the next page, in which case 'tuple' is unmodified.
+  bool ConvertOffsetsToPtrs(Tuple* tuple, const TupleDescriptor& tuple_desc)
+      WARN_UNUSED_RESULT;
 
   template <class ValueType>
+  WARN_UNUSED_RESULT
   bool ConvertValueOffsetsToPtrs(Tuple* tuple, uint8_t* page_start,
       const vector<SlotDescriptor*>& slots);
 
-  bool ConvertStringValueOffsetsToPtrs(Tuple* tuple, uint8_t* page_start);
-  bool ConvertCollectionValueOffsetsToPtrs(Tuple* tuple, uint8_t* page_start);
+  bool ConvertStringValueOffsetsToPtrs(Tuple* tuple, const TupleDescriptor& tuple_desc,
+      uint8_t* page_start) WARN_UNUSED_RESULT;
+  bool ConvertCollectionValueOffsetsToPtrs(Tuple* tuple,
+      const TupleDescriptor& tuple_desc, uint8_t* page_start) WARN_UNUSED_RESULT;
+
+  bool ConvertOffsetsForCollectionChildren(const CollectionValue& cv,
+      const SlotDescriptor& slot_desc) WARN_UNUSED_RESULT;
 
   int NumOpenPages(const vector<Page>& pages);
 

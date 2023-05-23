@@ -331,12 +331,8 @@ public class AnalyticPlanner {
       for (SlotDescriptor inputSlotDesc: tupleDesc.getSlots()) {
         if (inputSlotDesc.isMaterialized()) {
           // Project out collection slots that are not supported in the sorting tuple
-          // (collections containing var-len types).
-          Optional<String> err = SortInfo.checkTypeForVarLenCollection(
-              inputSlotDesc.getType());
-          // An empty 'Optional' result means there is no error so the type can be put
-          // into the sorting tuple.
-          if (!err.isPresent()) {
+          // (collections within structs).
+          if (SortInfo.isValidInSortingTuple(inputSlotDesc.getType())) {
             inputSlotRefs.add(new SlotRef(inputSlotDesc));
           } else {
             if (LOG.isTraceEnabled()) {

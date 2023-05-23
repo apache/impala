@@ -1,149 +1,113 @@
 ====
 ---- QUERY
-# Sort a collection.
-select id, int_array from complextypestbl order by id
+# Sort collections.
+select id, arr_int_1d, arr_string_3d, map_1d, map_3d from collection_tbl order by id desc
 ---- RESULTS
-1,'[1,2,3]'
-2,'[null,1,2,null,3,null]'
-3,'[]'
-4,'NULL'
-5,'NULL'
-6,'NULL'
-7,'NULL'
-8,'[-1]'
+3,'[null,4679,null,49,null]','[[["1","-1","second even-toed ungulate",null],["three even-toed ungulates"]],[["four even-toed ungulate"]]]','{645:"fourth even-toed ungulate",5:"fifth"}','{1:{10:{100:"hundred",200:"two hundred even-toed ungulates"},20:{300:"three hundred even-toed ungulates",400:"four hundred"}},2:{30:{500:"five hundred even-toed ungulates",600:"six hundred"},40:{700:"seven hundred even-toed ungulates",800:"eight hundred"}}}'
+2,'[1,null,3]','[[["second dinosaur bone",null,null],["three dinosaur bones"]],[["one",null,"four dinosaur bones"]]]','{1:"first dinosaur bone",2:"second",3:null}','{1:{10:{100:"hundred",200:"two hundred dinosaur bones"},20:{300:"three hundred dinosaur bones",400:"four hundred"}},2:{30:{500:"five hundred dinosaur bones",600:"six hundred"},40:{700:"seven hundred dinosaur bones",800:"eight hundred"}}}'
+1,'[1,2,null]','[[["1","second harmonic",null],["three cities"]],[["four castles"]]]','{1:"first automobile",2:"second"}','{1:{10:{100:"hundred",200:"two hundred pages"},20:{300:"three hundred pages",400:"four hundred"}},2:{30:{500:"five hundred pages",600:"six hundred"},40:{700:"seven hundred pages",800:"eight hundred"}}}'
 ---- TYPES
-bigint,string
+int,string,string,string,string
 ====
 ---- QUERY
-# Sort collection from HMS view.
-select id, int_array from complextypes_arrays_only_view order by id
+# Sort collections from HMS view.
+select id, int_array, int_array_array from complextypes_arrays_only_view order by id desc
 ---- RESULTS
-1,'[1,2,3]'
-2,'[null,1,2,null,3,null]'
-3,'[]'
-4,'NULL'
-5,'NULL'
-6,'NULL'
-7,'NULL'
-8,'[-1]'
+8,'[-1]','[[-1,-2],[]]'
+7,'NULL','[null,[5,6]]'
+6,'NULL','NULL'
+5,'NULL','NULL'
+4,'NULL','[]'
+3,'[]','[null]'
+2,'[null,1,2,null,3,null]','[[null,1,2,null],[3,null,4],[],null]'
+1,'[1,2,3]','[[1,2],[3,4]]'
 ---- TYPES
-bigint,string
+bigint,string,string
 ====
 ---- QUERY
 # Sort collection from WITH-clause inline view.
 with v as (
-  select id, int_array from complextypestbl
+  select id, arr_int_1d, arr_string_3d, map_1d, map_3d from collection_tbl
 )
-select id, int_array from v order by id
+select id, arr_int_1d, arr_string_3d, map_1d, map_3d from collection_tbl order by id desc
 ---- RESULTS
-1,'[1,2,3]'
-2,'[null,1,2,null,3,null]'
-3,'[]'
-4,'NULL'
-5,'NULL'
-6,'NULL'
-7,'NULL'
-8,'[-1]'
+3,'[null,4679,null,49,null]','[[["1","-1","second even-toed ungulate",null],["three even-toed ungulates"]],[["four even-toed ungulate"]]]','{645:"fourth even-toed ungulate",5:"fifth"}','{1:{10:{100:"hundred",200:"two hundred even-toed ungulates"},20:{300:"three hundred even-toed ungulates",400:"four hundred"}},2:{30:{500:"five hundred even-toed ungulates",600:"six hundred"},40:{700:"seven hundred even-toed ungulates",800:"eight hundred"}}}'
+2,'[1,null,3]','[[["second dinosaur bone",null,null],["three dinosaur bones"]],[["one",null,"four dinosaur bones"]]]','{1:"first dinosaur bone",2:"second",3:null}','{1:{10:{100:"hundred",200:"two hundred dinosaur bones"},20:{300:"three hundred dinosaur bones",400:"four hundred"}},2:{30:{500:"five hundred dinosaur bones",600:"six hundred"},40:{700:"seven hundred dinosaur bones",800:"eight hundred"}}}'
+1,'[1,2,null]','[[["1","second harmonic",null],["three cities"]],[["four castles"]]]','{1:"first automobile",2:"second"}','{1:{10:{100:"hundred",200:"two hundred pages"},20:{300:"three hundred pages",400:"four hundred"}},2:{30:{500:"five hundred pages",600:"six hundred"},40:{700:"seven hundred pages",800:"eight hundred"}}}'
 ---- TYPES
-bigint,string
+int,string,string,string,string
 ====
 ---- QUERY
 # Sort collection from nested query inline view.
-select id, int_array
-from (select id, int_array from complextypestbl) v
-order by id
+select id, arr_int_1d, arr_string_3d, map_1d, map_3d
+from (select id, arr_int_1d, arr_string_3d, map_1d, map_3d from collection_tbl) v
+order by id desc
 ---- RESULTS
-1,'[1,2,3]'
-2,'[null,1,2,null,3,null]'
-3,'[]'
-4,'NULL'
-5,'NULL'
-6,'NULL'
-7,'NULL'
-8,'[-1]'
+3,'[null,4679,null,49,null]','[[["1","-1","second even-toed ungulate",null],["three even-toed ungulates"]],[["four even-toed ungulate"]]]','{645:"fourth even-toed ungulate",5:"fifth"}','{1:{10:{100:"hundred",200:"two hundred even-toed ungulates"},20:{300:"three hundred even-toed ungulates",400:"four hundred"}},2:{30:{500:"five hundred even-toed ungulates",600:"six hundred"},40:{700:"seven hundred even-toed ungulates",800:"eight hundred"}}}'
+2,'[1,null,3]','[[["second dinosaur bone",null,null],["three dinosaur bones"]],[["one",null,"four dinosaur bones"]]]','{1:"first dinosaur bone",2:"second",3:null}','{1:{10:{100:"hundred",200:"two hundred dinosaur bones"},20:{300:"three hundred dinosaur bones",400:"four hundred"}},2:{30:{500:"five hundred dinosaur bones",600:"six hundred"},40:{700:"seven hundred dinosaur bones",800:"eight hundred"}}}'
+1,'[1,2,null]','[[["1","second harmonic",null],["three cities"]],[["four castles"]]]','{1:"first automobile",2:"second"}','{1:{10:{100:"hundred",200:"two hundred pages"},20:{300:"three hundred pages",400:"four hundred"}},2:{30:{500:"five hundred pages",600:"six hundred"},40:{700:"seven hundred pages",800:"eight hundred"}}}'
 ---- TYPES
-bigint,string
+int,string,string,string,string
 ====
 ---- QUERY
 # Sort a collection that is join-unnested.
 select id, a.item
-from complextypestbl t, t.int_array_array a
-order by id;
+from collection_tbl t, t.arr_string_3d a
+where id != 2
+order by id desc;
 ---- RESULTS
-1,'[1,2]'
-1,'[3,4]'
-2,'[null,1,2,null]'
-2,'[3,null,4]'
-2,'[]'
-2,'NULL'
-3,'NULL'
-7,'NULL'
-7,'[5,6]'
-8,'[-1,-2]'
-8,'[]'
+3,'[["1","-1","second even-toed ungulate",null],["three even-toed ungulates"]]'
+3,'[["four even-toed ungulate"]]'
+1,'[["1","second harmonic",null],["three cities"]]'
+1,'[["four castles"]]'
 ---- TYPES
-bigint,string
+int,string
 ====
 ---- QUERY
 # Sort a collection that is join-unnested in a WITH-clause inline view.
 with v as (
   select id, a.item arr
-  from complextypestbl t, t.int_array_array a
+  from collection_tbl t, t.arr_string_3d a
+  where id != 2
 )
-select id, arr from v order by id;
+select id, arr from v order by id desc;
 ---- RESULTS
-1,'[1,2]'
-1,'[3,4]'
-2,'[null,1,2,null]'
-2,'[3,null,4]'
-2,'[]'
-2,'NULL'
-3,'NULL'
-7,'NULL'
-7,'[5,6]'
-8,'[-1,-2]'
-8,'[]'
+3,'[["1","-1","second even-toed ungulate",null],["three even-toed ungulates"]]'
+3,'[["four even-toed ungulate"]]'
+1,'[["1","second harmonic",null],["three cities"]]'
+1,'[["four castles"]]'
 ---- TYPES
-bigint,string
+int,string
 ====
 ---- QUERY
 # Sort a collection that is join-unnested in a nested query inline view.
 select id, arr
 from (
     select id, a.item arr
-    from complextypestbl t, t.int_array_array a
+    from collection_tbl t, t.arr_string_3d a
   ) v
-order by id;
+where id != 2
+order by id desc;
 ---- RESULTS
-1,'[1,2]'
-1,'[3,4]'
-2,'[null,1,2,null]'
-2,'[3,null,4]'
-2,'[]'
-2,'NULL'
-3,'NULL'
-7,'NULL'
-7,'[5,6]'
-8,'[-1,-2]'
-8,'[]'
+3,'[["1","-1","second even-toed ungulate",null],["three even-toed ungulates"]]'
+3,'[["four even-toed ungulate"]]'
+1,'[["1","second harmonic",null],["three cities"]]'
+1,'[["four castles"]]'
 ---- TYPES
-bigint,string
+int,string
 ====
 ---- QUERY
-# Sorting is not supported yet for arrays containing varlen types: IMPALA-10939
-select id, arr_string_1d from collection_tbl order by id
----- CATCH
-AnalysisException: Sorting is not supported if the select list contains (possibly nested) collections with variable length data types.
+# Sort a collection of strings.
+select id, arr_string_1d from collection_tbl order by id desc
+---- RESULTS
+3,'["1",null,"three even-toed ungulates"]'
+2,'["one dinosaur bone",null,"2",null]'
+1,'["1","two wooden boxes",null]'
+---- TYPES
+int,string
 ====
 ---- QUERY
-# Sorting is not supported yet for arrays containing varlen types: IMPALA-10939
-select id, int_array_array from complextypestbl order by id
----- CATCH
-AnalysisException: Sorting is not supported if the select list contains (possibly nested) collections with variable length data types.
-====
----- QUERY
-# Being in the sorting tuple is supported for maps containing only fixed length types:
-# IMPALA-10939
+# Sort maps containing only fixed length types.
 select id, map_int_int, map_char3_char5 from map_non_varlen order by id desc
 ---- RESULTS
 10,'{100:1000,101:1010,102:1020}','{"aaj":"aaaaj"}'
@@ -160,46 +124,65 @@ select id, map_int_int, map_char3_char5 from map_non_varlen order by id desc
 int,string,string
 ====
 ---- QUERY
-# Sorting is not supported yet for collections containing varlen types: IMPALA-10939
-select id, int_map_array, int_map from complextypestbl order by id
----- CATCH
-AnalysisException: Sorting is not supported if the select list contains (possibly nested) collections with variable length data types.
+# Sort collections selected from within a struct.
+select id, struct_contains_arr.arr, struct_contains_nested_arr.arr from collection_struct_mix order by id desc;
+---- RESULTS
+2,'NULL','[["2022-12-10","2022-12-11",null,"2022-12-12"],null]'
+1,'[1,2,3,4,null,null,5]','[["2022-12-05","2022-12-06",null,"2022-12-07"],["2022-12-08","2022-12-09",null]]'
+---- TYPES
+INT,STRING,STRING
 ====
 ---- QUERY
-# Sorting is not supported yet for collections within structs: IMPALA-10939. Test with a
+# Sort collections containing structs, also containing var-len data.
+select id, arr_contains_struct, arr_contains_nested_struct from collection_struct_mix order by id desc;
+---- RESULTS
+2,'[{"i":100},{"i":8},{"i":35},{"i":45},null,{"i":193},{"i":null}]','[{"inner_struct":null,"small":104},{"inner_struct":{"str":"a few soju distilleries","l":28},"small":105},null]'
+1,'[{"i":1},{"i":2},{"i":3},{"i":4},null,{"i":5},{"i":null}]','[{"inner_struct":{"str":"","l":0},"small":2},null,{"inner_struct":{"str":"some spaceship captain","l":5},"small":20}]'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Sorting is not supported yet for collections within structs: IMPALA-12160. Test with a
 # struct that contains an array.
 select id, struct_contains_arr from collection_struct_mix order by id
 ---- CATCH
 AnalysisException: Sorting is not supported if the select list contains collection(s) nested in struct(s).
 ====
 ---- QUERY
-# Sorting is not supported yet for collections within structs: IMPALA-10939. Test with a
+# Sorting is not supported yet for collections within structs: IMPALA-12160. Test with a
 # struct that contains a map.
 select id, struct_contains_map from collection_struct_mix order by id;
 ---- CATCH
 AnalysisException: Sorting is not supported if the select list contains collection(s) nested in struct(s).
 ====
 ---- QUERY
-# Sort collection selected from within a struct.
-select id, struct_contains_arr.arr from collection_struct_mix order by id desc;
----- RESULTS
-2,'NULL'
-1,'[1,2,3,4,null,null,5]'
----- TYPES
-INT,STRING
-====
----- QUERY
-# Sort collection containing a struct.
-select id, arr_contains_struct from collection_struct_mix order by id desc;
----- RESULTS
-2,'[{"i":100},{"i":8},{"i":35},{"i":45},null,{"i":193},{"i":null}]'
-1,'[{"i":1},{"i":2},{"i":3},{"i":4},null,{"i":5},{"i":null}]'
----- TYPES
-INT,STRING
-====
----- QUERY
-# Sorting a collection containing a struct that contains var-len data is not supported.
-select id, arr_contains_nested_struct from collection_struct_mix order by id desc;
+# Sorting is not supported yet for collections within structs: IMPALA-12160. Test with an
+# array that contains a struct that contains an array.
+select id, maps.key, maps.value.big.arr from collection_struct_mix t, t.all_mix maps order by id
 ---- CATCH
-AnalysisException: Sorting is not supported if the select list contains (possibly nested) collections with variable length data types.
+AnalysisException: Sorting is not supported if the select list contains collection(s) nested in struct(s).
+====
+---- QUERY
+# Sorting by collections is not supported. Test with an array of fixed length type.
+select id, arr_int_1d from collection_tbl order by arr_int_1d
+---- CATCH
+AnalysisException: ORDER BY expression 'arr_int_1d' with complex type 'ARRAY<INT>' is not supported.
+====
+---- QUERY
+# Sorting by collections is not supported. Test with an array of variable length type.
+select id, arr_string_1d from collection_tbl order by arr_string_1d
+---- CATCH
+AnalysisException: ORDER BY expression 'arr_string_1d' with complex type 'ARRAY<STRING>' is not supported.
+====
+---- QUERY
+# Sorting by collections is not supported. Test with a map of fixed length type.
+select id, map_int_int from map_non_varlen order by map_int_int
+---- CATCH
+AnalysisException: ORDER BY expression 'map_int_int' with complex type 'MAP<INT,INT>' is not supported.
+====
+---- QUERY
+# Sorting by collections is not supported. Test with a map of variable length type.
+select id, map_1d from collection_tbl order by map_1d
+---- CATCH
+AnalysisException: ORDER BY expression 'map_1d' with complex type 'MAP<INT,STRING>' is not supported.
 ====

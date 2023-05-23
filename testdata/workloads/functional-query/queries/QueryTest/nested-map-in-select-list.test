@@ -96,9 +96,8 @@ select id, int_map from complextypestbl union select id, int_map from complextyp
 IllegalStateException: UNION, EXCEPT and INTERSECT are not supported for collection types
 ====
 ---- QUERY
-# Changing a column to a different type leads "non-pass-through" union that does a
-# deepcopy on the tuple, which is only implemented for collections of fixed-length types
-# in BE for arrays.
+# Changing a column to a different type leads to a "non-pass-through" union that does a
+# deepcopy on the tuple.
 select id, map_int_int from map_non_varlen
   union all select cast(id as tinyint), map_int_int from map_non_varlen
 ---- RESULTS
@@ -126,13 +125,19 @@ select id, map_int_int from map_non_varlen
 int,string
 ====
 ---- QUERY
-# Changing a column to a different type leads "non-pass-through" union that does a
-# deepcopy on the tuple, which is only implemented for collections of fixed-length types
-# in BE for arrays.
-select id, int_map from complextypestbl
-  union all select cast(id as tinyint), int_map from complextypestbl
----- CATCH
-IllegalStateException: only pass-through UNION ALL is supported for collections of variable length types.
+# Changing a column to a different type leads to a "non-pass-through" union that does a
+# deepcopy on the tuple.
+select id, map_1d, map_3d from collection_tbl
+  union all select cast(id as tinyint), map_1d, map_3d from collection_tbl
+---- RESULTS
+1,'{1:"first automobile",2:"second"}','{1:{10:{100:"hundred",200:"two hundred pages"},20:{300:"three hundred pages",400:"four hundred"}},2:{30:{500:"five hundred pages",600:"six hundred"},40:{700:"seven hundred pages",800:"eight hundred"}}}'
+2,'{1:"first dinosaur bone",2:"second",3:null}','{1:{10:{100:"hundred",200:"two hundred dinosaur bones"},20:{300:"three hundred dinosaur bones",400:"four hundred"}},2:{30:{500:"five hundred dinosaur bones",600:"six hundred"},40:{700:"seven hundred dinosaur bones",800:"eight hundred"}}}'
+3,'{645:"fourth even-toed ungulate",5:"fifth"}','{1:{10:{100:"hundred",200:"two hundred even-toed ungulates"},20:{300:"three hundred even-toed ungulates",400:"four hundred"}},2:{30:{500:"five hundred even-toed ungulates",600:"six hundred"},40:{700:"seven hundred even-toed ungulates",800:"eight hundred"}}}'
+1,'{1:"first automobile",2:"second"}','{1:{10:{100:"hundred",200:"two hundred pages"},20:{300:"three hundred pages",400:"four hundred"}},2:{30:{500:"five hundred pages",600:"six hundred"},40:{700:"seven hundred pages",800:"eight hundred"}}}'
+2,'{1:"first dinosaur bone",2:"second",3:null}','{1:{10:{100:"hundred",200:"two hundred dinosaur bones"},20:{300:"three hundred dinosaur bones",400:"four hundred"}},2:{30:{500:"five hundred dinosaur bones",600:"six hundred"},40:{700:"seven hundred dinosaur bones",800:"eight hundred"}}}'
+3,'{645:"fourth even-toed ungulate",5:"fifth"}','{1:{10:{100:"hundred",200:"two hundred even-toed ungulates"},20:{300:"three hundred even-toed ungulates",400:"four hundred"}},2:{30:{500:"five hundred even-toed ungulates",600:"six hundred"},40:{700:"seven hundred even-toed ungulates",800:"eight hundred"}}}'
+---- TYPES
+int,string,string
 ====
 ---- QUERY
 # Constants in the select list of unions also lead to "non-pass-through" union.
@@ -163,11 +168,32 @@ select 1, map_int_int from map_non_varlen
 tinyint,string
 ====
 ---- QUERY
-# Constants in the select list of unions also lead to "non-pass-through" union.
-select 1, int_map from complextypestbl
-  union all select 2, int_map from complextypestbl;
+# Constants in the select list of unions also lead to a "non-pass-through" union.
+select 1, int_map, int_map_array from complextypestbl
+  union all select 2, int_map, int_map_array from complextypestbl;
+
+select 1, map_1d, map_3d from collection_tbl
+  union all select 2, map_1d, map_3d from collection_tbl
+---- RESULTS
+1,'{1:"first automobile",2:"second"}','{1:{10:{100:"hundred",200:"two hundred pages"},20:{300:"three hundred pages",400:"four hundred"}},2:{30:{500:"five hundred pages",600:"six hundred"},40:{700:"seven hundred pages",800:"eight hundred"}}}'
+1,'{1:"first dinosaur bone",2:"second",3:null}','{1:{10:{100:"hundred",200:"two hundred dinosaur bones"},20:{300:"three hundred dinosaur bones",400:"four hundred"}},2:{30:{500:"five hundred dinosaur bones",600:"six hundred"},40:{700:"seven hundred dinosaur bones",800:"eight hundred"}}}'
+1,'{645:"fourth even-toed ungulate",5:"fifth"}','{1:{10:{100:"hundred",200:"two hundred even-toed ungulates"},20:{300:"three hundred even-toed ungulates",400:"four hundred"}},2:{30:{500:"five hundred even-toed ungulates",600:"six hundred"},40:{700:"seven hundred even-toed ungulates",800:"eight hundred"}}}'
+2,'{1:"first automobile",2:"second"}','{1:{10:{100:"hundred",200:"two hundred pages"},20:{300:"three hundred pages",400:"four hundred"}},2:{30:{500:"five hundred pages",600:"six hundred"},40:{700:"seven hundred pages",800:"eight hundred"}}}'
+2,'{1:"first dinosaur bone",2:"second",3:null}','{1:{10:{100:"hundred",200:"two hundred dinosaur bones"},20:{300:"three hundred dinosaur bones",400:"four hundred"}},2:{30:{500:"five hundred dinosaur bones",600:"six hundred"},40:{700:"seven hundred dinosaur bones",800:"eight hundred"}}}'
+2,'{645:"fourth even-toed ungulate",5:"fifth"}','{1:{10:{100:"hundred",200:"two hundred even-toed ungulates"},20:{300:"three hundred even-toed ungulates",400:"four hundred"}},2:{30:{500:"five hundred even-toed ungulates",600:"six hundred"},40:{700:"seven hundred even-toed ungulates",800:"eight hundred"}}}'
+---- TYPES
+tinyint,string,string
+====
+---- QUERY
+# Constants in the select list of unions also lead to a "non-pass-through" union and
+# structs containing collections are not allowed there yet because we can't materialise
+# them, see IMPALA-12160. However, set operations on structs are not supported at all at
+# present, and the error reflects that. When both limitations are lifted, the query should
+# succeed.
+select 1, struct_contains_map, all_mix from collection_struct_mix
+  union all select 2, struct_contains_map, all_mix from collection_struct_mix
 ---- CATCH
-IllegalStateException: only pass-through UNION ALL is supported for collections of variable length types.
+AnalysisException: Set operations don't support STRUCT type. STRUCT<m:MAP<INT,STRING>> in struct_contains_map
 ====
 ---- QUERY
 select 1 from (select int_map from complextypestbl) s

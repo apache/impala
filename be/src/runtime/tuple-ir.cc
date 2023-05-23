@@ -21,6 +21,9 @@
 
 namespace impala {
 
+// Used to force the compilation of the CodegenTypes struct.
+void Tuple::dummy(Tuple::CodegenTypes*) {}
+
 bool Tuple::CopyStrings(const char* err_ctx, RuntimeState* state,
     const SlotOffsets* string_slot_offsets, int num_string_slots, MemPool* pool,
     Status* status) noexcept {

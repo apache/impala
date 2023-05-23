@@ -1670,9 +1670,10 @@ public class Analyzer {
       for (StructField structField : type.getFields()) {
         // 'slotPath' could be null e.g. when the query has an order by clause and
         // this is the sorting tuple.
-        // TODO: IMPALA-10939: When we enable collections in sorting tuples we need to
-        // revisit this. Currently collection SlotDescriptors cannot be created without a
-        // path. Maybe descriptors should have a path even in the sorting tuple.
+        // TODO: IMPALA-12160: When we enable structs containing collections in sorting
+        // tuples we need to revisit this. Currently collection SlotDescriptors cannot be
+        // created without a path. Maybe descriptors should have a path even in the
+        // sorting tuple.
         if (slotPath == null) {
           createStructTuplesAndSlotDescsWithoutPath(slotPath, structField);
         } else {

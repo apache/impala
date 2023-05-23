@@ -265,10 +265,10 @@ public class UnionNode extends PlanNode {
     for (int i = 0; i < children_.size(); i++) {
       if (!isChildPassthrough(analyzer, children_.get(i), resultExprLists_.get(i))) {
         for (Expr expr : resultExprLists_.get(i)) {
-          Preconditions.checkState(!SortInfo.checkTypeForVarLenCollection(
-              expr.getType()).isPresent(),
-              "only pass-through UNION ALL is supported for collections of "
-              + "variable length types.");
+          // TODO IMPALA-12160: Add tests for collection-in-struct.
+          Preconditions.checkState(SortInfo.isValidInSortingTuple(expr.getType()),
+              "only pass-through UNION ALL is supported for "
+              + "structs containing collections.");
         }
         newResultExprLists.add(resultExprLists_.get(i));
         newChildren.add(children_.get(i));

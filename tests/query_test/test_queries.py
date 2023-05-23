@@ -148,7 +148,6 @@ class TestQueries(ImpalaTestSuite):
 
     if file_format in ['parquet', 'orc']:
       self.run_test_case('QueryTest/sort-complex', vector)
-      self.run_test_case('QueryTest/top-n-complex', vector)
 
   def test_partitioned_top_n(self, vector):
     """Test partitioned Top-N operator."""

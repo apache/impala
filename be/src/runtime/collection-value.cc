@@ -20,6 +20,5 @@
 namespace impala {
 
 const char* CollectionValue::LLVM_CLASS_NAME = "struct.impala::CollectionValue";
-const char* CollValueAndSize::LLVM_CLASS_NAME = "struct.impala::CollValueAndSize";
 
 }

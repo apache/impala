@@ -56,24 +56,6 @@ struct __attribute__((__packed__)) CollectionValue {
   static const char* LLVM_CLASS_NAME;
 };
 
-// A struct that contains a pointer to a CollectionValue and its byte size. Used instead
-// of std::pair because of codegen, because
-//   - the std::pair type is difficult to name in codegen and
-//   - we are not in control of the layout of std::pair.
-struct CollValueAndSize {
-  CollectionValue* coll_value;
-  // In most (maybe all) cases a 32 bit int should be enough but
-  // 'CollectionValue::ByteSize()' returns int64_t so we use that.
-  int64_t byte_size;
-
-  CollValueAndSize(): CollValueAndSize(nullptr, 0) {}
-  CollValueAndSize(CollectionValue* cv, int64_t size)
-    : coll_value(cv), byte_size(size) {}
-
-  /// For C++/IR interop, we need to be able to look up types by name.
-  static const char* LLVM_CLASS_NAME;
-};
-
 }
 
 #endif

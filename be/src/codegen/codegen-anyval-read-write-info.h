@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <string>
 #include <vector>
 #include <variant>
 
@@ -25,6 +26,8 @@
 namespace llvm {
 class ConstantStruct;
 class BasicBlock;
+class Function;
+class LLVMContext;
 class PHINode;
 class Value;
 }
@@ -36,12 +39,15 @@ class LlvmBuilder;
 class LlvmCodeGen;
 
 /// This class wraps an 'llvm::BasicBlock*' and provides a const interface to it extended
-/// with the possibility of branching to it (either conditionally or not).
-/// This is useful for the entry blocks of 'CodegenAnyValReadWriteInfo' objects as we do
-/// not want these blocks to be writable but we want to be able to branch to them.
+/// with the possibility of branching to it (either conditionally or not) and creating
+/// blocks before it.
+/// This is useful for example for the entry blocks of 'CodegenAnyValReadWriteInfo'
+/// objects as we do not want these blocks to be writable but we want to be able to branch
+/// to them.
 ///
 /// We cannot use a simple const pointer because the branching functions
-/// 'LlvmBuilder::Create[Cond]Br()' take a non-const pointer.
+/// 'LlvmBuilder::Create[Cond]Br()' and 'llvm::BasicBlock::Create()' take a non-const
+/// pointer.
 class NonWritableBasicBlock {
  public:
   explicit NonWritableBasicBlock(llvm::BasicBlock* basic_block)
@@ -60,6 +66,10 @@ class NonWritableBasicBlock {
   /// 'then_block'.
   void BranchToIfNot(LlvmBuilder* builder, llvm::Value* condition,
       const NonWritableBasicBlock& then_block) const;
+
+  /// Create a basic block that is inserted before this basic block.
+  llvm::BasicBlock* CreateBasicBlockBefore(llvm::LLVMContext& context,
+      const std::string& name = "", llvm::Function* fn = nullptr) const;
  private:
   llvm::BasicBlock* basic_block_;
 };

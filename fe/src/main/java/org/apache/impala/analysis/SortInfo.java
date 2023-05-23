@@ -332,68 +332,42 @@ public class SortInfo {
     return ProcessingCost.basicCost(label, inputCardinality, weight);
   }
 
-  // Collections with variable length data as well as any collections within structs are
-  // currently not allowed in the sorting tuple (see IMPALA-12019 and IMPALA-10939). This
-  // function checks whether the given type is allowed in the sorting tuple: returns an
-  // empty 'Optional' if the type is allowed, or an 'Optional' with an error message if it
-  // is not.
-  public static Optional<String> checkTypeForVarLenCollection(Type type) {
-    final String errorMsg = "Sorting is not supported if the select list contains " +
-      "(possibly nested) collections with variable length data types.";
-
+  // Collections within structs (also if they are nested in another struct or collection)
+  // are currently not allowed in the sorting tuple (see IMPALA-12160). This function
+  // returns whether the given type is allowed in the sorting tuple.
+  public static boolean isValidInSortingTuple(Type type) {
     if (type.isCollectionType()) {
       if (type instanceof ArrayType) {
         ArrayType arrayType = (ArrayType) type;
-        return isAllowedCollectionItemForSorting(arrayType.getItemType())
-            ? Optional.empty() : Optional.of(errorMsg);
+        return isValidInSortingTuple(arrayType.getItemType());
       } else {
         Preconditions.checkState(type instanceof MapType);
         MapType mapType = (MapType) type;
 
-        if (!isAllowedCollectionItemForSorting(mapType.getKeyType())) {
-          return Optional.of(errorMsg);
-        }
+        if (!isValidInSortingTuple(mapType.getKeyType())) return false;
 
-        return isAllowedCollectionItemForSorting(mapType.getValueType())
-            ? Optional.empty() : Optional.of(errorMsg);
+        return isValidInSortingTuple(mapType.getValueType());
       }
     } else if (type.isStructType()) {
       StructType structType = (StructType) type;
-      return checkStructTypeForVarLenCollection(structType);
+      return isValidStructInSortingTuple(structType);
     }
 
-    return Optional.empty();
+    return true;
   }
 
-  // Helper for checkTypeForVarLenCollection(), see more there.
-  private static Optional<String> checkStructTypeForVarLenCollection(
-      StructType structType) {
+  // Helper for isValidInSortingTuple(), see more there.
+  private static boolean isValidStructInSortingTuple(StructType structType) {
     for (StructField field : structType.getFields()) {
       Type fieldType = field.getType();
       if (fieldType.isStructType()) {
-        return checkStructTypeForVarLenCollection((StructType) fieldType);
+        if (!isValidStructInSortingTuple((StructType) fieldType)) return false;
       } else if (fieldType.isCollectionType()) {
-        // TODO IMPALA-10939: Once we allow sorting collections in structs, test that
+        // TODO IMPALA-12160: Once we allow sorting collections in structs, test that
         // collections containing var-len types are handled correctly.
-        String error = "Sorting is not supported if the select list "
-            + "contains collection(s) nested in struct(s).";
-        return Optional.of(error);
+        return false;
       }
     }
-
-    return Optional.empty();
-  }
-
-  private static boolean isAllowedCollectionItemForSorting(Type itemType) {
-    if (itemType.isStructType()) {
-      StructType structType = (StructType) itemType;
-      for (StructField field : structType.getFields()) {
-        Type fieldType = field.getType();
-        if (!isAllowedCollectionItemForSorting(fieldType)) return false;
-      }
-      return true;
-    }
-
-    return !itemType.isComplexType() && !itemType.isVarLenStringType();
+    return true;
   }
 }

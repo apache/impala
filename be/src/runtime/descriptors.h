@@ -35,6 +35,7 @@
 
 namespace llvm {
   class Constant;
+  class Function;
   class StructType;
   class Type;
   class Value;
@@ -196,15 +197,20 @@ class SlotDescriptor {
   /// 'slot_desc' is needed when 'pool_val' is non-NULL and the value is a collection. In
   /// this case the collection is copied and the slot desc is needed to calculate its byte
   /// size.
+  ///
+  /// If 'insert_before' contains a non-NULL pointer to a basic block, any newly created
+  /// blocks will be inserted before that.
   static void CodegenStoreNonNullAnyVal(CodegenAnyVal& any_val,
       llvm::Value* raw_val_ptr, llvm::Value* pool_val = nullptr,
-      const SlotDescriptor* slot_desc = nullptr);
+      const SlotDescriptor* slot_desc = nullptr,
+      const NonWritableBasicBlock& insert_before = NonWritableBasicBlock(nullptr));
 
   /// Like the above, but takes a 'CodegenAnyValReadWriteInfo' instead of a
   /// 'CodegenAnyVal'.
   static void CodegenStoreNonNullAnyVal(const CodegenAnyValReadWriteInfo& read_write_info,
       llvm::Value* raw_val_ptr, llvm::Value* pool_val = nullptr,
-      const SlotDescriptor* slot_desc = nullptr);
+      const SlotDescriptor* slot_desc = nullptr,
+      const NonWritableBasicBlock& insert_before = NonWritableBasicBlock(nullptr));
 
   /// Like 'CodegenStoreNonNullAnyVal' but stores the value into a new alloca()
   /// allocation. Returns a pointer to the stored value.
@@ -254,7 +260,7 @@ class SlotDescriptor {
 
   void CodegenWriteToSlotHelper(const CodegenAnyValReadWriteInfo& read_write_info,
       llvm::Value* main_tuple_llvm_struct_ptr, llvm::Value* tuple_llvm_struct_ptr,
-      llvm::Value* pool_val, NonWritableBasicBlock insert_before) const;
+      llvm::Value* pool_val, const NonWritableBasicBlock& insert_before) const;
 
   /// Stores a struct value into a native slot. This should only be used if this struct is
   /// not null.
@@ -265,26 +271,50 @@ class SlotDescriptor {
   /// beginning of the main tuple.
   void CodegenStoreStructToNativePtr(const CodegenAnyValReadWriteInfo& read_write_info,
       llvm::Value* main_tuple_ptr, llvm::Value* struct_slot_ptr, llvm::Value* pool_val,
-      NonWritableBasicBlock insert_before) const;
+      const NonWritableBasicBlock& insert_before) const;
 
   // Sets the null indicator bit to 0 - recursively for structs.
   void CodegenSetToNull(const CodegenAnyValReadWriteInfo& read_write_info,
       llvm::Value* tuple) const;
 
   /// Codegens writing a string or a collection to the address pointed to by 'slot_ptr'.
-  /// If 'pool_val' is non-NULL, the data will be copied into 'pool_val'. 'pool_val' has
-  /// to be of type MemPool*. 'slot_desc' is needed when 'pool_val' is non-NULL and the
-  /// value is a collection. In this case the collection is copied and the slot desc is
-  /// needed to calculate its byte size.
+  /// If 'pool_val' is non-NULL, the data will be deep-copied into 'pool_val'. 'pool_val'
+  /// has to be of type MemPool*. 'slot_desc' is needed when 'pool_val' is non-NULL and
+  /// the value is a collection. In this case the collection is copied and the slot desc
+  /// is needed to calculate its byte size.
   static void CodegenWriteStringOrCollectionToSlot(
       const CodegenAnyValReadWriteInfo& read_write_info,
-      llvm::Value* slot_ptr, llvm::Value* pool_val, const SlotDescriptor* slot_desc);
+      llvm::Value* slot_ptr, llvm::Value* pool_val, const SlotDescriptor* slot_desc,
+      const NonWritableBasicBlock& insert_before);
   static void CodegenWriteCollectionToSlot(
       const CodegenAnyValReadWriteInfo& read_write_info,
-      llvm::Value* slot_ptr, llvm::Value* pool_val, const SlotDescriptor* slot_desc);
+      llvm::Value* slot_ptr, llvm::Value* pool_val, const SlotDescriptor* slot_desc,
+      const NonWritableBasicBlock& insert_before);
   static void CodegenWriteStringToSlot(
       const CodegenAnyValReadWriteInfo& read_write_info,
       llvm::Value* slot_ptr, llvm::Value* pool_val, const SlotDescriptor* slot_desc);
+
+  void CodegenWriteCollectionItemsToSlot(LlvmCodeGen* codegen, LlvmBuilder* builder,
+      llvm::Value* collection_value, llvm::Value* num_tuples, llvm::Value* pool_val,
+      const NonWritableBasicBlock& insert_before) const;
+
+  // The below functions are helpers of 'CodegenWriteStringOrCollectionToSlot()'.
+  void CodegenWriteCollectionItemLoopBody(LlvmCodeGen* codegen, LlvmBuilder* builder,
+      llvm::Value* collection_value_ptr, llvm::Value* num_tuples,
+      llvm::Value* child_index, llvm::Function* fn,
+      const NonWritableBasicBlock& insert_before, llvm::Value* pool_val) const;
+
+  void CodegenWriteCollectionIterateOverChildren(LlvmCodeGen* codegen,
+      LlvmBuilder* builder, llvm::Value* children_tuple, llvm::Function* fn,
+      const NonWritableBasicBlock& insert_before, llvm::Value* pool_val) const;
+
+  void CodegenWriteCollectionStructChild(LlvmCodeGen* codegen, LlvmBuilder* builder,
+      llvm::Value* tuple, llvm::Function* fn, const NonWritableBasicBlock& insert_before,
+      llvm::Value* pool_val) const;
+
+  void CodegenWriteCollectionVarlenChild(LlvmCodeGen* codegen, LlvmBuilder* builder,
+      llvm::Value* child_tuple, llvm::Function* fn,
+      const NonWritableBasicBlock& insert_before, llvm::Value* pool_val) const;
 
   static llvm::Value* CodegenToTimestampValue(
       const CodegenAnyValReadWriteInfo& read_write_info);
@@ -579,9 +609,8 @@ class TupleDescriptor {
   /// but not necessarily the id.
   bool LayoutEquals(const TupleDescriptor& other_desc) const;
 
-  /// Creates a typed struct description for llvm.  The layout of the struct is computed
-  /// by the FE which includes the order of the fields in the resulting struct.
-  /// Returns the struct type or NULL if the type could not be created.
+  /// Creates and returns a typed struct description for llvm. The layout of the struct is
+  /// computed by the FE which includes the order of the fields in the resulting struct.
   /// For example, the aggregation tuple for this query: select count(*), min(int_col_a)
   /// would map to:
   /// struct Tuple {
@@ -621,18 +650,46 @@ class TupleDescriptor {
   /// collection, empty otherwise.
   SchemaPath tuple_path_;
 
-  /// If this tuple represents the children of a struct slot then 'master_tuple_' is the
-  /// tuple that holds the topmost struct slot. For example:
-  /// - Tuple0
-  ///     - Slot1 e.g. INT slot
-  ///     - Slot2 e.g. STRUCT slot
-  ///         - Tuple1 (Holds the children of the struct)
-  ///             - Slot3 e.g. INT child of the STRUCT
-  ///             - Slot4 e.g. STRING child of the STRUCT
-  /// In the above example the 'master_tuple_' for Tuple1 (that is the struct's tuple to
-  /// hold its children) would be Tuple0. In case the STRUCT in Slot2 was a nested struct
-  /// in any depth then the 'master_tuple_' for any of the tuples under Slot2 would be
-  /// again Tuple0.
+  /// If this tuple represents the children of a struct slot then the master tuple is
+  /// defined as follows:
+  ///  - starting from this tuple, go upwards in the slot-tuple tree as long as the parent
+  ///    slot is a struct
+  ///  - the tuple holding the last such struct slot, i.e. the slot whose immediate parent
+  ///    (if it exists) is not a struct, is the master tuple for this tuple (and all other
+  ///    tuples on the path).
+  /// Therefore the master tuple is either the main tuple or the item tuple of a
+  /// collection.
+  ///
+  /// For example:
+  /// - Tuple0 (Main tuple)
+  ///   - Slot0: INT
+  ///   - Slot1: STRUCT
+  ///     - Tuple1 (Holds the children of the struct in Slot1)
+  ///       - Slot2: ARRAY
+  ///         - Tuple2 (Holds the children of the array in Slot2)
+  ///           - Slot3: STRUCT
+  ///             - Tuple3 (Holds the children of the struct in Slot3)
+  ///               - Slot4: STRUCT
+  ///                 - Tuple4 (Holds the children of the struct in Slot4)
+  ///                   - Slot5: INT
+  ///                   - Slot6: STRING
+  ///
+  /// In the above example the master tuple for Tuple1 is Tuple0. For Tuple3 and Tuple4
+  /// the master tuple is Tuple2 because it holds the struct in Slot3 which is not
+  /// directly inside another struct. Tuple0 and Tuple2 do not have a master tuple because
+  /// they do not hold the children of structs.
+  ///
+  /// The reason for this is that, in memory, the children of a struct do not have their
+  /// own physical tuple but are placed in the tuple that conceptually holds their parent
+  /// struct. This means that the whole of a pure struct tree (i.e. one that does not
+  /// contain collections) of any depth will be placed in the same physical tuple, the
+  /// master tuple. Slot offsets are calculated in terms of the master tuple, not the
+  /// individual structs' virtual tuples.
+  ///
+  /// Children of a collection, on the other hand, do have their physical tuple that is
+  /// distinct from the one that holds their parent collection. This is because the number
+  /// of children a collection has is not known statically, in contrast to the number (and
+  /// type) of the fields of structs.
   TupleDescriptor* master_tuple_ = nullptr;
 
   TupleDescriptor(const TTupleDescriptor& tdesc);

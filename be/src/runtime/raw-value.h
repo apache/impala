@@ -119,12 +119,16 @@ class RawValue {
 
   /// Writes the bytes of a given value into the slot of a tuple. Supports primitive and
   /// complex types. 'value' is allowed to be NULL. For string and collection values, the
-  /// data is copied into memory allocated from 'pool' if pool is non-NULL, otherwise the
-  /// data is not copied.
-  /// If COLLECT_VAR_LEN_VALS is true, gathers the string slots of the slot tree into
-  /// 'string_values' and the collection slots along with their byte sizes into
-  /// 'collection_values'. In this case, 'string_values' and 'collection_values' must be
-  /// non-NULL.
+  /// data is deep-copied into memory allocated from 'pool' if pool is non-NULL, otherwise
+  /// the data is not copied.
+  ///
+  /// If COLLECT_VAR_LEN_VALS is true, gathers the non-NULL non-smallified string slots of
+  /// the slot tree into 'string_values' and the non-NULL collection slots along with
+  /// their byte sizes into 'collection_values' recursively. Smallified strings (see Small
+  /// String Optimization, IMPALA-12373) are not collected. Children are placed before
+  /// their parents in the vectors (post-order traversal) - see Tuple::MaterializeExprs()
+  /// and Sorter::Run::CollectNonNullVarSlots() for the reason. If COLLECT_VAR_LEN_VALS is
+  /// true, 'string_values' and 'collection_values' must be non-NULL.
   template <bool COLLECT_VAR_LEN_VALS>
   static void Write(const void* value, Tuple* tuple, const SlotDescriptor* slot_desc,
       MemPool* pool, std::vector<StringValue*>* string_values,
@@ -189,15 +193,23 @@ private:
       const SlotDescriptor* slot_desc, MemPool* pool, vector<StringValue*>* string_values,
       vector<pair<CollectionValue*, int64_t>>* collection_values);
 
+  template <bool COLLECT_VAR_LEN_VALS>
+  static void WriteCollectionChildren(const CollectionValue& dest,
+      const CollectionValue& src, const SlotDescriptor& collection_slot_desc,
+      MemPool* pool, vector<StringValue*>* string_values,
+      vector<pair<CollectionValue*, int64_t>>* collection_values);
+
+  template <bool COLLECT_VAR_LEN_VALS>
+  static void WriteCollectionVarlenChild(Tuple* child_dest_tuple, Tuple* child_src_tuple,
+      const SlotDescriptor* slot_desc, MemPool* pool, vector<StringValue*>* string_values,
+      vector<pair<CollectionValue*, int64_t>>* collection_values );
+
   /// Gets the destination slot from 'tuple' and 'slot_desc' and writes 'value' to this
-  /// slot. 'value' must be non-NULL. If COLLECT_VAR_LEN_VALS is true, collects the
-  /// pointers of the string slots to 'string_values' and the pointers of the collection
-  /// slots along with their byte sizes to 'collection_values'. 'slot_desc' has to be a
-  /// primitive type.
+  /// slot. 'value' must be primitive and non-NULL. If COLLECT_VAR_LEN_VALS is true,
+  /// collects the pointers of string slots to 'string_values'.
   template <bool COLLECT_VAR_LEN_VALS>
   static void WritePrimitiveCollectVarlen(const void* value, Tuple* tuple,
       const SlotDescriptor* slot_desc, MemPool* pool,
-      std::vector<StringValue*>* string_values,
-      std::vector<std::pair<CollectionValue*, int64_t>>* collection_values);
+      std::vector<StringValue*>* string_values);
 };
 }
