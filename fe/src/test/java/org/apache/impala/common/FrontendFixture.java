@@ -363,8 +363,8 @@ public class FrontendFixture {
       throws ImpalaException {
     StatementBase parsedStmt = Parser.parse(stmt, ctx.getQueryOptions());
     User user = new User(TSessionStateUtil.getEffectiveUser(ctx.getQueryCtx().session));
-    StmtMetadataLoader mdLoader =
-        new StmtMetadataLoader(frontend_, ctx.getQueryCtx().session.database, null, user);
+    StmtMetadataLoader mdLoader = new StmtMetadataLoader(
+        frontend_, ctx.getQueryCtx().session.database, null, user, null);
     StmtTableCache stmtTableCache = mdLoader.loadTables(parsedStmt);
     return ctx.analyzeAndAuthorize(parsedStmt, stmtTableCache,
         frontend_.getAuthzChecker());

@@ -21,6 +21,7 @@
 #include <string>
 
 #include "common/logging.h"
+#include "common/thread-debug-info.h"
 #include "rpc/jni-thrift-util.h"
 #include "util/backend-gflag-util.h"
 
@@ -120,16 +121,25 @@ Status Catalog::GetCatalogDelta(CatalogServer* caller, int64_t from_version,
 }
 
 Status Catalog::ExecDdl(const TDdlExecRequest& req, TDdlExecResponse* resp) {
+  if (req.__isset.header && req.header.__isset.query_id) {
+    GetThreadDebugInfo()->SetQueryId(req.header.query_id);
+  }
   return JniUtil::CallJniMethod(catalog_, exec_ddl_id_, req, resp);
 }
 
 Status Catalog::ResetMetadata(const TResetMetadataRequest& req,
     TResetMetadataResponse* resp) {
+  if (req.__isset.header && req.header.__isset.query_id) {
+    GetThreadDebugInfo()->SetQueryId(req.header.query_id);
+  }
   return JniUtil::CallJniMethod(catalog_, reset_metadata_id_, req, resp);
 }
 
 Status Catalog::UpdateCatalog(const TUpdateCatalogRequest& req,
     TUpdateCatalogResponse* resp) {
+  if (req.__isset.header && req.header.__isset.query_id) {
+    GetThreadDebugInfo()->SetQueryId(req.header.query_id);
+  }
   return JniUtil::CallJniMethod(catalog_, update_metastore_id_, req, resp);
 }
 
@@ -180,6 +190,9 @@ Status Catalog::GetFunctions(const TGetFunctionsRequest& request,
 }
 
 Status Catalog::PrioritizeLoad(const TPrioritizeLoadRequest& req) {
+  if (req.__isset.header && req.header.__isset.query_id) {
+    GetThreadDebugInfo()->SetQueryId(req.header.query_id);
+  }
   return JniUtil::CallJniMethod(catalog_, prioritize_load_id_, req);
 }
 

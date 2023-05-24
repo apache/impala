@@ -64,6 +64,9 @@ struct TCatalogServiceRequestHeader {
   // Set by LocalCatalog coordinators. The response will contain minimal catalog objects
   // (for invalidations) instead of full catalog objects.
   4: optional bool want_minimal_response
+
+  // The query id if this request comes from a query
+  5: optional Types.TUniqueId query_id
 }
 
 // Returns details on the result of an operation that updates the catalog. Information

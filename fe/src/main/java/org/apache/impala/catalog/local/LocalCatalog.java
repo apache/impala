@@ -227,7 +227,7 @@ public class LocalCatalog implements FeCatalog {
   }
 
   @Override
-  public void prioritizeLoad(Set<TableName> tableNames) {
+  public void prioritizeLoad(Set<TableName> tableNames, TUniqueId queryId) {
     // No-op for local catalog.
   }
 

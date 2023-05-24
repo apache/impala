@@ -40,6 +40,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.Frontend;
+import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.TUniqueIdUtil;
@@ -65,6 +66,7 @@ public class StmtMetadataLoader {
   private final String sessionDb_;
   private final EventSequence timeline_;
   private final User user_;
+  private final TUniqueId queryId_;
 
   // Results of the loading process. See StmtTableCache.
   private final Set<String> dbs_ = new HashSet<>();
@@ -110,11 +112,12 @@ public class StmtMetadataLoader {
    * column-masking/row-filtering policies.
    */
   public StmtMetadataLoader(Frontend fe, String sessionDb, EventSequence timeline,
-      User user) {
+      User user, TUniqueId queryId) {
     fe_ = Preconditions.checkNotNull(fe);
     sessionDb_ = Preconditions.checkNotNull(sessionDb);
     timeline_ = timeline;
     user_ = user;
+    queryId_ = queryId;
   }
 
   /**
@@ -123,7 +126,7 @@ public class StmtMetadataLoader {
    * keys, cross reference of a table.
    */
   public StmtMetadataLoader(Frontend fe, String sessionDb, EventSequence timeline) {
-    this(fe, sessionDb, timeline, null);
+    this(fe, sessionDb, timeline, null, null);
   }
 
   // Getters for testing
@@ -195,7 +198,7 @@ public class StmtMetadataLoader {
     // on-demand in the first recursive call to 'getMissingTables' above.
     while (!missingTbls.isEmpty()) {
       if (issueLoadRequest) {
-        catalog.prioritizeLoad(missingTbls);
+        catalog.prioritizeLoad(missingTbls, queryId_);
         ++numLoadRequestsSent_;
         requestedTbls.addAll(missingTbls);
       }

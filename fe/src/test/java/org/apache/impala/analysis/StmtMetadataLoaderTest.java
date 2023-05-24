@@ -251,7 +251,7 @@ public class StmtMetadataLoaderTest {
     EventSequence timeline = new EventSequence("Test Timeline");
     User user = new User("user");
     StmtMetadataLoader mdLoader =
-        new StmtMetadataLoader(fe, Catalog.DEFAULT_DB, timeline, user);
+        new StmtMetadataLoader(fe, Catalog.DEFAULT_DB, timeline, user, null);
     LocalDb db = new LocalDb(catalog, "default");
     mdLoader.collectPolicyTables(new FailedLoadLocalTable(
         db, "tbl", TImpalaTableType.TABLE, "comment",

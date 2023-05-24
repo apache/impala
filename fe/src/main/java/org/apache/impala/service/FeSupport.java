@@ -47,6 +47,7 @@ import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TSymbolLookupParams;
 import org.apache.impala.thrift.TSymbolLookupResult;
 import org.apache.impala.thrift.TTable;
+import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.NativeLibUtil;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
@@ -57,6 +58,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+
+import javax.annotation.Nullable;
 
 /**
  * This class provides the Impala executor functionality to the FE.
@@ -308,8 +311,8 @@ public class FeSupport {
     return NativePrioritizeLoad(thriftReq);
   }
 
-  public static void PrioritizeLoad(Set<TableName> tableNames)
-      throws InternalException {
+  public static void PrioritizeLoad(Set<TableName> tableNames,
+      @Nullable TUniqueId queryId) throws InternalException {
     Preconditions.checkNotNull(tableNames);
 
     LOG.info(String.format("Requesting prioritized load of table(s): %s",
@@ -323,8 +326,9 @@ public class FeSupport {
       objectDescs.add(catalogObject);
     }
 
-    TPrioritizeLoadRequest request = new TPrioritizeLoadRequest ();
+    TPrioritizeLoadRequest request = new TPrioritizeLoadRequest();
     request.setHeader(new TCatalogServiceRequestHeader());
+    request.header.setQuery_id(queryId);
     request.setObject_descs(objectDescs);
 
     try {

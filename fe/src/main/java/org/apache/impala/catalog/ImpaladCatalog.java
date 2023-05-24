@@ -59,6 +59,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
+import javax.annotation.Nullable;
+
 /**
  * Thread safe Catalog for an Impalad.  The Impalad catalog can be updated either via
  * a StateStore heartbeat or by directly applying the result of a catalog operation to
@@ -278,8 +280,9 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
 
 
   @Override // FeCatalog
-  public void prioritizeLoad(Set<TableName> tableNames) throws InternalException {
-    FeSupport.PrioritizeLoad(tableNames);
+  public void prioritizeLoad(Set<TableName> tableNames, @Nullable TUniqueId queryId)
+      throws InternalException {
+    FeSupport.PrioritizeLoad(tableNames, queryId);
   }
 
   @Override // FeCatalog

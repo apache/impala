@@ -337,8 +337,8 @@ public class FrontendTestBase extends AbstractFrontendTest {
       ctx.getQueryCtx().getClient_request().setStmt(stmt);
       StatementBase parsedStmt = Parser.parse(stmt, ctx.getQueryOptions());
       User user = new User(TSessionStateUtil.getEffectiveUser(ctx.getQueryCtx().session));
-      StmtMetadataLoader mdLoader =
-          new StmtMetadataLoader(fe, ctx.getQueryCtx().session.database, null, user);
+      StmtMetadataLoader mdLoader = new StmtMetadataLoader(
+          fe, ctx.getQueryCtx().session.database, null, user, null);
       StmtTableCache stmtTableCache = mdLoader.loadTables(parsedStmt);
       return ctx.analyzeAndAuthorize(parsedStmt, stmtTableCache, fe.getAuthzChecker());
     }

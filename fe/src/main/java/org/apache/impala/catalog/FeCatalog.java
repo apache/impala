@@ -28,6 +28,8 @@ import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.PatternMatcher;
 
+import javax.annotation.Nullable;
+
 /**
  * Interface between the front-end (analysis and planning) classes and the Catalog.
  */
@@ -80,7 +82,8 @@ public interface FeCatalog {
   /**
    * Issues a load request to the catalogd for the given tables.
    */
-  void prioritizeLoad(Set<TableName> tableNames) throws InternalException;
+  void prioritizeLoad(Set<TableName> tableNames, @Nullable TUniqueId queryId)
+      throws InternalException;
 
   /**
    * Fetches partition statistics for a table. The table is loaded if needed. If the table

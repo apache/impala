@@ -859,6 +859,7 @@ public class Frontend {
       TCatalogServiceRequestHeader header = new TCatalogServiceRequestHeader();
       header.setRequesting_user(analysis.getAnalyzer().getUser().getName());
       TQueryCtx queryCtx = analysis.getAnalyzer().getQueryCtx();
+      header.setQuery_id(queryCtx.query_id);
       header.setClient_ip(queryCtx.getSession().getNetwork_address().getHostname());
       TClientRequest clientRequest = queryCtx.getClient_request();
       header.setRedacted_sql_stmt(clientRequest.isSetRedacted_stmt() ?
@@ -2296,8 +2297,8 @@ public class Frontend {
     StatementBase stmt = Parser.parse(
         queryCtx.client_request.stmt, queryCtx.client_request.query_options);
     User user = new User(TSessionStateUtil.getEffectiveUser(queryCtx.session));
-    StmtMetadataLoader metadataLoader =
-        new StmtMetadataLoader(this, queryCtx.session.database, timeline, user);
+    StmtMetadataLoader metadataLoader = new StmtMetadataLoader(
+        this, queryCtx.session.database, timeline, user, queryCtx.getQuery_id());
     //TODO (IMPALA-8788): should load table write ids in transaction context.
     StmtTableCache stmtTableCache = metadataLoader.loadTables(stmt);
 

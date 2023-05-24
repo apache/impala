@@ -33,6 +33,7 @@ import org.apache.impala.catalog.Role;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.User;
 import org.apache.impala.thrift.TPrivilege;
+import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.PatternMatcher;
 
 import java.util.HashSet;
@@ -143,7 +144,7 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
    * this catalog from this thread without involving the catalogd/statestored.
    */
   @Override
-  public void prioritizeLoad(Set<TableName> tableNames) {
+  public void prioritizeLoad(Set<TableName> tableNames, TUniqueId queryId) {
     for (TableName tbl: tableNames) getOrLoadTable(tbl.getDb(), tbl.getTbl());
   }
 
