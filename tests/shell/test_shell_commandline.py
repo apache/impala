@@ -1422,11 +1422,11 @@ class TestImpalaShell(ImpalaTestSuite):
       assert "1\n" in lines[len(lines) - 2]
       assert "Fetched 1 row(s)" in lines[len(lines) - 1]
 
-  def skip_if_protocol_is_beeswax(self, vector):
+  def skip_if_protocol_is_beeswax(self, vector,
+      skip_msg="Floating-point value formatting is not supported with Beeswax"):
     """Helper to skip Beeswax protocol on formatting tests"""
     if vector.get_value("protocol") == "beeswax":
-      pytest.skip("Floating-point value formatting is not supported "
-                  "with Beeswax")
+      pytest.skip(skip_msg)
 
   def validate_fp_format(self, vector, column_type, format, value, expected_values):
     args = ['--hs2_fp_format', format, '-q',
@@ -1503,14 +1503,39 @@ class TestImpalaShell(ImpalaTestSuite):
   def test_output_rpc_to_screen_and_file(self, vector, populated_table, tmp_file):
     """Tests the flags that output hs2 rpc call details to both stdout
     and a file.  Asserts the expected text is written."""
-    self.skip_if_protocol_is_beeswax(vector)
+    self.skip_if_protocol_is_beeswax(vector,
+        "rpc detail output not supported with beeswax protocol")
 
     args = ['--rpc_stdout', '--rpc_file', tmp_file,
-            '-q', 'select * from {0}'.format(populated_table)]
+            '-q', 'select * from {0}'.format(populated_table),
+            '--protocol={0}'.format(vector.get_value("protocol"))]
+    if vector.get_value("strict_hs2_protocol") is True:
+      args.append('--strict_hs2_protocol')
+
     result = run_impala_shell_cmd(vector, args)
 
     stdout_data = result.stdout.strip()
     rpc_file_data = open(tmp_file, "r").read().strip()
+
+    # compare the rpc details from stdout and file to ensure they match
+    # stdout contains additional output such as query results, remove all non-rpc details
+    rpc_sep = "------------------------------------------------" + \
+              "------------------------------------------------"
+    stdout_data_rpc_only = ""
+    in_rpc_detail = False
+    for line in stdout_data.split("\n"):
+      if line == rpc_sep:
+        in_rpc_detail = not in_rpc_detail
+        stdout_data_rpc_only += line + "\n"
+      elif in_rpc_detail:
+        stdout_data_rpc_only += line + "\n"
+
+    # rpc only stdout data contains an extra ending newline
+    rpc_file_data += "\n"
+
+    assert stdout_data_rpc_only == rpc_file_data, \
+        "difference found between stdout and rpc file:\nSTDOUT:\n{0}\nFILE:\n{1}" \
+        .format(stdout_data_rpc_only, rpc_file_data)
 
     def check_multiline(check_desc, regex_lines):
       """Build and runs a multi-line regular expression against both the

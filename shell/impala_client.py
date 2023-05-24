@@ -1262,9 +1262,9 @@ class ImpalaHS2Client(ImpalaClient):
 
       def print_end_to_file(fh):
         self._print_line_separator(fh)
-        fh.write("[{0}] RPC CALL FINISHED:\n".format(datetime.now()))
+        fh.write("[{0}] RPC CALL FINISHED:\n".format(end_time))
         fh.write("OPERATION: {0}\nDETAILS:\n".format(rpc_func.__name__))
-        fh.write("  * Time:   {0}ms\n".format(duration.microseconds / 1000))
+        fh.write("  * Time:   {0}ms\n".format(duration.total_seconds() * 1000))
         fh.write("  * Result: {0}\n".format(result))
         if rpc_output is not None:
           fh.write("\nRPC RESPONSE:\n")
