@@ -406,7 +406,7 @@ class LIRSCacheShard : public CacheShard {
   void UnprotectedToTombstone(LIRSThreadState* tstate, LIRSHandle* e);
 
   // Exit the cache
-  void ToUninitialized(LIRSThreadState* tstate, LIRSHandle* e);
+  void ToUninitialized(LIRSThreadState* tstate, LIRSHandle* e, bool is_trim = false);
 
   // Functions move evictions and frees outside the critical section for mutex_ by
   // placing the affected entries on the LIRSThreadState. This function handles the
@@ -478,7 +478,7 @@ LIRSCacheShard::~LIRSCacheShard() {
   LIRSThreadState tstate;
   // Start with the recency list.
   while (!recency_list_.empty()) {
-    LIRSHandle* e = &*recency_list_.begin();
+    LIRSHandle* e = &recency_list_.front();
     DCHECK_NE(e->state(), UNINITIALIZED);
     DCHECK_EQ(e->num_references(), 0);
     // This removes it from the recency list and the unprotected list (if appropriate)
@@ -548,7 +548,7 @@ void LIRSCacheShard::EnforceProtectedCapacity(LIRSThreadState* tstate) {
   while (protected_usage_ > protected_capacity_) {
     DCHECK(!recency_list_.empty());
     // Get pointer to oldest entry and remove it
-    LIRSHandle* oldest = &*recency_list_.begin();
+    LIRSHandle* oldest = &recency_list_.front();
     // The oldest entry must be protected (i.e. the recency list must be trimmed)
     DCHECK_EQ(oldest->state(), PROTECTED);
     ProtectedToUnprotected(tstate, oldest);
@@ -562,9 +562,9 @@ void LIRSCacheShard::TrimRecencyList(LIRSThreadState* tstate) {
   // deleted. Unprotected entries still exist in the unprotected list, so UNPROTECTED
   // entries should only be removed from the recency list.
   while (!recency_list_.empty() && recency_list_.front().state() != PROTECTED) {
-    LIRSHandle* oldest = &*recency_list_.begin();
+    LIRSHandle* oldest = &recency_list_.front();
     if (oldest->state() == TOMBSTONE) {
-      ToUninitialized(tstate, oldest);
+      ToUninitialized(tstate, oldest, /* is_trim */ true);
     } else {
       DCHECK_EQ(oldest->state(), UNPROTECTED);
       recency_list_.pop_front();
@@ -622,7 +622,7 @@ void LIRSCacheShard::MoveToRecencyListBack(LIRSThreadState* tstate, LIRSHandle *
   bool need_trim = false;
   if (in_list) {
     // Is this the oldest entry in the list (the front)?
-    LIRSHandle* oldest = &*recency_list_.begin();
+    LIRSHandle* oldest = &recency_list_.front();
     // Invariant: the oldest entry in the list is always a protected entry
     CHECK_EQ(oldest->state(), PROTECTED);
     if (oldest == e) {
@@ -692,6 +692,8 @@ void LIRSCacheShard::UnprotectedToProtected(LIRSThreadState* tstate, LIRSHandle 
 void LIRSCacheShard::ProtectedToUnprotected(LIRSThreadState* tstate, LIRSHandle* e) {
   DCHECK(!e->unprotected_tombstone_list_hook_.is_linked());
   DCHECK(e->recency_list_hook_.is_linked());
+  // Must be the oldest on the recency list
+  DCHECK(&recency_list_.front() == e);
   recency_list_.erase(recency_list_.iterator_to(*e));
   // Trim the recency list after the removal
   TrimRecencyList(tstate);
@@ -788,13 +790,29 @@ bool LIRSCacheShard::UninitializedToUnprotected(LIRSThreadState* tstate, LIRSHan
   return true;
 }
 
-void LIRSCacheShard::ToUninitialized(LIRSThreadState* tstate, LIRSHandle* e) {
+void LIRSCacheShard::ToUninitialized(LIRSThreadState* tstate, LIRSHandle* e,
+    bool is_trim) {
   DCHECK_NE(e->state(), UNINITIALIZED);
   LIRSHandle* removed_elem = static_cast<LIRSHandle*>(table_.Remove(e->key(), e->hash()));
   DCHECK(e == removed_elem || removed_elem == nullptr);
   // Remove from the list (if it is in the list)
   if (e->recency_list_hook_.is_linked()) {
+    // If we are removing the last entry on the recency list, then we may need to call
+    // TrimRecencyList to maintain our invariant that the last entry on the recency list
+    // is a PROTECTED element. TrimRecencyList itself calls this function while enforcing
+    // the invariant, so this passes is_trim=true from TrimRecencyList to avoid the
+    // unnecessary recursion.
+    bool need_trim = false;
+    // Is this the oldest entry in the list (the front)?
+    LIRSHandle* oldest = &recency_list_.front();
+    if (!is_trim and oldest == e) {
+      DCHECK_EQ(e->state(), PROTECTED);
+      need_trim = true;
+    }
     recency_list_.erase(recency_list_.iterator_to(*e));
+    if (need_trim) {
+      TrimRecencyList(tstate);
+    }
   }
   if (e->state() == UNPROTECTED) {
     if (e->unprotected_tombstone_list_hook_.is_linked()) {

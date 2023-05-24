@@ -285,7 +285,7 @@ TEST_F(LIRSCacheTest, InsertExistingProtected) {
 
   FillCache();
 
-  // Replace an unprotected key with a new value
+  // Replace a protected key with a new value
   Insert(25, 1025);
   ASSERT_EQ(1, evicted_keys_.size());
   ASSERT_EQ(evicted_keys_[0], 25);
@@ -296,6 +296,56 @@ TEST_F(LIRSCacheTest, InsertExistingProtected) {
   FlushCache();
 
   // There were 5 unprotected elements (95-99). They are not impacted by changes in
+  // the protected elements.
+  for (int i = 0; i < 5; ++i) {
+    ASSERT_EQ(evicted_keys_[i], 95+i);
+    ASSERT_EQ(evicted_values_[i], 95+i);
+  }
+  // The only thing we guarantee is that key 25 is still protected. None of the other
+  // protected elements moved around, but the exact ordering is not specified.
+  for (int i = 5; i < 100; ++i) {
+    ASSERT_LT(evicted_keys_[i], 95);
+    ASSERT_GE(evicted_keys_[i], 0);
+    if (evicted_keys_[i] == 25) {
+      ASSERT_EQ(evicted_values_[i], 1025);
+    } else {
+      ASSERT_EQ(evicted_values_[i], evicted_keys_[i]);
+    }
+  }
+}
+
+TEST_F(LIRSCacheTest, InsertExistingProtectedNeedsTrim) {
+  // This is the same as InsertExistingProtected, except that it is verifying that
+  // replacing an existing protected key that is the last entry on the recency
+  // list will trim the recency list.
+
+  FillCache();
+
+  // Lookup every protected value except #25
+  // This doesn't change which keys are protected vs unprotected, but
+  // it changes the order of the elements on the recency list.
+  // 25 will be the oldest element, then there will be all of the
+  // unprotected elements, then all the other protected elements.
+  for (int i = 0; i < 95; ++i) {
+    if (i != 25) {
+      ASSERT_EQ(Lookup(i), i);
+    }
+  }
+
+  // Replace this last protected key with a new value. When this entry is inserted,
+  // it will remove the old protected key. This makes the unprotected entries the
+  // last on the list, so they will be trimmed off of the recency list.
+  Insert(25, 1025);
+  ASSERT_EQ(1, evicted_keys_.size());
+  ASSERT_EQ(evicted_keys_[0], 25);
+  ASSERT_EQ(evicted_values_[0], 25);
+  evicted_keys_.clear();
+  evicted_values_.clear();
+
+  // If the recency list wasn't trimmed appropriately, then this would hit an assert.
+  FlushCache();
+
+  // There were 5 unprotected elements (95-99). They were not impacted by changes in
   // the protected elements.
   for (int i = 0; i < 5; ++i) {
     ASSERT_EQ(evicted_keys_[i], 95+i);
@@ -492,6 +542,53 @@ TEST_F(LIRSCacheTest, Erase) {
   for (int i = 25; i < 94; ++i) {
     ASSERT_EQ(evicted_keys_[i+4], i + 1);
     ASSERT_EQ(evicted_values_[i+4], i + 1);
+  }
+}
+
+TEST_F(LIRSCacheTest, EraseNeedsTrim) {
+  // This is the same as InsertExistingProtectedNeedsTrim, except that it is verifying
+  // that erasing the last protected key on the recency list will trim the recency
+  // list.
+
+  FillCache();
+
+  // Lookup every protected value except #25
+  // This doesn't change which keys are protected vs unprotected, but
+  // it changes the order of the elements on the recency list.
+  // 25 will be the oldest element, then there will be all of the
+  // unprotected elements, then all the other protected elements.
+  for (int i = 0; i < 95; ++i) {
+    if (i != 25) {
+      ASSERT_EQ(Lookup(i), i);
+    }
+  }
+
+  // Replace this last protected key with a new value. When this entry is inserted,
+  // it will remove the old protected key. This makes the unprotected entries the
+  // last on the list, so they will be trimmed off of the recency list.
+  Erase(25);
+  ASSERT_EQ(1, evicted_keys_.size());
+  ASSERT_EQ(evicted_keys_[0], 25);
+  ASSERT_EQ(evicted_values_[0], 25);
+  evicted_keys_.clear();
+  evicted_values_.clear();
+
+  // If the recency list wasn't trimmed appropriately, then this would hit an assert.
+  FlushCache();
+
+  // There were 5 unprotected elements (95-99). They were not impacted by changes in
+  // the protected elements.
+  for (int i = 0; i < 5; ++i) {
+    ASSERT_EQ(evicted_keys_[i], 95+i);
+    ASSERT_EQ(evicted_values_[i], 95+i);
+  }
+  // The only thing we guarantee is that key 25 is gone. None of the other
+  // protected elements moved around, but the exact ordering is not specified.
+  for (int i = 5; i < 99; ++i) {
+    ASSERT_NE(evicted_keys_[i], 25);
+    ASSERT_LT(evicted_keys_[i], 95);
+    ASSERT_GE(evicted_keys_[i], 0);
+    ASSERT_EQ(evicted_values_[i], evicted_keys_[i]);
   }
 }
 
