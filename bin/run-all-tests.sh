@@ -52,6 +52,9 @@ fi
 # Run Cluster Tests
 : ${CLUSTER_TEST:=true}
 : ${CLUSTER_TEST_FILES:=}
+# Verifiers to run after all tests. Skipped if empty.
+: ${TEST_SUITE_VERIFIERS:=verifiers/test_banned_log_messages.py}
+: ${TEST_SUITE_VERIFIERS_LOG_DIR:=${IMPALA_LOGS_DIR}/verifiers}
 # Extra arguments passed to start-impala-cluster for tests. These do not apply to custom
 # cluster tests.
 : ${TEST_START_CLUSTER_ARGS:=}
@@ -328,6 +331,17 @@ do
       TEST_RET_CODE=1
     fi
     export IMPALA_MAX_LOG_FILES="${IMPALA_MAX_LOG_FILES_SAVE}"
+  fi
+
+  if [ ! -z "${TEST_SUITE_VERIFIERS}" ]; then
+    mkdir -p "${TEST_SUITE_VERIFIERS_LOG_DIR}"
+    pushd "${IMPALA_HOME}/tests"
+    if ! impala-py.test ${TEST_SUITE_VERIFIERS} \
+        --junitxml=${TEST_SUITE_VERIFIERS_LOG_DIR}/TEST-impala-verifiers.xml \
+        --resultlog=${TEST_SUITE_VERIFIERS_LOG_DIR}/TEST-impala-verifiers.log; then
+      TEST_RET_CODE=1
+    fi
+    popd
   fi
 
   # Run the process failure tests.

@@ -31,8 +31,8 @@ can do so through the environment variables and scripts listed below.
 | CDP_COMPONENTS_HOME | "${IMPALA_HOME}/toolchain/cdp_components-${CDP_BUILD_NUMBER}" | Location of the CDP components within the toolchain. |
 | CDH_MAJOR_VERSION | "7" | Identifier used to uniqueify paths for potentially incompatible component builds. |
 | IMPALA_CONFIG_SOURCED | "1" |  Set by ${IMPALA_HOME}/bin/impala-config.sh (internal use) |
-| JAVA_HOME | "/usr/lib/jvm/${JAVA_VERSION}" | Used to locate Java |
-| JAVA_VERSION | "java-7-oracle-amd64" | Can override to set a local Java version. |
+| IMPALA_JAVA_HOME_OVERRIDE | | Specify a non-system Java version. Overrides IMPALA_JDK_VERSION behavior. |
+| IMPALA_JDK_VERSION | "system" | Set to 8 or 11 to select a system Java version. Default will set JAVA_HOME based on the javac symlink in PATH. |
 | JAVA | "${JAVA_HOME}/bin/java" | Java binary location. |
 | CLASSPATH | | See bin/set-classpath.sh for details. |
 | PYTHONPATH |  Will be changed to include: "${IMPALA_HOME}/shell/gen-py" "${IMPALA_HOME}/testdata" "${THRIFT_PY_HOME}/python/lib/python2.7/site-packages" "${HIVE_HOME}/lib/py" |
