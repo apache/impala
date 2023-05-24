@@ -22,11 +22,14 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -37,6 +40,8 @@ import org.apache.iceberg.FileContent;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.expressions.Expression;
+import org.apache.iceberg.expressions.ExpressionUtil;
+import org.apache.iceberg.expressions.ExpressionVisitors;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.expressions.Expression.Operation;
 import org.apache.iceberg.expressions.True;
@@ -47,6 +52,7 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.IcebergExpressionCollector;
 import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.JoinOperator;
@@ -80,7 +86,6 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
-import org.apache.impala.planner.IcebergDeleteNode;
 import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.thrift.TColumnStats;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
@@ -101,29 +106,31 @@ import org.slf4j.LoggerFactory;
  * class deals with such complexities.
  */
 public class IcebergScanPlanner {
-  private final static Logger LOG = LoggerFactory.getLogger(IcebergScanPlanner.class);
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergScanPlanner.class);
 
   private Analyzer analyzer_;
   private PlannerContext ctx_;
   private TableRef tblRef_;
   private List<Expr> conjuncts_;
   private MultiAggregateInfo aggInfo_;
-
-  // Iceberg compatible expressions that are pushed down to Iceberg for query planning.
-  private final List<Expression> icebergPredicates_ = new ArrayList<>();
-  // The Impala representation of the expressions in 'icebergPredicates_'
-  private final List<Expr> impalaIcebergPredicates_ = new ArrayList<>();
-  // Indicates whether we have to push down 'impalaIcebergPredicates' to Impala's scan
-  // node or has Iceberg already done the partition pruning and no further rows could be
-  // skipped using these filters.
-  private boolean canSkipPushingDownIcebergPredicates_ = false;
-
+  // Mapping for translated Impala expressions
+  private final Map<Expression, Expr> impalaIcebergPredicateMapping_ =
+      new LinkedHashMap<>();
+  // Residual expressions after Iceberg planning
+  private final Set<Expression> residualExpressions_ =
+      new TreeSet<>(Comparator.comparing(ExpressionUtil::toSanitizedString));
+  // Expressions filtered by Iceberg's planFiles, subset of 'translatedExpressions_''s
+  // values
+  private final Set<Expr> skippedExpressions_ =
+      new TreeSet<>(Comparator.comparingInt(System::identityHashCode));
+  // Impala expressions that can't be translated into Iceberg expressions
+  private final List<Expr> untranslatedExpressions_ = new ArrayList<>();
+  // Conjuncts on columns not involved in IDENTITY-partitioning.
+  private List<Expr> nonIdentityConjuncts_ = new ArrayList<>();
   private List<FileDescriptor> dataFilesWithoutDeletes_ = new ArrayList<>();
   private List<FileDescriptor> dataFilesWithDeletes_ = new ArrayList<>();
   private Set<FileDescriptor> deleteFiles_ = new HashSet<>();
 
-  // Conjuncts on columns not involved in IDENTITY-partitioning.
-  private List<Expr> nonIdentityConjuncts_ = new ArrayList<>();
 
   // Statistics about the data and delete files. Useful for memory estimates of the
   // ANTI JOIN
@@ -163,9 +170,8 @@ public class IcebergScanPlanner {
    *  - no time travel
    */
   private boolean needIcebergForPlanning() {
-    return
-        !icebergPredicates_.isEmpty() ||
-        tblRef_.getTimeTravelSpec() != null;
+    return !impalaIcebergPredicateMapping_.isEmpty()
+        || tblRef_.getTimeTravelSpec() != null;
   }
 
   private void setFileDescriptorsBasedOnFileStore() throws ImpalaException {
@@ -366,14 +372,14 @@ public class IcebergScanPlanner {
   private void filterFileDescriptors() throws ImpalaException {
     TimeTravelSpec timeTravelSpec = tblRef_.getTimeTravelSpec();
 
-    canSkipPushingDownIcebergPredicates_ = true;
-    try (CloseableIterable<FileScanTask> fileScanTasks = IcebergUtil.planFiles(
-        getIceTable(), new ArrayList<Expression>(icebergPredicates_), timeTravelSpec)) {
+    try (CloseableIterable<FileScanTask> fileScanTasks =
+        IcebergUtil.planFiles(getIceTable(),
+            new ArrayList<>(impalaIcebergPredicateMapping_.keySet()), timeTravelSpec)) {
       long dataFilesCacheMisses = 0;
       for (FileScanTask fileScanTask : fileScanTasks) {
         Expression residualExpr = fileScanTask.residual();
         if (residualExpr != null && !(residualExpr instanceof True)) {
-          canSkipPushingDownIcebergPredicates_ = false;
+          residualExpressions_.add(residualExpr);
         }
         Pair<FileDescriptor, Boolean> fileDesc = getFileDescriptor(fileScanTask.file());
         if (!fileDesc.second) ++dataFilesCacheMisses;
@@ -409,14 +415,42 @@ public class IcebergScanPlanner {
   }
 
   private void filterConjuncts() {
-    if (canSkipPushingDownIcebergPredicates_) {
-      conjuncts_.removeAll(impalaIcebergPredicates_);
+    if (residualExpressions_.isEmpty()) {
+      conjuncts_.removeAll(impalaIcebergPredicateMapping_.values());
+      return;
     }
+    if (!analyzer_.getQueryOptions().iceberg_predicate_pushdown_subsetting) return;
+    trySubsettingPredicatesBeingPushedDown();
+  }
+
+  private boolean trySubsettingPredicatesBeingPushedDown() {
+    long startTime = System.currentTimeMillis();
+    List<Expr> expressionsToRetain = new ArrayList<>(untranslatedExpressions_);
+    for (Expression expression : residualExpressions_) {
+      List<Expression> locatedExpressions = ExpressionVisitors.visit(expression,
+          new IcebergExpressionCollector());
+      for (Expression located : locatedExpressions) {
+        Expr expr = impalaIcebergPredicateMapping_.get(located);
+        /* If we fail to locate any of the Iceberg residual expressions then we skip
+         filtering the predicates to be pushed down to Impala scanner.*/
+        if (expr == null) return false;
+        expressionsToRetain.add(expr);
+      }
+    }
+    skippedExpressions_.addAll(
+        conjuncts_.stream().filter(expr -> !expressionsToRetain.contains(expr)).collect(
+            Collectors.toSet()));
+    conjuncts_ = expressionsToRetain;
+    LOG.debug("Iceberg predicate pushdown subsetting took {} ms",
+        (System.currentTimeMillis() - startTime));
+    return true;
   }
 
   private List<Expr> getSkippedConjuncts() {
-    if (!canSkipPushingDownIcebergPredicates_) return Collections.emptyList();
-    return impalaIcebergPredicates_;
+    if (!residualExpressions_.isEmpty()) {
+      return new ArrayList<>(skippedExpressions_);
+    }
+    return new ArrayList<>(impalaIcebergPredicateMapping_.values());
   }
 
   private void updateDeleteStatistics() {
@@ -628,11 +662,11 @@ public class IcebergScanPlanner {
       throws ImpalaException {
     Expression predicate = convertIcebergPredicate(expr);
     if (predicate != null) {
-      icebergPredicates_.add(predicate);
-      impalaIcebergPredicates_.add(expr);
+      impalaIcebergPredicateMapping_.put(predicate, expr);
       LOG.debug("Push down the predicate: " + predicate + " to iceberg");
       return true;
     }
+    untranslatedExpressions_.add(expr);
     return false;
   }
 

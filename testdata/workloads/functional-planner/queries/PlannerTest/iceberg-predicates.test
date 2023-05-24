@@ -34,22 +34,21 @@ PLAN-ROOT SINK
    skipped Iceberg predicates: `year` = 2010
    row-size=20B cardinality=730
 ====
-# Here both predicates are pushed to Iceberg and also to Impala's scan node. However,
-# here is a room for optimisation as we could skip pushing down 'year' to the scan node
-# as it won't filter further rows.
+# Here both predicates are pushed to Iceberg and only one is pushed to Impala's scan node,
+# 'year' predicate is filtered out, as it won't filter further rows
 SELECT id, int_col, string_col from iceberg_partition_evolution where year = 2010 and id > 1000;
 ---- PLAN
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
    HDFS partitions=1/1 files=730 size=1.25MB
-   predicates: `year` = 2010, id > 1000
-   row-size=24B cardinality=730
+   predicates: id > 1000
+   skipped Iceberg predicates: `year` = 2010
+   row-size=20B cardinality=730
 ====
 # If we have predicates on partition columns with non-identity transform that could not
 # be pushed to Iceberg then all the predicates are also pushed to Impala's scan node.
-# However, here is a room for optimisation as we could skip pushing down 'year' to the
-# scan node as it won't filter further rows.
+# 'year' predicate is filtered out, as it won't filter further rows
 SELECT * FROM iceberg_partition_evolution
 WHERE year = 2010 AND date_string_col='061610';
 ---- PLAN
@@ -57,7 +56,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
    HDFS partitions=1/1 files=2 size=3.49KB
-   predicates: `year` = 2010, date_string_col = '061610'
+   predicates: date_string_col = '061610'
+   skipped Iceberg predicates: `year` = 2010
    row-size=40B cardinality=2
 ====
 # Checks when all the predicates are skipped in a count(*) query then the relevant
@@ -74,4 +74,96 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=6 size=6.85KB
    skipped Iceberg predicates: action = 'click'
    row-size=8B cardinality=6
+====
+# List of predicates contains an untranslated expression: user = NULL.
+# (Iceberg predicate conversion can't handle ref = null expressions, it will result an
+# untranslated expression which must be pushed down to Impala's scanner.)
+select user from iceberg_partitioned where action = 'click' and user = null
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.iceberg_partitioned]
+   HDFS partitions=1/1 files=6 size=6.85KB
+   predicates: `user` = NULL
+   skipped Iceberg predicates: action = 'click'
+   row-size=12B cardinality=1
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional_parquet.iceberg_partitioned]
+   HDFS partitions=1/1 files=6 size=6.85KB
+   predicates: `user` = NULL
+   skipped Iceberg predicates: action = 'click'
+   row-size=12B cardinality=1
+====
+# List of predicates contains an untranslated expression (action = NULL)
+select * from iceberg_partitioned where action = NULL and event_time < "2022-01-01";
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.iceberg_partitioned]
+   HDFS partitions=1/1 files=20 size=22.90KB
+   predicates: action = NULL
+   skipped Iceberg predicates: event_time < TIMESTAMP '2022-01-01 00:00:00'
+   row-size=44B cardinality=2
+====
+# List of predicates contains an untranslated expression (action LIKE "d%") and a redisual
+# expression after Iceberg's filtering
+select * from iceberg_partitioned where action like "d%" and event_time < "2022-01-01" and id < 10
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.iceberg_partitioned]
+   HDFS partitions=1/1 files=9 size=10.33KB
+   predicates: id < 10, action LIKE 'd%'
+   skipped Iceberg predicates: event_time < TIMESTAMP '2022-01-01 00:00:00'
+   row-size=44B cardinality=1
+====
+# Compound expression partially evaluated by Iceberg, and cannot be mapped back to Impala expression
+select * from iceberg_partitioned where action like "d%" and (event_time < "2020-01-01" or id > 10)
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.iceberg_partitioned]
+   HDFS partitions=1/1 files=10 size=11.42KB
+   predicates: (event_time < TIMESTAMP '2020-01-01 00:00:00' OR id > 10), action LIKE 'd%'
+   row-size=44B cardinality=1
+====
+# Predicate on a partition introduced by partition evolution pushed down to the scan node and
+# predicate on a partition that existed before partition evolution skipped.
+select * from iceberg_partition_evolution where month = 12 and year = 2010
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
+   HDFS partitions=1/1 files=62 size=108.30KB
+   predicates: `month` = 12
+   skipped Iceberg predicates: `year` = 2010
+   row-size=40B cardinality=620
+====
+# Compound expression "(id > 5 or (id < 2))" returned as a residual expression, but separated
+# by the expression collector (IcebergExpressionCollector), mapping lookup fails, thus falling
+# back to the push down everything
+select * from iceberg_partitioned where action in ('click', 'view') and (id > 5 or (id < 2))
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.iceberg_partitioned]
+   HDFS partitions=1/1 files=12 size=13.65KB
+   predicates: action IN ('click', 'view'), (id > 5 OR (id < 2))
+   row-size=44B cardinality=1
+====
+# IS NOT NULL predicate skipped on partitioned column 'action', predicate on
+# non-partitioned 'id' column is pushed down.
+select * from iceberg_partitioned where action is not null and id < 10
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.iceberg_partitioned]
+   HDFS partitions=1/1 files=9 size=10.33KB
+   predicates: id < 10
+   skipped Iceberg predicates: action IS NOT NULL
+   row-size=44B cardinality=1
 ====

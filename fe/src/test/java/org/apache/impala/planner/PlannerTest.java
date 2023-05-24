@@ -1275,6 +1275,18 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   /**
+   * Checks exercising predicate pushdown with Iceberg tables, without predicate
+   * subsetting.
+   */
+  @Test
+  public void testDisabledIcebergPredicateSubsetting() {
+    TQueryOptions queryOptions = new TQueryOptions();
+    queryOptions.setIceberg_predicate_pushdown_subsetting(false);
+    runPlannerTestFile("iceberg-predicates-disabled-subsetting", "functional_parquet",
+        queryOptions, ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
+  /**
    * Check that Iceberg V2 table scans work as expected.
    */
   @Test

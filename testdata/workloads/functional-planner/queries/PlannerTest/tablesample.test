@@ -323,13 +323,14 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=4 size=4.57KB
-   predicates: id > CAST(0 AS INT), action = 'click'
+   predicates: id > CAST(0 AS INT)
+   skipped Iceberg predicates: action = 'click'
    stored statistics:
      table: rows=20 size=22.90KB
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=5
-   parquet statistics predicates: id > CAST(0 AS INT), action = 'click'
-   parquet dictionary predicates: id > CAST(0 AS INT), action = 'click'
+   parquet statistics predicates: id > CAST(0 AS INT)
+   parquet dictionary predicates: id > CAST(0 AS INT)
    mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=44B cardinality=1
    in pipelines: 00(GETNEXT)

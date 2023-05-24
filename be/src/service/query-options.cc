@@ -1144,6 +1144,9 @@ Status impala::SetQueryOption(const string& key, const string& value,
         MemSpec mem_spec_val{};
         RETURN_IF_ERROR(QueryOptionParser::Parse<MemSpec>(option, value, &mem_spec_val));
         query_options->__set_mem_limit_coordinators(mem_spec_val.value);
+      }
+      case TImpalaQueryOptions::ICEBERG_PREDICATE_PUSHDOWN_SUBSETTING: {
+        query_options->__set_iceberg_predicate_pushdown_subsetting(IsTrue(value));
         break;
       }
       default:

@@ -841,6 +841,10 @@ enum TImpalaQueryOptions {
   // a) an int (= number of bytes);
   // b) a float followed by "M" (MB) or "G" (GB)
   MEM_LIMIT_COORDINATORS = 164
+
+  // Enables predicate subsetting for Iceberg plan nodes. If enabled, expressions
+  // evaluated by Iceberg are not pushed down the scanner node.
+  ICEBERG_PREDICATE_PUSHDOWN_SUBSETTING = 165;
 }
 
 // The summary of a DML statement.

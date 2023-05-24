@@ -1,0 +1,32 @@
+# If one or more non-partition predicates are present, then all predicates are pushed down
+# to the scan node. ICEBERG_PREDICATE_PUSHDOWN_SUBSETTING query option is disabled for
+# these tests.
+select user from iceberg_partitioned where action = "download" and user = "Lisa";
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.iceberg_partitioned]
+   HDFS partitions=1/1 files=6 size=6.97KB
+   predicates: `user` = 'Lisa', action = 'download'
+   row-size=24B cardinality=1
+====
+# If no residual expression remain after Iceberg's planning, all partition-based
+# predicates can be skipped
+select * from iceberg_partitioned where action = "download";
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.iceberg_partitioned]
+   HDFS partitions=1/1 files=6 size=6.97KB
+   skipped Iceberg predicates: action = 'download'
+   row-size=44B cardinality=6
+====
+select * from iceberg_partitioned where action = "download" and event_time < "2022-01-01";
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.iceberg_partitioned]
+   HDFS partitions=1/1 files=6 size=6.97KB
+   skipped Iceberg predicates: action = 'download', event_time < TIMESTAMP '2022-01-01 00:00:00'
+   row-size=44B cardinality=1
+====

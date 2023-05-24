@@ -822,7 +822,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=1 size=1.17KB
-   predicates: id > 0, action = 'download'
+   predicates: id > 0
+   skipped Iceberg predicates: action = 'download'
    row-size=64B cardinality=1
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -840,7 +841,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=1 size=1.17KB
-   predicates: id > 0, action = 'download'
+   predicates: id > 0
+   skipped Iceberg predicates: action = 'download'
    row-size=64B cardinality=1
 ====
 select * from iceberg_v2_partitioned_position_deletes
@@ -857,7 +859,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=1 size=1.17KB
-   predicates: `user` = 'Lisa', action = 'download'
+   predicates: `user` = 'Lisa'
+   skipped Iceberg predicates: action = 'download'
    row-size=64B cardinality=1
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -875,7 +878,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=1 size=1.17KB
-   predicates: `user` = 'Lisa', action = 'download'
+   predicates: `user` = 'Lisa'
+   skipped Iceberg predicates: action = 'download'
    row-size=64B cardinality=1
 ====
 select event_time, action from iceberg_partitioned where (action = 'click' or action = 'view') and id > 0;
@@ -884,7 +888,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=14 size=15.93KB
-   predicates: id > 0, action IN ('click', 'view')
+   predicates: id > 0
+   skipped Iceberg predicates: action IN ('click', 'view')
    row-size=32B cardinality=1
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -893,7 +898,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=14 size=15.93KB
-   predicates: id > 0, action IN ('click', 'view')
+   predicates: id > 0
+   skipped Iceberg predicates: action IN ('click', 'view')
    row-size=32B cardinality=1
 ====
 select event_time, action from iceberg_partitioned where action in ('click', 'view') and id > 0;
@@ -902,7 +908,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=14 size=15.93KB
-   predicates: id > 0, action IN ('click', 'view')
+   predicates: id > 0
+   skipped Iceberg predicates: action IN ('click', 'view')
    row-size=32B cardinality=1
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -911,7 +918,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=14 size=15.93KB
-   predicates: id > 0, action IN ('click', 'view')
+   predicates: id > 0
+   skipped Iceberg predicates: action IN ('click', 'view')
    row-size=32B cardinality=1
 ====
 select event_time, action from iceberg_partitioned where (event_time='2020-01-01 11:00:00' or action = 'click') and id > 0;
@@ -920,7 +928,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=6 size=6.85KB
-   predicates: id > 0, (event_time = TIMESTAMP '2020-01-01 11:00:00' OR action = 'click')
+   predicates: id > 0
+   skipped Iceberg predicates: (event_time = TIMESTAMP '2020-01-01 11:00:00' OR action = 'click')
    row-size=32B cardinality=1
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -929,7 +938,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=6 size=6.85KB
-   predicates: id > 0, (event_time = TIMESTAMP '2020-01-01 11:00:00' OR action = 'click')
+   predicates: id > 0
+   skipped Iceberg predicates: (event_time = TIMESTAMP '2020-01-01 11:00:00' OR action = 'click')
    row-size=32B cardinality=1
 ====
 select event_time, action from iceberg_partitioned where (event_time='2020-01-01 11:00:00' or action = 'click' or action = 'view') and id > 0;
@@ -938,7 +948,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=14 size=15.93KB
-   predicates: id > 0, (event_time = TIMESTAMP '2020-01-01 11:00:00' OR action = 'click' OR action = 'view')
+   predicates: id > 0
+   skipped Iceberg predicates: (event_time = TIMESTAMP '2020-01-01 11:00:00' OR action = 'click' OR action = 'view')
    row-size=32B cardinality=1
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -947,7 +958,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=14 size=15.93KB
-   predicates: id > 0, (event_time = TIMESTAMP '2020-01-01 11:00:00' OR action = 'click' OR action = 'view')
+   predicates: id > 0
+   skipped Iceberg predicates: (event_time = TIMESTAMP '2020-01-01 11:00:00' OR action = 'click' OR action = 'view')
    row-size=32B cardinality=1
 ====
 select event_time, action from iceberg_partitioned where (event_time='2020-01-01 11:00:00' or action in ('click', 'view')) and id > 0;
@@ -956,7 +968,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=14 size=15.93KB
-   predicates: id > 0, (event_time = TIMESTAMP '2020-01-01 11:00:00' OR action IN ('click', 'view'))
+   predicates: id > 0
+   skipped Iceberg predicates: (event_time = TIMESTAMP '2020-01-01 11:00:00' OR action IN ('click', 'view'))
    row-size=32B cardinality=1
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -965,7 +978,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=14 size=15.93KB
-   predicates: id > 0, (event_time = TIMESTAMP '2020-01-01 11:00:00' OR action IN ('click', 'view'))
+   predicates: id > 0
+   skipped Iceberg predicates: (event_time = TIMESTAMP '2020-01-01 11:00:00' OR action IN ('click', 'view'))
    row-size=32B cardinality=1
 ====
 select event_time, action from iceberg_partitioned where (event_time='2020-01-01 11:00:00' or action > 'a') and id > 0;
@@ -974,7 +988,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=20 size=22.90KB
-   predicates: id > 0, (event_time = TIMESTAMP '2020-01-01 11:00:00' OR action > 'a')
+   predicates: id > 0
+   skipped Iceberg predicates: (event_time = TIMESTAMP '2020-01-01 11:00:00' OR action > 'a')
    row-size=32B cardinality=2
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -983,7 +998,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=20 size=22.90KB
-   predicates: id > 0, (event_time = TIMESTAMP '2020-01-01 11:00:00' OR action > 'a')
+   predicates: id > 0
+   skipped Iceberg predicates: (event_time = TIMESTAMP '2020-01-01 11:00:00' OR action > 'a')
    row-size=32B cardinality=2
 ====
 # All predicates are pushed down to Iceberg and won't filter any further rows. Skip pushing it to Scan node.
