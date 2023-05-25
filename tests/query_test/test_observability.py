@@ -208,6 +208,11 @@ class TestObservability(ImpalaTestSuite):
     # After fetching the results and reaching finished state, we should still be able to
     # fetch an exec_summary.
     assert exec_summary is not None and exec_summary.nodes is not None
+    # Verify the query is complete.
+    assert exec_summary.progress.num_completed_scan_ranges == \
+        exec_summary.progress.total_scan_ranges
+    assert exec_summary.progress.num_completed_fragment_instances == \
+        exec_summary.progress.total_fragment_instances
 
   def test_exec_summary_in_runtime_profile(self):
     """Test that the exec summary is populated in runtime profile correctly in every

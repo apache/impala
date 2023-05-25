@@ -1004,7 +1004,7 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
   Coordinator* coord = query_handle->GetCoordinator();
   if (coord != nullptr) {
     // Report progress
-    ss << coord->progress().ToString() << "\n";
+    ss << coord->scan_progress().ToString() << "\n";
   }
   // Report the query status, if the query failed or has been retried.
   if (query_handle->IsRetriedQuery()) {

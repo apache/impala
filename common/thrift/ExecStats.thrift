@@ -84,6 +84,8 @@ struct TPlanNodeExecSummary {
 struct TExecProgress {
   1: optional i64 total_scan_ranges
   2: optional i64 num_completed_scan_ranges
+  3: optional i64 total_fragment_instances;
+  4: optional i64 num_completed_fragment_instances;
 }
 
 // Execution summary of an entire query.

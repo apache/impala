@@ -917,9 +917,13 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
         query_handle->GetCoordinator()->GetTExecSummary(result);
         TExecProgress progress;
         progress.__set_num_completed_scan_ranges(
-            query_handle->GetCoordinator()->progress().num_complete());
+            query_handle->GetCoordinator()->scan_progress().num_complete());
         progress.__set_total_scan_ranges(
-            query_handle->GetCoordinator()->progress().total());
+            query_handle->GetCoordinator()->scan_progress().total());
+        progress.__set_num_completed_fragment_instances(
+            query_handle->GetCoordinator()->query_progress().num_complete());
+        progress.__set_total_fragment_instances(
+            query_handle->GetCoordinator()->query_progress().total());
         // TODO: does this not need to be synchronized?
         result->__set_progress(progress);
       } else {
@@ -2397,8 +2401,10 @@ void ImpalaServer::QueryStateRecord::Init(const ClientRequestState& query_handle
 
   Coordinator* coord = query_handle.GetCoordinator();
   if (coord != nullptr) {
-    num_complete_fragments = coord->progress().num_complete();
-    total_fragments = coord->progress().total();
+    num_completed_scan_ranges = coord->scan_progress().num_complete();
+    total_scan_ranges = coord->scan_progress().total();
+    num_completed_fragment_instances = coord->query_progress().num_complete();
+    total_fragment_instances = coord->query_progress().total();
     auto utilization = coord->ComputeQueryResourceUtilization();
     total_peak_mem_usage = utilization.total_peak_mem_usage;
     cluster_mem_est = query_handle.schedule()->cluster_mem_est();
@@ -2406,8 +2412,10 @@ void ImpalaServer::QueryStateRecord::Init(const ClientRequestState& query_handle
     bytes_sent = utilization.exchange_bytes_sent + utilization.scan_bytes_sent;
     has_coord = true;
   } else {
-    num_complete_fragments = 0;
-    total_fragments = 0;
+    num_completed_scan_ranges = 0;
+    total_scan_ranges = 0;
+    num_completed_fragment_instances = 0;
+    total_fragment_instances = 0;
     total_peak_mem_usage = 0;
     cluster_mem_est = 0;
     bytes_read = 0;

@@ -184,7 +184,9 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// individual fragment instances are merged into a single output to retain readability.
   std::string GetErrorLog();
 
-  const ProgressUpdater& progress() const { return progress_; }
+  const ProgressUpdater& scan_progress() const { return scan_progress_; }
+
+  const ProgressUpdater& query_progress() const { return query_progress_; }
 
   /// Get a copy of the current exec summary. Thread-safe.
   void GetTExecSummary(TExecSummary* exec_summary);
@@ -335,7 +337,11 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
 
   /// Keeps track of number of completed ranges and total scan ranges. Initialized by
   /// Exec().
-  ProgressUpdater progress_;
+  ProgressUpdater scan_progress_;
+
+  /// Keeps track of number of completed fragment instances and total fragment instances.
+  /// Initialized by Exec().
+  ProgressUpdater query_progress_;
 
   /// Aggregate counters for the entire query. Lives in 'obj_pool_'. Set in Exec().
   RuntimeProfile* query_profile_ = nullptr;

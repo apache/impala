@@ -929,11 +929,17 @@ class ImpalaServer : public ImpalaServiceIf,
     /// True if the query required a coordinator fragment
     bool has_coord;
 
-    /// The number of fragments that have completed
-    int64_t num_complete_fragments;
+    /// The number of scan ranges that have completed.
+    int64_t num_completed_scan_ranges;
 
-    /// The total number of fragments
-    int64_t total_fragments;
+    /// The total number of scan ranges.
+    int64_t total_scan_ranges;
+
+    /// The number of fragment instances that have completed.
+    int64_t num_completed_fragment_instances;
+
+    /// The total number of fragment instances.
+    int64_t total_fragment_instances;
 
     /// The number of rows fetched by the client
     int64_t num_rows_fetched;

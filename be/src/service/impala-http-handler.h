@@ -202,6 +202,9 @@ class ImpalaHttpHandler {
   void QueryMemoryHandler(const Webserver::WebRequest& req,
       rapidjson::Document* output);
 
+  /// Utility method to print progress something as n/m(xx%).
+  std::string ProgressToString(int64_t num_completed, int64_t total);
+
   /// Helper method to render a single QueryStateRecord as a Json object Used by
   /// QueryStateHandler().
   void QueryStateToJson(const ImpalaServer::QueryStateRecord& record,

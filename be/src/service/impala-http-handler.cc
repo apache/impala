@@ -466,6 +466,10 @@ void ImpalaHttpHandler::AddQueryRecordTips(Document* document) {
       "completed number of scan ranges / the total number of scan ranges.",
       document->GetAllocator());
 
+  document->AddMember("tips_query_progress", "The progress of the query, i.e. the number "
+      "of completed fragment instances / the total number of fragment instances.",
+      document->GetAllocator());
+
   document->AddMember("tips_bytes_read", "The total number of bytes read from the data "
       "source during the query execution.", document->GetAllocator());
 
@@ -487,6 +491,17 @@ void ImpalaHttpHandler::AddQueryRecordTips(Document* document) {
 
   document->AddMember("tips_statement", "The statement submitted for the query.",
       document->GetAllocator());
+}
+
+std::string ImpalaHttpHandler::ProgressToString(int64_t num_completed, int64_t total) {
+  stringstream ss;
+  ss << num_completed << " / " << total << " (" << setw(4);
+  if (num_completed == 0 || total == 0) {
+    ss << "0%)";
+  } else {
+    ss << (100.0 * num_completed / (1.f * total)) << "%)";
+  }
+  return ss.str();
 }
 
 void ImpalaHttpHandler::QueryStateToJson(const ImpalaServer::QueryStateRecord& record,
@@ -543,20 +558,18 @@ void ImpalaHttpHandler::QueryStateToJson(const ImpalaServer::QueryStateRecord& r
   value->AddMember("mem_est", mem_est, document->GetAllocator());
 
   string progress = "N/A";
+  string query_progress = "N/A";
   if (record.has_coord) {
-    stringstream ss;
-    ss << record.num_complete_fragments << " / " << record.total_fragments
-       << " (" << setw(4);
-    if (record.total_fragments == 0) {
-      ss << "0%)";
-    } else {
-      ss << (100.0 * record.num_complete_fragments / (1.f * record.total_fragments))
-         << "%)";
-    }
-    progress = ss.str();
+    progress =
+        ProgressToString(record.num_completed_scan_ranges, record.total_scan_ranges);
+    query_progress = ProgressToString(record.num_completed_fragment_instances,
+        record.total_fragment_instances);
   }
   Value progress_json(progress.c_str(), document->GetAllocator());
   value->AddMember("progress", progress_json, document->GetAllocator());
+
+  Value query_progress_json(query_progress.c_str(), document->GetAllocator());
+  value->AddMember("query_progress", query_progress_json, document->GetAllocator());
 
   const string& printed_bytes_read = PrettyPrinter::Print(record.bytes_read,
       TUnit::BYTES);

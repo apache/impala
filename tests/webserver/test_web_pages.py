@@ -915,3 +915,12 @@ class TestWebPage(ImpalaTestSuite):
     assert page.status_code == requests.codes.ok
     page = requests.head("http://localhost:25020/operations")
     assert page.status_code == requests.codes.ok
+
+  def test_query_progress(self):
+    """Tests that /queries page shows query progress."""
+    query = "select count(*) from functional_parquet.alltypes where bool_col = sleep(100)"
+    response_json = self.__run_query_and_get_debug_page(
+      query, self.QUERIES_URL, expected_state=self.client.QUERY_STATES["RUNNING"])
+    for json_part in response_json['in_flight_queries']:
+      if query in json_part['stmt']:
+        assert json_part["query_progress"] == "0 / 4 ( 0%)"

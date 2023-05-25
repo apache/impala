@@ -407,8 +407,8 @@ inline bool Coordinator::BackendState::IsDoneLocked(
 bool Coordinator::BackendState::ApplyExecStatusReport(
     const ReportExecStatusRequestPB& backend_exec_status,
     const TRuntimeProfileForest& thrift_profiles, ExecSummary* exec_summary,
-    ProgressUpdater* scan_range_progress, DmlExecState* dml_exec_state,
-    vector<AuxErrorInfoPB>* aux_error_info,
+    ProgressUpdater* scan_range_progress, ProgressUpdater* query_progress,
+    DmlExecState* dml_exec_state, vector<AuxErrorInfoPB>* aux_error_info,
     const vector<FragmentStats*>& fragment_stats) {
   DCHECK(!IsEmptyBackend());
   CHECK(FLAGS_gen_experimental_profile ||
@@ -501,6 +501,7 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
       DCHECK(!instance_stats->done_);
       instance_stats->done_ = true;
       --num_remaining_instances_;
+      query_progress->Update(1);
     }
     if (!FLAGS_gen_experimental_profile) ++profile_iter;
   }

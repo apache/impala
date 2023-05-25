@@ -164,7 +164,7 @@ Status Coordinator::Exec() {
 
   // initialize progress updater
   const string& str = Substitute("Query $0", PrintId(query_id()));
-  progress_.Init(str, exec_params_.query_schedule().num_scan_ranges());
+  scan_progress_.Init(str, exec_params_.query_schedule().num_scan_ranges());
 
   query_state_ = ExecEnv::GetInstance()->query_exec_mgr()->CreateQueryState(
       query_ctx(), exec_params_.query_schedule().coord_backend_mem_limit());
@@ -176,6 +176,14 @@ Status Coordinator::Exec() {
   // the latter in the FragmentStats' root profile
   InitBackendStates();
   exec_summary_.Init(exec_params_);
+
+  int64_t total_finstances = 0;
+  for (BackendState* backend_state : backend_states_) {
+    total_finstances += backend_state->exec_params().instance_params().size();
+  }
+  const string& query_progress_str =
+      Substitute("Query $0 progress", PrintId(query_id()));
+  query_progress_.Init(query_progress_str, total_finstances);
 
   if (filter_mode_ != TRuntimeFilterMode::OFF) {
     // Populate the runtime filter routing table. This should happen before starting the
@@ -1050,7 +1058,8 @@ Status Coordinator::UpdateBackendExecStatus(const ReportExecStatusRequestPB& req
   vector<AuxErrorInfoPB> aux_error_info;
 
   if (backend_state->ApplyExecStatusReport(request, thrift_profiles, &exec_summary_,
-          &progress_, &dml_exec_state_, &aux_error_info, fragment_stats_)) {
+          &scan_progress_, &query_progress_, &dml_exec_state_, &aux_error_info,
+          fragment_stats_)) {
     // This backend execution has completed.
     if (VLOG_QUERY_IS_ON) {
       // Don't log backend completion if the query has already been cancelled.

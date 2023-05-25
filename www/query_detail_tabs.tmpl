@@ -47,6 +47,7 @@ under the License.
     <th title="{{tips_mem_usage}}">Mem Usage</th>
     <th title="{{tips_mem_estimate}}">Mem Estimate</th>
     <th title="{{tips_scan_progress}}">Scan Progress</th>
+    <th title="{{tips_query_progress}}">Query Progress</th>
     <th title="{{tips_bytes_read}}">Bytes Read</th>
     <th title="{{tips_bytes_sent}}">Bytes Sent</th>
     {{#inflight}}
@@ -77,6 +78,7 @@ under the License.
     <td>{{mem_usage}}</td>
     <td>{{mem_est}}</td>
     <td>{{progress}}</td>
+    <td>{{query_progress}}</td>
     <td>{{bytes_read}}</td>
     <td>{{bytes_sent}}</td>
     {{#inflight}}
@@ -120,10 +122,11 @@ if (typeof index == "undefined") {
     mem_usage       : 6,
     mem_est         : 7,
     progress        : 8,
-    bytes_read      : 9,
-    bytes_sent      : 10,
-    last_event      : 11,
-    rows_fetched    : 12
+    query_progress   : 9,
+    bytes_read      : 10,
+    bytes_sent      : 11,
+    last_event      : 12,
+    rows_fetched    : 13
   };
 
   // For waiting query
@@ -134,10 +137,11 @@ if (typeof index == "undefined") {
     mem_usage       : 7,
     mem_est         : 8,
     progress        : 9,
-    bytes_read      : 10,
-    bytes_sent      : 11,
-    last_event      : 12,
-    rows_fetched    : 13
+    query_progress  : 10,
+    bytes_read      : 11,
+    bytes_sent      : 12,
+    last_event      : 13,
+    rows_fetched    : 14
   };
 }
 
