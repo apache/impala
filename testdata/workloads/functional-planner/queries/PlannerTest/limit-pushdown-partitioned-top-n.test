@@ -923,3 +923,334 @@ PLAN-ROOT SINK
    HDFS partitions=11/11 files=11 size=814.73KB
    row-size=4B cardinality=11.00K
 ====
+# Regression test for IMPALA-12164. Test non-materialized slots
+# with BinaryPredicate.
+select id,
+       RANK() OVER(ORDER BY id DESC) AS rank_id
+  from (SELECT id
+          FROM functional.alltypesagg
+        WHERE int_col = 0 and false) alias_0
+  order by id
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SORT
+|  order by: id ASC
+|  row-size=12B cardinality=0
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=12B cardinality=0
+|
+01:SORT
+|  order by: id DESC
+|  row-size=4B cardinality=0
+|
+00:EMPTYSET
+====
+# Test non-materialized slots with BinaryPredicate and INNER-JOIN.
+select id,
+       RANK() OVER(ORDER BY id DESC) AS rank_id
+  from (SELECT tbl_0.id
+          FROM functional.alltypesagg tbl_0
+          JOIN functional.alltypesagg tbl_1
+          ON tbl_0.id = tbl_1.id
+        WHERE tbl_0.int_col =0 and false) alias_0
+  order by id
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SORT
+|  order by: id ASC
+|  row-size=12B cardinality=0
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=12B cardinality=0
+|
+01:SORT
+|  order by: id DESC
+|  row-size=4B cardinality=0
+|
+00:EMPTYSET
+====
+# Test non-materialized slots with BinaryPredicate and LEFT-JOIN.
+select id,
+       RANK() OVER(ORDER BY id DESC) AS rank_id
+  from (SELECT tbl_0.id
+          FROM functional.alltypesagg tbl_0
+          LEFT JOIN functional.alltypesagg tbl_1
+          ON tbl_0.id = tbl_1.id
+        WHERE tbl_0.int_col =0 and false) alias_0
+  order by id
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SORT
+|  order by: id ASC
+|  row-size=12B cardinality=0
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=12B cardinality=0
+|
+01:SORT
+|  order by: id DESC
+|  row-size=4B cardinality=0
+|
+00:EMPTYSET
+====
+# Test non-materialized slots with BinaryPredicate and FULL-JOIN.
+select id,
+       RANK() OVER(ORDER BY id DESC) AS rank_id
+  from (SELECT tbl_0.id
+          FROM functional.alltypesagg tbl_0
+          FULL JOIN functional.alltypesagg tbl_1
+          ON tbl_0.id = tbl_1.id
+        WHERE tbl_0.int_col =0 and false) alias_0
+  order by id
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SORT
+|  order by: id ASC
+|  row-size=12B cardinality=0
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=12B cardinality=0
+|
+01:SORT
+|  order by: id DESC
+|  row-size=4B cardinality=0
+|
+00:EMPTYSET
+====
+# Test non-materialized slots with BetweenPredicate.
+select id,
+       RANK() OVER(ORDER BY id DESC) AS rank_id
+  from (SELECT id
+          FROM functional.alltypesagg
+        WHERE int_col between 0 and 10 and false) alias_0
+  order by id
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SORT
+|  order by: id ASC
+|  row-size=12B cardinality=0
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=12B cardinality=0
+|
+01:SORT
+|  order by: id DESC
+|  row-size=4B cardinality=0
+|
+00:EMPTYSET
+====
+# Test non-materialized slots with BetweenPredicate and INNER-JOIN.
+select id,
+       RANK() OVER(ORDER BY id DESC) AS rank_id
+  from (SELECT tbl_0.id
+          FROM functional.alltypesagg tbl_0
+          JOIN functional.alltypesagg tbl_1
+          ON tbl_0.id = tbl_1.id
+        WHERE tbl_0.int_col between 0 and 10 and false) alias_0
+  order by id
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SORT
+|  order by: id ASC
+|  row-size=12B cardinality=0
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=12B cardinality=0
+|
+01:SORT
+|  order by: id DESC
+|  row-size=4B cardinality=0
+|
+00:EMPTYSET
+====
+# Test non-materialized slots with BetweenPredicate and LEFT-JOIN.
+select id,
+       RANK() OVER(ORDER BY id DESC) AS rank_id
+  from (SELECT tbl_0.id
+          FROM functional.alltypesagg tbl_0
+          LEFT JOIN functional.alltypesagg tbl_1
+          ON tbl_0.id = tbl_1.id
+        WHERE tbl_0.int_col between 0 and 10 and false) alias_0
+  order by id
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SORT
+|  order by: id ASC
+|  row-size=12B cardinality=0
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=12B cardinality=0
+|
+01:SORT
+|  order by: id DESC
+|  row-size=4B cardinality=0
+|
+00:EMPTYSET
+====
+# Test non-materialized slots with BetweenPredicate and FULL-JOIN.
+select id,
+       RANK() OVER(ORDER BY id DESC) AS rank_id
+  from (SELECT tbl_0.id
+          FROM functional.alltypesagg tbl_0
+          FULL JOIN functional.alltypesagg tbl_1
+          ON tbl_0.id = tbl_1.id
+        WHERE tbl_0.int_col between 0 and 10 and false) alias_0
+  order by id
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SORT
+|  order by: id ASC
+|  row-size=12B cardinality=0
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=12B cardinality=0
+|
+01:SORT
+|  order by: id DESC
+|  row-size=4B cardinality=0
+|
+00:EMPTYSET
+====
+# Test non-materialized slots with InPredicate.
+select id,
+       RANK() OVER(ORDER BY id DESC) AS rank_id
+  from (SELECT id
+          FROM functional.alltypesagg
+        WHERE int_col in(1, 2, 3) and false) alias_0
+  order by id
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SORT
+|  order by: id ASC
+|  row-size=12B cardinality=0
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=12B cardinality=0
+|
+01:SORT
+|  order by: id DESC
+|  row-size=4B cardinality=0
+|
+00:EMPTYSET
+====
+# Test non-materialized slots with InPredicate and INNER-JOIN.
+select id,
+       RANK() OVER(ORDER BY id DESC) AS rank_id
+  from (SELECT tbl_0.id
+          FROM functional.alltypesagg tbl_0
+          JOIN functional.alltypesagg tbl_1
+          ON tbl_0.id = tbl_1.id
+        WHERE tbl_0.int_col in(1, 2, 3) and false) alias_0
+  order by id
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SORT
+|  order by: id ASC
+|  row-size=12B cardinality=0
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=12B cardinality=0
+|
+01:SORT
+|  order by: id DESC
+|  row-size=4B cardinality=0
+|
+00:EMPTYSET
+====
+# Test non-materialized slots with InPredicate and LEFT-JOIN.
+select id,
+       RANK() OVER(ORDER BY id DESC) AS rank_id
+  from (SELECT tbl_0.id
+          FROM functional.alltypesagg tbl_0
+          LEFT JOIN functional.alltypesagg tbl_1
+          ON tbl_0.id = tbl_1.id
+        WHERE tbl_0.int_col in(1, 2, 3) and false) alias_0
+  order by id
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SORT
+|  order by: id ASC
+|  row-size=12B cardinality=0
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=12B cardinality=0
+|
+01:SORT
+|  order by: id DESC
+|  row-size=4B cardinality=0
+|
+00:EMPTYSET
+====
+# Test non-materialized slots with InPredicate and FULL-JOIN.
+select id,
+       RANK() OVER(ORDER BY id DESC) AS rank_id
+  from (SELECT tbl_0.id
+          FROM functional.alltypesagg tbl_0
+          FULL JOIN functional.alltypesagg tbl_1
+          ON tbl_0.id = tbl_1.id
+        WHERE tbl_0.int_col in(1, 2, 3) and false) alias_0
+  order by id
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SORT
+|  order by: id ASC
+|  row-size=12B cardinality=0
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=12B cardinality=0
+|
+01:SORT
+|  order by: id DESC
+|  row-size=4B cardinality=0
+|
+00:EMPTYSET
+====

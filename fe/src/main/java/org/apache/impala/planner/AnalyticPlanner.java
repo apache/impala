@@ -102,10 +102,13 @@ public class AnalyticPlanner {
    */
   public PlanNode createSingleNodePlan(PlanNode root,
       List<Expr> groupingExprs, List<Expr> inputPartitionExprs) throws ImpalaException {
-    // Identify predicates that reference the logical analytic tuple (this logical
-    // analytic tuple is replaced by different physical ones during planning)
+    // If the plan node is not an EmptySetNode, identify predicates that reference the
+    // logical analytic tuple (this logical analytic tuple is replaced by different
+    // physical ones during planning)
     List<TupleId> tids = new ArrayList<>();
-    tids.addAll(root.getTupleIds());
+    if (!(root instanceof EmptySetNode)) {
+      tids.addAll(root.getTupleIds());
+    }
     tids.add(analyticInfo_.getOutputTupleId());
     List<Expr> analyticConjs = analyzer_.getUnassignedConjuncts(tids);
     if (LOG.isTraceEnabled()) {

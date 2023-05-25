@@ -1865,6 +1865,7 @@ public class Analyzer {
         globalState_.conjunctsByOjClause.put(rhsRef.getId(), ojConjuncts);
       }
     }
+    boolean foundConstantFalse = false;
     for (Expr conjunct: conjuncts) {
       conjunct.setIsOnClauseConjunct(true);
       registerConjunct(conjunct);
@@ -1878,7 +1879,16 @@ public class Analyzer {
       if (rhsRef.getJoinOp().isInnerJoin()) {
         globalState_.ijClauseByConjunct.put(conjunct.getId(), rhsRef);
       }
-      markConstantConjunct(conjunct, false);
+      if (markConstantConjunct(conjunct, false)) {
+        foundConstantFalse = true;
+      }
+    }
+    // If a constant FALSE conjunct is found, we don't need to evaluate the other
+    // conjuncts in the same list. By marking the conjunct as assigned, the
+    // getUnassignedConjuncts() method will not return it, which means we won't
+    // consider it anymore.
+    if (foundConstantFalse) {
+      markConjunctsAssigned(conjuncts);
     }
   }
 
@@ -1888,9 +1898,18 @@ public class Analyzer {
    */
   public void registerConjuncts(Expr e, boolean fromHavingClause)
       throws AnalysisException {
-    for (Expr conjunct: e.getConjuncts()) {
+    boolean foundConstantFalse = false;
+    for (Expr conjunct : e.getConjuncts()) {
       registerConjunct(conjunct);
-      markConstantConjunct(conjunct, fromHavingClause);
+      foundConstantFalse = markConstantConjunct(conjunct, fromHavingClause);
+      if (foundConstantFalse) break;
+    }
+    // If a constant FALSE conjunct is found, we don't need to evaluate the other
+    // conjuncts in the same list. By marking the conjunct as assigned, the
+    // getUnassignedConjuncts() method will not return it, which means we won't
+    // consider it anymore.
+    if (foundConstantFalse) {
+      markConjunctsAssigned(e.getConjuncts());
     }
   }
 
@@ -1900,11 +1919,12 @@ public class Analyzer {
    * block as having an empty result set or as having an empty select-project-join
    * portion, if fromHavingClause is true or false, respectively.
    * No-op if the conjunct is not constant or is outer joined.
+   * Return true, if conjunct is constant FALSE.
    * Throws an AnalysisException if there is an error evaluating `conjunct`
    */
-  private void markConstantConjunct(Expr conjunct, boolean fromHavingClause)
+  private boolean markConstantConjunct(Expr conjunct, boolean fromHavingClause)
       throws AnalysisException {
-    if (!conjunct.isConstant() || isOjConjunct(conjunct)) return;
+    if (!conjunct.isConstant() || isOjConjunct(conjunct)) return false;
     markConjunctAssigned(conjunct);
     if ((!fromHavingClause && !hasEmptySpjResultSet_)
         || (fromHavingClause && !hasEmptyResultSet_)) {
@@ -1925,11 +1945,13 @@ public class Analyzer {
           } else {
             hasEmptySpjResultSet_ = true;
           }
+          return true;
         }
       } catch (InternalException ex) {
         throw new AnalysisException("Error evaluating \"" + conjunct.toSql() + "\"", ex);
       }
     }
+    return false;
   }
 
   /**
