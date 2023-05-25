@@ -87,6 +87,7 @@ if [[ $JAVA_HOME == Unknown ]]; then
 fi
 
 echo "JAVA_HOME: ${JAVA_HOME}"
+export JAVA_HOME
 # Given JAVA_HOME, find libjsig.so and libjvm.so and add them to LD_LIBRARY_PATH.
 # JAVA_HOME could be a symlink, so follow symlinks when looking for the libraries
 LIB_JSIG_DIR=$(find -L "${JAVA_HOME}" -name libjsig.so | head -1 | xargs dirname)

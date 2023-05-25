@@ -18,6 +18,8 @@
 #include "common/init.h"
 
 #include <csignal>
+#include <regex>
+#include <boost/filesystem.hpp>
 #include <gperftools/heap-profiler.h>
 #include <third_party/lss/linux_syscall_support.h>
 
@@ -51,6 +53,7 @@
 #include "util/network-util.h"
 #include "util/openssl-util.h"
 #include "util/os-info.h"
+#include "util/os-util.h"
 #include "util/parse-util.h"
 #include "util/periodic-counter-updater.h"
 #include "util/pretty-printer.h"
@@ -305,13 +308,38 @@ void BlockImpalaShutdownSignal() {
 static Status JavaAddOpens() {
   if (!FLAGS_jvm_automatic_add_opens) return Status::OK();
 
+  // Unknown flags in JAVA_TOOL_OPTIONS causes Java to ignore everything, so only include
+  // --add-opens for Java 9+. Uses JAVA_HOME if set, otherwise relies on PATH.
+  string cmd = "java";
+  const char* java_home = getenv("JAVA_HOME");
+  if (java_home != NULL) {
+    cmd = (boost::filesystem::path(java_home) / "bin" / "java").string();
+  }
+  cmd += " -version 2>&1";
+  string msg;
+  if (!RunShellProcess(cmd, &msg, false, {"JAVA_TOOL_OPTIONS"})) {
+    return Status(msg);
+  }
+
+  // Find a version string in the first line. Return if major version isn't 9+.
+  string first_line;
+  std::getline(istringstream(msg), first_line);
+  // Need to allow for a wide variety of formats for different JDK implementations.
+  // Example: openjdk version "11.0.19" 2023-04-18
+  std::regex java_version_pattern("\"([0-9]{1,3})\\.[0-9]+\\.[0-9]+[^\"]*\"");
+  std::smatch matches;
+  if (!std::regex_search(first_line, matches, java_version_pattern)) {
+    return Status(Substitute("Could not determine Java version: $0", msg));
+  }
+  DCHECK_EQ(matches.size(), 2);
+  if (std::stoi(matches.str(1)) < 9) return Status::OK();
+
   stringstream val_out;
   char* current_val_c = getenv("JAVA_TOOL_OPTIONS");
   if (current_val_c != NULL) {
     val_out << current_val_c;
   }
 
-  // These options are required for Java 9+, and ignored by Java 8.
   for (const string& param : {
     "--add-opens=java.base/java.io=ALL-UNNAMED",
     "--add-opens=java.base/java.lang.module=ALL-UNNAMED",

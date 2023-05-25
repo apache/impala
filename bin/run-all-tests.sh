@@ -243,6 +243,41 @@ do
     # Requires a running impalad cluster because some tests (such as DataErrorTest and
     # JdbcTest) queries against an impala cluster.
     pushd "${IMPALA_FE_DIR}"
+    if $JAVA -version 2>&1 | grep -q -E ' version "(9|[1-9][0-9])\.'; then
+      # If running with Java 9+, add-opens to JAVA_TOOL_OPTIONS for
+      # CatalogdMetaProviderTest.testWeights
+      JAVA_OPTIONS=" --add-opens=java.base/java.io=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/java.lang.module=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/java.lang.ref=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/java.lang.reflect=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/java.lang=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/java.net=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/java.nio.charset=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/java.nio.file.attribute=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/java.nio=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/java.security=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/java.util.concurrent=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/java.util.jar=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/java.util.zip=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/java.util=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.loader=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.math=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.module=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.perf=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.reflect=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.util.jar=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/sun.nio.fs=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink.beans=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink.linker.support=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink.linker=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink.support=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=jdk.management.jfr/jdk.management.jfr=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED"
+      export JAVA_TOOL_OPTIONS="$JAVA_OPTIONS ${JAVA_TOOL_OPTIONS-}"
+    fi
+
     MVN_ARGS=""
     if [[ "${TARGET_FILESYSTEM}" == "s3" ]]; then
       # When running against S3, only run the S3 frontend tests.
