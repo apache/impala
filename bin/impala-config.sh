@@ -594,7 +594,7 @@ export ENABLE_IMPALA_IR_DEBUG_INFO=${ENABLE_IMPALA_IR_DEBUG_INFO-false}
 # disk space for a developer environment. A large amount of the binary
 # size is due to debug information.
 #
-# These are two options for reducing the binary size and disk space
+# These are a few options for reducing the binary size and disk space
 # usage.
 # - IMPALA_MINIMAL_DEBUG_INFO=true changes the build to produce only
 #   minimal debuginfo (i.e. -g1). This has line tables and can do backtraces,
@@ -607,11 +607,19 @@ export ENABLE_IMPALA_IR_DEBUG_INFO=${ENABLE_IMPALA_IR_DEBUG_INFO-false}
 #   the Breakpad scripts have been modified to handle it, but there may
 #   be other tools that do not know how to use it. This reduces the size
 #   of binaries by 50+%.
+# - IMPALA_SPLIT_DEBUG_INFO=true changes the build to put debug info in
+#   separate .dwo files for each C++ file. Executables contain metadata
+#   pointing to these .dwo files without needing to incorporate the debug
+#   information. This allows executables to share a single copy of
+#   the debug information. It also reduces link time, as the linker does
+#   not need to process the debug info. Tools (including gdb) mostly know
+#   how to handle this split debug information.
 #
 # Due to the major reduction in binary size and broad support in debugging
 # tools, compressed debug information is enabled by default.
 export IMPALA_MINIMAL_DEBUG_INFO=${IMPALA_MINIMAL_DEBUG_INFO-false}
 export IMPALA_COMPRESSED_DEBUG_INFO=${IMPALA_COMPRESSED_DEBUG_INFO-true}
+export IMPALA_SPLIT_DEBUG_INFO=${IMPALA_SPLIT_DEBUG_INFO-false}
 
 # Download and use the CDH components from S3. It can be useful to set this to false if
 # building against a custom local build using HIVE_SRC_DIR_OVERRIDE,

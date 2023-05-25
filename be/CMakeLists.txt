@@ -270,6 +270,15 @@ if ($ENV{IMPALA_COMPRESSED_DEBUG_INFO} STREQUAL "true")
   endif()
 endif()
 
+# The IMPALA_SPLIT_DEBUG_INFO option stores debug info in a .dwo file for each C++ file.
+# This debug info can be referenced by executables without being incorporated into the
+# executable itself. Multiple executables can share a single copy of the debug info. This
+# reduces link time and disk space usage. Most tools (including gdb) know how to access
+# and read the .dwo files to get debug info.
+if ($ENV{IMPALA_SPLIT_DEBUG_INFO} STREQUAL "true")
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gsplit-dwarf")
+endif()
+
 # Use ccache when found and not explicitly disabled by setting the DISABLE_CCACHE envvar.
 find_program(CCACHE ccache)
 set(RULE_LAUNCH_PREFIX)
