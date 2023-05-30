@@ -223,6 +223,7 @@ class TestWebPage(CustomClusterTestSuite):
       expected_catalog_links = [
         "/",
         "/catalog",
+        "/events",
         "/jmx",
         "/log_level",
         "/memz",
