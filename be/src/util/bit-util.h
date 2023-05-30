@@ -150,7 +150,7 @@ class BitUtil {
   /// Returns the number of set bits in x
 #ifdef __aarch64__
   static inline int Popcount(uint64_t x) {
-    return PopcountNoHw(x);
+    return POPCNT_popcnt_u64(x);
   }
 #else
   static inline int Popcount(uint64_t x) {

@@ -25,7 +25,7 @@
 #include "parquet-bloom-filter.h"
 
 #ifdef __aarch64__
-  #include "sse2neon.h"
+  #include "arm_neon.h"
 #else
   #include <immintrin.h>
   #include <mm_malloc.h>
@@ -209,6 +209,57 @@ uint64_t ParquetBloomFilter::Hash(const uint8_t* input, size_t size) {
   return hash;
 }
 
+#ifdef __aarch64__
+// A static helper function for the arm64 methods. Turns a 32-bit hash into a 256-bit
+// Bucket with 1 single 1-bit set in each 32-bit lane.
+static inline ATTRIBUTE_ALWAYS_INLINE uint32x4x2_t MakeMask(const uint32_t hash) {
+  const uint32x4_t ones = vdupq_n_u32(1);
+  constexpr uint32_t c[8] = {BLOOM_HASH_CONSTANTS};
+  const uint32x4x2_t rehash = vld1q_u32_x2(c);
+  // Load hash, repeated 4 times.
+  uint32x4_t hash_data = vdupq_n_u32(hash);
+
+  // Multiply-shift hashing ala Dietzfelbinger et al.: multiply 'hash' by eight different
+  // odd constants, then keep the 5 most significant bits from each product.
+  int32x4x2_t t;
+  t.val[0] = vreinterpretq_s32_u32(vshrq_n_u32(vmulq_u32(rehash.val[0], hash_data), 27));
+  t.val[1] = vreinterpretq_s32_u32(vshrq_n_u32(vmulq_u32(rehash.val[1], hash_data), 27));
+
+  // Use these 5 bits to shift a single bit to a location in each 32-bit lane
+  uint32x4x2_t res;
+  res.val[0] = vshlq_u32(ones, t.val[0]);
+  res.val[1] = vshlq_u32(ones, t.val[1]);
+  return res;
+}
+
+ATTRIBUTE_NO_SANITIZE_INTEGER
+void ParquetBloomFilter::BucketInsert(const uint32_t bucket_idx,
+    const uint32_t hash) noexcept {
+  const uint32x4x2_t mask = MakeMask(hash);
+  uint32x4x2_t* addr = &(reinterpret_cast<uint32x4x2_t*>(directory_)[bucket_idx]);
+  uint32_t* bucket = reinterpret_cast<uint32_t*>(addr);
+  uint32x4x2_t data = vld1q_u32_x2(bucket);
+  data.val[0] = vorrq_u32(data.val[0], mask.val[0]);
+  data.val[1] = vorrq_u32(data.val[1], mask.val[1]);
+  vst1q_u32_x2(bucket, data);
+}
+
+ATTRIBUTE_NO_SANITIZE_INTEGER
+bool ParquetBloomFilter::BucketFind(
+    const uint32_t bucket_idx, const uint32_t hash) const noexcept {
+  const uint32x4x2_t mask = MakeMask(hash);
+  uint32x4x2_t* addr = &(reinterpret_cast<uint32x4x2_t*>(directory_)[bucket_idx]);
+  uint32_t* bucket = reinterpret_cast<uint32_t*>(addr);
+  uint32x4x2_t data = vld1q_u32_x2(bucket);
+  // We should return true if 'bucket' has a one wherever 'mask' does.
+  uint32x4_t t0 = vtstq_u32(data.val[0], mask.val[0]);
+  uint32x4_t t1 = vtstq_u32(data.val[1], mask.val[1]);
+  int64x2_t t = vreinterpretq_s64_u32(vandq_u32(t0, t1));
+  int64_t a = vgetq_lane_s64(t, 0) & vgetq_lane_s64(t, 1);
+  return a == -1;
+}
+
+#elif defined(__x86_64__)
 ATTRIBUTE_NO_SANITIZE_INTEGER
 void ParquetBloomFilter::BucketInsert(const uint32_t bucket_idx,
     const uint32_t hash) noexcept {
@@ -243,6 +294,7 @@ bool ParquetBloomFilter::BucketFind(
   }
   return true;
 }
+#endif
 
 bool ParquetBloomFilter::has_avx2() {
   return !FLAGS_disable_parquetbloomfilter_avx2 && !FLAGS_enable_legacy_avx_support

@@ -50,6 +50,7 @@ DelimitedTextParser<DELIMITED_TUPLES>::DelimitedTextParser(
   DCHECK(escape_char == '\0' || escape_char != collection_item_delim);
 
   // Initialize the sse search registers.
+#ifdef __x86_64__
   char search_chars[SSEUtil::CHARS_PER_128_BIT_REGISTER];
   memset(search_chars, 0, sizeof(search_chars));
   if (process_escapes_) {
@@ -92,6 +93,7 @@ DelimitedTextParser<DELIMITED_TUPLES>::DelimitedTextParser(
 
   DCHECK_GT(num_delims_, 0);
   xmm_delim_search_ = _mm_loadu_si128(reinterpret_cast<__m128i*>(search_chars));
+#endif
 
   ParserReset();
 }
@@ -132,6 +134,7 @@ Status DelimitedTextParser<DELIMITED_TUPLES>::ParseFieldLocations(int max_tuples
     last_row_delim_offset_ = -1;
   }
 
+#ifdef __x86_64__
   if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
     if (process_escapes_) {
       RETURN_IF_ERROR(ParseSse<true>(max_tuples, &remaining_len, byte_buffer_ptr,
@@ -141,6 +144,7 @@ Status DelimitedTextParser<DELIMITED_TUPLES>::ParseFieldLocations(int max_tuples
           row_end_locations, field_locations, num_tuples, num_fields, next_column_start));
     }
   }
+#endif
 
   if (*num_tuples == max_tuples) return Status::OK();
 
@@ -242,6 +246,7 @@ int64_t DelimitedTextParser<DELIMITED_TUPLES>::FindFirstInstance(const char* buf
 restart:
   found = false;
 
+#ifdef __x86_64__
   if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
     __m128i xmm_buffer, xmm_tuple_mask;
     while (len - tuple_start >= SSEUtil::CHARS_PER_128_BIT_REGISTER) {
@@ -264,6 +269,7 @@ restart:
       buffer += SSEUtil::CHARS_PER_128_BIT_REGISTER;
     }
   }
+#endif
   if (!found) {
     for (; tuple_start < len; ++tuple_start) {
       char c = *buffer++;

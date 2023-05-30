@@ -23,7 +23,7 @@
 #include <cstring>
 #include <limits>
 
-#ifndef __aarch64__
+#ifdef __x86_64__
 #include <immintrin.h>
 #endif
 

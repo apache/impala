@@ -92,6 +92,7 @@ inline Status DelimitedTextParser<DELIMITED_TUPLES>::FillColumns(int64_t len,
   return Status::OK();
 }
 
+#ifdef __x86_64__
 /// SSE optimized raw text file parsing.  SSE4_2 added an instruction (with 3 modes) for
 /// text processing.  The modes mimic strchr, strstr and strcmp.  For text parsing, we can
 /// leverage the strchr functionality.
@@ -231,6 +232,7 @@ inline Status DelimitedTextParser<DELIMITED_TUPLES>::ParseSse(int max_tuples,
   }
   return Status::OK();
 }
+#endif
 
 /// Simplified version of ParseSSE which does not handle tuple delimiters.
 template<>
@@ -242,7 +244,7 @@ inline Status DelimitedTextParser<false>::ParseSingleTuple(int64_t remaining_len
   column_idx_ = num_partition_keys_;
   current_column_has_escape_ = false;
 
-#ifndef __aarch64__
+#ifdef __x86_64__
   __m128i xmm_buffer, xmm_delim_mask, xmm_escape_mask;
 
   if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {

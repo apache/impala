@@ -23,7 +23,7 @@
 #include <vector>
 
 #ifdef __aarch64__
-#include "util/sse2neon.h"
+#include <arm_neon.h>
 #else
 #include <immintrin.h>
 #endif
@@ -104,17 +104,34 @@ inline void MultiplyShift(uint32_t* x) {
 //
 // TODO: Add the Intel intrinsics used in this function and the other functions in this
 // file to sse-util.h so that these functions can be inlined.
-#ifndef __aarch64__
+#ifdef __aarch64__
+inline void MultiplyShift128(uint32x4_t* x) {
+  uint32_t* xx = (uint32_t *)x;
+  const uint32x4_t m = vdupq_n_u32(0x61eaf8e9);
+  uint32x4_t a = vld1q_u32(xx);
+  a = vmulq_u32(a, m);
+  vst1q_u32(xx, a);
+}
+#elif defined(__x86_64__)
 inline void MultiplyShift128(__m128i* x) __attribute__((__target__("sse4.1")));
-#endif
 inline void MultiplyShift128(__m128i* x) {
   const __m128i m = _mm_set1_epi32(0x61eaf8e9);
   _mm_storeu_si128(x, _mm_mullo_epi32(_mm_loadu_si128(x), m));
 }
+#endif
 
-#ifndef __aarch64__
-// Like MultiplyShift, but using AVX2's 256-bit SIMD registers to do 8 at once.
+// Like MultiplyShift, but using 256-bit SIMD registers to do 8 at once.
 // Not inline, because it degrades the performance for unknown reasons.
+#ifdef __aarch64__
+void MultiplyShift256(uint32x4x2_t* x) {
+  uint32_t* xx = (uint32_t*) x;
+  const uint32x4_t m = vdupq_n_u32(0x61eaf8e9);
+  uint32x4x2_t a = vld1q_u32_x2(xx);
+  a.val[0] = vmulq_u32(a.val[0], m);
+  a.val[1] = vmulq_u32(a.val[1], m);
+  vst1q_u32_x2(xx, a);
+}
+#elif defined(__x86_64__)
 void MultiplyShift256(__m256i* x) __attribute__((__target__("avx2")));
 void MultiplyShift256(__m256i* x) {
   const __m256i m = _mm256_set1_epi32(0x61eaf8e9);
@@ -129,10 +146,30 @@ inline void MultiplyAddShift(uint32_t* x) {
   *x = (static_cast<uint64_t>(*x) * m + a) >> 32;
 }
 
-// Like MultiplyAddShift, but using SSE's 128-bit SIMD registers to do 4 at once.
-#ifndef __aarch64__
+// Like MultiplyAddShift, but using 128-bit SIMD registers to do 4 at once.
+#ifdef __aarch64__
+inline void MultiplyAddShift128(uint32x4_t* x) {
+  uint32_t* xx = (uint32_t*) x;
+  const uint32x2_t mlo = vdup_n_u32(0x020b4be0);
+  const uint32x4_t mhi = vdupq_n_u32(0xa1f1bd3e);
+  const uint64x2_t a = vdupq_n_u64(0x86b0426193d86e66ull);
+  uint32x4_t input = vld1q_u32(xx);
+  uint32x4_t prod32easy = vmulq_u32(input, mhi);
+  uint32x2_t input_lo = vget_low_u32 (input);
+  uint32x2_t input_hi = vget_high_u32 (input);
+  uint32x2_t input_even = vuzp1_u32(input_lo, input_hi);
+  uint32x4_t input_odds = vcombine_u32(vuzp2_u32(input_lo, input_hi), input_even);
+  uint64x2_t prod64_evens = vmull_u32(input_even, mlo);
+  uint64x2_t prod64_odds = vmull_high_u32(input_odds, mhi);
+  prod64_evens = vaddq_u64(a, prod64_evens);
+  prod64_odds = vaddq_u64(a, prod64_odds);
+  uint32x4_t prod64_evens_1 = vreinterpretq_u32_u64(prod64_evens);
+  uint32x4_t prod64_odds_1 = vreinterpretq_u32_u64(prod64_odds);
+  uint32x4_t prod32hard = vzip2q_u32(prod64_evens_1, prod64_odds_1);
+  vst1q_u32(xx, vaddq_u32(prod32easy, prod32hard));
+}
+#else
 inline void MultiplyAddShift128(__m128i* x) __attribute__((__target__("sse4.1")));
-#endif
 inline void MultiplyAddShift128(__m128i* x) {
   const auto m = _mm_set1_epi64x(0xa1f1bd3e020b4be0ull),
                 mhi = _mm_set1_epi32(0xa1f1bd3e),
@@ -147,6 +184,7 @@ inline void MultiplyAddShift128(__m128i* x) {
   auto prod32hard = _mm_unpackhi_epi32(prod64_evens, prod64_odds);
   _mm_storeu_si128(x, _mm_add_epi32(prod32easy, prod32hard));
 }
+#endif
 
 #ifndef __aarch64__
 // Like MultiplyAddShift, but using AVX2's 256-bit SIMD registers to do 8 at once.
@@ -329,8 +367,8 @@ int main() {
 
   suite32x4.BENCH(uint32_t[4], (Multiple<MultiplyShift, 4>));
   #ifdef __aarch64__
-  suite32x4.BENCH(__m128i, MultiplyAddShift128);
-  suite32x4.BENCH(__m128i, MultiplyShift128);
+  suite32x4.BENCH(uint32x4_t, MultiplyAddShift128);
+  suite32x4.BENCH(uint32x4_t, MultiplyShift128);
   #else
   if (CpuInfo::IsSupported(CpuInfo::SSE4_1)) {
     suite32x4.BENCH(__m128i, MultiplyAddShift128);
@@ -346,7 +384,9 @@ int main() {
   suite32x8.BENCH(uint32_t[8], (Multiple<MultiplyAddShift, 8>));
   suite32x8.BENCH(uint32_t[8], (Multiple<CRC, 8>));
   suite32x8.BENCH(uint32_t[8], (Multiple<MultiplyShift, 8>));
-  #ifndef __aarch64__
+  #ifdef __aarch64__
+  suite32x8.BENCH(uint32x4x2_t, MultiplyShift256);
+  #else
   if (CpuInfo::IsSupported(CpuInfo::AVX2)) {
     suite32x8.BENCH(uint32_t[8], Zobrist256simple);
     suite32x8.BENCH(__m256i, Zobrist256gather);

@@ -174,7 +174,7 @@ class DelimitedTextParser {
       (DELIMITED_TUPLES && field_delim_ != tuple_delim_ && c == field_delim_) ||
       (collection_item_delim_ != '\0' && c == collection_item_delim_);
   }
-
+#ifdef __x86_64__
   /// SSE(xmm) register containing the tuple search character(s).
   __m128i xmm_tuple_search_;
 
@@ -183,7 +183,7 @@ class DelimitedTextParser {
 
   /// SSE(xmm) register containing the escape search character.
   __m128i xmm_escape_search_;
-
+#endif
   /// For each col index [0, num_cols_), true if the column should be materialized.
   /// Not owned.
   const bool* is_materialized_col_;

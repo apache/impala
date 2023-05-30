@@ -61,6 +61,7 @@ using namespace impala;
 
 int StringCompare(const char* s1, int n1, const char* s2, int n2, int len) {
   DCHECK_EQ(len, std::min(n1, n2));
+#ifdef __x86_64__
   if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
     while (len >= SSEUtil::CHARS_PER_128_BIT_REGISTER) {
       __m128i xmm0 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(s1));
@@ -75,6 +76,7 @@ int StringCompare(const char* s1, int n1, const char* s2, int n2, int len) {
       s2 += SSEUtil::CHARS_PER_128_BIT_REGISTER;
     }
   }
+#endif
   // memcmp has undefined behavior when called on nullptr for either pointer
   int result = (len == 0) ? 0 : strncmp(s1, s2, len);
   if (result != 0) return result;

@@ -18,7 +18,7 @@
 #include "util/bit-util.h"
 
 #ifdef __aarch64__
-  #include "sse2neon.h"
+  #include "arm_neon.h"
 #else
   #include <emmintrin.h>
   #include <immintrin.h>
@@ -141,7 +141,21 @@ void SimdByteSwap::ByteSwapScalar(const void* source, int len, void* dest) {
   }
 }
 
-#ifndef __aarch64__
+#ifdef __aarch64__
+const uint8x16_t mask128i = {15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0};
+void SimdByteSwap::ByteSwap128(const uint8_t* src, uint8_t* dst) {
+  vst1q_u8(dst, vqtbl1q_u8(vld1q_u8(src), mask128i));
+}
+
+void SimdByteSwap::ByteSwap256(const uint8_t* src, uint8_t* dst) {
+  uint8x16x2_t a = vld1q_u8_x2(src);
+  uint8x16x2_t res;
+  res.val[1] = vqtbl1q_u8(a.val[0], mask128i);
+  res.val[0] = vqtbl1q_u8(a.val[1], mask128i);
+  vst1q_u8_x2(dst, res);
+}
+
+#else
 // This constant is concluded from the definition of _mm_set_epi8;
 // Refer this link for more details:
 // https://software.intel.com/sites/landingpage/IntrinsicsGuide/
@@ -170,13 +184,6 @@ inline void SimdByteSwap::ByteSwap256(const uint8_t* src, uint8_t* dst) {
   _mm_storeu_si128(reinterpret_cast<__m128i*>(dst + 16), part1);
   _mm256_zeroupper();
 }
-#else
-const uint8x16_t mask128i = {15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0};
-void SimdByteSwap::ByteSwap128(const uint8_t* src, uint8_t* dst) {
-  vst1q_u8(dst, vqtbl1q_u8(vld1q_u8(src), mask128i));
-}
-
-void SimdByteSwap::ByteSwap256(const uint8_t* src, uint8_t* dst) {}
 #endif
 
 // Internal implementation of ByteSwapSimd
@@ -191,15 +198,11 @@ inline void SimdByteSwap::ByteSwapSimd(const void* source, const int len, void* 
     << "Only 16 or 32 are valid for TEMPLATE_DATA_WIDTH now.";
   /// Function pointer to SIMD ByteSwap functions
   void (*bswap_fptr)(const uint8_t* src, uint8_t* dst) = NULL;
-#ifndef __aarch64__
   if (TEMPLATE_DATA_WIDTH == 16) {
     bswap_fptr = SimdByteSwap::ByteSwap128;
   } else if (TEMPLATE_DATA_WIDTH == 32) {
     bswap_fptr = SimdByteSwap::ByteSwap256;
   }
-#else
-  bswap_fptr = SimdByteSwap::ByteSwap128;
-#endif
 
   const uint8_t* src = reinterpret_cast<const uint8_t*>(source);
   uint8_t* dst = reinterpret_cast<uint8_t*>(dest);
@@ -233,7 +236,14 @@ void BitUtil::ByteSwap(void* dest, const void* source, int len) {
   if (LIKELY(len < 16)) {
     SimdByteSwap::ByteSwapScalar(source, len, dest);
   }
-#ifndef __aarch64__
+#ifdef __aarch64__
+  else if (len >= 32) {
+    SimdByteSwap::ByteSwapSimd<32>(source, len, dest);
+  }
+  else {
+    SimdByteSwap::ByteSwapSimd<16>(source, len, dest);
+  }
+#elif defined(__x86_64__)
   else if (len >= 32) {
     // AVX2 can only be used to process data whose size >= 32byte
     if (CpuInfo::IsSupported(CpuInfo::AVX2)) {
@@ -253,10 +263,6 @@ void BitUtil::ByteSwap(void* dest, const void* source, int len) {
     } else {
       SimdByteSwap::ByteSwapScalar(source, len, dest);
     }
-  }
-#else
-  else {
-    SimdByteSwap::ByteSwapSimd<16>(source, len, dest);
   }
 #endif
 }

@@ -22,8 +22,6 @@
 #include "runtime/string-value.h"
 
 #include <cstring>
-#include "util/cpu-info.h"
-#include "util/sse-util.h"
 
 namespace impala {
 

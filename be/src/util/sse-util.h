@@ -20,7 +20,7 @@
 #define IMPALA_UTIL_SSE_UTIL_H
 
 #ifdef __aarch64__
-  #include "sse2neon.h"
+  #include <arm_neon.h>
 #else
   #include <emmintrin.h>
 #endif
@@ -106,67 +106,7 @@ namespace SSEUtil {
 /// mode constant into the inline asm.
 #define SSE_ALWAYS_INLINE inline __attribute__ ((__always_inline__))
 
-#ifdef __aarch64__
-typedef union __attribute__((aligned(16))) __oword{
-  int64x2_t m128i;
-  uint8_t m128i_u8[16];
-} __oword;
-
-template<int MODE>
-static inline __m128i SSE4_cmpestrm(
-    int64x2_t str1, int len1, int64x2_t str2, int len2) {
-
-  __oword a, b;
-  a.m128i = str1;
-  b.m128i = str2;
-
-  __m128i result = {0, 0};
-  uint16_t i = 0;
-  uint16_t j = 0;
-
-  for (i = 0; i < len2; i++) {
-    for ( j = 0; j < len1; j++) {
-      if (a.m128i_u8[j] == b.m128i_u8[i]) {
-        result |= (1 << i);
-      }
-    }
-  }
-  return result;
-}
-
-template<int MODE>
-static inline int SSE4_cmpestri(
-    int64x2_t str1, int len1, int64x2_t str2, int len2) {
-
-  __oword a, b;
-  a.m128i = str1;
-  b.m128i = str2;
-
-  int len_s, len_l;
-  if (len1 > len2) {
-    len_s = len2;
-    len_l = len1;
-  } else {
-    len_s = len1;
-    len_l = len2;
-  }
-
-  int result;
-  int i;
-
-  for(i = 0; i < len_s; i++) {
-    if (a.m128i_u8[i] == b.m128i_u8[i]) {
-      break;
-    }
-  }
-
-  result = i;
-  if (result == len_s) result = len_l;
-
-  return result;
-}
-
-#else
+#ifdef __x86_64__
 template<int MODE>
 static inline __m128i SSE4_cmpestrm(__m128i str1, int len1, __m128i str2, int len2) {
 #ifdef __clang__
@@ -237,21 +177,44 @@ static inline uint32_t SSE4_crc32_u64(uint32_t crc, uint64_t v) {
 
 #ifdef __aarch64__
 static inline int POPCNT_popcnt_u64(uint64_t x) {
-  uint64_t count_result = 0;
-  uint64_t count[1];
-  uint8x8_t input_val, count8x8_val;
-  uint16x4_t count16x4_val;
-  uint32x2_t count32x2_val;
-  uint64x1_t count64x1_val;
+  // All instructions are dependent on each other: there's no ILP.
+  //                             Neoverse-N1  Neoverse-V1
+  //   fmov    d31, x0              3 cycles     3 cycles
+  //   cnt     v31.8b, v31.8b       2 cycles     2 cycles
+  //   addv    b31, v31.8b          5 cycles     4 cycles
+  //   fmov    w0, s31              2 cycles     2 cycles
+  //                        Total: 12 cycles    11 cycles
+  uint64x1_t val = vcreate_u64(x);
+  uint8x8_t input_val = vreinterpret_u8_u64(val);
+  uint8x8_t count8x8_val = vcnt_u8(input_val);
+  return vaddv_u8(count8x8_val);
 
-  input_val = vld1_u8((unsigned char *) &x);
-  count8x8_val = vcnt_u8(input_val);
-  count16x4_val = vpaddl_u8(count8x8_val);
-  count32x2_val = vpaddl_u16(count16x4_val);
-  count64x1_val = vpaddl_u32(count32x2_val);
-  vst1_u64(count, count64x1_val);
-  count_result = count[0];
-  return count_result;
+  // The following alternative is 2 cycles slower on V1.
+  // All instructions are dependent on each other: there's no ILP.
+  //                              Neoverse-N1  Neoverse-V1
+  //   fmov    d31, x0               3 cycles     3 cycles
+  //   cnt     v31.8b, v31.8b        2 cycles     2 cycles
+  //   uaddlp  v31.4h, v31.8b        2 cycles     2 cycles
+  //   uaddlp  v31.2s, v31.4h        2 cycles     2 cycles
+  //   uaddlp  v31.1d, v31.2s        2 cycles     2 cycles
+  //   fmov    x0, d31               2 cycles     2 cycles
+  //                         Total: 13 cycles    13 cycles
+  //
+  // uint64_t count_result = 0;
+  // uint64_t count[1];
+  // uint8x8_t input_val, count8x8_val;
+  // uint16x4_t count16x4_val;
+  // uint32x2_t count32x2_val;
+  // uint64x1_t count64x1_val;
+  //
+  // input_val = vld1_u8((unsigned char *) &x);
+  // count8x8_val = vcnt_u8(input_val);
+  // count16x4_val = vpaddl_u8(count8x8_val);
+  // count32x2_val = vpaddl_u16(count16x4_val);
+  // count64x1_val = vpaddl_u32(count32x2_val);
+  // vst1_u64(count, count64x1_val);
+  // count_result = count[0];
+  // return count_result;
 }
 #else
 static inline int64_t POPCNT_popcnt_u64(uint64_t a) {
@@ -334,6 +297,16 @@ static inline int64_t POPCNT_popcnt_u64(uint64_t a) {
 #define SSE4_crc32_u16 __crc32ch
 #define SSE4_crc32_u32 __crc32cw
 #define SSE4_crc32_u64 __crc32cd
+
+// We duplicate the POPCNT_popcnt_u64 definition for ARM here.
+// TODO: Untangle this file and fold back the two definitions.
+static inline int POPCNT_popcnt_u64(uint64_t x) {
+  uint64x1_t val = vcreate_u64(x);
+  uint8x8_t input_val = vreinterpret_u8_u64(val);
+  uint8x8_t count8x8_val = vcnt_u8(input_val);
+  return vaddv_u8(count8x8_val);
+}
+
 #endif
 #endif
 
