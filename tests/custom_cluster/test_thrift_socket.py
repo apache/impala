@@ -22,6 +22,12 @@ import ssl
 import sys
 import time
 
+# This import is the actual ImpalaShell class from impala_shell.py.
+# We rename it to ImpalaShellClass here because we later import another
+# class called ImpalaShell from tests/shell/util.py, and we don't want
+# to mask it.
+from shell.impala_shell import ImpalaShell as ImpalaShellClass
+
 from tests.common.environ import IS_REDHAT_DERIVATIVE
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.test_vector import ImpalaTestVector
@@ -51,7 +57,10 @@ SSL_ARGS = ("--ssl_client_ca_certificate=%s/server-cert.pem "
             "--hostname=localhost "  # Required to match hostname in certificate
             % (CERT_DIR, CERT_DIR, CERT_DIR))
 
-IDLE_ARGS = " --idle_client_poll_period_s=3 -v=2"
+# IMPALA-12114 was an issue that occurred when the number of idle polls exceeded a limit
+# and lead to disconnection. This uses a very short poll period to make these tests
+# do more polls and verify the fix for this issue.
+IDLE_ARGS = " --idle_client_poll_period_s=1 -v=2"
 
 
 class TestThriftSocket(CustomClusterTestSuite):
@@ -74,7 +83,8 @@ class TestThriftSocket(CustomClusterTestSuite):
     for protocol_dim in create_client_protocol_dimension():
       for vector in [ImpalaTestVector([protocol_dim])]:
         shell_args = ["-Q", "idle_session_timeout=1800"]
-        self._run_idle_shell(vector, shell_args, 6)
+        # This uses a longer idle time to verify IMPALA-12114, see comment above.
+        self._run_idle_shell(vector, shell_args, 12)
     self.assert_impalad_log_contains('INFO',
         r'Socket read or peek timeout encountered.*THRIFT_EAGAIN \(timed out\)',
         expected_count=-1)
@@ -89,7 +99,8 @@ class TestThriftSocket(CustomClusterTestSuite):
     for protocol_dim in create_client_protocol_dimension():
       for vector in [ImpalaTestVector([protocol_dim])]:
         shell_args = ["-Q", "idle_session_timeout=1800", "--ssl"]
-        self._run_idle_shell(vector, shell_args, 6)
+        # This uses a longer idle time to verify IMPALA-12114, see comment above.
+        self._run_idle_shell(vector, shell_args, 12)
     self.assert_impalad_log_contains('INFO',
         r'Socket read or peek timeout encountered.*THRIFT_POLL \(timed out\)',
         expected_count=-1)
@@ -97,9 +108,17 @@ class TestThriftSocket(CustomClusterTestSuite):
   def _run_idle_shell(self, vector, args, idle_time):
     p = ImpalaShell(vector, args)
     p.send_cmd("USE functional")
-    p.send_cmd("SHOW TABLES")
+    # Running different statements before and after idle allows for more
+    # precise asserts that can distinguish output from before vs after.
+    p.send_cmd("SHOW DATABASES")
     time.sleep(idle_time)
     p.send_cmd("SHOW TABLES")
 
     result = p.get_result()
+    # Output from before the idle period
+    assert "functional_parquet" in result.stdout, result.stdout
+    # Output from after the idle period
     assert "alltypesaggmultifilesnopart" in result.stdout, result.stdout
+    # Impala shell reconnects automatically, so we need to be sure that
+    # it didn't lose the connection.
+    assert ImpalaShellClass.CONNECTION_LOST_MESSAGE not in result.stderr, result.stderr

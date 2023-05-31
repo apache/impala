@@ -141,6 +141,10 @@ class ImpalaShell(cmd.Cmd, object):
   UNKNOWN_SERVER_VERSION = "Not Connected"
   PROMPT_FORMAT = "[{host}:{port}] {db}> "
   DISCONNECTED_PROMPT = "[Not connected] > "
+  # Message to display when the connection failed and it is reconnecting.
+  # This is used in some tests for verification that the session remained
+  # connected.
+  CONNECTION_LOST_MESSAGE = 'Connection lost, reconnecting...'
   # Message to display in shell when cancelling a query
   CANCELLATION_MESSAGE = ' Cancelling Query'
   # Number of times to attempt cancellation before giving up.
@@ -726,7 +730,7 @@ class ImpalaShell(cmd.Cmd, object):
       return str()
     # There is no need to reconnect if we are quitting.
     if not self.imp_client.is_connected() and not self._is_quit_command(args):
-      print("Connection lost, reconnecting...", file=sys.stderr)
+      print(ImpalaShell.CONNECTION_LOST_MESSAGE, file=sys.stderr)
       self._connect()
       self._validate_database(immediately=True)
     return args
