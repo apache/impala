@@ -199,6 +199,14 @@ under the License.
           <groupId>org.apache.shiro</groupId>
           <artifactId>shiro-core</artifactId>
         </exclusion>
+        <!-- RANGER-1837 causes Ranger to pull in ORC dependencies.
+        We have a much tighter coupling with the ORC version required by the Iceberg
+        dependency (which is likely to conflict), so the indirect dependency
+        through Ranger is excluded here. -->
+        <exclusion>
+          <groupId>org.apache.orc</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
         <!--
         We do not explicitly exclude all artifacts in org.eclipse.jetty because
         jetty-client is needed.
