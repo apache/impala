@@ -64,4 +64,40 @@ public class DebugUtilsTest {
     DebugUtils.executeDebugAction("TEST_JITTER_ACTION@JITTER:1", "test_jitter_action");
     DebugUtils.executeDebugAction("TEST_JITTER_ACTION:JITTER", "test_jitter_action");
   }
+
+
+  /**
+   * Test the EXCEPTION DebugAction.
+   */
+  @Test
+  public void testException() {
+    try {
+      DebugUtils.executeDebugAction(
+          "TEST_FAIL_ACTION:EXCEPTION@CommitFailedException@some text",
+          "test_fail_action");
+      Assert.fail("should have got exception");
+    } catch (Exception e) {
+      Assert.assertTrue(e.getClass().getName().contains("CommitFailedException"));
+      Assert.assertTrue(e.getMessage().contains("some text"));
+    }
+  }
+
+  /**
+   * Negative test for the EXCEPTION DebugAction.
+   */
+  @Test
+  public void testExceptionNegative() {
+    // Unimplemented Exception type. This logs an error but does not fail.
+    DebugUtils.executeDebugAction(
+        "TEST_FAIL_ACTION:EXCEPTION@LocalCatalogException@some text",
+        "test_fail_action");
+    try {
+      // No exception text specified in debug action string.
+      DebugUtils.executeDebugAction(
+          "TEST_FAIL_ACTION:EXCEPTION@CommitFailedException", "test_fail_action");
+    } catch (IllegalStateException e) {
+      Assert.assertTrue(
+          e.getMessage().contains("EXCEPTION debug action needs 3 action params"));
+    }
+  }
 }

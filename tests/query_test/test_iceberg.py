@@ -28,6 +28,7 @@ import re
 import time
 
 from subprocess import check_call
+# noinspection PyUnresolvedReferences
 from parquet.ttypes import ConvertedType
 
 from avro.datafile import DataFileReader
@@ -1098,6 +1099,51 @@ class TestIcebergTable(IcebergTestSuite):
   def test_convert_table(self, vector, unique_database):
       self.run_test_case('QueryTest/iceberg-migrate-from-external-hdfs-tables',
                          vector, unique_database)
+
+  def test_abort_transaction(self, unique_database):
+    """Test that iceberg operations fail correctly when an Iceberg transaction commit
+    fails, and that the effects of the failed operation are not visible."""
+    tbl_name = unique_database + ".abort_iceberg_transaction"
+    # The query options that inject an iceberg transaction commit failure.
+    abort_ice_transaction_options = {'debug_action':
+                       'CATALOGD_ICEBERG_COMMIT:EXCEPTION@'
+                       'CommitFailedException@'
+                       'simulated commit failure'}
+    # Create an iceberg table and insert a row.
+    self.client.execute("""create table {0} (i int)
+        stored as iceberg""".format(tbl_name))
+    self.execute_query_expect_success(self.client,
+        "insert into {0} values (1);".format(tbl_name))
+
+    # Run a query that would insert a row, but pass the query options that
+    # will cause the iceberg transaction to abort.
+    err = self.execute_query_expect_failure(self.client,
+        "insert into {0} values (2);".format(tbl_name),
+        query_options=abort_ice_transaction_options)
+    # Check that the error message looks reasonable.
+    result = str(err)
+    assert "Query aborted:CommitFailedException: simulated commit failure" in result
+    # Check that no data was inserted.
+    data = self.execute_query_expect_success(self.client,
+        "select * from {0}".format(tbl_name))
+    assert data.column_labels == ['I']
+    assert len(data.data) == 1
+    assert data.data[0] == '1'
+
+    # Run a query that would add a column to the table, but pass the query options that
+    # will cause the iceberg transaction to abort.
+    ddl_err = self.execute_query_expect_failure(self.client,
+        "alter table {0} add column {1} bigint"
+        .format(tbl_name, "j"), query_options=abort_ice_transaction_options)
+    ddl_result = str(ddl_err)
+    # Check that the error message looks reasonable.
+    assert "Query aborted:CommitFailedException: simulated commit failure" in ddl_result
+    # Check that no column was added.
+    data = self.execute_query_expect_success(self.client,
+        "select * from {0}".format(tbl_name))
+    assert data.column_labels == ['I']
+    assert len(data.data) == 1
+    assert data.data[0] == '1'
 
 
 class TestIcebergV2Table(IcebergTestSuite):

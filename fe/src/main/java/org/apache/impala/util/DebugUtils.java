@@ -22,6 +22,8 @@ import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import java.util.List;
 import java.util.Random;
+
+import org.apache.iceberg.exceptions.CommitFailedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +55,9 @@ public class DebugUtils {
   // debug action label for introducing delay when the catalog operation of INSERT, i.e.
   // CatalogOpExecutor#updateCatalog() finishes.
   public static final String INSERT_FINISH_DELAY = "catalogd_insert_finish_delay";
+
+  // debug action label for Iceberg transaction commit.
+  public static final String ICEBERG_COMMIT = "catalogd_iceberg_commit";
 
   // debug action label for throwing an exception during loadFileMetadataForPartitions.
   public static final String LOAD_FILE_METADATA_THROW_EXCEPTION =
@@ -86,8 +91,8 @@ public class DebugUtils {
    * For example, if the debug action configuration is:
    * CATALOGD_HDFS_LISTING_DELAY:SLEEP@100|CATALOGD_HMS_RPC_DELAY:JITTER@100@0.2
    * Then a when a label "CATALOGD_HDFS_LISTING_DELAY" is provided, this method will sleep
-   * for 100 milli-seconds. If the label CATALOGD_HMS_RPC_DELAY is provided, this method
-   * will sleep for a random value between 1-100 milli-seconds with a probability of 0.2.
+   * for 100 milliseconds. If the label CATALOGD_HMS_RPC_DELAY is provided, this method
+   * will sleep for a random value between 1-100 milliseconds with a probability of 0.2.
    *
    * @param debugActions the debug actions with the format given in the description
    *                     above.
@@ -108,7 +113,7 @@ public class DebugUtils {
           "Invalid debug action " + action);
       List<String> actionParams = Splitter.on('@').splitToList(components.get(1));
       Preconditions.checkState(actionParams.size() > 1,
-          "Illegal debug action format found in " + debugActions + " for label"
+          "Illegal debug action format found in " + debugActions + " for label "
               + label);
       switch (actionParams.get(0)) {
         case "SLEEP":
@@ -145,6 +150,27 @@ public class DebugUtils {
             LOG.error("Invalid number format in debug action {}", action);
           } catch (InterruptedException ex) {
             LOG.warn("Sleep interrupted for the debug action {}", label);
+          }
+          break;
+        case "EXCEPTION":
+          // the EXCEPTION debug action is of format EXCEPTION@<exception_type>@parameter
+          Preconditions.checkState(actionParams.size() == 3,
+              "EXCEPTION debug action needs 3 action params");
+          String exceptionClazz = actionParams.get(1);
+          String param = actionParams.get(2);
+          RuntimeException exceptionToThrow = null;
+          switch (exceptionClazz.toLowerCase()) {
+            case "commitfailedexception":
+              exceptionToThrow = new CommitFailedException(param);
+              break;
+            default:
+              LOG.error("Debug action exception class {} is not implemented",
+                  exceptionClazz);
+              break;
+          }
+          if (exceptionToThrow != null) {
+            LOG.info("Throwing DebugAction exception of class {}", exceptionClazz);
+            throw exceptionToThrow;
           }
           break;
         default:
