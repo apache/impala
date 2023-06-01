@@ -525,14 +525,16 @@ function renderTiming(ignored_arg) {
   var px_per_tic = chart_width / ntics;
   var x = name_width;
   var decimals = 2;
+  var timetick_label;
   for (var i = 1; i <= ntics; ++i) {
     var y = rownum_l * row_height;
     timeticks_footer.appendChild(get_svg_rect("#000000", x, y, px_per_tic,
         row_height, false));
     timeticks_footer.appendChild(get_svg_rect("#F0F0F0", x + 1, y + 1, px_per_tic - 2,
         row_height - 2, false));
-    timeticks_footer.appendChild(get_svg_text((i * sec_per_tic).toFixed(decimals),
-        "#000000", x + px_per_tic - decimals * char_width, text_y - 2, row_height, true));
+    timetick_label = (i * sec_per_tic).toFixed(decimals);
+    timeticks_footer.appendChild(get_svg_text(timetick_label, "#000000",
+        x + px_per_tic - timetick_label.length * char_width + 2, text_y, row_height, false));
     x += px_per_tic;
   }
 }
