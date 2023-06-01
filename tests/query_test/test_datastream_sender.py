@@ -33,4 +33,5 @@ class TestDataStreamSenderTpch(ImpalaTestSuite):
         v.get_value('table_format').file_format in ['parquet'])
 
   def test_krpc_datastream_sender_shuffle(self, vector):
+    vector.get_value('exec_option')['batch_size'] = 8
     self.run_test_case('datastream-sender', vector)
