@@ -380,6 +380,31 @@ static Status JavaAddOpens() {
   return Status::OK();
 }
 
+static Status JavaSetProcessName(string name) {
+  string current_val;
+  char* current_val_c = getenv("JAVA_TOOL_OPTIONS");
+  if (current_val_c != NULL) {
+    current_val = current_val_c;
+  }
+
+  if (!current_val.empty() && current_val.find("-Dsun.java.command") != string::npos) {
+    LOG(WARNING) << "Overriding sun.java.command in JAVA_TOOL_OPTIONS to " << name;
+  }
+
+  stringstream val_out;
+  if (!current_val.empty()) {
+    val_out << current_val << " ";
+  }
+  // Set sun.java.command so jps reports the name correctly, and ThreadNameAnnotator can
+  // use the process name for the main thread (and correctly restore the process name).
+  val_out << "-Dsun.java.command=" << name;
+
+  if (setenv("JAVA_TOOL_OPTIONS", val_out.str().c_str(), 1) < 0) {
+    return Status(Substitute("Could not update JAVA_TOOL_OPTIONS: $0", GetStrErrMsg()));
+  }
+  return Status::OK();
+}
+
 void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
     TestInfo::Mode test_mode, bool external_fe) {
   srand(time(NULL));
@@ -536,6 +561,9 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   if (init_jvm) {
     // Add JAVA_TOOL_OPTIONS for ehcache
     ABORT_IF_ERROR(JavaAddOpens());
+
+    ABORT_IF_ERROR(JavaSetProcessName(
+        boost::filesystem::path(argv[0]).filename().string()));
 
     if (!external_fe) {
       JniUtil::InitLibhdfs();

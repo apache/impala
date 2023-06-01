@@ -187,7 +187,7 @@ class BaseImpalaService(object):
     # as it will be preserved along with everything else in the log directory.
     impalad_pids = subprocess.check_output(["pgrep", "impalad"],
         universal_newlines=True).split("\n")[:-1]
-    catalogd_pids = subprocess.check_output(["pgrep", "-f", "catalogd"],
+    catalogd_pids = subprocess.check_output(["pgrep", "catalogd"],
         universal_newlines=True).split("\n")[:-1]
     minidump_diag_string = "Dumping minidumps for impalads/catalogds...\n"
     for pid in impalad_pids:

@@ -46,7 +46,12 @@ public class ThreadNameAnnotator implements AutoCloseable {
 
   public ThreadNameAnnotator(String annotation) {
     thr_ = Thread.currentThread();
-    oldName_ = thr_.getName();
+    if ("main".equals(thr_.getName())) {
+      // Use the process name from sun.java.command.
+      oldName_ = System.getProperty("sun.java.command", thr_.getName());
+    } else {
+      oldName_ = thr_.getName();
+    }
     newName_ = oldName_ + " [" + annotation + "]";
     thr_.setName(newName_);
   }
