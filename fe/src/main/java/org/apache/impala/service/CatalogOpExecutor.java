@@ -7405,7 +7405,7 @@ public class CatalogOpExecutor {
               msTable.getTableName(), hmsPartitionsStatsUnset);
         }
       } catch (TException te) {
-        new ImpalaRuntimeException(
+        throw new ImpalaRuntimeException(
             String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_partitions"), te);
       }
     }
