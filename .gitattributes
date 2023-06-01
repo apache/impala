@@ -15,7 +15,10 @@ www/bootstrap/css/bootstrap.min.css.map binary
 www/bootstrap/js/bootstrap.js binary
 www/bootstrap/js/bootstrap.min.js
 www/bootstrap/js/bootstrap.min.js binary
+www/c3/c3.v7.min.js binary
+www/c3/c3.v7.min.css binary
 www/d3.v3.min.js binary
+www/d3.v5.min.js binary
 www/dagre-d3.min.js binary
 www/DataTables-1.10.18/js/dataTables.bootstrap.min.js binary
 www/DataTables-1.10.18/js/dataTables.bootstrap4.min.js biinary
