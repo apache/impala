@@ -613,6 +613,26 @@ class TestWebPage(ImpalaTestSuite):
       assert any(pattern in t for t in thread_names), \
           "Could not find thread matching '%s'" % pattern
 
+  def test_rpc_read_write_metrics(self):
+    """Test that read/write metrics are exposed in /rpcz"""
+    rpcz = self.get_debug_page(self.RPCZ_URL)
+    hist_time_regex = "[0-9][0-9numsh.]*"
+    rpc_histogram_regex = (
+      "Count: [0-9]+, sum: " + hist_time_regex
+      + ", min / max: " + hist_time_regex + " / " + hist_time_regex
+      + ", 25th %-ile: " + hist_time_regex
+      + ", 50th %-ile: " + hist_time_regex
+      + ", 75th %-ile: " + hist_time_regex
+      + ", 90th %-ile: " + hist_time_regex
+      + ", 95th %-ile: " + hist_time_regex
+      + ", 99.9th %-ile: " + hist_time_regex)
+    assert len(rpcz['servers']) > 0
+    for s in rpcz['servers']:
+      for m in s['methods']:
+        assert re.search(rpc_histogram_regex, m["summary"])
+        assert re.search(rpc_histogram_regex, m["read"])
+        assert re.search(rpc_histogram_regex, m["write"])
+
   def test_krpc_rpcz(self):
     """Test that KRPC metrics are exposed in /rpcz and that they are updated when
     executing a query."""

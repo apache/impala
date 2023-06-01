@@ -151,6 +151,7 @@ string HistogramMetric::HistogramToHumanReadable(T* histogram, TUnit::type unit)
   DCHECK(histogram != nullptr);
   stringstream out;
   out << "Count: " << histogram->TotalCount() << ", "
+      << "sum: " << PrettyPrinter::Print(histogram->TotalSum(), unit) << ", "
       << "min / max: " << PrettyPrinter::Print(histogram->MinValue(), unit) << " / "
       << PrettyPrinter::Print(histogram->MaxValue(), unit) << ", "
       << "25th %-ile: " << PrettyPrinter::Print(histogram->ValueAtPercentile(25), unit)

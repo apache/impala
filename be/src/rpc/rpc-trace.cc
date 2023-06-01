@@ -38,6 +38,12 @@ using namespace strings;
 // Metric key format for rpc call duration metrics.
 const string RPC_PROCESSING_TIME_DISTRIBUTION_METRIC_KEY = "rpc-method.$0.call_duration";
 
+// Metric key format for rpc read metrics.
+const string RPC_READ_TIME_DISTRIBUTION_METRIC_KEY = "rpc-method.$0.read_duration";
+
+// Metric key format for rpc write metrics.
+const string RPC_WRITE_TIME_DISTRIBUTION_METRIC_KEY = "rpc-method.$0.write_duration";
+
 // Singleton class to keep track of all RpcEventHandlers, and to render them to a
 // web-based summary page.
 class RpcEventHandlerManager {
@@ -136,6 +142,8 @@ void RpcEventHandler::Reset(const string& method_name) {
   MethodMap::iterator it = method_map_.find(method_name);
   if (it == method_map_.end()) return;
   it->second->processing_time_distribution->Reset();
+  it->second->read_time_distribution->Reset();
+  it->second->write_time_distribution->Reset();
   it->second->num_in_flight.Store(0L);
 }
 
@@ -143,6 +151,8 @@ void RpcEventHandler::ResetAll() {
   lock_guard<mutex> l(method_map_lock_);
   for (const MethodMap::value_type& method: method_map_) {
     method.second->processing_time_distribution->Reset();
+    method.second->read_time_distribution->Reset();
+    method.second->write_time_distribution->Reset();
     method.second->num_in_flight.Store(0L);
   }
 }
@@ -165,6 +175,14 @@ void RpcEventHandler::ToJson(Value* server, Document* document) {
         rpc.second->processing_time_distribution->ToHumanReadable();
     Value summary(human_readable.c_str(), document->GetAllocator());
     method.AddMember("summary", summary, document->GetAllocator());
+    const string& human_readable_read =
+        rpc.second->read_time_distribution->ToHumanReadable();
+    Value read_stats(human_readable_read.c_str(), document->GetAllocator());
+    method.AddMember("read", read_stats, document->GetAllocator());
+    const string& human_readable_write =
+        rpc.second->write_time_distribution->ToHumanReadable();
+    Value write_stats(human_readable_write.c_str(), document->GetAllocator());
+    method.AddMember("write", write_stats, document->GetAllocator());
     method.AddMember("in_flight", rpc.second->num_in_flight.Load(),
         document->GetAllocator());
     Value server_name(server_name_.c_str(), document->GetAllocator());
@@ -187,33 +205,119 @@ void* RpcEventHandler::getContext(const char* fn_name, void* server_context) {
       const string& rpc_name = Substitute(RPC_PROCESSING_TIME_DISTRIBUTION_METRIC_KEY,
           Substitute("$0.$1", server_name_, descriptor->name));
       const TMetricDef& def =
-          MakeTMetricDef(rpc_name, TMetricKind::HISTOGRAM, TUnit::TIME_MS);
-      constexpr int32_t SIXTY_MINUTES_IN_MS = 60 * 1000 * 60;
+          MakeTMetricDef(rpc_name, TMetricKind::HISTOGRAM, TUnit::TIME_US);
+      constexpr int64_t SIXTY_MINUTES_IN_US = 60LL * 1000000LL * 60LL;
       // Store processing times of up to 60 minutes with 3 sig. fig.
       descriptor->processing_time_distribution =
-          metrics_->RegisterMetric(new HistogramMetric(def, SIXTY_MINUTES_IN_MS, 3));
+          metrics_->RegisterMetric(new HistogramMetric(def, SIXTY_MINUTES_IN_US, 3));
+
+      const string& read_rpc_name = Substitute(RPC_READ_TIME_DISTRIBUTION_METRIC_KEY,
+          Substitute("$0.$1", server_name_, descriptor->name));
+      const TMetricDef& read_def =
+          MakeTMetricDef(read_rpc_name, TMetricKind::HISTOGRAM, TUnit::TIME_US);
+      descriptor->read_time_distribution =
+          metrics_->RegisterMetric(new HistogramMetric(read_def, SIXTY_MINUTES_IN_US, 3));
+
+      const string& write_rpc_name = Substitute(RPC_WRITE_TIME_DISTRIBUTION_METRIC_KEY,
+          Substitute("$0.$1", server_name_, descriptor->name));
+      const TMetricDef& write_def =
+          MakeTMetricDef(write_rpc_name, TMetricKind::HISTOGRAM, TUnit::TIME_US);
+      descriptor->write_time_distribution = metrics_->RegisterMetric(
+          new HistogramMetric(write_def, SIXTY_MINUTES_IN_US, 3));
+
       it = method_map_.insert(make_pair(descriptor->name, descriptor)).first;
     }
   }
   it->second->num_in_flight.Add(1);
   // TODO: Consider pooling these
   InvocationContext* ctxt_ptr =
-      new InvocationContext(MonotonicMillis(), cnxn_ctx, it->second);
+      new InvocationContext(GetMonoTimeMicros(), cnxn_ctx, it->second);
+  SetThreadRPCContext(ctxt_ptr);
   VLOG_RPC << "RPC call: " << string(fn_name) << "(from "
            << TNetworkAddressToString(ctxt_ptr->cnxn_ctx->network_address) << ")";
   return reinterpret_cast<void*>(ctxt_ptr);
 }
 
+void RpcEventHandler::freeContext(void* ctx, const char* /* fn_name */) {
+  InvocationContext* rpc_ctx = reinterpret_cast<InvocationContext*>(ctx);
+  DCHECK(GetThreadRPCContext() == rpc_ctx);
+  SetThreadRPCContext(nullptr);
+  rpc_ctx->UnRegister();
+}
+
+// postWrite callback occurs after RPC write completes
 void RpcEventHandler::postWrite(void* ctx, const char* fn_name, uint32_t bytes) {
   InvocationContext* rpc_ctx = reinterpret_cast<InvocationContext*>(ctx);
-  int64_t elapsed_time = MonotonicMillis() - rpc_ctx->start_time_ms;
+  rpc_ctx->write_end_us = GetMonoTimeMicros();
+  const int64_t elapsed_time = rpc_ctx->write_end_us - rpc_ctx->start_time_us;
+  const int64_t write_time = rpc_ctx->write_end_us - rpc_ctx->write_start_us;
   const string& call_name = string(fn_name);
-  // TODO: bytes is always 0, how come?
+  // TODO: bytes is always 0 since TTransport does not track write count.
   VLOG_RPC << "RPC call: " << server_name_ << ":" << call_name << " from "
            << TNetworkAddressToString(rpc_ctx->cnxn_ctx->network_address) << " took "
-           << PrettyPrinter::Print(elapsed_time * 1000L * 1000L, TUnit::TIME_NS);
+           << PrettyPrinter::Print(elapsed_time * 1000L, TUnit::TIME_NS);
   MethodDescriptor* descriptor = rpc_ctx->method_descriptor;
-  delete rpc_ctx;
   descriptor->num_in_flight.Add(-1);
   descriptor->processing_time_distribution->Update(elapsed_time);
+  descriptor->write_time_distribution->Update(write_time);
+}
+
+// preRead callback occurs before RPC read starts
+void RpcEventHandler::preRead(void* ctx, const char* fn_name) {
+  InvocationContext* rpc_ctx = reinterpret_cast<InvocationContext*>(ctx);
+  rpc_ctx->read_start_us = GetMonoTimeMicros();
+}
+
+// postRead callback occurs after RPC read completes
+void RpcEventHandler::postRead(void* ctx, const char* fn_name, uint32_t bytes) {
+  InvocationContext* rpc_ctx = reinterpret_cast<InvocationContext*>(ctx);
+  rpc_ctx->read_end_us = GetMonoTimeMicros();
+  int64_t elapsed_time = rpc_ctx->read_end_us - rpc_ctx->start_time_us;
+  rpc_ctx->method_descriptor->read_time_distribution->Update(elapsed_time);
+}
+
+// preWrite callback occurs before RPC read starts
+void RpcEventHandler::preWrite(void* ctx, const char* fn_name) {
+  InvocationContext* rpc_ctx = reinterpret_cast<InvocationContext*>(ctx);
+  rpc_ctx->write_start_us = GetMonoTimeMicros();
+}
+
+__thread RpcEventHandler::InvocationContext* __rpc_context__;
+
+void RpcEventHandler::SetThreadRPCContext(RpcEventHandler::InvocationContext* ctxt_ptr) {
+  __rpc_context__ = ctxt_ptr;
+}
+
+RpcEventHandler::InvocationContext* RpcEventHandler::GetThreadRPCContext() {
+  return __rpc_context__;
+}
+
+void RpcEventHandler::InvocationContext::Register() {
+  DCHECK(refcnt_.Load() >= 1); // Should be registered with RpcEventHandler
+  refcnt_.Add(1);
+}
+
+void RpcEventHandler::InvocationContext::UnRegister() {
+  int32_t newCount = refcnt_.Add(-1);
+  DCHECK (newCount >= 0);
+  if (newCount == 0) {
+    delete this;
+  }
+}
+
+bool RpcEventHandler::InvocationContext::UnRegisterCompleted(
+    uint64_t& read_ns, uint64_t& write_ns) {
+  int32_t newCount = refcnt_.Load();
+  DCHECK (newCount >= 1);
+  if (newCount == 1) {
+    if (read_end_us > read_start_us) {
+      read_ns += ((read_end_us - read_start_us) * 1000L);
+    }
+    if (write_end_us > write_start_us) {
+      write_ns += ((write_end_us - write_start_us) * 1000L);
+    }
+    UnRegister();
+    return true;
+  }
+  return false;
 }

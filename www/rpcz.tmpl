@@ -178,19 +178,34 @@ under the License.
     Reset all
   </button>
 </h2>
+<label>
+<input type="checkbox" id="show_rw_stats" onClick="toggleRWStats()"/>
+  <span id="refresh_on">Show Read/Write stats</span>
+</label>
 {{/servers}}
 {{#servers}}
 
+
+<table width=100%>
+<tr>
+<td>
 <h3><samp>{{name}} </samp>
   <button class="btn btn-warning btn-xs" onClick="reset_server('{{name}}');">
     Reset stats
   </button>
 </h3>
+</td>
+<td align=right>
+</td>
+</tr>
+</table>
 
 <table class='table table-hover table-bordered' id='{{name}}'>
   <tr>
     <th>Method</th>
     <th>Duration summary</th>
+    <th class="rwstats" style="display:none">Read</th>
+    <th class="rwstats" style="display:none">Write</th>
     <th>In Flight</th>
     <th></th>
   </tr>
@@ -198,6 +213,8 @@ under the License.
   <tr>
     <td><samp>{{name}}</samp></td>
     <td>{{summary}}</td>
+    <td class="rwstats">{{read}}</td>
+    <td class="rwstats">{{write}}</td>
     <td>{{in_flight}}</td>
     <td align="center">
       <button class="btn btn-warning btn-xs"
@@ -209,6 +226,11 @@ under the License.
   {{/methods}}
 </table>
 {{/servers}}
+
+<style>
+.rwstats{
+}
+</style>
 
 <script>
 function reset_all() {
@@ -241,6 +263,14 @@ function update_impala_services(json) {
       var row = table.insertRow();
       row.insertCell().innerHTML = "<samp>" + method.name + "</samp>";
       row.insertCell().innerHTML = method.summary;
+      cell = row.insertCell()
+      cell.className= "rwstats";
+      cell.style.display= getRWDisplay();
+      cell.innerHTML = method.read;
+      cell = row.insertCell()
+      cell.className= "rwstats";
+      cell.style.display= getRWDisplay();
+      cell.innerHTML = method.write;
       row.insertCell().innerHTML = method.in_flight;
       var reset_cell = row.insertCell();
       reset_cell.align = "center";
@@ -391,6 +421,21 @@ function toggleRefresh() {
     document.getElementById("refresh_on").textContent = "Auto-refresh off";
   }
 }
+
+function getRWDisplay() {
+  if (document.getElementById('show_rw_stats').checked) {
+    return "";
+  }
+  return "none";
+}
+
+function toggleRWStats() {
+  var rwDisplay = getRWDisplay();
+  for (item of document.getElementsByClassName('rwstats')) {
+    item.style.display = rwDisplay;
+  }
+}
+
 </script>
 
 {{> www/common-footer.tmpl }}

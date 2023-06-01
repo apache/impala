@@ -21,6 +21,7 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exec/catalog-op-executor.h"
+#include "rpc/rpc-trace.h"
 #include "service/child-query.h"
 #include "service/impala-server.h"
 #include "service/query-result-set.h"
@@ -450,6 +451,17 @@ class ClientRequestState {
   /// returned without error.
   void SetPlanningDone() { is_planning_done_.store(true); }
 
+  // Register an RPC context with the query so that RPC metrics can be
+  // accumulated at the query level and shown in the query profile
+  void RegisterRPC();
+  // Unregister any RPCs that have been released by their RPC thread and
+  // accumulate their metrics into the profile timers
+  void UnRegisterCompletedRPCs();
+  // Unregister any remaining RPCs without recording timing in this query.
+  // RPC threads will usually have completed by this point.
+  void UnRegisterRemainingRPCs();
+  // Copy pending RPCs for a retried query
+  void CopyRPCs(ClientRequestState& from_request);
  protected:
   /// Updates the end_time_us_ of this query if it isn't set. The end time is determined
   /// when this function is called for the first time, calling it multiple times does not
@@ -608,6 +620,15 @@ class ClientRequestState {
   /// Timer to track idle time for the above counter.
   MonotonicStopWatch client_wait_sw_;
   int64_t last_client_wait_time_ = 0;
+
+  // Tracks time spent by client calls reading RPC arguments
+  RuntimeProfile::Counter* rpc_read_timer_;
+  // Tracks time spent by client calls writing RPC results
+  RuntimeProfile::Counter* rpc_write_timer_;
+  // Tracks number of client RPCs
+  RuntimeProfile::Counter* rpc_count_;
+  // Contexts for RPC calls that have not completed and had their stats collected
+  std::set<RpcEventHandler::InvocationContext*> pending_rpcs_;
 
   RuntimeProfile::EventSequence* query_events_;
 

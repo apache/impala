@@ -1507,6 +1507,12 @@ void ImpalaServer::CloseClientRequestState(const QueryHandle& query_handle) {
       ImpaladMetrics::QUERY_DURATIONS->Update(duration_ms);
     }
   }
+
+  // Final attempt to capture completed RPC stats
+  query_handle->UnRegisterCompletedRPCs();
+  // Unregister any remaining RPC and discard stats
+  query_handle->UnRegisterRemainingRPCs();
+
   {
     lock_guard<mutex> l(query_handle->session()->lock);
     query_handle->session()->inflight_queries.erase(query_handle->query_id());
@@ -1603,6 +1609,10 @@ Status ImpalaServer::GetActiveQueryHandle(
     return err;
   }
   query_handle->SetHandle(query_driver, query_driver->GetActiveClientRequestState());
+  // Update RPC Stats before every call. This is done here to minimize the
+  // pending set size and keep the profile updated while the query is executing.
+  (*query_handle)->UnRegisterCompletedRPCs();
+  (*query_handle)->RegisterRPC();
   return Status::OK();
 }
 

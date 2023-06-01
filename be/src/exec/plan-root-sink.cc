@@ -61,6 +61,7 @@ Status PlanRootSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker
   rows_sent_rate_ = profile_->AddDerivedCounter("RowsSentRate", TUnit::UNIT_PER_SECOND,
       bind<int64_t>(&RuntimeProfile::UnitsPerSecond, rows_sent_counter_,
                                                     profile_->total_time_counter()));
+  create_result_set_timer_ = ADD_TIMER(profile(), "CreateResultSetTime");
   return Status::OK();
 }
 

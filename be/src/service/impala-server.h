@@ -1023,6 +1023,7 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Returns the active QueryHandle for this query id. The QueryHandle contains the
   /// active ClientRequestState. Returns an error Status if the query id cannot be found.
+  /// If caller is an RPC thread, RPC context will be registered for time tracking
   /// See QueryDriver for a description of active ClientRequestStates.
   Status GetActiveQueryHandle(
       const TUniqueId& query_id, QueryHandle* query_handle);

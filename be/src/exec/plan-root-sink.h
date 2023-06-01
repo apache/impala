@@ -121,6 +121,9 @@ class PlanRootSink : public DataSink {
   /// Prepare().
   RuntimeProfile::Counter* rows_sent_rate_ = nullptr;
 
+  /// Measures the amount of time spend converting results to the client protocol
+  RuntimeProfile::Counter* create_result_set_timer_ = nullptr;
+
  private:
   /// Limit on the number of rows produced by this query, initialized by the constructor.
   const int64_t num_rows_produced_limit_;

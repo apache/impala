@@ -291,6 +291,10 @@ void QueryDriver::RetryQueryFromThread(
   retry_request_state->SetBlacklistedExecutorAddresses(
       client_request_state_->GetBlacklistedExecutorAddresses());
 
+  // Copy pending RPCs to the retry request. Whichever query ends up succeding
+  // will reap them.
+  retry_request_state->CopyRPCs(*client_request_state_);
+
   // Run the new query.
   status = retry_request_state->Exec();
   if (!status.ok()) {

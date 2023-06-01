@@ -133,6 +133,9 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
   client_wait_timer_ = ADD_TIMER(server_profile_, "ClientFetchWaitTimer");
   client_wait_time_stats_ =
       ADD_SUMMARY_STATS_TIMER(server_profile_, "ClientFetchWaitTimeStats");
+  rpc_read_timer_ = ADD_TIMER(server_profile_, "RPCReadTimer");
+  rpc_write_timer_ = ADD_TIMER(server_profile_, "RPCWriteTimer");
+  rpc_count_ = ADD_COUNTER(server_profile_, "RPCCount", TUnit::UNIT);
   bool is_external_fe = session_type() == TSessionType::EXTERNAL_FRONTEND;
   // "Impala Backend Timeline" was specifically chosen to exploit the lexicographical
   // ordering defined by the underlying std::map holding the timelines displayed in
@@ -181,6 +184,8 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
 
 ClientRequestState::~ClientRequestState() {
   DCHECK(wait_thread_.get() == NULL) << "BlockOnWait() needs to be called!";
+  DCHECK(pending_rpcs_.empty());
+  UnRegisterRemainingRPCs();
 }
 
 Status ClientRequestState::SetResultCache(QueryResultSet* cache,
@@ -1029,6 +1034,7 @@ Status ClientRequestState::ExecShutdownRequest() {
 }
 
 Status ClientRequestState::Finalize(bool check_inflight, const Status* cause) {
+  UnRegisterCompletedRPCs();
   RETURN_IF_ERROR(Cancel(check_inflight, cause, /*wait_until_finalized=*/true));
   MarkActive();
   // Make sure we join on wait_thread_ before we finish (and especially before this object
@@ -2156,4 +2162,54 @@ TCatalogServiceRequestHeader ClientRequestState::GetCatalogServiceRequestHeader(
           query_ctx_.client_request.redacted_stmt : query_ctx_.client_request.stmt);
   return header;
 }
+
+void ClientRequestState::RegisterRPC() {
+  RpcEventHandler::InvocationContext* rpc_context =
+      RpcEventHandler::GetThreadRPCContext();
+  // The existence of rpc_context means that this is called from an RPC
+  if (rpc_context) {
+    lock_guard<mutex> l(lock_);
+    if(pending_rpcs_.find(rpc_context) == pending_rpcs_.end()) {
+      rpc_context->Register();
+      pending_rpcs_.insert(rpc_context);
+      rpc_count_->Add(1);
+    }
+  }
+}
+
+void ClientRequestState::UnRegisterCompletedRPCs() {
+  lock_guard<mutex> l(lock_);
+  for (auto iter = pending_rpcs_.begin(); iter != pending_rpcs_.end();) {
+    RpcEventHandler::InvocationContext* rpc_context = *iter;
+    uint64_t read_ns = 0, write_ns = 0;
+    if (rpc_context->UnRegisterCompleted(read_ns, write_ns)) {
+      rpc_read_timer_->Add(read_ns);
+      rpc_write_timer_->Add(write_ns);
+      iter = pending_rpcs_.erase(iter);
+    } else {
+      ++iter;
+    }
+  }
+}
+
+void ClientRequestState::UnRegisterRemainingRPCs() {
+  lock_guard<mutex> l(lock_);
+  for (auto rpc_context: pending_rpcs_) {
+    rpc_context->UnRegister();
+  }
+  pending_rpcs_.clear();
+}
+
+void ClientRequestState::CopyRPCs(ClientRequestState& from_request) {
+  lock_guard<mutex> l_to(lock_);
+  lock_guard<mutex> l_from(from_request.lock_);
+  rpc_read_timer_->Add(from_request.rpc_read_timer_->value());
+  rpc_write_timer_->Add(from_request.rpc_write_timer_->value());
+  rpc_count_->Add(from_request.rpc_count_->value());
+  for (auto rpc_context: from_request.pending_rpcs_) {
+    rpc_context->Register();
+    pending_rpcs_.insert(rpc_context);
+  }
+}
+
 }

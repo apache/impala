@@ -22,7 +22,7 @@ from time import sleep
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import extend_exec_option_dimension
 from tests.util.parse_util import parse_duration_string_ms, \
-    get_time_summary_stats_counter
+    parse_duration_string_ns, get_time_summary_stats_counter
 
 
 class TestFetch(ImpalaTestSuite):
@@ -66,6 +66,23 @@ class TestFetch(ImpalaTestSuite):
       materialization_timer = re.search("RowMaterializationTimer: (.*)", runtime_profile)
       assert materialization_timer and len(materialization_timer.groups()) == 1 and \
           parse_duration_string_ms(materialization_timer.group(1)) > 1000
+      assert re.search("RPCCount: [5-9]", runtime_profile)
+
+      rpc_read_timer = re.search("RPCReadTimer: (.*)", runtime_profile)
+      assert rpc_read_timer and len(rpc_read_timer.groups()) == 1
+      rpc_read_ns = parse_duration_string_ns(rpc_read_timer.group(1))
+      assert 0 < rpc_read_ns and rpc_read_ns < 1000000
+
+      rpc_write_timer = re.search("RPCWriteTimer: (.*)", runtime_profile)
+      assert rpc_write_timer and len(rpc_write_timer.groups()) == 1
+      rpc_write_ns = parse_duration_string_ns(rpc_write_timer.group(1))
+      assert 0 < rpc_write_ns and rpc_write_ns < 10000000
+
+      create_result_time = re.search("CreateResultSetTime: (.*)", runtime_profile)
+      assert create_result_time and len(create_result_time.groups()) == 1
+      create_result_ms = parse_duration_string_ms(create_result_time.group(1))
+      assert 2400 < create_result_ms and create_result_ms < 2600
+
     finally:
       self.client.close_query(handle)
 
