@@ -1295,8 +1295,8 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=20B cardinality=2.88M
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=427.00MB Threads=120
-Per-Host Resource Estimates: Memory=3.56GB
+Max Per-Host Resource Reservation: Memory=424.19MB Threads=120
+Per-Host Resource Estimates: Memory=3.54GB
 F80:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -1311,7 +1311,7 @@ PLAN-ROOT SINK
 |  in pipelines: 129(GETNEXT)
 |
 F79:PLAN FRAGMENT [HASH(CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(channel) WHEN 105 THEN murmur_hash(channel) WHEN 106 THEN murmur_hash(channel) WHEN 107 THEN murmur_hash(channel) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_brand_id) WHEN 105 THEN murmur_hash(i_brand_id) WHEN 106 THEN murmur_hash(i_brand_id) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_class_id) WHEN 105 THEN murmur_hash(i_class_id) WHEN 106 THEN murmur_hash(NULL) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_category_id) WHEN 105 THEN murmur_hash(NULL) WHEN 106 THEN murmur_hash(NULL) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=137.09MB mem-reservation=93.62MB thread-reservation=1
+Per-Host Resources: mem-estimate=115.00MB mem-reservation=90.81MB thread-reservation=1
 129:TOP-N [LIMIT=100]
 |  order by: CASE valid_tid(104,105,106,107,108) WHEN 104 THEN channel WHEN 105 THEN channel WHEN 106 THEN channel WHEN 107 THEN channel WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_brand_id WHEN 105 THEN i_brand_id WHEN 106 THEN i_brand_id WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_class_id WHEN 105 THEN i_class_id WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_category_id WHEN 105 THEN NULL WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC
 |  mem-estimate=4.69KB mem-reservation=0B thread-reservation=0
@@ -1341,7 +1341,7 @@ Per-Host Resources: mem-estimate=137.09MB mem-reservation=93.62MB thread-reserva
 |  Class 4
 |    output: sum:merge(sales), sum:merge(number_sales)
 |    group by: NULL, NULL, NULL, NULL
-|  mem-estimate=120.09MB mem-reservation=76.62MB thread-reservation=0
+|  mem-estimate=98.00MB mem-reservation=73.81MB thread-reservation=0
 |  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=562.30K
 |  in pipelines: 215(GETNEXT), 151(OPEN), 179(OPEN), 207(OPEN)
 |
@@ -3098,8 +3098,8 @@ Per-Host Resources: mem-estimate=67.37MB mem-reservation=12.81MB thread-reservat
    tuple-ids=0 row-size=20B cardinality=2.88M
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=662.12MB Threads=141
-Per-Host Resource Estimates: Memory=2.28GB
+Max Per-Host Resource Reservation: Memory=588.50MB Threads=141
+Per-Host Resource Estimates: Memory=2.22GB
 F80:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -3114,7 +3114,7 @@ PLAN-ROOT SINK
 |  in pipelines: 129(GETNEXT)
 |
 F79:PLAN FRAGMENT [HASH(CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(channel) WHEN 105 THEN murmur_hash(channel) WHEN 106 THEN murmur_hash(channel) WHEN 107 THEN murmur_hash(channel) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_brand_id) WHEN 105 THEN murmur_hash(i_brand_id) WHEN 106 THEN murmur_hash(i_brand_id) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_class_id) WHEN 105 THEN murmur_hash(i_class_id) WHEN 106 THEN murmur_hash(NULL) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_category_id) WHEN 105 THEN murmur_hash(NULL) WHEN 106 THEN murmur_hash(NULL) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END)] hosts=3 instances=6
-Per-Instance Resources: mem-estimate=109.52MB mem-reservation=85.12MB thread-reservation=1
+Per-Instance Resources: mem-estimate=75.52MB mem-reservation=48.31MB thread-reservation=1
 129:TOP-N [LIMIT=100]
 |  order by: CASE valid_tid(104,105,106,107,108) WHEN 104 THEN channel WHEN 105 THEN channel WHEN 106 THEN channel WHEN 107 THEN channel WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_brand_id WHEN 105 THEN i_brand_id WHEN 106 THEN i_brand_id WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_class_id WHEN 105 THEN i_class_id WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_category_id WHEN 105 THEN NULL WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC
 |  mem-estimate=4.69KB mem-reservation=0B thread-reservation=0
@@ -3144,7 +3144,7 @@ Per-Instance Resources: mem-estimate=109.52MB mem-reservation=85.12MB thread-res
 |  Class 4
 |    output: sum:merge(sales), sum:merge(number_sales)
 |    group by: NULL, NULL, NULL, NULL
-|  mem-estimate=98.00MB mem-reservation=76.62MB thread-reservation=0
+|  mem-estimate=64.00MB mem-reservation=39.81MB thread-reservation=0
 |  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=562.30K
 |  in pipelines: 215(GETNEXT), 151(OPEN), 179(OPEN), 207(OPEN)
 |

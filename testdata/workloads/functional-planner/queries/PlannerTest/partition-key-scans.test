@@ -374,7 +374,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(2,4) = 2, count('test')), aggif(valid_tid(2,4) = 4, count(1234))
 |  group by: CASE valid_tid(2,4) WHEN 2 THEN 1234 WHEN 4 THEN 1234 END
-|  row-size=18B cardinality=2
+|  row-size=18B cardinality=1
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
