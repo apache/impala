@@ -26,10 +26,6 @@
 #include <boost/assert/source_location.hpp>
 #include <gutil/strings/substitute.h>
 
-#include <llvm/ADT/Triple.h>
-#include <llvm/Analysis/InstructionSimplify.h>
-#include <llvm/Analysis/Passes.h>
-#include <llvm/Analysis/TargetTransformInfo.h>
 #include <llvm/Bitcode/BitcodeReader.h>
 #include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
@@ -41,18 +37,17 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/InstIterator.h>
-#include <llvm/IR/LegacyPassManager.h>
-#include <llvm/IR/NoFolder.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Linker/Linker.h>
+#include <llvm/Passes/PassBuilder.h>
+#include <llvm/Support/CommandLine.h>
 #include <llvm/Support/DynamicLibrary.h>
 #include <llvm/Support/ErrorHandling.h>
 #include <llvm/Support/Host.h>
-#include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
-#include <llvm/Transforms/IPO.h>
-#include <llvm/Transforms/IPO/PassManagerBuilder.h>
+#include <llvm/Transforms/IPO/GlobalDCE.h>
+#include <llvm/Transforms/IPO/Internalize.h>
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
 #include <llvm/Transforms/Utils/Cloning.h>
@@ -155,8 +150,11 @@ const map<int64_t, std::string> LlvmCodeGen::cpu_flag_mappings_{
   LOG(FATAL) << "LLVM hit fatal error: " << reason.c_str();
 }
 
-Status LlvmCodeGen::InitializeLlvm(bool load_backend) {
+Status LlvmCodeGen::InitializeLlvm(const char* procname, bool load_backend) {
   DCHECK(!llvm_initialized_);
+  // Treat all functions as having the inline hint
+  std::array<const char*, 2> argv = { { procname, "-inline-threshold=325" } };
+  CHECK(llvm::cl::ParseCommandLineOptions(argv.size(), argv.data()));
   llvm::remove_fatal_error_handler();
   llvm::install_fatal_error_handler(LlvmCodegenHandleError);
   // These functions can *only* be called once per process and are used to set up
@@ -234,6 +232,7 @@ LlvmCodeGen::LlvmCodeGen(FragmentState* state, ObjectPool* pool,
   module_bitcode_gen_timer_ = ADD_TIMER(profile_, "ModuleBitcodeGenTime");
   module_bitcode_size_ = ADD_COUNTER(profile_, "ModuleBitcodeSize", TUnit::BYTES);
   ir_generation_timer_ = ADD_TIMER(profile_, "IrGenerationTime");
+  function_prune_timer_ = ADD_TIMER(profile_, "FunctionPruneTime");
   optimization_timer_ = ADD_TIMER(profile_, "OptimizationTime");
   compile_timer_ = ADD_TIMER(profile_, "CompileTime");
   main_thread_timer_ = ADD_TIMER(profile_, "MainThreadCodegenTime");
@@ -1239,10 +1238,7 @@ Status LlvmCodeGen::StoreCache(CodeGenCacheKey& cache_key) {
 }
 
 void LlvmCodeGen::PruneModule() {
-  SCOPED_TIMER(optimization_timer_);
-  llvm::TargetIRAnalysis target_analysis =
-      execution_engine_->getTargetMachine()->getTargetIRAnalysis();
-
+  SCOPED_TIMER(function_prune_timer_);
   // Before running any other optimization passes, run the internalize pass, giving it
   // the names of all functions registered by AddFunctionToJit(), followed by the
   // global dead code elimination pass. This causes all functions not registered to be
@@ -1252,15 +1248,18 @@ void LlvmCodeGen::PruneModule() {
   for (auto& entry : fns_to_jit_compile_) {
     exported_fn_names.insert(entry.first->getName().str());
   }
-  unique_ptr<llvm::legacy::PassManager> module_pass_manager(
-      new llvm::legacy::PassManager());
-  module_pass_manager->add(llvm::createTargetTransformInfoWrapperPass(target_analysis));
-  module_pass_manager->add(
-      llvm::createInternalizePass([&exported_fn_names](const llvm::GlobalValue& gv) {
+
+  llvm::ModuleAnalysisManager module_analysis_manager;
+  llvm::PassBuilder pass_builder(execution_engine_->getTargetMachine());
+  pass_builder.registerModuleAnalyses(module_analysis_manager);
+
+  llvm::ModulePassManager module_pass_manager;
+  module_pass_manager.addPass(
+      llvm::InternalizePass([&exported_fn_names](const llvm::GlobalValue& gv) {
         return exported_fn_names.find(gv.getName().str()) != exported_fn_names.end();
       }));
-  module_pass_manager->add(llvm::createGlobalDCEPass());
-  module_pass_manager->run(*module_);
+  module_pass_manager.addPass(llvm::GlobalDCEPass());
+  module_pass_manager.run(*module_, module_analysis_manager);
 }
 
 Status LlvmCodeGen::FinalizeModule() {
@@ -1404,28 +1403,25 @@ Status LlvmCodeGen::FinalizeModuleAsync(RuntimeProfile::EventSequence* event_seq
 Status LlvmCodeGen::OptimizeModule() {
   SCOPED_TIMER(optimization_timer_);
 
+  llvm::LoopAnalysisManager LAM;
+  llvm::FunctionAnalysisManager FAM;
+  llvm::CGSCCAnalysisManager CGAM;
+  llvm::ModuleAnalysisManager MAM;
+
   // This pass manager will construct optimizations passes that are "typical" for
   // c/c++ programs.  We're relying on llvm to pick the best passes for us.
   // TODO: we can likely muck with this to get better compile speeds or write
   // our own passes.  Our subexpression elimination optimization can be rolled into
   // a pass.
-  llvm::PassManagerBuilder pass_builder;
-  // 2 maps to -O2
-  // TODO: should we switch to 3? (3 may not produce different IR than 2 while taking
-  // longer, but we should check)
-  pass_builder.OptLevel = 2;
-  // Don't optimize for code size (this corresponds to -O2/-O3)
-  pass_builder.SizeLevel = 0;
-  // Use a threshold equivalent to adding InlineHint on all functions.
-  // This results in slightly better performance than the default threshold (225).
-  pass_builder.Inliner = llvm::createFunctionInliningPass(325);
+  llvm::PassBuilder pass_builder(execution_engine_->getTargetMachine());
+  pass_builder.registerModuleAnalyses(MAM);
+  pass_builder.registerCGSCCAnalyses(CGAM);
+  pass_builder.registerFunctionAnalyses(FAM);
+  pass_builder.registerLoopAnalyses(LAM);
+  pass_builder.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-  // The TargetIRAnalysis pass is required to provide information about the target
-  // machine to optimisation passes, e.g. the cost model.
-  llvm::TargetIRAnalysis target_analysis =
-      execution_engine_->getTargetMachine()->getTargetIRAnalysis();
-  unique_ptr<llvm::legacy::PassManager> module_pass_manager(
-      new llvm::legacy::PassManager());
+  llvm::ModulePassManager pass_manager = pass_builder.buildPerModuleDefaultPipeline(
+      llvm::PassBuilder::OptimizationLevel::O2);
 
   // Update counters before final optimization, but after removing unused functions. This
   // gives us a rough measure of how much work the optimization and compilation must do.
@@ -1442,23 +1438,8 @@ Status LlvmCodeGen::OptimizeModule() {
     return mem_tracker_->MemLimitExceeded(NULL, msg, estimated_memory);
   }
 
-  // Create and run function pass manager
-  unique_ptr<llvm::legacy::FunctionPassManager> fn_pass_manager(
-      new llvm::legacy::FunctionPassManager(module_));
-  fn_pass_manager->add(llvm::createTargetTransformInfoWrapperPass(target_analysis));
-  pass_builder.populateFunctionPassManager(*fn_pass_manager);
-  fn_pass_manager->doInitialization();
-  for (llvm::Module::iterator it = module_->begin(), end = module_->end(); it != end;
-       ++it) {
-    if (!it->isDeclaration()) fn_pass_manager->run(*it);
-  }
-  fn_pass_manager->doFinalization();
-
   // Create and run module pass manager
-  module_pass_manager.reset(new llvm::legacy::PassManager());
-  module_pass_manager->add(llvm::createTargetTransformInfoWrapperPass(target_analysis));
-  pass_builder.populateModulePassManager(*module_pass_manager);
-  module_pass_manager->run(*module_);
+  pass_manager.run(*module_, MAM);
   if (FLAGS_print_llvm_ir_instruction_count) {
     for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {
       InstructionCounter counter;

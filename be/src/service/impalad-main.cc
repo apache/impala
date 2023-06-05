@@ -59,7 +59,7 @@ DECLARE_bool(is_coordinator);
 int ImpaladMain(int argc, char** argv) {
   InitCommonRuntime(argc, argv, true);
 
-  ABORT_IF_ERROR(LlvmCodeGen::InitializeLlvm());
+  ABORT_IF_ERROR(LlvmCodeGen::InitializeLlvm(argv[0]));
   JniUtil::InitLibhdfs();
   ABORT_IF_ERROR(HBaseTableScanner::Init());
   ABORT_IF_ERROR(HBaseTable::InitJNI());

@@ -78,7 +78,8 @@ Java_org_apache_impala_service_FeSupport_NativeFeInit(
   // exceptions to the FE.
   InitCommonRuntime(1, &name, true,
       external_fe ? TestInfo::NON_TEST : TestInfo::FE_TEST, external_fe);
-  THROW_IF_ERROR(LlvmCodeGen::InitializeLlvm(true), env, JniUtil::internal_exc_class());
+  THROW_IF_ERROR(
+      LlvmCodeGen::InitializeLlvm(name, true), env, JniUtil::internal_exc_class());
   ExecEnv* exec_env = new ExecEnv(external_fe); // This also caches it from the process.
   THROW_IF_ERROR(exec_env->InitForFeSupport(), env, JniUtil::internal_exc_class());
 }

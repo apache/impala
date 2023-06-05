@@ -167,7 +167,7 @@ class LlvmCodeGen {
   /// the current object and not be able to find the backend symbols
   /// TODO: this can probably be removed after impalad refactor where the java
   /// side is not loading the be explicitly anymore.
-  static Status InitializeLlvm(bool load_backend = false);
+  static Status InitializeLlvm(const char* procname = "main", bool load_backend = false);
 
   /// Creates a codegen instance for Impala initialized with the cross-compiled Impala IR.
   /// 'codegen' will contain the created object on success.
@@ -842,6 +842,9 @@ class LlvmCodeGen {
   /// Time spent by ExecNodes while adding IR to the module. Update by
   /// FragmentInstanceState during its 'CODEGEN_START' state.
   RuntimeProfile::Counter* ir_generation_timer_;
+
+  /// Time spent pruning unused functions.
+  RuntimeProfile::Counter* function_prune_timer_;
 
   /// Time spent optimizing the module.
   RuntimeProfile::Counter* optimization_timer_;
