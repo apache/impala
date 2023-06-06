@@ -17,6 +17,10 @@
 
 package org.apache.impala.analysis;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 /**
  * This class standardizes the query string building process. At this point only used for
  * child query creation for Iceberg LOAD DATA INPATH queries. Each inner class is
@@ -33,8 +37,11 @@ public class QueryStringBuilder {
     private String likeLocation_;
     private String storedAsFileFormat_;
     private String tableLocation_;
+    private List<String> tableProperties_;
 
-    public Create() {}
+    public Create() {
+      tableProperties_ = new ArrayList<String>();
+    }
 
     public Create table(String tableName, Boolean external) {
       tableName_ = tableName;
@@ -59,6 +66,11 @@ public class QueryStringBuilder {
       return this;
     }
 
+    public Create addTableProperty(String key, String value) {
+      tableProperties_.add("'" + key + "'='" + value + "'");
+      return this;
+    }
+
     public String build() {
       StringBuilder builder = new StringBuilder();
       if (!external_) {
@@ -72,6 +84,15 @@ public class QueryStringBuilder {
       }
       builder.append("STORED AS " + storedAsFileFormat_ + " ");
       builder.append("LOCATION '" + tableLocation_ + "'");
+      if (!tableProperties_.isEmpty()) {
+        builder.append(" TBLPROPERTIES (");
+        Iterator<String> it = tableProperties_.iterator();
+        while(it.hasNext()) {
+          builder.append(it.next());
+          if(it.hasNext()) builder.append(", ");
+        }
+        builder.append(")");
+      }
       return builder.toString();
     }
   }

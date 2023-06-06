@@ -272,6 +272,7 @@ public class LoadDataStmt extends StatementBase {
             + "format, file '%s' has '%s' magic string.", filePathForLike, magicString));
       }
       createTableQueryBuilder.tableLocation("%s");
+      createTableQueryBuilder.addTableProperty("TEMPORARY", "true");
     } catch (IOException e) {
       throw new AnalysisException("Failed to generate CREATE TABLE subquery "
           + "statement. ", e);
