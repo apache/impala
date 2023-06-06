@@ -44,7 +44,7 @@ BINDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${BINDIR}/bootstrap_system.sh"
 
 export MAX_PYTEST_FAILURES=0
-source bin/impala-config.sh
+source bin/impala-config.sh > /dev/null 2>&1
 export NUM_CONCURRENT_TESTS=$(nproc)
 time -p ./buildall.sh -format -testdata -skiptests
 

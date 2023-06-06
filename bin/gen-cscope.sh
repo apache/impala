@@ -20,7 +20,7 @@
 
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
-. "$bin"/impala-config.sh
+. "$bin"/impala-config.sh > /dev/null 2>&1
 
 # Generate list of files for Cscope to index.
 # -ignore_readdir_race: this scripts runs in parallel with other build steps, so races

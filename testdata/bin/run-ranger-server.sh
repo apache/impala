@@ -29,7 +29,7 @@ fi
 # IMPALA-8815: don't allow additional potentially incompatible jars to get onto
 # the ranger classpath. We should only need the test cluster configs on the classpath.
 unset CLASSPATH
-. $IMPALA_HOME/bin/impala-config.sh
+. $IMPALA_HOME/bin/impala-config.sh > /dev/null 2>&1
 
 # Required to start Ranger with Java 11
 if [[ ! -d "${RANGER_HOME}"/ews/logs ]]; then

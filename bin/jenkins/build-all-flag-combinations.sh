@@ -30,7 +30,7 @@ setup_report_build_error
 
 export IMPALA_MAVEN_OPTIONS="-U"
 
-. bin/impala-config.sh
+. bin/impala-config.sh > /dev/null 2>&1
 
 : ${GENERATE_M2_ARCHIVE:=false}
 

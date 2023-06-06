@@ -25,7 +25,7 @@
 
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
-. "$bin"/impala-config.sh
+. "$bin"/impala-config.sh > /dev/null 2>&1
 
 function print_usage {
   echo "init-impala-python.sh - Script called from CMake to init python venvs"

@@ -23,7 +23,7 @@ setup_report_build_error
 
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
-. "$bin"/impala-config.sh
+. "$bin"/impala-config.sh > /dev/null 2>&1
 
 # location of the generated data
 DATALOC=$IMPALA_HOME/testdata/target

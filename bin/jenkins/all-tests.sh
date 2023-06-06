@@ -67,7 +67,7 @@ if ! bin/bootstrap_development.sh; then
   RET_CODE=1
 fi
 
-source bin/impala-config.sh
+source bin/impala-config.sh > /dev/null 2>&1
 
 # Sanity check: bootstrap_development.sh should not have modified any of
 # the Impala files. This is important for the continued functioning of

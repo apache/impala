@@ -28,7 +28,7 @@ DOCKER_NETWORK="test-impala-cluster"
 # Helper to source impala-config.sh, which may have unbound variables
 source_impala_config() {
   set +u
-  . ./bin/impala-config.sh
+  . ./bin/impala-config.sh > /dev/null 2>&1
   set -u
 }
 

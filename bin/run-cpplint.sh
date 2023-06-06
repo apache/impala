@@ -20,7 +20,7 @@
 
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
-. "$bin"/impala-config.sh
+. "$bin"/impala-config.sh > /dev/null 2>&1
 
 files=`find $IMPALA_BE_DIR/src -regex '.*\(cc\|h\)' -printf '%p '`
 cpplint.py $@ ${files}
