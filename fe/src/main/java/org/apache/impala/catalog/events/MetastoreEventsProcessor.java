@@ -715,6 +715,17 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     }
   }
 
+  public static long getCurrentEventIdNoThrow(IMetaStoreClient client) {
+    long latestEventId = -1L;
+    try {
+      latestEventId = client.getCurrentNotificationEventId().getEventId();
+    } catch (TException exception) {
+      LOG.warn(String.format("Unable to fetch latest event id from HMS: %s",
+          exception.getMessage()));
+    }
+    return latestEventId;
+  }
+
   /**
    * Starts the event processor from a given event id
    */

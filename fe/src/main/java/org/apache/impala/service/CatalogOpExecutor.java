@@ -1551,15 +1551,26 @@ public class CatalogOpExecutor {
       String reason, @Nullable String debugAction)
       throws CatalogException {
     Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
+    long eventId = -1L;
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       org.apache.hadoop.hive.metastore.api.Table msTbl =
           getMetaStoreTable(msClient, tbl);
+      if (msTbl.getPartitionKeysSize() == 0) {
+        eventId = MetastoreEventsProcessor.getCurrentEventIdNoThrow(
+            msClient.getHiveClient());
+      }
       if (tbl instanceof HdfsTable) {
         ((HdfsTable) tbl).load(true, msClient.getHiveClient(), msTbl,
             reloadFileMetadata, reloadTableSchema, false, partitionsToUpdate,
             debugAction, partitionToEventId, reason);
       } else {
         tbl.load(true, msClient.getHiveClient(), msTbl, reason);
+      }
+      // Update the lastRefreshEventId at the table level if it is unpartitioned table
+      // if it is partitioned table, partitions are updated in HdfsTable#load() method
+      if (msTbl.getPartitionKeysSize() == 0 && eventId > tbl.getLastRefreshEventId()
+          && reloadFileMetadata && reloadTableSchema) {
+        tbl.setLastRefreshEventId(eventId);
       }
     }
     tbl.setCatalogVersion(newCatalogVersion);
@@ -1635,11 +1646,18 @@ public class CatalogOpExecutor {
         LOG.trace(String.format("Altering view %s", tableName));
       }
       applyAlterTable(msTbl);
+      long eventId = -1L;
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+        eventId = MetastoreEventsProcessor.getCurrentEventIdNoThrow(
+            msClient.getHiveClient());
         tbl.load(true, msClient.getHiveClient(), msTbl, "ALTER VIEW");
       }
       addSummary(resp, "View has been altered.");
       tbl.setCatalogVersion(newCatalogVersion);
+      // Update the last refresh event id at table level
+      if (eventId > tbl.getLastRefreshEventId()) {
+        tbl.setLastRefreshEventId(eventId);
+      }
       addTableToCatalogUpdate(tbl, wantMinimalResult, resp.result);
     } finally {
       UnlockWriteLockIfErronouslyLocked();

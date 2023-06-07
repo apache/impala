@@ -365,6 +365,15 @@ public class BackendConfig {
     backendCfg_.enable_reload_events = flag;
   }
 
+  public boolean enableSkippingOlderEvents() {
+    return backendCfg_.enable_skipping_older_events;
+  }
+
+  @VisibleForTesting
+  public void setSkippingOlderEvents(boolean flag) {
+    backendCfg_.enable_skipping_older_events = flag;
+  }
+
   public boolean pullTableTypesAndComments() {
     return backendCfg_.pull_table_types_and_comments;
   }

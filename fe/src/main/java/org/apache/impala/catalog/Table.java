@@ -1048,7 +1048,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     if (eventId > lastRefreshEventId_) {
       lastRefreshEventId_ = eventId;
     }
-    LOG.debug("last refreshed event id for table: {} set to: {}", getFullName(),
+    LOG.info("last refreshed event id for table: {} set to: {}", getFullName(),
         lastRefreshEventId_);
     // TODO: Should we reset lastSyncedEvent Id if it is less than event Id?
     // If we don't reset it - we may start syncing table from an event id which

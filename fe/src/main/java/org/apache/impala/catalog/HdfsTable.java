@@ -56,6 +56,7 @@ import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.PartitionKeyValue;
+import org.apache.impala.catalog.events.MetastoreEventsProcessor;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
@@ -1927,6 +1928,7 @@ public class HdfsTable extends Table implements FeFsTable {
       }
       partBuilders.add(partBuilder);
     }
+    long latestEventId = MetastoreEventsProcessor.getCurrentEventIdNoThrow(client);
     long fileMdLoadTime = loadFileMetadataForPartitions(client, partBuilders,
         /* isRefresh=*/false);
     for (HdfsPartition.Builder p : partBuilders) {
@@ -1935,7 +1937,12 @@ public class HdfsTable extends Table implements FeFsTable {
       } else {
         updatePartition(p);
       }
+      if (latestEventId > -1) {
+        p.setLastRefreshEventId(latestEventId);
+      }
     }
+    LOG.info("Setting the latest refresh event id to {} for the loaded partitions for "
+        + "the table {}", latestEventId, getFullName());
     return fileMdLoadTime;
   }
 
@@ -2895,13 +2902,7 @@ public class HdfsTable extends Table implements FeFsTable {
     FsPermissionCache permissionCache = new FsPermissionCache();
     Map<HdfsPartition.Builder, HdfsPartition> partBuilderToPartitions = new HashMap<>();
     Set<HdfsPartition.Builder> partBuildersFileMetadataRefresh = new HashSet<>();
-    long latestEventId = -1L;
-    try {
-      latestEventId = client.getCurrentNotificationEventId().getEventId();
-    } catch (TException exception) {
-      LOG.warn(String.format("Unable to fetch latest event id from HMS: %s",
-          exception.getMessage()));
-    }
+    long latestEventId = MetastoreEventsProcessor.getCurrentEventIdNoThrow(client);
     for (Map.Entry<Partition, HdfsPartition> entry : hmsPartsToHdfsParts.entrySet()) {
       Partition hmsPartition = entry.getKey();
       HdfsPartition oldPartition = entry.getValue();
@@ -2935,6 +2936,8 @@ public class HdfsTable extends Table implements FeFsTable {
       }
       partBuilderToPartitions.put(partBuilder, oldPartition);
     }
+    LOG.info("Setting the latest refresh event id to {} for the reloaded {} partitions",
+        latestEventId, partBuilderToPartitions.size());
     if (!partBuildersFileMetadataRefresh.isEmpty()) {
       LOG.info("for table {}, file metadataOps: {}, refreshing file metadata for {}"
               + " out of {} partitions to reload in reloadPartitions()", getFullName(),

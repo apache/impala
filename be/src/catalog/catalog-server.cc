@@ -138,6 +138,16 @@ DEFINE_string(file_metadata_reload_properties, "EXTERNAL, metadata_location,"
     "refresh file metadata when these properties are changed. To skip this optimization,"
     "set the value to empty string");
 
+DEFINE_bool(enable_skipping_older_events, false, "This configuration is used to skip any"
+    "older events in the event processor based on the lastRefreshEventId on the"
+    "database/table/partition in the cache. All the DML queries that change the metadata"
+    "in the catalogD's cache will update the lastRefreshEventId i.e.., fetch the latest"
+    "available event on HMS and set it on the object. In case the event processor is"
+    "lagging, the older events in event processor queue can be skipped by comparing the"
+    "current event id to that of lastRefreshEventId. The default is set to false to"
+    "disable the optimisation. Set this true to enable skipping the older events and"
+    "quickly catch with the events of HMS");
+
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_subscriber_port);
 DECLARE_int32(state_store_port);

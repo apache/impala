@@ -3207,6 +3207,50 @@ public class MetastoreEventsProcessorTest {
         catalog_.getHdfsPartition(TEST_DB_NAME, testTblName, partKeyVals2));
   }
 
+  /**
+   * Test verifies if lastRefreshEventId is updated or not after a table is refreshed
+   * This is useful for skipping older events in the event processor
+   * @throws Exception
+   */
+  @Test
+  public void testSkippingOlderEvents() throws Exception {
+    BackendConfig.INSTANCE.setEnableSyncToLatestEventOnDdls(true);
+    BackendConfig.INSTANCE.setSkippingOlderEvents(true);
+    createDatabase(TEST_DB_NAME, null);
+    final String testTblName = "testSkippingOlderEvents";
+    createTable(testTblName, true);
+    eventsProcessor_.processEvents();
+    AlterTableExecutor hiveExecutor = new HiveAlterTableExecutor(TEST_DB_NAME,
+        testTblName);
+    hiveExecutor.execute();
+    HdfsTable testTbl = (HdfsTable)catalog_.getOrLoadTable(TEST_DB_NAME, testTblName,
+        "test", null);
+    long lastSyncEventIdBefore = testTbl.getLastRefreshEventId();
+    alterTableAddParameter(testTblName, "somekey", "someval");
+    eventsProcessor_.processEvents();
+    assertEquals(testTbl.getLastRefreshEventId(), eventsProcessor_.getCurrentEventId());
+    assertTrue(testTbl.getLastRefreshEventId() > lastSyncEventIdBefore);
+    confirmTableIsLoaded(TEST_DB_NAME, testTblName);
+    final String testUnpartTblName = "testUnPartSkippingOlderEvents";
+    createTable(testUnpartTblName, false);
+    testInsertEvents(TEST_DB_NAME, testUnpartTblName, false);
+    testTbl = (HdfsTable)catalog_.getOrLoadTable(TEST_DB_NAME, testUnpartTblName,
+        "test", null);
+    eventsProcessor_.processEvents();
+    assertEquals(testTbl.getLastRefreshEventId(), eventsProcessor_.getCurrentEventId());
+    confirmTableIsLoaded(TEST_DB_NAME, testUnpartTblName);
+    // Verify older HMS events are skipped by doing refresh in Impala
+    alterTableAddCol(testUnpartTblName, "newCol", "string", "test new column");
+    testTbl = (HdfsTable)catalog_.getOrLoadTable(TEST_DB_NAME, testUnpartTblName,
+        "test", null);
+    lastSyncEventIdBefore = testTbl.getLastRefreshEventId();
+    catalog_.reloadTable(testTbl, "test");
+    eventsProcessor_.processEvents();
+    assertEquals(testTbl.getLastRefreshEventId(), eventsProcessor_.getCurrentEventId());
+    assertTrue(testTbl.getLastRefreshEventId() > lastSyncEventIdBefore);
+    confirmTableIsLoaded(TEST_DB_NAME, testTblName);
+  }
+
   private void createDatabase(String catName, String dbName,
       Map<String, String> params) throws TException {
     try(MetaStoreClient msClient = catalog_.getMetaStoreClient()) {

@@ -311,6 +311,70 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     EventProcessorUtils.wait_for_event_processing(self)
     assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
 
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--hms_event_polling_interval_s=5"
+                  " --enable_skipping_older_events=true"
+                  " --enable_sync_to_latest_event_on_ddls=true")
+  def test_skipping_older_events(self, unique_database):
+    """Test is to verify IMPALA-11535, event processor should ignore older events if the
+    current event id is older than the lastRefreshEventId on the table/partition
+    """
+    test_old_table = "test_old_table"
+
+    def verify_skipping_older_events(table_name, is_transactional, is_partitioned):
+      query = " ".join(["create", "transactional" if is_transactional else '',
+        "table {}.{} (i int)", "partitioned by (year int)" if is_partitioned else ''])
+      self.run_stmt_in_hive(query.format(unique_database, table_name))
+      values = "values (10),(20),(30)"
+      EventProcessorUtils.wait_for_event_processing(self)
+
+      def verify_skipping_hive_stmt_events(stmt, new_table_name):
+        tbl_events_skipped_before = EventProcessorUtils.get_num_skipped_events()
+        self.run_stmt_in_hive(stmt)
+        self.client.execute(
+          "refresh {}.{}".format(unique_database, new_table_name))
+        tables_refreshed_before = EventProcessorUtils.get_int_metric("tables-refreshed")
+        partitions_refreshed_before = \
+          EventProcessorUtils.get_int_metric("partitions-refreshed")
+        EventProcessorUtils.wait_for_event_processing(self)
+        tbl_events_skipped_after = EventProcessorUtils.get_num_skipped_events()
+        assert tbl_events_skipped_after > tbl_events_skipped_before
+        tables_refreshed_after = EventProcessorUtils.get_int_metric("tables-refreshed")
+        partitions_refreshed_after = \
+          EventProcessorUtils.get_int_metric("partitions-refreshed")
+        if is_partitioned:
+          assert partitions_refreshed_after == partitions_refreshed_before
+        else:
+          assert tables_refreshed_after == tables_refreshed_before
+
+      # test single insert event
+      query = " ".join(["insert into `{}`.`{}`", "partition (year=2023)"
+        if is_partitioned else '', values])
+      verify_skipping_hive_stmt_events(
+        query.format(unique_database, table_name), table_name)
+      # test batch insert events
+      query = " ".join(["insert into `{}`.`{}`", "partition (year=2023)"
+        if is_partitioned else '', values, ";"])
+      complete_query = ""
+      for _ in range(3):
+        complete_query += query.format(unique_database, table_name)
+      verify_skipping_hive_stmt_events(complete_query, table_name)
+      # Dynamic partitions test
+      query = " ".join(["create", "transactional" if is_transactional else '',
+        "table `{}`.`{}` (i int)",
+        "partitioned by (year int)" if is_partitioned else '', ";"])
+      complete_query = query.format(unique_database, "new_table")
+      complete_query += "insert overwrite table `{db}`.`{tbl1}` " \
+        "select * from `{db}`.`{tbl2}`"\
+        .format(db=unique_database, tbl1="new_table", tbl2=table_name)
+      verify_skipping_hive_stmt_events(complete_query, "new_table")
+      # Drop the tables before running another test
+      self.client.execute("drop table {}.{}".format(unique_database, table_name))
+      self.client.execute("drop table {}.{}".format(unique_database, "new_table"))
+    verify_skipping_older_events(test_old_table, False, False)
+    verify_skipping_older_events(test_old_table, True, False)
+    verify_skipping_older_events(test_old_table, False, True)
+    verify_skipping_older_events(test_old_table, True, True)
 
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=1")
   def test_commit_compaction_events(self, unique_database):
