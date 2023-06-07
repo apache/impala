@@ -249,12 +249,6 @@ redhat sudo yum install -y curl gawk gcc gcc-c++ git krb5-devel krb5-server \
         net-tools langpacks-en glibc-langpack-en libxml2-devel libxslt-devel \
         java-${REDHAT_JAVA_VERSION}-openjdk-src java-${REDHAT_JAVA_VERSION}-openjdk-devel
 
-# Enable the Powertools repo for snappy-devel on RedHat 8
-redhat8 sudo yum install -y dnf-plugins-core
-# Package repo IDs changed from mixed case to all-lowercase between Centos 8.2
-# and 8.3, so use globbing to cover both conventions
-redhat8 sudo yum install -y --enablerepo="[Pp]ower[Tt]ools*" snappy-devel
-
 # RedHat / CentOS 8 exposes only specific versions of Python.
 # Set up unversioned default Python 2.x for older CentOS versions
 redhat6 sudo yum install -y python-devel python-setuptools python-argparse
