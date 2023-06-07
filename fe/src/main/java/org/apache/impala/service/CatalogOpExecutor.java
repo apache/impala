@@ -6624,24 +6624,29 @@ public class CatalogOpExecutor {
     final Timer.Context context
         = table.getMetrics().getTimer(HdfsTable.CATALOG_UPDATE_DURATION_METRIC).time();
 
-    long transactionId = -1;
-    TblTransaction tblTxn = null;
-    if (update.isSetTransaction_id()) {
-      transactionId = update.getTransaction_id();
-      Preconditions.checkState(transactionId > 0);
-      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-         // Setup transactional parameters needed to do alter table/partitions later.
-         // TODO: Could be optimized to possibly save some RPCs, as these parameters are
-         //       not always needed + the writeId of the INSERT could be probably reused.
-         tblTxn = MetastoreShim.createTblTransaction(
-             msClient.getHiveClient(), table.getMetaStoreTable(), transactionId);
-      }
-    }
-
     try {
       // Get new catalog version for table in insert.
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
       catalog_.getLock().writeLock().unlock();
+
+      TblTransaction tblTxn = null;
+      if (update.isSetTransaction_id()) {
+        long transactionId = update.getTransaction_id();
+        Preconditions.checkState(transactionId > 0);
+        try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+          if (DebugUtils.hasDebugAction(update.getDebug_action(),
+              DebugUtils.UPDATE_CATALOG_ABORT_INSERT_TXN)) {
+            MetastoreShim.abortTransaction(msClient.getHiveClient(), transactionId);
+            LOG.info("Aborted txn due to the debug action.");
+          }
+          // Setup transactional parameters needed to do alter table/partitions later.
+          // TODO: Could be optimized to possibly save some RPCs, as these parameters are
+          //       not always needed + the writeId of the INSERT could be probably reused.
+          tblTxn = MetastoreShim.createTblTransaction(
+              msClient.getHiveClient(), table.getMetaStoreTable(), transactionId);
+        }
+      }
+
       // Collects the cache directive IDs of any cached table/partitions that were
       // targeted. A watch on these cache directives is submitted to the
       // TableLoadingMgr and the table will be refreshed asynchronously after all

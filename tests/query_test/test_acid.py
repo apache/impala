@@ -346,3 +346,17 @@ class TestAcid(ImpalaTestSuite):
     valid_write_ids = acid_util.get_valid_write_ids(db_name, tbl_name)
     new_write_id = valid_write_ids.tblValidWriteIds[0].writeIdHighWaterMark
     assert new_write_id > orig_write_id
+
+  @SkipIfHive2.acid
+  def test_alloc_write_id_error_handing(self, unique_database):
+    tbl_name = "insert_only_table"
+    self.client.execute("""CREATE TABLE {0}.{1} (i int)
+        TBLPROPERTIES('transactional'='true', 'transactional_properties'='insert_only')
+        """.format(unique_database, tbl_name))
+    self.execute_query_expect_failure(
+        self.client,
+        "INSERT INTO {0}.{1} VALUES (0), (1), (2)".format(unique_database, tbl_name),
+        {"debug_action": "catalogd_update_catalog_abort_txn"})
+    # Create a new table and load it in catalogd. Catalogd should not hang.
+    self.client.execute("CREATE TABLE {0}.tbl (i int)".format(unique_database))
+    self.client.execute("DESCRIBE {0}.tbl".format(unique_database))

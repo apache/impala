@@ -54,6 +54,26 @@ public class DebugUtils {
   // CatalogOpExecutor#updateCatalog() finishes.
   public static final String INSERT_FINISH_DELAY = "catalogd_insert_finish_delay";
 
+  // debug action label to abort the transaction in updateCatalog.
+  public static final String UPDATE_CATALOG_ABORT_INSERT_TXN =
+      "catalogd_update_catalog_abort_txn";
+
+  /**
+   * Returns true if the label of action is set in the debugActions
+   */
+  public static boolean hasDebugAction(String debugActions, String label) {
+    if (Strings.isNullOrEmpty(debugActions)) {
+      return false;
+    }
+    List<String> actions = Splitter.on('|').splitToList(debugActions);
+    for (String action : actions) {
+      List<String> components = Splitter.on(':').splitToList(action);
+      if (components.isEmpty()) continue;
+      if (components.get(0).equalsIgnoreCase(label)) return true;
+    }
+    return false;
+  }
+
   /**
    * Given list of debug actions, execute the debug action pertaining to the given label.
    * The debugActions string is of the format specified for the query_option/configuration
