@@ -45,6 +45,7 @@ import org.apache.impala.util.ExprUtil;
 import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
+import com.google.common.math.IntMath;
 import com.google.common.math.LongMath;
 
 /**
@@ -343,28 +344,25 @@ abstract public class ScanNode extends PlanNode {
   }
 
   /**
-   * Given effectiveScanRangeCount, compute processing cost of this scan node.
+   * Compute processing cost of this scan node.
    * <p>
    * This method does not mutate any state of the scan node object, including
    * the processingCost_ field. Caller must set processingCost_ themself with
    * the return value of this method.
    */
-  protected ProcessingCost computeScanProcessingCost(
-      TQueryOptions queryOptions, long effectiveScanRangeCount) {
-    ProcessingCost cardinalityBasedCost = ProcessingCost.basicCost(getDisplayLabel(),
-        getInputCardinality(), ExprUtil.computeExprsTotalCost(conjuncts_),
-        rowMaterializationCost(effectiveScanRangeCount));
+  protected ProcessingCost computeScanProcessingCost(TQueryOptions queryOptions) {
+    Preconditions.checkArgument(queryOptions.isCompute_processing_cost());
+    ProcessingCost cardinalityBasedCost =
+        ProcessingCost.basicCost(getDisplayLabel(), getInputCardinality(),
+            ExprUtil.computeExprsTotalCost(conjuncts_), rowMaterializationCost());
 
-    int maxScannerThreads = (int) Math.min(effectiveScanRangeCount, Integer.MAX_VALUE);
-    if (ProcessingCost.isComputeCost(queryOptions)) {
-      // maxThread calculation below intentionally does not include core count from
-      // executor group config. This is to allow scan fragment parallelism to scale
-      // regardless of the core count limit.
-      int maxThreads = Math.max(queryOptions.getProcessing_cost_min_threads(),
-          queryOptions.getMax_fragment_instances_per_node());
-      maxScannerThreads = (int) Math.min(
-          maxScannerThreads, LongMath.saturatedMultiply(getNumNodes(), maxThreads));
-    }
+    // maxThread calculation below intentionally does not include core count from
+    // executor group config. This is to allow scan fragment parallelism to scale
+    // regardless of the core count limit.
+    int maxThreadsPerNode = Math.max(queryOptions.getProcessing_cost_min_threads(),
+        queryOptions.getMax_fragment_instances_per_node());
+    int maxScannerThreads = (int) Math.min(getEffectiveNumScanRanges(),
+        IntMath.saturatedMultiply(getNumNodes(), maxThreadsPerNode));
 
     if (getInputCardinality() == 0) {
       Preconditions.checkState(cardinalityBasedCost.getTotalCost() == 0,
@@ -391,19 +389,18 @@ abstract public class ScanNode extends PlanNode {
 
   /**
    * Estimate per-row cost as 1 per 1KB row size plus
-   * (0.5% * min_processing_per_thread) for every scan ranges.
+   * (scan_range_cost_factor * min_processing_per_thread) for every scan ranges.
    * <p>
    * This reflects deserialization/copy cost per row and scan range open cost.
-   * (0.5% * min_processing_per_thread) for every scan ranges roughly means that one scan
-   * node instance will handle at most 200 scan ranges.
    */
-  private float rowMaterializationCost(long effectiveScanRangeCount) {
+  private float rowMaterializationCost() {
     float perRowCost = getAvgRowSize() / 1024;
     if (getInputCardinality() <= 0) return perRowCost;
 
-    float perScanRangeCost = BackendConfig.INSTANCE.getMinProcessingPerThread() * 0.005f
-        / getInputCardinality() * effectiveScanRangeCount;
-    return perRowCost + perScanRangeCost;
+    float scanRangeCostPerRow = BackendConfig.INSTANCE.getMinProcessingPerThread()
+        * BackendConfig.INSTANCE.getScanRangeCostFactor() / getInputCardinality()
+        * getEffectiveNumScanRanges();
+    return perRowCost + scanRangeCostPerRow;
   }
 
   /**
@@ -420,10 +417,8 @@ abstract public class ScanNode extends PlanNode {
 
   public ExprSubstitutionMap getOptimizedAggSmap() { return optimizedAggSmap_; }
 
-  /**
-   * Return maximum number of scanner thread, rounded up to next multiple of numNodes.
-   */
-  protected int getMaxScannerThreads(int numNodes) {
-    return processingCost_.getNumInstanceMax(numNodes);
+  protected long getEffectiveNumScanRanges() {
+    Preconditions.checkNotNull(scanRangeSpecs_);
+    return scanRangeSpecs_.getConcrete_rangesSize();
   }
 }

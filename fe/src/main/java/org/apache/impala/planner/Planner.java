@@ -491,7 +491,7 @@ public class Planner {
   public static void computeProcessingCost(
       List<PlanFragment> planRoots, TQueryExecRequest request, PlannerContext planCtx) {
     Analyzer rootAnalyzer = planCtx.getRootAnalyzer();
-    if (!ProcessingCost.isComputeCost(rootAnalyzer.getQueryOptions())) {
+    if (!rootAnalyzer.getQueryOptions().isCompute_processing_cost()) {
       request.setCores_required(-1);
       return;
     }

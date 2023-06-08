@@ -148,7 +148,6 @@ import org.apache.impala.hooks.QueryEventHookManager;
 import org.apache.impala.planner.HdfsScanNode;
 import org.apache.impala.planner.PlanFragment;
 import org.apache.impala.planner.Planner;
-import org.apache.impala.planner.ProcessingCost;
 import org.apache.impala.planner.ScanNode;
 import org.apache.impala.thrift.TAlterDbParams;
 import org.apache.impala.thrift.TBackendGflags;
@@ -2028,7 +2027,7 @@ public class Frontend {
 
     // Capture the current state.
     planCtx.compilationState_.captureState();
-    boolean isComputeCost = ProcessingCost.isComputeCost(queryOptions);
+    boolean isComputeCost = queryOptions.isCompute_processing_cost();
 
     if (isComputeCost) {
       FrontendProfile.getCurrent().setToCounter(CPU_COUNT_DIVISOR, TUnit.DOUBLE_VALUE,

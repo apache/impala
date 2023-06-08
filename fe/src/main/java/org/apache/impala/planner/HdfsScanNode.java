@@ -2112,8 +2112,7 @@ public class HdfsScanNode extends ScanNode {
   @Override
   public void computeProcessingCost(TQueryOptions queryOptions) {
     Preconditions.checkNotNull(scanRangeSpecs_);
-    processingCost_ =
-        computeScanProcessingCost(queryOptions, getEffectiveNumScanRanges());
+    processingCost_ = computeScanProcessingCost(queryOptions);
   }
 
   @Override
@@ -2496,6 +2495,7 @@ public class HdfsScanNode extends ScanNode {
    * Return the number of scan ranges when considering MAX_SCAN_RANGE_LENGTH option.
    * computeScanRangeLocations() must be called before calling this.
    */
+  @Override
   public long getEffectiveNumScanRanges() {
     Preconditions.checkNotNull(scanRangeSpecs_);
     Preconditions.checkState(

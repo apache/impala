@@ -42,9 +42,6 @@ CPU_TEST_QUERY = "select * from tpcds_parquet.store_sales where ss_item_sk = 1 l
 GROUPING_TEST_QUERY = ("select ss_item_sk from tpcds_parquet.store_sales"
     " group by (ss_item_sk) order by ss_item_sk limit 10")
 
-# A query to test behavior of child queries.
-COMPUTE_STATS_QUERY = "COMPUTE STATS tpcds_parquet.store_sales"
-
 DEFAULT_RESOURCE_POOL = "default-pool"
 
 
@@ -936,24 +933,49 @@ class TestExecutorGroups(CustomClusterTestSuite):
         ["Executor Group: root.small-group", "EffectiveParallelism: 11",
          "ExecutorGroupsConsidered: 2"])
 
+    # Unset MT_DOP
+    self._set_query_options({'MT_DOP': '0'})
+
+    # Create small table based on tpcds_parquet.store_sales that will be used later
+    # for COMPUTE STATS test.
+    self._run_query_and_verify_profile(
+      ("create table {0}.{1} partitioned by (ss_sold_date_sk) as "
+       "select ss_sold_time_sk, ss_net_paid_inc_tax, ss_net_profit, ss_sold_date_sk "
+       "from tpcds_parquet.store_sales where ss_sold_date_sk < 2452184"
+       ).format(unique_database, "store_sales_subset"),
+      ["Executor Group: root.small", "ExecutorGroupsConsidered: 2",
+       "Verdict: Match", "CpuAsk: 10"])
+
+    compute_stats_query = ("compute stats {0}.{1}").format(
+        unique_database, "store_sales_subset")
+
+    # Test that child queries unset REQUEST_POOL that was set by Frontend planner for
+    # parent query. One child queries should run in root.small, and another one in
+    # root.large.
+    self._verify_total_admitted_queries("root.small", 3)
+    self._verify_total_admitted_queries("root.large", 1)
+    self._run_query_and_verify_profile(compute_stats_query,
+        ["ExecutorGroupsConsidered: 1",
+         "Verdict: Assign to first group because query is not auto-scalable"],
+        ["Executor Group:"])
+    self._verify_total_admitted_queries("root.small", 4)
+    self._verify_total_admitted_queries("root.large", 2)
+
+    # Test that child queries follow REQUEST_POOL that was set by client.
+    # Two child queries should all run in root.large.
+    self._set_query_options({'REQUEST_POOL': 'root.large'})
+    self._run_query_and_verify_profile(compute_stats_query,
+        ["ExecutorGroupsConsidered: 1",
+         "Verdict: Assign to first group because query is not auto-scalable"],
+        ["Executor Group:"])
+    self._verify_total_admitted_queries("root.large", 4)
+
     # Test that REQUEST_POOL will override executor group selection
-    self._set_query_options({
-      'MT_DOP': '0',
-      'REQUEST_POOL': 'root.large'})
     self._run_query_and_verify_profile(CPU_TEST_QUERY,
         ["Executor Group: root.large-group",
          ("Verdict: query option REQUEST_POOL=root.large is set. "
           "Memory and cpu limit checking is skipped."),
          "EffectiveParallelism: 13", "ExecutorGroupsConsidered: 1"])
-
-    # Test that child queries follow REQUEST_POOL that was set by client.
-    # Two child queries should all run in root.large.
-    self._verify_total_admitted_queries("root.large", 2)
-    self._run_query_and_verify_profile(COMPUTE_STATS_QUERY,
-        ["ExecutorGroupsConsidered: 1",
-         "Verdict: Assign to first group because query is not auto-scalable"],
-        ["Executor Group:"])
-    self._verify_total_admitted_queries("root.large", 4)
 
     # Test setting REQUEST_POOL and disabling COMPUTE_PROCESSING_COST
     self._set_query_options({
@@ -970,18 +992,6 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self._set_query_options({
       'REQUEST_POOL': '',
       'COMPUTE_PROCESSING_COST': 'true'})
-
-    # Test that child queries unset REQUEST_POOL that was set by Frontend planner for
-    # parent query. One child queries should run in root.small, and another one in
-    # root.large.
-    self._verify_total_admitted_queries("root.small", 2)
-    self._verify_total_admitted_queries("root.large", 5)
-    self._run_query_and_verify_profile(COMPUTE_STATS_QUERY,
-        ["ExecutorGroupsConsidered: 1",
-         "Verdict: Assign to first group because query is not auto-scalable"],
-        ["Executor Group:"])
-    self._verify_total_admitted_queries("root.small", 3)
-    self._verify_total_admitted_queries("root.large", 6)
 
     # Test that GROUPING_TEST_QUERY will get assigned to the large group.
     self._run_query_and_verify_profile(GROUPING_TEST_QUERY,
@@ -1153,7 +1163,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self._verify_query_num_for_resource_pool("root.small", 4)
     self._verify_query_num_for_resource_pool("root.tiny", 4)
     self._verify_query_num_for_resource_pool("root.large", 12)
-    self._verify_total_admitted_queries("root.small", 4)
+    self._verify_total_admitted_queries("root.small", 5)
     self._verify_total_admitted_queries("root.tiny", 6)
     self._verify_total_admitted_queries("root.large", 16)
 
@@ -1223,14 +1233,14 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self._set_query_options({'COMPUTE_PROCESSING_COST': 'true'})
     self._run_query_and_verify_profile(GROUPING_TEST_QUERY,
         ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
-          "Verdict: Match", "CpuAsk: 12"])
+          "Verdict: Match", "CpuAsk: 15"])
 
     # Test that high_scan_cost_query will get assigned to the large group.
     high_scan_cost_query = ("SELECT ss_item_sk FROM tpcds_parquet.store_sales "
         "WHERE ss_item_sk < 1000000 GROUP BY ss_item_sk LIMIT 10")
     self._run_query_and_verify_profile(high_scan_cost_query,
         ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
-          "Verdict: Match", "CpuAsk: 15"])
+          "Verdict: Match", "CpuAsk: 18"])
 
     # Test that high_scan_cost_query will get assigned to the small group
     # if MAX_FRAGMENT_INSTANCES_PER_NODE is limited to 1.

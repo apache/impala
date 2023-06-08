@@ -60,7 +60,7 @@ public abstract class DataSink {
     if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
       output.append(detailPrefix);
       output.append(resourceProfile_.getExplainString());
-      if (ProcessingCost.isComputeCost(queryOptions)) {
+      if (queryOptions.isCompute_processing_cost()) {
         // Show processing cost total.
         output.append(" cost=");
         if (processingCost_.isValid()) {

@@ -407,4 +407,8 @@ public class BackendConfig {
   public void setFileMetadataReloadProperties(String newPropertiesConfig) {
     backendCfg_.file_metadata_reload_properties = newPropertiesConfig;
   }
+
+  public float getScanRangeCostFactor() {
+    return (float) backendCfg_.scan_range_cost_factor;
+  }
 }

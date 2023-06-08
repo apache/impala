@@ -96,10 +96,6 @@ public abstract class ProcessingCost implements Cloneable {
     return processingCost;
   }
 
-  public static boolean isComputeCost(TQueryOptions queryOptions) {
-    return queryOptions.isCompute_processing_cost();
-  }
-
   /**
    * Merge multiple ProcessingCost into a single new ProcessingCost.
    * <p>

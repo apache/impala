@@ -224,6 +224,13 @@ DEFINE_int64_hidden(min_processing_per_thread, 10000000,
     "number of cores in selected executor group, MT_DOP, or PROCESSING_COST_MIN_THREAD "
     "query option. Must be a positive integer. Default to 10M.");
 
+// TODO: Benchmark and tune this config with an optimal value.
+DEFINE_double_hidden(scan_range_cost_factor, 0.005,
+    "(Advance) Cost factor associated with processing one scan range. Combined with "
+    "min_processing_per_thread flag, this flag define the cost to process one scan range "
+    "as (scan_range_cost_factor * min_processing_per_thread). Default to 0.005, which "
+    "roughly means that one scan node instance will handle at most 200 scan ranges.");
+
 DEFINE_bool_hidden(skip_resource_checking_on_last_executor_group_set, true,
     "(Advance) If true, memory and cpu resource checking will be skipped when a query "
     "is being planned against the last (largest) executor group set. Setting true will "
@@ -411,6 +418,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
       FLAGS_skip_resource_checking_on_last_executor_group_set);
   cfg.__set_file_metadata_reload_properties(FLAGS_file_metadata_reload_properties);
   cfg.__set_thrift_rpc_max_message_size(FLAGS_thrift_rpc_max_message_size);
+  cfg.__set_scan_range_cost_factor(FLAGS_scan_range_cost_factor);
   return Status::OK();
 }
 

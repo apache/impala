@@ -656,9 +656,7 @@ public class HBaseScanNode extends ScanNode {
 
   @Override
   public void computeProcessingCost(TQueryOptions queryOptions) {
-    Preconditions.checkNotNull(scanRangeSpecs_);
-    processingCost_ =
-        computeScanProcessingCost(queryOptions, scanRangeSpecs_.getConcrete_rangesSize());
+    processingCost_ = computeScanProcessingCost(queryOptions);
   }
 
   @Override

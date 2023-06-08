@@ -192,7 +192,7 @@ public class DistributedPlanner {
       PlanFragment inputFragment, InsertStmt insertStmt, Analyzer analyzer,
       List<PlanFragment> fragments)
       throws ImpalaException {
-    boolean isComputeCost = ProcessingCost.isComputeCost(analyzer.getQueryOptions());
+    boolean isComputeCost = analyzer.getQueryOptions().isCompute_processing_cost();
     boolean enforce_hdfs_writer_limit = insertStmt.getTargetTable() instanceof FeFsTable
         && (analyzer.getQueryOptions().getMax_fs_writers() > 0 || isComputeCost);
 
@@ -271,9 +271,8 @@ public class DistributedPlanner {
         // to help estimate the scan parallelism.
         int maxScanThread = 1;
         for (HdfsScanNode scanNode : hdfsScanNodes) {
-          long totalScanRange = scanNode.getEffectiveNumScanRanges();
-          ProcessingCost scanCost = scanNode.computeScanProcessingCost(
-              analyzer.getQueryOptions(), totalScanRange);
+          ProcessingCost scanCost =
+              scanNode.computeScanProcessingCost(analyzer.getQueryOptions());
           maxScanThread = Math.max(
               maxScanThread, scanCost.getNumInstanceMax(inputFragment.getNumNodes()));
         }
@@ -571,8 +570,7 @@ public class DistributedPlanner {
         // because it must be broadcast once per instance.
         long dataPayload = rhsDataSize * leftChildNodes;
         long hashTblBuildCost = dataPayload;
-        if (mt_dop > 1 && ctx_.getQueryOptions().use_dop_for_costing
-            && !ProcessingCost.isComputeCost(ctx_.getQueryOptions())) {
+        if (mt_dop > 1 && ctx_.getQueryOptions().use_dop_for_costing) {
           // In the broadcast join a single thread per node is building the hash
           // table of size N compared to the partition case where m threads are
           // building hash tables of size N/m each (assuming uniform distribution).
@@ -582,9 +580,9 @@ public class DistributedPlanner {
           // growth (a tunable parameter). We use the sqrt to model a non-linear
           // function since the slowdown with broadcast is not exactly linear.
           // TODO: more analysis is needed to establish an accurate correlation.
-          // TODO: this cost calculation is disabled if COMPUTE_PROCESSING_COST=true
-          // since num instances might change after plan created during
-          // Planner.computeProcessingCost() later. Need to find way to enable this back.
+          // TODO: revisit this calculation if COMPUTE_PROCESSING_COST=true.
+          //   Num instances might change during Planner.computeProcessingCost(),
+          //   later after parallel plan created.
           PlanNode leftPlanRoot = leftChildFragment.getPlanRoot();
           int actual_dop = leftPlanRoot.getNumInstances()/leftPlanRoot.getNumNodes();
           hashTblBuildCost *= (long) (ctx_.getQueryOptions().broadcast_to_partition_factor

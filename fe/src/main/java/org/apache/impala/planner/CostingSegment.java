@@ -190,10 +190,7 @@ public class CostingSegment extends TreeNode<CostingSegment> {
 
     ProcessingCost.tryAdjustConsumerParallelism(
         nodeStepCount, minParallelism, maxParallelism, producerCost, cost_);
-    newParallelism = cost_.getNumInstancesExpected();
-    Preconditions.checkState(newParallelism >= minParallelism,
-        "originalParallelism=" + originalParallelism + ". newParallelism="
-            + newParallelism + " < minParallelism=" + minParallelism);
+    newParallelism = Math.max(newParallelism, cost_.getNumInstancesExpected());
     Preconditions.checkState(newParallelism <= maxParallelism,
         "originalParallelism=" + originalParallelism + ". newParallelism="
             + newParallelism + " > maxParallelism=" + maxParallelism);

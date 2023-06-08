@@ -347,7 +347,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       expBuilder.append(nodeResourceProfile_.getExplainString());
       expBuilder.append("\n");
 
-      if (ProcessingCost.isComputeCost(queryOptions) && processingCost_.isValid()
+      if (queryOptions.isCompute_processing_cost() && processingCost_.isValid()
           && detailLevel.ordinal() >= TExplainLevel.VERBOSE.ordinal()) {
         // Print processing cost.
         expBuilder.append(processingCost_.getExplainString(detailPrefix, false));
@@ -373,7 +373,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
           .append(PrintUtils.printBytes(Math.round(avgRowSize_)))
           .append(" cardinality=")
           .append(PrintUtils.printEstCardinality(cardinality_));
-      if (ProcessingCost.isComputeCost(queryOptions)) {
+      if (queryOptions.isCompute_processing_cost()) {
         // Show processing cost total.
         expBuilder.append(" cost=");
         if (processingCost_.isValid()) {

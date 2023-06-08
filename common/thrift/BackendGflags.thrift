@@ -254,4 +254,6 @@ struct TBackendGflags {
   111: required i32 thrift_rpc_max_message_size
 
   112: required string file_metadata_reload_properties
+
+  113: required double scan_range_cost_factor
 }
