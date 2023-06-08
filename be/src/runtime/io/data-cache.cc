@@ -226,7 +226,7 @@ class DataCache::CacheFile {
   // Close the underlying file and delete it from the filesystem.
   void DeleteFile() {
     Close();
-    if (readonly_) return;
+    if (readonly_.Load()) return;
     DCHECK(!file_);
     kudu::Status status = kudu::Env::Default()->DeleteFile(path_);
     if (!status.ok()) {
@@ -280,10 +280,10 @@ class DataCache::CacheFile {
   bool Write(int64_t offset, const uint8_t* buffer, int64_t buffer_len) {
     DCHECK_EQ(offset % PAGE_SIZE, 0);
     DCHECK_LE(offset, current_offset_.Load());
-    if (UNLIKELY(readonly_)) return false;
+    if (UNLIKELY(readonly_.Load())) return false;
     // Hold the lock in shared mode to check if 'file_' is not closed already.
     kudu::shared_lock<rw_spinlock> lock(lock_.get_lock());
-    if (UNLIKELY(!file_ || readonly_)) return false;
+    if (UNLIKELY(!file_ || readonly_.Load())) return false;
     DCHECK_LE(offset + buffer_len, current_offset_.Load());
     kudu::Status status = file_->Write(offset, Slice(buffer, buffer_len));
     if (UNLIKELY(!status.ok())) {
@@ -297,10 +297,10 @@ class DataCache::CacheFile {
   void PunchHole(int64_t offset, int64_t hole_size) {
     DCHECK_EQ(offset % PAGE_SIZE, 0);
     DCHECK_EQ(hole_size % PAGE_SIZE, 0);
-    if (UNLIKELY(readonly_)) return;
+    if (UNLIKELY(readonly_.Load())) return;
     // Hold the lock in shared mode to check if 'file_' is not closed already.
     kudu::shared_lock<rw_spinlock> lock(lock_.get_lock());
-    if (UNLIKELY(!file_ || readonly_)) return;
+    if (UNLIKELY(!file_ || readonly_.Load())) return;
     DCHECK_LE(offset + hole_size, current_offset_.Load());
     kudu::Status status = file_->PunchHole(offset, hole_size);
     if (UNLIKELY(!status.ok())) {
@@ -321,13 +321,19 @@ class DataCache::CacheFile {
   }
 
   void SetReadOnly() {
-    readonly_ = true;
+    // Setting this without holding a lock tells other threads not to start new
+    // modifications.
+    readonly_.Store(true);
+    // Other threads get lock_ in shared mode for critical sections. Getting this
+    // in exclusive mode forces this thread to wait until all other threads have
+    // left their critical sections. That means that no writes should happen after
+    // this function returns (until RevokeReadOnly() runs).
     std::unique_lock<percpu_rwlock> lock(lock_);
   }
 
   void RevokeReadOnly() {
-    std::unique_lock<percpu_rwlock> lock(lock_);
-    readonly_ = false;
+    // Going from readonly to read/write doesn't need a full lock
+    readonly_.Store(false);
   }
 
   int64_t mtime() {
@@ -357,18 +363,18 @@ class DataCache::CacheFile {
   bool allow_append_ = true;
 
   /// The backing file cannot be written or punched hole if this is true.
-  bool readonly_ = false;
+  AtomicBool readonly_{false};
 
   /// The current offset in the file to append to on next insert.
   AtomicInt64 current_offset_;
 
   /// This is a reader-writer lock used for synchronization with the deleter thread.
-  /// It is taken in write mode in Close()/SetReadOnly()/RevokeReadOnly() and shared mode
+  /// It is taken in write mode in Close()/SetReadOnly() and shared mode
   /// everywhere else. It's expected that all places except for
-  /// Close()/SetReadOnly()/RevokeReadOnly() check that 'file_' is not NULL with the lock
-  /// held in shared mode while Close() ensures that no thread is holding the lock in
+  /// Close()/SetReadOnly() check that 'file_' is not NULL with the lock held in
+  /// shared mode while Close() ensures that no thread is holding the lock in
   /// shared mode so it's safe to close the file. The file can no longer be read, written
-  /// or hole punched after it has been closed. The only operation allowed is to deletion.
+  /// or hole punched after it has been closed. The only operation allowed is deletion.
   percpu_rwlock lock_;
 
   /// C'tor of CacheFile to be called by Create() only.
@@ -1354,7 +1360,7 @@ bool DataCache::Store(const string& filename, int64_t mtime, int64_t offset,
   DCHECK(!partitions_.empty());
 
   // Check early that the cache is read-only.
-  if (UNLIKELY(readonly_)) return false;
+  if (UNLIKELY(readonly_.Load())) return false;
 
   // Bail out early for uncacheable ranges or invalid requests.
   if (mtime < 0 || offset < 0 || buffer_len < 0) {
@@ -1381,14 +1387,16 @@ Status DataCache::CloseFilesAndVerifySizes() {
 }
 
 int64_t DataCache::SetDataCacheReadOnly() {
-  if (readonly_) return ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_NUM_WRITES->GetValue();
+  if (readonly_.Load()) {
+    return ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_NUM_WRITES->GetValue();
+  }
 
   // First set the read-only flag to reject new writes. The exclusive lock is then
   // acquired, because the shared lock will be acquired before any writes begin, so it
   // blocks here until all ongoing writes have completed and all shared lock has been
   // released. This ensures that there will be no more change to the cache after the
   // function returns.
-  readonly_ = true;
+  readonly_.Store(true);
   std::unique_lock<shared_mutex> lock(readonly_lock_);
   for (auto& partition : partitions_) {
     partition->SetCacheFilesReadOnly();
@@ -1398,13 +1406,15 @@ int64_t DataCache::SetDataCacheReadOnly() {
 }
 
 int64_t DataCache::RevokeDataCacheReadOnly() {
-  if (!readonly_) return ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_NUM_WRITES->GetValue();
+  if (!readonly_.Load()) {
+    return ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_NUM_WRITES->GetValue();
+  }
 
   std::unique_lock<shared_mutex> lock(readonly_lock_);
   for (auto& partition : partitions_) {
     partition->RevokeCacheFilesReadOnly();
   }
-  readonly_ = false;
+  readonly_.Store(false);
 
   return ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_NUM_WRITES->GetValue();
 }
@@ -1478,7 +1488,7 @@ bool DataCache::StoreInternal(const CacheKey& key, const uint8_t* buffer,
   // SetDataCacheReadOnly(). Therefore, when setting the read-only status, the lock
   // acquisition here can quickly fail, then return.
   kudu::shared_lock<shared_mutex> lock(readonly_lock_, std::try_to_lock);
-  if (UNLIKELY(!lock.owns_lock() || readonly_)) return false;
+  if (UNLIKELY(!lock.owns_lock() || readonly_.Load())) return false;
 
   int idx = key.Hash() % partitions_.size();
   bool start_reclaim;

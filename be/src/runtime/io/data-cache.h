@@ -452,7 +452,7 @@ class DataCache {
   boost::shared_mutex readonly_lock_;
 
   /// Store() will return false immediately if this is true.
-  bool readonly_ = false;
+  AtomicBool readonly_{false};
 
   /// The set of all cache partitions.
   std::vector<std::unique_ptr<Partition>> partitions_;
