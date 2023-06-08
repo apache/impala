@@ -135,6 +135,7 @@ class DataCacheBaseTest : public testing::Test {
     vector<unique_ptr<Thread>> threads;
     int num_misses[NUM_THREADS];
     int64_t write_times_us[NUM_THREADS];
+    int64_t num_writes = 0;
     for (int i = 0; i < NUM_THREADS; ++i) {
       unique_ptr<Thread> thread;
       num_misses[i] = 0;
@@ -144,13 +145,12 @@ class DataCacheBaseTest : public testing::Test {
              use_per_thread_filename ? thread_name : "", cache, max_start_offset,
              &barrier, &num_misses[i], &write_times_us[i]), &thread));
       threads.emplace_back(std::move(thread));
-    }
-
-    int64_t num_writes = 0;
-    if (test_readonly) {
-      // Set read-only before the writes are complete, and record the total write count of
-      // the cache after read-only set.
-      num_writes = cache->SetDataCacheReadOnly();
+      // If testing read only, set it read only after starting half of the threads.
+      if (i == (NUM_THREADS / 2) && test_readonly) {
+        // Set read-only before the writes are complete, and record the total write count
+        // of the cache after read-only set.
+        num_writes = cache->SetDataCacheReadOnly();
+      }
     }
 
     int cache_misses = 0;
