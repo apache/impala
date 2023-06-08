@@ -1,0 +1,15 @@
+====
+---- QUERY
+# Time travel query that tickles bug IMPALA-12197.
+create table iceberg_flights (uniquecarrier string) partitioned by (year int) stored as iceberg;
+create table iceberg_airlines (code string) stored as iceberg;
+insert into iceberg_flights(uniquecarrier, year) values('ba', 1966);
+insert into iceberg_airlines(code) values('ba');
+WITH dist_flights AS
+( SELECT DISTINCT f1.uniquecarrier AS carrier FROM iceberg_flights FOR SYSTEM_TIME AS OF '2040-12-31 00:00:00.000' f1)
+SELECT * FROM dist_flights JOIN iceberg_airlines a ON dist_flights.carrier = a.code;
+---- RESULTS
+'ba','ba'
+---- TYPES
+STRING,STRING
+====

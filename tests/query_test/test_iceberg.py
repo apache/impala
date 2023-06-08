@@ -641,6 +641,9 @@ class TestIcebergTable(IcebergTestSuite):
       except Exception as e:
         assert "Cannot find a snapshot older than" in str(e)
 
+  def test_time_travel_queries(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-time-travel', vector, use_db=unique_database)
+
   @SkipIf.not_dfs
   def test_strings_utf8(self, vector, unique_database):
     # Create table

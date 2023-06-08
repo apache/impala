@@ -75,8 +75,7 @@ public class IcebergTimeTravelTable
   // The Time Travel parameters that control the schema for the table.
   private final TimeTravelSpec timeTravelSpec_;
 
-  // colsByPos[i] refers to the ith column in the table. The first numClusteringCols are
-  // the clustering columns.
+  // colsByPos[i] refers to the ith column in the table.
   protected final ArrayList<Column> colsByPos_ = new ArrayList<>();
 
   // map from lowercase column name to Column object.
@@ -154,6 +153,12 @@ public class IcebergTimeTravelTable
   @Override // FeTable
   public List<Column> getNonClusteringColumns() {
     return colsByPos_;
+  }
+
+  @Override
+  public boolean isClusteringColumn(Column c) {
+    Preconditions.checkArgument(colsByPos_.get(c.getPosition()) == c);
+    return false;
   }
 
   @Override
