@@ -42,6 +42,7 @@ from tests.common.impala_cluster import (ImpalaCluster, DEFAULT_BEESWAX_PORT,
     DEFAULT_STATE_STORE_SUBSCRIBER_PORT, DEFAULT_IMPALAD_WEBSERVER_PORT,
     DEFAULT_STATESTORED_WEBSERVER_PORT, DEFAULT_CATALOGD_WEBSERVER_PORT,
     DEFAULT_ADMISSIOND_WEBSERVER_PORT, DEFAULT_CATALOGD_JVM_DEBUG_PORT,
+    DEFAULT_CATALOG_SERVICE_PORT, DEFAULT_CATALOGD_STATE_STORE_SUBSCRIBER_PORT,
     DEFAULT_EXTERNAL_FE_PORT, DEFAULT_IMPALAD_JVM_DEBUG_PORT,
     find_user_processes, run_daemon)
 
@@ -151,6 +152,10 @@ parser.add_option("--geospatial_library", dest="geospatial_library",
                   action="store", default="HIVE_ESRI",
                   help="Sets which implementation of geospatial libraries should be "
                   "initialized")
+parser.add_option("--enable_catalogd_ha", dest="enable_catalogd_ha",
+                  action="store_true", default=False,
+                  help="If true, enables CatalogD HA - the cluster will be launched "
+                  "with two catalogd instances as Active-Passive HA pair.")
 
 # For testing: list of comma-separated delays, in milliseconds, that delay impalad catalog
 # replica initialization. The ith delay is applied to the ith impalad.
@@ -285,6 +290,32 @@ def impalad_service_name(i):
     return "impalad_node{node_num}".format(node_num=i)
 
 
+def choose_catalogd_ports(instance_num):
+  """Compute the ports for catalogd instance num 'instance_num', returning as a map
+  from the argument name to the port number."""
+  return {'catalog_service_port': DEFAULT_CATALOG_SERVICE_PORT + instance_num,
+          'state_store_subscriber_port':
+              DEFAULT_CATALOGD_STATE_STORE_SUBSCRIBER_PORT + instance_num,
+          'webserver_port': DEFAULT_CATALOGD_WEBSERVER_PORT + instance_num}
+
+
+def build_catalogd_port_args(instance_num):
+  CATALOGD_PORTS = (
+      "-catalog_service_port={catalog_service_port} "
+      "-state_store_subscriber_port={state_store_subscriber_port} "
+      "-webserver_port={webserver_port}")
+  return CATALOGD_PORTS.format(**choose_catalogd_ports(instance_num))
+
+
+def catalogd_service_name(i):
+  """Return the name to use for the ith catalog daemon in the cluster."""
+  if i == 0:
+    # The first catalogd always logs to catalogd.INFO
+    return "catalogd"
+  else:
+    return "catalogd_node{node_num}".format(node_num=i)
+
+
 def combine_arg_list_opts(opt_args):
   """Helper for processing arguments like impalad_args. The input is a list of strings,
   each of which is the string passed into one instance of the argument, e.g. for
@@ -295,18 +326,32 @@ def combine_arg_list_opts(opt_args):
   return list(itertools.chain(*[shlex.split(arg) for arg in opt_args]))
 
 
-def build_statestored_arg_list():
+def build_statestored_arg_list(enable_catalogd_ha):
   """Build a list of command line arguments to pass to the statestored."""
-  return (build_logging_args("statestored") + build_kerberos_args("statestored") +
-      combine_arg_list_opts(options.state_store_args))
+  args = (build_logging_args("statestored") + build_kerberos_args("statestored")
+      + combine_arg_list_opts(options.state_store_args))
+  if (enable_catalogd_ha):
+    args.extend(["-enable_catalogd_ha=true"])
+  return args
 
 
-def build_catalogd_arg_list():
-  """Build a list of command line arguments to pass to the catalogd."""
-  return (build_logging_args("catalogd") +
-      ["-kudu_master_hosts", options.kudu_master_hosts] +
-      build_kerberos_args("catalogd") +
-      combine_arg_list_opts(options.catalogd_args))
+def build_catalogd_arg_list(num_catalogd, enable_catalogd_ha, remap_ports):
+  """Build a list of command line arguments to pass to the catalogd.
+  Build args for two catalogd instances if catalogd HA is enabled."""
+  catalogd_arg_list = []
+  for i in range(num_catalogd):
+    service_name = catalogd_service_name(i)
+    args = (build_logging_args(service_name)
+        + ["-kudu_master_hosts", options.kudu_master_hosts]
+        + build_kerberos_args("catalogd")
+        + combine_arg_list_opts(options.catalogd_args))
+    if remap_ports:
+      catalogd_port_args = build_catalogd_port_args(i)
+      args.extend(shlex.split(catalogd_port_args))
+    if enable_catalogd_ha:
+      args.extend(["-enable_catalogd_ha=true"])
+    catalogd_arg_list.append(args)
+  return catalogd_arg_list
 
 
 def build_admissiond_arg_list():
@@ -503,7 +548,7 @@ class MiniClusterOperations(object):
   def kill_all_impalads(self, force=False):
     kill_matching_processes(["impalad"], force=force)
 
-  def kill_catalogd(self, force=False):
+  def kill_all_catalogds(self, force=False):
     kill_matching_processes(["catalogd"], force=force)
 
   def kill_statestored(self, force=False):
@@ -516,20 +561,31 @@ class MiniClusterOperations(object):
     LOG.info("Starting State Store logging to {log_dir}/statestored.INFO".format(
         log_dir=options.log_dir))
     output_file = os.path.join(options.log_dir, "statestore-out.log")
-    run_daemon_with_options("statestored", build_statestored_arg_list(), output_file)
+    run_daemon_with_options("statestored",
+        build_statestored_arg_list(options.enable_catalogd_ha), output_file)
     if not check_process_exists("statestored", 10):
       raise RuntimeError("Unable to start statestored. Check log or file permissions"
                          " for more details.")
 
   def start_catalogd(self):
-    LOG.info("Starting Catalog Service logging to {log_dir}/catalogd.INFO".format(
-        log_dir=options.log_dir))
-    output_file = os.path.join(options.log_dir, "catalogd-out.log")
-    run_daemon_with_options("catalogd", build_catalogd_arg_list(), output_file,
-        jvm_debug_port=DEFAULT_CATALOGD_JVM_DEBUG_PORT)
-    if not check_process_exists("catalogd", 10):
-      raise RuntimeError("Unable to start catalogd. Check log or file permissions"
-                         " for more details.")
+    if options.enable_catalogd_ha:
+      num_catalogd = 2
+    else:
+      num_catalogd = 1
+    catalogd_arg_lists = build_catalogd_arg_list(
+        num_catalogd, options.enable_catalogd_ha, remap_ports=True)
+    for i in range(num_catalogd):
+      service_name = catalogd_service_name(i)
+      LOG.info(
+          "Starting Catalog Service logging to {log_dir}/{service_name}.INFO".format(
+              log_dir=options.log_dir, service_name=service_name))
+      output_file = os.path.join(
+          options.log_dir, "{service_name}-out.log".format(service_name=service_name))
+      run_daemon_with_options("catalogd", catalogd_arg_lists[i], output_file,
+          jvm_debug_port=DEFAULT_CATALOGD_JVM_DEBUG_PORT + i)
+      if not check_process_exists("catalogd", 10):
+        raise RuntimeError("Unable to start catalogd. Check log or file permissions"
+                           " for more details.")
 
   def start_admissiond(self):
     LOG.info("Starting Admission Control Service logging to {log_dir}/admissiond.INFO"
@@ -593,7 +649,7 @@ class DockerMiniClusterOperations(object):
 
   def kill_all_daemons(self, force=False):
     self.kill_statestored(force=force)
-    self.kill_catalogd(force=force)
+    self.kill_all_catalogds(force=force)
     self.kill_admissiond(force=force)
     self.kill_all_impalads(force=force)
 
@@ -607,8 +663,15 @@ class DockerMiniClusterOperations(object):
         LOG.info("Stopping container {0}".format(container_name))
         check_call(["docker", "stop", container_name])
 
-  def kill_catalogd(self, force=False):
-    self.__stop_container__("catalogd")
+  def kill_all_catalogds(self, force=False):
+    # List all running containers on the network and kill those with the catalogd name
+    # prefix to make sure that no running container are left over from previous clusters.
+    container_name_prefix = self.__gen_container_name__("catalogd")
+    for container_id, info in self.__get_network_info__()["Containers"].items():
+      container_name = info["Name"]
+      if container_name.startswith(container_name_prefix):
+        LOG.info("Stopping container {0}".format(container_name))
+        check_call(["docker", "stop", container_name])
 
   def kill_statestored(self, force=False):
     self.__stop_container__("statestored")
@@ -617,12 +680,22 @@ class DockerMiniClusterOperations(object):
     self.__stop_container__("admissiond")
 
   def start_statestore(self):
-    self.__run_container__("statestored", build_statestored_arg_list(),
+    self.__run_container__("statestored",
+        build_statestored_arg_list(options.enable_catalogd_ha),
         {DEFAULT_STATESTORED_WEBSERVER_PORT: DEFAULT_STATESTORED_WEBSERVER_PORT})
 
   def start_catalogd(self):
-    self.__run_container__("catalogd", build_catalogd_arg_list(),
-          {DEFAULT_CATALOGD_WEBSERVER_PORT: DEFAULT_CATALOGD_WEBSERVER_PORT})
+    if options.enable_catalogd_ha:
+      num_catalogd = 2
+    else:
+      num_catalogd = 1
+    catalogd_arg_lists = build_catalogd_arg_list(
+        num_catalogd, options.enable_catalogd_ha, remap_ports=False)
+    for i in range(num_catalogd):
+      chosen_ports = choose_catalogd_ports(i)
+      port_map = {DEFAULT_CATALOG_SERVICE_PORT: chosen_ports['catalog_service_port'],
+                  DEFAULT_CATALOGD_WEBSERVER_PORT: chosen_ports['webserver_port']}
+      self.__run_container__("catalogd", catalogd_arg_lists[i], port_map, i)
 
   def start_admissiond(self):
     self.__run_container__("admissiond", build_admissiond_arg_list(),
@@ -803,7 +876,7 @@ if __name__ == "__main__":
   if options.restart_impalad_only:
     cluster_ops.kill_all_impalads(force=options.force_kill)
   elif options.restart_catalogd_only:
-    cluster_ops.kill_catalogd(force=options.force_kill)
+    cluster_ops.kill_all_catalogds(force=options.force_kill)
   elif options.restart_statestored_only:
     cluster_ops.kill_statestored(force=options.force_kill)
   elif options.add_executors:

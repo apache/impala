@@ -505,6 +505,9 @@ class CatalogdService(BaseImpalaService):
       sleep(interval)
     assert False, 'Catalog version not ready in expected time.'
 
+  def get_catalog_service_port(self):
+    return self.service_port
+
 
 class AdmissiondService(BaseImpalaService):
   def __init__(self, hostname, webserver_interface, webserver_port,

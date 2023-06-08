@@ -23,7 +23,6 @@ namespace impala {
 
 /// Statestore subscriber for Catalog service.
 /// Catalog-specific parameters for statestore registration.
-/// We will add more parameters when supporting CatalogD HA.
 class StatestoreSubscriberCatalog : public StatestoreSubscriber {
  public:
   /// Only constructor.
@@ -38,12 +37,7 @@ class StatestoreSubscriberCatalog : public StatestoreSubscriber {
       const TNetworkAddress& statestore_address,
       MetricGroup* metrics,
       CatalogServiceVersion::type catalog_protocol_version,
-      const TNetworkAddress& catalogd_address)
-    : StatestoreSubscriber(subscriber_id, heartbeat_address, statestore_address, metrics,
-        TStatestoreSubscriberType::CATALOGD) {
-    catalogd_registration_.__set_protocol(catalog_protocol_version);
-    catalogd_registration_.__set_address(catalogd_address);
-  }
+      const TNetworkAddress& catalogd_address);
 
   virtual ~StatestoreSubscriberCatalog() {}
 

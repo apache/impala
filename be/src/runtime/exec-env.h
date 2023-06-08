@@ -321,6 +321,9 @@ class ExecEnv {
   /// Current address of Catalog service
   std::shared_ptr<const TNetworkAddress> catalogd_address_;
 
+  /// Flag that indicate if the metric for catalogd address has been set.
+  bool is_catalogd_address_metric_set_ = false;
+
   /// Protects catalogd_address_.
   mutable std::mutex catalogd_address_lock_;
 

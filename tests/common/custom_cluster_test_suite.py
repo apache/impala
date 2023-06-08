@@ -336,10 +336,14 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       raise Exception("statestored was not found")
 
     # The number of statestore subscribers is
-    # cluster_size (# of impalad) + 1 (for catalogd).
+    #     cluster_size (# of impalad) + 1 (for catalogd)
+    #     + 1 (for admissiond if enable_admission_service is set in the options)
+    #     + 1 (for catalogd if enable_catalogd_ha is set in the options).
     if expected_subscribers == 0:
       expected_subscribers = expected_num_impalads + 1
       if "--enable_admission_service" in options:
+        expected_subscribers += 1
+      if "--enable_catalogd_ha" in options:
         expected_subscribers += 1
 
     statestored.service.wait_for_live_subscribers(expected_subscribers,

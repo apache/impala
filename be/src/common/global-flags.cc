@@ -384,6 +384,27 @@ DEFINE_bool(tolerate_statestore_startup_delay, false, "If set to true, the subsc
     "startup. But instead it enters into Recovery mode, it will loop, sleep and retry "
     "till it successfully registers with the statestore.");
 
+// Starting flags for CatalogD High Availability
+DEFINE_bool(enable_catalogd_ha, false, "Set to true to enable CatalogD HA");
+DEFINE_bool(force_catalogd_active, false, "Set to true to force this catalogd instance "
+    "to take active role. It's used to perform manual fail over for catalog service.");
+// Use subscriber-id which is built with network address as priority value of catalogd
+// instance when designating active catalogd. The lower subscriber_id (i.e. lower network
+// address) corresponds to a higher priority.
+// This is mainly used in unit-test for predictable results.
+DEFINE_bool(use_subscriber_id_as_catalogd_priority, false, "Subscriber-id is used as "
+    "priority value of catalogd instance if this is set as true. Otherwise, "
+    "registration_id which is generated as random number will be used as priority value "
+    "of catalogd instance.");
+// Waiting period in ms for HA preemption. It should be set with proper value based on the
+// time to take for bringing a catalogd instance in-line in the deployment environment.
+DEFINE_int64(catalogd_ha_preemption_wait_period_ms, 10000, "(Advanced) The time after "
+    "which statestore designates the first registered catalogd as active if statestore "
+    "does not receive registration request from the second catalogd.");
+DEFINE_int64(active_catalogd_designation_monitoring_frequency_ms, 100, "(Advanced) "
+    "Frequency (in ms) with which the statestore monitors if active catalogd is "
+    "designated.");
+
 // TGeospatialLibrary's values are mapped here as constants
 static const string geo_lib_none = "NONE";
 static const string geo_lib_hive_esri = "HIVE_ESRI";

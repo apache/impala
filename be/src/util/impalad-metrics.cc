@@ -114,6 +114,8 @@ const char* ImpaladMetricKeys::CATALOG_OBJECT_VERSION_LOWER_BOUND =
     "catalog.catalog-object-version-lower-bound";
 const char* ImpaladMetricKeys::CATALOG_TOPIC_VERSION = "catalog.curr-topic";
 const char* ImpaladMetricKeys::CATALOG_SERVICE_ID = "catalog.curr-serviceid";
+const char* ImpaladMetricKeys::ACTIVE_CATALOGD_ADDRESS =
+    "catalog.active-catalogd-address";
 const char* ImpaladMetricKeys::CATALOG_READY = "catalog.ready";
 const char* ImpaladMetricKeys::CATALOG_CACHE_AVG_LOAD_TIME =
     "catalog.cache.average-load-time";
@@ -241,6 +243,7 @@ BooleanProperty* ImpaladMetrics::CATALOG_READY = nullptr;
 BooleanProperty* ImpaladMetrics::IMPALA_SERVER_READY = nullptr;
 StringProperty* ImpaladMetrics::IMPALA_SERVER_VERSION = nullptr;
 StringProperty* ImpaladMetrics::CATALOG_SERVICE_ID = nullptr;
+StringProperty* ImpaladMetrics::ACTIVE_CATALOGD_ADDRESS = nullptr;
 
 // Histograms
 HistogramMetric* ImpaladMetrics::QUERY_DURATIONS = nullptr;
@@ -263,6 +266,8 @@ void ImpaladMetrics::InitCatalogMetrics(MetricGroup* m) {
       catalog_metrics->AddGauge(ImpaladMetricKeys::CATALOG_TOPIC_VERSION, 0);
   CATALOG_SERVICE_ID =
       catalog_metrics->AddProperty<string>(ImpaladMetricKeys::CATALOG_SERVICE_ID, "");
+  ACTIVE_CATALOGD_ADDRESS = catalog_metrics->AddProperty<string>(
+      ImpaladMetricKeys::ACTIVE_CATALOGD_ADDRESS, "");
   CATALOG_READY =
       catalog_metrics->AddProperty<bool>(ImpaladMetricKeys::CATALOG_READY, false);
   // CatalogdMetaProvider cache metrics. Valid only when --use_local_catalog is set.

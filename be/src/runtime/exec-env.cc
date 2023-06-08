@@ -514,17 +514,17 @@ Status ExecEnv::StartStatestoreSubscriberService() {
 
   // Must happen after all topic registrations / callbacks are done
   if (statestore_subscriber_.get() != nullptr) {
-    bool has_registered_catalogd = false;
-    TCatalogRegistration catalogd_registration;
-    Status status =
-        statestore_subscriber_->Start(&has_registered_catalogd, &catalogd_registration);
+    bool has_active_catalogd = false;
+    TCatalogRegistration active_catalogd_registration;
+    Status status = statestore_subscriber_->Start(
+        &has_active_catalogd, &active_catalogd_registration);
     if (!status.ok()) {
       status.AddDetail("Statestore subscriber did not start up.");
       return status;
     }
     if (statestore_subscriber_->IsRegistered()) SetStatestoreRegistrationCompleted();
-    if (has_registered_catalogd && FLAGS_is_coordinator) {
-      UpdateCatalogd(catalogd_registration);
+    if (has_active_catalogd && FLAGS_is_coordinator) {
+      UpdateCatalogd(active_catalogd_registration);
     }
   }
 
@@ -693,6 +693,12 @@ void ExecEnv::UpdateCatalogd(const TCatalogRegistration& catalogd_registration) 
   }
   std::lock_guard<std::mutex> l(catalogd_address_lock_);
   DCHECK(catalogd_address_.get() != nullptr);
+  if (!is_catalogd_address_metric_set_) {
+    // At least set the metric once.
+    is_catalogd_address_metric_set_ = true;
+    ImpaladMetrics::ACTIVE_CATALOGD_ADDRESS->SetValue(
+        TNetworkAddressToString(catalogd_registration.address));
+  }
   bool is_matching = (catalogd_registration.address.port == catalogd_address_->port
       && catalogd_registration.address.hostname == catalogd_address_->hostname);
   if (!is_matching) {
@@ -701,6 +707,8 @@ void ExecEnv::UpdateCatalogd(const TCatalogRegistration& catalogd_registration) 
               << " to " << TNetworkAddressToString(catalogd_registration.address);
     catalogd_address_ =
         std::make_shared<const TNetworkAddress>(catalogd_registration.address);
+    ImpaladMetrics::ACTIVE_CATALOGD_ADDRESS->SetValue(
+        TNetworkAddressToString(catalogd_registration.address));
   }
 }
 

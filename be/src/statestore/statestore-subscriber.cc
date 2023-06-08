@@ -210,8 +210,8 @@ bool StatestoreSubscriber::IsRegistered() const {
   return statestore_->IsRegistered();
 }
 
-Status StatestoreSubscriber::Start(bool* has_registered_catalogd,
-    TCatalogRegistration* registered_catalogd_registration) {
+Status StatestoreSubscriber::Start(bool* has_active_catalogd,
+    TCatalogRegistration* active_catalogd_registration) {
   // Backend must be started before registration
   std::shared_ptr<TProcessor> processor(
       new StatestoreSubscriberProcessor(thrift_iface_));
@@ -240,7 +240,7 @@ Status StatestoreSubscriber::Start(bool* has_registered_catalogd,
   // Specify the port which the heartbeat server is listening on.
   heartbeat_address_.port = heartbeat_server_->port();
 
-  return statestore_->Start(has_registered_catalogd, registered_catalogd_registration);
+  return statestore_->Start(has_active_catalogd, active_catalogd_registration);
 }
 
 /// Set Register Request
@@ -357,8 +357,8 @@ void StatestoreSubscriber::StatestoreStub::AddCompleteRegistrationTopic(
   complete_registration_callbacks_.push_back(callback);
 }
 
-Status StatestoreSubscriber::StatestoreStub::Register(bool* has_registered_catalogd,
-    TCatalogRegistration* registered_catalogd_registration) {
+Status StatestoreSubscriber::StatestoreStub::Register(bool* has_active_catalogd,
+    TCatalogRegistration* active_catalogd_registration) {
   // Check protocol version of the statestore first.
   TGetProtocolVersionRequest get_protocol_request;
   TGetProtocolVersionResponse get_protocol_response;
@@ -451,11 +451,11 @@ Status StatestoreSubscriber::StatestoreStub::Register(bool* has_registered_catal
       VLOG(1) << "No statestore ID received from statestore";
     }
     if (status.ok() && response.__isset.catalogd_registration) {
-      VLOG(1) << "Registered catalogd address: "
+      VLOG(1) << "Active catalogd address: "
               << TNetworkAddressToString(response.catalogd_registration.address);
-      if (has_registered_catalogd != nullptr) *has_registered_catalogd = true;
-      if (registered_catalogd_registration != nullptr) {
-        *registered_catalogd_registration = response.catalogd_registration;
+      if (has_active_catalogd != nullptr) *has_active_catalogd = true;
+      if (active_catalogd_registration != nullptr) {
+        *active_catalogd_registration = response.catalogd_registration;
       }
     }
   }
@@ -463,8 +463,8 @@ Status StatestoreSubscriber::StatestoreStub::Register(bool* has_registered_catal
   return status;
 }
 
-Status StatestoreSubscriber::StatestoreStub::Start(bool* has_registered_catalogd,
-    TCatalogRegistration* registered_catalogd_registration) {
+Status StatestoreSubscriber::StatestoreStub::Start(bool* has_active_catalogd,
+    TCatalogRegistration* active_catalogd_registration) {
   Status status;
   {
     // Take the lock to ensure that, if a topic-update is received during registration
@@ -475,7 +475,7 @@ Status StatestoreSubscriber::StatestoreStub::Start(bool* has_registered_catalogd
     // Inject failure before registering to statestore.
     status = DebugAction(FLAGS_debug_actions, "REGISTER_STATESTORE_ON_STARTUP");
     if (status.ok()) {
-      status = Register(has_registered_catalogd, registered_catalogd_registration);
+      status = Register(has_active_catalogd, active_catalogd_registration);
     }
     if (status.ok()) {
       is_registered_ = true;
@@ -528,14 +528,14 @@ void StatestoreSubscriber::StatestoreStub::RecoveryModeChecker() {
       LOG(INFO) << subscriber_->subscriber_id_
                 << ": Connection with statestore lost, entering recovery mode";
       uint32_t attempt_count = 1;
-      bool has_registered_catalogd = false;
-      TCatalogRegistration registered_catalogd_registration;
+      bool has_active_catalogd = false;
+      TCatalogRegistration active_catalogd_registration;
       while (true) {
         LOG(INFO) << "Trying to re-register with statestore, attempt: "
                   << attempt_count++;
         re_registr_attempt_metric_->Increment(1);
         Status status =
-            Register(&has_registered_catalogd, &registered_catalogd_registration);
+            Register(&has_active_catalogd, &active_catalogd_registration);
         if (status.ok()) {
           if (!is_registered_) {
             is_registered_ = true;
@@ -550,9 +550,9 @@ void StatestoreSubscriber::StatestoreStub::RecoveryModeChecker() {
           failure_detector_->UpdateHeartbeat(STATESTORE_ID, true);
           LOG(INFO) << "Reconnected to statestore. Exiting recovery mode";
 
-          if (has_registered_catalogd) {
+          if (has_active_catalogd) {
             for (const UpdateCatalogdCallback& callback : update_catalogd_callbacks_) {
-              callback(registered_catalogd_registration);
+              callback(active_catalogd_registration);
             }
           }
           // Break out of enclosing while (true) to top of outer-scope loop.

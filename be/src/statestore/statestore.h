@@ -38,6 +38,7 @@
 #include "rpc/thrift-client.h"
 #include "runtime/client-cache.h"
 #include "statestore/failure-detector.h"
+#include "statestore/statestore-catalogd-mgr.h"
 #include "statestore/statestore-subscriber-client-wrapper.h"
 #include "util/aligned-new.h"
 #include "util/condition-variable.h"
@@ -52,7 +53,6 @@ namespace impala {
 class Status;
 
 typedef ClientCache<StatestoreSubscriberClientWrapper> StatestoreSubscriberClientCache;
-typedef TUniqueId RegistrationId;
 
 std::string SubscriberTypeToString(TStatestoreSubscriberType::type t);
 
@@ -128,10 +128,6 @@ std::string SubscriberTypeToString(TStatestoreSubscriberType::type t);
 /// 4. Topic::lock_ (terminal)
 class Statestore : public CacheLineAligned {
  public:
-  /// A SubscriberId uniquely identifies a single subscriber, and is
-  /// provided by the subscriber at registration time.
-  typedef std::string SubscriberId;
-
   /// A TopicId uniquely identifies a single topic
   typedef std::string TopicId;
 
@@ -168,8 +164,8 @@ class Statestore : public CacheLineAligned {
       bool subscribe_catalogd_change,
       const TCatalogRegistration& catalogd_registration,
       RegistrationId* registration_id,
-      bool* has_registered_catalogd,
-      TCatalogRegistration* registered_catalogd_registration);
+      bool* has_active_catalogd,
+      TCatalogRegistration* active_catalogd_registration);
 
   /// Registers webpages for the input webserver. If metrics_only is set then only
   /// '/healthz' page is registered.
@@ -529,48 +525,6 @@ class Statestore : public CacheLineAligned {
     bool unregistered_ = false;
   };
 
-  /// CatalogManager:
-  ///   Tracks variety of bookkeeping information for Catalog daemon.
-  class CatalogManager {
-   public:
-    CatalogManager()
-      : is_registered_(false),
-        sending_sequence_(0) {}
-
-    /// Register one catalogd.
-    bool RegisterCatalogd(const SubscriberId& subscriber_id,
-        const RegistrationId& registration_id,
-        const TCatalogRegistration& catalogd_registration);
-
-    /// Return the protocol version of catalog service and address of catalogd.
-    const TCatalogRegistration& GetCatalogRegistration(bool* is_registered);
-
-    /// Return the mutex lock.
-    std::mutex* GetLock() { return &catalog_mgr_lock_; }
-
-    /// Get sending sequence number.
-    int64 GetSendingSequence();
-
-   private:
-    /// Protect all member variable.
-    std::mutex catalog_mgr_lock_;
-
-    /// Indicate if the catalogd has been registered.
-    bool is_registered_;
-
-    /// subscriber_id of the registered catalogd.
-    SubscriberId catalogd_subscriber_id_;
-
-    /// RegistrationId of the registered catalogd.
-    RegistrationId catalogd_registration_id_;
-
-    /// Additional registration info for catalog daemon.
-    TCatalogRegistration catalogd_registration_;
-
-    /// Sending sequence number.
-    int64 sending_sequence_;
-  };
-
   /// Unique identifier for this statestore instance.
   TUniqueId statestore_id_;
 
@@ -593,7 +547,7 @@ class Statestore : public CacheLineAligned {
   SubscriberMap subscribers_;
 
   /// CatalogD Manager
-  CatalogManager catalog_manager_;
+  StatestoreCatalogdMgr catalog_manager_;
 
   /// Condition variable for sending the notifications of updating catalogd.
   ConditionVariable update_catalod_cv_;
@@ -720,6 +674,14 @@ class Statestore : public CacheLineAligned {
 
   /// Metric to count the total number of UpdateCatalogd RPCs sent by statestore.
   IntCounter* update_catalogd_metric_;
+
+  /// Metric to count the total number of requests for clearing topic entries from
+  /// catalogd. Catalogd indicates to clear topic entries when it is restarted or its
+  /// role has been changed from standby to active.
+  IntCounter* clear_topic_entries_metric_;
+
+  /// Metric that tracks the address of active catalogd for catalogd HA
+  StringProperty* active_catalogd_address_metric_;
 
   /// Utility method to add an update to the given thread pool, and to fail if the thread
   /// pool is already at capacity. Assumes that subscribers_lock_ is held by the caller.

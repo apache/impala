@@ -112,6 +112,8 @@ DEFINE_int32(statestore_update_catalogd_tcp_timeout_seconds, 3, "(Advanced) The 
     "protects against badly hung machines that are not able to respond to the "
     "UpdateCatalogd RPC in short order");
 
+DECLARE_bool(enable_catalogd_ha);
+DECLARE_int64(active_catalogd_designation_monitoring_frequency_ms);
 DECLARE_string(debug_actions);
 DECLARE_string(ssl_server_certificate);
 DECLARE_string(ssl_private_key);
@@ -134,6 +136,9 @@ const string STATESTORE_PRIORITY_UPDATE_DURATION =
     "statestore.priority-topic-update-durations";
 const string STATESTORE_HEARTBEAT_DURATION = "statestore.heartbeat-durations";
 const string STATESTORE_UPDATE_CATALOGD_NUM = "statestore.num-update-catalogd";
+const string STATESTORE_CLEAR_TOPIC_ENTRIES_NUM =
+    "statestore.num-clear-topic-entries-requests";
+const string STATESTORE_ACTIVE_CATALOGD_ADDRESS = "statestore.active-catalogd-address";
 
 // Initial version for each Topic registered by a Subscriber. Generally, the Topic will
 // have a Version that is the MAX() of all entries in the Topic, but this initial
@@ -213,18 +218,18 @@ class StatestoreThriftIf : public StatestoreServiceIf {
     }
 
     RegistrationId registration_id;
-    bool has_registered_catalogd;
-    TCatalogRegistration registered_catalogd_registration;
+    bool has_active_catalogd;
+    TCatalogRegistration active_catalogd_registration;
     Status status = statestore_->RegisterSubscriber(params.subscriber_id,
         params.subscriber_location, params.topic_registrations, subscriber_type,
         subscribe_catalogd_change, catalogd_registration, &registration_id,
-        &has_registered_catalogd, &registered_catalogd_registration);
+        &has_active_catalogd, &active_catalogd_registration);
     status.ToThrift(&response.status);
     response.__set_registration_id(registration_id);
     response.__set_statestore_id(statestore_->GetStateStoreId());
     response.__set_protocol_version(statestore_->GetProtocolVersion());
-    if (has_registered_catalogd) {
-      response.__set_catalogd_registration(registered_catalogd_registration);
+    if (has_active_catalogd) {
+      response.__set_catalogd_registration(active_catalogd_registration);
     }
   }
 
@@ -496,6 +501,7 @@ void Statestore::Subscriber::RefreshLastHeartbeatTimestamp() {
 
 Statestore::Statestore(MetricGroup* metrics)
   : protocol_version_(StatestoreServiceVersion::V2),
+    catalog_manager_(FLAGS_enable_catalogd_ha),
     subscriber_topic_update_threadpool_("statestore-update",
         "subscriber-update-worker",
         FLAGS_statestore_num_update_threads,
@@ -547,6 +553,10 @@ Statestore::Statestore(MetricGroup* metrics)
   heartbeat_duration_metric_ =
       StatsMetric<double>::CreateAndRegister(metrics, STATESTORE_HEARTBEAT_DURATION);
   update_catalogd_metric_ = metrics->AddCounter(STATESTORE_UPDATE_CATALOGD_NUM, 0);
+  clear_topic_entries_metric_ =
+      metrics->AddCounter(STATESTORE_CLEAR_TOPIC_ENTRIES_NUM, 0);
+  active_catalogd_address_metric_ = metrics->AddProperty<string>(
+      STATESTORE_ACTIVE_CATALOGD_ADDRESS, "");
 
   update_state_client_cache_->InitMetrics(metrics, "subscriber-update-state");
   heartbeat_client_cache_->InitMetrics(metrics, "subscriber-heartbeat");
@@ -715,11 +725,14 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
     bool subscribe_catalogd_change,
     const TCatalogRegistration& catalogd_registration,
     RegistrationId* registration_id,
-    bool* has_registered_catalogd,
-    TCatalogRegistration* registered_catalogd_registration) {
+    bool* has_active_catalogd,
+    TCatalogRegistration* active_catalogd_registration) {
   bool is_catalogd = subscriber_type == TStatestoreSubscriberType::CATALOGD;
   if (subscriber_id.empty()) {
     return Status("Subscriber ID cannot be empty string");
+  } else if (is_catalogd
+      && FLAGS_enable_catalogd_ha != catalogd_registration.enable_catalogd_ha) {
+    return Status("CalaogD HA enabling flag from catalogd does not match.");
   }
 
   // Create any new topics first, so that when the subscriber is first sent a topic update
@@ -743,6 +756,7 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
     }
   }
   LOG(INFO) << "Registering: " << subscriber_id;
+  bool is_reregistering = false;
   {
     lock_guard<mutex> l(subscribers_lock_);
     UUIDToTUniqueId(subscriber_uuid_generator_(), registration_id);
@@ -758,14 +772,15 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
                   << TNetworkAddressToString(subscriber->network_address())
                   << " , new address: " << TNetworkAddressToString(location);
       }
+      is_reregistering = true;
     }
 
-    if (is_catalogd) {
-      if (catalog_manager_.RegisterCatalogd(subscriber_id, *registration_id,
-              catalogd_registration)) {
-        LOG(INFO) << "CatalogD: " << subscriber_id << " is registered.";
-        update_catalod_cv_.NotifyAll();
-      }
+    if (is_catalogd
+        && catalog_manager_.RegisterCatalogd(is_reregistering, subscriber_id,
+            *registration_id, catalogd_registration)) {
+      LOG(INFO) << "Active catalogd role is designated to "
+                << catalog_manager_.GetActiveCatalogdSubscriberId();
+      update_catalod_cv_.NotifyAll();
     }
 
     shared_ptr<Subscriber> current_registration(new Subscriber(
@@ -781,34 +796,11 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
     RETURN_IF_ERROR(OfferUpdate(update, &subscriber_topic_update_threadpool_));
     RETURN_IF_ERROR(OfferUpdate(update, &subscriber_priority_topic_update_threadpool_));
     RETURN_IF_ERROR(OfferUpdate(update, &subscriber_heartbeat_threadpool_));
-    *registered_catalogd_registration =
-        catalog_manager_.GetCatalogRegistration(has_registered_catalogd);
+    *active_catalogd_registration =
+        catalog_manager_.GetActiveCatalogRegistration(has_active_catalogd);
   }
 
   return Status::OK();
-}
-
-bool Statestore::CatalogManager::RegisterCatalogd(const SubscriberId& subscriber_id,
-    const RegistrationId& registration_id,
-    const TCatalogRegistration& catalogd_registration) {
-  lock_guard<mutex> l(catalog_mgr_lock_);
-  is_registered_ = true;
-  catalogd_subscriber_id_ = subscriber_id;
-  catalogd_registration_id_ = registration_id;
-  catalogd_registration_ = catalogd_registration;
-  return true;
-}
-
-const TCatalogRegistration& Statestore::CatalogManager::GetCatalogRegistration(
-    bool* is_registered) {
-  lock_guard<mutex> l(catalog_mgr_lock_);
-  *is_registered = is_registered_;
-  return catalogd_registration_;
-}
-
-int64 Statestore::CatalogManager::GetSendingSequence() {
-  lock_guard<mutex> l(catalog_mgr_lock_);
-  return ++sending_sequence_;
 }
 
 bool Statestore::FindSubscriber(const SubscriberId& subscriber_id,
@@ -824,6 +816,13 @@ bool Statestore::FindSubscriber(const SubscriberId& subscriber_id,
 
 Status Statestore::SendTopicUpdate(Subscriber* subscriber, UpdateKind update_kind,
     bool* update_skipped) {
+  // Don't send topic update to inactive catalogd.
+  if (FLAGS_enable_catalogd_ha && subscriber->IsCatalogd()
+      && !catalog_manager_.IsActiveCatalogd(subscriber->id())) {
+    VLOG(3) << "Skip sending topic update to inactive catalogd";
+    return Status::OK();
+  }
+
   // Time any successful RPCs (i.e. those for which UpdateState() completed, even though
   // it may have returned an error.)
   MonotonicStopWatch sw;
@@ -909,6 +908,7 @@ Status Statestore::SendTopicUpdate(Subscriber* subscriber, UpdateKind update_kin
         DCHECK(!update.__isset.from_version);
         LOG(INFO) << "Received request for clearing the entries of topic: "
                   << update.topic_name << " from: " << subscriber->id();
+        clear_topic_entries_metric_->Increment(1);
         topic.ClearAllEntries();
       }
 
@@ -1152,6 +1152,11 @@ void Statestore::DoSubscriberUpdate(UpdateKind update_kind, int thread_id,
                   << "or re-registered (last known registration ID: "
                   << PrintId(update.registration_id) << ")";
         UnregisterSubscriber(subscriber.get());
+        if (subscriber->IsCatalogd()) {
+          if (catalog_manager_.UnregisterCatalogd(subscriber->id())) {
+            update_catalod_cv_.NotifyAll();
+          }
+        }
       } else {
         LOG(INFO) << "Failure was already detected for subscriber '" << subscriber->id()
                   << "'. Won't send another " << update_kind_str;
@@ -1201,6 +1206,15 @@ void Statestore::DoSubscriberUpdate(UpdateKind update_kind, int thread_id,
 }
 
 [[noreturn]] void Statestore::MonitorUpdateCatalogd() {
+  // Check if the first registered one should be designated with active role.
+  int64_t timeout_us =
+      FLAGS_active_catalogd_designation_monitoring_frequency_ms * MICROS_PER_MILLI;
+  while (!catalog_manager_.CheckActiveCatalog()) {
+    unique_lock<mutex> l(*catalog_manager_.GetLock());
+    update_catalod_cv_.WaitFor(l, timeout_us);
+  }
+  SendUpdateCatalogdNotification();
+
   // Wait for notification. If catalogd is registered, send notification to all
   // coordinators
   while (1) {
@@ -1213,11 +1227,14 @@ void Statestore::DoSubscriberUpdate(UpdateKind update_kind, int thread_id,
 }
 
 void Statestore::SendUpdateCatalogdNotification() {
-  bool has_registered_catalogd;
+  bool has_active_catalogd;
   TCatalogRegistration catalogd_registration =
-      catalog_manager_.GetCatalogRegistration(&has_registered_catalogd);
-  DCHECK(has_registered_catalogd);
-  if (!has_registered_catalogd) return;
+      catalog_manager_.GetActiveCatalogRegistration(&has_active_catalogd);
+  DCHECK(has_active_catalogd);
+  if (!has_active_catalogd) return;
+
+  active_catalogd_address_metric_->SetValue(
+      TNetworkAddressToString(catalogd_registration.address));
 
   vector<std::shared_ptr<Subscriber>> receivers;
   {

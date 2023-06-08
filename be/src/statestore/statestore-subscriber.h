@@ -129,14 +129,14 @@ class StatestoreSubscriber {
   /// Registers this subscriber with the statestore, and starts the
   /// heartbeat service, as well as a thread to check for failure and
   /// initiate recovery mode.
-  /// has_registered_catalogd - return true if the catalogd is successfully registered
-  ///                           to statestore.
-  /// registered_catalogd_registration - return the address and protocol of the
-  ///                                    registered catalogd.
+  /// has_active_catalogd - return true if the active catalogd is designated by
+  ///                       statestore.
+  /// active_catalogd_registration - return the address and protocol of the
+  ///                                active catalogd.
   ///
   /// Returns OK unless some error occurred, like a failure to connect.
-  virtual Status Start(bool* has_registered_catalogd = nullptr,
-      TCatalogRegistration* registered_catalogd_registration = nullptr);
+  virtual Status Start(bool* has_active_catalogd = nullptr,
+      TCatalogRegistration* active_catalogd_registration = nullptr);
 
   /// Set Register Request
   virtual Status SetRegisterRequest(TRegisterSubscriberRequest* request);
@@ -241,8 +241,8 @@ class StatestoreSubscriber {
         const TNetworkAddress& statestore_address, MetricGroup* metrics);
 
     /// Returns OK unless some error occurred, like a failure to connect.
-    Status Start(bool* has_registered_catalogd,
-        TCatalogRegistration* registered_catalogd_registration);
+    Status Start(bool* has_active_catalogd,
+        TCatalogRegistration* active_catalogd_registration);
 
     /// Adds a topic to the set of topics that updates will be received
     /// for. When a topic update is received, the supplied UpdateCallback
@@ -308,8 +308,8 @@ class StatestoreSubscriber {
     /// Creates a client of the remote statestore and sends a list of
     /// topics to register for. Returns OK unless there is some problem
     /// connecting, or the statestore reports an error.
-    Status Register(bool* has_registered_catalogd,
-        TCatalogRegistration* registered_catalogd_registration);
+    Status Register(bool* has_active_catalogd,
+        TCatalogRegistration* active_catalogd_registration);
 
     /// Returns OK if registration_id == registration_id_, or if registration_id_ is not
     /// yet set, an error otherwise. Used to confirm that RPCs from the statestore are

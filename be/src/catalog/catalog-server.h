@@ -24,6 +24,7 @@
 #include <boost/unordered_set.hpp>
 
 #include "catalog/catalog.h"
+#include "common/atomic.h"
 #include "gen-cpp/CatalogService.h"
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/Types_types.h"
@@ -54,11 +55,45 @@ class Catalog;
 /// cache over JNI to get the current state of the catalog. Any updates are broadcast to
 /// the rest of the cluster using the Statestore over the IMPALA_CATALOG_TOPIC.
 /// The CatalogServer must be the only writer to the IMPALA_CATALOG_TOPIC, meaning there
-/// cannot be multiple CatalogServers running at the same time, as the correctness of delta
-/// updates relies upon this assumption.
-/// TODO: In the future the CatalogServer could go into a "standby" mode if it detects
-/// updates from another writer on the topic. This is a bit tricky because it requires
-/// some basic form of leader election.
+/// cannot be multiple CatalogServers running at the same time, as the correctness of
+/// delta updates relies upon this assumption.
+///
+/// Catalog HA:
+/// To support catalog HA, we add the preemptive behavior for catalogd. When enabled,
+/// the preemptive behavior allows the catalogd with the higher priority to become active
+/// and the paired catalogd becomes standby. The active catalogd acts as the source of
+/// metadata and provides catalog service for the Impala cluster.
+/// By default, preemption is disabled on the catalogd which is running as single catalog
+/// instance in an Impala cluster. For deployment with catalog HA, the preemption must
+/// be enabled with starting flag "enable_catalogd_ha" on both the catalogd in the HA pair
+/// and statestore.
+/// The catalogd in an Active-Passive HA pair can be assigned an instance priority value
+/// to indicate a preference for which catalogd should assume the active role. The
+/// registration ID which is assigned by statestore can be used as instance priority
+/// value. The lower numerical value in registration ID corresponds to a higher priority.
+/// The catalogd with the higher priority is designated as active, the other catalogd is
+/// designated as standby. Only the active catalogd propagates the IMPALA_CATALOG_TOPIC
+/// to the cluster. This guarantees only one writer for the IMPALA_CATALOG_TOPIC in a
+/// Impala cluster.
+/// Statestore only send the IMPALA_CATALOG_TOPIC messages to active catalogd. Also
+/// catalogds are registered as writer for IMPALA_CATALOG_TOPIC so the standby catalogd
+/// does not receive catalog updates from statestore. When standby catalogd becomes
+/// active, its "last_sent_catalog_version_" member variable is reset. This will lead to
+/// non-delta catalog update for next IMPALA_CATALOG_TOPIC which also instructs the
+/// statestore to clear all entries for the catalog update topic, so that statestore keeps
+/// in-sync with new active catalogd for the catalog update topic.
+/// statestore which is the registration center of an Impala cluster assigns the roles
+/// for the catalogd in the HA pair after both catalogd register to statestore. When
+/// statestore detects the active catalogd is not healthy, it fails over catalog service
+/// to standby catalogd. When failover occurs, statestore sends notifications with the
+/// address of active catalogd to all coordinators and catalogd in the cluster. The event
+/// is logged in the statestore and catalogd logs. When the catalogd with the higher
+/// priority recovers from a failure, statestore does not resume it as active to avoid
+/// flip-flop between the two catalogd.
+/// To make a specific catalogd in the HA pair as active instance, the catalogd must be
+/// started with starting flag "force_catalogd_active" so that the catalogd will be
+/// assigned with active role when it registers to statestore. This allows administrator
+/// to manually perform catalog service failover.
 class CatalogServer {
  public:
   static std::string IMPALA_CATALOG_TOPIC;
@@ -99,6 +134,9 @@ class CatalogServer {
   /// Indicates whether the catalog service is ready.
   std::atomic_bool service_started_{false};
 
+  /// Set to 1 if this catalog instance is active.
+  AtomicInt32 is_active_{0};
+
   /// Thrift API implementation which proxies requests onto this CatalogService.
   std::shared_ptr<CatalogServiceIf> thrift_iface_;
   ThriftSerializer thrift_serializer_;
@@ -111,6 +149,12 @@ class CatalogServer {
 
   /// Tracks the partial fetch RPC call queue length on the Catalog server.
   IntGauge* partial_fetch_rpc_queue_len_metric_;
+
+  /// Metric that tracks if this catalogd is active when catalogd HA is enabled.
+  BooleanProperty* ha_active_status_metric_;
+
+  /// Metric to count the number of active status changes.
+  IntCounter* num_ha_active_status_change_metric_;
 
   /// Thread that polls the catalog for any updates.
   std::unique_ptr<Thread> catalog_update_gathering_thread_;
@@ -161,6 +205,9 @@ class CatalogServer {
   void UpdateCatalogTopicCallback(
       const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
       std::vector<TTopicDelta>* subscriber_topic_updates);
+
+  /// Callback function for receiving notification of updating catalogd.
+  void UpdateRegisteredCatalogd(const TCatalogRegistration& catalogd_registration);
 
   /// Executed by the catalog_update_gathering_thread_. Calls into JniCatalog
   /// to get the latest set of catalog objects that exist, along with some metadata on

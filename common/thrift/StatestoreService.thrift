@@ -201,6 +201,12 @@ struct TCatalogRegistration {
 
   // Address of catalogd.
   2: required Types.TNetworkAddress address;
+
+  // True if CatalogD HA is enabled.
+  3: optional bool enable_catalogd_ha;
+
+  // True if the catalogd instance is started as active instance.
+  4: optional bool force_catalogd_active;
 }
 
 struct TRegisterSubscriberRequest {

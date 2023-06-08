@@ -29,6 +29,8 @@ add_library(Statestore
   failure-detector.cc
   ${STATESTORE_SERVICE_PROTO_SRCS}
   statestore.cc
+  statestore-catalogd-mgr.cc
+  statestore-subscriber-catalog.cc
   statestore-subscriber.cc
   statestored-main.cc
 )

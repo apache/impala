@@ -165,6 +165,9 @@ class ImpaladMetricKeys {
   /// ServiceID of Catalog with impalad.
   static const char* CATALOG_SERVICE_ID;
 
+  // Address of active catalogd.
+  static const char* ACTIVE_CATALOGD_ADDRESS;
+
   /// Number of tables in the catalog
   static const char* CATALOG_NUM_TABLES;
 
@@ -339,6 +342,7 @@ class ImpaladMetrics {
   static BooleanProperty* IMPALA_SERVER_READY;
   static StringProperty* IMPALA_SERVER_VERSION;
   static StringProperty* CATALOG_SERVICE_ID;
+  static StringProperty* ACTIVE_CATALOGD_ADDRESS;
   // Histograms
   static HistogramMetric* QUERY_DURATIONS;
   static HistogramMetric* DDL_DURATIONS;

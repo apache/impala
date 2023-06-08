@@ -54,6 +54,7 @@ DEFAULT_HS2_HTTP_PORT = 28000
 DEFAULT_KRPC_PORT = 27000
 DEFAULT_CATALOG_SERVICE_PORT = 26000
 DEFAULT_STATE_STORE_SUBSCRIBER_PORT = 23000
+DEFAULT_CATALOGD_STATE_STORE_SUBSCRIBER_PORT = 23020
 DEFAULT_IMPALAD_WEBSERVER_PORT = 25000
 DEFAULT_STATESTORED_WEBSERVER_PORT = 25010
 DEFAULT_CATALOGD_WEBSERVER_PORT = 25020
@@ -92,17 +93,17 @@ class ImpalaCluster(object):
     Helpful to confirm that processes have been killed.
     """
     if self.docker_network is None:
-      self.__impalads, self.__statestoreds, self.__catalogd, self.__admissiond =\
+      self.__impalads, self.__statestoreds, self.__catalogds, self.__admissiond =\
           self.__build_impala_process_lists()
     else:
-      self.__impalads, self.__statestoreds, self.__catalogd, self.__admissiond =\
+      self.__impalads, self.__statestoreds, self.__catalogds, self.__admissiond =\
           self.__find_docker_containers()
     admissiond_str = ""
     if self.use_admission_service:
       admissiond_str = "/%d admissiond" % (1 if self.__admissiond else 0)
 
     LOG.debug("Found %d impalad/%d statestored/%d catalogd%s process(es)" %
-        (len(self.__impalads), len(self.__statestoreds), 1 if self.__catalogd else 0,
+        (len(self.__impalads), len(self.__statestoreds), len(self.__catalogds),
          admissiond_str))
 
   @property
@@ -123,8 +124,15 @@ class ImpalaCluster(object):
 
   @property
   def catalogd(self):
-    """Returns the catalogd process, or None if no catalogd process was found"""
-    return self.__catalogd
+    # If no catalogd process exists, return None. Otherwise, return first catalogd
+    return self.__catalogds[0] if len(self.__catalogds) > 0 else None
+
+  def catalogds(self):
+    """Returns a list of the known catalogd processes"""
+    return self.__catalogds
+
+  def get_first_catalogd(self):
+    return self.catalogds[0]
 
   @property
   def admissiond(self):
@@ -231,7 +239,7 @@ class ImpalaCluster(object):
     """
     impalads = list()
     statestored = list()
-    catalogd = None
+    catalogds = list()
     admissiond = None
     daemons = ['impalad', 'catalogd', 'statestored', 'admissiond']
     for binary, process in find_user_processes(daemons):
@@ -253,12 +261,13 @@ class ImpalaCluster(object):
       elif binary == 'statestored':
         statestored.append(StateStoreProcess(cmdline))
       elif binary == 'catalogd':
-        catalogd = CatalogdProcess(cmdline)
+        catalogds.append(CatalogdProcess(cmdline))
       elif binary == 'admissiond':
         admissiond = AdmissiondProcess(cmdline)
 
     self.__sort_impalads(impalads)
-    return impalads, statestored, catalogd, admissiond
+    self.__sort_catalogds(catalogds)
+    return impalads, statestored, catalogds, admissiond
 
   def __find_docker_containers(self):
     """
@@ -266,7 +275,7 @@ class ImpalaCluster(object):
     """
     impalads = []
     statestoreds = []
-    catalogd = None
+    catalogds = []
     admissiond = None
     output = check_output(["docker", "network", "inspect", self.docker_network],
                           universal_newlines=True)
@@ -292,15 +301,15 @@ class ImpalaCluster(object):
         statestoreds.append(StateStoreProcess(args, container_id=container_id,
                                               port_map=port_map))
       elif executable == 'catalogd':
-        assert catalogd is None
-        catalogd = CatalogdProcess(args, container_id=container_id,
-                                   port_map=port_map)
+        catalogds.append(CatalogdProcess(args, container_id=container_id,
+                                         port_map=port_map))
       elif executable == 'admissiond':
         assert admissiond is None
         admissiond = AdmissiondProcess(args, container_id=container_id,
                                        port_map=port_map)
     self.__sort_impalads(impalads)
-    return impalads, statestoreds, catalogd, admissiond
+    self.__sort_catalogds(catalogds)
+    return impalads, statestoreds, catalogds, admissiond
 
   def __sort_impalads(self, impalads):
     """Does an in-place sort of a list of ImpaladProcess objects into a canonical order.
@@ -308,6 +317,13 @@ class ImpalaCluster(object):
     first one. We need to use a port that is exposed and mapped to a host port for
     the containerised cluster."""
     impalads.sort(key=lambda i: i.service.hs2_port)
+
+  def __sort_catalogds(self, catalogds):
+    """Does an in-place sort of a list of CatalogdProcess objects into a canonical order.
+    We order them by their service port, so that get_first_catalogd() always returns the
+    first one. We need to use a port that is exposed and mapped to a host port for
+    the containerised cluster."""
+    catalogds.sort(key=lambda i: i.service.service_port)
 
 
 # Represents a process running on a machine and common actions that can be performed
@@ -573,9 +589,11 @@ class CatalogdProcess(BaseImpalaProcess):
   def __get_port(self):
     return int(self._get_port('catalog_service_port', DEFAULT_CATALOG_SERVICE_PORT))
 
-  def start(self, wait_until_ready=True):
+  def start(self, wait_until_ready=True, additional_args=None):
     """Starts catalogd and waits until the service is ready to accept connections."""
     restart_args = self.cmd[1:]
+    if additional_args:
+      restart_args = restart_args + [additional_args]
     LOG.info("Starting Catalogd process: {0}".format(restart_args))
     run_daemon("catalogd", restart_args)
     if wait_until_ready:

@@ -400,6 +400,16 @@
     "key": "catalog.ready"
   },
   {
+    "description": "The address of the Active Catalog Server daemon.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Address of Active Catalog daemon",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "catalog.active-catalogd-address"
+  },
+  {
     "description": "The number of clients currently in use by the Catalog Server client cache.",
     "contexts": [
       "IMPALAD"
@@ -1080,6 +1090,26 @@
     "units": "NONE",
     "kind": "GAUGE",
     "key": "impala.thrift-server.CatalogService.timedout-cnxn-requests"
+  },
+  {
+    "description": "Current active status of this Catalog Server daemon.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "The active status of Catalog Server daemon",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "catalog-server.ha-active-status"
+  },
+  {
+    "description": "The number of active status changes made to this Catalog Server Daemon.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Number of active status changes",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "catalog-server.ha-number-active-status-change"
   },
   {
     "description": "The number of active connections to this StateStore's service.",
@@ -1849,6 +1879,26 @@
     "units": "UNIT",
     "kind": "COUNTER",
     "key": "statestore.num-update-catalogd"
+  },
+  {
+    "description": "The number of requests for clearing topic entries from catalogd.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "Number of request for clearing topic entries",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "statestore.num-clear-topic-entries-requests"
+  },
+  {
+    "description": "The address of the Active Catalog Server daemon.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "Address of Active Catalog daemon",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "statestore.active-catalogd-address"
   },
   {
     "description": "The number of registered Statestore subscribers.",

@@ -17,6 +17,7 @@
 //
 // This file contains the main() function for the catalog daemon process,
 
+#include <gflags/gflags.h>
 #include <jni.h>
 
 #include "catalog/catalog-server.h"
@@ -50,8 +51,18 @@ using namespace impala;
 using namespace apache::thrift;
 
 int CatalogdMain(int argc, char** argv) {
-  FLAGS_webserver_port = 25020;
-  FLAGS_state_store_subscriber_port = 23020;
+  // Set webserver_port as 25020 and state_store_subscriber_port as 23020 for catalogd
+  // if and only if these two ports had not been set explicitly in command line.
+  // An Impala cluster could be launched with more than one catalogd instances when
+  // CatalogD HA is enabled. These two ports should be set explicitly in command line
+  // with different values for each catalogd instance when launching a mini-cluster.
+  if (google::GetCommandLineFlagInfoOrDie("webserver_port").is_default) {
+    FLAGS_webserver_port = 25020;
+  }
+  if (google::GetCommandLineFlagInfoOrDie("state_store_subscriber_port").is_default) {
+    FLAGS_state_store_subscriber_port = 23020;
+  }
+
   InitCommonRuntime(argc, argv, true);
   InitFeSupport();
 
