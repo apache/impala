@@ -21,4 +21,12 @@ set -euo pipefail
 . $IMPALA_HOME/bin/report_build_error.sh
 setup_report_build_error
 
+# If this directory doesn't exist, then the stop command will immediately error
+# trying to write to this directory. The stop won't be issued, and shutdown will
+# take 30 seconds longer.
+RANGER_LOG_DIR="${IMPALA_CLUSTER_LOGS_DIR}/ranger"
+if [[ ! -d "${RANGER_LOG_DIR}" ]]; then
+    mkdir -p "${RANGER_LOG_DIR}"
+fi
+
 "${RANGER_HOME}"/ews/ranger-admin-services.sh stop
