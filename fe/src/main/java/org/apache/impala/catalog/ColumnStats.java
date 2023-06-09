@@ -18,10 +18,10 @@
 package org.apache.impala.catalog;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.time.LocalDate;
-import java.util.Arrays;
 import java.util.Set;
+
+import javax.annotation.Nullable;
 
 import org.apache.hadoop.hive.metastore.api.BinaryColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.BooleanColumnStatsData;
@@ -152,7 +152,13 @@ public class ColumnStats {
    * Creates ColumnStats from the given expr. Sets numDistinctValues and if the expr
    * is a SlotRef also numNulls.
    */
-  public static ColumnStats fromExpr(Expr expr) {
+  public static ColumnStats fromExpr(Expr expr) { return fromExpr(expr, null); }
+
+  /**
+   * A variant of {@link #fromExpr(Expr)} that may reduce numDistinctValues
+   * if 'ignoreColumn' contains expr's column.
+   */
+  public static ColumnStats fromExpr(Expr expr, @Nullable Set<Column> ignoreColumn) {
     Preconditions.checkNotNull(expr);
     Preconditions.checkState(expr.getType().isValid(), expr);
     Type colType = expr.getType();
@@ -160,8 +166,14 @@ public class ColumnStats {
     stats.setNumDistinctValues(expr.getNumDistinctValues());
     SlotRef slotRef = expr.unwrapSlotRef(false);
     if (slotRef == null) return stats;
-    ColumnStats slotStats = slotRef.getDesc().getStats();
+    ColumnStats slotStats = ignoreColumn != null ?
+        slotRef.getDesc().getStats(ignoreColumn) :
+        slotRef.getDesc().getStats();
     if (slotStats == null) return stats;
+    if (ignoreColumn != null && slotStats.hasNumDistinctValues()
+        && slotStats.getNumDistinctValues() < stats.getNumDistinctValues()) {
+      stats.setNumDistinctValues(slotStats.getNumDistinctValues());
+    }
     stats.numNulls_ = slotStats.getNumNulls();
     if (!colType.isFixedLengthType()) {
       stats.avgSerializedSize_ = slotStats.getAvgSerializedSize();

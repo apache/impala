@@ -20,7 +20,9 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
@@ -179,6 +181,32 @@ public class SlotDescriptor {
   public boolean isScanSlot() { return path_ != null && path_.isRootedAtTable(); }
   public Column getColumn() { return !isScanSlot() ? null : path_.destColumn(); }
 
+  /**
+   * Populate 'sourceColumns' with Column(s) referred by this SlotDesc.
+   * Return true if this SlotDesc refer a column or all expr in sourceExprs_ refer to
+   * a Column. Otherwise, return false and no Column will be added into 'sourceColumns'.
+   */
+  protected boolean collectColumns(Set<Column> sourceColumns) {
+    Column c = getColumn();
+    if (c != null) {
+      sourceColumns.add(c);
+      return true;
+    } else if (!sourceExprs_.isEmpty()) {
+      // Only populate sourceColumns if all expr in sourceExprs_ refers to a column.
+      Set<Column> thisSourceColumns = new HashSet<>();
+      for (int i = 0; i < sourceExprs_.size(); ++i) {
+        SlotRef slotRef = sourceExprs_.get(i).unwrapSlotRef(false);
+        if (slotRef == null || !slotRef.hasDesc() || slotRef.getDesc() == this
+            || !slotRef.getDesc().collectColumns(thisSourceColumns)) {
+          return false;
+        }
+      }
+      sourceColumns.addAll(thisSourceColumns);
+      return true;
+    }
+    return false;
+  }
+
   public boolean isVirtualColumn() {
     if (path_ == null) return false;
     return path_.getVirtualColumnType() != TVirtualColumnType.NONE;
@@ -199,6 +227,30 @@ public class SlotDescriptor {
       }
     }
     return stats_;
+  }
+
+  public ColumnStats getStats(Set<Column> ignoreColumns) {
+    Preconditions.checkNotNull(ignoreColumns);
+    ColumnStats thisStats = getStats();
+    if (!thisStats.hasNumDistinctValues()) return thisStats;
+
+    Set<Column> sourceColumns = new HashSet<>();
+    boolean allHasSourceColumn = collectColumns(sourceColumns);
+    if (!allHasSourceColumn) return thisStats;
+
+    long ndv = 0;
+    for (Column column : sourceColumns) {
+      if (!column.getStats().hasNumDistinctValues()) return thisStats;
+      if (!ignoreColumns.contains(column)) {
+        ndv += column.getStats().getNumDistinctValues();
+      }
+    }
+    if (thisStats.getNumDistinctValues() > ndv) {
+      // Clone thisStats and lower the ndv to avoid modifying Column.stats_.
+      thisStats = thisStats.clone();
+      thisStats.setNumDistinctValues(ndv);
+    }
+    return thisStats;
   }
 
   private void getEnclosingStructSlotAndTupleDescs(List<SlotDescriptor> slotDescs,

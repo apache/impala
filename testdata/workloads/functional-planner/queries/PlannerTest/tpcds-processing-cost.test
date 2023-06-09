@@ -270,8 +270,8 @@ with  cross_items as
  order by channel,i_brand_id,i_class_id,i_category_id
 LIMIT 100
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=716.38MB Threads=163
-Per-Host Resource Estimates: Memory=2.36GB
+Max Per-Host Resource Reservation: Memory=668.62MB Threads=163
+Per-Host Resource Estimates: Memory=2.34GB
 F80:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[606] cpu-comparison-result=157 [max(1 (self) vs 157 (sum children))]
@@ -287,8 +287,8 @@ PLAN-ROOT SINK
 |  in pipelines: 129(GETNEXT)
 |
 F79:PLAN FRAGMENT [HASH(CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(channel) WHEN 105 THEN murmur_hash(channel) WHEN 106 THEN murmur_hash(channel) WHEN 107 THEN murmur_hash(channel) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_brand_id) WHEN 105 THEN murmur_hash(i_brand_id) WHEN 106 THEN murmur_hash(i_brand_id) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_class_id) WHEN 105 THEN murmur_hash(i_class_id) WHEN 106 THEN murmur_hash(NULL) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_category_id) WHEN 105 THEN murmur_hash(NULL) WHEN 106 THEN murmur_hash(NULL) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END)] hosts=3 instances=6 (adjusted from 48)
-Per-Instance Resources: mem-estimate=77.05MB mem-reservation=48.31MB thread-reservation=1
-max-parallelism=6 segment-costs=[3516572, 3936100, 400, 6] cpu-comparison-result=157 [max(6 (self) vs 157 (sum children))]
+Per-Instance Resources: mem-estimate=70.05MB mem-reservation=30.44MB thread-reservation=1
+max-parallelism=6 segment-costs=[2028749, 2270779, 400, 6] cpu-comparison-result=157 [max(6 (self) vs 157 (sum children))]
 129:TOP-N [LIMIT=100]
 |  order by: CASE valid_tid(104,105,106,107,108) WHEN 104 THEN channel WHEN 105 THEN channel WHEN 106 THEN channel WHEN 107 THEN channel WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_brand_id WHEN 105 THEN i_brand_id WHEN 106 THEN i_brand_id WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_class_id WHEN 105 THEN i_class_id WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_category_id WHEN 105 THEN NULL WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC
 |  mem-estimate=4.69KB mem-reservation=0B thread-reservation=0
@@ -298,8 +298,8 @@ max-parallelism=6 segment-costs=[3516572, 3936100, 400, 6] cpu-comparison-result
 128:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(104,105,106,107,108) IN (CAST(104 AS INT), CAST(105 AS INT), CAST(106 AS INT), CAST(107 AS INT), CAST(108 AS INT)), CASE valid_tid(104,105,106,107,108) WHEN CAST(104 AS INT) THEN sum(sales) WHEN CAST(105 AS INT) THEN sum(sales) WHEN CAST(106 AS INT) THEN sum(sales) WHEN CAST(107 AS INT) THEN sum(sales) WHEN CAST(108 AS INT) THEN sum(sales) END), aggif(valid_tid(104,105,106,107,108) IN (CAST(104 AS INT), CAST(105 AS INT), CAST(106 AS INT), CAST(107 AS INT), CAST(108 AS INT)), CASE valid_tid(104,105,106,107,108) WHEN CAST(104 AS INT) THEN sum(number_sales) WHEN CAST(105 AS INT) THEN sum(number_sales) WHEN CAST(106 AS INT) THEN sum(number_sales) WHEN CAST(107 AS INT) THEN sum(number_sales) WHEN CAST(108 AS INT) THEN sum(number_sales) END)
 |  group by: CASE valid_tid(104,105,106,107,108) WHEN CAST(104 AS INT) THEN channel WHEN CAST(105 AS INT) THEN channel WHEN CAST(106 AS INT) THEN channel WHEN CAST(107 AS INT) THEN channel WHEN CAST(108 AS INT) THEN NULL END, CASE valid_tid(104,105,106,107,108) WHEN CAST(104 AS INT) THEN i_brand_id WHEN CAST(105 AS INT) THEN i_brand_id WHEN CAST(106 AS INT) THEN i_brand_id WHEN CAST(107 AS INT) THEN NULL WHEN CAST(108 AS INT) THEN NULL END, CASE valid_tid(104,105,106,107,108) WHEN CAST(104 AS INT) THEN i_class_id WHEN CAST(105 AS INT) THEN i_class_id WHEN CAST(106 AS INT) THEN NULL WHEN CAST(107 AS INT) THEN NULL WHEN CAST(108 AS INT) THEN NULL END, CASE valid_tid(104,105,106,107,108) WHEN CAST(104 AS INT) THEN i_category_id WHEN CAST(105 AS INT) THEN NULL WHEN CAST(106 AS INT) THEN NULL WHEN CAST(107 AS INT) THEN NULL WHEN CAST(108 AS INT) THEN NULL END, CASE valid_tid(104,105,106,107,108) WHEN CAST(104 AS INT) THEN CAST(104 AS INT) WHEN CAST(105 AS INT) THEN CAST(105 AS INT) WHEN CAST(106 AS INT) THEN CAST(106 AS INT) WHEN CAST(107 AS INT) THEN CAST(107 AS INT) WHEN CAST(108 AS INT) THEN CAST(108 AS INT) END
-|  mem-estimate=10.00MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
-|  tuple-ids=109 row-size=52B cardinality=562.30K cost=3936100
+|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  tuple-ids=109 row-size=52B cardinality=324.40K cost=2270779
 |  in pipelines: 128(GETNEXT), 215(OPEN)
 |
 215:AGGREGATE [FINALIZE]
@@ -318,18 +318,18 @@ max-parallelism=6 segment-costs=[3516572, 3936100, 400, 6] cpu-comparison-result
 |  Class 4
 |    output: sum:merge(sales), sum:merge(number_sales)
 |    group by: NULL, NULL, NULL, NULL
-|  mem-estimate=64.00MB mem-reservation=39.81MB thread-reservation=0
-|  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=562.30K cost=3373800
+|  mem-estimate=57.00MB mem-reservation=25.69MB thread-reservation=0
+|  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=324.40K cost=1946382
 |  in pipelines: 215(GETNEXT), 151(OPEN), 179(OPEN), 207(OPEN)
 |
 214:EXCHANGE [HASH(CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(channel) WHEN 105 THEN murmur_hash(channel) WHEN 106 THEN murmur_hash(channel) WHEN 107 THEN murmur_hash(channel) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_brand_id) WHEN 105 THEN murmur_hash(i_brand_id) WHEN 106 THEN murmur_hash(i_brand_id) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_class_id) WHEN 105 THEN murmur_hash(i_class_id) WHEN 106 THEN murmur_hash(NULL) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_category_id) WHEN 105 THEN murmur_hash(NULL) WHEN 106 THEN murmur_hash(NULL) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END)]
 |  mem-estimate=13.05MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=562.30K cost=142772
+|  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=324.40K cost=82367
 |  in pipelines: 151(GETNEXT), 179(GETNEXT), 207(GETNEXT)
 |
 F78:PLAN FRAGMENT [RANDOM] hosts=3 instances=12 (adjusted from 48)
-Per-Instance Resources: mem-estimate=68.27MB mem-reservation=28.94MB thread-reservation=1
-max-parallelism=12 segment-costs=[749813, 429878, 215944, 13294224, 142772] cpu-comparison-result=157 [max(12 (self) vs 157 (sum children))]
+Per-Instance Resources: mem-estimate=68.27MB mem-reservation=25.94MB thread-reservation=1
+max-parallelism=12 segment-costs=[749813, 429878, 215944, 13294224, 82367] cpu-comparison-result=157 [max(12 (self) vs 157 (sum children))]
 127:AGGREGATE [STREAMING]
 |  Class 0
 |    output: sum(sales), sum(number_sales)
@@ -346,8 +346,8 @@ max-parallelism=12 segment-costs=[749813, 429878, 215944, 13294224, 142772] cpu-
 |  Class 4
 |    output: sum(sales), sum(number_sales)
 |    group by: NULL, NULL, NULL, NULL
-|  mem-estimate=50.00MB mem-reservation=27.00MB thread-reservation=0
-|  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=562.30K cost=8308890
+|  mem-estimate=50.00MB mem-reservation=24.00MB thread-reservation=0
+|  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=324.40K cost=8308890
 |  in pipelines: 151(GETNEXT), 179(GETNEXT), 207(GETNEXT)
 |
 00:UNION
@@ -7089,8 +7089,8 @@ ORDER BY channel,
 LIMIT 100;
 
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=103.81MB Threads=26
-Per-Host Resource Estimates: Memory=331MB
+Max Per-Host Resource Reservation: Memory=101.94MB Threads=26
+Per-Host Resource Estimates: Memory=328MB
 F13:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.05MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[708] cpu-comparison-result=32 [max(1 (self) vs 32 (sum children))]
@@ -7106,8 +7106,8 @@ PLAN-ROOT SINK
 |  in pipelines: 17(GETNEXT)
 |
 F12:PLAN FRAGMENT [HASH(channel,col_name,d_year,d_qoy,i_category)] hosts=3 instances=6 (adjusted from 48)
-Per-Instance Resources: mem-estimate=14.14MB mem-reservation=2.88MB thread-reservation=1
-max-parallelism=6 segment-costs=[972054, 500, 8] cpu-comparison-result=32 [max(6 (self) vs 32 (sum children))]
+Per-Instance Resources: mem-estimate=12.57MB mem-reservation=1.94MB thread-reservation=1
+max-parallelism=6 segment-costs=[499288, 500, 8] cpu-comparison-result=32 [max(6 (self) vs 32 (sum children))]
 17:TOP-N [LIMIT=100]
 |  order by: channel ASC, col_name ASC, d_year ASC, d_qoy ASC, i_category ASC
 |  mem-estimate=7.22KB mem-reservation=0B thread-reservation=0
@@ -7117,24 +7117,24 @@ max-parallelism=6 segment-costs=[972054, 500, 8] cpu-comparison-result=32 [max(6
 27:AGGREGATE [FINALIZE]
 |  output: count:merge(*), sum:merge(ext_sales_price)
 |  group by: channel, col_name, d_year, d_qoy, i_category
-|  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=11 row-size=74B cardinality=137.37K cost=961604
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=11 row-size=74B cardinality=70.56K cost=493920
 |  in pipelines: 27(GETNEXT), 01(OPEN), 07(OPEN), 11(OPEN)
 |
 26:EXCHANGE [HASH(channel,col_name,d_year,d_qoy,i_category)]
-|  mem-estimate=4.14MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=11 row-size=74B cardinality=137.37K cost=10450
+|  mem-estimate=2.57MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=11 row-size=74B cardinality=70.56K cost=5368
 |  in pipelines: 01(GETNEXT), 07(GETNEXT), 11(GETNEXT)
 |
 F11:PLAN FRAGMENT [RANDOM] hosts=3 instances=12 (adjusted from 48)
 Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
 Per-Instance Resources: mem-estimate=27.83MB mem-reservation=3.00MB thread-reservation=1
-max-parallelism=12 segment-costs=[97906925, 10450] cpu-comparison-result=32 [max(21 (self) vs 32 (sum children))]
+max-parallelism=12 segment-costs=[97906925, 5368] cpu-comparison-result=32 [max(21 (self) vs 32 (sum children))]
 16:AGGREGATE [STREAMING]
 |  output: count(*), sum(ext_sales_price)
 |  group by: channel, col_name, d_year, d_qoy, i_category
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=11 row-size=74B cardinality=137.37K cost=961604
+|  tuple-ids=11 row-size=74B cardinality=70.56K cost=961604
 |  in pipelines: 01(GETNEXT), 07(GETNEXT), 11(GETNEXT)
 |
 00:UNION

@@ -93,7 +93,7 @@ PLAN-ROOT SINK
 |  output: sum(total_sales)
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=26 row-size=44B cardinality=10.46K
+|  tuple-ids=26 row-size=44B cardinality=8.85K
 |  in pipelines: 31(GETNEXT), 10(OPEN), 20(OPEN), 30(OPEN)
 |
 00:UNION
@@ -415,7 +415,7 @@ PLAN-ROOT SINK
 |  in pipelines: 32(GETNEXT)
 |
 F22:PLAN FRAGMENT [HASH(i_item_id)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=10.29MB mem-reservation=1.94MB thread-reservation=1
+Per-Host Resources: mem-estimate=10.26MB mem-reservation=1.94MB thread-reservation=1
 32:TOP-N [LIMIT=100]
 |  order by: i_item_id ASC, sum(total_sales) ASC
 |  mem-estimate=4.30KB mem-reservation=0B thread-reservation=0
@@ -426,12 +426,12 @@ Per-Host Resources: mem-estimate=10.29MB mem-reservation=1.94MB thread-reservati
 |  output: sum:merge(total_sales)
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=26 row-size=44B cardinality=10.46K
+|  tuple-ids=26 row-size=44B cardinality=8.85K
 |  in pipelines: 55(GETNEXT), 39(OPEN), 46(OPEN), 53(OPEN)
 |
 54:EXCHANGE [HASH(i_item_id)]
-|  mem-estimate=293.89KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=26 row-size=44B cardinality=10.46K
+|  mem-estimate=270.81KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=26 row-size=44B cardinality=8.85K
 |  in pipelines: 39(GETNEXT), 46(GETNEXT), 53(GETNEXT)
 |
 F21:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -440,7 +440,7 @@ Per-Host Resources: mem-estimate=20.78MB mem-reservation=3.94MB thread-reservati
 |  output: sum(total_sales)
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=26 row-size=44B cardinality=10.46K
+|  tuple-ids=26 row-size=44B cardinality=8.85K
 |  in pipelines: 39(GETNEXT), 46(GETNEXT), 53(GETNEXT)
 |
 00:UNION
@@ -909,7 +909,7 @@ PLAN-ROOT SINK
 |  in pipelines: 32(GETNEXT)
 |
 F22:PLAN FRAGMENT [HASH(i_item_id)] hosts=3 instances=6
-Per-Instance Resources: mem-estimate=10.43MB mem-reservation=1.94MB thread-reservation=1
+Per-Instance Resources: mem-estimate=10.41MB mem-reservation=1.94MB thread-reservation=1
 32:TOP-N [LIMIT=100]
 |  order by: i_item_id ASC, sum(total_sales) ASC
 |  mem-estimate=4.30KB mem-reservation=0B thread-reservation=0
@@ -920,12 +920,12 @@ Per-Instance Resources: mem-estimate=10.43MB mem-reservation=1.94MB thread-reser
 |  output: sum:merge(total_sales)
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=26 row-size=44B cardinality=10.46K
+|  tuple-ids=26 row-size=44B cardinality=8.85K
 |  in pipelines: 55(GETNEXT), 39(OPEN), 46(OPEN), 53(OPEN)
 |
 54:EXCHANGE [HASH(i_item_id)]
-|  mem-estimate=437.89KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=26 row-size=44B cardinality=10.46K
+|  mem-estimate=414.81KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=26 row-size=44B cardinality=8.85K
 |  in pipelines: 39(GETNEXT), 46(GETNEXT), 53(GETNEXT)
 |
 F21:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -934,7 +934,7 @@ Per-Instance Resources: mem-estimate=21.48MB mem-reservation=3.94MB thread-reser
 |  output: sum(total_sales)
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=26 row-size=44B cardinality=10.46K
+|  tuple-ids=26 row-size=44B cardinality=8.85K
 |  in pipelines: 39(GETNEXT), 46(GETNEXT), 53(GETNEXT)
 |
 00:UNION

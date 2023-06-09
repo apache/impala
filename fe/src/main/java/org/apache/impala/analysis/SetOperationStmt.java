@@ -18,8 +18,11 @@
 package org.apache.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.common.AnalysisException;
@@ -621,14 +624,27 @@ public class SetOperationStmt extends QueryStmt {
 
     // Compute column stats for the materialized slots from the source exprs.
     List<ColumnStats> columnStats = new ArrayList<>();
+    List<Set<Column>> sourceColumns = new ArrayList<>();
     for (int i = 0; i < operands_.size(); ++i) {
       List<Expr> selectExprs = operands_.get(i).getQueryStmt().getResultExprs();
       for (int j = 0; j < selectExprs.size(); ++j) {
-        ColumnStats statsToAdd = ColumnStats.fromExpr(selectExprs.get(j));
         if (i == 0) {
+          ColumnStats statsToAdd = ColumnStats.fromExpr(selectExprs.get(j));
           columnStats.add(statsToAdd);
+          sourceColumns.add(new HashSet<>());
         } else {
+          ColumnStats statsToAdd = columnStats.get(j).hasNumDistinctValues() ?
+              ColumnStats.fromExpr(selectExprs.get(j), sourceColumns.get(j)) :
+              ColumnStats.fromExpr(selectExprs.get(j));
           columnStats.get(j).add(statsToAdd);
+        }
+
+        if (columnStats.get(j).hasNumDistinctValues()) {
+          // Collect expr columns to keep ndv low in later stats addition.
+          SlotRef slotRef = selectExprs.get(j).unwrapSlotRef(false);
+          if (slotRef != null && slotRef.hasDesc()) {
+            slotRef.getDesc().collectColumns(sourceColumns.get(j));
+          }
         }
       }
     }

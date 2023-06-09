@@ -96,7 +96,7 @@ PLAN-ROOT SINK
 |  other predicates: CAST(sum(sales_cnt) AS DECIMAL(17,2)) / CAST(sum(sales_cnt) AS DECIMAL(17,2)) < CAST(0.9 AS DECIMAL(1,1))
 |  runtime filters: RF004[min_max] <- i_brand_id, RF005[min_max] <- i_category_id, RF006[min_max] <- i_class_id, RF007[min_max] <- i_manufact_id
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=14,30 row-size=88B cardinality=175
+|  tuple-ids=14,30 row-size=88B cardinality=525
 |  in pipelines: 23(GETNEXT), 47(OPEN)
 |
 |--47:AGGREGATE [FINALIZE]
@@ -104,7 +104,7 @@ PLAN-ROOT SINK
 |  |  group by: d_year, i_brand_id, i_class_id, i_category_id, i_manufact_id
 |  |  having: d_year = CAST(2001 AS INT)
 |  |  mem-estimate=10.00MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
-|  |  tuple-ids=30 row-size=44B cardinality=175
+|  |  tuple-ids=30 row-size=44B cardinality=525
 |  |  in pipelines: 47(GETNEXT), 46(OPEN)
 |  |
 |  46:AGGREGATE [FINALIZE]
@@ -339,7 +339,7 @@ PLAN-ROOT SINK
 |  group by: d_year, i_brand_id, i_class_id, i_category_id, i_manufact_id
 |  having: d_year = CAST(2002 AS INT)
 |  mem-estimate=10.00MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
-|  tuple-ids=14 row-size=44B cardinality=175
+|  tuple-ids=14 row-size=44B cardinality=525
 |  in pipelines: 23(GETNEXT), 22(OPEN)
 |
 22:AGGREGATE [FINALIZE]
@@ -588,7 +588,7 @@ PLAN-ROOT SINK
 |  in pipelines: 49(GETNEXT)
 |
 F36:PLAN FRAGMENT [HASH(i_brand_id,i_category_id,i_class_id,i_manufact_id)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=1.99MB mem-reservation=1.94MB thread-reservation=1
+Per-Host Resources: mem-estimate=2.10MB mem-reservation=1.94MB thread-reservation=1
 49:TOP-N [LIMIT=100]
 |  order by: sales_cnt - sales_cnt ASC, sales_amt - sales_amt ASC
 |  mem-estimate=7.03KB mem-reservation=0B thread-reservation=0
@@ -601,12 +601,12 @@ Per-Host Resources: mem-estimate=1.99MB mem-reservation=1.94MB thread-reservatio
 |  other predicates: CAST(sum(sales_cnt) AS DECIMAL(17,2)) / CAST(sum(sales_cnt) AS DECIMAL(17,2)) < CAST(0.9 AS DECIMAL(1,1))
 |  runtime filters: RF004[min_max] <- i_brand_id, RF005[min_max] <- i_category_id, RF006[min_max] <- i_class_id, RF007[min_max] <- i_manufact_id
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=14,30 row-size=88B cardinality=175
+|  tuple-ids=14,30 row-size=88B cardinality=525
 |  in pipelines: 65(GETNEXT), 81(OPEN)
 |
 |--83:EXCHANGE [HASH(i_brand_id,i_category_id,i_class_id,i_manufact_id)]
-|  |  mem-estimate=27.12KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=30 row-size=44B cardinality=175
+|  |  mem-estimate=81.35KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=30 row-size=44B cardinality=525
 |  |  in pipelines: 81(GETNEXT)
 |  |
 |  F35:PLAN FRAGMENT [HASH(d_year,i_brand_id,i_class_id,i_category_id,i_manufact_id)] hosts=3 instances=3
@@ -616,7 +616,7 @@ Per-Host Resources: mem-estimate=1.99MB mem-reservation=1.94MB thread-reservatio
 |  |  group by: d_year, i_brand_id, i_class_id, i_category_id, i_manufact_id
 |  |  having: d_year = CAST(2001 AS INT)
 |  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  |  tuple-ids=30 row-size=44B cardinality=175
+|  |  tuple-ids=30 row-size=44B cardinality=525
 |  |  in pipelines: 81(GETNEXT), 79(OPEN)
 |  |
 |  80:EXCHANGE [HASH(d_year,i_brand_id,i_class_id,i_category_id,i_manufact_id)]
@@ -953,8 +953,8 @@ Per-Host Resources: mem-estimate=1.99MB mem-reservation=1.94MB thread-reservatio
 |     in pipelines: 25(GETNEXT)
 |
 82:EXCHANGE [HASH(i_brand_id,i_category_id,i_class_id,i_manufact_id)]
-|  mem-estimate=27.12KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=14 row-size=44B cardinality=175
+|  mem-estimate=81.35KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=14 row-size=44B cardinality=525
 |  in pipelines: 65(GETNEXT)
 |
 F17:PLAN FRAGMENT [HASH(d_year,i_brand_id,i_class_id,i_category_id,i_manufact_id)] hosts=3 instances=3
@@ -964,7 +964,7 @@ Per-Host Resources: mem-estimate=11.58MB mem-reservation=2.88MB thread-reservati
 |  group by: d_year, i_brand_id, i_class_id, i_category_id, i_manufact_id
 |  having: d_year = CAST(2002 AS INT)
 |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=14 row-size=44B cardinality=175
+|  tuple-ids=14 row-size=44B cardinality=525
 |  in pipelines: 65(GETNEXT), 63(OPEN)
 |
 64:EXCHANGE [HASH(d_year,i_brand_id,i_class_id,i_category_id,i_manufact_id)]
@@ -1332,11 +1332,11 @@ Per-Instance Resources: mem-estimate=311.03KB mem-reservation=0B thread-reservat
 |  fk/pk conjuncts: assumed fk/pk
 |  other predicates: CAST(sum(sales_cnt) AS DECIMAL(17,2)) / CAST(sum(sales_cnt) AS DECIMAL(17,2)) < CAST(0.9 AS DECIMAL(1,1))
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=14,30 row-size=88B cardinality=175
+|  tuple-ids=14,30 row-size=88B cardinality=525
 |  in pipelines: 65(GETNEXT), 81(OPEN)
 |
 |--F38:PLAN FRAGMENT [HASH(i_brand_id,i_category_id,i_class_id,i_manufact_id)] hosts=3 instances=6
-|  |  Per-Instance Resources: mem-estimate=1.99MB mem-reservation=1.94MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=2.09MB mem-reservation=1.94MB thread-reservation=1
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: i_brand_id, i_category_id, i_class_id, i_manufact_id
@@ -1344,8 +1344,8 @@ Per-Instance Resources: mem-estimate=311.03KB mem-reservation=0B thread-reservat
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  83:EXCHANGE [HASH(i_brand_id,i_category_id,i_class_id,i_manufact_id)]
-|  |  mem-estimate=51.72KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=30 row-size=44B cardinality=175
+|  |  mem-estimate=155.18KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=30 row-size=44B cardinality=525
 |  |  in pipelines: 81(GETNEXT)
 |  |
 |  F35:PLAN FRAGMENT [HASH(d_year,i_brand_id,i_class_id,i_category_id,i_manufact_id)] hosts=3 instances=6
@@ -1355,7 +1355,7 @@ Per-Instance Resources: mem-estimate=311.03KB mem-reservation=0B thread-reservat
 |  |  group by: d_year, i_brand_id, i_class_id, i_category_id, i_manufact_id
 |  |  having: d_year = CAST(2001 AS INT)
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=30 row-size=44B cardinality=175
+|  |  tuple-ids=30 row-size=44B cardinality=525
 |  |  in pipelines: 81(GETNEXT), 79(OPEN)
 |  |
 |  80:EXCHANGE [HASH(d_year,i_brand_id,i_class_id,i_category_id,i_manufact_id)]
@@ -1767,8 +1767,8 @@ Per-Instance Resources: mem-estimate=311.03KB mem-reservation=0B thread-reservat
 |     in pipelines: 25(GETNEXT)
 |
 82:EXCHANGE [HASH(i_brand_id,i_category_id,i_class_id,i_manufact_id)]
-|  mem-estimate=51.72KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=14 row-size=44B cardinality=175
+|  mem-estimate=155.18KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=14 row-size=44B cardinality=525
 |  in pipelines: 65(GETNEXT)
 |
 F17:PLAN FRAGMENT [HASH(d_year,i_brand_id,i_class_id,i_category_id,i_manufact_id)] hosts=3 instances=6
@@ -1778,7 +1778,7 @@ Per-Instance Resources: mem-estimate=11.72MB mem-reservation=1.94MB thread-reser
 |  group by: d_year, i_brand_id, i_class_id, i_category_id, i_manufact_id
 |  having: d_year = CAST(2002 AS INT)
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=14 row-size=44B cardinality=175
+|  tuple-ids=14 row-size=44B cardinality=525
 |  in pipelines: 65(GETNEXT), 63(OPEN)
 |
 64:EXCHANGE [HASH(d_year,i_brand_id,i_class_id,i_category_id,i_manufact_id)]

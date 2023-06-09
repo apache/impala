@@ -56,10 +56,10 @@ ORDER BY channel,
 LIMIT 100;
 
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=33.69MB Threads=4
-Per-Host Resource Estimates: Memory=297MB
+Max Per-Host Resource Reservation: Memory=25.19MB Threads=4
+Per-Host Resource Estimates: Memory=290MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=296.94MB mem-reservation=33.69MB thread-reservation=4 runtime-filters-memory=6.00MB
+|  Per-Host Resources: mem-estimate=289.94MB mem-reservation=25.19MB thread-reservation=4 runtime-filters-memory=6.00MB
 PLAN-ROOT SINK
 |  output exprs: channel, col_name, d_year, d_qoy, i_category, count(*), sum(ext_sales_price)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -73,8 +73,8 @@ PLAN-ROOT SINK
 16:AGGREGATE [FINALIZE]
 |  output: count(*), sum(ext_sales_price)
 |  group by: channel, col_name, d_year, d_qoy, i_category
-|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
-|  tuple-ids=11 row-size=74B cardinality=137.37K
+|  mem-estimate=10.00MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  tuple-ids=11 row-size=74B cardinality=70.56K
 |  in pipelines: 16(GETNEXT), 01(OPEN), 07(OPEN), 12(OPEN)
 |
 00:UNION
@@ -229,8 +229,8 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=20B cardinality=130.03K
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=51.31MB Threads=19
-Per-Host Resource Estimates: Memory=626MB
+Max Per-Host Resource Reservation: Memory=49.44MB Threads=19
+Per-Host Resource Estimates: Memory=625MB
 F13:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -245,7 +245,7 @@ PLAN-ROOT SINK
 |  in pipelines: 17(GETNEXT)
 |
 F12:PLAN FRAGMENT [HASH(channel,col_name,d_year,d_qoy,i_category)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=13.46MB mem-reservation=4.75MB thread-reservation=1
+Per-Host Resources: mem-estimate=11.89MB mem-reservation=2.88MB thread-reservation=1
 17:TOP-N [LIMIT=100]
 |  order by: channel ASC, col_name ASC, d_year ASC, d_qoy ASC, i_category ASC
 |  mem-estimate=7.22KB mem-reservation=0B thread-reservation=0
@@ -255,13 +255,13 @@ Per-Host Resources: mem-estimate=13.46MB mem-reservation=4.75MB thread-reservati
 27:AGGREGATE [FINALIZE]
 |  output: count:merge(*), sum:merge(ext_sales_price)
 |  group by: channel, col_name, d_year, d_qoy, i_category
-|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=11 row-size=74B cardinality=137.37K
+|  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=11 row-size=74B cardinality=70.56K
 |  in pipelines: 27(GETNEXT), 01(OPEN), 07(OPEN), 11(OPEN)
 |
 26:EXCHANGE [HASH(channel,col_name,d_year,d_qoy,i_category)]
-|  mem-estimate=3.46MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=11 row-size=74B cardinality=137.37K
+|  mem-estimate=1.89MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=11 row-size=74B cardinality=70.56K
 |  in pipelines: 01(GETNEXT), 07(GETNEXT), 11(GETNEXT)
 |
 F11:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -270,7 +270,7 @@ Per-Host Resources: mem-estimate=70.93MB mem-reservation=16.69MB thread-reservat
 |  output: count(*), sum(ext_sales_price)
 |  group by: channel, col_name, d_year, d_qoy, i_category
 |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=11 row-size=74B cardinality=137.37K
+|  tuple-ids=11 row-size=74B cardinality=70.56K
 |  in pipelines: 01(GETNEXT), 07(GETNEXT), 11(GETNEXT)
 |
 00:UNION
@@ -480,8 +480,8 @@ Per-Host Resources: mem-estimate=70.93MB mem-reservation=16.69MB thread-reservat
    tuple-ids=0 row-size=20B cardinality=130.03K
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=75.69MB Threads=20
-Per-Host Resource Estimates: Memory=293MB
+Max Per-Host Resource Reservation: Memory=73.81MB Threads=20
+Per-Host Resource Estimates: Memory=290MB
 F13:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.05MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -496,7 +496,7 @@ PLAN-ROOT SINK
 |  in pipelines: 17(GETNEXT)
 |
 F12:PLAN FRAGMENT [HASH(channel,col_name,d_year,d_qoy,i_category)] hosts=3 instances=6
-Per-Instance Resources: mem-estimate=13.68MB mem-reservation=2.88MB thread-reservation=1
+Per-Instance Resources: mem-estimate=12.11MB mem-reservation=1.94MB thread-reservation=1
 17:TOP-N [LIMIT=100]
 |  order by: channel ASC, col_name ASC, d_year ASC, d_qoy ASC, i_category ASC
 |  mem-estimate=7.22KB mem-reservation=0B thread-reservation=0
@@ -506,13 +506,13 @@ Per-Instance Resources: mem-estimate=13.68MB mem-reservation=2.88MB thread-reser
 27:AGGREGATE [FINALIZE]
 |  output: count:merge(*), sum:merge(ext_sales_price)
 |  group by: channel, col_name, d_year, d_qoy, i_category
-|  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=11 row-size=74B cardinality=137.37K
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=11 row-size=74B cardinality=70.56K
 |  in pipelines: 27(GETNEXT), 01(OPEN), 07(OPEN), 11(OPEN)
 |
 26:EXCHANGE [HASH(channel,col_name,d_year,d_qoy,i_category)]
-|  mem-estimate=3.68MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=11 row-size=74B cardinality=137.37K
+|  mem-estimate=2.11MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=11 row-size=74B cardinality=70.56K
 |  in pipelines: 01(GETNEXT), 07(GETNEXT), 11(GETNEXT)
 |
 F11:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -522,7 +522,7 @@ Per-Instance Resources: mem-estimate=27.83MB mem-reservation=4.00MB thread-reser
 |  output: count(*), sum(ext_sales_price)
 |  group by: channel, col_name, d_year, d_qoy, i_category
 |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=11 row-size=74B cardinality=137.37K
+|  tuple-ids=11 row-size=74B cardinality=70.56K
 |  in pipelines: 01(GETNEXT), 07(GETNEXT), 11(GETNEXT)
 |
 00:UNION

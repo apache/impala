@@ -614,7 +614,7 @@ with t2 as (select * from functional.alltypestiny)
 select * from t1 union all select * from t2
 ---- PLAN
 WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,month)]
-|  partitions=16
+|  partitions=4
 |
 03:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
@@ -632,7 +632,7 @@ WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,
    row-size=89B cardinality=8
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,month)]
-|  partitions=16
+|  partitions=4
 |
 04:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
@@ -659,7 +659,7 @@ with t2 as (select * from functional.alltypestiny)
 select * from t1 union all select * from t2
 ---- PLAN
 WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,month)]
-|  partitions=16
+|  partitions=4
 |
 00:UNION
 |  row-size=89B cardinality=16
@@ -673,7 +673,7 @@ WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,
    row-size=89B cardinality=8
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,month)]
-|  partitions=16
+|  partitions=4
 |
 03:EXCHANGE [HASH(year,month)]
 |
