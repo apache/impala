@@ -1115,9 +1115,12 @@ class TestAsyncDDLTiming(TestDdlBase):
       # the execute call. This means that the sync and async cases are the same.
       assert client.get_state(handle) == pending_state
 
-      # Wait for the statement to finish with a timeout of 20 seconds
-      # (30 seconds without shortcircuit reads)
-      wait_time = 20 if IS_HDFS else 30
+      # Wait for the statement to finish with a timeout of 40 seconds
+      # (60 seconds without shortcircuit reads). There are other tests running
+      # in parallel and ASAN can be slow, so this timeout has been bumped
+      # substantially to avoid flakiness. The actual test case does not depend
+      # on the statement finishing in a particular amount of time.
+      wait_time = 40 if IS_HDFS else 60
       wait_start = time.time()
       self.wait_for_state(handle, finished_state, wait_time, client=client)
       wait_end = time.time()
