@@ -32,18 +32,6 @@ import org.apache.hadoop.io.Text;
  * interface.
  */
 public class BufferAlteringUdf extends UDF {
-  /**
-   * Increments the first byte by one in a Text and returns the result as a Text
-   */
-  public Text evaluate(Text text) throws ParseException {
-    if ((null == text) || ("".equals(text.toString()))) {
-      return null;
-    }
-    byte[] bytes = text.getBytes();
-
-    incrementByteArray(bytes);
-    return text;
-  }
 
   /**
    * Increments the first byte by one in a BytesWritable and returns the result as a
@@ -60,11 +48,10 @@ public class BufferAlteringUdf extends UDF {
   }
 
   /**
-   * Copies the source BytesWritable to the target BytesWritable, implicitly resizing it.
-   * After the copy, the first byte of the target BytesWritable is incremented by one.
+   * Copies the source BytesWritable to the target Text, implicitly resizing it.
+   * After the copy, the first byte of the target Text is incremented by one.
    */
-  public BytesWritable evaluate(BytesWritable target, BytesWritable source)
-      throws ParseException {
+  public Text evaluate(Text target, BytesWritable source) throws ParseException {
     if (null == source || null == target) {
       return null;
     }

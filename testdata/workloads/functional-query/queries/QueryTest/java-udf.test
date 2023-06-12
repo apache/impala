@@ -350,27 +350,6 @@ symbol='org.apache.impala.TestUdf';
 CatalogException: Variable arguments not supported in Hive UDFs.
 ====
 ---- QUERY
-select increment("a");
----- TYPES
-STRING
----- RESULTS
-'b'
-====
----- QUERY
-select increment(NULL);
----- TYPES
-STRING
----- RESULTS
-'NULL'
-====
----- QUERY
-select increment("");
----- TYPES
-STRING
----- RESULTS
-''
-====
----- QUERY
 select increment(cast("a" as binary));
 ---- TYPES
 BINARY
@@ -378,9 +357,23 @@ BINARY
 'b'
 ====
 ---- QUERY
-select copy_and_increment(cast("bbb" as binary), cast("aaaa" as binary));
+select increment(cast("" as binary));
 ---- TYPES
 BINARY
+---- RESULTS
+''
+====
+---- QUERY
+select increment(NULL);
+---- TYPES
+BINARY
+---- RESULTS
+'NULL'
+====
+---- QUERY
+select copy_and_increment("bbb", cast("aaaa" as binary));
+---- TYPES
+STRING
 ---- RESULTS
 'baaa'
 ====

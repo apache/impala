@@ -93,11 +93,7 @@ create function increment(binary) returns binary
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.BufferAlteringUdf';
 
-create function increment(string) returns string
-location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
-symbol='org.apache.impala.BufferAlteringUdf';
-
-create function copy_and_increment(binary, binary) returns binary
+create function copy_and_increment(string, binary) returns string
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.BufferAlteringUdf';
 ====
