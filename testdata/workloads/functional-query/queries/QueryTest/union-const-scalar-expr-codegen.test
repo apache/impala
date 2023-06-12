@@ -16,7 +16,7 @@ tinyint,tinyint,tinyint
 #SORT_NODE
 ExecOption: Codegen Enabled
 #UNION_NODE
-ExecOption: Codegen Disabled for const scalar expressions, Codegen Enabled
+ExecOption: Codegen Enabled, Codegen Disabled for const scalar expressions
 ====
 ---- QUERY
 # Test insert statement with values (translated into UNION with const expressions).
@@ -29,7 +29,7 @@ insert into test_values_codegen(c1) values (CAST(1+ceil(2.5)*3 as tinyint));
 00:UNION
    constant-operands=1
 #UNION_NODE
-ExecOption: Codegen Disabled for const scalar expressions, Codegen Enabled
+ExecOption: Codegen Enabled, Codegen Disabled for const scalar expressions
 ====
 ---- QUERY
 # Test insert statement with values having const scalar expressions.
@@ -43,7 +43,7 @@ insert into test_values_codegen values
 00:UNION
    constant-operands=2
 #UNION_NODE
-ExecOption: Codegen Disabled for const scalar expressions, Codegen Enabled
+ExecOption: Codegen Enabled, Codegen Disabled for const scalar expressions
 ====
 ---- QUERY
 # Test the result of above inserts with codegen disabled.

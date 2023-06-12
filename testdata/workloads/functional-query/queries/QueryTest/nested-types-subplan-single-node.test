@@ -36,3 +36,43 @@ BIGINT,STRING,BIGINT
 ---- RUNTIME_PROFILE
 !row_regex: .*Codegen Enabled, Codegen Enabled.*
 ====
+---- QUERY
+# Regression test for IMPALA-12204
+select c1.c_custkey, v.o_orderkey from
+  customer c1, customer c2,
+  (select x.* from c1.c_orders x, c2.c_orders y
+  where x.o_orderkey = y.o_orderkey) v
+where c1.c_custkey = c2.c_custkey
+  and c1.c_custkey < 4;
+---- RESULTS
+1,579908
+1,4273923
+1,454791
+1,4808192
+1,3868359
+1,5133509
+2,1763205
+2,1842406
+2,1374019
+2,430243
+2,1071617
+2,3986496
+2,2992930
+---- TYPES
+BIGINT,BIGINT
+---- RUNTIME_PROFILE
+!row_regex: .*Build Side Codegen Enabled, Hash Table Construction Codegen Enabled, Build Side Codegen Enabled, Hash Table Construction Codegen Enabled.*
+====
+---- QUERY
+# Regression test for IMPALA-12204
+select count(*) from customer c,
+  (select o_orderkey from c.c_orders
+   union all select 100) v
+where c_custkey < 4
+---- RESULTS
+16
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+!row_regex: .*Codegen Disabled for const scalar expressions, Codegen Disabled for const scalar expressions.*
+====

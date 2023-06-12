@@ -183,11 +183,6 @@ Status UnionNode::Open(RuntimeState* state) {
   // Ensures that rows are available for clients to fetch after this Open() has
   // succeeded.
   if (!children_.empty()) RETURN_IF_ERROR(child(child_idx_)->Open(state));
-
-  if (is_codegen_status_added_ && num_const_scalar_expr_to_be_codegened_ == 0
-      && !const_exprs_lists_.empty()) {
-    runtime_profile_->AppendExecOption("Codegen Disabled for const scalar expressions");
-  }
   return Status::OK();
 }
 
@@ -373,4 +368,8 @@ void UnionNode::Close(RuntimeState* state) {
     ScalarExprEvaluator::Close(evals, state);
   }
   ExecNode::Close(state);
+  if (is_codegen_status_added_ && num_const_scalar_expr_to_be_codegened_ == 0
+      && !const_exprs_lists_.empty()) {
+    runtime_profile_->AppendExecOption("Codegen Disabled for const scalar expressions");
+  }
 }

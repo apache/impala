@@ -123,7 +123,7 @@ class FragmentState {
   int64_t NumScalarExprNeedsCodegen() const { return scalar_exprs_to_codegen_.size(); }
 
   /// Check if codegen was disabled and if so, add a message to the runtime profile.
-  /// Call this only after expressions have been have been created.
+  /// Call this only after expressions have been created.
   void CheckAndAddCodegenDisabledMessage(std::vector<std::string>& codegen_status_msgs) {
     if (CodegenDisabledByQueryOption()) {
       codegen_status_msgs.emplace_back(

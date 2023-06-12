@@ -165,9 +165,6 @@ Status DataSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
 
 Status DataSink::Open(RuntimeState* state) {
   DCHECK_EQ(output_exprs_.size(), output_expr_evals_.size());
-  for (const string& codegen_msg : sink_config_.codegen_status_msgs_) {
-    profile_->AppendExecOption(codegen_msg);
-  }
   return ScalarExprEvaluator::Open(output_expr_evals_, state);
 }
 
@@ -178,6 +175,9 @@ void DataSink::Close(RuntimeState* state) {
   if (expr_results_pool_.get() != nullptr) expr_results_pool_->FreeAll();
   if (expr_mem_tracker_ != nullptr) expr_mem_tracker_->Close();
   if (mem_tracker_ != nullptr) mem_tracker_->Close();
+  for (const string& codegen_msg : sink_config_.codegen_status_msgs_) {
+    profile_->AppendExecOption(codegen_msg);
+  }
   closed_ = true;
 }
 
