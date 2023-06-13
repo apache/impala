@@ -2229,7 +2229,11 @@ public class CatalogServiceCatalog extends Catalog {
       LOG.trace("table {} exits in cache, last synced id {}", tbl.getFullName(),
           tbl.getLastSyncedEventId());
       // if no validWriteIdList is provided, we return the tbl if its loaded
-      if (tbl.isLoaded() && validWriteIdList == null) {
+      // In the external front end use case it is possible that an external table might
+      // have validWriteIdList, so we can simply ignore this value if table is external
+      if (tbl.isLoaded() && (validWriteIdList == null ||
+          (!AcidUtils.isTransactionalTable(tbl.getMetaStoreTable().getParameters())))) {
+        incrementCatalogDCacheHitMetric(reason);
         LOG.trace("returning already loaded table {}", tbl.getFullName());
         return tbl;
       }
@@ -2241,16 +2245,7 @@ public class CatalogServiceCatalog extends Catalog {
       // the ValidWriteIdList only when the table id matches.
       if (tbl instanceof HdfsTable
           && AcidUtils.compare((HdfsTable) tbl, validWriteIdList, tableId) >= 0) {
-        CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-            .getCounter(CatalogHmsUtils.CATALOGD_CACHE_HIT_METRIC)
-            .inc();
-        // Update the cache stats for a HMS API from which the current method got invoked.
-        if (HmsApiNameEnum.contains(reason)) {
-          CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-              .getCounter(String
-                  .format(CatalogHmsUtils.CATALOGD_CACHE_API_HIT_METRIC, reason))
-              .inc();
-        }
+        incrementCatalogDCacheHitMetric(reason);
         // Check if any partition of the table has a newly compacted file.
         // We just take the read lock here so that we don't serialize all the getTable
         // calls for the same table. If there are concurrent calls, it is possible we
@@ -2299,6 +2294,23 @@ public class CatalogServiceCatalog extends Catalog {
       return replaceTableIfUnchanged(loadReq.get(), previousCatalogVersion, tableId);
     } finally {
       loadReq.close();
+    }
+  }
+
+  /**
+   * Increments catalogD's cache hit metrics
+   * @param reason
+   */
+  private void incrementCatalogDCacheHitMetric(String reason) {
+    CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
+        .getCounter(CatalogHmsUtils.CATALOGD_CACHE_HIT_METRIC)
+        .inc();
+    // Update the cache stats for a HMS API from which the current method got invoked.
+    if (HmsApiNameEnum.contains(reason)) {
+      CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
+          .getCounter(String
+              .format(CatalogHmsUtils.CATALOGD_CACHE_API_HIT_METRIC, reason))
+          .inc();
     }
   }
 
