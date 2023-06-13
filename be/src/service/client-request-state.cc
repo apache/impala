@@ -184,8 +184,9 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
 
 ClientRequestState::~ClientRequestState() {
   DCHECK(wait_thread_.get() == NULL) << "BlockOnWait() needs to be called!";
-  DCHECK(pending_rpcs_.empty());
-  UnRegisterRemainingRPCs();
+  DCHECK(!track_rpcs_);  // Should get set to false in Finalize()
+  DCHECK(pending_rpcs_.empty()); // Should get cleared in Finalize()
+  UnRegisterRemainingRPCs(); // Avoid memory leaks if Finalize() didn't get called
 }
 
 Status ClientRequestState::SetResultCache(QueryResultSet* cache,
@@ -1088,6 +1089,7 @@ Status ClientRequestState::Finalize(bool check_inflight, const Status* cause) {
 
   // Update the timeline here so that all of the above work is captured in the timeline.
   query_events_->MarkEvent("Unregister query");
+  UnRegisterRemainingRPCs();
   return Status::OK();
 }
 
@@ -2178,7 +2180,7 @@ void ClientRequestState::RegisterRPC() {
   // The existence of rpc_context means that this is called from an RPC
   if (rpc_context) {
     lock_guard<mutex> l(lock_);
-    if(pending_rpcs_.find(rpc_context) == pending_rpcs_.end()) {
+    if (track_rpcs_ && pending_rpcs_.find(rpc_context) == pending_rpcs_.end()) {
       rpc_context->Register();
       pending_rpcs_.insert(rpc_context);
       rpc_count_->Add(1);
@@ -2206,6 +2208,7 @@ void ClientRequestState::UnRegisterRemainingRPCs() {
   for (auto rpc_context: pending_rpcs_) {
     rpc_context->UnRegister();
   }
+  track_rpcs_ = false;
   pending_rpcs_.clear();
 }
 

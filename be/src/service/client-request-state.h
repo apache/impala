@@ -629,6 +629,9 @@ class ClientRequestState {
   RuntimeProfile::Counter* rpc_count_;
   // Contexts for RPC calls that have not completed and had their stats collected
   std::set<RpcEventHandler::InvocationContext*> pending_rpcs_;
+  // Enables tracking of RPCs in pending_rpcs_. Also used to turn off tracking once
+  // Finalize() has been called.
+  bool track_rpcs_ = true;
 
   RuntimeProfile::EventSequence* query_events_;
 
