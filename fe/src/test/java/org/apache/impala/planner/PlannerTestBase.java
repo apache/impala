@@ -47,7 +47,6 @@ import org.apache.impala.testutil.TestFileParser.Section;
 import org.apache.impala.testutil.TestFileParser.TestCase;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.testutil.TestUtils.ResultFilter;
-import org.apache.impala.thrift.ImpalaInternalServiceConstants;
 import org.apache.impala.thrift.QueryConstants;
 import org.apache.impala.thrift.TDescriptorTable;
 import org.apache.impala.thrift.TExecRequest;
@@ -83,6 +82,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -398,6 +398,23 @@ public class PlannerTestBase extends FrontendTestBase {
     options.setExplain_level(TExplainLevel.STANDARD);
     options.setExec_single_node_rows_threshold(0);
     return options;
+  }
+
+  protected static TQueryOptions tpcdsParquetQueryOptions() {
+    TQueryOptions options = new TQueryOptions();
+    /* Enable minmax overlap filter feature for tpcds Parquet tests. */
+    options.setMinmax_filter_threshold(0.5);
+    /* Disable minmax filter on sorted columns. */
+    options.setMinmax_filter_sorted_columns(false);
+    /* Disable minmax filter on partition columns. */
+    options.setMinmax_filter_partition_columns(false);
+    return options;
+  }
+
+  protected static Set<PlannerTestOption> tpcdsParquetTestOptions() {
+    return ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
+        PlannerTestOption.INCLUDE_RESOURCE_HEADER, PlannerTestOption.VALIDATE_RESOURCES,
+        PlannerTestOption.VALIDATE_CARDINALITY);
   }
 
   /**

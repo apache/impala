@@ -24,8 +24,6 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.google.common.collect.ImmutableSet;
-
 
 /**
  * Plans from the TPC-DS qualification queries at scale factor 1. Single node,
@@ -33,24 +31,14 @@ import com.google.common.collect.ImmutableSet;
  * also preformed.
  */
 public class TpcdsPlannerTest extends PlannerTestBase {
+  private static Set<PlannerTestOption> testOptions = tpcdsParquetTestOptions();
 
-  private static Set<PlannerTestOption> testOptions =
-      ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
-          PlannerTestOption.INCLUDE_RESOURCE_HEADER, PlannerTestOption.VALIDATE_RESOURCES,
-          PlannerTestOption.VALIDATE_CARDINALITY);
-
-  private static TQueryOptions options = new TQueryOptions();
+  private static TQueryOptions options = tpcdsParquetQueryOptions();
 
   @BeforeClass
   public static void setUp() throws Exception {
     PlannerTestBase.setUp();
     Paths.get(outDir_.toString(), "tpcds").toFile().mkdirs();
-    /* Enable minmax overlap filter feature for tpcds Parquet tests. */
-    options.setMinmax_filter_threshold(0.5);
-    /* Disable minmax filter on sorted columns. */
-    options.setMinmax_filter_sorted_columns(false);
-    /* Disable minmax filter on partition columns. */
-    options.setMinmax_filter_partition_columns(false);
   }
 
   @Test

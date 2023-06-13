@@ -812,6 +812,27 @@ enum TImpalaQueryOptions {
   // CHAR type as the common type. This avoids padding and thereby loss of information.
   // See IMPALA-10753.
   VALUES_STMT_AVOID_LOSSY_CHAR_PADDING = 161;
+
+  // Threshold in bytes to determine whether an aggregation node's memory estimate is
+  // deemed large. If an aggregation node's memory estimate is large, an alternative
+  // estimation is used to lower the memory usage estimation for that aggregation node.
+  // The new memory estimate will not be lower than the specified
+  // LARGE_AGG_MEM_THRESHOLD. Unlike PREAGG_BYTES_LIMIT, LARGE_AGG_MEM_THRESHOLD is
+  // evaluated on both preagg and merge agg, and does not cap max memory reservation of
+  // the aggregation node (it may still increase memory allocation beyond the threshold
+  // if it is available). However, if a plan node is a streaming preaggregation node and
+  // PREAGG_BYTES_LIMIT is set, then PREAGG_BYTES_LIMIT will override the value of
+  // LARGE_AGG_MEM_THRESHOLD as a threshold. 0 or -1 means this option has no effect.
+  LARGE_AGG_MEM_THRESHOLD = 162
+
+  // Correlation factor that will be used to calculate a lower memory estimation of
+  // aggregation node when the default memory estimation exceed
+  // LARGE_AGG_MEM_THRESHOLD. Given N as number of grouping expressions,
+  // the final correlation factor is calculated as:
+  //   corrFactor = AGG_MEM_CORRELATION_FACTOR ^ N
+  // Valid values are in [0.0, 1.0]. Setting value 1.0 will result in an equal memory
+  // estimate as the default estimation (no change). Default to 0.5.
+  AGG_MEM_CORRELATION_FACTOR = 163
 }
 
 // The summary of a DML statement.

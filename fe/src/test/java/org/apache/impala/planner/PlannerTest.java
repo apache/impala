@@ -22,6 +22,7 @@ import static org.junit.Assert.assertEquals;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.ColumnStats;
@@ -1386,18 +1387,12 @@ public class PlannerTest extends PlannerTestBase {
    */
   @Test
   public void testProcessingCost() {
-    TQueryOptions options = new TQueryOptions();
+    TQueryOptions options = tpcdsParquetQueryOptions();
     options.setCompute_processing_cost(true);
     options.setProcessing_cost_min_threads(2);
     options.setMax_fragment_instances_per_node(16);
-    options.setMinmax_filter_threshold(0.5);
-    options.setMinmax_filter_sorted_columns(false);
-    options.setMinmax_filter_partition_columns(false);
-    runPlannerTestFile("tpcds-processing-cost", "tpcds_parquet", options,
-        ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
-            PlannerTestOption.INCLUDE_RESOURCE_HEADER,
-            PlannerTestOption.VALIDATE_RESOURCES,
-            PlannerTestOption.VALIDATE_CARDINALITY));
+    runPlannerTestFile(
+        "tpcds-processing-cost", "tpcds_parquet", options, tpcdsParquetTestOptions());
   }
 
   /**
@@ -1407,5 +1402,24 @@ public class PlannerTest extends PlannerTestBase {
   public void testPredicateSelectivityHints() {
     runPlannerTestFile("predicate-selectivity-hint",
         ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
+  /**
+   * Test that memory estimate of aggregation node equals to the default estimation
+   * (with NDV multiplication method) if AGG_MEM_CORRELATION_FACTOR=1.0 or
+   * LARGE_AGG_MEM_THRESHOLD is less than or equal to zero.
+   */
+  @Test
+  public void testAggNodeMaxMemEstimate() {
+    Set<PlannerTestOption> testOptions = tpcdsParquetTestOptions();
+    TQueryOptions options = tpcdsParquetQueryOptions();
+    double defaultAggMemCorrelationFactor = options.getAgg_mem_correlation_factor();
+    options.setAgg_mem_correlation_factor(1.0);
+    runPlannerTestFile(
+        "agg-node-max-mem-estimate", "tpcds_parquet", options, testOptions);
+
+    options.setLarge_agg_mem_threshold(0);
+    runPlannerTestFile(
+        "agg-node-max-mem-estimate", "tpcds_parquet", options, testOptions);
   }
 }

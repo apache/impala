@@ -1127,6 +1127,19 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_values_stmt_avoid_lossy_char_padding(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::LARGE_AGG_MEM_THRESHOLD: {
+        MemSpec mem_spec_val{};
+        RETURN_IF_ERROR(QueryOptionParser::Parse<MemSpec>(option, value, &mem_spec_val));
+        query_options->__set_large_agg_mem_threshold(mem_spec_val.value);
+        break;
+      }
+      case TImpalaQueryOptions::AGG_MEM_CORRELATION_FACTOR: {
+        double double_val = 0.0f;
+        RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckInclusiveRange<double>(
+            option, value, 0.0, 1.0, &double_val));
+        query_options->__set_agg_mem_correlation_factor(double_val);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

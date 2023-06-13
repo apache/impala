@@ -114,6 +114,8 @@ const i32 NUM_NODES_ALL_RACKS = -1
 // constant used as upperbound for TQueryOptions.processing_cost_min_threads and
 // TQueryOptions.max_fragment_instances_per_node
 const i32 MAX_FRAGMENT_INSTANCES_PER_NODE = 128
+// Conservative minimum size of hash table for low-cardinality aggregations.
+const i64 MIN_HASH_TBL_MEM = 10485760  // 10MB
 
 // Query options that correspond to ImpalaService.ImpalaQueryOptions, with their
 // respective defaults. Query options can be set in the following ways:
@@ -649,6 +651,12 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   162: optional bool values_stmt_avoid_lossy_char_padding = false;
+
+  // See comment in ImpalaService.thrift
+  163: optional i64 large_agg_mem_threshold = 536870912  // 512MB
+
+  // See comment in ImpalaService.thrift
+  164: optional double agg_mem_correlation_factor = 0.5
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

@@ -27,6 +27,7 @@ import java.util.Set;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.testutil.TestUtils;
+import org.apache.impala.thrift.QueryConstants;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
 import org.junit.Test;
@@ -887,12 +888,14 @@ public class CardinalityTest extends PlannerTestBase {
     // Ndv of int_col is 10;
     // MIN_HASH_TBL_MEM is 10M
     verifyApproxMemoryEstimate("SELECT COUNT(int_col) FROM functional.alltypes "
-        + "GROUP BY int_col", AggregationNode.MIN_HASH_TBL_MEM, true, false,
-        ImmutableSet.of(), pathToFirstAggregationNode, AggregationNode.class);
+            + "GROUP BY int_col",
+        QueryConstants.MIN_HASH_TBL_MEM, true, false, ImmutableSet.of(),
+        pathToFirstAggregationNode, AggregationNode.class);
     // create a single node plan.
     verifyApproxMemoryEstimate("SELECT COUNT(int_col) FROM functional.alltypes "
-        + "GROUP BY int_col", AggregationNode.MIN_HASH_TBL_MEM, false, false,
-        ImmutableSet.of(), pathToAggregationNode, AggregationNode.class);
+            + "GROUP BY int_col",
+        QueryConstants.MIN_HASH_TBL_MEM, false, false, ImmutableSet.of(),
+        pathToAggregationNode, AggregationNode.class);
 
     // FUNCTIONAL.ALLTYPES.ID's Ndv is 7300 and avgRowSize is 4
     // FUNCTIONAL.ALLTYPESSMALL.TIMESTAMP_COL's Ndv is 100 and avgRowSize is 16

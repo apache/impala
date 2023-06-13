@@ -552,17 +552,23 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   }
 
   /**
-    * data partition of this fragment, the number of nodes, and the degree of parallelism.
-    * Returns -1 for an invalid estimate, e.g., because getNumDistinctValues() failed on
-    * one of the exprs.
-    */
-  public long getPerInstanceNdv(List<Expr> exprs) {
+   * Estimates the number of distinct values of exprs per fragment instance based on the
+   * data partition of this fragment, the number of nodes, and the degree of parallelism.
+   * By default, it estimates the number of distinct values by using simple multiplication
+   * of each expr.getNumDistinctValues(), and divide it by numInstances if a partition
+   * column exist in an expr. However, if useMaxNdv is true, this method will return the
+   * minimum between the default estimation vs the maximum expr.getNumDistinctValues().
+   * Returns -1 for an invalid estimate, e.g., because getNumDistinctValues() failed on
+   * one of the exprs.
+   */
+  public long getPerInstanceNdv(List<Expr> exprs, boolean useMaxNdv) {
     Preconditions.checkNotNull(dataPartition_);
     long result = 1;
     int numInstances = getNumInstances();
     Preconditions.checkState(numInstances >= 0);
     // The number of nodes is zero for empty tables.
     if (numInstances == 0) return 0;
+    long maxNdv = 1;
     boolean partition = false;
     for (Expr expr: exprs) {
       long numDistinct = expr.getNumDistinctValues();
@@ -574,10 +580,12 @@ public class PlanFragment extends TreeNode<PlanFragment> {
         partition = true;
       }
       result = PlanNode.checkedMultiply(result, numDistinct);
+      maxNdv = Math.max(maxNdv, numDistinct);
     }
     if (partition) {
       result = (long)Math.max((double) result / (double) numInstances, 1L);
     }
+    if (useMaxNdv && result > maxNdv) result = maxNdv;
     return result;
   }
 

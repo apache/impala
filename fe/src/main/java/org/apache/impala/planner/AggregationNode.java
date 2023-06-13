@@ -35,6 +35,7 @@ import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.ValidTupleIdExpr;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.thrift.QueryConstants;
 import org.apache.impala.thrift.TAggregationNode;
 import org.apache.impala.thrift.TAggregator;
 import org.apache.impala.thrift.TExplainLevel;
@@ -81,9 +82,6 @@ public class AggregationNode extends PlanNode {
   // Resource profiles for each aggregation class.
   // Set in computeNodeResourceProfile().
   private List<ResourceProfile> resourceProfiles_;
-
-  // Conservative minimum size of hash table for low-cardinality aggregations.
-  protected final static long MIN_HASH_TBL_MEM = 10L * 1024L * 1024L;
 
   // If the group clause is empty ( aggInfo.getGroupingExprs() is empty ),
   // the hash table will not be created.
@@ -596,60 +594,105 @@ public class AggregationNode extends PlanNode {
     }
   }
 
+  private long estimatePerInstanceDataBytes(
+      long perInstanceCardinality, long inputCardinality) {
+    Preconditions.checkArgument(perInstanceCardinality > -1);
+    // Per-instance cardinality cannot be greater than the total input cardinality
+    // going into this aggregation class.
+    if (inputCardinality != -1) {
+      // Calculate the input cardinality distributed across fragment instances.
+      long numInstances = fragment_.getNumInstances();
+      long perInstanceInputCardinality;
+      if (numInstances > 1) {
+        if (useStreamingPreagg_) {
+          // A skew factor was added to account for data skew among
+          // multiple fragment instances.
+          // This number was derived using empirical analysis of real-world
+          // and benchmark (tpch, tpcds) queries.
+          perInstanceInputCardinality = (long) Math.ceil(
+              ((double) inputCardinality / numInstances) * DEFAULT_SKEW_FACTOR);
+        } else {
+          // The data is distributed through hash, it will be more balanced.
+          perInstanceInputCardinality =
+              (long) Math.ceil((double) inputCardinality / numInstances);
+        }
+      } else {
+        // When numInstances is 1 or unknown(-1), perInstanceInputCardinality is the
+        // same as inputCardinality.
+        perInstanceInputCardinality = inputCardinality;
+      }
+
+      if (useStreamingPreagg_) {
+        // A reduction factor of 2 (input rows divided by output rows) was
+        // added to grow hash tables. If the reduction factor is lower than 2,
+        // only part of the data will be inserted into the hash table.
+        perInstanceCardinality =
+            Math.min(perInstanceCardinality, perInstanceInputCardinality / 2);
+      } else {
+        perInstanceCardinality =
+            Math.min(perInstanceCardinality, perInstanceInputCardinality);
+      }
+    }
+    // The memory of the data stored in hash table and the memory of the
+    // hash table‘s structure
+    long perInstanceDataBytes = (long) Math.ceil(
+        perInstanceCardinality * (avgRowSize_ + PlannerContext.SIZE_OF_BUCKET));
+    return perInstanceDataBytes;
+  }
+
   private ResourceProfile computeAggClassResourceProfile(
       TQueryOptions queryOptions, AggregateInfo aggInfo, long inputCardinality) {
     Preconditions.checkNotNull(
         fragment_, "PlanNode must be placed into a fragment before calling this method.");
-    long perInstanceCardinality = fragment_.getPerInstanceNdv(aggInfo.getGroupingExprs());
+    long perInstanceCardinality =
+        fragment_.getPerInstanceNdv(aggInfo.getGroupingExprs(), false);
     long perInstanceMemEstimate;
     long perInstanceDataBytes = -1;
+
+    // Determine threshold for large aggregation node.
+    long largeAggMemThreshold = Long.MAX_VALUE;
+    if (useStreamingPreagg_ && queryOptions.getPreagg_bytes_limit() > 0) {
+      largeAggMemThreshold = queryOptions.getPreagg_bytes_limit();
+    } else if (queryOptions.getLarge_agg_mem_threshold() > 0) {
+      largeAggMemThreshold = queryOptions.getLarge_agg_mem_threshold();
+    }
+
     if (perInstanceCardinality == -1) {
       perInstanceMemEstimate = DEFAULT_PER_INSTANCE_MEM;
     } else {
-      // Per-instance cardinality cannot be greater than the total input cardinality
-      // going into this aggregation class.
-      if (inputCardinality != -1) {
-        // Calculate the input cardinality distributed across fragment instances.
-        long numInstances = fragment_.getNumInstances();
-        long perInstanceInputCardinality;
-        if (numInstances > 1) {
-          if (useStreamingPreagg_) {
-            // A skew factor was added to account for data skew among
-            // multiple fragment instances.
-            // This number was derived using empirical analysis of real-world
-            // and benchmark (tpch, tpcds) queries.
-            perInstanceInputCardinality = (long) Math.ceil(
-                ((double) inputCardinality / numInstances) * DEFAULT_SKEW_FACTOR);
-          } else {
-            // The data is distributed through hash, it will be more balanced.
-            perInstanceInputCardinality =
-                (long) Math.ceil((double) inputCardinality / numInstances);
-          }
-        } else {
-          // When numInstances is 1 or unknown(-1), perInstanceInputCardinality is the
-          // same as inputCardinality.
-          perInstanceInputCardinality = inputCardinality;
-        }
+      perInstanceDataBytes =
+          estimatePerInstanceDataBytes(perInstanceCardinality, inputCardinality);
+      if (perInstanceDataBytes > largeAggMemThreshold) {
+        // Should try to schedule agg node with lower memory estimation than
+        // current perInstanceDataBytes. This is fine since preagg node can passthrough
+        // row under memory pressure, while final agg node can spill to disk.
+        // Try to come up with lower memory requirement by using max(NDV) and
+        // AGG_MEM_CORRELATION_FACTOR to estimate a lower perInstanceCardinality rather
+        // than the default NDV multiplication method.
+        long lowPerInstanceCardinality =
+            fragment_.getPerInstanceNdv(aggInfo.getGroupingExprs(), true);
+        Preconditions.checkState(lowPerInstanceCardinality > -1);
+        long lowPerInstanceDataBytes = Math.max(largeAggMemThreshold,
+            estimatePerInstanceDataBytes(lowPerInstanceCardinality, inputCardinality));
+        Preconditions.checkState(lowPerInstanceDataBytes <= perInstanceDataBytes);
 
-        if (useStreamingPreagg_) {
-          // A reduction factor of 2 (input rows divided by output rows) was
-          // added to grow hash tables. If the reduction factor is lower than 2,
-          // only part of the data will be inserted into the hash table.
-          perInstanceCardinality =
-              Math.min(perInstanceCardinality, perInstanceInputCardinality / 2);
-        } else {
-          perInstanceCardinality =
-              Math.min(perInstanceCardinality, perInstanceInputCardinality);
+        // Given N as number of grouping expressions,
+        // corrFactor = AGG_MEM_CORRELATION_FACTOR ^ N
+        double corrFactor = Math.pow(queryOptions.getAgg_mem_correlation_factor(),
+            aggInfo.getGroupingExprs().size());
+        long resolvedPerInstanceDataBytes = lowPerInstanceDataBytes
+            + Math.round(corrFactor * (perInstanceDataBytes - lowPerInstanceDataBytes));
+        if (LOG.isTraceEnabled() && perInstanceDataBytes > resolvedPerInstanceDataBytes) {
+          LOG.trace("Node " + getDisplayLabel() + " reduce perInstanceDataBytes from "
+              + perInstanceDataBytes + " to " + resolvedPerInstanceDataBytes);
         }
+        perInstanceDataBytes = resolvedPerInstanceDataBytes;
       }
-      // The memory of the data stored in hash table and the memory of the
-      // hash table‘s structure
-      perInstanceDataBytes = (long)Math.ceil(perInstanceCardinality *
-                                  (avgRowSize_ + PlannerContext.SIZE_OF_BUCKET));
       if (aggInfo.getGroupingExprs().isEmpty()) {
         perInstanceMemEstimate = MIN_PLAIN_AGG_MEM;
       } else {
-        perInstanceMemEstimate = (long)Math.max(perInstanceDataBytes, MIN_HASH_TBL_MEM);
+        perInstanceMemEstimate =
+            Math.max(perInstanceDataBytes, QueryConstants.MIN_HASH_TBL_MEM);
       }
     }
 

@@ -159,6 +159,7 @@ TEST(QueryOptions, SetByteOptions) {
       {MAKE_OPTIONDEF(scratch_limit), {-1, I64_MAX}},
       {MAKE_OPTIONDEF(max_result_spooling_mem), {-1, I64_MAX}},
       {MAKE_OPTIONDEF(max_spilled_result_spooling_mem), {-1, I64_MAX}},
+      {MAKE_OPTIONDEF(large_agg_mem_threshold), {-1, I64_MAX}},
   };
   vector<pair<OptionDef<int32_t>, Range<int32_t>>> case_set_i32{
       {MAKE_OPTIONDEF(runtime_filter_min_size),

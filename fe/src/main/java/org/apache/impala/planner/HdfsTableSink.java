@@ -163,7 +163,8 @@ public class HdfsTableSink extends TableSink {
       // If the insert is clustered, it produces a single partition at a time.
       numBufferedPartitionsPerInstance = 1;
     } else {
-      numBufferedPartitionsPerInstance = fragment_.getPerInstanceNdv(partitionKeyExprs_);
+      numBufferedPartitionsPerInstance =
+          fragment_.getPerInstanceNdv(partitionKeyExprs_, false);
       if (numBufferedPartitionsPerInstance == -1) {
         numBufferedPartitionsPerInstance = DEFAULT_NUM_PARTITIONS;
       }
