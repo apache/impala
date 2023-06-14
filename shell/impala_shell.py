@@ -2254,9 +2254,6 @@ def impala_shell_main():
 
   intro = get_intro(options)
 
-  # Suppressing unwanted notifications from Thrift
-  logging.getLogger('thrift').addHandler(logging.NullHandler())
-
   with ImpalaShell(options, query_options) as shell:
     while shell.is_alive:
       try:
@@ -2295,6 +2292,8 @@ def impala_shell_main():
 
 
 if __name__ == "__main__":
+  # Suppressing unwanted notifications from Thrift
+  logging.getLogger('thrift').addHandler(logging.NullHandler())
   try:
     impala_shell_main()
   except FatalShellException:
