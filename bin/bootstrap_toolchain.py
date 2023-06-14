@@ -56,12 +56,10 @@
 
 from __future__ import absolute_import, division, print_function
 import logging
-import glob
 import multiprocessing.pool
 import os
 import platform
 import random
-import re
 import shutil
 import subprocess
 import sys
@@ -71,36 +69,22 @@ import time
 from collections import namedtuple
 from string import Template
 
-# Maps return values from 'lsb_release -irs' to the corresponding OS labels for both the
-# toolchain and the CDP components.
-OsMapping = namedtuple('OsMapping', ['lsb_release', 'toolchain', 'cdh'])
+# Maps the ID + major version of the VERSION_ID from /etc/os-release to the corresponding
+# OS label for the toolchain. See https://github.com/chef/os_release for a database of
+# /etc/os-release files.
+OsMapping = namedtuple('OsMapping', ['release', 'toolchain'])
 OS_MAPPING = [
-  OsMapping("centos5", "ec2-package-centos-5", None),
-  OsMapping("centos6", "ec2-package-centos-6", "redhat6"),
-  OsMapping("centos7", "ec2-package-centos-7", "redhat7"),
-  OsMapping("centos8", "ec2-package-centos-8", "redhat8"),
-  OsMapping("rocky8", "ec2-package-centos-8", "redhat8"),
-  OsMapping("almalinux8", "ec2-package-centos-8", "redhat8"),
-  OsMapping("redhatenterpriseserver5", "ec2-package-centos-5", None),
-  OsMapping("redhatenterpriseserver6", "ec2-package-centos-6", "redhat6"),
-  OsMapping("redhatenterpriseserver7", "ec2-package-centos-7", "redhat7"),
-  OsMapping("redhatenterprise8", "ec2-package-centos-8", "redhat8"),
-  OsMapping("redhatenterpriseserver8", "ec2-package-centos-8", "redhat8"),
-  OsMapping("debian6", "ec2-package-debian-6", None),
-  OsMapping("debian7", "ec2-package-debian-7", None),
-  OsMapping("debian8", "ec2-package-debian-8", "debian8"),
-  OsMapping("suselinux11", "ec2-package-sles-11", None),
-  OsMapping("suselinux12", "ec2-package-sles-12", "sles12"),
-  OsMapping("suse12", "ec2-package-sles-12", "sles12"),
-  OsMapping("suselinux15", "ec2-package-sles-15", "sles15"),
-  OsMapping("suse15", "ec2-package-sles-15", "sles15"),
-  OsMapping("ubuntu12.04", "ec2-package-ubuntu-12-04", None),
-  OsMapping("ubuntu14.04", "ec2-package-ubuntu-14-04", None),
-  OsMapping("ubuntu15.04", "ec2-package-ubuntu-14-04", None),
-  OsMapping("ubuntu15.10", "ec2-package-ubuntu-14-04", None),
-  OsMapping('ubuntu16.04', "ec2-package-ubuntu-16-04", "ubuntu1604"),
-  OsMapping('ubuntu18.04', "ec2-package-ubuntu-18-04", "ubuntu1804"),
-  OsMapping('ubuntu20.04', "ec2-package-ubuntu-20-04", "ubuntu2004")
+  OsMapping("rhel7", "ec2-package-centos-7"),
+  OsMapping("centos7", "ec2-package-centos-7"),
+  OsMapping("rhel8", "ec2-package-centos-8"),
+  OsMapping("centos8", "ec2-package-centos-8"),
+  OsMapping("rocky8", "ec2-package-centos-8"),
+  OsMapping("almalinux8", "ec2-package-centos-8"),
+  OsMapping("sles12", "ec2-package-sles-12"),
+  OsMapping("sles15", "ec2-package-sles-15"),
+  OsMapping('ubuntu16', "ec2-package-ubuntu-16-04"),
+  OsMapping('ubuntu18', "ec2-package-ubuntu-18-04"),
+  OsMapping('ubuntu20', "ec2-package-ubuntu-20-04")
 ]
 
 
@@ -350,6 +334,7 @@ class ApacheComponent(EnvVersionedPackage):
                                        unpack_directory_tmpl=unpack_directory_tmpl,
                                        makedir=makedir, template_subs_in=template_subs)
 
+
 class ToolchainKudu(ToolchainPackage):
   def __init__(self, platform_label=None):
     super(ToolchainKudu, self).__init__('kudu', platform_release=platform_label)
@@ -377,32 +362,45 @@ def try_get_platform_release_label():
     return None
 
 
-# Cache "lsb_release -irs" to avoid excessive logging from sh, and
-# to shave a little bit of time.
-lsb_release_cache = None
+# Cache the /etc/os-release calculation to shave a little bit of time.
+os_release_cache = None
 
 
 def get_platform_release_label(release=None):
   """Gets the right package label from the OS version. Raise exception if not found.
-     'release' can be provided to override the underlying OS version.
+     'release' can be provided to override the underlying OS version. This uses
+     ID and VERSION_ID from /etc/os-release to identify a distribution. Specifically,
+     this returns the concatenation of the ID and the major version component
+     of VERSION_ID. i.e. ID=ubuntu VERSION_ID=16.04 => ubuntu16
   """
-  global lsb_release_cache
+  global os_release_cache
   if not release:
-    if lsb_release_cache:
-      release = lsb_release_cache
+    if os_release_cache:
+      release = os_release_cache
     else:
-      lsb_release = subprocess.check_output(
-          ["lsb_release", "-irs"], universal_newlines=True)
-      release = "".join([x.lower() for x in lsb_release.split()])
-      # Only need to check against the major release if RHEL, CentOS or Suse
-      for distro in ['centos', 'rocky', 'almalinux', 'redhatenterprise',
-                     'redhatenterpriseserver', 'suse']:
-        if distro in release:
-          release = release.split('.')[0]
-          break
-      lsb_release_cache = release
+      os_id = None
+      os_major_version = None
+      with open("/etc/os-release") as f:
+        for line in f:
+          # We assume that ID and VERSION_ID are present and don't contain '=' inside
+          # the actual value. This is true for all distributions we currently support.
+          if line.startswith("ID="):
+            os_id = line.split("=")[1].strip().strip('"')
+          elif line.startswith("VERSION_ID="):
+            os_version_id = line.split("=")[1].strip().strip('"')
+            # Some distributions have a major version that doesn't change (e.g. 3.12.0
+            # and 3.12.0). The distributions that we support don't do this. This
+            # calculation would need to change for that circumstance.
+            os_major_version = os_version_id.split(".")[0]
+
+      if os_id is None or os_major_version is None:
+        raise Exception("Error parsing /etc/os-release: "
+            "os_id={0} os_major_version={1}".format(os_id, os_major_version))
+
+      release = "{0}{1}".format(os_id, os_major_version)
+      os_release_cache = release
   for mapping in OS_MAPPING:
-    if re.search(mapping.lsb_release, release):
+    if mapping.release == release:
       return mapping
   raise Exception("Could not find package label for OS version: {0}.".format(release))
 
@@ -563,7 +561,6 @@ def main():
   downloads = []
   if os.getenv("SKIP_TOOLCHAIN_BOOTSTRAP", "false") != "true":
     downloads += get_toolchain_downloads()
-  kudu_download = None
   if os.getenv("DOWNLOAD_CDH_COMPONENTS", "false") == "true":
     create_directory_from_env_var("CDP_COMPONENTS_HOME")
     create_directory_from_env_var("APACHE_COMPONENTS_HOME")
