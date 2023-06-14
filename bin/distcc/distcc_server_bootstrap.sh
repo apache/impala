@@ -33,10 +33,10 @@ if [[ "$USER" != "root" ]]; then
   exit 1
 fi
 
-LSB_ID=$(lsb_release -is)
-LSB_VERSION=$(lsb_release -rs)
-if [[ "$LSB_ID" == Ubuntu ]]; then
-  if ! [[ $LSB_VERSION == 16.04 || $LSB_VERSION == 18.04 ]]; then
+OS_ID=$(source /etc/os-release && echo $ID)
+OS_VERSION=$(source /etc/os-release && echo $VERSION_ID)
+if [[ "$OS_ID" == Ubuntu ]]; then
+  if ! [[ $OS_VERSION == 16.04 || $OS_VERSION == 18.04 ]]; then
     echo "This script only supports Ubuntu 16.04 and 18.04" >&2
     exit 1
   fi

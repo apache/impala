@@ -245,7 +245,7 @@ redhat sudo yum install -y curl gawk gcc gcc-c++ git krb5-devel krb5-server \
         cyrus-sasl-gssapi cyrus-sasl-devel cyrus-sasl-plain \
         postgresql postgresql-server \
         wget vim-common nscd cmake fuse-devel zlib-devel \
-        psmisc lsof openssh-server redhat-lsb python3-devel python3-setuptools \
+        psmisc lsof openssh-server python3-devel python3-setuptools \
         net-tools langpacks-en glibc-langpack-en libxml2-devel libxslt-devel \
         java-${REDHAT_JAVA_VERSION}-openjdk-src java-${REDHAT_JAVA_VERSION}-openjdk-devel
 

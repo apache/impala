@@ -57,18 +57,18 @@ fi
 set -x
 ALLOWED_NETS=$1
 
-LSB_ID=$(lsb_release -is)
-LSB_VERSION=$(lsb_release -rs)
-if [[ "$LSB_ID" == Ubuntu ]]; then
-  if ! [[ $LSB_VERSION == 14.04 || $LSB_VERSION == 16.04 || $LSB_VERSION == 18.04 ]]; then
+OS_ID=$(source /etc/os-release && echo "$ID")
+OS_VERSION=$(source /etc/os-release && echo "$VERSION_ID")
+if [[ "$OS_ID" == ubuntu ]]; then
+  if ! [[ $OS_VERSION == 14.04 || $OS_VERSION == 16.04 || $OS_VERSION == 18.04 ]]; then
     echo "This script only supports Ubuntu 14.04, 16.04 and 18.04" >&2
     exit 1
   fi
   LINUX_FLAVOUR=ubuntu
   DISTCCD_USER=distccd
   DISTCCD_SERVICE=distcc
-elif [[ "$LSB_ID" == CentOS ]]; then
-  if ! [[ $LSB_VERSION == 6.* || $LSB_VERSION = 7.* ]]; then
+elif [[ "$OS_ID" == centos ]]; then
+  if ! [[ $OS_VERSION == 6.* || $OS_VERSION = 7.* ]]; then
     echo "This script only supports CentOS 6 and 7" >&2
     exit 1
   fi
