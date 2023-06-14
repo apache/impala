@@ -73,6 +73,11 @@ Status TestEnv::Init() {
   if (enable_buffer_pool_) {
     exec_env_->InitBufferPool(buffer_pool_min_buffer_len_, buffer_pool_capacity_,
         static_cast<int64_t>(0.1 * buffer_pool_capacity_));
+  } else {
+    // The buffer pool requires tcmalloc's aggressive_memory_decommit to be set.
+    // Since this codepath will never call InitBufferPool(), this needs to manually
+    // set it.
+    exec_env_->InitTcMallocAggressiveDecommit();
   }
   if (process_mem_tracker_use_metrics_) {
     exec_env_->InitMemTracker(process_mem_limit_);

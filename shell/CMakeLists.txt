@@ -53,8 +53,10 @@ add_custom_target(shell_python2_install DEPENDS "${PYTHON2_VENV}" shell_pypi_tes
   COMMAND "${PYTHON2_VENV}/bin/pip" install --cache-dir "${PYTHON2_PIP_CACHE}" "${SHELL_TEST_PKG}"
 )
 
+# In cases where system python3 is old, this can use impala-virtualenv, so it
+# needs to depend on impala_python.
 add_custom_command(OUTPUT "${PYTHON3_VENV}" DEPENDS impala_python
-  COMMAND impala-virtualenv --python "$ENV{IMPALA_SYSTEM_PYTHON3}" "${PYTHON3_VENV}"
+  COMMAND "${CMAKE_SOURCE_DIR}/bin/cmake_aux/create_py3_virtualenv.sh" "${PYTHON3_VENV}"
 )
 
 add_custom_target(shell_python3_install DEPENDS "${PYTHON3_VENV}" shell_pypi_test_package

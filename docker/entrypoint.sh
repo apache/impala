@@ -108,7 +108,10 @@ function build() {
   fi
   if command -v apt-get > /dev/null; then
     apt-get update
-    apt-get install -y sudo git lsb-release python
+    # The 'python' package doesn't exist on Ubuntu 22, so this installs python3.
+    # TODO: It might not be necessary to install python here, as the container
+    # will invoke bootstrap_system.sh.
+    apt-get install -y sudo git python3
   elif grep 'release 8\.' /etc/redhat-release; then
     # WARNING: Install the following packages one by one!
     # Installing them in a common transaction breaks something inside yum/dnf,

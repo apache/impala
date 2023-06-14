@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import pytest
+import re
 import requests
 import signal
 import ssl
@@ -244,18 +245,26 @@ class TestClientSsl(CustomClusterTestSuite):
     run_impala_shell_cmd(vector, args, expect_success=False)
 
   def _validate_positive_cases(self, vector, ca_cert=""):
+    python3_10_version_re = re.compile(r"using Python 3\.1[0-9]")
     shell_options = ["--ssl", "-q", "select 1 + 2"]
     result = run_impala_shell_cmd(vector, shell_options, wait_until_connected=False)
     for msg in [self.SSL_ENABLED, self.CONNECTED, self.FETCHED]:
       assert msg in result.stderr
-    assert self.DEPRECATION_WARNING not in result.stderr
+    # Python >3.10 has deprecated ssl.PROTOCOL_TLS and impala-shell currently emits a
+    # DeprecationWarning for that version. As a temporary workaround, this skips the
+    # assert about deprecation for Python 3.10 or above. This can be removed when
+    # IMPALA-12219 is fixed.
+    # Note: This is the version that impala-shell uses, not the version pytests uses.
+    if not python3_10_version_re.search(result.stderr):
+      assert self.DEPRECATION_WARNING not in result.stderr
 
     if ca_cert != "":
       shell_options = shell_options + ["--ca_cert=%s" % ca_cert]
       result = run_impala_shell_cmd(vector, shell_options, wait_until_connected=False)
       for msg in [self.SSL_ENABLED, self.CONNECTED, self.FETCHED]:
         assert msg in result.stderr
-      assert self.DEPRECATION_WARNING not in result.stderr
+      if not python3_10_version_re.search(result.stderr):
+        assert self.DEPRECATION_WARNING not in result.stderr
 
   def _verify_ssl_webserver(self):
     for port in ["25000", "25010", "25020"]:

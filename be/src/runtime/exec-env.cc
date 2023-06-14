@@ -568,8 +568,7 @@ void ExecEnv::SetImpalaServer(ImpalaServer* server) {
   }
 }
 
-void ExecEnv::InitBufferPool(int64_t min_buffer_size, int64_t capacity,
-    int64_t clean_pages_limit) {
+void ExecEnv::InitTcMallocAggressiveDecommit() {
 #if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
   // Aggressive decommit is required so that unused pages in the TCMalloc page heap are
   // not backed by physical pages and do not contribute towards memory consumption.
@@ -577,6 +576,11 @@ void ExecEnv::InitBufferPool(int64_t min_buffer_size, int64_t capacity,
   MallocExtension::instance()->SetNumericProperty(
       "tcmalloc.aggressive_memory_decommit", 1);
 #endif
+}
+
+void ExecEnv::InitBufferPool(int64_t min_buffer_size, int64_t capacity,
+    int64_t clean_pages_limit) {
+  InitTcMallocAggressiveDecommit();
   buffer_pool_.reset(
       new BufferPool(metrics_.get(), min_buffer_size, capacity, clean_pages_limit));
   buffer_reservation_.reset(new ReservationTracker());

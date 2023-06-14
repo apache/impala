@@ -80,11 +80,15 @@ OS_MAPPING = [
   OsMapping("centos8", "ec2-package-centos-8"),
   OsMapping("rocky8", "ec2-package-centos-8"),
   OsMapping("almalinux8", "ec2-package-centos-8"),
+  OsMapping("rhel9", "ec2-package-rocky-9"),
+  OsMapping("rocky9", "ec2-package-rocky-9"),
+  OsMapping("almalinux9", "ec2-package-rocky-9"),
   OsMapping("sles12", "ec2-package-sles-12"),
   OsMapping("sles15", "ec2-package-sles-15"),
   OsMapping('ubuntu16', "ec2-package-ubuntu-16-04"),
   OsMapping('ubuntu18', "ec2-package-ubuntu-18-04"),
-  OsMapping('ubuntu20', "ec2-package-ubuntu-20-04")
+  OsMapping('ubuntu20', "ec2-package-ubuntu-20-04"),
+  OsMapping('ubuntu22', "ec2-package-ubuntu-22-04")
 ]
 
 

@@ -35,6 +35,9 @@ PROJECT(ASSEMBLER)
 #  -fsigned-char: on aarch64 platform, type of char default is unsigned char, here
 #        set it to signed-char to be compatible with x86-64
 #  -Wno-deprecated: gutil contains deprecated headers
+#  -Wno-deprecated-declarations: OpenSSL3 deprecated various APIs currently used by
+#       Impala, so this disables those warnings until they can be addressed.
+#       See IMPALA-12226.
 #  -Wno-vla: we use C99-style variable-length arrays
 #  -pthread: enable multithreaded malloc
 #  -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG: enable nanosecond precision for boost
@@ -46,7 +49,7 @@ SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wall -Wno-sign-compare -Wno-unknown-p
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fno-strict-aliasing -fno-omit-frame-pointer")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fsigned-char")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -std=c++17")
-SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated -Wno-vla")
+SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated -Wno-deprecated-declarations -Wno-vla")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_SYSTEM_NO_DEPRECATED")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_BIND_GLOBAL_PLACEHOLDERS")

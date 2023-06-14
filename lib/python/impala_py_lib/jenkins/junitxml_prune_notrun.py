@@ -58,7 +58,7 @@ def junitxml_prune_notrun(junitxml_filename):
     # not support an XML declaration on Python 2.6, so use minidom to write the XML.
     root_node_minidom = minidom.parseString(ET.tostring(root))
     junitxml_string = root_node_minidom.toxml(encoding="utf-8")
-    with open(junitxml_filename, "w") as f:
+    with open(junitxml_filename, "wb") as f:
         f.write(junitxml_string)
 
 

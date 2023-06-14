@@ -327,6 +327,13 @@ class ExecEnv {
   /// Initialize ExecEnv based on Hadoop config from frontend.
   Status InitHadoopConfig();
 
+  /// Set tcmalloc's aggressive_memory_decommit=1. This needs to be called before
+  /// initializing the buffer pool, because the buffer pool asserts that this
+  /// property is set and newer versions of tcmalloc do not set it by default.
+  /// InitBufferPool() calls this automatically, so this is only used directly by
+  /// TestEnv.
+  void InitTcMallocAggressiveDecommit();
+
   /// Initialise 'buffer_pool_' and 'buffer_reservation_' with given capacity.
   void InitBufferPool(int64_t min_page_len, int64_t capacity, int64_t clean_pages_limit);
 

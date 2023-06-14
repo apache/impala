@@ -70,17 +70,22 @@ set -x
 
 # Determine whether we're running on redhat or ubuntu
 REDHAT=
-REDHAT6=
 REDHAT7=
 REDHAT8=
+REDHAT9=
 UBUNTU=
 UBUNTU16=
 UBUNTU18=
 UBUNTU20=
+UBUNTU22=
 IN_DOCKER=
 if [[ -f /etc/redhat-release ]]; then
   REDHAT=true
   echo "Identified redhat system."
+  if grep 'release 9\.' /etc/redhat-release; then
+    REDHAT9=true
+    echo "Identified redhat9 system."
+  fi
   if grep 'release 8\.' /etc/redhat-release; then
     REDHAT8=true
     echo "Identified redhat8 system."
@@ -88,10 +93,6 @@ if [[ -f /etc/redhat-release ]]; then
   if grep 'release 7\.' /etc/redhat-release; then
     REDHAT7=true
     echo "Identified redhat7 system."
-  fi
-  if grep 'release 6\.' /etc/redhat-release; then
-    REDHAT6=true
-    echo "Identified redhat6 system."
   fi
   # TODO: restrict redhat versions
 else
@@ -114,8 +115,12 @@ else
     then
       UBUNTU20=true
       echo "Identified Ubuntu 20.04 system."
+    elif [[ $DISTRIB_RELEASE = 22.04 ]]
+    then
+      UBUNTU22=true
+      echo "Identified Ubuntu 22.04 system."
     else
-      echo "This script supports Ubuntu versions 16.04, 18.04 or 20.04" >&2
+      echo "This script supports Ubuntu versions 16.04, 18.04, 20.04, or 22.04" >&2
       exit 1
     fi
   else
@@ -155,6 +160,12 @@ function ubuntu20 {
   fi
 }
 
+function ubuntu22 {
+  if [[ "$UBUNTU22" == true ]]; then
+    "$@"
+  fi
+}
+
 # Helper function to execute following command only on RedHat
 function redhat {
   if [[ "$REDHAT" == true ]]; then
@@ -162,12 +173,6 @@ function redhat {
   fi
 }
 
-# Helper function to execute following command only on RedHat6
-function redhat6 {
-  if [[ "$REDHAT6" == true ]]; then
-    "$@"
-  fi
-}
 # Helper function to execute following command only on RedHat7
 function redhat7 {
   if [[ "$REDHAT7" == true ]]; then
@@ -177,6 +182,12 @@ function redhat7 {
 # Helper function to execute following command only on RedHat8
 function redhat8 {
   if [[ "$REDHAT8" == true ]]; then
+    "$@"
+  fi
+}
+# Helper function to execute following command only on RedHat8
+function redhat9 {
+  if [[ "$REDHAT9" == true ]]; then
     "$@"
   fi
 }
@@ -219,16 +230,22 @@ fi
 source "$IMPALA_HOME/bin/impala-config-java.sh"
 
 ubuntu apt-get update
-ubuntu apt-get --yes install ccache curl gawk g++ gcc apt-utils git libffi-dev \
+ubuntu apt-get --yes install ccache curl file gawk g++ gcc apt-utils git libffi-dev \
         libkrb5-dev krb5-admin-server krb5-kdc krb5-user libsasl2-dev \
         libsasl2-modules libsasl2-modules-gssapi-mit libssl-dev make ninja-build \
-        python-dev python-setuptools python3-dev python3-setuptools postgresql \
+        python3-dev python3-setuptools python3-venv postgresql \
         ssh wget vim-common psmisc lsof net-tools language-pack-en libxml2-dev \
         libxslt-dev openjdk-${UBUNTU_JAVA_VERSION}-jdk \
         openjdk-${UBUNTU_JAVA_VERSION}-source openjdk-${UBUNTU_JAVA_VERSION}-dbg
 
+# Regular python packages don't exist on Ubuntu 22. Everything is Python 3.
+ubuntu16 apt-get --yes install python python-dev python-setuptools
+ubuntu18 apt-get --yes install python python-dev python-setuptools
+ubuntu20 apt-get --yes install python python-dev python-setuptools
+
 # Required by Kudu in the minicluster
 ubuntu20 apt-get --yes install libtinfo5
+ubuntu22 apt-get --yes install libtinfo5
 ARCH_NAME=$(uname -p)
 if [[ $ARCH_NAME == 'aarch64' ]]; then
   ubuntu apt-get --yes install unzip pkg-config flex maven python3-pip build-essential \
@@ -240,18 +257,24 @@ fi
 ubuntu sudo update-java-alternatives -s \
     java-1.${UBUNTU_JAVA_VERSION}.0-openjdk-${UBUNTU_PACKAGE_ARCH}
 
-redhat sudo yum install -y curl gawk gcc gcc-c++ git krb5-devel krb5-server \
+redhat sudo yum install -y file gawk gcc gcc-c++ git krb5-devel krb5-server \
         krb5-workstation libevent-devel libffi-devel make openssl-devel cyrus-sasl \
         cyrus-sasl-gssapi cyrus-sasl-devel cyrus-sasl-plain \
         postgresql postgresql-server \
-        wget vim-common nscd cmake fuse-devel zlib-devel \
-        psmisc lsof openssh-server python3-devel python3-setuptools \
+        wget vim-common nscd cmake zlib-devel \
+        procps psmisc lsof openssh-server python3-devel python3-setuptools \
         net-tools langpacks-en glibc-langpack-en libxml2-devel libxslt-devel \
         java-${REDHAT_JAVA_VERSION}-openjdk-src java-${REDHAT_JAVA_VERSION}-openjdk-devel
 
+# fuse-devel doesn't exist for Redhat 9
+redhat7 sudo yum install -y fuse-devel curl
+redhat8 sudo yum install -y fuse-devel curl
+# Redhat9 can have curl-minimal preinstalled, which can conflict with curl.
+# Adding --allowerasing allows curl to replace curl-minimal.
+redhat9 sudo yum install -y --allowerasing curl
+
 # RedHat / CentOS 8 exposes only specific versions of Python.
 # Set up unversioned default Python 2.x for older CentOS versions
-redhat6 sudo yum install -y python-devel python-setuptools python-argparse
 redhat7 sudo yum install -y python-devel python-setuptools python-argparse
 
 # Install Python 2.x explicitly for CentOS 8
@@ -278,6 +301,38 @@ function setup_python2() {
 redhat8 setup_python2
 redhat8 pip install --user argparse
 
+# Point Python to Python 3 for Redhat 9 and Ubuntu 22
+function setup_python3() {
+  # If python is already set, then use it. Otherwise, try to point python to python3.
+  if ! command -v python > /dev/null; then
+    if command -v python3 ; then
+      # Newer OSes (e.g. Redhat 9 and equivalents) make it harder to get Python 2, and we
+      # need to start using Python 3 by default.
+      # For these new OSes (Ubuntu 22, Redhat 9), there is no alternative entry for
+      # python, so we need to create one from scratch.
+      if command -v alternatives > /dev/null; then
+        if sudo alternatives --list | grep python > /dev/null ; then
+          sudo alternatives --set python /usr/bin/python3
+        else
+          # The alternative doesn't exist, create it
+          sudo alternatives --install /usr/bin/python python /usr/bin/python3 20
+        fi
+      elif command -v update-alternatives > /dev/null; then
+        # This is what Ubuntu 20/22+ does. There is no official python alternative,
+        # so we need to create one.
+        sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 20
+      else
+        echo "ERROR: trying to set python to point to python3"
+        echo "ERROR: alternatives/update-alternatives don't exist, so giving up..."
+        exit 1
+      fi
+    fi
+  fi
+}
+
+redhat9 setup_python3
+ubuntu22 setup_python3
+
 # CentOS repos don't contain ccache, so install from EPEL
 redhat sudo yum install -y epel-release
 redhat sudo yum install -y ccache
@@ -299,19 +354,16 @@ if [ ! -d /usr/local/apache-maven-3.5.4 ]; then
   MAVEN_DIRECTORY="/usr/local/apache-maven-3.5.4"
   redhat8 indocker sudo chmod 0755 ${MAVEN_DIRECTORY}
   redhat8 indocker sudo chmod 0755 ${MAVEN_DIRECTORY}/{bin,boot}
+  redhat9 indocker sudo chmod 0755 ${MAVEN_DIRECTORY}
+  redhat9 indocker sudo chmod 0755 ${MAVEN_DIRECTORY}/{bin,boot}
 fi
 
 if ! { service --status-all | grep -E '^ \[ \+ \]  ssh$'; }
 then
   ubuntu sudo service ssh start
-  # TODO: CentOS/RH 7 uses systemd, and this doesn't work.
-  redhat6 sudo service sshd start
-  redhat7 notindocker sudo service sshd start
-  redhat8 notindocker sudo service sshd start
-  redhat7 indocker sudo /usr/bin/ssh-keygen -A
-  redhat7 indocker sudo /usr/sbin/sshd
-  redhat8 indocker sudo /usr/bin/ssh-keygen -A
-  redhat8 indocker sudo /usr/sbin/sshd
+  redhat notindocker sudo service sshd start
+  redhat indocker sudo /usr/bin/ssh-keygen -A
+  redhat indocker sudo /usr/sbin/sshd
   # The CentOS 8.1 image includes /var/run/nologin by mistake; this file prevents
   # SSH logins. See https://github.com/CentOS/sig-cloud-instance-images/issues/60
   redhat8 indocker sudo rm -f /var/run/nologin
@@ -323,14 +375,9 @@ fi
 
 echo ">>> Configuring system"
 
-redhat6 sudo service postgresql initdb
-redhat6 sudo service postgresql stop
-redhat7 notindocker sudo service postgresql initdb
-redhat7 notindocker sudo service postgresql stop
-redhat7 indocker sudo -u postgres PGDATA=/var/lib/pgsql/data pg_ctl init
-redhat8 notindocker sudo service postgresql initdb
-redhat8 notindocker sudo service postgresql stop
-redhat8 indocker sudo -u postgres PGDATA=/var/lib/pgsql/data pg_ctl init
+redhat notindocker sudo service postgresql initdb
+redhat notindocker sudo service postgresql stop
+redhat indocker sudo -u postgres PGDATA=/var/lib/pgsql/data pg_ctl init
 ubuntu sudo service postgresql stop
 
 # These configurations expose connectiong to PostgreSQL via md5-hashed
@@ -344,14 +391,10 @@ redhat sudo sed -ri 's/local +all +all +(ident|peer)/local all all trust/g' \
 redhat sudo sed -i -e 's,\(host.*\)ident,\1md5,' /var/lib/pgsql/data/pg_hba.conf
 
 ubuntu sudo service postgresql start
-redhat6 sudo service postgresql start
-redhat7 notindocker sudo service postgresql start
-redhat8 notindocker sudo service postgresql start
+redhat notindocker sudo service postgresql start
 # Important to redirect pg_ctl to a logfile, lest it keep the stdout
 # file descriptor open, preventing the shell from exiting.
-redhat7 indocker sudo -u postgres PGDATA=/var/lib/pgsql/data bash -c \
-  "pg_ctl start -w --timeout=120 >> /var/lib/pgsql/pg.log 2>&1"
-redhat8 indocker sudo -u postgres PGDATA=/var/lib/pgsql/data bash -c \
+redhat indocker sudo -u postgres PGDATA=/var/lib/pgsql/data bash -c \
   "pg_ctl start -w --timeout=120 >> /var/lib/pgsql/pg.log 2>&1"
 
 # Set up postgres for HMS
@@ -419,11 +462,10 @@ echo -e "\n* - nofile 1048576" | sudo tee -a /etc/security/limits.conf
 
 # Default on CentOS limits a user to 1024 or 4096 processes (threads) , which isn't
 # enough for minicluster with all of its friends.
-redhat6 sudo sed -i 's,\*\s*soft\s*nproc\s*[0-9]*$,* soft nproc unlimited,' \
-  /etc/security/limits.d/*-nproc.conf
 redhat7 sudo sed -i 's,\*\s*soft\s*nproc\s*[0-9]*$,* soft nproc unlimited,' \
   /etc/security/limits.d/*-nproc.conf
 redhat8 echo -e "* soft nproc unlimited" | sudo tee -a /etc/security/limits.conf
+redhat9 echo -e "* soft nproc unlimited" | sudo tee -a /etc/security/limits.conf
 
 echo ">>> Checking out Impala"
 

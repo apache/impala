@@ -81,7 +81,7 @@ export USE_APACHE_HIVE=${USE_APACHE_HIVE-false}
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=296-f7e1d0d78b
+export IMPALA_TOOLCHAIN_BUILD_ID=320-33e177225e
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p5
@@ -114,7 +114,7 @@ export IMPALA_GFLAGS_VERSION=2.2.0-p2
 unset IMPALA_GFLAGS_URL
 export IMPALA_GLOG_VERSION=0.3.5-p3
 unset IMPALA_GLOG_URL
-export IMPALA_GPERFTOOLS_VERSION=2.5-p4
+export IMPALA_GPERFTOOLS_VERSION=2.10
 unset IMPALA_GPERFTOOLS_URL
 export IMPALA_GTEST_VERSION=1.6.0
 unset IMPALA_GTEST_URL
@@ -124,9 +124,9 @@ export IMPALA_LIBEV_VERSION=4.20-p1
 unset IMPALA_LIBEV_URL
 export IMPALA_LIBUNWIND_VERSION=1.5.0-p1
 unset IMPALA_LIBUNWIND_URL
-export IMPALA_LLVM_VERSION=5.0.1-p5
+export IMPALA_LLVM_VERSION=5.0.1-p7
 unset IMPALA_LLVM_URL
-export IMPALA_LLVM_ASAN_VERSION=5.0.1-p5
+export IMPALA_LLVM_ASAN_VERSION=5.0.1-p7
 unset IMPALA_LLVM_ASAN_URL
 
 # To limit maximum memory available for the mini-cluster and CDH cluster, add the
@@ -140,7 +140,7 @@ export IMPALA_LLVM_UBSAN_BASE_VERSION=5.0.1
 
 # Debug builds should use the release+asserts build to get additional coverage.
 # Don't use the LLVM debug build because the binaries are too large to distribute.
-export IMPALA_LLVM_DEBUG_VERSION=5.0.1-asserts-p5
+export IMPALA_LLVM_DEBUG_VERSION=5.0.1-asserts-p7
 unset IMPALA_LLVM_DEBUG_URL
 export IMPALA_LZ4_VERSION=1.9.3
 unset IMPALA_LZ4_URL
@@ -265,6 +265,7 @@ export IMPALA_OBS_VERSION=3.1.1-hw-42
 # free distributions, but Redhat UBI images are known to work.
 export IMPALA_REDHAT7_DOCKER_BASE=${IMPALA_REDHAT7_DOCKER_BASE:-"centos:centos7.9.2009"}
 export IMPALA_REDHAT8_DOCKER_BASE=${IMPALA_REDHAT8_DOCKER_BASE:-"rockylinux:8.5"}
+export IMPALA_REDHAT9_DOCKER_BASE=${IMPALA_REDHAT9_DOCKER_BASE:-"rockylinux:9.2"}
 
 # When set to true, this instructs start-impala-cluster.py to start with Java 11 images
 # created via 'make docker_java11_images' (or 'docker_debug_java11_images'). The Java
@@ -947,7 +948,7 @@ fi
 # overall build type) and does not apply when using a local Kudu build.
 export USE_KUDU_DEBUG_BUILD=${USE_KUDU_DEBUG_BUILD-false}
 
-export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"345fd44ca3"}
+export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"14c326461c"}
 export IMPALA_KUDU_HOME=${IMPALA_TOOLCHAIN_PACKAGES_HOME}/kudu-$IMPALA_KUDU_VERSION
 export IMPALA_KUDU_JAVA_HOME=\
 ${IMPALA_TOOLCHAIN_PACKAGES_HOME}/kudu-${IMPALA_KUDU_VERSION}/java
