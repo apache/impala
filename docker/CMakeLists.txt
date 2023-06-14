@@ -25,42 +25,39 @@ set(IMPALA_UTILITY_BUILD_CONTEXT_DIR
 
 set(DOCKER_BUILD ${CMAKE_SOURCE_DIR}/docker/docker-build.sh)
 
-find_program(LSB_RELEASE_EXEC lsb_release)
-execute_process(COMMAND ${LSB_RELEASE_EXEC} -is
-  OUTPUT_VARIABLE LSB_RELEASE_ID
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-execute_process(COMMAND ${LSB_RELEASE_EXEC} -rs
-  OUTPUT_VARIABLE LSB_RELEASE_VERSION
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
+# These CMake commands are using information from /etc/os-release
+cmake_host_system_information(RESULT OS_DISTRIB_ID QUERY DISTRIB_ID)
+cmake_host_system_information(RESULT OS_DISTRIB_VERSION_ID QUERY DISTRIB_VERSION_ID)
 
 set(QUICKSTART_BASE_IMAGE "UNSUPPORTED")
 set(DISTRO_BASE_IMAGE "UNSUPPORTED")
 
-if(${LSB_RELEASE_ID} STREQUAL "Ubuntu")
-  if(${LSB_RELEASE_VERSION} STREQUAL "16.04" OR
-     ${LSB_RELEASE_VERSION} STREQUAL "18.04" OR
-     ${LSB_RELEASE_VERSION} STREQUAL "20.04")
-    set(DISTRO_BASE_IMAGE "ubuntu:${LSB_RELEASE_VERSION}")
-    set(QUICKSTART_BASE_IMAGE "ubuntu:${LSB_RELEASE_VERSION}")
+# The CMake variables are using information from /etc/os-release.
+# A database of /etc/os-release files is available at
+# https://github.com/chef/os_release
+# These comparisons are based on those values.
+if(${OS_DISTRIB_ID} STREQUAL "ubuntu")
+  if(${OS_DISTRIB_VERSION_ID} STREQUAL "16.04" OR
+     ${OS_DISTRIB_VERSION_ID} STREQUAL "18.04" OR
+     ${OS_DISTRIB_VERSION_ID} STREQUAL "20.04")
+    set(DISTRO_BASE_IMAGE "ubuntu:${OS_DISTRIB_VERSION_ID}")
+    set(QUICKSTART_BASE_IMAGE "ubuntu:${OS_DISTRIB_VERSION_ID}")
   endif()
-  if (${LSB_RELEASE_VERSION} STREQUAL "16.04" OR
-      ${LSB_RELEASE_VERSION} STREQUAL "18.04")
+  if (${OS_DISTRIB_VERSION_ID} STREQUAL "16.04" OR
+      ${OS_DISTRIB_VERSION_ID} STREQUAL "18.04")
     set(PIP "python-pip")
-  elseif (${LSB_RELEASE_VERSION} STREQUAL "20.04")
+  elseif (${OS_DISTRIB_VERSION_ID} STREQUAL "20.04")
     set(PIP "python3-pip")
   endif()
-elseif(${LSB_RELEASE_ID} STREQUAL "RedHatEnterpriseServer" OR
-       ${LSB_RELEASE_ID} STREQUAL "RedHatEnterprise" OR
-       ${LSB_RELEASE_ID} STREQUAL "Rocky" OR
-       ${LSB_RELEASE_ID} STREQUAL "AlmaLinux" OR
-       ${LSB_RELEASE_ID} STREQUAL "CentOS")
+elseif(${OS_DISTRIB_ID} STREQUAL "rhel" OR
+       ${OS_DISTRIB_ID} STREQUAL "rocky" OR
+       ${OS_DISTRIB_ID} STREQUAL "almalinux" OR
+       ${OS_DISTRIB_ID} STREQUAL "centos")
   # The Quickstart images currently don't support using a Redhat
   # base image, so this doesn't set QUICKSTART_BASE_IMAGE.
-  if(${LSB_RELEASE_VERSION} MATCHES "7.*")
+  if(${OS_DISTRIB_VERSION_ID} MATCHES "7.*")
     set(DISTRO_BASE_IMAGE "$ENV{IMPALA_REDHAT7_DOCKER_BASE}")
-  elseif(${LSB_RELEASE_VERSION} MATCHES "8.*")
+  elseif(${OS_DISTRIB_VERSION_ID} MATCHES "8.*")
     set(DISTRO_BASE_IMAGE "$ENV{IMPALA_REDHAT8_DOCKER_BASE}")
   endif()
 endif()
