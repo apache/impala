@@ -95,7 +95,11 @@ void ThreadIdCB(CRYPTO_THREADID* tid) {
 #endif
 
 void CheckFIPSMode() {
-  auto fips_mode = FIPS_mode();
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
+  int fips_mode = FIPS_mode();
+#else
+  int fips_mode = EVP_default_properties_is_fips_enabled(NULL);
+#endif
   // If the environment variable KUDU_REQUIRE_FIPS_MODE is set to "1", we
   // check if FIPS approved mode is enabled. If not, we crash the process.
   // As this is used in clients as well, we can't use gflags to set this.

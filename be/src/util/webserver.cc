@@ -55,6 +55,7 @@
 #include "util/jwt-util.h"
 #include "util/mem-info.h"
 #include "util/metrics.h"
+#include "util/openssl-util.h"
 #include "util/os-info.h"
 #include "util/os-util.h"
 #include "util/pretty-printer.h"
@@ -450,7 +451,7 @@ Status Webserver::Start() {
   }
 
   if (!FLAGS_webserver_password_file.empty()) {
-    if (FIPS_mode()) {
+    if (IsFIPSMode()) {
       return Status("HTTP digest authorization is not supported in FIPS approved mode.");
     } else {
       // Squeasel doesn't log anything if it can't stat the password file (but will if it

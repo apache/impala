@@ -22,13 +22,12 @@
 #include "exprs/math-functions.h"
 #include "exprs/string-functions.h"
 
-#include <openssl/crypto.h>
-#include <openssl/evp.h>
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 #include "runtime/runtime-state.h"
 #include "udf/udf-internal.h"
 #include "util/debug-util.h"
+#include "util/openssl-util.h"
 #include "util/time.h"
 
 #include "common/names.h"
@@ -247,7 +246,7 @@ StringVal UtilityFunctions::Sha1(FunctionContext* ctx, const StringVal& input_st
   }
 
   // SHA-1 is not supported for FIPS.
-  if (FIPS_mode()) {
+  if (IsFIPSMode()) {
     ctx->SetError("sha1 is not supported in FIPS mode.");
     return StringVal::null();
   } else {
@@ -266,7 +265,7 @@ StringVal UtilityFunctions::Sha2(FunctionContext* ctx, const StringVal& input_st
   }
 
   // SHA-224 and SHA-256 are deprecated for FIPS mode.
-  if (FIPS_mode() && (bit_len.val == 224 || bit_len.val == 256)) {
+  if (IsFIPSMode() && (bit_len.val == 224 || bit_len.val == 256)) {
     ctx->SetError("Only bit lengths 384 and 512 are supported in FIPS mode.");
     return StringVal::null();
   }
@@ -308,7 +307,7 @@ StringVal UtilityFunctions::Md5(FunctionContext* ctx, const StringVal& input_str
   if (input_str.is_null) {
     return StringVal::null();
   }
-  if (UNLIKELY(FIPS_mode())) {
+  if (UNLIKELY(IsFIPSMode())) {
     ctx->SetError("MD5 is not supported in FIPS mode.");
     return StringVal::null();
   } else {

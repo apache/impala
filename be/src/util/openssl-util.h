@@ -15,10 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_UTIL_OPENSSL_UTIL_H
-#define IMPALA_UTIL_OPENSSL_UTIL_H
+#pragma once
 
 #include <openssl/aes.h>
+#include <openssl/crypto.h>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
 #include <openssl/ssl.h>
@@ -58,6 +58,16 @@ bool IsExternalTlsConfigured();
 /// Add entropy from the system RNG to OpenSSL's global RNG. Called at system startup
 /// and again periodically to add new entropy.
 void SeedOpenSSLRNG();
+
+/// Returns true if OpenSSL's FIPS mode is enabled. This calculation varies by the OpenSSL
+/// version, so it is useful to have a shared function.
+inline bool IsFIPSMode() {
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
+  return FIPS_mode() > 0;
+#else
+  return EVP_default_properties_is_fips_enabled(nullptr) > 0;
+#endif
+};
 
 enum AES_CIPHER_MODE {
   AES_256_CFB,
@@ -200,5 +210,3 @@ class EncryptionKey {
 };
 
 }
-
-#endif

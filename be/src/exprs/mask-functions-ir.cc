@@ -20,13 +20,13 @@
 #include <boost/locale/generator.hpp>
 #include <boost/locale/utf8_codecvt.hpp>
 #include <gutil/strings/substitute.h>
-#include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/sha.h>
 
 #include "exprs/anyval-util.h"
 #include "exprs/math-functions.h"
 #include "exprs/string-functions.h"
+#include "util/openssl-util.h"
 #include "util/ubsan.h"
 
 #include "common/names.h"
@@ -943,7 +943,7 @@ TimestampVal MaskFunctions::Mask(FunctionContext* ctx, const TimestampVal& val,
 StringVal MaskFunctions::MaskHash(FunctionContext* ctx, const StringVal& val) {
   // Hive hash the value by sha256 and encoding it into a lower case hex string in
   // non FIPS mode. In FIPS enabled mode, it's required to use sha512 for mask hash.
-  if (FIPS_mode()) {
+  if (IsFIPSMode()) {
     StringVal sha512_hash(ctx, SHA512_DIGEST_LENGTH);
     if (UNLIKELY(sha512_hash.is_null)) return StringVal::null();
     discard_result(SHA512(val.ptr, val.len, sha512_hash.ptr));

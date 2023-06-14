@@ -29,7 +29,6 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/unordered_map.hpp>
 
-#include <openssl/crypto.h>
 #include <openssl/sha.h>
 
 #include "codegen/llvm-codegen.h"
@@ -71,6 +70,7 @@
 #include "util/debug-util.h"
 #include "util/decimal-util.h"
 #include "util/metrics.h"
+#include "util/openssl-util.h"
 #include "util/string-parser.h"
 #include "util/string-util.h"
 #include "util/test-info.h"
@@ -5706,7 +5706,7 @@ TEST_P(ExprTest, SHAFunctions) {
   unsigned char sha384[SHA384_DIGEST_LENGTH];
   unsigned char sha512[SHA512_DIGEST_LENGTH];
 
-  if (FIPS_mode()) {
+  if (IsFIPSMode()) {
     TestError(sha1fn);
     TestError(sha2fn + ", 224)");
     TestError(sha2fn + ", 256)");
@@ -5733,7 +5733,7 @@ TEST_P(ExprTest, SHAFunctions) {
   TestStringValue(sha2fn + ", 512)", expected);
 
   // Test empty strings. Empty string is valid input and produces hash.
-  if (!FIPS_mode()) {
+  if (!IsFIPSMode()) {
     SHA1(input, 0, sha1);
     expected = ToHex(sha1, SHA_DIGEST_LENGTH);
     TestStringValue("sha1('')", expected);
@@ -5764,7 +5764,7 @@ TEST_P(ExprTest, SHAFunctions) {
 }
 
 TEST_P(ExprTest, MD5Function) {
-  if (FIPS_mode()) {
+  if (IsFIPSMode()) {
     TestError("md5('foo')");
   } else {
     std::string expected("1fdf956bdad98101171512d18eec3bcf");
@@ -10787,7 +10787,7 @@ TEST_P(ExprTest, MaskTest) {
 }
 
 TEST_P(ExprTest, MaskHashTest) {
-  if (FIPS_mode()) {
+  if (IsFIPSMode()) {
     TestStringValue("mask_hash('TestString-123')",
         "f3a58111be6ecec11449ac44654e72376b7759883ea11723b6e51354d50436de"
         "645bd061cb5c2b07b68e15b7a7c342cac41f69b9c4efe19e810bbd7abf639a1c");

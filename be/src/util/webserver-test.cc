@@ -24,7 +24,6 @@
 #include <boost/lexical_cast.hpp>
 #include <gutil/strings/substitute.h>
 #include <map>
-#include <openssl/crypto.h>
 #include <openssl/ssl.h>
 #include <regex>
 
@@ -35,6 +34,7 @@
 #include "util/default-path-handlers.h"
 #include "util/kudu-status-util.h"
 #include "util/metrics.h"
+#include "util/openssl-util.h"
 #include "util/os-util.h"
 #include "util/webserver.h"
 
@@ -662,7 +662,7 @@ TEST(Webserver, StartWithPasswordFileTest) {
 
   MetricGroup metrics("webserver-test");
   Webserver webserver("", FLAGS_webserver_port, &metrics);
-  if (FIPS_mode()) {
+  if (IsFIPSMode()) {
     ASSERT_FALSE(webserver.Start().ok());
   } else {
     ASSERT_OK(webserver.Start());
@@ -701,7 +701,7 @@ TEST(Webserver, StartWithPasswordFileTest) {
 }
 
 TEST(Webserver, StartWithMissingPasswordFileTest) {
-  if (FIPS_mode()) return;
+  if (IsFIPSMode()) return;
   stringstream password_file;
   password_file << getenv("IMPALA_HOME") << "/be/src/testutil/doesntexist";
   auto password =
