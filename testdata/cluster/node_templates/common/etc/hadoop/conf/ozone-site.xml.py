@@ -34,6 +34,7 @@ CONFIG = {
   # Select a random available port
   'hdds.datanode.http-address': '${EXTERNAL_LISTEN_HOST}:0',
   'hdds.datanode.replication.port': '0',
+  'hdds.datanode.client.port': '${DATANODE_CLIENT_PORT}',
 
   # Directories
   'ozone.metadata.dirs': '${NODE_DIR}/data/ozone',
