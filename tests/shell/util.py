@@ -32,6 +32,12 @@ import sys
 import time
 from subprocess import Popen, PIPE
 
+# This import is the actual ImpalaShell class from impala_shell.py.
+# We rename it to ImpalaShellClass here because we later import another
+# class called ImpalaShell from tests/shell/util.py, and we don't want
+# to mask it.
+from shell.impala_shell import ImpalaShell as ImpalaShellClass
+
 from tests.common.environ import (IMPALA_LOCAL_BUILD_VERSION,
                                   ImpalaTestClusterProperties)
 from tests.common.impala_service import ImpaladService
@@ -229,10 +235,41 @@ class ImpalaShell(object):
     # if stderr is redirected.
     if wait_until_connected and (args is None or "--quiet" not in args) and \
        stderr_file is None:
+      # We don't want to hang waiting for input. So, here are the scenarios
+      # we need to handle:
+      # 1. Shell process exits
+      # 2. Shell fails to connect. This can lead to an interactive prompt
+      #    that blocks for input forever. The two messages to look for are
+      #    "Error connecting" and "Socket error"
+      # 3. Process successfully connecting: "Connected to"
+      # Cases 1 and 2 should lead to an assert.
       start_time = time.time()
+      process_status = None
+      connection_err = None
       connected = False
-      while time.time() - start_time < timeout and not connected:
-        connected = "Connected to" in self.shell_process.stderr.readline()
+      while time.time() - start_time < timeout:
+        # Condition 1: check if the shell process has exited
+        # poll() returns None until the process exits
+        process_status = self.shell_process.poll()
+        if process_status is not None:
+          break
+        # readline() can block forever, so the timeout logic may not be effective
+        # if something gets stuck here.
+        line = self.shell_process.stderr.readline()
+        # Condition 2: check for errors connecting
+        if ImpalaShellClass.ERROR_CONNECTING_MESSAGE in line or \
+           ImpalaShellClass.SOCKET_ERROR_MESSAGE in line:
+          connection_err = line
+          break
+
+        # Condition 3: check if the connection is successful
+        connected = ImpalaShellClass.CONNECTED_TO_MESSAGE in line
+        if connected:
+          break
+
+      assert process_status is None, \
+          "Impala shell exited with return code {0}".format(process_status)
+      assert connection_err is None, connection_err
       assert connected, "Impala shell is not connected"
 
   def pid(self):

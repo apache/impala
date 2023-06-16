@@ -137,14 +137,23 @@ class ImpalaShell(cmd.Cmd, object):
   Status tells the caller that the command completed successfully.
   """
 
+  # NOTE: These variables are centrally defined for reuse, but they are also
+  # used directly in several tests to verify shell behavior (e.g. to
+  # verify that the shell remained connected or the shell connected
+  # successfully).
+
   # If not connected to an impalad, the server version is unknown.
   UNKNOWN_SERVER_VERSION = "Not Connected"
   PROMPT_FORMAT = "[{host}:{port}] {db}> "
   DISCONNECTED_PROMPT = "[Not connected] > "
   # Message to display when the connection failed and it is reconnecting.
-  # This is used in some tests for verification that the session remained
-  # connected.
   CONNECTION_LOST_MESSAGE = 'Connection lost, reconnecting...'
+  # Message to display when there is an exception when connecting.
+  ERROR_CONNECTING_MESSAGE = "Error connecting"
+  # Message to display when there is a socket error.
+  SOCKET_ERROR_MESSAGE = "Socket error"
+  # Message to display upon successful connection to an Impalad
+  CONNECTED_TO_MESSAGE = "Connected to"
   # Message to display in shell when cancelling a query
   CANCELLATION_MESSAGE = ' Cancelling Query'
   # Number of times to attempt cancellation before giving up.
@@ -1015,7 +1024,8 @@ class ImpalaShell(cmd.Cmd, object):
         pass
 
     if self.imp_client.connected:
-      self._print_if_verbose('Connected to %s:%s' % self.impalad)
+      self._print_if_verbose('%s %s:%s' %
+          (self.CONNECTED_TO_MESSAGE, self.impalad[0], self.impalad[1]))
       self._print_if_verbose('Server version: %s' % self.server_version)
       self.set_prompt(ImpalaShell.DEFAULT_DB)
       self._validate_database()
@@ -1084,7 +1094,7 @@ class ImpalaShell(cmd.Cmd, object):
       if e.errno == errno.EINTR:
         self._reconnect_cancellation()
       else:
-        print("Socket error %s: %s" % (e.errno, e), file=sys.stderr)
+        print("%s %s: %s" % (self.SOCKET_ERROR_MESSAGE, e.errno, e), file=sys.stderr)
         self.close_connection()
         self.prompt = self.DISCONNECTED_PROMPT
     except Exception as e:
@@ -1096,7 +1106,8 @@ class ImpalaShell(cmd.Cmd, object):
       if self.use_ssl and sys.version_info < (2,7,9) \
           and "EOF occurred in violation of protocol" in str(e):
         print("Warning: TLSv1.2 is not supported for Python < 2.7.9", file=sys.stderr)
-      print("Error connecting: %s, %s" % (type(e).__name__, e), file=sys.stderr)
+      print("%s: %s, %s" %
+          (self.ERROR_CONNECTING_MESSAGE, type(e).__name__, e), file=sys.stderr)
       # A secure connection may still be open. So we explicitly close it.
       self.close_connection()
       # If a connection to another impalad failed while already connected
@@ -1452,7 +1463,7 @@ class ImpalaShell(cmd.Cmd, object):
         print(ImpalaShell.CANCELLATION_MESSAGE)
         self._reconnect_cancellation()
       else:
-        print("Socket error %s: %s" % (e.errno, e), file=sys.stderr)
+        print("%s %s: %s" % (self.SOCKET_ERROR_MESSAGE, e.errno, e), file=sys.stderr)
         self.prompt = self.DISCONNECTED_PROMPT
         self.imp_client.connected = False
     except Exception as e:
@@ -2269,7 +2280,8 @@ def impala_shell_main():
             print(shell.CANCELLATION_MESSAGE)
             shell._reconnect_cancellation()
           else:
-            print("Socket error %s: %s" % (e.errno, e), file=sys.stderr)
+            print("%s %s: %s" %
+                (shell.SOCKET_ERROR_MESSAGE, e.errno, e), file=sys.stderr)
             shell.imp_client.connected = False
             shell.prompt = shell.DISCONNECTED_PROMPT
         except DisconnectedException as e:
