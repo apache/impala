@@ -17,6 +17,11 @@
 
 package org.apache.impala.catalog;
 
+import static org.apache.impala.catalog.monitor.TableLoadingTimeHistogram.Quantile.P100;
+import static org.apache.impala.catalog.monitor.TableLoadingTimeHistogram.Quantile.P50;
+import static org.apache.impala.catalog.monitor.TableLoadingTimeHistogram.Quantile.P75;
+import static org.apache.impala.catalog.monitor.TableLoadingTimeHistogram.Quantile.P95;
+import static org.apache.impala.catalog.monitor.TableLoadingTimeHistogram.Quantile.P99;
 import static org.apache.impala.thrift.TCatalogObjectType.HDFS_PARTITION;
 import static org.apache.impala.thrift.TCatalogObjectType.TABLE;
 
@@ -72,6 +77,7 @@ import org.apache.impala.catalog.monitor.CatalogMonitor;
 import org.apache.impala.catalog.monitor.CatalogTableMetrics;
 import org.apache.impala.catalog.metastore.HmsApiNameEnum;
 import org.apache.impala.catalog.metastore.ICatalogMetastoreServer;
+import org.apache.impala.catalog.monitor.TableLoadingTimeHistogram;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
@@ -2382,6 +2388,9 @@ public class CatalogServiceCatalog extends Catalog {
     versionLock_.writeLock().lock();
     try {
       Table removedTable = parentDb.removeTable(tblName);
+      if (removedTable != null && !removedTable.isStoredInImpaladCatalogCache()) {
+        CatalogMonitor.INSTANCE.getCatalogTableMetrics().removeTable(removedTable);
+      }
       if (removedTable != null) {
         removedTable.setCatalogVersion(incrementAndGetCatalogVersion());
         deleteLog_.addRemovedObject(removedTable.toMinimalTCatalogObject());
@@ -3360,39 +3369,42 @@ public class CatalogServiceCatalog extends Catalog {
     usage.setFrequently_accessed_tables(new ArrayList<>());
     usage.setHigh_file_count_tables(new ArrayList<>());
     usage.setLong_metadata_loading_tables(new ArrayList<>());
-    for (Table largeTable : catalogTableMetrics.getLargestTables()) {
+    for (Pair<TTableName, Long> largeTable : catalogTableMetrics.getLargestTables()) {
       TTableUsageMetrics tableUsageMetrics =
-          new TTableUsageMetrics(largeTable.getTableName().toThrift());
-      tableUsageMetrics.setMemory_estimate_bytes(largeTable.getEstimatedMetadataSize());
+          new TTableUsageMetrics(largeTable.getFirst());
+      tableUsageMetrics.setMemory_estimate_bytes(largeTable.getSecond());
       usage.addToLarge_tables(tableUsageMetrics);
     }
-    for (Table frequentTable : catalogTableMetrics.getFrequentlyAccessedTables()) {
+    for (Pair<TTableName, Long> frequentTable :
+            catalogTableMetrics.getFrequentlyAccessedTables()) {
       TTableUsageMetrics tableUsageMetrics =
-          new TTableUsageMetrics(frequentTable.getTableName().toThrift());
-      tableUsageMetrics.setNum_metadata_operations(frequentTable.getMetadataOpsCount());
+          new TTableUsageMetrics(frequentTable.getFirst());
+      tableUsageMetrics.setNum_metadata_operations(frequentTable.getSecond());
       usage.addToFrequently_accessed_tables(tableUsageMetrics);
     }
-    for (Table mostFilesTable : catalogTableMetrics.getHighFileCountTables()) {
+    for (Pair<TTableName, Long> mostFilesTable :
+            catalogTableMetrics.getHighFileCountTables()) {
       TTableUsageMetrics tableUsageMetrics =
-          new TTableUsageMetrics(mostFilesTable.getTableName().toThrift());
-      tableUsageMetrics.setNum_files(mostFilesTable.getNumFiles());
+          new TTableUsageMetrics(mostFilesTable.getFirst());
+      tableUsageMetrics.setNum_files(mostFilesTable.getSecond());
       usage.addToHigh_file_count_tables(tableUsageMetrics);
     }
-    for (Table longestLoadingTable : catalogTableMetrics.getLongMetadataLoadingTables()) {
+    for (Pair<TTableName, TableLoadingTimeHistogram> longestLoadingTable :
+            catalogTableMetrics.getLongMetadataLoadingTables()) {
       TTableUsageMetrics tableUsageMetrics =
-          new TTableUsageMetrics(longestLoadingTable.getTableName().toThrift());
+          new TTableUsageMetrics(longestLoadingTable.getFirst());
       tableUsageMetrics.setMedian_table_loading_ns(
-          longestLoadingTable.getMedianTableLoadingTime());
+          longestLoadingTable.getSecond().getQuantile(P50));
       tableUsageMetrics.setMax_table_loading_ns(
-          longestLoadingTable.getMaxTableLoadingTime());
+          longestLoadingTable.getSecond().getQuantile(P100));
       tableUsageMetrics.setP75_loading_time_ns(
-          longestLoadingTable.get75TableLoadingTime());
+          longestLoadingTable.getSecond().getQuantile(P75));
       tableUsageMetrics.setP95_loading_time_ns(
-          longestLoadingTable.get95TableLoadingTime());
+          longestLoadingTable.getSecond().getQuantile(P95));
       tableUsageMetrics.setP99_loading_time_ns(
-          longestLoadingTable.get99TableLoadingTime());
+          longestLoadingTable.getSecond().getQuantile(P99));
       tableUsageMetrics.setNum_table_loading(
-          longestLoadingTable.getTableLoadingCounts());
+          longestLoadingTable.getSecond().getCount());
       usage.addToLong_metadata_loading_tables(tableUsageMetrics);
     }
     return usage;

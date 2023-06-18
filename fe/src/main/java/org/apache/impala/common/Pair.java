@@ -29,6 +29,13 @@ public class Pair<F, S> {
     this.second = second;
   }
 
+  public F getFirst() {
+    return first;
+  }
+  public S getSecond() {
+    return second;
+  }
+
   @Override
   /**
    * A pair is equal if both parts are equal().

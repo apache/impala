@@ -17,31 +17,40 @@
 
 package org.apache.impala.catalog.monitor;
 
-import com.google.common.base.Function;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.common.Pair;
+import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.TopNCache;
 
 import java.util.List;
 
+import static org.apache.impala.catalog.monitor.TableLoadingTimeHistogram.Quantile.P100;
+import static org.apache.impala.catalog.monitor.TableLoadingTimeHistogram.Quantile.P50;
+import static org.apache.impala.catalog.monitor.TableLoadingTimeHistogram.Quantile.P75;
+import static org.apache.impala.catalog.monitor.TableLoadingTimeHistogram.Quantile.P95;
+import static org.apache.impala.catalog.monitor.TableLoadingTimeHistogram.Quantile.P99;
+
 /**
  * Class that monitors catalog table usage. Currently, it tracks,
- *  - the most frequently accessed tables (in terms of number of metadata operations)
- *  - the tables with the highest (estimated) memory requirements
- *  - the tables with the highest number of files
- *  - the tables with the longest table metadata loading time
- *
- *  This class is thread-safe.
+ * - the most frequently accessed tables (in terms of number of metadata operations)
+ * - the tables with the highest (estimated) memory requirements
+ * - the tables with the highest number of files
+ * - the tables with the longest table metadata loading time
+ * <p>
+ * This class is thread-safe.
  */
 public final class CatalogTableMetrics {
   public final static CatalogTableMetrics INSTANCE = new CatalogTableMetrics();
 
-  private final TopNCache<Table, Long> frequentlyAccessedTables_;
+  private final TopNCache<TableMetric<Long>, Long> frequentlyAccessedTables_;
 
-  private final TopNCache<Table, Long> largestTables_;
+  private final TopNCache<TableMetric<Long>, Long> largestTables_;
 
-  private final TopNCache<Table, Long> highFileCountTables_;
+  private final TopNCache<TableMetric<Long>, Long> highFileCountTables_;
 
-  private final TopNCache<Table, Long> longMetadataLoadingTables_;
+  private final TopNCache<TableMetric<TableLoadingTimeHistogram>, Long>
+      longMetadataLoadingTables_;
 
   private CatalogTableMetrics() {
     final int num_tables_tracked = Integer.getInteger(
@@ -49,68 +58,108 @@ public final class CatalogTableMetrics {
     final int num_loading_time_tables_tracked = Integer.getInteger(
         "org.apache.impala.catalog.CatalogUsageMonitor.NUM_LOADING_TIME_TABLES_TRACKED",
         100);
-    frequentlyAccessedTables_ = new TopNCache<Table, Long>(new Function<Table, Long>() {
-      @Override
-      public Long apply(Table tbl) {
-        return tbl.getMetadataOpsCount();
-      }
-    }, num_tables_tracked, true);
+    frequentlyAccessedTables_ =
+        new TopNCache<>(TableMetric::getSecond, num_tables_tracked, true);
 
-    largestTables_ = new TopNCache<Table, Long>(new Function<Table, Long>() {
-      @Override
-      public Long apply(Table tbl) {
-        return tbl.getEstimatedMetadataSize();
-      }
-    }, num_tables_tracked, false);
+    largestTables_ = new TopNCache<>(TableMetric::getSecond, num_tables_tracked, false);
 
-    highFileCountTables_ = new TopNCache<Table, Long>(new Function<Table, Long>() {
-      @Override
-      public Long apply(Table tbl) {
-        return tbl.getNumFiles();
-      }
-    }, num_tables_tracked, false);
+    highFileCountTables_ =
+        new TopNCache<>(TableMetric::getSecond, num_tables_tracked, false);
 
     // sort by maximum loading time by default
-    longMetadataLoadingTables_ = new TopNCache<Table, Long>(new Function<Table, Long>() {
-      @Override
-      public Long apply(Table tbl) {
-        return tbl.getMaxTableLoadingTime();
-      }
-    }, num_loading_time_tables_tracked, false);
+    longMetadataLoadingTables_ = new TopNCache<>(metric
+        -> metric.getSecond().getQuantile(P100),
+        num_loading_time_tables_tracked, false);
   }
 
   public void updateFrequentlyAccessedTables(Table tbl) {
-    frequentlyAccessedTables_.putOrUpdate(tbl);
+    TableMetric<Long> metric = TableMetric.of(tbl, tbl.getMetadataOpsCount());
+    frequentlyAccessedTables_.putOrUpdate(metric);
   }
 
-  public void updateLargestTables(Table tbl) { largestTables_.putOrUpdate(tbl); }
+  public void updateLargestTables(Table tbl) {
+    TableMetric<Long> metric = TableMetric.of(tbl, tbl.getEstimatedMetadataSize());
+    largestTables_.putOrUpdate(metric);
+  }
 
   public void updateHighFileCountTables(Table tbl) {
-    highFileCountTables_.putOrUpdate(tbl);
+    TableMetric<Long> metric = TableMetric.of(tbl, tbl.getNumFiles());
+    highFileCountTables_.putOrUpdate(metric);
   }
 
   public void updateLongMetadataLoadingTables(Table tbl) {
-    longMetadataLoadingTables_.putOrUpdate(tbl);
+    TableLoadingTimeHistogram histogram = new TableLoadingTimeHistogram();
+    histogram.setQuantile(P50, tbl.getMedianTableLoadingTime());
+    histogram.setQuantile(P75, tbl.get75TableLoadingTime());
+    histogram.setQuantile(P95, tbl.get95TableLoadingTime());
+    histogram.setQuantile(P99, tbl.get99TableLoadingTime());
+    histogram.setQuantile(P100, tbl.getMaxTableLoadingTime());
+    histogram.setCount(tbl.getTableLoadingCounts());
+    TableMetric<TableLoadingTimeHistogram> metric = TableMetric.of(tbl, histogram);
+    longMetadataLoadingTables_.putOrUpdate(metric);
   }
 
+  @SuppressWarnings({"unchecked", "rawtypes"})
   public void removeTable(Table tbl) {
-    frequentlyAccessedTables_.remove(tbl);
-    largestTables_.remove(tbl);
-    highFileCountTables_.remove(tbl);
-    longMetadataLoadingTables_.remove(tbl);
+    TableMetric metric = TableMetric.emptyOf(tbl);
+    frequentlyAccessedTables_.remove(metric);
+    largestTables_.remove(metric);
+    highFileCountTables_.remove(metric);
+    longMetadataLoadingTables_.remove(metric);
   }
 
-  public List<Table> getFrequentlyAccessedTables() {
+  /**
+   * Removes all tables from the underlying TopNCache.
+   */
+  @VisibleForTesting
+  synchronized void removeAllTables() {
+    frequentlyAccessedTables_.removeAll();
+    largestTables_.removeAll();
+    highFileCountTables_.removeAll();
+    longMetadataLoadingTables_.removeAll();
+  }
+
+  public List<? extends Pair<TTableName, Long>> getFrequentlyAccessedTables() {
     return frequentlyAccessedTables_.listEntries();
   }
 
-  public List<Table> getLargestTables() { return largestTables_.listEntries(); }
+  public List<? extends Pair<TTableName, Long>> getLargestTables() {
+    return largestTables_.listEntries();
+  }
 
-  public List<Table> getHighFileCountTables() {
+  public List<? extends Pair<TTableName, Long>> getHighFileCountTables() {
     return highFileCountTables_.listEntries();
   }
 
-  public List<Table> getLongMetadataLoadingTables() {
+  public List<? extends Pair<TTableName, TableLoadingTimeHistogram>>
+      getLongMetadataLoadingTables() {
     return longMetadataLoadingTables_.listEntries();
+  }
+
+  /**
+   * a data class to isolate the implicit refernce to
+   * {@link org.apache.impala.catalog.Db}, see IMPALA-6876.
+   */
+  static class TableMetric<T> extends Pair<TTableName, T> {
+    TableMetric(TTableName tableName, T value) { super(tableName, value); }
+
+    static <T> TableMetric<T> of(Table tbl, T value) {
+      TTableName tTableName = tbl.getTableName().toThrift();
+      return new TableMetric<>(tTableName, value);
+    }
+
+    static TableMetric<?> emptyOf(Table tbl) { return of(tbl, null); }
+
+    @Override
+    public int hashCode() {
+      return first.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj == null) return false;
+      if (!(obj instanceof TableMetric)) return false;
+      return first.equals(((TableMetric<?>) obj).first);
+    }
   }
 }

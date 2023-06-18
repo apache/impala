@@ -21,6 +21,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -101,8 +102,15 @@ public final class TopNCache<T, R extends Long>  {
   public synchronized void remove(T item) { heap_.remove(item); }
 
   /**
+   * Removes all items from the cache.
+   */
+  @VisibleForTesting
+  public synchronized void removeAll() {
+    heap_.clear();
+  }
+
+  /**
    * Returns the list of all the items in the cache.
    */
   public synchronized List<T> listEntries() { return ImmutableList.copyOf(heap_); }
 }
-
