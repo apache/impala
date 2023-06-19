@@ -386,3 +386,6 @@ table_name:complextypestbl_parquet_v2_snappy, constraint:restrict_to, table_form
 
 # The table is used to test a specific parquet page layout bug
 table_name:empty_parquet_page_source_impala10186, constraint:restrict_to, table_format:text/none/none
+
+# The table is used as test coverage for ORC-1304
+table_name:empty_stream_tbl, constraint:restrict_to, table_format:orc/def/block

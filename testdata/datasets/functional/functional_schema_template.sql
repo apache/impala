@@ -4203,3 +4203,15 @@ delimited
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/empty_parquet_page_source_impala10186/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+empty_stream_tbl
+---- COLUMNS
+s1 struct<id:int>
+s2 struct<id:int>
+---- TABLE_PROPERTIES
+transactional=false
+---- DEPENDENT_LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/empty_present_stream.orc' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====

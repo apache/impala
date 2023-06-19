@@ -856,3 +856,11 @@ select count(*) from functional_orc_def.decimal_tbl where d4 is null;
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 0
 ====
+---- QUERY
+# Regression test for ORC-1304
+select s2.id from functional_orc_def.empty_stream_tbl where s1.id = 100;
+---- RESULTS
+NULL
+---- TYPES
+INT
+====
