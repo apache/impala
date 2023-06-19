@@ -104,8 +104,16 @@ def get_build_date():
   return "${BUILD_DATE}"
 EOF
 
-# Building all eggs.
-echo "Building all external modules into eggs"
+# Building all external dependencies
+#
+# This builds each package to a wheel, then pip installs that wheel into the external
+# dependencies directory for that Python version. The result directories are similar
+# to the lib/python${version}/site-packages directory for a virtualenv with impala-shell
+# installed.
+#
+# These use the same pip caches as the virtualenvs to avoid extra downloads. This
+# script is a prerequisite for the pypi packaging, so there is no concurrency issue.
+echo "Building all external dependencies"
 for MODULE in ${SHELL_HOME}/ext-py/*; do
   # Sometimes there are leftover module directories from version changes. If IMPALA_HOME
   # is a git repository, then we can check if the module directory is tracked by git.
@@ -122,29 +130,41 @@ for MODULE in ${SHELL_HOME}/ext-py/*; do
     echo "Cleaning up old build artifacts."
     rm -rf dist 2>&1 > /dev/null
     rm -rf build 2>&1 > /dev/null
-    echo "Creating a Python 2 egg for ${MODULE}"
+    echo "Building ${MODULE} with Python 2"
+    # Use the py2_venv to get the wheel package needed for bdist_wheel below.
+    # python2 is now the virtualenv's python2, which is $IMPALA_SYSTEM_PYTHON2
+    source ${IMPALA_HOME}/shell/build/py2_venv/bin/activate
     if [[ "$MODULE" == *"/bitarray"* ]]; then
-      # Need to use setuptools to build egg for bitarray module
-      ${IMPALA_SYSTEM_PYTHON2} -c "import setuptools; exec(open('setup.py').read())" \
-          -q bdist_egg
+      # Need to use setuptools to build wheel for bitarray module
+      python2 -c "import setuptools; exec(open('setup.py').read())" \
+          -q bdist_wheel
     else
-      ${IMPALA_SYSTEM_PYTHON2} setup.py -q bdist_egg clean
+      python2 setup.py -q bdist_wheel clean
     fi
-    cp dist/*.egg ${TARBALL_ROOT}/ext-py2
+    # pip install the wheel into the python 2 external dependencies directory
+    PYTHON2_PIP_CACHE="~/.cache/impala_py2_pip"
+    pip install --no-deps --cache "${PYTHON2_PIP_CACHE}" \
+      --target ${TARBALL_ROOT}/ext-py2 dist/*.whl
   fi
   if [ ! -z "${IMPALA_SYSTEM_PYTHON3:-}" ]; then
     echo "Cleaning up old build artifacts."
     rm -rf dist 2>&1 > /dev/null
     rm -rf build 2>&1 > /dev/null
-    echo "Creating a Python 3 egg for ${MODULE}"
+    echo "Building ${MODULE} with Python 3"
+    # Use the py3_venv to get the wheel package needed for bdist_wheel below.
+    # python3 is now the virtualenv's python3, which is $IMPALA_SYSTEM_PYTHON3
+    source ${IMPALA_HOME}/shell/build/py3_venv/bin/activate
     if [[ "$MODULE" == *"/bitarray"* ]]; then
-      # Need to use setuptools to build egg for bitarray module
-      ${IMPALA_SYSTEM_PYTHON3} -c "import setuptools; exec(open('setup.py').read())" \
-          -q bdist_egg
+      # Need to use setuptools to build wheel for bitarray module
+      python3 -c "import setuptools; exec(open('setup.py').read())" \
+          -q bdist_wheel
     else
-      ${IMPALA_SYSTEM_PYTHON3} setup.py -q bdist_egg clean
+      python3 setup.py -q bdist_wheel clean
     fi
-    cp dist/*.egg ${TARBALL_ROOT}/ext-py3
+    # pip install the wheel into the python 2 external dependencies directory
+    PYTHON3_PIP_CACHE="~/.cache/impala_py3_pip"
+    pip install --no-deps --cache "${PYTHON3_PIP_CACHE}" \
+      --target ${TARBALL_ROOT}/ext-py3 dist/*.whl
   fi
   popd 2>&1 > /dev/null
 done
