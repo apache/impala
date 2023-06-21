@@ -19,7 +19,6 @@
 
 #include <cstdint>
 #include <string>
-#include <utility>
 
 #include "common/status.h"
 
@@ -30,8 +29,9 @@ class CGroupUtil {
   /// Determines the CGroup memory limit from the current processes' cgroup.
   /// If the limit is more than INT64_MAX, INT64_MAX is returned (since that is
   /// effectively unlimited anyway). Does not take into account memory limits
-  /// set on any ancestor CGroups.
-  static Status FindCGroupMemLimit(int64_t* bytes);
+  /// set on any ancestor CGroups. If is_v2 is provided: will return true when
+  /// CGroup v2 is used, false otherwise.
+  static Status FindCGroupMemLimit(int64_t* bytes, bool* is_v2 = nullptr);
 
   /// Returns a human-readable string with information about CGroups.
   static std::string DebugString();
@@ -41,22 +41,17 @@ class CGroupUtil {
   /// Finds the path of the cgroup of 'subsystem' for the current process.
   /// E.g. FindGlobalCGroup("memory") will return the memory cgroup
   /// that this process belongs to. This is a path relative to the system-wide root
-  /// cgroup for 'subsystem'.
+  /// cgroup for 'subsystem'. Pass subsystem="" for CGroup V2 unified entries.
   static Status FindGlobalCGroup(const std::string& subsystem, std::string* path);
-
-  /// Returns the absolute path to the CGroup from inside the container.
-  /// E.g. if this process belongs to
-  /// /sys/fs/cgroup/memory/kubepods/burstable/pod-<long unique id>, which is mounted at
-  /// /sys/fs/cgroup/memory inside the container, this function returns
-  /// "/sys/fs/cgroup/memory".
-  static Status FindAbsCGroupPath(const std::string& subsystem, std::string* path);
 
   /// Figures out the mapping of the cgroup root from the container's point of view to
   /// the full path relative to the system-wide cgroups outside of the container.
   /// E.g. /sys/fs/cgroup/memory/kubepods/burstable/pod-<long unique id> may be mounted at
   /// /sys/fs/cgroup/memory inside the container. In that case this function would return
-  /// ("/sys/fs/cgroup/memory", "kubepods/burstable/pod-<long unique id>").
-  static Status FindCGroupMounts(
-      const std::string& subsystem, std::pair<std::string, std::string>* result);
+  /// ("/sys/fs/cgroup/memory", "/kubepods/burstable/pod-<long unique id>").
+  /// CGroup v2 uses a unified hierarchy, so the result will be the same for any
+  /// value of 'subsystem'. Returns whether the mount is for cgroup v1 or v2.
+  static Status FindCGroupMounts(const std::string& subsystem,
+      std::string* mount_path, std::string* system_path, bool* is_v2);
 };
 } // namespace impala

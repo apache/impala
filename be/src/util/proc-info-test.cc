@@ -41,15 +41,19 @@ TEST(CGroupInfo, Basic) {
 
 // Test error handling when cgroup is not present.
 TEST(CGroupInfo, ErrorHandling) {
+  string mp, sp;
+  bool isV2;
+  Status err = CGroupUtil::FindCGroupMounts("fake-cgroup", &mp, &sp, &isV2);
+  if (isV2) {
+    // Ignores subsystem, so should always succeed.
+    EXPECT_TRUE(err.ok()) << err;
+  } else {
+    EXPECT_FALSE(err.ok()) << err;
+  }
   string path;
-  Status err = CGroupUtil::FindGlobalCGroup("fake-cgroup", &path);
-  LOG(INFO) << err.msg().msg();
-  EXPECT_FALSE(err.ok());
-  err = CGroupUtil::FindAbsCGroupPath("fake-cgroup", &path);
-  EXPECT_FALSE(err.ok());
-  pair<string, string> p;
-  err = CGroupUtil::FindCGroupMounts("fake-cgroup", &p);
-  EXPECT_FALSE(err.ok());
+  err = CGroupUtil::FindGlobalCGroup("fake-cgroup", &path);
+  // Always fails; v2 lists an empty subsystem.
+  EXPECT_FALSE(err.ok()) << err;
 }
 
 TEST(ProcessStateInfo, Basic) {
