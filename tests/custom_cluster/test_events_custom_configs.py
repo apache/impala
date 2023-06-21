@@ -22,6 +22,7 @@ import pytest
 
 from hive_metastore.ttypes import FireEventRequest
 from hive_metastore.ttypes import FireEventRequestData
+from hive_metastore.ttypes import InsertEventRequestData
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS
@@ -556,6 +557,56 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     assert batch_events_after_hive > batch_events_insert
     # 24 partitions inserted and hence we must refresh 24 partitions once.
     assert int(partitions_refreshed_after_hive) == int(partitions_refreshed_insert) + 24
+
+  @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=5")
+  def test_event_processor_failure_extra_space(self, unique_database):
+    """This test verifies that impala event processor is in active state after
+    processing a couple of previously erroneous events"""
+    test_table = "extra_space_table"
+    # IMPALA-11939 -- create table event in HMS contains extra spaces in the db/table
+    self.run_stmt_in_hive("create table ` {}`.`{} ` (i1 int) partitioned by (year int)"
+      .format(unique_database, test_table))
+    self.run_stmt_in_hive("alter table ` {}`.`{} ` add columns (i2 int)"
+      .format(unique_database, test_table))
+    EventProcessorUtils.wait_for_event_processing(self)
+    assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+
+  @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=10")
+  def test_event_processor_dropped_partition(self, unique_database):
+    """This test verifies that impala event processor is in active state after
+    processing partitioned insert events of a dropped table"""
+    # IMPALA-11768 -- Insert partition events should be ignored
+    # if the table is dropped
+    test_table = "partitioned_table"
+
+    def is_event_processor_active(is_insert):
+      self.run_stmt_in_hive("create table {}.{} (i1 int) partitioned by (year int)"
+        .format(unique_database, test_table))
+      EventProcessorUtils.wait_for_event_processing(self)
+      self.client.execute("refresh {}.{}".format(unique_database, test_table))
+      self.run_stmt_in_hive(
+        "insert into {}.{} partition(year=2023) values (4),(5),(6)"
+        .format(unique_database, test_table))
+      data = FireEventRequestData()
+      if is_insert:
+        insert_data = InsertEventRequestData()
+        insert_data.filesAdded = "/warehouse/mytable/b1"
+        insert_data.replace = False
+        data.insertData = insert_data
+      else:
+        data.refreshEvent = True
+      req = FireEventRequest(True, data)
+      req.dbName = unique_database
+      req.tableName = test_table
+      req.partitionVals = ["2023"]
+      self.hive_client.fire_listener_event(req)
+      self.run_stmt_in_hive(
+        "drop table {}.{}".format(unique_database, test_table))
+      EventProcessorUtils.wait_for_event_processing(self)
+      assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+
+    is_event_processor_active(True)
+    is_event_processor_active(False)
 
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=1")
   def test_iceberg_self_events(self, unique_database):

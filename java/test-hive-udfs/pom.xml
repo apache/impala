@@ -55,6 +55,10 @@ under the License.
           <groupId>org.apache.atlas</groupId>
           <artifactId>*</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>com.cloudera</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>

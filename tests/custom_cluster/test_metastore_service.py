@@ -1201,10 +1201,8 @@ class TestMetastoreService(CustomClusterTestSuite):
       get_parts_req.tbl_name = "table-does-not-exist"
       get_parts_req.names = []
       if expect_fallback:
-        # TODO HMS actually throws an InvalidObjectException but the HMS API signature
-        # doesn't declare it in the signature.
         self.__get_parts_by_names_expect_exception(catalog_hms_client, get_parts_req,
-                                                   "Internal error")
+                                                   "InvalidObjectException")
       else:
         self.__get_parts_by_names_expect_exception(catalog_hms_client, get_parts_req,
           "Table {0}.table-does-not-exist not found".format(

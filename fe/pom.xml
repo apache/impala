@@ -491,6 +491,10 @@ under the License.
           <groupId>com.sun.jersey</groupId>
           <artifactId>jersey-server</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>com.cloudera</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -523,6 +527,10 @@ under the License.
         </exclusion>
         <exclusion>
           <groupId>org.apache.hadoop</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.cloudera</groupId>
           <artifactId>*</artifactId>
         </exclusion>
       </exclusions>

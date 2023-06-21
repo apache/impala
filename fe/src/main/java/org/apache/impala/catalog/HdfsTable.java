@@ -45,6 +45,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.ForeignKeysRequest;
+import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PrimaryKeysRequest;
@@ -2816,7 +2817,7 @@ public class HdfsTable extends Table implements FeFsTable {
       }
       reloadPartitions(client, hmsPartToHdfsPart, fileMetadataLoadOpts);
       return hmsPartToHdfsPart.size();
-    } catch (NoSuchObjectException e) {
+    } catch (NoSuchObjectException | InvalidObjectException e) {
       // HMS throws a NoSuchObjectException if the table does not exist
       // in HMS anymore. In case the partitions don't exist in HMS it does not include
       // them in the result of getPartitionsByNames.
