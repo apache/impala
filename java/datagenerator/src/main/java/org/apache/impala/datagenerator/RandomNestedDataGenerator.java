@@ -24,6 +24,7 @@ import java.lang.StringBuilder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.HashMap;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Date;
 
@@ -54,9 +55,10 @@ public class RandomNestedDataGenerator {
   public static final Double CHANCE_UNIQUE = 0.02;
 
   private static void generateDataToFile(
-      String schemaFile, int targetNumElements, String outputFile) throws IOException {
+      String schemaFile, int targetNumElements, String outputFile, Optional<Long> seed)
+      throws IOException {
     buildCache();
-    rand = new Random();
+    rand = seed.isPresent() ? new Random(seed.get()) : new Random();
     Schema schema = new Schema.Parser().parse(new File(schemaFile));
     Configuration conf = new Configuration();
     conf.set("parquet.avro.write-old-list-structure", "false");
@@ -251,8 +253,10 @@ public class RandomNestedDataGenerator {
   }
 
   public static void main(String[] args) throws Exception {
-    if (args.length != 4) {
-      System.err.println("Arguments: schema_file num_elements list_len output_file");
+    final int num_args = args.length;
+    if (num_args < 4 || num_args > 5) {
+      System.err.println(
+          "Arguments: schema_file num_elements list_len output_file [random_seed]");
       System.exit(1);
     }
     String schemaFile = args[0];
@@ -260,6 +264,13 @@ public class RandomNestedDataGenerator {
     numListItems = Integer.valueOf(args[2]);
     String outputFile = args[3];
 
-    generateDataToFile(schemaFile, numElements, outputFile);
+    Optional<Long> seed;
+    if (num_args > 4) {
+      seed = Optional.of(Long.valueOf(args[4]));
+    } else {
+      seed = Optional.empty();
+    }
+
+    generateDataToFile(schemaFile, numElements, outputFile, seed);
   }
 }
