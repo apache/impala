@@ -21,6 +21,7 @@
 #include <tuple>
 #include <utility>
 
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/lexical_cast.hpp>
 #include <thrift/Thrift.h>
 #include <thrift/protocol/TProtocolException.h>
@@ -47,6 +48,7 @@
 
 #include "common/names.h"
 
+using boost::posix_time::seconds;
 using boost::shared_lock;
 using boost::shared_mutex;
 using boost::upgrade_lock;
@@ -83,8 +85,6 @@ DEFINE_int32(statestore_heartbeat_frequency_ms, 1000, "(Advanced) Frequency (in 
 DEFINE_double_hidden(heartbeat_monitoring_frequency_ms, 60000, "(Advanced) Frequency (in "
     "ms) with which the statestore monitors heartbeats from a subscriber.");
 
-DEFINE_int32(state_store_port, 24000, "port where StatestoreService is running");
-
 DEFINE_int32(statestore_heartbeat_tcp_timeout_seconds, 3, "(Advanced) The time after "
     "which a heartbeat RPC to a subscriber will timeout. This setting protects against "
     "badly hung machines that are not able to respond to the heartbeat RPC in short "
@@ -112,6 +112,52 @@ DEFINE_int32(statestore_update_catalogd_tcp_timeout_seconds, 3, "(Advanced) The 
     "protects against badly hung machines that are not able to respond to the "
     "UpdateCatalogd RPC in short order");
 
+// Flags for Statestore HA
+// Host and port of peer's StatestoreHaService for Statestore HA.
+DEFINE_string(state_store_peer_host, "localhost",
+    "hostname where peer's StatestoreHaService is running");
+DEFINE_int32(state_store_peer_ha_port, 24021,
+    "port where peer's StatestoreHaService is running");
+DEFINE_bool(enable_statestored_ha, false, "Set to true to enable Statestore HA");
+DEFINE_bool(statestore_force_active, false, "Set to true to force this statestored "
+    "instance to take active role. It's used to perform manual fail over for statestore "
+    "service.");
+// Use network address as priority value of statestored instance when designating active
+// statestored. The lower network address corresponds to a higher priority.
+// This is mainly used in unit-test for predictable results.
+DEFINE_bool(use_network_address_as_statestore_priority, false, "Network address is "
+    "used as priority value of statestored instance if this is set as true. Otherwise, "
+    "statestored_id which is generated as random number will be used as priority value "
+    "of statestored instance.");
+// Waiting period in ms for HA preemption. It should be set with proper value based on the
+// time to take for bringing a statestored instance in-line in the deployment environment.
+DEFINE_int64(statestore_ha_preemption_wait_period_ms, 10000, "(Advanced) The time after "
+    "which statestored designates itself as active role if the statestore does not "
+    "receive HA handshake request/response from peer statestored.");
+DEFINE_double_hidden(statestore_ha_heartbeat_monitoring_frequency_ms, 1000, "(Advanced) "
+    "Frequency (in ms) with which the statestore monitors HA heartbeats from active "
+    "statestore.");
+DEFINE_int32(statestore_update_statestore_tcp_timeout_seconds, 3, "(Advanced) The "
+    "time after which a UpdateStatestoredRole RPC to a subscriber will timeout. This "
+    "setting protects against badly hung machines that are not able to respond to the "
+    "UpdateStatestoredRole RPC in short order.");
+DEFINE_int32(statestore_peer_timeout_seconds, 30, "The amount of time (in seconds) that "
+    "may elapse before the connection with the peer statestore is considered lost.");
+DEFINE_int32(statestore_peer_cnxn_attempts, 10, "The number of times to retry an "
+    "RPC connection to the peer statestore. A setting of 0 means retry indefinitely");
+DEFINE_int32(statestore_peer_cnxn_retry_interval_ms, 1000, "The interval, in ms, "
+    "to wait between attempts to make an RPC connection to the peer statestore. "
+    "It's set as statestore_ha_preemption_wait_period_ms/statestore_peer_cnxn_attempts "
+    "if statestore_peer_cnxn_attempts > 0, default value if "
+    "statestore_peer_cnxn_attempts == 0.");
+DEFINE_int32(statestore_ha_client_rpc_timeout_ms, 300000, "(Advanced) The underlying "
+    "TSocket send/recv timeout in milliseconds for a client RPC of Statestore HA "
+    "service.");
+DEFINE_int64(update_statestore_rpc_resend_interval_ms, 100, "(Advanced) Interval "
+    "(in ms) with which the statestore resends the RPCs of updating statestored's role "
+    "to subscribers if the statestore has failed to send the RPCs to the subscribers.");
+
+DECLARE_string(hostname);
 DECLARE_bool(enable_catalogd_ha);
 DECLARE_int64(active_catalogd_designation_monitoring_interval_ms);
 DECLARE_int64(update_catalogd_rpc_resend_interval_ms);
@@ -124,6 +170,9 @@ DECLARE_string(ssl_minimum_version);
 #ifndef NDEBUG
 DECLARE_int32(stress_statestore_startup_delay_ms);
 #endif
+
+// Used to identify the statestore in the failure detector
+const string STATESTORE_ID = "STATESTORE";
 
 // Metric keys
 // TODO: Replace 'backend' with 'subscriber' when we can coordinate a change with CM
@@ -140,9 +189,17 @@ const string STATESTORE_SUCCESSFUL_UPDATE_CATALOGD_RPC_NUM =
     "statestore.num-successful-update-catalogd-rpc";
 const string STATESTORE_FAILED_UPDATE_CATALOGD_RPC_NUM =
     "statestore.num-failed-update-catalogd-rpc";
+const string STATESTORE_SUCCESSFUL_UPDATE_STATESTORED_ROLE_RPC_NUM =
+    "statestore.num-successful-update-statestored-role-rpc";
+const string STATESTORE_FAILED_UPDATE_STATESTORED_ROLE_RPC_NUM =
+    "statestore.num-failed-update-statestored-role-rpc";
 const string STATESTORE_CLEAR_TOPIC_ENTRIES_NUM =
     "statestore.num-clear-topic-entries-requests";
 const string STATESTORE_ACTIVE_CATALOGD_ADDRESS = "statestore.active-catalogd-address";
+const string STATESTORE_ACTIVE_STATUS = "statestore.active-status";
+const string STATESTORE_SERVICE_STARTED = "statestore.service-started";
+const string STATESTORE_IN_HA_RECOVERY = "statestore.in-ha-recovery-mode";
+const string STATESTORE_CONNECTED_PEER = "statestore.connected-with-peer-statestored";
 
 // Initial version for each Topic registered by a Subscriber. Generally, the Topic will
 // have a Version that is the MAX() of all entries in the Topic, but this initial
@@ -158,6 +215,7 @@ const char* Statestore::IMPALA_MEMBERSHIP_TOPIC = "impala-membership";
 const char* Statestore::IMPALA_REQUEST_QUEUE_TOPIC = "impala-request-queue";
 
 typedef ClientConnection<StatestoreSubscriberClientWrapper> StatestoreSubscriberConn;
+typedef ClientConnection<StatestoreHaServiceClientWrapper> StatestoreHaServiceConn;
 
 namespace impala {
 
@@ -233,7 +291,12 @@ class StatestoreThriftIf : public StatestoreServiceIf {
     response.__set_registration_id(registration_id);
     response.__set_statestore_id(statestore_->GetStateStoreId());
     response.__set_protocol_version(statestore_->GetProtocolVersion());
-    if (has_active_catalogd) {
+    bool is_active_statestored = false;
+    int64_t active_statestored_version =
+        statestore_->GetActiveVersion(&is_active_statestored);
+    response.__set_statestore_is_active(is_active_statestored);
+    response.__set_active_statestored_version(active_statestored_version);
+    if (is_active_statestored && has_active_catalogd) {
       response.__set_catalogd_registration(active_catalogd_registration);
       response.__set_catalogd_version(active_catalogd_version);
     }
@@ -247,6 +310,73 @@ class StatestoreThriftIf : public StatestoreServiceIf {
     Status status = Status::OK();
     status.ToThrift(&response.status);
     return;
+  }
+
+  virtual void SetStatestoreDebugAction(TSetStatestoreDebugActionResponse& response,
+      const TSetStatestoreDebugActionRequest& params) {
+    if (params.__isset.disable_network) {
+      bool disable_network = params.disable_network;
+      LOG(INFO) << (disable_network ? "Disable" : "Enable")
+                << " statestored network";
+      statestore_->SetStatestoreDebugAction(disable_network);
+    }
+    Status status = Status::OK();
+    status.ToThrift(&response.status);
+    return;
+  }
+
+ private:
+  Statestore* statestore_;
+};
+
+class StatestoreHaThriftIf : public StatestoreHaServiceIf {
+ public:
+  StatestoreHaThriftIf(Statestore* statestore) : statestore_(statestore) {
+    DCHECK(statestore_ != NULL);
+  }
+
+  // Receive HA handshake request from peer statestore instance.
+  // Each statestore instance start this StatestoreHaService server and each has client
+  // cache. They use client to negotiate active-standby role with peer. If retry failed
+  // for 3 times, assume its peer is not started and the instance take the active role.
+  // Otherwise, designate the role based on the priorities.
+  virtual void StatestoreHaHandshake(TStatestoreHaHandshakeResponse& response,
+      const TStatestoreHaHandshakeRequest& params) {
+    if (params.src_protocol_version < statestore_->GetProtocolVersion()) {
+      // Refuse old version of statestore
+      Status status = Status(TErrorCode::STATESTORE_INCOMPATIBLE_PROTOCOL,
+          statestore_->GetPeerStatestoreHaAddress(), params.src_protocol_version + 1,
+          statestore_->GetProtocolVersion() + 1);
+      status.ToThrift(&response.status);
+      return;
+    } else if (params.src_statestore_id == statestore_->GetStateStoreId()) {
+      // Ignore request sent by itself.
+      return;
+    }
+    bool dst_statestore_active = false;
+    Status status = statestore_->ReceiveHaHandshakeRequest(params.src_statestore_id,
+        params.src_statestore_address, params.src_force_active, &dst_statestore_active);
+    status.ToThrift(&response.status);
+    response.__set_dst_protocol_version(statestore_->GetProtocolVersion());
+    response.__set_dst_statestore_id(statestore_->GetStateStoreId());
+    response.__set_dst_statestore_active(dst_statestore_active);
+  }
+
+  // Receive HA heartbeat from peer statestore instance.
+  virtual void StatestoreHaHeartbeat(TStatestoreHaHeartbeatResponse& response,
+      const TStatestoreHaHeartbeatRequest& params) {
+    if (params.protocol_version < statestore_->GetProtocolVersion()) {
+      // Refuse old version of statestore
+      Status status =
+          Status(TErrorCode::STATESTORE_INCOMPATIBLE_PROTOCOL,
+              statestore_->GetPeerStatestoreHaAddress(), params.protocol_version + 1,
+              statestore_->GetProtocolVersion() + 1);
+      status.ToThrift(&response.status);
+      return;
+    }
+    statestore_->HaHeartbeatRequest(params.dst_statestore_id, params.src_statestore_id);
+    Status status = Status::OK();
+    status.ToThrift(&response.status);
   }
 
  private:
@@ -539,6 +669,7 @@ Statestore::Statestore(MetricGroup* metrics)
         FLAGS_statestore_update_catalogd_tcp_timeout_seconds * 1000, "",
         IsInternalTlsConfigured())),
     thrift_iface_(new StatestoreThriftIf(this)),
+    ha_thrift_iface_(new StatestoreHaThriftIf(this)),
     failure_detector_(new MissedHeartbeatFailureDetector(
         FLAGS_statestore_max_missed_heartbeats,
         FLAGS_statestore_max_missed_heartbeats / 2)) {
@@ -562,15 +693,50 @@ Statestore::Statestore(MetricGroup* metrics)
       metrics->AddCounter(STATESTORE_SUCCESSFUL_UPDATE_CATALOGD_RPC_NUM, 0);
   failed_update_catalogd_rpc_metric_ =
       metrics->AddCounter(STATESTORE_FAILED_UPDATE_CATALOGD_RPC_NUM, 0);
+  successful_update_statestored_role_rpc_metric_ =
+      metrics->AddCounter(STATESTORE_SUCCESSFUL_UPDATE_STATESTORED_ROLE_RPC_NUM, 0);
+  failed_update_statestored_role_rpc_metric_ =
+      metrics->AddCounter(STATESTORE_FAILED_UPDATE_STATESTORED_ROLE_RPC_NUM, 0);
   clear_topic_entries_metric_ =
       metrics->AddCounter(STATESTORE_CLEAR_TOPIC_ENTRIES_NUM, 0);
   active_catalogd_address_metric_ = metrics->AddProperty<string>(
       STATESTORE_ACTIVE_CATALOGD_ADDRESS, "");
+  active_status_metric_ = metrics->AddProperty(STATESTORE_ACTIVE_STATUS, true);
+  service_started_metric_ = metrics->AddProperty(STATESTORE_SERVICE_STARTED, false);
 
   update_state_client_cache_->InitMetrics(metrics, "subscriber-update-state");
   heartbeat_client_cache_->InitMetrics(metrics, "subscriber-heartbeat");
   update_catalogd_client_cache_->InitMetrics(
       metrics, "subscriber-update-catalogd");
+  if (!FLAGS_enable_statestored_ha) {
+    is_active_ = true;
+    active_status_metric_->SetValue(is_active_);
+    active_version_ = UnixMicros();
+  } else {
+    is_active_ = false;
+    active_status_metric_->SetValue(is_active_);
+    active_version_ = 0;
+    update_statestored_client_cache_.reset(new StatestoreSubscriberClientCache(
+        1, 0, FLAGS_statestore_update_statestore_tcp_timeout_seconds * 1000,
+        FLAGS_statestore_update_statestore_tcp_timeout_seconds * 1000, "",
+        IsInternalTlsConfigured()));
+    update_statestored_client_cache_->InitMetrics(
+        metrics, "subscriber-update-statestored");
+    ha_client_cache_.reset(new StatestoreHaClientCache(1, 0,
+        FLAGS_statestore_ha_client_rpc_timeout_ms,
+        FLAGS_statestore_ha_client_rpc_timeout_ms, "",
+        IsInternalTlsConfigured()));
+    ha_client_cache_->InitMetrics(metrics, "statestored-ha");
+    ha_standby_ss_failure_detector_.reset(new MissedHeartbeatFailureDetector(
+        FLAGS_statestore_max_missed_heartbeats,
+        FLAGS_statestore_max_missed_heartbeats / 2));
+    ha_active_ss_failure_detector_.reset(new TimeoutFailureDetector(
+        seconds(FLAGS_statestore_peer_timeout_seconds),
+        seconds(FLAGS_statestore_peer_timeout_seconds / 2)));
+
+    in_ha_recovery_mode_metric_ = metrics->AddProperty(STATESTORE_IN_HA_RECOVERY, false);
+    connected_peer_metric_ = metrics->AddProperty(STATESTORE_CONNECTED_PEER, false);
+  }
 }
 
 Statestore::~Statestore() {
@@ -613,7 +779,7 @@ Status Statestore::Init(int32_t state_store_port) {
   RETURN_IF_ERROR(Thread::Create("statestore-update-catalogd", "update-catalogd-thread",
       &Statestore::MonitorUpdateCatalogd, this, &update_catalogd_thread_));
   service_started_ = true;
-
+  service_started_metric_->SetValue(true);
   return Status::OK();
 }
 
@@ -720,6 +886,16 @@ Status Statestore::OfferUpdate(const ScheduledSubscriberUpdate& update,
     SubscriberMap::iterator subscriber_it = subscribers_.find(update.subscriber_id);
     DCHECK(subscriber_it != subscribers_.end());
     subscribers_.erase(subscriber_it);
+    if (FLAGS_enable_statestored_ha) {
+      ActiveConnStateMap::iterator conn_states_it =
+          active_conn_states_.find(update.subscriber_id);
+      if (conn_states_it != active_conn_states_.end()) {
+        if (conn_states_it->second == TStatestoreConnState::FAILED) {
+          --failed_conn_state_count_;
+        }
+        active_conn_states_.erase(conn_states_it);
+      }
+    }
     LOG(ERROR) << ss.str();
     return Status(ss.str());
   }
@@ -743,6 +919,8 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
   } else if (is_catalogd
       && FLAGS_enable_catalogd_ha != catalogd_registration.enable_catalogd_ha) {
     return Status("CalaogD HA enabling flag from catalogd does not match.");
+  } else if (disable_network_.Load()) {
+    return Status("Reject registration since network is disabled.");
   }
 
   // Create any new topics first, so that when the subscriber is first sent a topic update
@@ -797,6 +975,9 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
         subscriber_id, *registration_id, location, topic_registrations,
         subscriber_type, subscribe_catalogd_change));
     subscribers_.emplace(subscriber_id, current_registration);
+    if (FLAGS_enable_statestored_ha) {
+      active_conn_states_.emplace(subscriber_id, TStatestoreConnState::OK);
+    }
     failure_detector_->UpdateHeartbeat(subscriber_id, true);
     num_subscribers_metric_->SetValue(subscribers_.size());
     subscriber_set_metric_->Add(subscriber_id);
@@ -814,6 +995,12 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
   return Status::OK();
 }
 
+void Statestore::SetStatestoreDebugAction(bool disable_network) {
+  if (FLAGS_debug_actions == "DISABLE_STATESTORE_NETWORK") {
+    disable_network_.Store(disable_network);
+  }
+}
+
 bool Statestore::FindSubscriber(const SubscriberId& subscriber_id,
     const RegistrationId& registration_id, shared_ptr<Subscriber>* subscriber) {
   DCHECK(subscriber != nullptr);
@@ -827,9 +1014,12 @@ bool Statestore::FindSubscriber(const SubscriberId& subscriber_id,
 
 Status Statestore::SendTopicUpdate(Subscriber* subscriber, UpdateKind update_kind,
     bool* update_skipped) {
-  // Don't send topic update to inactive catalogd.
-  if (FLAGS_enable_catalogd_ha && subscriber->IsCatalogd()
+  if (!IsActive()) {
+    // Don't send topic update if the statestored is not active.
+    return Status::OK();
+  } else if (FLAGS_enable_catalogd_ha && subscriber->IsCatalogd()
       && !catalog_manager_.IsActiveCatalogd(subscriber->id())) {
+    // Don't send topic update to inactive catalogd.
     VLOG(3) << "Skip sending topic update to inactive catalogd";
     return Status::OK();
   }
@@ -1040,6 +1230,10 @@ ThreadPool<Statestore::ScheduledSubscriberUpdate>* Statestore::GetThreadPool(
 }
 
 Status Statestore::SendHeartbeat(Subscriber* subscriber) {
+  if (disable_network_.Load()) {
+    return Status("Don't send heartbeat since network is disabled.");
+  }
+
   MonotonicStopWatch sw;
   sw.Start();
 
@@ -1052,10 +1246,39 @@ Status Statestore::SendHeartbeat(Subscriber* subscriber) {
   THeartbeatResponse response;
   request.__set_registration_id(subscriber->registration_id());
   request.__set_statestore_id(statestore_id_);
+  if (FLAGS_enable_statestored_ha && !IsActive()) {
+    // Send heartbeat to subscriber with request for connection state between active
+    // statestore and subscriber.
+    request.__set_request_statestore_conn_state(true);
+  }
   RETURN_IF_ERROR(
       client.DoRpc(&StatestoreSubscriberClientWrapper::Heartbeat, request, &response));
 
   heartbeat_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
+  if (FLAGS_enable_statestored_ha && !IsActive()
+      && response.__isset.statestore_conn_state) {
+    TStatestoreConnState::type conn_state = response.statestore_conn_state;
+    lock_guard<mutex> l(subscribers_lock_);
+    if (active_conn_states_.find(subscriber->id()) != active_conn_states_.end()
+        && active_conn_states_[subscriber->id()] != conn_state) {
+      if (conn_state == TStatestoreConnState::FAILED) {
+        DCHECK(active_conn_states_[subscriber->id()] == TStatestoreConnState::OK
+            || active_conn_states_[subscriber->id()] == TStatestoreConnState::UNKNOWN);
+        ++failed_conn_state_count_;
+      } else if (active_conn_states_[subscriber->id()] == TStatestoreConnState::FAILED) {
+        DCHECK(conn_state == TStatestoreConnState::OK
+            || conn_state == TStatestoreConnState::UNKNOWN);
+        --failed_conn_state_count_;
+      } else {
+        DCHECK((active_conn_states_[subscriber->id()] == TStatestoreConnState::OK &&
+            conn_state == TStatestoreConnState::UNKNOWN)
+            || (conn_state == TStatestoreConnState::OK &&
+            active_conn_states_[subscriber->id()] == TStatestoreConnState::UNKNOWN));
+      }
+      // Save the connection state between active statestore and subscriber.
+      active_conn_states_[subscriber->id()] = conn_state;
+    }
+  }
   return Status::OK();
 }
 
@@ -1252,6 +1475,9 @@ void Statestore::DoSubscriberUpdate(UpdateKind update_kind, int thread_id,
 
 void Statestore::SendUpdateCatalogdNotification(int64_t* last_active_catalogd_version,
     vector<std::shared_ptr<Subscriber>>& rpc_receivers) {
+  // Don't send UpdateCatalogd RPC if the statestore is not active.
+  if (!IsActive()) return;
+
   bool has_active_catalogd;
   int64_t active_catalogd_version = 0;
   TCatalogRegistration catalogd_registration =
@@ -1357,6 +1583,125 @@ void Statestore::SendUpdateCatalogdNotification(int64_t* last_active_catalogd_ve
   }
 }
 
+[[noreturn]] void Statestore::MonitorUpdateStatestoredRole() {
+  // rpc_receivers is used to track subscribers to which statestore need to send RPCs
+  // when there is a change in the elected active statestored. It is updated from
+  // subscribers_, and the subscribers will be removed from this list if the RPCs are
+  // successfully sent to them.
+  vector<std::shared_ptr<Subscriber>> rpc_receivers;
+  // Wait for notification. If new statestored leader is elected, send notification
+  // to all subscribers.
+  int64_t timeout_us = FLAGS_update_statestore_rpc_resend_interval_ms * MICROS_PER_MILLI;
+  int64_t last_active_statestored_version = 0;
+  while (1) {
+    {
+      unique_lock<mutex> l(ha_lock_);
+      update_statestored_cv_.WaitFor(l, timeout_us);
+    }
+    SendUpdateStatestoredRoleNotification(
+        &last_active_statestored_version, rpc_receivers);
+  }
+}
+
+void Statestore::SendUpdateStatestoredRoleNotification(
+    int64_t* last_active_statestored_version,
+    vector<std::shared_ptr<Subscriber>>& rpc_receivers) {
+  bool is_active_statestored = false;
+  int64_t active_statestored_version = GetActiveVersion(&is_active_statestored);
+  if (!is_active_statestored ||
+      (active_statestored_version == *last_active_statestored_version
+          && rpc_receivers.empty())) {
+    // Don't resend RPCs if there is no change in active statestored and no RPC failure
+    // in last round.
+    return;
+  }
+  bool has_active_catalogd;
+  int64_t active_catalogd_version = 0;
+  TCatalogRegistration catalogd_registration =
+      catalog_manager_.GetActiveCatalogRegistration(
+          &has_active_catalogd, &active_catalogd_version);
+
+  bool resend_rpc = false;
+  if (active_statestored_version > *last_active_statestored_version) {
+    // Send notification for the latest elected active statestored.
+    LOG(INFO) << "Send notification for active statestored version: "
+              << active_statestored_version;
+    // statestored_active_status_metric_->SetValue(true);
+    rpc_receivers.clear();
+    {
+      lock_guard<mutex> l(subscribers_lock_);
+      for (const auto& subscriber : subscribers_) {
+        rpc_receivers.push_back(subscriber.second);
+      }
+    }
+    *last_active_statestored_version = active_statestored_version;
+  } else {
+    DCHECK(!rpc_receivers.empty());
+    lock_guard<mutex> l(subscribers_lock_);
+    for (std::vector<std::shared_ptr<Subscriber>>::iterator it = rpc_receivers.begin();
+         it != rpc_receivers.end();) {
+      // Don't resend RPC to subscribers which have been removed from subscriber list.
+      std::shared_ptr<Subscriber> subscriber = *it;
+      if (subscribers_.find(subscriber->id()) == subscribers_.end()) {
+        it = rpc_receivers.erase(it);
+      } else {
+        ++it;
+      }
+    }
+    if (rpc_receivers.empty()) return;
+    resend_rpc = true;
+  }
+
+  for (std::vector<std::shared_ptr<Subscriber>>::iterator it = rpc_receivers.begin();
+       it != rpc_receivers.end();) {
+    std::shared_ptr<Subscriber> subscriber = *it;
+    Status status;
+    if (!resend_rpc) {
+      status = DebugAction(
+          FLAGS_debug_actions, "SEND_UPDATE_STATESTORED_RPC_FIRST_ATTEMPT");
+    }
+    if (status.ok()) {
+      StatestoreSubscriberConn client(update_statestored_client_cache_.get(),
+          subscriber->network_address(), &status);
+      if (status.ok()) {
+        TUpdateStatestoredRoleRequest request;
+        TUpdateStatestoredRoleResponse response;
+        request.__set_registration_id(subscriber->registration_id());
+        request.__set_statestore_id(statestore_id_);
+        request.__set_active_statestored_version(active_statestored_version);
+        request.__set_is_active(true);
+        if (has_active_catalogd && subscriber->IsSubscribedCatalogdChange()) {
+          request.__set_catalogd_version(active_catalogd_version);
+          request.__set_catalogd_registration(catalogd_registration);
+        }
+        status = client.DoRpc(&StatestoreSubscriberClientWrapper::UpdateStatestoredRole,
+            request, &response);
+        if (!status.ok() && status.code() == TErrorCode::RPC_RECV_TIMEOUT) {
+          // Add details to status to make it more useful, while preserving the stack
+          status.AddDetail(Substitute(
+              "Subscriber $0 timed-out during update catalogd RPC. Timeout is $1s.",
+              subscriber->id(), FLAGS_statestore_update_catalogd_tcp_timeout_seconds));
+        }
+      }
+    }
+    if (status.ok()) {
+      // Remove the subscriber from the receiver list so that Statestore will not resend
+      // RPC to it in next round.
+      successful_update_statestored_role_rpc_metric_->Increment(1);
+      it = rpc_receivers.erase(it);
+    } else {
+      LOG(ERROR) << "Couldn't send UpdateStatestoredRole RPC,  " << status.GetDetail();
+      failed_update_statestored_role_rpc_metric_->Increment(1);
+      // Leave the subscriber in the receiver list. Statestore will resend RPC to it in
+      // next round.
+      ++it;
+    }
+  }
+  if (rpc_receivers.empty()) {
+    LOG(INFO) << "Successfully sent UpdateStatestoredRole RPCs to all subscribers";
+  }
+}
+
 void Statestore::UnregisterSubscriber(Subscriber* subscriber) {
   SubscriberMap::const_iterator it = subscribers_.find(subscriber->id());
   if (it == subscribers_.end() ||
@@ -1369,6 +1714,9 @@ void Statestore::UnregisterSubscriber(Subscriber* subscriber) {
   update_state_client_cache_->CloseConnections(subscriber->network_address());
   heartbeat_client_cache_->CloseConnections(subscriber->network_address());
   update_catalogd_client_cache_->CloseConnections(subscriber->network_address());
+  if (FLAGS_enable_statestored_ha) {
+    update_statestored_client_cache_->CloseConnections(subscriber->network_address());
+  }
 
   // Prevent the failure detector from growing without bound
   failure_detector_->EvictPeer(subscriber->id());
@@ -1382,6 +1730,16 @@ void Statestore::UnregisterSubscriber(Subscriber* subscriber) {
   num_subscribers_metric_->Increment(-1L);
   subscriber_set_metric_->Remove(subscriber->id());
   subscribers_.erase(subscriber->id());
+  if (FLAGS_enable_statestored_ha) {
+    ActiveConnStateMap::iterator conn_states_it =
+        active_conn_states_.find(subscriber->id());
+    if (conn_states_it != active_conn_states_.end()) {
+      if (conn_states_it->second == TStatestoreConnState::FAILED) {
+        --failed_conn_state_count_;
+      }
+      active_conn_states_.erase(conn_states_it);
+    }
+  }
 }
 
 void Statestore::MainLoop() {
@@ -1413,4 +1771,316 @@ void Statestore::HealthzHandler(
   }
   *(data) << "Not Available";
   *response = HttpStatusCode::ServiceUnavailable;
+}
+
+Status Statestore::InitStatestoreHa(
+    int32_t statestore_ha_port, const TNetworkAddress& peer_statestore_ha_addr) {
+  local_statestore_ha_addr_ = MakeNetworkAddress(FLAGS_hostname, statestore_ha_port);
+  peer_statestore_ha_addr_ = peer_statestore_ha_addr;
+
+  std::shared_ptr<TProcessor> processor(
+      new StatestoreHaServiceProcessor(ha_thrift_iface()));
+  std::shared_ptr<TProcessorEventHandler> event_handler(
+      new RpcEventHandler("StatestoreHa", metrics_));
+  processor->setEventHandler(event_handler);
+  ThriftServerBuilder builder("StatestoreHaService", processor, statestore_ha_port);
+  if (IsInternalTlsConfigured()) {
+    SSLProtocol ssl_version;
+    RETURN_IF_ERROR(
+        SSLProtoVersions::StringToProtocol(FLAGS_ssl_minimum_version, &ssl_version));
+    LOG(INFO) << "Enabling SSL for Statestore";
+    builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
+        .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
+        .ssl_version(ssl_version)
+        .cipher_list(FLAGS_ssl_cipher_list);
+  }
+  ThriftServer* ha_server;
+  RETURN_IF_ERROR(builder.metrics(metrics_).Build(&ha_server));
+  ha_thrift_server_.reset(ha_server);
+  RETURN_IF_ERROR(ha_thrift_server_->Start());
+  // Wait till Thrift server is ready.
+  RETURN_IF_ERROR(WaitForLocalServer(
+      *ha_thrift_server_, /* num_retries */ 10, /* retry_interval_ms */ 1000));
+
+  RETURN_IF_ERROR(Thread::Create("statestore-ha-heartbeat",
+      "ha-heartbeat-monitoring-thread", &Statestore::MonitorStatestoredHaHeartbeat,
+      this, &ha_monitoring_thread_));
+  RETURN_IF_ERROR(Thread::Create("statestore-update-statestored",
+      "update-statestored-thread",&Statestore::MonitorUpdateStatestoredRole, this,
+      &update_statestored_thread_));
+
+  // Negotiate role for HA with peer statestore instance on startup.
+  TStatestoreHaHandshakeResponse response;
+  Status status = SendHaHandshake(&response);
+  if (!status.ok()) {
+    // statestored designates itself as active if the statestore can not connect to the
+    // peer statestored.
+    lock_guard<mutex> l(ha_lock_);
+    is_active_ = true;
+    active_status_metric_->SetValue(is_active_);
+    active_version_ = UnixMicros();
+    LOG(INFO) << "Set Statestore as active since it does not receive handshake "
+              << "response in HA preemption waiting period";
+    found_peer_ = false;
+    connected_peer_metric_->SetValue(found_peer_);
+  } else {
+    status = Status(response.status);
+    DCHECK(status.ok());
+    lock_guard<mutex> l(ha_lock_);
+    peer_statestore_id_ = response.dst_statestore_id;
+    is_active_ = !response.dst_statestore_active;
+    active_status_metric_->SetValue(is_active_);
+    if (is_active_) active_version_ = UnixMicros();
+    found_peer_ = true;
+    connected_peer_metric_->SetValue(found_peer_);
+    // connected_to_peer_statestore_metric_->SetValue(true);
+    LOG(INFO) << "Receive Statestore HA handshake response, set the statestore as "
+              << (is_active_ ? "active" : "standby");
+  }
+  return Status::OK();
+}
+
+bool Statestore::IsActive() {
+  lock_guard<mutex> l(ha_lock_);
+  return is_active_;
+}
+
+int64_t Statestore::GetActiveVersion(bool* is_active) {
+  lock_guard<mutex> l(ha_lock_);
+  *is_active = is_active_;
+  return active_version_;
+}
+
+Status Statestore::SendHaHandshake(TStatestoreHaHandshakeResponse* response) {
+  if (disable_network_.Load()) {
+    return Status("Don't send HA handshake since network is disabled.");
+  }
+  // Negotiate the role for HA with peer statestore instance in client mode.
+  LOG(INFO) << "Send Statestore HA handshake request";
+  TStatestoreHaHandshakeRequest request;
+  request.__set_src_statestore_id(statestore_id_);
+  request.__set_src_statestore_address(
+      TNetworkAddressToString(local_statestore_ha_addr_));
+  request.__set_src_force_active(FLAGS_statestore_force_active);
+  int attempt = 0; // Used for debug action only.
+  if (FLAGS_statestore_peer_cnxn_attempts > 0) {
+    FLAGS_statestore_peer_cnxn_retry_interval_ms =
+        FLAGS_statestore_ha_preemption_wait_period_ms /
+        FLAGS_statestore_peer_cnxn_attempts;
+  }
+  StatestoreHaServiceConn::RpcStatus rpc_status =
+      StatestoreHaServiceConn::DoRpcWithRetry(ha_client_cache_.get(),
+          peer_statestore_ha_addr_,
+          &StatestoreHaServiceClientWrapper::StatestoreHaHandshake,
+          request,
+          FLAGS_statestore_peer_cnxn_attempts,
+          FLAGS_statestore_peer_cnxn_retry_interval_ms,
+          [&attempt]() {
+            return attempt++ == 0 ?
+                DebugAction(FLAGS_debug_actions, "STATESTORE_HA_HANDSHAKE_FIRST_ATTEMPT")
+                : Status::OK();
+          },
+          response);
+  return rpc_status.status;
+}
+
+Status Statestore::ReceiveHaHandshakeRequest(const TUniqueId& peer_statestore_id,
+    const string& peer_statestore_address, bool peer_force_active,
+    bool* statestore_active) {
+  // Process HA handshake request from peer statstore
+  LOG(INFO) << "Receive Statestore HA handshake request";
+  lock_guard<mutex> l(ha_lock_);
+  peer_statestore_id_ = peer_statestore_id;
+  if (peer_force_active) {
+    is_active_ = false;
+    active_status_metric_->SetValue(is_active_);
+    ha_active_ss_failure_detector_->UpdateHeartbeat(STATESTORE_ID, true);
+    LOG(INFO) << "Set the statestored as standby since the peer is started with force "
+              << "active flag";
+  } else if (!is_active_) {
+    if (FLAGS_statestore_force_active) {
+      is_active_ = true;
+      active_status_metric_->SetValue(is_active_);
+      active_version_ = UnixMicros();
+      ha_standby_ss_failure_detector_->UpdateHeartbeat(STATESTORE_ID, true);
+      LOG(INFO) << "Set the statestored as active since it's started with force active "
+                << "flag";
+    } else {
+      // Compare priority and assign the statestored with high priority as active
+      // statestored.
+      is_active_ = FLAGS_use_network_address_as_statestore_priority ?
+          TNetworkAddressToString(local_statestore_ha_addr_) < peer_statestore_address :
+          statestore_id_ < peer_statestore_id;
+      active_status_metric_->SetValue(is_active_);
+      if (is_active_) {
+        active_version_ = UnixMicros();
+        ha_standby_ss_failure_detector_->UpdateHeartbeat(STATESTORE_ID, true);
+      } else {
+        ha_active_ss_failure_detector_->UpdateHeartbeat(STATESTORE_ID, true);
+      }
+      LOG(INFO) << "Set the statestored as " << (is_active_ ? "active" : "standby");
+    }
+  }
+  *statestore_active = is_active_;
+  if (!found_peer_) {
+    found_peer_ = true;
+    connected_peer_metric_->SetValue(found_peer_);
+  }
+  return Status::OK();
+}
+
+void Statestore::HaHeartbeatRequest(const TUniqueId& dst_statestore_id,
+    const TUniqueId& src_statestore_id) {
+  // Don't process HA heartbeat if network is disabled.
+  if (disable_network_.Load()) return;
+  lock_guard<mutex> l(ha_lock_);
+  if (!is_active_) {
+    // process HA heartbeat from active statestore
+    ha_active_ss_failure_detector_->UpdateHeartbeat(STATESTORE_ID, true);
+  } else {
+    // Receive heartbeat from its peer statestored. That means both statestored designate
+    // themselves as active. Enter recovery mode to restart negotiation.
+    LOG(WARNING)
+        << "Both statestoreds designate themselves as active, restart negotiation.";
+    in_recovery_mode_ = true;
+    in_ha_recovery_mode_metric_->SetValue(in_recovery_mode_);
+    is_active_ = false;
+    active_status_metric_->SetValue(is_active_);
+    LOG(WARNING) << "Enter HA recovery mode.";
+  }
+}
+
+[[noreturn]] void Statestore::MonitorStatestoredHaHeartbeat() {
+  while (1) {
+    SleepForMs(FLAGS_statestore_ha_heartbeat_monitoring_frequency_ms);
+    lock_guard<mutex> l(ha_lock_);
+    if (in_recovery_mode_) {
+      // Keep sending HA handshake request to its peer periodically until receiving
+      // response.
+      TStatestoreHaHandshakeResponse response;
+      Status status = SendHaHandshake(&response);
+      if (!status.ok()) continue;
+      status = Status(response.status);
+      DCHECK(status.ok());
+
+      // Exit "recovery" mode.
+      in_recovery_mode_ = false;
+      in_ha_recovery_mode_metric_->SetValue(in_recovery_mode_);
+      peer_statestore_id_ = response.dst_statestore_id;
+      is_active_ = !response.dst_statestore_active;
+      active_status_metric_->SetValue(is_active_);
+      found_peer_ = true;
+      connected_peer_metric_->SetValue(found_peer_);
+      LOG(INFO) << "Receive Statestore HA handshake response, exit HA recovery mode. "
+                << "Set the statestored as " << (is_active_ ? "active" : "standby");
+      if (is_active_) {
+        active_version_ = UnixMicros();
+        // Send notification to all subscribers.
+        update_statestored_cv_.NotifyAll();
+      }
+    } else if (is_active_) {
+      // Statestored in active state
+      // Send HA heartbeat to standby statestored.
+      if (found_peer_) {
+        Status status = SendHaHeartbeat();
+        if (status.ok()) continue;
+      }
+      // Check if standby statestored is reachable.
+      FailureDetector::PeerState state =
+          ha_standby_ss_failure_detector_->GetPeerState(STATESTORE_ID);
+      if (state != FailureDetector::FAILED) {
+        continue;
+      } else if (found_peer_) {
+        // Stop sending HA heartbeat.
+        found_peer_ = false;
+        connected_peer_metric_->SetValue(found_peer_);
+        LOG(INFO) << "Statestored lost connection with peer statestored";
+      }
+
+      lock_guard<mutex> l(subscribers_lock_);
+      if (subscribers_.size() == 0) {
+        // To avoid race with new active statestored, original active statestored enter
+        // "recovery" mode if it does not receive heartbeat responses from standby
+        // statestored and all subscribers.
+        in_recovery_mode_ = true;
+        in_ha_recovery_mode_metric_->SetValue(in_recovery_mode_);
+        is_active_ = false;
+        active_status_metric_->SetValue(is_active_);
+        LOG(WARNING) << "Enter HA recovery mode.";
+      }
+      // TODO: IMPALA-12507 Need better approach to handle split-brain in network.
+      // In the scenario, active statestored still can reach some subscribers.
+    } else {
+      // Statestored in standby state
+      // Monitor connection state with its peer statestored.
+      FailureDetector::PeerState state =
+          ha_active_ss_failure_detector_->GetPeerState(STATESTORE_ID);
+      // Check if the majority of subscribers lost connection with active statestored.
+      int failed_conn_state_count = 0;
+      int total_subscribers = 0;
+      {
+        lock_guard<mutex> l(subscribers_lock_);
+        failed_conn_state_count = failed_conn_state_count_;
+        total_subscribers = active_conn_states_.size();
+      }
+      bool majority_failed = failed_conn_state_count > 0 &&
+          failed_conn_state_count > total_subscribers / 2;
+      if (state != FailureDetector::FAILED) {
+        if (majority_failed) {
+          LOG(WARNING) << "Active statestored may have network issue. "
+                       << failed_conn_state_count << " out of " << total_subscribers
+                       << " subscribers lost connections with active statestored.";
+        }
+        continue;
+      } else if (majority_failed) {
+        // When standby statestored lost connection with active statestored, take over
+        // active role if the majority of subscribers lost connections with active
+        // statestored.
+        LOG(INFO) << "Statestore change to active state, " << failed_conn_state_count
+                  << " out of " << total_subscribers
+                  << " subscribers lost connections with active statestored.";
+        is_active_ = true;
+        active_status_metric_->SetValue(is_active_);
+        active_version_ = UnixMicros();
+        found_peer_ = false;
+        connected_peer_metric_->SetValue(found_peer_);
+        // Send notification to all subscribers.
+        update_statestored_cv_.NotifyAll();
+      } else if (total_subscribers == 0) {
+        // If there is no subscriber, it means this statestored lost connection with
+        // other nodes in the cluster, enter "recovery" mode.
+        in_recovery_mode_ = true;
+        in_ha_recovery_mode_metric_->SetValue(in_recovery_mode_);
+        LOG(WARNING) << "Enter HA recovery mode.";
+      } else {
+        VLOG(3) << "Standby statestored missed HA heartbeat from active statestored, "
+                << failed_conn_state_count << " out of " << total_subscribers
+                << " subscribers lost connections with active statestored.";
+      }
+    }
+  }
+}
+
+Status Statestore::SendHaHeartbeat() {
+  if (disable_network_.Load()) {
+    ha_standby_ss_failure_detector_->UpdateHeartbeat(STATESTORE_ID, false);
+    return Status("Don't send HA heartbeat since network is disabled.");
+  }
+
+  Status status;
+  StatestoreHaServiceConn client(ha_client_cache_.get(),
+      peer_statestore_ha_addr_, &status);
+  RETURN_IF_ERROR(status);
+
+  TStatestoreHaHeartbeatRequest request;
+  TStatestoreHaHeartbeatResponse response;
+  request.__set_dst_statestore_id(peer_statestore_id_);
+  request.__set_src_statestore_id(statestore_id_);
+  status = client.DoRpc(&StatestoreHaServiceClientWrapper::StatestoreHaHeartbeat,
+      request, &response);
+  ha_standby_ss_failure_detector_->UpdateHeartbeat(STATESTORE_ID, status.ok());
+  if (status.ok()) {
+    status = Status(response.status);
+  }
+  return status;
 }

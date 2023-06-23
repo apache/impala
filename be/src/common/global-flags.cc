@@ -415,6 +415,20 @@ DEFINE_int32(iceberg_reload_new_files_threshold, 100, "(Advanced) If during a ta
     "reload all file metadata. If number of new files are less or equal to this, "
     "catalogd will only load the metadata of the newly added files.");
 
+// Host and port of Statestore Service
+DEFINE_string(state_store_host, "localhost",
+    "hostname where StatestoreService is running");
+DEFINE_int32(state_store_port, 24000, "port where StatestoreService is running");
+
+// Starting flags for Statestore HA
+DEFINE_string(state_store_2_host, "localhost",
+    "hostname where second StatestoreService instance is running");
+DEFINE_int32(state_store_2_port, 24001,
+    "port where second StatestoreService instance is running");
+// Port for RPC communication between two statestore instances for Statestore HA
+DEFINE_int32(state_store_ha_port, 24020,
+    "port where StatestoreHaService is running");
+
 // TGeospatialLibrary's values are mapped here as constants
 static const string geo_lib_none = "NONE";
 static const string geo_lib_hive_esri = "HIVE_ESRI";

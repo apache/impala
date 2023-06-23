@@ -38,6 +38,8 @@ DEFINE_int32(
 
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_port);
+DECLARE_string(state_store_2_host);
+DECLARE_int32(state_store_2_port);
 DECLARE_int32(state_store_subscriber_port);
 DECLARE_string(hostname);
 
@@ -58,9 +60,11 @@ AdmissiondEnv::AdmissiondEnv()
       MakeNetworkAddress(FLAGS_hostname, FLAGS_state_store_subscriber_port);
   TNetworkAddress statestore_address =
       MakeNetworkAddress(FLAGS_state_store_host, FLAGS_state_store_port);
+  TNetworkAddress statestore2_address =
+      MakeNetworkAddress(FLAGS_state_store_2_host, FLAGS_state_store_2_port);
   statestore_subscriber_.reset(new StatestoreSubscriber(
       Substitute("admissiond@$0", TNetworkAddressToString(admission_service_addr)),
-      subscriber_address, statestore_address, metrics,
+      subscriber_address, statestore_address, statestore2_address, metrics,
       TStatestoreSubscriberType::ADMISSIOND));
 
   scheduler_.reset(new Scheduler(metrics, request_pool_service()));

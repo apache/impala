@@ -55,6 +55,9 @@ DEFAULT_KRPC_PORT = 27000
 DEFAULT_CATALOG_SERVICE_PORT = 26000
 DEFAULT_STATE_STORE_SUBSCRIBER_PORT = 23000
 DEFAULT_CATALOGD_STATE_STORE_SUBSCRIBER_PORT = 23020
+DEFAULT_STATESTORE_SERVICE_PORT = 24000
+DEFAULT_STATESTORE_HA_SERVICE_PORT = 24020
+DEFAULT_PEER_STATESTORE_HA_SERVICE_PORT = 24021
 DEFAULT_IMPALAD_WEBSERVER_PORT = 25000
 DEFAULT_STATESTORED_WEBSERVER_PORT = 25010
 DEFAULT_CATALOGD_WEBSERVER_PORT = 25020
@@ -116,6 +119,13 @@ class ImpalaCluster(object):
     """
     # If no statestored process exists, return None.
     return self.__statestoreds[0] if len(self.__statestoreds) > 0 else None
+
+  def statestoreds(self):
+    """Returns a list of the known statestored processes"""
+    return self.__statestoreds
+
+  def get_first_statestored(self):
+    return self.statestoreds[0]
 
   @property
   def impalads(self):
@@ -238,7 +248,7 @@ class ImpalaCluster(object):
     environment this would need to enumerate each machine in the cluster.
     """
     impalads = list()
-    statestored = list()
+    statestoreds = list()
     catalogds = list()
     admissiond = None
     daemons = ['impalad', 'catalogd', 'statestored', 'admissiond']
@@ -259,15 +269,16 @@ class ImpalaCluster(object):
       if binary == 'impalad':
         impalads.append(ImpaladProcess(cmdline))
       elif binary == 'statestored':
-        statestored.append(StateStoreProcess(cmdline))
+        statestoreds.append(StateStoreProcess(cmdline))
       elif binary == 'catalogd':
         catalogds.append(CatalogdProcess(cmdline))
       elif binary == 'admissiond':
         admissiond = AdmissiondProcess(cmdline)
 
     self.__sort_impalads(impalads)
+    self.__sort_statestoreds(statestoreds)
     self.__sort_catalogds(catalogds)
-    return impalads, statestored, catalogds, admissiond
+    return impalads, statestoreds, catalogds, admissiond
 
   def __find_docker_containers(self):
     """
@@ -308,6 +319,7 @@ class ImpalaCluster(object):
         admissiond = AdmissiondProcess(args, container_id=container_id,
                                        port_map=port_map)
     self.__sort_impalads(impalads)
+    self.__sort_statestoreds(statestoreds)
     self.__sort_catalogds(catalogds)
     return impalads, statestoreds, catalogds, admissiond
 
@@ -317,6 +329,13 @@ class ImpalaCluster(object):
     first one. We need to use a port that is exposed and mapped to a host port for
     the containerised cluster."""
     impalads.sort(key=lambda i: i.service.hs2_port)
+
+  def __sort_statestoreds(self, statestoreds):
+    """Does an in-place sort of a list of StateStoredService objects into a canonical
+    order. We order them by their service port, so that get_first_statestored() always
+    returns the first one. We need to use a port that is exposed and mapped to a host
+    port for the containerised cluster."""
+    statestoreds.sort(key=lambda i: i.service.service_port)
 
   def __sort_catalogds(self, catalogds):
     """Does an in-place sort of a list of CatalogdProcess objects into a canonical order.
@@ -569,10 +588,26 @@ class StateStoreProcess(BaseImpalaProcess):
   def __init__(self, cmd, container_id=None, port_map=None):
     super(StateStoreProcess, self).__init__(cmd, container_id, port_map)
     self.service = StateStoredService(self.hostname, self.webserver_interface,
-        self.get_webserver_port(), self._get_webserver_certificate_file())
+        self.get_webserver_port(), self._get_webserver_certificate_file(),
+        self.__get_port())
 
   def _get_default_webserver_port(self):
     return DEFAULT_STATESTORED_WEBSERVER_PORT
+
+  def __get_port(self):
+    return int(self._get_port('state_store_port', DEFAULT_STATESTORE_SERVICE_PORT))
+
+  def start(self, wait_until_ready=True, additional_args=None):
+    """Starts statestored and waits until the service is started and ready to accept
+    connections."""
+    restart_args = self.cmd[1:]
+    if additional_args:
+      restart_args = restart_args + [additional_args]
+    LOG.info("Starting Statestored process: {0}".format(restart_args))
+    run_daemon("statestored", restart_args)
+    if wait_until_ready:
+      self.service.wait_for_metric_value('statestore.service-started',
+                                         expected_value=1, timeout=30)
 
 
 # Represents a catalogd process

@@ -149,8 +149,10 @@ DEFINE_bool(enable_skipping_older_events, false, "This configuration is used to 
     "quickly catch with the events of HMS");
 
 DECLARE_string(state_store_host);
-DECLARE_int32(state_store_subscriber_port);
 DECLARE_int32(state_store_port);
+DECLARE_string(state_store_2_host);
+DECLARE_int32(state_store_2_port);
+DECLARE_int32(state_store_subscriber_port);
 DECLARE_string(hostname);
 DECLARE_bool(compact_catalog_topic);
 DECLARE_bool(enable_catalogd_ha);
@@ -372,6 +374,8 @@ Status CatalogServer::Start() {
       MakeNetworkAddress(FLAGS_hostname, FLAGS_state_store_subscriber_port);
   TNetworkAddress statestore_address =
       MakeNetworkAddress(FLAGS_state_store_host, FLAGS_state_store_port);
+  TNetworkAddress statestore2_address =
+      MakeNetworkAddress(FLAGS_state_store_2_host, FLAGS_state_store_2_port);
   TNetworkAddress server_address = MakeNetworkAddress(FLAGS_hostname,
       FLAGS_catalog_service_port);
 
@@ -391,8 +395,8 @@ Status CatalogServer::Start() {
   active_catalogd_version_checker_.reset(new ActiveCatalogdVersionChecker());
   statestore_subscriber_.reset(new StatestoreSubscriberCatalog(
      Substitute("catalog-server@$0", TNetworkAddressToString(server_address)),
-     subscriber_address, statestore_address, metrics_, protocol_version_,
-     server_address));
+     subscriber_address, statestore_address, statestore2_address, metrics_,
+     protocol_version_, server_address));
 
   StatestoreSubscriber::UpdateCallback cb =
       bind<void>(mem_fn(&CatalogServer::UpdateCatalogTopicCallback), this, _1, _2);

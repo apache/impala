@@ -27,11 +27,12 @@ StatestoreSubscriberCatalog::StatestoreSubscriberCatalog(
     const std::string& subscriber_id,
     const TNetworkAddress& heartbeat_address,
     const TNetworkAddress& statestore_address,
+    const TNetworkAddress& statestore2_address,
     MetricGroup* metrics,
     CatalogServiceVersion::type catalog_protocol_version,
     const TNetworkAddress& catalogd_address)
-  : StatestoreSubscriber(subscriber_id, heartbeat_address, statestore_address, metrics,
-    TStatestoreSubscriberType::CATALOGD) {
+  : StatestoreSubscriber(subscriber_id, heartbeat_address, statestore_address,
+        statestore2_address, metrics, TStatestoreSubscriberType::CATALOGD) {
   catalogd_registration_.__set_protocol(catalog_protocol_version);
   catalogd_registration_.__set_address(catalogd_address);
   catalogd_registration_.__set_enable_catalogd_ha(FLAGS_enable_catalogd_ha);

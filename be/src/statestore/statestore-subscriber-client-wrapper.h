@@ -64,6 +64,14 @@ class StatestoreSubscriberClientWrapper : public StatestoreSubscriberClient {
      recv_UpdateCatalogd(_return);
    }
 
+   void UpdateStatestoredRole(TUpdateStatestoredRoleResponse& _return,
+       const TUpdateStatestoredRoleRequest& params, bool* send_done) {
+     DCHECK(!*send_done);
+     send_UpdateStatestoredRole(params);
+     *send_done = true;
+     recv_UpdateStatestoredRole(_return);
+   }
+
 #pragma clang diagnostic pop
 };
 

@@ -70,6 +70,7 @@ set(SRC_FILES
   ResourceProfile_types.cpp
   RuntimeProfile_types.cpp
   SqlConstraints_types.cpp
+  StatestoreHaService.cpp
   StatestoreService.cpp
   StatestoreService_types.cpp
   StatestoreSubscriber.cpp

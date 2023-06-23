@@ -473,13 +473,17 @@ class ImpaladService(BaseImpalaService):
 # accessing the debug webpage.
 class StateStoredService(BaseImpalaService):
   def __init__(self, hostname, webserver_interface, webserver_port,
-      webserver_certificate_file):
+      webserver_certificate_file, service_port):
     super(StateStoredService, self).__init__(
         hostname, webserver_interface, webserver_port, webserver_certificate_file)
+    self.service_port = service_port
 
   def wait_for_live_subscribers(self, num_subscribers, timeout=15, interval=1):
     self.wait_for_metric_value('statestore.live-backends', num_subscribers,
                                timeout=timeout, interval=interval)
+
+  def get_statestore_service_port(self):
+    return self.service_port
 
 
 # Allows for interacting with the Catalog service to perform operations such as

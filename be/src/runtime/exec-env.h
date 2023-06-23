@@ -92,7 +92,9 @@ class ExecEnv {
   ExecEnv(bool external_fe = false);
 
   ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
-      const std::string& statestore_host, int statestore_port, bool external_fe = false);
+      const std::string& statestore_host, int statestore_port,
+      const std::string& statestore2_host = "", int statestore2_port = 0,
+      bool external_fe = false);
 
   /// Returns the most recently created exec env instance. In a normal impalad, this is
   /// the only instance. In test setups with multiple ExecEnv's per process,

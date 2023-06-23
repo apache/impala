@@ -194,6 +194,16 @@ enum TStatestoreSubscriberType {
   COORDINATOR_EXECUTOR = 5
 }
 
+// To support statestore HA, the standby statestore instance monitor the state of active
+// statestore instance by collecting connection states between active statestore instance
+// and subscribers. This enum define the connection states reported by subscribers in
+// heartbeat response message.
+enum TStatestoreConnState {
+   OK = 0
+   FAILED = 1
+   UNKNOWN = 2
+}
+
 // Additional registration info for catalog daemon.
 struct TCatalogRegistration {
   // Protocol version of Catalog service.
@@ -257,6 +267,12 @@ struct TRegisterSubscriberResponse {
 
   // The version of active catalogd
   6: optional i64 catalogd_version;
+
+  // Active state of this Statestore instance.
+  7: optional bool statestore_is_active;
+
+  // The version of active statestored
+  8: optional i64 active_statestored_version;
 }
 
 struct TGetProtocolVersionRequest {
@@ -276,6 +292,22 @@ struct TGetProtocolVersionResponse {
   3: optional Types.TUniqueId statestore_id;
 }
 
+struct TSetStatestoreDebugActionRequest {
+  // Protocol version of the subscriber
+  1: required StatestoreServiceVersion protocol_version =
+      StatestoreServiceVersion.V2
+
+  // Disable network for statestored if it's set as true so that statestored does not
+  // sent heartbeat and HA handshake messages. Enable network if it's set as false.
+  // This is used to simulate network failure for unit-test.
+  2: optional bool disable_network;
+}
+
+struct TSetStatestoreDebugActionResponse {
+  // whether the call was executed correctly at the application level
+  1: required Status.TStatus status;
+}
+
 service StatestoreService {
   // Register a single subscriber. Note that after a subscriber is registered, no new
   // topics may be added.
@@ -283,6 +315,11 @@ service StatestoreService {
 
   // Get protocol version of the statestore
   TGetProtocolVersionResponse GetProtocolVersion(1: TGetProtocolVersionRequest params);
+
+  // Set debug action for the statestored.
+  // This API is only used for unit-test.
+  TSetStatestoreDebugActionResponse SetStatestoreDebugAction(
+      1: TSetStatestoreDebugActionRequest params);
 }
 
 struct TUpdateStateRequest {
@@ -323,11 +360,19 @@ struct THeartbeatRequest {
 
   // Unique identifier for the statestore instance.
   3: optional Types.TUniqueId statestore_id;
+
+  // Flag set by standby Statestore instance to request the connection state between
+  // active statestore and the subscriber.
+  4: optional bool request_statestore_conn_state;
 }
 
 struct THeartbeatResponse {
   // Whether the call was executed correctly at the application level
   1: required Status.TStatus status;
+
+  // Connection state between active statestore and the subscriber reported by
+  // the subscriber.
+  2: optional TStatestoreConnState statestore_conn_state;
 }
 
 struct TUpdateCatalogdRequest {
@@ -358,6 +403,40 @@ struct TUpdateCatalogdResponse {
   2: optional bool skipped;
 }
 
+struct TUpdateStatestoredRoleRequest {
+  // Protocol version of the statestore
+  1: required StatestoreServiceVersion protocol_version =
+      StatestoreServiceVersion.V2;
+
+  // registration_id of the receiver
+  2: required Types.TUniqueId registration_id;
+
+  // Unique identifier for the statestore instance.
+  3: required Types.TUniqueId statestore_id;
+
+  // Monotonously increasing number
+  4: required i64 active_statestored_version;
+
+  // Active state of Statestore instance
+  5: required bool is_active;
+
+  // Send elected active catalogd along with the role of active statestore.
+  // The version of active catalogd. Don't set this catalogd_version and
+  // catalogd_registration if active catalogd has not been elected.
+  6: optional i64 catalogd_version;
+
+  // Catalog registration info.
+  7: optional TCatalogRegistration catalogd_registration;
+}
+
+struct TUpdateStatestoredRoleResponse {
+  // Whether the call was executed correctly
+  1: required Status.TStatus status;
+
+  // True if this update was skipped by the subscriber.
+  2: optional bool skipped;
+}
+
 service StatestoreSubscriber {
   // Called when the statestore sends a topic update. The request contains a map of
   // topic names to TTopicDelta updates, sent from the statestore to the subscriber. Each
@@ -369,6 +448,12 @@ service StatestoreSubscriber {
   // received an unexpected delta update version range, they can request a new delta
   // update based off a specific version from the statestore. The next statestore
   // delta update will be based off of the version the subscriber requested.
+  //
+  // When Statestore HA is enabled, two statestore instances will be created in an Impala
+  // cluster as Active-Passive HA pair. All subscribers should register to both
+  // statestore instances so that two statestore instances have same set of subscribers.
+  // Both Statestore instances send heartbeat to their subscribers, but only active
+  // statestore instance sends topic update to its subscribers.
   TUpdateStateResponse UpdateState(1: TUpdateStateRequest params);
 
   // Called when the statestore sends a heartbeat.
@@ -376,4 +461,70 @@ service StatestoreSubscriber {
 
   // Called when active catalogd has been updated.
   TUpdateCatalogdResponse UpdateCatalogd(1: TUpdateCatalogdRequest params);
+
+  // Called by standby statestore when the Statestore service failover happens, which
+  // causes the active states of statestoreds are changed.
+  TUpdateStatestoredRoleResponse UpdateStatestoredRole(
+      1: TUpdateStatestoredRoleRequest params);
+}
+
+struct TStatestoreHaHandshakeRequest {
+  // Service's version of source Statestore instance
+  1: required StatestoreServiceVersion src_protocol_version =
+      StatestoreServiceVersion.V2;
+
+  // Instance id of source Statestore instance
+  2: required Types.TUniqueId src_statestore_id;
+
+  // Address of the Statestore that source statestore instance runs
+  3: required string src_statestore_address;
+
+  // True if starting flag statestore_force_active is set as true for source statestore
+  // instance.
+  4: required bool src_force_active;
+}
+
+struct TStatestoreHaHandshakeResponse {
+  // Whether the call was executed correctly
+  1: required Status.TStatus status;
+
+  // Service's version of destination Statestore instance
+  2: required StatestoreServiceVersion dst_protocol_version =
+      StatestoreServiceVersion.V2;
+
+  // Instance id of destination Statestore instance
+  3: required Types.TUniqueId dst_statestore_id;
+
+  // Indication if the destination Statestore is active for preemption. Source
+  // statestore should set itself as inactive if dst_statestore_active is set as true.
+  // Otherwise, source statestore sets itself as active.
+  4: required bool dst_statestore_active;
+}
+
+struct TStatestoreHaHeartbeatRequest {
+  // Service's version of source Statestore instance
+  1: required StatestoreServiceVersion protocol_version =
+      StatestoreServiceVersion.V2;
+
+  // Destination Statestore instance id
+  2: required Types.TUniqueId dst_statestore_id;
+
+  // Source Statestore instance id
+  3: required Types.TUniqueId src_statestore_id;
+}
+
+struct TStatestoreHaHeartbeatResponse {
+  1: required Status.TStatus status;
+}
+
+// Service for communication between two statestore instances in an Active-Passive
+// HA (High Availability) pair.
+service StatestoreHaService {
+  // StatestoreHaHandshake: negotiate active role between two instances during startup.
+  TStatestoreHaHandshakeResponse StatestoreHaHandshake(
+      1: TStatestoreHaHandshakeRequest params);
+
+  // StatestoreHaHeartbeat: active statestore sends heartbeat to standby statestore.
+  TStatestoreHaHeartbeatResponse StatestoreHaHeartbeat(
+      1: TStatestoreHaHeartbeatRequest params);
 }

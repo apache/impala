@@ -69,6 +69,7 @@ DEFINE_int64_hidden(statestore_subscriber_recovery_grace_period_ms, 30000L, "Per
 DEFINE_int32(statestore_client_rpc_timeout_ms, 300000, "(Advanced) The underlying "
     "TSocket send/recv timeout in milliseconds for a catalog client RPC.");
 
+DECLARE_bool(enable_statestored_ha);
 DECLARE_bool(tolerate_statestore_startup_delay);
 DECLARE_string(debug_actions);
 DECLARE_string(ssl_client_ca_certificate);
@@ -120,6 +121,10 @@ class StatestoreSubscriberThriftIf : public StatestoreSubscriberIf {
           .ToThrift(&response.status);
       // Make sure Thrift thinks the field is set.
       response.__set_skipped(response.skipped);
+    } else {
+      LOG(WARNING) << Substitute("Receive UpdateState RPC request from incompatible "
+          "statestored (protocol version $0), the request is ignored.",
+          params.protocol_version);
     }
     TStatus thrift_status;
     status.ToThrift(&thrift_status);
@@ -130,13 +135,29 @@ class StatestoreSubscriberThriftIf : public StatestoreSubscriberIf {
     Status status = CheckProtocolVersion(request.protocol_version);
     if (status.ok()) {
       TUniqueId registration_id, statestore_id;
+      bool request_statestore_conn_state = false;
+      TStatestoreConnState::type active_statestore_conn_state =
+          TStatestoreConnState::UNKNOWN;
       if (request.__isset.registration_id) {
         registration_id = request.registration_id;
       }
       if (request.__isset.statestore_id) {
         statestore_id = request.statestore_id;
       }
-      subscriber_->Heartbeat(registration_id, statestore_id);
+      if (request.__isset.request_statestore_conn_state) {
+        request_statestore_conn_state = request.request_statestore_conn_state;
+      }
+      subscriber_->Heartbeat(registration_id, statestore_id,
+          request_statestore_conn_state, &active_statestore_conn_state);
+      if (request_statestore_conn_state) {
+        // Send connection state with active statestore instance to standby statestore
+        // instance.
+        response.__set_statestore_conn_state(active_statestore_conn_state);
+      }
+    } else {
+      LOG(WARNING) << Substitute("Receive Heartbeat RPC request from incompatible "
+          "statestored (protocol version $0), the request is ignored.",
+          request.protocol_version);
     }
     TStatus thrift_status;
     status.ToThrift(&thrift_status);
@@ -152,6 +173,38 @@ class StatestoreSubscriberThriftIf : public StatestoreSubscriberIf {
           request.registration_id, request.statestore_id, request.catalogd_version,
           &update_skipped);
       response.__set_skipped(update_skipped);
+    } else {
+      LOG(WARNING) << Substitute("Receive UpdateCatalogd RPC request from incompatible "
+          "statestored (protocol version $0), the request is ignored.",
+          request.protocol_version);
+    }
+    TStatus thrift_status;
+    status.ToThrift(&thrift_status);
+    response.__set_status(thrift_status);
+  }
+
+  virtual void UpdateStatestoredRole(TUpdateStatestoredRoleResponse& response,
+      const TUpdateStatestoredRoleRequest& request) {
+    bool update_skipped = false;
+    Status status = CheckProtocolVersion(request.protocol_version);
+    if (status.ok()) {
+      bool update_active_catalogd = false;
+      int64_t active_catalogd_version = 0;
+      TCatalogRegistration catalogd_registration;
+      if (request.__isset.catalogd_version) {
+        update_active_catalogd = true;
+        active_catalogd_version = request.catalogd_version;
+        catalogd_registration = request.catalogd_registration;
+      }
+      subscriber_->UpdateStatestoredRole(request.is_active, request.registration_id,
+          request.statestore_id, request.active_statestored_version,
+          update_active_catalogd, &catalogd_registration, active_catalogd_version,
+          &update_skipped);
+      response.__set_skipped(update_skipped);
+    } else {
+      LOG(WARNING) << Substitute("Receive UpdateStatestoredRole RPC request from "
+          "incompatible statestored (protocol version $0), the request is ignored.",
+          request.protocol_version);
     }
     TStatus thrift_status;
     status.ToThrift(&thrift_status);
@@ -173,7 +226,8 @@ class StatestoreSubscriberThriftIf : public StatestoreSubscriberIf {
 
 StatestoreSubscriber::StatestoreSubscriber(const string& subscriber_id,
     const TNetworkAddress& heartbeat_address, const TNetworkAddress& statestore_address,
-    MetricGroup* metrics, TStatestoreSubscriberType::type subscriber_type)
+    const TNetworkAddress& statestore2_address, MetricGroup* metrics,
+    TStatestoreSubscriberType::type subscriber_type)
   : subscriber_id_(subscriber_id),
     protocol_version_(StatestoreServiceVersion::V2),
     catalog_protocol_version_(CatalogServiceVersion::V2),
@@ -183,34 +237,58 @@ StatestoreSubscriber::StatestoreSubscriber(const string& subscriber_id,
     client_cache_(new StatestoreClientCache(1, 0, FLAGS_statestore_client_rpc_timeout_ms,
         FLAGS_statestore_client_rpc_timeout_ms, "",
         !FLAGS_ssl_client_ca_certificate.empty())),
-    metrics_(metrics->GetOrCreateChildGroup("statestore-subscriber")) {
-  statestore_ = new StatestoreStub(this, statestore_address, metrics);
+    metrics_(metrics->GetOrCreateChildGroup("statestore-subscriber")),
+    enable_statestored_ha_(FLAGS_enable_statestored_ha) {
+  statestore_ =
+      new StatestoreStub(this, /* first_statestore */true, statestore_address, metrics);
+  if (!enable_statestored_ha_) {
+    statestore_->SetStatestoreActive(true, 1);
+    active_statestore_ = statestore_;
+  } else {
+    DCHECK(!statestore2_address.hostname.empty() && statestore2_address.port != 0);
+    statestore2_ = new StatestoreStub(
+        this, /* first_statestore */false, statestore2_address, metrics);
+  }
   client_cache_->InitMetrics(metrics, "statestore-subscriber.statestore");
 }
 
 Status StatestoreSubscriber::AddTopic(const Statestore::TopicId& topic_id,
     bool is_transient, bool populate_min_subscriber_topic_version,
     string filter_prefix, const UpdateCallback& callback) {
-  return statestore_->AddTopic(topic_id, is_transient,
-      populate_min_subscriber_topic_version, filter_prefix, callback);
+  RETURN_IF_ERROR(statestore_->AddTopic(topic_id, is_transient,
+      populate_min_subscriber_topic_version, filter_prefix, callback));
+  if (statestore2_ != nullptr) {
+    RETURN_IF_ERROR(statestore2_->AddTopic(topic_id, is_transient,
+        populate_min_subscriber_topic_version, filter_prefix, callback));
+  }
+  return Status::OK();
 }
 
 void StatestoreSubscriber::AddUpdateCatalogdTopic(
     const UpdateCatalogdCallback& callback) {
   statestore_->AddUpdateCatalogdTopic(callback);
+  if (statestore2_ != nullptr) {
+    statestore2_->AddUpdateCatalogdTopic(callback);
+  }
 }
 
 void StatestoreSubscriber::AddCompleteRegistrationTopic(
     const CompleteRegistrationCallback& callback) {
   statestore_->AddCompleteRegistrationTopic(callback);
+  if (statestore2_ != nullptr) {
+    statestore2_->AddCompleteRegistrationTopic(callback);
+  }
 }
 
-bool StatestoreSubscriber::IsInPostRecoveryGracePeriod() const {
-  return statestore_->IsInPostRecoveryGracePeriod();
+bool StatestoreSubscriber::IsInPostRecoveryGracePeriod() {
+  StatestoreStub* active_statestore = GetActiveStatestore();
+  return (active_statestore != nullptr) ?
+      active_statestore->IsInPostRecoveryGracePeriod() : false;
 }
 
-bool StatestoreSubscriber::IsRegistered() const {
-  return statestore_->IsRegistered();
+bool StatestoreSubscriber::IsRegistered() {
+  StatestoreStub* active_statestore = GetActiveStatestore();
+  return (active_statestore != nullptr) ? active_statestore->IsRegistered() : false;
 }
 
 Status StatestoreSubscriber::Start() {
@@ -246,7 +324,30 @@ Status StatestoreSubscriber::Start() {
   // Specify the port which the heartbeat server is listening on.
   heartbeat_address_.port = heartbeat_server_->port();
 
-  return statestore_->Start();
+  if (!enable_statestored_ha_) {
+    return statestore_->Start();
+  } else {
+    DCHECK(statestore2_ != nullptr);
+    bool statestore_is_active = false;
+    bool statestore2_is_active = false;
+    RETURN_IF_ERROR(statestore_->Start(&statestore_is_active));
+    RETURN_IF_ERROR(statestore2_->Start(&statestore2_is_active));
+    lock_guard<mutex> r(statestore_ha_lock_);
+    DCHECK(!statestore_is_active || !statestore2_is_active);
+    if (statestore_is_active) {
+      active_statestore_ = statestore_;
+      standby_statestore_ = statestore2_;
+    } else if (statestore2_is_active) {
+      active_statestore_ = statestore2_;
+      standby_statestore_ = statestore_;
+    } else {
+      // Both statestoreds are not ready. If FLAGS_tolerate_statestore_startup_delay is
+      // as true, subscriber enter recovery mode.
+      active_statestore_ = nullptr;
+      standby_statestore_ = nullptr;
+    }
+  }
+  return Status::OK();
 }
 
 /// Set Register Request
@@ -265,15 +366,34 @@ Status StatestoreSubscriber::SetRegisterRequest(
   request->__set_subscriber_location(heartbeat_address);
   request->__set_subscriber_id(subscriber_id_);
   request->__set_subscriber_type(subscriber_type_);
-  request->__set_subscribe_catalogd_change(statestore_->IsSubscribedCatalogdChange());
   return Status::OK();
 }
 
-void StatestoreSubscriber::Heartbeat(
-    const RegistrationId& registration_id, const TUniqueId& statestore_id) {
+void StatestoreSubscriber::Heartbeat(const RegistrationId& registration_id,
+    const TUniqueId& statestore_id, bool request_active_conn_state,
+    TStatestoreConnState::type* active_statestore_conn_state) {
   // It's possible the heartbeat is received for previous registration.
-  if (statestore_->IsMatchingStatestoreId(statestore_id)) {
+  DCHECK(statestore_ != nullptr);
+  if (statestore_->IsMatchingStatestoreId(statestore_id) || statestore2_ == nullptr) {
+    // Due to race, subscriber could receive heartbeat before receiving registration
+    // response. "statestore2_ == nullptr" means HA is not enabled. In that case,
+    // we still handle the heartbeat request from statestore even registration response
+    // is not received.
     statestore_->Heartbeat(registration_id);
+    // Report connection state with active statestore instance for the request from
+    // standby statestore.
+    if (request_active_conn_state && !statestore_->IsStatestoreActive()
+        && statestore2_ != nullptr) {
+      *active_statestore_conn_state = statestore2_->GetStatestoreConnState();
+    }
+  } else if (statestore2_ != nullptr
+      && statestore2_->IsMatchingStatestoreId(statestore_id)) {
+    statestore2_->Heartbeat(registration_id);
+    // Report connection state with active statestore instance for the request from
+    // standby statestore.
+    if (request_active_conn_state && !statestore2_->IsStatestoreActive()) {
+      *active_statestore_conn_state = statestore_->GetStatestoreConnState();
+    }
   } else {
     VLOG(3) << "Ignore heartbeat message from unknown statestored: " << statestore_id;
   }
@@ -283,46 +403,103 @@ void StatestoreSubscriber::UpdateCatalogd(
     const TCatalogRegistration& catalogd_registration,
     const RegistrationId& registration_id, const TUniqueId& statestore_id,
     int64_t active_catalogd_version, bool* update_skipped) {
-  if (statestore_->IsMatchingStatestoreId(statestore_id)) {
-    statestore_->UpdateCatalogd(
-        catalogd_registration, registration_id, active_catalogd_version, update_skipped);
+  // Accept UpdateCatalogd RPC from active statestore
+  StatestoreStub* active_statestore = GetActiveStatestore();
+  if (active_statestore != nullptr
+      && active_statestore->IsMatchingStatestoreId(statestore_id)) {
+    active_statestore->UpdateCatalogd(catalogd_registration, registration_id,
+        active_catalogd_version, /* statestore_failover */false, update_skipped);
   } else {
     // It's possible the catalogd update RPC is received before the registration response
     // is received. Skip this update so that the statestore will retry this update in
     // the future.
     *update_skipped = true;
-    LOG(INFO) << "Skipped updating catalogd message from unknown statestored: "
+    LOG(INFO) << "Skipped updating catalogd message from unknown or inactive "
+              << "statestored: " << statestore_id;
+  }
+}
+
+void StatestoreSubscriber::UpdateStatestoredRole(bool is_active,
+    const RegistrationId& registration_id, const TUniqueId& statestore_id,
+    int64_t active_statestored_version, bool update_active_catalogd,
+    const TCatalogRegistration* catalogd_registration, int64_t active_catalogd_version,
+    bool* update_skipped) {
+  DCHECK(enable_statestored_ha_);
+  // Accept UpdateStatestoredRole RPC from standby statestored
+  StatestoreStub* standby_statestore = GetStandbyStatestore();
+  if (standby_statestore != nullptr
+      && standby_statestore_->IsMatchingStatestoreId(statestore_id)) {
+    // Receive notification of statestore service fail over, switch active and standby
+    // statestoreds.
+    standby_statestore->IncCountForUpdateStatestoredRoleRPC();
+    DCHECK(is_active);
+    {
+      lock_guard<mutex> r(statestore_ha_lock_);
+      StatestoreStub* tmp = active_statestore_;
+      active_statestore_ = standby_statestore_;
+      standby_statestore_ = tmp;
+      active_statestore_->SetStatestoreActive(is_active, active_statestored_version);
+      standby_statestore_->SetStatestoreActive(!is_active, active_statestored_version);
+    }
+    if (update_active_catalogd) {
+      StatestoreStub* active_statestore = GetActiveStatestore();
+      DCHECK(active_statestore != nullptr);
+      active_statestore->UpdateCatalogd(*catalogd_registration, registration_id,
+          active_catalogd_version, /* statestore_failover */true, update_skipped);
+      DCHECK(!(*update_skipped));
+    }
+  } else {
+    // It's possible the statestored update RPC is received before the registration
+    // response is received. Skip this update so that the statestore will retry this
+    // update in the future.
+    *update_skipped = true;
+    LOG(INFO) << "Skipped updating statestored message from unknown statestored: "
               << statestore_id;
   }
+}
+
+StatestoreSubscriber::StatestoreStub* StatestoreSubscriber::GetActiveStatestore() {
+  lock_guard<mutex> r(statestore_ha_lock_);
+  return active_statestore_;
+}
+
+StatestoreSubscriber::StatestoreStub* StatestoreSubscriber::GetStandbyStatestore() {
+  lock_guard<mutex> r(statestore_ha_lock_);
+  DCHECK(standby_statestore_ != nullptr);
+  return standby_statestore_;
 }
 
 Status StatestoreSubscriber::UpdateState(const TopicDeltaMap& incoming_topic_deltas,
     const RegistrationId& registration_id, const TUniqueId& statestore_id,
     vector<TTopicDelta>* subscriber_topic_updates, bool* skipped) {
-  if (statestore_->IsMatchingStatestoreId(statestore_id)) {
-    return statestore_->UpdateState(
+  // Accept UpdateState RPC from active statestore.
+  StatestoreStub* active_statestore = GetActiveStatestore();
+  if (active_statestore != nullptr
+      && active_statestore->IsMatchingStatestoreId(statestore_id)) {
+    return active_statestore->UpdateState(
         incoming_topic_deltas, registration_id, subscriber_topic_updates, skipped);
   } else {
     // It's possible the topic update is received before the registration response is
     // received. Skip this update so that the statestore will retry this update in the
     // future.
     *skipped = true;
-    VLOG(3) << "Skipped topic update message from unknown statestored: " << statestore_id;
+    VLOG(3) << "Skipped topic update message from unknown or inactive statestored: "
+            << statestore_id;
     return Status::OK();
   }
 }
 
 StatestoreSubscriber::StatestoreStub::StatestoreStub(StatestoreSubscriber* subscriber,
-    const TNetworkAddress& statestore_address, MetricGroup* metrics)
+    bool first_statestore, const TNetworkAddress& statestore_address,
+    MetricGroup* metrics)
   : subscriber_(subscriber),
     statestore_address_(statestore_address),
     failure_detector_(
         new TimeoutFailureDetector(seconds(FLAGS_statestore_subscriber_timeout_seconds),
             seconds(FLAGS_statestore_subscriber_timeout_seconds / 2))),
     is_registered_(false) {
-  std::string metrics_name_prefix = "";
-  metrics_ = metrics->GetOrCreateChildGroup(
-      metrics_name_prefix + "statestore-subscriber");
+  std::string name_prefix = first_statestore ? "statestore" : "statestore2";
+  metrics_ = metrics->GetOrCreateChildGroup(name_prefix + "-subscriber");
   connected_to_statestore_metric_ = metrics_->AddProperty(
       "statestore-subscriber.connected", false);
   connection_failure_metric_ = metrics_->AddCounter(
@@ -343,6 +520,10 @@ StatestoreSubscriber::StatestoreStub::StatestoreStub(StatestoreSubscriber* subsc
       "statestore-subscriber.statestore-id", "N/A");
   update_catalogd_rpc_metric_ = metrics_->AddCounter(
       "statestore-subscriber.num-update-catalogd-rpc", 0);
+  update_statestored_role_rpc_metric_ = metrics_->AddCounter(
+      "statestore-subscriber.num-update-statestored-role-rpc", 0);
+  active_status_metric_ = metrics_->AddProperty(
+      name_prefix + "-subscriber.statestore-active-status", is_active_);
   re_registr_attempt_metric_ = metrics_->AddCounter(
       "statestore-subscriber.num-re-register-attempt", 0);
 }
@@ -425,6 +606,7 @@ Status StatestoreSubscriber::StatestoreStub::Register(bool* has_active_catalogd,
     thrift_topic.__set_filter_prefix(registration.second.filter_prefix);
     request.topic_registrations.push_back(thrift_topic);
   }
+  request.__set_subscribe_catalogd_change(IsSubscribedCatalogdChange());
 
   {
     // Reset registration_id_ and statestore_id_ before registering with statestore
@@ -480,6 +662,15 @@ Status StatestoreSubscriber::StatestoreStub::Register(bool* has_active_catalogd,
     } else {
       VLOG(1) << "No statestore ID received from statestore";
     }
+    if (status.ok() && response.__isset.statestore_is_active) {
+      is_active_ = response.statestore_is_active;
+      if (is_active_) {
+        DCHECK(response.active_statestored_version > 0
+            && active_statestored_version_ <= response.active_statestored_version);
+      }
+      active_statestored_version_ = response.active_statestored_version;
+      active_status_metric_->SetValue(is_active_);
+    }
     if (status.ok() && response.__isset.catalogd_registration) {
       VLOG(1) << "Active catalogd address: "
               << TNetworkAddressToString(response.catalogd_registration.address);
@@ -496,7 +687,7 @@ Status StatestoreSubscriber::StatestoreStub::Register(bool* has_active_catalogd,
   return status;
 }
 
-Status StatestoreSubscriber::StatestoreStub::Start() {
+Status StatestoreSubscriber::StatestoreStub::Start(bool* startstore_is_active) {
   Status status;
   {
     bool has_active_catalogd = false;
@@ -515,6 +706,7 @@ Status StatestoreSubscriber::StatestoreStub::Start() {
     }
     if (status.ok()) {
       is_registered_ = true;
+      if (startstore_is_active != nullptr) *startstore_is_active = is_active_;
       LOG(INFO) << "statestore registration successful on startup";
       if (has_active_catalogd) {
         DCHECK(active_catalogd_version >= 0);
@@ -557,6 +749,7 @@ void StatestoreSubscriber::StatestoreStub::RecoveryModeChecker() {
   // that the statestore has failed from our perspective. If so, enter recovery
   // mode and try to reconnect, followed by reregistering all subscriptions.
   while (true) {
+    bool updateStatestoredRole = false;
     FailureDetector::PeerState state = failure_detector_->GetPeerState(STATESTORE_ID);
     if (state == FailureDetector::FAILED
         || (state == FailureDetector::UNKNOWN && !is_registered)) {
@@ -587,6 +780,11 @@ void StatestoreSubscriber::StatestoreStub::RecoveryModeChecker() {
                 : complete_registration_callbacks_) {
               callback();
             }
+          }
+          if (is_active_) {
+            updateStatestoredRole = true;
+            LOG(INFO) << "Statestored " << TNetworkAddressToString(statestore_address_)
+                      << " is active.";
           }
           // Make sure to update failure detector so that we don't immediately fail on
           // the next loop while we're waiting for heartbeat messages to resume.
@@ -624,6 +822,19 @@ void StatestoreSubscriber::StatestoreStub::RecoveryModeChecker() {
       last_recovery_time_metric_->SetValue(CurrentTimeString());
     }
 
+    if (FLAGS_enable_statestored_ha && updateStatestoredRole) {
+      LOG(INFO) << "Update the roles of statestoreds";
+      bool update_skipped = false;
+      bool is_active = false;
+      RegistrationId registration_id;
+      TUniqueId statestore_id;
+      int64_t active_statestored_version = GetActiveVersion(&is_active);
+      GetRegistrationIdAndStatestoreId(&registration_id, &statestore_id);
+      subscriber_->UpdateStatestoredRole(is_active, registration_id,
+          statestore_id, active_statestored_version, /* update_active_catalogd */false,
+          nullptr, 0, &update_skipped);
+      DCHECK(!update_skipped);
+    }
     SleepForMs(SLEEP_INTERVAL_MS);
   }
 }
@@ -667,20 +878,32 @@ void StatestoreSubscriber::StatestoreStub::Heartbeat(
 void StatestoreSubscriber::StatestoreStub::UpdateCatalogd(
     const TCatalogRegistration& catalogd_registration,
     const RegistrationId& registration_id, int64_t active_catalogd_version,
-    bool* update_skipped) {
+    bool statestore_failover, bool* update_skipped) {
   const Status& status = CheckRegistrationId(registration_id);
   if (status.ok()) {
-    // Try to acquire lock to avoid race with updating catalogd from registration thread.
-    shared_lock<shared_mutex> l(lock_, boost::try_to_lock);
-    if (!l.owns_lock()) {
-      LOG(INFO) << "Unable to acquire the lock, skip UpdateCatalogd RPC notification.";
-      *update_skipped = true;
-      return;
-    }
-    update_catalogd_rpc_metric_->Increment(1);
-    DCHECK(active_catalogd_version >= 0);
-    for (const UpdateCatalogdCallback& callback : update_catalogd_callbacks_) {
-      callback(false, active_catalogd_version, catalogd_registration);
+    if (statestore_failover) {
+      lock_guard<shared_mutex> exclusive_lock(lock_);
+      DCHECK(active_catalogd_version >= 0);
+      for (const UpdateCatalogdCallback& callback : update_catalogd_callbacks_) {
+        // Set is_registration_reply as true like new registration if statestore service
+        // fail over to standby statestored.
+        callback(/* is_registration_reply */true, active_catalogd_version,
+            catalogd_registration);
+      }
+    } else {
+      // Try to acquire lock to avoid race with updating catalogd from registration
+      // thread.
+      shared_lock<shared_mutex> l(lock_, boost::try_to_lock);
+      if (!l.owns_lock()) {
+        LOG(INFO) << "Unable to acquire the lock, skip UpdateCatalogd RPC notification.";
+        *update_skipped = true;
+        return;
+      }
+      update_catalogd_rpc_metric_->Increment(1);
+      DCHECK(active_catalogd_version >= 0);
+      for (const UpdateCatalogdCallback& callback : update_catalogd_callbacks_) {
+        callback(false, active_catalogd_version, catalogd_registration);
+      }
     }
   } else {
     // It's possible the registration is not completed.
@@ -829,6 +1052,54 @@ bool StatestoreSubscriber::StatestoreStub::IsInPostRecoveryGracePeriod() const {
 bool StatestoreSubscriber::StatestoreStub::IsRegistered() {
   lock_guard<shared_mutex> exclusive_lock(lock_);
   return is_registered_;
+}
+
+void StatestoreSubscriber::StatestoreStub::SetStatestoreActive(
+    bool is_active, int64_t active_statestored_version) {
+  lock_guard<shared_mutex> exclusive_lock(lock_);
+  is_active_ = is_active;
+  DCHECK(active_statestored_version_ <= active_statestored_version);
+  active_statestored_version_ = active_statestored_version;
+  active_status_metric_->SetValue(is_active);
+}
+
+bool StatestoreSubscriber::StatestoreStub::IsStatestoreActive() {
+  lock_guard<shared_mutex> exclusive_lock(lock_);
+  return is_active_;
+}
+
+int64_t StatestoreSubscriber::StatestoreStub::GetActiveVersion(bool* is_active) {
+  lock_guard<shared_mutex> exclusive_lock(lock_);
+  *is_active = is_active_;
+  return active_statestored_version_;
+}
+
+void StatestoreSubscriber::StatestoreStub::GetRegistrationIdAndStatestoreId(
+    RegistrationId* registration_id, TUniqueId* statestore_id) {
+  lock_guard<shared_mutex> exclusive_lock(lock_);
+  *registration_id = registration_id_;
+  *statestore_id = statestore_id_;
+}
+
+void StatestoreSubscriber::StatestoreStub::IncCountForUpdateStatestoredRoleRPC() {
+  lock_guard<shared_mutex> exclusive_lock(lock_);
+  update_statestored_role_rpc_metric_->Increment(1);
+}
+
+TStatestoreConnState::type
+StatestoreSubscriber::StatestoreStub::GetStatestoreConnState() {
+  lock_guard<shared_mutex> exclusive_lock(lock_);
+  FailureDetector::PeerState state = failure_detector_->GetPeerState(STATESTORE_ID);
+  switch (state) {
+    case FailureDetector::FAILED:
+      return TStatestoreConnState::FAILED;
+    case FailureDetector::UNKNOWN:
+      return TStatestoreConnState::UNKNOWN;
+    case FailureDetector::SUSPECTED:
+    case FailureDetector::OK:
+    default:
+      return TStatestoreConnState::OK;
+  }
 }
 
 }

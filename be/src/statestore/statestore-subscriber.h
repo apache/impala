@@ -73,10 +73,12 @@ class StatestoreSubscriber {
   ///   heartbeat_address - the local address on which the heartbeat service which
   ///                       communicates with the statestore should be started.
   ///   statestore_address - the address of the statestore to register with
+  ///   statestore2_address - the address of the second statestore to register with
   ///   subscriber_type - subscriber type
   StatestoreSubscriber(const std::string& subscriber_id,
       const TNetworkAddress& heartbeat_address,
       const TNetworkAddress& statestore_address,
+      const TNetworkAddress& statestore2_address,
       MetricGroup* metrics,
       TStatestoreSubscriberType::type subscriber_type);
 
@@ -166,10 +168,10 @@ class StatestoreSubscriber {
 
   /// Returns true if the statestore has recovered and the configurable post-recovery
   /// grace period has not yet elapsed.
-  bool IsInPostRecoveryGracePeriod() const;
+  bool IsInPostRecoveryGracePeriod();
 
   /// Returns true if the registration with statestore is completed.
-  bool IsRegistered() const;
+  bool IsRegistered();
 
  private:
   /// Unique, but opaque, identifier for this subscriber.
@@ -247,11 +249,16 @@ class StatestoreSubscriber {
   /// tracks variety of bookkeeping information.
   class StatestoreStub {
    public:
-    StatestoreStub(StatestoreSubscriber* subscriber,
+    StatestoreStub(StatestoreSubscriber* subscriber, bool first_statestore,
         const TNetworkAddress& statestore_address, MetricGroup* metrics);
 
+    /// Start to register with the statestore server.
     /// Returns OK unless some error occurred, like a failure to connect.
-    Status Start();
+    /// Note: If the statestore server is not ready, the registration will fail and the
+    /// subscriber enter recovery mode. In recovery mode, the class-wide lock_ is taken
+    /// to ensure mutual exclusion with any operations in flight. To avoid accessing
+    /// member variable is_active_, return its value in the given output parameter.
+    Status Start(bool* startstore_is_active = nullptr);
 
     /// Adds a topic to the set of topics that updates will be received
     /// for. When a topic update is received, the supplied UpdateCallback
@@ -302,7 +309,7 @@ class StatestoreSubscriber {
     /// Called when the catalogd has been updated.
     void UpdateCatalogd(const TCatalogRegistration& catalogd_registration,
         const RegistrationId& registration_id, int64_t active_catalogd_version,
-        bool* update_skipped);
+        bool statestore_failover, bool* update_skipped);
 
     /// Run in a separate thread. In a loop, check failure_detector_ to see if the
     /// statestore is still sending heartbeat messages. If not, enter 'recovery mode'
@@ -343,6 +350,23 @@ class StatestoreSubscriber {
     /// Returns true if the registration with statestore is completed.
     bool IsRegistered();
 
+    /// Get/set the active state of the registered statestore instance.
+    bool IsStatestoreActive();
+    void SetStatestoreActive(bool is_active, int64_t active_statestored_version);
+
+    /// Return the version of active statestore.
+    int64_t GetActiveVersion(bool* is_active);
+
+    /// Return registration-Id and statestore-Id.
+    void GetRegistrationIdAndStatestoreId(
+        RegistrationId* registration_id, TUniqueId* statestore_id);
+
+    /// Increase count for receiving UpdateStatestoredRole RPC.
+    void IncCountForUpdateStatestoredRoleRPC();
+
+    /// Get connection state with the registered statestore instance.
+    TStatestoreConnState::type GetStatestoreConnState();
+
    private:
     /// Pointer to parent StatestoreSubscriber object
     StatestoreSubscriber* subscriber_;
@@ -357,6 +381,12 @@ class StatestoreSubscriber {
     /// private methods must be called holding this lock; this is noted in the method
     /// comments.
     boost::shared_mutex lock_;
+
+    /// True if the registered statestore instance is active.
+    bool is_active_ = false;
+
+    /// The version of active statestored.
+    int64_t active_statestored_version_ = 0;
 
     /// Failure detector that tracks heartbeat messages from the statestore.
     boost::scoped_ptr<impala::TimeoutFailureDetector> failure_detector_;
@@ -398,6 +428,13 @@ class StatestoreSubscriber {
 
     /// Metric to count the total number of UpdateCatalogd RPCs received by subscriber.
     IntCounter* update_catalogd_rpc_metric_;
+
+    /// Metric that tracks if the statestored is active when statestored HA is enabled.
+    BooleanProperty* active_status_metric_;
+
+    /// Metric to count the total number of UpdateStatestoredRole RPCs received by
+    /// subscriber.
+    IntCounter* update_statestored_role_rpc_metric_;
 
     /// Metric to count the total number of re-registration attempt.
     IntCounter* re_registr_attempt_metric_;
@@ -446,8 +483,22 @@ class StatestoreSubscriber {
     AtomicInt64 last_registration_ms_{0};
   };
 
-  // statestore instances
+  /// Set to true if statestored HA is enabled.
+  bool enable_statestored_ha_ = false;
+
+  /// Pointers of two StatestoreStub objects
   StatestoreStub* statestore_ = nullptr;
+  StatestoreStub* statestore2_ = nullptr;
+
+  /// Lock to protect statestore HA related variables: active_statestore_,
+  /// standby_statestore_
+  std::mutex statestore_ha_lock_;
+
+  /// Pointers for active and standby StatestoreStub objects. Subscriber find active
+  /// statestore during registration, or get notification when statestore service
+  /// fail over to standby statestore.
+  StatestoreStub* active_statestore_ = nullptr;
+  StatestoreStub* standby_statestore_ = nullptr;
 
   /// Called when the statestore sends a topic update.
   Status UpdateState(const TopicDeltaMap& incoming_topic_deltas,
@@ -456,12 +507,24 @@ class StatestoreSubscriber {
 
   /// Called when the statestore sends a heartbeat message.
   void Heartbeat(const RegistrationId& registration_id,
-      const TUniqueId& statestore_id);
+      const TUniqueId& statestore_id, bool request_active_conn_state,
+      TStatestoreConnState::type* active_statestore_conn_state);
 
-  /// Called when the catalogd has been updated.
+  /// Called when the active catalogd has been updated.
   void UpdateCatalogd(const TCatalogRegistration& catalogd_registration,
       const RegistrationId& registration_id, const TUniqueId& statestore_id,
       int64_t active_catalogd_version, bool* update_skipped);
+
+  /// Called when the active statestore has been updated.
+  void UpdateStatestoredRole(bool is_active,
+      const RegistrationId& registration_id, const TUniqueId& statestore_id,
+      int64_t active_statestored_version, bool update_active_catalogd,
+      const TCatalogRegistration* catalogd_registration, int64_t active_catalogd_version,
+      bool* update_skipped);
+
+  /// Return the pointer of the active/standby StatestoreStub.
+  StatestoreStub* GetActiveStatestore();
+  StatestoreStub* GetStandbyStatestore();
 
   /// Subscriber thrift implementation, needs to access UpdateState
   friend class StatestoreSubscriberThriftIf;

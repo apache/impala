@@ -1172,6 +1172,66 @@
     "key": "impala.thrift-server.StatestoreService.timedout-cnxn-requests"
   },
   {
+    "description": "The number of active connections to this StateStore's HA service.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "StateStore HA Service Active Connections",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.StatestoreHaService.connections-in-use"
+  },
+  {
+    "description": "Amount of time clients of StateStore HA Service spent waiting for connection to be set up",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "StateStore HA Service client connection setup time",
+    "units": "TIME_US",
+    "kind": "HISTOGRAM",
+    "key": "impala.thrift-server.StatestoreHaService.connection-setup-time"
+  },
+  {
+    "description": "Amount of time clients of StateStore HA Service spent waiting for service threads",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "StateStore HA Service clients' wait time for service threads",
+    "units": "TIME_US",
+    "kind": "HISTOGRAM",
+    "key": "impala.thrift-server.StatestoreHaService.svc-thread-wait-time"
+  },
+  {
+    "description": "The total number of connections made to this StateStore's StateStore HA service over its lifetime.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "StateStore HA Service Connections",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala.thrift-server.StatestoreHaService.total-connections"
+  },
+  {
+    "description": "The number of connections to the Statestore HA Service that have been accepted and are waiting to be setup.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "Statestore HA Service Connections Queued for Setup",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.StatestoreHaService.connection-setup-queue-size"
+  },
+  {
+    "description": "The number of connection requests to the Statestore HA Service that have been timed out waiting to be setup.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "Statestore HA Service Connection Requests Timed Out",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.StatestoreHaService.timedout-cnxn-requests"
+  },
+  {
     "description": "The number of active Impala Backend client connections to this Impala Daemon.",
     "contexts": [
       "IMPALAD"
@@ -1783,6 +1843,18 @@
     "key": "statestore-subscriber.num-update-catalogd-rpc"
   },
   {
+    "description": "The number of RPCs received for updating role of statestored.",
+    "contexts": [
+      "ADMISSIOND",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Number of UpdateStatestoredRole RPCs",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "statestore-subscriber.num-update-statestored-role-rpc"
+  },
+  {
     "description": "The number of Re-Registration Attempt.",
     "contexts": [
       "ADMISSIOND",
@@ -1861,6 +1933,30 @@
     "key": "statestore-subscriber.topic-update-interval-time"
   },
   {
+    "description": "Current active status of the Statestore daemon.",
+    "contexts": [
+      "ADMISSIOND",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "The active status of Statestore daemon",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "statestore-subscriber.statestore-active-status"
+  },
+  {
+    "description": "Current active status of the Statestore daemon.",
+    "contexts": [
+      "ADMISSIOND",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "The active status of Statestore daemon",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "statestore2-subscriber.statestore-active-status"
+  },
+  {
     "description": "The time (sec) spent sending heartbeat RPCs. Includes subscriber-side processing time and network transmission time.",
     "contexts": [
       "STATESTORE"
@@ -1889,6 +1985,26 @@
     "units": "UNIT",
     "kind": "COUNTER",
     "key": "statestore.num-failed-update-catalogd-rpc"
+  },
+  {
+    "description": "The number of successful RPCs for updating role of statestored.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "Number of successful UpdateStatestoredRole RPCs sent by statestore",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "statestore.num-successful-update-statestored-role-rpc"
+  },
+  {
+    "description": "The number of failed RPCs for updating role of statestored.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "Number of failed UpdatetatestoredRole RPCs sent by statestore",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "statestore.num-failed-update-statestored-role-rpc"
   },
   {
     "description": "The number of requests for clearing topic entries from catalogd.",
@@ -1991,6 +2107,46 @@
     "key": "statestore.version"
   },
   {
+    "description": "Current active status of this Statestore daemon.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "The active status of Statestore daemon",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "statestore.active-status"
+  },
+  {
+    "description": "Statestore service is started and ready to accept connections.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "Statestore service started",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "statestore.service-started"
+  },
+  {
+    "description": "Statestored instance is in HA recovery mode.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "Statestored in HA recovery mode",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "statestore.in-ha-recovery-mode"
+  },
+  {
+    "description": "Statestored instance connected with peer statestored.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "Statestored connected with peer statestored",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "statestore.connected-with-peer-statestored"
+  },
+  {
     "description": "The number of clients in use by the Statestore heartbeat client cache.",
     "contexts": [
       "STATESTORE"
@@ -2049,6 +2205,46 @@
     "units": "NONE",
     "kind": "GAUGE",
     "key": "subscriber-update-catalogd.client-cache.total-clients"
+  },
+  {
+    "description": "The number of clients in use by the Statestore update statestored client cache.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "Subscriber Update role of Statestored Client Cache Clients In Use",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "subscriber-update-statestored.client-cache.clients-in-use"
+  },
+  {
+    "description": "The total number of clients in the Statestore update statestored client cache.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "Subscriber Update role of Statestored Client Cache Total Clients",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "subscriber-update-statestored.client-cache.total-clients"
+  },
+  {
+    "description": "The number of clients in use by the Statestore update statestored client cache.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "Subscriber Update role of Statestored Client Cache Clients In Use",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "statestored-ha.client-cache.clients-in-use"
+  },
+  {
+    "description": "The total number of clients in the Statestore update statestored client cache.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "Subscriber Update role of Statestored Client Cache Total Clients",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "statestored-ha.client-cache.total-clients"
   },
   {
     "description": "Number of bytes used by the application. This will not typically match the memory use reported by the OS, because it does not include TCMalloc overhead or memory fragmentation.",

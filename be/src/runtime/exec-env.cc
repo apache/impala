@@ -84,8 +84,6 @@ DEFINE_bool(enable_webserver, true, "If true, debug webserver is enabled");
 DEFINE_bool(ping_expose_webserver_url, true,
     "If true, debug webserver url is exposed via PingImpalaService/PingImpalaHS2Service "
     "RPC calls");
-DEFINE_string(state_store_host, "localhost",
-    "hostname where StatestoreService is running");
 DEFINE_int32(state_store_subscriber_port, 23000,
     "port where StatestoreSubscriberService should be exported");
 DEFINE_int32(num_hdfs_worker_threads, 16,
@@ -128,7 +126,6 @@ DEFINE_int32(local_catalog_cache_concurrency_level, 4,
     "level to avoid lock contention, the default value 4 is consistent with the "
     "default value of the original cache.");
 
-DECLARE_int32(state_store_port);
 DECLARE_int32(num_threads_per_core);
 DECLARE_int32(num_cores);
 DECLARE_int32(krpc_port);
@@ -146,6 +143,10 @@ DECLARE_string(admission_service_host);
 DECLARE_int32(admission_service_port);
 DECLARE_string(catalog_service_host);
 DECLARE_int32(catalog_service_port);
+DECLARE_string(state_store_host);
+DECLARE_int32(state_store_port);
+DECLARE_string(state_store_2_host);
+DECLARE_int32(state_store_2_port);
 
 DECLARE_string(ssl_client_ca_certificate);
 
@@ -208,10 +209,12 @@ ExecEnv* ExecEnv::exec_env_ = nullptr;
 
 ExecEnv::ExecEnv(bool external_fe)
   : ExecEnv(FLAGS_krpc_port, FLAGS_state_store_subscriber_port, FLAGS_webserver_port,
-        FLAGS_state_store_host, FLAGS_state_store_port, external_fe) {}
+      FLAGS_state_store_host, FLAGS_state_store_port, FLAGS_state_store_2_host,
+      FLAGS_state_store_2_port, external_fe) {}
 
 ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
-    const string& statestore_host, int statestore_port, bool external_fe)
+    const string& statestore_host, int statestore_port,
+    const std::string& statestore2_host, int statestore2_port, bool external_fe)
   : obj_pool_(new ObjectPool),
     metrics_(new MetricGroup("impala-metrics")),
     // Create the CatalogServiceClientCache with num_retries = 1 and wait_ms = 0.
@@ -251,6 +254,8 @@ ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
       MakeNetworkAddress(FLAGS_hostname, subscriber_port);
   TNetworkAddress statestore_address =
       MakeNetworkAddress(statestore_host, statestore_port);
+  TNetworkAddress statestore2_address =
+      MakeNetworkAddress(statestore2_host, statestore2_port);
 
   catalogd_address_ = std::make_shared<const TNetworkAddress>(
       MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port));
@@ -266,7 +271,7 @@ ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
   // Set StatestoreSubscriber::subscriber_id as hostname + krpc_port.
   statestore_subscriber_.reset(new StatestoreSubscriber(
       Substitute("impalad@$0:$1", FLAGS_hostname, FLAGS_krpc_port), subscriber_address,
-      statestore_address, metrics_.get(), subscriber_type));
+      statestore_address, statestore2_address, metrics_.get(), subscriber_type));
 
   if (FLAGS_is_coordinator) {
     hdfs_op_thread_pool_.reset(

@@ -30,11 +30,14 @@ class StatestoreSubscriberCatalog : public StatestoreSubscriber {
   ///   heartbeat_address - the local address on which the heartbeat service which
   ///                       communicates with the statestore should be started.
   ///   statestore_address - the address of the statestore to register with
+  ///   statestore2_address - the address of the second statestore instance which is
+  ///                        launched when statestored HA is enabled.
   ///   catalogd_address - address of catalog service.
   ///   catalog_protocol_version - protocol version of Catalog service.
   StatestoreSubscriberCatalog(const std::string& subscriber_id,
       const TNetworkAddress& heartbeat_address,
       const TNetworkAddress& statestore_address,
+      const TNetworkAddress& statestore2_address,
       MetricGroup* metrics,
       CatalogServiceVersion::type catalog_protocol_version,
       const TNetworkAddress& catalogd_address);
