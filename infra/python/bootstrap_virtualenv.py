@@ -177,6 +177,13 @@ def exec_pip_install(venv_dir, is_py3, args, cc="no-cc-available", env=None):
   toolchain_binutils_dir = toolchain_pkg_dir("binutils")
   binutils_bin_dir = os.path.join(toolchain_binutils_dir, "bin")
   env["PATH"] = "{0}:{1}".format(binutils_bin_dir, env["PATH"])
+  # Sometimes pip install invokes gcc directly without using the CC environment
+  # variable. If system GCC is too new, then it will fail, because it needs symbols
+  # that are not in Impala's libstdc++. To avoid this, we add GCC to the PATH,
+  # so any direct reference will use our GCC rather than the system GCC.
+  toolchain_gcc_dir = toolchain_pkg_dir("gcc")
+  gcc_bin_dir = os.path.join(toolchain_gcc_dir, "bin")
+  env["PATH"] = "{0}:{1}".format(gcc_bin_dir, env["PATH"])
 
   # Parallelize the slow numpy build.
   # Use getconf instead of nproc because it is supported more widely, e.g. on older
