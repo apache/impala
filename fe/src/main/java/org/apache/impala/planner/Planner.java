@@ -228,7 +228,8 @@ public class Planner {
             Preconditions.checkState(!mentionedColumns.isEmpty());
             List<ColumnLabel> targetColLabels = new ArrayList<>();
             for (String column: mentionedColumns) {
-              targetColLabels.add(new ColumnLabel(column, targetTable.getTableName()));
+              targetColLabels.add(new ColumnLabel(column, targetTable.getTableName(),
+                  ColumnLineageGraph.getTableType(targetTable)));
             }
             graph.addTargetColumnLabels(targetColLabels);
           } else {
@@ -242,7 +243,8 @@ public class Planner {
               List<ColumnLabel> targetColLabels = new ArrayList<>();
               for (String column: targetTable.getColumnNames()) {
                 if (column.equals(Schema.getAutoIncrementingColumnName())) continue;
-                targetColLabels.add(new ColumnLabel(column, targetTable.getTableName()));
+                targetColLabels.add(new ColumnLabel(column, targetTable.getTableName(),
+                    ColumnLineageGraph.getTableType(targetTable)));
               }
               graph.addTargetColumnLabels(targetColLabels);
             } else {

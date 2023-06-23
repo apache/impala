@@ -24,8 +24,11 @@ struct TVertexMetadata {
   // Table name.
   1: required string table_name
 
+  // Type of the table (e.g. hive, iceberg, kudu, hbase)
+  2: required string table_type
+
   // Create time of the table/view.
-  2: required i64 table_create_time
+  3: required i64 table_create_time
 }
 
 struct TVertex {

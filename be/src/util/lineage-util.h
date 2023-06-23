@@ -47,6 +47,8 @@ class LineageUtil {
         writer->StartObject();
         writer->String("tableName");
         writer->String(vertex.metadata.table_name.c_str());
+        writer->String("tableType");
+        writer->String(vertex.metadata.table_type.c_str());
         writer->String("tableCreateTime");
         writer->Int64(vertex.metadata.table_create_time);
         writer->EndObject();

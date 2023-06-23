@@ -183,7 +183,8 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
     ColumnLineageGraph graph = analyzer.getColumnLineageGraph();
     List<ColumnLabel> colDefs = new ArrayList<>();
     for (ColumnDef colDef: finalColDefs_) {
-      colDefs.add(new ColumnLabel(colDef.getColName(), new TableName(dbName_, getTbl())));
+      colDefs.add(new ColumnLabel(colDef.getColName(), new TableName(dbName_, getTbl()),
+          ColumnLineageGraph.VIEW));
     }
     graph.addTargetColumnLabels(colDefs);
     graph.computeLineageGraph(viewDefStmt_.getResultExprs(), analyzer);

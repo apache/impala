@@ -34,7 +34,15 @@ import java.util.TreeSet;
 
 import com.google.common.collect.ImmutableSortedMap;
 import org.apache.impala.analysis.ColumnLineageGraph.Vertex.Metadata;
+import org.apache.impala.catalog.FeDataSource;
+import org.apache.impala.catalog.FeDataSourceTable;
+import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeHBaseTable;
+import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.VirtualTable;
 import org.apache.impala.common.Id;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.thrift.TEdgeType;
@@ -84,6 +92,13 @@ import com.google.common.hash.Hashing;
  *   partition by and/or order by clause.
  */
 public class ColumnLineageGraph {
+  public static final String ICEBERG = "iceberg";
+  public static final String HIVE = "hive";
+  public static final String KUDU = "kudu";
+  public static final String HBASE = "hbase";
+  public static final String VIEW = "view";
+  public static final String VIRTUAL = "virtual";
+  public static final String EXTERNAL_DATASOURCE = "external-datasource";
   /**
    * Represents a vertex in the column lineage graph. A Vertex may correspond to a base
    * table column, a column in the destination table (for the case of INSERT or CTAS
@@ -92,10 +107,12 @@ public class ColumnLineageGraph {
   public static final class Vertex implements Comparable<Vertex> {
     public static class Metadata {
       private final String tableName_; // the table name
+      private final String tableType_; // type of the table
       private final long tableCreateTime_; // the table/view create time
 
-      public Metadata(String tableName, long tableCreateTime) {
+      public Metadata(String tableName, String tableType, long tableCreateTime) {
         tableName_ = tableName;
+        tableType_ = tableType;
         tableCreateTime_ = tableCreateTime;
       }
 
@@ -105,12 +122,13 @@ public class ColumnLineageGraph {
         if (o == null || getClass() != o.getClass()) return false;
         Metadata metadata = (Metadata) o;
         return tableCreateTime_ == metadata.tableCreateTime_ &&
-            Objects.equals(tableName_, metadata.tableName_);
+            Objects.equals(tableName_, metadata.tableName_) &&
+            Objects.equals(tableType_, metadata.tableType_);
       }
 
       @Override
       public int hashCode() {
-        return Objects.hash(tableName_, tableCreateTime_);
+        return Objects.hash(tableName_, tableType_, tableCreateTime_);
       }
 
       /**
@@ -120,7 +138,8 @@ public class ColumnLineageGraph {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Metadata metadata = (Metadata) o;
-        return Objects.equals(tableName_, metadata.tableName_);
+        return Objects.equals(tableName_, metadata.tableName_) &&
+            Objects.equals(tableType_, metadata.tableType_);
       }
     }
 
@@ -162,6 +181,7 @@ public class ColumnLineageGraph {
       if (metadata_ != null) {
         JSONObject jsonMetadata = new JSONObject();
         jsonMetadata.put("tableName", metadata_.tableName_);
+        jsonMetadata.put("tableType", metadata_.tableType_);
         jsonMetadata.put("tableCreateTime", metadata_.tableCreateTime_);
         obj.put("metadata", jsonMetadata);
       }
@@ -179,8 +199,9 @@ public class ColumnLineageGraph {
         return new Vertex(new VertexId(id), label, null);
       }
       String tableName = (String) jsonMetadata.get("tableName");
+      String tableType = (String) jsonMetadata.get("tableType");
       long tableCreateTime = (Long) jsonMetadata.get("tableCreateTime");
-      return new Vertex(new VertexId(id), label, new Metadata(tableName,
+      return new Vertex(new VertexId(id), label, new Metadata(tableName, tableType,
           tableCreateTime));
     }
 
@@ -191,7 +212,7 @@ public class ColumnLineageGraph {
       TVertex vertex = new TVertex(id_.asInt(), label_);
       if (metadata_ != null) {
         TVertexMetadata metadata = new TVertexMetadata(metadata_.tableName_,
-            metadata_.tableCreateTime_);
+            metadata_.tableType_, metadata_.tableCreateTime_);
         vertex.setMetadata(metadata);
       }
       return vertex;
@@ -206,6 +227,7 @@ public class ColumnLineageGraph {
       Metadata metadata = null;
       if (thriftMetadata != null) {
         metadata = new Metadata(thriftMetadata.getTable_name(),
+            thriftMetadata.getTable_type(),
             thriftMetadata.getTable_create_time());
       }
       return new Vertex(new VertexId(id), vertex.label, metadata);
@@ -395,14 +417,16 @@ public class ColumnLineageGraph {
   public static class ColumnLabel implements Comparable<ColumnLabel> {
     private final String columnLabel_;
     private final TableName tableName_;
+    private final String tableType_;
 
-    public ColumnLabel(String columnName, TableName tableName) {
+    public ColumnLabel(String columnName, TableName tableName, String tableType) {
       columnLabel_ = columnName;
       tableName_ = tableName;
+      tableType_ = tableType;
     }
 
     public ColumnLabel(String columnName) {
-      this(columnName, null);
+      this(columnName, null, null);
     }
 
     @Override
@@ -493,12 +517,12 @@ public class ColumnLineageGraph {
       if (target.tableName_ != null) {
         FeTable feTable = analyzer.getStmtTableCache().tables.get(target.tableName_);
         if (feTable != null && feTable.getMetaStoreTable() != null) {
-          metadata = new Metadata(target.tableName_.toString(),
+          metadata = new Metadata(target.tableName_.toString(), getTableType(feTable),
               feTable.getMetaStoreTable().getCreateTime());
         } else {
           // -1 is just a placeholder that will be updated after the table/view has been
           // created. See client-request-state.cc (LogLineageRecord) for more information.
-          metadata = new Metadata(target.tableName_.toString(), -1);
+          metadata = new Metadata(target.tableName_.toString(), target.tableType_, -1);
         }
       }
       targetVertices.add(createVertex(target.columnLabel_, metadata));
@@ -510,12 +534,26 @@ public class ColumnLineageGraph {
       Preconditions.checkState(feTable != null);
       Metadata metadata = feTable != null && feTable.getMetaStoreTable() != null ?
           new Metadata(feTable.getTableName().toString(),
+              getTableType(feTable),
               feTable.getMetaStoreTable().getCreateTime()) : null;
       sourceVertices.add(createVertex(source.getKey(), metadata));
     }
     MultiEdge edge = new MultiEdge(sourceVertices, targetVertices, type);
     edges_.add(edge);
     return edge;
+  }
+
+  public static String getTableType(FeTable tbl) {
+    if (tbl instanceof FeIcebergTable) return ICEBERG;
+    if (tbl instanceof FeFsTable) return HIVE;
+    if (tbl instanceof FeKuduTable) return KUDU;
+    if (tbl instanceof FeHBaseTable) return HBASE;
+    if (tbl instanceof FeView) return VIEW;
+    if (tbl instanceof VirtualTable) return VIRTUAL;
+    if (tbl instanceof FeDataSourceTable) return EXTERNAL_DATASOURCE;
+    LOG.error(String.format("Table '%s' has unknown type: '%s'", tbl.getFullName(),
+        tbl.getClass().getName()));
+    return "unknown";
   }
 
   /**
@@ -904,7 +942,8 @@ public class ColumnLineageGraph {
   public void addTargetColumnLabels(FeTable dstTable) {
     Preconditions.checkNotNull(dstTable);
     for (String columnName: dstTable.getColumnNames()) {
-      targetColumnLabels_.add(new ColumnLabel(columnName, dstTable.getTableName()));
+      targetColumnLabels_.add(new ColumnLabel(columnName, dstTable.getTableName(),
+          getTableType(dstTable)));
     }
   }
 }

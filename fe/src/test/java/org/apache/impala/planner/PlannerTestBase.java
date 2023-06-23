@@ -738,8 +738,11 @@ public class PlannerTestBase extends FrontendTestBase {
     String query = testCase.getQuery();
     ArrayList<String> expectedLineage = testCase.getSectionContents(Section.LINEAGE);
     if (expectedLineage == null || expectedLineage.isEmpty()) return;
+    if (execRequest == null) {
+      errorLog.append("Failed to execute query:\n" + query + "\n");
+      return;
+    }
     TLineageGraph lineageGraph = null;
-    if (execRequest == null) return;
     if (execRequest.isSetQuery_exec_request()) {
       lineageGraph = execRequest.query_exec_request.lineage_graph;
     } else if (execRequest.isSetCatalog_op_request()) {
