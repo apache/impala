@@ -315,6 +315,19 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   @Override
   public TTableDescriptor toThriftDescriptor(int tableId,
       Set<Long> referencedPartitions) {
+    TTableDescriptor tableDesc = new TTableDescriptor(tableId, TTableType.HDFS_TABLE,
+        FeCatalogUtils.getTColumnDescriptors(this),
+        getNumClusteringCols(), name_, db_.getName());
+    tableDesc.setHdfsTable(toTHdfsTable(referencedPartitions,
+        ThriftObjectType.DESCRIPTOR_ONLY));
+    return tableDesc;
+  }
+
+  public THdfsTable toTHdfsTable(ThriftObjectType type) {
+    return toTHdfsTable(null, type);
+  }
+
+  private THdfsTable toTHdfsTable(Set<Long> referencedPartitions, ThriftObjectType type) {
     if (referencedPartitions == null) {
       // null means "all partitions".
       referencedPartitions = getPartitionIds();
@@ -323,10 +336,11 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
     List<? extends FeFsPartition> partitions = loadPartitions(referencedPartitions);
     for (FeFsPartition partition : partitions) {
       idToPartition.put(partition.getId(),
-          FeCatalogUtils.fsPartitionToThrift(partition,
-              ThriftObjectType.DESCRIPTOR_ONLY));
+          FeCatalogUtils.fsPartitionToThrift(partition, type));
     }
 
+    // Prototype partition has no partition values and file descriptors etc.
+    // So we always use DESCRIPTOR_ONLY here.
     THdfsPartition tPrototypePartition = FeCatalogUtils.fsPartitionToThrift(
         createPrototypePartition(), ThriftObjectType.DESCRIPTOR_ONLY);
 
@@ -345,10 +359,6 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
     if (AcidUtils.isFullAcidTable(getMetaStoreTable().getParameters())) {
       hdfsTable.setIs_full_acid(true);
     }
-
-    TTableDescriptor tableDesc = new TTableDescriptor(tableId, TTableType.HDFS_TABLE,
-        FeCatalogUtils.getTColumnDescriptors(this),
-        getNumClusteringCols(), name_, db_.getName());
     // 'ref_' can be null when this table is the target of a CTAS statement.
     if (ref_ != null) {
       TValidWriteIdList validWriteIdList =
@@ -356,8 +366,11 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
       if (validWriteIdList != null) hdfsTable.setValid_write_ids(validWriteIdList);
       hdfsTable.setPartition_prefixes(ref_.getPartitionPrefixes());
     }
-    tableDesc.setHdfsTable(hdfsTable);
-    return tableDesc;
+    if (type == ThriftObjectType.FULL) {
+      hdfsTable.setNetwork_addresses(hostIndex_.getList());
+      hdfsTable.setSql_constraints(getSqlConstraints().toThrift());
+    }
+    return hdfsTable;
   }
 
   private static boolean isAvroFormat(Table msTbl) {
@@ -558,6 +571,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
    * Populate constraint information by making a request to MetaProvider.
    */
   private void loadConstraints() throws TException {
+    if (sqlConstraints_ != null) return;
     sqlConstraints_ = db_.getCatalog().getMetaProvider().loadConstraints(ref_, msTable_);
   }
 

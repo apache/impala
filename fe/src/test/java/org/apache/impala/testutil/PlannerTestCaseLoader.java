@@ -73,7 +73,7 @@ public class PlannerTestCaseLoader implements AutoCloseable {
    */
   public String loadTestCase(String testCasePath) throws Exception {
     String stmt = catalogOpExecutor_.copyTestCaseData(new TCopyTestCaseReq(testCasePath),
-        new TDdlExecResponse(new TCatalogUpdateResult()));
+        new TDdlExecResponse(new TCatalogUpdateResult()), /*wantMinimalResult*/false);
     TQueryCtx queryCtx = TestUtils.createQueryContext(
         new TQueryOptions().setPlanner_testcase_mode(true));
     queryCtx.client_request.setStmt(stmt);

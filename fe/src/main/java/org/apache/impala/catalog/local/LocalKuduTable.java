@@ -213,6 +213,11 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
         FeCatalogUtils.getTColumnDescriptors(this),
         getNumClusteringCols(),
         name_, db_.getName());
+    desc.setKuduTable(toTKuduTable());
+    return desc;
+  }
+
+  public TKuduTable toTKuduTable() {
     TKuduTable tbl = new TKuduTable();
     tbl.setIs_primary_key_unique(isPrimaryKeyUnique_);
     tbl.setHas_auto_incrementing(hasAutoIncrementingColumn_);
@@ -226,8 +231,7 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
     for (KuduPartitionParam partitionParam: partitionBy_) {
       tbl.addToPartition_by(partitionParam.toThrift());
     }
-    desc.setKuduTable(tbl);
-    return desc;
+    return tbl;
   }
 
   /**

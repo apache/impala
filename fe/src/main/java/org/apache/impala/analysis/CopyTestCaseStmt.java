@@ -25,10 +25,10 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
@@ -38,7 +38,8 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TTestCaseData;
 import org.apache.impala.util.CompressionUtil;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -58,7 +59,7 @@ public class CopyTestCaseStmt extends StatementBase {
   // File name prefix of the testcase file for a given query statement.
   private static final String TEST_OUTPUT_FILE_PREFIX = "impala-testcase-data-";
 
-  private static final Logger LOG = Logger.getLogger(CopyTestCaseStmt.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CopyTestCaseStmt.class);
 
   // QueryStmt for which the testcase should be created. Set to null if we are loading
   // an existing testcase.
@@ -158,7 +159,7 @@ public class CopyTestCaseStmt extends StatementBase {
    * views and databases which are then serialized into the TTestCaseData output val.
    */
   @VisibleForTesting
-  public TTestCaseData getTestCaseData() {
+  public TTestCaseData getTestCaseData() throws ImpalaException {
     Preconditions.checkState(queryStmt_.isAnalyzed());
     TTestCaseData result = new TTestCaseData(queryStmt_.getOrigSqlString(),
         hdfsPath_.getLocation(), BackendConfig.INSTANCE.getImpalaBuildVersion());
@@ -172,13 +173,7 @@ public class CopyTestCaseStmt extends StatementBase {
       result.addToDbs(db.toThrift());
     }
     for (FeTable table: referencedTbls) {
-      Preconditions.checkState(table instanceof FeTable);
-      ((Table) table).takeReadLock();
-      try {
-        result.addToTables_and_views(((Table) table).toThrift());
-      } finally {
-        ((Table) table).releaseReadLock();
-      }
+      result.addToTables_and_views(FeCatalogUtils.feTableToThrift(table));
     }
     return result;
   }
@@ -204,8 +199,10 @@ public class CopyTestCaseStmt extends StatementBase {
       throw new ImpalaRuntimeException(String.format("Error writing test case output to" +
           " file: %s", filePath), e);
     }
-    LOG.info(String.format(
-        "Created testcase file %s for query: %s", filePath, data.getQuery_stmt()));
+    LOG.info("Created testcase file {} which contains {} db(s), {} table(s)/view(s)" +
+            " for query: {}",
+        filePath, data.getDbsSize(), data.getTables_and_viewsSize(),
+        data.getQuery_stmt());
     return filePath.toString();
   }
 }

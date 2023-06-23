@@ -629,7 +629,10 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     // the table lock should already be held, and we want the toThrift() to be consistent
     // with the modification. So this check helps us identify places where the lock
     // acquisition is probably missing entirely.
-    if (!isLockedByCurrentThread()) {
+    // Note that we only need the lock in catalogd. In Impalad catalog cache there are no
+    // modification on the table object - we just replace the old object with new ones.
+    // So don't need this lock in Impalad.
+    if (!storedInImpaladCatalogCache_ && !isLockedByCurrentThread()) {
       throw new IllegalStateException(
           "Table.toThrift() called without holding the table lock: " +
               getFullName() + " " + getClass().getName());

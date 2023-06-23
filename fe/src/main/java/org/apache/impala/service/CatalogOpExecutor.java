@@ -549,7 +549,8 @@ public class CatalogOpExecutor {
           break;
         case COPY_TESTCASE:
           catalogOpMetric_.increment(ddl_type, Optional.empty());
-          copyTestCaseData(ddlRequest.getCopy_test_case_params(), response);
+          copyTestCaseData(ddlRequest.getCopy_test_case_params(), response,
+              wantMinimalResult);
           break;
         default:
           catalogOpMetric_.increment(ddl_type, Optional.empty());
@@ -585,7 +586,7 @@ public class CatalogOpExecutor {
    */
   @VisibleForTesting
   public String copyTestCaseData(
-      TCopyTestCaseReq request, TDdlExecResponse response)
+      TCopyTestCaseReq request, TDdlExecResponse response, boolean wantMinimalResult)
       throws ImpalaException {
     Path inputPath = new Path(Preconditions.checkNotNull(request.input_path));
     // Read the data from the source FS.
@@ -624,7 +625,7 @@ public class CatalogOpExecutor {
         Db ret = catalog_.addDb(db.getName(), db.getMetaStoreDb());
         if (ret != null) {
           ++numDbsAdded;
-          response.result.addToUpdated_catalog_objects(db.toTCatalogObject());
+          addDbToCatalogUpdate(db, wantMinimalResult, response.result);
         }
       }
     }
@@ -651,7 +652,7 @@ public class CatalogOpExecutor {
         // to IMPALA-4092.
         t.takeReadLock();
         try {
-          response.result.addToUpdated_catalog_objects(t.toTCatalogObject());
+          addTableToCatalogUpdate(t, wantMinimalResult, response.result);
         } finally {
           t.releaseReadLock();
         }

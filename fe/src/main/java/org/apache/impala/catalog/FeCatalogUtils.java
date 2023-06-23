@@ -39,13 +39,22 @@ import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.local.CatalogdMetaProvider;
 import org.apache.impala.catalog.local.LocalCatalog;
+import org.apache.impala.catalog.local.LocalFsTable;
+import org.apache.impala.catalog.local.LocalHbaseTable;
+import org.apache.impala.catalog.local.LocalIcebergTable;
+import org.apache.impala.catalog.local.LocalKuduTable;
+import org.apache.impala.catalog.local.LocalView;
 import org.apache.impala.catalog.local.MetaProvider;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TColumnDescriptor;
 import org.apache.impala.thrift.TGetCatalogMetricsResult;
 import org.apache.impala.thrift.THdfsPartition;
+import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableStats;
+import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.MetaStoreUtil;
 import org.slf4j.Logger;
@@ -390,6 +399,54 @@ public abstract class FeCatalogUtils {
       thriftHdfsPart.setTotal_file_size_bytes(totalFileBytes);
     }
     return thriftHdfsPart;
+  }
+
+  /**
+   * Returns the FULL thrift object for a FeTable. The result can be directly loaded into
+   * the catalog cache of catalogd. See CatalogOpExecutor#copyTestCaseData().
+   */
+  public static TTable feTableToThrift(FeTable table) throws ImpalaException {
+    if (table instanceof Table) return ((Table) table).toThrift();
+    // In local-catalog mode, coordinator caches the metadata in finer grained manner.
+    // Construct the thrift table using fine-grained APIs.
+    TTable res = new TTable(table.getDb().getName(), table.getName());
+    res.setTable_stats(table.getTTableStats());
+    res.setMetastore_table(table.getMetaStoreTable());
+    res.setClustering_columns(new ArrayList<>());
+    for (Column c : table.getClusteringColumns()) {
+      res.addToClustering_columns(c.toThrift());
+    }
+    res.setColumns(new ArrayList<>());
+    for (Column c : table.getNonClusteringColumns()) {
+      res.addToColumns(c.toThrift());
+    }
+    res.setVirtual_columns(new ArrayList<>());
+    for (VirtualColumn c : table.getVirtualColumns()) {
+      res.addToVirtual_columns(c.toThrift());
+    }
+    if (table instanceof LocalFsTable) {
+      res.setTable_type(TTableType.HDFS_TABLE);
+      res.setHdfs_table(((LocalFsTable) table).toTHdfsTable(
+          CatalogObject.ThriftObjectType.FULL));
+    } else if (table instanceof LocalKuduTable) {
+      res.setTable_type(TTableType.KUDU_TABLE);
+      res.setKudu_table(((LocalKuduTable) table).toTKuduTable());
+    } else if (table instanceof LocalHbaseTable) {
+      res.setTable_type(TTableType.HBASE_TABLE);
+      res.setHbase_table(FeHBaseTable.Util.getTHBaseTable((FeHBaseTable) table));
+    } else if (table instanceof LocalIcebergTable) {
+      res.setTable_type(TTableType.ICEBERG_TABLE);
+      LocalIcebergTable iceTable = (LocalIcebergTable) table;
+      res.setIceberg_table(FeIcebergTable.Utils.getTIcebergTable(iceTable));
+      res.setHdfs_table(iceTable.transfromToTHdfsTable(/*unused*/true));
+    } else if (table instanceof LocalView) {
+      res.setTable_type(TTableType.VIEW);
+      // Metadata of the view are stored in msTable. Nothing else need to add here.
+    } else {
+      throw new NotImplementedException("Unsupported type to export: " +
+          table.getClass());
+    }
+    return res;
   }
 
   /**
