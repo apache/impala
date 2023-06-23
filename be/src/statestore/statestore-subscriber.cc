@@ -268,6 +268,8 @@ void StatestoreSubscriber::Heartbeat(
   // It's possible the heartbeat is received for previous registration.
   if (statestore_->IsMatchingStatestoreId(statestore_id)) {
     statestore_->Heartbeat(registration_id);
+  } else {
+    VLOG(3) << "Ignore heartbeat message from unknown statestored: " << statestore_id;
   }
 }
 
@@ -277,6 +279,9 @@ void StatestoreSubscriber::UpdateCatalogd(
     const TUniqueId& statestore_id, int64 sequence) {
   if (statestore_->IsMatchingStatestoreId(statestore_id)) {
     statestore_->UpdateCatalogd(catalogd_registration, registration_id, sequence);
+  } else {
+    VLOG(3) << "Ignore updating catalogd message from unknown statestored: "
+            << statestore_id;
   }
 }
 
@@ -286,6 +291,8 @@ Status StatestoreSubscriber::UpdateState(const TopicDeltaMap& incoming_topic_del
   if (statestore_->IsMatchingStatestoreId(statestore_id)) {
     return statestore_->UpdateState(
         incoming_topic_deltas, registration_id, subscriber_topic_updates, skipped);
+  } else {
+    VLOG(3) << "Ignore topic update message from unknown statestored: " << statestore_id;
   }
   return Status::OK();
 }
@@ -483,7 +490,7 @@ Status StatestoreSubscriber::StatestoreStub::Start(bool* has_active_catalogd,
     } else {
       LOG(INFO) << "statestore registration unsuccessful on startup: "
                 << status.GetDetail();
-      if (FLAGS_tolerate_statestore_startup_delay) {
+      if (FLAGS_tolerate_statestore_startup_delay && !TestInfo::is_be_test()) {
         LOG(INFO) << "Tolerate the delay of the statestore's availability on startup";
         status = Status::OK();
       }
@@ -612,7 +619,11 @@ Status StatestoreSubscriber::StatestoreStub::CheckRegistrationIdAndUpdateCatalog
 bool StatestoreSubscriber::StatestoreStub::IsMatchingStatestoreId(
     const TUniqueId statestore_id) {
   lock_guard<mutex> r(id_lock_);
-  return statestore_id == statestore_id_;
+  // It's possible the topic update messages are received before receiving the
+  // registration response. In the case, statestore_id_ and is_registered_ are not set.
+  // TODO: need to revisit this when supporting statestored HA.
+  return statestore_id == statestore_id_ ||
+      (!is_registered_ && statestore_id_.hi == 0 && statestore_id_.lo == 0);
 }
 
 void StatestoreSubscriber::StatestoreStub::Heartbeat(
