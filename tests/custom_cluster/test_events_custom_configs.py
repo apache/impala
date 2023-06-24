@@ -297,6 +297,20 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     part_events_skipped_after = EventProcessorUtils.get_num_skipped_events()
     assert part_events_skipped_after > part_events_skipped_before
 
+    # Test to verify IMPALA-12213
+    table = self.hive_client.get_table(unique_database, test_reload_table)
+    table.dbName = unique_database
+    table.tableName = "test_sequence_table"
+    self.hive_client.create_table(table)
+    data = FireEventRequestData()
+    data.refreshEvent = True
+    req = FireEventRequest(True, data)
+    req.dbName = unique_database
+    req.tableName = "test_sequence_table"
+    self.hive_client.fire_listener_event(req)
+    EventProcessorUtils.wait_for_event_processing(self)
+    assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+
 
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=1")
   def test_commit_compaction_events(self, unique_database):

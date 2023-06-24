@@ -2603,7 +2603,7 @@ public class MetastoreEvents {
     }
 
     private boolean isOlderEvent() {
-      if (tbl_ instanceof IncompleteTable) {
+      if (tbl_ == null || tbl_ instanceof IncompleteTable) {
         return false;
       }
       // Always check the lastRefreshEventId on the table first for table level refresh
