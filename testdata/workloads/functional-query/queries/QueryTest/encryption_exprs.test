@@ -1,0 +1,456 @@
+====
+---- QUERY
+# AES encryption/decryption examples:
+select aes_decrypt(base64decode('y6Ss+zCYObpCbgfWfyNWTw=='),'1234567890123456','AES_128_ECB','');
+---- RESULTS
+'ABC'
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('BQGHoM3lqYcsurCRq3PlUw=='),'1234567890123456','AES_128_ECB','');
+---- RESULTS
+''
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('E1zl+pDv/GY4JLk254KAIQ=='),'12345678901234567890123456789012','AES_256_ECB','');
+---- RESULTS
+'ABC'
+---- TYPES
+STRING
+====
+---- QUERY
+select base64encode(aes_encrypt('ABC', '1234567890123456','AES_128_GCM','1234567890123456'));
+---- RESULTS
+'x+am+BIqtrEK9FpC/zrvpOycjQ=='
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('x+am+BIqtrEK9FpC/zrvpOycjQ=='),'1234567890123456','AES_128_GCM','1234567890123456');
+---- RESULTS
+'ABC'
+---- TYPES
+STRING
+====
+---- QUERY
+select base64encode(aes_encrypt('', '1234567890123456','AES_128_GCM','1234567890123456'));
+---- RESULTS
+'moMhTz224yot8uRtksO+pw=='
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('moMhTz224yot8uRtksO+pw=='),'1234567890123456','AES_128_GCM','1234567890123456');
+---- RESULTS
+''
+---- TYPES
+STRING
+====
+---- QUERY
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_GCM','1234567890123456'));
+---- RESULTS
+'F/DLkSwEikFOlqzXVCysy1JX7Q=='
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','AES_256_GCM','1234567890123456');
+---- RESULTS
+'ABC'
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_GCM','1234567890123456'),
+'12345678901234567890123456789012','AES_256_GCM','1234567890123456');
+---- RESULTS
+'ABC'
+---- TYPES
+STRING
+====
+---- QUERY
+select base64encode(aes_encrypt(aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),
+'12345678901234567890123456789012','AES_256_GCM','1234567890123456'),'12345678901234567890123456789012','AES_256_GCM',
+'1234567890123456'));
+---- RESULTS
+'F/DLkSwEikFOlqzXVCysy1JX7Q=='
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('ofMshL41XkG6NQ+v6bawAQ=='),'1234567890123456','AES_128_ECB','');
+---- RESULTS
+'Hello World!'
+---- TYPES
+STRING
+====
+---- QUERY
+select base64encode(aes_encrypt('The quick brown fox jumps over the lazy dog', '1234567890123456','AES_128_GCM',
+'1234567890123456'));
+---- RESULTS
+'0syAnPYY0qT/RNtD7s0UkV/4P7HSl8xI1ZCz9AINV3r5W0xLkUs/gAlXWD+i6TIx+WiWiuipZJMXLmM='
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('0syAnPYY0qT/RNtD7s0UkV/4P7HSl8xI1ZCz9AINV3r5W0xLkUs/gAlXWD+i6TIx+WiWiuipZJMXLmM='),
+'1234567890123456','AES_128_GCM','1234567890123456');
+---- RESULTS
+'The quick brown fox jumps over the lazy dog'
+---- TYPES
+STRING
+====
+---- QUERY
+select base64encode(aes_encrypt('Impala', '1234567890123456','AES_128_GCM','12345678901'));
+---- RESULTS
+'sBDdvFMLqNtJvuHUP8s7oWaH0NWXNQ=='
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('sBDdvFMLqNtJvuHUP8s7oWaH0NWXNQ=='),'1234567890123456','AES_128_GCM','12345678901');
+---- RESULTS
+'Impala'
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(aes_encrypt('Impala', '1234567890123456','AES_128_GCM','12345678901'),
+'1234567890123456','AES_128_GCM','12345678901');
+---- RESULTS
+'Impala'
+---- TYPES
+STRING
+====
+---- QUERY
+select base64encode(aes_encrypt('impalaaaaaaaaaaaaaaaaaaaa', '12345678901234567890123456789012','AES_256_CFB',
+'1234567890123456'));
+---- RESULTS
+'pkw4Y8WLkJnACfAL4R4BNUBzdnUeUo7vTw=='
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('pkw4Y8WLkJnACfAL4R4BNUBzdnUeUo7vTw=='),'12345678901234567890123456789012',
+'AES_256_CFB','1234567890123456');
+---- RESULTS
+'impalaaaaaaaaaaaaaaaaaaaa'
+---- TYPES
+STRING
+====
+---- QUERY
+select base64encode(aes_encrypt('', '12345678901234567890123456789012','AES_256_CFB','1234567890123456'));
+---- RESULTS
+''
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode(''),'12345678901234567890123456789012','AES_256_CFB','1234567890123456');
+---- RESULTS
+''
+---- TYPES
+STRING
+====
+---- QUERY
+select base64encode(aes_encrypt('impalaaaaaaaaaaaaaaaaaaaa', '12345678901234567890123456789012','AES_256_CTR',
+'1234567890123456'));
+---- RESULTS
+'pkw4Y8WLkJnACfAL4R4BNb0HYMEjpcA63A=='
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('pkw4Y8WLkJnACfAL4R4BNb0HYMEjpcA63A=='),'12345678901234567890123456789012',
+'AES_256_CTR','1234567890123456');
+---- RESULTS
+'impalaaaaaaaaaaaaaaaaaaaa'
+---- TYPES
+STRING
+====
+---- QUERY
+select base64encode(aes_encrypt('', '12345678901234567890123456789012','AES_256_CTR','1234567890123456'));
+---- RESULTS
+''
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode(''),'12345678901234567890123456789012','AES_256_CTR','1234567890123456');
+---- RESULTS
+''
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt((aes_encrypt('impalaaaaaaaaaaaaaaaaaaaa', '12345678901234567890123456789012','AES_256_CFB',
+'1234567890123456')),'12345678901234567890123456789012','AES_256_CFB','1234567890123456');
+---- RESULTS
+'impalaaaaaaaaaaaaaaaaaaaa'
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt((aes_encrypt('impalaaaaaaaaaaaaaaaaaaaa', '12345678901234567890123456789012','AES_256_CTR',
+'1234567890123456')),'12345678901234567890123456789012','AES_256_CTR','1234567890123456');
+---- RESULTS
+'impalaaaaaaaaaaaaaaaaaaaa'
+---- TYPES
+STRING
+====
+---- QUERY
+# Encryption/ decryption when mode is NULL, defaulting to GCM mode.
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012',NULL,'1234567890123456'));
+---- RESULTS
+'F/DLkSwEikFOlqzXVCysy1JX7Q=='
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_GCM','1234567890123456'),
+'12345678901234567890123456789012',NULL,'1234567890123456');
+---- RESULTS
+'ABC'
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012',NULL,'1234567890123456');
+---- RESULTS
+'ABC'
+---- TYPES
+STRING
+====
+---- QUERY
+# Encryption/ decryption with expr as NULL.
+select base64encode(aes_encrypt(NULL, '12345678901234567890123456789012','AES_256_GCM','1234567890123456'));
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(NULL,'12345678901234567890123456789012','AES_256_GCM','1234567890123456');
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+select base64encode(aes_encrypt(NULL, '12345678901234567890123456789012','AES_256_CTR','1234567890123456'));
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(NULL,'12345678901234567890123456789012','AES_256_CTR','1234567890123456');
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+select base64encode(aes_encrypt(NULL, '12345678901234567890123456789012','AES_256_CFB','1234567890123456'));
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(NULL,'12345678901234567890123456789012','AES_256_CFB','1234567890123456');
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+# Key cannot be NULL.
+select base64encode(aes_encrypt('ABC',NULL,'AES_256_CFB','1234567890123456'));
+---- RESULTS
+---- CATCH
+Key cannot be NULL.
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),NULL,'AES_256_CFB','1234567890123456');
+---- RESULTS
+---- CATCH
+UDF ERROR: Key cannot be NULL.
+====
+---- QUERY
+# Key cannot be NULL, with the default mode GCM.
+select base64encode(aes_encrypt('ABC',NULL,'AES_256_GCM','1234567890123456'));
+---- RESULTS
+---- CATCH
+Key cannot be NULL.
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),NULL,'AES_256_GCM','1234567890123456');
+---- RESULTS
+---- CATCH
+UDF ERROR: Key cannot be NULL.
+====
+---- QUERY
+# ECB not supported for AES encryption.
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_ECB','1234567890123456'));
+---- RESULTS
+---- CATCH
+ECB mode is not supported for encryption.
+====
+---- QUERY
+# iv cannot be NULL for GCM mode.
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_GCM',NULL));
+---- RESULTS
+---- CATCH
+IV vector required for AES_256_GCM mode
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','AES_256_GCM',NULL);
+---- RESULTS
+---- CATCH
+UDF ERROR: IV vector required for AES_256_GCM mode
+====
+---- QUERY
+# iv cannot be NULL for CFB mode.
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_CFB',NULL));
+---- RESULTS
+---- CATCH
+IV vector required for AES_256_CFB mode
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','AES_256_CFB',NULL);
+---- RESULTS
+---- CATCH
+UDF ERROR: IV vector required for AES_256_CFB mode
+====
+---- QUERY
+# iv cannot be NULL for CTR mode.
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_CTR',NULL));
+---- RESULTS
+---- CATCH
+IV vector required for AES_256_CTR mode
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','AES_256_CTR',NULL);
+---- RESULTS
+---- CATCH
+UDF ERROR: IV vector required for AES_256_CTR mode
+====
+---- QUERY
+# Error resulting due to user entered incorrect mode.
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_CTB','1234567890123456'));
+---- RESULTS
+---- CATCH
+Invalid AES 'mode': AES_256_CTB
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','AES_256_CTB',
+'1234567890123456');
+---- RESULTS
+---- CATCH
+UDF ERROR: Invalid AES 'mode': AES_256_CTB
+====
+---- QUERY
+# Error with incorrect key length.
+select base64encode(aes_encrypt('ABC', '123456789012345678901234567890121','AES_256_GCM','1234567890123456'));
+---- RESULTS
+---- CATCH
+AES only supports 128 and 256 bit key lengths
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'123456789012345678901234567890121','AES_256_GCM',
+'1234567890123456');
+---- RESULTS
+---- CATCH
+UDF ERROR: AES only supports 128 and 256 bit key lengths
+====
+---- QUERY
+# Error with incorrect iv length.
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_GCM','12345678901234567'));
+---- RESULTS
+---- CATCH
+IV vector size is greater than 16 bytes
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','AES_256_GCM',
+'12345678901234567');
+---- RESULTS
+---- CATCH
+UDF ERROR: IV vector size is greater than 16 bytes
+====
+---- QUERY
+# Prefixes of supported modes are not accepted
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','','1234567890123456'));
+---- RESULTS
+---- CATCH
+Invalid AES 'mode':
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','',
+'1234567890123456');
+---- RESULTS
+---- CATCH
+UDF ERROR: Invalid AES 'mode':
+====
+---- QUERY
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256','1234567890123456'));
+---- RESULTS
+---- CATCH
+Invalid AES 'mode': AES_256
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','AES_256',
+'1234567890123456');
+---- RESULTS
+---- CATCH
+UDF ERROR: Invalid AES 'mode': AES_256
+====
+---- QUERY
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_GC','1234567890123456'));
+---- RESULTS
+---- CATCH
+Invalid AES 'mode': AES_256_GC
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','AES_256_GC',
+'1234567890123456');
+---- RESULTS
+---- CATCH
+UDF ERROR: Invalid AES 'mode': AES_256_GC
+====
+---- QUERY
+# Modes are case-insensitive.
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','aes_256_gcm','1234567890123456'));
+---- RESULTS
+'F/DLkSwEikFOlqzXVCysy1JX7Q=='
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','aes_256_gcm',
+'1234567890123456');
+---- RESULTS
+'ABC'
+---- TYPES
+STRING
+====
+---- QUERY
+select count(*) from functional.alltypes where string_col = aes_decrypt(aes_encrypt(string_col, '1234567890123456',
+'AES_128_GCM', '1234567890123456'), '1234567890123456', 'AES_128_GCM', '1234567890123456');
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from functional_parquet.alltypes where CAST(timestamp_col AS STRING) =
+aes_decrypt(aes_encrypt(CAST(timestamp_col AS STRING), '1234567890123456', 'AES_128_GCM', '1234567890123456'),
+'1234567890123456', 'AES_128_GCM', '1234567890123456');
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====

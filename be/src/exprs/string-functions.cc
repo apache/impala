@@ -20,13 +20,19 @@
 
 #include "exprs/string-functions.h"
 
+#include <openssl/bio.h>
+#include <openssl/evp.h>
+
+#include "gutil/strings/stringpiece.h"
 #include <gutil/strings/util.h>
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/error/en.h>
 #include <rapidjson/writer.h>
+#include <string>
 
 #include "exprs/anyval-util.h"
+#include "util/openssl-util.h"
 #include "util/string-util.h"
 #include "util/string-parser.h"
 
@@ -400,5 +406,182 @@ StringVal StringFunctions::GetJsonObjectImpl(FunctionContext* ctx,
   }
 
   return ToStringVal(ctx, queue, &allocator);
+}
+
+// Initializes the EncryptionKey for AES Encryption/ Decryption by validating arguments.
+Status InitializeEncryptionKey(FunctionContext* ctx, const StringVal& expr,
+    const StringVal& key, const StringVal& mode, const StringVal& iv, bool is_encrypt,
+    EncryptionKey* encryption_key) {
+  if (key.is_null) {
+    return Status(Substitute("Key cannot be NULL."));
+  }
+  if (key.len != 16 && key.len != 32) {
+    return Status(Substitute("AES only supports 128 and 256 bit key lengths."));
+  }
+  AES_CIPHER_MODE cipher_mode;
+
+  // If user passed a "NULL" field in mode, default AES encryption mode is chosen.
+  if (mode.is_null) {
+    cipher_mode = EncryptionKey::GetSupportedDefaultMode();
+    bool* state = reinterpret_cast<bool*>(
+        ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
+    if (state == nullptr || *state == false) {
+      VLOG_QUERY <<  "No AES mode was specified by user. Using " <<
+          EncryptionKey::ModeToString(cipher_mode) << " mode as default.";
+      if (state != nullptr) {
+        *state = true;
+      }
+    }
+  } else {
+       cipher_mode = EncryptionKey::StringToMode
+           (std::string_view(reinterpret_cast<const char*>(mode.ptr), mode.len));
+  }
+
+  if (cipher_mode == AES_CIPHER_MODE::INVALID) {
+    return Status(Substitute("Invalid AES 'mode': $0", StringPiece
+        (reinterpret_cast<const char*>(mode.ptr), mode.len)).c_str());
+  }
+
+  bool is_ecb = (cipher_mode == AES_CIPHER_MODE::AES_256_ECB
+      || cipher_mode == AES_CIPHER_MODE::AES_128_ECB);
+
+  // Check if iv is null in case of non ECB modes.
+  if (!is_ecb && iv.is_null) {
+    return Status(Substitute("IV vector required for $0 mode",
+        EncryptionKey::ModeToString(cipher_mode)).c_str());
+  }
+
+  // Check if IV vector size is valid (<= AES_BLOCK_SIZE) in case of non ECB modes.
+  if (!is_ecb && iv.len > AES_BLOCK_SIZE) {
+    return Status(Substitute("IV vector size is greater than 16 bytes."));
+  }
+
+  // ECB mode is not supported for Encryption.
+  if (is_encrypt && is_ecb) {
+    return Status(Substitute("ECB mode is not supported for encryption."));
+  }
+
+  // Initialize key and IV.
+  Status status = encryption_key->InitializeFields(key.ptr, key.len,
+      iv.ptr, iv.len, cipher_mode);
+
+  return status;
+}
+
+// An entrypoint to perform AES decryption on a given expression string.
+// GCM mode expects expression, key, AES mode and iv vector.
+// CTR and CFB modes expect expression, key, AES mode and iv vector.
+// ECB mode expects expression, key, AES mode.
+// If the mode passed by the user is supported by Impala (a valid member of
+// AES_CIPHER_MODE except for INVALID) but not supported by the OpenSSL
+// library used internally, then the default mode of the library is chosen.
+//
+// This is different from the case where the user enters a mode that Impala does not
+// support (e.g., a nonexistent or invalid mode). In such cases, the mode is
+// considered invalid, and an error is returned.
+//
+// Description of the modes supported:
+// AES-GCM (Advanced Encryption Standard Galois/Counter Mode) is a mode of operation
+// for symmetric key cryptographic block ciphers. It combines the AES block cipher
+// with the Galois/Counter Mode (GCM) operation for authenticated encryption.
+// AES-GCM provides both confidentiality and integrity, making it suitable for secure
+// communication and storage. Due to its security features and efficiency,
+// AES-GCM is chosen as the default choice for the current implementation.
+//
+// AES-ECB (Electronic Codebook) mode is a basic mode of operation for the AES
+// block cipher. In ECB mode, each block of plaintext is encrypted independently with
+// the same key, resulting in identical plaintext blocks producing identical ciphertext
+// blocks. It is included for bringing compatibility with legacy systems.
+// NOTE: This mode is only supported for decryption.
+//
+// CTR Mode:
+// AES-CTR (Counter) mode is a mode of operation for block ciphers that turns a block
+// cipher into a stream cipher. It works by encrypting a counter value to produce a
+// stream of key material, which is then XORed with the plaintext to produce the
+// ciphertext. CTR mode offers parallel encryption and decryption.
+//
+// CFB Mode:
+// AES-CFB (Cipher Feedback) mode is another mode of operation for block ciphers, where
+// ciphertext feedback is used to create a stream of key material. It operates on a
+// block-by-block basis, where the previous ciphertext block is encrypted and then XORed
+// with the plaintext to produce the next ciphertext block.
+StringVal StringFunctions::AesDecryptImpl(FunctionContext* ctx, const StringVal& expr,
+    const StringVal& key, const StringVal& mode, const StringVal& iv) {
+  if (expr.is_null) {
+    return StringVal::null();
+  }
+  EncryptionKey encryption_key;
+  Status status = InitializeEncryptionKey(ctx, expr, key, mode, iv, false,
+      &encryption_key);
+  if (!status.ok()) {
+    ctx->SetError(status.msg().msg().data());
+    return StringVal::null();
+  }
+  int64_t len = expr.len;
+
+  // Remove spaces and set value of gcm_tag in case of GCM mode
+  if (encryption_key.IsGcmMode()) {
+    len -= AES_BLOCK_SIZE;
+    encryption_key.SetGcmTag(expr.ptr + len);
+  }
+
+  StringVal result = StringVal(ctx, len);
+
+  // Decrypt the input
+  int64_t out_len = 0;
+  status = encryption_key.Decrypt(expr.ptr, len, result.ptr, &out_len);
+  if (!status.ok()) {
+    ctx->SetError("AES decryption failed");
+    return StringVal::null();
+  }
+  const int64_t len_diff = result.len - out_len;
+  DCHECK(len_diff == 0 || (encryption_key.IsEcbMode() && 0 < len_diff &&
+      len_diff <= AES_BLOCK_SIZE));
+  result.len = out_len;
+  return result;
+}
+
+// An entrypoint to perform AES encryption on a given expression string. In contrast
+// to AesDecryptImpl(), it does not support ECB modes. For other details, see the
+// comment at AesDecryptImpl().
+StringVal StringFunctions::AesEncryptImpl(FunctionContext* ctx, const StringVal& expr,
+    const StringVal& key, const StringVal& mode, const StringVal& iv) {
+  if (expr.is_null) {
+    return StringVal::null();
+  }
+  EncryptionKey encryption_key;
+  Status status = InitializeEncryptionKey(ctx, expr, key, mode, iv, true,
+      &encryption_key);
+  if (!status.ok()) {
+    ctx->SetError(status.msg().msg().data());
+    return StringVal::null();
+  }
+
+  // Calculate expected output length
+  int expected_out_len = expr.len;
+
+  // Append space for gcm_tag in case of GCM mode
+  if (encryption_key.IsGcmMode()) {
+    expected_out_len += AES_BLOCK_SIZE;
+  }
+
+  // Allocate buffer for output
+  StringVal result = StringVal(ctx, expected_out_len);
+  // Encrypt the input
+  int64_t out_len = 0;
+  status = encryption_key.Encrypt(expr.ptr, expr.len, result.ptr,
+      &out_len);
+  if (!status.ok()) {
+    ctx->SetError("AES encryption failed.");
+    return StringVal::null();
+  }
+  // Append gcm_tag to encrypted buffer
+  if (encryption_key.IsGcmMode()) {
+    encryption_key.GetGcmTag(result.ptr + out_len);
+    out_len += AES_BLOCK_SIZE;
+  }
+  // Ensure expected output length matches actual output length
+  DCHECK_EQ(expected_out_len, out_len);
+  return result;
 }
 }

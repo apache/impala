@@ -57,7 +57,8 @@ class OpenSSLUtilTest : public ::testing::Test {
 
   void TestEncryptionDecryption(const int64_t buffer_size) {
     vector<uint8_t> original(buffer_size);
-    vector<uint8_t> scratch(buffer_size); // Scratch buffer for in-place encryption.
+    // Scratch buffer for in-place encryption.
+    vector<uint8_t> scratch(buffer_size + AES_BLOCK_SIZE);
     if (buffer_size % 8 == 0) {
       GenerateRandomData(original.data(), buffer_size);
     } else {
@@ -65,18 +66,32 @@ class OpenSSLUtilTest : public ::testing::Test {
     }
 
     // Check all the modes
-    AES_CIPHER_MODE modes[] = {AES_256_GCM, AES_256_CTR, AES_256_CFB};
+    AES_CIPHER_MODE modes[] = {
+        AES_CIPHER_MODE::AES_256_GCM,
+        AES_CIPHER_MODE::AES_256_CTR,
+        AES_CIPHER_MODE::AES_256_CFB,
+        AES_CIPHER_MODE::AES_256_ECB,
+        AES_CIPHER_MODE::AES_128_GCM,
+        AES_CIPHER_MODE::AES_128_ECB,
+    };
     for (auto m : modes) {
       memcpy(scratch.data(), original.data(), buffer_size);
 
       EncryptionKey key;
-      key.InitializeRandom();
-      key.SetCipherMode(m);
+      ASSERT_OK(key.InitializeRandom(AES_BLOCK_SIZE, m));
 
-      ASSERT_OK(key.Encrypt(scratch.data(), buffer_size, scratch.data()));
+      int64_t encrypted_length;
+      if (key.IsEcbMode() && buffer_size > numeric_limits<int>::max() - AES_BLOCK_SIZE) {
+          ASSERT_ERROR_MSG(key.Encrypt(scratch.data(),buffer_size, scratch.data()),
+              "Input buffer length exceeds the supported length for ECB mode.");
+          continue;
+      }
+      ASSERT_OK(key.Encrypt(scratch.data(), buffer_size, scratch.data(),
+          &encrypted_length));
+
       // Check that encryption did something
       ASSERT_NE(0, memcmp(original.data(), scratch.data(), buffer_size));
-      ASSERT_OK(key.Decrypt(scratch.data(), buffer_size, scratch.data()));
+      ASSERT_OK(key.Decrypt(scratch.data(), encrypted_length, scratch.data()));
       // Check that we get the original data back.
       ASSERT_EQ(0, memcmp(original.data(), scratch.data(), buffer_size));
     }
@@ -94,14 +109,19 @@ TEST_F(OpenSSLUtilTest, Encryption) {
   vector<uint8_t> decrypted(buffer_size);
   GenerateRandomData(original.data(), buffer_size);
 
-  // Check both CTR & CFB
-  AES_CIPHER_MODE modes[] = {AES_256_GCM, AES_256_CTR, AES_256_CFB};
+  // Check GCM, CTR and CFB
+  AES_CIPHER_MODE modes[] = {
+      AES_CIPHER_MODE::AES_256_GCM,
+      AES_CIPHER_MODE::AES_256_CTR,
+      AES_CIPHER_MODE::AES_256_CFB,
+      AES_CIPHER_MODE::AES_128_GCM
+  };
   for (auto m : modes) {
     // Iterate multiple times to ensure that key regeneration works correctly.
     EncryptionKey key;
     for (int i = 0; i < 2; ++i) {
-      key.InitializeRandom(); // Generate a new key for each iteration.
-      key.SetCipherMode(m);
+      // Generate a new key for each iteration.
+      ASSERT_OK(key.InitializeRandom(AES_BLOCK_SIZE, m));
 
       // Check that OpenSSL is happy with the amount of entropy we're feeding it.
       DCHECK_EQ(1, RAND_status());
@@ -118,6 +138,18 @@ TEST_F(OpenSSLUtilTest, Encryption) {
       ASSERT_EQ(0, memcmp(original.data(), decrypted.data(), buffer_size));
     }
   }
+}
+
+/// Test to check whether key and mode are validated in InitializeFields().
+TEST_F(OpenSSLUtilTest, ValidateInitialize) {
+  EncryptionKey key;
+  uint8_t IV[AES_BLOCK_SIZE] = {};
+  uint8_t key16bits[16] = {};
+  Status status_initialize_fields = key.InitializeFields
+      (key16bits,16, IV, AES_BLOCK_SIZE, AES_CIPHER_MODE::AES_256_GCM);
+  ASSERT_FALSE(status_initialize_fields.ok());
+  ASSERT_OK(key.InitializeFields(key16bits,
+      16, IV, AES_BLOCK_SIZE, AES_CIPHER_MODE::AES_128_GCM));
 }
 
 /// Test that encryption and decryption work in-place.
@@ -145,8 +177,7 @@ TEST_F(OpenSSLUtilTest, GcmIntegrity) {
   vector<uint8_t> buffer(buffer_size);
 
   EncryptionKey key;
-  key.InitializeRandom();
-  key.SetCipherMode(AES_256_GCM);
+  ASSERT_OK(key.InitializeRandom(AES_BLOCK_SIZE, AES_CIPHER_MODE::AES_256_GCM));
 
   // Even it has been set as GCM mode, it may fall back to other modes.
   // Check if GCM mode is supported at runtime.
@@ -205,7 +236,7 @@ TEST_F(OpenSSLUtilTest, RandSeeding) {
     DCHECK_EQ(1, RAND_status());
 
     EncryptionKey key;
-    key.InitializeRandom();
+    ASSERT_OK(key.InitializeRandom(AES_BLOCK_SIZE, key.GetSupportedDefaultMode()));
   }
 }
 }

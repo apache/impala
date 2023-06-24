@@ -17,8 +17,12 @@
 
 #include "util/openssl-util.h"
 
+#include <boost/algorithm/string.hpp>
+#include <string_view>
+
 #include <limits.h>
 #include <sstream>
+#include <iostream>
 
 #include <glog/logging.h>
 #include <openssl/err.h>
@@ -56,6 +60,9 @@ const EVP_CIPHER* EVP_aes_256_ctr();
 
 ATTRIBUTE_WEAK
 const EVP_CIPHER* EVP_aes_256_gcm();
+
+ATTRIBUTE_WEAK
+const EVP_CIPHER* EVP_aes_128_gcm();
 }
 
 namespace impala {
@@ -75,7 +82,7 @@ int MaxSupportedTlsVersion() {
   return SSLv23_method()->version;
 #else
   // OpenSSL 1.1+ doesn't let us detect the supported TLS version at runtime. Assume
-  // that the OpenSSL library we're linked against supports only up to TLS1.2
+  // that the OpenSSL library we're linked against supports only up to TLS1.2.
   return TLS1_2_VERSION;
 #endif
 }
@@ -187,7 +194,47 @@ bool AuthenticationHash::Verify(
   return memcmp(signature, out, HashLen()) == 0;
 }
 
-void EncryptionKey::InitializeRandom() {
+int GetKeyLenForMode(AES_CIPHER_MODE m) {
+  switch (m) {
+    case AES_CIPHER_MODE::AES_128_ECB:
+    case AES_CIPHER_MODE::AES_128_GCM:
+      return 16;
+    case AES_CIPHER_MODE::AES_256_ECB:
+    case AES_CIPHER_MODE::AES_256_GCM:
+    case AES_CIPHER_MODE::AES_256_CTR:
+    case AES_CIPHER_MODE::AES_256_CFB:
+      return 32;
+    default:
+      return -1;
+  }
+}
+
+Status ValidateModeAndKeyLength(AES_CIPHER_MODE m, int key_len) {
+  if (m == AES_CIPHER_MODE::INVALID) {
+    return Status("Invalid AES mode specified.");
+  }
+
+  int expected_key_len = GetKeyLenForMode(m);
+  DCHECK_GT(expected_key_len, 0);
+  if (key_len != expected_key_len) {
+    return Status("Mismatch between mode and key length.");
+  }
+
+  return Status::OK();
+}
+
+Status EncryptionKey::InitializeRandom(int iv_len, AES_CIPHER_MODE m) {
+  mode_ = m;
+  if (!IsModeSupported(m)) {
+    mode_ = GetSupportedDefaultMode();
+    LOG(WARNING) << Substitute("$0 is not supported, fall back to $1.",
+        ModeToString(m), ModeToString(mode_));
+  }
+
+  if (m == AES_CIPHER_MODE::INVALID) {
+    return Status("Invalid AES mode specified.");
+  }
+
   uint64_t next_key_num = keys_generated.Add(1);
   if (next_key_num % RNG_RESEED_INTERVAL == 0) {
     SeedOpenSSLRNG();
@@ -196,63 +243,92 @@ void EncryptionKey::InitializeRandom() {
   RAND_bytes(iv_, sizeof(iv_));
   memset(gcm_tag_, 0, sizeof(gcm_tag_));
   initialized_ = true;
+  key_length_ = GetKeyLenForMode(mode_);
+  iv_length_ = iv_len;
+  return Status::OK();
 }
 
-Status EncryptionKey::Encrypt(const uint8_t* data, int64_t len, uint8_t* out) {
-  return EncryptInternal(true, data, len, out);
+Status EncryptionKey::Encrypt(const uint8_t* data, int64_t len, uint8_t* out,
+    int64_t* out_len) {
+  return EncryptInternal(true, data, len, out, out_len);
 }
 
-Status EncryptionKey::Decrypt(const uint8_t* data, int64_t len, uint8_t* out) {
-  return EncryptInternal(false, data, len, out);
+Status EncryptionKey::Decrypt(const uint8_t* data, int64_t len, uint8_t* out,
+    int64_t* out_len) {
+  return EncryptInternal(false, data, len, out, out_len);
 }
 
 Status EncryptionKey::EncryptInternal(
-    bool encrypt, const uint8_t* data, int64_t len, uint8_t* out) {
+    bool encrypt, const uint8_t* data, int64_t len, uint8_t* out, int64_t* out_len) {
   DCHECK(initialized_);
   DCHECK_GE(len, 0);
-  const char* err_context = encrypt ? "encrypting" : "decrypting";
-  // Create and initialize the context for encryption
-  ScopedEVPCipherCtx ctx(0);
+  if (IsEcbMode()) {
+    if ((encrypt && len > numeric_limits<int>::max() - AES_BLOCK_SIZE)
+        || (!encrypt && len > numeric_limits<int>::max())) {
+      return Status("Input buffer length exceeds the supported length for ECB mode.");
+    }
+  }
 
-  // Start encryption/decryption.  We use a 256-bit AES key, and the cipher block mode
-  // is either CTR or CFB(stream cipher), both of which support arbitrary length
-  // ciphertexts - it doesn't have to be a multiple of 16 bytes. Additionally, CTR
-  // mode is well-optimized(instruction level parallelism) with hardware acceleration
-  // on x86 and PowerPC
+  const char* err_context = encrypt ? "encrypting" : "decrypting";
+  // Create and initialize the context for encryption.
+  // If it is ECB mode then padding will be enabled
+  // for this ctx, otherwise it will be disabled.
+  bool padding_enabled = IsEcbMode();
+  int padding_flag = padding_enabled ? 1 : 0;
+  ScopedEVPCipherCtx ctx(padding_flag);
+
+  // Start encryption/decryption. We use a 128/256-bit AES key and support GCM, CTR
+  // CFB and ECB for encryption and decryption. When the cipher block mode is either
+  // GCM, CTR or CFB(stream cipher), it supports arbitrary length ciphertexts - it
+  // doesn't have to be a multiple of 16 bytes. While for ECB decryption,
+  // the length has to be multiples of 16. Additionally, CTR mode is
+  // well-optimized (instruction level parallelism) with hardware acceleration
+  // on x86 and PowerPC.
+
+  // In the first initialization, only evpCipher is initialized, and in the second
+  // initialization, the key and IV vector are set. This approach is necessary because a
+  // variable-length IV vector is used. Therefore, in GCM mode, the IV length must be
+  // initialized before setting the IV vector.
   const EVP_CIPHER* evpCipher = GetCipher();
-  int success = encrypt ? EVP_EncryptInit_ex(ctx.ctx, evpCipher, NULL, NULL, NULL) :
-                          EVP_DecryptInit_ex(ctx.ctx, evpCipher, NULL, NULL, NULL);
+  DCHECK(evpCipher != nullptr);
+  int success = encrypt ?
+      EVP_EncryptInit_ex(ctx.ctx, evpCipher, nullptr, nullptr, nullptr):
+      EVP_DecryptInit_ex(ctx.ctx, evpCipher, nullptr, nullptr, nullptr);
   if (success != 1) {
     return OpenSSLErr(encrypt ? "EVP_EncryptInit_ex" : "EVP_DecryptInit_ex", err_context);
   }
+
   if (IsGcmMode()) {
-    if (EVP_CIPHER_CTX_ctrl(ctx.ctx, EVP_CTRL_GCM_SET_IVLEN, AES_BLOCK_SIZE, NULL)
-        != 1) {
+    // Set iv_vector for GCM mode.
+    if (EVP_CIPHER_CTX_ctrl(ctx.ctx, EVP_CTRL_GCM_SET_IVLEN, iv_length_, nullptr)!= 1) {
       return OpenSSLErr("EVP_CIPHER_CTX_ctrl", err_context);
     }
   }
   // setting iv after changing iv len, see https://github.com/openssl/openssl/pull/22590
-  success = encrypt ? EVP_EncryptInit_ex(ctx.ctx, NULL, NULL, key_, iv_) :
-                      EVP_DecryptInit_ex(ctx.ctx, NULL, NULL, key_, iv_);
+  success = encrypt ? EVP_EncryptInit_ex(ctx.ctx, nullptr, nullptr, key_, iv_):
+                      EVP_DecryptInit_ex(ctx.ctx, nullptr, nullptr, key_, iv_);
   if (success != 1) {
     return OpenSSLErr(encrypt ? "EVP_EncryptInit_ex" : "EVP_DecryptInit_ex", err_context);
   }
 
-  // The OpenSSL encryption APIs use ints for buffer lengths for some reason. To support
-  // larger buffers we need to chunk larger buffers into smaller parts.
-  int64_t offset = 0;
-  while (offset < len) {
-    int in_len = static_cast<int>(min<int64_t>(len - offset, numeric_limits<int>::max()));
-    int out_len;
+  // The OpenSSL encryption APIs use INT for buffer lengths. To support larger buffers,
+  // larger buffers need to be chunked into smaller parts.
+  int64_t output_offset = 0;
+  int64_t input_offset = 0;
+  while (input_offset < len) {
+    int in_len = static_cast<int>(min<int64_t>(len - input_offset,
+        numeric_limits<int>::max()));
+    int output_len;
+    uint8_t* out_addr = out + output_offset;
+    const uint8_t* in_addr = data + input_offset;
     success = encrypt ?
-        EVP_EncryptUpdate(ctx.ctx, out + offset, &out_len, data + offset, in_len) :
-        EVP_DecryptUpdate(ctx.ctx, out + offset, &out_len, data + offset, in_len);
+        EVP_EncryptUpdate(ctx.ctx, out_addr, &output_len, in_addr, in_len) :
+        EVP_DecryptUpdate(ctx.ctx, out_addr, &output_len, in_addr, in_len);
     if (success != 1) {
       return OpenSSLErr(encrypt ? "EVP_EncryptUpdate" : "EVP_DecryptUpdate", err_context);
     }
-    // This is safe because we're using CTR/CFB mode without padding.
-    DCHECK_EQ(in_len, out_len);
-    offset += in_len;
+    output_offset += output_len;
+    input_offset += in_len;
   }
 
   if (IsGcmMode() && !encrypt) {
@@ -265,11 +341,14 @@ Status EncryptionKey::EncryptInternal(
 
   // Finalize encryption or decryption.
   int final_out_len;
-  success = encrypt ? EVP_EncryptFinal_ex(ctx.ctx, out + offset, &final_out_len) :
-                      EVP_DecryptFinal_ex(ctx.ctx, out + offset, &final_out_len);
+  success = encrypt ? EVP_EncryptFinal_ex(ctx.ctx, out + output_offset, &final_out_len) :
+                      EVP_DecryptFinal_ex(ctx.ctx, out + output_offset, &final_out_len);
+
   if (success != 1) {
     return OpenSSLErr(encrypt ? "EVP_EncryptFinal" : "EVP_DecryptFinal", err_context);
   }
+
+  if (out_len != nullptr) *out_len = output_offset + final_out_len;
 
   if (IsGcmMode() && encrypt) {
     if (EVP_CIPHER_CTX_ctrl(ctx.ctx, EVP_CTRL_GCM_GET_TAG, AES_BLOCK_SIZE, gcm_tag_)
@@ -277,33 +356,55 @@ Status EncryptionKey::EncryptInternal(
       return OpenSSLErr("EVP_CIPHER_CTX_ctrl", err_context);
     }
   }
-  // Again safe due to GCM/CTR/CFB with no padding
-  DCHECK_EQ(final_out_len, 0);
+
   DCHECK_EQ(ERR_peek_error(), 0) << "Did not clear OpenSSL error queue";
   return Status::OK();
 }
 
 const EVP_CIPHER* EncryptionKey::GetCipher() const {
   // use weak symbol to avoid compiling error on OpenSSL 1.0.0 environment
-  if (mode_ == AES_256_CTR) return EVP_aes_256_ctr();
-  if (mode_ == AES_256_GCM) return EVP_aes_256_gcm();
-
-  return EVP_aes_256_cfb();
+  switch (mode_) {
+    case AES_CIPHER_MODE::AES_256_CTR: return EVP_aes_256_ctr();
+    case AES_CIPHER_MODE::AES_256_GCM: return EVP_aes_256_gcm();
+    case AES_CIPHER_MODE::AES_256_CFB: return EVP_aes_256_cfb();
+    case AES_CIPHER_MODE::AES_256_ECB: return EVP_aes_256_ecb();
+    case AES_CIPHER_MODE::AES_128_GCM: return EVP_aes_128_gcm();
+    case AES_CIPHER_MODE::AES_128_ECB: return EVP_aes_128_ecb();
+    default: return nullptr;
+  }
 }
 
-void EncryptionKey::SetCipherMode(AES_CIPHER_MODE m) {
+Status EncryptionKey::InitializeFields(const uint8_t* key, int key_len, const uint8_t* iv,
+    int iv_len, AES_CIPHER_MODE m) {
   mode_ = m;
-
   if (!IsModeSupported(m)) {
     mode_ = GetSupportedDefaultMode();
     LOG(WARNING) << Substitute("$0 is not supported, fall back to $1.",
         ModeToString(m), ModeToString(mode_));
   }
+  Status status = ValidateModeAndKeyLength(m, key_len);
+  RETURN_IF_ERROR(status);
+
+  key_length_ = key_len;
+  iv_length_ = iv_len;
+  memcpy(key_, key, key_length_);
+  if (iv_length_ != 0) {
+    memcpy(iv_, iv, iv_length_);
+  }
+  initialized_ = true;
+  return Status::OK();
+}
+
+void EncryptionKey::SetGcmTag(const uint8_t* tag)  {
+  memcpy(gcm_tag_, tag, AES_BLOCK_SIZE);
+}
+
+void EncryptionKey::GetGcmTag(uint8_t* out) const {
+  memcpy(out, gcm_tag_, AES_BLOCK_SIZE);
 }
 
 bool EncryptionKey::IsModeSupported(AES_CIPHER_MODE m) {
   switch (m) {
-    case AES_256_GCM:
       // It becomes a bit tricky for GCM mode, because GCM mode is enabled since
       // OpenSSL 1.0.1, but the tag validation only works since 1.0.1d. We have
       // to make sure that OpenSSL version >= 1.0.1d for GCM. So we need
@@ -313,34 +414,67 @@ bool EncryptionKey::IsModeSupported(AES_CIPHER_MODE m) {
       // will try to fall back to CTR mode, so it is not ideal but is OK to use
       // SSLeay() for GCM mode here since in the worst case, we will be using
       // AES_256_CTR in a system that supports AES_256_GCM.
+    case AES_CIPHER_MODE::AES_256_GCM:
       return (CpuInfo::IsSupported(CpuInfo::PCLMULQDQ)
           && SSLeay() >= OPENSSL_VERSION_1_0_1D && EVP_aes_256_gcm);
 
-    case AES_256_CTR:
+    case AES_CIPHER_MODE::AES_128_GCM:
+      return (CpuInfo::IsSupported(CpuInfo::PCLMULQDQ)
+          && SSLeay() >= OPENSSL_VERSION_1_0_1D && EVP_aes_128_gcm);
+
+    case AES_CIPHER_MODE::AES_256_CTR:
       // If TLS1.2 is supported, then we're on a verison of OpenSSL that
       // supports AES-256-CTR.
       return (MaxSupportedTlsVersion() >= TLS1_2_VERSION && EVP_aes_256_ctr);
 
-    case AES_256_CFB:
+    case AES_CIPHER_MODE::AES_256_CFB:
+    case AES_CIPHER_MODE::AES_256_ECB:
+    case AES_CIPHER_MODE::AES_128_ECB:
       return true;
-
+    case AES_CIPHER_MODE::INVALID:
+      return false;
     default:
       return false;
   }
 }
 
 AES_CIPHER_MODE EncryptionKey::GetSupportedDefaultMode() {
-  if (IsModeSupported(AES_256_GCM)) return AES_256_GCM;
-  if (IsModeSupported(AES_256_CTR)) return AES_256_CTR;
-  return AES_256_CFB;
+  if (IsModeSupported(AES_CIPHER_MODE::AES_256_GCM)) {
+    return AES_CIPHER_MODE::AES_256_GCM;
+  }
+  if (IsModeSupported(AES_CIPHER_MODE::AES_256_CTR)) {
+    return AES_CIPHER_MODE::AES_256_CTR;
+  }
+  return AES_CIPHER_MODE::AES_256_CFB;
 }
 
 const string EncryptionKey::ModeToString(AES_CIPHER_MODE m) {
   switch(m) {
-    case AES_256_GCM: return "AES-GCM";
-    case AES_256_CTR: return "AES-CTR";
-    case AES_256_CFB: return "AES-CFB";
+    case AES_CIPHER_MODE::AES_256_GCM: return std::string(AES_256_GCM_STR);
+    case AES_CIPHER_MODE::AES_256_CTR: return std::string(AES_256_CTR_STR);
+    case AES_CIPHER_MODE::AES_256_CFB: return std::string(AES_256_CFB_STR);
+    case AES_CIPHER_MODE::AES_256_ECB: return std::string(AES_256_ECB_STR);
+    case AES_CIPHER_MODE::AES_128_GCM: return std::string(AES_128_GCM_STR);
+    case AES_CIPHER_MODE::AES_128_ECB: return std::string(AES_128_ECB_STR);
+    case AES_CIPHER_MODE::INVALID: return "INVALID";
   }
-  return "Unknown mode";
+  return "INVALID";
+}
+
+AES_CIPHER_MODE EncryptionKey::StringToMode(std:: string_view str) {
+  if (boost::iequals(str, AES_256_GCM_STR)) {
+    return AES_CIPHER_MODE::AES_256_GCM;
+  } else if (boost::iequals(str, AES_256_CTR_STR)) {
+    return AES_CIPHER_MODE::AES_256_CTR;
+  } else if (boost::iequals(str, AES_256_CFB_STR)) {
+    return AES_CIPHER_MODE::AES_256_CFB;
+  } else if (boost::iequals(str, AES_256_ECB_STR)) {
+    return AES_CIPHER_MODE::AES_256_ECB;
+  } else if (boost::iequals(str, AES_128_GCM_STR)) {
+    return AES_CIPHER_MODE::AES_128_GCM;
+  } else if (boost::iequals(str, AES_128_ECB_STR)) {
+    return AES_CIPHER_MODE::AES_128_ECB;
+  }
+  return AES_CIPHER_MODE::INVALID;
 }
 }

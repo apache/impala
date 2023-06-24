@@ -17,12 +17,13 @@
 
 #pragma once
 
+#include <string_view>
+
 #include <openssl/aes.h>
 #include <openssl/crypto.h>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
 #include <openssl/ssl.h>
-
 #include "common/status.h"
 
 namespace impala {
@@ -69,11 +70,26 @@ inline bool IsFIPSMode() {
 #endif
 };
 
-enum AES_CIPHER_MODE {
+// Enum of all the AES modes that are currently supported. INVALID is used whenever
+// user inputs a wrong AES Mode, for example, AES_128_CTF etc.
+enum class AES_CIPHER_MODE {
   AES_256_CFB,
   AES_256_CTR,
-  AES_256_GCM
+  AES_256_GCM,
+  AES_256_ECB,
+  AES_128_GCM,
+  AES_128_ECB,
+  INVALID
 };
+
+// AES cipher mode strings as constexpr static std::string_view used in StringToMode()
+// and ModeToString() functions for string comparisons.
+static constexpr std::string_view AES_256_GCM_STR = "AES_256_GCM";
+static constexpr std::string_view AES_256_CTR_STR = "AES_256_CTR";
+static constexpr std::string_view AES_256_CFB_STR = "AES_256_CFB";
+static constexpr std::string_view AES_256_ECB_STR = "AES_256_ECB";
+static constexpr std::string_view AES_128_GCM_STR = "AES_128_GCM";
+static constexpr std::string_view AES_128_ECB_STR = "AES_128_ECB";
 
 /// The hash of a data buffer used for checking integrity. A SHA256 hash is used
 /// internally.
@@ -117,14 +133,14 @@ class AuthenticationHash {
 /// The key and initialization vector (IV) required to encrypt and decrypt a buffer of
 /// data. This should be regenerated for each buffer of data.
 ///
-/// We use AES with a 256-bit key and GCM/CTR/CFB cipher block mode, which gives us a
-/// stream cipher that can support arbitrary-length ciphertexts. The mode is chosen
-/// depends on the OpenSSL version & the hardware support at runtime. The IV is used as
-/// an input to the cipher as the "block to supply before the first block of plaintext".
-/// This is required because all ciphers (except the weak ECB) are built such that each
-/// block depends on the output from the previous block. Since the first block doesn't
-/// have a previous block, we supply this IV. Think of it  as starting off the chain of
-/// encryption.
+/// AES is employed with a 256-bit/128-bit key, and the cipher block mode is chosen
+/// from GCM, CTR, CFB, or ECB based on the OpenSSL version and hardware support
+/// at runtime. This configuration yields a cipher capable of handling
+/// arbitrary-length ciphertexts (except ECB). The IV serves as input to the cipher,
+/// acting as the "block to supply before the first block of plaintext." This is necessary
+/// because all ciphers (except ECB) are designed such that each block depends on
+/// the output from the preceding block. Since the first block lacks a previous
+/// block, the IV is supplied to initiate the encryption chain.
 ///
 /// Notes for GCM:
 /// (1) GCM mode was supported since OpenSSL 1.0.1, however the tag verification
@@ -137,54 +153,84 @@ class AuthenticationHash {
 
 class EncryptionKey {
  public:
-  EncryptionKey() : initialized_(false) { mode_ = GetSupportedDefaultMode(); }
+  EncryptionKey() : initialized_(false) { mode_ = AES_CIPHER_MODE::INVALID; }
 
   /// Initializes a key for temporary use with randomly generated data, and clears the
   /// tag for GCM mode. Reinitializes with new random values if the key was already
   /// initialized. We use AES-GCM/AES-CTR/AES-CFB mode so key/IV pairs should not be
   /// reused. This function automatically reseeds the RNG periodically, so callers do
   /// not need to do it.
-  void InitializeRandom();
+  Status InitializeRandom(int iv_len, AES_CIPHER_MODE mode);
 
   /// Encrypts a buffer of input data 'data' of length 'len' into an output buffer 'out'.
-  /// Exactly 'len' bytes will be written to 'out'. This key must be initialized before
-  /// calling. Operates in-place if 'in' == 'out', otherwise the buffers must not overlap.
-  /// For GCM mode, the hash tag will be kept inside(gcm_tag_ variable).
-  Status Encrypt(const uint8_t* data, int64_t len, uint8_t* out) WARN_UNUSED_RESULT;
+  /// The 'out' buffer must contain sufficient length to hold the extra padding block in
+  /// case of ECB mode. In other modes, the 'out' buffer should at least be as big as the
+  /// length of the 'data' buffer. This key must be initialized before calling this
+  /// function. If 'in' == 'out', the operation is performed in-place; otherwise, the
+  /// buffers must not overlap. In GCM mode, the hash tag is kept internally (in the
+  /// 'gcm_tag_' variable). 'out_len' (if not NULL) will be set to the output length.
+  Status Encrypt(const uint8_t* data, int64_t len, uint8_t* out,
+      int64_t* out_len = nullptr) WARN_UNUSED_RESULT;
 
-  /// Decrypts a buffer of input data 'data' of length 'len' that was encrypted with this
-  /// key into an output buffer 'out'. Exactly 'len' bytes will be written to 'out'.
-  /// This key must be initialized before calling. Operates in-place if 'in' == 'out',
-  /// otherwise the buffers must not overlap. For GCM mode, the hash tag, which is
-  /// computed during encryption, will be used for intgerity verification.
-  Status Decrypt(const uint8_t* data, int64_t len, uint8_t* out) WARN_UNUSED_RESULT;
+  /// Decrypts a buffer of input data 'data' of length 'len', encrypted with this key,
+  /// into an output buffer 'out'.'out' buffer should be at least as big as the
+  /// length of the 'data' buffer.
+  /// Prior to calling this function, the key must be initialized. If 'in' == 'out', the
+  /// operation is performed in-place; otherwise, the buffers must not overlap. In GCM
+  /// mode, the hash tag computed during encryption is used for integrity verification.
+  /// 'out_len' (if not NULL) will be set to the output length.
+  Status Decrypt(const uint8_t* data, int64_t len, uint8_t* out,
+      int64_t* out_len = nullptr) WARN_UNUSED_RESULT;
 
-  /// Specify a cipher mode. Currently used only for testing but maybe in future we
-  /// can provide a configuration option for the end user who can choose a preferred
-  /// mode(GCM, CTR, CFB...) based on their software/hardware environment.
-  /// If not supported, fall back to the supported mode at runtime.
-  void SetCipherMode(AES_CIPHER_MODE m);
+  /// If it is GCM mode at runtime
+  bool IsGcmMode() const {
+      return mode_ == AES_CIPHER_MODE::AES_256_GCM
+          || mode_ == AES_CIPHER_MODE::AES_128_GCM;
+  }
 
-  /// If is GCM mode at runtime
-  bool IsGcmMode() const { return mode_ == AES_256_GCM; }
+  /// If it is ECB mode at runtime.
+  bool IsEcbMode() const {
+      return mode_ == AES_CIPHER_MODE::AES_256_ECB
+          || mode_ == AES_CIPHER_MODE::AES_128_ECB;
+  }
 
-  /// Returns the a default mode which is supported at runtime. If GCM mode
+  /// It initializes 'key_' and 'iv_'.
+  /// Specifies a cipher mode. It gives an option to configure this mode for end users,
+  /// allowing them to choose a preferred mode (e.g., GCM, CTR, CFB) based on their
+  /// software/hardware environment. If the specified mode is not supported, the
+  /// implementation falls back to a supported mode at runtime.
+  Status InitializeFields(const uint8_t* key, int key_len, const uint8_t* iv, int iv_len,
+      AES_CIPHER_MODE mode);
+
+  /// Getter function for 'gcm_tag_' which is required for encryption using GCM mode.
+  void GetGcmTag(uint8_t* out) const;
+  /// Setter function for setting 'gcm_tag_' which is required for decryption using GCM
+  /// mode.
+  void SetGcmTag(const uint8_t* tag);
+
+  /// Returns the default mode which is supported at runtime. If GCM mode
   /// is supported, return AES_256_GCM as the default. If GCM is not supported,
   /// but CTR is still supported, return AES_256_CTR. When both GCM and
   /// CTR modes are not supported, return AES_256_CFB.
+  /// ECB mode is not used unless requested by the user specifically.
   static AES_CIPHER_MODE GetSupportedDefaultMode();
 
   /// Converts mode type to string.
   static const std::string ModeToString(AES_CIPHER_MODE m);
+  static AES_CIPHER_MODE StringToMode(std::string_view str);
 
  private:
   /// Helper method that encrypts/decrypts if 'encrypt' is true/false respectively.
   /// A buffer of input data 'data' of length 'len' is encrypted/decrypted with this
-  /// key into an output buffer 'out'. Exactly 'len' bytes will be written to 'out'.
+  /// key into an output buffer 'out'.
+  /// The 'out' buffer must contain sufficient length to hold the extra padding block in
+  /// case of ECB mode. In other modes, 'out' buffer should be at least as big as the
+  /// length of the 'data' buffer.
   /// This key must be initialized before calling. Operates in-place if 'in' == 'out',
   /// otherwise the buffers must not overlap.
+  /// 'out_len' (if not NULL) will be set to the output length.
   Status EncryptInternal(bool encrypt, const uint8_t* data, int64_t len,
-      uint8_t* out) WARN_UNUSED_RESULT;
+      uint8_t* out, int64_t* out_len) WARN_UNUSED_RESULT;
 
   /// Check if mode m is supported at runtime
   static bool IsModeSupported(AES_CIPHER_MODE m);
@@ -198,9 +244,11 @@ class EncryptionKey {
 
   /// An AES 256-bit key.
   uint8_t key_[32];
+  int key_length_;
 
   /// An initialization vector to feed as the first block to AES.
   uint8_t iv_[AES_BLOCK_SIZE];
+  int iv_length_;
 
   /// Tag for GCM mode
   uint8_t gcm_tag_[AES_BLOCK_SIZE];

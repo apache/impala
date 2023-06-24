@@ -135,6 +135,20 @@ class StringFunctions {
   /// Cleans up the work done by TrimPrepare above.
   static void TrimClose(FunctionContext*, FunctionContext::FunctionStateScope);
 
+  /// AES encryption functions in Impala, using openSSL libraries.
+  static void AesPrepare(FunctionContext* context,
+      FunctionContext::FunctionStateScope scope);
+  static StringVal AesDecrypt(FunctionContext* ctx, const StringVal& expr,
+      const StringVal& key, const StringVal& mode, const StringVal& iv);
+  static StringVal AesEncrypt(FunctionContext* ctx, const StringVal& expr,
+      const StringVal& key, const StringVal& mode, const StringVal& iv);
+  static StringVal AesDecryptImpl(FunctionContext* ctx, const StringVal& expr,
+      const StringVal& key, const StringVal& mode, const StringVal& iv);
+  static StringVal AesEncryptImpl(FunctionContext* ctx, const StringVal& expr,
+      const StringVal& key, const StringVal& mode, const StringVal& iv);
+  static void AesClose(FunctionContext* context,
+      FunctionContext::FunctionStateScope scope);
+
   /// Trims occurrences of the characters in 'chars_to_trim' string from
   /// the beginning of string 'str'.
   static StringVal LTrimString(FunctionContext* ctx, const StringVal& str,

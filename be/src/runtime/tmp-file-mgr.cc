@@ -2083,7 +2083,7 @@ Status TmpWriteHandle::EncryptAndHash(
       counters == nullptr ? nullptr : counters->encryption_time);
   // Since we're using GCM/CTR/CFB mode, we must take care not to reuse a
   // key/IV pair. Regenerate a new key and IV for every data buffer we write.
-  key_.InitializeRandom();
+  RETURN_IF_ERROR(key_.InitializeRandom(AES_BLOCK_SIZE, key_.GetSupportedDefaultMode()));
   RETURN_IF_ERROR(key_.Encrypt(buffer.data(), buffer.len(), buffer.data()));
 
   if (!key_.IsGcmMode()) {

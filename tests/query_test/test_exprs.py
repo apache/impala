@@ -72,6 +72,12 @@ class TestExprs(ImpalaTestSuite):
         vector.get_value('enable_expr_rewrites')
     self.run_test_case('QueryTest/special-strings', vector)
 
+  def test_encryption_exprs(self, vector):
+    """Test handling encryption/ decryption functionality"""
+    vector.get_value('exec_option')['enable_expr_rewrites'] = \
+      vector.get_value('enable_expr_rewrites')
+    self.run_test_case('QueryTest/encryption_exprs', vector)
+
 # Tests very deep expression trees and expressions with many children. Impala defines
 # a 'safe' upper bound on the expr depth and the number of expr children in the
 # FE Expr.java and any changes to those limits should be reflected in this test.
