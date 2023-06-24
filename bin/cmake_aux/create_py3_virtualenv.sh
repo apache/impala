@@ -42,12 +42,14 @@ if $IS_PY36_OR_HIGHER ; then
     # Success
     exit 0
   fi
-fi
-
-if $IS_PY36_OR_HIGHER ; then
+  # Failure
   echo "WARNING: Tried to create virtualenv with Python3's venv module and failed."
   echo "Falling back to old impala-virtualenv path..."
+  # Remove the directory that Python3 venv created, so impala-virtualenv can start
+  # from a clean slate.
+  rm -rf ${VENV_DIR}
 fi
+
 # Fall back to using the old impala-virtualenv method
 impala-virtualenv --python ${IMPALA_SYSTEM_PYTHON3} ${VENV_DIR}
 
