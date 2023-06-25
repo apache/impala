@@ -491,3 +491,47 @@ class TestInsertHdfsWriterLimit(ImpalaTestSuite):
     assert num_instances_per_host == expected_num_instances_per_host, \
       result.runtime_profile
     self.client.clear_configuration()
+
+
+class TestInsertNonPartitionedTable(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestInsertNonPartitionedTable, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+          v.get_value('table_format').file_format == 'text'
+          and v.get_value('table_format').compression_codec == 'none')
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+
+  @classmethod
+  def setup_class(cls):
+    super(TestInsertNonPartitionedTable, cls).setup_class()
+
+  def test_insert_load_file_fail(self, vector, unique_database):
+    """Tests metadata won't be corrupted after file metadata loading fails
+    in non-partitioned tables."""
+    table_name = '{0}.{1}'.format(unique_database, 'test_unpartition_tbl')
+    self.client.execute('create table {0}(f0 int)'
+        .format(table_name))
+    self.client.execute('insert overwrite table {0} select 0'
+        .format(table_name))
+    result = self.client.execute("select f0 from {0}".format(table_name))
+    assert result.data == ["0"]
+
+    exec_options = vector.get_value('exec_option')
+    exec_options['debug_action'] = 'catalogd_load_file_metadata_throw_exception'
+    try:
+      self.execute_query("insert overwrite table {0} select 1"
+          .format(table_name), exec_options)
+      assert False, "Expected query to fail."
+    except Exception as e:
+      assert "Failed to load metadata for table:" in str(e)
+
+    exec_options['debug_action'] = ''
+    self.execute_query("insert overwrite table {0} select 2"
+        .format(table_name), exec_options)
+    result = self.client.execute("select f0 from {0}".format(table_name))
+    assert result.data == ["2"]

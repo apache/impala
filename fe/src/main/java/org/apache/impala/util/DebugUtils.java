@@ -54,6 +54,10 @@ public class DebugUtils {
   // CatalogOpExecutor#updateCatalog() finishes.
   public static final String INSERT_FINISH_DELAY = "catalogd_insert_finish_delay";
 
+  // debug action label for throwing an exception during loadFileMetadataForPartitions.
+  public static final String LOAD_FILE_METADATA_THROW_EXCEPTION =
+      "catalogd_load_file_metadata_throw_exception";
+
   // debug action label to abort the transaction in updateCatalog.
   public static final String UPDATE_CATALOG_ABORT_INSERT_TXN =
       "catalogd_update_catalog_abort_txn";

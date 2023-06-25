@@ -774,6 +774,12 @@ public class HdfsTable extends Table implements FeFsTable {
     final Clock clock = Clock.defaultClock();
     long startTime = clock.getTick();
 
+    if (DebugUtils.hasDebugAction(debugActions,
+        DebugUtils.LOAD_FILE_METADATA_THROW_EXCEPTION)) {
+      throw new CatalogException("Threw a catalog exception due to the debug action " +
+          "during loading file metadata.");
+    }
+
     //TODO: maybe it'd be better to load the valid txn list in the context of a
     // transaction to have consistent valid write ids and valid transaction ids.
     // Currently tables are loaded when they are first referenced and stay in catalog
@@ -1372,11 +1378,10 @@ public class HdfsTable extends Table implements FeFsTable {
     if (LOG.isTraceEnabled()) {
       LOG.trace("update unpartitioned table: " + getFullName());
     }
+    // Step 1: fetch external metadata
     HdfsPartition oldPartition = Iterables.getOnlyElement(partitionMap_.values());
-    resetPartitions();
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
     Preconditions.checkNotNull(msTbl);
-    setPrototypePartition(msTbl.getSd());
     HdfsPartition.Builder partBuilder = createPartitionBuilder(msTbl.getSd(),
         /*msPartition=*/null, new FsPermissionCache());
     // Copy over the FDs from the old partition to the new one, so that
@@ -1389,6 +1394,9 @@ public class HdfsTable extends Table implements FeFsTable {
     partBuilder.setPrevId(oldPartition.getId());
     long fileMdLoadTime = loadFileMetadataForPartitions(client,
         ImmutableList.of(partBuilder), /*isRefresh=*/true, debugAction);
+    // Step 2: update internal fields
+    resetPartitions();
+    setPrototypePartition(msTbl.getSd());
     setUnpartitionedTableStats(partBuilder);
     addPartition(partBuilder.build());
     return fileMdLoadTime;

@@ -1500,7 +1500,7 @@ public class CatalogOpExecutor {
       boolean reloadFileMetadata, boolean reloadTableSchema,
       Set<String> partitionsToUpdate, String reason) throws CatalogException {
     loadTableMetadata(tbl, newCatalogVersion, reloadFileMetadata, reloadTableSchema,
-        partitionsToUpdate, null, reason);
+        partitionsToUpdate, null, reason, null);
   }
 
   /**
@@ -1511,7 +1511,7 @@ public class CatalogOpExecutor {
   private void loadTableMetadata(Table tbl, long newCatalogVersion,
       boolean reloadFileMetadata, boolean reloadTableSchema,
       Set<String> partitionsToUpdate, @Nullable Map<String, Long> partitionToEventId,
-      String reason)
+      String reason, @Nullable String debugAction)
       throws CatalogException {
     Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
@@ -1519,8 +1519,8 @@ public class CatalogOpExecutor {
           getMetaStoreTable(msClient, tbl);
       if (tbl instanceof HdfsTable) {
         ((HdfsTable) tbl).load(true, msClient.getHiveClient(), msTbl,
-            reloadFileMetadata, reloadTableSchema, false, partitionsToUpdate, null,
-            partitionToEventId, reason);
+            reloadFileMetadata, reloadTableSchema, false, partitionsToUpdate,
+            debugAction, partitionToEventId, reason);
       } else {
         tbl.load(true, msClient.getHiveClient(), msTbl, reason);
       }
@@ -6856,7 +6856,7 @@ public class CatalogOpExecutor {
       }
 
       loadTableMetadata(table, newCatalogVersion, true, false, partsToLoadMetadata,
-          partitionToEventId, "INSERT");
+          partitionToEventId, "INSERT", update.getDebug_action());
       addTableToCatalogUpdate(table, update.header.want_minimal_response,
           response.result);
     } finally {
