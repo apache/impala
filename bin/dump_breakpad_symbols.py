@@ -56,8 +56,8 @@
 from __future__ import absolute_import, division, print_function
 import errno
 import logging
-import glob
 import magic
+import multiprocessing
 import os
 import shutil
 import subprocess
@@ -66,6 +66,7 @@ import tempfile
 
 from argparse import ArgumentParser
 from collections import namedtuple
+from multiprocessing.pool import ThreadPool
 
 BinarySymbolInfo = namedtuple('BinarySymbolInfo', 'path, debug_path')
 
@@ -137,6 +138,8 @@ def parse_args():
   parser.add_argument('-s', '--symbol_pkg', '--debuginfo_rpm', help="""RPM/DEB file
       containing the debug symbols matching the binaries in -r""")
   parser.add_argument('--objcopy', help='Path to the objcopy binary from Binutils')
+  parser.add_argument('--num_processes', type=int, default=multiprocessing.cpu_count(),
+      help="Number of parallel processes to use.")
   args = parser.parse_args()
 
   # Post processing checks
@@ -341,9 +344,20 @@ def main():
   assert objcopy
   status = 0
   ensure_dir_exists(args.dest_dir)
-  for binary in enumerate_binaries(args):
-    if not process_binary(dump_syms, objcopy, binary, args.dest_dir):
+  # Use a thread pool to go parallel
+  thread_pool = ThreadPool(processes=args.num_processes)
+
+  def processing_fn(binary):
+    return process_binary(dump_syms, objcopy, binary, args.dest_dir)
+
+  for result in thread_pool.imap_unordered(processing_fn, enumerate_binaries(args)):
+    if not result:
+      thread_pool.terminate()
       status = 1
+      break
+
+  thread_pool.close()
+  thread_pool.join()
   sys.exit(status)
 
 
