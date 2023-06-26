@@ -42,7 +42,8 @@ TEST(CGroupInfo, Basic) {
 // Test error handling when cgroup is not present.
 TEST(CGroupInfo, ErrorHandling) {
   string mp, sp;
-  bool isV2;
+  // Initialize isV2 so we choose the else branch if an error is returned.
+  bool isV2 = false;
   Status err = CGroupUtil::FindCGroupMounts("fake-cgroup", &mp, &sp, &isV2);
   if (isV2) {
     // Ignores subsystem, so should always succeed.

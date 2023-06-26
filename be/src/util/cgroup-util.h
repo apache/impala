@@ -48,9 +48,9 @@ class CGroupUtil {
   /// the full path relative to the system-wide cgroups outside of the container.
   /// E.g. /sys/fs/cgroup/memory/kubepods/burstable/pod-<long unique id> may be mounted at
   /// /sys/fs/cgroup/memory inside the container. In that case this function would return
-  /// ("/sys/fs/cgroup/memory", "/kubepods/burstable/pod-<long unique id>").
-  /// CGroup v2 uses a unified hierarchy, so the result will be the same for any
-  /// value of 'subsystem'. Returns whether the mount is for cgroup v1 or v2.
+  /// ("/sys/fs/cgroup/memory", "/kubepods/burstable/pod-<long unique id>"). CGroup v2
+  /// uses a unified hierarchy, so the result will be the same for any value of
+  /// 'subsystem'. If Status is Ok, returns whether the mount is for cgroup v1 or v2.
   static Status FindCGroupMounts(const std::string& subsystem,
       std::string* mount_path, std::string* system_path, bool* is_v2);
 };
