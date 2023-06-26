@@ -882,6 +882,26 @@ class TestWebPage(ImpalaTestSuite):
         "href='http://.*:%s/'" % self.IMPALAD_TEST_PORT[0], self.IMPALAD_TEST_PORT,
         regex=True, headers={'X-Forwarded-Context': '/gateway'})
 
+  def test_catalog_operations_endpoint(self):
+    """Test to check that the /operations endpoint returns 200 OK."""
+    page = requests.get("http://localhost:25020/operations")
+    assert page.status_code == requests.codes.ok
+    page = requests.head("http://localhost:25020/operations")
+    assert page.status_code == requests.codes.ok
+
+  def test_query_progress(self):
+    """Tests that /queries page shows query progress."""
+    query = "select count(*) from functional_parquet.alltypes where bool_col = sleep(100)"
+    response_json = self.__run_query_and_get_debug_page(
+      query, self.QUERIES_URL, expected_state=self.client.QUERY_STATES["RUNNING"])
+    for json_part in response_json['in_flight_queries']:
+      if query in json_part['stmt']:
+        assert json_part["query_progress"] == "0 / 4 ( 0%)"
+
+
+class TestWebPageAndCloseSession(ImpalaTestSuite):
+  ROOT_URL = "http://localhost:{0}/"
+
   @SkipIfDockerizedCluster.daemon_logs_not_exposed
   def test_display_src_socket_in_query_cause(self):
     # Execute a long running query then cancel it from the WebUI.
@@ -908,19 +928,3 @@ class TestWebPage(ImpalaTestSuite):
     requests.get(close_session_url)
     self.assert_impalad_log_contains("INFO", "Session closed from Impala\'s debug "
       "web interface by user: 'anonymous' at", expected_count=-1)
-
-  def test_catalog_operations_endpoint(self):
-    """Test to check that the /operations endpoint returns 200 OK."""
-    page = requests.get("http://localhost:25020/operations")
-    assert page.status_code == requests.codes.ok
-    page = requests.head("http://localhost:25020/operations")
-    assert page.status_code == requests.codes.ok
-
-  def test_query_progress(self):
-    """Tests that /queries page shows query progress."""
-    query = "select count(*) from functional_parquet.alltypes where bool_col = sleep(100)"
-    response_json = self.__run_query_and_get_debug_page(
-      query, self.QUERIES_URL, expected_state=self.client.QUERY_STATES["RUNNING"])
-    for json_part in response_json['in_flight_queries']:
-      if query in json_part['stmt']:
-        assert json_part["query_progress"] == "0 / 4 ( 0%)"
