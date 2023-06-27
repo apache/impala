@@ -314,6 +314,24 @@
   </property>
 
   <property>
+    <name>ranger.jpa.jdbc.idletimeout</name>
+    <value>300000</value>
+    <description/>
+  </property>
+
+  <property>
+    <name>ranger.jpa.jdbc.maxlifetime</name>
+    <value>1800000</value>
+    <description/>
+  </property>
+
+  <property>
+    <name>ranger.jpa.jdbc.connectiontimeout</name>
+    <value>30000</value>
+    <description/>
+  </property>
+
+  <property>
     <name>ranger.jpa.jdbc.maxstatements</name>
     <value>500</value>
     <description/>
