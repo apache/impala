@@ -199,6 +199,11 @@ public abstract class ModifyStmt extends StatementBase {
     modifyImpl_ = null;
   }
 
+  @Override
+  public boolean resolveTableMask(Analyzer analyzer) throws AnalysisException {
+    return sourceStmt_.resolveTableMask(analyzer);
+  }
+
   /**
    * Builds and validates the sourceStmt_. The select list of the sourceStmt_ contains
    * first the SlotRefs for the key Columns, followed by the expressions representing the

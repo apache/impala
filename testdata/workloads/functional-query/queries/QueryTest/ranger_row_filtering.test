@@ -377,6 +377,25 @@ select * from $UNIQUE_DB.masked_tbl;
 INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT,INT
 ====
 ---- QUERY
+# Test UPDATE stmt
+create table $UNIQUE_DB.masked_kudu_tbl(id int primary key, string_col string) stored as kudu;
+insert into $UNIQUE_DB.masked_kudu_tbl select id, string_col from functional.alltypestiny;
+insert into $UNIQUE_DB.masked_kudu_tbl values (1, NULL), (3, NULL), (5, NULL);
+update k set k.string_col=a.string_col
+from $UNIQUE_DB.masked_kudu_tbl k JOIN functional.alltypestiny a ON (k.id=a.id);
+select * from $UNIQUE_DB.masked_kudu_tbl;
+---- RESULTS
+0,'0'
+1,'NULL'
+2,'0'
+3,'NULL'
+4,'0'
+5,'NULL'
+6,'0'
+---- TYPES
+INT, STRING
+====
+---- QUERY
 # Test on SELECT used in INSERT statement
 create table $UNIQUE_DB.masked_tbl2 like functional.alltypestiny stored as textfile;
 insert into $UNIQUE_DB.masked_tbl2 partition(year, month) select * from functional.alltypestiny;
