@@ -234,8 +234,25 @@ inline bool BatchedBitReader::GetBytes(int num_bytes, T* v) {
   DCHECK_LE(num_bytes, sizeof(T));
   if (UNLIKELY(buffer_pos_ + num_bytes > buffer_end_)) return false;
   *v = 0; // Ensure unset bytes are initialized to zero.
-  memcpy(v, buffer_pos_, num_bytes);
-  buffer_pos_ += num_bytes;
+
+  // It is possible that we want to "read" when we're at the end of the buffer if for
+  // example we're unpacking values of bitwidth 0, but 'num_bytes' must then be 0. In this
+  // case 'buffer_pos_' == 'buffer_end_'.
+  //
+  // It is not completely clear whether a one-past-the-end pointer (like 'buffer_end_') is
+  // valid when used as an argument to memcpy(), see
+  // https://en.cppreference.com/w/cpp/string/byte/memcpy and
+  // https://stackoverflow.com/questions/29844298/is-it-legal-to-call-memcpy-with-zero-length-on-a-pointer-just-past-the-end-of-an.
+  // Placing the memcpy() call in a conditional block seems to work around the problem
+  // described in IMPALA-12239. It is probably not the solution to the root cause,
+  // however; see the Jira ticket for more details.
+  if (LIKELY(buffer_pos_ != buffer_end_)) {
+    memcpy(v, buffer_pos_, num_bytes);
+    buffer_pos_ += num_bytes;
+  } else {
+    DCHECK_EQ(num_bytes, 0);
+  }
+
   return true;
 }
 
