@@ -429,7 +429,9 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
   return_val.serverProtocolVersion = state->hs2_version;
   VLOG_QUERY << "Opened session: " << PrintId(session_id)
-             << " effective username: " << GetEffectiveUser(*state);
+             << ", effective username: " << GetEffectiveUser(*state)
+             << ", client address: "
+             << "<" << TNetworkAddressToString(state->network_address) << ">.";
 }
 
 void ImpalaServer::CloseSession(TCloseSessionResp& return_val,

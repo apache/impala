@@ -1720,7 +1720,9 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
   }
   // Reconfigure the poll period of session_maintenance_thread_ if necessary.
   UnregisterSessionTimeout(session_state->session_timeout);
-  VLOG_QUERY << "Closed session: " << PrintId(session_id);
+  VLOG_QUERY << "Closed session: " << PrintId(session_id)
+             << ", client address: "
+             << "<" << TNetworkAddressToString(session_state->network_address) << ">.";
   return Status::OK();
 }
 
