@@ -36,8 +36,8 @@ fi
 OS_ID=$(source /etc/os-release && echo $ID)
 OS_VERSION=$(source /etc/os-release && echo $VERSION_ID)
 if [[ "$OS_ID" == Ubuntu ]]; then
-  if ! [[ $OS_VERSION == 16.04 || $OS_VERSION == 18.04 ]]; then
-    echo "This script only supports Ubuntu 16.04 and 18.04" >&2
+  if ! [[ $OS_VERSION == 16.04 || $OS_VERSION == 18.04 || $OS_VERSION == 20.04 ]]; then
+    echo "This script only supports Ubuntu 16.04, 18.04, and 20.04" >&2
     exit 1
   fi
 fi
@@ -71,5 +71,10 @@ sudo -u distccd -H bash <<"EOF"
  ./infra/python/deps/download_requirements
  DOWNLOAD_CDH_COMPONENTS=false ./bin/bootstrap_toolchain.py
 EOF
+
+# To resolve CVE-2004-2687, newer distcc versions only allow programs to be executed
+# if they have a symlink under '/usr/lib/distcc'.
+# https://github.com/distcc/distcc/commit/dfb45b528746bf89c030fccac307ebcf7c988512
+sudo ln -s $(which ccache) /usr/lib/distcc/ccache
 
 (cd impala && ./bin/distcc/distcc_server_setup.sh "$@")
