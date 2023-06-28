@@ -91,6 +91,8 @@ import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TUpdateTableUsageRequest;
 import org.apache.impala.thrift.TGetAllHadoopConfigsResponse;
+import org.apache.impala.thrift.TWaitForHmsEventRequest;
+import org.apache.impala.thrift.TWaitForHmsEventResponse;
 import org.apache.impala.util.AuthorizationUtil;
 import org.apache.impala.util.CatalogOpUtil;
 import org.apache.impala.util.EventSequence;
@@ -98,6 +100,7 @@ import org.apache.impala.util.GlogAppender;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.NoOpEventSequence;
 import org.apache.impala.util.PatternMatcher;
+import org.apache.impala.util.TUniqueIdUtil;
 import org.apache.impala.util.ThreadNameAnnotator;
 import org.apache.impala.util.TUniqueIdUtil;
 import org.apache.thrift.TBase;
@@ -105,6 +108,7 @@ import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TSimpleJSONProtocol;
+import org.apache.thrift.transport.TTransportException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -636,5 +640,14 @@ public class JniCatalog {
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }
+  }
+
+  public byte[] waitForHmsEvent(byte[] req) throws TException, ImpalaException {
+    TWaitForHmsEventRequest request = new TWaitForHmsEventRequest();
+    JniUtil.deserializeThrift(protocolFactory_, request, req);
+    String queryId = TUniqueIdUtil.PrintId(request.getHeader().getQuery_id());
+    String shortDesc = "waitForHmsEvent " + queryId;
+    return execAndSerialize(
+        "waitForHmsEvent", shortDesc, () -> catalog_.waitForHmsEvent(request));
   }
 }

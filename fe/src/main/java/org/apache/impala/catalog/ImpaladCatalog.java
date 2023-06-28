@@ -392,7 +392,8 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
    *  catalog version is < the catalog version of this drop operation.
    */
   private void removeCatalogObject(TCatalogObject catalogObject) {
-    Preconditions.checkState(catalogObject.getCatalog_version() != 0);
+    Preconditions.checkState(catalogObject.getCatalog_version() != 0,
+        "Dropped catalog version is 0. type: %s", catalogObject.getType());
     long dropCatalogVersion = catalogObject.getCatalog_version();
     switch(catalogObject.getType()) {
       case DATABASE:

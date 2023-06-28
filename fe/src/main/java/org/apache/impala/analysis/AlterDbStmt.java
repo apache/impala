@@ -43,4 +43,7 @@ public abstract class AlterDbStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     analyzer.getDb(dbName_, Privilege.ALTER);
   }
+
+  @Override
+  public String getParsedDb() { return dbName_; }
 }

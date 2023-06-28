@@ -316,4 +316,6 @@ struct TBackendGflags {
   142: required bool enable_reading_puffin_stats
 
   143: required string injected_group_members_debug_only
+
+  144: required i32 hms_event_sync_sleep_interval_ms
 }

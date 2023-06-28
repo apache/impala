@@ -287,6 +287,9 @@ class ImpaladMetricKeys {
 
   /// Time spent writing completed queries to the query log table.
   static const char* COMPLETED_QUERIES_WRITE_DURATIONS;
+
+  /// Time spent in the WaitForHmsEvent catalogd RPC.
+  static const char* WAIT_FOR_HMS_EVENT_DURATIONS;
 };
 
 /// Global impalad-wide metrics.  This is useful for objects that want to update metrics
@@ -387,6 +390,7 @@ class ImpaladMetrics {
   static HistogramMetric* QUERY_DURATIONS;
   static HistogramMetric* DDL_DURATIONS;
   static HistogramMetric* COMPLETED_QUERIES_WRITE_DURATIONS;
+  static HistogramMetric* WAIT_FOR_HMS_EVENT_DURATIONS;
 
   // Other
   static StatsMetric<uint64_t, StatsType::MEAN>* IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO;

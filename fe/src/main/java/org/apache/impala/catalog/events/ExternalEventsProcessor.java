@@ -41,6 +41,11 @@ public interface ExternalEventsProcessor {
   long getCurrentEventId() throws MetastoreNotificationFetchException;
 
   /**
+   * Get the latest event id that has been processed.
+   */
+  default long getLastSyncedEventId() { return -1; }
+
+  /**
    * Pauses the event processing. Use <code>start(fromEventId)</code> method below to
    * restart the event processing
    */

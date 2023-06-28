@@ -64,6 +64,8 @@ public class CreateDbStmt extends StatementBase {
   }
 
   public String getComment() { return comment_; }
+  @Override
+  public String getParsedDb() { return dbName_; }
   public String getDb() { return dbName_; }
   public boolean getIfNotExists() { return ifNotExists_; }
 

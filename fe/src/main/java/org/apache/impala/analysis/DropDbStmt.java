@@ -44,6 +44,8 @@ public class DropDbStmt extends StatementBase {
     this.cascade_ = cascade;
   }
 
+  @Override
+  public String getParsedDb() { return dbName_; }
   public String getDb() { return dbName_; }
   public boolean getIfExists() { return ifExists_; }
   public boolean getCascade() { return cascade_; }

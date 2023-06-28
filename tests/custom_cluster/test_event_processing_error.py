@@ -356,21 +356,19 @@ class TestEventProcessingError(CustomClusterTestSuite):
     replication tests
     """
     # inserts on transactional tables
-    TestEventProcessingBase._run_test_insert_events_impl(self.hive_client, self.client,
-      self.cluster, unique_database, True)
+    TestEventProcessingBase._run_test_insert_events_impl(unique_database, True)
     assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
     try:
         test_db = unique_database + "_no_transact"
         self.run_stmt_in_hive("""create database {}""".format(test_db))
         # inserts on external tables
-        TestEventProcessingBase._run_test_insert_events_impl(self.hive_client,
-          self.client, self.cluster, test_db, False)
+        TestEventProcessingBase._run_test_insert_events_impl(test_db, False)
         assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
     finally:
         self.run_stmt_in_hive("""drop database {} cascade""".format(test_db))
     # replication related tests
-    TestEventProcessingBase._run_event_based_replication_tests_impl(self.hive_client,
-      self.client, self.cluster, self.filesystem_client)
+    TestEventProcessingBase._run_event_based_replication_tests_impl(
+        self.filesystem_client)
     assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
 
   def __create_table_and_load__(self, db_name, table_name, is_transactional,

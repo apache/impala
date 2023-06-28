@@ -772,6 +772,34 @@ struct TSetEventProcessorStatusResponse {
   2: optional string info
 }
 
+struct TWaitForHmsEventRequest {
+  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V2
+
+  // Common header included in all CatalogService requests.
+  2: required TCatalogServiceRequestHeader header
+
+  // Timeout in seconds for waiting catalogd to catch up the latest event when it
+  // receives this request.
+  3: required i32 timeout_s
+
+  // Set to true for SHOW DATABASES statements.
+  4: required bool want_db_list
+
+  // Set to true for SHOW TABLES/VIEWS statements.
+  5: required bool want_table_list
+
+  // Descriptors of catalog objects that might be used by the query.
+  6: optional list<CatalogObjects.TCatalogObject> object_descs
+}
+
+struct TWaitForHmsEventResponse {
+  // The status of the operation, OK if the operation was successful.
+  1: required Status.TStatus status
+
+  // Catalog updates that should be applied on coordinator side
+  2: optional TCatalogUpdateResult result
+}
+
 // The CatalogService API
 service CatalogService {
   // Executes a DDL request and returns details on the result of the operation.
@@ -816,4 +844,8 @@ service CatalogService {
   // Update the status of EventProcessor.
   TSetEventProcessorStatusResponse SetEventProcessorStatus(
       1: TSetEventProcessorStatusRequest req);
+
+  // Waits until catalogd processes the latest HMS event and get the catalog version
+  // to catch up the metadata changes.
+  TWaitForHmsEventResponse WaitForHmsEvent(1: TWaitForHmsEventRequest req);
 }

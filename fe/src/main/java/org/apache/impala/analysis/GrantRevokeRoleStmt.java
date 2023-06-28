@@ -64,4 +64,7 @@ public class GrantRevokeRoleStmt extends AuthorizationStmt {
       throw new AnalysisException("Group name in GRANT/REVOKE ROLE cannot be empty.");
     }
   }
+
+  @Override
+  public boolean requiresHmsMetadata() { return false; }
 }

@@ -4165,6 +4165,15 @@ public class Analyzer {
   }
 
   /**
+   * Add a batch of warnings based on addWarning().
+   */
+  public void addWarnings(Iterable<String> warnings) {
+    for (String msg : warnings) {
+      addWarning(msg);
+    }
+  }
+
+  /**
    * 'addWarning' method may be called after the warnings are retrieved, e.g. in
    * analyzing some substituted/cloned predicates (IMPALA-11021). We need to make sure
    * no new warnings are added after retrieved.

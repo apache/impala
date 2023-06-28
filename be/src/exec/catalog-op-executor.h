@@ -110,6 +110,10 @@ class CatalogOpExecutor {
   /// a pointer to the profile of the execution in catalogd.
   const TRuntimeProfileNode* catalog_profile() const { return catalog_profile_.get(); }
 
+  /// Makes an RPC to the catalog server to wait until it processes the latest HMS event.
+  Status WaitForHmsEvent(const TWaitForHmsEventRequest& req,
+      TWaitForHmsEventResponse* resp);
+
  private:
   /// Helper functions used in ExecComputeStats() for setting the thrift structs in params
   /// for the table/column stats based on the results of the corresponding child query.

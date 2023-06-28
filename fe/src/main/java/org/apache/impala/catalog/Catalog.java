@@ -745,6 +745,11 @@ public abstract class Catalog implements AutoCloseable {
     }
   }
 
+  public static String toCatalogObjectSummary(TCatalogObject catalogObject) {
+    return String.format("%s(%d)", toCatalogObjectKey(catalogObject),
+        catalogObject.catalog_version);
+  }
+
   /**
    * Returns true if the two objects have the same object type and key (generated using
    * toCatalogObjectKey()).

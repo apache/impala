@@ -152,12 +152,18 @@ class Catalog {
   /// Returns OK if the refreshing was successful, otherwise a Status object with
   /// information on the error will be returned.
   Status RefreshDataSources();
+
   /// Returns all Hadoop configurations in key, value form in result.
   Status GetAllHadoopConfigs(TGetAllHadoopConfigsResponse* result);
 
   /// Update the status of EventProcessor.
   Status SetEventProcessorStatus(
       const TSetEventProcessorStatusRequest& req, TSetEventProcessorStatusResponse* resp);
+
+  /// Waits until catalogd processes the latest HMS event and get the catalog version
+  /// that catches up the metadata changes.
+  Status WaitForHmsEvent(const TWaitForHmsEventRequest& req,
+      TWaitForHmsEventResponse* resp);
 
  private:
   jobject catalog_;  // instance of org.apache.impala.service.JniCatalog
@@ -187,6 +193,7 @@ class Catalog {
   jmethodID get_latest_compactions_id_; // JniCatalog.getLatestCompactions()
   jmethodID get_hadoop_configs_id_;  // JniCatalog.getAllHadoopConfigs()
   jmethodID set_event_processor_status_id_; // JniCatalog.setEventProcessorStatus()
+  jmethodID wait_for_hms_event_id_; // JniCatalog.waitForHmsEvent()
 };
 
 }

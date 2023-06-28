@@ -765,6 +765,36 @@ Java_org_apache_impala_service_FeSupport_NativeGetLatestCompactions(
   return result_bytes;
 }
 
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_org_apache_impala_service_FeSupport_NativeWaitForHmsEvents(JNIEnv* env,
+    jclass fe_support_class, jbyteArray thrift_request, jbyteArray thrift_query_options) {
+  TWaitForHmsEventRequest request;
+  TQueryOptions query_options;
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, thrift_request, &request), env,
+      JniUtil::internal_exc_class(), nullptr);
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, thrift_query_options, &query_options), env,
+      JniUtil::internal_exc_class(), nullptr);
+  CatalogOpExecutor catalog_op_executor(ExecEnv::GetInstance(), nullptr, nullptr);
+  TWaitForHmsEventResponse response;
+  Status status = catalog_op_executor.WaitForHmsEvent(request, &response);
+  TStatus result;
+  jbyteArray result_bytes = nullptr;
+  if (!status.ok()) {
+    status.ToThrift(&result);
+    THROW_IF_ERROR_RET(SerializeThriftMsg(env, &result, &result_bytes), env,
+        JniUtil::internal_exc_class(), result_bytes);
+    return result_bytes;
+  }
+  ImpalaServer* server = ExecEnv::GetInstance()->impala_server();
+  DCHECK(server != nullptr);
+  status = server->ProcessCatalogUpdateResult(response.result,
+      /*wait_for_all_subscribers*/false, query_options, /*timeline*/nullptr);
+  status.ToThrift(&result);
+  THROW_IF_ERROR_RET(SerializeThriftMsg(env, &result, &result_bytes), env,
+      JniUtil::internal_exc_class(), result_bytes);
+  return result_bytes;
+}
+
 namespace impala {
 
 static JNINativeMethod native_methods[] = {
@@ -855,6 +885,10 @@ static JNINativeMethod native_methods[] = {
   {
     const_cast<char*>("NativeNumLiveQueries"), const_cast<char*>("()J"),
     (void*)::Java_org_apache_impala_service_FeSupport_NativeNumLiveQueries
+  },
+  {
+    const_cast<char*>("NativeWaitForHmsEvents"), const_cast<char*>("([B[B)[B"),
+    (void*)::Java_org_apache_impala_service_FeSupport_NativeWaitForHmsEvents
   },
 };
 

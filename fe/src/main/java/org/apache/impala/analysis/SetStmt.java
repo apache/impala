@@ -79,4 +79,7 @@ public class SetStmt extends StatementBase {
     request.setQuery_option_type(queryOptionType_);
     return request;
   }
+
+  @Override
+  public boolean requiresHmsMetadata() { return false; }
 }

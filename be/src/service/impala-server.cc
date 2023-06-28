@@ -1583,8 +1583,9 @@ void ImpalaServer::UpdateExecSummary(const QueryHandle& query_handle) const {
   query_handle->summary_profile()->SetTExecSummary(t_exec_summary);
   string exec_summary = PrintExecSummary(t_exec_summary);
   query_handle->summary_profile()->AddInfoStringRedacted("ExecSummary", exec_summary);
-  query_handle->summary_profile()->AddInfoStringRedacted("Errors",
-      query_handle->GetCoordinator()->GetErrorLog());
+  vector<string> errors = query_handle->GetAnalysisWarnings();
+  errors.emplace_back(query_handle->GetCoordinator()->GetErrorLog());
+  query_handle->summary_profile()->AddInfoStringRedacted("Errors", join(errors, "\n"));
 }
 
 Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_inflight,
@@ -2306,6 +2307,13 @@ void ImpalaServer::CatalogUpdateCallback(
   catalog_version_update_cv_.NotifyAll();
 }
 
+static inline void MarkTimelineEvent(RuntimeProfile::EventSequence* timeline,
+    const string& str) {
+  if (timeline != nullptr) {
+    timeline->MarkEvent(str);
+  }
+}
+
 void ImpalaServer::WaitForCatalogUpdate(const int64_t catalog_update_version,
     const TUniqueId& catalog_service_id, RuntimeProfile::EventSequence* timeline) {
   unique_lock<mutex> unique_lock(catalog_version_lock_);
@@ -2318,10 +2326,12 @@ void ImpalaServer::WaitForCatalogUpdate(const int64_t catalog_update_version,
   }
 
   if (catalog_update_info_.catalog_service_id != catalog_service_id) {
-    timeline->MarkEvent("Detected change in catalog service ID");
-    VLOG_QUERY << "Detected change in catalog service ID";
+    MarkTimelineEvent(timeline, "Catalog service ID changed when waiting for "
+        "catalog update to arrive");
+    VLOG_QUERY << "Detected catalog service ID changed when waiting for "
+        "catalog update to arrive";
   } else {
-    timeline->MarkEvent(Substitute("Applied catalog version $0",
+    MarkTimelineEvent(timeline, Substitute("Applied catalog version $0",
         catalog_update_version));
     VLOG_QUERY << "Applied catalog version: " << catalog_update_version;
   }
@@ -2341,11 +2351,14 @@ void ImpalaServer::WaitForCatalogUpdateTopicPropagation(
   }
 
   if (catalog_update_info_.catalog_service_id != catalog_service_id) {
-    timeline->MarkEvent("Detected change in catalog service ID");
-    VLOG_QUERY << "Detected change in catalog service ID";
+    MarkTimelineEvent(timeline, "Catalog service ID changed when waiting for "
+        "catalog propagation");
+    VLOG_QUERY << "Detected catalog service ID changed when waiting for "
+        "catalog propagation";
   } else {
-    timeline->MarkEvent(Substitute("Min catalog topic version of coordinators reached $0",
-        min_req_subscriber_topic_version));
+    MarkTimelineEvent(timeline,
+        Substitute("Min catalog topic version of coordinators reached $0",
+            min_req_subscriber_topic_version));
     VLOG_QUERY << "Min catalog topic version of coordinators: "
         << min_req_subscriber_topic_version;
   }
@@ -2368,10 +2381,10 @@ void ImpalaServer::WaitForMinCatalogUpdate(const int64_t min_req_catalog_object_
   }
 
   if (catalog_update_info_.catalog_service_id != catalog_service_id) {
-    timeline->MarkEvent("Detected change in catalog service ID");
+    MarkTimelineEvent(timeline, "Detected change in catalog service ID");
     VLOG_QUERY << "Detected change in catalog service ID";
   } else {
-    timeline->MarkEvent(Substitute("Local min catalog version reached $0",
+    MarkTimelineEvent(timeline, Substitute("Local min catalog version reached $0",
         min_req_catalog_object_version));
     VLOG_QUERY << "Updated catalog object version lower bound: "
         << min_req_catalog_object_version;
@@ -2429,7 +2442,7 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
       // Apply the changes to the local catalog cache.
       TUpdateCatalogCacheResponse resp;
       Status status = exec_env_->frontend()->UpdateCatalogCache(update_req, &resp);
-      timeline->MarkEvent("Applied catalog updates from DDL");
+      MarkTimelineEvent(timeline, "Applied catalog updates from DDL");
       if (!status.ok()) LOG(ERROR) << status.GetDetail();
       RETURN_IF_ERROR(status);
     } else {

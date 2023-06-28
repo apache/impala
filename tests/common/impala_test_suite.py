@@ -624,6 +624,26 @@ class ImpalaTestSuite(BaseTestSuite):
         return int(m['value'])
     assert False, "Could not find metric: %s" % name
 
+  def verify_timeline_item(self, section, label, profile):
+    in_section = False
+    for line in profile.split('\n'):
+      line = line.strip()
+      if line.startswith(section + ": "):
+        in_section = True
+        continue
+      if not in_section:
+        continue
+      if not line.startswith("- "):
+        # Not a label. The current timeline section ends.
+        break
+      if line.startswith("- {}: ".format(label)):
+        match = re.search(r'\((.*)\)', line)
+        assert match, "Value not found in '{}'".format(line)
+        duration = match.group(1)
+        assert duration != '0ns' and duration != '0'
+        return
+    assert False, "'- {}:' not found in\n{}".format(label, profile)
+
   def __do_replacements(self, s, use_db=None, extra=None):
     globs = globals()
     # following assignment are purposefully redundant to avoid flake8 warnings (F401).
@@ -1477,49 +1497,37 @@ class ImpalaTestSuite(BaseTestSuite):
     """Check if lines contain value."""
     return any([line.find(value) != -1 for line in lines])
 
+  def execute_query_with_hms_sync(self, query, timeout_s, strict=True):
+    """Execute the query with WaitForHmsSync enabled"""
+    with self.create_impala_client() as client:
+      client.set_configuration({"sync_hms_events_wait_time_s": timeout_s,
+                                "sync_hms_events_strict_mode": strict})
+      return self.__execute_query(client, query)
+
   def wait_for_db_to_appear(self, db_name, timeout_s):
     """Wait until the database with 'db_name' is present in the impalad's local catalog.
-    Fail after timeout_s if the doesn't appear."""
-    start_time = time.time()
-    while time.time() - start_time < timeout_s:
-      try:
-        # This will throw an exception if the database is not present.
-        self.client.execute("describe database `{db_name}`".format(db_name=db_name))
-        return
-      except Exception:
-        time.sleep(0.2)
-        continue
-    raise Exception("DB {0} didn't show up after {1}s", db_name, timeout_s)
+    Fail after timeout_s if it doesn't appear."""
+    result = self.execute_query_with_hms_sync(
+        "describe database `{0}`".format(db_name), timeout_s)
+    assert result.success
 
   def confirm_db_exists(self, db_name):
     """Confirm the database with 'db_name' is present in the impalad's local catalog.
        Fail if the db is not present"""
     # This will throw an exception if the database is not present.
     self.client.execute("describe database `{db_name}`".format(db_name=db_name))
-    return
 
   def confirm_table_exists(self, db_name, tbl_name):
     """Confirms if the table exists. The describe table command will fail if the table
        does not exist."""
     self.client.execute("describe `{0}`.`{1}`".format(db_name, tbl_name))
-    return
 
-  def wait_for_table_to_appear(self, db_name, table_name, timeout_s):
+  def wait_for_table_to_appear(self, db_name, table_name, timeout_s=10):
     """Wait until the table with 'table_name' in 'db_name' is present in the
-    impalad's local catalog. Fail after timeout_s if the doesn't appear."""
-    start_time = time.time()
-    while time.time() - start_time < timeout_s:
-      try:
-        # This will throw an exception if the table is not present.
-        self.client.execute("describe `{db_name}`.`{table_name}`".format(
-                            db_name=db_name, table_name=table_name))
-        return
-      except Exception as ex:
-        print(str(ex))
-        time.sleep(0.2)
-        continue
-    raise Exception("Table {0}.{1} didn't show up after {2}s", db_name, table_name,
-                    timeout_s)
+    impalad's local catalog. Fail after timeout_s if it doesn't appear."""
+    result = self.execute_query_with_hms_sync(
+        "describe `{0}`.`{1}`".format(db_name, table_name), timeout_s)
+    assert result.success
 
   def assert_eventually(self, timeout_s, period_s, condition, error_msg=None):
     """Assert that the condition (a function with no parameters) returns True within the

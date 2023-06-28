@@ -69,4 +69,7 @@ public class ShowDataSrcsStmt extends StatementBase {
     params.setShow_pattern(getPattern());
     return params;
   }
+
+  @Override
+  public boolean requiresHmsMetadata() { return false; }
 }

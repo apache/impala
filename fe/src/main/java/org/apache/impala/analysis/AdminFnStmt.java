@@ -201,4 +201,7 @@ public class AdminFnStmt extends StatementBase {
       event_id_ = params_.get(1).evalToInteger(analyzer, "event_id");
     }
   }
+
+  @Override
+  public boolean requiresHmsMetadata() { return false; }
 }

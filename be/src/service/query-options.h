@@ -51,7 +51,7 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
 // plus one. Thus, the second argument to the DCHECK has to be updated every
 // time we add or remove a query option to/from the enum TImpalaQueryOptions.
 constexpr unsigned NUM_QUERY_OPTIONS =
-    TImpalaQueryOptions::USE_LEGACY_HIVE_TIMESTAMP_CONVERSION + 1;
+    TImpalaQueryOptions::SYNC_HMS_EVENTS_STRICT_MODE + 1;
 #define QUERY_OPTS_TABLE                                                                 \
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(), NUM_QUERY_OPTIONS);             \
   REMOVED_QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED) \
@@ -365,7 +365,11 @@ constexpr unsigned NUM_QUERY_OPTIONS =
   QUERY_OPT_FN(estimate_duplicate_in_preagg,                                             \
       ESTIMATE_DUPLICATE_IN_PREAGG, TQueryOptionLevel::ADVANCED)                         \
   QUERY_OPT_FN(use_legacy_hive_timestamp_conversion,                                     \
-      USE_LEGACY_HIVE_TIMESTAMP_CONVERSION, TQueryOptionLevel::ADVANCED)
+      USE_LEGACY_HIVE_TIMESTAMP_CONVERSION, TQueryOptionLevel::ADVANCED)                 \
+  QUERY_OPT_FN(sync_hms_events_wait_time_s, SYNC_HMS_EVENTS_WAIT_TIME_S,                 \
+      TQueryOptionLevel::ADVANCED)                                                       \
+  QUERY_OPT_FN(sync_hms_events_strict_mode, SYNC_HMS_EVENTS_STRICT_MODE,                 \
+      TQueryOptionLevel::ADVANCED)                                                       \
   ;
 
 /// Enforce practical limits on some query options to avoid undesired query state.

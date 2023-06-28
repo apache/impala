@@ -92,13 +92,16 @@ import org.apache.impala.analysis.OptimizeStmt;
 import org.apache.impala.analysis.Parser;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.ResetMetadataStmt;
+import org.apache.impala.analysis.ShowDbsStmt;
 import org.apache.impala.analysis.ShowFunctionsStmt;
 import org.apache.impala.analysis.ShowGrantPrincipalStmt;
 import org.apache.impala.analysis.ShowRolesStmt;
+import org.apache.impala.analysis.ShowTablesOrViewsStmt;
 import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.analysis.TableName;
+import org.apache.impala.analysis.TableRef;
 import org.apache.impala.analysis.TruncateStmt;
 import org.apache.impala.authentication.saml.ImpalaSamlClient;
 import org.apache.impala.authorization.AuthorizationChecker;
@@ -133,6 +136,7 @@ import org.apache.impala.catalog.MaterializedViewHdfsTable;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.SystemTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
@@ -160,6 +164,8 @@ import org.apache.impala.planner.ScanNode;
 import org.apache.impala.thrift.CatalogLookupStatus;
 import org.apache.impala.thrift.TAlterDbParams;
 import org.apache.impala.thrift.TBackendGflags;
+import org.apache.impala.thrift.TCatalogObject;
+import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCatalogOpRequest;
 import org.apache.impala.thrift.TCatalogOpType;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
@@ -170,12 +176,14 @@ import org.apache.impala.thrift.TCommentOnParams;
 import org.apache.impala.thrift.TCopyTestCaseReq;
 import org.apache.impala.thrift.TCounter;
 import org.apache.impala.thrift.TCreateDropRoleParams;
+import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDdlExecRequest;
 import org.apache.impala.thrift.TDdlQueryOptions;
 import org.apache.impala.thrift.TDdlType;
 import org.apache.impala.thrift.TDescribeHistoryParams;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TDescribeResult;
+import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TDescribeTableParams;
 import org.apache.impala.thrift.TIcebergDmlFinalizeParams;
@@ -212,13 +220,17 @@ import org.apache.impala.thrift.TRuntimeProfileNode;
 import org.apache.impala.thrift.TShowFilesParams;
 import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TSlotCountStrategy;
+import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TStmtType;
+import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TTruncateParams;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUnit;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
+import org.apache.impala.thrift.TWaitForHmsEventRequest;
+import org.apache.impala.thrift.TWaitForHmsEventResponse;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.DebugUtils;
 import org.apache.impala.util.EventSequence;
@@ -904,17 +916,9 @@ public class Frontend {
     ddl.setSync_ddl(result.getQuery_options().isSync_ddl());
     result.setCatalog_op_request(ddl);
     if (ddl.getOp_type() == TCatalogOpType.DDL) {
-      TCatalogServiceRequestHeader header = new TCatalogServiceRequestHeader();
-      header.setRequesting_user(analysis.getAnalyzer().getUser().getName());
-      TQueryCtx queryCtx = analysis.getAnalyzer().getQueryCtx();
-      header.setQuery_id(queryCtx.query_id);
-      header.setClient_ip(queryCtx.getSession().getNetwork_address().getHostname());
-      TClientRequest clientRequest = queryCtx.getClient_request();
-      header.setRedacted_sql_stmt(clientRequest.isSetRedacted_stmt() ?
-          clientRequest.getRedacted_stmt() : clientRequest.getStmt());
-      header.setWant_minimal_response(
-          BackendConfig.INSTANCE.getBackendCfg().use_local_catalog);
-      header.setCoordinator_hostname(BackendConfig.INSTANCE.getHostname());
+      TCatalogServiceRequestHeader header = createCatalogServiceRequestHeader(
+          analysis.getAnalyzer().getUser().getName(),
+          analysis.getAnalyzer().getQueryCtx());
       ddl.getDdl_params().setHeader(header);
       // Forward relevant query options to the catalogd.
       TDdlQueryOptions ddlQueryOpts = new TDdlQueryOptions();
@@ -2185,6 +2189,119 @@ public class Frontend {
         expectedNumExecutor(execGroupSet), execGroupSet.getNum_cores_per_executor());
   }
 
+  private static TCatalogServiceRequestHeader createCatalogServiceRequestHeader(
+      String requestingUser, TQueryCtx queryCtx) {
+    TCatalogServiceRequestHeader header = new TCatalogServiceRequestHeader();
+    header.setRequesting_user(requestingUser);
+    header.setQuery_id(queryCtx.query_id);
+    header.setClient_ip(queryCtx.getSession().getNetwork_address().getHostname());
+    TClientRequest clientRequest = queryCtx.getClient_request();
+    header.setRedacted_sql_stmt(clientRequest.isSetRedacted_stmt() ?
+            clientRequest.getRedacted_stmt() : clientRequest.getStmt());
+    header.setWant_minimal_response(
+        BackendConfig.INSTANCE.getBackendCfg().use_local_catalog);
+    header.setCoordinator_hostname(BackendConfig.INSTANCE.getHostname());
+    return header;
+  }
+
+  /**
+   * Collect required catalog objects for query planning of the statement and update
+   * the request.
+   */
+  private void collectRequiredObjects(TWaitForHmsEventRequest req, StatementBase stmt,
+      String sessionDb) {
+    if (stmt instanceof ShowDbsStmt) {
+      req.want_db_list = true;
+      return;
+    }
+    // The statement hasn't been analyzed yet. We can only get the parsed db, i.e. the db
+    // name written in the query string.
+    String dbName = stmt.getParsedDb();
+    // Use the session database if the db is not specified in SHOW TABLES/VIEWS/FUNCTIONS
+    // statement.
+    if (dbName == null &&
+        (stmt instanceof ShowFunctionsStmt || stmt instanceof ShowTablesOrViewsStmt)) {
+      dbName = sessionDb;
+    }
+    if (dbName != null) {
+      TCatalogObject dbDesc = new TCatalogObject();
+      dbDesc.setType(TCatalogObjectType.DATABASE);
+      dbDesc.setDb(new TDatabase(dbName));
+      req.addToObject_descs(dbDesc);
+      if (stmt instanceof ShowTablesOrViewsStmt) {
+        req.setWant_table_list(true);
+        LOG.info("Waiting for HMS events on database {} and underlying tables", dbName);
+      } else {
+        LOG.info("Waiting for HMS events on database " + dbName);
+      }
+      // 'dbName' is not null only for CREATE/DROP/ALTER database or SHOW TABLES/VIEWS
+      // statements. No more tables are needed.
+      return;
+    }
+    List<TableRef> tblRefs = new ArrayList<>();
+    stmt.collectTableRefs(tblRefs);
+    Set<TableName> tableNames = new HashSet<>();
+    for (TableRef ref : tblRefs) {
+      tableNames.addAll(org.apache.impala.analysis.Path.getCandidateTables(
+          ref.getPath(), sessionDb));
+    }
+    Set<String> dbNames = new HashSet<>();
+    for (TableName tblName : tableNames) {
+      dbNames.add(tblName.getDb());
+      TCatalogObject tblDesc = new TCatalogObject();
+      tblDesc.setType(TCatalogObjectType.TABLE);
+      tblDesc.setTable(new TTable(tblName.getDb(), tblName.getTbl()));
+      req.addToObject_descs(tblDesc);
+    }
+    // Add dbs needed by the tables.
+    for (String name : dbNames) {
+      TCatalogObject dbDesc = new TCatalogObject();
+      dbDesc.setType(TCatalogObjectType.DATABASE);
+      dbDesc.setDb(new TDatabase(name));
+      req.addToObject_descs(dbDesc);
+    }
+    LOG.info("Waiting for HMS events on the dbs: {} and tables: {}",
+        String.join(", ", dbNames),
+        tableNames.stream().map(TableName::toString).collect(Collectors.joining(", ")));
+  }
+
+  private void waitForHmsEvents(TQueryCtx queryCtx, TQueryOptions queryOptions,
+      List<String> warnings, EventSequence timeline) throws ImpalaException {
+    if (!queryOptions.isSetSync_hms_events_wait_time_s()
+        || queryOptions.sync_hms_events_wait_time_s <= 0) {
+      return;
+    }
+    StatementBase stmt = Parser.parse(
+        queryCtx.client_request.stmt, queryCtx.client_request.query_options);
+    // Return immediately for simple statements that don't require HMS metadata, e.g.
+    // SET query_option=value;
+    if (!stmt.requiresHmsMetadata()) return;
+    TWaitForHmsEventRequest req = new TWaitForHmsEventRequest();
+    req.setTimeout_s(queryOptions.sync_hms_events_wait_time_s);
+    req.setHeader(createCatalogServiceRequestHeader(
+        TSessionStateUtil.getEffectiveUser(queryCtx.session), queryCtx));
+    collectRequiredObjects(req, stmt, queryCtx.session.database);
+    // TODO: share 'timeline' to BE so we know when the updates are applied
+    TStatus status = FeSupport.WaitForHmsEvents(req, queryOptions);
+    if (status.status_code != TErrorCode.OK) {
+      String errorMsg;
+      if (queryOptions.sync_hms_events_strict_mode) {
+        errorMsg = "Failed to sync events from Metastore";
+      } else {
+        errorMsg = "Continuing without syncing Metastore events";
+      }
+      timeline.markEvent(errorMsg);
+      errorMsg += ": " + String.join("", status.error_msgs);
+      LOG.error(errorMsg);
+      warnings.add(errorMsg);
+      if (queryOptions.sync_hms_events_strict_mode) {
+        throw new InternalException(errorMsg);
+      }
+    } else {
+      timeline.markEvent("Synced events from Metastore");
+    }
+  }
+
   private TExecRequest getTExecRequest(PlanCtx planCtx, EventSequence timeline)
       throws ImpalaException {
     TQueryCtx queryCtx = planCtx.getQueryContext();
@@ -2193,6 +2310,8 @@ public class Frontend {
         + queryCtx.session.database);
 
     TQueryOptions queryOptions = queryCtx.client_request.getQuery_options();
+    List<String> warnings = new ArrayList<>();
+    waitForHmsEvents(queryCtx, queryOptions, warnings, timeline);
     boolean enable_replan = queryOptions.isEnable_replan();
     final boolean clientSetRequestPool = queryOptions.isSetRequest_pool();
     Preconditions.checkState(
@@ -2288,7 +2407,7 @@ public class Frontend {
       String retryMsg = "";
       while (true) {
         try {
-          req = doCreateExecRequest(planCtx, timeline);
+          req = doCreateExecRequest(planCtx, warnings, timeline);
           markTimelineRetries(attempt, retryMsg, timeline);
           break;
         } catch (InconsistentMetadataFetchException e) {
@@ -2584,7 +2703,7 @@ public class Frontend {
   }
 
   private TExecRequest doCreateExecRequest(PlanCtx planCtx,
-      EventSequence timeline) throws ImpalaException {
+      List<String> warnings, EventSequence timeline) throws ImpalaException {
     TQueryCtx queryCtx = planCtx.getQueryContext();
     // Parse stmt and collect/load metadata to populate a stmt-local table cache
     StatementBase stmt = Parser.parse(
@@ -2628,6 +2747,7 @@ public class Frontend {
       LOG.info("Analysis finished.");
     }
     Preconditions.checkNotNull(analysisResult.getStmt());
+    analysisResult.getAnalyzer().addWarnings(warnings);
     TExecRequest result = createBaseExecRequest(queryCtx, analysisResult);
     for (TableName table : stmtTableCache.tables.keySet()) {
       result.addToTables(table.toThrift());

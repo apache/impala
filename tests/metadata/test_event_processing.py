@@ -20,11 +20,15 @@ import pytest
 import re
 import time
 
-from tests.common.impala_cluster import ImpalaCluster
+from tests.common.test_dimensions import (
+    create_single_exec_option_dimension,
+    add_mandatory_exec_option)
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS, SkipIfHive2, SkipIfCatalogV2
 from tests.metadata.test_event_processing_base import TestEventProcessingBase
 from tests.util.event_processor_utils import EventProcessorUtils
+
+PROCESSING_TIMEOUT_S = 10
 
 
 @SkipIfFS.hive
@@ -32,21 +36,18 @@ from tests.util.event_processor_utils import EventProcessorUtils
 class TestEventProcessing(ImpalaTestSuite):
   """This class contains tests that exercise the event processing mechanism in the
   catalog."""
-  CATALOG_URL = "http://localhost:25020"
-  PROCESSING_TIMEOUT_S = 10
 
   @SkipIfHive2.acid
   def test_transactional_insert_events(self, unique_database):
     """Executes 'run_test_insert_events' for transactional tables.
     """
-    TestEventProcessingBase._run_test_insert_events_impl(self.hive_client, self.client,
-        ImpalaCluster.get_e2e_test_cluster(), unique_database, is_transactional=True)
+    TestEventProcessingBase._run_test_insert_events_impl(
+        unique_database, is_transactional=True)
 
   def test_insert_events(self, unique_database):
     """Executes 'run_test_insert_events' for non-transactional tables.
     """
-    TestEventProcessingBase._run_test_insert_events_impl(self.hive_client, self.client,
-        ImpalaCluster.get_e2e_test_cluster(), unique_database)
+    TestEventProcessingBase._run_test_insert_events_impl(unique_database)
 
   def test_iceberg_inserts(self):
     """IMPALA-10735: INSERT INTO Iceberg table fails during INSERT event generation
@@ -75,8 +76,8 @@ class TestEventProcessing(ImpalaTestSuite):
     self._run_test_empty_partition_events(unique_database, False)
 
   def test_event_based_replication(self):
-    TestEventProcessingBase._run_event_based_replication_tests_impl(self.hive_client,
-        self.client, ImpalaCluster.get_e2e_test_cluster(), self.filesystem_client)
+    TestEventProcessingBase._run_event_based_replication_tests_impl(
+        self.filesystem_client)
 
   def _run_test_empty_partition_events(self, unique_database, is_transactional):
     test_tbl = unique_database + ".test_events"
@@ -84,29 +85,28 @@ class TestEventProcessing(ImpalaTestSuite):
       is_transactional)
     self.run_stmt_in_hive("create table {0} (key string, value string) \
       partitioned by (year int) stored as parquet {1}".format(test_tbl, TBLPROPERTIES))
-    EventProcessorUtils.wait_for_event_processing(self)
+    self.client.set_configuration({
+      "sync_hms_events_wait_time_s": PROCESSING_TIMEOUT_S,
+      "sync_hms_events_strict_mode": True
+    })
     self.client.execute("describe {0}".format(test_tbl))
 
     self.run_stmt_in_hive(
       "alter table {0} add partition (year=2019)".format(test_tbl))
-    EventProcessorUtils.wait_for_event_processing(self)
     assert [('2019',)] == self.get_impala_partition_info(test_tbl, 'year')
 
     self.run_stmt_in_hive(
       "alter table {0} add if not exists partition (year=2019)".format(test_tbl))
-    EventProcessorUtils.wait_for_event_processing(self)
     assert [('2019',)] == self.get_impala_partition_info(test_tbl, 'year')
     assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
 
     self.run_stmt_in_hive(
       "alter table {0} drop partition (year=2019)".format(test_tbl))
-    EventProcessorUtils.wait_for_event_processing(self)
     assert ('2019') not in self.get_impala_partition_info(test_tbl, 'year')
     assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
 
     self.run_stmt_in_hive(
       "alter table {0} drop if exists partition (year=2019)".format(test_tbl))
-    EventProcessorUtils.wait_for_event_processing(self)
     assert ('2019') not in self.get_impala_partition_info(test_tbl, 'year')
     assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
 
@@ -287,3 +287,125 @@ class TestEventProcessing(ImpalaTestSuite):
     assert warning in cmd_output
     # The cleanup method will drop 'unique_database' and tables in it, which generates
     # more than 2 self-events. It's OK for EP to skip them.
+
+
+@SkipIfFS.hive
+@SkipIfCatalogV2.hms_event_polling_disabled()
+class TestEventSyncWaiting(ImpalaTestSuite):
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-planner'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestEventSyncWaiting, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    add_mandatory_exec_option(cls, 'sync_hms_events_wait_time_s', PROCESSING_TIMEOUT_S)
+    add_mandatory_exec_option(cls, 'sync_hms_events_strict_mode', True)
+
+  def test_hms_event_sync(self, vector, unique_database):
+    """Verify query option sync_hms_events_wait_time_s should protect the query by
+    waiting until Impala sync the HMS changes."""
+    client = self.default_impala_client(vector.get_value('protocol'))
+    client.set_configuration(vector.get_exec_option_dict())
+    tbl_name = unique_database + ".tbl"
+    label = "Synced events from Metastore"
+    # Test DESCRIBE on new table created in Hive
+    self.run_stmt_in_hive(
+        "create table {0} (i int) partitioned by (p int)".format(tbl_name))
+    res = self.execute_query_expect_success(client, "describe " + tbl_name)
+    assert res.data == ["i\tint\t", 'p\tint\t']
+    assert res.log == ''
+    self.verify_timeline_item("Query Compilation", label, res.runtime_profile)
+
+    # Test SHOW TABLES gets new tables created in Hive
+    self.run_stmt_in_hive("create table {0}_2 (i int)".format(tbl_name))
+    res = self.execute_query_expect_success(client, "show tables in " + unique_database)
+    assert res.data == ["tbl", "tbl_2"]
+    assert res.log == ''
+    self.verify_timeline_item("Query Compilation", label, res.runtime_profile)
+
+    # Test SHOW VIEWS gets new views created in Hive
+    self.run_stmt_in_hive(
+        "create view {0}.v as select * from {1}".format(unique_database, tbl_name))
+    res = self.execute_query_expect_success(client, "show views in " + unique_database)
+    assert res.data == ["v"]
+    assert res.log == ''
+    self.verify_timeline_item("Query Compilation", label, res.runtime_profile)
+
+    # Test DROP TABLE
+    try:
+      self.run_stmt_in_hive("""create database {0}_2;
+          create table {0}_2.tbl(i int);
+          create table {0}_2.tbl_2(i int);""".format(unique_database))
+      self.execute_query_expect_success(
+          client, "drop table {0}_2.tbl".format(unique_database))
+    finally:
+      self.run_stmt_in_hive(
+          "drop database if exists {0}_2 cascade".format(unique_database))
+
+    # Test SHOW DATABASES
+    res = self.execute_query_expect_success(client, "show databases")
+    assert unique_database + "\t" in res.data
+    assert unique_database + "_2\t" not in res.data
+    self.verify_timeline_item("Query Compilation", label, res.runtime_profile)
+
+    # Test DROP DATABASE
+    try:
+      self.run_stmt_in_hive("create database {0}_3".format(unique_database))
+      self.execute_query_expect_success(
+          client, "drop database {0}_3".format(unique_database))
+    finally:
+      self.run_stmt_in_hive(
+          "drop database if exists {0}_3 cascade".format(unique_database))
+
+    # Test DESCRIBE DATABASE
+    try:
+      self.run_stmt_in_hive("create database {0}_4".format(unique_database))
+      self.execute_query_expect_success(
+          client, "describe database {0}_4".format(unique_database))
+    finally:
+      self.run_stmt_in_hive("drop database if exists {0}_4".format(unique_database))
+
+    # Test SHOW FUNCTIONS
+    try:
+      self.run_stmt_in_hive("create database {0}_5".format(unique_database))
+      self.execute_query_expect_success(
+          client, "show functions in {0}_5".format(unique_database))
+    finally:
+      self.run_stmt_in_hive("drop database if exists {0}_5".format(unique_database))
+
+    # Test SELECT gets new values inserted by Hive
+    self.run_stmt_in_hive(
+        "insert into table {0} partition (p=0) select 0".format(tbl_name))
+    res = self.execute_query_expect_success(client, "select * from " + tbl_name)
+    assert res.data == ["0\t0"]
+    assert res.log == ''
+    self.verify_timeline_item("Query Compilation", label, res.runtime_profile)
+    # Same case but using INSERT OVERWRITE in Hive
+    self.run_stmt_in_hive(
+        "insert overwrite table {0} partition (p=0) select 1".format(tbl_name))
+    res = self.execute_query_expect_success(client, "select * from " + tbl_name)
+    assert res.data == ["1\t0"]
+    assert res.log == ''
+    self.verify_timeline_item("Query Compilation", label, res.runtime_profile)
+
+    # Test SHOW PARTITIONS gets new partitions created by Hive
+    self.run_stmt_in_hive(
+        "insert into table {0} partition (p=2) select 2".format(tbl_name))
+    res = self.execute_query_expect_success(client, "show partitions " + tbl_name)
+    assert self.has_value('p=0', res.data)
+    assert self.has_value('p=2', res.data)
+    # 3 result lines: 2 for partitions, 1 for total info
+    assert len(res.data) == 3
+    assert res.log == ''
+    self.verify_timeline_item("Query Compilation", label, res.runtime_profile)
+
+    # Test CREATE TABLE on table dropped by Hive
+    self.run_stmt_in_hive("drop table " + tbl_name)
+    self.execute_query_expect_success(client, "create table {0} (j int)".format(tbl_name))
+    res = self.execute_query_expect_success(client, "describe " + tbl_name)
+    assert res.data == ["j\tint\t"]
+    assert res.log == ''
+    self.verify_timeline_item("Query Compilation", label, res.runtime_profile)

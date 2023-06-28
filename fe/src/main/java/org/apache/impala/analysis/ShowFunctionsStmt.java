@@ -65,6 +65,8 @@ public class ShowFunctionsStmt extends StatementBase {
     return postAnalysisDb_;
   }
 
+  @Override
+  public String getParsedDb() { return parsedDb_; }
   public String getPattern() { return pattern_; }
 
   @Override

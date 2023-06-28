@@ -24,6 +24,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -60,12 +61,15 @@ import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.common.PrintUtils;
+import org.apache.impala.common.Reference;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.CatalogOpExecutor;
+import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TEventBatchProgressInfo;
 import org.apache.impala.thrift.TEventProcessorMetrics;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
+import org.apache.impala.thrift.TStatus;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.NoOpEventSequence;
@@ -678,6 +682,9 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   // can ignore the drop events when they are received later.
   private final DeleteEventLog deleteEventLog_ = new DeleteEventLog();
 
+  // Sleep interval when waiting for HMS events to be synced.
+  private final int hmsEventSyncSleepIntervalMs_;
+
   @VisibleForTesting
   MetastoreEventsProcessor(CatalogOpExecutor catalogOpExecutor, long startSyncFromId,
       long pollingFrequencyInSec) throws CatalogException {
@@ -689,6 +696,10 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     initMetrics();
     metastoreEventFactory_ = new MetastoreEventFactory(catalogOpExecutor);
     pollingFrequencyInSec_ = pollingFrequencyInSec;
+    hmsEventSyncSleepIntervalMs_ = BackendConfig.INSTANCE
+        .getBackendCfg().hms_event_sync_sleep_interval_ms;
+    Preconditions.checkState(hmsEventSyncSleepIntervalMs_ > 0,
+        "hms_event_sync_sleep_interval_ms must be positive");
   }
 
   /**
@@ -804,10 +815,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   }
 
   /**
-   * returns the current value of LastSyncedEventId. This method is not thread-safe and
-   * only to be used for testing purposes
+   * returns the current value of LastSyncedEventId.
    */
-  @VisibleForTesting
   public long getLastSyncedEventId() {
     return lastSyncedEventId_.get();
   }
@@ -1520,5 +1529,58 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     public String getTableName() {
       return tableName_;
     }
+  }
+
+  public TStatus waitForSyncUpToCurrentEvent(long timeoutMs) {
+    TStatus res = new TStatus();
+    // Only waits when event-processor is in ACTIVE/PAUSED states. PAUSED states happen
+    // at startup or when global invalidate is running, so it's ok to wait for.
+    if (!EventProcessorStatus.ACTIVE.equals(eventProcessorStatus_)
+        && !EventProcessorStatus.PAUSED.equals(eventProcessorStatus_)) {
+      res.setStatus_code(TErrorCode.GENERAL);
+      res.addToError_msgs(
+          "Current state of HMS event processor is " + eventProcessorStatus_);
+      return res;
+    }
+    long waitForEventId;
+    try {
+      waitForEventId = getCurrentEventId();
+    } catch (MetastoreNotificationFetchException e) {
+      res.setStatus_code(TErrorCode.GENERAL);
+      res.addToError_msgs("Failed to fetch current HMS event id: " + e.getMessage());
+      return res;
+    }
+    long lastSyncedEventId = getLastSyncedEventId();
+    long startMs = System.currentTimeMillis();
+    long sleepIntervalMs = Math.min(timeoutMs, hmsEventSyncSleepIntervalMs_);
+    // Avoid too many log entries if the waiting interval is smaller than 500ms.
+    int logIntervals = Math.max(1, 1000 / hmsEventSyncSleepIntervalMs_);
+    int numIters = 0;
+    while (lastSyncedEventId < waitForEventId
+        && System.currentTimeMillis() - startMs < timeoutMs) {
+      if (numIters++ % logIntervals == 0) {
+        LOG.info("Waiting for last synced event id ({}) to reach {}",
+            lastSyncedEventId, waitForEventId);
+      }
+      Uninterruptibles.sleepUninterruptibly(sleepIntervalMs, TimeUnit.MILLISECONDS);
+      lastSyncedEventId = getLastSyncedEventId();
+      if (!EventProcessorStatus.ACTIVE.equals(eventProcessorStatus_)
+          && !EventProcessorStatus.PAUSED.equals(eventProcessorStatus_)) {
+        res.setStatus_code(TErrorCode.GENERAL);
+        res.addToError_msgs(
+            "Current state of HMS event processor is " + eventProcessorStatus_);
+        return res;
+      }
+    }
+    if (lastSyncedEventId < waitForEventId) {
+      res.setStatus_code(TErrorCode.GENERAL);
+      res.addToError_msgs(String.format("Timeout waiting for HMS events to be synced. " +
+          "Event id to wait for: %d. Last synced event id: %d",
+          waitForEventId, lastSyncedEventId));
+      return res;
+    }
+    LOG.info("Last synced event id ({}) reached {}", lastSyncedEventId, waitForEventId);
+    res.setStatus_code(TErrorCode.OK);
+    return res;
   }
 }

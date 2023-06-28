@@ -46,6 +46,10 @@ STATESTORED_ARGS = (
   "-statestore_heartbeat_frequency_ms={freq_ms} "
   "-statestore_priority_update_frequency_ms={freq_ms}").format(
     freq_ms=STATESTORE_RPC_FREQUENCY_MS)
+EVENT_SYNC_QUERY_OPTIONS = {
+    "sync_hms_events_wait_time_s": 10,
+    "sync_hms_events_strict_mode": True
+}
 
 
 def wait_single_statestore_heartbeat():
@@ -428,11 +432,11 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
           create table {db}.{tbl} (id int);
           insert into {db}.{tbl} values(1);""".format(db=db_name, tbl=tbl_name))
       # With MetastoreEventProcessor running, the insert event will be processed. Query
-      # the table from Impala.
-      EventProcessorUtils.wait_for_event_processing(self, event_proc_timeout)
-      # Verify that the data is present in Impala.
-      data = self.execute_scalar("select * from %s.%s" % (db_name, tbl_name))
-      assert data == '1'
+      # the table from Impala. Verify that the data is present in Impala.
+      result = self.execute_query_with_hms_sync(
+          "select * from %s.%s" % (db_name, tbl_name), event_proc_timeout)
+      assert len(result.data) == 1
+      assert result.data[0] == '1'
       # Execute ALTER TABLE + DROP in quick succession so they will be processed in the
       # same event batch.
       self.run_stmt_in_hive("""
@@ -1491,3 +1495,96 @@ class TestEventProcessingWithImpala(TestEventProcessingCustomConfigsBase):
     self.cluster.catalogd.set_jvm_log_level("org.apache.impala.util.DebugUtils", "trace")
     self._run_self_events_test(unique_database, vector.get_value('exec_option'),
         use_impala=True)
+
+
+@SkipIfFS.hive
+class TestEventSyncFailures(TestEventProcessingCustomConfigsBase):
+
+  @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=0")
+  def test_hms_event_sync_with_event_processing_disabled(self, vector):
+    """Test with HMS event processing disabled. Verify the error message appears
+    correctly in non-strict mode. Verify the query fails in strict mode."""
+    client = self.default_impala_client(vector.get_value('protocol'))
+    query = "select count(*) from functional.alltypes"
+    # Timeline label shown in the profile when the wait failed.
+    label = "Continuing without syncing Metastore events"
+    # Verify error messages in non-strict mode
+    client.set_configuration({"sync_hms_events_wait_time_s": 10})
+    handle = client.execute_async(query)
+    client.wait_for_finished_timeout(handle, 5)
+    results = client.fetch(query, handle)
+    assert results.success
+    assert len(results.data) == 1
+    assert int(results.data[0]) == 7300
+
+    client_log = client.get_log(handle)
+    expected_error = "Continuing without syncing Metastore events: " \
+                     "HMS event processing is disabled"
+    assert expected_error in client_log
+    profile = client.get_runtime_profile(handle)
+    assert "Errors: " + expected_error in profile, profile
+    self.verify_timeline_item("Query Compilation", label, profile)
+    client.close_query(handle)
+
+    # Verify multi-lines in error log
+    client.set_configuration({"sync_hms_events_wait_time_s": 10,
+                              "debug_action": "0:PREPARE:INJECT_ERROR_LOG"})
+    handle = client.execute_async(query)
+    client.wait_for_finished_timeout(handle, 5)
+    client_log = client.get_log(handle)
+    expected_error += "\nDebug Action: INJECT_ERROR_LOG"
+    assert expected_error in client_log
+    profile = client.get_runtime_profile(handle)
+    assert "Errors: " + expected_error in profile, profile
+    self.verify_timeline_item("Query Compilation", label, profile)
+
+    # Verify failures in strict mode
+    err = self.execute_query_expect_failure(
+        client, query, EVENT_SYNC_QUERY_OPTIONS)
+    expected_error = "Failed to sync events from Metastore: " \
+                     "HMS event processing is disabled"
+    assert expected_error in str(err)
+    client.close_query(handle)
+
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--debug_actions=catalogd_event_processing_delay:SLEEP@2000")
+  def test_hms_event_sync_timeout(self, vector, unique_database):
+    client = self.default_impala_client(vector.get_value('protocol'))
+    # Timeline label shown in the profile when the wait failed.
+    label = "Continuing without syncing Metastore events"
+    # Prepare a partitioned table and load it into catalogd
+    create_stmt = "create table {}.part (i int) partitioned by (p int)".format(
+        unique_database)
+    self.execute_query_expect_success(client, create_stmt)
+    self.execute_query_expect_success(client, "describe {}.part".format(unique_database))
+
+    # Add a partition in Hive which generates an ADD_PARTITION event
+    alter_stmt = "insert into {}.part partition (p=0) values (0)".format(unique_database)
+    self.run_stmt_in_hive(alter_stmt)
+
+    # SELECT gets 0 rows since timeout waiting for HMS events to be synced
+    query = "select * from {}.part".format(unique_database)
+    client.set_configuration({"sync_hms_events_wait_time_s": 2})
+    handle = client.execute_async(query)
+    client.wait_for_finished_timeout(handle, 60)
+    results = client.fetch(query, handle)
+    assert results.success
+    assert len(results.data) == 0
+
+    # Verify the warnings
+    client_log = client.get_log(handle)
+    expected_error = (
+        "Continuing without syncing Metastore events: "
+        "Timeout waiting for HMS events to be synced. Event id to wait for:")
+    assert expected_error in client_log
+    assert ". Last synced event id: " in client_log
+    profile = client.get_runtime_profile(handle)
+    assert "Errors: " + expected_error in profile, profile
+    self.verify_timeline_item("Query Compilation", label, profile)
+    # The duration is something like "2s034ms". Just checking "2s" here.
+    assert "- Continuing without syncing Metastore events: 2s" in profile, profile
+    client.close_query(handle)
+
+    # SELECT gets the new row if waiting for enough time
+    results = self.execute_query_expect_success(client, query, EVENT_SYNC_QUERY_OPTIONS)
+    assert len(results.data) == 1

@@ -55,6 +55,8 @@ public class DescribeDbStmt extends StatementBase {
     return sb.toString() + dbName_;
   }
 
+  @Override
+  public String getParsedDb() { return dbName_; }
   public String getDb() { return dbName_; }
 
   @Override

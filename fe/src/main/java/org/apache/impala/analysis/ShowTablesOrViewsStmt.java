@@ -66,6 +66,7 @@ public abstract class ShowTablesOrViewsStmt extends StatementBase {
     this.postAnalysisDb_ = null;
   }
 
+  @Override
   public String getParsedDb() { return parsedDb_; }
   public String getPattern() { return pattern_; }
 

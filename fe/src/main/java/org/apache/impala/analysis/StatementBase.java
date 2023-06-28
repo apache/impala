@@ -32,6 +32,8 @@ import org.apache.impala.rewrite.ExprRewriter;
 
 import com.google.common.base.Preconditions;
 
+import javax.annotation.Nullable;
+
 import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 
 /**
@@ -67,6 +69,17 @@ public abstract class StatementBase extends StmtNode {
    * Subclasses should override this method as necessary.
    */
   public void collectTableRefs(List<TableRef> tblRefs) { }
+
+  /**
+   * Returns the db name for CREATE/DROP/ALTER database or SHOW TABLES/VIEWS statements.
+   */
+  @Nullable
+  public String getParsedDb() { return null; }
+
+  /**
+   * Returns whether the analysis on the statement requires HMS metadata.
+   */
+  public boolean requiresHmsMetadata() { return true; }
 
   /**
    * Analyzes the statement and throws an AnalysisException if analysis fails. A failure

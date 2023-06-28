@@ -81,7 +81,7 @@ class TestFileCodecInterop(ImpalaTestSuite):
 
     # Make sure Impala's metadata is in sync.
     if cluster_properties.is_catalog_v2_cluster():
-      self.wait_for_table_to_appear(unique_database, hive_table, timeout_s=10)
+      self.wait_for_table_to_appear(unique_database, "t1_hive", timeout_s=10)
     else:
       self.client.execute("invalidate metadata {0}".format(hive_table))
 

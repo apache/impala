@@ -762,6 +762,12 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   187: optional bool use_legacy_hive_timestamp_conversion = false;
+
+  // See comment in ImpalaService.thrift
+  188: optional i32 sync_hms_events_wait_time_s = 0
+
+  // See comment in ImpalaService.thrift
+  189: optional bool sync_hms_events_strict_mode = false
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

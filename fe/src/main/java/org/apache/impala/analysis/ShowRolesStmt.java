@@ -68,4 +68,7 @@ public class ShowRolesStmt extends AuthorizationStmt {
     super.analyze(analyzer);
     requestingUser_ = analyzer.getUser();
   }
+
+  @Override
+  public boolean requiresHmsMetadata() { return false; }
 }

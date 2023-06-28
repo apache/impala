@@ -986,6 +986,18 @@ enum TImpalaQueryOptions {
   // method and they produce the same results for modern time periods (post 1970, and in
   // most instances before that).
   USE_LEGACY_HIVE_TIMESTAMP_CONVERSION = 186
+
+  // Maximum time in seconds to wait for catalogd catching up HMS events before query
+  // planning. Only events generated before the query is submitted will be waited for.
+  // Defaults to 0 which disables waiting. Please only use this on queries that depend on
+  // external modifications. Don't set it cluster wide since it impacts performance.
+  SYNC_HMS_EVENTS_WAIT_TIME_S = 187
+
+  // Whether to fail the query if coordinator fails to wait for HMS events to be synced
+  // in catalogd, e.g. when event-processor is in ERROR state or timed out waiting for
+  // SYNC_HMS_EVENTS_WAIT_TIME_S seconds. Defaults to false, which means coordinator will
+  // start query planning regardless of the failure.
+  SYNC_HMS_EVENTS_STRICT_MODE = 188
 }
 
 // The summary of a DML statement.

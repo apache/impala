@@ -47,10 +47,13 @@ import org.apache.impala.thrift.TPrioritizeLoadResponse;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TResultRow;
+import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TSymbolLookupParams;
 import org.apache.impala.thrift.TSymbolLookupResult;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TUniqueId;
+import org.apache.impala.thrift.TWaitForHmsEventRequest;
+import org.apache.impala.thrift.TWaitForHmsEventResponse;
 import org.apache.impala.util.NativeLibUtil;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
@@ -154,6 +157,9 @@ public class FeSupport {
 
   // Get the number of live queries.
   public native static long NativeNumLiveQueries();
+
+  public native static byte[] NativeWaitForHmsEvents(byte[] thriftReq,
+      byte[] thriftQueryOptions);
 
   /**
    * Locally caches the jar at the specified HDFS location.
@@ -554,6 +560,22 @@ public class FeSupport {
 
   public static long NumLiveQueries() {
     return NativeNumLiveQueries();
+  }
+
+  public static TStatus WaitForHmsEvents(TWaitForHmsEventRequest req,
+      TQueryOptions queryOptions) throws InternalException {
+    try {
+      TSerializer serializer = new TSerializer();
+      byte[] result = NativeWaitForHmsEvents(serializer.serialize(req),
+          serializer.serialize(queryOptions));
+      Preconditions.checkNotNull(result, "result of NativeWaitForHmsEvents is null");
+      TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
+      TStatus status = new TStatus();
+      deserializer.deserialize(status, result);
+      return status;
+    } catch (TException e) {
+      throw new InternalException("Error waiting for HMS events", e);
+    }
   }
 
   /**

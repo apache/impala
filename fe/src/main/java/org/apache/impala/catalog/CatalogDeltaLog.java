@@ -17,12 +17,15 @@
 
 package org.apache.impala.catalog;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.impala.thrift.TCatalogObject;
+import org.apache.impala.thrift.TCatalogObjectType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
@@ -57,8 +60,9 @@ import com.google.common.collect.ImmutableList;
 public class CatalogDeltaLog {
   // Map of the catalog version an object was removed from the catalog
   // to the catalog object, ordered by catalog version.
-  private SortedMap<Long, TCatalogObject> removedCatalogObjects_ =
-      new TreeMap<Long, TCatalogObject>();
+  private SortedMap<Long, TCatalogObject> removedCatalogObjects_ = new TreeMap<>();
+  // Map of the catalog object key to its latest removed version.
+  private Map<String, Long> latestRemovedVersions_ = new HashMap<>();
 
   /**
    * Adds a new item to the map of removed catalog objects.
@@ -66,6 +70,8 @@ public class CatalogDeltaLog {
   public synchronized void addRemovedObject(TCatalogObject catalogObject) {
     Preconditions.checkNotNull(catalogObject);
     removedCatalogObjects_.put(catalogObject.getCatalog_version(), catalogObject);
+    String key = Catalog.toCatalogObjectKey(catalogObject);
+    latestRemovedVersions_.merge(key, catalogObject.catalog_version, Long::max);
   }
 
   /**
@@ -76,7 +82,34 @@ public class CatalogDeltaLog {
       long toVersion) {
     SortedMap<Long, TCatalogObject> objects =
         removedCatalogObjects_.subMap(fromVersion + 1, toVersion + 1);
-    return ImmutableList.<TCatalogObject>copyOf(objects.values());
+    return ImmutableList.copyOf(objects.values());
+  }
+
+  /**
+   * Retrieve all the removed db objects.
+   */
+  public synchronized List<TCatalogObject> retrieveDbObjects() {
+    Map<String, TCatalogObject> res = new HashMap<>();
+    for (TCatalogObject obj : removedCatalogObjects_.values()) {
+      if (obj.type != TCatalogObjectType.DATABASE) continue;
+      res.put(Catalog.toCatalogObjectKey(obj), obj);
+    }
+    return ImmutableList.copyOf(res.values());
+  }
+
+  /**
+   * Retrieve all the removed table objects from dbName.
+   */
+  public synchronized List<TCatalogObject> retrieveTableObjects(String dbName) {
+    Map<String, TCatalogObject> res = new HashMap<>();
+    for (TCatalogObject obj : removedCatalogObjects_.values()) {
+      if (obj.type != TCatalogObjectType.TABLE
+          || !StringUtils.equals(dbName, obj.table.db_name)) {
+        continue;
+      }
+      res.put(Catalog.toCatalogObjectKey(obj), obj);
+    }
+    return ImmutableList.copyOf(res.values());
   }
 
   /**
@@ -89,8 +122,10 @@ public class CatalogDeltaLog {
     // Nothing will be garbage collected so avoid creating a new object.
     if (!removedCatalogObjects_.isEmpty() &&
         removedCatalogObjects_.firstKey() < currentCatalogVersion) {
-      removedCatalogObjects_ = new TreeMap<Long, TCatalogObject>(
+      removedCatalogObjects_ = new TreeMap<>(
           removedCatalogObjects_.tailMap(currentCatalogVersion));
+      latestRemovedVersions_.entrySet().removeIf(
+          e -> e.getValue() < currentCatalogVersion);
     }
   }
 
@@ -110,5 +145,13 @@ public class CatalogDeltaLog {
       if (Catalog.keyEquals(catalogObject, entry.getValue())) return true;
     }
     return false;
+  }
+
+  /**
+   * Gets the recently removed version of a catalog object.
+   */
+  public synchronized long getLatestRemovedVersion(TCatalogObject catalogObject) {
+    String key = Catalog.toCatalogObjectKey(catalogObject);
+    return latestRemovedVersions_.getOrDefault(key, 0L);
   }
 }

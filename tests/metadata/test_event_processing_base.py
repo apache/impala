@@ -17,137 +17,131 @@
 from __future__ import absolute_import, division, print_function
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfFS, SkipIfCatalogV2
-from tests.util.event_processor_utils import EventProcessorUtils
+
+EVENT_SYNC_QUERY_OPTIONS = {
+    "sync_hms_events_wait_time_s": 10,
+    "sync_hms_events_strict_mode": True
+}
 
 
-@SkipIfFS.hive
-@SkipIfCatalogV2.hms_event_polling_disabled()
 class TestEventProcessingBase(ImpalaTestSuite):
 
   @classmethod
-  def _run_test_insert_events_impl(cls, hive_client, impala_client, impala_cluster,
-      unique_database, is_transactional=False):
+  def _run_test_insert_events_impl(cls, unique_database, is_transactional=False):
     """Test for insert event processing. Events are created in Hive and processed in
     Impala. The following cases are tested :
     Insert into table --> for partitioned and non-partitioned table
     Insert overwrite table --> for partitioned and non-partitioned table
     Insert into partition --> for partitioned table
     """
-    # Test table with no partitions.
-    tbl_insert_nopart = 'tbl_insert_nopart'
-    cls.run_stmt_in_hive(
-      "drop table if exists %s.%s" % (unique_database, tbl_insert_nopart))
-    tblproperties = ""
-    if is_transactional:
-      tblproperties = "tblproperties ('transactional'='true'," \
-          "'transactional_properties'='insert_only')"
-    cls.run_stmt_in_hive("create table %s.%s (id int, val int) %s"
-        % (unique_database, tbl_insert_nopart, tblproperties))
-    EventProcessorUtils.wait_for_event_processing_impl(hive_client, impala_cluster)
-    # Test CTAS and insert by Impala with empty results (IMPALA-10765).
-    cls.execute_query_expect_success(impala_client,
-        "create table {db}.ctas_tbl {prop} as select * from {db}.{tbl}"
-        .format(db=unique_database, tbl=tbl_insert_nopart, prop=tblproperties))
-    cls.execute_query_expect_success(impala_client,
-        "insert into {db}.ctas_tbl select * from {db}.{tbl}"
-        .format(db=unique_database, tbl=tbl_insert_nopart))
-    # Test insert into table, this will fire an insert event.
-    cls.run_stmt_in_hive("insert into %s.%s values(101, 200)"
-        % (unique_database, tbl_insert_nopart))
-    # With MetastoreEventProcessor running, the insert event will be processed. Query the
-    # table from Impala.
-    EventProcessorUtils.wait_for_event_processing_impl(hive_client, impala_cluster)
-    # Verify that the data is present in Impala.
-    data = cls.execute_scalar_expect_success(impala_client, "select * from %s.%s" %
-        (unique_database, tbl_insert_nopart))
-    assert data.split('\t') == ['101', '200']
+    with cls.create_impala_client() as impala_client:
+      # Test table with no partitions.
+      tbl_insert_nopart = 'tbl_insert_nopart'
+      cls.run_stmt_in_hive(
+        "drop table if exists %s.%s" % (unique_database, tbl_insert_nopart))
+      tblproperties = ""
+      if is_transactional:
+        tblproperties = "tblproperties ('transactional'='true'," \
+            "'transactional_properties'='insert_only')"
+      cls.run_stmt_in_hive("create table %s.%s (id int, val int) %s"
+          % (unique_database, tbl_insert_nopart, tblproperties))
+      impala_client.set_configuration(EVENT_SYNC_QUERY_OPTIONS)
+      # Test CTAS and insert by Impala with empty results (IMPALA-10765).
+      cls.execute_query_expect_success(impala_client,
+          "create table {db}.ctas_tbl {prop} as select * from {db}.{tbl}"
+          .format(db=unique_database, tbl=tbl_insert_nopart, prop=tblproperties))
+      cls.execute_query_expect_success(impala_client,
+          "insert into {db}.ctas_tbl select * from {db}.{tbl}"
+          .format(db=unique_database, tbl=tbl_insert_nopart))
+      # Test insert into table, this will fire an insert event.
+      cls.run_stmt_in_hive("insert into %s.%s values(101, 200)"
+          % (unique_database, tbl_insert_nopart))
+      # With MetastoreEventProcessor running, the insert event will be processed. Query
+      # the table from Impala. Verify that the data is present in Impala.
+      data = cls.execute_scalar_expect_success(impala_client, "select * from %s.%s" %
+          (unique_database, tbl_insert_nopart))
+      assert data.split('\t') == ['101', '200']
 
-    # Test insert overwrite. Overwrite the existing value.
-    cls.run_stmt_in_hive("insert overwrite table %s.%s values(101, 201)"
-        % (unique_database, tbl_insert_nopart))
-    # Make sure the event has been processed.
-    EventProcessorUtils.wait_for_event_processing_impl(hive_client, impala_cluster)
-    # Verify that the data is present in Impala.
-    data = cls.execute_scalar_expect_success(impala_client, "select * from %s.%s" %
-        (unique_database, tbl_insert_nopart))
-    assert data.split('\t') == ['101', '201']
-    # Test insert overwrite by Impala with empty results (IMPALA-10765).
-    cls.execute_query_expect_success(impala_client,
-        "insert overwrite {db}.{tbl} select * from {db}.ctas_tbl"
-        .format(db=unique_database, tbl=tbl_insert_nopart))
-    result = cls.execute_query_expect_success(impala_client,
-        "select * from {db}.{tbl}".format(db=unique_database, tbl=tbl_insert_nopart))
-    assert len(result.data) == 0
+      # Test insert overwrite. Overwrite the existing value.
+      cls.run_stmt_in_hive("insert overwrite table %s.%s values(101, 201)"
+          % (unique_database, tbl_insert_nopart))
+      # Make sure the event has been processed using sync_hms_events_wait_time_s.
+      # Verify that the data is present in Impala.
+      data = cls.execute_scalar_expect_success(impala_client, "select * from %s.%s" %
+          (unique_database, tbl_insert_nopart))
+      assert data.split('\t') == ['101', '201']
+      # Test insert overwrite by Impala with empty results (IMPALA-10765).
+      cls.execute_query_expect_success(impala_client,
+          "insert overwrite {db}.{tbl} select * from {db}.ctas_tbl"
+          .format(db=unique_database, tbl=tbl_insert_nopart))
+      result = cls.execute_query_expect_success(impala_client,
+          "select * from {db}.{tbl}".format(db=unique_database, tbl=tbl_insert_nopart))
+      assert len(result.data) == 0
 
-    # Test partitioned table.
-    tbl_insert_part = 'tbl_insert_part'
-    cls.run_stmt_in_hive("drop table if exists %s.%s"
-        % (unique_database, tbl_insert_part))
-    cls.run_stmt_in_hive("create table %s.%s (id int, name string) "
-        "partitioned by(day int, month int, year int) %s"
-        % (unique_database, tbl_insert_part, tblproperties))
-    EventProcessorUtils.wait_for_event_processing_impl(hive_client, impala_cluster)
-    # Test insert overwrite by Impala with empty results (IMPALA-10765).
-    cls.execute_query_expect_success(impala_client,
-        "create table {db}.ctas_part partitioned by (day, month, year) {prop} as "
-        "select * from {db}.{tbl}".format(db=unique_database, tbl=tbl_insert_part,
-            prop=tblproperties))
-    cls.execute_query_expect_success(impala_client,
-        "insert into {db}.ctas_part partition(day=0, month=0, year=0) select id, "
-        "name from {db}.{tbl}".format(db=unique_database, tbl=tbl_insert_part))
-    # Insert data into partitions.
-    cls.run_stmt_in_hive(
-        "insert into %s.%s partition(day=28, month=03, year=2019)"
-        "values(101, 'x')" % (unique_database, tbl_insert_part))
-    # Make sure the event has been processed.
-    EventProcessorUtils.wait_for_event_processing_impl(hive_client, impala_cluster)
-    # Verify that the data is present in Impala.
-    data = cls.execute_scalar_expect_success(impala_client,
-        "select * from %s.%s" % (unique_database, tbl_insert_part))
-    assert data.split('\t') == ['101', 'x', '28', '3', '2019']
+      # Test partitioned table.
+      tbl_insert_part = 'tbl_insert_part'
+      cls.run_stmt_in_hive("drop table if exists %s.%s"
+          % (unique_database, tbl_insert_part))
+      cls.run_stmt_in_hive("create table %s.%s (id int, name string) "
+          "partitioned by(day int, month int, year int) %s"
+          % (unique_database, tbl_insert_part, tblproperties))
+      # Test insert overwrite by Impala with empty results (IMPALA-10765).
+      cls.execute_query_expect_success(impala_client,
+          "create table {db}.ctas_part partitioned by (day, month, year) {prop} as "
+          "select * from {db}.{tbl}".format(db=unique_database, tbl=tbl_insert_part,
+              prop=tblproperties))
+      cls.execute_query_expect_success(impala_client,
+          "insert into {db}.ctas_part partition(day=0, month=0, year=0) select id, "
+          "name from {db}.{tbl}".format(db=unique_database, tbl=tbl_insert_part))
+      # Insert data into partitions.
+      cls.run_stmt_in_hive(
+          "insert into %s.%s partition(day=28, month=03, year=2019)"
+          "values(101, 'x')" % (unique_database, tbl_insert_part))
+      # Make sure the event has been processed using sync_hms_events_wait_time_s.
+      # Verify that the data is present in Impala.
+      data = cls.execute_scalar_expect_success(impala_client,
+          "select * from %s.%s" % (unique_database, tbl_insert_part))
+      assert data.split('\t') == ['101', 'x', '28', '3', '2019']
 
-    # Test inserting into existing partitions.
-    cls.run_stmt_in_hive(
-        "insert into %s.%s partition(day=28, month=03, year=2019)"
-        "values(102, 'y')" % (unique_database, tbl_insert_part))
-    EventProcessorUtils.wait_for_event_processing_impl(hive_client, impala_cluster)
-    # Verify that the data is present in Impala.
-    data = cls.execute_scalar_expect_success(impala_client,
-        "select count(*) from %s.%s where day=28 and month=3 "
-        "and year=2019" % (unique_database, tbl_insert_part))
-    assert data.split('\t') == ['2']
-    # Test inserting into existing partitions by Impala with empty results
-    # (IMPALA-10765).
-    cls.execute_query_expect_success(impala_client,
-        "insert into {db}.{tbl} partition(day=28, month=03, year=2019) "
-        "select id, name from {db}.ctas_part"
-        .format(db=unique_database, tbl=tbl_insert_part))
+      # Test inserting into existing partitions.
+      cls.run_stmt_in_hive(
+          "insert into %s.%s partition(day=28, month=03, year=2019)"
+          "values(102, 'y')" % (unique_database, tbl_insert_part))
+      # Verify that the data is present in Impala.
+      data = cls.execute_scalar_expect_success(impala_client,
+          "select count(*) from %s.%s where day=28 and month=3 "
+          "and year=2019" % (unique_database, tbl_insert_part))
+      assert data.split('\t') == ['2']
+      # Test inserting into existing partitions by Impala with empty results
+      # (IMPALA-10765).
+      cls.execute_query_expect_success(impala_client,
+          "insert into {db}.{tbl} partition(day=28, month=03, year=2019) "
+          "select id, name from {db}.ctas_part"
+          .format(db=unique_database, tbl=tbl_insert_part))
 
-    # Test insert overwrite into existing partitions
-    cls.run_stmt_in_hive(
-        "insert overwrite table %s.%s partition(day=28, month=03, "
-        "year=2019)" "values(101, 'z')" % (unique_database, tbl_insert_part))
-    EventProcessorUtils.wait_for_event_processing_impl(hive_client, impala_cluster)
-    # Verify that the data is present in Impala.
-    data = cls.execute_scalar_expect_success(impala_client,
-        "select * from %s.%s where day=28 and month=3 and"
-        " year=2019 and id=101" % (unique_database, tbl_insert_part))
-    assert data.split('\t') == ['101', 'z', '28', '3', '2019']
-    # Test insert overwrite into existing partitions by Impala with empty results
-    # (IMPALA-10765).
-    cls.execute_query_expect_success(impala_client, "insert overwrite {db}.{tbl} "
-                       "partition(day=28, month=03, year=2019) "
-                       "select id, name from {db}.ctas_part"
-                       .format(db=unique_database, tbl=tbl_insert_part))
-    result = cls.execute_query_expect_success(impala_client, "select * from {db}.{tbl} "
-                                "where day=28 and month=3 and year=2019"
-                                .format(db=unique_database, tbl=tbl_insert_part))
-    assert len(result.data) == 0
+      # Test insert overwrite into existing partitions
+      cls.run_stmt_in_hive(
+          "insert overwrite table %s.%s partition(day=28, month=03, "
+          "year=2019)" "values(101, 'z')" % (unique_database, tbl_insert_part))
+      # Verify that the data is present in Impala.
+      data = cls.execute_scalar_expect_success(impala_client,
+          "select * from %s.%s where day=28 and month=3 and"
+          " year=2019 and id=101" % (unique_database, tbl_insert_part))
+      assert data.split('\t') == ['101', 'z', '28', '3', '2019']
+      impala_client.clear_configuration()
+      # Test insert overwrite into existing partitions by Impala with empty results
+      # (IMPALA-10765).
+      cls.execute_query_expect_success(impala_client, "insert overwrite {db}.{tbl} "
+                         "partition(day=28, month=03, year=2019) "
+                         "select id, name from {db}.ctas_part"
+                         .format(db=unique_database, tbl=tbl_insert_part))
+      result = cls.execute_query_expect_success(impala_client, "select * from {db}.{tbl} "
+                                  "where day=28 and month=3 and year=2019"
+                                  .format(db=unique_database, tbl=tbl_insert_part))
+      assert len(result.data) == 0
 
   @classmethod
-  def _run_event_based_replication_tests_impl(cls, hive_client, impala_client,
-      impala_cluster, filesystem_client, transactional=True):
+  def _run_event_based_replication_tests_impl(cls, filesystem_client, transactional=True):
     """Hive Replication relies on the insert events generated on the tables.
     This test issues some basic replication commands from Hive and makes sure
     that the replicated table has correct data."""
@@ -156,12 +150,13 @@ class TestEventProcessingBase(ImpalaTestSuite):
     target_db = ImpalaTestSuite.get_random_name("repl_target_")
     unpartitioned_tbl = "unpart_tbl"
     partitioned_tbl = "part_tbl"
+    impala_client = cls.create_impala_client()
     try:
       cls.run_stmt_in_hive("create database {0}".format(source_db))
       cls.run_stmt_in_hive(
         "alter database {0} set dbproperties ('repl.source.for'='xyz')"
         .format(source_db))
-      EventProcessorUtils.wait_for_event_processing_impl(hive_client, impala_cluster)
+      impala_client.set_configuration(EVENT_SYNC_QUERY_OPTIONS)
       # explicit create table command since create table like doesn't allow tblproperties
       impala_client.execute("create table {0}.{1} (a string, b string) stored as parquet"
         " {2}".format(source_db, unpartitioned_tbl, TBLPROPERTIES))
@@ -195,7 +190,6 @@ class TestEventProcessingBase(ImpalaTestSuite):
       # replicate the table from source to target
       cls.run_stmt_in_hive("repl load {0} into {1}".format(source_db,
         target_db))
-      EventProcessorUtils.wait_for_event_processing_impl(hive_client, impala_cluster)
       assert unpartitioned_tbl in impala_client.execute(
         "show tables in {0}".format(target_db)).get_data()
       assert partitioned_tbl in impala_client.execute(
@@ -221,9 +215,6 @@ class TestEventProcessingBase(ImpalaTestSuite):
       # replicate the table from source to target
       cls.run_stmt_in_hive("repl load {0} into {1}".format(source_db,
         target_db))
-      # we wait until the events catch up in case repl command above did some HMS
-      # operations.
-      EventProcessorUtils.wait_for_event_processing_impl(hive_client, impala_cluster)
       # confirm the number of rows in target match with the source table.
       rows_in_unpart_tbl_target = int(cls.execute_scalar_expect_success(impala_client,
         "select count(*) from {0}.{1}".format(target_db, unpartitioned_tbl))
@@ -246,9 +237,6 @@ class TestEventProcessingBase(ImpalaTestSuite):
       # replicate the table from source to target
       cls.run_stmt_in_hive("repl load {0} into {1}".format(source_db,
         target_db))
-      # we wait until the events catch up in case repl command above did some HMS
-      # operations.
-      EventProcessorUtils.wait_for_event_processing_impl(hive_client, impala_cluster)
       # confirm the number of rows in target match with the source table.
       rows_in_unpart_tbl_target = int(cls.execute_scalar_expect_success(impala_client,
         "select count(*) from {0}.{1}".format(target_db, unpartitioned_tbl))
@@ -270,9 +258,6 @@ class TestEventProcessingBase(ImpalaTestSuite):
       # replicate the table from source to target
       cls.run_stmt_in_hive("repl load {0} into {1}".format(source_db,
         target_db))
-      # we wait until the events catch up in case repl command above did some HMS
-      # operations.
-      EventProcessorUtils.wait_for_event_processing_impl(hive_client, impala_cluster)
       # confirm the number of rows in target match with the source table.
       rows_in_unpart_tbl_source = int(cls.execute_scalar_expect_success(impala_client,
         "select count(*) from "
@@ -298,9 +283,6 @@ class TestEventProcessingBase(ImpalaTestSuite):
       # replicate the table from source to target
       cls.run_stmt_in_hive("repl load {0} into {1}".format(source_db,
         target_db))
-      # we wait until the events catch up in case repl command above did some HMS
-      # operations.
-      EventProcessorUtils.wait_for_event_processing_impl(hive_client, impala_cluster)
       # confirm the number of rows in target match with the source table.
       rows_in_unpart_tbl_target = int(cls.execute_scalar_expect_success(impala_client,
         "select count(*) from {0}.{1}".format(target_db, unpartitioned_tbl))
@@ -328,6 +310,7 @@ class TestEventProcessingBase(ImpalaTestSuite):
       if target_db_obj is not None and target_db_obj.managedLocationUri is not None:
         filesystem_client.delete_file_dir(
           target_db_obj.managedLocationUri, True)
+      impala_client.close()
 
   @classmethod
   def __get_db_nothrow(self, name):

@@ -28,7 +28,6 @@ from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.skip import SkipIfKudu, SkipIfBuildType, SkipIf
 from tests.common.test_dimensions import BEESWAX, add_mandatory_exec_option
 from tests.common.test_result_verifier import error_msg_expected
-from tests.util.event_processor_utils import EventProcessorUtils
 
 KUDU_MASTER_HOSTS = pytest.config.option.kudu_master_hosts
 LOG = logging.getLogger(__name__)
@@ -319,15 +318,13 @@ class TestKuduHMSIntegration(CustomKuduTest):
     kudu_client.delete_table(kudu_tbl_name)
     assert not kudu_client.table_exists(kudu_tbl_name)
 
-    # Wait for events to prevent race condition
-    EventProcessorUtils.wait_for_event_processing(self)
-
     try:
-      cursor.execute("DROP TABLE %s" % kudu_tbl_name)
+      self.execute_query_with_hms_sync(
+          "DROP TABLE %s" % kudu_tbl_name, 10, strict=True)
       assert False
     except Exception as e:
       LOG.info(str(e))
-      "Table does not exist: %s" % kudu_tbl_name in str(e)
+      assert "Table does not exist: %s" % kudu_tbl_name in str(e)
 
   @pytest.mark.execute_serially
   def test_drop_external_kudu_table(self, cursor, kudu_client, unique_database):

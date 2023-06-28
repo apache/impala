@@ -25,7 +25,6 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TShowGrantPrincipalParams;
 
-import java.util.HashSet;
 import java.util.List;
 
 /**
@@ -106,4 +105,7 @@ public class ShowGrantPrincipalStmt extends AuthorizationStmt {
     }
     return params;
   }
+
+  @Override
+  public boolean requiresHmsMetadata() { return false; }
 }

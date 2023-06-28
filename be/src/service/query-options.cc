@@ -1334,6 +1334,17 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_use_legacy_hive_timestamp_conversion(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::SYNC_HMS_EVENTS_WAIT_TIME_S: {
+        int32_t time_s = 0;
+        RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckNonNegative<int32_t>(
+            option, value, &time_s));
+        query_options->__set_sync_hms_events_wait_time_s(time_s);
+        break;
+      }
+      case TImpalaQueryOptions::SYNC_HMS_EVENTS_STRICT_MODE: {
+        query_options->__set_sync_hms_events_strict_mode(IsTrue(value));
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {

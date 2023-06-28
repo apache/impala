@@ -29,6 +29,8 @@
 #include "service/impala-server.h"
 #include "service/hs2-util.h"
 #include "util/debug-util.h"
+#include "util/histogram-metric.h"
+#include "util/impalad-metrics.h"
 #include "util/runtime-profile-counters.h"
 #include "util/string-parser.h"
 #include "util/test-info.h"
@@ -490,4 +492,22 @@ Status CatalogOpExecutor::SetEventProcessorStatus(
   RETURN_IF_ERROR(rpc_status.status);
   if (result->status.status_code != TErrorCode::OK) return Status(result->status);
   return Status::OK();
+}
+
+Status CatalogOpExecutor::WaitForHmsEvent(const TWaitForHmsEventRequest& req,
+    TWaitForHmsEventResponse* resp) {
+  int attempt = 0; // Used for debug action only.
+  MonotonicStopWatch sw;
+  sw.Start();
+  CatalogServiceConnection::RpcStatus rpc_status =
+      CatalogServiceConnection::DoRpcWithRetry(env_->catalogd_client_cache(),
+          *ExecEnv::GetInstance()->GetCatalogdAddress().get(),
+          &CatalogServiceClientWrapper::WaitForHmsEvent, req,
+          FLAGS_catalog_client_connection_num_retries,
+          FLAGS_catalog_client_rpc_retry_interval_ms,
+          [&attempt]() { return CatalogRpcDebugFn(&attempt); }, resp);
+  RETURN_IF_ERROR(rpc_status.status);
+  ImpaladMetrics::WAIT_FOR_HMS_EVENT_DURATIONS->Update(
+    sw.ElapsedTime() / NANOS_PER_MICRO / MICROS_PER_MILLI);
+  return Status(resp->status);
 }
