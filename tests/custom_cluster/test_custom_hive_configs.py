@@ -20,7 +20,7 @@ import pytest
 from os import getenv
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfHive2
+from tests.common.skip import SkipIfHive2, SkipIf
 
 HIVE_SITE_EXT_DIR = getenv('IMPALA_HOME') + '/fe/src/test/resources/hive-site-ext'
 
@@ -35,6 +35,7 @@ class TestCustomHiveConfigs(CustomClusterTestSuite):
     super(TestCustomHiveConfigs, cls).setup_class()
 
   @SkipIfHive2.acid
+  @SkipIf.is_test_jdk
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(hive_conf_dir=HIVE_SITE_EXT_DIR)
   def test_ctas_read_write_consistence(self, unique_database):

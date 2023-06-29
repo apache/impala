@@ -25,12 +25,14 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import (
     CustomClusterTestSuite,
     DEFAULT_CLUSTER_SIZE)
+from tests.common.skip import SkipIf
 from tests.util.filesystem_utils import IS_ISILON, IS_LOCAL
 
 
 NUM_SUBSCRIBERS = DEFAULT_CLUSTER_SIZE + 1
 
 
+@SkipIf.is_test_jdk
 class TestHiveMetaStoreFailure(CustomClusterTestSuite):
   """Tests to validate the Catalog Service continues to function even if the HMS
   fails."""
@@ -113,6 +115,7 @@ class TestHiveMetaStoreFailure(CustomClusterTestSuite):
         "MetaStoreClient lost connection. Attempting to reconnect", expected_count=-1)
 
 
+@SkipIf.is_test_jdk
 class TestCatalogHMSFailures(CustomClusterTestSuite):
   """Test Catalog behavior when HMS is not present."""
 

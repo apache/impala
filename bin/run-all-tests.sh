@@ -32,6 +32,15 @@ setup_report_build_error
 : ${TIMEOUT_FOR_RUN_ALL_TESTS_MINS:=1200}
 KERB_ARGS=""
 
+# Use a different JDK for testing. Picked up by impala-config and start-impala-cluster.
+if [ ! -z "${TEST_JAVA_HOME_OVERRIDE:-}" ]; then
+  export MINICLUSTER_JAVA_HOME="${JAVA_HOME}"
+  export IMPALA_JAVA_HOME_OVERRIDE="${TEST_JAVA_HOME_OVERRIDE}"
+elif [ ! -z "${TEST_JDK_VERSION:-}" ]; then
+  export MINICLUSTER_JAVA_HOME="${JAVA_HOME}"
+  export IMPALA_JDK_VERSION="${TEST_JDK_VERSION}"
+fi
+
 . "${IMPALA_HOME}/bin/impala-config.sh" > /dev/null 2>&1
 . "${IMPALA_HOME}/testdata/bin/run-step.sh"
 if "${CLUSTER_DIR}/admin" is_kerberized; then

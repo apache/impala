@@ -99,6 +99,10 @@ if kernel_version_match is not None and len(kernel_version_match.groups()) == 4:
   kernel_version = [int(x) for x in list(kernel_version_match.groups())]
 IS_BUGGY_EL6_KERNEL = 'el6' in kernel_release and kernel_version < [2, 6, 32, 674]
 
+# Detect if we're testing a different JDK than we used to build and start minicluster.
+IS_TEST_JDK = os.environ.get("TEST_JAVA_HOME_OVERRIDE",
+                             os.environ.get("TEST_JDK_VERSION", "")) != ""
+
 class ImpalaBuildFlavors:
   """
   Represents the possible CMAKE_BUILD_TYPE values. These build flavors are needed

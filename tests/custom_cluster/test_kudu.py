@@ -26,7 +26,7 @@ from time import sleep
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.kudu_test_suite import KuduTestSuite
-from tests.common.skip import SkipIfKudu, SkipIfBuildType
+from tests.common.skip import SkipIfKudu, SkipIfBuildType, SkipIf
 from tests.common.test_dimensions import add_exec_option_dimension
 from tests.util.event_processor_utils import EventProcessorUtils
 
@@ -139,6 +139,7 @@ class TestKuduClientTimeout(CustomKuduTest):
     self.run_test_case('QueryTest/kudu-timeouts-impalad', vector)
 
 
+@SkipIf.is_test_jdk
 class TestKuduHMSIntegration(CustomKuduTest):
   START_END_TIME_LINEAGE_LOG_DIR = tempfile.mkdtemp(prefix="start_end_time")
 
@@ -740,6 +741,7 @@ class TestKuduTransactionIgnoreConflict(TestKuduTransactionBase):
     self._test_kudu_txn_ctas(cursor, unique_database, False, "no error")
 
 
+@SkipIf.is_test_jdk
 class TestKuduTxnKeepalive(CustomKuduTest):
   """
   Tests the Kudu transaction to ensure the transaction handle kept by the front-end in

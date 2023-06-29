@@ -29,7 +29,7 @@ from subprocess import check_call
 
 from getpass import getuser
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfFS, SkipIfHive2
+from tests.common.skip import SkipIfFS, SkipIfHive2, SkipIf
 from tests.common.test_dimensions import (create_client_protocol_dimension,
     create_exec_option_dimension, create_orc_dimension)
 from tests.util.hdfs_util import NAMENODE
@@ -724,6 +724,7 @@ class TestRanger(CustomClusterTestSuite):
                            user=ADMIN)
 
   @pytest.mark.execute_serially
+  @SkipIf.is_test_jdk
   @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS, reset_ranger=True)
   def test_show_grant_hive_privilege(self, unique_name):
@@ -2027,6 +2028,7 @@ class TestRanger(CustomClusterTestSuite):
                            user=ADMIN)
 
   @pytest.mark.execute_serially
+  @SkipIf.is_test_jdk
   @SkipIfFS.hive
   @SkipIfHive2.ranger_auth
   @CustomClusterTestSuite.with_args()

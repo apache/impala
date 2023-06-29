@@ -18,6 +18,7 @@
 package org.apache.impala.customservice;
 
 import static org.junit.Assert.assertEquals;
+import org.apache.commons.lang.StringUtils;
 
 import org.apache.impala.analysis.AnalyzeKuduDDLTest;
 import org.apache.impala.analysis.AuditingKuduTest;
@@ -47,6 +48,15 @@ public class KuduHMSIntegrationTest {
   private static void restartKudu(boolean enableHMSIntegration)
       throws Exception {
     List<String> envp = getSystemEnv(enableHMSIntegration);
+    String altJavaHome = System.getenv("MINICLUSTER_JAVA_HOME");
+    if (!StringUtils.isEmpty(altJavaHome)) {
+      // Restart Kudu with the same Java version. Skip loading libjsig.
+      envp.removeIf(s -> s.startsWith("LD_PRELOAD="));
+      envp.removeIf(s -> s.startsWith("JAVA="));
+      envp.removeIf(s -> s.startsWith("JAVA_HOME="));
+      envp.add("JAVA=" + altJavaHome + "/bin/java");
+      envp.add("JAVA_HOME=" + altJavaHome);
+    }
     int exitVal = CustomServiceRunner.RestartMiniclusterComponent(
         "kudu", envp.toArray(new String[envp.size()]));
     assertEquals(0, exitVal);
