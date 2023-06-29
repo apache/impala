@@ -363,7 +363,7 @@ Status LlvmCodeGen::LinkModuleFromLocalFs(const string& file) {
   RETURN_IF_ERROR(LoadModuleFromFile(file, &new_module));
 
   // The module data layout must match the one selected by the execution engine.
-  new_module->setDataLayout(execution_engine_->getDataLayout());
+  new_module->setDataLayout(execution_engine()->getDataLayout());
 
   // Parse all functions' names from the new module and find those which also exist in
   // the main module. They are declarations in the new module or duplicated definitions
@@ -449,7 +449,7 @@ Status LlvmCodeGen::CreateImpalaCodegen(FragmentState* state,
 }
 
 Status LlvmCodeGen::Init(unique_ptr<llvm::Module> module) {
-  DCHECK(module != NULL);
+  DCHECK(module != nullptr);
 
   llvm::CodeGenOpt::Level opt_level = llvm::CodeGenOpt::Aggressive;
 #ifndef NDEBUG
@@ -469,43 +469,52 @@ Status LlvmCodeGen::Init(unique_ptr<llvm::Module> module) {
   builder.setMAttrs(cpu_attrs_);
   builder.setErrorStr(&error_string_);
 
-  execution_engine_.reset(builder.create());
-  if (execution_engine_ == NULL) {
-    module_ = NULL; // module_ was owned by builder.
+  unique_ptr<llvm::ExecutionEngine> execution_engine =
+      unique_ptr<llvm::ExecutionEngine>(builder.create());
+  if (execution_engine == nullptr) {
+    module_ = nullptr; // module_ was owned by builder.
     stringstream ss;
     ss << "Could not create ExecutionEngine: " << error_string_;
     return Status(ss.str());
   }
 
   // The module data layout must match the one selected by the execution engine.
-  module_->setDataLayout(execution_engine_->getDataLayout());
+  module_->setDataLayout(execution_engine->getDataLayout());
 
   void_type_ = llvm::Type::getVoidTy(context());
   ptr_type_ = llvm::PointerType::get(i8_type(), 0);
   true_value_ = llvm::ConstantInt::get(context(), llvm::APInt(1, true, true));
   false_value_ = llvm::ConstantInt::get(context(), llvm::APInt(1, false, true));
 
-  SetupJITListeners();
+  unique_ptr<CodegenSymbolEmitter> symbol_emitter = SetupSymbolEmitter(
+      execution_engine.get());
+
+  execution_engine_wrapper_ = make_shared<LlvmExecutionEngineWrapper>(
+      std::move(execution_engine), std::move(symbol_emitter));
 
   RETURN_IF_ERROR(LoadIntrinsics());
 
   return Status::OK();
 }
 
-void LlvmCodeGen::SetupJITListeners() {
+unique_ptr<CodegenSymbolEmitter> LlvmCodeGen::SetupSymbolEmitter(
+    llvm::ExecutionEngine* execution_engine) {
   bool need_symbol_emitter = !FLAGS_asm_module_dir.empty() || FLAGS_perf_map;
-  if (!need_symbol_emitter) return;
-  symbol_emitter_.reset(new CodegenSymbolEmitter(id_));
-  execution_engine_->RegisterJITEventListener(symbol_emitter_.get());
-  symbol_emitter_->set_emit_perf_map(FLAGS_perf_map);
+  if (!need_symbol_emitter) return nullptr;
+  unique_ptr<CodegenSymbolEmitter> symbol_emitter =
+      make_unique<CodegenSymbolEmitter>(id_);
+  execution_engine->RegisterJITEventListener(symbol_emitter.get());
+  symbol_emitter->set_emit_perf_map(FLAGS_perf_map);
 
   if (!FLAGS_asm_module_dir.empty()) {
-    symbol_emitter_->set_asm_path(Substitute("$0/$1.asm", FLAGS_asm_module_dir, id_));
+    symbol_emitter->set_asm_path(Substitute("$0/$1.asm", FLAGS_asm_module_dir, id_));
   }
+
+  return symbol_emitter;
 }
 
 LlvmCodeGen::~LlvmCodeGen() {
-  DCHECK(execution_engine_ == nullptr) << "Must Close() before destruction";
+  DCHECK(execution_engine_wrapper_ == nullptr) << "Must Close() before destruction";
 }
 
 void LlvmCodeGen::Close() {
@@ -517,10 +526,8 @@ void LlvmCodeGen::Close() {
   }
   if (mem_tracker_ != nullptr) mem_tracker_->Close();
 
-  // Execution engine executes callback on event listener, so tear down engine first.
-  execution_engine_.reset();
-  execution_engine_cached_.reset();
-  symbol_emitter_.reset();
+  execution_engine_wrapper_.reset();
+  execution_engine_wrapper_cached_.reset();
   module_ = nullptr;
 }
 
@@ -933,7 +940,7 @@ Status LlvmCodeGen::LoadFunction(const TFunction& fn, const string& symbol,
 #endif
     // Associate the dynamically loaded function pointer with the Function* we defined.
     // This tells LLVM where the compiled function definition is located in memory.
-    execution_engine_->addGlobalMapping(*llvm_fn, fn_ptr);
+    execution_engine()->addGlobalMapping(*llvm_fn, fn_ptr);
     // Disable the codegen cache because codegen cache uses the llvm module bitcode as
     // the key while the bitcode doesn't contain the global function mapping of the
     // execution engine. If the mapping is changed during running, like udf recreation,
@@ -1150,12 +1157,13 @@ bool LlvmCodeGen::LookupCache(CodeGenCacheKey& cache_key) {
   CodeGenCache* cache = ExecEnv::GetInstance()->codegen_cache();
   DCHECK(cache != nullptr);
   Status lookup_status = cache->Lookup(cache_key,
-      state_->query_options().codegen_cache_mode, &entry, &execution_engine_cached_);
-  bool entry_exist = lookup_status.ok() && !entry.Empty();
+      state_->query_options().codegen_cache_mode, &entry,
+      &execution_engine_wrapper_cached_);
+  bool entry_exists = lookup_status.ok() && !entry.Empty();
   LOG(INFO) << DebugCacheEntryString(cache_key, true /*is_lookup*/,
       CodeGenCacheModeAnalyzer::is_debug(state_->query_options().codegen_cache_mode),
-      entry_exist);
-  if (entry_exist) {
+      entry_exists);
+  if (entry_exists) {
     // Fallback to normal procedure if function names hashcode is not expected.
     // The names hashcode should be the same unless there is a collision on the
     // key, we expect this case is very rare.
@@ -1169,9 +1177,11 @@ bool LlvmCodeGen::LookupCache(CodeGenCacheKey& cache_key) {
       return false;
     }
 
-    // execution_engine_cached_ is used to keep the life of the jitted functions in
-    // case the engine is evicted in the global cache.
-    DCHECK(execution_engine_cached_ != nullptr);
+    // execution_engine_wrapper_cached_ is used to keep the life of the jitted functions
+    // in case the engine is evicted in the global cache.
+    DCHECK(execution_engine_wrapper_cached_ != nullptr);
+    llvm::ExecutionEngine* cached_execution_engine =
+        execution_engine_wrapper_cached_->execution_engine();
     vector<void*> jitted_funcs;
     // Get pointers to all codegen'd functions.
     for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {
@@ -1183,7 +1193,7 @@ bool LlvmCodeGen::LookupCache(CodeGenCacheKey& cache_key) {
       // for key collision cases, we expect all the functions should be in the
       // cached execution engine.
       void* jitted_function = reinterpret_cast<void*>(
-          execution_engine_cached_->getFunctionAddress(function->getName()));
+          cached_execution_engine->getFunctionAddress(function->getName()));
       if (jitted_function == nullptr) {
         LOG(WARNING) << "Failed to get a jitted function from cache: "
                      << function->getName().data()
@@ -1204,8 +1214,8 @@ bool LlvmCodeGen::LookupCache(CodeGenCacheKey& cache_key) {
     COUNTER_SET(num_functions_, entry.num_functions);
     COUNTER_SET(num_instructions_, entry.num_instructions);
   }
-  cache->IncHitOrMissCount(/*hit*/ entry_exist);
-  return entry_exist;
+  cache->IncHitOrMissCount(/*hit*/ entry_exists);
+  return entry_exists;
 }
 
 string LlvmCodeGen::GetAllFunctionNames() {
@@ -1250,7 +1260,7 @@ void LlvmCodeGen::PruneModule() {
   }
 
   llvm::ModuleAnalysisManager module_analysis_manager;
-  llvm::PassBuilder pass_builder(execution_engine_->getTargetMachine());
+  llvm::PassBuilder pass_builder(execution_engine()->getTargetMachine());
   pass_builder.registerModuleAnalyses(module_analysis_manager);
 
   llvm::ModulePassManager module_pass_manager;
@@ -1348,7 +1358,7 @@ Status LlvmCodeGen::FinalizeModule() {
   {
     SCOPED_TIMER(compile_timer_);
     // Finalize module, which compiles all functions.
-    execution_engine_->finalizeObject();
+    execution_engine()->finalizeObject();
   }
 
   SetFunctionPointers();
@@ -1413,7 +1423,7 @@ Status LlvmCodeGen::OptimizeModule() {
   // TODO: we can likely muck with this to get better compile speeds or write
   // our own passes.  Our subexpression elimination optimization can be rolled into
   // a pass.
-  llvm::PassBuilder pass_builder(execution_engine_->getTargetMachine());
+  llvm::PassBuilder pass_builder(execution_engine()->getTargetMachine());
   pass_builder.registerModuleAnalyses(MAM);
   pass_builder.registerCGSCCAnalyses(CGAM);
   pass_builder.registerFunctionAnalyses(FAM);
@@ -1458,7 +1468,7 @@ void LlvmCodeGen::SetFunctionPointers() {
   for (const std::pair<llvm::Function*, CodegenFnPtrBase*>& fn_pair
       : fns_to_jit_compile_) {
     llvm::Function* function = fn_pair.first;
-    void* jitted_function = execution_engine_->getPointerToFunction(function);
+    void* jitted_function = execution_engine()->getPointerToFunction(function);
     DCHECK(jitted_function != nullptr) << "Failed to jit " << function->getName().data();
     fn_pair.second->store(jitted_function);
   }
@@ -1473,7 +1483,7 @@ void LlvmCodeGen::DestroyModule() {
   llvm_intrinsics_.clear();
   hash_fns_.clear();
   fns_to_jit_compile_.clear();
-  execution_engine_->removeModule(module_);
+  execution_engine()->removeModule(module_);
   module_ = NULL;
 }
 

@@ -203,20 +203,21 @@ class CodeGenCache {
   /// entry will be reset to empty.
   /// Return Status::Okay unless there is any internal error to throw.
   Status Lookup(const CodeGenCacheKey& key, const TCodeGenCacheMode::type& mode,
-      CodeGenCacheEntry* entry, std::shared_ptr<llvm::ExecutionEngine>* execution_engine);
+      CodeGenCacheEntry* entry,
+      std::shared_ptr<LlvmExecutionEngineWrapper>* execution_engine);
 
   /// Store the cache entry with the specific cache key.
-  Status Store(const CodeGenCacheKey& key, const LlvmCodeGen* codegen,
+  Status Store(const CodeGenCacheKey& key, LlvmCodeGen* codegen,
       const TCodeGenCacheMode::type& mode);
 
   /// Store the shared pointer of llvm execution engine to the cache to keep all the
   /// jitted functions in that engine alive.
-  void StoreEngine(const LlvmCodeGen* codegen);
+  void StoreEngine(LlvmCodeGen* codegen);
 
-  /// Look up the shared pointer of llvm execution engine by its raw pointer address.
-  /// If found, return true. Ohterwise, return false.
+  /// Look up the shared pointer of the LlvmExecutionEngineWrapper by the raw pointer of
+  /// its execution engine field. If found, return true. Ohterwise, return false.
   bool LookupEngine(const llvm::ExecutionEngine* engine,
-      std::shared_ptr<llvm::ExecutionEngine>* execution_engine);
+      std::shared_ptr<LlvmExecutionEngineWrapper>* execution_engine_wrapper);
 
   /// Remove the shared pointer of llvm execution engine from the cache by its raw
   /// pointer address.
@@ -255,7 +256,7 @@ class CodeGenCache {
   friend class LlvmCodeGenCacheTest;
 
   /// Helper function to store the entry to the cache.
-  Status StoreInternal(const CodeGenCacheKey& key, const LlvmCodeGen* codegen,
+  Status StoreInternal(const CodeGenCacheKey& key, LlvmCodeGen* codegen,
       const TCodeGenCacheMode::type& mode);
 
   /// Indicate if the cache is closed. If is closed, no call is allowed for any functions
@@ -289,10 +290,10 @@ class CodeGenCache {
   /// Protects to the map of cached engines.
   std::mutex cached_engines_lock_;
 
-  /// Stores the llvm execution engine shared pointer to keep the jitted functions alive.
-  /// The shared pointer entry could be removed when cache entry evicted or the whole
-  /// cache destructed.
-  std::unordered_map<const llvm::ExecutionEngine*, std::shared_ptr<llvm::ExecutionEngine>>
-      cached_engines_;
+  /// Stores shared pointers to LlvmExecutionEngineWrappers to keep the jitted functions
+  /// alive. The shared pointer entries could be removed when the cache entry is evicted
+  /// or when the whole cache is destructed.
+  std::unordered_map<const llvm::ExecutionEngine*,
+      std::shared_ptr<LlvmExecutionEngineWrapper>> cached_engines_;
 };
 } // namespace impala

@@ -105,7 +105,7 @@ void CodeGenCache::ReleaseResources() {
 
 Status CodeGenCache::Lookup(const CodeGenCacheKey& cache_key,
     const TCodeGenCacheMode::type& mode, CodeGenCacheEntry* entry,
-    shared_ptr<llvm::ExecutionEngine>* execution_engine) {
+    shared_ptr<LlvmExecutionEngineWrapper>* execution_engine) {
   DCHECK(!is_closed_);
   DCHECK(cache_ != nullptr);
   DCHECK(entry != nullptr);
@@ -139,7 +139,7 @@ Status CodeGenCache::Lookup(const CodeGenCacheKey& cache_key,
 }
 
 Status CodeGenCache::StoreInternal(const CodeGenCacheKey& cache_key,
-    const LlvmCodeGen* codegen, const TCodeGenCacheMode::type& mode) {
+    LlvmCodeGen* codegen, const TCodeGenCacheMode::type& mode) {
   // In normal mode, we will store the whole key content to the cache.
   // Otherwise, in optimal mode, we will only store the hash code and length of the key.
   Slice key = cache_key.optimal_key_slice();
@@ -158,14 +158,14 @@ Status CodeGenCache::StoreInternal(const CodeGenCacheKey& cache_key,
   }
   CodeGenCacheEntry* cache_entry =
       reinterpret_cast<CodeGenCacheEntry*>(cache_->MutableValue(&pending_handle));
-  cache_entry->Reset(codegen->execution_engine_.get(), codegen->num_functions_->value(),
+  cache_entry->Reset(codegen->execution_engine(), codegen->num_functions_->value(),
       codegen->num_instructions_->value(), codegen->function_names_hashcode_, mem_charge);
   StoreEngine(codegen);
   /// It is thread-safe, but could override the existing entry with the same key.
   Cache::UniqueHandle cache_handle =
       cache_->Insert(move(pending_handle), evict_callback_.get());
   if (cache_handle == nullptr) {
-    RemoveEngine(codegen->execution_engine_.get());
+    RemoveEngine(codegen->execution_engine());
     return Status(Substitute("Couldn't insert codegen cache entry,"
                              " hash code:'$0', size: '$1'",
         cache_key.hash_code().str(), mem_charge));
@@ -176,7 +176,7 @@ Status CodeGenCache::StoreInternal(const CodeGenCacheKey& cache_key,
   return Status::OK();
 }
 
-Status CodeGenCache::Store(const CodeGenCacheKey& cache_key, const LlvmCodeGen* codegen,
+Status CodeGenCache::Store(const CodeGenCacheKey& cache_key, LlvmCodeGen* codegen,
     const TCodeGenCacheMode::type& mode) {
   DCHECK(!is_closed_);
   DCHECK(cache_ != nullptr);
@@ -209,20 +209,21 @@ Status CodeGenCache::Store(const CodeGenCacheKey& cache_key, const LlvmCodeGen* 
   return status;
 }
 
-void CodeGenCache::StoreEngine(const LlvmCodeGen* codegen) {
+void CodeGenCache::StoreEngine(LlvmCodeGen* codegen) {
   DCHECK(codegen != nullptr);
   lock_guard<mutex> lock(cached_engines_lock_);
-  cached_engines_.emplace(codegen->execution_engine_.get(), codegen->execution_engine_);
+  cached_engines_.emplace(codegen->execution_engine(),
+      codegen->execution_engine_wrapper_);
 }
 
 bool CodeGenCache::LookupEngine(const llvm::ExecutionEngine* engine,
-    shared_ptr<llvm::ExecutionEngine>* execution_engine) {
+    shared_ptr<LlvmExecutionEngineWrapper>* execution_engine_wrapper) {
   DCHECK(engine != nullptr);
-  DCHECK(execution_engine != nullptr);
+  DCHECK(execution_engine_wrapper != nullptr);
   lock_guard<mutex> lock(cached_engines_lock_);
   auto engine_it = cached_engines_.find(engine);
   if (engine_it == cached_engines_.end()) return false;
-  *execution_engine = engine_it->second;
+  *execution_engine_wrapper = engine_it->second;
   return true;
 }
 

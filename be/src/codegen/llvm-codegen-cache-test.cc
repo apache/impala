@@ -78,8 +78,11 @@ class LlvmCodeGenCacheTest : public testing::Test {
   }
 
   static void CheckResult(LlvmCodeGen* codegen, bool is_double = false) {
-    ASSERT_TRUE(codegen->execution_engine_cached_ != nullptr);
-    CheckResult(codegen->execution_engine_cached_.get(), is_double);
+    ASSERT_TRUE(codegen->execution_engine_wrapper_cached_ != nullptr);
+    llvm::ExecutionEngine* cached_execution_engine =
+        codegen->execution_engine_wrapper_cached_->execution_engine();
+    ASSERT_TRUE(cached_execution_engine != nullptr);
+    CheckResult(cached_execution_engine, is_double);
   }
 
   static void CheckResult(llvm::ExecutionEngine* engine, bool is_double = false) {
@@ -131,7 +134,7 @@ class LlvmCodeGenCacheTest : public testing::Test {
   RuntimeProfile* profile_;
   scoped_ptr<TestEnv> test_env_;
   scoped_ptr<CodeGenCache> codegen_cache_;
-  shared_ptr<llvm::ExecutionEngine> exec_engine_;
+  shared_ptr<LlvmExecutionEngineWrapper> exec_engine_wrapper_;
   TQueryOptions query_options_;
 };
 
@@ -214,18 +217,18 @@ void LlvmCodeGenCacheTest::TestBasicFunction(TCodeGenCacheMode::type mode) {
   EXPECT_OK(codegen_cache_->Store(cache_key, codegen.get(), mode));
   CheckInUseMetrics(
       codegen_cache_.get(), 1 /*num_entry_in_use*/, mem_charge /*bytes_in_use*/);
-  EXPECT_OK(codegen_cache_->Lookup(cache_key, mode, &entry, &exec_engine_));
+  EXPECT_OK(codegen_cache_->Lookup(cache_key, mode, &entry, &exec_engine_wrapper_));
   CheckResult(entry);
   codegen->Close();
   // Close the LlvmCodeGen, but should not affect the stored cache.
-  EXPECT_OK(codegen_cache_->Lookup(cache_key, mode, &entry, &exec_engine_));
+  EXPECT_OK(codegen_cache_->Lookup(cache_key, mode, &entry, &exec_engine_wrapper_));
   CheckResult(entry);
   // Override the entry with a different function, should be able to find the new
   // function from the new entry.
   EXPECT_OK(codegen_cache_->Store(cache_key, codegen_double.get(), mode));
   CheckInUseMetrics(
       codegen_cache_.get(), 1 /*num_entry_in_use*/, mem_charge_double /*bytes_in_use*/);
-  EXPECT_OK(codegen_cache_->Lookup(cache_key, mode, &entry, &exec_engine_));
+  EXPECT_OK(codegen_cache_->Lookup(cache_key, mode, &entry, &exec_engine_wrapper_));
   CheckResult(entry, true /*is_double*/);
   EXPECT_EQ(codegen_cache_->codegen_cache_entries_evicted_->GetValue(), 1);
   codegen_double->Close();
@@ -411,12 +414,12 @@ TEST_F(LlvmCodeGenCacheTest, ModeAnalyzer) {
   EXPECT_FALSE(CodeGenCacheModeAnalyzer::is_optimal(TCodeGenCacheMode::NORMAL_DEBUG));
 }
 
-// Check the number of execution engine stored in the cache.
-// Because the shared pointer of the execution engine needs to be stored in the codegen
-// cache while the entry using the execution engine is stored in the cache.
+// Check the number of execution engine wrappers stored in the cache. Because the shared
+// pointer of the execution engine wrapper needs to be stored in the codegen cache while
+// the entry using the execution engine is stored in the cache.
 void LlvmCodeGenCacheTest::CheckEngineCount(LlvmCodeGen* codegen, int expect_count) {
   lock_guard<mutex> lock(codegen_cache_->cached_engines_lock_);
-  auto engine_it = codegen_cache_->cached_engines_.find(codegen->execution_engine_.get());
+  auto engine_it = codegen_cache_->cached_engines_.find(codegen->execution_engine());
   EXPECT_TRUE(engine_it != codegen_cache_->cached_engines_.end());
   EXPECT_EQ(codegen_cache_->cached_engines_.size(), expect_count);
 }
@@ -431,7 +434,7 @@ bool LlvmCodeGenCacheTest::CheckKeyExist(TCodeGenCacheMode::type mode, string ke
   CodeGenCacheKey cache_key;
   CodeGenCacheEntry entry;
   CodeGenCacheKeyConstructor::construct(key, &cache_key);
-  EXPECT_OK(codegen_cache_->Lookup(cache_key, mode, &entry, &exec_engine_));
+  EXPECT_OK(codegen_cache_->Lookup(cache_key, mode, &entry, &exec_engine_wrapper_));
   return !entry.Empty();
 }
 
@@ -470,9 +473,9 @@ void LlvmCodeGenCacheTest::TestSwitchModeHelper(TCodeGenCacheMode::type mode, st
   if (expect_engine_num != -1) {
     CheckEngineCount(codegen.get(), expect_engine_num);
   }
-  EXPECT_OK(codegen_cache_->Lookup(cache_key, mode, &entry, &exec_engine_));
+  EXPECT_OK(codegen_cache_->Lookup(cache_key, mode, &entry, &exec_engine_wrapper_));
   CheckResult(entry);
-  if (engine) *engine = codegen->execution_engine_.get();
+  if (engine) *engine = codegen->execution_engine();
   codegen->Close();
 }
 
