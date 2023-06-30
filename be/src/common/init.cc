@@ -351,11 +351,11 @@ static Status JavaAddJammAgent() {
   istringstream classpath {getenv("CLASSPATH")};
   string jamm_path, test_path;
   while (getline(classpath, test_path, ':')) {
-    jamm_path = FileSystemUtil::FindFileInPath(test_path, "jamm-.*.jar");
+    jamm_path = FileSystemUtil::FindFileInPath(test_path, "impala-jamm-.*.jar");
     if (!jamm_path.empty()) break;
   }
   if (jamm_path.empty()) {
-    return Status("Could not find jamm-*.jar in Java CLASSPATH");
+    return Status("Could not find impala-jamm-*.jar in Java CLASSPATH");
   }
   val_out << "-javaagent:" << jamm_path;
 

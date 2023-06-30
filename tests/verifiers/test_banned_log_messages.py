@@ -33,6 +33,9 @@ class TestBannedLogMessages(ImpalaTestSuite):
   def assert_message_absent(self, message, log_dir=os.environ["IMPALA_LOGS_DIR"]):
     for root, _, files in os.walk(log_dir):
       for file in files:
+        if file == 'mvn.log':
+          # Skip mvn.log as some builds warn about extra shaded classes
+          continue
         log_file_path = os.path.join(root, file)
         returncode = subprocess.call(['grep', message, log_file_path])
         assert returncode == 1, "%s contains '%s'" % (log_file_path, message)

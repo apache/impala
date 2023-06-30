@@ -245,7 +245,7 @@ do
     pushd "${IMPALA_FE_DIR}"
 
     # Add Jamm as javaagent for CatalogdMetaProviderTest.testWeights
-    JAMM_JAR=$(compgen -G ${IMPALA_HOME}/fe/target/dependency/jamm-*.jar)
+    JAMM_JAR=$(compgen -G ${IMPALA_HOME}/fe/target/dependency/impala-jamm-*.jar)
     export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS-} -javaagent:${JAMM_JAR}"
 
     if $JAVA -version 2>&1 | grep -q -E ' version "(9|[1-9][0-9])\.'; then
