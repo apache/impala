@@ -1769,6 +1769,17 @@ public class HdfsTable extends Table implements FeFsTable {
     return parts;
   }
 
+  /**
+   * Tracks the in-flight INSERT event id in the partition.
+   * @return false if the partition doesn't exist. Otherwise returns true.
+   */
+  public boolean addInflightInsertEventToPartition(String partName, long eventId) {
+    HdfsPartition partition = nameToPartitionMap_.get(partName);
+    if (partition == null) return false;
+    partition.addToVersionsForInflightEvents(/*isInsertEvent*/true, eventId);
+    return true;
+  }
+
   private void setUnpartitionedTableStats(HdfsPartition.Builder partBuilder) {
     Preconditions.checkState(numClusteringCols_ == 0);
     // For unpartitioned tables set the numRows in its single partition

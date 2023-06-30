@@ -20,6 +20,7 @@ import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIfFS, SkipIfLocal
+from tests.util.event_processor_utils import EventProcessorUtils
 from tests.util.filesystem_utils import IS_ISILON, WAREHOUSE
 from tests.util.hdfs_util import (
     HdfsConfig,
@@ -129,3 +130,67 @@ class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
       self._check_partition_perms("p1=1/p2=3/p3=4/", default_perms)
     finally:
        client.close()
+
+
+@SkipIfFS.hive
+class TestInsertUnSyncedPartition(CustomClusterTestSuite):
+
+  @classmethod
+  def setup_class(cls):
+    super(TestInsertUnSyncedPartition, cls).setup_class()
+
+  @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=0")
+  def test_insert_unsynced_partition(self, unique_database):
+    """Regression test for IMPALA-12257. Tests with event-processing disabled so
+    catalogd can easily have unsynced partition with HMS."""
+    self._test_insert_on_unsynced_partition(unique_database, "part1", False, False)
+    self._test_insert_on_unsynced_partition(unique_database, "part2", False, True)
+    self._test_insert_on_unsynced_partition(unique_database, "txn_part1", True, False)
+    self._test_insert_on_unsynced_partition(unique_database, "txn_part2", True, True)
+
+  def _test_insert_on_unsynced_partition(self, db, tbl, is_transactional, is_overwrite):
+    tbl_name = db + "." + tbl
+    create_stmt = """
+        create table {0} (i int) partitioned by (p int)
+        stored as textfile""".format(tbl_name)
+    if is_transactional:
+      create_stmt += """ tblproperties(
+        'transactional'='true',
+        'transactional_properties'='insert_only')"""
+    self.client.execute(create_stmt)
+    # Run any query on the table to make it loaded in catalogd.
+    self.client.execute("describe " + tbl_name)
+    # Add the partition in Hive so catalogd is not aware of it.
+    self.run_stmt_in_hive("""
+        insert into {0} partition (p=0) values (0)""".format(tbl_name))
+    # Track the last event id so we can fetch the generated events
+    last_event_id = EventProcessorUtils.get_current_notification_id(self.hive_client)
+    # Insert the new partition in Impala.
+    self.client.execute("""
+        insert {0} {1} partition(p=0) values (1)
+        """.format("overwrite" if is_overwrite else "into", tbl_name))
+    events = EventProcessorUtils.get_next_notification(self.hive_client, last_event_id)
+    if is_transactional:
+      assert len(events) > 2
+      assert events[0].eventType == "OPEN_TXN"
+      assert events[1].eventType == "ALLOC_WRITE_ID_EVENT"
+      assert events[1].dbName == db
+      assert events[1].tableName == tbl
+      # There is an empty ADD_PARTITION event due to Impala invokes the add_partitions
+      # HMS API but no new partitions are really added. This might change in future Hive
+      # versions. Here we just verify whether the last event is COMMIT_TXN.
+      assert events[len(events) - 1].eventType == "COMMIT_TXN"
+    else:
+      assert len(events) > 0
+      last_event = events[len(events) - 1]
+      assert last_event.dbName == db
+      assert last_event.tableName == tbl
+      assert last_event.eventType == "INSERT"
+
+    res = self.client.execute("select * from " + tbl_name)
+    if is_overwrite:
+      assert res.data == ["1\t0"]
+    else:
+      assert "0\t0" in res.data
+      assert "1\t0" in res.data
+      assert len(res.data) == 2
