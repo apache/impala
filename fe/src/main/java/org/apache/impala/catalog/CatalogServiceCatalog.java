@@ -3900,6 +3900,9 @@ public class CatalogServiceCatalog extends Catalog {
       Partition msPartition, long eventId) {
     try {
       HdfsPartition hdfsPartition = getHdfsPartition(dbName, tableName, msPartition);
+      LOG.info("Partition {} of table {}.{} has last refresh id as {}. " +
+          "Comparing it with {}.", hdfsPartition.getPartitionName(), dbName, tableName,
+          hdfsPartition.getLastRefreshEventId(), eventId);
       if (hdfsPartition.getLastRefreshEventId() > eventId) {
         return true;
       }

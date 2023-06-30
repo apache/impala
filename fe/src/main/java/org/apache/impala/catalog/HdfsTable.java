@@ -2901,6 +2901,8 @@ public class HdfsTable extends Table implements FeFsTable {
           oldPartition.getPartitionValues(), partBuilder.getPartitionValues()) == 0);
       if (oldPartition != null) {
         partBuilder.setFileDescriptors(oldPartition);
+        partBuilder.setCreateEventId(oldPartition.getCreateEventId());
+        partBuilder.setLastCompactionId(oldPartition.getLastCompactionId());
       }
       partBuilder.setLastRefreshEventId(latestEventId);
       switch (fileMetadataLoadOpts) {

@@ -4547,14 +4547,15 @@ public class CatalogOpExecutor {
       return false;
     }
     // if the partition has been created since the event was generated, skip
-    // dropping the event.
-    if (hdfsPartition.getCreateEventId() > eventId) {
-      LOG.info("Not dropping partition {} of table {} since it's create event id {} is "
-              + "higher than eventid {}", hdfsPartition.getPartitionName(),
-          hdfsTable.getFullName(), hdfsPartition.getCreateEventId(), eventId);
-      return false;
-    }
-    return true;
+    // the stale event.
+    boolean isStale = hdfsPartition.getCreateEventId() > eventId;
+    LOG.info("{} partition {} of table {} since it's create event id {} is {} than " +
+            "eventid {}",
+        isStale ? "Not dropping" : "Dropping",
+        hdfsPartition.getPartitionName(), hdfsTable.getFullName(),
+        hdfsPartition.getCreateEventId(), isStale ? "higher" : "not higher",
+        eventId);
+    return !isStale;
   }
 
   /**

@@ -1323,7 +1323,10 @@ public class HdfsPartition extends CatalogObjectImpl
       }
       // Take over the in-flight events
       inFlightEvents_ = partition.inFlightEvents_;
+      // Don't lose the event ids
+      createEventId_ = partition.createEventId_;
       lastCompactionId_ = partition.lastCompactionId_;
+      lastRefreshEventId_ = partition.lastRefreshEventId_;
       return this;
     }
 
