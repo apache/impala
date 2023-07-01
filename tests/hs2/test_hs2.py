@@ -18,32 +18,36 @@
 # Client tests for Impala's HiveServer2 interface
 
 from __future__ import absolute_import, division, print_function
-from builtins import range
-from getpass import getuser
 from contextlib import contextmanager
+from getpass import getuser
 import json
 import logging
-import pytest
 import random
 import threading
 import time
 import uuid
-import impala.dbapi as impyla
 
+from builtins import range
+import impala.dbapi as impyla
+import pytest
+
+from impala_thrift_gen.ImpalaService import ImpalaHiveServer2Service
+from impala_thrift_gen.TCLIService import TCLIService
 from tests.common.impala_test_suite import IMPALAD_HOSTNAME, IMPALAD_HS2_HTTP_PORT
+from tests.common.skip import SkipIfDockerizedCluster
+from tests.hs2.hs2_test_suite import (
+    create_op_handle_without_secret,
+    create_session_handle_without_secret,
+    HS2TestSuite,
+    needs_session,
+    needs_session_cluster_properties,
+    operation_id_to_query_id,
+)
 
 try:
   from urllib.request import urlopen
 except ImportError:
   from urllib2 import urlopen
-
-from ImpalaService import ImpalaHiveServer2Service
-from tests.common.environ import ImpalaTestClusterProperties
-from tests.common.skip import SkipIfDockerizedCluster
-from tests.hs2.hs2_test_suite import (HS2TestSuite, needs_session,
-    operation_id_to_query_id, create_session_handle_without_secret,
-    create_op_handle_without_secret, needs_session_cluster_properties)
-from TCLIService import TCLIService
 
 LOG = logging.getLogger('test_hs2')
 

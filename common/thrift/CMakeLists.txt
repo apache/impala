@@ -135,18 +135,19 @@ function(THRIFT_GEN_DS VAR)
   set(${VAR} ${${VAR}} PARENT_SCOPE)
 endfunction(THRIFT_GEN_DS)
 
+set(THIRDPARTY_THRIFT_DIR "thirdparty_thrift")
 set(HIVE_THRIFT_SOURCE_DIR "hive-$ENV{IMPALA_HIVE_MAJOR_VERSION}-api")
 set(TCLI_SERVICE_THRIFT "${HIVE_THRIFT_SOURCE_DIR}/TCLIService.thrift")
 message("Using Thrift CPP compiler: ${THRIFT_CPP_COMPILER}")
 message("Using Thrift JAVA compiler: ${THRIFT_JAVA_COMPILER}")
 message("Using Thrift PY compiler: ${THRIFT_PY_COMPILER}")
 set(THRIFT_QUIET_WRAPPER "${CMAKE_SOURCE_DIR}/bin/thrift-quiet-wrapper.sh")
-set(THRIFT_CPP_INCLUDE_DIR_OPTION -I ${THRIFT_CPP_CONTRIB_DIR}
-  -I $ENV{HIVE_METASTORE_THRIFT_DIR} -I ${HIVE_THRIFT_SOURCE_DIR})
-set(THRIFT_JAVA_INCLUDE_DIR_OPTION -I ${THRIFT_JAVA_CONTRIB_DIR}
-  -I $ENV{HIVE_METASTORE_THRIFT_DIR} -I ${HIVE_THRIFT_SOURCE_DIR})
-set(THRIFT_PY_INCLUDE_DIR_OPTION -I ${THRIFT_PY_CONTRIB_DIR}
-  -I $ENV{HIVE_METASTORE_THRIFT_DIR} -I ${HIVE_THRIFT_SOURCE_DIR})
+set(THRIFT_CPP_INCLUDE_DIR_OPTION -I ${THIRDPARTY_THRIFT_DIR}
+  -I ${HIVE_THRIFT_SOURCE_DIR})
+set(THRIFT_JAVA_INCLUDE_DIR_OPTION -I ${THIRDPARTY_THRIFT_DIR}
+  -I ${HIVE_THRIFT_SOURCE_DIR})
+set(THRIFT_PY_INCLUDE_DIR_OPTION -I ${THIRDPARTY_THRIFT_DIR}
+  -I ${HIVE_THRIFT_SOURCE_DIR})
 set(BE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/be/generated-sources)
 set(FE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/fe/generated-sources)
 # TODO: avoid duplicating generated java classes
@@ -158,12 +159,13 @@ file(MAKE_DIRECTORY ${FE_OUTPUT_DIR})
 file(MAKE_DIRECTORY ${EXT_DS_OUTPUT_DIR})
 file(MAKE_DIRECTORY ${PYTHON_OUTPUT_DIR})
 file(MAKE_DIRECTORY ${HIVE_THRIFT_SOURCE_DIR})
+file(MAKE_DIRECTORY ${THIRDPARTY_THRIFT_DIR})
 
 # Args passed to thrift for Java gen
 set(JAVA_FE_ARGS ${THRIFT_JAVA_INCLUDE_DIR_OPTION} --gen java -o ${FE_OUTPUT_DIR})
 set(JAVA_EXT_DS_ARGS ${THRIFT_JAVA_INCLUDE_DIR_OPTION} --gen java -o ${EXT_DS_OUTPUT_DIR})
 set(PYTHON_ARGS ${THRIFT_PY_INCLUDE_DIR_OPTION} -r --gen py:no_utf8strings -o
-                ${PYTHON_OUTPUT_DIR})
+    ${PYTHON_OUTPUT_DIR})
 
 set (EXT_DATA_SRC_FILES
   ErrorCodes.thrift
@@ -211,6 +213,16 @@ set (SRC_FILES
 )
 
 SET_SOURCE_FILES_PROPERTIES(Status.thrift PROPERTIES OBJECT_DEPENDS ErrorCodes.thrift)
+SET_SOURCE_FILES_PROPERTIES(CatalogObjects.thrift PROPERTIES OBJECT_DEPENDS
+    ${THIRDPARTY_THRIFT_DIR}/hive_metastore.thrift)
+SET_SOURCE_FILES_PROPERTIES(CatalogService.thrift PROPERTIES OBJECT_DEPENDS
+    ${THIRDPARTY_THRIFT_DIR}/hive_metastore.thrift)
+SET_SOURCE_FILES_PROPERTIES(JniCatalog.thrift PROPERTIES OBJECT_DEPENDS
+    ${THIRDPARTY_THRIFT_DIR}/hive_metastore.thrift)
+SET_SOURCE_FILES_PROPERTIES(SqlConstraints.thrift PROPERTIES OBJECT_DEPENDS
+    ${THIRDPARTY_THRIFT_DIR}/hive_metastore.thrift)
+SET_SOURCE_FILES_PROPERTIES(beeswax.thrift PROPERTIES OBJECT_DEPENDS
+    ${THIRDPARTY_THRIFT_DIR}/hive_metastore.thrift)
 
 add_custom_command(OUTPUT ErrorCodes.thrift
   COMMAND python generate_error_codes.py
@@ -232,6 +244,33 @@ add_custom_command(OUTPUT hive-$ENV{IMPALA_HIVE_MAJOR_VERSION}-api/TCLIService.t
   DEPENDS hive-1-api/TCLIService.thrift
 )
 
+# This generates hive_metastore.thrift in the $THIRDPARTY_THRIFT_DIR. The two
+# modification are:
+# 1. Set the impala_thrift_gen python namespace
+# 2. Rearranges the fb303 reference so that it doesn't have the share/fb303/if
+#    directory structure
+add_custom_command(OUTPUT ${THIRDPARTY_THRIFT_DIR}/hive_metastore.thrift
+  COMMAND ${CMAKE_SOURCE_DIR}/bin/cmake_aux/add_thrift_python_namespace.sh
+      $ENV{HIVE_METASTORE_THRIFT_DIR}/hive_metastore.thrift
+      ${THIRDPARTY_THRIFT_DIR}/hive_metastore.thrift.tmp
+  COMMAND cat ${THIRDPARTY_THRIFT_DIR}/hive_metastore.thrift.tmp |
+      sed 's|share/fb303/if/||' > ${THIRDPARTY_THRIFT_DIR}/hive_metastore.thrift
+  COMMAND rm ${THIRDPARTY_THRIFT_DIR}/hive_metastore.thrift.tmp
+  DEPENDS $ENV{HIVE_METASTORE_THRIFT_DIR}/hive_metastore.thrift
+)
+
+# Generate fb303.thrift in the $THIRDPARTY_THRIFT_DIR with the appropriate
+# impala_thrift_gen python namespace.
+add_custom_command(OUTPUT ${THIRDPARTY_THRIFT_DIR}/fb303.thrift
+  COMMAND ${CMAKE_SOURCE_DIR}/bin/cmake_aux/add_thrift_python_namespace.sh
+      ${THRIFT_PY_CONTRIB_DIR}/share/fb303/if/fb303.thrift
+      ${THIRDPARTY_THRIFT_DIR}/fb303.thrift
+  DEPENDS ${THRIFT_PY_CONTRIB_DIR}/share/fb303/if/fb303.thrift
+)
+
+SET_SOURCE_FILES_PROPERTIES(${THIRDPARTY_THRIFT_DIR}/hive_metastore.thrift
+    PROPERTIES OBJECT_DEPENDS ${THIRDPARTY_THRIFT_DIR}/fb303.thrift)
+
 # Create a build command for each of the thrift src files and generate
 # a list of files they produce
 THRIFT_GEN(THRIFT_ALL_FILES ${SRC_FILES})
@@ -240,11 +279,15 @@ THRIFT_GEN_DS(THRIFT_DATA_SRC_FILES ${EXT_DATA_SRC_FILES})
 add_custom_target(thrift-generated-files-error DEPENDS ErrorCodes.thrift)
 add_custom_target(thrift-generated-files-metrics DEPENDS MetricDefs.thrift)
 add_custom_target(thrift-generated-files-tcli-service DEPENDS ${TCLI_SERVICE_THRIFT})
+add_custom_target(thrift-generated-files-hive-metastore
+  DEPENDS ${THIRDPARTY_THRIFT_DIR}/hive_metastore.thrift)
+add_custom_target(thrift-generated-files-fb303 DEPENDS ${THIRDPARTY_THRIFT_DIR}/fb303.thrift)
 
 # Add a custom target that generates all the thrift files
 add_custom_target(thrift-cpp ALL DEPENDS ${THRIFT_ALL_FILES})
 add_dependencies(thrift-cpp thrift-generated-files-metrics thrift-generated-files-error
-  thrift-generated-files-tcli-service)
+  thrift-generated-files-tcli-service thrift-generated-files-hive-metastore
+  thrift-generated-files-fb303)
 
 add_custom_target(thrift-ext-data-src ALL DEPENDS ${THRIFT_DATA_SRC_FILES})
 add_dependencies(thrift-ext-data-src thrift-cpp)

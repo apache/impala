@@ -20,6 +20,7 @@
 /**
  * File format description for the parquet file format
  */
+namespace py impala_thrift_gen.parquet
 namespace cpp parquet
 namespace java org.apache.parquet.format
 

@@ -17,13 +17,17 @@
 #
 
 from __future__ import absolute_import, division, print_function
-import pytest
 import re
 
-from tests.hs2.hs2_test_suite import (HS2TestSuite, needs_session,
-    create_op_handle_without_secret)
-from TCLIService import TCLIService, constants
-from TCLIService.ttypes import TTypeId
+import pytest
+
+from impala_thrift_gen.TCLIService import constants, TCLIService
+from impala_thrift_gen.TCLIService.ttypes import TTypeId
+from tests.hs2.hs2_test_suite import (
+    create_op_handle_without_secret,
+    HS2TestSuite,
+    needs_session,
+)
 
 
 # Simple test to make sure all the HS2 types are supported for both the row and

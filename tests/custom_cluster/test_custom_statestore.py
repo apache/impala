@@ -19,26 +19,25 @@
 # Tests statestore with non-default startup options
 
 from __future__ import absolute_import, division, print_function
-from builtins import range
 import logging
-import pytest
-import uuid
 import socket
-
-from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.environ import build_flavor_timeout
-from tests.common.skip import SkipIfBuildType
-from tests.common.patterns import print_id
 from time import sleep
+import uuid
 
-from Types.ttypes import TNetworkAddress
+from builtins import range
+import pytest
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket, TTransport
 
-import StatestoreService.StatestoreSubscriber as Subscriber
-import StatestoreService.StatestoreService as Statestore
-import CatalogService.CatalogService as Catalog
-from ErrorCodes.ttypes import TErrorCode
+import impala_thrift_gen.CatalogService.CatalogService as Catalog
+from impala_thrift_gen.ErrorCodes.ttypes import TErrorCode
+import impala_thrift_gen.StatestoreService.StatestoreService as Statestore
+import impala_thrift_gen.StatestoreService.StatestoreSubscriber as Subscriber
+from impala_thrift_gen.Types.ttypes import TNetworkAddress
+from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.environ import build_flavor_timeout
+from tests.common.patterns import print_id
+from tests.common.skip import SkipIfBuildType
 
 LOG = logging.getLogger('custom_statestore_test')
 STATESTORE_SERVICE_PORT = 24000

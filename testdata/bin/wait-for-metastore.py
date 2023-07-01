@@ -28,7 +28,7 @@ from optparse import OptionParser
 from tests.util.thrift_util import create_transport
 
 # Imports required for Hive Metastore Client
-from hive_metastore import ThriftHiveMetastore
+from impala_thrift_gen.hive_metastore import ThriftHiveMetastore
 from thrift.transport import TTransport, TSocket
 from thrift.protocol import TBinaryProtocol
 

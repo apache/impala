@@ -21,13 +21,14 @@
 # succeed as long all previously fetched rows fit into the bounded result cache.
 
 from __future__ import absolute_import, division, print_function
+
 from builtins import range
 import pytest
 
-from ImpalaService import ImpalaHiveServer2Service
-from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
-from TCLIService import TCLIService
+from impala_thrift_gen.ImpalaService import ImpalaHiveServer2Service
+from impala_thrift_gen.TCLIService import TCLIService
 from tests.common.impala_cluster import ImpalaCluster
+from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 
 
 class TestFetchFirst(HS2TestSuite):

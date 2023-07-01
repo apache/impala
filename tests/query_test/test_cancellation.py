@@ -19,18 +19,19 @@
 #
 
 from __future__ import absolute_import, division, print_function
-from builtins import range
-import pytest
 from threading import Thread
 from time import sleep
-from RuntimeProfile.ttypes import TRuntimeProfileFormat
+
+from builtins import range
+import pytest
+
+from impala_thrift_gen.RuntimeProfile.ttypes import TRuntimeProfileFormat
+from tests.common.impala_connection import MinimalHS2Connection
+from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT, ImpalaTestSuite
 from tests.common.test_dimensions import add_mandatory_exec_option
 from tests.common.test_vector import ImpalaTestDimension
-from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT
 from tests.util.cancel_util import cancel_query_and_validate_state
 from tests.verifiers.metric_verifier import MetricVerifier
-from tests.common.impala_connection import MinimalHS2Connection
 
 # PRIMARY KEY for lineitem
 LINEITEM_PK = 'l_orderkey, l_partkey, l_suppkey, l_linenumber'

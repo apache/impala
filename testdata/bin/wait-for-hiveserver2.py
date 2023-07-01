@@ -30,7 +30,7 @@ from optparse import OptionParser
 from tests.util.thrift_util import create_transport
 
 # Imports required for HiveServer2 Client
-from TCLIService import TCLIService
+from impala_thrift_gen.TCLIService import TCLIService
 from thrift.transport import TTransport, TSocket
 from thrift.protocol import TBinaryProtocol
 

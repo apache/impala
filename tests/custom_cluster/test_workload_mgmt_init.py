@@ -16,26 +16,26 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-
+from logging import getLogger
 import os
 import re
-
 from subprocess import CalledProcessError
-from logging import getLogger
 
-from SystemTables.ttypes import TQueryTableColumn
+from impala_thrift_gen.SystemTables.ttypes import TQueryTableColumn
 from tests.common.custom_cluster_test_suite import (
+    CustomClusterTestSuite,
     WORKLOAD_MGMT_IMPALAD_FLAGS,
-    CustomClusterTestSuite)
+)
 from tests.common.test_dimensions import hs2_client_protocol_dimension
 from tests.common.test_vector import HS2
 from tests.util.workload_management import (
     assert_query,
-    WM_DB,
-    QUERY_TBL_LOG_NAME,
-    QUERY_TBL_LOG,
+    QUERY_TBL_LIVE,
     QUERY_TBL_LIVE_NAME,
-    QUERY_TBL_LIVE)
+    QUERY_TBL_LOG,
+    QUERY_TBL_LOG_NAME,
+    WM_DB,
+)
 
 LOG = getLogger(__name__)
 QUERY_TBL_ALL = "{},{}".format(QUERY_TBL_LOG_NAME, QUERY_TBL_LIVE_NAME)

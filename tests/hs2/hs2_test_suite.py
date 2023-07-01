@@ -18,17 +18,19 @@
 # Superclass of all HS2 tests containing commonly used functions.
 
 from __future__ import absolute_import, division, print_function
-from builtins import range
 from getpass import getuser
-from TCLIService import TCLIService
-from ImpalaService import ImpalaHiveServer2Service
+import sys
+from time import sleep, time
+
+from builtins import range
+from thrift.protocol import TBinaryProtocol
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
-from thrift.protocol import TBinaryProtocol
-from tests.common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_PORT
+
+from impala_thrift_gen.ImpalaService import ImpalaHiveServer2Service
+from impala_thrift_gen.TCLIService import TCLIService
+from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT, ImpalaTestSuite
 from tests.common.test_result_verifier import error_msg_startswith
-from time import sleep, time
-import sys
 
 
 def add_session_helper(self, protocol_version, conf_overlay, close_session, fn):

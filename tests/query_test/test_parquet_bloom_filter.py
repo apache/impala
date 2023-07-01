@@ -16,21 +16,18 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-from builtins import range
+from collections import namedtuple
 import math
 import os
-
-from collections import namedtuple
-from parquet.ttypes import BloomFilterHeader
 from subprocess import check_call
 
+from builtins import range
+
+from impala_thrift_gen.parquet.ttypes import BloomFilterHeader
 from tests.common.file_utils import create_table_and_copy_files
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.util.filesystem_utils import get_fs_path
-from tests.util.get_parquet_metadata import (
-    get_parquet_metadata,
-    read_serialized_object
-)
+from tests.util.get_parquet_metadata import get_parquet_metadata, read_serialized_object
 
 
 class TestParquetBloomFilter(ImpalaTestSuite):

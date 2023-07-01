@@ -18,6 +18,7 @@
 //
 // This file contains the details of the protocol between coordinators and backends.
 
+namespace py impala_thrift_gen.ImpalaInternalService
 namespace cpp impala
 namespace java org.apache.impala.thrift
 

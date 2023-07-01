@@ -16,18 +16,19 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-from builtins import map
-import os
-import struct
-import sys
-
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from functools import reduce
-from parquet.ttypes import ColumnIndex, FileMetaData, OffsetIndex, PageHeader, Type
+import os
+import struct
 from subprocess import check_call
+import sys
+
+from builtins import map
 from thrift.protocol import TCompactProtocol
 from thrift.transport import TTransport
+
+from impala_thrift_gen.parquet.ttypes import FileMetaData, Type
 
 PARQUET_VERSION_NUMBER = b'PAR1'
 

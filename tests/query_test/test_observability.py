@@ -18,6 +18,12 @@
 from __future__ import absolute_import, division, print_function
 from collections import defaultdict
 from datetime import datetime
+import re
+from time import sleep, time
+
+import pytest
+
+from impala_thrift_gen.RuntimeProfile.ttypes import TRuntimeProfileFormat
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -25,10 +31,6 @@ from tests.common.skip import SkipIfFS, SkipIfLocal, SkipIfNotHdfsMinicluster
 from tests.common.test_vector import HS2
 from tests.util.filesystem_utils import WAREHOUSE
 from tests.util.parse_util import get_duration_us_from_str
-from time import sleep, time
-from RuntimeProfile.ttypes import TRuntimeProfileFormat
-import pytest
-import re
 
 
 class TestObservability(ImpalaTestSuite):

@@ -16,24 +16,26 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+
 from builtins import range
 import pytest
 
-from hive_metastore.ttypes import Database
-from hive_metastore.ttypes import FieldSchema
-from hive_metastore.ttypes import FindNextCompactRequest
-from hive_metastore.ttypes import GetTableRequest
-from hive_metastore.ttypes import GetPartitionsByNamesRequest
-from hive_metastore.ttypes import TruncateTableRequest
-from hive_metastore.ttypes import Table
-from hive_metastore.ttypes import StorageDescriptor
-from hive_metastore.ttypes import SerDeInfo
-from hive_metastore.ttypes import UpdateTransactionalStatsRequest
-from hive_metastore.ttypes import WriteNotificationLogBatchRequest
-
-from tests.util.event_processor_utils import EventProcessorUtils
+from impala_thrift_gen.hive_metastore.ttypes import (
+    Database,
+    FieldSchema,
+    FindNextCompactRequest,
+    GetPartitionsByNamesRequest,
+    GetTableRequest,
+    SerDeInfo,
+    StorageDescriptor,
+    Table,
+    TruncateTableRequest,
+    UpdateTransactionalStatsRequest,
+    WriteNotificationLogBatchRequest,
+)
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.util.event_processor_utils import EventProcessorUtils
 from tests.util.filesystem_utils import IS_HDFS, IS_OZONE
 
 

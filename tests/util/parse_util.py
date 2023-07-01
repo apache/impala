@@ -203,7 +203,7 @@ def get_bytes_summary_stats_counter(counter_name, runtime_profile):
   """
   # This requires the Thrift definitions to be generated. We limit the scope of the import
   # to allow tools like the stress test to import this file without building Impala.
-  from RuntimeProfile.ttypes import TSummaryStatsCounter
+  from impala_thrift_gen.RuntimeProfile.ttypes import TSummaryStatsCounter
 
   regex_summary_stat = re.compile(r"""\(
     Avg:[^\(]*\((?P<avg>[0-9]+)\)\s;\s # Matches Avg: [?].[?] [?]B (?)
@@ -256,7 +256,7 @@ def get_time_summary_stats_counter(counter_name, runtime_profile):
   """
   # This requires the Thrift definitions to be generated. We limit the scope of the import
   # to allow tools like the stress test to import this file without building Impala.
-  from RuntimeProfile.ttypes import TSummaryStatsCounter
+  from impala_thrift_gen.RuntimeProfile.ttypes import TSummaryStatsCounter
 
   regex_summary_stat = re.compile(r"""\(
     Avg:\s(?P<avg>.*)\s;\s # Matches Avg: ? ;

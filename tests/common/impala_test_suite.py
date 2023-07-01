@@ -102,11 +102,11 @@ from tests.util.thrift_util import create_transport
 from tests.util.retry import retry
 
 # Imports required for Hive Metastore Client
-from hive_metastore import ThriftHiveMetastore
+from impala_thrift_gen.hive_metastore import ThriftHiveMetastore
 from thrift.protocol import TBinaryProtocol
 
 # Import to validate query option names
-from ImpalaService.ttypes import TImpalaQueryOptions
+from impala_thrift_gen.ImpalaService.ttypes import TImpalaQueryOptions
 
 # Initializing the logger before conditional imports, since we will need it
 # for them.

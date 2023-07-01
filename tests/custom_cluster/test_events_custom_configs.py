@@ -23,9 +23,9 @@ from os import getenv
 from time import sleep
 
 
-from hive_metastore.ttypes import FireEventRequest
-from hive_metastore.ttypes import FireEventRequestData
-from hive_metastore.ttypes import InsertEventRequestData
+from impala_thrift_gen.hive_metastore.ttypes import FireEventRequest
+from impala_thrift_gen.hive_metastore.ttypes import FireEventRequestData
+from impala_thrift_gen.hive_metastore.ttypes import InsertEventRequestData
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_connection import ERROR, FINISHED
 from tests.common.impala_test_suite import ImpalaTestSuite

@@ -16,13 +16,27 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-from tests.util.thrift_util import create_transport
-from hive_metastore import ThriftHiveMetastore
-from hive_metastore.ttypes import (AbortTxnRequest, AllocateTableWriteIdsRequest,
-    CheckLockRequest, CommitTxnRequest, GetValidWriteIdsRequest, HeartbeatRequest,
-    LockComponent, LockLevel, LockType, LockRequest, OpenTxnRequest, ShowLocksRequest,
-    TruncateTableRequest, UnlockRequest)
+
 from thrift.protocol import TBinaryProtocol
+
+from impala_thrift_gen.hive_metastore import ThriftHiveMetastore
+from impala_thrift_gen.hive_metastore.ttypes import (
+    AbortTxnRequest,
+    AllocateTableWriteIdsRequest,
+    CheckLockRequest,
+    CommitTxnRequest,
+    GetValidWriteIdsRequest,
+    HeartbeatRequest,
+    LockComponent,
+    LockLevel,
+    LockRequest,
+    LockType,
+    OpenTxnRequest,
+    ShowLocksRequest,
+    TruncateTableRequest,
+    UnlockRequest,
+)
+from tests.util.thrift_util import create_transport
 
 # HMS config
 metastore_host = "localhost"

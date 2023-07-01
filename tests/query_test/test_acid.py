@@ -19,13 +19,18 @@
 
 from __future__ import absolute_import, division, print_function
 import os
-import pytest
+from subprocess import check_call
 import time
 
-from hive_metastore.ttypes import CommitTxnRequest, LockType, OpenTxnRequest
-from subprocess import check_call
+import pytest
+
+from impala_thrift_gen.hive_metastore.ttypes import (
+    CommitTxnRequest,
+    LockType,
+    OpenTxnRequest,
+)
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIf, SkipIfHive2, SkipIfCatalogV2, SkipIfFS
+from tests.common.skip import SkipIf, SkipIfCatalogV2, SkipIfFS, SkipIfHive2
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.acid_txn import AcidTxn
 

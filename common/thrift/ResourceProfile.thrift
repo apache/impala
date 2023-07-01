@@ -19,6 +19,7 @@
 // and DataSinks to configure their memory usage. See ResourceProfile.java for more
 // details.
 
+namespace py impala_thrift_gen.ResourceProfile
 namespace cpp impala
 namespace java org.apache.impala.thrift
 

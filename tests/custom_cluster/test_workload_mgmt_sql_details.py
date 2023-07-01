@@ -19,7 +19,7 @@ from __future__ import absolute_import, division, print_function
 
 import os
 
-from SystemTables.ttypes import TQueryTableColumn
+from impala_thrift_gen.SystemTables.ttypes import TQueryTableColumn
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.test_dimensions import hs2_client_protocol_dimension
 from tests.common.wm_test_suite import WorkloadManagementTestSuite

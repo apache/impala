@@ -22,9 +22,11 @@ from __future__ import absolute_import, division, print_function
 import base64
 import datetime
 import zlib
+
 from thrift.protocol import TCompactProtocol
 from thrift.TSerialization import deserialize
-from RuntimeProfile.ttypes import TRuntimeProfileTree
+
+from impala_thrift_gen.RuntimeProfile.ttypes import TRuntimeProfileTree
 
 
 def decode_profile_line(line):

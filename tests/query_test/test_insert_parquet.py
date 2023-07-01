@@ -18,27 +18,35 @@
 # Targeted Impala insert tests
 
 from __future__ import absolute_import, division, print_function
-from builtins import map, range, round
-import os
-
 from collections import namedtuple
-from datetime import datetime, date
+from datetime import date, datetime
 from decimal import Decimal
+import os
 from subprocess import check_call
-from parquet.ttypes import ColumnOrder, SortingColumn, TypeDefinedOrder, ConvertedType
 
+from builtins import map, range, round
+
+from impala_thrift_gen.parquet.ttypes import (
+    ColumnOrder,
+    ConvertedType,
+    SortingColumn,
+    TypeDefinedOrder,
+)
 from tests.common.environ import impalad_basedir
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import SkipIfFS, SkipIfLocal
 from tests.common.test_dimensions import (
     add_exec_option_dimension,
-    create_exec_option_dimension)
+    create_exec_option_dimension,
+)
 from tests.common.test_result_verifier import verify_query_result_is_equal
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import get_fs_path, WAREHOUSE
-from tests.util.get_parquet_metadata import (decode_stats_value,
-    get_parquet_metadata_from_hdfs_folder)
+from tests.util.get_parquet_metadata import (
+    decode_stats_value,
+    get_parquet_metadata_from_hdfs_folder,
+)
 
 PARQUET_CODECS = ['none', 'snappy', 'gzip', 'zstd', 'lz4']
 IMPALA_HOME = os.environ['IMPALA_HOME']

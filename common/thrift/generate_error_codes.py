@@ -539,6 +539,7 @@ preamble = """
 // IT BY HAND.
 //
 
+namespace py impala_thrift_gen.ErrorCodes
 namespace cpp impala
 namespace java org.apache.impala.thrift
 

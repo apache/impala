@@ -16,37 +16,37 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-from builtins import range
 from collections import defaultdict, namedtuple
 import datetime
+import json
 import logging
 import os
-import pytest
-import pytz
 import random
 import re
-import time
-
 from subprocess import check_call, check_output
-# noinspection PyUnresolvedReferences
-from parquet.ttypes import ConvertedType
+import time
 
 from avro.datafile import DataFileReader
 from avro.io import DatumReader
-import json
+from builtins import range
+import pytest
+import pytz
 
-from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
+# noinspection PyUnresolvedReferences
+from impala_thrift_gen.parquet.ttypes import ConvertedType
+from tests.common.file_utils import (
+    create_iceberg_table_from_directory,
+    create_table_from_parquet,
+)
 from tests.common.iceberg_test_suite import IcebergTestSuite
-from tests.common.skip import SkipIf, SkipIfFS, SkipIfDockerizedCluster
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
+from tests.common.skip import SkipIf, SkipIfDockerizedCluster, SkipIfFS
 from tests.common.test_dimensions import add_exec_option_dimension
 from tests.common.test_result_verifier import error_msg_startswith
-from tests.common.file_utils import (
-  create_iceberg_table_from_directory,
-  create_table_from_parquet)
 from tests.shell.util import run_impala_shell_cmd
-from tests.util.filesystem_utils import get_fs_path, IS_HDFS, WAREHOUSE, FILESYSTEM_PREFIX
+from tests.util.filesystem_utils import FILESYSTEM_PREFIX, get_fs_path, IS_HDFS, WAREHOUSE
 from tests.util.get_parquet_metadata import get_parquet_metadata
-from tests.util.iceberg_util import cast_ts, quote, get_snapshots, IcebergCatalogs
+from tests.util.iceberg_util import cast_ts, get_snapshots, IcebergCatalogs, quote
 
 LOG = logging.getLogger(__name__)
 

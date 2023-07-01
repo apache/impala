@@ -15,10 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 from __future__ import absolute_import, division, print_function
+
 from builtins import range
 
-from hive_metastore.ttypes import FireEventRequest
-from hive_metastore.ttypes import FireEventRequestData
+from impala_thrift_gen.hive_metastore.ttypes import FireEventRequest, FireEventRequestData
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIfCatalogV2, SkipIfFS
 from tests.metadata.test_event_processing_base import TestEventProcessingBase

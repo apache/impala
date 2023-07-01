@@ -20,14 +20,15 @@
 # succeeded by querying Impala, or vice versa.
 
 from __future__ import absolute_import, division, print_function
-import logging
-import requests
-import time
 import json
-from hive_metastore.ttypes import NotificationEventRequest
+import logging
+import time
 
-from tests.common.impala_cluster import ImpalaCluster
+import requests
+
+from impala_thrift_gen.hive_metastore.ttypes import NotificationEventRequest
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.impala_cluster import ImpalaCluster
 
 LOG = logging.getLogger('event_processor_utils')
 LOG.setLevel(level=logging.DEBUG)

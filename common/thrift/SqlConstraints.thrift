@@ -16,6 +16,7 @@
 // under the License.
 
 
+namespace py impala_thrift_gen.SqlConstraints
 namespace cpp impala
 namespace java org.apache.impala.thrift
 

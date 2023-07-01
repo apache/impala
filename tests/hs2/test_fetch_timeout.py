@@ -16,12 +16,11 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-from time import sleep
-from time import time
-from tests.common.errors import Timeout
-from tests.hs2.hs2_test_suite import (HS2TestSuite, needs_session)
-from TCLIService import TCLIService
+from time import sleep, time
 
+from impala_thrift_gen.TCLIService import TCLIService
+from tests.common.errors import Timeout
+from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 
 # Tests for the query option FETCH_ROWS_TIMEOUT_MS, which is the maximum amount of
 # time, in milliseconds, a fetch rows request (TFetchResultsReq) from the client should

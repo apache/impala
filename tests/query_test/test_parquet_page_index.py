@@ -18,21 +18,26 @@
 # Targeted Impala insert tests
 
 from __future__ import absolute_import, division, print_function
+from collections import namedtuple
 import os
 import random
 import string
-
-from collections import namedtuple
 from subprocess import check_call
-from parquet.ttypes import BoundaryOrder, ColumnIndex, OffsetIndex, PageHeader, PageType
 
+from impala_thrift_gen.parquet.ttypes import (
+    BoundaryOrder,
+    ColumnIndex,
+    OffsetIndex,
+    PageHeader,
+    PageType,
+)
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
 from tests.util.filesystem_utils import get_fs_path
 from tests.util.get_parquet_metadata import (
     decode_stats_value,
     get_parquet_metadata,
-    read_serialized_object
+    read_serialized_object,
 )
 
 PAGE_INDEX_MAX_STRING_LENGTH = 64

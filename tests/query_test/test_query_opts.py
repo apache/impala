@@ -21,11 +21,12 @@
 #       timeout).
 
 from __future__ import absolute_import, division, print_function
-from TCLIService import TCLIService
 
+from impala_thrift_gen.TCLIService import TCLIService
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
+
 
 class TestQueryOptions(ImpalaTestSuite):
   @classmethod

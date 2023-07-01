@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+namespace py impala_thrift_gen.NetworkTest
 namespace cpp impalatest
 
 struct ThriftDataParams {

@@ -26,22 +26,23 @@
 #   result = client.execute(query_string)
 #   where result is an object of the class ImpalaBeeswaxResult.
 from __future__ import absolute_import, division, print_function
-from builtins import filter, map
-import logging
-import time
-import shlex
-import getpass
-import re
-import sys
-
-from beeswaxd import BeeswaxService
-from beeswaxd.BeeswaxService import QueryState
 from datetime import datetime
-from ImpalaService import ImpalaService
-from tests.util.thrift_util import create_transport
-from thrift.transport.TTransport import TTransportException
+import getpass
+import logging
+import re
+import shlex
+import sys
+import time
+
+from builtins import filter, map
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
+from thrift.transport.TTransport import TTransportException
+
+from impala_thrift_gen.beeswax import BeeswaxService
+from impala_thrift_gen.beeswax.BeeswaxService import QueryState
+from impala_thrift_gen.ImpalaService import ImpalaService
+from tests.util.thrift_util import create_transport
 
 LOG = logging.getLogger('impala_beeswax')
 # time to sleep in seconds before polling again. This uses a fixed

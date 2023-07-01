@@ -16,28 +16,31 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-from builtins import range
 import logging
 import os
-import pytest
-import psutil
 import re
 import signal
 import socket
-import time
-import threading
-
 from subprocess import check_call
-from tests.common.environ import build_flavor_timeout
+import threading
+import time
 from time import sleep
 
+from builtins import range
 from impala.error import HiveServer2Error
-from TCLIService import TCLIService
+import psutil
+import pytest
 
+from impala_thrift_gen.TCLIService import TCLIService
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.environ import build_flavor_timeout
 from tests.common.impala_connection import (
-    ERROR, FINISHED, IMPALA_CONNECTION_EXCEPTION, RUNNING)
-from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfFS
+    ERROR,
+    FINISHED,
+    IMPALA_CONNECTION_EXCEPTION,
+    RUNNING,
+)
+from tests.common.skip import SkipIfFS, SkipIfNotHdfsMinicluster
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 
 LOG = logging.getLogger(__name__)

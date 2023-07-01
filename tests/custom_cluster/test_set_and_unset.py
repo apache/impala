@@ -16,12 +16,14 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+
 import pytest
 
+from impala_thrift_gen.ImpalaService import ImpalaHiveServer2Service
+from impala_thrift_gen.TCLIService import TCLIService
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
-from TCLIService import TCLIService
-from ImpalaService import ImpalaHiveServer2Service
+
 
 class TestSetAndUnset(CustomClusterTestSuite, HS2TestSuite):
   """

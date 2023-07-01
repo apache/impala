@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from TCLIService.TCLIService import TTypeId
+from impala_thrift_gen.TCLIService.TCLIService import TTypeId
 
 import sys
 

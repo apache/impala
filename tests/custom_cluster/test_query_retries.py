@@ -22,21 +22,29 @@
 # TODO: Add a test that cancels queries while a retry is running
 
 from __future__ import absolute_import, division, print_function
-from builtins import map, range
-import pytest
+from random import randint
 import re
 import time
 
-from random import randint
+from builtins import map, range
+import pytest
 
-from RuntimeProfile.ttypes import TRuntimeProfileFormat
-from tests.common.impala_connection import (
-    ERROR, FINISHED, IMPALA_CONNECTION_EXCEPTION, RUNNING)
-from tests.common.impala_test_suite import ImpalaTestSuite, LOG
+from impala_thrift_gen.RuntimeProfile.ttypes import TRuntimeProfileFormat
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.errors import Timeout
-from tests.common.skip import (SkipIfEC, SkipIfBuildType, SkipIfFS,
-    SkipIfNotHdfsMinicluster)
+from tests.common.impala_connection import (
+    ERROR,
+    FINISHED,
+    IMPALA_CONNECTION_EXCEPTION,
+    RUNNING,
+)
+from tests.common.impala_test_suite import ImpalaTestSuite, LOG
+from tests.common.skip import (
+    SkipIfBuildType,
+    SkipIfEC,
+    SkipIfFS,
+    SkipIfNotHdfsMinicluster,
+)
 from tests.common.test_dimensions import add_mandatory_exec_option
 
 # The BE krpc port of the impalad to simulate rpc or disk errors in tests.

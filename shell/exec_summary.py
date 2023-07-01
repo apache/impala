@@ -18,7 +18,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from ExecStats.ttypes import TExecStats
+from __future__ import absolute_import, print_function, unicode_literals
+
+from impala_thrift_gen.ExecStats.ttypes import TExecStats
 
 
 def build_exec_summary_table(summary, idx, indent_level, new_indent_level, output,

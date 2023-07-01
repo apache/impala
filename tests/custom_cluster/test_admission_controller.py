@@ -18,50 +18,58 @@
 # Tests admission control
 
 from __future__ import absolute_import, division, print_function
-from builtins import int, range, round
+from copy import deepcopy
 import itertools
 import logging
 import os
-import pytest
 import re
 import signal
 import sys
 import threading
-from copy import deepcopy
 from time import sleep, time
 
+from builtins import int, range, round
+import pytest
+
+from impala_thrift_gen.ImpalaService import ImpalaHiveServer2Service
+from impala_thrift_gen.TCLIService import TCLIService
 from tests.common.cluster_config import (
-    impalad_admission_ctrl_flags,
     impalad_admission_ctrl_config_args,
-    RESOURCES_DIR)
+    impalad_admission_ctrl_flags,
+    RESOURCES_DIR,
+)
 from tests.common.custom_cluster_test_suite import (
     ADMISSIOND_ARGS,
+    CustomClusterTestSuite,
     IMPALAD_ARGS,
     START_ARGS,
     WORKLOAD_MGMT_IMPALAD_FLAGS,
-    CustomClusterTestSuite)
+)
 from tests.common.environ import build_flavor_timeout, ImpalaTestClusterProperties
 from tests.common.impala_connection import (
-    RUNNING, FINISHED, ERROR,
-    IMPALA_CONNECTION_EXCEPTION)
+    ERROR,
+    FINISHED,
+    IMPALA_CONNECTION_EXCEPTION,
+    RUNNING,
+)
 from tests.common.resource_pool_config import ResourcePoolConfig
-from tests.common.skip import SkipIfFS, SkipIfEC, SkipIfNotHdfsMinicluster
+from tests.common.skip import SkipIfEC, SkipIfFS, SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (
-    HS2,
     add_mandatory_exec_option,
     create_exec_option_dimension,
     create_single_exec_option_dimension,
-    create_uncompressed_text_dimension)
+    create_uncompressed_text_dimension,
+    HS2,
+)
 from tests.common.test_vector import ImpalaTestDimension
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
-from tests.util.workload_management import QUERY_TBL_LIVE
 from tests.util.web_pages_util import (
+    get_mem_admitted_backends_debug_page,
     get_num_completed_backends,
-    get_mem_admitted_backends_debug_page)
+)
+from tests.util.workload_management import QUERY_TBL_LIVE
 from tests.verifiers.mem_usage_verifier import MemUsageVerifier
 from tests.verifiers.metric_verifier import MetricVerifier
-from ImpalaService import ImpalaHiveServer2Service
-from TCLIService import TCLIService
 
 LOG = logging.getLogger('admission_test')
 

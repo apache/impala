@@ -17,10 +17,12 @@
 #
 from __future__ import absolute_import, division, print_function
 import getpass
+
 import pytest
-from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
-from TCLIService import TCLIService
+
+from impala_thrift_gen.TCLIService import TCLIService
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 
 USER_NAME = getpass.getuser()
 PROXY_USER = "proxy_user_name"

@@ -21,6 +21,7 @@
 // of the execution parameters of any one of the backends on which it is running
 // (those are recorded in TPlanFragmentInstanceCtx).
 
+namespace py impala_thrift_gen.PlanNodes
 namespace cpp impala
 namespace java org.apache.impala.thrift
 

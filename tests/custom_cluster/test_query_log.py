@@ -16,19 +16,19 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-
+from getpass import getuser
 import os
+from random import choice, randint
+from signal import SIGRTMIN
 import string
 from time import sleep, time
 
-from getpass import getuser
-from ImpalaService import ImpalaHiveServer2Service
-from random import choice, randint
-from signal import SIGRTMIN
-from TCLIService import TCLIService
+from thrift.protocol import TBinaryProtocol
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
-from thrift.protocol import TBinaryProtocol
+
+from impala_thrift_gen.ImpalaService import ImpalaHiveServer2Service
+from impala_thrift_gen.TCLIService import TCLIService
 from tests.common.cluster_config import impalad_admission_ctrl_config_args
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_connection import FINISHED
@@ -39,9 +39,10 @@ from tests.common.wm_test_suite import WorkloadManagementTestSuite
 from tests.util.retry import retry
 from tests.util.workload_management import (
     assert_query,
-    WM_DB,
     QUERY_TBL_LOG,
-    redaction_rules_file)
+    redaction_rules_file,
+    WM_DB,
+)
 
 
 class TestQueryLogTableBasic(WorkloadManagementTestSuite):

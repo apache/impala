@@ -21,29 +21,28 @@
 
 from __future__ import absolute_import, division, print_function
 import abc
-from future.utils import with_metaclass
 import getpass
 import logging
 import re
 import time
 
-from beeswaxd.BeeswaxService import QueryState
+from future.utils import with_metaclass
 import impala.dbapi as impyla
 import impala.error as impyla_error
 import impala.hiveserver2 as hs2
-import tests.common
-from Query.ttypes import TQueryOptions
-from RuntimeProfile.ttypes import TRuntimeProfileFormat
+
+from impala_thrift_gen.beeswax.BeeswaxService import QueryState
+from impala_thrift_gen.Query.ttypes import TQueryOptions
+from impala_thrift_gen.RuntimeProfile.ttypes import TRuntimeProfileFormat
 from tests.beeswax.impala_beeswax import (
-  DEFAULT_SLEEP_INTERVAL,
-  ImpalaBeeswaxClient,
-  ImpalaBeeswaxException)
+    DEFAULT_SLEEP_INTERVAL,
+    ImpalaBeeswaxClient,
+    ImpalaBeeswaxException,
+)
+import tests.common
 from tests.common.patterns import LOG_FORMAT
 from tests.common.test_vector import BEESWAX, HS2, HS2_HTTP
-from tests.util.thrift_util import (
-  op_handle_to_query_id,
-  session_handle_to_session_id)
-
+from tests.util.thrift_util import op_handle_to_query_id, session_handle_to_session_id
 
 LOG = logging.getLogger(__name__)
 console_handler = logging.StreamHandler()

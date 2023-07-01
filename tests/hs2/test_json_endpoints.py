@@ -19,18 +19,20 @@
 
 from __future__ import absolute_import, division, print_function
 import json
-import pytest
 from time import time
+
+import pytest
+
+from impala_thrift_gen.TCLIService import TCLIService
+from tests.common.environ import IS_DOCKERIZED_TEST_CLUSTER
+from tests.common.impala_cluster import ImpalaCluster
+from tests.hs2.hs2_test_suite import HS2TestSuite
 
 try:
   from urllib.request import urlopen
 except ImportError:
   from urllib2 import urlopen
 
-from tests.common.environ import IS_DOCKERIZED_TEST_CLUSTER
-from tests.common.impala_cluster import ImpalaCluster
-from tests.hs2.hs2_test_suite import HS2TestSuite
-from TCLIService import TCLIService
 
 class TestJsonEndpoints(HS2TestSuite):
   def _get_json_queries(self, http_addr):

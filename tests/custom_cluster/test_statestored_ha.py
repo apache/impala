@@ -17,23 +17,23 @@
 
 from __future__ import absolute_import, division, print_function
 import logging
-import pytest
 import time
-
-from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.environ import build_flavor_timeout, ImpalaTestClusterProperties
-from tests.common.impala_cluster import (
-    DEFAULT_CATALOG_SERVICE_PORT, DEFAULT_STATESTORE_SERVICE_PORT)
-from tests.common.impala_connection import (
-    ERROR, IMPALA_CONNECTION_EXCEPTION, RUNNING)
-from tests.common.skip import SkipIfBuildType, SkipIfNotHdfsMinicluster
 from time import sleep
 
+import pytest
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket, TTransport
 
-import StatestoreService.StatestoreSubscriber as Subscriber
-import StatestoreService.StatestoreService as Statestore
+import impala_thrift_gen.StatestoreService.StatestoreService as Statestore
+import impala_thrift_gen.StatestoreService.StatestoreSubscriber as Subscriber
+from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.environ import build_flavor_timeout, ImpalaTestClusterProperties
+from tests.common.impala_cluster import (
+    DEFAULT_CATALOG_SERVICE_PORT,
+    DEFAULT_STATESTORE_SERVICE_PORT,
+)
+from tests.common.impala_connection import ERROR, IMPALA_CONNECTION_EXCEPTION, RUNNING
+from tests.common.skip import SkipIfBuildType, SkipIfNotHdfsMinicluster
 
 LOG = logging.getLogger('statestored_ha_test')
 

@@ -17,8 +17,8 @@
 
 // Interface for interacting with Beeswax Server
 
+namespace py impala_thrift_gen.beeswax
 namespace java com.cloudera.beeswax.api
-namespace py beeswaxd
 namespace cpp beeswax
 
 include "hive_metastore.thrift"

@@ -18,17 +18,18 @@
 # Client tests for SQL statement authorization
 
 from __future__ import absolute_import, division, print_function
-import pytest
+from getpass import getuser
 import random
 import threading
 import time
 
-from getpass import getuser
-from ImpalaService import ImpalaHiveServer2Service
-from TCLIService import TCLIService
+import pytest
+from thrift.protocol import TBinaryProtocol
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
-from thrift.protocol import TBinaryProtocol
+
+from impala_thrift_gen.ImpalaService import ImpalaHiveServer2Service
+from impala_thrift_gen.TCLIService import TCLIService
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.file_utils import assert_file_in_dir_contains
 from tests.common.test_result_verifier import error_msg_equal

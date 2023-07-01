@@ -18,6 +18,7 @@
 //
 // This file contains structures produced by the planner.
 
+namespace py impala_thrift_gen.Planner
 namespace cpp impala
 namespace java org.apache.impala.thrift
 

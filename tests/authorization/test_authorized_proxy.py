@@ -16,16 +16,17 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-import pytest
+import json
 import os
 import time
-import json
 
-from ImpalaService import ImpalaHiveServer2Service
-from TCLIService import TCLIService
+import pytest
+from thrift.protocol import TBinaryProtocol
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
-from thrift.protocol import TBinaryProtocol
+
+from impala_thrift_gen.ImpalaService import ImpalaHiveServer2Service
+from impala_thrift_gen.TCLIService import TCLIService
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.hs2.hs2_test_suite import operation_id_to_query_id
 

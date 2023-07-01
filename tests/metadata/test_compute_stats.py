@@ -16,23 +16,28 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-from builtins import range
 import os
-import pytest
-from hive_metastore.ttypes import (
-    ColumnStatistics, ColumnStatisticsDesc, ColumnStatisticsData,
-    ColumnStatisticsObj, StringColumnStatsData)
 
+from builtins import range
+import pytest
+
+from impala_thrift_gen.CatalogObjects.ttypes import THdfsCompression
+from impala_thrift_gen.hive_metastore.ttypes import (
+    ColumnStatistics,
+    ColumnStatisticsData,
+    ColumnStatisticsDesc,
+    ColumnStatisticsObj,
+    StringColumnStatsData,
+)
 from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfFS, SkipIfLocal, SkipIfCatalogV2
+from tests.common.skip import SkipIfCatalogV2, SkipIfFS, SkipIfLocal
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
     create_single_exec_option_dimension,
-    create_uncompressed_text_dimension)
-from CatalogObjects.ttypes import THdfsCompression
-
+    create_uncompressed_text_dimension,
+)
 
 IMPALA_TEST_CLUSTER_PROPERTIES = ImpalaTestClusterProperties.get_instance()
 

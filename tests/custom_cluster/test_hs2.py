@@ -16,13 +16,13 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from time import sleep
 
 import pytest
 
+from impala_thrift_gen.TCLIService import TCLIService
+from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.hs2.hs2_test_suite import HS2TestSuite, operation_id_to_query_id
-from time import sleep
-from TCLIService import TCLIService
 
 
 class TestHS2(CustomClusterTestSuite):

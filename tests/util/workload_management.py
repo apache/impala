@@ -24,7 +24,7 @@ import requests
 from datetime import datetime
 from time import sleep, time
 
-from SystemTables.ttypes import TQueryTableColumn
+from impala_thrift_gen.SystemTables.ttypes import TQueryTableColumn
 from tests.util.assert_time import assert_time_str, convert_to_milliseconds
 from tests.util.memory import assert_byte_str, convert_to_bytes
 

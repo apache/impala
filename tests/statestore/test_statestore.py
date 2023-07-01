@@ -16,37 +16,37 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-from builtins import range
 from collections import defaultdict
 import json
 import logging
 import socket
 import threading
-import traceback
 import time
+import traceback
 import uuid
+
+from builtins import range
+from thrift.protocol import TBinaryProtocol
+from thrift.server.TServer import TServer
+from thrift.transport import TSocket, TTransport
+
+from impala_thrift_gen.ErrorCodes.ttypes import TErrorCode
+import impala_thrift_gen.StatestoreService.StatestoreService as Statestore
+import impala_thrift_gen.StatestoreService.StatestoreSubscriber as Subscriber
+from impala_thrift_gen.StatestoreService.StatestoreSubscriber import (
+    TTopicRegistration,
+    TUpdateStateResponse,
+)
+from impala_thrift_gen.Status.ttypes import TStatus
+from impala_thrift_gen.Types.ttypes import TNetworkAddress
+from tests.common.base_test_suite import BaseTestSuite
+from tests.common.environ import build_flavor_timeout
+from tests.common.skip import SkipIfDockerizedCluster
 
 try:
   from urllib.request import urlopen
 except ImportError:
   from urllib2 import urlopen
-
-from Types.ttypes import TNetworkAddress
-from thrift.protocol import TBinaryProtocol
-from thrift.server.TServer import TServer
-from thrift.transport import TSocket
-from thrift.transport import TTransport
-
-import StatestoreService.StatestoreSubscriber as Subscriber
-import StatestoreService.StatestoreService as Statestore
-from StatestoreService.StatestoreSubscriber import TUpdateStateResponse
-from StatestoreService.StatestoreSubscriber import TTopicRegistration
-from ErrorCodes.ttypes import TErrorCode
-from Status.ttypes import TStatus
-
-from tests.common.base_test_suite import BaseTestSuite
-from tests.common.environ import build_flavor_timeout
-from tests.common.skip import SkipIfDockerizedCluster
 
 LOG = logging.getLogger('test_statestore')
 

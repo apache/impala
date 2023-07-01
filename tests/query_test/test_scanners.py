@@ -22,17 +22,19 @@
 # explode.
 
 from __future__ import absolute_import, division, print_function
-from builtins import range
+from copy import deepcopy
 import os
-import pytest
 import random
 import re
-import tempfile
-from copy import deepcopy
-from parquet.ttypes import ConvertedType
 from subprocess import check_call
+import tempfile
 
+from builtins import range
+import pytest
+
+from impala_thrift_gen.parquet.ttypes import ConvertedType
 from testdata.common import widetable
+from tests.common.file_utils import create_table_and_copy_files, create_table_from_parquet
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import (
     SkipIf,
@@ -41,21 +43,18 @@ from tests.common.skip import (
     SkipIfHive2,
     SkipIfHive3,
     SkipIfLocal,
-    SkipIfNotHdfsMinicluster)
+    SkipIfNotHdfsMinicluster,
+)
 from tests.common.test_dimensions import (
     add_exec_option_dimension,
     add_mandatory_exec_option,
-    create_single_exec_option_dimension,
     create_exec_option_dimension,
-    create_uncompressed_text_dimension)
-from tests.common.file_utils import (
-    create_table_from_parquet,
-    create_table_and_copy_files)
-from tests.common.test_result_verifier import (
-    QueryTestResult,
-    parse_result_rows)
+    create_single_exec_option_dimension,
+    create_uncompressed_text_dimension,
+)
+from tests.common.test_result_verifier import parse_result_rows, QueryTestResult
 from tests.common.test_vector import ImpalaTestDimension
-from tests.util.filesystem_utils import IS_HDFS, get_fs_path
+from tests.util.filesystem_utils import get_fs_path, IS_HDFS
 from tests.util.get_parquet_metadata import get_parquet_metadata
 from tests.util.parse_util import get_bytes_summary_stats_counter
 from tests.util.test_file_parser import QueryTestSectionReader

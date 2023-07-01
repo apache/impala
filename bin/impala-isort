@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -15,23 +17,5 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Python3-only requirements
-
-pylint == 2.10.2
-  astroid == 2.7.3
-    lazy-object-proxy == 1.6.0
-    wrapt == 1.12.1
-    typed-ast == 1.4.3
-  configparser == 4.0.2
-  isort == 5.13.2
-    futures == 3.3.0; python_version == "2.7"
-    poetry-core == 1.9.1
-  singledispatch == 3.6.1
-  toml == 0.10.2
-  platformdirs == 2.4.1
-  typing-extensions == 3.10.0.2
-k5test==0.10.3
-
-# Below are needed only for dev
-flake8==3.9.2
-flake8-unused-arguments==0.0.13
+source "$(dirname "$0")/impala-python3-common.sh"
+exec "$PY_ENV_DIR/bin/isort" "$@"

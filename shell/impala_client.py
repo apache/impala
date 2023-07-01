@@ -33,17 +33,19 @@ import traceback
 from datetime import datetime
 import uuid
 
-from beeswaxd import BeeswaxService
-from beeswaxd.BeeswaxService import QueryState
-from ImpalaService import ImpalaService, ImpalaHiveServer2Service
-from ImpalaService.ImpalaHiveServer2Service import (TGetRuntimeProfileReq,
-    TGetExecSummaryReq, TPingImpalaHS2ServiceReq, TCloseImpalaOperationReq)
-from ErrorCodes.ttypes import TErrorCode
-from Status.ttypes import TStatus
-from TCLIService.TCLIService import (TExecuteStatementReq, TOpenSessionReq,
-    TCloseSessionReq, TProtocolVersion, TStatusCode, TGetOperationStatusReq,
-    TOperationState, TFetchResultsReq, TFetchOrientation, TGetLogReq,
-    TGetResultSetMetadataReq, TTypeId, TCancelOperationReq, TCloseOperationReq)
+from impala_thrift_gen.beeswax import BeeswaxService
+from impala_thrift_gen.beeswax.BeeswaxService import QueryState
+from impala_thrift_gen.ImpalaService import ImpalaService, ImpalaHiveServer2Service
+from impala_thrift_gen.ImpalaService.ImpalaHiveServer2Service import (
+    TGetRuntimeProfileReq, TGetExecSummaryReq, TPingImpalaHS2ServiceReq,
+    TCloseImpalaOperationReq)
+from impala_thrift_gen.ErrorCodes.ttypes import TErrorCode
+from impala_thrift_gen.Status.ttypes import TStatus
+from impala_thrift_gen.TCLIService.TCLIService import (TExecuteStatementReq,
+    TOpenSessionReq, TCloseSessionReq, TProtocolVersion, TStatusCode,
+    TGetOperationStatusReq, TOperationState, TFetchResultsReq, TFetchOrientation,
+    TGetLogReq, TGetResultSetMetadataReq, TTypeId, TCancelOperationReq,
+    TCloseOperationReq)
 from ImpalaHttpClient import ImpalaHttpClient
 from exec_summary import build_exec_summary_table
 from kerberos_util import get_kerb_host_from_kerberos_host_fqdn
