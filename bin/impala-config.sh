@@ -433,7 +433,7 @@ fi
 # the generated Python code. The code that uses the generated Python code gets
 # the corresponding Thrift runtime library by pip installing thrift (and does not
 # respect this version). If upgrading IMPALA_THRIFT_PY_VERSION, also upgrade the
-# thrift version in shell/ext-py, shell/packaging/requirements.txt, and
+# thrift version in shell/packaging/requirements.txt and
 # infra/python/deps/requirements.txt.
 export IMPALA_THRIFT_CPP_VERSION=0.16.0-p7
 unset IMPALA_THRIFT_CPP_URL

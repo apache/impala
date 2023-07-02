@@ -1,42 +1,6 @@
 /build/
 /gen-py/
-ext-py/bitarray-2.3.0/bitarray.egg-info/
-ext-py/bitarray-2.3.0/dist/
-ext-py/bitarray-2.3.0/build/
-ext-py/kerberos-1.3.1/dist/
-ext-py/kerberos-1.3.1/build/
-ext-py/kerberos-1.3.1/kerberos.egg-info/
-ext-py/prettytable-0.7.2/dist/
-ext-py/prettytable-0.7.2/build/
-ext-py/prettytable-0.7.2/prettytable.egg-info
-ext-py/sasl-0.3.1/dist/
-ext-py/sasl-0.3.1/build/
-ext-py/sasl-0.3.1/sasl.egg-info/
-ext-py/six-1.14.0/dist/
-ext-py/six-1.14.0/build/
-ext-py/six-1.14.0/six.egg-info/
-ext-py/sqlparse-0.3.1/dist/
-ext-py/sqlparse-0.3.1/build/
-ext-py/sqlparse-0.3.1/sqlparse.egg-info/
-ext-py/thrift-0.16.0/dist/
-ext-py/thrift-0.16.0/build/
-ext-py/thrift-0.16.0/thrift.egg-info/
-ext-py/thrift_sasl-0.4.3/dist/
-ext-py/thrift_sasl-0.4.3/build/
-ext-py/thrift_sasl-0.4.3/thrift_sasl.egg-info/
+/ext-py/
 
-# This file is used by buildall.sh to find files that need to be removed during the
-# clean phase. Previous version of deps should be kept here for cleaning otherwise they
-# may cause a build failure. Also the ignore path must be changed to the root folder
-# so "git clean -Xdf" will work.
-ext-py/bitarray-0.9.0/
-ext-py/bitarray-1.2.1/
-ext-py/prettytable-0.7.1/
-ext-py/sasl-0.1.1/
-ext-py/sasl-0.2.1/
-ext-py/six-1.11.0/
-ext-py/sqlparse-0.1.7/
-ext-py/sqlparse-0.1.19/
-ext-py/thrift-0.14.2/
-ext-py/thrift_sasl-0.4.1/
-ext-py/thrift_sasl-0.4.2/
+# Ignore the build version python file
+impala_shell/impala_build_version.py

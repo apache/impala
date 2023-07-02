@@ -20,15 +20,8 @@
 
 # This script runs the Impala shell. Python is required.
 #
-# This script assumes that the supporting library files for the Impala shell are
-# rooted in either the same directory that this script is in, or in a directory
-# in the environment variable ${IMPALA_SHELL_HOME}.
-#
-# The required directories are:
-# gen-py/ -- containing the Python thrift stubs for connecting to Impalad
-# lib/ -- containing the Hive Beeswax libraries; note this directory exists only in the
-#         shell tarball, not the Impala repository, see make_shell_tarball.sh for details
-# ext-py${VERSION}/ -- containing the external dependencies for the shell.
+# This contains installations for different versions of Python in
+# install_py${PYTHON_VERSION} directories (e.g. install_py3.8).
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SHELL_HOME=${IMPALA_SHELL_HOME:-${SCRIPT_DIR}}
@@ -42,26 +35,19 @@ if ! command -v "${PYTHON_EXE}" > /dev/null; then
   PYTHON_EXE=python3
 fi
 
-PYTHONPATH="${SHELL_HOME}/gen-py:${SHELL_HOME}/lib:${PYTHONPATH}"
-
-# External dependencies are installed in /ext-py${PYTHON_VERSION}
+# impala-shell is installed in /install_py${PYTHON_VERSION}
 PYTHON_VERSION=$("${PYTHON_EXE}" -c 'import sys; \
   print("{}.{}".format(sys.version_info.major, sys.version_info.minor))')
-if [ ! -d "${SHELL_HOME}/ext-py${PYTHON_VERSION}" ]; then
-  # List all ext-py* dirs, remove ext-py prefix, and join into a comma-separated string.
-  dirs=( $(cd ${SHELL_HOME} && echo ext-py*) )
-  vers="${dirs[@]#ext-py}"
+if [ ! -d "${SHELL_HOME}/install_py${PYTHON_VERSION}" ]; then
+  # List all install_py* dirs, remove install_py prefix, and join into a comma-separated
+  # string.
+  dirs=( $(cd ${SHELL_HOME} && echo install_py*) )
+  vers="${dirs[@]#install_py}"
   pretty="$(printf "%s, " ${vers[@]})"
   echo "This impala-shell package was not built to support Python ${PYTHON_VERSION}." \
        "Supported Python versions are: ${pretty%, }."
   exit 1
 fi
 
-PYTHONPATH="${SHELL_HOME}/ext-py${PYTHON_VERSION}:${PYTHONPATH}"
-
-if [ "${PYTHON_VERSION}" = "2.7" ]; then
-  # Python 2 requires the legacy pkg_resources.py code
-  PYTHONPATH="${PYTHONPATH}:${SHELL_HOME}/legacy"
-fi
-PYTHONPATH="${PYTHONPATH}" PYTHONIOENCODING='utf-8' exec ${PYTHON_EXE} \
-  ${SHELL_HOME}/impala_shell.py "$@"
+PYTHONIOENCODING='utf-8' PYTHONPATH="${SHELL_HOME}/install_py${PYTHON_VERSION}" \
+  exec ${PYTHON_EXE} -m "impala_shell.impala_shell" "$@"

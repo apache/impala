@@ -56,20 +56,26 @@ foreach(PYTHON_EXE IN LISTS PYTHON_EXES)
   set(PIP_CACHE "${PIP_LOC}/${PYTHON_NAME}")
 
   # Supports fallback to impala-virtualenv for older Python versions.
-  add_custom_command(OUTPUT "${VENV}" DEPENDS impala_python
+  # This upgrades pip in the virtualenv to make the behavior more consistent across
+  # different distributions
+  add_custom_target(${PYTHON_NAME}_venv
+    BYPRODUCTS "${VENV}"
+    DEPENDS impala_python
     COMMAND "${CMAKE_SOURCE_DIR}/bin/cmake_aux/create_virtualenv.sh"
             "${PYTHON_EXE}" "${VENV}"
+    COMMAND "${VENV}/bin/pip" install --cache-dir "${PIP_CACHE}" --upgrade pip
     COMMAND "${VENV}/bin/pip" install --cache-dir "${PIP_CACHE}" wheel
   )
 
-  list(APPEND IMPALA_PYTHON_BUILD_VENVS "${VENV}")
+  list(APPEND IMPALA_PYTHON_BUILD_VENVS ${PYTHON_NAME}_venv)
 endforeach()
 
-add_custom_target(shell_tarball DEPENDS gen-deps "${IMPALA_PYTHON_BUILD_VENVS}"
-  COMMAND "${CMAKE_SOURCE_DIR}/shell/make_shell_tarball.sh" ${PYTHON_EXES}
+add_custom_target(shell_impala_build_version
+  DEPENDS gen-deps "${CMAKE_SOURCE_DIR}/bin/version.info"
+  COMMAND "${CMAKE_SOURCE_DIR}/shell/gen_impala_build_version.sh"
 )
 
-add_custom_target(shell_pypi_package DEPENDS shell_tarball impala_python
+add_custom_target(shell_pypi_package DEPENDS gen-deps shell_impala_build_version impala_python
   COMMAND "${CMAKE_SOURCE_DIR}/shell/packaging/make_python_package.sh"
 )
 
@@ -82,18 +88,22 @@ set(SHELL_TEST_PKG
   "${CMAKE_SOURCE_DIR}/shell/build/dist/impala_shell-${PKG_VERSION}.tar.gz")
 get_filename_component(SHELL_TEST_PKG_DIR "${SHELL_TEST_PKG}" DIRECTORY)
 # Generates SHELL_TEST_PKG
-add_custom_target(shell_pypi_test_package DEPENDS shell_tarball impala_python
+add_custom_target(shell_pypi_test_package DEPENDS gen-deps shell_impala_build_version impala_python
   COMMAND env BUILD_VERSION=${PKG_VERSION} OFFICIAL=true DIST_DIR="${SHELL_TEST_PKG_DIR}"
     "${CMAKE_SOURCE_DIR}/shell/packaging/make_python_package.sh"
 )
 
 # Tests expect to find venvs at 'python2_venv' and 'python3_venv' in tests/shell/util.py.
 set(PYTHON2_VENV "${VENV_LOC}/python2_venv")
-add_custom_target(shell_python2_install DEPENDS "${PYTHON2_VENV}" shell_pypi_test_package
+add_custom_target(shell_python2_install DEPENDS python2_venv shell_pypi_test_package
   COMMAND "${PYTHON2_VENV}/bin/pip" install --cache-dir "${PIP_LOC}/python2" "${SHELL_TEST_PKG}"
 )
 
 set(PYTHON3_VENV "${VENV_LOC}/python3_venv")
-add_custom_target(shell_python3_install DEPENDS "${PYTHON3_VENV}" shell_pypi_test_package
+add_custom_target(shell_python3_install DEPENDS python3_venv shell_pypi_test_package
   COMMAND "${PYTHON3_VENV}/bin/pip" install --cache-dir "${PIP_LOC}/python3" "${SHELL_TEST_PKG}"
+)
+
+add_custom_target(shell_tarball DEPENDS gen-deps shell_pypi_test_package "${IMPALA_PYTHON_BUILD_VENVS}"
+  COMMAND "${CMAKE_SOURCE_DIR}/shell/make_shell_tarball.sh" "${SHELL_TEST_PKG}" ${PYTHON_EXES}
 )

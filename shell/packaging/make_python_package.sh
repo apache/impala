@@ -27,8 +27,8 @@
 # Until the thrift-generated python files in ${IMPALA_HOME}/shell/gen-py
 # have been created by the build process, this script will not work.
 # It also relies upon the impala_build_version.py file created by the
-# parent packaging script, ${IMPALA_HOME}/shell/make_shell_tarball.sh,
-# which needs to be run before this script will work.
+# ${IMPALA_HOME}/shell/gen_impala_build_version.sh script, which needs
+# to run before this script will work.
 #
 # After those files exist, however, this script can be run again at will.
 
