@@ -346,6 +346,7 @@ message(STATUS "RapidJson include dir: " ${RAPIDJSON_INCLUDE_DIR})
 # find Avro headers and libs
 find_package(Avro REQUIRED)
 IMPALA_ADD_THIRDPARTY_LIB(avro ${AVRO_INCLUDE_DIR} ${AVRO_STATIC_LIB} "")
+message(STATUS "Use C++ AVRO library: " $ENV{USE_AVRO_CPP})
 
 # find ORC headers and libs
 find_package(Orc REQUIRED)

@@ -26,12 +26,24 @@ set(AVRO_SEARCH_HEADER_PATHS ${AVRO_ROOT}/include)
 
 set(AVRO_SEARCH_LIB_PATH ${AVRO_ROOT}/lib)
 
-find_path(AVRO_INCLUDE_DIR NAMES avro/schema.h schema.h PATHS
-  ${AVRO_SEARCH_HEADER_PATHS}
+set(AVRO_LIB_NAME "libavro.a")
+set(AVRO_PROBE_INCLUDE_NAME_1 "avro/schema.h")
+set(AVRO_PROBE_INCLUDE_NAME_2 "schema.h")
+
+# Search for the AVRO C++ library when USE_AVRO_CPP environment variable is true.
+string(TOUPPER $ENV{USE_AVRO_CPP} USE_AVRO_CPP)
+if (USE_AVRO_CPP)
+  set(AVRO_LIB_NAME "libavrocpp_s.a")
+  set(AVRO_PROBE_INCLUDE_NAME_1 "avro/Schema.hh")
+  set(AVRO_PROBE_INCLUDE_NAME_2 "Schema.hh")
+endif()
+
+find_path(AVRO_INCLUDE_DIR NAMES ${AVRO_PROBE_INCLUDE_NAME_1} ${AVRO_PROBE_INCLUDE_NAME_2}
+  PATHS ${AVRO_SEARCH_HEADER_PATHS}
   # make sure we don't accidentally pick up a different version
   NO_DEFAULT_PATH)
 
-find_library(AVRO_STATIC_LIB NAMES libavro.a PATHS ${AVRO_SEARCH_LIB_PATH})
+find_library(AVRO_STATIC_LIB NAMES ${AVRO_LIB_NAME} PATHS ${AVRO_SEARCH_LIB_PATH})
 
 if(NOT AVRO_STATIC_LIB)
   message(FATAL_ERROR "Avro includes and libraries NOT found. "
