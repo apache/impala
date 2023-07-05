@@ -43,15 +43,15 @@ INT,STRING
 ---- QUERY
 SHOW FILES IN id_part;
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=1/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=2/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=2/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=3/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=4/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=4/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=5/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=6/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=6/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=1/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=2/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=2/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=3/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=4/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=4/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=5/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=6/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=6/(?!delete-).*.parq','.*B','','.*'
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====
@@ -89,20 +89,20 @@ INT,STRING
 ---- QUERY
 SHOW FILES IN id_part;
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=1/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=1/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=2/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=2/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=3/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=3/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=4/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=4/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=5/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=5/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=6/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=6/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=__HIVE_DEFAULT_PARTITION__/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=__HIVE_DEFAULT_PARTITION__/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=1/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=1/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=2/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=2/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=3/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=3/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=4/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=4/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=5/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=5/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=6/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=6/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=__HIVE_DEFAULT_PARTITION__/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=__HIVE_DEFAULT_PARTITION__/(?!delete-).*.parq','.*B','','.*'
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====
@@ -164,18 +164,18 @@ INT,STRING
 ---- QUERY
 SHOW FILES IN trunc_part;
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=f/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=f/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=f/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=o/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=o/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=s/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=s/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=t/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=t/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=t/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=__HIVE_DEFAULT_PARTITION__/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=__HIVE_DEFAULT_PARTITION__/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=f/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=f/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=f/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=o/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=o/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=s/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=s/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=t/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=t/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=t/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=__HIVE_DEFAULT_PARTITION__/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/trunc_part/data/s_trunc=__HIVE_DEFAULT_PARTITION__/(?!delete-).*.parq','.*B','','.*'
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====
@@ -241,19 +241,19 @@ INT,STRING,DOUBLE
 ---- QUERY
 SHOW FILES IN multi_part;
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=0/s_trunc=f/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=0/s_trunc=f/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=0/s_trunc=t/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=0/s_trunc=t/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=0/s_trunc=t/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=2/s_trunc=f/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=2/s_trunc=f/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=2/s_trunc=o/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=2/s_trunc=o/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=2/s_trunc=s/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=2/s_trunc=s/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=__HIVE_DEFAULT_PARTITION__/s_trunc=n/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=__HIVE_DEFAULT_PARTITION__/s_trunc=n/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=0/s_trunc=f/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=0/s_trunc=f/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=0/s_trunc=t/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=0/s_trunc=t/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=0/s_trunc=t/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=2/s_trunc=f/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=2/s_trunc=f/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=2/s_trunc=o/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=2/s_trunc=o/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=2/s_trunc=s/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=2/s_trunc=s/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=__HIVE_DEFAULT_PARTITION__/s_trunc=n/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_part/data/i_bucket=__HIVE_DEFAULT_PARTITION__/s_trunc=n/(?!delete-).*.parq','.*B','','.*'
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====
@@ -362,16 +362,16 @@ INT,STRING,DOUBLE
 ---- QUERY
 SHOW FILES IN evolve_part;
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/i=10/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/i=10/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/i=20/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/i=20/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc=f/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc=f/delete-.*parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc=f/(?!delete-).*.parq','.*B','','NONE'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc=t/(?!delete-).*.parq','.*B','','NONE'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/i=10/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/i=10/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/i=20/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/i=20/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc=f/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc=f/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc=f/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc=t/(?!delete-).*.parq','.*B','','.*'
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====
