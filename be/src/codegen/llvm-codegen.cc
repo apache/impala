@@ -1177,36 +1177,8 @@ bool LlvmCodeGen::LookupCache(CodeGenCacheKey& cache_key) {
       return false;
     }
 
-    // execution_engine_wrapper_cached_ is used to keep the life of the jitted functions
-    // in case the engine is evicted in the global cache.
-    DCHECK(execution_engine_wrapper_cached_ != nullptr);
-    llvm::ExecutionEngine* cached_execution_engine =
-        execution_engine_wrapper_cached_->execution_engine();
-    vector<void*> jitted_funcs;
-    // Get pointers to all codegen'd functions.
-    for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {
-      llvm::Function* function = fns_to_jit_compile_[i].first;
-      DCHECK(function != nullptr);
-      // Using the function getFunctionAddress() with a non-existent function name
-      // would hit an assertion during the test, could be a bug in llvm 5, need to
-      // review after upgrade llvm. But because we already checked the names hashcode
-      // for key collision cases, we expect all the functions should be in the
-      // cached execution engine.
-      void* jitted_function = reinterpret_cast<void*>(
-          cached_execution_engine->getFunctionAddress(function->getName()));
-      if (jitted_function == nullptr) {
-        LOG(WARNING) << "Failed to get a jitted function from cache: "
-                     << function->getName().data()
-                     << " key hash_code=" << cache_key.hash_code();
-        cache->IncHitOrMissCount(/*hit*/ false);
-        return false;
-      }
-      jitted_funcs.emplace_back(jitted_function);
-    }
-    DCHECK_EQ(jitted_funcs.size(), fns_to_jit_compile_.size());
-    for (int i = 0; i < jitted_funcs.size(); i++) {
-      fns_to_jit_compile_[i].second->store(jitted_funcs[i]);
-    }
+    const bool fn_pointers_set_from_cache = SetFunctionPointers(cache, &cache_key);
+    if (!fn_pointers_set_from_cache) return false;
 
     // Because we cache the entire execution engine, the cached number of functions should
     // be the same as the total function number.
@@ -1221,11 +1193,11 @@ bool LlvmCodeGen::LookupCache(CodeGenCacheKey& cache_key) {
 string LlvmCodeGen::GetAllFunctionNames() {
   stringstream result;
   // The way to concat would be like "function1,function2".
-  const char separator = ',';
-  for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {
-    llvm::Function* function = fns_to_jit_compile_[i].first;
-    DCHECK(function != nullptr);
-    result << function->getName().data() << separator;
+  // The function names are sorted in 'fns_to_jit_compile_'.
+  constexpr char separator = ',';
+  for (auto& entry : fns_to_jit_compile_) {
+    const llvm::StringRef& fn_name = entry.first;
+    result << fn_name.data() << separator;
   }
   return result.str();
 }
@@ -1254,19 +1226,14 @@ void LlvmCodeGen::PruneModule() {
   // global dead code elimination pass. This causes all functions not registered to be
   // JIT'd to be marked as internal, and any internal functions that are not used are
   // deleted by DCE pass. This greatly decreases compile time by removing unused code.
-  unordered_set<string> exported_fn_names;
-  for (auto& entry : fns_to_jit_compile_) {
-    exported_fn_names.insert(entry.first->getName().str());
-  }
-
   llvm::ModuleAnalysisManager module_analysis_manager;
   llvm::PassBuilder pass_builder(execution_engine()->getTargetMachine());
   pass_builder.registerModuleAnalyses(module_analysis_manager);
 
   llvm::ModulePassManager module_pass_manager;
   module_pass_manager.addPass(
-      llvm::InternalizePass([&exported_fn_names](const llvm::GlobalValue& gv) {
-        return exported_fn_names.find(gv.getName().str()) != exported_fn_names.end();
+      llvm::InternalizePass([this](const llvm::GlobalValue& gv) {
+        return fns_to_jit_compile_.count(gv.getName()) > 0;
       }));
   module_pass_manager.addPass(llvm::GlobalDCEPass());
   module_pass_manager.run(*module_, module_analysis_manager);
@@ -1451,10 +1418,12 @@ Status LlvmCodeGen::OptimizeModule() {
   // Create and run module pass manager
   pass_manager.run(*module_, MAM);
   if (FLAGS_print_llvm_ir_instruction_count) {
-    for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {
+    for (auto& entry : fns_to_jit_compile_) {
       InstructionCounter counter;
-      counter.visit(*fns_to_jit_compile_[i].first);
-      VLOG(1) << fns_to_jit_compile_[i].first->getName().str();
+      llvm::Function* llvm_function = entry.second.first;
+      const llvm::StringRef& llvm_function_name = entry.first;
+      counter.visit(*llvm_function);
+      VLOG(1) << llvm_function_name.data();
       VLOG(1) << counter.PrintCounters();
     }
   }
@@ -1463,15 +1432,51 @@ Status LlvmCodeGen::OptimizeModule() {
   return Status::OK();
 }
 
-void LlvmCodeGen::SetFunctionPointers() {
+bool LlvmCodeGen::SetFunctionPointers(CodeGenCache* cache,
+    const CodeGenCacheKey* cache_key) {
   // Get pointers to all codegen'd functions.
-  for (const std::pair<llvm::Function*, CodegenFnPtrBase*>& fn_pair
-      : fns_to_jit_compile_) {
-    llvm::Function* function = fn_pair.first;
-    void* jitted_function = execution_engine()->getPointerToFunction(function);
-    DCHECK(jitted_function != nullptr) << "Failed to jit " << function->getName().data();
-    fn_pair.second->store(jitted_function);
+  for (auto& entry : fns_to_jit_compile_) {
+    const llvm::StringRef& function_name = entry.first;
+
+    LlvmFunctionWithFnPtrTargets& fn_with_targets = entry.second;
+    llvm::Function* function = fn_with_targets.first;
+    std::vector<CodegenFnPtrBase*>& jitted_fn_ptrs = fn_with_targets.second;
+
+    void* jitted_function = nullptr;
+    if (cache != nullptr) {
+      DCHECK(cache_key != nullptr);
+      // execution_engine_wrapper_cached_ is used to keep the life of the jitted functions
+      // in case the engine is evicted in the global cache.
+      DCHECK(execution_engine_wrapper_cached_ != nullptr);
+      llvm::ExecutionEngine* cached_execution_engine =
+          execution_engine_wrapper_cached_->execution_engine();
+
+      // Using the function getFunctionAddress() with a non-existent function name would
+      // hit an assertion during the test, could be a bug in llvm 5, need to review after
+      // upgrade llvm. But because we already checked the names hashcode for key collision
+      // cases, we expect all the functions should be in the cached execution engine.
+      jitted_function = reinterpret_cast<void*>(
+          cached_execution_engine->getFunctionAddress(function_name));
+      if (jitted_function == nullptr) {
+        LOG(WARNING) << "Failed to get a jitted function from cache: "
+                     << function_name.data()
+                     << " key hash_code=" << cache_key->hash_code();
+        cache->IncHitOrMissCount(/*hit*/ false);
+        return false;
+      }
+    } else {
+      DCHECK(cache_key == nullptr);
+      jitted_function = execution_engine()->getPointerToFunction(function);
+      DCHECK(jitted_function != nullptr) << "Failed to jit " << function_name.data();
+    }
+
+    DCHECK(jitted_function != nullptr);
+    for (CodegenFnPtrBase* jitted_fn_ptr : jitted_fn_ptrs) {
+      jitted_fn_ptr->store(jitted_function);
+    }
   }
+
+  return true;
 }
 
 void LlvmCodeGen::DestroyModule() {
@@ -1490,6 +1495,7 @@ void LlvmCodeGen::DestroyModule() {
 void LlvmCodeGen::AddFunctionToJit(llvm::Function* fn, CodegenFnPtrBase* fn_ptr) {
   DCHECK(finalized_functions_.find(fn) != finalized_functions_.end())
       << "Attempted to add a non-finalized function to Jit: " << fn->getName().str();
+  DCHECK(!is_compiled_);
   llvm::Type* decimal_val_type = GetNamedType(CodegenAnyVal::LLVM_DECIMALVAL_NAME);
   if (fn->getReturnType() == decimal_val_type) {
     // Per the x86 calling convention ABI, DecimalVals should be returned via an extra
@@ -1526,8 +1532,16 @@ void LlvmCodeGen::AddFunctionToJit(llvm::Function* fn, CodegenFnPtrBase* fn_ptr)
 }
 
 void LlvmCodeGen::AddFunctionToJitInternal(llvm::Function* fn, CodegenFnPtrBase* fn_ptr) {
-  DCHECK(!is_compiled_);
-  fns_to_jit_compile_.push_back(make_pair(fn, fn_ptr));
+  DCHECK(fn != nullptr);
+  DCHECK(fn_ptr != nullptr);
+  const llvm::StringRef& fn_name = fn->getName();
+
+  auto it = fns_to_jit_compile_.find(fn_name);
+  if (it == fns_to_jit_compile_.end()) {
+    fns_to_jit_compile_[fn_name] = make_pair(fn, vector<CodegenFnPtrBase*>{fn_ptr});
+  } else {
+    it->second.second.push_back(fn_ptr);
+  }
 }
 
 void LlvmCodeGen::CodegenDebugTrace(
@@ -2013,8 +2027,9 @@ string LlvmCodeGen::DebugCacheEntryString(CodeGenCacheKey& key, bool is_lookup,
     out << "\nFragment Plan: " << apache::thrift::ThriftDebugString(state_->fragment())
         << "\n";
     out << "CodeGen Functions: \n";
-    for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {
-      out << "  " << fns_to_jit_compile_[i].first->getName().data() << "\n";
+    for (auto& entry : fns_to_jit_compile_) {
+      const llvm::StringRef& fn_name = entry.first;
+      out << "  " << fn_name.data() << "\n";
     }
   }
   return out.str();

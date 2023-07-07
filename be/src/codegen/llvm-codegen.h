@@ -92,6 +92,7 @@ class ImpalaMCJITMemoryManager;
 class SubExprElimination;
 class Thread;
 class TupleDescriptor;
+class CodeGenCache;
 class CodeGenCacheKey;
 
 /// Define builder subclass in case we want to change the template arguments later
@@ -734,8 +735,12 @@ class LlvmCodeGen {
   /// Optimizes the module. This includes pruning the module of any unused functions.
   Status OptimizeModule();
 
-  /// Points the function pointers in 'fns_to_jit_compile_' to the compiled functions.
-  void SetFunctionPointers();
+  /// Points the function pointers in 'fns_to_jit_compile_' to the compiled functions. If
+  /// 'cache' and 'cache_key' are non-NULL, retrieves the functions from the cached
+  /// execution engine, otherwise from the current execution engine.
+  /// Note: either both or none of 'cache' and 'cache_key' should be NULL.
+  bool SetFunctionPointers(CodeGenCache* cache = nullptr,
+      const CodeGenCacheKey* cache_key = nullptr);
 
   /// Clears generated hash fns.  This is only used for testing.
   void ClearHashFns();
@@ -947,8 +952,23 @@ class LlvmCodeGen {
   /// Used to avoid linking the same module twice, which causes symbol collision errors.
   std::set<std::string> linked_modules_;
 
-  /// The vector of functions to automatically JIT compile after FinalizeModule().
-  std::vector<std::pair<llvm::Function*, CodegenFnPtrBase*>> fns_to_jit_compile_;
+  /// Stores the functions to automatically JIT compile after FinalizeModule(). The
+  /// 'CodegenFnPtrBase*' function pointers will be set to the functions compiled from the
+  /// corresponding 'llvm::Function' objects.
+  ///
+  /// The functions are stored in a sorted map where the keys are the function names.
+  /// This is because we need the function names in GetAllFunctionNames() (in sorted
+  /// order) and in PruneModule() (in any order).
+  ///
+  /// There is a one-to-one correspondence between function names and 'llvm::Function'
+  /// objects but an 'llvm::Function' object may correspond to multiple
+  /// 'CodegenFnPtrBase*'s, for example if multiple 'SlotRef' expressions refer to the
+  /// same slot and the 'llvm::Function' is reused. In these cases the function pointers
+  /// corresponding to a single 'llvm::Function' are owned by different objects but they
+  /// will be set to the same value.
+  using LlvmFunctionWithFnPtrTargets =
+      std::pair<llvm::Function*, std::vector<CodegenFnPtrBase*>>;
+  std::map<llvm::StringRef, LlvmFunctionWithFnPtrTargets> fns_to_jit_compile_;
 
   /// The hash code generated from all the function names in fns_to_jit_compile_.
   /// Used by the codegen cache only.

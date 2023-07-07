@@ -365,7 +365,7 @@ void LlvmCodeGenCacheTest::TestSkipCache() {
   // Insert a new function to the codegen, and regenerate the function names hash
   // code, expect a failure because the hash code inconsistency with the code in
   // the cache.
-  codegen->fns_to_jit_compile_.emplace_back(empty_func, &fn_ptr);
+  codegen->AddFunctionToJitInternal(empty_func, &fn_ptr);
   codegen->GenerateFunctionNamesHashCode();
   // Expect a look up failure.
   EXPECT_FALSE(codegen->LookupCache(cache_key));

@@ -193,6 +193,35 @@ class TestCodegenCache(CustomClusterTestSuite):
     assert self.get_metric('impala.codegen-cache.entries-evicted') >= cache_entries_in_use
     assert self.get_metric('impala.codegen-cache.hits') == 0
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(cluster_size=1,
+          impalad_args="--codegen_cache_capacity=1GB")
+  # Regression test for IMPALA-12269. The first query uses one of the codegen'd functions
+  # in two objects, so it is added to be jitted twice. For the second query it is added
+  # only once. The hash of the function names should be the same in both cases.
+  def test_codegen_cache_with_duplicate_fn_names(self, vector):
+    exec_options = copy(vector.get_value('exec_option'))
+    exec_options['exec_single_node_rows_threshold'] = 0
+
+    q1 = """select int_col, tinyint_col from functional_parquet.alltypessmall
+        order by int_col desc limit 20"""
+    q2 = """select tinyint_col from functional_parquet.alltypessmall
+        order by int_col desc limit 20"""
+
+    self._check_metric_expect_init()
+    self.execute_query_expect_success(self.client, q1, exec_options)
+    assert self.get_metric('impala.codegen-cache.entries-evicted') == 0
+
+    self.execute_query_expect_success(self.client, q2, exec_options)
+    # If the function name hashes of the first and the second query didn't match, there
+    # would be no cache hit and the cache entry from the first query would be evicted
+    # because the llvm modules of the two queries, hence the cache keys, are identical.
+    assert self.get_metric('impala.codegen-cache.entries-evicted') == 0
+    assert self.get_metric('impala.codegen-cache.hits') == 1
+    # Expect two misses for the two fragments of the first query and one for one of the
+    # fragments of the second query.
+    assert self.get_metric('impala.codegen-cache.misses') == 3
+
   def _check_metric_expect_init(self):
     # Verifies that the cache metrics are all zero.
     assert self.get_metric('impala.codegen-cache.entries-evicted') == 0
