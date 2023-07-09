@@ -181,7 +181,6 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
   jbyteArray result_bytes = NULL;
   TQueryCtx query_ctx;
   TExprBatch expr_batch;
-  JniLocalFrame jni_frame;
   TResultRow expr_results;
   vector<TColumnValue> results;
   ObjectPool obj_pool;
@@ -211,9 +210,6 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
     fragment_state.ReleaseResources();
     state.ReleaseResources();
   });
-
-  THROW_IF_ERROR_RET(
-      jni_frame.push(env), env, JniUtil::internal_exc_class(), result_bytes);
 
   MemPool expr_mem_pool(state.query_mem_tracker());
 
