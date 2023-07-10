@@ -73,19 +73,23 @@ Catalog::Catalog() {
   };
 
   JNIEnv* jni_env = JniUtil::GetJNIEnv();
+  // Used to release local references promptly
+  JniLocalFrame jni_frame;
+  ABORT_IF_ERROR(jni_frame.push(jni_env));
+
   // Create an instance of the java class JniCatalog
-  catalog_class_ = jni_env->FindClass("org/apache/impala/service/JniCatalog");
+  jclass catalog_class = jni_env->FindClass("org/apache/impala/service/JniCatalog");
   ABORT_IF_EXC(jni_env);
 
   uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
   for (int i = 0; i < num_methods; ++i) {
-    ABORT_IF_ERROR(JniUtil::LoadJniMethod(jni_env, catalog_class_, &(methods[i])));
+    ABORT_IF_ERROR(JniUtil::LoadJniMethod(jni_env, catalog_class, &(methods[i])));
   }
 
   jbyteArray cfg_bytes;
   ABORT_IF_ERROR(GetThriftBackendGFlagsForJNI(jni_env, &cfg_bytes));
 
-  jobject catalog = jni_env->NewObject(catalog_class_, catalog_ctor_, cfg_bytes);
+  jobject catalog = jni_env->NewObject(catalog_class, catalog_ctor_, cfg_bytes);
   CLEAN_EXIT_IF_EXC(jni_env);
   ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, catalog, &catalog_));
 }
