@@ -602,7 +602,8 @@ public class InsertStmt extends DmlStatementBase {
         if (iceTable.getPartitionSpecs().size() > 1) {
           throw new AnalysisException("The Iceberg table has multiple partition specs. " +
               "This means the outcome of dynamic partition overwrite is unforeseeable. " +
-              "Consider using TRUNCATE and INSERT INTO to overwrite your table.");
+              "Consider using TRUNCATE then INSERT INTO from the previous snapshot " +
+              "to overwrite your table.");
         }
         validateBucketTransformForOverwrite(iceTable);
       }

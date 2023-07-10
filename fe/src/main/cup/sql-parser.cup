@@ -318,7 +318,7 @@ terminal
   KW_JOIN, KW_JSONFILE, KW_KUDU, KW_LAST, KW_LEFT, KW_LEXICAL, KW_LIKE, KW_LIMIT, KW_LINES,
   KW_LOAD, KW_LOCATION, KW_LOGICAL_OR, KW_MANAGED_LOCATION, KW_MAP, KW_MERGE_FN,
   KW_METADATA, KW_MINUS, KW_NON, KW_NORELY, KW_NOT,
-  KW_NOVALIDATE, KW_NULL, KW_NULLS, KW_OF, KW_OFFSET, KW_ON, KW_OR,
+  KW_NOVALIDATE, KW_NULL, KW_NULLS, KW_OF, KW_OFFSET, KW_ON, KW_OPTIMIZE, KW_OR,
   KW_ORC, KW_ORDER, KW_OUTER,
   KW_OVER, KW_OVERWRITE, KW_PARQUET, KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED,
   KW_PARTITIONS, KW_PRECEDING, KW_PREPARE_FN, KW_PRIMARY, KW_PRODUCED, KW_PURGE,
@@ -462,6 +462,7 @@ nonterminal Expr sign_chain_expr;
 nonterminal InsertStmt insert_stmt, upsert_stmt;
 nonterminal UpdateStmt update_stmt;
 nonterminal DeleteStmt delete_stmt;
+nonterminal OptimizeStmt optimize_stmt;
 nonterminal List<Pair<SlotRef, Expr>> update_set_expr_list;
 nonterminal StatementBase explain_stmt;
 // Optional partition spec
@@ -673,6 +674,8 @@ stmt ::=
   {: RESULT = upsert; :}
   | delete_stmt:delete
   {: RESULT = delete; :}
+  | optimize_stmt:optimize
+  {: RESULT = optimize; :}
   | use_stmt:use
   {: RESULT = use; :}
   | show_tables_stmt:show_tables
@@ -837,6 +840,11 @@ explain_stmt ::=
      delete.setIsExplain();
      RESULT = delete;
   :}
+  | KW_EXPLAIN optimize_stmt:optimize
+  {:
+     optimize.setIsExplain();
+     RESULT = optimize;
+  :}
   ;
 
 copy_testcase_stmt ::=
@@ -984,6 +992,11 @@ delete_stmt ::=
   | KW_DELETE dotted_path:target_table from_clause:from
   where_clause:where
   {: RESULT = new DeleteStmt(target_table, from, where); :}
+  ;
+
+optimize_stmt ::=
+  KW_OPTIMIZE KW_TABLE table_name:table
+  {: RESULT = new OptimizeStmt(table); :}
   ;
 
 opt_query_stmt ::=
@@ -4421,6 +4434,8 @@ word ::=
   | KW_OFFSET:r
   {: RESULT = r.toString(); :}
   | KW_ON:r
+  {: RESULT = r.toString(); :}
+  | KW_OPTIMIZE:r
   {: RESULT = r.toString(); :}
   | KW_OR:r
   {: RESULT = r.toString(); :}

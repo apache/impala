@@ -2381,7 +2381,8 @@ public class Frontend {
         }
       }
       if (!analysisResult.isExplainStmt() &&
-          (analysisResult.isInsertStmt() || analysisResult.isCreateTableAsSelectStmt())) {
+          (analysisResult.isInsertStmt() || analysisResult.isCreateTableAsSelectStmt()
+          || analysisResult.isOptimizeStmt())) {
         InsertStmt insertStmt = analysisResult.getInsertStmt();
         FeTable targetTable = insertStmt.getTargetTable();
         if (AcidUtils.isTransactionalTable(
@@ -2508,7 +2509,7 @@ public class Frontend {
         result.query_exec_request.stmt_type = result.stmt_type;
         // fill in the metadata
         result.setResult_set_metadata(createQueryResultSetMetadata(analysisResult));
-      } else if (analysisResult.isInsertStmt() ||
+      } else if (analysisResult.isInsertStmt() || analysisResult.isOptimizeStmt() ||
           analysisResult.isCreateTableAsSelectStmt()) {
         // For CTAS the overall TExecRequest statement type is DDL, but the
         // query_exec_request should be DML

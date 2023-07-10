@@ -95,6 +95,7 @@ public class AnalysisContext {
     public boolean isQueryStmt() { return stmt_ instanceof QueryStmt; }
     public boolean isSetOperationStmt() { return stmt_ instanceof SetOperationStmt; }
     public boolean isInsertStmt() { return stmt_ instanceof InsertStmt; }
+    public boolean isOptimizeStmt() { return stmt_ instanceof OptimizeStmt; }
     public boolean isDropDbStmt() { return stmt_ instanceof DropDbStmt; }
     public boolean isDropTableOrViewStmt() {
       return stmt_ instanceof DropTableOrViewStmt;
@@ -187,7 +188,7 @@ public class AnalysisContext {
     }
 
     public boolean isDmlStmt() {
-      return isInsertStmt() || isUpdateStmt() || isDeleteStmt();
+      return isInsertStmt() || isUpdateStmt() || isDeleteStmt() || isOptimizeStmt();
     }
 
     /**
@@ -197,7 +198,7 @@ public class AnalysisContext {
     public boolean isHierarchicalAuthStmt() {
       return isQueryStmt() || isInsertStmt() || isUpdateStmt() || isDeleteStmt()
           || isCreateTableAsSelectStmt() || isCreateViewStmt() || isAlterViewStmt()
-          || isTestCaseStmt();
+          || isOptimizeStmt() || isTestCaseStmt();
     }
 
     /**
@@ -296,9 +297,16 @@ public class AnalysisContext {
       return (QueryStmt) stmt_;
     }
 
+    public OptimizeStmt getOptimizeStmt() {
+      Preconditions.checkState(isOptimizeStmt());
+      return (OptimizeStmt) stmt_;
+    }
+
     public InsertStmt getInsertStmt() {
       if (isCreateTableAsSelectStmt()) {
         return getCreateTableAsSelectStmt().getInsertStmt();
+      } else if (isOptimizeStmt()) {
+        return getOptimizeStmt().getInsertStmt();
       } else {
         Preconditions.checkState(isInsertStmt());
         return (InsertStmt) stmt_;
@@ -407,7 +415,7 @@ public class AnalysisContext {
     }
     public boolean requiresExprRewrite() {
       return isQueryStmt() || isInsertStmt() || isCreateTableAsSelectStmt()
-          || isUpdateStmt() || isDeleteStmt();
+          || isUpdateStmt() || isDeleteStmt() || isOptimizeStmt();
     }
     public boolean requiresSetOperationRewrite() {
       return analyzer_.containsSetOperation() && !isCreateViewStmt() && !isAlterViewStmt()

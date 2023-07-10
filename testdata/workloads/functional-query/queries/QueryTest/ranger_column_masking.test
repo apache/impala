@@ -733,6 +733,12 @@ compute stats functional.alltypestiny
 AuthorizationException: User '$USER' does not have privileges to execute 'ALTER' on: functional.alltypestiny
 ====
 ---- QUERY
+# Optimize statement on masked tables should be blocked, because reading and inserting masked data would result in data loss.
+optimize table functional_parquet.iceberg_partitioned
+---- CATCH
+AuthorizationException: User '$USER' does not have privileges to execute 'INSERT' on: functional_parquet.iceberg_partitioned
+====
+---- QUERY
 # Select masked INPUT_FILE__NAME plus all cols
 select input__file__name, * from alltypestiny order by id;
 ---- RESULTS

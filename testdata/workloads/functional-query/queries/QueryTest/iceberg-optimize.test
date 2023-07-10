@@ -1,0 +1,123 @@
+====
+---- QUERY
+CREATE TABLE ice_optimize (i int, s string)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+====
+---- QUERY
+# Insert rows one by one to write multiple small files.
+INSERT INTO ice_optimize VALUES(1, 'one');
+INSERT INTO ice_optimize VALUES(2, 'two');
+INSERT INTO ice_optimize VALUES(3, 'three');
+SHOW FILES IN ice_optimize;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize/data/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize/data/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize/data/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# OPTIMIZE TABLE should create 1 data file.
+OPTIMIZE TABLE ice_optimize;
+SHOW FILES IN ice_optimize;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize/data/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+SELECT * FROM ice_optimize;
+---- RESULTS
+1,'one'
+2,'two'
+3,'three'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+DELETE FROM ice_optimize WHERE i = 2;
+SHOW FILES IN ice_optimize;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize/data/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize/data/delete-.*parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Checking that the delete file was merged and there is no delete file in the table.
+OPTIMIZE TABLE ice_optimize;
+SHOW FILES IN ice_optimize;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize/data/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+SELECT * FROM ice_optimize;
+---- RESULTS
+1,'one'
+3,'three'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Schema evolution should work and return correct results according to the latest schema.
+ALTER TABLE ice_optimize DROP COLUMN s;
+ALTER TABLE ice_optimize ADD COLUMN b BOOLEAN;
+INSERT INTO ice_optimize VALUES(4, true);
+OPTIMIZE TABLE ice_optimize;
+SELECT * FROM ice_optimize;
+---- RESULTS
+1,NULL
+3,NULL
+4,true
+---- TYPES
+INT,BOOLEAN
+====
+---- QUERY
+CREATE TABLE ice_optimize_part
+PARTITIONED BY(i int)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='1');
+====
+---- QUERY
+# Insert values into each partition to write multiple small files in each.
+INSERT INTO ice_optimize_part VALUES(1), (2), (3);
+INSERT INTO ice_optimize_part VALUES(2), (3);
+INSERT INTO ice_optimize_part VALUES(1), (3);
+SHOW FILES IN ice_optimize_part;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_part/data/i=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_part/data/i=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_part/data/i=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_part/data/i=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_part/data/i=3/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_part/data/i=3/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_part/data/i=3/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# OPTIMIZE TABLE should create 1 data file per partition.
+OPTIMIZE TABLE ice_optimize_part;
+SHOW FILES IN ice_optimize_part;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_part/data/i=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_part/data/i=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_part/data/i=3/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====

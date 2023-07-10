@@ -3579,8 +3579,8 @@ public class ParserTest extends FrontendTestBase {
         "^\n" +
         "Encountered: IDENTIFIER\n" +
         "Expected: ALTER, COMMENT, COMPUTE, COPY, CREATE, DELETE, DESCRIBE, DROP, " +
-            "EXPLAIN, GRANT, INSERT, INVALIDATE, LOAD, REFRESH, REVOKE, SELECT, SET, " +
-            "SHOW, TRUNCATE, UNSET, UPDATE, UPSERT, USE, VALUES, WITH\n");
+            "EXPLAIN, GRANT, INSERT, INVALIDATE, LOAD, OPTIMIZE, REFRESH, REVOKE, " +
+            "SELECT, SET, SHOW, TRUNCATE, UNSET, UPDATE, UPSERT, USE, VALUES, WITH\n");
 
     // missing select list
     ParserError("select from t",

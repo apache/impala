@@ -779,9 +779,25 @@ delete from ice_delete where i = 1;
 AnalysisException: Impala can only write delete files in PARQUET, but the given table uses a different file format: $DATABASE.ice_delete
 ====
 ---- QUERY
-# Cannot delete from Iceberg table is write mode is not 'merge-on-read'
+# Cannot delete from Iceberg table if write mode is not 'merge-on-read'
 alter table ice_delete set tblproperties ('write.delete.format.default'='PARQUET', 'write.delete.mode'='copy-on-write');
 delete from ice_delete where i = 1;
 ---- CATCH
 AnalysisException: Unsupported delete mode: 'copy-on-write' for Iceberg table: $DATABASE.ice_delete
+====
+---- QUERY
+optimize table non_iceberg_table;
+---- CATCH
+AnalysisException: OPTIMIZE is only supported for Iceberg tables.
+====
+---- QUERY
+optimize table iceberg_overwrite_bucket;
+---- CATCH
+AnalysisException: The Iceberg table has multiple partition specs. This means the outcome of dynamic partition overwrite is unforeseeable. Consider using TRUNCATE then INSERT INTO from the previous snapshot to overwrite your table.
+====
+---- QUERY
+CREATE TABLE ice_complex (id BIGINT NULL, int_array ARRAY<INT> NULL) STORED AS ICEBERG;
+optimize table ice_complex;
+---- CATCH
+AnalysisException: Unable to INSERT into target table ($DATABASE.ice_complex) because the column 'int_array' has a complex type 'ARRAY<INT>' and Impala doesn't support inserting into tables containing complex type columns
 ====

@@ -1301,3 +1301,34 @@ class TestIcebergV2Table(IcebergTestSuite):
     hive_output = self.run_stmt_in_hive("SELECT id FROM {} ORDER BY id".format(ice_t))
     # Test that Hive sees the same rows deleted.
     assert hive_output == "id\n4\n5\n6\n7\n8\n"
+
+  def test_optimize(self, vector, unique_database):
+    tbl_name = unique_database + ".optimize_iceberg"
+    self.execute_query("""create table {0} (i int)
+        stored as iceberg""".format(tbl_name))
+    self.execute_query("insert into {0} values (1);".format(tbl_name))
+    self.execute_query("insert into {0} values (2);".format(tbl_name))
+    self.execute_query("insert into {0} values (8);".format(tbl_name))
+    result_before_opt = self.execute_query("SELECT * FROM {}".format(tbl_name))
+    snapshots = get_snapshots(self.client, tbl_name, expected_result_size=3)
+    snapshot_before = snapshots[2]
+
+    # Check that a new snapshot is created after Iceberg table optimization.
+    self.execute_query("optimize table {0};".format(tbl_name))
+    snapshots = get_snapshots(self.client, tbl_name, expected_result_size=4)
+    snapshot_after = snapshots[3]
+    assert(snapshot_before.get_creation_time() < snapshot_after.get_creation_time())
+    # Check that the last snapshot's parent ID is the snapshot ID before 'OPTIMIZE TABLE'.
+    assert(snapshot_before.get_snapshot_id() == snapshot_after.get_parent_id())
+
+    result_after_opt = self.execute_query("SELECT * FROM {0}".format(tbl_name))
+    # Check that we get the same result from the table before and after 'OPTIMIZE TABLE'.
+    assert result_after_opt.data.sort() == result_before_opt.data.sort()
+
+    result_time_travel = self.execute_query(
+        "select * from {0} for system_version as of {1};".format(
+            tbl_name, snapshot_before.get_snapshot_id()))
+    # Check that time travel to the previous snapshot returns all results correctly.
+    assert result_after_opt.data.sort() == result_time_travel.data.sort()
+
+    self.run_test_case('QueryTest/iceberg-optimize', vector, unique_database)
