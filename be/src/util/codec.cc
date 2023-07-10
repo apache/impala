@@ -40,6 +40,9 @@ using namespace strings;
 
 const char* const Codec::DEFAULT_COMPRESSION =
     "org.apache.hadoop.io.compress.DefaultCodec";
+// An alias for DefaultCodec
+const char* const Codec::DEFLATE_COMPRESSION =
+    "org.apache.hadoop.io.compress.DeflateCodec";
 const char* const Codec::GZIP_COMPRESSION = "org.apache.hadoop.io.compress.GzipCodec";
 const char* const Codec::BZIP2_COMPRESSION = "org.apache.hadoop.io.compress.BZip2Codec";
 const char* const Codec::SNAPPY_COMPRESSION = "org.apache.hadoop.io.compress.SnappyCodec";
@@ -53,6 +56,7 @@ const char* const NO_LZO_MSG = "LZO codecs may not be created via the Codec inte
 
 const Codec::CodecMap Codec::CODEC_MAP = {{"", THdfsCompression::NONE},
     {DEFAULT_COMPRESSION, THdfsCompression::DEFAULT},
+    {DEFLATE_COMPRESSION, THdfsCompression::DEFAULT},
     {GZIP_COMPRESSION, THdfsCompression::GZIP},
     {BZIP2_COMPRESSION, THdfsCompression::BZIP2},
     {SNAPPY_COMPRESSION, THdfsCompression::SNAPPY_BLOCKED},
