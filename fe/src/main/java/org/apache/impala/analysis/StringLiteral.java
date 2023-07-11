@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TExprNode;
@@ -148,7 +149,8 @@ public class StringLiteral extends LiteralExpr {
   }
 
   @Override
-  protected Expr uncheckedCastTo(Type targetType) throws AnalysisException {
+  protected Expr uncheckedCastTo(Type targetType, TypeCompatibility compatibility)
+      throws AnalysisException {
     Preconditions.checkState(targetType.isNumericType() || targetType.isDateOrTimeType()
         || targetType.equals(this.type_) || targetType.isStringType());
     if (targetType.equals(this.type_)) {
@@ -161,7 +163,7 @@ public class StringLiteral extends LiteralExpr {
       // Let the BE do the cast
       // - it is in Boost format in case target type is TIMESTAMP
       // - CCTZ is used for conversion in case target type is DATE.
-      return new CastExpr(targetType, this);
+      return new CastExpr(targetType, this, compatibility);
     }
     return this;
   }

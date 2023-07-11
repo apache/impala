@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 
@@ -44,7 +45,7 @@ public class NullLiteral extends LiteralExpr {
   public static NullLiteral create(Type type) {
     NullLiteral l = new NullLiteral();
     l.analyzeNoThrow(null);
-    l.uncheckedCastTo(type);
+    l.uncheckedCastTo(type, TypeCompatibility.DEFAULT);
     return l;
   }
 
@@ -65,7 +66,7 @@ public class NullLiteral extends LiteralExpr {
   public String getStringValue() { return "NULL"; }
 
   @Override
-  protected Expr uncheckedCastTo(Type targetType) {
+  protected Expr uncheckedCastTo(Type targetType, TypeCompatibility compatibility) {
     Preconditions.checkState(targetType.isValid());
     type_ = targetType;
     return this;

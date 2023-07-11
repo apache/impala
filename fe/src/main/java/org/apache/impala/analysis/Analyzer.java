@@ -3387,12 +3387,12 @@ public class Analyzer {
 
     TypeCompatibility regularCompatibility = this.getRegularCompatibilityLevel();
     TypeCompatibility permissiveCompatibility = this.getPermissiveCompatibilityLevel();
-    TypeCompatibility compatibilityLevel = regularCompatibility;
 
     // Determine compatible types for exprs, position by position.
     List<Expr> firstList = exprLists.get(0);
     List<Expr> widestExprs = new ArrayList<>(firstList.size());
     for (int i = 0; i < firstList.size(); ++i) {
+      TypeCompatibility compatibilityLevel = regularCompatibility;
       // Type compatible with the i-th exprs of all expr lists.
       // Initialize with type of i-th expr in first list.
       Type compatibleType = firstList.get(i).getType();

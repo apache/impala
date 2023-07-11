@@ -1110,7 +1110,14 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     if (smap == null) return result;
     result = result.substituteImpl(smap, analyzer);
     result.analyze(analyzer);
-    if (preserveRootType && !type_.equals(result.getType())) result = result.castTo(type_);
+    if (preserveRootType && !type_.equals(result.getType())) {
+      if (this instanceof CastExpr) {
+        CastExpr thisCastExpr = (CastExpr) this;
+        TypeCompatibility compatibility = thisCastExpr.getCompatibility();
+        return result.castTo(type_, compatibility);
+      }
+      return result.castTo(type_);
+    }
     return result;
   }
 
@@ -1570,7 +1577,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
           "targetType=" + targetType + " type=" + type);
       }
     }
-    return uncheckedCastTo(targetType);
+    return uncheckedCastTo(targetType, compatibility);
   }
 
   public final Expr castTo(Type targetType) throws AnalysisException {
@@ -1578,20 +1585,23 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
-   * Create an expression equivalent to 'this' but returning targetType;
-   * possibly by inserting an implicit cast,
-   * or by returning an altogether new expression
-   * or by returning 'this' with a modified return type'.
-   * @param targetType
-   *          type to be cast to
-   * @return cast expression, or converted literal,
-   *         should never return null
-   * @throws AnalysisException
-   *           when an invalid cast is asked for, for example,
-   *           failure to convert a string literal to a date literal
+   * Create an expression equivalent to 'this' but returning targetType; possibly by
+   * inserting an implicit cast, or by returning an altogether new expression or by
+   * returning 'this' with a modified return type'.
+   *
+   * @param targetType    type to be cast to
+   * @param compatibility compatibility level used to calculate the cast
+   * @return cast expression, or converted literal, should never return null
+   * @throws AnalysisException when an invalid cast is asked for, for example, failure to
+   *                           convert a string literal to a date literal
    */
+  protected Expr uncheckedCastTo(Type targetType, TypeCompatibility compatibility)
+      throws AnalysisException {
+    return new CastExpr(targetType, this, compatibility);
+  }
+
   protected Expr uncheckedCastTo(Type targetType) throws AnalysisException {
-    return new CastExpr(targetType, this);
+    return uncheckedCastTo(targetType, TypeCompatibility.DEFAULT);
   }
 
   /**

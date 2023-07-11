@@ -25,6 +25,7 @@ import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TCastExpr;
 import org.apache.impala.thrift.TExpr;
@@ -51,10 +52,14 @@ public class CastExpr extends Expr {
   // Stores the value of the FORMAT clause.
   private final String castFormat_;
 
+  // Stores the compatibility level with which the cast was defined.
+  private final TypeCompatibility compatibility_;
+
   /**
    * C'tor for "pre-analyzed" implicit casts.
    */
-  public CastExpr(Type targetType, Expr e, String format) {
+  public CastExpr(
+      Type targetType, Expr e, String format, TypeCompatibility compatibility) {
     super();
     Preconditions.checkState(targetType.isValid());
     Preconditions.checkNotNull(e);
@@ -62,6 +67,7 @@ public class CastExpr extends Expr {
     targetTypeDef_ = null;
     isImplicit_ = true;
     castFormat_ = format;
+    compatibility_ = compatibility;
     // replace existing implicit casts
     if (e instanceof CastExpr) {
       CastExpr castExpr = (CastExpr) e;
@@ -84,7 +90,11 @@ public class CastExpr extends Expr {
   }
 
   public CastExpr(Type targetType, Expr e) {
-    this(targetType, e, null);
+    this(targetType, e, null, TypeCompatibility.DEFAULT);
+  }
+
+  public CastExpr(Type targetType, Expr e, TypeCompatibility compatibility) {
+    this(targetType, e, null, compatibility);
   }
 
   /**
@@ -101,6 +111,7 @@ public class CastExpr extends Expr {
     targetTypeDef_ = targetTypeDef;
     children_.add(e);
     castFormat_ = format;
+    compatibility_ = TypeCompatibility.DEFAULT;
   }
 
   /**
@@ -112,6 +123,7 @@ public class CastExpr extends Expr {
     isImplicit_ = other.isImplicit_;
     noOp_ = other.noOp_;
     castFormat_ = other.castFormat_;
+    compatibility_ = TypeCompatibility.DEFAULT;
   }
 
   private static String getFnName(Type targetType) {
@@ -272,6 +284,8 @@ public class CastExpr extends Expr {
 
   public boolean isImplicit() { return isImplicit_; }
 
+  public TypeCompatibility getCompatibility() { return compatibility_; }
+
   @Override
   protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(!isImplicit_);
@@ -317,7 +331,8 @@ public class CastExpr extends Expr {
       // for every type since it is redundant with STRING. Casts to go through 2 casts:
       // (1) cast to string, to stringify the value
       // (2) cast to CHAR, to truncate or pad with spaces
-      CastExpr tostring = new CastExpr(ScalarType.STRING, children_.get(0), castFormat_);
+      CastExpr tostring =
+          new CastExpr(ScalarType.STRING, children_.get(0), castFormat_, compatibility_);
       tostring.analyze();
       children_.set(0, tostring);
     }

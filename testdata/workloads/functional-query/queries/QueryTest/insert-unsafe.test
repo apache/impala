@@ -213,4 +213,13 @@ AnalysisException: Unsafe implicit cast is prohibited for non-const expression: 
 INSERT INTO unsafe_insert(double_col) select string_col from unsafe_insert;
 ---- CATCH
 AnalysisException: Unsafe implicit cast is prohibited for non-const expression: string_col
-
+====
+---- QUERY
+# Mixing unsafe and regular compatibility on column level, unsafe union between 1 and "1"
+# regular union between column 'string_col' and "100".
+INSERT INTO unsafe_insert(int_col, string_col) select 1, string_col from unsafe_insert union select "1", "100";
+====
+---- QUERY
+# Regression test for expression substitution on unsafe casts.
+INSERT INTO unsafe_insert(int_col, string_col) select "1", "1" from unsafe_insert union select 1, "1";
+====

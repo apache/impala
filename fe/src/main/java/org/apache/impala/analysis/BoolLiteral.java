@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TBoolLiteral;
 import org.apache.impala.thrift.TExprNode;
@@ -89,11 +90,12 @@ public class BoolLiteral extends LiteralExpr {
   }
 
   @Override
-  protected Expr uncheckedCastTo(Type targetType) throws AnalysisException {
+  protected Expr uncheckedCastTo(Type targetType, TypeCompatibility compatibility)
+      throws AnalysisException {
     if (targetType.equals(this.type_)) {
       return this;
     } else {
-      return new CastExpr(targetType, this);
+      return new CastExpr(targetType, this, compatibility);
     }
   }
 

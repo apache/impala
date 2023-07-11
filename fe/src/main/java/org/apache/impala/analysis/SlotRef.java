@@ -28,6 +28,7 @@ import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.thrift.TExprNode;
@@ -460,12 +461,13 @@ public class SlotRef extends Expr {
   }
 
   @Override
-  protected Expr uncheckedCastTo(Type targetType) throws AnalysisException {
+  protected Expr uncheckedCastTo(Type targetType, TypeCompatibility compatibility)
+      throws AnalysisException {
     if (type_.isNull()) {
       // Hack to prevent null SlotRefs in the BE
       return NullLiteral.create(targetType);
     } else {
-      return super.uncheckedCastTo(targetType);
+      return super.uncheckedCastTo(targetType, compatibility);
     }
   }
 

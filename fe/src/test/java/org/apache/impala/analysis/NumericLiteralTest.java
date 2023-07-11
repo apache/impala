@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InvalidValueException;
 import org.apache.impala.common.SqlCastException;
@@ -435,23 +436,24 @@ public class NumericLiteralTest {
     {
       // Integral types
       NumericLiteral n = new NumericLiteral(BigDecimal.ZERO);
-      Expr result = n.uncheckedCastTo(Type.BIGINT);
+      Expr result = n.uncheckedCastTo(Type.BIGINT, TypeCompatibility.DEFAULT);
       assertSame(n, result);
       assertEquals(Type.BIGINT, n.getType());
-      result = n.uncheckedCastTo(Type.TINYINT);
+      result = n.uncheckedCastTo(Type.TINYINT, TypeCompatibility.DEFAULT);
       assertSame(n, result);
       assertEquals(Type.TINYINT, n.getType());
-      result = n.uncheckedCastTo(ScalarType.createDecimalType(5, 0));
+      result = n.uncheckedCastTo(
+          ScalarType.createDecimalType(5, 0), TypeCompatibility.DEFAULT);
       assertSame(n, result);
       assertEquals(ScalarType.createDecimalType(5, 0), n.getType());
     }
     {
       // Integral types, with overflow
       NumericLiteral n = new NumericLiteral(ABOVE_SMALLINT);
-      Expr result = n.uncheckedCastTo(Type.BIGINT);
+      Expr result = n.uncheckedCastTo(Type.BIGINT, TypeCompatibility.DEFAULT);
       assertSame(n, result);
       assertEquals(Type.BIGINT, n.getType());
-      Expr result2 = n.uncheckedCastTo(Type.SMALLINT);
+      Expr result2 = n.uncheckedCastTo(Type.SMALLINT, TypeCompatibility.DEFAULT);
       assertTrue(result2 instanceof CastExpr);
       assertEquals(Type.SMALLINT, result2.getType());
     }
@@ -459,10 +461,11 @@ public class NumericLiteralTest {
       // Decimal types, with overflow
       // Note: not safe to reuse above value after exception
       NumericLiteral n = new NumericLiteral(ABOVE_SMALLINT);
-      Expr result = n.uncheckedCastTo(Type.BIGINT);
+      Expr result = n.uncheckedCastTo(Type.BIGINT, TypeCompatibility.DEFAULT);
       assertSame(n, result);
       assertEquals(Type.BIGINT, n.getType());
-      Expr result2 = n.uncheckedCastTo(ScalarType.createDecimalType(2, 0));
+      Expr result2 = n.uncheckedCastTo(
+          ScalarType.createDecimalType(2, 0), TypeCompatibility.DEFAULT);
       assertTrue(result2 instanceof CastExpr);
       assertEquals(ScalarType.createDecimalType(2, 0), result2.getType());
     }
@@ -470,13 +473,16 @@ public class NumericLiteralTest {
       // Decimal types
       NumericLiteral n = new NumericLiteral(new BigDecimal("123.45"));
       assertEquals(ScalarType.createDecimalType(5, 2), n.getType());
-      Expr result = n.uncheckedCastTo(ScalarType.createDecimalType(6, 3));
+      Expr result = n.uncheckedCastTo(
+          ScalarType.createDecimalType(6, 3), TypeCompatibility.DEFAULT);
       assertSame(n, result);
       assertEquals(ScalarType.createDecimalType(6, 3), n.getType());
-      result = n.uncheckedCastTo(ScalarType.createDecimalType(5, 2));
+      result = n.uncheckedCastTo(
+          ScalarType.createDecimalType(5, 2), TypeCompatibility.DEFAULT);
       assertSame(n, result);
       assertEquals(ScalarType.createDecimalType(5, 2), n.getType());
-      result = n.uncheckedCastTo(ScalarType.createDecimalType(4, 1));
+      result = n.uncheckedCastTo(
+          ScalarType.createDecimalType(4, 1), TypeCompatibility.DEFAULT);
       assertNotSame(n, result);
       assertEquals(ScalarType.createDecimalType(4, 1), result.getType());
       assertEquals("123.5", ((NumericLiteral) result).toSql());
@@ -602,29 +608,30 @@ public class NumericLiteralTest {
   public void testCast() throws SqlCastException {
     NumericLiteral n = NumericLiteral.create(1000);
     assertEquals(Type.SMALLINT, n.getType());
-    Expr result = n.uncheckedCastTo(Type.TINYINT);
+    Expr result = n.uncheckedCastTo(Type.TINYINT, TypeCompatibility.DEFAULT);
     assertTrue(result instanceof CastExpr);
     assertEquals(Type.TINYINT, result.getType());
 
-    result = n.uncheckedCastTo(Type.INT);
+    result = n.uncheckedCastTo(Type.INT, TypeCompatibility.DEFAULT);
     assertSame(n, result);
     assertEquals(Type.INT, n.getType());
 
     n = new NumericLiteral(new BigDecimal("123.45"));
     assertEquals(ScalarType.createDecimalType(5, 2), n.getType());
-    assertSame(n, n.uncheckedCastTo(ScalarType.createDecimalType(6, 3)));
+    assertSame(n,
+        n.uncheckedCastTo(ScalarType.createDecimalType(6, 3), TypeCompatibility.DEFAULT));
     assertEquals(ScalarType.createDecimalType(6, 3), n.getType());
 
     n = new NumericLiteral(new BigDecimal("123.45"));
     Type newType = ScalarType.createDecimalType(4, 1);
-    result = n.uncheckedCastTo(newType);
+    result = n.uncheckedCastTo(newType, TypeCompatibility.DEFAULT);
     assertNotSame(result, n);
     assertTrue(result instanceof NumericLiteral);
     assertEquals(newType, result.getType());
     NumericLiteral n2 = (NumericLiteral) result;
     assertEquals("123.5", n2.getValue().toString());
 
-    Expr result2 = n2.uncheckedCastTo(Type.SMALLINT);
+    Expr result2 = n2.uncheckedCastTo(Type.SMALLINT, TypeCompatibility.DEFAULT);
     assertNotSame(result2, result);
     assertEquals(Type.SMALLINT, result2.getType());
     assertEquals("124", ((NumericLiteral)result2).getValue().toString());
