@@ -870,7 +870,9 @@ class TestExecutorGroups(CustomClusterTestSuite):
                                          exec_group_set_prefix="root.large") == 1
 
   def _set_query_options(self, query_options):
-    """Set query options"""
+    """Set query options by running it as an SQL statement.
+    To mimic impala-shell behavior, use self.client.set_configuration() instead.
+    """
     for k, v in query_options.items():
       self.execute_query_expect_success(self.client, "SET {}='{}'".format(k, v))
 
@@ -904,9 +906,11 @@ class TestExecutorGroups(CustomClusterTestSuite):
   @UniqueDatabase.parametrize(sync_ddl=True)
   @pytest.mark.execute_serially
   def test_query_cpu_count_divisor_default(self, unique_database):
-    # Expect to run the query on the small group by default.
     coordinator_test_args = ""
     self._setup_three_exec_group_cluster(coordinator_test_args)
+    self.client.clear_configuration()
+
+    # Expect to run the query on the small group by default.
     self._set_query_options({'COMPUTE_PROCESSING_COST': 'true'})
     self._run_query_and_verify_profile(CPU_TEST_QUERY,
         ["Executor Group: root.small-group", "EffectiveParallelism: 11",
@@ -957,22 +961,36 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self._run_query_and_verify_profile(compute_stats_query,
         ["ExecutorGroupsConsidered: 1",
          "Verdict: Assign to first group because query is not auto-scalable"],
-        ["Executor Group:"])
+        ["Query Options (set by configuration): REQUEST_POOL=",
+         "Executor Group:"])
     self._verify_total_admitted_queries("root.small", 4)
     self._verify_total_admitted_queries("root.large", 2)
 
-    # Test that child queries follow REQUEST_POOL that was set by client.
+    # Test that child queries follow REQUEST_POOL that is set through client
+    # configuration. Two child queries should all run in root.small.
+    self.client.set_configuration({'REQUEST_POOL': 'root.small'})
+    self._run_query_and_verify_profile(compute_stats_query,
+        ["Query Options (set by configuration): REQUEST_POOL=root.small",
+         "ExecutorGroupsConsidered: 1",
+         "Verdict: Assign to first group because query is not auto-scalable"],
+        ["Executor Group:"])
+    self._verify_total_admitted_queries("root.small", 6)
+    self.client.clear_configuration()
+
+    # Test that child queries follow REQUEST_POOL that is set through SQL statement.
     # Two child queries should all run in root.large.
     self._set_query_options({'REQUEST_POOL': 'root.large'})
     self._run_query_and_verify_profile(compute_stats_query,
-        ["ExecutorGroupsConsidered: 1",
+        ["Query Options (set by configuration): REQUEST_POOL=root.large",
+         "ExecutorGroupsConsidered: 1",
          "Verdict: Assign to first group because query is not auto-scalable"],
         ["Executor Group:"])
     self._verify_total_admitted_queries("root.large", 4)
 
     # Test that REQUEST_POOL will override executor group selection
     self._run_query_and_verify_profile(CPU_TEST_QUERY,
-        ["Executor Group: root.large-group",
+        ["Query Options (set by configuration): REQUEST_POOL=root.large",
+         "Executor Group: root.large-group",
          ("Verdict: query option REQUEST_POOL=root.large is set. "
           "Memory and cpu limit checking is skipped."),
          "EffectiveParallelism: 13", "ExecutorGroupsConsidered: 1"])
@@ -982,7 +1000,8 @@ class TestExecutorGroups(CustomClusterTestSuite):
       'COMPUTE_PROCESSING_COST': 'false',
       'REQUEST_POOL': 'root.large'})
     self._run_query_and_verify_profile(CPU_TEST_QUERY,
-        ["Executor Group: root.large-group",
+        ["Query Options (set by configuration): REQUEST_POOL=root.large",
+         "Executor Group: root.large-group",
          ("Verdict: query option REQUEST_POOL=root.large is set. "
           "Memory and cpu limit checking is skipped."),
          "ExecutorGroupsConsidered: 1"],
@@ -992,6 +1011,14 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self._set_query_options({
       'REQUEST_POOL': '',
       'COMPUTE_PROCESSING_COST': 'true'})
+
+    # Test that empty REQUEST_POOL should have no impact.
+    self.client.set_configuration({'REQUEST_POOL': ''})
+    self._run_query_and_verify_profile(CPU_TEST_QUERY,
+        ["Executor Group: root.small-group", "ExecutorGroupsConsidered: 2",
+         "Verdict: Match"],
+        ["Query Options (set by configuration): REQUEST_POOL="])
+    self.client.clear_configuration()
 
     # Test that GROUPING_TEST_QUERY will get assigned to the large group.
     self._run_query_and_verify_profile(GROUPING_TEST_QUERY,
@@ -1160,10 +1187,10 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # END testing insert + MAX_FS_WRITER
 
     # Check resource pools on the Web queries site and admission site
-    self._verify_query_num_for_resource_pool("root.small", 4)
+    self._verify_query_num_for_resource_pool("root.small", 7)
     self._verify_query_num_for_resource_pool("root.tiny", 4)
     self._verify_query_num_for_resource_pool("root.large", 12)
-    self._verify_total_admitted_queries("root.small", 5)
+    self._verify_total_admitted_queries("root.small", 8)
     self._verify_total_admitted_queries("root.tiny", 6)
     self._verify_total_admitted_queries("root.large", 16)
 

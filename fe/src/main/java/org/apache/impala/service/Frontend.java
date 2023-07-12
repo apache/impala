@@ -52,6 +52,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
@@ -1943,7 +1944,8 @@ public class Frontend {
       // If defined, request_pool can be a suffix of the group name prefix. For example
       //   group_set_prefix = root.queue1
       //   request_pool = queue1
-      if (request_pool != null && !e.getExec_group_name_prefix().endsWith(request_pool)) {
+      if (StringUtils.isNotEmpty(request_pool)
+          && !e.getExec_group_name_prefix().endsWith(request_pool)) {
         continue;
       }
       TExecutorGroupSet new_entry = new TExecutorGroupSet(e);
@@ -1965,7 +1967,8 @@ public class Frontend {
       }
       result.add(new_entry);
     }
-    if (executorGroupSets.size() > 0 && result.size() == 0 && request_pool != null) {
+    if (executorGroupSets.size() > 0 && result.size() == 0
+        && StringUtils.isNotEmpty(request_pool)) {
       throw new AnalysisException("Request pool: " + request_pool
           + " does not map to any known executor group set.");
     }
@@ -2018,6 +2021,9 @@ public class Frontend {
 
     TQueryOptions queryOptions = queryCtx.client_request.getQuery_options();
     boolean enable_replan = queryOptions.isEnable_replan();
+    final boolean clientSetRequestPool = queryOptions.isSetRequest_pool();
+    Preconditions.checkState(
+        !clientSetRequestPool || !queryOptions.getRequest_pool().isEmpty());
 
     List<TExecutorGroupSet> originalExecutorGroupSets =
         ExecutorMembershipSnapshot.getAllExecutorGroupSets();
@@ -2131,7 +2137,7 @@ public class Frontend {
       }
 
       if (notScalable) {
-        setGroupNamePrefix(default_executor_group, req, group_set);
+        setGroupNamePrefix(default_executor_group, clientSetRequestPool, req, group_set);
         addInfoString(
             groupSetProfile, VERDICT, "Assign to first group because " + reason);
         FrontendProfile.getCurrent().addChildrenProfile(groupSetProfile);
@@ -2187,7 +2193,7 @@ public class Frontend {
       }
 
       boolean matchFound = false;
-      if (queryOptions.isSetRequest_pool()) {
+      if (clientSetRequestPool) {
         if (!default_executor_group) {
           Preconditions.checkState(group_set.getExec_group_name_prefix().endsWith(
               queryOptions.getRequest_pool()));
@@ -2216,7 +2222,7 @@ public class Frontend {
       FrontendProfile.getCurrent().addChildrenProfile(groupSetProfile);
 
       if (matchFound) {
-        setGroupNamePrefix(default_executor_group, req, group_set);
+        setGroupNamePrefix(default_executor_group, clientSetRequestPool, req, group_set);
         break;
       }
 
@@ -2267,14 +2273,14 @@ public class Frontend {
     return req;
   }
 
-  private static void setGroupNamePrefix(
-      boolean default_executor_group, TExecRequest req, TExecutorGroupSet group_set) {
+  private static void setGroupNamePrefix(boolean default_executor_group,
+      boolean clientSetRequestPool, TExecRequest req, TExecutorGroupSet group_set) {
     // Set the group name prefix in both the returned query options and
     // the query context for non default group setup.
     if (!default_executor_group) {
       String namePrefix = group_set.getExec_group_name_prefix();
       req.query_options.setRequest_pool(namePrefix);
-      req.setRequest_pool_set_by_frontend(true);
+      req.setRequest_pool_set_by_frontend(!clientSetRequestPool);
       if (req.query_exec_request != null) {
         req.query_exec_request.query_ctx.setRequest_pool(namePrefix);
       }
