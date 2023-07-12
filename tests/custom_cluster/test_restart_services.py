@@ -176,7 +176,7 @@ class TestRestart(CustomClusterTestSuite):
     self.execute_query_expect_success(self.client, "invalidate metadata")
 
     # No need to care whether the dll is executed successfully, it is just to make
-    # the local catalog catche of impalad out of sync
+    # the local catalog cache of impalad out of sync
     for i in range(0, 10):
       try:
         query = "alter table join_aa add columns (age" + str(i) + " int)"
@@ -185,6 +185,124 @@ class TestRestart(CustomClusterTestSuite):
         LOG.info(str(e))
       if i == 5:
         self.cluster.catalogd.restart()
+
+    self.execute_query_expect_success(self.client,
+        "alter table join_aa add columns (name string)")
+    self.execute_query_expect_success(self.client, "select name from join_aa")
+    self.execute_query_expect_success(self.client, "drop table join_aa")
+
+  WAIT_FOR_CATALOG_UPDATE_TIMEOUT_SEC = 5
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(cluster_size=1,
+    statestored_args="--statestore_update_frequency_ms=2000",
+    impalad_args=("--wait_for_new_catalog_service_id_timeout_sec={} \
+                  --wait_for_new_catalog_service_id_max_iterations=-1"
+                  .format(WAIT_FOR_CATALOG_UPDATE_TIMEOUT_SEC)))
+  def test_restart_catalogd_while_handling_rpc_response_with_timeout(self):
+    """Regression test for IMPALA-12267. We'd like to cause a situation where
+         - The coordinator issues a DDL or DML query
+         - Catalogd sends a response RPC
+         - Catalogd is restarted and gets a new catalog service ID
+         - The coordinator receives the update about the new catalogd from the statestore
+           before processing the RPC from the old catalogd.
+    Before IMPALA-12267 the coordinator hung infinitely in this situation, waiting for a
+    statestore update with a new catalog service ID assuming the service ID it had was
+    stale, but it already had the most recent one."""
+    self.execute_query_expect_success(self.client, "drop table if exists join_aa")
+    self.execute_query_expect_success(self.client, "create table join_aa(id int)")
+    # Make the catalog object version grow large enough
+    self.execute_query_expect_success(self.client, "invalidate metadata")
+
+    debug_action_sleep_time_sec = 10
+    DEBUG_ACTION = ("WAIT_BEFORE_PROCESSING_CATALOG_UPDATE:SLEEP@{}"
+                    .format(debug_action_sleep_time_sec * 1000))
+
+    query = "alter table join_aa add columns (age" + " int)"
+    handle = self.execute_query_async(query, query_options={"debug_action": DEBUG_ACTION})
+
+    # Wait a bit so the RPC from the catalogd arrives to the coordinator.
+    time.sleep(0.5)
+
+    self.cluster.catalogd.restart()
+
+    # Wait for the query to finish.
+    max_wait_time = (debug_action_sleep_time_sec
+        + self.WAIT_FOR_CATALOG_UPDATE_TIMEOUT_SEC + 10)
+    self.wait_for_state(handle, self.client.QUERY_STATES["FINISHED"], max_wait_time)
+
+    self.assert_impalad_log_contains("WARNING",
+        "Waiting for catalog update with a new catalog service ID timed out.")
+    self.assert_impalad_log_contains("WARNING",
+        "Ignoring catalog update result of catalog service ID")
+
+    self.execute_query_expect_success(self.client, "select age from join_aa")
+
+    self.execute_query_expect_success(self.client,
+        "alter table join_aa add columns (name string)")
+    self.execute_query_expect_success(self.client, "select name from join_aa")
+    self.execute_query_expect_success(self.client, "drop table join_aa")
+
+  WAIT_FOR_CATALOG_UPDATE_MAX_ITERATIONS = 3
+  STATESTORE_UPDATE_FREQ_SEC = 2
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(cluster_size=1,
+    statestored_args="--statestore_update_frequency_ms={}".format(
+        STATESTORE_UPDATE_FREQ_SEC * 1000),
+    impalad_args=("--wait_for_new_catalog_service_id_timeout_sec=-1 \
+                  --wait_for_new_catalog_service_id_max_iterations={}"
+                  .format(WAIT_FOR_CATALOG_UPDATE_MAX_ITERATIONS)))
+  def test_restart_catalogd_while_handling_rpc_response_with_max_iters(self):
+    """We create the same situation as described in
+    'test_restart_catalogd_while_handling_rpc_response_with_timeout()' but we get out of
+    it not by timing out but by giving up waiting after receiving
+    'WAIT_FOR_CATALOG_UPDATE_MAX_ITERATIONS' updates from the statestore that don't change
+    the catalog service ID."""
+    self.execute_query_expect_success(self.client, "drop table if exists join_aa")
+    self.execute_query_expect_success(self.client, "create table join_aa(id int)")
+    # Make the catalog object version grow large enough
+    self.execute_query_expect_success(self.client, "invalidate metadata")
+
+    debug_action_sleep_time_sec = 10
+    DEBUG_ACTION = ("WAIT_BEFORE_PROCESSING_CATALOG_UPDATE:SLEEP@{}"
+                    .format(debug_action_sleep_time_sec * 1000))
+
+    query = "alter table join_aa add columns (age" + " int)"
+    handle = self.execute_query_async(query, query_options={"debug_action": DEBUG_ACTION})
+
+    # Wait a bit so the RPC from the catalogd arrives to the coordinator.
+    time.sleep(0.5)
+
+    self.cluster.catalogd.restart()
+
+    # Sleep until the coordinator is done with the debug action sleep and it starts
+    # waiting for catalog updates.
+    time.sleep(debug_action_sleep_time_sec + 0.5)
+
+    # Issue DML queries so that the coordinator receives catalog updates.
+    for i in range(self.WAIT_FOR_CATALOG_UPDATE_MAX_ITERATIONS):
+      try:
+        query = "alter table join_aa add columns (age" + str(i) + " int)"
+        self.execute_query_async(query)
+        time.sleep(self.STATESTORE_UPDATE_FREQ_SEC)
+      except Exception as e:
+        LOG.info(str(e))
+
+    # Wait for the query to finish.
+    max_wait_time = 10
+    self.wait_for_state(handle, self.client.QUERY_STATES["FINISHED"], max_wait_time)
+
+    expected_log_msg = "Received {} non-empty catalog updates from the statestore " \
+        "while waiting for an update with a new catalog service ID but the catalog " \
+        "service ID has not changed. Giving up waiting.".format(
+            self.WAIT_FOR_CATALOG_UPDATE_MAX_ITERATIONS)
+
+    self.assert_impalad_log_contains("INFO", expected_log_msg)
+    self.assert_impalad_log_contains("WARNING",
+        "Ignoring catalog update result of catalog service ID")
+
+    self.execute_query_expect_success(self.client, "select age from join_aa")
 
     self.execute_query_expect_success(self.client,
         "alter table join_aa add columns (name string)")

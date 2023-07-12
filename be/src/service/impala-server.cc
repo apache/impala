@@ -379,6 +379,28 @@ DEFINE_bool(auto_check_compaction, false,
     "additional RPCs to hive metastore for each table in a query during the query "
     "compilation.");
 
+DEFINE_int32(wait_for_new_catalog_service_id_timeout_sec, 5 * 60,
+    "During DDL/DML queries, if there is a mismatch between the catalog service ID that"
+    "the coordinator knows of and the one in the RPC response from the catalogd, the "
+    "coordinator waits for a statestore update with a new catalog service ID in order to "
+    "catch up with the one in the RPC response. However, in rare cases the service ID "
+    "the coordinator knows of is the more recent one, in which case it could wait "
+    "infinitely - to avoid this, this flag can be set to a positive value (in seconds) "
+    "to limit the waiting time. Negative values and zero have no effect. See also "
+    "'--wait_for_new_catalog_service_id_max_iterations,'.");
+
+DEFINE_int32(wait_for_new_catalog_service_id_max_iterations, 10,
+    "This flag is used in the same situation as described at the "
+    "'--wait_for_new_catalog_service_id_timeout_sec' flag. Instead of limiting the "
+    "waiting time, the effect of this flag is that the coordinator gives up waiting "
+    "after receiving the set number of valid catalog updates that do not change the "
+    "catalog service ID. Negative values and zero have no effect. If both this flag and "
+    "'--wait_for_new_catalog_service_id_timeout_sec' are set, the coordinator stops "
+    "waiting when the stop condition of either of them is met. Note that it is possible "
+    "that the coordinator does not receive any catalog update from the statestore and in "
+    "this case it will wait indefinitely if "
+    "'--wait_for_new_catalog_service_id_timeout_sec' is not set.");
+
 // Flags for JWT token based authentication.
 DECLARE_bool(jwt_token_auth);
 DECLARE_bool(jwt_validate_signature);
@@ -883,6 +905,67 @@ Status ImpalaServer::DecompressToProfile(TRuntimeProfileFormat::type format,
     tmp_profile->PrettyPrint(profile->string_output);
   }
   return Status::OK();
+}
+
+void ImpalaServer::WaitForNewCatalogServiceId(TUniqueId cur_service_id,
+    unique_lock<mutex>* ver_lock) {
+  DCHECK(ver_lock != nullptr);
+  // The catalog service ID of 'catalog_update_result' does not match the current catalog
+  // service ID. It is possible that catalogd has been restarted and
+  // 'catalog_update_result' contains the new service ID but we haven't received the
+  // statestore update about the new catalogd yet. We'll wait until we receive an update
+  // with a new catalog service ID or we give up (if
+  // --wait_for_new_catalog_service_id_timeout_sec is set and we time out OR if
+  // --wait_for_new_catalog_service_id_max_iterations is set and we reach the max number
+  // of updates without a new service ID). The timeout is useful in case the service ID of
+  // 'catalog_update_result' is actually older than the current catalog service ID. This
+  // is possible if the RPC response came from the old catalogd and we have already
+  // received the statestore update about the new one (see IMPALA-12267).
+  const bool timeout_set = FLAGS_wait_for_new_catalog_service_id_timeout_sec > 0;
+  const int64_t timeout_ms =
+      FLAGS_wait_for_new_catalog_service_id_timeout_sec * MILLIS_PER_SEC;
+  timespec wait_end_time;
+  if (timeout_set) TimeFromNowMillis(timeout_ms, &wait_end_time);
+
+  const bool max_statestore_updates_set =
+      FLAGS_wait_for_new_catalog_service_id_max_iterations > 0;
+
+  bool timed_out = false;
+  int num_statestore_updates = 0;
+
+  int64_t old_catalog_version = catalog_update_info_.catalog_version;
+  while (catalog_update_info_.catalog_service_id == cur_service_id) {
+    if (max_statestore_updates_set
+        && catalog_update_info_.catalog_version != old_catalog_version) {
+      old_catalog_version = catalog_update_info_.catalog_version;
+      ++num_statestore_updates;
+      if (num_statestore_updates < FLAGS_wait_for_new_catalog_service_id_max_iterations) {
+        LOG(INFO) << "Received " << num_statestore_updates << " non-empty catalog "
+            << "updates from the statestore while waiting for an update with a new "
+            << "catalog service ID but the catalog service ID has not changed. Going to "
+            << "give up waiting after "
+            << FLAGS_wait_for_new_catalog_service_id_max_iterations
+            << " such updates in total.";
+      } else {
+        LOG(WARNING) << "Received " << num_statestore_updates << " non-empty catalog "
+            << "updates from the statestore while waiting for an update with a new "
+            << "catalog service ID but the catalog service ID has not changed. "
+            << "Giving up waiting.";
+        break;
+      }
+    }
+
+    if (timeout_set) {
+      timed_out = !catalog_version_update_cv_.WaitUntil(*ver_lock, wait_end_time);
+      if (timed_out) {
+        LOG(WARNING) << "Waiting for catalog update with a new "
+            << "catalog service ID timed out.";
+        break;
+      }
+    } else {
+      catalog_version_update_cv_.Wait(*ver_lock);
+    }
+  }
 }
 
 Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& user,
@@ -2171,7 +2254,8 @@ void ImpalaServer::WaitForMinCatalogUpdate(const int64_t min_req_catalog_object_
 }
 
 Status ImpalaServer::ProcessCatalogUpdateResult(
-    const TCatalogUpdateResult& catalog_update_result, bool wait_for_all_subscribers) {
+    const TCatalogUpdateResult& catalog_update_result, bool wait_for_all_subscribers,
+    const TQueryOptions& query_options) {
   const TUniqueId& catalog_service_id = catalog_update_result.catalog_service_id;
   if (!catalog_update_result.__isset.updated_catalog_objects &&
       !catalog_update_result.__isset.removed_catalog_objects) {
@@ -2192,18 +2276,17 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
   } else {
     TUniqueId cur_service_id;
     {
+      Status status = DebugAction(query_options, "WAIT_BEFORE_PROCESSING_CATALOG_UPDATE");
+      DCHECK(status.ok());
+
       unique_lock<mutex> ver_lock(catalog_version_lock_);
       cur_service_id = catalog_update_info_.catalog_service_id;
-      if (catalog_update_info_.catalog_service_id != catalog_service_id) {
+      if (cur_service_id != catalog_service_id) {
         LOG(INFO) << "Catalog service ID mismatch. Current ID: "
             << PrintId(cur_service_id) << ". ID in response: "
-            << PrintId(catalog_service_id) << ". Catalogd may be restarted. Waiting for"
-            " new catalog update from statestore.";
-        // Catalog service ID has been changed, and impalad request a full topic update.
-        // When impalad completes the full topic update, it will exit this loop.
-        while (cur_service_id == catalog_update_info_.catalog_service_id) {
-          catalog_version_update_cv_.Wait(ver_lock);
-        }
+            << PrintId(catalog_service_id) << ". Catalogd may have been restarted. "
+            "Waiting for new catalog update from statestore.";
+        WaitForNewCatalogServiceId(cur_service_id, &ver_lock);
         cur_service_id = catalog_update_info_.catalog_service_id;
       }
     }
@@ -2224,17 +2307,30 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
       RETURN_IF_ERROR(status);
     } else {
       // We can't apply updates on another service id, because the local catalog is still
-      // inconsistent with the catalogd that executes the DDL. Catalogd may be restarted
-      // more than once inside a statestore update cycle. 'cur_service_id' could belong
-      // to 1) a stale update from the previous restarted catalogd, or 2) a newer update
-      // from next restarted catalogd. We are good to ignore the DDL result at the second
-      // case. However, in the first case clients may see stale catalog until the
-      // expected catalog topic update comes.
+      // inconsistent with the catalogd that executes the DDL/DML.
+      //
+      // 'cur_service_id' could belong to
+      // 1) a stale update about a previous catalogd; this is possible if
+      //     a) catalogd was restarted more than once (for example inside a statestore
+      //        update cycle) and we only got the updates about some but not all restarts
+      //        - the update about the catalogd that has 'catalog_service_id' has not
+      //        arrived yet OR
+      //     b) we gave up waiting (timed out or got a certain number of updates) before
+      //        getting the update about the new catalogd
+      // 2) an update about a restarted catalogd that is newer than the one with
+      //    'catalog_service_id' (in this case we also timed out waiting for an update)
+      //
+      // We are good to ignore the DDL/DML result in the second case. However, in the
+      // first case clients may see a stale catalog until the expected catalog topic
+      // update arrives.
       // TODO: handle the first case in IMPALA-10875.
-      LOG(WARNING) << "Ignoring catalog update result of catalog service ID: "
-          << PrintId(catalog_service_id) << ". The expected catalog service ID: "
-          << PrintId(catalog_service_id) << ". Current catalog service ID: "
-          << PrintId(cur_service_id) <<". Catalogd may be restarted more than once.";
+      LOG(WARNING) << "Ignoring catalog update result of catalog service ID "
+          << PrintId(catalog_service_id)
+          << " because it does not match with current catalog service ID "
+          << PrintId(cur_service_id)
+          << ". The current catalog service ID may be stale (this may be caused by the "
+          << "catalogd having been restarted more than once) or newer than the catalog "
+          << "service ID of the update result.";
     }
     if (!wait_for_all_subscribers) return Status::OK();
     // Wait until we receive and process the catalog update that covers the effects

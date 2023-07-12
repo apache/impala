@@ -169,15 +169,17 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
   /**
    * Update the catalog service Id. Trigger a full update if the service ID changes.
    */
-  private void setCatalogServiceId(TUniqueId catalog_service_id) throws CatalogException {
+  private void setCatalogServiceId(TUniqueId catalogServiceId) throws CatalogException {
     // Check for changes in the catalog service ID.
-    if (!catalogServiceId_.equals(catalog_service_id)) {
+    if (!catalogServiceId_.equals(catalogServiceId)) {
       boolean firstRun = catalogServiceId_.equals(INITIAL_CATALOG_SERVICE_ID);
-      catalogServiceId_ = catalog_service_id;
+      TUniqueId oldCatalogServiceId = catalogServiceId_;
+      catalogServiceId_ = catalogServiceId;
       if (!firstRun) {
         // Throw an exception which will trigger a full topic update request.
-        throw new CatalogException("Detected catalog service ID change. Aborting " +
-            "updateCatalog()");
+        throw new CatalogException("Detected catalog service ID changes from " +
+            TUniqueIdUtil.PrintId(oldCatalogServiceId) + " to " +
+            TUniqueIdUtil.PrintId(catalogServiceId) + ". Aborting updateCatalog()");
       }
     }
   }

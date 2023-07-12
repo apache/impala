@@ -417,11 +417,14 @@ class ImpalaServer : public ImpalaServiceIf,
   /// been updated from a statestore heartbeat that includes this catalog
   /// update's version.
   ///
-  /// If wait_for_all_subscribers is true, this function also
-  /// waits for all other catalog topic subscribers to process this update by checking the
-  /// current min_subscriber_topic_version included in each state store heartbeat.
+  /// If 'wait_for_all_subscribers' is true, this function also waits for all other
+  /// catalog topic subscribers to process this update by checking the current
+  /// min_subscriber_topic_version included in each state store heartbeat.
+  ///
+  /// 'query_options' is used for running debug actions.
   Status ProcessCatalogUpdateResult(const TCatalogUpdateResult& catalog_update_result,
-      bool wait_for_all_subscribers) WARN_UNUSED_RESULT;
+      bool wait_for_all_subscribers, const TQueryOptions& query_options)
+      WARN_UNUSED_RESULT;
 
   /// Wait until the catalog update with version 'catalog_update_version' is
   /// received and applied in the local catalog cache or until the catalog
@@ -1253,6 +1256,9 @@ class ImpalaServer : public ImpalaServiceIf,
   Status DecompressToProfile(TRuntimeProfileFormat::type format,
       std::shared_ptr<QueryStateRecord> query_record, RuntimeProfileOutput* profile);
 
+  void WaitForNewCatalogServiceId(TUniqueId cur_service_id,
+      std::unique_lock<std::mutex>* ver_lock);
+
   /// Logger for writing encoded query profiles, one per line with the following format:
   /// <ms-since-epoch> <query-id> <thrift query profile URL encoded and gzipped>
   boost::scoped_ptr<SimpleLogger> profile_logger_;
@@ -1549,6 +1555,7 @@ class ImpalaServer : public ImpalaServiceIf,
       catalog_topic_version(0L),
       catalog_object_version_lower_bound(0L) {
     }
+
     /// Update the metrics to store the current version of catalog, current topic and
     /// current service id used by impalad.
     void  UpdateCatalogVersionMetrics();
