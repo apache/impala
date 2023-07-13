@@ -29,6 +29,7 @@ import org.apache.impala.analysis.CaseExpr;
 import org.apache.impala.analysis.CaseWhenClause;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
+import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.MultiAggregateInfo.AggPhase;
 import org.apache.impala.analysis.NumericLiteral;
@@ -676,10 +677,14 @@ public class AggregationNode extends PlanNode {
             estimatePerInstanceDataBytes(lowPerInstanceCardinality, inputCardinality));
         Preconditions.checkState(lowPerInstanceDataBytes <= perInstanceDataBytes);
 
-        // Given N as number of grouping expressions,
-        // corrFactor = AGG_MEM_CORRELATION_FACTOR ^ N
+        // Given N as number of non-literal grouping expressions,
+        // corrFactor = AGG_MEM_CORRELATION_FACTOR ^ max(0, N - 1)
+        long nonLiteralExprCount = aggInfo.getGroupingExprs()
+                                       .stream()
+                                       .filter(e -> !(e instanceof LiteralExpr))
+                                       .count();
         double corrFactor = Math.pow(queryOptions.getAgg_mem_correlation_factor(),
-            aggInfo.getGroupingExprs().size());
+            Math.max(0, nonLiteralExprCount - 1));
         long resolvedPerInstanceDataBytes = lowPerInstanceDataBytes
             + Math.round(corrFactor * (perInstanceDataBytes - lowPerInstanceDataBytes));
         if (LOG.isTraceEnabled() && perInstanceDataBytes > resolvedPerInstanceDataBytes) {

@@ -827,9 +827,9 @@ enum TImpalaQueryOptions {
 
   // Correlation factor that will be used to calculate a lower memory estimation of
   // aggregation node when the default memory estimation exceed
-  // LARGE_AGG_MEM_THRESHOLD. Given N as number of grouping expressions,
+  // LARGE_AGG_MEM_THRESHOLD. Given N as number of non-literal grouping expressions,
   // the final correlation factor is calculated as:
-  //   corrFactor = AGG_MEM_CORRELATION_FACTOR ^ N
+  //   corrFactor = AGG_MEM_CORRELATION_FACTOR ^ max(0, N - 1)
   // Valid values are in [0.0, 1.0]. Setting value 1.0 will result in an equal memory
   // estimate as the default estimation (no change). Default to 0.5.
   AGG_MEM_CORRELATION_FACTOR = 163
