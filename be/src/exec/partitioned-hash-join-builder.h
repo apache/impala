@@ -541,6 +541,9 @@ class PhjBuilder : public JoinBuilder {
 
   std::string DebugString() const;
 
+  /// Unregisters one probe thread from the barrier
+  void UnregisterThreadFromBarrier() const;
+
   /// Computes the minimum reservation required to execute the spilling partitioned
   /// hash algorithm successfully for any input size (assuming enough disk space is
   /// available for spilled rows). This includes buffers used by the build side,

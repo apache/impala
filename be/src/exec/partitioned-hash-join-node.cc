@@ -24,8 +24,8 @@
 
 #include "codegen/llvm-codegen.h"
 #include "exec/blocking-join-node.inline.h"
-#include "exec/exec-node.inline.h"
 #include "exec/exec-node-util.h"
+#include "exec/exec-node.inline.h"
 #include "exec/hash-table.inline.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/scalar-expr.h"
@@ -35,6 +35,7 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "util/cyclic-barrier.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
 
@@ -309,6 +310,8 @@ void PartitionedHashJoinNode::Close(RuntimeState* state) {
       builder_->CloseFromProbe(state);
       waited_for_build_ = false;
     }
+
+    if (builder_->num_probe_threads() > 1) builder_->UnregisterThreadFromBarrier();
   }
   ScalarExprEvaluator::Close(other_join_conjunct_evals_, state);
   if (probe_expr_results_pool_ != nullptr) probe_expr_results_pool_->FreeAll();

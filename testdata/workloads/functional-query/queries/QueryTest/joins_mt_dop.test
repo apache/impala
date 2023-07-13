@@ -49,3 +49,13 @@ int,int
 6,6
 7,7
 ====
+---- QUERY
+# IMPALA-12233: make sure PHJ does not hang with limit
+select ss_cdemo_sk from tpcds.store_sales where ss_sold_date_sk = (select max(ss_sold_date_sk) from tpcds.store_sales) group by ss_cdemo_sk limit 3;
+---- RESULTS
+row_regex: [0-9]*
+row_regex: [0-9]*
+row_regex: [0-9]*
+---- TYPES
+int
+====

@@ -1383,6 +1383,10 @@ string PhjBuilder::DebugString() const {
   ss << " buffer_pool_client=" << buffer_pool_client_->DebugString();
   return ss.str();
 }
+void PhjBuilder::UnregisterThreadFromBarrier() const {
+  DCHECK(probe_barrier_ != nullptr);
+  probe_barrier_->Unregister();
+}
 
 Status PhjBuilderConfig::CodegenProcessBuildBatch(LlvmCodeGen* codegen,
     llvm::Function* hash_fn, llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn,

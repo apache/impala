@@ -155,6 +155,106 @@ TEST(CyclicBarrierTest, Cancellation) {
   IMPALA_ASSERT_DEBUG_DEATH(barrier.Cancel(Status::OK()), "");
 }
 
+// Test that unregister functions as expected when the last call is an Unregister
+TEST(CyclicBarrierTest, UnregisterLast) {
+  const int NUM_THREADS = 8;
+  const int NUM_OF_UNREGISTERING_THREADS = 6;
+  int counter = 0;
+  AtomicInt32 waits_complete{0};
+  AtomicInt32 unregisters_complete{0};
+  CyclicBarrier barrier(NUM_THREADS + NUM_OF_UNREGISTERING_THREADS);
+  thread_group threads;
+  thread_group unregistering_threads;
+  // All threads should join the barrier, waiting.
+  for (int i = 0; i < NUM_THREADS; ++i) {
+    threads.add_thread(new thread([&barrier, &waits_complete, &counter]() {
+      Status status = barrier.Wait([&counter]() {
+        ++counter;
+        return Status::OK();
+      });
+      EXPECT_TRUE(status.ok());
+      waits_complete.Add(1);
+    }));
+  }
+  SleepForMs(10); // Give other threads a chance to start before unregistering
+  EXPECT_EQ(0, counter) << "The callback should not have run.";
+
+  // All threads but one unregisters, the others are still waiting in the barrier
+  for (int i = 0; i < NUM_OF_UNREGISTERING_THREADS - 1; ++i) {
+    unregistering_threads.add_thread(new thread([&barrier, &unregisters_complete]() {
+      barrier.Unregister();
+      unregisters_complete.Add(1);
+    }));
+  }
+  unregistering_threads.join_all();
+
+  EXPECT_EQ(0, counter) << "The callback should not have run.";
+  EXPECT_EQ(0, waits_complete.Load()) << "Threads should not have returned.";
+  EXPECT_EQ(NUM_OF_UNREGISTERING_THREADS - 1, unregisters_complete.Load())
+      << "Unregisters should have returned.";
+
+  barrier.Unregister();
+
+  threads.join_all();
+
+  EXPECT_EQ(1, counter) << "Counter should have been incremented by the woken up thread "
+                           "after the last Unregister.";
+  EXPECT_EQ(NUM_THREADS, waits_complete.Load()) << "Threads should have returned.";
+}
+
+// Test that unregister functions as expected when the last call is a Wait.
+TEST(CyclicBarrierTest, UnregisterNotLast) {
+  const int NUM_THREADS = 8;
+  const int NUM_OF_UNREGISTERING_THREADS = 6;
+  int counter = 0;
+  AtomicInt32 waits_complete{0};
+  AtomicInt32 unregisters_complete{0};
+  CyclicBarrier barrier(NUM_THREADS + NUM_OF_UNREGISTERING_THREADS);
+  thread_group threads;
+  thread_group unregistering_threads;
+  // All threads but one should join the barrier, waiting.
+  for (int i = 0; i < NUM_THREADS - 1; ++i) {
+    threads.add_thread(new thread([&barrier, &waits_complete, &counter]() {
+      Status status = barrier.Wait([&counter]() {
+        ++counter;
+        return Status::OK();
+      });
+      EXPECT_TRUE(status.ok());
+      waits_complete.Add(1);
+    }));
+  }
+  SleepForMs(10); // Give other threads a chance to start before unregistering
+  EXPECT_EQ(0, counter) << "The callback should not have run.";
+
+  // All threads unregister, the others are still waiting in the barrier for the last one
+  for (int i = 0; i < NUM_OF_UNREGISTERING_THREADS; ++i) {
+    unregistering_threads.add_thread(new thread([&barrier, &unregisters_complete]() {
+      barrier.Unregister();
+      unregisters_complete.Add(1);
+    }));
+  }
+  unregistering_threads.join_all();
+
+  EXPECT_EQ(0, counter) << "The callback should not have run.";
+  EXPECT_EQ(0, waits_complete.Load()) << "Threads should not have returned.";
+  EXPECT_EQ(NUM_OF_UNREGISTERING_THREADS, unregisters_complete.Load())
+      << "Unregisters should have returned.";
+
+  threads.add_thread(new thread([&barrier, &waits_complete, &counter]() {
+    Status status = barrier.Wait([&counter]() {
+      ++counter;
+      return Status::OK();
+    });
+    EXPECT_TRUE(status.ok());
+    waits_complete.Add(1);
+  }));
+
+  threads.join_all();
+
+  EXPECT_EQ(1, counter) << "Counter should have been incremented by the last thread.";
+  EXPECT_EQ(NUM_THREADS, waits_complete.Load()) << "Threads should have returned.";
+}
+
 // Passing an empty/null function to Wait() is not supported.
 TEST(CyclicBarrierTest, NullFunction) {
   CyclicBarrier barrier(1);

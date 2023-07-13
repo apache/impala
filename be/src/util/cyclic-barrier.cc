@@ -34,4 +34,16 @@ void CyclicBarrier::Cancel(const Status& err) {
   }
   barrier_cv_.NotifyAll();
 }
+
+void CyclicBarrier::Unregister() {
+  bool notify = false;
+  {
+    unique_lock<mutex> l(lock_);
+    if (!cancel_status_.ok()) return; // Already cancelled.
+    --num_threads_;
+    DCHECK_GE(num_threads_, 0);
+    if (num_waiting_threads_ == num_threads_) notify = true;
+  }
+  if (notify) barrier_cv_.NotifyOne();
+}
 } // namespace impala

@@ -54,13 +54,16 @@ class CyclicBarrier {
       if (num_waiting_threads_ < num_threads_) {
         // Wait for the last thread to wake us up.
         int64_t start_cycle = cycle_num_;
-        while (cancel_status_.ok() && cycle_num_ == start_cycle) {
+        while (cancel_status_.ok() && cycle_num_ == start_cycle
+            && num_waiting_threads_ < num_threads_) {
           barrier_cv_.Wait(l);
         }
-        return cancel_status_;
+        if (!cancel_status_.ok() || cycle_num_ > start_cycle) {
+          return cancel_status_;
+        }
       }
-      // This is the last thread and barrier isn't cancelled. We can proceed by
-      // resetting state for the next cycle.
+      // This is the last thread or a woken up thread by the last unregister and barrier
+      // isn't cancelled. We can proceed by resetting state for the next cycle.
       fn_status = fn();
       if (fn_status.ok()) {
         num_waiting_threads_ = 0;
@@ -79,9 +82,13 @@ class CyclicBarrier {
   // 'err' must be a non-OK status.
   void Cancel(const Status& err);
 
+  // Unregisters one thread from the synchronization, wakes up one waiting thread to
+  // execute 'fn' of Wait() if the unregistering thread was the last one.
+  void Unregister();
+
  private:
   // The number of threads participating in synchronization.
-  const int num_threads_;
+  int num_threads_;
 
   // Protects below members.
   std::mutex lock_;
