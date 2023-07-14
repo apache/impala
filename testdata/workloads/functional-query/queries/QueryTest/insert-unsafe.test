@@ -152,6 +152,9 @@ INSERT INTO unsafe_insert(char_col) values (cast("100" as STRING));
 INSERT INTO unsafe_insert(varchar_col) values (cast("100" as STRING));
 ====
 ---- QUERY
+INSERT INTO unsafe_insert(float_col) values ("100"), (15629);
+====
+---- QUERY
 INSERT INTO unsafe_insert(bigint_col) select string_col from unsafe_insert;
 ---- CATCH
 AnalysisException: Unsafe implicit cast is prohibited for non-const expression: string_col

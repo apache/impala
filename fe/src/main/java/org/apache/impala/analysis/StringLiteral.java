@@ -156,7 +156,7 @@ public class StringLiteral extends LiteralExpr {
     } else if (targetType.isStringType()) {
       type_ = targetType;
     } else if (targetType.isNumericType()) {
-      return convertToNumber();
+      return convertToNumber(targetType);
     } else if (targetType.isDateOrTimeType()) {
       // Let the BE do the cast
       // - it is in Boost format in case target type is TIMESTAMP
@@ -169,14 +169,14 @@ public class StringLiteral extends LiteralExpr {
   /**
    * Convert this string literal to numeric literal.
    *
+   * @param targetType sets the target type of the newly created literal
    * @return new converted literal (not null)
    *         the type of the literal is determined by the lexical scanner
    * @throws AnalysisException
    *           if NumberFormatException occurs,
    *           or if floating point value is NaN or infinite
    */
-  public LiteralExpr convertToNumber()
-      throws AnalysisException {
+  public LiteralExpr convertToNumber(Type targetType) throws AnalysisException {
     StringReader reader = new StringReader(value_);
     SqlScanner scanner = new SqlScanner(reader);
     // For distinguishing positive and negative numbers.
@@ -201,12 +201,12 @@ public class StringLiteral extends LiteralExpr {
     if (sym.sym == SqlParserSymbols.INTEGER_LITERAL) {
       BigDecimal val = (BigDecimal) sym.value;
       if (negative) val = val.negate();
-      return new NumericLiteral(val);
+      return new NumericLiteral(val, targetType);
     }
     if (sym.sym == SqlParserSymbols.DECIMAL_LITERAL) {
       BigDecimal val = (BigDecimal) sym.value;
       if (negative) val = val.negate();
-      return new NumericLiteral(val);
+      return new NumericLiteral(val, targetType);
     }
     // Symbol is not an integer or floating point literal.
     throw new AnalysisException("Failed to convert string literal '"
