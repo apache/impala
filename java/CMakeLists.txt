@@ -27,7 +27,7 @@ ExternalProject_Add(jamm
   PATCH_COMMAND     sed -i.bak s/0.4.0-SNAPSHOT/0.4.0-IMPALA/ pom.xml
   CONFIGURE_COMMAND sed s:JAVA_HOME:$ENV{JAVA_HOME}:g ${CMAKE_CURRENT_SOURCE_DIR}/toolchains.xml.tmpl > toolchains.xml
   BUILD_IN_SOURCE   true
-  BUILD_COMMAND     mvn --toolchains toolchains.xml install -Dmaven.test.skip=true -DskipTests
+  BUILD_COMMAND     mvn --batch-mode --toolchains toolchains.xml install -Dmaven.test.skip=true -DskipTests
   INSTALL_COMMAND   ""
 )
 
