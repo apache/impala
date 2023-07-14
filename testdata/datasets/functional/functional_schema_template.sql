@@ -3781,7 +3781,7 @@ map_timestamp_key MAP<TIMESTAMP, STRING>
 map_date_key MAP<DATE, STRING>
 ---- DEPENDENT_LOAD_HIVE
 -- It would be nice to insert NULLs, but I couldn't find a way in Hive.
-INSERT OVERWRITE {db_name}{db_suffix}.{table_name} VALUES
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} VALUES
   (1,
    array(1, 2, NULL),
    array(array(1, 2, NULL), array(3)),
@@ -3842,7 +3842,7 @@ map_timestamp_key MAP<TIMESTAMP, STRING>
 map_date_key MAP<DATE, STRING>
 struct_contains_map STRUCT<m: MAP<INT, STRING>, s: STRING>
 ---- DEPENDENT_LOAD_HIVE
-INSERT OVERWRITE {db_name}{db_suffix}.{table_name} VALUES
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} VALUES
   (1,
    map(true, "true", if(false, false, NULL), "null"),
    map(-1Y, "one", if(false, 1Y, NULL), "null"),
@@ -3871,7 +3871,7 @@ id INT
 map_int_int MAP<INT,INT>
 map_char3_char5 MAP<CHAR(3),CHAR(5)>
 ---- DEPENDENT_LOAD_HIVE
-INSERT OVERWRITE {db_name}{db_suffix}.{table_name} VALUES
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} VALUES
   (1, map(10, 100, 11, 110, 12, 120), map(cast("aaa" as char(3)), cast("aaaaa" as char(5)))),
   (2, map(20, 200, 21, 210, 22, 220), map(cast("aab" as char(3)), cast("aaaab" as char(5)))),
   (3, map(30, 300, 31, 310, 32, 320), map(cast("aac" as char(3)), cast("aaaac" as char(5)))),
@@ -3897,7 +3897,7 @@ arr_contains_nested_struct ARRAY<STRUCT<inner_struct: STRUCT<str: STRING, l: INT
 struct_contains_nested_arr STRUCT<arr: ARRAY<ARRAY<DATE>>, i: INT>
 all_mix MAP<INT, STRUCT<big: STRUCT<arr: ARRAY<STRUCT<inner_arr: ARRAY<ARRAY<INT>>, m: TIMESTAMP>>, n: INT>, small: STRUCT<str: STRING, i: INT>>>
 ---- DEPENDENT_LOAD_HIVE
-INSERT OVERWRITE {db_name}{db_suffix}.{table_name} VALUES
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} VALUES
   (
     1,
     named_struct("arr", array(1, 2, 3, 4, NULL, NULL, 5)),
@@ -4143,7 +4143,7 @@ date_string_col string
 string_col string
 timestamp_col timestamp
 ---- DEPENDENT_LOAD_HIVE
-INSERT OVERWRITE {db_name}{db_suffix}.{table_name} select * from functional.alltypesagg;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select * from functional.alltypesagg;
 ---- TABLE_PROPERTIES
 parquet.writer.version=v2
 parquet.compression=UNCOMPRESSED
@@ -4169,7 +4169,7 @@ date_string_col string
 string_col string
 timestamp_col timestamp
 ---- DEPENDENT_LOAD_HIVE
-INSERT OVERWRITE {db_name}{db_suffix}.{table_name} select * from functional.alltypesagg;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select * from functional.alltypesagg;
 ---- TABLE_PROPERTIES
 parquet.writer.version=v2
 parquet.compression=SNAPPY
@@ -4186,7 +4186,7 @@ int_map map<string, int>
 int_map_array array<map<string, int>>
 nested_struct struct<a: int, b: array<int>, c: struct<d: array<array<struct<e: int, f: string>>>>, g: map<string, struct<h: struct<i: array<double>>>>>
 ---- DEPENDENT_LOAD_HIVE
-INSERT OVERWRITE {db_name}{db_suffix}.{table_name} select * from functional_parquet.complextypestbl;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select * from functional_parquet.complextypestbl;
 ---- TABLE_PROPERTIES
 parquet.writer.version=v2
 parquet.compression=UNCOMPRESSED
@@ -4203,7 +4203,7 @@ int_map map<string, int>
 int_map_array array<map<string, int>>
 nested_struct struct<a: int, b: array<int>, c: struct<d: array<array<struct<e: int, f: string>>>>, g: map<string, struct<h: struct<i: array<double>>>>>
 ---- DEPENDENT_LOAD_HIVE
-INSERT OVERWRITE {db_name}{db_suffix}.{table_name} select * from functional_parquet.complextypestbl;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select * from functional_parquet.complextypestbl;
 ---- TABLE_PROPERTIES
 parquet.writer.version=v2
 parquet.compression=SNAPPY
