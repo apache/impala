@@ -7,6 +7,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
    HDFS partitions=1/1 files=730 size=1.25MB
+   Iceberg snapshot id: 188637238055891670
    skipped Iceberg predicates: `year` = 2010
    row-size=20B cardinality=7.30K
 ====
@@ -19,6 +20,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
    HDFS partitions=1/1 files=124 size=216.63KB
    predicates: `month` = 1
+   Iceberg snapshot id: 188637238055891670
    row-size=24B cardinality=1.24K
 ====
 # The predicates that couldn't be pushed to Iceberg are pushed down to the scan node,
@@ -31,6 +33,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
    HDFS partitions=1/1 files=730 size=1.25MB
    predicates: power(id, 3) > 1000
+   Iceberg snapshot id: 188637238055891670
    skipped Iceberg predicates: `year` = 2010
    row-size=20B cardinality=730
 ====
@@ -43,6 +46,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
    HDFS partitions=1/1 files=730 size=1.25MB
    predicates: id > 1000
+   Iceberg snapshot id: 188637238055891670
    skipped Iceberg predicates: `year` = 2010
    row-size=20B cardinality=730
 ====
@@ -57,6 +61,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
    HDFS partitions=1/1 files=2 size=3.49KB
    predicates: date_string_col = '061610'
+   Iceberg snapshot id: 188637238055891670
    skipped Iceberg predicates: `year` = 2010
    row-size=40B cardinality=2
 ====
@@ -72,6 +77,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=6 size=6.85KB
+   Iceberg snapshot id: 8270633197658268308
    skipped Iceberg predicates: action = 'click'
    row-size=8B cardinality=6
 ====
@@ -85,6 +91,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=6 size=6.85KB
    predicates: `user` = NULL
+   Iceberg snapshot id: 8270633197658268308
    skipped Iceberg predicates: action = 'click'
    row-size=12B cardinality=1
 ---- DISTRIBUTEDPLAN
@@ -95,6 +102,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=6 size=6.85KB
    predicates: `user` = NULL
+   Iceberg snapshot id: 8270633197658268308
    skipped Iceberg predicates: action = 'click'
    row-size=12B cardinality=1
 ====
@@ -106,6 +114,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=20 size=22.90KB
    predicates: action = NULL
+   Iceberg snapshot id: 8270633197658268308
    skipped Iceberg predicates: event_time < TIMESTAMP '2022-01-01 00:00:00'
    row-size=44B cardinality=2
 ====
@@ -118,6 +127,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=9 size=10.33KB
    predicates: id < 10, action LIKE 'd%'
+   Iceberg snapshot id: 8270633197658268308
    skipped Iceberg predicates: event_time < TIMESTAMP '2022-01-01 00:00:00'
    row-size=44B cardinality=1
 ====
@@ -129,6 +139,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=10 size=11.42KB
    predicates: (event_time < TIMESTAMP '2020-01-01 00:00:00' OR id > 10), action LIKE 'd%'
+   Iceberg snapshot id: 8270633197658268308
    row-size=44B cardinality=1
 ====
 # Predicate on a partition introduced by partition evolution pushed down to the scan node and
@@ -140,6 +151,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
    HDFS partitions=1/1 files=62 size=108.30KB
    predicates: `month` = 12
+   Iceberg snapshot id: 188637238055891670
    skipped Iceberg predicates: `year` = 2010
    row-size=40B cardinality=620
 ====
@@ -153,6 +165,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=12 size=13.65KB
    predicates: action IN ('click', 'view'), (id > 5 OR (id < 2))
+   Iceberg snapshot id: 8270633197658268308
    row-size=44B cardinality=1
 ====
 # IS NOT NULL predicate skipped on partitioned column 'action', predicate on
@@ -164,10 +177,10 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=9 size=10.33KB
    predicates: id < 10
+   Iceberg snapshot id: 8270633197658268308
    skipped Iceberg predicates: action IS NOT NULL
    row-size=44B cardinality=1
 ====
----- QUERY
 # Regression test for IMPALA-12580: predicate filtering could throw UnsupportedOperationException
 select p_int from functional_parquet.iceberg_alltypes_part where i = 1 and p_int = i;
 ---- PLAN
@@ -176,10 +189,10 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.iceberg_alltypes_part]
    HDFS partitions=1/1 files=1 size=433B
    predicates: i = 1
+   Iceberg snapshot id: 6167994413873848621
    skipped Iceberg predicates: functional_parquet.iceberg_alltypes_part.p_int = 1
    row-size=8B cardinality=1
 ====
----- QUERY
 # Regression test for IMPALA-12580: predicate filtering could throw UnsupportedOperationException
 select * from functional_parquet.iceberg_alltypes_part
 where i = 1 and p_bigint = 10 + i and p_int = p_bigint - 10;
@@ -189,10 +202,10 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.iceberg_alltypes_part]
    HDFS partitions=1/1 files=1 size=433B
    predicates: i = 1
+   Iceberg snapshot id: 6167994413873848621
    skipped Iceberg predicates: p_bigint = 11, p_int = 1
    row-size=49B cardinality=1
 ====
----- QUERY
 select * from functional_parquet.iceberg_alltypes_part
 where p_string = concat(chr(cast(p_int + 104 as int)), "mpala") and
 p_string = concat("i", "mpala") and p_decimal between 122 and 124 and i = floor(p_float)
@@ -202,10 +215,10 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.iceberg_alltypes_part]
    HDFS partitions=1/1 files=1 size=433B
    predicates: i = floor(p_float), concat(chr(CAST(p_int + 104 AS INT)), 'mpala') = 'impala'
+   Iceberg snapshot id: 6167994413873848621
    skipped Iceberg predicates: p_string = 'impala', p_decimal >= 122, p_decimal <= 124
    row-size=49B cardinality=1
 ====
----- QUERY
 select * from functional_parquet.iceberg_alltypes_part where i in (1,2,3) and i = p_int;
 ---- PLAN
 PLAN-ROOT SINK
@@ -213,6 +226,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.iceberg_alltypes_part]
    HDFS partitions=1/1 files=1 size=433B
    predicates: i = p_int, i IN (1, 2, 3)
+   Iceberg snapshot id: 6167994413873848621
    skipped Iceberg predicates: functional_parquet.iceberg_alltypes_part.p_int IN (1, 2, 3)
    row-size=49B cardinality=1
 ====

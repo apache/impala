@@ -211,6 +211,9 @@ public class TestUtils {
   public static final IgnoreValueFilter CARDINALITY_FILTER =
       new IgnoreValueFilter("cardinality", "\\S+");
 
+  public static final IgnoreValueFilter ICEBERG_SNAPSHOT_ID_FILTER =
+      new IgnoreValueFilter("Iceberg snapshot id", " \\d+", ':');
+
   // Ignore any values after 'rows=' in partitions: 0/24 rows=12.83K or
   // partitions: 0/24 rows=unavailable entries
   public static final ReplaceValueFilter PARTITIONS_FILTER =

@@ -70,6 +70,9 @@ public class IcebergScanNode extends HdfsScanNode {
   // already applied them and they won't filter any further rows.
   private List<Expr> skippedConjuncts_;
 
+  // The Iceberg snapshot id used for this scan.
+  private final long snapshotId_;
+
   // This member is set when this scan node is the left child of an IcebergDeleteNode or
   // in other words when this scan node reads data files that have delete files
   // associated. Holds the scan node ID of the right child of the IcebergDeleteNode
@@ -78,15 +81,16 @@ public class IcebergScanNode extends HdfsScanNode {
 
   public IcebergScanNode(PlanNodeId id, TableRef tblRef, List<Expr> conjuncts,
       MultiAggregateInfo aggInfo, List<FileDescriptor> fileDescs,
-      List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts)
+      List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts, long snapshotId)
       throws ImpalaRuntimeException {
     this(id, tblRef, conjuncts, aggInfo, fileDescs, nonIdentityConjuncts,
-        skippedConjuncts, null);
+        skippedConjuncts, null, snapshotId);
   }
 
   public IcebergScanNode(PlanNodeId id, TableRef tblRef, List<Expr> conjuncts,
       MultiAggregateInfo aggInfo, List<FileDescriptor> fileDescs,
-      List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts, PlanNodeId deleteId)
+      List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts, PlanNodeId deleteId,
+      long snapshotId)
       throws ImpalaRuntimeException {
     super(id, tblRef.getDesc(), conjuncts,
         getIcebergPartition(((FeIcebergTable)tblRef.getTable()).getFeFsTable()), tblRef,
@@ -102,6 +106,7 @@ public class IcebergScanNode extends HdfsScanNode {
       filesAreSorted_ = true;
     }
     nonIdentityConjuncts_ = nonIdentityConjuncts;
+    snapshotId_ = snapshotId;
     //TODO IMPALA-11577: optimize file format counting
     boolean hasParquet = false;
     boolean hasOrc = false;
@@ -263,10 +268,14 @@ public class IcebergScanNode extends HdfsScanNode {
   @Override
   protected String getDerivedExplainString(
       String indentPrefix, TExplainLevel detailLevel) {
+    StringBuilder output = new StringBuilder();
+    output.append(
+        indentPrefix + "Iceberg snapshot id: " + String.valueOf(snapshotId_) + "\n");
     if (!skippedConjuncts_.isEmpty()) {
-      return indentPrefix + String.format("skipped Iceberg predicates: %s\n",
-          Expr.getExplainString(skippedConjuncts_, detailLevel));
+      output.append(indentPrefix +
+          String.format("skipped Iceberg predicates: %s\n",
+              Expr.getExplainString(skippedConjuncts_, detailLevel)));
     }
-    return "";
+    return output.toString();
   }
 }

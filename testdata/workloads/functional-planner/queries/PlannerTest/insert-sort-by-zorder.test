@@ -401,6 +401,7 @@ WRITE TO HDFS [functional_parquet.iceberg_partition_transforms_zorder, OVERWRITE
 |
 00:SCAN HDFS [functional_parquet.iceberg_partition_transforms_zorder]
    HDFS partitions=1/1 files=1 size=1.08KB
+   Iceberg snapshot id: 7350750578864730166
    row-size=36B cardinality=1
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional_parquet.iceberg_partition_transforms_zorder, OVERWRITE=true, PARTITION-KEYS=(year(functional_parquet.iceberg_partition_transforms_zorder.ts),iceberg_bucket_transform(functional_parquet.iceberg_partition_transforms_zorder.s, 5))]
@@ -413,5 +414,6 @@ WRITE TO HDFS [functional_parquet.iceberg_partition_transforms_zorder, OVERWRITE
 |
 00:SCAN HDFS [functional_parquet.iceberg_partition_transforms_zorder]
    HDFS partitions=1/1 files=1 size=1.08KB
+   Iceberg snapshot id: 7350750578864730166
    row-size=36B cardinality=1
 ====

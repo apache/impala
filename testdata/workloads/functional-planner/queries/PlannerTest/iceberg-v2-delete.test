@@ -9,6 +9,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_no_deletes-POSITION-DELETE]
 00:SCAN HDFS [functional_parquet.iceberg_v2_no_deletes]
    HDFS partitions=1/1 files=1 size=625B
    predicates: i = 3
+   Iceberg snapshot id: 728158873687794725
    row-size=24B cardinality=1
 ---- DISTRIBUTEDPLAN
 DELETE FROM ICEBERG [functional_parquet.iceberg_v2_no_deletes-POSITION-DELETE]
@@ -20,6 +21,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_no_deletes-POSITION-DELETE]
 00:SCAN HDFS [functional_parquet.iceberg_v2_no_deletes]
    HDFS partitions=1/1 files=1 size=625B
    predicates: i = 3
+   Iceberg snapshot id: 728158873687794725
    row-size=24B cardinality=1
 ====
 DELETE FROM iceberg_v2_delete_positional where id = 15
@@ -35,11 +37,13 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE-01 functional_parquet.iceberg_v2_delete_positional-position-delete]
 |     HDFS partitions=1/1 files=1 size=1.54KB
+|     Iceberg snapshot id: 5725822353600261755
 |     row-size=182B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional]
    HDFS partitions=1/1 files=1 size=662B
    predicates: id = 15
+   Iceberg snapshot id: 5725822353600261755
    row-size=28B cardinality=1
 ---- DISTRIBUTEDPLAN
 DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
@@ -55,11 +59,13 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE-01 functional_parquet.iceberg_v2_delete_positional-position-delete]
 |     HDFS partitions=1/1 files=1 size=1.54KB
+|     Iceberg snapshot id: 5725822353600261755
 |     row-size=182B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional]
    HDFS partitions=1/1 files=1 size=662B
    predicates: id = 15
+   Iceberg snapshot id: 5725822353600261755
    row-size=28B cardinality=1
 ====
 DELETE FROM iceberg_v2_delete_positional
@@ -85,10 +91,12 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
 |  |
 |  |--04:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE-04 functional_parquet.iceberg_v2_delete_positional-position-delete]
 |  |     HDFS partitions=1/1 files=1 size=1.54KB
+|  |     Iceberg snapshot id: 5725822353600261755
 |  |     row-size=182B cardinality=1
 |  |
 |  03:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional]
 |     HDFS partitions=1/1 files=1 size=662B
+|     Iceberg snapshot id: 5725822353600261755
 |     row-size=28B cardinality=3
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
@@ -96,11 +104,13 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE-01 functional_parquet.iceberg_v2_delete_positional-position-delete]
 |     HDFS partitions=1/1 files=1 size=1.54KB
+|     Iceberg snapshot id: 5725822353600261755
 |     row-size=182B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional]
    HDFS partitions=1/1 files=1 size=662B
    runtime filters: RF000 -> id
+   Iceberg snapshot id: 5725822353600261755
    row-size=28B cardinality=3
 ---- DISTRIBUTEDPLAN
 DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
@@ -133,10 +143,12 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
 |  |  |
 |  |  04:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE-04 functional_parquet.iceberg_v2_delete_positional-position-delete]
 |  |     HDFS partitions=1/1 files=1 size=1.54KB
+|  |     Iceberg snapshot id: 5725822353600261755
 |  |     row-size=182B cardinality=1
 |  |
 |  03:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional]
 |     HDFS partitions=1/1 files=1 size=662B
+|     Iceberg snapshot id: 5725822353600261755
 |     row-size=28B cardinality=3
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
@@ -146,11 +158,13 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE-01 functional_parquet.iceberg_v2_delete_positional-position-delete]
 |     HDFS partitions=1/1 files=1 size=1.54KB
+|     Iceberg snapshot id: 5725822353600261755
 |     row-size=182B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional]
    HDFS partitions=1/1 files=1 size=662B
    runtime filters: RF000 -> id
+   Iceberg snapshot id: 5725822353600261755
    row-size=28B cardinality=3
 ====
 DELETE FROM iceberg_v2_delete_positional WHERE FILE__POSITION = id
@@ -166,11 +180,13 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE-01 functional_parquet.iceberg_v2_delete_positional-position-delete]
 |     HDFS partitions=1/1 files=1 size=1.54KB
+|     Iceberg snapshot id: 5725822353600261755
 |     row-size=182B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional]
    HDFS partitions=1/1 files=1 size=662B
    predicates: FILE__POSITION = id
+   Iceberg snapshot id: 5725822353600261755
    row-size=28B cardinality=1
 ---- DISTRIBUTEDPLAN
 DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
@@ -186,11 +202,13 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE-01 functional_parquet.iceberg_v2_delete_positional-position-delete]
 |     HDFS partitions=1/1 files=1 size=1.54KB
+|     Iceberg snapshot id: 5725822353600261755
 |     row-size=182B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional]
    HDFS partitions=1/1 files=1 size=662B
    predicates: FILE__POSITION = id
+   Iceberg snapshot id: 5725822353600261755
    row-size=28B cardinality=1
 ====
 delete from iceberg_v2_partitioned_position_deletes where id = 20;
@@ -206,11 +224,13 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
 |     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=3 size=3.48KB
    predicates: id = 20
+   Iceberg snapshot id: 8885697082976537578
    row-size=40B cardinality=2
 ---- DISTRIBUTEDPLAN
 DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
@@ -228,11 +248,13 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
 |     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=3 size=3.48KB
    predicates: id = 20
+   Iceberg snapshot id: 8885697082976537578
    row-size=40B cardinality=2
 ====
 delete from iceberg_v2_partitioned_position_deletes where action = 'click';
@@ -248,10 +270,12 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
 |     HDFS partitions=1/1 files=1 size=3.15KB
+|     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=3
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=1 size=1.15KB
+   Iceberg snapshot id: 8885697082976537578
    skipped Iceberg predicates: action = 'click'
    row-size=36B cardinality=6
 ---- DISTRIBUTEDPLAN
@@ -268,10 +292,12 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
 |     HDFS partitions=1/1 files=1 size=3.15KB
+|     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=3
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=1 size=1.15KB
+   Iceberg snapshot id: 8885697082976537578
    skipped Iceberg predicates: action = 'click'
    row-size=36B cardinality=6
 ====
@@ -288,11 +314,13 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
 |     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=3 size=3.48KB
    predicates: `user` LIKE 'A%'
+   Iceberg snapshot id: 8885697082976537578
    row-size=48B cardinality=2
 ---- DISTRIBUTEDPLAN
 DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
@@ -310,11 +338,13 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
 |     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=3 size=3.48KB
    predicates: `user` LIKE 'A%'
+   Iceberg snapshot id: 8885697082976537578
    row-size=48B cardinality=2
 ====
 delete from iceberg_v2_partitioned_position_deletes
@@ -340,10 +370,12 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |  |
 |  |--04:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE-04 functional_parquet.iceberg_v2_delete_positional-position-delete]
 |  |     HDFS partitions=1/1 files=1 size=1.54KB
+|  |     Iceberg snapshot id: 5725822353600261755
 |  |     row-size=182B cardinality=1
 |  |
 |  03:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional]
 |     HDFS partitions=1/1 files=1 size=662B
+|     Iceberg snapshot id: 5725822353600261755
 |     row-size=28B cardinality=3
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
@@ -351,11 +383,13 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
 |     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=3 size=3.48KB
    runtime filters: RF000 -> id
+   Iceberg snapshot id: 8885697082976537578
    row-size=40B cardinality=20
 ---- DISTRIBUTEDPLAN
 DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
@@ -390,10 +424,12 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |  |  |
 |  |  04:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE-04 functional_parquet.iceberg_v2_delete_positional-position-delete]
 |  |     HDFS partitions=1/1 files=1 size=1.54KB
+|  |     Iceberg snapshot id: 5725822353600261755
 |  |     row-size=182B cardinality=1
 |  |
 |  03:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional]
 |     HDFS partitions=1/1 files=1 size=662B
+|     Iceberg snapshot id: 5725822353600261755
 |     row-size=28B cardinality=3
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
@@ -403,11 +439,13 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
 |     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=3 size=3.48KB
    runtime filters: RF000 -> id
+   Iceberg snapshot id: 8885697082976537578
    row-size=40B cardinality=20
 ====
 DELETE FROM iceberg_v2_partitioned_position_deletes WHERE FILE__POSITION = id
@@ -423,11 +461,13 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
 |     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=3 size=3.48KB
    predicates: FILE__POSITION = id
+   Iceberg snapshot id: 8885697082976537578
    row-size=40B cardinality=2
 ---- DISTRIBUTEDPLAN
 DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
@@ -445,10 +485,12 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
 |     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=3 size=3.48KB
    predicates: FILE__POSITION = id
+   Iceberg snapshot id: 8885697082976537578
    row-size=40B cardinality=2
 ====

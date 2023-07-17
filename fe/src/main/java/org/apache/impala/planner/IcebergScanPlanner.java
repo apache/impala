@@ -129,6 +129,8 @@ public class IcebergScanPlanner {
   private long dataFilesWithDeletesMaxPath_ = 0;
   private Set<Long> equalityDeleteSequenceNumbers_ = new HashSet<>();
 
+  private final long snapshotId_;
+
   public IcebergScanPlanner(Analyzer analyzer, PlannerContext ctx,
       TableRef iceTblRef, List<Expr> conjuncts, MultiAggregateInfo aggInfo)
       throws ImpalaException {
@@ -140,6 +142,7 @@ public class IcebergScanPlanner {
     conjuncts_ = conjuncts;
     aggInfo_ = aggInfo;
     extractIcebergConjuncts();
+    snapshotId_ = IcebergUtil.getSnapshotId(getIceTable(), tblRef_.getTimeTravelSpec());
   }
 
   public PlanNode createIcebergScanPlan() throws ImpalaException {
@@ -187,7 +190,7 @@ public class IcebergScanPlanner {
       Preconditions.checkState(dataFilesWithDeletes_.isEmpty());
       PlanNode ret = new IcebergScanNode(ctx_.getNextNodeId(), tblRef_, conjuncts_,
           aggInfo_, dataFilesWithoutDeletes_, nonIdentityConjuncts_,
-          getSkippedConjuncts());
+          getSkippedConjuncts(), snapshotId_);
       ret.init(analyzer_);
       return ret;
     }
@@ -211,7 +214,7 @@ public class IcebergScanPlanner {
     // can just create a SCAN node for these and do a UNION ALL with the ANTI JOIN.
     IcebergScanNode dataScanNode = new IcebergScanNode(
         ctx_.getNextNodeId(), tblRef_, conjuncts_, aggInfo_, dataFilesWithoutDeletes_,
-        nonIdentityConjuncts_, getSkippedConjuncts());
+        nonIdentityConjuncts_, getSkippedConjuncts(), snapshotId_);
     dataScanNode.init(analyzer_);
     List<Expr> outputExprs = tblRef_.getDesc().getSlots().stream().map(
         SlotRef::new).collect(Collectors.toList());
@@ -246,7 +249,7 @@ public class IcebergScanPlanner {
     addDeletePositionSlots(deleteDeltaRef);
     IcebergScanNode dataScanNode = new IcebergScanNode(
         dataScanNodeId, tblRef_, conjuncts_, aggInfo_, dataFilesWithDeletes_,
-        nonIdentityConjuncts_, getSkippedConjuncts(), deleteScanNodeId);
+        nonIdentityConjuncts_, getSkippedConjuncts(), deleteScanNodeId, snapshotId_);
     dataScanNode.init(analyzer_);
     IcebergScanNode deleteScanNode = new IcebergScanNode(
         deleteScanNodeId,
@@ -255,7 +258,8 @@ public class IcebergScanPlanner {
         aggInfo_,
         Lists.newArrayList(positionDeleteFiles_),
         Collections.emptyList(), /*nonIdentityConjuncts*/
-        Collections.emptyList()); /*skippedConjuncts*/
+        Collections.emptyList(), /*skippedConjuncts*/
+        snapshotId_);
     deleteScanNode.init(analyzer_);
 
     // Now let's create the JOIN node
@@ -435,7 +439,7 @@ public class IcebergScanPlanner {
       PlanNodeId dataScanNodeId = ctx_.getNextNodeId();
       IcebergScanNode dataScanNode = new IcebergScanNode(
           dataScanNodeId, tblRef_, conjuncts_, aggInfo_, dataFilesWithDeletes_,
-          nonIdentityConjuncts_, getSkippedConjuncts());
+          nonIdentityConjuncts_, getSkippedConjuncts(), snapshotId_);
       addSlotsForEqualityDelete(equalityIds_, tblRef_);
       dataScanNode.init(analyzer_);
 
@@ -464,7 +468,8 @@ public class IcebergScanPlanner {
         aggInfo_,
         Lists.newArrayList(equalityDeleteFiles_),
         Collections.emptyList(), /*nonIdentityConjuncts*/
-        Collections.emptyList()); /*skippedConjuncts*/
+        Collections.emptyList(), /*skippedConjuncts*/
+        snapshotId_);
     deleteScanNode.init(analyzer_);
 
     Pair<List<BinaryPredicate>, List<Expr>> equalityJoinConjuncts =

@@ -8,6 +8,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=6 size=6.97KB
    predicates: `user` = 'Lisa', action = 'download'
+   Iceberg snapshot id: 8270633197658268308
    row-size=24B cardinality=1
 ====
 # If no residual expression remain after Iceberg's planning, all partition-based
@@ -18,6 +19,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=6 size=6.97KB
+   Iceberg snapshot id: 8270633197658268308
    skipped Iceberg predicates: action = 'download'
    row-size=44B cardinality=6
 ====
@@ -27,6 +29,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
    HDFS partitions=1/1 files=6 size=6.97KB
+   Iceberg snapshot id: 8270633197658268308
    skipped Iceberg predicates: action = 'download', event_time < TIMESTAMP '2022-01-01 00:00:00'
    row-size=44B cardinality=1
 ====

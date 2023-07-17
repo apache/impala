@@ -965,7 +965,8 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = defaultQueryOptions();
     runPlannerTestFile("tablesample", options,
         ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
-            PlannerTestOption.DO_NOT_VALIDATE_ROWCOUNT_ESTIMATION_FOR_PARTITIONS));
+            PlannerTestOption.DO_NOT_VALIDATE_ROWCOUNT_ESTIMATION_FOR_PARTITIONS,
+            PlannerTestOption.VALIDATE_ICEBERG_SNAPSHOT_IDS));
   }
 
   @Test
@@ -1283,7 +1284,8 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions queryOptions = new TQueryOptions();
     queryOptions.setIceberg_predicate_pushdown_subsetting(false);
     runPlannerTestFile("iceberg-predicates-disabled-subsetting", "functional_parquet",
-        queryOptions, ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+        queryOptions, ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY,
+            PlannerTestOption.VALIDATE_ICEBERG_SNAPSHOT_IDS));
   }
 
   /**
@@ -1291,8 +1293,11 @@ public class PlannerTest extends PlannerTestBase {
    */
   @Test
   public void testIcebergV2TableScans() {
-    runPlannerTestFile("iceberg-v2-tables", "functional_parquet",
-        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+    TQueryOptions options = defaultQueryOptions();
+    options.setTimezone("UTC");
+    runPlannerTestFile("iceberg-v2-tables", "functional_parquet", options,
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY,
+            PlannerTestOption.VALIDATE_ICEBERG_SNAPSHOT_IDS));
   }
 
   /**
@@ -1303,7 +1308,8 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = defaultQueryOptions();
     options.setDisable_optimized_iceberg_v2_read(true);
     runPlannerTestFile("iceberg-v2-tables-hash-join", "functional_parquet", options,
-        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY,
+            PlannerTestOption.VALIDATE_ICEBERG_SNAPSHOT_IDS));
   }
 
   /**
@@ -1312,7 +1318,8 @@ public class PlannerTest extends PlannerTestBase {
   @Test
   public void testIcebergV2Delete() {
     runPlannerTestFile("iceberg-v2-delete", "functional_parquet",
-        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY,
+            PlannerTestOption.VALIDATE_ICEBERG_SNAPSHOT_IDS));
   }
 
   @Test

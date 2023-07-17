@@ -590,6 +590,9 @@ public class PlannerTestBase extends FrontendTestBase {
               PlannerTestOption.DO_NOT_VALIDATE_ROWCOUNT_ESTIMATION_FOR_PARTITIONS)) {
         resultFilters.add(TestUtils.PARTITIONS_FILTER);
       }
+      if (!testOptions.contains(PlannerTestOption.VALIDATE_ICEBERG_SNAPSHOT_IDS)) {
+        resultFilters.add(TestUtils.ICEBERG_SNAPSHOT_ID_FILTER);
+      }
 
       String planDiff = TestUtils.compareOutput(
           Lists.newArrayList(explainStr.split("\n")), expectedPlan, true, resultFilters);
@@ -910,7 +913,11 @@ public class PlannerTestBase extends FrontendTestBase {
     DISABLE_HDFS_NUM_ROWS_ESTIMATE,
     // If set, make no attempt to validate the estimated number of rows for any
     // partitions in an hdfs table.
-    DO_NOT_VALIDATE_ROWCOUNT_ESTIMATION_FOR_PARTITIONS
+    DO_NOT_VALIDATE_ROWCOUNT_ESTIMATION_FOR_PARTITIONS,
+    // Verify that the snapshot ids in the plan match to the expected values. We
+    // can only do this for tests that operate on pre-written Iceberg tables,
+    // e.g. functional_parquet.iceberg_partitioned.
+    VALIDATE_ICEBERG_SNAPSHOT_IDS
   }
 
   protected void runPlannerTestFile(String testFile, TQueryOptions options) {

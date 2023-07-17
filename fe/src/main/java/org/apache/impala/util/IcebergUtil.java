@@ -646,6 +646,12 @@ public class IcebergUtil {
     }
   }
 
+  public static long getSnapshotId(FeIcebergTable table, TimeTravelSpec timeTravelSpec) {
+    if (timeTravelSpec == null) return table.snapshotId();
+    TableScan scan = createScanAsOf(table, timeTravelSpec);
+    return scan.snapshot().snapshotId();
+  }
+
   private static TableScan createScanAsOf(FeIcebergTable table,
       TimeTravelSpec timeTravelSpec) {
     TableScan scan = table.getIcebergApiTable().newScan();

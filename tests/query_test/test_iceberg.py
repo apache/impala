@@ -462,6 +462,12 @@ class TestIcebergTable(IcebergTestSuite):
           "select count(*) from {0} for system_time as of {1}".format(tbl_name, ts),
           expected)
 
+    def expect_snapshot_id_in_plan_t(ts, snapshot_id):
+      data = impalad_client.execute(
+        "explain select * from {0} for system_time as of {1}".format(
+          tbl_name, ts))
+      assert "   Iceberg snapshot id: {0}".format(snapshot_id) in data.data
+
     def expect_results_v(snapshot_id, expected_results, expected_cols):
       expect_results(
           "select * from {0} for system_version as of {1}".format(tbl_name, snapshot_id),
@@ -472,6 +478,13 @@ class TestIcebergTable(IcebergTestSuite):
           "select count(*) from {0} for system_version as of {1}".format(
               tbl_name, snapshot_id),
           expected)
+
+    def expect_snapshot_id_in_plan_v(snapshot_id):
+      data = impalad_client.execute(
+        "explain select * from {0} for system_version as of {1}".format(
+          tbl_name, snapshot_id))
+      assert "   Iceberg snapshot id: {0}".format(snapshot_id) in data.data
+
 
     def impala_now():
       now_data = impalad_client.execute("select now()")
@@ -539,6 +552,18 @@ class TestIcebergTable(IcebergTestSuite):
       expect_results_v(snapshots[2].get_snapshot_id(), [], i_cols)
       expect_results_v(snapshots[3].get_snapshot_id(), ['100'], i_cols)
       expect_results_v(snapshots[4].get_snapshot_id(), ['100\tNULL', '3\t103'], ij_cols)
+
+      expect_snapshot_id_in_plan_v(snapshots[0].get_snapshot_id())
+      expect_snapshot_id_in_plan_v(snapshots[1].get_snapshot_id())
+      expect_snapshot_id_in_plan_v(snapshots[2].get_snapshot_id())
+      expect_snapshot_id_in_plan_v(snapshots[3].get_snapshot_id())
+      expect_snapshot_id_in_plan_v(snapshots[4].get_snapshot_id())
+
+      expect_snapshot_id_in_plan_t(quote(ts_1), snapshots[0].get_snapshot_id())
+      expect_snapshot_id_in_plan_t(quote(ts_2), snapshots[1].get_snapshot_id())
+      expect_snapshot_id_in_plan_t(quote(ts_3), snapshots[2].get_snapshot_id())
+      expect_snapshot_id_in_plan_t(quote(ts_4), snapshots[3].get_snapshot_id())
+      expect_snapshot_id_in_plan_t(quote(ts_5), snapshots[4].get_snapshot_id())
 
       # Test of plain count star optimization
       # 'NumRowGroups' and 'NumFileMetadataRead' should not appear in profile
