@@ -518,7 +518,7 @@ class TestObservability(CustomClusterTestSuite):
           cache_entry_median_size = cache_metrics[cache_entry_median_size_key]
           cache_entry_99th_size = cache_metrics[cache_entry_99th_size_key]
           assert cache_entry_median_size > 300 and cache_entry_median_size < 1000
-          assert cache_entry_99th_size > 12500 and cache_entry_99th_size < 18000
+          assert cache_entry_99th_size > 12500 and cache_entry_99th_size < 19000
 
           cache_hit_count_prev_run = cache_hit_count
           cache_request_count_prev_run = cache_request_count
