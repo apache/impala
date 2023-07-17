@@ -17,9 +17,10 @@
 # under the License.
 #
 
-import six
 import datetime
 import os.path
+import sys
+
 from six.moves import http_cookies
 
 
@@ -56,7 +57,12 @@ def get_all_matching_cookies(cookie_names, path, resp_headers):
 
   cookies = http_cookies.SimpleCookie()
   try:
-    cookies.load(resp_headers['Set-Cookie'])
+    if sys.version_info.major == 2:
+      cookies.load(resp_headers['Set-Cookie'])
+    else:
+      cookie_headers = resp_headers.get_all('Set-Cookie')
+      for header in cookie_headers:
+        cookies.load(header)
   except Exception:
     return None
 
