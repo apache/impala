@@ -29,6 +29,7 @@ from subprocess import check_call
 
 from getpass import getuser
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.file_utils import copy_files_to_hdfs_dir
 from tests.common.skip import SkipIfFS, SkipIfHive2, SkipIf
 from tests.common.test_dimensions import (create_client_protocol_dimension,
     create_exec_option_dimension, create_orc_dimension)
@@ -75,6 +76,152 @@ class TestRanger(CustomClusterTestSuite):
     """Tests grant/revoke with catalog v1."""
     self._test_grant_revoke(unique_name, [None, "invalidate metadata",
                                           "refresh authorization"])
+
+  @pytest.mark.execute_serially
+  @SkipIfFS.hdfs_acls
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_insert_with_catalog_v1(self, unique_name):
+    """
+    Test that when Ranger is the authorization provider in the legacy catalog mode,
+    Impala does not throw an AnalysisException when an authorized user tries to execute
+    an INSERT query against a partitioned table of which the respective table path and
+    the partition path are not writable according to HDFS permission.
+    """
+    user = getuser()
+    admin_client = self.create_impala_client()
+    unique_database = unique_name + "_db"
+    unique_table = unique_name + "_tbl"
+    partition_column = "year"
+    partition_value = "2008"
+    table_path = "test-warehouse/{0}.db/{1}".format(unique_database, unique_table)
+    table_partition_path = "{0}/{1}={2}"\
+        .format(table_path, partition_column, partition_value)
+    insert_statement = "insert into {0}.{1} (name) partition ({2}) " \
+        "values (\"Adam\", {3})".format(unique_database, unique_table, partition_column,
+        partition_value)
+    authz_err = "AuthorizationException: User '{0}' does not have privileges to " \
+        "execute 'INSERT' on: {1}.{2}".format(user, unique_database, unique_table)
+    try:
+      admin_client.execute("drop database if exists {0} cascade"
+          .format(unique_database), user=ADMIN)
+      admin_client.execute("create database {0}".format(unique_database), user=ADMIN)
+      admin_client.execute("create table {0}.{1} (name string) partitioned by ({2} int)"
+          .format(unique_database, unique_table, partition_column), user=ADMIN)
+      admin_client.execute("alter table {0}.{1} add partition ({2}={3})"
+          .format(unique_database, unique_table, partition_column, partition_value),
+          user=ADMIN)
+
+      # Change the owner user and group of the HDFS paths corresponding to the table and
+      # the partition so that according to Impala's FsPermissionChecker, the table is not
+      # writable to the user that loads the table. This user usually is the one
+      # representing the Impala service. Before IMPALA-11871, changing either the table
+      # path or the partition path to non-writable would result in an AnalysisException.
+      self.hdfs_client.chown(table_path, "another_user", "another_group")
+      self.hdfs_client.chown(table_partition_path, "another_user", "another_group")
+      # Invalidate the table metadata to force the catalog server to reload the HDFS
+      # table and the related partition(s).
+      admin_client.execute("invalidate metadata {0}.{1}"
+          .format(unique_database, unique_table), user=ADMIN)
+
+      # Verify that the INSERT statement fails with AuthorizationException because the
+      # requesting user does not have the INSERT privilege on the table.
+      result = self._run_query_as_user(insert_statement, user, False)
+      assert authz_err in str(result)
+
+      admin_client.execute("grant insert on table {0}.{1} to user {2}"
+          .format(unique_database, unique_table, user), user=ADMIN)
+      # Verify that the INSERT statement succeeds without AnalysisException.
+      self._run_query_as_user(insert_statement, user, True)
+    finally:
+      admin_client.execute("revoke insert on table {0}.{1} from user {2}"
+          .format(unique_database, unique_table, user))
+      admin_client.execute("drop database if exists {0} cascade"
+          .format(unique_database), user=ADMIN)
+
+  @pytest.mark.execute_serially
+  @SkipIfFS.hdfs_acls
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_load_data_with_catalog_v1(self, unique_name):
+    """
+    Test that when Ranger is the authorization provider in the legacy catalog mode,
+    Impala does not throw an AnalysisException when an authorized user tries to execute
+    a LOAD DATA query against a table partition of which the respective partition path is
+    not writable according to Impala's FsPermissionChecker.
+    """
+    user = getuser()
+    admin_client = self.create_impala_client()
+    unique_database = unique_name + "_db"
+    unique_table = unique_name + "_tbl"
+    partition_column = "year"
+    partition_value = "2008"
+    destination_table_path = "test-warehouse/{0}.db/{1}" \
+        .format(unique_database, unique_table, )
+    destination_table_partition_path = "{0}/{1}={2}"\
+        .format(destination_table_path, partition_column, partition_value)
+    file_name = "load_data_with_catalog_v1.txt"
+    files_for_table = ["testdata/data/{0}".format(file_name)]
+    source_hdfs_dir = "/tmp"
+    load_data_statement = "load data inpath '{0}/{1}' into table {2}.{3} " \
+        "partition ({4}={5})".format(source_hdfs_dir, file_name, unique_database,
+        unique_table, partition_column, partition_value)
+    authz_err = "AuthorizationException: User '{0}' does not have privileges to " \
+        "execute 'INSERT' on: {1}.{2}".format(user, unique_database, unique_table)
+    try:
+      admin_client.execute("drop database if exists {0} cascade"
+          .format(unique_database), user=ADMIN)
+      admin_client.execute("create database {0}".format(unique_database), user=ADMIN)
+      copy_files_to_hdfs_dir(files_for_table, source_hdfs_dir)
+      admin_client.execute("create table {0}.{1} (name string) partitioned by ({2} int) "
+          "row format delimited fields terminated by ',' "
+          "stored as textfile".format(unique_database, unique_table, partition_column),
+          user=ADMIN)
+      # We need to add the partition. Otherwise, the LOAD DATA statement can't create new
+      # partitions.
+      admin_client.execute("alter table {0}.{1} add partition ({2}={3})"
+          .format(unique_database, unique_table, partition_column, partition_value),
+          user=ADMIN)
+
+      # Change the permissions of the HDFS path of the destination table partition.
+      # Before IMPALA-11871, even we changed the table path to non-writable, loading
+      # data into the partition was still allowed if the destination partition path
+      # was writable according to Impala's FsPermissionChecker. But if the destination
+      # partition path was not writable, an AnalysisException would be thrown.
+      self.hdfs_client.chown(destination_table_partition_path, "another_user",
+          "another_group")
+      # Invalidate the table metadata to force the catalog server to reload the HDFS
+      # table and the related partition(s).
+      admin_client.execute("invalidate metadata {0}.{1}"
+          .format(unique_database, unique_table), user=ADMIN)
+
+      # To execute the LOAD DATA statement, a user has to be granted the ALL privilege
+      # on the source HDFS path and the INSERT privilege on the destination table.
+      # The following verifies the LOAD DATA statement fails with AuthorizationException
+      # due to insufficient privileges.
+      result = self._run_query_as_user(load_data_statement, user, False)
+      assert authz_err in str(result)
+
+      admin_client.execute("grant all on uri '{0}/{1}' to user {2}"
+          .format(source_hdfs_dir, file_name, user), user=ADMIN)
+      # The following verifies the ALL privilege on the source file alone is not
+      # sufficient to execute the LOAD DATA statement.
+      result = self._run_query_as_user(load_data_statement, user, False)
+      assert authz_err in str(result)
+
+      admin_client.execute("grant insert on table {0}.{1} to user {2}"
+          .format(unique_database, unique_table, user), user=ADMIN)
+      # Verify the LOAD DATA statement fails without AnalysisException.
+      self._run_query_as_user(load_data_statement, user, True)
+    finally:
+      admin_client.execute("revoke all on uri '{0}/{1}' from user {2}"
+          .format(source_hdfs_dir, file_name, user), user=ADMIN)
+      admin_client.execute("revoke insert on table {0}.{1} from user {2}"
+          .format(unique_database, unique_table, user), user=ADMIN)
+      admin_client.execute("drop database if exists {0} cascade"
+          .format(unique_database), user=ADMIN)
+      self.filesystem_client.delete_file_dir("{0}/{1}"
+          .format(source_hdfs_dir, file_name))
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

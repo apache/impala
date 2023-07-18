@@ -843,7 +843,7 @@ public class HdfsTable extends Table implements FeFsTable {
    * permissions Impala has on the given path. If the path does not exist, recurses up
    * the path until a existing parent directory is found, and inherit access permissions
    * from that.
-   * Always returns READ_WRITE for S3, ADLS, GCS and COS files.
+   * Always returns READ_WRITE for S3, ADLS, GCS, COS files, and Ranger-enabled HDFS.
    */
   private static TAccessLevel getAvailableAccessLevel(String tableName,
       Path location, FsPermissionCache permCache) throws IOException {
@@ -880,6 +880,18 @@ public class HdfsTable extends Table implements FeFsTable {
     // Avoid loading permissions in local catalog mode since they are not used in
     // LocalFsTable. Remove this once we resolve IMPALA-7539.
     if (BackendConfig.INSTANCE.isMinimalTopicMode()) return true;
+
+    // Authorization on Ranger-enabled HDFS can be managed via the HDFS policy
+    // repository, and thus it is possible to check the existence of necessary
+    // permissions via RPC to the Hadoop NameNode, or Ranger REST API. Before
+    // IMPALA-12994 is resolved, we assume the Impala service user has the READ_WRITE
+    // permission on all HDFS files in the case when Ranger is enabled in Impala.
+    // This also avoids significant overhead when the number of table partitions gets
+    // bigger.
+    if (FileSystemUtil.isDistributedFileSystem(fs) &&
+        BackendConfig.INSTANCE.getAuthorizationProvider().equalsIgnoreCase("ranger")) {
+      return true;
+    }
 
     // Avoid calling getPermissions() on file path for S3 files, as that makes a round
     // trip to S3. Also, the S3A connector is currently unable to manage S3 permissions,
