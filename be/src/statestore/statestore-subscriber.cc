@@ -326,8 +326,8 @@ StatestoreSubscriber::StatestoreStub::StatestoreStub(StatestoreSubscriber* subsc
       "statestore-subscriber.registration-id", "N/A");
   statestore_id_metric_ = metrics_->AddProperty<string>(
       "statestore-subscriber.statestore-id", "N/A");
-  update_catalogd_metric_ = metrics_->AddCounter(
-      "statestore-subscriber.num-update-catalogd", 0);
+  update_catalogd_rpc_metric_ = metrics_->AddCounter(
+      "statestore-subscriber.num-update-catalogd-rpc", 0);
   re_registr_attempt_metric_ = metrics_->AddCounter(
       "statestore-subscriber.num-re-register-attempt", 0);
 }
@@ -641,7 +641,7 @@ void StatestoreSubscriber::StatestoreStub::Heartbeat(
 void StatestoreSubscriber::StatestoreStub::UpdateCatalogd(
     const TCatalogRegistration& catalogd_registration,
     const RegistrationId& registration_id, int64 sequence) {
-  update_catalogd_metric_->Increment(1);
+  update_catalogd_rpc_metric_->Increment(1);
   const Status& status =
       CheckRegistrationIdAndUpdateCatalogdSeq(registration_id, sequence);
   if (status.ok()) {

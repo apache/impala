@@ -64,8 +64,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
     assert(len(catalogds) == 2)
     catalogd_service_1 = catalogds[0].service
     catalogd_service_2 = catalogds[1].service
-    assert(catalogd_service_1.get_metric_value("catalog-server.ha-active-status"))
-    assert(not catalogd_service_2.get_metric_value("catalog-server.ha-active-status"))
+    assert(catalogd_service_1.get_metric_value("catalog-server.active-status"))
+    assert(not catalogd_service_2.get_metric_value("catalog-server.active-status"))
 
     # Verify ports of the active catalogd of statestore and impalad are matching with
     # the catalog service port of the current active catalogd.
@@ -94,7 +94,7 @@ class TestCatalogdHA(CustomClusterTestSuite):
     catalogds = self.cluster.catalogds()
     assert(len(catalogds) == 1)
     catalogd_service_1 = catalogds[0].service
-    assert(catalogd_service_1.get_metric_value("catalog-server.ha-active-status"))
+    assert(catalogd_service_1.get_metric_value("catalog-server.active-status"))
 
     # Verify ports of the active catalogd of statestore and impalad are matching with
     # the catalog service port of the current active catalogd.
@@ -106,11 +106,7 @@ class TestCatalogdHA(CustomClusterTestSuite):
     self.execute_query_expect_success(
         self.client, "select count(*) from functional.alltypes")
 
-  @CustomClusterTestSuite.with_args(
-    statestored_args="--use_subscriber_id_as_catalogd_priority=true "
-                     "--statestore_heartbeat_frequency_ms=1000",
-    start_args="--enable_catalogd_ha")
-  def test_catalogd_auto_failover(self):
+  def __test_catalogd_auto_failover(self):
     """Stop active catalogd and verify standby catalogd becomes active.
     Restart original active catalogd. Verify that statestore does not resume its
     active role."""
@@ -119,8 +115,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
     assert(len(catalogds) == 2)
     catalogd_service_1 = catalogds[0].service
     catalogd_service_2 = catalogds[1].service
-    assert(catalogd_service_1.get_metric_value("catalog-server.ha-active-status"))
-    assert(not catalogd_service_2.get_metric_value("catalog-server.ha-active-status"))
+    assert(catalogd_service_1.get_metric_value("catalog-server.active-status"))
+    assert(not catalogd_service_2.get_metric_value("catalog-server.active-status"))
 
     statestore_service = self.cluster.statestored.service
     start_count_clear_topic_entries = statestore_service.get_metric_value(
@@ -132,10 +128,10 @@ class TestCatalogdHA(CustomClusterTestSuite):
     # Wait for long enough for the statestore to detect the failure of active catalogd
     # and assign active role to standby catalogd.
     catalogd_service_2.wait_for_metric_value(
-        "catalog-server.ha-active-status", expected_value=True, timeout=30)
+        "catalog-server.active-status", expected_value=True, timeout=30)
     assert(catalogd_service_2.get_metric_value(
         "catalog-server.ha-number-active-status-change") > 0)
-    assert(catalogd_service_2.get_metric_value("catalog-server.ha-active-status"))
+    assert(catalogd_service_2.get_metric_value("catalog-server.active-status"))
 
     # Verify ports of the active catalogd of statestore and impalad are matching with
     # the catalog service port of the current active catalogd.
@@ -156,8 +152,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
     catalogds[0].start(wait_until_ready=True)
     sleep(1)
     catalogd_service_1 = catalogds[0].service
-    assert(not catalogd_service_1.get_metric_value("catalog-server.ha-active-status"))
-    assert(catalogd_service_2.get_metric_value("catalog-server.ha-active-status"))
+    assert(not catalogd_service_1.get_metric_value("catalog-server.active-status"))
+    assert(catalogd_service_2.get_metric_value("catalog-server.active-status"))
 
     # Verify ports of the active catalogd of statestore and impalad are matching with
     # the catalog service port of the current active catalogd.
@@ -170,7 +166,36 @@ class TestCatalogdHA(CustomClusterTestSuite):
     statestored_args="--use_subscriber_id_as_catalogd_priority=true "
                      "--statestore_heartbeat_frequency_ms=1000",
     start_args="--enable_catalogd_ha")
-  def test_catalogd_manual_failover(self):
+  def test_catalogd_auto_failover(self):
+    """Tests for Catalog Service auto fail over without failed RPCs."""
+    self.__test_catalogd_auto_failover()
+
+    statestore_service = self.cluster.statestored.service
+    successful_update_catalogd_rpc_num = statestore_service.get_metric_value(
+        "statestore.num-successful-update-catalogd-rpc")
+    failed_update_catalogd_rpc_num = statestore_service.get_metric_value(
+        "statestore.num-failed-update-catalogd-rpc")
+    assert(successful_update_catalogd_rpc_num >= 6)
+    assert(failed_update_catalogd_rpc_num == 0)
+
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--use_subscriber_id_as_catalogd_priority=true "
+                     "--statestore_heartbeat_frequency_ms=1000 "
+                     "--debug_actions=SEND_UPDATE_CATALOGD_RPC_FIRST_ATTEMPT:FAIL@1.0",
+    start_args="--enable_catalogd_ha")
+  def test_catalogd_auto_failover_with_failed_rpc(self):
+    """Tests for Catalog Service auto fail over with failed RPCs."""
+    self.__test_catalogd_auto_failover()
+
+    statestore_service = self.cluster.statestored.service
+    successful_update_catalogd_rpc_num = statestore_service.get_metric_value(
+        "statestore.num-successful-update-catalogd-rpc")
+    failed_update_catalogd_rpc_num = statestore_service.get_metric_value(
+        "statestore.num-failed-update-catalogd-rpc")
+    assert(successful_update_catalogd_rpc_num >= 6)
+    assert(failed_update_catalogd_rpc_num == successful_update_catalogd_rpc_num)
+
+  def __test_catalogd_manual_failover(self):
     """Stop active catalogd and verify standby catalogd becomes active.
     Restart original active catalogd with force_catalogd_active as true. Verify that
     statestore resume it as active.
@@ -180,8 +205,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
     assert(len(catalogds) == 2)
     catalogd_service_1 = catalogds[0].service
     catalogd_service_2 = catalogds[1].service
-    assert(catalogd_service_1.get_metric_value("catalog-server.ha-active-status"))
-    assert(not catalogd_service_2.get_metric_value("catalog-server.ha-active-status"))
+    assert(catalogd_service_1.get_metric_value("catalog-server.active-status"))
+    assert(not catalogd_service_2.get_metric_value("catalog-server.active-status"))
 
     statestore_service = self.cluster.statestored.service
     start_count_clear_topic_entries = statestore_service.get_metric_value(
@@ -193,10 +218,10 @@ class TestCatalogdHA(CustomClusterTestSuite):
     # Wait for long enough for the statestore to detect the failure of active catalogd
     # and assign active role to standby catalogd.
     catalogd_service_2.wait_for_metric_value(
-        "catalog-server.ha-active-status", expected_value=True, timeout=30)
+        "catalog-server.active-status", expected_value=True, timeout=30)
     assert(catalogd_service_2.get_metric_value(
         "catalog-server.ha-number-active-status-change") > 0)
-    assert(catalogd_service_2.get_metric_value("catalog-server.ha-active-status"))
+    assert(catalogd_service_2.get_metric_value("catalog-server.active-status"))
 
     # Verify ports of the active catalogd of statestore and impalad are matching with
     # the catalog service port of the current active catalogd.
@@ -220,11 +245,11 @@ class TestCatalogdHA(CustomClusterTestSuite):
                        additional_args="--force_catalogd_active=true")
     catalogd_service_1 = catalogds[0].service
     catalogd_service_1.wait_for_metric_value(
-        "catalog-server.ha-active-status", expected_value=True, timeout=15)
-    assert(catalogd_service_1.get_metric_value("catalog-server.ha-active-status"))
+        "catalog-server.active-status", expected_value=True, timeout=15)
+    assert(catalogd_service_1.get_metric_value("catalog-server.active-status"))
     sleep_time_s = build_flavor_timeout(2, slow_build_timeout=5)
     sleep(sleep_time_s)
-    assert(not catalogd_service_2.get_metric_value("catalog-server.ha-active-status"))
+    assert(not catalogd_service_2.get_metric_value("catalog-server.active-status"))
 
     # Verify ports of the active catalogd of statestore and impalad are matching with
     # the catalog service port of the current active catalogd.
@@ -238,6 +263,39 @@ class TestCatalogdHA(CustomClusterTestSuite):
     assert end_count_clear_topic_entries > start_count_clear_topic_entries
 
   @CustomClusterTestSuite.with_args(
+    statestored_args="--use_subscriber_id_as_catalogd_priority=true "
+                     "--statestore_heartbeat_frequency_ms=1000",
+    start_args="--enable_catalogd_ha")
+  def test_catalogd_manual_failover(self):
+    """Tests for Catalog Service manual fail over without failed RPCs."""
+    self.__test_catalogd_manual_failover()
+
+    statestore_service = self.cluster.statestored.service
+    successful_update_catalogd_rpc_num = statestore_service.get_metric_value(
+        "statestore.num-successful-update-catalogd-rpc")
+    failed_update_catalogd_rpc_num = statestore_service.get_metric_value(
+        "statestore.num-failed-update-catalogd-rpc")
+    assert(successful_update_catalogd_rpc_num >= 10)
+    assert(failed_update_catalogd_rpc_num == 0)
+
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--use_subscriber_id_as_catalogd_priority=true "
+                     "--statestore_heartbeat_frequency_ms=1000 "
+                     "--debug_actions=SEND_UPDATE_CATALOGD_RPC_FIRST_ATTEMPT:FAIL@1.0",
+    start_args="--enable_catalogd_ha")
+  def test_catalogd_manual_failover_with_failed_rpc(self):
+    """Tests for Catalog Service manual fail over with failed RPCs."""
+    self.__test_catalogd_manual_failover()
+
+    statestore_service = self.cluster.statestored.service
+    successful_update_catalogd_rpc_num = statestore_service.get_metric_value(
+        "statestore.num-successful-update-catalogd-rpc")
+    failed_update_catalogd_rpc_num = statestore_service.get_metric_value(
+        "statestore.num-failed-update-catalogd-rpc")
+    assert(successful_update_catalogd_rpc_num >= 10)
+    assert(failed_update_catalogd_rpc_num == successful_update_catalogd_rpc_num)
+
+  @CustomClusterTestSuite.with_args(
     statestored_args="--use_subscriber_id_as_catalogd_priority=true",
     start_args="--enable_catalogd_ha")
   def test_restart_statestore(self):
@@ -248,8 +306,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
     assert(len(catalogds) == 2)
     catalogd_service_1 = catalogds[0].service
     catalogd_service_2 = catalogds[1].service
-    assert(catalogd_service_1.get_metric_value("catalog-server.ha-active-status"))
-    assert(not catalogd_service_2.get_metric_value("catalog-server.ha-active-status"))
+    assert(catalogd_service_1.get_metric_value("catalog-server.active-status"))
+    assert(not catalogd_service_2.get_metric_value("catalog-server.active-status"))
 
     # Verify ports of the active catalogd of statestore and impalad are matching with
     # the catalog service port of the current active catalogd.
@@ -266,8 +324,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
         expected_value=5, timeout=wait_time_s)
     sleep_time_s = build_flavor_timeout(2, slow_build_timeout=5)
     sleep(sleep_time_s)
-    assert(catalogd_service_1.get_metric_value("catalog-server.ha-active-status"))
-    assert(not catalogd_service_2.get_metric_value("catalog-server.ha-active-status"))
+    assert(catalogd_service_1.get_metric_value("catalog-server.active-status"))
+    assert(not catalogd_service_2.get_metric_value("catalog-server.active-status"))
 
     # Verify ports of the active catalogd of statestore and impalad are matching with
     # the catalog service port of the current active catalogd.

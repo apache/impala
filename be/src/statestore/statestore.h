@@ -672,8 +672,12 @@ class Statestore : public CacheLineAligned {
   /// Same as above, but for SendHeartbeat() RPCs.
   StatsMetric<double>* heartbeat_duration_metric_;
 
-  /// Metric to count the total number of UpdateCatalogd RPCs sent by statestore.
-  IntCounter* update_catalogd_metric_;
+  /// Metric to count the total number of successful UpdateCatalogd RPCs sent by
+  /// statestore.
+  IntCounter* successful_update_catalogd_rpc_metric_;
+
+  /// Metric to count the total number of failed UpdateCatalogd RPCs sent by statestore.
+  IntCounter* failed_update_catalogd_rpc_metric_;
 
   /// Metric to count the total number of requests for clearing topic entries from
   /// catalogd. Catalogd indicates to clear topic entries when it is restarted or its
@@ -796,7 +800,8 @@ class Statestore : public CacheLineAligned {
   [[noreturn]] void MonitorUpdateCatalogd();
 
   /// Send notification of updating catalogd to the coordinators.
-  void SendUpdateCatalogdNotification();
+  void SendUpdateCatalogdNotification(int64* last_sending_sequence,
+      vector<std::shared_ptr<Subscriber>>& receivers);
 
   /// Raw callback to indicate whether the service is ready.
   void HealthzHandler(const Webserver::WebRequest& req, std::stringstream* data,

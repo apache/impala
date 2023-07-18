@@ -392,7 +392,7 @@ class StatestoreSubscriber {
     StringProperty* statestore_id_metric_;
 
     /// Metric to count the total number of UpdateCatalogd RPCs received by subscriber.
-    IntCounter* update_catalogd_metric_;
+    IntCounter* update_catalogd_rpc_metric_;
 
     /// Metric to count the total number of re-registration attempt.
     IntCounter* re_registr_attempt_metric_;

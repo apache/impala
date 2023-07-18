@@ -66,7 +66,8 @@ class StatestoreCatalogdMgr {
 
   /// Return the protocol version of catalog service and address of active catalogd.
   /// Set *has_active_catalogd as false if the active one is not designated yet.
-  const TCatalogRegistration& GetActiveCatalogRegistration(bool* has_active_catalogd);
+  const TCatalogRegistration& GetActiveCatalogRegistration(
+      bool* has_active_catalogd, int64* sending_sequence);
 
   /// Return the subscriber-id of active catalogd.
   /// This function should be called after the active catalogd is designated.
@@ -77,9 +78,6 @@ class StatestoreCatalogdMgr {
 
   /// Return the mutex lock.
   std::mutex* GetLock() { return &catalog_mgr_lock_; }
-
-  /// Get sending sequence number.
-  int64 GetSendingSequence();
 
  private:
   /// Protect all member variables.
@@ -118,7 +116,8 @@ class StatestoreCatalogdMgr {
   /// Additional registration info of standby catalogd
   TCatalogRegistration standby_catalogd_registration_;
 
-  /// Monotonically increasing sending sequence number.
+  /// Monotonically increasing sending sequence number. The value is increased when
+  /// a new active catalogd is designated.
   int64 sending_sequence_;
 };
 

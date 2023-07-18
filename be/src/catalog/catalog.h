@@ -137,6 +137,10 @@ class Catalog {
   /// report.
   Status UpdateTableUsage(const TUpdateTableUsageRequest& req);
 
+  /// Regenerate Catalog Service ID.
+  /// The function should be called when the CatalogD becomes active.
+  void RegenerateServiceId();
+
  private:
   /// Descriptor of Java Catalog class itself, used to create a new instance.
   jclass catalog_class_;
@@ -162,6 +166,7 @@ class Catalog {
   jmethodID prioritize_load_id_; // JniCatalog.prioritizeLoad()
   jmethodID catalog_ctor_;
   jmethodID update_table_usage_id_;
+  jmethodID regenerate_service_id_; // JniCatalog.regenerateServiceId()
 };
 
 }

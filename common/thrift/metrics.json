@@ -1099,7 +1099,7 @@
     "label": "The active status of Catalog Server daemon",
     "units": "NONE",
     "kind": "PROPERTY",
-    "key": "catalog-server.ha-active-status"
+    "key": "catalog-server.active-status"
   },
   {
     "description": "The number of active status changes made to this Catalog Server Daemon.",
@@ -1780,7 +1780,7 @@
     "label": "Number of UpdateCatalogd RPCs",
     "units": "UNIT",
     "kind": "COUNTER",
-    "key": "statestore-subscriber.num-update-catalogd"
+    "key": "statestore-subscriber.num-update-catalogd-rpc"
   },
   {
     "description": "The number of Re-Registration Attempt.",
@@ -1871,14 +1871,24 @@
     "key": "statestore.heartbeat-durations"
   },
   {
-    "description": "The number of RPCs sent for updating catalogd.",
+    "description": "The number of successful RPCs for updating catalogd.",
     "contexts": [
       "STATESTORE"
     ],
-    "label": "Number of UpdateCatalogd RPCs",
+    "label": "Number of successful UpdateCatalogd RPCs sent by statestore",
     "units": "UNIT",
     "kind": "COUNTER",
-    "key": "statestore.num-update-catalogd"
+    "key": "statestore.num-successful-update-catalogd-rpc"
+  },
+  {
+    "description": "The number of failed RPCs for updating catalogd.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "Number of failed UpdateCatalogd RPCs sent by statestore",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "statestore.num-failed-update-catalogd-rpc"
   },
   {
     "description": "The number of requests for clearing topic entries from catalogd.",

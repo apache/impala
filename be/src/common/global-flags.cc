@@ -401,9 +401,12 @@ DEFINE_bool(use_subscriber_id_as_catalogd_priority, false, "Subscriber-id is use
 DEFINE_int64(catalogd_ha_preemption_wait_period_ms, 10000, "(Advanced) The time after "
     "which statestore designates the first registered catalogd as active if statestore "
     "does not receive registration request from the second catalogd.");
-DEFINE_int64(active_catalogd_designation_monitoring_frequency_ms, 100, "(Advanced) "
-    "Frequency (in ms) with which the statestore monitors if active catalogd is "
+DEFINE_int64(active_catalogd_designation_monitoring_interval_ms, 100, "(Advanced) "
+    "Interval (in ms) with which the statestore monitors if active catalogd is "
     "designated.");
+DEFINE_int64(update_catalogd_rpc_resend_interval_ms, 100, "(Advanced) Interval (in ms) "
+    "with which the statestore resends the update catalogd RPC to a subscriber if the "
+    "statestore has failed to send the RPC to the subscriber.");
 
 // TGeospatialLibrary's values are mapped here as constants
 static const string geo_lib_none = "NONE";

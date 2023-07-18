@@ -85,6 +85,7 @@ import org.apache.impala.util.CatalogOpUtil;
 import org.apache.impala.util.GlogAppender;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.ThreadNameAnnotator;
+import org.apache.impala.util.TUniqueIdUtil;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
@@ -107,7 +108,11 @@ public class JniCatalog {
   private final AuthorizationManager authzManager_;
 
   // A unique identifier for this instance of the Catalog Service.
-  private static final TUniqueId catalogServiceId_ = generateId();
+  // The service id will be regenerated when the CatalogD becomes active.
+  private static TUniqueId catalogServiceId_ = generateId();
+
+  // Lock to protect catalogServiceId_.
+  private final static Object catalogServiceIdLock_ = new Object();
 
   // A singleton monitoring class that keeps track of the catalog usage metrics.
   private final CatalogOperationMetrics catalogOperationUsage_ =
@@ -248,7 +253,19 @@ public class JniCatalog {
     return databaseName + "." + tableName;
   }
 
-  public static TUniqueId getServiceId() { return catalogServiceId_; }
+  public static TUniqueId getServiceId() {
+    synchronized (catalogServiceIdLock_) {
+      return catalogServiceId_;
+    }
+  }
+
+  public void regenerateServiceId() {
+    synchronized (catalogServiceIdLock_) {
+      catalogServiceId_ = generateId();
+      LOG.info("Regenerate Catalog Service Id {}",
+          TUniqueIdUtil.PrintId(catalogServiceId_).intern());
+    }
+  }
 
   /**
    * Gets the current catalog version.

@@ -150,8 +150,8 @@ class CatalogServer {
   /// Tracks the partial fetch RPC call queue length on the Catalog server.
   IntGauge* partial_fetch_rpc_queue_len_metric_;
 
-  /// Metric that tracks if this catalogd is active when catalogd HA is enabled.
-  BooleanProperty* ha_active_status_metric_;
+  /// Metric that tracks if this catalogd is active.
+  BooleanProperty* active_status_metric_;
 
   /// Metric to count the number of active status changes.
   IntCounter* num_ha_active_status_change_metric_;

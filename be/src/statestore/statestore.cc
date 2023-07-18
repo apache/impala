@@ -113,7 +113,8 @@ DEFINE_int32(statestore_update_catalogd_tcp_timeout_seconds, 3, "(Advanced) The 
     "UpdateCatalogd RPC in short order");
 
 DECLARE_bool(enable_catalogd_ha);
-DECLARE_int64(active_catalogd_designation_monitoring_frequency_ms);
+DECLARE_int64(active_catalogd_designation_monitoring_interval_ms);
+DECLARE_int64(update_catalogd_rpc_resend_interval_ms);
 DECLARE_string(debug_actions);
 DECLARE_string(ssl_server_certificate);
 DECLARE_string(ssl_private_key);
@@ -135,7 +136,10 @@ const string STATESTORE_UPDATE_DURATION = "statestore.topic-update-durations";
 const string STATESTORE_PRIORITY_UPDATE_DURATION =
     "statestore.priority-topic-update-durations";
 const string STATESTORE_HEARTBEAT_DURATION = "statestore.heartbeat-durations";
-const string STATESTORE_UPDATE_CATALOGD_NUM = "statestore.num-update-catalogd";
+const string STATESTORE_SUCCESSFUL_UPDATE_CATALOGD_RPC_NUM =
+    "statestore.num-successful-update-catalogd-rpc";
+const string STATESTORE_FAILED_UPDATE_CATALOGD_RPC_NUM =
+    "statestore.num-failed-update-catalogd-rpc";
 const string STATESTORE_CLEAR_TOPIC_ENTRIES_NUM =
     "statestore.num-clear-topic-entries-requests";
 const string STATESTORE_ACTIVE_CATALOGD_ADDRESS = "statestore.active-catalogd-address";
@@ -552,7 +556,10 @@ Statestore::Statestore(MetricGroup* metrics)
       metrics, STATESTORE_PRIORITY_UPDATE_DURATION);
   heartbeat_duration_metric_ =
       StatsMetric<double>::CreateAndRegister(metrics, STATESTORE_HEARTBEAT_DURATION);
-  update_catalogd_metric_ = metrics->AddCounter(STATESTORE_UPDATE_CATALOGD_NUM, 0);
+  successful_update_catalogd_rpc_metric_ =
+      metrics->AddCounter(STATESTORE_SUCCESSFUL_UPDATE_CATALOGD_RPC_NUM, 0);
+  failed_update_catalogd_rpc_metric_ =
+      metrics->AddCounter(STATESTORE_FAILED_UPDATE_CATALOGD_RPC_NUM, 0);
   clear_topic_entries_metric_ =
       metrics->AddCounter(STATESTORE_CLEAR_TOPIC_ENTRIES_NUM, 0);
   active_catalogd_address_metric_ = metrics->AddProperty<string>(
@@ -796,8 +803,10 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
     RETURN_IF_ERROR(OfferUpdate(update, &subscriber_topic_update_threadpool_));
     RETURN_IF_ERROR(OfferUpdate(update, &subscriber_priority_topic_update_threadpool_));
     RETURN_IF_ERROR(OfferUpdate(update, &subscriber_heartbeat_threadpool_));
+    int64 sending_sequence;
     *active_catalogd_registration =
-        catalog_manager_.GetActiveCatalogRegistration(has_active_catalogd);
+        catalog_manager_.GetActiveCatalogRegistration(
+            has_active_catalogd, &sending_sequence);
   }
 
   return Status::OK();
@@ -1206,71 +1215,124 @@ void Statestore::DoSubscriberUpdate(UpdateKind update_kind, int thread_id,
 }
 
 [[noreturn]] void Statestore::MonitorUpdateCatalogd() {
-  // Check if the first registered one should be designated with active role.
+  int64 last_sending_sequence = 0;
+  // rpc_receivers is used to track subscribers to which statestore need to send RPCs
+  // when there is a change in the elected active catalogd. It is updated from
+  // subscribers_, and the subscribers will be removed from this list if the RPCs are
+  // successfully sent to them.
+  vector<std::shared_ptr<Subscriber>> rpc_receivers;
   int64_t timeout_us =
-      FLAGS_active_catalogd_designation_monitoring_frequency_ms * MICROS_PER_MILLI;
+      FLAGS_active_catalogd_designation_monitoring_interval_ms * MICROS_PER_MILLI;
+  // Check if the first registered one should be designated with active role.
   while (!catalog_manager_.CheckActiveCatalog()) {
     unique_lock<mutex> l(*catalog_manager_.GetLock());
     update_catalod_cv_.WaitFor(l, timeout_us);
   }
-  SendUpdateCatalogdNotification();
+  SendUpdateCatalogdNotification(&last_sending_sequence, rpc_receivers);
 
-  // Wait for notification. If catalogd is registered, send notification to all
-  // coordinators
+  // Wait for notification. If new leader is elected due to catalogd is registered or
+  // unregistered, send notification to all coordinators and catalogds.
+  timeout_us = FLAGS_update_catalogd_rpc_resend_interval_ms * MICROS_PER_MILLI;
   while (1) {
     {
       unique_lock<mutex> l(*catalog_manager_.GetLock());
-      update_catalod_cv_.Wait(l);
+      update_catalod_cv_.WaitFor(l, timeout_us);
     }
-    SendUpdateCatalogdNotification();
+    SendUpdateCatalogdNotification(&last_sending_sequence, rpc_receivers);
   }
 }
 
-void Statestore::SendUpdateCatalogdNotification() {
+void Statestore::SendUpdateCatalogdNotification(int64* last_sending_sequence,
+    vector<std::shared_ptr<Subscriber>>& rpc_receivers) {
   bool has_active_catalogd;
+  int64 sending_sequence = 0;
   TCatalogRegistration catalogd_registration =
-      catalog_manager_.GetActiveCatalogRegistration(&has_active_catalogd);
-  DCHECK(has_active_catalogd);
-  if (!has_active_catalogd) return;
+      catalog_manager_.GetActiveCatalogRegistration(
+          &has_active_catalogd, &sending_sequence);
+  if (!has_active_catalogd ||
+      (sending_sequence == *last_sending_sequence && rpc_receivers.empty())) {
+    // Don't resend RPCs if there is no change in Active Catalogd and no RPC failure in
+    // last round.
+    return;
+  }
 
-  active_catalogd_address_metric_->SetValue(
-      TNetworkAddressToString(catalogd_registration.address));
-
-  vector<std::shared_ptr<Subscriber>> receivers;
-  {
-    lock_guard<mutex> l(subscribers_lock_);
-    for (const auto& subscriber : subscribers_) {
-      if (subscriber.second->IsSubscribedCatalogdChange()) {
-        receivers.push_back(subscriber.second);
+  bool resend_rpc = false;
+  if (sending_sequence > *last_sending_sequence) {
+    // Send notification for the latest elected active catalogd.
+    active_catalogd_address_metric_->SetValue(
+        TNetworkAddressToString(catalogd_registration.address));
+    rpc_receivers.clear();
+    {
+      lock_guard<mutex> l(subscribers_lock_);
+      for (const auto& subscriber : subscribers_) {
+        if (subscriber.second->IsSubscribedCatalogdChange()) {
+          rpc_receivers.push_back(subscriber.second);
+        }
       }
+    }
+    *last_sending_sequence = sending_sequence;
+  } else {
+    DCHECK(!rpc_receivers.empty());
+    lock_guard<mutex> l(subscribers_lock_);
+    for (std::vector<std::shared_ptr<Subscriber>>::iterator it = rpc_receivers.begin();
+         it != rpc_receivers.end();) {
+      // Don't resend RPC to subscribers which have been removed from subscriber list.
+      std::shared_ptr<Subscriber> subscriber = *it;
+      if (subscribers_.find(subscriber->id()) == subscribers_.end()) {
+        it = rpc_receivers.erase(it);
+      } else {
+        ++it;
+      }
+    }
+    if (rpc_receivers.empty()) return;
+    resend_rpc = true;
+  }
+
+  for (std::vector<std::shared_ptr<Subscriber>>::iterator it = rpc_receivers.begin();
+       it != rpc_receivers.end();) {
+    std::shared_ptr<Subscriber> subscriber = *it;
+    Status status;
+    if (!resend_rpc) {
+      status = DebugAction(
+          FLAGS_debug_actions, "SEND_UPDATE_CATALOGD_RPC_FIRST_ATTEMPT");
+    }
+    if (status.ok()) {
+      StatestoreSubscriberConn client(update_catalogd_client_cache_.get(),
+          subscriber->network_address(), &status);
+      if (status.ok()) {
+        TUpdateCatalogdRequest request;
+        TUpdateCatalogdResponse response;
+        request.__set_registration_id(subscriber->registration_id());
+        request.__set_statestore_id(statestore_id_);
+        request.__set_sequence(sending_sequence);
+        request.__set_catalogd_registration(catalogd_registration);
+        status = client.DoRpc(
+            &StatestoreSubscriberClientWrapper::UpdateCatalogd, request, &response);
+        if (!status.ok()) {
+          if (status.code() == TErrorCode::RPC_RECV_TIMEOUT) {
+            // Add details to status to make it more useful, while preserving the stack
+            status.AddDetail(Substitute(
+                "Subscriber $0 timed-out during update catalogd RPC. Timeout is $1s.",
+                subscriber->id(), FLAGS_statestore_update_catalogd_tcp_timeout_seconds));
+          }
+        }
+      }
+    }
+    if (status.ok()) {
+      successful_update_catalogd_rpc_metric_->Increment(1);
+      // Remove the subscriber from the receiver list so that Statestore will not resend
+      // RPC to it in next round.
+      it = rpc_receivers.erase(it);
+    } else {
+      LOG(ERROR) << "Couldn't send UpdateCatalogd RPC,  " << status.GetDetail();
+      failed_update_catalogd_rpc_metric_->Increment(1);
+      // Leave the subscriber in the receiver list. Statestore will resend RPC to it in
+      // next round.
+      ++it;
     }
   }
-  for (const auto& subscriber : receivers) {
-    Status status;
-    StatestoreSubscriberConn client(update_catalogd_client_cache_.get(),
-        subscriber->network_address(), &status);
-    if (status.ok()) {
-      TUpdateCatalogdRequest request;
-      TUpdateCatalogdResponse response;
-      request.__set_registration_id(subscriber->registration_id());
-      request.__set_statestore_id(statestore_id_);
-      request.__set_sequence(catalog_manager_.GetSendingSequence());
-      request.__set_catalogd_registration(catalogd_registration);
-      status = client.DoRpc(
-          &StatestoreSubscriberClientWrapper::UpdateCatalogd, request, &response);
-      if (!status.ok()) {
-        if (status.code() == TErrorCode::RPC_RECV_TIMEOUT) {
-          // Add details to status to make it more useful, while preserving the stack
-          status.AddDetail(Substitute(
-              "Subscriber $0 timed-out during update catalogd RPC. Timeout is $1s.",
-                  subscriber->id(),
-                  FLAGS_statestore_update_catalogd_tcp_timeout_seconds));
-        }
-        LOG(ERROR) << "Couldn't send UpdateCatalogd RPC,  " << status.GetDetail();
-      } else {
-        update_catalogd_metric_->Increment(1);
-      }
-    }
+  if (rpc_receivers.empty()) {
+    LOG(INFO) << "Successfully sent UpdateCatalogd RPCs to all subscribers";
   }
 }
 

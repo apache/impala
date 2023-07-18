@@ -158,7 +158,7 @@ const string CATALOG_SERVER_TOPIC_PROCESSING_TIMES =
     "catalog-server.topic-processing-time-s";
 const string CATALOG_SERVER_PARTIAL_FETCH_RPC_QUEUE_LEN =
     "catalog.partial-fetch-rpc.queue-len";
-const string CATALOG_HA_ACTIVE_STATUS = "catalog-server.ha-active-status";
+const string CATALOG_ACTIVE_STATUS = "catalog-server.active-status";
 const string CATALOG_HA_NUM_ACTIVE_STATUS_CHANGE =
     "catalog-server.ha-number-active-status-change";
 
@@ -350,8 +350,8 @@ CatalogServer::CatalogServer(MetricGroup* metrics)
       CATALOG_SERVER_TOPIC_PROCESSING_TIMES);
   partial_fetch_rpc_queue_len_metric_ =
       metrics->AddGauge(CATALOG_SERVER_PARTIAL_FETCH_RPC_QUEUE_LEN, 0);
-  ha_active_status_metric_ =
-      metrics->AddProperty(CATALOG_HA_ACTIVE_STATUS, !FLAGS_enable_catalogd_ha);
+  active_status_metric_ =
+      metrics->AddProperty(CATALOG_ACTIVE_STATUS, !FLAGS_enable_catalogd_ha);
   num_ha_active_status_change_metric_ =
       metrics->AddCounter(CATALOG_HA_NUM_ACTIVE_STATUS_CHANGE, 0);
   is_active_.Store(FLAGS_enable_catalogd_ha ? 0 : 1);
@@ -528,8 +528,10 @@ void CatalogServer::UpdateRegisteredCatalogd(
         // Signal the catalog update gathering thread to start.
         topic_updates_ready_ = false;
         catalog_update_cv_.NotifyOne();
+        // Regenerate Catalog Service ID.
+        catalog_->RegenerateServiceId();
       }
-      ha_active_status_metric_->SetValue(is_active);
+      active_status_metric_->SetValue(is_active);
     }
     num_ha_active_status_change_metric_->Increment(1);
     LOG(INFO) << "The role of catalogd instance is changed to "

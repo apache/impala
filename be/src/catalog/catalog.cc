@@ -69,6 +69,7 @@ Catalog::Catalog() {
     {"prioritizeLoad", "([B)V", &prioritize_load_id_},
     {"getPartitionStats", "([B)[B", &get_partition_stats_id_},
     {"updateTableUsage", "([B)V", &update_table_usage_id_},
+    {"regenerateServiceId", "()V", &regenerate_service_id_},
   };
 
   JNIEnv* jni_env = JniUtil::GetJNIEnv();
@@ -203,4 +204,10 @@ Status Catalog::GetPartitionStats(
 
 Status Catalog::UpdateTableUsage(const TUpdateTableUsageRequest& req) {
   return JniUtil::CallJniMethod(catalog_, update_table_usage_id_, req);
+}
+
+void Catalog::RegenerateServiceId() {
+  JNIEnv* jni_env = JniUtil::GetJNIEnv();
+  jni_env->CallVoidMethod(catalog_, regenerate_service_id_);
+  ABORT_IF_EXC(jni_env);
 }

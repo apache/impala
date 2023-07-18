@@ -253,15 +253,17 @@ class TestStatestoreStartupDelay(CustomClusterTestSuite):
     except Exception:
       self._stop_impala_cluster()
 
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--statestore_heartbeat_frequency_ms=10000")
   def test_subscriber_tolerate_restart_catalog(self):
     """Restart catalogd and verify update-catalogd RPCs are sent by statestore
     """
     statestore_service = self.cluster.statestored.service
     start_sent_rpc_count = statestore_service.get_metric_value(
-        "statestore.num-update-catalogd")
+        "statestore.num-successful-update-catalogd-rpc")
     impalad_service = self.cluster.impalads[0].service
     start_recv_rpc_count = impalad_service.get_metric_value(
-        "statestore-subscriber.num-update-catalogd")
+        "statestore-subscriber.num-update-catalogd-rpc")
 
     # Restart catalog daemon.
     self.cluster.catalogd.restart()
@@ -269,10 +271,10 @@ class TestStatestoreStartupDelay(CustomClusterTestSuite):
     sleep(wait_time_s)
     # Verify update-catalogd RPCs are sent to coordinators from statestore.
     end_sent_rpc_count = statestore_service.get_metric_value(
-        "statestore.num-update-catalogd")
+        "statestore.num-successful-update-catalogd-rpc")
     assert end_sent_rpc_count > start_sent_rpc_count
     end_recv_rpc_count = impalad_service.get_metric_value(
-        "statestore-subscriber.num-update-catalogd")
+        "statestore-subscriber.num-update-catalogd-rpc")
     assert end_recv_rpc_count > start_recv_rpc_count
 
   @SkipIfBuildType.not_dev_build
@@ -287,5 +289,5 @@ class TestStatestoreStartupDelay(CustomClusterTestSuite):
 
     # Verify that impalad received notification of updating catalogd.
     recv_rpc_count = self.cluster.impalads[0].service.get_metric_value(
-        "statestore-subscriber.num-update-catalogd")
+        "statestore-subscriber.num-update-catalogd-rpc")
     assert recv_rpc_count > 0
