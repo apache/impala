@@ -167,7 +167,8 @@ class TestRestart(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    statestored_args="--statestore_update_frequency_ms=5000")
+    statestored_args="--statestore_update_frequency_ms=5000 "
+                     "--statestore_heartbeat_frequency_ms=10000")
   def test_restart_catalogd(self):
     self.execute_query_expect_success(self.client, "drop table if exists join_aa")
     self.execute_query_expect_success(self.client, "create table join_aa(id int)")

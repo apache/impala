@@ -54,7 +54,7 @@ bool StatestoreCatalogdMgr::RegisterCatalogd(bool is_reregistering,
   std::lock_guard<std::mutex> l(catalog_mgr_lock_);
   if (!enable_catalogd_ha_) {
     // CatalogD HA is not enabled.
-    num_registered_catalogd_++;
+    if (!is_reregistering) num_registered_catalogd_++;
     DCHECK(num_registered_catalogd_ < 2);
     is_active_catalogd_assigned_ = true;
     COPY_CATALOGD_REGISTRATION_FROM_LOCAL_VARIABLES(active);
