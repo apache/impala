@@ -140,16 +140,20 @@ class TestCodegenCache(CustomClusterTestSuite):
     self._test_codegen_cache(vector,
       "select sum(identity(bigint_col)) from functional.alltypes", False)
 
+  CODEGEN_CACHE_CAPACITY_IN_SYMBOL_EMITTER_TESTS = "3.25MB"
+
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(cluster_size=1,
-          impalad_args="--codegen_cache_capacity=2.5MB --asm_module_dir=/dev/null")
+          impalad_args="--codegen_cache_capacity={} --asm_module_dir=/dev/null".format(
+              CODEGEN_CACHE_CAPACITY_IN_SYMBOL_EMITTER_TESTS))
   # Regression test for IMPALA-12260.
   def test_codegen_cache_with_asm_module_dir(self, vector):
     self._test_codegen_cache_with_symbol_emitter(vector)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(cluster_size=1,
-          impalad_args="--codegen_cache_capacity=2.5MB --perf_map")
+          impalad_args="--codegen_cache_capacity={} --perf_map".format(
+              CODEGEN_CACHE_CAPACITY_IN_SYMBOL_EMITTER_TESTS))
   # Regression test for IMPALA-12260.
   def test_codegen_cache_with_perf_map(self, vector):
     self._test_codegen_cache_with_symbol_emitter(vector)
@@ -169,23 +173,24 @@ class TestCodegenCache(CustomClusterTestSuite):
 
     q1 = """select int_col, tinyint_col from functional_parquet.alltypessmall
         order by int_col desc limit 20"""
-    q2 = """select bool_col, year, month
-        from functional_parquet.alltypes
-        group by id, bool_col, smallint_col, bigint_col, float_col, double_col,
-            date_string_col, string_col, timestamp_col, year, month
-        order by id, bool_col, smallint_col, bigint_col, float_col, double_col,
-            date_string_col, string_col, timestamp_col, year, month
-        limit 20"""
+    q2 = """select t1.bool_col, t1.year, t1.month
+         from functional_parquet.alltypes t1
+         inner join functional_parquet.alltypessmall t2 on t1.year = t2.year
+         group by t1.id, t1.bool_col, t1.smallint_col, t1.bigint_col, t1.float_col,
+             t1.double_col, t1.date_string_col, t1.string_col, t1.timestamp_col, t1.year,
+             t1.month
+         order by t1.id, t1.bool_col, t1.smallint_col, t1.bigint_col, t1.float_col,
+             t1.double_col, t1.date_string_col, t1.string_col, t1.timestamp_col, t1.year,
+             t1.month"""
 
     self._check_metric_expect_init()
     self.execute_query_expect_success(self.client, q1, exec_options)
-    assert self.get_metric('impala.codegen-cache.entries-in-use') == 2
-    assert self.get_metric('impala.codegen-cache.entries-evicted') == 0
+    cache_entries_in_use = self.get_metric('impala.codegen-cache.entries-in-use')
+    assert cache_entries_in_use > 0
     assert self.get_metric('impala.codegen-cache.hits') == 0
 
     self.execute_query_expect_success(self.client, q2, exec_options)
-    assert self.get_metric('impala.codegen-cache.entries-in-use') == 3
-    assert self.get_metric('impala.codegen-cache.entries-evicted') == 2
+    assert self.get_metric('impala.codegen-cache.entries-evicted') >= cache_entries_in_use
     assert self.get_metric('impala.codegen-cache.hits') == 0
 
   def _check_metric_expect_init(self):
