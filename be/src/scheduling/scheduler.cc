@@ -61,6 +61,7 @@ namespace impala {
 static const string LOCAL_ASSIGNMENTS_KEY("simple-scheduler.local-assignments.total");
 static const string ASSIGNMENTS_KEY("simple-scheduler.assignments.total");
 static const string SCHEDULER_INIT_KEY("simple-scheduler.initialized");
+static const string SCHEDULER_WARNING_KEY("Scheduler Warning");
 
 static const vector<TPlanNodeType::type> SCAN_NODE_TYPES{TPlanNodeType::HDFS_SCAN_NODE,
     TPlanNodeType::HBASE_SCAN_NODE, TPlanNodeType::DATA_SOURCE_NODE,
@@ -267,17 +268,23 @@ Status Scheduler::ComputeFragmentExecParams(
 }
 
 Status Scheduler::CheckEffectiveInstanceCount(
-    const FragmentScheduleState* fragment_state, const ScheduleState* state) {
+    const FragmentScheduleState* fragment_state, ScheduleState* state) {
   // These checks are only intended if COMPUTE_PROCESSING_COST=true.
   if (!state->query_options().compute_processing_cost) return Status::OK();
 
   int effective_instance_count = fragment_state->fragment.effective_instance_count;
   if (effective_instance_count < fragment_state->instance_states.size()) {
-    return Status(
-        Substitute("$0 scheduled $1 instances, higher than the effective count ($2). "
-                   "Consider running the query with COMPUTE_PROCESSING_COST=false.",
-            fragment_state->fragment.display_name, fragment_state->instance_states.size(),
-            effective_instance_count));
+    if (state->summary_profile()->GetInfoString(SCHEDULER_WARNING_KEY) == nullptr) {
+      state->summary_profile()->AddInfoString(SCHEDULER_WARNING_KEY,
+          "Cluster membership might changed between planning and scheduling");
+    }
+
+    string warn_message = Substitute(
+        "$0 scheduled instance count ($1) is higher than its effective count ($2)",
+        fragment_state->fragment.display_name, fragment_state->instance_states.size(),
+        effective_instance_count);
+    state->summary_profile()->AppendInfoString(SCHEDULER_WARNING_KEY, warn_message);
+    LOG(WARNING) << warn_message;
   }
 
   DCHECK(!fragment_state->instance_states.empty());
@@ -308,24 +315,23 @@ Status Scheduler::CheckEffectiveInstanceCount(
   QueryConstants qc;
   if (largest_inst_per_host > qc.MAX_FRAGMENT_INSTANCES_PER_NODE) {
     return Status(Substitute(
-        "$0 scheduled $1 instances, higher than maximum instances per node ($2). "
-        "Consider running the query with COMPUTE_PROCESSING_COST=false.",
+        "$0 scheduled instance count ($1) is higher than maximum instances per node"
+        " ($2), indicating a planner bug. Consider running the query with"
+        " COMPUTE_PROCESSING_COST=false.",
         fragment_state->fragment.display_name, largest_inst_per_host,
         qc.MAX_FRAGMENT_INSTANCES_PER_NODE));
   }
 
   int planned_inst_per_host = ceil((float)effective_instance_count / num_host);
   if (largest_inst_per_host > planned_inst_per_host) {
-    stringstream err_msg;
-    err_msg << fragment_state->fragment.display_name
-            << " has imbalance number of instance to host assignment."
-            << " Consider running the query with COMPUTE_PROCESSING_COST=false."
-            << " Host " << fragment_state->instance_states[largest_inst_idx].host
-            << " has " << largest_inst_per_host << " instances assigned."
-            << " effective_instance_count=" << effective_instance_count
-            << " planned_inst_per_host=" << planned_inst_per_host
-            << " num_host=" << num_host;
-    return Status(err_msg.str());
+    LOG(WARNING) << fragment_state->fragment.display_name
+                 << " has imbalance number of instance to host assignment."
+                 << " Consider running the query with COMPUTE_PROCESSING_COST=false."
+                 << " Host " << fragment_state->instance_states[largest_inst_idx].host
+                 << " has " << largest_inst_per_host << " instances assigned."
+                 << " effective_instance_count=" << effective_instance_count
+                 << " planned_inst_per_host=" << planned_inst_per_host
+                 << " num_host=" << num_host;
   }
   return Status::OK();
 }

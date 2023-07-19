@@ -826,7 +826,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # The path to resources directory which contains the admission control config files.
     RESOURCES_DIR = os.path.join(os.environ['IMPALA_HOME'], "fe", "src", "test",
                                  "resources")
-    # Define two group sets: tiny, small and large
+    # Define three group sets: tiny, small and large
     fs_allocation_path = os.path.join(RESOURCES_DIR, "fair-scheduler-3-groups.xml")
     # Define the min-query-mem-limit, max-query-mem-limit,
     # max-query-cpu-core-per-node-limit and max-query-cpu-core-coordinator-limit
@@ -844,8 +844,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
         "-llama_site_path %s "
         "%s ")
 
-    # Start with a regular admission config, multiple pools, no resource limits,
-    # and query_cpu_count_divisor=2.
+    # Start with a regular admission config, multiple pools, no resource limits.
     self._restart_coordinators(num_coordinators=1,
         extra_args=extra_args_template % (fs_allocation_path, llama_site_path,
           coordinator_test_args))
@@ -1384,3 +1383,59 @@ class TestExecutorGroups(CustomClusterTestSuite):
         QUERY, {'request_pool': 'queue1'}, "Executor Group: root.queue1-group2")
     self.client.close()
     second_coord_client.close()
+
+  @pytest.mark.execute_serially
+  def test_75_percent_availability(self):
+    """Test query planning and execution when only 75% of executor is up.
+    This test will run query over 8 node executor group at its healthy threshold (6) and
+    start the other 2 executor after query is planned.
+    """
+    coordinator_test_args = ''
+    # The path to resources directory which contains the admission control config files.
+    RESOURCES_DIR = os.path.join(os.environ['IMPALA_HOME'], "fe", "src", "test",
+                                 "resources")
+
+    # Reuse cluster configuration from _setup_three_exec_group_cluster, but only start
+    # root.large executor groups.
+    fs_allocation_path = os.path.join(RESOURCES_DIR, "fair-scheduler-3-groups.xml")
+    llama_site_path = os.path.join(RESOURCES_DIR, "llama-site-3-groups.xml")
+
+    # extra args template to start coordinator
+    extra_args_template = ("-vmodule admission-controller=3 "
+        "-admission_control_slots=8 "
+        "-expected_executor_group_sets=root.large:8 "
+        "-fair_scheduler_allocation_path %s "
+        "-llama_site_path %s "
+        "%s ")
+
+    # Start with a regular admission config, multiple pools, no resource limits.
+    self._restart_coordinators(num_coordinators=1,
+        extra_args=extra_args_template % (fs_allocation_path, llama_site_path,
+          coordinator_test_args))
+
+    # Create fresh client
+    self.create_impala_clients()
+    # Start root.large exec group with 8 admission slots and 6 executors.
+    self._add_executor_group("group", 6, num_executors=6, admission_control_slots=8,
+                             resource_pool="root.large", extra_args="-mem_limit=2g")
+    assert self._get_num_executor_groups(only_healthy=False) == 1
+    assert self._get_num_executor_groups(only_healthy=False,
+                                         exec_group_set_prefix="root.large") == 1
+
+    # Run query and let it compile, but delay admission for 5s
+    handle = self.execute_query_async(CPU_TEST_QUERY, {
+      "COMPUTE_PROCESSING_COST": "true",
+      "DEBUG_ACTION": "AC_BEFORE_ADMISSION:SLEEP@5000"})
+
+    # Start the next 2 executors.
+    self._add_executors("group", 6, num_executors=2, resource_pool="root.large",
+        extra_args="-mem_limit=2g", expected_num_impalads=9)
+
+    self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 60)
+    profile = self.client.get_runtime_profile(handle)
+    assert "F00:PLAN FRAGMENT [RANDOM] hosts=6 instances=12" in profile, profile
+    assert ("Scheduler Warning: Cluster membership might changed between planning and "
+        "scheduling, F00 scheduled instance count (16) is higher than its effective "
+        "count (12)") in profile, profile
+    assert "00:SCAN HDFS               8     16" in profile, profile
+    self.client.close_query(handle)

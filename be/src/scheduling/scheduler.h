@@ -444,7 +444,7 @@ class Scheduler {
   /// instance_states size match with effective_instance_count. Fragment with UnionNode or
   /// ScanNode or one where IsExceedMaxFsWriters equals true is not checked.
   static Status CheckEffectiveInstanceCount(
-      const FragmentScheduleState* fragment_state, const ScheduleState* state);
+      const FragmentScheduleState* fragment_state, ScheduleState* state);
 
   /// Check if sink_fragment_state has hdfs_table_sink AND ref_fragment_state scheduled
   /// to exceed max_fs_writers query option.
