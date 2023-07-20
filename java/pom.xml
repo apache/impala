@@ -370,7 +370,6 @@ under the License.
     <module>../fe</module>
     <module>query-event-hook-api</module>
     <module>shaded-deps/hive-exec</module>
-    <module>shaded-deps/jamm</module>
     <module>shaded-deps/s3a-aws-sdk</module>
     <module>TableFlattener</module>
     <module>test-hive-udfs</module>

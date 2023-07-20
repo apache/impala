@@ -364,15 +364,9 @@ under the License.
     </dependency>
 
     <dependency>
-      <groupId>org.apache.impala</groupId>
-      <artifactId>impala-jamm</artifactId>
-      <version>${project.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>*</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
+      <groupId>com.github.jbellis</groupId>
+      <artifactId>jamm</artifactId>
+      <version>0.4.0</version>
     </dependency>
 
     <dependency>
