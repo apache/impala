@@ -26,6 +26,10 @@ add_library(Catalog
 )
 add_dependencies(Catalog gen-deps)
 
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
 add_library(CatalogTests STATIC
   catalog-util-test.cc
 )

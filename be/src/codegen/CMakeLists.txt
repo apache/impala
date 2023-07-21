@@ -40,11 +40,6 @@ add_library(CodeGen
 )
 add_dependencies(CodeGen gen-deps)
 
-add_library(CodeGenTests STATIC
-  instruction-counter-test.cc
-)
-add_dependencies(CodeGenTests gen-deps)
-
 # output cross compile to ir metadata
 set(IR_DESC_GEN_OUTPUT
   $ENV{IMPALA_HOME}/be/generated-sources/impala-ir/impala-ir-names.h
@@ -122,6 +117,14 @@ add_custom_command(
   DEPENDS ${LEGACY_AVX_IR_OUTPUT_FILE}
 )
 
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
+add_library(CodeGenTests STATIC
+  instruction-counter-test.cc
+)
+add_dependencies(CodeGenTests gen-deps)
 
 # Run the clang compiler to generate BC for llvm-codegen-test
 add_custom_target(test-loop.bc

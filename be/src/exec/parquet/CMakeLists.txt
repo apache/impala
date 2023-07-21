@@ -43,6 +43,10 @@ add_library(ExecParquet
 
 add_dependencies(ExecParquet gen-deps)
 
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
 add_library(ExecParquetTests STATIC
   hdfs-parquet-scanner-test.cc
   parquet-bool-decoder-test.cc

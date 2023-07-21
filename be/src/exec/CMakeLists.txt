@@ -105,6 +105,10 @@ add_library(Exec
 
 add_dependencies(Exec gen-deps)
 
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
 add_library(ExecTests STATIC
   acid-metadata-utils-test.cc
   delimited-text-parser-test.cc

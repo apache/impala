@@ -26,6 +26,10 @@ add_library(Experiments
 )
 add_dependencies(Experiments gen-deps)
 
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
 add_executable(data-provider-test data-provider-test.cc)
 add_executable(tuple-splitter-test tuple-splitter-test.cc)
 add_executable(hash-partition-test hash-partition-test.cc)

@@ -31,6 +31,10 @@ add_library(BufferPool
 )
 add_dependencies(BufferPool gen-deps)
 
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
 add_library(BufferPoolTests STATIC
   free-list-test.cc
   suballocator-test.cc
