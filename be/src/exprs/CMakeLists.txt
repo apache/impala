@@ -85,6 +85,10 @@ add_library(Exprs
 )
 add_dependencies(Exprs gen-deps)
 
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
 add_library(ExprsTests STATIC
   datasketches-test.cc
   expr-test.cc

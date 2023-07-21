@@ -28,6 +28,10 @@ add_library(UtilCache
 )
 add_dependencies(UtilCache gen-deps)
 
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
 add_library(UtilCacheTests STATIC
   cache-test.cc
   lirs-cache-test.cc

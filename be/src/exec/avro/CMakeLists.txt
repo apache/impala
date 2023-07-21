@@ -33,6 +33,10 @@ add_library(ExecAvro
 
 add_dependencies(ExecAvro gen-deps)
 
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
 add_library(ExecAvroTests STATIC
   hdfs-avro-scanner-test.cc
 )
