@@ -465,6 +465,9 @@ Status StatestoreSubscriber::StatestoreStub::Register(bool* has_active_catalogd,
         *active_catalogd_registration = response.catalogd_registration;
       }
     }
+    // Reset last received sequence number of update_catalogd RPC since statestore
+    // could be restarted.
+    last_update_catalogd_seq_ = 0;
   }
   heartbeat_interval_timer_.Start();
   return status;

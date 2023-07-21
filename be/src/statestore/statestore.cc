@@ -1236,7 +1236,11 @@ void Statestore::DoSubscriberUpdate(UpdateKind update_kind, int thread_id,
   while (1) {
     {
       unique_lock<mutex> l(*catalog_manager_.GetLock());
-      update_catalod_cv_.WaitFor(l, timeout_us);
+      if (rpc_receivers.empty()) {
+        update_catalod_cv_.Wait(l);
+      } else {
+        update_catalod_cv_.WaitFor(l, timeout_us);
+      }
     }
     SendUpdateCatalogdNotification(&last_sending_sequence, rpc_receivers);
   }

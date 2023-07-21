@@ -17,6 +17,7 @@
 
 from __future__ import absolute_import, division, print_function
 import logging
+import re
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
@@ -336,3 +337,7 @@ class TestCatalogdHA(CustomClusterTestSuite):
     # Verify simple query is ran successfully.
     self.execute_query_expect_success(
         self.client, "select count(*) from functional.alltypes")
+
+    unexpected_msg = re.compile(
+        "unexpected sequence number: [0-9]+, was expecting greater than [0-9]+")
+    self.assert_catalogd_log_contains("INFO", unexpected_msg, expected_count=0)
