@@ -23,7 +23,9 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/codegen")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/codegen")
 
 # Generated C files for IR
-set(IR_C_FILE $ENV{IMPALA_HOME}/be/generated-sources/impala-ir/impala-ir.cc)
+set(IR_O1_C_FILE $ENV{IMPALA_HOME}/be/generated-sources/impala-ir/impala-ir-o1.cc)
+set(IR_O2_C_FILE $ENV{IMPALA_HOME}/be/generated-sources/impala-ir/impala-ir-o2.cc)
+set(IR_Os_C_FILE $ENV{IMPALA_HOME}/be/generated-sources/impala-ir/impala-ir-os.cc)
 set(LEGACY_AVX_IR_C_FILE $ENV{IMPALA_HOME}/be/generated-sources/impala-ir/impala-ir-legacy-avx.cc)
 
 add_library(CodeGen
@@ -35,7 +37,9 @@ add_library(CodeGen
   llvm-codegen.cc
   llvm-codegen-cache.cc
   instruction-counter.cc
-  ${IR_C_FILE}
+  ${IR_O1_C_FILE}
+  ${IR_O2_C_FILE}
+  ${IR_Os_C_FILE}
   ${LEGACY_AVX_IR_C_FILE}
 )
 add_dependencies(CodeGen gen-deps)
@@ -61,71 +65,47 @@ add_custom_target(gen_ir_descriptions ALL DEPENDS ${IR_DESC_GEN_OUTPUT})
 
 set(IR_INPUT_FILES impala-ir.cc)
 
-# Set of files for generating the regular IR
-set(IR_TMP_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/impala-tmp.bc")
-set(IR_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/impala.bc")
-set(IR_TMP_C_FILE ${IR_C_FILE}.tmp)
+function(COMPILE_TO_IR_C_ARRAY IR_C_FILE VARNAME OPT PLATFORM_SPECIFIC)
+  # Run the clang compiler to generate IR. Then run the LLVM opt tool to apply specific
+  # optimisations. We need to compile to IR several times for different optimization settings
+  # and legacy AVX support.
+  get_filename_component(BASE_NAME ${IR_C_FILE} NAME_WE)
+  set(IR_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/${BASE_NAME}.bc")
+  set(IR_TMP_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/${BASE_NAME}-tmp.bc")
+  add_custom_command(
+    OUTPUT ${IR_OUTPUT_FILE}
+    COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} ${OPT} ${PLATFORM_SPECIFIC}
+            ${CLANG_INCLUDE_FLAGS} ${IR_INPUT_FILES} -o ${IR_TMP_OUTPUT_FILE}
+    COMMAND ${LLVM_OPT_EXECUTABLE} ${LLVM_OPT_IR_FLAGS} < ${IR_TMP_OUTPUT_FILE} > ${IR_OUTPUT_FILE}
+    COMMAND rm ${IR_TMP_OUTPUT_FILE}
+    DEPENDS ExecIr ExecAvroIr ExecKuduIr ExprsIr RuntimeIr UdfIr UtilIr ${IR_INPUT_FILES}
+  )
 
-# Set of files for generating the legacy AVX IR
-# This is generated on all platforms, but it is only used for x86_64
-set(LEGACY_AVX_IR_TMP_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/impala-tmp-legacy-avx.bc")
-set(LEGACY_AVX_IR_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/impala-legacy-avx.bc")
-set(LEGACY_AVX_IR_TMP_C_FILE ${LEGACY_AVX_IR_C_FILE}.tmp)
-
-# Run the clang compiler to generate IR. Then run the LLVM opt tool to apply specific
-# optimisations. We need to compile to IR twice, once with regular options and one
-# with legacy AVX support.
-# At runtime impala will pick the file to load based on a startup parameter.
+  # Convert LLVM bytecode to C array.
+  set(IR_TMP_C_FILE ${IR_C_FILE}.tmp)
+  add_custom_command(
+    OUTPUT ${IR_C_FILE}
+    COMMAND $ENV{IMPALA_HOME}/bin/file2array.sh -n -v ${VARNAME} ${IR_OUTPUT_FILE} > ${IR_TMP_C_FILE}
+    COMMAND mv ${IR_TMP_C_FILE} ${IR_C_FILE}
+    DEPENDS $ENV{IMPALA_HOME}/bin/file2array.sh
+    DEPENDS ${IR_OUTPUT_FILE}
+  )
+endfunction(COMPILE_TO_IR_C_ARRAY)
 
 if (NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
   set(PLATFORM_SPECIFIC_FLAGS "-mavx2")
   set(LEGACY_AVX_SPECIFIC_FLAGS "-mavx")
 endif()
-add_custom_command(
-  OUTPUT ${IR_OUTPUT_FILE}
-  COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} ${PLATFORM_SPECIFIC_FLAGS}
-          ${CLANG_INCLUDE_FLAGS} ${IR_INPUT_FILES} -o ${IR_TMP_OUTPUT_FILE}
-  COMMAND ${LLVM_OPT_EXECUTABLE} ${LLVM_OPT_IR_FLAGS} < ${IR_TMP_OUTPUT_FILE} > ${IR_OUTPUT_FILE}
-  COMMAND rm ${IR_TMP_OUTPUT_FILE}
-  DEPENDS ExecIr ExecAvroIr ExecKuduIr ExprsIr RuntimeIr UdfIr UtilIr ${IR_INPUT_FILES}
-)
-
-add_custom_command(
-  OUTPUT ${LEGACY_AVX_IR_OUTPUT_FILE}
-  COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} ${LEGACY_AVX_SPECIFIC_FLAGS}
-          ${CLANG_INCLUDE_FLAGS} ${IR_INPUT_FILES} -o ${LEGACY_AVX_IR_TMP_OUTPUT_FILE}
-  COMMAND ${LLVM_OPT_EXECUTABLE} ${LLVM_OPT_IR_FLAGS} < ${LEGACY_AVX_IR_TMP_OUTPUT_FILE}
-          > ${LEGACY_AVX_IR_OUTPUT_FILE}
-  COMMAND rm ${LEGACY_AVX_IR_TMP_OUTPUT_FILE}
-  DEPENDS ExecIr ExecAvroIr ExecKuduIr ExprsIr RuntimeIr UdfIr UtilIr ${IR_INPUT_FILES}
-)
-
-add_custom_target(compile_to_ir DEPENDS ${IR_OUTPUT_FILE})
-add_custom_target(compile_to_ir_legacy_avx DEPENDS ${LEGACY_AVX_IR_OUTPUT_FILE})
-
-# Convert LLVM bytecode to C array.
-add_custom_command(
-  OUTPUT ${IR_C_FILE}
-  COMMAND $ENV{IMPALA_HOME}/bin/file2array.sh -n -v impala_llvm_ir ${IR_OUTPUT_FILE} > ${IR_TMP_C_FILE}
-  COMMAND mv ${IR_TMP_C_FILE} ${IR_C_FILE}
-  DEPENDS $ENV{IMPALA_HOME}/bin/file2array.sh
-  DEPENDS ${IR_OUTPUT_FILE}
-)
-
-# Convert LLVM bytecode to C array.
-add_custom_command(
-  OUTPUT ${LEGACY_AVX_IR_C_FILE}
-  COMMAND $ENV{IMPALA_HOME}/bin/file2array.sh -n -v impala_legacy_avx_llvm_ir
-          ${LEGACY_AVX_IR_OUTPUT_FILE} > ${LEGACY_AVX_IR_TMP_C_FILE}
-  COMMAND mv ${LEGACY_AVX_IR_TMP_C_FILE} ${LEGACY_AVX_IR_C_FILE}
-  DEPENDS $ENV{IMPALA_HOME}/bin/file2array.sh
-  DEPENDS ${LEGACY_AVX_IR_OUTPUT_FILE}
-)
+# At runtime impala will pick the file to load based on a startup parameter.
+COMPILE_TO_IR_C_ARRAY(${IR_O1_C_FILE} impala_llvm_o1_ir -O1 ${PLATFORM_SPECIFIC_FLAGS})
+COMPILE_TO_IR_C_ARRAY(${IR_O2_C_FILE} impala_llvm_o2_ir -O2 ${PLATFORM_SPECIFIC_FLAGS})
+COMPILE_TO_IR_C_ARRAY(${IR_Os_C_FILE} impala_llvm_os_ir -Os ${PLATFORM_SPECIFIC_FLAGS})
+COMPILE_TO_IR_C_ARRAY(${LEGACY_AVX_IR_C_FILE} impala_legacy_avx_llvm_ir -O1 ${LEGACY_AVX_SPECIFIC_FLAGS})
 
 
 # Run the clang compiler to generate BC for llvm-codegen-test
 add_custom_target(test-loop.bc
-  COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} ${CLANG_INCLUDE_FLAGS} ${CMAKE_SOURCE_DIR}/testdata/llvm/test-loop.cc -o ${CMAKE_SOURCE_DIR}/llvm-ir/test-loop.bc
+  COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} -O2 ${CLANG_INCLUDE_FLAGS} ${CMAKE_SOURCE_DIR}/testdata/llvm/test-loop.cc -o ${CMAKE_SOURCE_DIR}/llvm-ir/test-loop.bc
   SOURCES ${CMAKE_SOURCE_DIR}/testdata/llvm/test-loop.cc
 )
 

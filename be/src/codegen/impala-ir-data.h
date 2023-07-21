@@ -22,8 +22,14 @@
 #ifndef IMPALA_CODEGEN_IR_DATA_H
 #define IMPALA_CODEGEN_IR_DATA_H
 
-extern const unsigned char impala_llvm_ir[];
-extern const size_t impala_llvm_ir_len;
+extern const unsigned char impala_llvm_o1_ir[];
+extern const size_t impala_llvm_o1_ir_len;
+
+extern const unsigned char impala_llvm_o2_ir[];
+extern const size_t impala_llvm_o2_ir_len;
+
+extern const unsigned char impala_llvm_os_ir[];
+extern const size_t impala_llvm_os_ir_len;
 
 extern const unsigned char impala_legacy_avx_llvm_ir[];
 extern const size_t impala_legacy_avx_llvm_ir_len;

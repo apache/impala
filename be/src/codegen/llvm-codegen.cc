@@ -125,6 +125,8 @@ DEFINE_string_hidden(llvm_cpu_attr_whitelist, "adx,aes,avx,avx2,bmi,bmi2,cmov,cx
     "routinely tested. This flag is provided to enable additional LLVM CPU attribute "
     "flags for testing.");
 #endif
+DEFINE_string_hidden(llvm_ir_opt, "Os",
+    "The IR optimization level for pre-generated code; supports O1, O2, and Os.");
 DECLARE_bool(enable_legacy_avx_support);
 
 namespace impala {
@@ -279,8 +281,18 @@ Status LlvmCodeGen::CreateFromMemory(FragmentState* state, ObjectPool* pool,
   // LLVM IR to use.
   if (IsCPUFeatureEnabled(CpuInfo::AVX2)) {
     // Use the default IR that supports AVX2
-    module_ir = llvm::StringRef(
-        reinterpret_cast<const char*>(impala_llvm_ir), impala_llvm_ir_len);
+    if (FLAGS_llvm_ir_opt == "O1") {
+      module_ir = llvm::StringRef(
+          reinterpret_cast<const char*>(impala_llvm_o1_ir), impala_llvm_o1_ir_len);
+    } else if (FLAGS_llvm_ir_opt == "O2") {
+      module_ir = llvm::StringRef(
+          reinterpret_cast<const char*>(impala_llvm_o2_ir), impala_llvm_o2_ir_len);
+    } else if (FLAGS_llvm_ir_opt == "Os") {
+      module_ir = llvm::StringRef(
+          reinterpret_cast<const char*>(impala_llvm_os_ir), impala_llvm_os_ir_len);
+    } else {
+      CHECK(false) << "llvm_ir_opt flag invalid; try O1, O2, or Os.";
+    }
     module_name = "Impala IR with AVX2 support";
   } else if (FLAGS_enable_legacy_avx_support && IsCPUFeatureEnabled(CpuInfo::AVX)) {
     // If there is no AVX but legacy mode is enabled, use legacy IR with AVX support
