@@ -37,6 +37,10 @@ add_library(Scheduling STATIC
 )
 add_dependencies(Scheduling gen-deps)
 
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
 add_library(SchedulingTests STATIC
   admission-controller-test.cc
   cluster-membership-mgr-test.cc

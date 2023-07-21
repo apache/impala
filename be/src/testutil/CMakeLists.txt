@@ -18,6 +18,10 @@
 
 cmake_minimum_required(VERSION 2.6)
 
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
 # where to put generated libraries
 set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/testutil")
 

@@ -15,6 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
 
 # where to put generated libraries
 set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/benchmarks")

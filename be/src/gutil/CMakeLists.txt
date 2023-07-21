@@ -70,6 +70,10 @@ ADD_EXPORTABLE_LIBRARY(gutil
   # Disable warnings which trigger a lot in the Google code:
   COMPILE_FLAGS "-funsigned-char -Wno-deprecated -Wno-char-subscripts")
 
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
 add_kudu_test(strings/string_util-test)
 
 add_library(GUtilTests STATIC

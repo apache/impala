@@ -30,4 +30,8 @@ add_library(Statestore
 )
 add_dependencies(Statestore gen-deps)
 
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
 ADD_BE_LSAN_TEST(statestore-test)

@@ -40,6 +40,10 @@ add_library(Parquet
 
 add_dependencies(Parquet gen-deps)
 
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
 add_library(ParquetTests STATIC
   hdfs-parquet-scanner-test.cc
   parquet-bool-decoder-test.cc

@@ -104,6 +104,25 @@ add_library(Util
   ${MPFIT_SRC_DIR}/mpfit.c)
 add_dependencies(Util gen-deps gen_ir_descriptions)
 
+# Squeasel requires C99 compatibility to build.
+SET_SOURCE_FILES_PROPERTIES(${SQUEASEL_SRC_DIR}/squeasel.c
+  PROPERTIES COMPILE_FLAGS -std=c99)
+
+# shared library which provides native logging support to JVMs over JNI.
+add_library(loggingsupport SHARED
+  logging-support.cc
+)
+
+add_executable(parquet-reader parquet-reader.cc)
+
+target_link_libraries(parquet-reader ${IMPALA_LINK_LIBS})
+
+target_link_libraries(loggingsupport ${IMPALA_LINK_LIBS_DYNAMIC_TARGETS})
+
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
 add_library(UtilTests STATIC
   benchmark-test.cc
   bitmap-test.cc
@@ -148,21 +167,6 @@ add_library(UtilTests STATIC
   zip-util-test.cc
 )
 add_dependencies(UtilTests gen-deps gen_ir_descriptions)
-
-# Squeasel requires C99 compatibility to build.
-SET_SOURCE_FILES_PROPERTIES(${SQUEASEL_SRC_DIR}/squeasel.c
-  PROPERTIES COMPILE_FLAGS -std=c99)
-
-# shared library which provides native logging support to JVMs over JNI.
-add_library(loggingsupport SHARED
-  logging-support.cc
-)
-
-add_executable(parquet-reader parquet-reader.cc)
-
-target_link_libraries(parquet-reader ${IMPALA_LINK_LIBS})
-
-target_link_libraries(loggingsupport ${IMPALA_LINK_LIBS_DYNAMIC_TARGETS})
 
 ADD_UNIFIED_BE_LSAN_TEST(benchmark-test "BenchmarkTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(bitmap-test "Bitmap.*")

@@ -87,6 +87,10 @@ add_library(Runtime
 )
 add_dependencies(Runtime gen-deps)
 
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
 add_library(RuntimeTests STATIC
   coordinator-backend-state-test.cc
   date-test.cc

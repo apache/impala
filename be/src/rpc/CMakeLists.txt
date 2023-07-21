@@ -40,6 +40,13 @@ add_library(Rpc
 )
 add_dependencies(Rpc gen-deps)
 
+if (BUILD_WITH_NO_TESTS)
+  # thrift-util.cc uses the EXPECT_NO_THROW macro, explicitly linking gtest library
+  # to avoid linker errors.
+  target_link_libraries(Rpc gtest)
+  return()
+endif()
+
 add_library(RpcTests STATIC
   thrift-util-test.cc
 )

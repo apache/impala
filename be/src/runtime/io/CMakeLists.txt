@@ -41,6 +41,10 @@ add_library(IoTests STATIC
 )
 add_dependencies(IoTests gen-deps)
 
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
 # This test runs forever so should not be part of 'make test'
 add_executable(disk-io-mgr-stress-test disk-io-mgr-stress-test.cc)
 target_link_libraries(disk-io-mgr-stress-test ${IMPALA_TEST_LINK_LIBS})

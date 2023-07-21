@@ -47,13 +47,6 @@ add_library(Service
 )
 add_dependencies(Service gen-deps)
 
-add_library(ServiceTests STATIC
-  hs2-util-test.cc
-  impala-server-test.cc
-  query-options-test.cc
-)
-add_dependencies(ServiceTests gen-deps)
-
 # this shared library provides Impala executor functionality to FE test.
 add_library(fesupport SHARED
   fe-support.cc
@@ -72,10 +65,6 @@ target_link_libraries(fesupport ${IMPALA_LINK_LIBS_DYNAMIC_TARGETS})
 
 add_executable(impalad
   daemon-main.cc
-)
-
-add_executable(unifiedbetests
-  unified-betest-main.cc
 )
 
 # All Impala daemons run from the same binary. The code that is run is determined by the
@@ -106,13 +95,28 @@ target_link_libraries(impalad
   ${IMPALA_LINK_LIBS}
 )
 
+install(FILES ${STATESTORED_SYMLINK} DESTINATION ${IMPALA_INSTALLDIR}/bin)
+install(FILES ${CATALOGD_SYMLINK} DESTINATION ${IMPALA_INSTALLDIR}/bin)
+install(TARGETS impalad DESTINATION ${IMPALA_INSTALLDIR}/bin)
+
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
+add_executable(unifiedbetests
+  unified-betest-main.cc
+)
+
 target_link_libraries(unifiedbetests
   ${JAVA_JSIG_LIBRARY} ${UNIFIED_TEST_LINK_LIBS})
 ADD_DEPENDENCIES(unified-be-test-executable unifiedbetests)
 
-install(FILES ${STATESTORED_SYMLINK} DESTINATION ${IMPALA_INSTALLDIR}/bin)
-install(FILES ${CATALOGD_SYMLINK} DESTINATION ${IMPALA_INSTALLDIR}/bin)
-install(TARGETS impalad DESTINATION ${IMPALA_INSTALLDIR}/bin)
+add_library(ServiceTests STATIC
+  hs2-util-test.cc
+  impala-server-test.cc
+  query-options-test.cc
+)
+add_dependencies(ServiceTests gen-deps)
 
 # Exception to unified be tests: Custom main() due to leak
 ADD_BE_TEST(session-expiry-test session-expiry-test.cc) # TODO: this leaks thrift server

@@ -54,6 +54,10 @@ add_dependencies(udf-sample-ir gen-deps)
 COMPILE_TO_IR(uda-sample.cc )
 add_dependencies(uda-sample-ir gen-deps)
 
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
 # This is an example of how to use the test harness to help develop UDF and UDAs.
 add_executable(udf-sample-test udf-sample-test.cc)
 target_link_libraries(udf-sample-test ImpalaUdf udfsample)

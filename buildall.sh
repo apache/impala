@@ -454,6 +454,9 @@ generate_cmake_files() {
   if [[ $BUILD_SHARED_LIBS -eq 1 ]]; then
     CMAKE_ARGS+=(-DBUILD_SHARED_LIBS=ON)
   fi
+  if [[ "$BUILD_TESTS" -eq 0 && "$GEN_PACKAGE" -eq 1 ]]; then
+    CMAKE_ARGS+=(-DBUILD_WITH_NO_TESTS=ON)
+  fi
   if [[ "${MAKE_CMD}" = "ninja" ]]; then
     CMAKE_ARGS+=(-GNinja)
   fi

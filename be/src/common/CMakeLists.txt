@@ -37,12 +37,6 @@ add_library(Common
 )
 add_dependencies(Common gen-deps)
 
-add_library(CommonTests STATIC
-  atomic-test.cc
-  thread-debug-info-test.cc
-)
-add_dependencies(CommonTests gen-deps)
-
 # Command to generate the build version file if not present. We don't automatically
 # regenerate the file if present, which speeds up incremental builds but can lead
 # to the version being stale.
@@ -58,9 +52,19 @@ add_library(GlobalFlags
 )
 add_dependencies(GlobalFlags gen-deps)
 
-ADD_UNIFIED_BE_LSAN_TEST(atomic-test AtomicTest.*)
-ADD_UNIFIED_BE_LSAN_TEST(thread-debug-info-test ThreadDebugInfo.*)
-
 # Generate config.h from config.h.in, filling in variables from CMake
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in
     ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
+add_library(CommonTests STATIC
+  atomic-test.cc
+  thread-debug-info-test.cc
+)
+add_dependencies(CommonTests gen-deps)
+
+ADD_UNIFIED_BE_LSAN_TEST(atomic-test AtomicTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(thread-debug-info-test ThreadDebugInfo.*)

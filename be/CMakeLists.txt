@@ -28,6 +28,8 @@ enable_testing()
 #      to CMakeFiles/<currentdir>.dir/<srcfile>.s
 PROJECT(ASSEMBLER)
 
+option(BUILD_WITH_NO_TESTS "Do not generate test and benchmark targets" OFF)
+
 # compiler flags that are common across debug/release builds
 #  -Wall: Enable all warnings.
 #  -Wno-sign-compare: suppress warnings for comparison between signed and unsigned
@@ -414,13 +416,16 @@ set (IMPALA_LIBS
   security
   Service
   Statestore
-  TestUtil
   ThriftSaslTransport
   token_proto
   Udf
   Util
   UtilCache
 )
+
+if (NOT BUILD_WITH_NO_TESTS)
+  set(IMPALA_LIBS ${IMPALA_LIBS} TestUtil)
+endif()
 
 set (IMPALA_LINK_LIBS
   ${WL_START_GROUP}
@@ -584,17 +589,19 @@ endif()
 set(LLVM_IR_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/llvm-ir")
 file(MAKE_DIRECTORY ${LLVM_IR_OUTPUT_DIRECTORY})
 
-# Add custom target to only build the backend tests
-# Note: this specifies "ALL" so it builds if running "make" with no arguments. This is
-# necessary due to the non-executable targets (i.e. generating backend test scripts)
-# that run for the unified backend tests.
-add_custom_target(be-test ALL)
+if (NOT BUILD_WITH_NO_TESTS)
+  # Add custom target to only build the backend tests
+  # Note: this specifies "ALL" so it builds if running "make" with no arguments. This is
+  # necessary due to the non-executable targets (i.e. generating backend test scripts)
+  # that run for the unified backend tests.
+  add_custom_target(be-test ALL)
 
-# Add custom target to build unified backend tests
-add_custom_target(unified-be-test)
+  # Add custom target to build unified backend tests
+  add_custom_target(unified-be-test)
 
-# Add custom target to build the unified backend test executable
-add_custom_target(unified-be-test-executable)
+  # Add custom target to build the unified backend test executable
+  add_custom_target(unified-be-test-executable)
+endif()
 
 # Variable to use to aggregate all of the filter patterns, joined by ":"
 set_property(GLOBAL PROPERTY AGG_UNIFIED_FILTER_PATTERN)
@@ -735,18 +742,20 @@ link_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/build/transport
 )
 
-# Add custom target to validate the unified backend test executable and test match
-# patterns. At this point, all filter patterns have been aggregated from the individual
-# ADD_UNIFIED_BE_TEST calls into AGG_UNIFIED_FILTER_PATTERN.
-get_property(TOTAL_UNIFIED_FILTER_PATTERN GLOBAL PROPERTY AGG_UNIFIED_FILTER_PATTERN)
-add_custom_target(unified-be-test-validated-executable
-  "${CMAKE_CURRENT_SOURCE_DIR}/../bin/validate-unified-backend-test-filters.py"
-  "-f" "${TOTAL_UNIFIED_FILTER_PATTERN}"
-  "-b" "${BUILD_OUTPUT_ROOT_DIRECTORY}/service/unifiedbetests")
+if (NOT BUILD_WITH_NO_TESTS)
+  # Add custom target to validate the unified backend test executable and test match
+  # patterns. At this point, all filter patterns have been aggregated from the individual
+  # ADD_UNIFIED_BE_TEST calls into AGG_UNIFIED_FILTER_PATTERN.
+  get_property(TOTAL_UNIFIED_FILTER_PATTERN GLOBAL PROPERTY AGG_UNIFIED_FILTER_PATTERN)
+  add_custom_target(unified-be-test-validated-executable
+    "${CMAKE_CURRENT_SOURCE_DIR}/../bin/validate-unified-backend-test-filters.py"
+    "-f" "${TOTAL_UNIFIED_FILTER_PATTERN}"
+    "-b" "${BUILD_OUTPUT_ROOT_DIRECTORY}/service/unifiedbetests")
 
-ADD_DEPENDENCIES(be-test unified-be-test)
-ADD_DEPENDENCIES(unified-be-test unified-be-test-validated-executable)
-ADD_DEPENDENCIES(unified-be-test-validated-executable unified-be-test-executable)
+  ADD_DEPENDENCIES(be-test unified-be-test)
+  ADD_DEPENDENCIES(unified-be-test unified-be-test-validated-executable)
+  ADD_DEPENDENCIES(unified-be-test-validated-executable unified-be-test-executable)
+endif()
 
 # only generate statically linked libs and executables
 set(BUILD_SHARED_LIBS OFF)

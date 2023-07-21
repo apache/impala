@@ -32,5 +32,9 @@ add_library(ImpalaUdf udf.cc udf-ir.cc udf-test-harness.cc)
 add_dependencies(ImpalaUdf gen-deps)
 set_target_properties(ImpalaUdf PROPERTIES COMPILE_FLAGS "-DIMPALA_UDF_SDK_BUILD")
 
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
 ADD_UDF_TEST(udf-test)
 ADD_UDF_TEST(uda-test)
