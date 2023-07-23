@@ -34,7 +34,6 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.hive.executor.TestHiveJavaFunctionFactory;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.service.FeSupport;
-import org.apache.impala.thrift.TUniqueId;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -47,10 +46,9 @@ import java.util.UUID;
 public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
   private CatalogOpExecutor opExecutor_;
   private CatalogServiceTestCatalog(boolean loadInBackground, int numLoadingThreads,
-      TUniqueId catalogServiceId, MetaStoreClientPool metaStoreClientPool)
-      throws ImpalaException {
-    super(loadInBackground, numLoadingThreads, catalogServiceId,
-        System.getProperty("java.io.tmpdir"), metaStoreClientPool);
+      MetaStoreClientPool metaStoreClientPool) throws ImpalaException {
+    super(loadInBackground, numLoadingThreads, System.getProperty("java.io.tmpdir"),
+        metaStoreClientPool);
 
     // Cache pools are typically loaded asynchronously, but as there is no fixed execution
     // order for tests, the cache pools are loaded synchronously before the tests are
@@ -74,8 +72,7 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
       if (MetastoreShim.getMajorVersion() > 2) {
         MetastoreShim.setHiveClientCapabilities();
       }
-      cs = new CatalogServiceTestCatalog(false, 16, new TUniqueId(),
-          new MetaStoreClientPool(0, 0));
+      cs = new CatalogServiceTestCatalog(false, 16, new MetaStoreClientPool(0, 0));
       cs.setAuthzManager(factory.newAuthorizationManager(cs));
       cs.setMetastoreEventProcessor(NoOpEventProcessor.getInstance());
       cs.setCatalogMetastoreServer(NoOpCatalogMetastoreServer.INSTANCE);
@@ -106,7 +103,7 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
       MetastoreShim.setHiveClientCapabilities();
     }
     CatalogServiceTestCatalog cs = new CatalogServiceTestCatalog(false, 16,
-        new TUniqueId(), new EmbeddedMetastoreClientPool(0, derbyPath));
+        new EmbeddedMetastoreClientPool(0, derbyPath));
     cs.setAuthzManager(new NoopAuthorizationManager());
     cs.setMetastoreEventProcessor(NoOpEventProcessor.getInstance());
     cs.setCatalogOpExecutor(new CatalogOpExecutor(cs,

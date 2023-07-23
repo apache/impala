@@ -89,6 +89,7 @@ import org.apache.impala.hive.executor.HiveJavaFunction;
 import org.apache.impala.hive.executor.HiveJavaFunctionFactoryImpl;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
+import org.apache.impala.service.JniCatalog;
 import org.apache.impala.thrift.CatalogLookupStatus;
 import org.apache.impala.thrift.CatalogServiceConstants;
 import org.apache.impala.thrift.TCatalog;
@@ -240,8 +241,6 @@ public class CatalogServiceCatalog extends Catalog {
   // default value of table id in the GetPartialCatalogObjectRequest
   public static final long TABLE_ID_UNAVAILABLE = -1;
 
-  private final TUniqueId catalogServiceId_;
-
   // Fair lock used to synchronize reads/writes of catalogVersion_. Because this lock
   // protects catalogVersion_, it can be used to perform atomic bulk catalog operations
   // since catalogVersion_ cannot change externally while the lock is being held.
@@ -340,8 +339,7 @@ public class CatalogServiceCatalog extends Catalog {
    * @throws ImpalaException
    */
   public CatalogServiceCatalog(boolean loadInBackground, int numLoadingThreads,
-      TUniqueId catalogServiceId, String localLibraryPath,
-      MetaStoreClientPool metaStoreClientPool)
+      String localLibraryPath, MetaStoreClientPool metaStoreClientPool)
       throws ImpalaException {
     super(metaStoreClientPool);
     blacklistedDbs_ = CatalogBlacklistUtils.parseBlacklistedDbs(
@@ -356,7 +354,6 @@ public class CatalogServiceCatalog extends Catalog {
         .getBackendCfg().topic_update_tbl_max_wait_time_ms;
     Preconditions.checkState(topicUpdateTblLockMaxWaitTimeMs_ >= 0,
         "topic_update_tbl_max_wait_time_ms must be positive");
-    catalogServiceId_ = catalogServiceId;
     tableLoadingMgr_ = new TableLoadingMgr(this, numLoadingThreads);
     loadInBackground_ = loadInBackground;
     try {
@@ -397,9 +394,8 @@ public class CatalogServiceCatalog extends Catalog {
    * to establish an initial connection to the HMS before giving up.
    */
   public CatalogServiceCatalog(boolean loadInBackground, int numLoadingThreads,
-      int initialHmsCnxnTimeoutSec, TUniqueId catalogServiceId, String localLibraryPath)
-      throws ImpalaException {
-    this(loadInBackground, numLoadingThreads, catalogServiceId, localLibraryPath,
+      int initialHmsCnxnTimeoutSec, String localLibraryPath) throws ImpalaException {
+    this(loadInBackground, numLoadingThreads, localLibraryPath,
         new MetaStoreClientPool(INITIAL_META_STORE_CLIENT_POOL_SIZE,
             initialHmsCnxnTimeoutSec));
   }
@@ -999,7 +995,8 @@ public class CatalogServiceCatalog extends Catalog {
     // can safely forward their min catalog version.
     TCatalogObject catalog =
         new TCatalogObject(TCatalogObjectType.CATALOG, ctx.toVersion);
-    catalog.setCatalog(new TCatalog(catalogServiceId_, ctx.lastResetStartVersion));
+    catalog.setCatalog(
+        new TCatalog(JniCatalog.getServiceId(), ctx.lastResetStartVersion));
     ctx.addCatalogObject(catalog, false);
     // Garbage collect the delete and topic update log.
     deleteLog_.garbageCollect(ctx.toVersion);
@@ -3528,7 +3525,7 @@ public class CatalogServiceCatalog extends Catalog {
    * Gets the id for this catalog service
    */
   public String getCatalogServiceId() {
-    return TUniqueIdUtil.PrintId(catalogServiceId_).intern();
+    return TUniqueIdUtil.PrintId(JniCatalog.getServiceId()).intern();
   }
 
   /**

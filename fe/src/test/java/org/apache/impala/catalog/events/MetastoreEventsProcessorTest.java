@@ -157,7 +157,6 @@ import org.apache.impala.thrift.TTableRowFormat;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.thrift.TTypeNode;
 import org.apache.impala.thrift.TTypeNodeType;
-import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TUpdatedPartition;
 import org.apache.impala.util.MetaStoreUtil;
@@ -1764,17 +1763,16 @@ public class MetastoreEventsProcessorTest {
     private String tblName_;
 
     private FakeCatalogServiceCatalogForFlagTests(boolean loadInBackground,
-        int numLoadingThreads, TUniqueId catalogServiceId, String localLibraryPath,
+        int numLoadingThreads, String localLibraryPath,
         MetaStoreClientPool metaStoreClientPool) throws ImpalaException {
-      super(loadInBackground, numLoadingThreads, catalogServiceId, localLibraryPath,
-          metaStoreClientPool);
+      super(loadInBackground, numLoadingThreads, localLibraryPath, metaStoreClientPool);
     }
 
     public static CatalogServiceCatalog create() {
       FeSupport.loadLibrary();
       CatalogServiceCatalog cs;
       try {
-        cs = new FakeCatalogServiceCatalogForFlagTests(false, 16, new TUniqueId(),
+        cs = new FakeCatalogServiceCatalogForFlagTests(false, 16,
             System.getProperty("java.io.tmpdir"), new MetaStoreClientPool(0, 0));
         cs.setAuthzManager(new NoopAuthorizationManager());
         cs.setMetastoreEventProcessor(NoOpEventProcessor.getInstance());

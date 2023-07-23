@@ -344,6 +344,7 @@ CatalogServer::CatalogServer(MetricGroup* metrics)
   : protocol_version_(CatalogServiceVersion::V2),
     thrift_iface_(new CatalogServiceThriftIf(this)),
     thrift_serializer_(FLAGS_compact_catalog_topic), metrics_(metrics),
+    is_active_(!FLAGS_enable_catalogd_ha),
     topic_updates_ready_(false), last_sent_catalog_version_(0L),
     catalog_objects_max_version_(0L) {
   topic_processing_time_metric_ = StatsMetric<double>::CreateAndRegister(metrics,
@@ -354,7 +355,6 @@ CatalogServer::CatalogServer(MetricGroup* metrics)
       metrics->AddProperty(CATALOG_ACTIVE_STATUS, !FLAGS_enable_catalogd_ha);
   num_ha_active_status_change_metric_ =
       metrics->AddCounter(CATALOG_HA_NUM_ACTIVE_STATUS_CHANGE, 0);
-  is_active_.Store(FLAGS_enable_catalogd_ha ? 0 : 1);
 }
 
 Status CatalogServer::Start() {
@@ -408,7 +408,7 @@ Status CatalogServer::Start() {
       statestore_subscriber_->Start(&has_active_catalogd, &active_catalogd_registration));
   if (FLAGS_enable_catalogd_ha && has_active_catalogd) {
     UpdateRegisteredCatalogd(active_catalogd_registration);
-    if (FLAGS_force_catalogd_active && is_active_.Load() != 1) {
+    if (FLAGS_force_catalogd_active && !IsActive()) {
       LOG(ERROR) << "Could not start CatalogD as active instance";
       return Status("Could not start CatalogD as active instance");
     }
@@ -417,7 +417,7 @@ Status CatalogServer::Start() {
   // Notify the thread to start for the first time.
   {
     lock_guard<mutex> l(catalog_lock_);
-    catalog_update_cv_.NotifyOne();
+    if (is_active_) catalog_update_cv_.NotifyOne();
   }
   return Status::OK();
 }
@@ -451,18 +451,15 @@ void CatalogServer::RegisterWebpages(Webserver* webserver, bool metrics_only) {
 void CatalogServer::UpdateCatalogTopicCallback(
     const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
     vector<TTopicDelta>* subscriber_topic_updates) {
-  // Don't update catalog if this instance is not active.
-  if (is_active_.Load() == 0) return;
-
   StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
       incoming_topic_deltas.find(CatalogServer::IMPALA_CATALOG_TOPIC);
   if (topic == incoming_topic_deltas.end()) return;
 
   unique_lock<mutex> l(catalog_lock_, std::try_to_lock);
-  // Return if unable to acquire the catalog_lock_ or if the topic update data is
-  // not yet ready for processing. This indicates the catalog_update_gathering_thread_
-  // is still building a topic update.
-  if (!l || !topic_updates_ready_) return;
+  // Return if unable to acquire the catalog_lock_, or this instance is not active,
+  // or if the topic update data is not yet ready for processing. This indicates the
+  // catalog_update_gathering_thread_ is still building a topic update.
+  if (!l || !is_active_ || !topic_updates_ready_) return;
 
   const TTopicDelta& delta = topic->second;
 
@@ -510,33 +507,38 @@ void CatalogServer::UpdateRegisteredCatalogd(
             << TNetworkAddressToString(catalogd_registration.address);
   bool is_matching = (catalogd_registration.address.hostname == FLAGS_hostname
       && catalogd_registration.address.port == FLAGS_catalog_service_port);
-  bool is_changed;
+  lock_guard<mutex> l(catalog_lock_);
   if (is_matching) {
-    is_changed = is_active_.CompareAndSwap(0, 1);
-  } else {
-    is_changed = is_active_.CompareAndSwap(1, 0);
-  }
-  if (is_changed) {
-    {
-      unique_lock<mutex> unique_lock(catalog_lock_);
-      bool is_active = (is_active_.Load() != 0);
-      if (is_active) {
-        // Reset last_sent_catalog_version_ when the catalogd become active. This will
-        // lead to non-delta catalog update for next IMPALA_CATALOG_TOPIC which also
-        // instruct the statestore to clear all entries for the catalog update topic.
-        last_sent_catalog_version_ = 0;
-        // Signal the catalog update gathering thread to start.
-        topic_updates_ready_ = false;
-        catalog_update_cv_.NotifyOne();
-        // Regenerate Catalog Service ID.
-        catalog_->RegenerateServiceId();
-      }
-      active_status_metric_->SetValue(is_active);
+    if (!is_active_) {
+      is_active_ = true;
+      active_status_metric_->SetValue(true);
+      num_ha_active_status_change_metric_->Increment(1);
+      // Reset last_sent_catalog_version_ when the catalogd become active. This will
+      // lead to non-delta catalog update for next IMPALA_CATALOG_TOPIC which also
+      // instruct the statestore to clear all entries for the catalog update topic.
+      last_sent_catalog_version_ = 0;
+      // Regenerate Catalog Service ID.
+      catalog_->RegenerateServiceId();
+      // Clear pending topic updates.
+      pending_topic_updates_.clear();
+      // Signal the catalog update gathering thread to start.
+      topic_updates_ready_ = false;
+      catalog_update_cv_.NotifyOne();
+      LOG(INFO) << "This catalogd instance is changed to active status";
     }
-    num_ha_active_status_change_metric_->Increment(1);
-    LOG(INFO) << "The role of catalogd instance is changed to "
-              << (is_matching ? "active" : "standby");
+  } else {
+    if (is_active_) {
+      is_active_ = false;
+      active_status_metric_->SetValue(false);
+      num_ha_active_status_change_metric_->Increment(1);
+      LOG(INFO) << "This catalogd instance is changed to inactive status";
+    }
   }
+}
+
+bool CatalogServer::IsActive() {
+  lock_guard<mutex> l(catalog_lock_);
+  return is_active_;
 }
 
 [[noreturn]] void CatalogServer::GatherCatalogUpdatesThread() {

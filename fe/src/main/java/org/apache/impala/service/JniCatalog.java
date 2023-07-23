@@ -24,6 +24,9 @@ import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.impala.analysis.TableName;
@@ -111,8 +114,9 @@ public class JniCatalog {
   // The service id will be regenerated when the CatalogD becomes active.
   private static TUniqueId catalogServiceId_ = generateId();
 
-  // Lock to protect catalogServiceId_.
-  private final static Object catalogServiceIdLock_ = new Object();
+  // ReadWriteLock to protect catalogServiceId_.
+  private final static ReentrantReadWriteLock catalogServiceIdLock_ =
+      new ReentrantReadWriteLock(true /*fair ordering*/);
 
   // A singleton monitoring class that keeps track of the catalog usage metrics.
   private final CatalogOperationMetrics catalogOperationUsage_ =
@@ -155,8 +159,7 @@ public class JniCatalog {
         new MetaStoreClientPool(CatalogServiceCatalog.INITIAL_META_STORE_CLIENT_POOL_SIZE,
             cfg.initial_hms_cnxn_timeout_s);
     catalog_ = new CatalogServiceCatalog(cfg.load_catalog_in_background,
-        cfg.num_metadata_loading_threads, getServiceId(), cfg.local_library_path,
-        metaStoreClientPool);
+        cfg.num_metadata_loading_threads, cfg.local_library_path, metaStoreClientPool);
     authzManager_ = authzFactory.newAuthorizationManager(catalog_);
     catalog_.setAuthzManager(authzManager_);
     catalogOpExecutor_ = new CatalogOpExecutor(catalog_, authzConfig, authzManager_,
@@ -254,16 +257,23 @@ public class JniCatalog {
   }
 
   public static TUniqueId getServiceId() {
-    synchronized (catalogServiceIdLock_) {
+    catalogServiceIdLock_.readLock().lock();
+    try {
       return catalogServiceId_;
+    } finally {
+      catalogServiceIdLock_.readLock().unlock();
     }
   }
 
   public void regenerateServiceId() {
-    synchronized (catalogServiceIdLock_) {
+    catalogServiceIdLock_.writeLock().lock();
+    try {
+      TUniqueId oldCatalogServiceId = catalogServiceId_;
       catalogServiceId_ = generateId();
-      LOG.info("Regenerate Catalog Service Id {}",
-          TUniqueIdUtil.PrintId(catalogServiceId_).intern());
+      LOG.info("Old Catalog Service ID " + TUniqueIdUtil.PrintId(oldCatalogServiceId) +
+          ", Regenerate Catalog Service ID " + TUniqueIdUtil.PrintId(catalogServiceId_));
+    } finally {
+      catalogServiceIdLock_.writeLock().unlock();
     }
   }
 

@@ -134,9 +134,6 @@ class CatalogServer {
   /// Indicates whether the catalog service is ready.
   std::atomic_bool service_started_{false};
 
-  /// Set to 1 if this catalog instance is active.
-  AtomicInt32 is_active_{0};
-
   /// Thrift API implementation which proxies requests onto this CatalogService.
   std::shared_ptr<CatalogServiceIf> thrift_iface_;
   ThriftSerializer thrift_serializer_;
@@ -162,9 +159,12 @@ class CatalogServer {
   /// Thread that periodically wakes up and refreshes certain Catalog metrics.
   std::unique_ptr<Thread> catalog_metrics_refresh_thread_;
 
-  /// Protects catalog_update_cv_, pending_topic_updates_,
+  /// Protects is_active_, catalog_update_cv_, pending_topic_updates_,
   /// catalog_objects_to/from_version_, and last_sent_catalog_version.
   std::mutex catalog_lock_;
+
+  /// Set to true if this catalog instance is active.
+  bool is_active_;
 
   /// Condition variable used to signal when the catalog_update_gathering_thread_ should
   /// fetch its next set of updates from the JniCatalog. At the end of each statestore
@@ -208,6 +208,9 @@ class CatalogServer {
 
   /// Callback function for receiving notification of updating catalogd.
   void UpdateRegisteredCatalogd(const TCatalogRegistration& catalogd_registration);
+
+  /// Returns the active status of the catalogd.
+  bool IsActive();
 
   /// Executed by the catalog_update_gathering_thread_. Calls into JniCatalog
   /// to get the latest set of catalog objects that exist, along with some metadata on

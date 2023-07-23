@@ -55,6 +55,20 @@ class TestCatalogdHA(CustomClusterTestSuite):
     _, catalog_service_port = active_catalogd_address.split(":")
     assert(int(catalog_service_port) == catalogd_service.get_catalog_service_port())
 
+  def __run_simple_queries(self):
+    try:
+      self.execute_query_expect_success(
+          self.client, "drop table if exists test_catalogd_ha")
+      self.execute_query_expect_success(
+          self.client, "create table if not exists test_catalogd_ha (id int)")
+      self.execute_query_expect_success(
+          self.client, "insert into table test_catalogd_ha values(1), (2), (3)")
+      self.execute_query_expect_success(
+          self.client, "select count(*) from test_catalogd_ha")
+    finally:
+      self.execute_query_expect_success(
+          self.client, "drop table if exists test_catalogd_ha")
+
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_subscriber_id_as_catalogd_priority=true",
     start_args="--enable_catalogd_ha")
@@ -74,9 +88,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
     self.__verify_impalad_active_catalogd_port(0, catalogd_service_1)
     self.__verify_impalad_active_catalogd_port(1, catalogd_service_1)
     self.__verify_impalad_active_catalogd_port(2, catalogd_service_1)
-    # Verify simple query is ran successfully.
-    self.execute_query_expect_success(
-        self.client, "select count(*) from functional.alltypes")
+    # Verify simple queries are ran successfully.
+    self.__run_simple_queries()
 
     # Restart one coordinator. Verify it get active catalogd address from statestore.
     self.cluster.impalads[0].restart()
@@ -103,9 +116,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
     self.__verify_impalad_active_catalogd_port(0, catalogd_service_1)
     self.__verify_impalad_active_catalogd_port(1, catalogd_service_1)
     self.__verify_impalad_active_catalogd_port(2, catalogd_service_1)
-    # Verify simple query is ran successfully.
-    self.execute_query_expect_success(
-        self.client, "select count(*) from functional.alltypes")
+    # Verify simple queries are ran successfully.
+    self.__run_simple_queries()
 
   def __test_catalogd_auto_failover(self):
     """Stop active catalogd and verify standby catalogd becomes active.
@@ -140,9 +152,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
     self.__verify_impalad_active_catalogd_port(0, catalogd_service_2)
     self.__verify_impalad_active_catalogd_port(1, catalogd_service_2)
     self.__verify_impalad_active_catalogd_port(2, catalogd_service_2)
-    # Verify simple query is ran successfully.
-    self.execute_query_expect_success(
-        self.client, "select count(*) from functional.alltypes")
+    # Verify simple queries are ran successfully.
+    self.__run_simple_queries()
 
     end_count_clear_topic_entries = statestore_service.get_metric_value(
         "statestore.num-clear-topic-entries-requests")
@@ -231,9 +242,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
     self.__verify_impalad_active_catalogd_port(1, catalogd_service_2)
     self.__verify_impalad_active_catalogd_port(2, catalogd_service_2)
 
-    # Verify simple query is ran successfully.
-    self.execute_query_expect_success(
-        self.client, "select count(*) from functional.alltypes")
+    # Verify simple queries are ran successfully.
+    self.__run_simple_queries()
 
     end_count_clear_topic_entries = statestore_service.get_metric_value(
         "statestore.num-clear-topic-entries-requests")
@@ -334,9 +344,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
     self.__verify_impalad_active_catalogd_port(0, catalogd_service_1)
     self.__verify_impalad_active_catalogd_port(1, catalogd_service_1)
     self.__verify_impalad_active_catalogd_port(2, catalogd_service_1)
-    # Verify simple query is ran successfully.
-    self.execute_query_expect_success(
-        self.client, "select count(*) from functional.alltypes")
+    # Verify simple queries are ran successfully.
+    self.__run_simple_queries()
 
     unexpected_msg = re.compile(
         "unexpected sequence number: [0-9]+, was expecting greater than [0-9]+")
