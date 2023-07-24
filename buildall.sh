@@ -416,28 +416,40 @@ bootstrap_dependencies() {
 
   # Populate necessary thirdparty components unless it's set to be skipped.
   if [[ "${SKIP_TOOLCHAIN_BOOTSTRAP}" = true ]]; then
-    echo "SKIP_TOOLCHAIN_BOOTSTRAP is true, skipping toolchain bootstrap."
+    if ! [ -z "${NATIVE_TOOLCHAIN_HOME}" ]; then
+      if ! [ -d "${NATIVE_TOOLCHAIN_HOME}" ]; then
+        mkdir -p "${NATIVE_TOOLCHAIN_HOME}"
+        pushd "${NATIVE_TOOLCHAIN_HOME}"
+        git init
+        git remote add toolchain "${IMPALA_TOOLCHAIN_REPO}"
+        git fetch toolchain "${IMPALA_TOOLCHAIN_BRANCH}"
+        # Specifying a branch avoids a large message from git about detached HEADs.
+        git checkout "${IMPALA_TOOLCHAIN_COMMIT_HASH}" -b "${IMPALA_TOOLCHAIN_BUILD_ID}"
+      else
+        pushd "${NATIVE_TOOLCHAIN_HOME}"
+      fi
+      echo "Begin building toolchain, may need several hours, please be patient...."
+      ./buildall.sh
+      popd
+    else
+      echo "SKIP_TOOLCHAIN_BOOTSTRAP is true, skipping toolchain bootstrap."
+    fi
     if [[ "${DOWNLOAD_CDH_COMPONENTS}" = true ]]; then
       echo ">>> Downloading and extracting cdh components."
       "$IMPALA_HOME/bin/bootstrap_toolchain.py"
     fi
-    # Create soft link to locally builded native-toolchain on aarch64
-    if [[ "$(uname -p)" = "aarch64" ]]; then
-      mkdir -p $IMPALA_TOOLCHAIN_PACKAGES_HOME
-      cd "$IMPALA_TOOLCHAIN_PACKAGES_HOME"
-      ln -f -s ${NATIVE_TOOLCHAIN_HOME}/build/* .
-      cd -
-      if ! [[ -d "$IMPALA_HOME/../hadoopAarch64NativeLibs" ]]; then
-        git clone https://github.com/zhaorenhai/hadoopAarch64NativeLibs \
-          "$IMPALA_HOME/../hadoopAarch64NativeLibs"
-      fi
-      cp $IMPALA_HOME/../hadoopAarch64NativeLibs/lib*  $HADOOP_HOME/lib/native/
-    fi
-
   else
     echo ">>> Downloading and extracting toolchain dependencies."
     "$IMPALA_HOME/bin/bootstrap_toolchain.py"
     echo "Toolchain bootstrap complete."
+  fi
+  # Download prebuilt Hadoop native binaries for aarch64
+  if [[ "$(uname -p)" = "aarch64" ]]; then
+    if ! [[ -d "$IMPALA_HOME/../hadoopAarch64NativeLibs" ]]; then
+      git clone https://github.com/zhaorenhai/hadoopAarch64NativeLibs \
+        "$IMPALA_HOME/../hadoopAarch64NativeLibs"
+    fi
+    cp $IMPALA_HOME/../hadoopAarch64NativeLibs/lib*  $HADOOP_HOME/lib/native/
   fi
   if [[ "${USE_APACHE_HIVE}" = true ]]; then
     "$IMPALA_HOME/testdata/bin/patch_hive.sh"

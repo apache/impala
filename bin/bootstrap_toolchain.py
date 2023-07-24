@@ -568,7 +568,8 @@ def main():
   if os.getenv("DOWNLOAD_CDH_COMPONENTS", "false") == "true":
     create_directory_from_env_var("CDP_COMPONENTS_HOME")
     create_directory_from_env_var("APACHE_COMPONENTS_HOME")
-    if platform.processor() != "aarch64":
+    if os.getenv("SKIP_TOOLCHAIN_BOOTSTRAP", "false") != "true":
+      # Kudu is currently sourced from native-toolchain
       downloads += get_kudu_downloads()
     downloads += get_hadoop_downloads()
 

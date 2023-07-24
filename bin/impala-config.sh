@@ -86,6 +86,11 @@ export USE_AVRO_CPP=${USE_AVRO_CPP:=false}
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
 export IMPALA_TOOLCHAIN_BUILD_ID=358-e7cfab15d3
+export IMPALA_TOOLCHAIN_REPO=\
+${IMPALA_TOOLCHAIN_REPO:-https://github.com/cloudera/native-toolchain.git}
+export IMPALA_TOOLCHAIN_BRANCH=${IMPALA_TOOLCHAIN_BRANCH:-master}
+export IMPALA_TOOLCHAIN_COMMIT_HASH=\
+${IMPALA_TOOLCHAIN_COMMIT_HASH-e7cfab15d36ae051747252b676f0a11a9c58fe05}
 # Versions of toolchain dependencies.
 # -----------------------------------
 if $USE_AVRO_CPP; then
@@ -316,8 +321,13 @@ fi
 # IMPALA_TOOLCHAIN_PACKAGES_HOME is the location inside IMPALA_TOOLCHAIN where native
 # toolchain packages are placed. This uses a subdirectory that contains the information
 # about the compiler to allow using different compiler versions.
-export IMPALA_TOOLCHAIN_PACKAGES_HOME=\
+IMPALA_TOOLCHAIN_PACKAGES_HOME=\
 ${IMPALA_TOOLCHAIN}/toolchain-packages-gcc${IMPALA_GCC_VERSION}
+if ! [ -z ${NATIVE_TOOLCHAIN_HOME-} ]; then
+  IMPALA_TOOLCHAIN_PACKAGES_HOME=$(realpath ${NATIVE_TOOLCHAIN_HOME})/build
+  export SKIP_TOOLCHAIN_BOOTSTRAP=true
+fi
+export IMPALA_TOOLCHAIN_PACKAGES_HOME
 
 export CDP_HADOOP_URL=${CDP_HADOOP_URL-}
 export CDP_HBASE_URL=${CDP_HBASE_URL-}

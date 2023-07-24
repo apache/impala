@@ -481,23 +481,12 @@ echo -e "\n$SET_IMPALA_HOME" >> ~/.bashrc
 eval "$SET_IMPALA_HOME"
 
 if [[ $ARCH_NAME == 'aarch64' ]]; then
-  echo -e "\nexport SKIP_TOOLCHAIN_BOOTSTRAP=true" >> \
-    "${IMPALA_HOME}/bin/impala-config-local.sh"
   SET_TOOLCHAIN_HOME="export NATIVE_TOOLCHAIN_HOME=${IMPALA_HOME}/../native-toolchain"
   echo -e "\n$SET_TOOLCHAIN_HOME" >> ~/.bashrc
   echo -e "\n$SET_TOOLCHAIN_HOME" >> "${IMPALA_HOME}/bin/impala-config-local.sh"
   eval "$SET_TOOLCHAIN_HOME"
-  if ! [[ -d "$NATIVE_TOOLCHAIN_HOME" ]]; then
-    time -p git clone https://github.com/cloudera/native-toolchain/ \
-      "$NATIVE_TOOLCHAIN_HOME"
-  fi
-  cd "$NATIVE_TOOLCHAIN_HOME"
-  git pull
-  echo "Begin build tool chain, may need several hours, please be patient...."
+  # Provide access to ~/.cache on build machines so we can use ccache.
   sudo chmod 755 ~/.cache
-  ./buildall.sh
-  cd -
-  mkdir -p ${IMPALA_HOME}/toolchain
 fi
 
 # Try to prepopulate the m2 directory to save time
