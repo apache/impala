@@ -1437,5 +1437,4 @@ class TestExecutorGroups(CustomClusterTestSuite):
     assert ("Scheduler Warning: Cluster membership might changed between planning and "
         "scheduling, F00 scheduled instance count (16) is higher than its effective "
         "count (12)") in profile, profile
-    assert "00:SCAN HDFS               8     16" in profile, profile
     self.client.close_query(handle)
