@@ -51,6 +51,7 @@
 #include "service/data-stream-service.h"
 #include "service/frontend.h"
 #include "service/impala-server.h"
+#include "statestore/statestore-subscriber-catalog.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
@@ -249,6 +250,7 @@ ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
 
   catalogd_address_ = std::make_shared<const TNetworkAddress>(
       MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port));
+  active_catalogd_version_checker_.reset(new ActiveCatalogdVersionChecker());
 
   TStatestoreSubscriberType::type subscriber_type = TStatestoreSubscriberType::UNKNOWN;
   if (FLAGS_is_coordinator) {
@@ -267,7 +269,7 @@ ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
         CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024));
 
     StatestoreSubscriber::UpdateCatalogdCallback update_catalogd_cb =
-        bind<void>(mem_fn(&ExecEnv::UpdateCatalogd), this, _1);
+        bind<void>(mem_fn(&ExecEnv::UpdateActiveCatalogd), this, _1, _2, _3);
     statestore_subscriber_->AddUpdateCatalogdTopic(update_catalogd_cb);
   }
   StatestoreSubscriber::CompleteRegistrationCallback complete_registration_cb =
@@ -514,18 +516,12 @@ Status ExecEnv::StartStatestoreSubscriberService() {
 
   // Must happen after all topic registrations / callbacks are done
   if (statestore_subscriber_.get() != nullptr) {
-    bool has_active_catalogd = false;
-    TCatalogRegistration active_catalogd_registration;
-    Status status = statestore_subscriber_->Start(
-        &has_active_catalogd, &active_catalogd_registration);
+    Status status = statestore_subscriber_->Start();
     if (!status.ok()) {
       status.AddDetail("Statestore subscriber did not start up.");
       return status;
     }
     if (statestore_subscriber_->IsRegistered()) SetStatestoreRegistrationCompleted();
-    if (has_active_catalogd && FLAGS_is_coordinator) {
-      UpdateCatalogd(active_catalogd_registration);
-    }
   }
 
   return Status::OK();
@@ -671,7 +667,13 @@ Status ExecEnv::GetAdmissionServiceAddress(
   return Status::OK();
 }
 
-void ExecEnv::UpdateCatalogd(const TCatalogRegistration& catalogd_registration) {
+void ExecEnv::UpdateActiveCatalogd(bool is_registration_reply,
+    int64 active_catalogd_version, const TCatalogRegistration& catalogd_registration) {
+  std::lock_guard<std::mutex> l(catalogd_address_lock_);
+  if (!active_catalogd_version_checker_->CheckActiveCatalogdVersion(
+          is_registration_reply, active_catalogd_version)) {
+    return;
+  }
   if (catalogd_registration.address.hostname.empty()
       || catalogd_registration.address.port == 0) {
     return;
@@ -691,7 +693,6 @@ void ExecEnv::UpdateCatalogd(const TCatalogRegistration& catalogd_registration) 
               << statestore_subscriber_->GetCatalogProtocolVersion()
               << " vs. " << catalogd_registration.protocol;
   }
-  std::lock_guard<std::mutex> l(catalogd_address_lock_);
   DCHECK(catalogd_address_.get() != nullptr);
   if (!is_catalogd_address_metric_set_) {
     // At least set the metric once.

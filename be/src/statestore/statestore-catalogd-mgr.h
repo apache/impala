@@ -45,7 +45,7 @@ class StatestoreCatalogdMgr {
       is_active_catalogd_assigned_(false),
       num_registered_catalogd_(0),
       first_catalogd_register_time_(0),
-      sending_sequence_(0) {}
+      active_catalogd_version_(0L) {}
 
   /// Register one catalogd.
   /// Return true if new active catalogd is designated during this registration.
@@ -67,7 +67,7 @@ class StatestoreCatalogdMgr {
   /// Return the protocol version of catalog service and address of active catalogd.
   /// Set *has_active_catalogd as false if the active one is not designated yet.
   const TCatalogRegistration& GetActiveCatalogRegistration(
-      bool* has_active_catalogd, int64* sending_sequence);
+      bool* has_active_catalogd, int64_t* active_catalogd_version);
 
   /// Return the subscriber-id of active catalogd.
   /// This function should be called after the active catalogd is designated.
@@ -116,9 +116,9 @@ class StatestoreCatalogdMgr {
   /// Additional registration info of standby catalogd
   TCatalogRegistration standby_catalogd_registration_;
 
-  /// Monotonically increasing sending sequence number. The value is increased when
-  /// a new active catalogd is designated.
-  int64 sending_sequence_;
+  /// Monotonically increasing version number. The value is increased when a new active
+  /// catalogd is designated.
+  int64_t active_catalogd_version_;
 };
 
 } // namespace impala

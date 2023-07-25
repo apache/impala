@@ -112,9 +112,24 @@ class StatestoreSubscriber {
       const UpdateCallback& callback);
 
   /// UpdateCatalogdCallback is invoked every time that a notification of updating
-  /// catalogd is received from the statestore.
-  typedef boost::function<void (const TCatalogRegistration& catalogd_registration)>
-      UpdateCatalogdCallback;
+  /// catalogd is received from the statestore. This callback function could be called
+  /// for two events: receive registration RPC reply, receive UpdateCatalogD RPC request.
+  ///   is_registration_reply: set it as true when the function is called for the event
+  ///                          of registration reply.
+  ///   active_catalogd_version: the version of active catalogd.
+  ///   catalogd_registration: registration info of active catalogd, including its
+  ///                          address and port.
+  ///
+  /// When receiving registration RPC reply for the attempt of re-registration, it's
+  /// possible the active catalogd has NOT been elected by statestore yet. In this case,
+  /// we still need to call this function so that coordinators and catalogds could reset
+  /// their 'last_active_catalogd_version_'. Otherwise, the catalogd updates may be
+  /// ignored by coordinators and catalogds after statestore is restarted. In this case,
+  /// active_catalogd_version is set as invalid value -1. catalogd_registration has
+  /// invalid value and should not be used by callee.
+  typedef boost::function<void (
+      bool is_registration_reply, int64_t active_catalogd_version,
+      const TCatalogRegistration& catalogd_registration)> UpdateCatalogdCallback;
 
   /// Adds a callback for notification of updating catalogd.
   void AddUpdateCatalogdTopic(const UpdateCatalogdCallback& callback);
@@ -129,14 +144,9 @@ class StatestoreSubscriber {
   /// Registers this subscriber with the statestore, and starts the
   /// heartbeat service, as well as a thread to check for failure and
   /// initiate recovery mode.
-  /// has_active_catalogd - return true if the active catalogd is designated by
-  ///                       statestore.
-  /// active_catalogd_registration - return the address and protocol of the
-  ///                                active catalogd.
   ///
   /// Returns OK unless some error occurred, like a failure to connect.
-  virtual Status Start(bool* has_active_catalogd = nullptr,
-      TCatalogRegistration* active_catalogd_registration = nullptr);
+  virtual Status Start();
 
   /// Set Register Request
   virtual Status SetRegisterRequest(TRegisterSubscriberRequest* request);
@@ -241,8 +251,7 @@ class StatestoreSubscriber {
         const TNetworkAddress& statestore_address, MetricGroup* metrics);
 
     /// Returns OK unless some error occurred, like a failure to connect.
-    Status Start(bool* has_active_catalogd,
-        TCatalogRegistration* active_catalogd_registration);
+    Status Start();
 
     /// Adds a topic to the set of topics that updates will be received
     /// for. When a topic update is received, the supplied UpdateCallback
@@ -292,7 +301,8 @@ class StatestoreSubscriber {
 
     /// Called when the catalogd has been updated.
     void UpdateCatalogd(const TCatalogRegistration& catalogd_registration,
-        const RegistrationId& registration_id, int64 sequence);
+        const RegistrationId& registration_id, int64_t active_catalogd_version,
+        bool* update_skipped);
 
     /// Run in a separate thread. In a loop, check failure_detector_ to see if the
     /// statestore is still sending heartbeat messages. If not, enter 'recovery mode'
@@ -308,18 +318,13 @@ class StatestoreSubscriber {
     /// Creates a client of the remote statestore and sends a list of
     /// topics to register for. Returns OK unless there is some problem
     /// connecting, or the statestore reports an error.
-    Status Register(bool* has_active_catalogd,
+    Status Register(bool* has_active_catalogd, int64_t* active_catalogd_version,
         TCatalogRegistration* active_catalogd_registration);
 
     /// Returns OK if registration_id == registration_id_, or if registration_id_ is not
     /// yet set, an error otherwise. Used to confirm that RPCs from the statestore are
     /// intended for the current registration epoch.
     Status CheckRegistrationId(const RegistrationId& registration_id);
-
-    // Returns OK if registration_id == registration_id_ and
-    // sequence == last_update_catalogd_seq_.
-    Status CheckRegistrationIdAndUpdateCatalogdSeq(const RegistrationId& registration_id,
-        int64 sequence);
 
     /// Check if the given statestore ID is matching with the statestore ID of this
     /// statestore.
@@ -437,9 +442,6 @@ class StatestoreSubscriber {
     /// from the statestore.
     TUniqueId statestore_id_;
 
-    // Last sequence number for notification of changing active CatalogD.
-    int64 last_update_catalogd_seq_ = 0;
-
     /// Monotonic timestamp of the last successful registration.
     AtomicInt64 last_registration_ms_{0};
   };
@@ -459,7 +461,7 @@ class StatestoreSubscriber {
   /// Called when the catalogd has been updated.
   void UpdateCatalogd(const TCatalogRegistration& catalogd_registration,
       const RegistrationId& registration_id, const TUniqueId& statestore_id,
-      int64 sequence);
+      int64_t active_catalogd_version, bool* update_skipped);
 
   /// Subscriber thrift implementation, needs to access UpdateState
   friend class StatestoreSubscriberThriftIf;

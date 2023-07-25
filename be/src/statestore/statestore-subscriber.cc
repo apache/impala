@@ -145,10 +145,13 @@ class StatestoreSubscriberThriftIf : public StatestoreSubscriberIf {
 
   virtual void UpdateCatalogd(TUpdateCatalogdResponse& response,
       const TUpdateCatalogdRequest& request) {
+    bool update_skipped = false;
     Status status = CheckProtocolVersion(request.protocol_version);
     if (status.ok()) {
       subscriber_->UpdateCatalogd(request.catalogd_registration,
-          request.registration_id, request.statestore_id, request.sequence);
+          request.registration_id, request.statestore_id, request.catalogd_version,
+          &update_skipped);
+      response.__set_skipped(update_skipped);
     }
     TStatus thrift_status;
     status.ToThrift(&thrift_status);
@@ -210,8 +213,7 @@ bool StatestoreSubscriber::IsRegistered() const {
   return statestore_->IsRegistered();
 }
 
-Status StatestoreSubscriber::Start(bool* has_active_catalogd,
-    TCatalogRegistration* active_catalogd_registration) {
+Status StatestoreSubscriber::Start() {
   // Backend must be started before registration
   std::shared_ptr<TProcessor> processor(
       new StatestoreSubscriberProcessor(thrift_iface_));
@@ -240,7 +242,7 @@ Status StatestoreSubscriber::Start(bool* has_active_catalogd,
   // Specify the port which the heartbeat server is listening on.
   heartbeat_address_.port = heartbeat_server_->port();
 
-  return statestore_->Start(has_active_catalogd, active_catalogd_registration);
+  return statestore_->Start();
 }
 
 /// Set Register Request
@@ -275,13 +277,18 @@ void StatestoreSubscriber::Heartbeat(
 
 void StatestoreSubscriber::UpdateCatalogd(
     const TCatalogRegistration& catalogd_registration,
-    const RegistrationId& registration_id,
-    const TUniqueId& statestore_id, int64 sequence) {
+    const RegistrationId& registration_id, const TUniqueId& statestore_id,
+    int64_t active_catalogd_version, bool* update_skipped) {
   if (statestore_->IsMatchingStatestoreId(statestore_id)) {
-    statestore_->UpdateCatalogd(catalogd_registration, registration_id, sequence);
+    statestore_->UpdateCatalogd(
+        catalogd_registration, registration_id, active_catalogd_version, update_skipped);
   } else {
-    VLOG(3) << "Ignore updating catalogd message from unknown statestored: "
-            << statestore_id;
+    // It's possible the catalogd update RPC is received before the registration response
+    // is received. Skip this update so that the statestore will retry this update in
+    // the future.
+    *update_skipped = true;
+    LOG(INFO) << "Skipped updating catalogd message from unknown statestored: "
+              << statestore_id;
   }
 }
 
@@ -292,9 +299,13 @@ Status StatestoreSubscriber::UpdateState(const TopicDeltaMap& incoming_topic_del
     return statestore_->UpdateState(
         incoming_topic_deltas, registration_id, subscriber_topic_updates, skipped);
   } else {
-    VLOG(3) << "Ignore topic update message from unknown statestored: " << statestore_id;
+    // It's possible the topic update is received before the registration response is
+    // received. Skip this update so that the statestore will retry this update in the
+    // future.
+    *skipped = true;
+    VLOG(3) << "Skipped topic update message from unknown statestored: " << statestore_id;
+    return Status::OK();
   }
-  return Status::OK();
 }
 
 StatestoreSubscriber::StatestoreStub::StatestoreStub(StatestoreSubscriber* subscriber,
@@ -365,6 +376,7 @@ void StatestoreSubscriber::StatestoreStub::AddCompleteRegistrationTopic(
 }
 
 Status StatestoreSubscriber::StatestoreStub::Register(bool* has_active_catalogd,
+    int64_t* active_catalogd_version,
     TCatalogRegistration* active_catalogd_registration) {
   // Check protocol version of the statestore first.
   TGetProtocolVersionRequest get_protocol_request;
@@ -410,6 +422,13 @@ Status StatestoreSubscriber::StatestoreStub::Register(bool* has_active_catalogd,
     request.topic_registrations.push_back(thrift_topic);
   }
 
+  {
+    // Reset registration_id_ and statestore_id_ before registering with statestore
+    // so that RPC messages for previous registration are not accepted.
+    lock_guard<mutex> l(id_lock_);
+    registration_id_ = TUniqueId();
+    statestore_id_ = TUniqueId();
+  }
   RETURN_IF_ERROR(subscriber_->SetRegisterRequest(&request));
   TRegisterSubscriberResponse response;
   attempt = 0; // Used for debug action only.
@@ -461,22 +480,24 @@ Status StatestoreSubscriber::StatestoreStub::Register(bool* has_active_catalogd,
       VLOG(1) << "Active catalogd address: "
               << TNetworkAddressToString(response.catalogd_registration.address);
       if (has_active_catalogd != nullptr) *has_active_catalogd = true;
+      if (active_catalogd_version != nullptr && response.__isset.catalogd_version) {
+        *active_catalogd_version = response.catalogd_version;
+      }
       if (active_catalogd_registration != nullptr) {
         *active_catalogd_registration = response.catalogd_registration;
       }
     }
-    // Reset last received sequence number of update_catalogd RPC since statestore
-    // could be restarted.
-    last_update_catalogd_seq_ = 0;
   }
   heartbeat_interval_timer_.Start();
   return status;
 }
 
-Status StatestoreSubscriber::StatestoreStub::Start(bool* has_active_catalogd,
-    TCatalogRegistration* active_catalogd_registration) {
+Status StatestoreSubscriber::StatestoreStub::Start() {
   Status status;
   {
+    bool has_active_catalogd = false;
+    int64_t active_catalogd_version = 0;
+    TCatalogRegistration active_catalogd_registration;
     // Take the lock to ensure that, if a topic-update is received during registration
     // (perhaps because Register() has succeeded, but we haven't finished setting up
     // state on the client side), UpdateState() will reject the message.
@@ -485,11 +506,18 @@ Status StatestoreSubscriber::StatestoreStub::Start(bool* has_active_catalogd,
     // Inject failure before registering to statestore.
     status = DebugAction(FLAGS_debug_actions, "REGISTER_STATESTORE_ON_STARTUP");
     if (status.ok()) {
-      status = Register(has_active_catalogd, active_catalogd_registration);
+      status = Register(
+          &has_active_catalogd, &active_catalogd_version, &active_catalogd_registration);
     }
     if (status.ok()) {
       is_registered_ = true;
       LOG(INFO) << "statestore registration successful on startup";
+      if (has_active_catalogd) {
+        DCHECK(active_catalogd_version >= 0);
+        for (const UpdateCatalogdCallback& callback : update_catalogd_callbacks_) {
+          callback(true, active_catalogd_version, active_catalogd_registration);
+        }
+      }
     } else {
       LOG(INFO) << "statestore registration unsuccessful on startup: "
                 << status.GetDetail();
@@ -539,13 +567,14 @@ void StatestoreSubscriber::StatestoreStub::RecoveryModeChecker() {
                 << ": Connection with statestore lost, entering recovery mode";
       uint32_t attempt_count = 1;
       bool has_active_catalogd = false;
+      int64_t active_catalogd_version = 0;
       TCatalogRegistration active_catalogd_registration;
       while (true) {
         LOG(INFO) << "Trying to re-register with statestore, attempt: "
                   << attempt_count++;
         re_registr_attempt_metric_->Increment(1);
-        Status status =
-            Register(&has_active_catalogd, &active_catalogd_registration);
+        Status status = Register(&has_active_catalogd, &active_catalogd_version,
+            &active_catalogd_registration);
         if (status.ok()) {
           if (!is_registered_) {
             is_registered_ = true;
@@ -559,11 +588,16 @@ void StatestoreSubscriber::StatestoreStub::RecoveryModeChecker() {
           // the next loop while we're waiting for heartbeat messages to resume.
           failure_detector_->UpdateHeartbeat(STATESTORE_ID, true);
           LOG(INFO) << "Reconnected to statestore. Exiting recovery mode";
-
-          if (has_active_catalogd) {
-            for (const UpdateCatalogdCallback& callback : update_catalogd_callbacks_) {
-              callback(active_catalogd_registration);
-            }
+          if (!has_active_catalogd) {
+            // Need to reset version of last received active catalogd for new
+            // registration. Note that active_catalogd_registration is invalid when
+            // active_catalogd_version is negative.
+            active_catalogd_version = -1;
+          } else {
+            DCHECK(active_catalogd_version >= 0);
+          }
+          for (const UpdateCatalogdCallback& callback : update_catalogd_callbacks_) {
+            callback(true, active_catalogd_version, active_catalogd_registration);
           }
           // Break out of enclosing while (true) to top of outer-scope loop.
           break;
@@ -604,21 +638,6 @@ Status StatestoreSubscriber::StatestoreStub::CheckRegistrationId(
   return Status::OK();
 }
 
-Status StatestoreSubscriber::StatestoreStub::CheckRegistrationIdAndUpdateCatalogdSeq(
-    const RegistrationId& registration_id, int64 sequence){
-  lock_guard<mutex> r(id_lock_);
-  if (registration_id_ != TUniqueId() &&
-      (registration_id != registration_id_ || sequence <= last_update_catalogd_seq_)) {
-    return Status(Substitute("Unexpected registration ID: $0, was expecting $1 "
-        "or unexpected sequence number: $2, was expecting greater than $3",
-            PrintId(registration_id), PrintId(registration_id_), sequence,
-            last_update_catalogd_seq_));
-  }
-  last_update_catalogd_seq_ = sequence;
-  return Status::OK();
-}
-
-
 bool StatestoreSubscriber::StatestoreStub::IsMatchingStatestoreId(
     const TUniqueId statestore_id) {
   lock_guard<mutex> r(id_lock_);
@@ -643,14 +662,27 @@ void StatestoreSubscriber::StatestoreStub::Heartbeat(
 
 void StatestoreSubscriber::StatestoreStub::UpdateCatalogd(
     const TCatalogRegistration& catalogd_registration,
-    const RegistrationId& registration_id, int64 sequence) {
-  update_catalogd_rpc_metric_->Increment(1);
-  const Status& status =
-      CheckRegistrationIdAndUpdateCatalogdSeq(registration_id, sequence);
+    const RegistrationId& registration_id, int64_t active_catalogd_version,
+    bool* update_skipped) {
+  const Status& status = CheckRegistrationId(registration_id);
   if (status.ok()) {
-    for (const UpdateCatalogdCallback& callback : update_catalogd_callbacks_) {
-      callback(catalogd_registration);
+    // Try to acquire lock to avoid race with updating catalogd from registration thread.
+    shared_lock<shared_mutex> l(lock_, boost::try_to_lock);
+    if (!l.owns_lock()) {
+      LOG(INFO) << "Unable to acquire the lock, skip UpdateCatalogd RPC notification.";
+      *update_skipped = true;
+      return;
     }
+    update_catalogd_rpc_metric_->Increment(1);
+    DCHECK(active_catalogd_version >= 0);
+    for (const UpdateCatalogdCallback& callback : update_catalogd_callbacks_) {
+      callback(false, active_catalogd_version, catalogd_registration);
+    }
+  } else {
+    // It's possible the registration is not completed.
+    LOG(INFO) << "Skip UpdateCatalogd RPC notification due to unknown registration_id. "
+              << "It's likely the registration reply is not received.";
+    *update_skipped = true;
   }
 }
 

@@ -254,6 +254,9 @@ struct TRegisterSubscriberResponse {
 
   // Catalog registration info.
   5: optional TCatalogRegistration catalogd_registration;
+
+  // The version of active catalogd
+  6: optional i64 catalogd_version;
 }
 
 struct TGetProtocolVersionRequest {
@@ -338,8 +341,8 @@ struct TUpdateCatalogdRequest {
   // Unique identifier for the statestore instance.
   3: required Types.TUniqueId statestore_id;
 
-  // Monotonously increasing number
-  4: required i64 sequence;
+  // The version of active catalogd
+  4: required i64 catalogd_version;
 
   // Catalog registration info.
   5: required TCatalogRegistration catalogd_registration;
@@ -348,6 +351,11 @@ struct TUpdateCatalogdRequest {
 struct TUpdateCatalogdResponse {
   // Whether the call was executed correctly at the application level
   1: required Status.TStatus status;
+
+  // True if this update was skipped by the subscriber. This is distinguished from a
+  // non-OK status since the former indicates an error which contributes to the
+  // statestore's view of a subscriber's liveness.
+  2: optional bool skipped;
 }
 
 service StatestoreSubscriber {

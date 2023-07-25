@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "common/logging.h"
 #include "statestore/statestore-subscriber-catalog.h"
 
 using namespace impala;
@@ -35,4 +36,33 @@ StatestoreSubscriberCatalog::StatestoreSubscriberCatalog(
   catalogd_registration_.__set_address(catalogd_address);
   catalogd_registration_.__set_enable_catalogd_ha(FLAGS_enable_catalogd_ha);
   catalogd_registration_.__set_force_catalogd_active(FLAGS_force_catalogd_active);
+}
+
+bool ActiveCatalogdVersionChecker::CheckActiveCatalogdVersion(
+    bool is_registration_reply, int64 active_catalogd_version) {
+  if (is_registration_reply) {
+    last_update_for_registration_ = true;
+    if (active_catalogd_version < 0) {
+      // Reset the version of last received active catalogd.
+      last_active_catalogd_version_ = 0;
+      return false;
+    }
+  } else {
+    if (last_active_catalogd_version_ >= active_catalogd_version) {
+      if (last_update_for_registration_
+          && last_active_catalogd_version_ == active_catalogd_version) {
+        VLOG(3) << "Duplicated update of active catalogd";
+      } else {
+        LOG(INFO) << "Ignore the update of active catalogd since more recent update has "
+                  << "been processed (" << last_active_catalogd_version_ << " vs "
+                  << active_catalogd_version << ")";
+      }
+      last_update_for_registration_ = false;
+      return false;
+    }
+    last_update_for_registration_ = false;
+  }
+  DCHECK(active_catalogd_version >= 0);
+  last_active_catalogd_version_ = active_catalogd_version;
+  return true;
 }

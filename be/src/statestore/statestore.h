@@ -165,6 +165,7 @@ class Statestore : public CacheLineAligned {
       const TCatalogRegistration& catalogd_registration,
       RegistrationId* registration_id,
       bool* has_active_catalogd,
+      int64_t* active_catalogd_version,
       TCatalogRegistration* active_catalogd_registration);
 
   /// Registers webpages for the input webserver. If metrics_only is set then only
@@ -800,7 +801,7 @@ class Statestore : public CacheLineAligned {
   [[noreturn]] void MonitorUpdateCatalogd();
 
   /// Send notification of updating catalogd to the coordinators.
-  void SendUpdateCatalogdNotification(int64* last_sending_sequence,
+  void SendUpdateCatalogdNotification(int64_t* last_active_catalogd_version,
       vector<std::shared_ptr<Subscriber>>& receivers);
 
   /// Raw callback to indicate whether the service is ready.

@@ -38,8 +38,9 @@ using kudu::HttpStatusCode;
 
 namespace impala {
 
-class StatestoreSubscriber;
+class ActiveCatalogdVersionChecker;
 class Catalog;
+class StatestoreSubscriber;
 
 /// The Impala CatalogServer manages the caching and persistence of cluster-wide metadata.
 /// The CatalogServer aggregates the metadata from the Hive Metastore, the NameNode,
@@ -159,12 +160,16 @@ class CatalogServer {
   /// Thread that periodically wakes up and refreshes certain Catalog metrics.
   std::unique_ptr<Thread> catalog_metrics_refresh_thread_;
 
-  /// Protects is_active_, catalog_update_cv_, pending_topic_updates_,
-  /// catalog_objects_to/from_version_, and last_sent_catalog_version.
+  /// Protects is_active_, active_catalogd_version_checker_,
+  /// catalog_update_cv_, pending_topic_updates_, catalog_objects_to/from_version_, and
+  /// last_sent_catalog_version.
   std::mutex catalog_lock_;
 
   /// Set to true if this catalog instance is active.
   bool is_active_;
+
+  /// Object to track the version of received active catalogd.
+  boost::scoped_ptr<ActiveCatalogdVersionChecker> active_catalogd_version_checker_;
 
   /// Condition variable used to signal when the catalog_update_gathering_thread_ should
   /// fetch its next set of updates from the JniCatalog. At the end of each statestore
@@ -206,8 +211,15 @@ class CatalogServer {
       const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
       std::vector<TTopicDelta>* subscriber_topic_updates);
 
-  /// Callback function for receiving notification of updating catalogd.
-  void UpdateRegisteredCatalogd(const TCatalogRegistration& catalogd_registration);
+  /// Callback function for receiving notification of new active catalogd.
+  /// This function is called when active catalogd is found from registration process,
+  /// or UpdateCatalogd RPC is received. The two kinds of RPCs could be received out of
+  /// sending order.
+  /// Reset 'last_active_catalogd_version_' if 'is_registration_reply' is true and
+  /// 'active_catalogd_version' is negative. In this case, 'catalogd_registration' is
+  /// invalid and should not be used.
+  void UpdateActiveCatalogd(bool is_registration_reply, int64_t active_catalogd_version,
+      const TCatalogRegistration& catalogd_registration);
 
   /// Returns the active status of the catalogd.
   bool IsActive();

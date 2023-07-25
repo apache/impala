@@ -378,6 +378,7 @@ Status CatalogServer::Start() {
   RETURN_IF_ERROR(Thread::Create("catalog-server", "catalog-metrics-refresh-thread",
       &CatalogServer::RefreshMetrics, this, &catalog_metrics_refresh_thread_));
 
+  active_catalogd_version_checker_.reset(new ActiveCatalogdVersionChecker());
   statestore_subscriber_.reset(new StatestoreSubscriberCatalog(
      Substitute("catalog-server@$0", TNetworkAddressToString(server_address)),
      subscriber_address, statestore_address, metrics_, protocol_version_,
@@ -398,20 +399,18 @@ Status CatalogServer::Start() {
     return status;
   }
   // Add callback to handle notification of updating catalogd from Statestore.
-  StatestoreSubscriber::UpdateCatalogdCallback update_catalogd_cb =
-      bind<void>(mem_fn(&CatalogServer::UpdateRegisteredCatalogd), this, _1);
-  statestore_subscriber_->AddUpdateCatalogdTopic(update_catalogd_cb);
+  if (FLAGS_enable_catalogd_ha) {
+    StatestoreSubscriber::UpdateCatalogdCallback update_catalogd_cb =
+        bind<void>(mem_fn(&CatalogServer::UpdateActiveCatalogd), this, _1, _2, _3);
+    statestore_subscriber_->AddUpdateCatalogdTopic(update_catalogd_cb);
+  }
 
-  bool has_active_catalogd = false;
-  TCatalogRegistration active_catalogd_registration;
-  RETURN_IF_ERROR(
-      statestore_subscriber_->Start(&has_active_catalogd, &active_catalogd_registration));
-  if (FLAGS_enable_catalogd_ha && has_active_catalogd) {
-    UpdateRegisteredCatalogd(active_catalogd_registration);
-    if (FLAGS_force_catalogd_active && !IsActive()) {
-      LOG(ERROR) << "Could not start CatalogD as active instance";
-      return Status("Could not start CatalogD as active instance");
-    }
+  RETURN_IF_ERROR(statestore_subscriber_->Start());
+  if (FLAGS_force_catalogd_active && !IsActive()) {
+    // If both catalogd are started with 'force_catalogd_active' as true in short time,
+    // the second election overwrite the first election. The one which registering with
+    // statstore first will be inactive.
+    LOG(WARNING) << "Could not start CatalogD as active instance";
   }
 
   // Notify the thread to start for the first time.
@@ -497,8 +496,13 @@ void CatalogServer::UpdateCatalogTopicCallback(
   catalog_update_cv_.NotifyOne();
 }
 
-void CatalogServer::UpdateRegisteredCatalogd(
-    const TCatalogRegistration& catalogd_registration) {
+void CatalogServer::UpdateActiveCatalogd(bool is_registration_reply,
+    int64_t active_catalogd_version, const TCatalogRegistration& catalogd_registration) {
+  lock_guard<mutex> l(catalog_lock_);
+  if (!active_catalogd_version_checker_->CheckActiveCatalogdVersion(
+          is_registration_reply, active_catalogd_version)) {
+    return;
+  }
   if (catalogd_registration.address.hostname.empty()
       || catalogd_registration.address.port == 0) {
     return;
@@ -507,7 +511,6 @@ void CatalogServer::UpdateRegisteredCatalogd(
             << TNetworkAddressToString(catalogd_registration.address);
   bool is_matching = (catalogd_registration.address.hostname == FLAGS_hostname
       && catalogd_registration.address.port == FLAGS_catalog_service_port);
-  lock_guard<mutex> l(catalog_lock_);
   if (is_matching) {
     if (!is_active_) {
       is_active_ = true;
@@ -531,7 +534,11 @@ void CatalogServer::UpdateRegisteredCatalogd(
       is_active_ = false;
       active_status_metric_->SetValue(false);
       num_ha_active_status_change_metric_->Increment(1);
-      LOG(INFO) << "This catalogd instance is changed to inactive status";
+      LOG(INFO) << "This catalogd instance is changed to inactive status. "
+                << "Current active catalogd: "
+                << TNetworkAddressToString(catalogd_registration.address)
+                << ", active_catalogd_version: "
+                << active_catalogd_version;
     }
   }
 }

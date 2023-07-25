@@ -223,17 +223,19 @@ class StatestoreThriftIf : public StatestoreServiceIf {
 
     RegistrationId registration_id;
     bool has_active_catalogd;
+    int64_t active_catalogd_version;
     TCatalogRegistration active_catalogd_registration;
     Status status = statestore_->RegisterSubscriber(params.subscriber_id,
         params.subscriber_location, params.topic_registrations, subscriber_type,
         subscribe_catalogd_change, catalogd_registration, &registration_id,
-        &has_active_catalogd, &active_catalogd_registration);
+        &has_active_catalogd, &active_catalogd_version, &active_catalogd_registration);
     status.ToThrift(&response.status);
     response.__set_registration_id(registration_id);
     response.__set_statestore_id(statestore_->GetStateStoreId());
     response.__set_protocol_version(statestore_->GetProtocolVersion());
     if (has_active_catalogd) {
       response.__set_catalogd_registration(active_catalogd_registration);
+      response.__set_catalogd_version(active_catalogd_version);
     }
   }
 
@@ -733,6 +735,7 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
     const TCatalogRegistration& catalogd_registration,
     RegistrationId* registration_id,
     bool* has_active_catalogd,
+    int64_t* active_catalogd_version,
     TCatalogRegistration* active_catalogd_registration) {
   bool is_catalogd = subscriber_type == TStatestoreSubscriberType::CATALOGD;
   if (subscriber_id.empty()) {
@@ -803,10 +806,9 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
     RETURN_IF_ERROR(OfferUpdate(update, &subscriber_topic_update_threadpool_));
     RETURN_IF_ERROR(OfferUpdate(update, &subscriber_priority_topic_update_threadpool_));
     RETURN_IF_ERROR(OfferUpdate(update, &subscriber_heartbeat_threadpool_));
-    int64 sending_sequence;
     *active_catalogd_registration =
         catalog_manager_.GetActiveCatalogRegistration(
-            has_active_catalogd, &sending_sequence);
+            has_active_catalogd, active_catalogd_version);
   }
 
   return Status::OK();
@@ -1221,7 +1223,7 @@ void Statestore::DoSubscriberUpdate(UpdateKind update_kind, int thread_id,
 }
 
 [[noreturn]] void Statestore::MonitorUpdateCatalogd() {
-  int64 last_sending_sequence = 0;
+  int64_t last_active_catalogd_version = 0;
   // rpc_receivers is used to track subscribers to which statestore need to send RPCs
   // when there is a change in the elected active catalogd. It is updated from
   // subscribers_, and the subscribers will be removed from this list if the RPCs are
@@ -1234,7 +1236,7 @@ void Statestore::DoSubscriberUpdate(UpdateKind update_kind, int thread_id,
     unique_lock<mutex> l(*catalog_manager_.GetLock());
     update_catalod_cv_.WaitFor(l, timeout_us);
   }
-  SendUpdateCatalogdNotification(&last_sending_sequence, rpc_receivers);
+  SendUpdateCatalogdNotification(&last_active_catalogd_version, rpc_receivers);
 
   // Wait for notification. If new leader is elected due to catalogd is registered or
   // unregistered, send notification to all coordinators and catalogds.
@@ -1248,26 +1250,27 @@ void Statestore::DoSubscriberUpdate(UpdateKind update_kind, int thread_id,
         update_catalod_cv_.WaitFor(l, timeout_us);
       }
     }
-    SendUpdateCatalogdNotification(&last_sending_sequence, rpc_receivers);
+    SendUpdateCatalogdNotification(&last_active_catalogd_version, rpc_receivers);
   }
 }
 
-void Statestore::SendUpdateCatalogdNotification(int64* last_sending_sequence,
+void Statestore::SendUpdateCatalogdNotification(int64_t* last_active_catalogd_version,
     vector<std::shared_ptr<Subscriber>>& rpc_receivers) {
   bool has_active_catalogd;
-  int64 sending_sequence = 0;
+  int64_t active_catalogd_version = 0;
   TCatalogRegistration catalogd_registration =
       catalog_manager_.GetActiveCatalogRegistration(
-          &has_active_catalogd, &sending_sequence);
+          &has_active_catalogd, &active_catalogd_version);
   if (!has_active_catalogd ||
-      (sending_sequence == *last_sending_sequence && rpc_receivers.empty())) {
+      (active_catalogd_version == *last_active_catalogd_version
+          && rpc_receivers.empty())) {
     // Don't resend RPCs if there is no change in Active Catalogd and no RPC failure in
     // last round.
     return;
   }
 
   bool resend_rpc = false;
-  if (sending_sequence > *last_sending_sequence) {
+  if (active_catalogd_version > *last_active_catalogd_version) {
     // Send notification for the latest elected active catalogd.
     active_catalogd_address_metric_->SetValue(
         TNetworkAddressToString(catalogd_registration.address));
@@ -1280,7 +1283,7 @@ void Statestore::SendUpdateCatalogdNotification(int64* last_sending_sequence,
         }
       }
     }
-    *last_sending_sequence = sending_sequence;
+    *last_active_catalogd_version = active_catalogd_version;
   } else {
     DCHECK(!rpc_receivers.empty());
     lock_guard<mutex> l(subscribers_lock_);
@@ -1301,6 +1304,7 @@ void Statestore::SendUpdateCatalogdNotification(int64* last_sending_sequence,
   for (std::vector<std::shared_ptr<Subscriber>>::iterator it = rpc_receivers.begin();
        it != rpc_receivers.end();) {
     std::shared_ptr<Subscriber> subscriber = *it;
+    bool update_skipped = false;
     Status status;
     if (!resend_rpc) {
       status = DebugAction(
@@ -1314,7 +1318,7 @@ void Statestore::SendUpdateCatalogdNotification(int64* last_sending_sequence,
         TUpdateCatalogdResponse response;
         request.__set_registration_id(subscriber->registration_id());
         request.__set_statestore_id(statestore_id_);
-        request.__set_sequence(sending_sequence);
+        request.__set_catalogd_version(active_catalogd_version);
         request.__set_catalogd_registration(catalogd_registration);
         status = client.DoRpc(
             &StatestoreSubscriberClientWrapper::UpdateCatalogd, request, &response);
@@ -1325,14 +1329,23 @@ void Statestore::SendUpdateCatalogdNotification(int64* last_sending_sequence,
                 "Subscriber $0 timed-out during update catalogd RPC. Timeout is $1s.",
                 subscriber->id(), FLAGS_statestore_update_catalogd_tcp_timeout_seconds));
           }
+        } else {
+          update_skipped = (response.__isset.skipped && response.skipped);
         }
       }
     }
     if (status.ok()) {
-      successful_update_catalogd_rpc_metric_->Increment(1);
-      // Remove the subscriber from the receiver list so that Statestore will not resend
-      // RPC to it in next round.
-      it = rpc_receivers.erase(it);
+      if (update_skipped) {
+        // The subscriber skipped processing this update. It's not considered as a failure
+        // since subscribers can decide what they do with any update. The subscriber is
+        // left in the receiver list so that RPC will be resent to it in next round.
+        ++it;
+      } else {
+        successful_update_catalogd_rpc_metric_->Increment(1);
+        // Remove the subscriber from the receiver list so that Statestore will not resend
+        // RPC to it in next round.
+        it = rpc_receivers.erase(it);
+      }
     } else {
       LOG(ERROR) << "Couldn't send UpdateCatalogd RPC,  " << status.GetDetail();
       failed_update_catalogd_rpc_metric_->Increment(1);

@@ -52,4 +52,27 @@ class StatestoreSubscriberCatalog : public StatestoreSubscriber {
   TCatalogRegistration catalogd_registration_;
 };
 
+/// ActiveCatalogdVersionChecker:
+/// Tracks the version of received active catalogd.
+class ActiveCatalogdVersionChecker {
+ public:
+  ActiveCatalogdVersionChecker()
+    : last_update_for_registration_(false),
+      last_active_catalogd_version_(0L) {}
+
+  /// Returns true if the given active_catalogd_version is newer than the last received
+  /// version.
+  /// This function is not thread-safe. It must be protected by the caller.
+  bool CheckActiveCatalogdVersion(
+      bool is_registration_reply, int64 active_catalogd_version);
+
+ private:
+  /// True if the last update of active catalogd was processed for event of receiving
+  /// registration reply.
+  bool last_update_for_registration_;
+
+  /// Version of last received active catalogd.
+  int64_t last_active_catalogd_version_;
+};
+
 }

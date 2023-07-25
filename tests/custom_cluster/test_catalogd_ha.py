@@ -353,6 +353,37 @@ class TestCatalogdHA(CustomClusterTestSuite):
     # Verify simple queries are ran successfully.
     self.__run_simple_queries()
 
-    unexpected_msg = re.compile(
-        "unexpected sequence number: [0-9]+, was expecting greater than [0-9]+")
+    unexpected_msg = re.compile("Ignore the update of active catalogd since more recent "
+        "update has been processed ([0-9]+ vs [0-9]+)")
     self.assert_catalogd_log_contains("INFO", unexpected_msg, expected_count=0)
+    self.assert_impalad_log_contains("INFO", unexpected_msg, expected_count=0)
+
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--force_catalogd_active=true",
+    start_args="--enable_catalogd_ha")
+  def test_two_catalogd_with_force_active(self):
+    """The test case for cluster started with catalogd HA enabled and
+    both catalogds started with 'force_catalogd_active' as true.
+    Verify that one and only one catalogd is active."""
+    catalogds = self.cluster.catalogds()
+    assert(len(catalogds) == 2)
+    catalogd_service_1 = catalogds[0].service
+    catalogd_service_2 = catalogds[1].service
+    assert(catalogd_service_1.get_metric_value("catalog-server.active-status")
+        != catalogd_service_2.get_metric_value("catalog-server.active-status"))
+
+    # Verify ports of the active catalogd of statestore and impalad are matching with
+    # the catalog service port of the current active catalogd.
+    if catalogd_service_1.get_metric_value("catalog-server.active-status"):
+      self.__verify_statestore_active_catalogd_port(catalogd_service_1)
+      self.__verify_impalad_active_catalogd_port(0, catalogd_service_1)
+      self.__verify_impalad_active_catalogd_port(1, catalogd_service_1)
+      self.__verify_impalad_active_catalogd_port(2, catalogd_service_1)
+    else:
+      self.__verify_statestore_active_catalogd_port(catalogd_service_2)
+      self.__verify_impalad_active_catalogd_port(0, catalogd_service_2)
+      self.__verify_impalad_active_catalogd_port(1, catalogd_service_2)
+      self.__verify_impalad_active_catalogd_port(2, catalogd_service_2)
+
+    # Verify simple queries are ran successfully.
+    self.__run_simple_queries()

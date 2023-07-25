@@ -58,7 +58,7 @@ bool StatestoreCatalogdMgr::RegisterCatalogd(bool is_reregistering,
     DCHECK(num_registered_catalogd_ < 2);
     is_active_catalogd_assigned_ = true;
     COPY_CATALOGD_REGISTRATION_FROM_LOCAL_VARIABLES(active);
-    ++sending_sequence_;
+    ++active_catalogd_version_;
     return true;
   }
 
@@ -72,7 +72,7 @@ bool StatestoreCatalogdMgr::RegisterCatalogd(bool is_reregistering,
         COPY_CATALOGD_REGISTRATION_FROM_LOCAL_VARIABLES(active);
         LOG(INFO) << active_catalogd_subscriber_id_
                   << " is re-registered with FLAGS_force_catalogd_active.";
-        ++sending_sequence_;
+        ++active_catalogd_version_;
         return true;
       }
     } else {
@@ -85,7 +85,7 @@ bool StatestoreCatalogdMgr::RegisterCatalogd(bool is_reregistering,
         LOG(INFO) << active_catalogd_subscriber_id_
                   << " is re-registered after HA preemption waiting period and "
                   << "is assigned as active catalogd.";
-        ++sending_sequence_;
+        ++active_catalogd_version_;
         return true;
       }
     }
@@ -102,6 +102,9 @@ bool StatestoreCatalogdMgr::RegisterCatalogd(bool is_reregistering,
     bool is_waiting_period_expired = false;
     if (first_catalogd_register_time_ == 0) {
       first_catalogd_register_time_ = MonotonicMillis();
+      if (FLAGS_catalogd_ha_preemption_wait_period_ms == 0) {
+        is_waiting_period_expired = true;
+      }
     } else if (MonotonicMillis() - first_catalogd_register_time_ >=
         FLAGS_catalogd_ha_preemption_wait_period_ms) {
       is_waiting_period_expired = true;
@@ -112,7 +115,7 @@ bool StatestoreCatalogdMgr::RegisterCatalogd(bool is_reregistering,
       is_active_catalogd_assigned_ = true;
       COPY_CATALOGD_REGISTRATION_FROM_LOCAL_VARIABLES(active);
       LOG(INFO) << active_catalogd_subscriber_id_ << " is assigned as active catalogd.";
-      ++sending_sequence_;
+      ++active_catalogd_version_;
       return true;
     }
     // Wait second catalogd to be registered.
@@ -120,7 +123,8 @@ bool StatestoreCatalogdMgr::RegisterCatalogd(bool is_reregistering,
             << "period.";
   } else {
     num_registered_catalogd_++;
-    DCHECK(num_registered_catalogd_ == 2);
+    DCHECK(num_registered_catalogd_ == 2)
+        << "No more than 2 CatalogD registrations are allowed!";
     if (catalogd_registration.force_catalogd_active) {
       // Force to set the current one as active catalogd
       if (is_active_catalogd_assigned_) {
@@ -133,7 +137,7 @@ bool StatestoreCatalogdMgr::RegisterCatalogd(bool is_reregistering,
       LOG(INFO) << active_catalogd_subscriber_id_
                 << " is registered with FLAGS_force_catalogd_active and is assigned as "
                 << "active catalogd.";
-      ++sending_sequence_;
+      ++active_catalogd_version_;
       return true;
     } else if (is_active_catalogd_assigned_) {
       // Existing one is already assigned as active catalogd.
@@ -154,7 +158,7 @@ bool StatestoreCatalogdMgr::RegisterCatalogd(bool is_reregistering,
       }
       LOG(INFO) << active_catalogd_subscriber_id_
                 << " has higher priority and is assigned as active catalogd.";
-      ++sending_sequence_;
+      ++active_catalogd_version_;
       return true;
     }
   }
@@ -177,7 +181,7 @@ bool StatestoreCatalogdMgr::CheckActiveCatalog() {
   COPY_CATALOGD_REGISTRATION_FROM_MEMBER_VARIABLES(active, first);
   LOG(INFO) << active_catalogd_subscriber_id_
             << " is assigned as active catalogd after preemption waiting period.";
-  ++sending_sequence_;
+  ++active_catalogd_version_;
   return true;
 }
 
@@ -193,7 +197,7 @@ bool StatestoreCatalogdMgr::UnregisterCatalogd(
       COPY_CATALOGD_REGISTRATION_FROM_MEMBER_VARIABLES(active, standby);
       RESET_CATALOGD_REGISTRATION_MEMBER_VARIABLES(standby);
       LOG(INFO) << "Fail over active catalogd to " << active_catalogd_subscriber_id_;
-      ++sending_sequence_;
+      ++active_catalogd_version_;
       return true;
     } else {
       is_active_catalogd_assigned_ = false;
@@ -215,10 +219,10 @@ bool StatestoreCatalogdMgr::UnregisterCatalogd(
 }
 
 const TCatalogRegistration& StatestoreCatalogdMgr::GetActiveCatalogRegistration(
-    bool* has_active_catalogd, int64* sending_sequence) {
+    bool* has_active_catalogd, int64_t* active_catalogd_version) {
   std::lock_guard<std::mutex> l(catalog_mgr_lock_);
   *has_active_catalogd = is_active_catalogd_assigned_;
-  *sending_sequence = sending_sequence_;
+  *active_catalogd_version = active_catalogd_version_;
   return active_catalogd_registration_;
 }
 

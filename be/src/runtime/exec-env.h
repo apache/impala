@@ -42,6 +42,7 @@ class KuduClient;
 
 namespace impala {
 
+class ActiveCatalogdVersionChecker;
 class AdmissionController;
 class BufferPool;
 class CallableThreadPool;
@@ -204,9 +205,15 @@ class ExecEnv {
     statestore_registration_completed_.CompareAndSwap(0, 1);
   }
 
-  /// Callback function for receiving notification of updating catalogd.
-  /// This function is called after catalogd is registered to statestore.
-  void UpdateCatalogd(const TCatalogRegistration& catalogd_registration);
+  /// Callback function for receiving notification of new active catalogd.
+  /// This function is called when active catalogd is found from registration process,
+  /// or UpdateCatalogd RPC is received. The two kinds of RPCs could be received out of
+  /// sending order.
+  /// Reset 'last_active_catalogd_version_' if 'is_registration_reply' is true and
+  /// 'active_catalogd_version' is negative. In this case, 'catalogd_registration' is
+  /// invalid and should not be used.
+  void UpdateActiveCatalogd(bool is_registration_reply, int64_t active_catalogd_version,
+      const TCatalogRegistration& catalogd_registration);
 
   /// Return the current address of Catalog service.
   std::shared_ptr<const TNetworkAddress> GetCatalogdAddress() const;
@@ -321,10 +328,13 @@ class ExecEnv {
   /// Current address of Catalog service
   std::shared_ptr<const TNetworkAddress> catalogd_address_;
 
+  /// Object to track the version of received active catalogd.
+  boost::scoped_ptr<ActiveCatalogdVersionChecker> active_catalogd_version_checker_;
+
   /// Flag that indicate if the metric for catalogd address has been set.
   bool is_catalogd_address_metric_set_ = false;
 
-  /// Protects catalogd_address_.
+  /// Protects catalogd_address_ and active_catalogd_version_tracker_.
   mutable std::mutex catalogd_address_lock_;
 
   /// Initialize ExecEnv based on Hadoop config from frontend.
