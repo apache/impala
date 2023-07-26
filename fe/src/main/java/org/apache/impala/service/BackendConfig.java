@@ -415,4 +415,8 @@ public class BackendConfig {
   public boolean useJammWeigher() {
     return backendCfg_.use_jamm_weigher;
   }
+
+  public int icebergReloadNewFilesThreshold() {
+    return backendCfg_.iceberg_reload_new_files_threshold;
+  }
 }

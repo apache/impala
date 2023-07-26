@@ -258,4 +258,6 @@ struct TBackendGflags {
   113: required double scan_range_cost_factor
 
   114: required bool use_jamm_weigher
+
+  115: required i32 iceberg_reload_new_files_threshold
 }

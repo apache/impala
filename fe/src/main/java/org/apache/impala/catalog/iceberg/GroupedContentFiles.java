@@ -57,6 +57,11 @@ public class GroupedContentFiles {
     return Iterables.concat(dataFilesWithoutDeletes, dataFilesWithDeletes, deleteFiles);
   }
 
+  public int size() {
+    return dataFilesWithDeletes.size() + dataFilesWithoutDeletes.size() +
+        deleteFiles.size();
+  }
+
   public boolean isEmpty() {
     return Iterables.isEmpty(getAllContentFiles());
   }

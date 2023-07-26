@@ -408,6 +408,11 @@ DEFINE_int64(update_catalogd_rpc_resend_interval_ms, 100, "(Advanced) Interval (
     "with which the statestore resends the update catalogd RPC to a subscriber if the "
     "statestore has failed to send the RPC to the subscriber.");
 
+DEFINE_int32(iceberg_reload_new_files_threshold, 100, "(Advanced) If during a table "
+    "refresh the number of new files are greater than this, catalogd will completely "
+    "reload all file metadata. If number of new files are less or equal to this, "
+    "catalogd will only load the metadata of the newly added files.");
+
 // TGeospatialLibrary's values are mapped here as constants
 static const string geo_lib_none = "NONE";
 static const string geo_lib_hive_esri = "HIVE_ESRI";

@@ -67,7 +67,7 @@ public class FileMetadataLoader {
 
   protected boolean forceRefreshLocations = false;
 
-  private List<FileDescriptor> loadedFds_;
+  protected List<FileDescriptor> loadedFds_;
   private List<FileDescriptor> loadedInsertDeltaFds_;
   private List<FileDescriptor> loadedDeleteDeltaFds_;
   protected LoadStats loadStats_;

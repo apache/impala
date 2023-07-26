@@ -698,18 +698,16 @@ public interface FeIcebergTable extends FeFsTable {
         FileStatus fileStatus, FeIcebergTable table) throws IOException {
       Reference<Long> numUnknownDiskIds = new Reference<>(0L);
 
-      String relPath = null;
       String absPath = null;
       Path tableLoc = new Path(table.getIcebergTableLocation());
-      URI relUri = tableLoc.toUri().relativize(fileStatus.getPath().toUri());
-      if (relUri.isAbsolute() || relUri.getPath().startsWith(Path.SEPARATOR)) {
+      String relPath = FileSystemUtil.relativizePathNoThrow(
+          fileStatus.getPath(), tableLoc);
+      if (relPath == null) {
         if (Utils.requiresDataFilesInTableLocation(table)) {
           throw new RuntimeException(fileStatus.getPath()
               + " is outside of the Iceberg table location " + tableLoc);
         }
         absPath = fileStatus.getPath().toString();
-      } else {
-        relPath = relUri.getPath();
       }
 
       if (!FileSystemUtil.supportsStorageIds(fs)) {

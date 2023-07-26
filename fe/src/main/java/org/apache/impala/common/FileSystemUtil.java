@@ -965,11 +965,26 @@ public class FileSystemUtil {
    */
   public static String relativizePath(Path path, Path startPath) {
     URI relUri = startPath.toUri().relativize(path.toUri());
-    if (relUri.isAbsolute() || relUri.getPath().startsWith("/")) {
+    if (!isRelative(relUri)) {
       throw new RuntimeException("FileSystem returned an unexpected path " +
           path + " for a file within " + startPath);
     }
     return relUri.getPath();
+  }
+
+  /**
+   * Return the path of 'path' relative to the startPath. This may
+   * differ from simply the file name in the case of recursive listings.
+   * Instead of throwing an exception, it returns null when cannot relativize 'path'.
+   */
+  public static String relativizePathNoThrow(Path path, Path startPath) {
+    URI relUri = startPath.toUri().relativize(path.toUri());
+    if (isRelative(relUri)) return relUri.getPath();
+    return null;
+  }
+
+  private static boolean isRelative(URI uri) {
+    return !(uri.isAbsolute() || uri.getPath().startsWith(Path.SEPARATOR));
   }
 
   /**

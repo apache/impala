@@ -17,13 +17,17 @@
 
 package org.apache.impala.catalog;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -36,13 +40,32 @@ import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Reference;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.ListMap;
+
+import org.apache.impala.util.ThreadNameAnnotator;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utility for loading the content files metadata of the Iceberg tables.
  */
 public class IcebergFileMetadataLoader extends FileMetadataLoader {
+  private final static Logger LOG = LoggerFactory.getLogger(
+      IcebergFileMetadataLoader.class);
+
+  private static final Configuration CONF = new Configuration();
+
+  // Default value of 'newFilesThreshold_' if the given parameter or startup flag have
+  // invalid value.
+  private final int NEW_FILES_THRESHOLD_DEFAULT = 100;
+
+  // If there are more new files than 'newFilesThreshold_', we should fall back
+  // to regular file metadata loading.
+  private final int newFilesThreshold_;
+
   private final GroupedContentFiles icebergFiles_;
   private final boolean canDataBeOutsideOfTableLocation_;
 
@@ -50,10 +73,82 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
       List<FileDescriptor> oldFds, ListMap<TNetworkAddress> hostIndex,
       ValidTxnList validTxnList, ValidWriteIdList writeIds,
       GroupedContentFiles icebergFiles, boolean canDataBeOutsideOfTableLocation) {
+    this(partDir, recursive, oldFds, hostIndex, validTxnList, writeIds,
+        icebergFiles, canDataBeOutsideOfTableLocation,
+        BackendConfig.INSTANCE.icebergReloadNewFilesThreshold());
+  }
+
+  public IcebergFileMetadataLoader(Path partDir, boolean recursive,
+      List<FileDescriptor> oldFds, ListMap<TNetworkAddress> hostIndex,
+      ValidTxnList validTxnList, ValidWriteIdList writeIds,
+      GroupedContentFiles icebergFiles, boolean canDataBeOutsideOfTableLocation,
+      int newFilesThresholdParam) {
     super(partDir, recursive, oldFds, hostIndex, validTxnList, writeIds,
         HdfsFileFormat.ICEBERG);
     icebergFiles_ = icebergFiles;
     canDataBeOutsideOfTableLocation_ = canDataBeOutsideOfTableLocation;
+    if (newFilesThresholdParam >= 0) {
+      newFilesThreshold_ = newFilesThresholdParam;
+    } else {
+      newFilesThreshold_ = NEW_FILES_THRESHOLD_DEFAULT;
+      LOG.warn("Ignoring invalid new files threshold: {} " +
+          "using value: {}", newFilesThresholdParam, newFilesThreshold_);
+    }
+  }
+
+  @Override
+  public void load() throws CatalogException, IOException {
+    if (!shouldReuseOldFds()) {
+      super.load();
+    } else {
+      reloadWithOldFds();
+    }
+  }
+
+  /**
+   *  Iceberg tables are a collection of immutable, uniquely identifiable data files,
+   *  which means we can safely reuse the old FDs.
+   */
+  private void reloadWithOldFds() throws IOException {
+    loadStats_ = new LoadStats(partDir_);
+    FileSystem fs = partDir_.getFileSystem(CONF);
+
+    String msg = String.format("Refreshing Iceberg file metadata from path %s " +
+        "while reusing old file descriptors", partDir_);
+    LOG.trace(msg);
+    try (ThreadNameAnnotator tna = new ThreadNameAnnotator(msg)) {
+      loadedFds_ = new ArrayList<>();
+      Reference<Long> numUnknownDiskIds = new Reference<>(0L);
+      for (ContentFile<?> contentFile : icebergFiles_.getAllContentFiles()) {
+        FileDescriptor fd = getOldFd(contentFile);
+        if (fd == null) {
+          fd = getFileDescriptor(fs, contentFile, numUnknownDiskIds);
+        } else {
+          ++loadStats_.skippedFiles;
+        }
+        loadedFds_.add(Preconditions.checkNotNull(fd));
+      }
+      Preconditions.checkState(loadStats_.loadedFiles <= newFilesThreshold_);
+      loadStats_.unknownDiskIds += numUnknownDiskIds.getRef();
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(loadStats_.debugString());
+      }
+    }
+  }
+
+  private FileDescriptor getFileDescriptor(FileSystem fs, ContentFile<?> contentFile,
+        Reference<Long> numUnknownDiskIds) throws IOException {
+    Path fileLoc = FileSystemUtil.createFullyQualifiedPath(
+        new Path(contentFile.path().toString()));
+    FileStatus stat;
+    if (FileSystemUtil.supportsStorageIds(fs)) {
+      stat = Utils.createLocatedFileStatus(fileLoc, fs);
+    } else {
+      // For OSS service (e.g. S3A, COS, OSS, etc), we create FileStatus ourselves.
+      stat = Utils.createFileStatus(contentFile, fileLoc);
+    }
+    return getFileDescriptor(fs, FileSystemUtil.supportsStorageIds(fs),
+        numUnknownDiskIds, stat);
   }
 
   /**
@@ -63,18 +158,15 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
   @Override
   protected FileDescriptor getFileDescriptor(FileSystem fs, boolean listWithLocations,
       Reference<Long> numUnknownDiskIds, FileStatus fileStatus) throws IOException {
-    String relPath = null;
     String absPath = null;
-    URI relUri = partDir_.toUri().relativize(fileStatus.getPath().toUri());
-    if (relUri.isAbsolute() || relUri.getPath().startsWith(Path.SEPARATOR)) {
+    String relPath = FileSystemUtil.relativizePathNoThrow(fileStatus.getPath(), partDir_);
+    if (relPath == null) {
       if (canDataBeOutsideOfTableLocation_) {
         absPath = fileStatus.getPath().toString();
       } else {
         throw new IOException(String.format("Failed to load Iceberg datafile %s, because "
             + "it's outside of the table location", fileStatus.getPath().toUri()));
       }
-    } else {
-      relPath = relUri.getPath();
     }
 
     String path = Strings.isNullOrEmpty(relPath) ? absPath : relPath;
@@ -135,5 +227,48 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
       }
     }
     return stats;
+  }
+
+  @VisibleForTesting
+  boolean shouldReuseOldFds() throws IOException {
+    if (oldFdsByPath_ == null || oldFdsByPath_.isEmpty()) return false;
+    if (forceRefreshLocations) return false;
+
+    int oldFdsSize = oldFdsByPath_.size();
+    int iceContentFilesSize = icebergFiles_.size();
+
+    if (iceContentFilesSize - oldFdsSize > newFilesThreshold_) {
+      LOG.trace("There are at least {} new files under path {}.",
+          iceContentFilesSize - oldFdsSize, partDir_);
+      return false;
+    }
+
+    int newFiles = 0;
+    for (ContentFile<?> contentFile : icebergFiles_.getAllContentFiles()) {
+      if (getOldFd(contentFile) == null) {
+        ++newFiles;
+        if (newFiles > newFilesThreshold_) {
+          LOG.trace("There are at least {} new files under path {}.", newFiles, partDir_);
+          return false;
+        }
+      }
+    }
+    LOG.trace("There are only {} new files under path {}.", newFiles, partDir_);
+    return true;
+  }
+
+  FileDescriptor getOldFd(ContentFile<?> contentFile) throws IOException {
+    Path contentFilePath = FileSystemUtil.createFullyQualifiedPath(
+        new Path(contentFile.path().toString()));
+    String lookupPath = FileSystemUtil.relativizePathNoThrow(contentFilePath, partDir_);
+    if (lookupPath == null) {
+      if (canDataBeOutsideOfTableLocation_) {
+        lookupPath = contentFilePath.toString();
+      } else {
+        throw new IOException(String.format("Failed to load Iceberg datafile %s, because "
+            + "it's outside of the table location", contentFilePath));
+      }
+    }
+    return oldFdsByPath_.get(lookupPath);
   }
 }

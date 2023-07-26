@@ -334,7 +334,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
    * propagate alterations made to the Iceberg table to HMS.
    */
   @Override
-  public void load(boolean dummy /* not used */, IMetaStoreClient msClient,
+  public void load(boolean reuseMetadata, IMetaStoreClient msClient,
       org.apache.hadoop.hive.metastore.api.Table msTbl, String reason)
       throws TableLoadingException {
     final Timer.Context context =
@@ -362,7 +362,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
         hdfsTable_.setIcebergFiles(icebergFiles);
         hdfsTable_.setCanDataBeOutsideOfTableLocation(
             !Utils.requiresDataFilesInTableLocation(this));
-        hdfsTable_.load(msClient, msTable_, reason);
+        hdfsTable_.load(reuseMetadata, msClient, msTable_, reason);
         fileStore_ = Utils.loadAllPartition(this, icebergFiles);
         partitionStats_ = Utils.loadPartitionStats(this, icebergFiles);
         setIcebergTableStats();

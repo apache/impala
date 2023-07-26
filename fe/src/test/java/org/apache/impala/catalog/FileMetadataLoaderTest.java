@@ -22,6 +22,7 @@ import static org.junit.Assert.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -31,8 +32,11 @@ import org.apache.hadoop.hive.common.ValidReadTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.compat.MetastoreShim;
+import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.ListMap;
 import org.junit.Test;
 
@@ -113,15 +117,15 @@ public class FileMetadataLoaderTest {
 
   @Test
   public void testIcebergLoading() throws IOException, CatalogException {
-    ListMap<TNetworkAddress> hostIndex = new ListMap<>();
-    Path table1Path = new Path(
-        "hdfs://localhost:20500/test-warehouse/iceberg_test/iceberg_partitioned");
-    FileMetadataLoader fml1 = new FileMetadataLoader(table1Path, /* recursive=*/true,
-        /* oldFds = */ Collections.emptyList(), hostIndex, null, null,
-        HdfsFileFormat.ICEBERG);
+    CatalogServiceCatalog catalog = CatalogServiceTestCatalog.create();
+    IcebergFileMetadataLoader fml1 = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_partitioned",
+        /* oldFds = */ Collections.emptyList(),
+        /* canDataBeOutsideOfTableLocation = */ false);
     fml1.load();
-    assertEquals(25, fml1.getStats().loadedFiles);
-    assertEquals(25, fml1.getLoadedFds().size());
+    assertEquals(20, fml1.getStats().loadedFiles);
+    assertEquals(0, fml1.getStats().skippedFiles);
+    assertEquals(20, fml1.getLoadedFds().size());
 
     ArrayList<String> relPaths = new ArrayList<>(
         Collections2.transform(fml1.getLoadedFds(), FileDescriptor::getRelativePath));
@@ -129,20 +133,213 @@ public class FileMetadataLoaderTest {
     assertEquals("data/event_time_hour=2020-01-01-08/action=view/" +
         "00001-1-b975a171-0911-47c2-90c8-300f23c28772-00000.parquet", relPaths.get(0));
 
-    Path table2Path = new Path(
-        "hdfs://localhost:20500/test-warehouse/iceberg_test/iceberg_non_partitioned");
-    FileMetadataLoader fml2 = new FileMetadataLoader(table2Path, /* recursive=*/true,
-        /* oldFds = */ Collections.emptyList(), hostIndex, null, null,
-        HdfsFileFormat.ICEBERG);
+    IcebergFileMetadataLoader fml2 =  getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_non_partitioned",
+        /* oldFds = */ Collections.emptyList(),
+        /* canDataBeOutsideOfTableLocation = */ false);
     fml2.load();
-    assertEquals(25, fml2.getStats().loadedFiles);
-    assertEquals(25, fml2.getLoadedFds().size());
+    assertEquals(20, fml2.getStats().loadedFiles);
+    assertEquals(0, fml2.getStats().skippedFiles);
+    assertEquals(20, fml2.getLoadedFds().size());
 
     relPaths = new ArrayList<>(
         Collections2.transform(fml2.getLoadedFds(), FileDescriptor::getRelativePath));
     Collections.sort(relPaths);
     assertEquals("data/00001-1-5dbd44ad-18bc-40f2-9dd6-aeb2cc23457c-00000.parquet",
         relPaths.get(0));
+  }
+
+  @Test
+  public void testIcebergRefresh() throws IOException, CatalogException {
+    CatalogServiceCatalog catalog = CatalogServiceTestCatalog.create();
+    IcebergFileMetadataLoader fml1 = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_partitioned",
+        /* oldFds = */ Collections.emptyList(),
+        /* canDataBeOutsideOfTableLocation = */ false);
+    fml1.load();
+
+    IcebergFileMetadataLoader fml1Refresh = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_partitioned",
+        /* oldFds = */ fml1.getLoadedFds(),
+        /* canDataBeOutsideOfTableLocation = */ false);
+    assertTrue(fml1Refresh.shouldReuseOldFds());
+    fml1Refresh.load();
+    assertEquals(0, fml1Refresh.getStats().loadedFiles);
+    assertEquals(20, fml1Refresh.getStats().skippedFiles);
+    assertEquals(20, fml1Refresh.getLoadedFds().size());
+
+    List<String> relPaths = new ArrayList<>(
+        Collections2.transform(fml1Refresh.getLoadedFds(),
+        FileDescriptor::getRelativePath));
+    Collections.sort(relPaths);
+    assertEquals("data/event_time_hour=2020-01-01-08/action=view/" +
+        "00001-1-b975a171-0911-47c2-90c8-300f23c28772-00000.parquet", relPaths.get(0));
+
+    IcebergFileMetadataLoader fml2 = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_non_partitioned",
+        /* oldFds = */ Collections.emptyList(),
+        /* canDataBeOutsideOfTableLocation = */ false);
+    fml2.load();
+
+    IcebergFileMetadataLoader fml2Refresh = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_non_partitioned",
+        /* oldFds = */ fml2.getLoadedFds(),
+        /* canDataBeOutsideOfTableLocation = */ false);
+    assertTrue(fml2Refresh.shouldReuseOldFds());
+    fml2Refresh.load();
+    assertEquals(0, fml2Refresh.getStats().loadedFiles);
+    assertEquals(20, fml2Refresh.getStats().skippedFiles);
+    assertEquals(20, fml2Refresh.getLoadedFds().size());
+
+    relPaths = new ArrayList<>(
+        Collections2.transform(fml2Refresh.getLoadedFds(),
+            FileDescriptor::getRelativePath));
+    Collections.sort(relPaths);
+    assertEquals("data/00001-1-5dbd44ad-18bc-40f2-9dd6-aeb2cc23457c-00000.parquet",
+        relPaths.get(0));
+  }
+
+  @Test
+  public void testIcebergPartialRefresh() throws IOException, CatalogException {
+    CatalogServiceCatalog catalog = CatalogServiceTestCatalog.create();
+    IcebergFileMetadataLoader fml1 = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_partitioned",
+        /* oldFds = */ Collections.emptyList(),
+        /* canDataBeOutsideOfTableLocation = */ false);
+    fml1.load();
+
+    IcebergFileMetadataLoader fml1Refresh = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_partitioned",
+        /* oldFds = */ fml1.getLoadedFds().subList(0, 10),
+        /* canDataBeOutsideOfTableLocation = */ false);
+    assertTrue(fml1Refresh.shouldReuseOldFds());
+    fml1Refresh.load();
+    assertEquals(10, fml1Refresh.getStats().loadedFiles);
+    assertEquals(10, fml1Refresh.getStats().skippedFiles);
+    assertEquals(20, fml1Refresh.getLoadedFds().size());
+
+    IcebergFileMetadataLoader fml2 = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_non_partitioned",
+        /* oldFds = */ Collections.emptyList(),
+        /* canDataBeOutsideOfTableLocation = */ false);
+    fml2.load();
+
+    IcebergFileMetadataLoader fml2Refresh = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_non_partitioned",
+        /* oldFds = */ fml2.getLoadedFds().subList(0, 10),
+        /* canDataBeOutsideOfTableLocation = */ false);
+    assertTrue(fml2Refresh.shouldReuseOldFds());
+    fml2Refresh.load();
+    assertEquals(10, fml2Refresh.getStats().loadedFiles);
+    assertEquals(10, fml2Refresh.getStats().skippedFiles);
+    assertEquals(20, fml2Refresh.getLoadedFds().size());
+  }
+
+  @Test
+  public void testIcebergNewFilesThreshold() throws IOException, CatalogException {
+    CatalogServiceCatalog catalog = CatalogServiceTestCatalog.create();
+    IcebergFileMetadataLoader fml1 = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_partitioned",
+        /* oldFds = */ Collections.emptyList(),
+        /* canDataBeOutsideOfTableLocation = */ false);
+    fml1.load();
+
+    IcebergFileMetadataLoader fml1Refresh = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_partitioned",
+        /* oldFds = */ fml1.getLoadedFds().subList(0, 10),
+        /* canDataBeOutsideOfTableLocation = */ false);
+    assertTrue(fml1Refresh.shouldReuseOldFds());
+    fml1Refresh.setForceRefreshBlockLocations(true);
+    assertFalse(fml1Refresh.shouldReuseOldFds());
+    fml1Refresh.setForceRefreshBlockLocations(false);
+    assertTrue(fml1Refresh.shouldReuseOldFds());
+
+    IcebergFileMetadataLoader fml1Refresh10 = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_partitioned",
+        /* oldFds = */ fml1.getLoadedFds().subList(0, 10),
+        /* canDataBeOutsideOfTableLocation = */ false, 10);
+    assertTrue(fml1Refresh10.shouldReuseOldFds());
+    IcebergFileMetadataLoader fml1Refresh9 = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_partitioned",
+        /* oldFds = */ fml1.getLoadedFds().subList(0, 10),
+        /* canDataBeOutsideOfTableLocation = */ false, 9);
+    assertFalse(fml1Refresh9.shouldReuseOldFds());
+
+
+    IcebergFileMetadataLoader fml2 = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_non_partitioned",
+        /* oldFds = */ Collections.emptyList(),
+        /* canDataBeOutsideOfTableLocation = */ false);
+    fml2.load();
+
+    IcebergFileMetadataLoader fml2Refresh = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_non_partitioned",
+        /* oldFds = */ fml2.getLoadedFds().subList(0, 10),
+        /* canDataBeOutsideOfTableLocation = */ false);
+    IcebergFileMetadataLoader fml2Refresh10 = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_non_partitioned",
+        /* oldFds = */ fml2.getLoadedFds().subList(0, 10),
+        /* canDataBeOutsideOfTableLocation = */ false, 10);
+    assertTrue(fml2Refresh10.shouldReuseOldFds());
+    IcebergFileMetadataLoader fml2Refresh9 = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_non_partitioned",
+        /* oldFds = */ fml2.getLoadedFds().subList(0, 10),
+        /* canDataBeOutsideOfTableLocation = */ false, 9);
+    assertFalse(fml2Refresh9.shouldReuseOldFds());
+  }
+
+  @Test
+  public void testIcebergMultipleStorageLocations() throws IOException, CatalogException {
+    CatalogServiceCatalog catalog = CatalogServiceTestCatalog.create();
+    IcebergFileMetadataLoader fml1 = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_multiple_storage_locations",
+        /* oldFds = */ Collections.emptyList(),
+        /* canDataBeOutsideOfTableLocation = */ true);
+    fml1.load();
+
+    IcebergFileMetadataLoader fml1Refresh1 = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_multiple_storage_locations",
+        /* oldFds = */ fml1.getLoadedFds().subList(0, 1),
+        /* canDataBeOutsideOfTableLocation = */ true);
+    assertTrue(fml1Refresh1.shouldReuseOldFds());
+    fml1Refresh1.load();
+    assertEquals(5, fml1Refresh1.getStats().loadedFiles);
+    assertEquals(1, fml1Refresh1.getStats().skippedFiles);
+    assertEquals(6, fml1Refresh1.getLoadedFds().size());
+
+    IcebergFileMetadataLoader fml1Refresh5 = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_multiple_storage_locations",
+        /* oldFds = */ fml1.getLoadedFds().subList(0, 5),
+        /* canDataBeOutsideOfTableLocation = */ true);
+    assertTrue(fml1Refresh5.shouldReuseOldFds());
+    fml1Refresh5.load();
+    assertEquals(1, fml1Refresh5.getStats().loadedFiles);
+    assertEquals(5, fml1Refresh5.getStats().skippedFiles);
+    assertEquals(6, fml1Refresh5.getLoadedFds().size());
+  }
+
+  private IcebergFileMetadataLoader getLoaderForIcebergTable(
+      CatalogServiceCatalog catalog, String dbName, String tblName,
+      List<FileDescriptor> oldFds, boolean canDataBeOutsideOfTableLocation)
+      throws CatalogException {
+    return getLoaderForIcebergTable(catalog, dbName, tblName, oldFds,
+        canDataBeOutsideOfTableLocation, -1);
+  }
+
+  private IcebergFileMetadataLoader getLoaderForIcebergTable(
+      CatalogServiceCatalog catalog, String dbName, String tblName,
+      List<FileDescriptor> oldFds, boolean canDataBeOutsideOfTableLocation,
+      int newFilesThreshold)
+      throws CatalogException {
+    ListMap<TNetworkAddress> hostIndex = new ListMap<>();
+    FeIcebergTable iceT = (FeIcebergTable)catalog.getOrLoadTable(
+        dbName, tblName, "test", null);
+    Path location = new Path(iceT.getLocation());
+    GroupedContentFiles iceFiles = IcebergUtil.getIcebergFiles(iceT,
+        /*predicates=*/Collections.emptyList(), /*timeTravelSpec=*/null);
+    return new IcebergFileMetadataLoader(location, /* recursive=*/true,
+        oldFds, hostIndex, null, null, iceFiles, canDataBeOutsideOfTableLocation,
+        newFilesThreshold);
   }
 
   private FileMetadataLoader getLoaderForAcidTable(
