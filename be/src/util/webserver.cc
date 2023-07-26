@@ -28,6 +28,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/mem_fn.hpp>
 #include <boost/thread/shared_mutex.hpp>
+#include <gssapi/gssapi_krb5.h>
 #include <rapidjson/document.h>
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/stringbuffer.h>
@@ -501,6 +502,7 @@ Status Webserver::Start() {
       return Status("Unable to configure web server for SPNEGO authentication: "
                     "must configure a keytab file for the server");
     }
+    krb5_gss_register_acceptor_identity(kt_file);
     LOG(INFO) << "Webserver: secured with SPNEGO authentication.";
   }
 
