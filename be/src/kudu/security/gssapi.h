@@ -19,6 +19,7 @@
 #include <string>
 
 #include <gssapi/gssapi.h>
+#include <gssapi/gssapi_krb5.h>
 
 namespace kudu {
 

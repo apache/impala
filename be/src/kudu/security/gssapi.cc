@@ -23,9 +23,12 @@
 
 #include <glog/logging.h>
 
+#include "common/global-flags.h"
 #include "kudu/gutil/strings/escaping.h"
 #include "kudu/util/scoped_cleanup.h"
 #include "kudu/util/status.h"
+
+DECLARE_string(spnego_keytab_file);
 
 using std::string;
 
@@ -123,6 +126,10 @@ Status SpnegoStep(const string& in_token_b64,
   // [1] http://krbdev.mit.edu/rt/Ticket/History.html?id=8620
   size_t real_token_size = token.size();
   token.resize(real_token_size + 256);
+
+  if (!FLAGS_spnego_keytab_file.empty()) {
+    krb5_gss_register_acceptor_identity(FLAGS_spnego_keytab_file.c_str());
+  }
 
   gss_buffer_desc input_token {real_token_size, const_cast<char*>(token.data())};
 

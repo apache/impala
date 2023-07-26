@@ -33,6 +33,7 @@
 #include <rapidjson/stringbuffer.h>
 
 #include "common/logging.h"
+#include "common/global-flags.h"
 #include "gutil/endian.h"
 #include "gutil/strings/escaping.h"
 #include "gutil/strings/strip.h"
@@ -162,6 +163,7 @@ DECLARE_bool(jwt_token_auth);
 DECLARE_bool(jwt_validate_signature);
 DECLARE_string(jwt_custom_claim_username);
 DECLARE_string(trusted_auth_header);
+DECLARE_string(spnego_keytab_file);
 
 static const char* DOC_FOLDER = "/www/";
 static const int DOC_FOLDER_LEN = strlen(DOC_FOLDER);
@@ -474,7 +476,13 @@ Status Webserver::Start() {
     // propagated into this environment variable where the GSSAPI calls will
     // pick it up. In other words, we aren't expecting users to pass in this
     // environment variable specifically.
-    const char* kt_file = getenv("KRB5_KTNAME");
+
+    // If --spnego_keytab_file flag is not empty, web server uses keytab file location
+    // specified in --spnego_keytab_file instead of --keytab_file. This is for seperation
+    // of impala service keytab and spnego keytab for web console authentication.
+    const char* kt_file = FLAGS_spnego_keytab_file.empty() ?
+      getenv("KRB5_KTNAME") :
+      FLAGS_spnego_keytab_file.c_str();
     if (!kt_file || !kudu::Env::Default()->FileExists(kt_file)) {
       return Status("Unable to configure web server for SPNEGO authentication: "
                     "must configure a keytab file for the server");

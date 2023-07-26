@@ -52,6 +52,8 @@ DEFINE_string(principal, "", "Kerberos principal. If set, both client and backen
 DEFINE_string(be_principal, "", "Kerberos principal for backend network connections only,"
     "overriding --principal if set. Must not be set if --principal is not set.");
 DEFINE_string(keytab_file, "", "Absolute path to Kerberos keytab file");
+DEFINE_string(spnego_keytab_file, "", "Absolute path to Kerberos keytab file "
+    "for HTTP spnego. If it is empty, --keytab_file flag will be used.");
 DEFINE_string(krb5_ccname, "/tmp/krb5cc_impala_internal", "Absolute path to the file "
     "based credentials cache that we pass to the KRB5CCNAME environment variable.");
 DEFINE_string(krb5_conf, "", "Absolute path to Kerberos krb5.conf if in a non-standard "
