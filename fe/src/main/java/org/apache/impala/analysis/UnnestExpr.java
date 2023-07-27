@@ -242,10 +242,13 @@ public class UnnestExpr extends SlotRef {
 
   @Override
   public boolean isBoundByTupleIds(List<TupleId> tids) {
-    Preconditions.checkState(desc_ != null);
-    TupleId parentId = desc_.getParent().getRootDesc().getId();
-    for (TupleId tid: tids) {
-      if (tid.equals(parentId)) return true;
+    Preconditions.checkState(desc_ != null, "Null desc_ in UnnestExpr");
+    Preconditions.checkState(desc_.getParent() != null, "Null parent in UnnestExpr");
+    if (desc_.getParent().getRootDesc() != null) {
+      TupleId parentId = desc_.getParent().getRootDesc().getId();
+      for (TupleId tid : tids) {
+        if (tid.equals(parentId)) return true;
+      }
     }
     return super.isBoundByTupleIds(tids);
   }

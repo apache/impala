@@ -481,3 +481,105 @@ where arr1_unnested > 7;
 5,12,'twelve'
 ---- TYPES
 INT,INT,STRING
+====
+---- QUERY
+# Regression test for IMPALA-12319. Test sorting on unnest results.
+select id, item, row_number() over (order by id, item)
+from (
+  select id, unnest(arr1) item from functional_parquet.complextypes_arrays
+) v;
+---- RESULTS
+1,1,1
+1,2,2
+1,3,3
+1,4,4
+1,5,5
+2,1,6
+2,3,7
+2,4,8
+2,5,9
+2,NULL,10
+3,8,11
+3,9,12
+3,10,13
+4,10,14
+5,10,15
+5,12,16
+5,NULL,17
+7,1,18
+7,2,19
+10,1,20
+10,2,21
+10,3,22
+---- TYPES
+INT,INT,BIGINT
+====
+---- QUERY
+# Same as the above test without using the inline view.
+select id, unnest(arr1), row_number() over (order by id, unnest(arr1))
+from functional_parquet.complextypes_arrays
+---- RESULTS
+1,1,1
+1,2,2
+1,3,3
+1,4,4
+1,5,5
+2,1,6
+2,3,7
+2,4,8
+2,5,9
+2,NULL,10
+3,8,11
+3,9,12
+3,10,13
+4,10,14
+5,10,15
+5,12,16
+5,NULL,17
+7,1,18
+7,2,19
+10,1,20
+10,2,21
+10,3,22
+---- TYPES
+INT,INT,BIGINT
+====
+---- QUERY
+select id, item1, item2, row_number() over (order by id, item1, item2)
+from (
+  select id, unnest(arr1) as item1, unnest(arr2) as item2
+  from functional_parquet.complextypes_arrays
+) v;
+---- RESULTS
+1,1,'one',1
+1,2,'two',2
+1,3,'three',3
+1,4,'four',4
+1,5,'five',5
+2,1,'one',6
+2,3,'three',7
+2,4,'NULL',8
+2,5,'five',9
+2,NULL,'two',10
+3,8,'NULL',11
+3,9,'NULL',12
+3,10,'ten',13
+4,10,'ten',14
+4,NULL,'eight',15
+4,NULL,'nine',16
+5,10,'ten',17
+5,12,'twelve',18
+5,NULL,'eleven',19
+5,NULL,'thirteen',20
+6,NULL,'str1',21
+6,NULL,'str2',22
+7,1,'NULL',23
+7,2,'NULL',24
+9,NULL,'str1',25
+9,NULL,'str2',26
+10,1,'NULL',27
+10,2,'NULL',28
+10,3,'NULL',29
+---- TYPES
+INT,INT,STRING,BIGINT
+====

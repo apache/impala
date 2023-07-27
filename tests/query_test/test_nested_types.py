@@ -270,12 +270,23 @@ class TestZippingUnnest(ImpalaTestSuite):
     """
     self.run_test_case('QueryTest/zipping-unnest-in-select-list', vector)
 
+
+class TestZippingUnnestFromView(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestZippingUnnestFromView, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'parquet')
+
   def test_zipping_unnest_from_view(self, vector, unique_database):
     """Zipping unnest queries where views are involved."""
-    if vector.get_value('table_format').file_format == 'orc':
-      pytest.skip('No need to run this test for multiple file formats.')
     self.run_test_case('QueryTest/zipping-unnest-from-view', vector,
         use_db=unique_database)
+
 
 class TestNestedTypesNoMtDop(ImpalaTestSuite):
   """Functional tests for nested types that do not need to be run with mt_dop > 0."""

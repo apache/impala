@@ -284,3 +284,137 @@ PLAN-ROOT SINK
    predicates: cta.id % 2 = 1
    row-size=28B cardinality=135
 ====
+select id, item, row_number() over (order by id, item) rn
+from (
+  select id, unnest(arr1) item from functional_parquet.complextypes_arrays
+) v
+---- PLAN
+PLAN-ROOT SINK
+|
+06:ANALYTIC
+|  functions: row_number()
+|  order by: id ASC, UNNEST() ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=32B cardinality=13.51K
+|
+05:SORT
+|  order by: id ASC, UNNEST() ASC
+|  row-size=24B cardinality=13.51K
+|
+01:SUBPLAN
+|  row-size=20B cardinality=13.51K
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=20B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=16B cardinality=1
+|  |
+|  03:UNNEST [functional_parquet.complextypes_arrays.arr1 arr1]
+|     row-size=0B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypes_arrays]
+   HDFS partitions=1/1 files=1 size=1.06KB
+   predicates: !empty(functional_parquet.complextypes_arrays.arr1)
+   row-size=16B cardinality=1.35K
+====
+select id, unnest(arr1), row_number() over (order by id, unnest(arr1))
+from functional_parquet.complextypes_arrays
+---- PLAN
+PLAN-ROOT SINK
+|
+06:ANALYTIC
+|  functions: row_number()
+|  order by: id ASC, UNNEST() ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=32B cardinality=13.51K
+|
+05:SORT
+|  order by: id ASC, UNNEST() ASC
+|  row-size=24B cardinality=13.51K
+|
+01:SUBPLAN
+|  row-size=20B cardinality=13.51K
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=20B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=16B cardinality=1
+|  |
+|  03:UNNEST [functional_parquet.complextypes_arrays.arr1 arr1]
+|     row-size=0B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypes_arrays]
+   HDFS partitions=1/1 files=1 size=1.06KB
+   predicates: !empty(functional_parquet.complextypes_arrays.arr1)
+   row-size=16B cardinality=1.35K
+====
+select id, item1, item2, row_number() over (order by id, item1, item2)
+from (
+  select id, unnest(arr1) as item1, unnest(arr2) as item2
+  from functional_parquet.complextypes_arrays
+) v
+---- PLAN
+PLAN-ROOT SINK
+|
+06:ANALYTIC
+|  functions: row_number()
+|  order by: id ASC, UNNEST() ASC, UNNEST() ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=56B cardinality=13.51K
+|
+05:SORT
+|  order by: id ASC, UNNEST() ASC, UNNEST() ASC
+|  row-size=48B cardinality=13.51K
+|
+01:SUBPLAN
+|  row-size=44B cardinality=13.51K
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=44B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=28B cardinality=1
+|  |
+|  03:UNNEST [functional_parquet.complextypes_arrays.arr1 arr1, functional_parquet.complextypes_arrays.arr2 arr2]
+|     row-size=0B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypes_arrays]
+   HDFS partitions=1/1 files=1 size=1.06KB
+   row-size=28B cardinality=1.35K
+====
+select id, item, row_number() over (order by id, item)
+from (
+  select id, unnest(arr1) + length(unnest(arr2)) as item
+  from functional_parquet.complextypes_arrays
+) v
+---- PLAN
+PLAN-ROOT SINK
+|
+06:ANALYTIC
+|  functions: row_number()
+|  order by: id ASC, UNNEST(arr1) + length(UNNEST(arr2)) ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=48B cardinality=13.51K
+|
+05:SORT
+|  order by: id ASC, UNNEST(arr1) + length(UNNEST(arr2)) ASC
+|  row-size=40B cardinality=13.51K
+|
+01:SUBPLAN
+|  row-size=44B cardinality=13.51K
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=44B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=28B cardinality=1
+|  |
+|  03:UNNEST [functional_parquet.complextypes_arrays.arr1 arr1, functional_parquet.complextypes_arrays.arr2 arr2]
+|     row-size=0B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypes_arrays]
+   HDFS partitions=1/1 files=1 size=1.06KB
+   row-size=28B cardinality=1.35K
+====
