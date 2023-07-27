@@ -347,11 +347,6 @@ ALTER TABLE iceberg_table_hadoop_catalog ADD PARTITION(fake_col='fake_value');
 AnalysisException: ALTER TABLE ADD PARTITION is not supported for Iceberg tables: $DATABASE.iceberg_table_hadoop_catalog
 ====
 ---- QUERY
-ALTER TABLE iceberg_table_hadoop_catalog DROP PARTITION(fake_col='fake_value');
----- CATCH
-AnalysisException: ALTER TABLE DROP PARTITION is not supported for Iceberg tables: $DATABASE.iceberg_table_hadoop_catalog
-====
----- QUERY
 ALTER TABLE iceberg_table_hadoop_catalog RECOVER PARTITIONS;
 ---- CATCH
 AnalysisException: ALTER TABLE RECOVER PARTITIONS is not supported on Iceberg tables: $DATABASE.iceberg_table_hadoop_catalog
@@ -446,7 +441,7 @@ CREATE TABLE iceberg_wrong_partition (i int)
 PARTITIONED BY SPEC (wrong(i))
 STORED AS ICEBERG;
 ---- CATCH
-Unsupported iceberg partition type: WRONG
+Unsupported Iceberg partition type: WRONG
 ====
 ---- QUERY
 CREATE TABLE iceberg_wrong_parquet_row_group_size1 ( i int)

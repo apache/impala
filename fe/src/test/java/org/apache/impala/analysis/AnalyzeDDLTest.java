@@ -325,6 +325,55 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("alter table functional.alltypes add " +
         "partition(year=2050, month=10) location '  '",
         "URI path cannot be empty.");
+
+    // Iceberg DROP PARTITION
+    String partitioned =
+        "alter table functional_parquet.iceberg_partitioned drop partition";
+    String evolution =
+        "alter table functional_parquet.iceberg_partition_evolution drop partition";
+    String nonPartitioned =
+        "alter table functional_parquet.iceberg_non_partitioned drop partition";
+
+    AnalysisError(nonPartitioned + "(user = 'Alan')",
+        "Table is not partitioned: functional_parquet.iceberg_non_partitioned");
+    AnalysisError(partitioned + "(action = 'Foo')",
+        "No matching partition(s) found");
+    AnalysisError(partitioned + "(user = 'Alan')",
+        "Partition exprs cannot contain non-partition column(s): `user`");
+    AnalysisError(partitioned + "(user = 'Alan' or user = 'Lisa' and id > 10)",
+        "Partition exprs cannot contain non-partition column(s): `user`");
+    AnalysisError(partitioned + "(void(action) = 'click')",
+        "VOID transform is not supported for partition selection");
+    AnalysisError(partitioned + "(day(action) = 'Alan')",
+        "Can't filter column 'action' with transform type: 'DAY'");
+    AnalysisError(partitioned + "(action = action)",
+        "Invalid partition filtering expression: action = action");
+    AnalysisError(partitioned + "(action = action and action = 'click' "
+            + "or hour(event_time) > '2020-01-01-01')",
+        "Invalid partition filtering expression: "
+            + "action = action AND action = 'click' OR HOUR(event_time) > 438289");
+    AnalysisError(
+        partitioned + "(action)", "Invalid partition filtering expression: action");
+    AnalysisError(partitioned + "(2)", "Invalid partition filtering expression: 2");
+    AnalysisError(partitioned + "(truncate(action))",
+        "BUCKET and TRUNCATE partition transforms should have a parameter");
+    AnalysisError(partitioned + "(truncate('string', action))",
+        "Invalid transform parameter value: string");
+    AnalysisError(partitioned + "(truncate(1, 2, action))",
+        "Invalid partition predicate: truncate(1, 2, action)");
+    AnalysisError(partitioned + " (action = 'click') purge",
+        "Partition purge is not supported for Iceberg tables");
+
+    AnalyzesOk(partitioned + "(hour(event_time) > '2020-01-01-01')");
+    AnalyzesOk(partitioned + "(hour(event_time) < '2020-02-01-01')");
+    AnalyzesOk(partitioned + "(hour(event_time) = '2020-01-01-9')");
+    AnalyzesOk(partitioned + "(hour(event_time) = '2020-01-01-9', action = 'click')");
+    AnalyzesOk(partitioned + "(action = 'click')");
+    AnalyzesOk(partitioned + "(action = 'click' or action = 'download')");
+    AnalyzesOk(partitioned + "(action in ('click', 'download'))");
+    AnalyzesOk(partitioned + "(hour(event_time) in ('2020-01-01-9', '2020-01-01-1'))");
+    AnalyzesOk(evolution + "(truncate(4,date_string_col,4) = '1231')");
+    AnalyzesOk(evolution + "(month = 12)");
   }
 
   @Test

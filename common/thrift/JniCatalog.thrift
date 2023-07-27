@@ -292,6 +292,9 @@ struct TAlterTableDropPartitionParams {
 
   // If true, underlying data is purged using -skipTrash
   3: required bool purge
+
+  // Summary of partitions to delete for Iceberg tables
+  4: optional CatalogObjects.TIcebergDropPartitionRequest iceberg_drop_partition_request
 }
 
 // Parameters for ALTER TABLE ALTER/CHANGE COLUMN commands

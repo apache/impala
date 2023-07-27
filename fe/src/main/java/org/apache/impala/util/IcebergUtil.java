@@ -27,6 +27,7 @@ import com.google.common.primitives.Longs;
 import com.google.flatbuffers.FlatBufferBuilder;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -56,6 +57,7 @@ import org.apache.iceberg.TableScan;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.expressions.Expression;
+import org.apache.iceberg.expressions.Literal;
 import org.apache.iceberg.hadoop.HadoopFileIO;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.mr.Catalogs;
@@ -101,8 +103,7 @@ import org.apache.impala.thrift.TIcebergPartitionTransformType;
 
 @SuppressWarnings("UnstableApiUsage")
 public class IcebergUtil {
-
-  private static final int ICEBERG_EPOCH_YEAR = 1970;
+  public static final int ICEBERG_EPOCH_YEAR = 1970;
   private static final int ICEBERG_EPOCH_MONTH = 1;
   @SuppressWarnings("unused")
   private static final int ICEBERG_EPOCH_DAY = 1;
@@ -390,28 +391,27 @@ public class IcebergUtil {
     return pSize;
   }
 
-  public static IcebergPartitionTransform getPartitionTransform(
-      PartitionField field, HashMap<String, Integer> transformParams)
-      throws TableLoadingException {
+  public static IcebergPartitionTransform getPartitionTransform(PartitionField field,
+      Map<String, Integer> transformParams) throws ImpalaRuntimeException {
     String type = field.transform().toString();
     String transformMappingKey = getPartitionTransformMappingKey(field.sourceId(),
         getPartitionTransformType(type));
     return getPartitionTransform(type, transformParams.get(transformMappingKey));
   }
 
-  public static IcebergPartitionTransform getPartitionTransform(String transformType,
-      Integer transformParam) throws TableLoadingException {
+  public static IcebergPartitionTransform getPartitionTransform(
+      String transformType, Integer transformParam) throws ImpalaRuntimeException {
     return new IcebergPartitionTransform(getPartitionTransformType(transformType),
         transformParam);
   }
 
   public static IcebergPartitionTransform getPartitionTransform(String transformType)
-      throws TableLoadingException {
+      throws ImpalaRuntimeException {
     return getPartitionTransform(transformType, null);
   }
 
-  private static TIcebergPartitionTransformType getPartitionTransformType(
-      String transformType) throws TableLoadingException {
+  public static TIcebergPartitionTransformType getPartitionTransformType(
+      String transformType) throws ImpalaRuntimeException {
     Preconditions.checkNotNull(transformType);
     transformType = transformType.toUpperCase();
     if ("IDENTITY".equals(transformType)) {
@@ -428,8 +428,8 @@ public class IcebergUtil {
       case "YEAR":  case "YEARS":  return TIcebergPartitionTransformType.YEAR;
       case "VOID": return TIcebergPartitionTransformType.VOID;
       default:
-        throw new TableLoadingException("Unsupported iceberg partition type: " +
-            transformType);
+        throw new ImpalaRuntimeException(
+            "Unsupported Iceberg partition type: " + transformType);
     }
   }
 
@@ -449,7 +449,7 @@ public class IcebergUtil {
    * expose the interface of the transform types outside their package and the only
    * way to get the transform's parameter is implementing this visitor class.
    */
-  public static HashMap<String, Integer> getPartitionTransformParams(PartitionSpec spec) {
+  public static Map<String, Integer> getPartitionTransformParams(PartitionSpec spec) {
     List<Pair<String, Integer>> transformParams = PartitionSpecVisitor.visit(
         spec, new PartitionSpecVisitor<Pair<String, Integer>>() {
           @Override
@@ -746,6 +746,39 @@ public class IcebergUtil {
   }
 
   /**
+   * Returns the integer representation of date transforms
+   * @param transformType type of the transform
+   * @param stringValue date value as a string
+   * @return Integer representation of a transform value, or an empty optional if the
+   * parse failed, or the supplied transform is not supported.
+   */
+  public static Integer getDateTimeTransformValue(
+      TIcebergPartitionTransformType transformType, String stringValue)
+      throws ImpalaRuntimeException {
+    try {
+      switch (transformType) {
+        case YEAR: return parseYearToTransformYear(stringValue);
+        case MONTH: return parseMonthToTransformMonth(stringValue);
+        case DAY: return parseDayToTransformMonth(stringValue);
+        case HOUR: return parseHourToTransformHour(stringValue);
+      }
+    } catch (NumberFormatException | DateTimeException | IllegalStateException e) {
+      throw new ImpalaRuntimeException(
+          String.format("Unable to parse value '%s' as '%s' transform value", stringValue,
+              transformType));
+    }
+    throw new ImpalaRuntimeException("Unexpected partition transform: " + transformType);
+  }
+
+  public static boolean isDateTimeTransformType(
+      TIcebergPartitionTransformType transformType) {
+    return transformType.equals(TIcebergPartitionTransformType.YEAR)
+        || transformType.equals(TIcebergPartitionTransformType.MONTH)
+        || transformType.equals(TIcebergPartitionTransformType.DAY)
+        || transformType.equals(TIcebergPartitionTransformType.HOUR);
+  }
+
+  /**
    * In the partition path years are represented naturally, e.g. 1984. However, we need
    * to convert it to an integer which represents the years from 1970. So, for 1984 the
    * return value should be 14.
@@ -770,12 +803,22 @@ public class IcebergUtil {
   }
 
   /**
+   * In the partition path days are represented as <year>-<month>-<day>, e.g. 2023-12-12.
+   * This functions converts this string to an integer which represents the days from
+   * '1970-01-01' with the help of Iceberg's type converter.
+   */
+  private static Integer parseDayToTransformMonth(String monthStr) {
+    Literal<Integer> days = Literal.of(monthStr).to(Types.DateType.get());
+    return days.value();
+  }
+
+  /**
    * In the partition path hours are represented as <year>-<month>-<day>-<hour>, e.g.
    * 1970-01-01-01. We need to convert it to a single integer which represents the hours
    * from '1970-01-01 00:00:00'.
    */
   private static Integer parseHourToTransformHour(String hourStr) {
-    final OffsetDateTime EPOCH = Instant.ofEpochSecond(0).atOffset(ZoneOffset.UTC);
+    final OffsetDateTime epoch = Instant.ofEpochSecond(0).atOffset(ZoneOffset.UTC);
     String[] parts = hourStr.split("-", -1);
     Preconditions.checkState(parts.length == 4);
     int year = Integer.parseInt(parts[0]);
@@ -785,7 +828,7 @@ public class IcebergUtil {
     OffsetDateTime datetime = OffsetDateTime.of(
         LocalDateTime.of(year, month, day, hour, /*minute=*/0),
         ZoneOffset.UTC);
-    return (int)ChronoUnit.HOURS.between(EPOCH, datetime);
+    return (int) ChronoUnit.HOURS.between(epoch, datetime);
   }
 
   public static TCompressionCodec parseParquetCompressionCodec(

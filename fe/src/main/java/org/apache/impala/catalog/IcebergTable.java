@@ -465,7 +465,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
   /**
    * Load schema and partitioning schemes directly from Iceberg.
    */
-  public void loadSchemaFromIceberg() throws TableLoadingException {
+  public void loadSchemaFromIceberg()
+      throws TableLoadingException, ImpalaRuntimeException {
     loadSchema();
     addVirtualColumns();
     partitionSpecs_ = Utils.loadPartitionSpecByIceberg(this);

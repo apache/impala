@@ -23,7 +23,6 @@ import com.google.common.collect.Lists;
 import com.google.common.primitives.Ints;
 
 import java.io.IOException;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -67,6 +66,7 @@ import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.Reference;
@@ -545,7 +545,7 @@ public interface FeIcebergTable extends FeFsTable {
      * @return a list of {@link org.apache.hadoop.hive.metastore.api.FieldSchema}
      */
     public static List<FieldSchema> getPartitionTransformKeys(FeIcebergTable table)
-        throws TableLoadingException {
+        throws ImpalaRuntimeException {
       Table icebergTable = table.getIcebergApiTable();
 
       if (icebergTable.specs().isEmpty()) {
@@ -553,7 +553,7 @@ public interface FeIcebergTable extends FeFsTable {
       }
 
       PartitionSpec latestSpec = icebergTable.spec();
-      HashMap<String, Integer> transformParams = IcebergUtil.getPartitionTransformParams(
+      Map<String, Integer> transformParams = IcebergUtil.getPartitionTransformParams(
           latestSpec);
       List<FieldSchema> fieldSchemaList = Lists.newArrayList();
       for (PartitionField field : latestSpec.fields()) {
@@ -888,7 +888,7 @@ public interface FeIcebergTable extends FeFsTable {
      * Get iceberg partition spec by iceberg table metadata
      */
     public static List<IcebergPartitionSpec> loadPartitionSpecByIceberg(
-        FeIcebergTable table) throws TableLoadingException {
+        FeIcebergTable table) throws ImpalaRuntimeException {
       List<IcebergPartitionSpec> ret = new ArrayList<>();
       for (PartitionSpec spec : table.getIcebergApiTable().specs().values()) {
         ret.add(convertPartitionSpec(spec));
@@ -897,9 +897,9 @@ public interface FeIcebergTable extends FeFsTable {
     }
 
     public static IcebergPartitionSpec convertPartitionSpec(PartitionSpec spec)
-        throws TableLoadingException {
-      List<IcebergPartitionField> fields = new ArrayList<>();;
-      HashMap<String, Integer> transformParams =
+        throws ImpalaRuntimeException {
+      List<IcebergPartitionField> fields = new ArrayList<>();
+      Map<String, Integer> transformParams =
           IcebergUtil.getPartitionTransformParams(spec);
       for (PartitionField field : spec.fields()) {
         fields.add(new IcebergPartitionField(field.sourceId(), field.fieldId(),
@@ -1051,6 +1051,28 @@ public interface FeIcebergTable extends FeFsTable {
     public static FileStatus createFileStatus(ContentFile<?> contentFile, Path path) {
       return new FileStatus(contentFile.fileSizeInBytes(), false, 0, 0,
           DEFAULT_MODIFICATION_TIME, path);
+    }
+
+    public static long getTotalNumberOfFiles(FeIcebergTable icebergTable,
+        TimeTravelSpec travelSpec)
+        throws ImpalaRuntimeException {
+      Map<String, String> snapshotSummary = getSnapshotSummary(
+          icebergTable.getIcebergApiTable(),
+          travelSpec);
+      if (snapshotSummary == null) {
+        throw new ImpalaRuntimeException("Invalid Iceberg snapshot summary");
+      }
+      try {
+        String totalDataFilesProp = snapshotSummary.get(
+            SnapshotSummary.TOTAL_DATA_FILES_PROP);
+        String totalDeleteFilesProp = snapshotSummary.getOrDefault(
+            SnapshotSummary.TOTAL_DELETE_FILES_PROP, "0");
+        long totalDataFiles = Long.parseLong(totalDataFilesProp);
+        long totalDeleteFiles = Long.parseLong(totalDeleteFilesProp);
+        return totalDataFiles + totalDeleteFiles;
+      } catch (NumberFormatException e) {
+        throw new ImpalaRuntimeException("Invalid Iceberg snapshot summary value");
+      }
     }
   }
 }

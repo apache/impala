@@ -1173,6 +1173,55 @@ class TestIcebergTable(IcebergTestSuite):
     assert len(data.data) == 1
     assert data.data[0] == '1'
 
+  def test_drop_partition(self, vector, unique_database):
+    create_table_stmt = """CREATE TABLE {}.iceberg_all_partitions
+        (identity_boolean boolean, identity_int int, identity_bigint bigint,
+        identity_float float, identity_double double, identity_decimal decimal(20,10),
+        identity_date date, identity_timestamp timestamp, identity_string string,
+        bucket_int int, bucket_bigint bigint, bucket_decimal decimal(20,10),
+        bucket_date date, bucket_timestamp timestamp, bucket_string string,
+        truncate_int int, truncate_bigint bigint, truncate_decimal decimal(20,10),
+        truncate_string string, year_date date, year_timestamp timestamp,
+        month_date date, month_timestamp timestamp, day_date date,
+        day_timestamp timestamp, hour_timestamp timestamp)
+      PARTITIONED BY SPEC
+        (identity(identity_boolean), identity(identity_int), identity(identity_bigint),
+        identity(identity_float), identity(identity_double), identity(identity_decimal),
+        identity(identity_date), identity(identity_string), bucket(5,bucket_int),
+        bucket(5,bucket_bigint), bucket(5,bucket_decimal), bucket(5,bucket_date),
+        bucket(5,bucket_timestamp), bucket(5,bucket_string), truncate(5,truncate_int),
+        truncate(5,truncate_bigint), truncate(5,truncate_decimal),
+        truncate(5,truncate_string), year(year_date), year(year_timestamp),
+        month(month_date), month(month_timestamp), day(day_date), day(day_timestamp),
+        hour(hour_timestamp))
+      STORED AS ICEBERG""".format(unique_database)
+    self.execute_query(create_table_stmt)
+    self.run_test_case('QueryTest/iceberg-drop-partition', vector,
+      use_db=unique_database)
+
+  def test_rollback_after_drop_partition(self, vector, unique_database):
+    table_name = "iceberg_drop_partition_rollback"
+    qualified_table_name = "{}.{}".format(unique_database, table_name)
+    create_table_stmt = """CREATE TABLE {}(identity_int int, unpartitioned_int int)
+      PARTITIONED BY SPEC (identity_int) STORED AS ICEBERG""".format(qualified_table_name)
+    insert_into_stmt = """INSERT INTO {} values(1, 2)""".format(qualified_table_name)
+    drop_partition_stmt = """ALTER TABLE {} DROP PARTITION (identity_int = 1)""".format(
+      qualified_table_name)
+
+    self.execute_query(create_table_stmt)
+    self.execute_query(insert_into_stmt)
+    self.execute_query(drop_partition_stmt)
+
+    snapshots = get_snapshots(self.client, qualified_table_name, expected_result_size=2)
+    rollback = """ALTER TABLE {} EXECUTE ROLLBACK ({})""".format(
+      qualified_table_name, snapshots[0].get_snapshot_id())
+    # Rollback before DROP PARTITION
+    self.execute_query(rollback)
+    snapshots = get_snapshots(self.client, qualified_table_name, expected_result_size=3)
+    assert snapshots[0].get_snapshot_id() == snapshots[2].get_snapshot_id()
+    assert snapshots[0].get_parent_id() == snapshots[2].get_parent_id()
+    assert snapshots[0].get_creation_time() < snapshots[2].get_creation_time()
+
 
 class TestIcebergV2Table(IcebergTestSuite):
   """Tests related to Iceberg V2 tables."""

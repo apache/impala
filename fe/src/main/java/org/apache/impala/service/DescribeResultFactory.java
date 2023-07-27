@@ -33,7 +33,7 @@ import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
-import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TDescribeOutputStyle;
@@ -198,8 +198,8 @@ public class DescribeResultFactory {
    * Hive's MetadataFormatUtils class is used to build the results.  filteredColumns is a
    * list of columns the user is authorized to view.
    */
-  public static TDescribeResult buildDescribeFormattedResult(FeTable table,
-      List<Column> filteredColumns) throws TableLoadingException {
+  public static TDescribeResult buildDescribeFormattedResult(
+      FeTable table, List<Column> filteredColumns) throws ImpalaRuntimeException {
     TDescribeResult result = new TDescribeResult();
     result.results = Lists.newArrayList();
 

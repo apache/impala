@@ -65,6 +65,8 @@ public class IcebergPartitionField extends StmtNode {
     return sourceId_;
   }
 
+  public int getFieldId_() { return fieldId_; }
+
   public TIcebergPartitionTransformType getTransformType() {
     return transform_.getTransformType();
   }

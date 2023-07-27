@@ -1,0 +1,287 @@
+====
+---- QUERY
+# Failing implicit string to hour cast
+alter table iceberg_all_partitions drop partition (hour(hour_timestamp) = "2012-12-12");
+---- CATCH
+AnalysisException: operands of type INT and STRING are not comparable: HOUR(hour_timestamp) = '2012-12-12'
+====
+---- QUERY
+# Failing implicit string to day cast
+alter table iceberg_all_partitions drop partition (day(day_date) = "2012-12");
+---- CATCH
+AnalysisException: operands of type INT and STRING are not comparable: DAY(day_date) = '2012-12'
+====
+---- QUERY
+# Failing implicit string to month cast
+alter table iceberg_all_partitions drop partition (month(month_date) = "2012");
+---- CATCH
+AnalysisException: operands of type INT and STRING are not comparable: MONTH(month_date) = '2012'
+====
+---- QUERY
+# Failing implicit string to year cast
+alter table iceberg_all_partitions drop partition (year(year_date) = "2012-12-12-20");
+---- CATCH
+AnalysisException: operands of type INT and STRING are not comparable: YEAR(year_date) = '2012-12-12-20'
+====
+---- QUERY
+INSERT INTO iceberg_all_partitions(identity_boolean) VALUES (true);
+INSERT INTO iceberg_all_partitions(identity_int) VALUES (1);
+INSERT INTO iceberg_all_partitions(identity_bigint) VALUES (1);
+INSERT INTO iceberg_all_partitions(identity_float) VALUES (1.0);
+INSERT INTO iceberg_all_partitions(identity_double) VALUES (1.0);
+INSERT INTO iceberg_all_partitions(identity_decimal) VALUES (1);
+INSERT INTO iceberg_all_partitions(identity_date) VALUES ('2000-12-12');
+INSERT INTO iceberg_all_partitions(identity_string) VALUES ("string-transform-omitted");
+INSERT INTO iceberg_all_partitions(identity_string) VALUES ("string-transform-set");
+INSERT INTO iceberg_all_partitions(identity_string) VALUES ("string"), ("another-string");
+INSERT INTO iceberg_all_partitions(identity_string) VALUES ("string"), ("another-string");
+INSERT INTO iceberg_all_partitions(bucket_int) VALUES (100), (200);
+INSERT INTO iceberg_all_partitions(bucket_bigint) VALUES (100);
+INSERT INTO iceberg_all_partitions(bucket_decimal) VALUES (10);
+INSERT INTO iceberg_all_partitions(bucket_date) VALUES ("1526-01-12");
+INSERT INTO iceberg_all_partitions(bucket_string) VALUES ("string");
+INSERT INTO iceberg_all_partitions(bucket_timestamp) VALUES ("1583-04-02 03:00:00");
+INSERT INTO iceberg_all_partitions(truncate_int) VALUES (131072);
+INSERT INTO iceberg_all_partitions(truncate_bigint) VALUES (68719476736);
+INSERT INTO iceberg_all_partitions(truncate_decimal) VALUES (100000.1234567891);
+INSERT INTO iceberg_all_partitions(truncate_string) VALUES ('thisisalongstring');
+INSERT INTO iceberg_all_partitions(year_date) VALUES ('2077-05-06');
+INSERT INTO iceberg_all_partitions(month_date) VALUES ('2023-12-01');
+INSERT INTO iceberg_all_partitions(day_date) VALUES ('2023-12-01');
+INSERT INTO iceberg_all_partitions(year_timestamp) VALUES ('2023-12-02 00:00:00');
+INSERT INTO iceberg_all_partitions(month_timestamp) VALUES ('2023-12-02 00:00:00');
+INSERT INTO iceberg_all_partitions(day_timestamp) VALUES ('2023-03-02 00:00:00');
+INSERT INTO iceberg_all_partitions(hour_timestamp) VALUES ('2023-06-02 00:00:00');
+INSERT INTO iceberg_all_partitions(identity_string, hour_timestamp) VALUES ('string-hour','2023-03-02 00:00:00');
+INSERT INTO iceberg_all_partitions(identity_string, hour_timestamp) VALUES ('another-string-hour', '2023-03-02 00:00:00');
+INSERT INTO iceberg_all_partitions(identity_string, hour_timestamp) VALUES ('another-string-hour', '2023-03-02 10:00:00');
+INSERT INTO iceberg_all_partitions(identity_string, hour_timestamp) VALUES ('string-hour', '2023-03-02 10:00:00');
+INSERT INTO iceberg_all_partitions(identity_string, identity_int) VALUES ('string-comma', 567);
+INSERT INTO iceberg_all_partitions(identity_string, identity_int) VALUES ('string-comma', 568);
+INSERT INTO iceberg_all_partitions(identity_int) VALUES (NULL);
+====
+---- QUERY
+# Number of partitions before DROP PARTITION queries
+SELECT COUNT(1) FROM $DATABASE.iceberg_all_partitions.`partitions`;
+---- RESULTS
+36
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP IF EXISTS PARTITION (identity_boolean = false)
+---- RESULTS
+'Dropped 0 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (identity_boolean = false)
+---- CATCH
+No matching partition(s) found
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (identity_boolean = true)
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (identity_int = 1)
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (identity_bigint = 1)
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (identity_float < 3.0)
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (identity_double > 0.0)
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (identity_decimal < 3);
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (identity_date = '2000-12-12');
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (identity_string = "string-transform-omitted");
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (identity(identity_string) = "string-transform-set");
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (identity(identity_string) = "another-string");
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (identity(identity_string) = "string");
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (bucket(5, bucket_int) in (1,2));
+---- RESULTS
+'Dropped 2 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (bucket(5, bucket_bigint) = 1);
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (bucket(5, bucket_decimal) = 3);
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (bucket(5, bucket_date) = 0);
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (bucket(5, bucket_timestamp) = 1);
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (bucket(5, bucket_string) = 1);
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (truncate(5, truncate_int) = 131070);
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (truncate(5, truncate_bigint) = 68719476735);
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (truncate(5, truncate_decimal) = 100000.1234567890);
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (truncate(5, truncate_string) = 'thisi');
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (year(year_date) = '2077');
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+# Checkpoint for remaining partitions
+SELECT COUNT(1) FROM $DATABASE.iceberg_all_partitions.`partitions`;
+---- RESULTS
+13
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (month(month_date) = '2023-12');
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (day(day_date) = '2023-12-01');
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (year(year_timestamp) = '2023');
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (month(month_timestamp) = '2023-12');
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (day(day_timestamp) = '2023-03-02');
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (hour(hour_timestamp) = '2023-06-02-0');
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (identity_string in ('string-hour', 'another-string-hour') and hour(hour_timestamp) = '2023-03-02-10');
+---- RESULTS
+'Dropped 2 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (hour(hour_timestamp) < '2030-03-02-10');
+---- RESULTS
+'Dropped 2 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (identity_string = "string-comma", identity_int in (567, 568));
+---- RESULTS
+'Dropped 2 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_all_partitions DROP PARTITION (identity_int IS NULL);
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+# Number of partitions after DROP PARTITION queries
+SELECT count(1) FROM $DATABASE.iceberg_all_partitions.`partitions`;
+---- RESULTS
+0
+====
+---- QUERY
+# Partition evolution
+CREATE TABLE iceberg_drop_partition_evolution(identity_int int, unpartitioned_int_to_identity_int int, year_date_col_to_month_date_col date)
+PARTITIONED BY SPEC(identity(identity_int), year(year_date_col_to_month_date_col)) STORED AS ICEBERG;
+INSERT INTO iceberg_drop_partition_evolution VALUES (1, 2, "2023-10-11");
+ALTER TABLE iceberg_drop_partition_evolution SET PARTITION SPEC(identity(identity_int), identity(unpartitioned_int_to_identity_int), year(year_date_col_to_month_date_col));
+INSERT INTO iceberg_drop_partition_evolution VALUES (1, 2, "2023-01-11");
+ALTER TABLE iceberg_drop_partition_evolution DROP PARTITION (unpartitioned_int_to_identity_int = 2);
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+ALTER TABLE iceberg_drop_partition_evolution SET PARTITION SPEC(identity(identity_int), month(year_date_col_to_month_date_col));
+ALTER TABLE iceberg_drop_partition_evolution DROP PARTITION (unpartitioned_int_to_identity_int = 2);
+---- CATCH
+AnalysisException: Partition exprs cannot contain non-partition column(s): unpartitioned_int_to_identity_int
+====
+---- QUERY
+INSERT INTO iceberg_drop_partition_evolution VALUES (1, 2, "2023-11-11");
+ALTER TABLE iceberg_drop_partition_evolution DROP PARTITION (month(year_date_col_to_month_date_col) = "2023-11");
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+# Dropping delete files
+CREATE TABLE iceberg_drop_partition_delete(identity_int int, unpartitioned_int int)
+PARTITIONED BY SPEC (identity_int) STORED AS ICEBERG TBLPROPERTIES('format-version'='2');
+INSERT INTO iceberg_drop_partition_delete VALUES (1,2);
+INSERT INTO iceberg_drop_partition_delete VALUES (2,1);
+DELETE FROM iceberg_drop_partition_delete WHERE identity_int = 1;
+ALTER TABLE iceberg_drop_partition_delete DROP PARTITION (identity_int = 1);
+SHOW FILES IN iceberg_drop_partition_delete;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_drop_partition_delete/data/identity_int=2/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====

@@ -17,24 +17,23 @@
 
 package org.apache.impala.analysis;
 
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
 import org.apache.impala.analysis.BinaryPredicate.Operator;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsPartition;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Reference;
 import org.apache.impala.planner.HdfsPartitionPruner;
 import org.apache.impala.thrift.TPartitionKeyValue;
-
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 
 /**
  * Represents a set of partitions resulting from evaluating a list of partition conjuncts
@@ -45,20 +44,20 @@ public class PartitionSet extends PartitionSpecBase {
 
   // Result of analysis, null until analysis is complete.
   private List<? extends FeFsPartition> partitions_;
-
   public PartitionSet(List<Expr> partitionExprs) {
     this.partitionExprs_ = ImmutableList.copyOf(partitionExprs);
   }
-
   public List<? extends FeFsPartition> getPartitions() { return partitions_; }
+  public List<Expr> getPartitionExprs() { return partitionExprs_; }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
+    if(table_ instanceof FeIcebergTable) return;
     List<Expr> conjuncts = new ArrayList<>();
     // Do not register column-authorization requests.
     analyzer.setEnablePrivChecks(false);
-    for (Expr e: partitionExprs_) {
+    for (Expr e : partitionExprs_) {
       e.analyze(analyzer);
       e.checkReturnsBool("Partition expr", false);
       conjuncts.addAll(e.getConjuncts());
@@ -66,7 +65,7 @@ public class PartitionSet extends PartitionSpecBase {
 
     TupleDescriptor desc = analyzer.getDescriptor(tableName_.toString());
     List<SlotId> partitionSlots = desc.getPartitionSlots();
-    for (Expr e: conjuncts) {
+    for (Expr e : conjuncts) {
       analyzer.getConstantFolder().rewrite(e, analyzer);
       // Make sure there are no constant predicates in the partition exprs.
       if (e.isConstant()) {
@@ -89,7 +88,7 @@ public class PartitionSet extends PartitionSpecBase {
       partitions_ = pruner.prunePartitions(analyzer, transformedConjuncts, true,
           null).first;
     } catch (ImpalaException e) {
-      if (e instanceof AnalysisException) throw (AnalysisException) e;
+      if (e instanceof AnalysisException) throw (AnalysisException)e;
       throw new AnalysisException("Partition expr evaluation failed in the backend.", e);
     }
 

@@ -36,6 +36,7 @@ import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.IcebergContentFileStore;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
@@ -138,7 +139,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   private LocalIcebergTable(LocalDb db, Table msTable, MetaProvider.TableMetaRef ref,
       LocalFsTable fsTable, ColumnMap cmap, TPartialTableInfo tableInfo,
       TableParams tableParams, org.apache.iceberg.Table icebergApiTable)
-      throws TableLoadingException {
+      throws ImpalaRuntimeException {
     super(db, msTable, ref, cmap);
 
     Preconditions.checkNotNull(tableInfo);

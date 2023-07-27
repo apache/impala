@@ -1395,7 +1395,8 @@ public class CatalogOpExecutor {
         || type == TAlterTableType.ALTER_COLUMN
         || type == TAlterTableType.SET_PARTITION_SPEC
         || type == TAlterTableType.SET_TBL_PROPERTIES
-        || type == TAlterTableType.UNSET_TBL_PROPERTIES;
+        || type == TAlterTableType.UNSET_TBL_PROPERTIES
+        || type == TAlterTableType.DROP_PARTITION;
   }
 
   /**
@@ -1471,6 +1472,14 @@ public class CatalogOpExecutor {
         case UNSET_TBL_PROPERTIES:
           needsToUpdateHms |= !unsetIcebergTblProperties(tbl, params, iceTxn);
           addSummary(response, "Updated table.");
+          break;
+        case DROP_PARTITION:
+          // Metadata change only
+          needsToUpdateHms = false;
+          long droppedPartitions = IcebergCatalogOpExecutor.alterTableDropPartition(
+              iceTxn, params.getDrop_partition_params());
+          addSummary(
+              response, String.format("Dropped %d partition(s)", droppedPartitions));
           break;
         case REPLACE_COLUMNS:
           // It doesn't make sense to replace all the columns of an Iceberg table as it

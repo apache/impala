@@ -17,8 +17,8 @@
 
 package org.apache.impala.planner;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,47 +32,38 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-
 import org.apache.curator.shaded.com.google.common.collect.Lists;
 import org.apache.iceberg.ContentFile;
 import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileContent;
 import org.apache.iceberg.FileScanTask;
-import org.apache.iceberg.Schema;
 import org.apache.iceberg.expressions.Expression;
 import org.apache.iceberg.expressions.ExpressionUtil;
 import org.apache.iceberg.expressions.ExpressionVisitors;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.expressions.Expression.Operation;
 import org.apache.iceberg.expressions.True;
-import org.apache.iceberg.expressions.UnboundPredicate;
 import org.apache.iceberg.io.CloseableIterable;
-import org.apache.iceberg.types.Types;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
-import org.apache.impala.analysis.CompoundPredicate;
+import org.apache.impala.analysis.BinaryPredicate.Operator;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.IcebergExpressionCollector;
 import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.JoinOperator;
-import org.apache.impala.analysis.LiteralExpr;
-import org.apache.impala.catalog.Column;
-import org.apache.impala.catalog.ColumnStats;
-import org.apache.impala.analysis.BoolLiteral;
-import org.apache.impala.analysis.DateLiteral;
 import org.apache.impala.analysis.MultiAggregateInfo;
-import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
-import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TableRef;
 import org.apache.impala.analysis.TimeTravelSpec;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
-import org.apache.impala.analysis.BinaryPredicate.Operator;
+import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.IcebergContentFileStore;
 import org.apache.impala.catalog.IcebergPositionDeleteTable;
@@ -80,23 +71,18 @@ import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.VirtualColumn;
-import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.IcebergPredicateConverter;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
-import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.thrift.TColumnStats;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TVirtualColumnType;
-import org.apache.impala.util.ExprUtil;
 import org.apache.impala.util.IcebergUtil;
-
-import com.google.common.base.Preconditions;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -220,7 +206,7 @@ public class IcebergScanPlanner {
         nonIdentityConjuncts_, getSkippedConjuncts());
     dataScanNode.init(analyzer_);
     List<Expr> outputExprs = tblRef_.getDesc().getSlots().stream().map(
-        entry -> new SlotRef(entry)).collect(Collectors.toList());
+        SlotRef::new).collect(Collectors.toList());
     UnionNode unionNode = new UnionNode(ctx_.getNextNodeId(), tblRef_.getId(),
         outputExprs, false);
     unionNode.addChild(dataScanNode, outputExprs);
@@ -404,8 +390,8 @@ public class IcebergScanPlanner {
       }
       if (dataFilesCacheMisses > 0) {
         Preconditions.checkState(timeTravelSpec != null);
-        LOG.info("File descriptors had to be loaded on demand during time travel: " +
-            String.valueOf(dataFilesCacheMisses));
+        LOG.info("File descriptors had to be loaded on demand during time travel: {}",
+            dataFilesCacheMisses);
       }
     } catch (IOException | TableLoadingException e) {
       throw new ImpalaRuntimeException(String.format(
@@ -506,7 +492,7 @@ public class IcebergScanPlanner {
       if (tblRef_.getTimeTravelSpec() == null) {
         // We should always find the data files in the cache when not doing time travel.
         throw new ImpalaRuntimeException("Cannot find file in cache: " + cf.path()
-            + " with snapshot id: " + String.valueOf(getIceTable().snapshotId()));
+            + " with snapshot id: " + getIceTable().snapshotId());
       }
       // We can still find the file descriptor among the old file descriptors.
       fileDesc = fileStore.getOldFileDescriptor(pathHash);
@@ -626,248 +612,21 @@ public class IcebergScanPlanner {
   }
 
   /**
-   * Returns Iceberg operator by BinaryPredicate operator, or null if the operation
-   * is not supported by Iceberg.
+   * Transform Impala predicate to Iceberg predicate
    */
-  private Operation getIcebergOperator(BinaryPredicate.Operator op) {
-    switch (op) {
-      case EQ: return Operation.EQ;
-      case NE: return Operation.NOT_EQ;
-      case LE: return Operation.LT_EQ;
-      case GE: return Operation.GT_EQ;
-      case LT: return Operation.LT;
-      case GT: return Operation.GT;
-      default: return null;
-    }
-  }
-
-  /**
-   * Returns Iceberg operator by CompoundPredicate operator, or null if the operation
-   * is not supported by Iceberg.
-   */
-  private Operation getIcebergOperator(CompoundPredicate.Operator op) {
-    switch (op) {
-      case AND: return Operation.AND;
-      case OR: return Operation.OR;
-      case NOT: return Operation.NOT;
-      default: return null;
-    }
-  }
-
-  /**
-   * Transform impala predicate to iceberg predicate
-   */
-  private boolean tryConvertIcebergPredicate(Expr expr)
-      throws ImpalaException {
-    Expression predicate = convertIcebergPredicate(expr);
-    if (predicate != null) {
+  private boolean tryConvertIcebergPredicate(Expr expr) {
+    IcebergPredicateConverter converter =
+        new IcebergPredicateConverter(getIceTable().getIcebergSchema(), analyzer_);
+    try {
+      Expression predicate = converter.convert(expr);
       impalaIcebergPredicateMapping_.put(predicate, expr);
-      LOG.debug("Push down the predicate: " + predicate + " to iceberg");
+      LOG.debug("Push down the predicate: {} to iceberg", predicate);
       return true;
     }
-    untranslatedExpressions_.add(expr);
-    return false;
-  }
-
-  private Expression convertIcebergPredicate(Expr expr)
-      throws ImpalaException {
-    if (expr instanceof BinaryPredicate) {
-      return convertIcebergPredicate((BinaryPredicate) expr);
-    } else if (expr instanceof InPredicate) {
-      return convertIcebergPredicate((InPredicate) expr);
-    } else if (expr instanceof IsNullPredicate) {
-      return convertIcebergPredicate((IsNullPredicate) expr);
-    } else if (expr instanceof CompoundPredicate) {
-      return convertIcebergPredicate((CompoundPredicate) expr);
-    } else {
-      return null;
+    catch (ImpalaException e) {
+      untranslatedExpressions_.add(expr);
+      return false;
     }
-  }
-
-  private UnboundPredicate<Object> convertIcebergPredicate(BinaryPredicate predicate)
-      throws ImpalaException {
-    Operation op = getIcebergOperator(predicate.getOp());
-    if (op == null) {
-      return null;
-    }
-
-    // Do not convert if there is an implicit cast
-    if (!(predicate.getChild(0) instanceof SlotRef)) {
-      return null;
-    }
-    SlotRef ref = (SlotRef) predicate.getChild(0);
-
-    if (!(predicate.getChild(1) instanceof LiteralExpr)) {
-      return null;
-    }
-    LiteralExpr literal = (LiteralExpr) predicate.getChild(1);
-
-    // If predicate contains map/struct, this column would be null
-    Column col = ref.getDesc().getColumn();
-    if (col == null) {
-      return null;
-    }
-
-    // Cannot push BinaryPredicate with null literal values
-    if (Expr.IS_NULL_LITERAL.apply(literal)) {
-      return null;
-    }
-
-    Object value = getIcebergValue(ref, literal);
-    if (value == null) {
-      return null;
-    }
-
-    return Expressions.predicate(op, col.getName(), value);
-  }
-
-  private UnboundPredicate<Object> convertIcebergPredicate(InPredicate predicate)
-      throws ImpalaException {
-    // Do not convert if there is an implicit cast
-    if (!(predicate.getChild(0) instanceof SlotRef)) {
-      return null;
-    }
-    SlotRef ref = (SlotRef) predicate.getChild(0);
-
-    // If predicate contains map/struct, this column would be null
-    Column col = ref.getDesc().getColumn();
-    if (col == null) {
-      return null;
-    }
-
-    // Expressions takes a list of values as Objects
-    List<Object> values = new ArrayList<>();
-    for (int i = 1; i < predicate.getChildren().size(); ++i) {
-      if (!Expr.IS_LITERAL.apply(predicate.getChild(i))) {
-        return null;
-      }
-      LiteralExpr literal = (LiteralExpr) predicate.getChild(i);
-
-      // Cannot push IN or NOT_IN predicate with null literal values
-      if (Expr.IS_NULL_LITERAL.apply(literal)) {
-        return null;
-      }
-
-      Object value = getIcebergValue(ref, literal);
-      if (value == null) {
-        return null;
-      }
-
-      values.add(value);
-    }
-
-    // According to the method:
-    // 'org.apache.iceberg.expressions.InclusiveMetricsEvaluator.MetricsEvalVisitor#notIn'
-    // Expressions.notIn only works when the push-down column is the partition column
-    if (predicate.isNotIn())
-      return Expressions.notIn(col.getName(), values);
-    else {
-      return Expressions.in(col.getName(), values);
-    }
-  }
-
-  private UnboundPredicate<Object> convertIcebergPredicate(IsNullPredicate predicate) {
-    // Do not convert if there is an implicit cast
-    if (!(predicate.getChild(0) instanceof SlotRef)) {
-      return null;
-    }
-    SlotRef ref = (SlotRef) predicate.getChild(0);
-
-    // If predicate contains map/struct, this column would be null
-    Column col = ref.getDesc().getColumn();
-    if (col == null) {
-      return null;
-    }
-
-    if (predicate.isNotNull()) {
-      return Expressions.notNull(col.getName());
-    } else{
-      return Expressions.isNull(col.getName());
-    }
-  }
-
-  private Expression convertIcebergPredicate(CompoundPredicate predicate)
-      throws ImpalaException {
-    Operation op = getIcebergOperator(predicate.getOp());
-    if (op == null) {
-      return null;
-    }
-
-    Expression left = convertIcebergPredicate(predicate.getChild(0));
-    if (left == null) {
-      return null;
-    }
-    if (op.equals(Operation.NOT)) {
-      return Expressions.not(left);
-    }
-
-    Expression right = convertIcebergPredicate(predicate.getChild(1));
-    if (right == null) {
-      return null;
-    }
-    return op.equals(Operation.AND) ? Expressions.and(left, right)
-        : Expressions.or(left, right);
-  }
-
-  private Object getIcebergValue(SlotRef ref, LiteralExpr literal)
-      throws ImpalaException {
-    IcebergColumn iceCol = (IcebergColumn) ref.getDesc().getColumn();
-    Schema iceSchema = getIceTable().getIcebergSchema();
-    switch (literal.getType().getPrimitiveType()) {
-      case BOOLEAN: return ((BoolLiteral) literal).getValue();
-      case TINYINT:
-      case SMALLINT:
-      case INT: return ((NumericLiteral) literal).getIntValue();
-      case BIGINT: return ((NumericLiteral) literal).getLongValue();
-      case FLOAT: return (float) ((NumericLiteral) literal).getDoubleValue();
-      case DOUBLE: return ((NumericLiteral) literal).getDoubleValue();
-      case STRING:
-      case DATETIME:
-      case CHAR: return ((StringLiteral) literal).getUnescapedValue();
-      case TIMESTAMP: return getIcebergTsValue(literal, iceCol, iceSchema);
-      case DATE: return ((DateLiteral) literal).getValue();
-      case DECIMAL: return getIcebergDecimalValue(ref, (NumericLiteral) literal);
-      default: {
-        Preconditions.checkState(false,
-            "Unsupported iceberg type considered for predicate: %s",
-            literal.getType().toSql());
-      }
-    }
-    return null;
-  }
-
-  private BigDecimal getIcebergDecimalValue(SlotRef ref, NumericLiteral literal) {
-    Type colType = ref.getDesc().getColumn().getType();
-    int scale = colType.getDecimalDigits();
-    BigDecimal literalValue = literal.getValue();
-
-    if (literalValue.scale() > scale) return null;
-    // Iceberg DecimalLiteral needs to have the exact same scale.
-    if (literalValue.scale() < scale) return literalValue.setScale(scale);
-    return literalValue;
-  }
-
-  private Object getIcebergTsValue(LiteralExpr literal,
-      IcebergColumn iceCol, Schema iceSchema) throws AnalysisException {
-    try {
-      org.apache.iceberg.types.Type iceType = iceSchema.findType(iceCol.getFieldId());
-      Preconditions.checkState(iceType instanceof Types.TimestampType);
-      Types.TimestampType tsType = (Types.TimestampType) iceType;
-      if (tsType.shouldAdjustToUTC()) {
-        return ExprUtil.localTimestampToUnixTimeMicros(analyzer_, literal);
-      } else {
-        return ExprUtil.utcTimestampToUnixTimeMicros(analyzer_, literal);
-      }
-    } catch (InternalException ex) {
-      // We cannot interpret the timestamp literal. Maybe the timestamp is invalid,
-      // or the local timestamp ambigously converts to UTC due to daylight saving
-      // time backward turn. E.g. '2021-10-31 02:15:00 Europe/Budapest' converts to
-      // either '2021-10-31 00:15:00 UTC' or '2021-10-31 01:15:00 UTC'.
-      LOG.warn("Exception occurred during timestamp conversion: " + ex.toString() +
-          "\nThis means timestamp predicate is not pushed to Iceberg, let Impala " +
-          "backend handle it.");
-    }
-    return null;
   }
 
 }
