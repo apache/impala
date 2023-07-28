@@ -146,13 +146,6 @@ class TestIcebergTable(IcebergTestSuite):
 
   @SkipIf.not_dfs(reason="Dfs required as test to directly delete files.")
   def test_drop_corrupt_table(self, unique_database):
-    self._do_test_drop_corrupt_table(unique_database, do_invalidate=False)
-
-  @SkipIf.not_dfs(reason="Dfs required as test to directly delete files.")
-  def test_drop_corrupt_table_with_invalidate(self, unique_database):
-    self._do_test_drop_corrupt_table(unique_database, do_invalidate=True)
-
-  def _do_test_drop_corrupt_table(self, unique_database, do_invalidate):
     """Test that if the underlying iceberg metadata directory is deleted, then a query
       fails with a reasonable error message, and the table can be dropped successfully."""
     table = "corrupt_iceberg_tbl"
@@ -166,9 +159,8 @@ class TestIcebergTable(IcebergTestSuite):
     assert status, "Delete failed with {0}".format(status)
     assert not self.filesystem_client.exists(metadata_location)
 
-    if do_invalidate:
-      # Invalidate so that table loading problems will happen in the catalog.
-      self.client.execute("invalidate metadata {0}".format(full_table_name))
+    # Invalidate so that table loading problems will happen in the catalog.
+    self.client.execute("invalidate metadata {0}".format(full_table_name))
 
     # Query should now fail.
     err = self.execute_query_expect_failure(self.client, """select * from {0}""".
