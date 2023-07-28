@@ -55,8 +55,10 @@ class TestCatalogdHA(CustomClusterTestSuite):
     _, catalog_service_port = active_catalogd_address.split(":")
     assert(int(catalog_service_port) == catalogd_service.get_catalog_service_port())
 
-  def __run_simple_queries(self):
+  def __run_simple_queries(self, sync_ddl=False):
     try:
+      if sync_ddl:
+        self.execute_query_expect_success(self.client, "set SYNC_DDL=1")
       self.execute_query_expect_success(
           self.client, "drop table if exists test_catalogd_ha")
       self.execute_query_expect_success(
@@ -90,6 +92,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
     self.__verify_impalad_active_catalogd_port(2, catalogd_service_1)
     # Verify simple queries are ran successfully.
     self.__run_simple_queries()
+    # Verify simple queries with sync_ddl as 1.
+    self.__run_simple_queries(sync_ddl=True)
 
     # Restart one coordinator. Verify it get active catalogd address from statestore.
     self.cluster.impalads[0].restart()
@@ -154,6 +158,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
     self.__verify_impalad_active_catalogd_port(2, catalogd_service_2)
     # Verify simple queries are ran successfully.
     self.__run_simple_queries()
+    # Verify simple queries with sync_ddl as 1.
+    self.__run_simple_queries(sync_ddl=True)
 
     end_count_clear_topic_entries = statestore_service.get_metric_value(
         "statestore.num-clear-topic-entries-requests")

@@ -986,6 +986,12 @@ Statestore::TopicEntry::Version Statestore::GetMinSubscriberTopicVersion(
   bool found = false;
   // Find the minimum version processed for this topic across all topic subscribers.
   for (const SubscriberMap::value_type& subscriber: subscribers_) {
+    if (FLAGS_enable_catalogd_ha && subscriber.second->IsCatalogd()
+        && !catalog_manager_.IsActiveCatalogd(subscriber.second->id())) {
+      // Skip inactive catalogd since it does not apply catalog updates from the active
+      // catalogd.
+      continue;
+    }
     auto subscribed_topics = subscriber.second->GetTopicsMapForId(topic_id);
     if (subscribed_topics->find(topic_id) != subscribed_topics->end()) {
       found = true;
