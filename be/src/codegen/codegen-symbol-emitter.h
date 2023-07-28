@@ -41,9 +41,11 @@ namespace impala {
 /// and symbols for perf profiling.
 class CodegenSymbolEmitter : public llvm::JITEventListener {
  public:
-  CodegenSymbolEmitter(std::string id) : id_(id), emit_perf_map_(false) { }
+  CodegenSymbolEmitter(std::string id)
+      : id_(id), emit_perf_map_(false), non_freed_objects_(0)
+  { }
 
-  ~CodegenSymbolEmitter() { }
+  ~CodegenSymbolEmitter();
 
   /// Write the current contents of 'perf_map_' to /tmp/perf-<pid>.map
   /// Atomically updates the current map by writing to a temporary file then moving it.
@@ -89,6 +91,15 @@ class CodegenSymbolEmitter : public llvm::JITEventListener {
 
   /// If true, emit perf map info to /tmp/perf-<pid>.map.
   bool emit_perf_map_;
+
+  /// The number of object files that have been emitted but not freed yet. The counter is
+  /// incremented in NotifyObjectEmitted() and decremented in NotifyFreeingObject(). At
+  /// the time of the destruction of this object, this should be 0 - if it is greater than
+  /// 0, the LLVM execution engine to which this object is subscribed is still alive and
+  /// it will try to notify this object when the object file is freed (most likely when
+  /// the execution engine itself is destroyed), leading to use-after-free. See
+  /// IMPALA-12306 for more.
+  int non_freed_objects_;
 
   /// File to emit disassembly to. If empty string, don't emit.
   std::string asm_path_;

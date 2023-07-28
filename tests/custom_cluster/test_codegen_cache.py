@@ -141,6 +141,7 @@ class TestCodegenCache(CustomClusterTestSuite):
       "select sum(identity(bigint_col)) from functional.alltypes", False)
 
   SYMBOL_EMITTER_TESTS_IMPALAD_ARGS = "--cache_force_single_shard=1 \
+      --codegen_symbol_emitter_log_successful_destruction_test_only=1 \
       --codegen_cache_entry_bytes_charge_overhead=10000000 --codegen_cache_capacity=25MB "
 
   @pytest.mark.execute_serially
@@ -183,12 +184,28 @@ class TestCodegenCache(CustomClusterTestSuite):
     the '--codegen_cache_entry_bytes_charge_overhead' startup flag to
     artificially assign a higher size to the cache entries, compared to which
     the real size, and therefore also changes in the real size, are
-    insignificant."""
+    insignificant.
+
+    This test verifies that the use-after-free scenario doesn't happen. We can't rely on
+    the crash to detect it because
+    1) the crash is not guaranteed to happen, use-after-free is undefined behaviour
+    2) the crash may happen well after the query has finished returning results.
+
+    Therefore in 'CodegenSymbolEmitter' we count how many object files have been emitted
+    and freed. If the difference is greater than zero at the time of the destruction of
+    the 'CodegenSymbolEmitter', the LLVM execution engine to which the symbol emitter is
+    subscribed is still alive and will attempt to notify the symbol emitter when it will
+    have already been destroyed, leading to use-after-free.
+
+    When the --codegen_symbol_emitter_log_successful_destruction_test_only flag is set to
+    true, 'CodegenSymbolEmitter' will log a message when it is being destroyed correctly
+    (i.e. when use-after-free will not happen). If we don't have the expected message in
+    the logs (after some timeout), the test fails."""
 
     exec_options = copy(vector.get_value('exec_option'))
     exec_options['exec_single_node_rows_threshold'] = 0
 
-    q1 = """select int_col, tinyint_col from functional_parquet.alltypessmall
+    q1 = """select int_col from functional_parquet.alltypessmall
         order by int_col desc limit 20"""
     q2 = """select t1.bool_col, t1.year, t1.month
          from functional_parquet.alltypes t1
@@ -201,14 +218,27 @@ class TestCodegenCache(CustomClusterTestSuite):
              t1.month"""
 
     self._check_metric_expect_init()
+
+    symbol_emitter_ok_msg = "Successful destruction of CodegenSymbolEmitter object."
+
+    # ## First query
     self.execute_query_expect_success(self.client, q1, exec_options)
     cache_entries_in_use = self.get_metric('impala.codegen-cache.entries-in-use')
+    cache_entries_evicted = self.get_metric('impala.codegen-cache.entries-evicted')
     assert cache_entries_in_use > 0
     assert self.get_metric('impala.codegen-cache.hits') == 0
+    # Initialising the cross-compiled modules also consumes an LLVM executor engine.
+    expected_num_msg = cache_entries_evicted + 1
+    self.assert_impalad_log_contains("INFO", symbol_emitter_ok_msg, expected_num_msg)
 
+    # ## Second query
     self.execute_query_expect_success(self.client, q2, exec_options)
-    assert self.get_metric('impala.codegen-cache.entries-evicted') >= cache_entries_in_use
     assert self.get_metric('impala.codegen-cache.hits') == 0
+    cache_entries_evicted = self.get_metric('impala.codegen-cache.entries-evicted')
+    assert cache_entries_evicted >= cache_entries_in_use
+    # Initialising the cross-compiled modules also consumes an LLVM executor engine.
+    expected_num_msg = cache_entries_evicted + 1
+    self.assert_impalad_log_contains("INFO", symbol_emitter_ok_msg, expected_num_msg)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(cluster_size=1,
