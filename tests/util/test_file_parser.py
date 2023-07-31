@@ -208,6 +208,9 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
       if len(lines_content) != 0:
         # Add trailing newline to last line if present. This disambiguates between the
         # case of no lines versus a single line with no text.
+        # This extra newline is needed only for the verification of the subsections of
+        # RESULTS, DML_RESULTS and ERRORS and will be removed in write_test_file()
+        # when '--update_results' is added to output the updated golden file.
         subsection_str += "\n"
 
       if subsection_name not in valid_section_names:
@@ -294,6 +297,9 @@ def split_section_lines(section_str):
 def join_section_lines(lines):
   """
   The inverse of split_section_lines().
+  The extra newline at the end will be removed in write_test_file() so that when the
+  actual contents of a subsection do not match the expected contents, we won't see
+  extra newlines in those subsections (ERRORS, TYPES, LABELS, RESULTS and DML_RESULTS).
   """
   return '\n'.join(lines) + '\n'
 
@@ -323,8 +329,11 @@ def write_test_file(test_file_name, test_file_sections, encoding=None):
         if section_name == 'RESULTS' and test_case.get('VERIFIER'):
           full_section_name = '%s: %s' % (section_name, test_case['VERIFIER'])
         test_file_text.append("%s %s" % (SUBSECTION_DELIMITER, full_section_name))
-        section_value = ''.join(test_case[section_name])
-        if section_value.strip():
+        # We remove the extra newlines added in parse_test_file_text() so that in the
+        # updated golden file we will not see an extra newline at the end of each
+        # subsection.
+        section_value = ''.join(test_case[section_name]).strip()
+        if section_value:
           test_file_text.append(section_value)
     test_file_text.append(SECTION_DELIMITER)
     test_file.write(('\n').join(test_file_text))
