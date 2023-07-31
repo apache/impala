@@ -107,7 +107,8 @@ public abstract class JoinNode extends PlanNode {
   public enum DistributionMode {
     NONE("NONE"),
     BROADCAST("BROADCAST"),
-    PARTITIONED("PARTITIONED");
+    PARTITIONED("PARTITIONED"),
+    DIRECTED("DIRECTED");
 
     private final String description_;
 
@@ -117,9 +118,18 @@ public abstract class JoinNode extends PlanNode {
 
     @Override
     public String toString() { return description_; }
+
     public static DistributionMode fromThrift(TJoinDistributionMode distrMode) {
-      if (distrMode == TJoinDistributionMode.BROADCAST) return BROADCAST;
-      return PARTITIONED;
+      switch (distrMode) {
+        case BROADCAST:
+          return BROADCAST;
+        case SHUFFLE:
+          return PARTITIONED;
+        case DIRECTED:
+          return DIRECTED;
+        default:
+          throw new RuntimeException("Invalid distribution mode: " + distrMode);
+      }
     }
   }
 
@@ -205,7 +215,8 @@ public abstract class JoinNode extends PlanNode {
   // Returns true if we can share a join build between multiple consuming fragment
   // instances.
   public boolean canShareBuild() {
-    return distrMode_ == JoinNode.DistributionMode.BROADCAST;
+    return distrMode_ == JoinNode.DistributionMode.BROADCAST ||
+        distrMode_ == DistributionMode.DIRECTED;
   }
 
   public JoinOperator getJoinOp() { return joinOp_; }
@@ -991,11 +1002,4 @@ public abstract class JoinNode extends PlanNode {
    * Does not modify the state of this node.
    */
   public abstract Pair<ProcessingCost, ProcessingCost> computeJoinProcessingCost();
-
-  /* Helper to return all predicates as a string. */
-  public String getAllPredicatesAsString(TExplainLevel level) {
-    return "Conjuncts=" + Expr.getExplainString(getConjuncts(), level)
-        + ", EqJoinConjuncts=" + Expr.getExplainString(getEqJoinConjuncts(), level)
-        + ", EqJoinConjuncts=" + Expr.getExplainString(getOtherJoinConjuncts(), level);
-  }
 }

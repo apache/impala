@@ -39,6 +39,11 @@ enum TPartitionType {
   // schemes. We should add something like lists of TDataPartitions to reflect that
   // and then this can be removed. (IMPALA-5255)
   KUDU = 4
+
+  // Used for distributing the contents of Iceberg delete files. Each row of a delete
+  // file is directly sent to the hosts that are responsible for reading the
+  // corresponding data files. No broadcast or shuffle is needed in this case.
+  DIRECTED = 5
 }
 
 // Specification of how a single logical data stream is partitioned.

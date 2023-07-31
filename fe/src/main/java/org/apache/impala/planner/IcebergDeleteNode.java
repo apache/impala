@@ -191,18 +191,11 @@ public class IcebergDeleteNode extends JoinNode {
           rhsNdv = PlanNode.checkedMultiply(rhsNdv, rhsPdNdv);
         }
       }
+
       // The memory of the data stored in hash table is the file path of the data files
       // which have delete files and 8 byte for every deleted row position
-      int numberOfDataFilesWithDelete = 0;
-      if (distrMode_ == DistributionMode.PARTITIONED) {
-        numberOfDataFilesWithDelete = ((IcebergScanNode) getChild(0).getChild(0))
-                                          .getFileDescriptorsWithLimit(null, false, -1)
-                                          .size();
-      } else {
-        numberOfDataFilesWithDelete = ((IcebergScanNode) getChild(0))
-                                          .getFileDescriptorsWithLimit(null, false, -1)
-                                          .size();
-      }
+      int numberOfDataFilesWithDelete = ((IcebergScanNode) getChild(0))
+          .getFileDescriptorsWithLimit(null, false, -1).size();
 
       perBuildInstanceDataBytes = (long) Math.ceil(
           numberOfDataFilesWithDelete * getChild(1).getAvgRowSize() + 8 * rhsCard);

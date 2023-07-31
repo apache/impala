@@ -252,7 +252,7 @@ public class IcebergScanPlanner {
     addDeletePositionSlots(deleteDeltaRef);
     IcebergScanNode dataScanNode = new IcebergScanNode(
         dataScanNodeId, tblRef_, conjuncts_, aggInfo_, dataFilesWithDeletes_,
-        nonIdentityConjuncts_, getSkippedConjuncts());
+        nonIdentityConjuncts_, getSkippedConjuncts(), deleteScanNodeId);
     dataScanNode.init(analyzer_);
     IcebergScanNode deleteScanNode = new IcebergScanNode(
         deleteScanNodeId,

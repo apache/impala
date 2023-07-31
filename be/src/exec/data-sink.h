@@ -20,6 +20,7 @@
 #define IMPALA_EXEC_DATA_SINK_H
 
 #include <boost/scoped_ptr.hpp>
+#include <unordered_map>
 #include <vector>
 
 #include "common/status.h"
@@ -42,6 +43,7 @@ class TPlanExecRequest;
 class TPlanExecParams;
 class TPlanFragmentInstanceCtx;
 class TInsertStats;
+class NetworkAddressPB;
 
 /// Configuration class for creating DataSink objects. It contains a subset of the static
 /// state of their corresponding DataSink, of which there is one instance per fragment.
@@ -77,6 +79,9 @@ class DataSinkConfig {
   /// A list of messages that will eventually be added to the data sink's runtime
   /// profile to convey codegen related information. Populated in Codegen().
   std::vector<std::string> codegen_status_msgs_;
+
+  /// A mapping from file paths to hosts where the particular file is scheduled.
+  std::unordered_map<std::string, std::vector<NetworkAddressPB>> filepath_to_hosts_;
 
   /// Creates a new data sink config, allocated in state->obj_pool() and returned through
   /// *sink, from the thrift sink object in fragment_ctx.

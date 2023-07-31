@@ -1,0 +1,28 @@
+====
+---- QUERY
+# Files are going to be split up to multiple scan ranges, 10 files into 30 ranges. See if
+# directed distribution mode still gives a good result if the Exchange node sends out one
+# row to multiple hosts. No separate JOIN BUILD fragment is used.
+set MAX_SCAN_RANGE_LENGTH=512b;
+select count(1) from iceberg_v2_partitioned_position_deletes;
+---- RESULTS
+10
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, BuildRows): 30
+row_regex: (?!.*F03:JOIN BUILD.*)
+====
+---- QUERY
+# Same as above but here there is a separate fragment for the join build.
+set MT_DOP=4;
+set MAX_SCAN_RANGE_LENGTH=512b;
+select count(1) from iceberg_v2_partitioned_position_deletes;
+---- RESULTS
+10
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, BuildRows): 30
+row_regex: .*F03:JOIN BUILD.*
+====

@@ -23,6 +23,7 @@
 #include "exec/exec-node.h"
 #include "exec/data-sink.h"
 #include "exprs/slot-ref.h"
+#include "kudu/util/path_util.h"
 #include "runtime/exec-env.h"
 #include "runtime/query-state.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
@@ -39,13 +40,13 @@ const string FragmentState::FSTATE_THREAD_GROUP_NAME = "fragment-init";
 const string FragmentState::FSTATE_THREAD_NAME_PREFIX = "init-and-codegen";
 
 Status FragmentState::CreateFragmentStateMap(const TExecPlanFragmentInfo& fragment_info,
-    const ExecQueryFInstancesRequestPB& exec_request, QueryState* state,
+    const ExecQueryFInstancesRequestPB& exec_request, QueryState* query_state,
     std::unordered_map<TFragmentIdx, FragmentState*>& fragment_map) {
   int fragment_ctx_idx = 0;
   const TPlanFragment& frag = fragment_info.fragments[fragment_ctx_idx];
   const PlanFragmentCtxPB& frag_ctx = exec_request.fragment_ctxs(fragment_ctx_idx);
   FragmentState* fragment_state =
-      state->obj_pool()->Add(new FragmentState(state, frag, frag_ctx));
+      query_state->obj_pool()->Add(new FragmentState(query_state, frag, frag_ctx));
   fragment_map[fragment_state->fragment_idx()] = fragment_state;
   for (int i = 0; i < fragment_info.fragment_instance_ctxs.size(); ++i) {
     const TPlanFragmentInstanceCtx& instance_ctx =
@@ -61,8 +62,8 @@ Status FragmentState::CreateFragmentStateMap(const TExecPlanFragmentInfo& fragme
       const PlanFragmentCtxPB& fragment_ctx =
           exec_request.fragment_ctxs(fragment_ctx_idx);
       DCHECK_EQ(fragment.idx, fragment_ctx.fragment_idx());
-      fragment_state =
-          state->obj_pool()->Add(new FragmentState(state, fragment, fragment_ctx));
+      fragment_state = query_state->obj_pool()->Add(
+          new FragmentState(query_state, fragment, fragment_ctx));
       fragment_map[fragment_state->fragment_idx()] = fragment_state;
       // we expect fragment and instance contexts to follow the same order
       DCHECK_EQ(fragment_state->fragment_idx(), instance_ctx.fragment_idx);
@@ -85,6 +86,49 @@ Status FragmentState::Init() {
   RETURN_IF_ERROR(PlanNode::CreateTree(this, fragment_.plan, &plan_tree_));
   RETURN_IF_ERROR(DataSinkConfig::CreateConfig(
       fragment_.output_sink, plan_tree_->row_descriptor_, this, &sink_config_));
+
+  if (fragment_.output_sink.type == TDataSinkType::DATA_STREAM_SINK) {
+    DCHECK(fragment_.output_sink.__isset.stream_sink);
+    if (fragment_.output_sink.stream_sink.output_partition.type ==
+        TPartitionType::DIRECTED) {
+      RETURN_IF_ERROR(PutFilesToHostsMappingToSinkConfig());
+    }
+  }
+  return Status::OK();
+}
+
+Status FragmentState::PutFilesToHostsMappingToSinkConfig() {
+  DCHECK(plan_tree_->tnode_ != nullptr);
+  DCHECK_EQ(fragment_.output_sink.stream_sink.output_partition.type,
+      TPartitionType::DIRECTED);
+
+  const QueryState::NodeToFileSchedulings* node_to_file_schedulings =
+      query_state_->node_to_file_schedulings();
+  QueryState::NodeToFileSchedulings::const_iterator node_to_file_schedulings_it =
+      node_to_file_schedulings->find(plan_tree_->tnode_->node_id);
+  if (node_to_file_schedulings_it == node_to_file_schedulings->end()) {
+    return Status(Substitute("Failed to find file to hosts mapping for plan node: "
+        "$0", plan_tree_->tnode_->node_id));
+  }
+
+  DCHECK_EQ(plan_tree_->tnode_->node_type, TPlanNodeType::HDFS_SCAN_NODE);
+  TupleDescriptor* tuple_desc =
+      desc_tbl().GetTupleDescriptor(plan_tree_->tnode_->hdfs_scan_node.tuple_id);
+  DCHECK(tuple_desc != nullptr);
+  DCHECK(tuple_desc->table_desc() != nullptr);
+  const HdfsTableDescriptor* hdfs_table_desc =
+      static_cast<const HdfsTableDescriptor*>(tuple_desc->table_desc());
+
+  for (auto file_scheduling : node_to_file_schedulings_it->second) {
+    string full_file_path = file_scheduling.file_path;
+    if (file_scheduling.is_relative_path) {
+      full_file_path = kudu::JoinPathSegments(
+          hdfs_table_desc->hdfs_base_dir(), file_scheduling.file_path);
+    }
+    DCHECK(!full_file_path.empty());
+
+    sink_config_->filepath_to_hosts_[full_file_path] = file_scheduling.hosts;
+  }
   return Status::OK();
 }
 

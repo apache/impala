@@ -60,6 +60,7 @@ enum TKuduReplicaSelection {
 enum TJoinDistributionMode {
   BROADCAST = 0
   SHUFFLE = 1
+  DIRECTED = 2
 }
 
 // The order of the enum values needs to be kept in sync with

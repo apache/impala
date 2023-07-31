@@ -393,6 +393,20 @@ message PlanFragmentInstanceCtxPB {
   repeated JoinBuildInputPB join_build_inputs = 3;
 }
 
+// List of host addresses.
+message FilepathToHostsListPB {
+  repeated NetworkAddressPB hosts = 1;
+
+  // True if the key in the map for this entry is a relative path, false if it is an
+  // absolute path.
+  required bool is_relative = 2;
+}
+
+// File path to a list of host addresses mapping.
+message FilepathToHostsMapPB {
+  map<string, FilepathToHostsListPB> filepath_to_hosts = 1;
+}
+
 // ExecQueryFInstances
 message ExecQueryFInstancesRequestPB {
   // This backend's index into Coordinator::backend_states_, needed for subsequent rpcs to
@@ -430,6 +444,9 @@ message ExecQueryFInstancesRequestPB {
   // Execution parameters for specific fragment instances. Corresponds to
   // 'fragment_instance_ctxs' in the TExecPlanFragmentInfo sidecar.
   repeated PlanFragmentInstanceCtxPB fragment_instance_ctxs = 8;
+
+  // Mapping to store which data file is read on which host, grouped by scan node ID.
+  map<int32, FilepathToHostsMapPB> by_node_filepath_to_hosts = 9;
 }
 
 message ExecQueryFInstancesResponsePB {

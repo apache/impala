@@ -41,7 +41,7 @@ class FragmentState {
   /// thrift and protobuf references of the fragment and instance context objects from
   /// 'fragment_info' and 'exec_request'.
   static Status CreateFragmentStateMap(const TExecPlanFragmentInfo& fragment_info,
-      const ExecQueryFInstancesRequestPB& exec_request, QueryState* state,
+      const ExecQueryFInstancesRequestPB& exec_request, QueryState* query_state,
       std::unordered_map<TFragmentIdx, FragmentState*>& fragment_map);
   FragmentState(QueryState* query_state, const TPlanFragment& fragment,
       const PlanFragmentCtxPB& fragment_ctx);
@@ -236,5 +236,9 @@ class FragmentState {
 
   /// Create the plan tree, data sink config.
   Status Init();
+
+  /// Helper function to populate the filename to hosts mapping in 'sink_config_' from
+  /// 'query_state_';
+  Status PutFilesToHostsMappingToSinkConfig();
 };
 }

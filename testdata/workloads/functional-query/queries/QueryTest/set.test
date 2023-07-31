@@ -135,6 +135,11 @@ set default_join_distribution_mode=bar
 Invalid default join distribution mode: 'bar'. Valid values are BROADCAST(0), SHUFFLE(1).
 ====
 ---- QUERY
+set default_join_distribution_mode=directed
+---- CATCH
+Invalid default join distribution mode: 'directed'. Valid values are BROADCAST(0), SHUFFLE(1).
+====
+---- QUERY
 set kudu_read_mode=bar
 ---- CATCH
 Invalid Kudu read mode: 'bar'. Valid values are DEFAULT(0), READ_LATEST(1), READ_AT_SNAPSHOT(2).

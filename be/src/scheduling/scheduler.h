@@ -83,6 +83,11 @@ class Scheduler {
   typedef boost::unordered_map<IpAddr, ExecutorGroup::Executors::const_iterator>
       NextExecutorPerHost;
 
+  /// Map from file paths to hosts where those files are scheduled, grouped by scan node
+  /// ID.
+  typedef std::unordered_map<int, std::unordered_map<
+      std::string, std::unordered_set<NetworkAddressPB>>> ByNodeFilepathToHosts;
+
   /// Internal structure to track scan range assignments for an executor host. This struct
   /// is used as the heap element in and maintained by AddressableAssignmentHeap.
   struct ExecutorAssignmentInfo {
@@ -413,6 +418,14 @@ class Scheduler {
   /// by the scheduler.
   void CreateCollocatedJoinBuildInstances(
       FragmentScheduleState* fragment_state, ScheduleState* state);
+
+  /// This is called during the execution of Schedule() and populates
+  /// 'ScheduleState::query_schedule_pb_::by_node_filepath_to_hosts' mapping with the
+  /// information of what files are scheduled to what hosts grouped by scan node.
+  /// 'duplicate_check' keeps track of the previously added items and used for preventing
+  /// duplicates being added.
+  void PopulateFilepathToHostsMapping(const FInstanceScheduleState& finst,
+      ScheduleState* state, ByNodeFilepathToHosts* duplicate_check);
 
   /// Add all hosts that the scans identified by 'scan_ids' are executed on to
   /// 'scan_hosts'.

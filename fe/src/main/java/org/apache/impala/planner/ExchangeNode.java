@@ -23,6 +23,7 @@ import org.apache.impala.analysis.SortInfo;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExchangeNode;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanNode;
@@ -71,11 +72,35 @@ public class ExchangeNode extends PlanNode {
     // If the output of the sink is not partitioned but the target fragment is
     // partitioned, then the data exchange is broadcast.
     Preconditions.checkState(!children_.isEmpty());
+    // Has to examine isDirectedExchange() too because for a DIRECTED exchange the below
+    // code would also return true.
+    if (isDirectedExchange()) return false;
     DataSink sink = getChild(0).getFragment().getSink();
     if (sink == null) return false;
     Preconditions.checkState(sink instanceof DataStreamSink);
     DataStreamSink streamSink = (DataStreamSink) sink;
     return !streamSink.getOutputPartition().isPartitioned() && fragment_.isPartitioned();
+  }
+
+  protected boolean isDirectedExchange() {
+    if (fragment_.getSink().getSinkType() == TDataSinkType.ICEBERG_DELETE_BUILDER) {
+      // If this EXCHANGE is using a JoinBuildSink to send to an IcebergDeleteNode in a
+      // separate fragment.
+      return true;
+    }
+    // If this EXCHANGE is right below an IcebergDeleteNode in the same fragment.
+    return isChildOfIcebergDeleteNode(fragment_.getPlanRoot());
+  }
+
+  protected boolean isChildOfIcebergDeleteNode(PlanNode currNode) {
+    if (currNode instanceof IcebergDeleteNode) {
+      Preconditions.checkState(currNode.getChildCount() == 2);
+      if (currNode.getChild(1) == this) return true;
+    }
+    for (PlanNode child : currNode.getChildren()) {
+      if (isChildOfIcebergDeleteNode(child)) return true;
+    }
+    return false;
   }
 
   public ExchangeNode(PlanNodeId id, PlanNode input) {
@@ -162,7 +187,9 @@ public class ExchangeNode extends PlanNode {
     Preconditions.checkState(!children_.isEmpty());
     DataSink sink = getChild(0).getFragment().getSink();
     if (sink == null) return "";
-    if (isBroadcastExchange()) {
+    if (isDirectedExchange()) {
+      return "DIRECTED";
+    } else if (isBroadcastExchange()) {
       return "BROADCAST";
     } else {
       Preconditions.checkState(sink instanceof DataStreamSink);

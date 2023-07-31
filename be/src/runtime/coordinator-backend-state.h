@@ -474,6 +474,9 @@ class Coordinator::BackendState {
 
   /// Logs 'msg' at the VLOG_QUERY level, along with 'query_id_' and 'krpc_host_'.
   void VLogForBackend(const std::string& msg);
+
+  /// Populates the 'by_node_filepath_to_hosts' mapping in 'request' from 'exec_params_'.
+  void CopyFilepathToHostsMappingToRequest(ExecQueryFInstancesRequestPB* request) const;
 };
 
 /// Per fragment execution statistics.

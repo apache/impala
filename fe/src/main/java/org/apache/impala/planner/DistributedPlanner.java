@@ -160,7 +160,7 @@ public class DistributedPlanner {
     } else if (root instanceof IcebergDeleteNode) {
       Preconditions.checkState(childFragments.size() == 2);
       result = createIcebergDeleteFragment((IcebergDeleteNode) root,
-          childFragments.get(1), childFragments.get(0), fragments);
+          childFragments.get(0), childFragments.get(1));
     } else {
       throw new InternalException("Cannot create plan fragment for this node type: "
           + root.getExplainString(ctx_.getQueryOptions()));
@@ -674,135 +674,31 @@ public class DistributedPlanner {
   }
 
   /**
-   * Helper function to produce an iceberg delete fragment
-   */
-  private PlanFragment createPartitionedIcebergDeleteFragment(IcebergDeleteNode node,
-      PlanFragment leftChildFragment, PlanFragment rightChildFragment,
-      List<Expr> lhsJoinExprs, List<Expr> rhsJoinExprs) {
-    Preconditions.checkState(node.getDistributionMode() == DistributionMode.PARTITIONED);
-
-    DataPartition rhsJoinPartition =
-        DataPartition.hashPartitioned(Expr.cloneList(rhsJoinExprs));
-    DataPartition lhsJoinPartition =
-        DataPartition.hashPartitioned(Expr.cloneList(lhsJoinExprs));
-
-    // Create a new parent fragment containing a HashJoin node with two
-    // ExchangeNodes as inputs; the latter are the destinations of the
-    // left- and rightChildFragments, which now partition their output
-    // on their respective join exprs.
-    // The new fragment is hash-partitioned on the lhs input join exprs.
-    ExchangeNode lhsExchange =
-        new ExchangeNode(ctx_.getNextNodeId(), leftChildFragment.getPlanRoot());
-    lhsExchange.computeStats(ctx_.getRootAnalyzer());
-    node.setChild(0, lhsExchange);
-    ExchangeNode rhsExchange =
-        new ExchangeNode(ctx_.getNextNodeId(), rightChildFragment.getPlanRoot());
-    rhsExchange.computeStats(ctx_.getRootAnalyzer());
-    node.setChild(1, rhsExchange);
-
-    // Connect the child fragments in a new fragment, and set the data partition
-    // of the new fragment and its child fragments.
-    DataPartition outputPartition = lhsJoinPartition;
-
-    PlanFragment joinFragment =
-        new PlanFragment(ctx_.getNextFragmentId(), node, outputPartition);
-    leftChildFragment.setDestination(lhsExchange);
-    leftChildFragment.setOutputPartition(lhsJoinPartition);
-    rightChildFragment.setDestination(rhsExchange);
-    rightChildFragment.setOutputPartition(rhsJoinPartition);
-    return joinFragment;
-  }
-
-  /**
-   * Creates either a broadcast join or a repartitioning join depending on the expected
-   * cost and various constraints. See computeDistributionMode() for more details.
+   * Creates a fragment for an IcebergDeleteNode with DIRECTED distribution mode.
+   * Similarly to a BROADCAST join, the left child of the join is in the same fragment
+   * with the join itself, while the right child is in a separate fragment.
    */
   private PlanFragment createIcebergDeleteFragment(IcebergDeleteNode node,
-      PlanFragment rightChildFragment, PlanFragment leftChildFragment,
-      List<PlanFragment> fragments) throws ImpalaException {
-    // For both join types, the total cost is calculated as the amount of data
-    // sent over the network, the hash tables build cost is roughly the same.
-    // broadcast: send the rightChildFragment's output to each node executing
-    // the leftChildFragment.
-    PlanNode rhsTree = rightChildFragment.getPlanRoot();
-    long rhsDataSize = -1;
-    long broadcastCost = -1;
-    int mt_dop = ctx_.getQueryOptions().mt_dop;
-    int leftChildNodes = leftChildFragment.getNumNodes();
-    if (rhsTree.getCardinality() != -1) {
-      rhsDataSize = Math.round(
-          rhsTree.getCardinality() * ExchangeNode.getAvgSerializedRowSize(rhsTree));
-
-      Preconditions.checkState(leftChildNodes != -1);
-      broadcastCost = rhsDataSize * leftChildNodes;
-    }
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("broadcast: cost=" + Long.toString(broadcastCost));
-      LOG.trace("card=" + Long.toString(rhsTree.getCardinality())
-          + " row_size=" + Float.toString(rhsTree.getAvgRowSize())
-          + " #nodes=" + Integer.toString(leftChildNodes));
-    }
-
-    // repartition: both left- and rightChildFragment are partitioned on the
-    // file path, and a hash table is built with the rightChildFragment's output.
-    PlanNode lhsTree = leftChildFragment.getPlanRoot();
-    List<Expr> lhsJoinExprs = new ArrayList<>();
-    List<Expr> rhsJoinExprs = new ArrayList<>();
-
+      PlanFragment leftChildFragment, PlanFragment rightChildFragment)
+          throws ImpalaException {
     Preconditions.checkState(node.getEqJoinConjuncts().size() == 2);
     BinaryPredicate filePathEq = node.getEqJoinConjuncts().get(1);
 
-    // Verify that the partitioning is based in file path
+    // Verify that the partitioning is based on file path
     Preconditions.checkState(
         ((SlotRef) filePathEq.getChild(0)).getDesc().getVirtualColumnType()
         == TVirtualColumnType.INPUT_FILE_NAME);
 
-    lhsJoinExprs.add(filePathEq.getChild(0).clone());
-    rhsJoinExprs.add(filePathEq.getChild(1).clone());
+    node.setDistributionMode(DistributionMode.DIRECTED);
 
-    long partitionCost = -1;
-    if (lhsTree.getCardinality() != -1 && rhsTree.getCardinality() != -1) {
-      Preconditions.checkState(rhsDataSize != -1);
-      double lhsNetworkCost = Math.round(
-          lhsTree.getCardinality() * ExchangeNode.getAvgSerializedRowSize(lhsTree));
-      double rhsNetworkCost = rhsDataSize;
-      partitionCost = Math.round(lhsNetworkCost + rhsNetworkCost);
-    }
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("partition: cost=" + Long.toString(partitionCost));
-      LOG.trace("lhs card=" + Long.toString(lhsTree.getCardinality())
-          + " row_size=" + Float.toString(lhsTree.getAvgRowSize()));
-      LOG.trace("rhs card=" + Long.toString(rhsTree.getCardinality())
-          + " row_size=" + Float.toString(rhsTree.getAvgRowSize()));
-      LOG.trace(rhsTree.getExplainString(ctx_.getQueryOptions()));
-    }
-
-    DistributionMode distrMode = DistributionMode.fromThrift(
-        ctx_.getQueryOptions().getDefault_join_distribution_mode());
-
-    // Broadcast mode has better fast path checks, it could be slightly more favoured,
-    // but network costs dominate probing costs, so it does not matter much.
-    if (broadcastCost != -1 && partitionCost != -1) {
-      if (broadcastCost < partitionCost) distrMode = DistributionMode.BROADCAST;
-      if (partitionCost < broadcastCost) distrMode = DistributionMode.PARTITIONED;
-    }
-
-    node.setDistributionMode(distrMode);
-
-    PlanFragment hjFragment = null;
-    if (distrMode == DistributionMode.BROADCAST) {
-      // Doesn't create a new fragment, but modifies leftChildFragment to execute
-      // the join; the build input is provided by an ExchangeNode, which is the
-      // destination of the rightChildFragment's output
-      node.setChild(0, leftChildFragment.getPlanRoot());
-      connectChildFragment(node, 1, leftChildFragment, rightChildFragment);
-      leftChildFragment.setPlanRoot(node);
-      hjFragment = leftChildFragment;
-    } else {
-      hjFragment = createPartitionedIcebergDeleteFragment(
-          node, leftChildFragment, rightChildFragment, lhsJoinExprs, rhsJoinExprs);
-    }
-    return hjFragment;
+    // Doesn't create a new fragment, but modifies leftChildFragment to execute
+    // the join; the build input is provided by an ExchangeNode, which is the
+    // destination of the rightChildFragment's output
+    node.setChild(0, leftChildFragment.getPlanRoot());
+    rightChildFragment.setOutputPartition(DataPartition.DIRECTED);
+    connectChildFragment(node, 1, leftChildFragment, rightChildFragment);
+    leftChildFragment.setPlanRoot(node);
+    return leftChildFragment;
  }
 
  /**

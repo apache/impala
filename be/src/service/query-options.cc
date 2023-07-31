@@ -524,8 +524,11 @@ Status impala::SetQueryOption(const string& key, const string& value,
       }
       case TImpalaQueryOptions::DEFAULT_JOIN_DISTRIBUTION_MODE: {
         TJoinDistributionMode::type enum_type;
+        // Not using the values from '_TJoinDistributionMode_VALUES_TO_NAMES' so that we
+        // can exclude 'DIRECTED' mode from the options.
+        std::map<int, const char*> values_to_names {{0, "BROADCAST"}, {1, "SHUFFLE"}};
         RETURN_IF_ERROR(GetThriftEnum(value, "default join distribution mode",
-            _TJoinDistributionMode_VALUES_TO_NAMES, &enum_type));
+            values_to_names, &enum_type));
         query_options->__set_default_join_distribution_mode(enum_type);
         break;
       }

@@ -340,6 +340,10 @@ struct THdfsScanNode {
 
   // The overlap predicates
   13: optional list<TOverlapPredicateDesc> overlap_predicate_descs
+
+  // For IcebergScanNodes that are the left children of an IcebergDeleteNode this stores
+  // the node ID of the right child.
+  14: optional Types.TPlanNodeId deleteFileScanNodeId
 }
 
 struct TDataSourceScanNode {

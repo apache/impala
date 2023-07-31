@@ -20,6 +20,7 @@
 #define IMPALA_RUNTIME_KRPC_DATA_STREAM_SENDER_H
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "codegen/impala-ir.h"
@@ -30,17 +31,21 @@
 #include "exprs/scalar-expr.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/outbound-row-batch.h"
+#include "util/container-util.h"
 #include "util/runtime-profile.h"
+
+#include "gen-cpp/common.pb.h"
 
 namespace impala {
 
 class KrpcDataStreamSender;
 class MemTracker;
+class NetworkAddressPB;
+class PlanFragmentDestinationPB;
 class RowBatch;
 class RowDescriptor;
 class TDataStreamSink;
 class TNetworkAddress;
-class PlanFragmentDestinationPB;
 
 class KrpcDataStreamSenderConfig : public DataSinkConfig {
  public:
@@ -105,7 +110,7 @@ class KrpcDataStreamSender : public DataSink {
   /// 'per_channel_buffer_size' is the soft limit in bytes of the buffering into the
   /// per-channel's accumulating row batch before it will be sent.
   /// NOTE: supported partition types are UNPARTITIONED (broadcast), HASH_PARTITIONED,
-  /// and RANDOM.
+  /// RANDOM, and DIRECTED (used for sending rows from Iceberg delete files).
   KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
       const KrpcDataStreamSenderConfig& sink_config, const TDataStreamSink& sink,
       const google::protobuf::RepeatedPtrField<PlanFragmentDestinationPB>& destinations,
@@ -184,6 +189,12 @@ class KrpcDataStreamSender : public DataSink {
 
   /// Adds the given row to 'channels_[channel_id]'.
   Status AddRowToChannel(const int channel_id, TupleRow* row);
+
+  /// Functions to dump the content of the "filename to hosts" related mappings into logs.
+  void DumpFilenameToHostsMapping() const;
+  void DumpDestinationHosts() const;
+
+  bool IsDirectedMode() const { return !filepath_to_hosts_.empty(); }
 
   /// Sender instance id, unique within a fragment.
   const int sender_id_;
@@ -278,6 +289,14 @@ class KrpcDataStreamSender : public DataSink {
   /// Pointer for the codegen'd HashAndAddRows() function.
   /// NULL if codegen is disabled or failed.
   const CodegenFnPtr<KrpcDataStreamSenderConfig::HashAndAddRowsFn>& hash_and_add_rows_fn_;
+
+  /// Mapping to store which data file is read on which hosts.
+  const std::unordered_map<std::string, std::vector<NetworkAddressPB>>&
+      filepath_to_hosts_;
+
+  /// A mapping between host addresses to channels. Used for DIRECTED distribution mode
+  /// where only one channel is associated with each host address.
+  std::unordered_map<NetworkAddressPB, Channel*> host_to_channel_;
 };
 
 } // namespace impala

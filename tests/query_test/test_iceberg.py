@@ -1343,3 +1343,25 @@ class TestIcebergV2Table(IcebergTestSuite):
     assert result_after_opt.data.sort() == result_time_travel.data.sort()
 
     self.run_test_case('QueryTest/iceberg-optimize', vector, unique_database)
+
+
+# Tests to exercise the DIRECTED distribution mode for V2 Iceberg tables. Note, that most
+# of the test coverage is in TestIcebergV2Table.test_read_position_deletes but since it
+# runs also with the V2 optimizations setting turned off, some tests were moved here.
+class TestIcebergDirectedMode(IcebergTestSuite):
+  """Tests related to Iceberg DIRECTED distribution mode."""
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestIcebergDirectedMode, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  @SkipIfDockerizedCluster.internal_hostname
+  @SkipIf.hardcoded_uris
+  def test_directed_mode(self, vector):
+      self.run_test_case('QueryTest/iceberg-v2-directed-mode', vector)

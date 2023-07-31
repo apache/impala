@@ -738,12 +738,14 @@ KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
     dest_node_id_(sink.dest_node_id),
     next_unknown_partition_(0),
     exchange_hash_seed_(sink_config.exchange_hash_seed_),
-    hash_and_add_rows_fn_(sink_config.hash_and_add_rows_fn_) {
+    hash_and_add_rows_fn_(sink_config.hash_and_add_rows_fn_),
+    filepath_to_hosts_(sink_config.filepath_to_hosts_) {
   DCHECK_GT(destinations.size(), 0);
   DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED
       || sink.output_partition.type == TPartitionType::HASH_PARTITIONED
       || sink.output_partition.type == TPartitionType::RANDOM
-      || sink.output_partition.type == TPartitionType::KUDU);
+      || sink.output_partition.type == TPartitionType::KUDU
+      || sink.output_partition.type == TPartitionType::DIRECTED);
 
   string process_address =
       NetworkAddressPBToString(ExecEnv::GetInstance()->krpc_address());
@@ -753,6 +755,11 @@ KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
     channels_.emplace_back(new Channel(this, row_desc_, destination.address().hostname(),
         destination.krpc_backend(), destination.fragment_instance_id(), sink.dest_node_id,
         per_channel_buffer_size, is_local));
+
+    if (IsDirectedMode()) {
+      DCHECK(host_to_channel_.find(destination.address()) == host_to_channel_.end());
+      host_to_channel_[destination.address()] = channels_.back().get();
+    }
   }
 
   if (partition_type_ == TPartitionType::UNPARTITIONED
@@ -761,6 +768,8 @@ KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
     random_shuffle(channels_.begin(), channels_.end());
   }
 
+  DCHECK(filepath_to_hosts_.empty() || partition_type_ == TPartitionType::DIRECTED) <<
+      " TPartitionType: " << partition_type_ << " dest ID: " << dest_node_id_;
 }
 
 KrpcDataStreamSender::~KrpcDataStreamSender() {
@@ -952,6 +961,8 @@ string KrpcDataStreamSenderConfig::PartitionTypeName() const {
     return "Random Partitioned";
   case TPartitionType::KUDU:
     return "Kudu Partitioned";
+  case TPartitionType::DIRECTED:
+    return "Directed distribution mode";
   default:
     DCHECK(false) << partition_type_;
     return "";
@@ -1064,6 +1075,60 @@ Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
         RETURN_IF_ERROR(channels_[channel_ids[i]]->AddRow(row));
       }
     }
+  } else if (partition_type_ == TPartitionType::DIRECTED) {
+    const int num_rows = batch->num_rows();
+    char* prev_filename_ptr = nullptr;
+    vector<Channel*> prev_channels;
+    bool skipped_prev_row = false;
+    for (int row_idx = 0; row_idx < num_rows; ++row_idx) {
+      DCHECK_EQ(batch->num_tuples_per_row(), 1);
+      TupleRow* tuple_row = batch->GetRow(row_idx);
+      Tuple* row = batch->GetRow(row_idx)->GetTuple(0);
+      StringValue* filename_value = row->GetStringSlot(0);
+      DCHECK(filename_value != nullptr);
+
+      if (filename_value->ptr == prev_filename_ptr) {
+        // If the filename pointer is the same as the previous one then we can instantly
+        // send the row to the same channels as the previous row.
+        DCHECK(skipped_prev_row || !prev_channels.empty());
+        for (Channel* ch : prev_channels) RETURN_IF_ERROR(ch->AddRow(tuple_row));
+        continue;
+      }
+      prev_filename_ptr = filename_value->ptr;
+      string filename(filename_value->ptr, filename_value->len);
+
+      const auto filepath_to_hosts_it = filepath_to_hosts_.find(filename);
+      if (filepath_to_hosts_it == filepath_to_hosts_.end()) {
+        // This can happen when e.g. compaction removed some data files from a snapshot
+        // but a delete file referencing them remained because it references other data
+        // files that remains in the new snapshot.
+        // Another use-case is table sampling where we read only a subset of the data
+        // files.
+        VLOG(3) << "Row from delete file refers to a non-existing data file: " <<
+            filename;
+        skipped_prev_row = true;
+        continue;
+      }
+      skipped_prev_row = false;
+
+      prev_channels.clear();
+      for (const NetworkAddressPB& host_addr : filepath_to_hosts_it->second) {
+        const auto channel_map_it = host_to_channel_.find(host_addr);
+        if (channel_map_it == host_to_channel_.end()) {
+          DumpFilenameToHostsMapping();
+          DumpDestinationHosts();
+
+          stringstream ss;
+          ss << "Failed to distribute Iceberg delete file content"
+              " in DIRECTED distribution mode. Host not found " << host_addr <<
+              ". Try 'SET DISABLE_OPTIMIZED_ICEBERG_V2_READ=1' as a workaround.";
+          return Status(ss.str());
+        }
+
+        prev_channels.push_back(channel_map_it->second);
+        RETURN_IF_ERROR(channel_map_it->second->AddRow(tuple_row));
+      }
+    }
   } else {
     DCHECK_EQ(partition_type_, TPartitionType::HASH_PARTITIONED);
     const KrpcDataStreamSenderConfig::HashAndAddRowsFn hash_and_add_rows_fn =
@@ -1078,6 +1143,26 @@ Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
   expr_results_pool_->Clear();
   RETURN_IF_ERROR(state->CheckQueryState());
   return Status::OK();
+}
+
+void KrpcDataStreamSender::DumpFilenameToHostsMapping() const {
+  VLOG(3) << "Dumping the contents of the filename to hosts mapping";
+  if (filepath_to_hosts_.empty()) {
+    VLOG(3) << "The mapping is empty";
+    return;
+  }
+  for (const auto& file_to_hosts : filepath_to_hosts_) {
+    for (const auto& host_addr : file_to_hosts.second) {
+      VLOG(3) << "Filename: " << file_to_hosts.first << " host address: " << host_addr;
+    }
+  }
+}
+
+void KrpcDataStreamSender::DumpDestinationHosts() const {
+  VLOG(3) << "Dumping the destination hosts";
+  for (const auto& host : host_to_channel_) {
+    VLOG(3) << "Network Address: " << host.first;
+  }
 }
 
 Status KrpcDataStreamSender::FlushFinal(RuntimeState* state) {

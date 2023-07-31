@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "common/atomic.h"
 #include "common/compiler-util.h"
@@ -119,6 +120,20 @@ class TRuntimeProfileForest;
 /// - set up kudu clients in Init(), remove related locking
 class QueryState {
  public:
+  /// Stores information about which file is scheduled to which hosts.
+  struct FileSchedulingInfo {
+    std::string file_path;
+    std::vector<NetworkAddressPB> hosts;
+    bool is_relative_path;
+
+    FileSchedulingInfo(const string& fn, bool is_rel)
+        : file_path(fn), is_relative_path(is_rel) {}
+  };
+
+  /// Stores information about which file is scheduled to which hosts, grouped by scan
+  /// node ID.
+  typedef std::unordered_map<int, std::vector<FileSchedulingInfo>> NodeToFileSchedulings;
+
   /// Use this class to obtain a QueryState for the duration of a function/block,
   /// rather than manually via QueryExecMgr::Get-/ReleaseQueryState().
   /// Pattern:
@@ -154,6 +169,9 @@ class QueryState {
   bool codegen_cache_enabled() const;
   MemTracker* query_mem_tracker() const { return query_mem_tracker_; }
   RuntimeProfile* host_profile() const { return host_profile_; }
+  const NodeToFileSchedulings* node_to_file_schedulings() const {
+    return &node_to_file_schedulings_;
+  }
   UniqueIdPB GetCoordinatorBackendId() const;
 
   /// The following getters are only valid after Init().
@@ -378,6 +396,9 @@ class QueryState {
   /// Set in Init(). TODO: find a way not to have to copy this
   ExecQueryFInstancesRequestPB exec_rpc_params_;
   TExecPlanFragmentInfo fragment_info_;
+
+  /// Stores which data file is scheduled to which host, grouped by scan node ID.
+  NodeToFileSchedulings node_to_file_schedulings_;
 
   /// Buffer reservation for this query (owned by obj_pool_). Set in Init().
   ReservationTracker* buffer_reservation_ = nullptr;

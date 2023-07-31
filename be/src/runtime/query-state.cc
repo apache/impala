@@ -268,6 +268,17 @@ Status QueryState::Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
   RETURN_IF_ERROR(
       ControlService::GetProxy(coord_addr, query_ctx().coord_hostname, &proxy_));
 
+  // Making a copy of the "filepath to hosts" mapping into std library types.
+  for (const auto& nodes : exec_rpc_params->by_node_filepath_to_hosts()) {
+    for (const auto& files : nodes.second.filepath_to_hosts()) {
+      FileSchedulingInfo file_schedule_info(files.first, files.second.is_relative());
+      for (const auto& host : files.second.hosts()) {
+        file_schedule_info.hosts.push_back(host);
+      }
+      node_to_file_schedulings_[nodes.first].push_back(file_schedule_info);
+    }
+  }
+
   // don't copy query_ctx, it's large and we already did that in the c'tor
   exec_rpc_params_.set_coord_state_idx(exec_rpc_params->coord_state_idx());
   exec_rpc_params_.mutable_fragment_ctxs()->Swap(

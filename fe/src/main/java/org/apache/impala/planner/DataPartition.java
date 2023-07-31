@@ -56,7 +56,8 @@ public class DataPartition {
 
   private DataPartition(TPartitionType type) {
     Preconditions.checkState(type == TPartitionType.UNPARTITIONED
-        || type == TPartitionType.RANDOM);
+        || type == TPartitionType.RANDOM
+        || type == TPartitionType.DIRECTED);
     type_ = type;
     partitionExprs_ = new ArrayList<>();
   }
@@ -66,6 +67,8 @@ public class DataPartition {
 
   public final static DataPartition RANDOM =
       new DataPartition(TPartitionType.RANDOM);
+
+  public final static DataPartition DIRECTED = new DataPartition(TPartitionType.DIRECTED);
 
   public static DataPartition hashPartitioned(List<Expr> exprs) {
     return new DataPartition(TPartitionType.HASH_PARTITIONED, exprs);

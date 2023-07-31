@@ -327,6 +327,8 @@ void Coordinator::BackendState::ExecAsync(const DebugOptions& debug_options,
     }
     request.set_query_ctx_sidecar_idx(query_ctx_sidecar_idx);
 
+    CopyFilepathToHostsMappingToRequest(&request);
+
     VLOG_FILE << "making rpc: ExecQueryFInstances"
               << " host=" << impalad_address() << " query_id=" << PrintId(query_id_);
 
@@ -340,6 +342,25 @@ done:
   // Notify after releasing 'lock_' so that we don't wake up a thread just to have it
   // immediately block again.
   exec_done_cv_.NotifyAll();
+}
+
+void Coordinator::BackendState::CopyFilepathToHostsMappingToRequest(
+    ExecQueryFInstancesRequestPB* request) const {
+  DCHECK(request != nullptr);
+  google::protobuf::Map<int32, FilepathToHostsMapPB>* by_node_filepath_to_hosts =
+      request->mutable_by_node_filepath_to_hosts();
+  for (const auto& it_nodes : exec_params_.query_schedule().by_node_filepath_to_hosts()) {
+    google::protobuf::Map<string, FilepathToHostsListPB>* filepath_to_hosts =
+        (*by_node_filepath_to_hosts)[it_nodes.first].mutable_filepath_to_hosts();
+    for (const auto& it_files : it_nodes.second.filepath_to_hosts()) {
+      (*filepath_to_hosts)[it_files.first].set_is_relative(
+          it_files.second.is_relative());
+      for (const auto& it_host : it_files.second.hosts()) {
+        auto* hosts = (*filepath_to_hosts)[it_files.first].add_hosts();
+        *hosts = it_host;
+      }
+    }
+  }
 }
 
 Status Coordinator::BackendState::GetStatus(bool* is_fragment_failure,

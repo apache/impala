@@ -252,7 +252,8 @@ Status Scheduler::ComputeFragmentExecParams(
       DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED
           || sink.output_partition.type == TPartitionType::HASH_PARTITIONED
           || sink.output_partition.type == TPartitionType::RANDOM
-          || sink.output_partition.type == TPartitionType::KUDU);
+          || sink.output_partition.type == TPartitionType::KUDU
+          || sink.output_partition.type == TPartitionType::DIRECTED);
       PlanNodeId exch_id = sink.dest_node_id;
       google::protobuf::Map<int32_t, int32_t>* per_exch_num_senders =
           dest_state->exec_params->mutable_per_exch_num_senders();
@@ -937,12 +938,52 @@ bool Scheduler::IsCoordinatorOnlyQuery(const TQueryExecRequest& exec_request) {
       && type == TPartitionType::UNPARTITIONED;
 }
 
+void Scheduler::PopulateFilepathToHostsMapping(const FInstanceScheduleState& finst,
+    ScheduleState* state, ByNodeFilepathToHosts* duplicate_check) {
+  for (const auto& per_node_ranges : finst.exec_params.per_node_scan_ranges()) {
+    const TPlanNode& node = state->GetNode(per_node_ranges.first);
+    if (node.node_type != TPlanNodeType::HDFS_SCAN_NODE) continue;
+    if (!node.hdfs_scan_node.__isset.deleteFileScanNodeId) continue;
+    const TPlanNodeId delete_file_node_id = node.hdfs_scan_node.deleteFileScanNodeId;
+
+    for (const auto& scan_ranges : per_node_ranges.second.scan_ranges()) {
+      string file_path;
+      bool is_relative = false;
+      const HdfsFileSplitPB& hdfs_file_split = scan_ranges.scan_range().hdfs_file_split();
+      if (hdfs_file_split.has_relative_path() &&
+          !hdfs_file_split.relative_path().empty()) {
+        file_path = hdfs_file_split.relative_path();
+        is_relative = true;
+      } else {
+        file_path = hdfs_file_split.absolute_path();
+      }
+      DCHECK(!file_path.empty());
+
+      std::unordered_set<NetworkAddressPB>& current_hosts =
+          (*duplicate_check)[delete_file_node_id][file_path];
+      if (current_hosts.find(finst.host) != current_hosts.end()) continue;
+      current_hosts.insert(finst.host);
+
+      auto* by_node_filepath_to_hosts =
+          state->query_schedule_pb()->mutable_by_node_filepath_to_hosts();
+      auto* filepath_to_hosts =
+          (*by_node_filepath_to_hosts)[delete_file_node_id].mutable_filepath_to_hosts();
+      (*filepath_to_hosts)[file_path].set_is_relative(is_relative);
+      auto* hosts = (*filepath_to_hosts)[file_path].add_hosts();
+      *hosts = finst.host;
+    }
+  }
+}
+
 void Scheduler::ComputeBackendExecParams(
     const ExecutorConfig& executor_config, ScheduleState* state) {
+  ByNodeFilepathToHosts duplicate_check;
   for (FragmentScheduleState& f : state->fragment_schedule_states()) {
     const NetworkAddressPB* prev_host = nullptr;
     int num_hosts = 0;
     for (FInstanceScheduleState& i : f.instance_states) {
+      PopulateFilepathToHostsMapping(i, state, &duplicate_check);
+
       BackendScheduleState& be_state = state->GetOrCreateBackendScheduleState(i.host);
       be_state.exec_params->add_instance_params()->Swap(&i.exec_params);
       // Different fragments do not synchronize their Open() and Close(), so the backend

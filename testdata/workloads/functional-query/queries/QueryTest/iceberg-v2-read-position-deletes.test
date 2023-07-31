@@ -323,12 +323,16 @@ aggregation(SUM, NumRowGroups): 0
 aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
+# Checks that each delete row is only sent once to the build side of the join because
+# it's either a directed Iceberg join (when V2 opt is ON) or because it's a partitioned
+# join (when V2 opt is OFF).
 SELECT count(*) from iceberg_v2_partitioned_position_deletes
 ---- RESULTS
 10
 ---- TYPES
 bigint
 ---- RUNTIME_PROFILE
+aggregation(SUM, BuildRows): 10
 aggregation(SUM, NumRowGroups): 6
 aggregation(SUM, NumFileMetadataRead): 0
 ====

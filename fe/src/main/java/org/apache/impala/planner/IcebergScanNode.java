@@ -39,6 +39,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.fb.FbIcebergDataFileFormat;
 import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TPlanNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,9 +64,23 @@ public class IcebergScanNode extends HdfsScanNode {
   // already applied them and they won't filter any further rows.
   private List<Expr> skippedConjuncts_;
 
+  // This member is set when this scan node is the left child of an IcebergDeleteNode or
+  // in other words when this scan node reads data files that have delete files
+  // associated. Holds the scan node ID of the right child of the IcebergDeleteNode
+  // responsible for reading the delete files of the corresponding table.
+  private final PlanNodeId deleteFileScanNodeId;
+
   public IcebergScanNode(PlanNodeId id, TableRef tblRef, List<Expr> conjuncts,
       MultiAggregateInfo aggInfo, List<FileDescriptor> fileDescs,
       List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts)
+      throws ImpalaRuntimeException {
+    this(id, tblRef, conjuncts, aggInfo, fileDescs, nonIdentityConjuncts,
+        skippedConjuncts, null);
+  }
+
+  public IcebergScanNode(PlanNodeId id, TableRef tblRef, List<Expr> conjuncts,
+      MultiAggregateInfo aggInfo, List<FileDescriptor> fileDescs,
+      List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts, PlanNodeId deleteId)
       throws ImpalaRuntimeException {
     super(id, tblRef.getDesc(), conjuncts,
         getIcebergPartition(((FeIcebergTable)tblRef.getTable()).getFeFsTable()), tblRef,
@@ -96,6 +111,7 @@ public class IcebergScanNode extends HdfsScanNode {
     if (hasOrc) fileFormats_.add(HdfsFileFormat.ORC);
     if (hasAvro) fileFormats_.add(HdfsFileFormat.AVRO);
     this.skippedConjuncts_ = skippedConjuncts;
+    this.deleteFileScanNodeId = deleteId;
   }
 
   /**
@@ -219,6 +235,15 @@ public class IcebergScanNode extends HdfsScanNode {
     Map<Long, List<FileDescriptor>> result = new HashMap<>();
     result.put(part.getId(), sampleFiles);
     return result;
+  }
+
+  @Override
+  protected void toThrift(TPlanNode msg) {
+    super.toThrift(msg);
+    Preconditions.checkNotNull(msg.hdfs_scan_node);
+    if (deleteFileScanNodeId != null) {
+      msg.hdfs_scan_node.setDeleteFileScanNodeId(deleteFileScanNodeId.asInt());
+    }
   }
 
   @Override

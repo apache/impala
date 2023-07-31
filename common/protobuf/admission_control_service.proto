@@ -154,6 +154,9 @@ message QuerySchedulePB {
 
   /// The cluster wide estimated memory usage of this query.
   optional int64 cluster_mem_est = 9;
+
+  // Mapping to store which data file is read on which hosts, grouped by scan node ID.
+  map<int32, FilepathToHostsMapPB> by_node_filepath_to_hosts = 10;
 }
 
 message AdmitQueryRequestPB {
