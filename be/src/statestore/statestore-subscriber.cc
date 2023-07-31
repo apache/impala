@@ -238,6 +238,8 @@ Status StatestoreSubscriber::Start() {
   RETURN_IF_ERROR(builder.Build(&server));
   heartbeat_server_.reset(server);
   RETURN_IF_ERROR(heartbeat_server_->Start());
+  RETURN_IF_ERROR(WaitForLocalServer(
+      *heartbeat_server_, /* num_retries */ 10, /* retry_interval_ms */ 1000));
 
   // Specify the port which the heartbeat server is listening on.
   heartbeat_address_.port = heartbeat_server_->port();
