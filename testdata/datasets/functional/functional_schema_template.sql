@@ -3694,7 +3694,6 @@ ALTER TABLE {db_name}{db_suffix}.{table_name} SET TBLPROPERTIES('write.format.de
 INSERT INTO TABLE {db_name}{db_suffix}.{table_name} values(2, 'orc', 1.5, false);
 ALTER TABLE {db_name}{db_suffix}.{table_name} SET TBLPROPERTIES('write.format.default'='parquet');
 INSERT INTO TABLE {db_name}{db_suffix}.{table_name} values(3, 'parquet', 2.5, false);
-
 ====
 ---- DATASET
 functional
@@ -3709,8 +3708,7 @@ TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
               'format-version'='2');
 ---- DEPENDENT_LOAD
 `hadoop fs -mkdir -p /test-warehouse/iceberg_test/hadoop_catalog/ice && \
-hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/ice/iceberg_lineitem_multiblock /test-warehouse/iceberg_test/hadoop_catalog/ice
-
+hadoop fs -Ddfs.block.size=524288 -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/ice/iceberg_lineitem_multiblock /test-warehouse/iceberg_test/hadoop_catalog/ice
 ====
 ---- DATASET
 functional

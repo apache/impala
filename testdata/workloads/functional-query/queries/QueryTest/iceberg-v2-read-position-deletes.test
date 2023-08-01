@@ -672,6 +672,21 @@ SELECT count(*) from iceberg_lineitem_multiblock;
 bigint
 ====
 ---- QUERY
+select count(*) from iceberg_lineitem_multiblock where l_linenumber%5=0;
+---- RESULTS
+0
+---- TYPES
+bigint
+====
+---- QUERY
+SET BATCH_SIZE=2;
+select count(*) from iceberg_lineitem_multiblock where l_linenumber%5=0;
+---- RESULTS
+0
+---- TYPES
+bigint
+====
+---- QUERY
 SELECT * from iceberg_v2_partitioned_position_deletes;
 ---- RESULTS
 6,'Alex','view',2020-01-01 09:00:00

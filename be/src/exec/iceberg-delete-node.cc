@@ -324,21 +324,36 @@ void IcebergDeleteNode::IcebergDeleteState::UpdateImpl() {
 }
 
 void IcebergDeleteNode::IcebergDeleteState::Update(
-    impala::StringValue* file_path, int64_t* probe_pos) {
+    impala::StringValue* file_path, int64_t* next_probe_pos) {
   DCHECK(builder_ != nullptr);
   // Making sure the row ids are in ascending order inside a row batch in broadcast mode
   DCHECK(builder_->IsDistributedMode() || current_probe_pos_ == INVALID_ROW_ID
-      || current_probe_pos_ < *probe_pos);
-  DCHECK(!builder_->IsDistributedMode() || previous_file_path_ == nullptr
-      || *file_path != *previous_file_path_ || current_probe_pos_ == INVALID_ROW_ID
-      || current_probe_pos_ < *probe_pos);
-  current_probe_pos_ = *probe_pos;
+      || current_probe_pos_ < *next_probe_pos);
+  bool is_consecutive_pos = false;
+  if(current_probe_pos_ != INVALID_ROW_ID) {
+    const int64_t step = *next_probe_pos - current_probe_pos_;
+    is_consecutive_pos = step == 1;
+  }
+  current_probe_pos_ = *next_probe_pos;
 
   if (previous_file_path_ != nullptr
       && (!builder_->IsDistributedMode() || *file_path == *previous_file_path_)) {
     // Fast path if the file did not change, no need to hash again
     if (current_deleted_pos_row_id_ != INVALID_ROW_ID
         && current_probe_pos_ > (*current_delete_row_)[current_deleted_pos_row_id_]) {
+      UpdateImpl();
+    } else if (builder_->IsDistributedMode() && !is_consecutive_pos) {
+      // In distributed mode (which means PARTITIONED JOIN distribution mode) we cannot
+      // rely on ascending row order, not even inside row batches, not even when the
+      // previous file path is the same as the current one.
+      // This is because files with multiple blocks can be processed by multiple hosts
+      // in parallel, then the rows are getting hash-exchanged based on their file paths.
+      // Then the exchange-receiver at the LHS coalesces the row batches from multiple
+      // senders, hence the row IDs getting unordered. So we are always doing a binary
+      // search here to find the proper delete row id.
+      // This won't be a problem with the DIRECTED distribution mode (see IMPALA-12308)
+      // which will behave similarly to the BROADCAST mode in this regard.
+      DCHECK_EQ(*file_path, *previous_file_path_);
       UpdateImpl();
     }
   } else {
